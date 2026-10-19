@@ -1,4 +1,4 @@
-import { plural } from '@terminator/extension-sdk'
+import { plural } from '@terminator/extension-sdk/plain'
 import type { HomeAsk, HomeFocusCandidate } from '../../shared/schemas/home-feed.schema'
 import { localDateKey, type FocusItem } from './focus'
 import type { SinceEvent } from './since-you-left'

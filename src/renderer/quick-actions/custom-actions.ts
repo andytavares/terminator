@@ -13,7 +13,6 @@ export type CustomRunPlan =
   | { ok: true; kind: 'input'; sessionId: string; data: string }
   | { ok: true; kind: 'new-tab'; projectId: string; data: string }
 
-/** @internal */
 export const MAX_TYPED_LINE_BYTES = 1024
 
 function planPrompt(a: CustomAction, env: CustomRunEnv, text: string): CustomRunPlan {

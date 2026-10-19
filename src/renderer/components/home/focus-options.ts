@@ -2,7 +2,8 @@ import type { HomeFocusCandidate, WorkKey } from '../../../shared/schemas/home-f
 import type { FocusItem } from '../../home/focus'
 import type { WorkThread } from '../../home/work-threads'
 
-/** What a thread points at: the ticket or the branch an extension named, when it has one. */
+/** What a thread points at: the ticket or the branch an extension named, when it has one.
+ * @internal */
 export function workKeyOfThread(thread: WorkThread): WorkKey | undefined {
   const [tracker, ticket] = thread.key.split(/:(.*)/s)
   if (thread.ticketKey && (tracker === 'linear' || tracker === 'jira') && ticket) {

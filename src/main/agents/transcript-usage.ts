@@ -32,6 +32,7 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>()
 
+/** @internal */
 export function forgetTranscriptCache(): void {
   cache.clear()
 }

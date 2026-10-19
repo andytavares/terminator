@@ -33,12 +33,6 @@ const TABS: Array<{ id: LauncherTab; label: string }> = [
   { id: 'scratch', label: 'Scratch terminal' },
 ]
 
-/** Mounts the launcher while ⌘N, Quick actions or the Home button has it open. */
-export function StartWorkHost(): JSX.Element | null {
-  const { open, closeLauncher } = useStartWorkStore()
-  return open ? <StartWork onClose={closeLauncher} /> : null
-}
-
 /** What the person has typed, picked and been told so far. */
 function useLauncherFields() {
   const prefill = useStartWorkStore.getState().prefill

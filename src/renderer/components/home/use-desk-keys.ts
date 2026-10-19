@@ -27,7 +27,8 @@ const LETTER_COMMANDS: Record<string, DeskKeyCommand> = {
 
 const AFTER_G: Record<string, HomeViewName> = { i: 'insights', d: 'desk' }
 
-/** What the key means on the Desk; `afterG` is true when the key before it was G. */
+/** What the key means on the Desk; `afterG` is true when the key before it was G.
+ * @internal */
 export function deskKeyCommand(press: KeyPress, afterG: boolean): DeskKeyCommand | null {
   if (press.metaKey || press.ctrlKey || press.altKey) return null
   if (afterG && AFTER_G[press.key]) return { kind: 'view', view: AFTER_G[press.key] }

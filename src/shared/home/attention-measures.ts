@@ -4,9 +4,11 @@
 // averages: one session left waiting overnight would make an average say
 // nothing about a normal day.
 
+/** @internal */
 export type AttentionState = 'working' | 'awaiting-input'
 
-/** How an interval ended. `null` on the interval itself means it is still going. */
+/** How an interval ended. `null` on the interval itself means it is still going.
+ * @internal */
 export type AttentionEnd = 'working' | 'awaiting-input' | 'idle' | 'exited'
 
 /** A session's time in one state. */
@@ -31,7 +33,7 @@ export interface TimeWindow {
   to: number
 }
 
-export interface DayPoint {
+interface DayPoint {
   /** Local midnight of the day, epoch ms. */
   dayStart: number
   agentHours: number
@@ -108,6 +110,7 @@ function medianOf(values: number[]): number {
   return sorted.length % 2 === 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
 }
 
+/** @internal */
 export function waitsOnYou(
   intervals: readonly AttentionInterval[],
   window: TimeWindow
@@ -120,13 +123,15 @@ export function waitsOnYou(
   }
 }
 
+/** @internal */
 export function agentHours(intervals: readonly AttentionInterval[], window: TimeWindow): number {
   return (
     spansIn(intervals, 'working', window).reduce((sum, span) => sum + lengthOf(span), 0) / HOUR_MS
   )
 }
 
-/** The medianOf number of sessions working together, over the time at least one was working. */
+/** The medianOf number of sessions working together, over the time at least one was working.
+ * @internal */
 export function runningAtOnceMedian(
   intervals: readonly AttentionInterval[],
   window: TimeWindow
@@ -172,7 +177,8 @@ function runsOf(own: readonly AttentionInterval[]): { finished: number; unaided:
   return tally
 }
 
-/** The share of finished runs that needed no help from you. */
+/** The share of finished runs that needed no help from you.
+ * @internal */
 export function finishedWithoutHelpRatio(intervals: readonly AttentionInterval[]): number {
   const bySession = new Map<string, AttentionInterval[]>()
   for (const interval of intervals) {
@@ -184,7 +190,8 @@ export function finishedWithoutHelpRatio(intervals: readonly AttentionInterval[]
   return finished === 0 ? 0 : unaided / finished
 }
 
-/** Minutes spent waiting on you since local midnight of `now`. */
+/** Minutes spent waiting on you since local midnight of `now`.
+ * @internal */
 export function waitedOnYouToday(intervals: readonly AttentionInterval[], now: number): number {
   const midnight = new Date(now)
   midnight.setHours(0, 0, 0, 0)
@@ -192,13 +199,16 @@ export function waitedOnYouToday(intervals: readonly AttentionInterval[], now: n
   return spans.reduce((sum, span) => sum + lengthOf(span), 0) / MINUTE_MS
 }
 
+/** @internal */
 export function longestWait(intervals: readonly AttentionInterval[], window: TimeWindow): number {
   const lengths = spansIn(intervals, 'awaiting-input', window).map(lengthOf)
   return lengths.length === 0 ? 0 : Math.max(...lengths) / MINUTE_MS
 }
 
-/** One point per local day the window touches, oldest first. */
-export function perDay(intervals: readonly AttentionInterval[], window: TimeWindow): DayPoint[] {
+/**
+ * One point per local day the window touches, oldest first.
+ */
+function perDay(intervals: readonly AttentionInterval[], window: TimeWindow): DayPoint[] {
   const first = new Date(window.from)
   first.setHours(0, 0, 0, 0)
   const days: DayPoint[] = []

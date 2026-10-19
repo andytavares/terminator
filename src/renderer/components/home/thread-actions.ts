@@ -1,4 +1,4 @@
-import { SEND_TO_AGENT_ACTION } from '@terminator/extension-sdk'
+import { SEND_TO_AGENT_ACTION } from '@terminator/extension-sdk/plain'
 import { useHomeFeedStore } from '../../stores/home-feed.store'
 import { startSessionInBranch } from '../../terminal/start-session'
 import { agentCommand, PROMPT_TOO_LONG } from './start-work'

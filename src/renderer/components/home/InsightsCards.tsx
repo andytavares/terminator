@@ -1,5 +1,5 @@
 import React from 'react'
-import { HOME_MEASURES } from '@terminator/extension-sdk'
+import { HOME_MEASURES } from '@terminator/extension-sdk/plain'
 import { MetricCard, Sparkline } from '@terminator/extension-ui'
 import type { SparklineTone } from '@terminator/extension-ui'
 import type { HomeMeasure } from '../../../shared/schemas/home-feed.schema'

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { StatusDot, type StatusTone } from '@terminator/extension-ui'
-import { plural } from '@terminator/extension-sdk'
+import { plural } from '@terminator/extension-sdk/plain'
 import { useHomeFeedStore } from '../../stores/home-feed.store'
 import { useFocusStore } from '../../home/focus-store'
 import { focusDone, localDateKey } from '../../home/focus'

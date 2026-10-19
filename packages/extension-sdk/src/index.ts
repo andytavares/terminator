@@ -5,7 +5,7 @@ export type * from '../types/api'
 export type * from '../types/issues'
 export type * from '../types/extensions'
 export type * from '../types/github'
-export { HOME_MEASURES, SEND_TO_AGENT_ACTION } from './home-contract'
+export { HOME_MEASURES, SEND_TO_AGENT_ACTION, plural } from './plain'
 
 /** One invoke channel: its payload schema, the response to a payload the schema rejects, and how
  * to answer a valid one. The core registers its own channels in this shape, and so does
@@ -51,11 +51,6 @@ export async function dispatchChannel(spec: ChannelSpec, payload: unknown): Prom
 /** The response to a payload a channel's schema rejects. */
 export function validationError(error: z.ZodError): { error: string; message: string } {
   return { error: 'VALIDATION_ERROR', message: error.message }
-}
-
-/** `word` when `count` is one, else its plural (`word` + "s" unless `many` is given). */
-export function plural(count: number, word: string, many = `${word}s`): string {
-  return count === 1 ? word : many
 }
 
 /** Registers one channel: its name, the schema its payload is parsed with, and its handler. */

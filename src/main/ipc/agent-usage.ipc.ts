@@ -34,6 +34,7 @@ async function readOrNull(file: string): Promise<TranscriptUsage | null> {
   }
 }
 
+/** @internal */
 export async function collectAgentUsage(
   records: SessionRecord[],
   input: AgentUsageInput

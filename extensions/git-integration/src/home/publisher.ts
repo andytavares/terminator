@@ -6,10 +6,12 @@ import { createHomeActionHandler } from './actions.js'
 import { buildGitHomeFeed, type FeedInputs } from './feed.js'
 import type { TicketIndex } from './work-key.js'
 
-/** How often the dashboard refreshes while its view is open (FOCUS_REFRESH_MS in ReviewDashboard.tsx). */
+/** How often the dashboard refreshes while its view is open (FOCUS_REFRESH_MS in ReviewDashboard.tsx).
+ * @internal */
 export const HOME_REFRESH_MS = 2 * 60 * 1000
 
-/** How often the merged pull requests are searched again: they change only when one merges. */
+/** How often the merged pull requests are searched again: they change only when one merges.
+ * @internal */
 export const MERGED_REFRESH_MS = 15 * 60 * 1000
 
 /** A dashboard search's answer, as far as Home reads it. */

@@ -9,7 +9,8 @@ export type JoinableToWork = Pick<DashboardPR, 'headRefName' | 'title' | 'localR
 /** The keys of the user's open issues and the tracker each belongs to. */
 export type TicketIndex = ReadonlyMap<string, TrackerId>
 
-/** The ticket key in `text` ("tav-20-pr-overview" gives "TAV-20"), or null. */
+/** The ticket key in `text` ("tav-20-pr-overview" gives "TAV-20"), or null.
+ * @internal */
 export function parseTicketKey(text: string): string | null {
   const match = TICKET_KEY.exec(text)
   return match ? match[1].toUpperCase() : null

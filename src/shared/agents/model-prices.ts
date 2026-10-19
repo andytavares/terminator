@@ -36,7 +36,8 @@ function priceFor(model: string): ModelPrice | undefined {
   return PRICES.find((price) => model.startsWith(price.prefix))
 }
 
-/** Dollars for these tokens, or null when the model has no known price. */
+/** Dollars for these tokens, or null when the model has no known price.
+ * @internal */
 export function estimateCostUsd(model: string, tokens: TokenCounts): number | null {
   const price = priceFor(model)
   if (!price) return null

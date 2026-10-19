@@ -1,5 +1,5 @@
 import React from 'react'
-import { HOME_MEASURES } from '@terminator/extension-sdk'
+import { HOME_MEASURES } from '@terminator/extension-sdk/plain'
 import { ArrowUpRight } from 'lucide-react'
 import { useHomeFeedStore } from '../../stores/home-feed.store'
 import { useHomeView } from './home-view'

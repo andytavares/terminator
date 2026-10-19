@@ -1,13 +1,11 @@
-import React, { useEffect, useMemo, useRef } from 'react'
+import React, { Suspense, lazy, useEffect, useMemo, useRef } from 'react'
 import { DeskHeader } from './DeskHeader'
 import { SummaryLine } from './SummaryLine'
 import { askMatches, useDeskFilter } from './desk-filter'
-import { PlanTheDay } from './PlanTheDay'
 import { YourMove } from './YourMove'
 import { QuietDesk } from './QuietDesk'
 import { InFlight } from './InFlight'
 import { TodayRail } from './TodayRail'
-import { Insights } from './Insights'
 import { useHomeView } from './home-view'
 import { useDeskModel, type DeskState } from './useDeskModel'
 import { useDeskController, type DeskController } from './use-desk-controller'
@@ -15,6 +13,10 @@ import { useDeskKeys } from './use-desk-keys'
 import { useMarkLeftHome } from './use-mark-left-home'
 import { useOpenRequestedResume } from './desk-selection'
 import './HomeScreen.css'
+
+// Shown on demand, so each is its own chunk (https://react.dev/reference/react/lazy).
+const Insights = lazy(() => import('./Insights').then((m) => ({ default: m.Insights })))
+const PlanTheDay = lazy(() => import('./PlanTheDay').then((m) => ({ default: m.PlanTheDay })))
 
 export interface HomeScreenProps {
   /** Quick actions is ⌘P everywhere now; the Desk draws no button for it. */
@@ -41,7 +43,9 @@ export function HomeScreen(_props: HomeScreenProps = {}): JSX.Element {
   return (
     <section className="desk" aria-label="Home" tabIndex={-1} ref={rootRef} onKeyDown={onKeyDown}>
       <DeskHeader ref={searchRef} now={desk.now} />
-      {view === 'insights' ? <Insights /> : <DeskBody desk={desk} controller={controller} />}
+      <Suspense fallback={null}>
+        {view === 'insights' ? <Insights /> : <DeskBody desk={desk} controller={controller} />}
+      </Suspense>
     </section>
   )
 }
@@ -79,7 +83,9 @@ function DeskBody(props: DeskBodyProps): JSX.Element {
   return (
     <div className="desk__body">
       <SummaryLine desk={desk} />
-      <PlanTheDay />
+      <Suspense fallback={null}>
+        <PlanTheDay />
+      </Suspense>
       {showBand && <Band desk={desk} controller={controller} />}
       {showLower && (
         <div className="desk-lower">

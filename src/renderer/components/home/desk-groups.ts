@@ -1,3 +1,4 @@
+import type { DeskCount } from './desk-filter'
 import { groupThreads, yourMoveFirst, type WorkThread } from '../../home/work-threads'
 
 export type DeskGroupBy = 'move' | 'repo'
@@ -61,8 +62,6 @@ export function visibleThreadKeys(groups: readonly DeskGroup[], expandedIds: rea
     .filter((group) => !group.collapsible || expandedIds.includes(group.id))
     .flatMap((group) => group.threads.map((thread) => thread.key))
 }
-
-export type DeskCount = 'your-move' | 'agents' | 'others' | 'failing'
 
 export interface DeskFilterValue {
   text: string

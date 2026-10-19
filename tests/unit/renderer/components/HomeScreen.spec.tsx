@@ -38,6 +38,8 @@ vi.mock('../../../../src/renderer/components/home/PlanTheDay', () => ({
 }))
 vi.mock('../../../../src/renderer/components/home/Insights', () => ({
   Insights: () => <div>Insights view</div>,
+}))
+vi.mock('../../../../src/renderer/components/home/InsightsBar', () => ({
   InsightsBar: () => <div>Insights window</div>,
 }))
 
@@ -349,11 +351,11 @@ describe('HomeScreen — the summary line, right side', () => {
 })
 
 describe('HomeScreen — Desk and Insights', () => {
-  it('shows Insights in place of the Desk, and G then D brings the Desk back', () => {
+  it('shows Insights in place of the Desk, and G then D brings the Desk back', async () => {
     useHomeFeedStore.setState({ asks: [homeFeedAsk({ id: 'r1' })] })
     render(<HomeScreen />)
     fireEvent.click(screen.getByRole('radio', { name: 'Insights' }))
-    expect(screen.getByText('Insights view')).toBeTruthy()
+    expect(await screen.findByText('Insights view')).toBeTruthy()
     expect(screen.getByText('Insights window')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Start work/ })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Your move' })).toBeNull()

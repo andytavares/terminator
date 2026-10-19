@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { readStoredJson, writeStoredJson } from './local-storage'
 import type { Dismissal, Dismissals } from './desk-order'
 
+/** @internal */
 export const DISMISSALS_KEY = 'terminator.home.dismissals'
 const EXPIRES_AFTER_MS = 7 * 24 * 60 * 60 * 1000
 

@@ -4,12 +4,12 @@ import { TrackerIdSchema } from './integrations.schema.js'
 // What an extension publishes for Home to draw (ADR 117). Mirrors HomeFeed in
 // packages/extension-sdk/types/api.d.ts.
 
-export const WorkKeySchema = z.union([
+const WorkKeySchema = z.union([
   z.object({ tracker: TrackerIdSchema, key: z.string().min(1) }),
   z.object({ repoRoot: z.string().min(1), branch: z.string().min(1) }),
 ])
 
-export const HomeAskSchema = z.object({
+const HomeAskSchema = z.object({
   id: z.string().min(1),
   kind: z.enum(['answer', 'fix', 'review', 'decide', 'finished', 'task']),
   title: z.string(),
@@ -25,6 +25,7 @@ export const HomeAskSchema = z.object({
   open: z.object({ command: z.string().min(1), args: z.unknown().optional() }),
 })
 
+/** @internal */
 export const ThreadFacetSchema = z.object({
   workKey: WorkKeySchema,
   kind: z.enum(['pull-request', 'order', 'task']),
@@ -52,7 +53,7 @@ export const ThreadFacetSchema = z.object({
   updatedAt: z.string(),
 })
 
-export const HomeMeasureSchema = z.object({
+const HomeMeasureSchema = z.object({
   id: z.string().min(1),
   question: z.string(),
   value: z.number(),
@@ -63,7 +64,7 @@ export const HomeMeasureSchema = z.object({
   detail: z.string().optional(),
 })
 
-export const HomeFocusCandidateSchema = z.object({
+const HomeFocusCandidateSchema = z.object({
   id: z.string().min(1),
   title: z.string(),
   detail: z.string().optional(),

@@ -1,15 +1,10 @@
 import { create } from 'zustand'
-import { z } from 'zod'
 import { readStoredJson, writeStoredJson } from '../../home/local-storage'
+import { storedParkedOf } from '../../home/stored-shapes'
 
+/** @internal */
 export const PARKED_THREADS_KEY = 'terminator.home.parked-threads'
 const FORGOTTEN_AFTER_MS = 30 * 24 * 60 * 60 * 1000
-
-/** Parked work keys with when each was parked. The first version stored the keys alone. */
-const StoredSchema = z.union([
-  z.record(z.string(), z.number()),
-  z.array(z.string()).transform((keys) => Object.fromEntries(keys.map((key) => [key, Date.now()]))),
-])
 
 interface ParkedThreadsState {
   /** Work keys the operator parked by hand; the Desk lists them under Parked. */
@@ -29,11 +24,13 @@ function remember(keys: string[], parkedAt: Record<string, number>): Partial<Par
   return { keys, parkedAt: kept }
 }
 
-const stored = readStoredJson<Record<string, number>>(PARKED_THREADS_KEY, {}, StoredSchema)
+const storedParked = readStoredJson<Record<string, number>>(PARKED_THREADS_KEY, {}, (value) =>
+  storedParkedOf(value, Date.now())
+)
 
 export const useParkedThreads = create<ParkedThreadsState>((set) => ({
-  keys: Object.keys(stored),
-  parkedAt: stored,
+  keys: Object.keys(storedParked),
+  parkedAt: storedParked,
   park: (key) => set((s) => (s.keys.includes(key) ? s : remember([...s.keys, key], s.parkedAt))),
   unpark: (key) =>
     set((s) =>

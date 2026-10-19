@@ -84,7 +84,8 @@ function fixAsk(pr: DashboardPR, tickets: TicketIndex): HomeAsk {
   }
 }
 
-/** Reviews others wait on, and my own pull requests whose checks fail. */
+/** Reviews others wait on, and my own pull requests whose checks fail.
+ * @internal */
 export function buildAsks(prs: DashboardPR[], tickets: TicketIndex): HomeAsk[] {
   return prs.flatMap((pr) => {
     if (pr.section === 'requested' || pr.section === 're-review')
@@ -154,7 +155,8 @@ function facetOf(pr: DashboardPR, { tickets, updatedAt }: FacetSource): ThreadFa
   ]
 }
 
-/** One facet per open pull request of mine that can be joined to its work. */
+/** One facet per open pull request of mine that can be joined to its work.
+ * @internal */
 export function buildFacets(
   prs: DashboardPR[],
   tickets: TicketIndex,
@@ -188,7 +190,8 @@ function mergedFacetOf(pr: MergedPullRequest, { tickets, updatedAt }: FacetSourc
   ]
 }
 
-/** One closed facet per merged pull request of mine that can be joined to its work. */
+/** One closed facet per merged pull request of mine that can be joined to its work.
+ * @internal */
 export function buildMergedFacets(
   merged: MergedPullRequest[],
   tickets: TicketIndex,
@@ -216,7 +219,8 @@ function recentLevels(calendar: ContributionCalendar): number[] {
     .map((day) => day.level)
 }
 
-/** "How much shipped?" and the recent days' levels, from the calendar Insights already fetched. */
+/** "How much shipped?" and the recent days' levels, from the calendar Insights already fetched.
+ * @internal */
 export function buildMeasures(calendar: ContributionCalendar | null): HomeMeasure[] {
   if (!calendar) return []
   const series = mergedPerWeek(calendar, WEEKS_IN_QUARTER, 0)

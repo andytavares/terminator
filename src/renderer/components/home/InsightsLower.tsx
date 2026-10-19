@@ -1,5 +1,5 @@
 import React from 'react'
-import { HOME_MEASURES } from '@terminator/extension-sdk'
+import { HOME_MEASURES } from '@terminator/extension-sdk/plain'
 import { Clock, GitPullRequest, ListTodo } from 'lucide-react'
 import { Button, MetricCard } from '@terminator/extension-ui'
 import type { AgentUsage } from '../../../shared/agents/agent-usage'
@@ -161,7 +161,7 @@ function LookBackRow(props: LookBackRowProps): JSX.Element {
 }
 
 /** The weekly review a task extension offers: a task ask whose primary action is Start review. */
-export function weeklyReviewAsk(asks: readonly Sourced<HomeAsk>[]): Sourced<HomeAsk> | null {
+function weeklyReviewAsk(asks: readonly Sourced<HomeAsk>[]): Sourced<HomeAsk> | null {
   return (
     asks.find((a) => a.kind === 'task' && a.actions.some((x) => x.id === 'start-review')) ?? null
   )

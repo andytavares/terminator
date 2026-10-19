@@ -1,28 +1,11 @@
 import { create } from 'zustand'
-import { z } from 'zod'
-import { WorkKeySchema } from '../../shared/schemas/home-feed.schema'
 import { readStoredJson, writeStoredJson } from './local-storage'
+import { storedFocusOf } from './stored-shapes'
 import { FOCUS_LIMIT, localDateKey, type FocusItem } from './focus'
 
+/** @internal */
 export const FOCUS_KEY = 'terminator.home.focus'
 const KEPT_DAYS = 7
-
-const PersistedSchema = z.object({
-  days: z.record(
-    z.string(),
-    z.array(
-      z.object({
-        id: z.string(),
-        title: z.string(),
-        detail: z.string().optional(),
-        workKey: WorkKeySchema.optional(),
-        doneByHand: z.boolean(),
-      })
-    )
-  ),
-  lastLeftHomeAt: z.number().nullable().default(null),
-  planDismissedOn: z.string().nullable().default(null),
-})
 
 interface Persisted {
   days: Record<string, FocusItem[]>
@@ -67,7 +50,7 @@ export const useFocusStore = create<FocusState>((set) => ({
   ...readStoredJson<Persisted>(
     FOCUS_KEY,
     { days: {}, lastLeftHomeAt: null, planDismissedOn: null },
-    PersistedSchema
+    storedFocusOf
   ),
   pickFocus: (item) =>
     set((s) =>

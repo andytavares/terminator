@@ -4,7 +4,7 @@ import type { MergedHomeFeed } from '../../shared/schemas/home-feed.schema'
 // The renderer's mirror of what extensions have published for Home (ADR 117).
 
 /** Whether the extension ran an action, and why not when it did not. */
-export type ActionResult = { ok: true } | { ok: false; message: string }
+type ActionResult = { ok: true } | { ok: false; message: string }
 
 interface HomeFeedState extends MergedHomeFeed {
   load: () => Promise<void>

@@ -1,18 +1,15 @@
-import type { z } from 'zod'
-
-/** Reads a JSON value, or the fallback when storage is absent, blocked, corrupt or not shaped like `schema`. */
+/** Reads a JSON value, or the fallback when storage is absent, blocked, corrupt or `parse` refuses it. */
 export function readStoredJson<T>(
   key: string,
   fallback: T,
-  schema?: z.ZodType<T, z.ZodTypeDef, unknown>
+  parse?: (value: unknown) => T | null
 ): T {
   try {
     const raw = localStorage.getItem(key)
     if (raw === null) return fallback
     const value: unknown = JSON.parse(raw)
-    if (schema === undefined) return value as T
-    const parsed = schema.safeParse(value)
-    return parsed.success ? parsed.data : fallback
+    if (parse === undefined) return value as T
+    return parse(value) ?? fallback
   } catch {
     return fallback
   }

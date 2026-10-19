@@ -104,7 +104,8 @@ export interface DurationSpread {
   count: number
 }
 
-/** The value at fraction `at` of the sorted list, interpolating between neighbours. */
+/** The value at fraction `at` of the sorted list, interpolating between neighbours.
+ * @internal */
 export function quantile(sorted: readonly number[], at: number): number {
   const position = (sorted.length - 1) * at
   const below = Math.floor(position)

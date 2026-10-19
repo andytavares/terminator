@@ -8,7 +8,8 @@ export type ThreadSummary =
   | { status: 'ready'; text: string }
   | { status: 'error' }
 
-/** What the model is told: the renderer holds each session's latest line and note, not its transcript. */
+/** What the model is told: the renderer holds each session's latest line and note, not its transcript.
+ * @internal */
 export function summaryInputOf(thread: WorkThread): ThreadSummaryInput {
   const pr = pullRequestOf(thread)
   return {

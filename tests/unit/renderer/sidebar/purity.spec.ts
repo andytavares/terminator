@@ -73,7 +73,7 @@ const STATEFUL = new Set(['dismissals.ts', 'focus-store.ts', 'local-storage.ts']
 const homeModules = readdirSync(HOME).filter((f) => f.endsWith('.ts') && !STATEFUL.has(f))
 
 // The SDK's helpers are pure functions shared with the extensions (plural, validationError).
-const PURE_PACKAGES = new Set(['@terminator/extension-sdk'])
+const PURE_PACKAGES = new Set(['@terminator/extension-sdk/plain'])
 
 describe('the Desk pure layer imports nothing but types, siblings and the sidebar layer', () => {
   it('has modules to check', () => {

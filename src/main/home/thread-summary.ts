@@ -8,8 +8,10 @@ import type { ThreadSummaryInput } from '../../shared/schemas/agent-usage.schema
 // there is no resolver: the app adopts the login-shell PATH at start-up (login-shell-path.ts), so
 // a bare `claude` is found once `ready` has resolved.
 
-export const SUMMARY_MODEL = 'claude-haiku-5-5'
+const SUMMARY_MODEL = 'claude-haiku-5-5'
+/** @internal */
 export const SUMMARY_TIMEOUT_MS = 30_000
+/** @internal */
 export const SUMMARY_COOLDOWN_MS = 2 * 60_000
 
 const INSTRUCTION =
@@ -26,6 +28,7 @@ export interface ThreadSummaryDeps {
   ready: () => Promise<void>
 }
 
+/** @internal */
 export function summaryArgs(): string[] {
   return [
     '-p',
@@ -39,6 +42,7 @@ export function summaryArgs(): string[] {
   ]
 }
 
+/** @internal */
 export function summaryPrompt(input: ThreadSummaryInput): string {
   const lines = [`Work: ${input.title}${input.ticketKey ? ` (${input.ticketKey})` : ''}`]
   if (input.pullRequest) {

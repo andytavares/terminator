@@ -16,7 +16,8 @@ interface Surface {
   viewParam: string
 }
 
-/** Told, with the extension's id, once its frame has a height worth showing. */
+/** Told, with the extension's id, once its frame has a height worth showing.
+ * @internal */
 export const FrameHeightReadyContext = createContext<(extensionId: string) => void>(() => {})
 
 function rememberedHeightKey({ extensionId, viewParam }: Surface): string {

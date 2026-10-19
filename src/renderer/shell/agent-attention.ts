@@ -11,9 +11,11 @@ import type { AgentState, TerminalSession } from '../../shared/types/index'
 // agents raise (shown on the session), and each change of a session's state
 // (kept in the attention log).
 
-/** A state must hold this long before it is reported: busy flips on every burst of output. */
+/** A state must hold this long before it is reported: busy flips on every burst of output.
+ * @internal */
 export const SETTLE_MS = 2000
 
+/** @internal */
 export interface StateReport {
   sessionId: string
   projectId: string | null
@@ -85,7 +87,8 @@ class StateChangeTracker {
   }
 }
 
-/** Calls `send` once per settled state change of any session. Returns the way to stop. */
+/** Calls `send` once per settled state change of any session. Returns the way to stop.
+ * @internal */
 export function trackStateChanges(send: (report: StateReport) => void): () => void {
   const tracker = new StateChangeTracker(send)
   tracker.observeSessions(useSessionStore.getState().sessions)

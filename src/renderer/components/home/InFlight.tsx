@@ -1,15 +1,16 @@
-import React from 'react'
+import React, { Suspense, lazy } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { StatusDot } from '@terminator/extension-ui'
 import { DropdownMenu, RadioChoices } from '../sidebar/menu'
 import { useNow } from '../session/useNow'
 import { InFlightRow } from './InFlightRow'
-import { ThreadDrawer } from './ThreadDrawer'
 import { useDeskSelection } from './desk-selection'
 import { useWorkThreads } from './useWorkThreads'
 import { DESK_GROUP_OPTIONS, deskGroups, filterThreads, type DeskGroup } from './desk-groups'
 import { useDeskFilter } from './desk-filter'
 import '../sidebar/SidebarMenu.css'
+
+const ThreadDrawer = lazy(() => import('./ThreadDrawer').then((m) => ({ default: m.ThreadDrawer })))
 import './InFlight.css'
 
 const MINUTE_MS = 60_000
@@ -96,6 +97,17 @@ function InFlightHeader({ count }: { count: number }): JSX.Element {
   )
 }
 
+/** The drawer of the thread that is open; its code loads the first time one opens. */
+function OpenThreadDrawer(): JSX.Element | null {
+  const openThreadKey = useDeskSelection((s) => s.openThreadKey)
+  if (openThreadKey === null) return null
+  return (
+    <Suspense fallback={null}>
+      <ThreadDrawer />
+    </Suspense>
+  )
+}
+
 /** The Desk's list of work, grouped by whose move it is, with the drawer of the one that is open. */
 export function InFlight(): JSX.Element {
   const { threads } = useWorkThreads()
@@ -119,7 +131,7 @@ export function InFlight(): JSX.Element {
           <GroupRows group={group} now={now} />
         </React.Fragment>
       ))}
-      <ThreadDrawer />
+      <OpenThreadDrawer />
     </section>
   )
 }

@@ -128,15 +128,16 @@ describe('In flight rows — Parked and grouping', () => {
   })
 })
 
+/** The drawer is its own chunk, so it is there once the lazy import has resolved. */
 const openBuilding = () => {
   render(<InFlight />)
   fireEvent.click(inFlightRowNamed('PR overview shows status before story'))
-  return screen.getByRole('dialog', { name: 'PR overview shows status before story' })
+  return screen.findByRole('dialog', { name: 'PR overview shows status before story' })
 }
 
 describe('the work-thread drawer', () => {
   it('opens from a click with the title, stage, agents and pull request checks', async () => {
-    const drawer = within(openBuilding())
+    const drawer = within(await openBuilding())
     expect(drawer.getByRole('heading', { level: 4 }).textContent).toContain('TAV-20')
     expect(drawer.getByRole('list', { name: 'Stage' })).toBeTruthy()
     expect(drawer.getByText('AGENTS AND TERMINALS · 1')).toBeTruthy()
@@ -147,12 +148,12 @@ describe('the work-thread drawer', () => {
     expect(drawer.getByText('Keep the existing risk chip.')).toBeTruthy()
   })
 
-  it('opens on Enter and returns focus to the row on Escape', () => {
+  it('opens on Enter and returns focus to the row on Escape', async () => {
     render(<InFlight />)
     const target = inFlightRowNamed('PR overview shows status before story')
     target.focus()
     fireEvent.keyDown(target, { key: 'Enter' })
-    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(await screen.findByRole('dialog')).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(document.activeElement).toBe(target)
@@ -161,8 +162,11 @@ describe('the work-thread drawer', () => {
 
 describe('the work-thread drawer — summary', () => {
   it('shows Writing a summary, then the model text with its source', async () => {
-    const drawer = within(openBuilding())
+    let answer: (value: { text: string; generatedAt: string }) => void = () => {}
+    summaryGet.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const drawer = within(await openBuilding())
     expect(drawer.getByText('Writing a summary…')).toBeTruthy()
+    answer({ text: 'Two agents are on this.', generatedAt: 'now' })
     expect(await drawer.findByText(/Two agents are on this\./)).toBeTruthy()
     expect(drawer.getByText(/From the agents' latest messages and the pull request\./)).toBeTruthy()
     expect(summaryGet.mock.calls[0][0]).toMatchObject({
@@ -174,7 +178,7 @@ describe('the work-thread drawer — summary', () => {
 
   it('says a failed summary in plain words and asks again on Retry', async () => {
     summaryGet.mockResolvedValueOnce({ error: 'model unavailable' })
-    const drawer = within(openBuilding())
+    const drawer = within(await openBuilding())
     expect(await drawer.findByText(/Could not write a summary/)).toBeTruthy()
     fireEvent.click(drawer.getByRole('button', { name: 'Retry' }))
     expect(await drawer.findByText(/Two agents are on this\./)).toBeTruthy()
@@ -189,22 +193,22 @@ describe('the work-thread drawer — checks', () => {
       runAction,
       asks: [sendToAgentAsk],
     })
-    const drawer = within(openBuilding())
+    const drawer = within(await openBuilding())
     fireEvent.click(drawer.getByRole('button', { name: 'Send to agent' }))
     await waitFor(() =>
       expect(runAction).toHaveBeenCalledWith('git-integration', 'fix:o/r#275', 'send-to-agent')
     )
   })
 
-  it('offers no Send to agent when no extension published one', () => {
-    const drawer = within(openBuilding())
+  it('offers no Send to agent when no extension published one', async () => {
+    const drawer = within(await openBuilding())
     expect(drawer.queryByRole('button', { name: 'Send to agent' })).toBeNull()
   })
 })
 
 describe('the work-thread drawer — actions', () => {
-  it('opens the terminal, the pull request and the ticket, and parks the work', () => {
-    const drawer = within(openBuilding())
+  it('opens the terminal, the pull request and the ticket, and parks the work', async () => {
+    const drawer = within(await openBuilding())
     fireEvent.click(drawer.getByRole('button', { name: 'Open terminal' }))
     expect(spies.open).toHaveBeenCalledWith('building')
     fireEvent.click(drawer.getByRole('button', { name: 'Open pull request #275' }))
@@ -216,14 +220,14 @@ describe('the work-thread drawer — actions', () => {
     expect(drawer.getByRole('button', { name: 'Unpark' })).toBeTruthy()
   })
 
-  it("starts a Claude agent on the thread's branch", () => {
-    const drawer = within(openBuilding())
+  it("starts a Claude agent on the thread's branch", async () => {
+    const drawer = within(await openBuilding())
     fireEvent.click(drawer.getByRole('button', { name: 'New agent on this branch' }))
     expect(spies.startInBranch).toHaveBeenCalledWith('p20', expect.stringContaining('claude'))
   })
 
-  it('opens a session from its row', () => {
-    const drawer = within(openBuilding())
+  it('opens a session from its row', async () => {
+    const drawer = within(await openBuilding())
     fireEvent.click(drawer.getByRole('button', { name: 'Open Writing ReviewHeader tests' }))
     expect(spies.open).toHaveBeenCalledWith('building')
   })

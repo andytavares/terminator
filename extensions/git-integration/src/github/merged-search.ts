@@ -1,7 +1,8 @@
 // The merged-pull-request search for Home (ADR 117): one search, run apart from the dashboard
 // refresh, that reads each pull request's timeline so Insights can say where the time went.
 
-/** How far back Home looks for merged pull requests. */
+/** How far back Home looks for merged pull requests.
+ * @internal */
 export const MERGED_DAYS = 90
 const DAY_MS = 24 * 60 * 60 * 1000
 const MINUTE_MS = 60_000

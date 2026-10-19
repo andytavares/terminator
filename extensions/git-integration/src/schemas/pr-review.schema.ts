@@ -262,7 +262,7 @@ export const ReviewQueuePRSchema = z.object({
 const DashboardSectionSchema = z.enum(['re-review', 'requested', 'team', 'mine', 'involved'])
 
 /** One check on a pull request's latest commit. */
-export const DashboardCheckSchema = z.object({
+const DashboardCheckSchema = z.object({
   name: z.string(),
   state: z.enum(['passed', 'failed', 'running']),
   detailsUrl: z.string().optional(),

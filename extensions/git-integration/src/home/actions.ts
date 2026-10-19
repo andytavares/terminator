@@ -14,7 +14,8 @@ interface ActionDeps {
   pullRequests: () => DashboardPR[]
 }
 
-/** The folder `branch` is checked out in, from `git worktree list --porcelain`. */
+/** The folder `branch` is checked out in, from `git worktree list --porcelain`.
+ * @internal */
 export function worktreeOfBranch(porcelain: string, branch: string): string | undefined {
   const block = porcelain
     .split('\n\n')

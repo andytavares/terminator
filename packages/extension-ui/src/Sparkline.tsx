@@ -23,7 +23,8 @@ const TONE_COLOR: Record<SparklineTone, string> = {
   good: 'var(--tm-success)',
 }
 
-/** The point of each value: spread across the width, scaled between the padded top and bottom. */
+/** The point of each value: spread across the width, scaled between the padded top and bottom.
+ * @internal */
 export function sparklinePoints(
   values: readonly number[],
   size: 'md' | 'sm'

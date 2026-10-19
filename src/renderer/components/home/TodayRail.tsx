@@ -79,7 +79,7 @@ function FocusEditor({ options, picked }: { options: FocusOption[]; picked: Focu
   )
 }
 
-export function FocusCard(): JSX.Element {
+function FocusCard(): JSX.Element {
   const [editing, setEditing] = useState(false)
   const now = useNow(MINUTE_MS)
   const days = useFocusStore((s) => s.days)

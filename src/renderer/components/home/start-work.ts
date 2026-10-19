@@ -126,7 +126,7 @@ export function agentCommand(prompt: string | null): string | null {
   return new TextEncoder().encode(command).length > MAX_TYPED_LINE_BYTES ? null : command
 }
 
-export const ticketPrompt = (issue: IssueSummary): string =>
+const ticketPrompt = (issue: IssueSummary): string =>
   `Work on ${issue.key}: ${issue.title} (${issue.url})`
 
 export type WorkRequest = { workspace: Workspace; runAs: RunAs } & (

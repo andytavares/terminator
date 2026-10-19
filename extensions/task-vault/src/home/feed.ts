@@ -2,7 +2,7 @@ import type { HomeAsk, HomeFeed, HomeFocusCandidate } from '@terminator/extensio
 import type { IndexedTask } from '../vault/types'
 
 export const OPEN_COMMAND = 'task-vault:open'
-export const WEEKLY_REVIEW_ITEM = 'weekly-review'
+const WEEKLY_REVIEW_ITEM = 'weekly-review'
 const TASK_ITEM_PREFIX = 'task:'
 
 export interface HomeFeedInput {

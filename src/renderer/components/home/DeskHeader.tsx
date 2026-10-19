@@ -4,7 +4,7 @@ import { Button, Kbd, SegmentedControl } from '@terminator/extension-ui'
 import { DeskSearch } from './DeskSearch'
 import { useStartWorkStore } from './start-work'
 import { useHomeView, type HomeViewName } from './home-view'
-import { InsightsBar } from './Insights'
+import { InsightsBar } from './InsightsBar'
 
 const VIEWS = [
   { value: 'desk', label: 'Desk' },
