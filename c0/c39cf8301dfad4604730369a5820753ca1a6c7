@@ -1,0 +1,23 @@
+extensions/foundry/tests/line/worktree.spec.ts
+  s_d918463020569b::t_6fe6cfa89f0c42 4,123-124,176-178,184,198-313,704-706,709,713
+extensions/foundry/src/line/worktree.ts
+  s_d918463020569b::t_6fe6cfa89f0c42 101-111,118-125,128-146,148,150,153,158-182,193
+extensions/foundry/src/line/refinery-run.ts
+  s_d918463020569b::t_6fe6cfa89f0c42 6,135,140-147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c0c39cf8301dfad4604730369a5820753ca1a6c7",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
