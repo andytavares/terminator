@@ -1,0 +1,26 @@
+extensions/foundry/tests/line/worktree.spec.ts
+  s_d918463020569b::t_1a89dbda3075cb 6,126-127,285-327
+  s_d918463020569b::t_cb5dfc7414ab63 328
+extensions/foundry/src/line/refinery-run.ts
+  s_d918463020569b::t_a06ca204a4bd07 143
+  s_d918463020569b::t_f7c275bc4d7e5b 6
+extensions/foundry/src/line/worktree.ts
+  s_d918463020569b::t_a06ca204a4bd07 80-88,94-102,109,114-115,125-126,156-160,176,193-196,199,202,205-209,211-213,217-223
+  s_d918463020569b::t_f7c275bc4d7e5b 75,79,89-93,103-105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "404325524cf3abde0113b29ddf293cd88c331321",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
