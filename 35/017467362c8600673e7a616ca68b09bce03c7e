@@ -1,0 +1,81 @@
+extensions/foundry/src/ipc/ui-registration.ts
+  s_3ced19ecaa16dd::t_e9f9ae028f59be 55,59,67,70-76
+  s_3ced19ecaa16dd::t_73c1b053fb6da9 45,69
+  s_3ced19ecaa16dd::t_9e991aaa283aa9 63-66,68,79-81,104,112,136
+  s_3ced19ecaa16dd::t_3fc1a7bf00360f 118-120
+  s_3ced19ecaa16dd::t_d1b1e0affcfe4b 6,46,56-58,77-78,100-103,105-111,113-117,121-135,137
+extensions/foundry/src/state/live-index.ts
+  s_3ced19ecaa16dd::t_16c8adaafc8f80 42-43,45
+extensions/foundry/tests/home/publish.spec.ts
+  s_3ced19ecaa16dd::t_a6b85ecc790d17 1-6,8-19,21-23,26-94,96-98,103-108,110-114,118-122,124-129,131-133
+  s_3ced19ecaa16dd::t_6c69bfe4274524 116-117
+  s_3ced19ecaa16dd::t_e9f9ae028f59be 99-102
+  s_3ced19ecaa16dd::t_a617e10b89b688 20,24-25
+  s_3ced19ecaa16dd::t_a45f0694c97c6c 134-142
+  s_3ced19ecaa16dd::t_ae7b3f1e30176a 7,95,109,115,123,130
+extensions/foundry/tests/home/feed.spec.ts
+  s_3ced19ecaa16dd::t_bf65d709de7804 80,82,200-203
+  s_3ced19ecaa16dd::t_7b31a17ed57bf0 5,62-72,111
+  s_3ced19ecaa16dd::t_b03eedb0803511 138-140
+  s_3ced19ecaa16dd::t_9e991aaa283aa9 35,94,113,130,143,156,187,211,219
+  s_3ced19ecaa16dd::t_a6b85ecc790d17 107-109,165,194,196
+  s_3ced19ecaa16dd::t_b3a81d88107afb 1-2,4,6,8-13,15-27,36,39-61,73,75-79,83-93,95-103,105-106,110,112,114-115,117-129,133-137,141-142,145-147,149-155,159-164,166-173,175-179,182-186,188-193,195,197,199,204-207,209-210,212-218,221-240
+  s_3ced19ecaa16dd::t_b897c7649259f8 7,28,30-34
+  s_3ced19ecaa16dd::t_ae7b3f1e30176a 3,14,29,37-38,74,81,104,116,131-132,144,148,157-158,174,180-181,198,208,220
+extensions/foundry/tests/helpers/foundry-host.ts
+  s_3ced19ecaa16dd::t_b03eedb0803511 215
+  s_3ced19ecaa16dd::t_52a9a7eb20514d 205,224-237
+  s_3ced19ecaa16dd::t_16c8adaafc8f80 90-93,148-149
+  s_3ced19ecaa16dd::t_a121d16d955c8f 219-223
+  s_3ced19ecaa16dd::t_fd4898c94ece19 238
+extensions/foundry/src/ipc/inbox-registration.ts
+  s_3ced19ecaa16dd::t_16c8adaafc8f80 45,58
+extensions/foundry/tests/runtime/quick-actions.spec.ts
+  s_3ced19ecaa16dd::t_a121d16d955c8f 90
+  s_3ced19ecaa16dd::t_d3f77ce98a5c20 10
+extensions/foundry/src/index.ts
+  s_3ced19ecaa16dd::t_5bb9f8130469cc 41,64
+  s_3ced19ecaa16dd::t_73c1b053fb6da9 17,39-40,61,63,74-76,78-79
+  s_3ced19ecaa16dd::t_ae7b3f1e30176a 16,62
+  s_3ced19ecaa16dd::t_397d2881c33c15 71
+extensions/foundry/tests/channel-schemas.spec.ts
+  s_3ced19ecaa16dd::t_a1fb7fad1123b1 5,55
+extensions/foundry/tests/ipc/ui-channels.spec.ts
+  s_3ced19ecaa16dd::t_37d28369e30efa 16
+extensions/foundry/src/home/feed.ts
+  s_3ced19ecaa16dd::t_ae7b3f1e30176a 44,73-74,93,104,119
+  s_3ced19ecaa16dd::t_d22eaaf8c5694a 105,107-110,112-115
+  s_3ced19ecaa16dd::t_75d68d9fa3fdc7 1-43,45-72,75-92,94-103,106,111,116-118,120-186
+extensions/foundry/tests/ipc/run-actions-ipc.spec.ts
+  s_3ced19ecaa16dd::t_a121d16d955c8f 102
+  s_3ced19ecaa16dd::t_d3f77ce98a5c20 10
+extensions/foundry/src/home/publish.ts
+  s_3ced19ecaa16dd::t_5bb9f8130469cc 11-12,27,53,93,98-99,110-113,115-120,123
+  s_3ced19ecaa16dd::t_3fc1a7bf00360f 95,100-109,114,121-122
+  s_3ced19ecaa16dd::t_52a9a7eb20514d 127
+  s_3ced19ecaa16dd::t_ae7b3f1e30176a 3,37,43,51,57,67,87
+  s_3ced19ecaa16dd::t_dbfb659d57f78f 1-2,4-10,13-26,28-36,38-42,44-45,47-50,52,58-65,68,81-83,85,88-89,92,94,96-97,124-126,128-138
+  s_3ced19ecaa16dd::t_dd0ab7d6211e9b 66,69-80
+  s_3ced19ecaa16dd::t_bebd03ed7cafd4 46,54-56,84,86,90-91
+extensions/foundry/tests/home/commands.spec.ts
+  s_3ced19ecaa16dd::t_e01e7ad2d762bd 55,57
+  s_3ced19ecaa16dd::t_477c60ace61476 1-54,56,58-64
+extensions/foundry/src/renderer/App.tsx
+  s_3ced19ecaa16dd::t_e9f9ae028f59be 138-150,241-244
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "35017467362c8600673e7a616ca68b09bce03c7e",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
