@@ -1,11 +1,12 @@
 import React from 'react'
 import { HOME_MEASURES } from '@terminator/extension-sdk/plain'
-import { Clock, GitPullRequest, ListTodo } from 'lucide-react'
-import { Button, MetricCard } from '@terminator/extension-ui'
+import { Clock, GitPullRequest, ListTodo, X } from 'lucide-react'
+import { Button, IconButton, MetricCard } from '@terminator/extension-ui'
 import type { AgentUsage } from '../../../shared/agents/agent-usage'
 import type { AttentionMeasures } from '../../../shared/home/attention-measures'
 import type { HomeAsk, HomeMeasure, Sourced } from '../../../shared/schemas/home-feed.schema'
 import { useExtensionRegistry } from '../../extensions/registry'
+import { useDismissalsStore } from '../../home/dismissals'
 import {
   formatAge,
   formatNumber,
@@ -139,10 +140,12 @@ interface LookBackRowProps {
   title: string
   detail: string
   action?: { label: string; primary: boolean; run: () => void }
+  /** Removes a row that is out of date or no longer true; names the row for assistive technology. */
+  dismiss?: { label: string; run: () => void }
 }
 
 function LookBackRow(props: LookBackRowProps): JSX.Element {
-  const { icon, title, detail, action } = props
+  const { icon, title, detail, action, dismiss } = props
   return (
     <div className="ins__lr">
       {icon}
@@ -156,9 +159,23 @@ function LookBackRow(props: LookBackRowProps): JSX.Element {
       ) : (
         <span />
       )}
+      {dismiss && (
+        <IconButton
+          icon={X}
+          label={dismiss.label}
+          size="sm"
+          className="ins__lr-dismiss"
+          onClick={dismiss.run}
+        />
+      )}
     </div>
   )
 }
+
+const dismissAsk = (ask: Sourced<HomeAsk>) => ({
+  label: `Dismiss ${ask.detail}`,
+  run: () => useDismissalsStore.getState().markDone(ask.id),
+})
 
 /** The weekly review a task extension offers: a task ask whose primary action is Start review. */
 function weeklyReviewAsk(asks: readonly Sourced<HomeAsk>[]): Sourced<HomeAsk> | null {
@@ -178,6 +195,7 @@ function WeeklyReviewRow({ review }: { review: Sourced<HomeAsk> }): JSX.Element 
         primary: true,
         run: () => void runAskAction(review, 'start-review'),
       }}
+      dismiss={dismissAsk(review)}
     />
   )
 }
@@ -189,6 +207,7 @@ function OldestReviewRow({ oldest }: { oldest: NonNullable<LookingBackProps['old
       title="Oldest review you owe"
       detail={`${oldest.ask.detail} · ${formatAge(oldest.ageMs)}`}
       action={{ label: 'Open', primary: false, run: () => void openAsk(oldest.ask) }}
+      dismiss={dismissAsk(oldest.ask)}
     />
   )
 }

@@ -78,7 +78,7 @@
 
 .ins__lr {
   display: grid;
-  grid-template-columns: 16px 1fr auto;
+  grid-template-columns: 16px 1fr auto auto;
   align-items: center;
   gap: 9px;
   padding: 6px 0;
@@ -170,4 +170,13 @@
   height: 8px;
   margin-right: 5px;
   border-radius: 2px;
+}
+
+.ins__lr-dismiss {
+  opacity: 0;
+}
+
+.ins__lr:hover .ins__lr-dismiss,
+.ins__lr-dismiss:focus-visible {
+  opacity: 1;
 }
