@@ -2,7 +2,7 @@
  * Every channel Foundry registers, read from the registry `activate` builds
  * rather than from its source.
  */
-import { freshFoundryStorage } from './helpers/foundry-host.js'
+import { freshFoundryStorage, idleHome } from './helpers/foundry-host.js'
 import { partialFake } from '../../../tests/support/fakes'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -52,6 +52,7 @@ function registeringApi(): ExtensionAPI {
       showSelf: vi.fn(),
     }),
     commands: partialFake<ExtensionAPI['commands']>({ register: () => disposable }),
+    home: idleHome(),
     shell: partialFake<ExtensionAPI['shell']>({
       exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
     }),

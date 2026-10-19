@@ -13,7 +13,7 @@ let host: FoundryHost
 beforeAll(() => {
   host = fakeHost(() => '/unused')
   registerViewChannels(host.api)
-  registerCommands(host.api)
+  registerCommands(host.api, { create: vi.fn() })
   registerModelChannels(host.api)
 })
 

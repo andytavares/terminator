@@ -42,7 +42,7 @@ export interface InboxRegistrationDeps {
 export function registerInboxChannels(
   context: ActivationContext,
   deps: InboxRegistrationDeps
-): void {
+): InboxChannels {
   const inbox = createInbox(context, deps)
   reg(
     context.api,
@@ -55,6 +55,7 @@ export function registerInboxChannels(
     foundryChannel('foundry:inbox.decide', DecidePayload, inbox.decide)
   )
   registerAttention(context, deps.standingSources)
+  return inbox
 }
 
 function createInbox(context: ActivationContext, deps: InboxRegistrationDeps): InboxChannels {

@@ -87,6 +87,10 @@ export interface FoundryHost {
   /** Settings by key; a missing key reads as unset. */
   readonly settings: Map<string, unknown>
   readonly broadcast: ReturnType<typeof vi.fn>
+  /** Every feed Foundry published to Home. */
+  readonly homePublish: ReturnType<typeof vi.fn>
+  /** The handlers Foundry registered for Home's item actions. */
+  readonly homeActionHandlers: Array<(itemId: string, actionId: string) => Promise<void>>
   readonly showToast: ReturnType<typeof vi.fn>
   readonly createNotification: ReturnType<typeof vi.fn>
   /** Palette and menu commands by id, so a spec can run one. */
@@ -141,6 +145,8 @@ function hostParts() {
       options.command === 'gh' ? gh(options) : realGit(options)
     ),
     broadcast: vi.fn(),
+    homePublish: vi.fn(),
+    homeActionHandlers: [] as Array<(itemId: string, actionId: string) => Promise<void>>,
     showToast: vi.fn(),
     createNotification: vi.fn(() => ({ dispose: vi.fn() })),
     issues: noIssues(),
@@ -196,6 +202,7 @@ function foundryHostApi({ dataDir, globalStorage, handlers, parts }: HostApiInpu
       openAuxiliary: vi.fn(),
     }),
     commands: hostCommands(parts.commands),
+    home: hostHome(parts),
     shell: hostShell(parts.exec),
     notifications: partialFake<ExtensionAPI['notifications']>({
       showToast: parts.showToast,
@@ -205,10 +212,28 @@ function foundryHostApi({ dataDir, globalStorage, handlers, parts }: HostApiInpu
     settings: hostSettings(dataDir, parts.settings),
     workspace: hostWorkspace(parts.workspaces),
     issues: parts.issues,
-    // Foundry keeps its runtime state in its own folder: a throw-away one per
-    // host, so a spec never writes it into the working tree.
-    paths: { app: path.resolve(__dirname, '../..'), globalStorage },
+    paths: hostPaths(globalStorage),
   })
+}
+
+/** A Home that takes a feed and a handler and does nothing with either. */
+export function idleHome(): ExtensionAPI['home'] {
+  return partialFake<ExtensionAPI['home']>({ publish: vi.fn(), onAction: vi.fn(disposableStub) })
+}
+
+function hostHome(parts: HostParts): ExtensionAPI['home'] {
+  return partialFake<ExtensionAPI['home']>({
+    publish: parts.homePublish,
+    onAction: vi.fn((handler: (itemId: string, actionId: string) => Promise<void>) => {
+      parts.homeActionHandlers.push(handler)
+      return disposableStub()
+    }),
+  })
+}
+
+// A throw-away storage folder per host, so a spec never writes into the working tree.
+function hostPaths(globalStorage: string): ExtensionAPI['paths'] {
+  return { app: path.resolve(__dirname, '../..'), globalStorage }
 }
 
 function hostShell(exec: HostParts['exec']): ExtensionAPI['shell'] {
