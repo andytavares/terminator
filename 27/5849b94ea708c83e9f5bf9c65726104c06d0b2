@@ -1,0 +1,30 @@
+src/renderer/components/terminal/TerminalSession.tsx
+  s_3ced19ecaa16dd::t_a45f0694c97c6c 227,311-313
+  s_3ced19ecaa16dd::t_85a8f6e66df9d5 309
+  s_3ced19ecaa16dd::t_4fc95730bb441c 279,310
+  s_3ced19ecaa16dd::t_3327c543865290 314-315
+tests/e2e/live-preview-spacing.spec.ts
+  s_3ced19ecaa16dd::t_dc66c5e0185628 23-24
+  s_3ced19ecaa16dd::t_19d7c9509619b5 1-11,15-17,25,36-37,42-43,70-73,81-84
+  s_3ced19ecaa16dd::t_4e195c7c3fdfd7 29-30
+  s_3ced19ecaa16dd::t_91b36302d5b277 45,49
+  s_3ced19ecaa16dd::t_3fca815470fa89 46-48
+  s_3ced19ecaa16dd::t_a72b6e092d0d7e 12-14,18-22,26-28,31-35,38-41,44,51-69,74-80
+  s_3ced19ecaa16dd::t_30cf4d331aa53e 50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "275849b94ea708c83e9f5bf9c65726104c06d0b2",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
