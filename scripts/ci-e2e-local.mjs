@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The E2E job of .github/workflows/ci.yml, run here step for step (selection, five shards at
-// CI=1, burn-in of changed specs). `npm run ci:local` runs all of it; `-- 3` runs only shard 3.
+// CI=1, burn-in of changed specs). `npm run ci:local:e2e` runs all of it; `-- 3` runs only shard 3.
 
 import { execFileSync, spawnSync } from 'node:child_process'
 import { cpus, loadavg } from 'node:os'

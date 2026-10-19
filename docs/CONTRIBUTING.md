@@ -57,6 +57,15 @@ Starts the app on a fresh profile and passes when the main log says `App ready`,
 4. `base64 -i terminator-g2.p12 | gh secret set APPLE_CERTIFICATE`, then `gh secret set APPLE_CERTIFICATE_PASSWORD`, and delete the `.p12`.
 5. Run the `Test Notarization` workflow and confirm it passes.
 
+### Before you push
+
+```bash
+npm run ci:local        # Every check CI runs, cheapest first; stops at the first failure
+npm run ci:local:e2e    # Only the e2e job: specs selected by the diff, five shards, burn-in
+```
+
+The pre-push hook (`.husky/pre-push`) runs `npm run ci:local`, so a check that would fail in CI fails on your machine first. It runs the Lint job's steps (audit, syncpack, knip, jscpd, ESLint), format, typecheck, the unit suite with coverage under the temp-leak check, perf budgets, stories, the Storybook build, the start smoke tests and the e2e specs this diff selects. It prints what it leaves out and why: the design system's visual baselines are Linux screenshots, so they run in CI only. `tests/unit/scripts/ci-local.spec.ts` fails when `ci.yml` gains a command `ci:local` does not run.
+
 ### Run tests
 
 ```bash
