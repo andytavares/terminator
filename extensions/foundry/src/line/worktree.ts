@@ -80,12 +80,8 @@ export function ensureCheckout(
   return sharedCheckout({ order, lane, reattachOnly: false }, deps)
 }
 
-/**
- * The lane's checkout on its existing branch, never a new or reset one.
- *
- * For work already pushed (the refinery): cutting the branch afresh from the
- * base and force-pushing it would replace the pull request with the base.
- */
+/** The lane's checkout on its existing branch, never a new or reset one: for pushed work,
+ * a branch cut afresh from the base and force-pushed would replace the pull request. */
 export function reattachCheckout(
   order: WorkOrder,
   lane: number,
@@ -128,10 +124,8 @@ interface CheckoutPlan {
 
 type WorktreeState = 'absent' | 'present' | 'stale'
 
-// What git knows about `target`: registered with a folder behind it, registered
-// with the folder gone (`prunable`), or not registered. Asked of git: a directory
-// that exists but is not registered is not a checkout git knows. Records are
-// matched whole, so `<target>@baseline` is not `<target>`.
+// Asked of git, since an unregistered directory is not a checkout. Stale: registered with
+// the folder gone. Records are matched whole, so `<target>@baseline` is not `<target>`.
 async function worktreeState(
   origin: string,
   target: string,
@@ -190,10 +184,9 @@ async function runAdd(
   if (added.exitCode !== 0) throw new CheckoutFailedError(repo.name, added.stderr)
 }
 
-// Adds `target` as a worktree of `repo`, unless it already is one; whether it already was.
-// A registration whose folder is gone is replaced with `--force`, which touches only that
-// one: `git worktree prune` would drop every other lane's registration with it, and those
-// lanes would then be cut afresh from the base, losing their commits.
+// Whether `target` was already a worktree. A stale one is replaced with `--force`, never
+// `git worktree prune`: that drops every lane's stale registration, and those lanes would
+// then be cut afresh from the base, losing their commits.
 async function addWorktree(
   repo: CheckoutPlan['repo'],
   addition: WorktreeAddition,
