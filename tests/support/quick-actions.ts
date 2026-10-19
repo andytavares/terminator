@@ -46,6 +46,11 @@ export const CORE_SHORTCUTS: ShortcutSpec[] = [
     firedBy: (e) => meta(e) && e.shiftKey && e.key.toLowerCase() === 'e',
   },
   {
+    actionId: 'core.start-work',
+    display: '⌘N',
+    firedBy: (e) => meta(e) && !e.shiftKey && e.key.toLowerCase() === 'n',
+  },
+  {
     actionId: 'core.new-scratch',
     display: '⌘⇧T',
     firedBy: (e) => meta(e) && e.shiftKey && e.key.toLowerCase() === 't',

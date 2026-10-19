@@ -172,8 +172,8 @@ export function registerExtensionHandlers(
 
   onChannel(
     'extension:execute-command',
-    (_event, { key, ctx }: { key: string; ctx: CommandContext }) => {
-      void executeExtensionCommand(key, ctx)
+    (_event, { key, ctx, args }: { key: string; ctx: CommandContext; args?: unknown }) => {
+      void executeExtensionCommand(key, ctx, args)
     }
   )
 }

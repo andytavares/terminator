@@ -1,0 +1,235 @@
+/* The Start work launcher, drawn as in the approved Home design. The shell centres the dialog
+   (ADR 110); this is the panel inside it. */
+.start-work {
+  width: 820px;
+  max-width: 100%;
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 12px;
+  box-shadow: 0 30px 70px rgb(0 0 0 / 55%);
+  overflow: hidden;
+  color: var(--tm-text-primary);
+  font-size: 12px;
+}
+
+.start-work__input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--tm-border);
+  font-size: 15px;
+}
+
+.start-work__input > svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--tm-text-muted);
+}
+
+.start-work__input input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--tm-text-primary);
+  caret-color: var(--tm-accent-text);
+  font: inherit;
+}
+
+.start-work__tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.start-work__tabs button {
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tm-text-secondary);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.start-work__tabs button[aria-selected='true'] {
+  background: var(--tm-bg-card-hover);
+  color: var(--tm-text-primary);
+}
+
+.start-work__body {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  min-height: 330px;
+}
+
+.start-work__list {
+  padding: 6px;
+  border-right: 1px solid var(--tm-border);
+  overflow-y: auto;
+  max-height: 420px;
+}
+
+.start-work__group {
+  margin: 0;
+  padding: 10px 8px 4px;
+  color: var(--tm-text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.start-work__hint {
+  margin: 0;
+  padding: 10px 8px;
+  color: var(--tm-text-muted);
+}
+
+.start-work__row {
+  display: grid;
+  grid-template-columns: 16px 58px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.start-work__row[aria-selected='true'] {
+  background: var(--tm-accent-dim);
+}
+
+.start-work__row svg {
+  width: 14px;
+  height: 14px;
+  color: var(--tm-text-muted);
+}
+
+.start-work__key {
+  font-family: var(--tm-font-mono);
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+}
+
+.start-work__side {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 14px;
+}
+
+.start-work__label {
+  font-size: 11.5px;
+  color: var(--tm-text-secondary);
+}
+
+.start-work__options {
+  display: grid;
+  gap: 12px;
+}
+
+.start-work__option {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.start-work__option[aria-checked='true'] {
+  border-color: var(--tm-accent);
+  background: var(--tm-accent-dim);
+}
+
+.start-work__option small {
+  display: block;
+  margin-top: 2px;
+  color: var(--tm-text-muted);
+  font-size: 11px;
+}
+
+.start-work__radio {
+  box-sizing: border-box;
+  width: 13px;
+  height: 13px;
+  margin-top: 1px;
+  border: 1.5px solid var(--tm-text-muted);
+  border-radius: 50%;
+}
+
+.start-work__option[aria-checked='true'] .start-work__radio {
+  border: 4px solid var(--tm-accent-text);
+}
+
+.start-work__summary {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 5px 10px;
+  margin: 0;
+  font-size: 11.5px;
+}
+
+.start-work__summary dt {
+  color: var(--tm-text-muted);
+}
+
+.start-work__summary dd {
+  margin: 0;
+  overflow: hidden;
+  color: var(--tm-text-primary);
+  font-family: var(--tm-font-mono);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.start-work__repos {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 8px;
+  background: var(--tm-bg-card);
+}
+
+.start-work__repos button {
+  width: 100%;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tm-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.start-work__repos [aria-selected='true'] button,
+.start-work__repos button:hover {
+  background: var(--tm-accent-dim);
+}
+
+.start-work__footer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 14px;
+  border-top: 1px solid var(--tm-border);
+  color: var(--tm-text-muted);
+  font-size: 11px;
+}
+
+.start-work__footer > button {
+  margin-left: auto;
+}
+
+.start-work__error {
+  color: var(--tm-danger);
+}

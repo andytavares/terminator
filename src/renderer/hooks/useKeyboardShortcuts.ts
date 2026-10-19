@@ -4,6 +4,7 @@ import { useSessionStore } from '../stores/session.store'
 import { useTerminalSession } from './useTerminalSession'
 import { useSettingsStore } from '../stores/settings.store'
 import { useExtensionRegistry, matchesAccelerator } from '../extensions/registry'
+import { useStartWorkStore } from '../components/home/start-work'
 import {
   cycleMostRecentlyAttended,
   jumpToNextAwaitingInput,
@@ -91,6 +92,12 @@ const APP_KEYS: CoreKey[] = [
     test: (e, at) => at.isMeta && e.shiftKey && e.key === 'e',
     actionId: 'core.toggle-overview',
     run: (c) => c.options.onToggleOverview?.(),
+  },
+  // Cmd+N: the Start work launcher. The menu has no New Window item, so the key reaches the page.
+  {
+    test: (e, at) => at.isMeta && !e.shiftKey && e.key === 'n',
+    actionId: 'core.start-work',
+    run: () => useStartWorkStore.getState().openLauncher(),
   },
   {
     test: (e, at) => at.isMeta && e.shiftKey && e.key === 't',

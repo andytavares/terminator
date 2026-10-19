@@ -6,6 +6,7 @@ import { NameTerminalDialog } from '../components/NameTerminalDialog'
 import { LogWindow } from '../components/LogWindow'
 import { ToastContainer } from '../components/ToastContainer'
 import { HomeBadge, SessionLinkHost } from '../components/AppShellParts'
+import { StartWorkHost } from '../components/home/StartWork'
 // Not lazy: the keys typed straight after ⌘P ("n n", "/") would reach the
 // app before a lazily loaded panel mounted, and be lost.
 import { QuickActionsHost, type QuickActionsHostProps } from '../components/QuickActionsHost'
@@ -57,6 +58,7 @@ export function ShellOverlays(state: ShellOverlayState): JSX.Element {
         <SessionLinkHost sessionId={state.linkSessionId} onClose={state.closeLink} />
       )}
       {state.quickActions && <QuickActionsHost {...state.quickActions} />}
+      <StartWorkHost />
       <HomeBadge />
       <ToastContainer />
       <ExtensionOverlays />

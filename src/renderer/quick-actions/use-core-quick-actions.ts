@@ -10,6 +10,7 @@ import { useSessionFacts, useIssue } from '../components/session/useSessionFacts
 import { revealSession } from '../terminal/navigate-to-session'
 import { qualifiedBranchLabel } from '../sidebar/branch-display'
 import { agentStateOf } from '../sidebar/agent-state'
+import { useStartWorkStore } from '../components/home/start-work'
 import { buildCoreActions, type CoreSessionSummary } from './core-actions'
 import type { QuickActionTarget } from './use-active-scope'
 import type { CoreActionDeps } from './core-actions'
@@ -224,6 +225,7 @@ function coreActionDeps(c: CoreContext, paletteSessions: CoreSessionSummary[]): 
     ...workspaceHandlers(c),
     ...issueHandlers(c),
     ...shellHandlers(c.shell),
+    onStartWork: () => useStartWorkStore.getState().openLauncher(),
   }
 }
 

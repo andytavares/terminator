@@ -690,8 +690,8 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.executeCommand',
     kind: 'send',
     channel: 'extension:execute-command',
-    signature: signature<(key: string, ctx: CommandContext) => void>(),
-    toPayload: (key, ctx) => ({ key, ctx }),
+    signature: signature<(key: string, ctx: CommandContext, args?: unknown) => void>(),
+    toPayload: (key, ctx, args) => ({ key, ctx, args }),
     extensionView: 'shared',
   }),
   // Run another extension's command by full id, e.g.
