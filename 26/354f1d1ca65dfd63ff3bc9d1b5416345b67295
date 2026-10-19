@@ -1,0 +1,56 @@
+extensions/task-vault/tests/home/feed.spec.ts
+  s_3ced19ecaa16dd::t_8971485def35a9 58,60
+  s_3ced19ecaa16dd::t_44a37aeab56967 1-4,6-15,18-30,33-52,54-57,59,61-64,70-101,105-114
+  s_3ced19ecaa16dd::t_b58afd52e33458 16-17,31-32
+  s_3ced19ecaa16dd::t_a10e26f91d18e1 5,53,65-69,102-104
+extensions/task-vault/src/home/publisher.ts
+  s_3ced19ecaa16dd::t_b33d6f971bea95 2
+  s_3ced19ecaa16dd::t_1340e32d5a848e 1,3,5-37,39-53,61-74,76,78,80,82-84,86,88-89,91-92,94-100
+  s_3ced19ecaa16dd::t_8971485def35a9 4,54-58,60
+  s_3ced19ecaa16dd::t_b58afd52e33458 77,90
+  s_3ced19ecaa16dd::t_1cd1cb6d870b87 87
+  s_3ced19ecaa16dd::t_a10e26f91d18e1 38,59,75,79,81,85,93
+extensions/task-vault/tests/index.spec.ts
+  s_3ced19ecaa16dd::t_8971485def35a9 38-44,50,325
+  s_3ced19ecaa16dd::t_578f7973c01b8d 70,305-324,326
+extensions/task-vault/src/home/feed.ts
+  s_3ced19ecaa16dd::t_44a37aeab56967 1-80
+extensions/task-vault/tests/index-reset.spec.ts
+  s_3ced19ecaa16dd::t_1fc7e5ea42dbb6 64
+extensions/task-vault/src/ipc/weekly-review.ipc.ts
+  s_3ced19ecaa16dd::t_b33d6f971bea95 49-52,61
+  s_3ced19ecaa16dd::t_d39d228a8a9219 7
+extensions/task-vault/manifest.json
+  s_3ced19ecaa16dd::t_b33d6f971bea95 27-31
+extensions/task-vault/tests/channel-schemas.spec.ts
+  s_3ced19ecaa16dd::t_7524aa2941eb0b 45
+extensions/task-vault/src/index.ts
+  s_3ced19ecaa16dd::t_8971485def35a9 32,315-316,323-325,330
+  s_3ced19ecaa16dd::t_b33d6f971bea95 33,293-300,305-310,317-322,342,349
+  s_3ced19ecaa16dd::t_b9164f6962c0b8 301-304
+extensions/task-vault/tests/home/publisher.spec.ts
+  s_3ced19ecaa16dd::t_8971485def35a9 43,83,85,108,110
+  s_3ced19ecaa16dd::t_d8ba4784af42ee 80
+  s_3ced19ecaa16dd::t_1340e32d5a848e 1-12,14-27,33-42,44-45,47-59,61-71,73,75-76,78-79,81-82,84,86-88,90-91,93-99,101-102,104,106-107,109,111,113-119
+  s_3ced19ecaa16dd::t_76a39d982cf860 28-32
+  s_3ced19ecaa16dd::t_a617e10b89b688 72,74
+  s_3ced19ecaa16dd::t_a10e26f91d18e1 13,46,60,77,89,92,100,103,105,112
+extensions/task-vault/src/ipc/vault-task-state.ts
+  s_3ced19ecaa16dd::t_b9164f6962c0b8 51-54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "26354f1d1ca65dfd63ff3bc9d1b5416345b67295",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
