@@ -262,11 +262,12 @@
   align-items: center;
 }
 
-/* The design system's field (controls.css), sized for the picker's header. */
+/* The design system's field (controls.css), at the small height of the buttons beside it. */
 .rp-search {
   flex: 1 1 200px;
   min-width: 0;
-  padding: 5px 9px;
+  height: var(--tm-control-height-sm);
+  padding: 0 9px;
   font: inherit;
 }
 
