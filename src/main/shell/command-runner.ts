@@ -142,11 +142,16 @@ function timeOut(run: CommandRun): void {
   stopGroup(run.child)
 }
 
+/** A command's output, and whether it ran to an answer of its own. */
+interface Finish {
+  output: ShellExecOutput<string | Buffer>
+  /** True when the command never started or a signal ended it: its exit code is then a stand-in
+   * (1), not something it said. A timeout is `output.timedOut`, not this. */
+  didNotRun: boolean
+}
+
 /** Resolves once the command has ended and its output has closed, or it could not start. */
-function finished(
-  run: CommandRun,
-  input: ShellExecInput
-): Promise<ShellExecOutput<string | Buffer>> {
+function finished(run: CommandRun, input: ShellExecInput): Promise<Finish> {
   const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const timer = timeoutMs > 0 ? setTimeout(() => timeOut(run), timeoutMs) : undefined
   return new Promise((resolve) => {
@@ -156,7 +161,11 @@ function finished(
       settled = true
       clearTimeout(timer)
       running.delete(run.child)
-      resolve(toOutput(run, code, input.encoding))
+      const endedBySignal = code === null && !run.timedOut && run.failure === undefined
+      resolve({
+        output: toOutput(run, code, input.encoding),
+        didNotRun: run.failure !== undefined || endedBySignal,
+      })
     }
     run.child.once('error', (error) => {
       run.failure = error.message
@@ -167,11 +176,17 @@ function finished(
 }
 
 /** Runs a command and resolves with its result once it has ended, or could not start. */
-export function runProcess(
+export async function runProcess(
   input: ShellExecInput,
   environment: NodeJS.ProcessEnv
 ): Promise<ShellExecOutput<string | Buffer>> {
-  return finished(startCommand(input, environment), input)
+  return (await finished(startCommand(input, environment), input)).output
+}
+
+/** `runTextCommand`'s result, and whether the command ran to an answer of its own. Core only: the
+ * extension API's `ShellExecOutput` does not carry it. */
+export interface TextCommandResult extends ShellExecOutput {
+  didNotRun: boolean
 }
 
 /**
@@ -180,7 +195,12 @@ export function runProcess(
 export async function runTextCommand(
   input: Omit<ShellExecInput, 'encoding'>,
   environment: NodeJS.ProcessEnv
-): Promise<ShellExecOutput> {
-  const result = await runProcess(input, environment)
-  return { ...result, stdout: result.stdout.toString(), stderr: result.stderr.toString() }
+): Promise<TextCommandResult> {
+  const { output, didNotRun } = await finished(startCommand(input, environment), input)
+  return {
+    ...output,
+    stdout: output.stdout.toString(),
+    stderr: output.stderr.toString(),
+    didNotRun,
+  }
 }

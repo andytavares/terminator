@@ -447,7 +447,10 @@ export const ELECTRON_API_MANIFEST = [
     path: 'git.isRepo',
     kind: 'invoke',
     channel: 'git:is-repo',
-    signature: signature<(path: string) => Promise<{ isRepo: boolean; root?: string }>>(),
+    signature:
+      signature<
+        (path: string) => Promise<{ isRepo: boolean; root?: string } | { error: string }>
+      >(),
     toPayload: (path) => ({ path }),
     extensionView: 'shared',
   }),
