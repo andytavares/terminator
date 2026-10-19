@@ -8,7 +8,7 @@ type Fields = Record<string, unknown>
 const isObject = (value: unknown): value is Fields =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-const isOptionalOf = (value: unknown, kind: 'string' | 'number'): boolean =>
+const isOptionalOf = (value: unknown, kind: 'string' | 'number' | 'boolean'): boolean =>
   value === undefined || typeof value === kind
 
 function isWorkKey(value: unknown): value is WorkKey {
@@ -28,25 +28,25 @@ function isFocusItem(value: unknown): value is FocusItem {
 
 export interface StoredFocus {
   days: Record<string, FocusItem[]>
-  lastLeftHomeAt: number | null
   planDismissedOn: string | null
+  planCollapsed: boolean
 }
 
 const nullable = (value: unknown, kind: 'string' | 'number'): boolean =>
   value === null || isOptionalOf(value, kind)
 
-/** The stored focus, or null when it is not shaped like one; missing times read as null. */
+/** The stored focus, or null when it is not shaped like one; missing fields read as empty. */
 export function storedFocusOf(value: unknown): StoredFocus | null {
   if (!isObject(value) || !isObject(value.days)) return null
   const days = Object.values(value.days)
   if (!days.every((items) => Array.isArray(items) && items.every(isFocusItem))) return null
-  if (!nullable(value.lastLeftHomeAt, 'number') || !nullable(value.planDismissedOn, 'string')) {
+  if (!nullable(value.planDismissedOn, 'string') || !isOptionalOf(value.planCollapsed, 'boolean')) {
     return null
   }
   return {
     days: value.days as Record<string, FocusItem[]>,
-    lastLeftHomeAt: (value.lastLeftHomeAt as number | undefined) ?? null,
     planDismissedOn: (value.planDismissedOn as string | undefined) ?? null,
+    planCollapsed: (value.planCollapsed as boolean | undefined) ?? false,
   }
 }
 
@@ -56,6 +56,12 @@ export function storedParkedOf(value: unknown, now: number): Record<string, numb
     if (!value.every((key) => typeof key === 'string')) return null
     return Object.fromEntries(value.map((key: string) => [key, now]))
   }
+  if (!isObject(value) || !Object.values(value).every((at) => typeof at === 'number')) return null
+  return value as Record<string, number>
+}
+
+/** Dismissed keys with the thread activity each was dismissed at. */
+export function storedDismissedOf(value: unknown): Record<string, number> | null {
   if (!isObject(value) || !Object.values(value).every((at) => typeof at === 'number')) return null
   return value as Record<string, number>
 }

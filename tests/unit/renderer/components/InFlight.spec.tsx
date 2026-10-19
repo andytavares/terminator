@@ -1,16 +1,22 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
 import { InFlight } from '../../../../src/renderer/components/home/InFlight'
 import { useDeskSelection } from '../../../../src/renderer/components/home/desk-selection'
 import { useParkedThreads } from '../../../../src/renderer/components/home/parked-threads'
+import { useDismissedThreads } from '../../../../src/renderer/components/home/dismissed-threads'
 import { useHomeFeedStore } from '../../../../src/renderer/stores/home-feed.store'
+import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { installElectronApi } from '../../../support/electron-api'
 import { FACTS, seedDesk, sendToAgentAsk } from '../home/desk-world'
 
 const spies = vi.hoisted(() => ({
   open: vi.fn(),
   resume: vi.fn(),
+  saveDescription: vi.fn(),
+  closeSession: vi.fn(),
   startInBranch: vi.fn(),
   facts: [] as unknown[],
 }))
@@ -18,7 +24,26 @@ vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
   useSessionFacts: () => spies.facts,
 }))
 vi.mock('../../../../src/renderer/components/session/session-actions', () => ({
-  SESSION_ACTIONS: { onOpen: spies.open, onResume: spies.resume },
+  SESSION_ACTIONS: {
+    onOpen: spies.open,
+    onResume: spies.resume,
+    onSaveDescription: spies.saveDescription,
+    onCloseSession: spies.closeSession,
+  },
+}))
+
+const linkStub = vi.hoisted(() => {
+  function FakeLinkDialog({ onClose }: { facts: unknown; onClose: () => void }): JSX.Element {
+    return (
+      <div role="dialog" aria-label="Link a work item">
+        <button onClick={onClose}>Close link dialog</button>
+      </div>
+    )
+  }
+  return { FakeLinkDialog }
+})
+vi.mock('../../../../src/renderer/components/session/SessionLinkDialog', () => ({
+  SessionLinkDialog: linkStub.FakeLinkDialog,
 }))
 vi.mock('../../../../src/renderer/terminal/start-session', () => ({
   startSessionInBranch: spies.startInBranch,
@@ -57,6 +82,7 @@ function resetDesk(): void {
   useDeskSelection.setState({ selectedThreadKey: null, openThreadKey: null, groupBy: 'move' })
   useDeskSelection.setState({ expandedGroupIds: [] })
   useParkedThreads.setState({ keys: [] })
+  useDismissedThreads.setState({ dismissed: {} })
 }
 
 beforeEach(() => {
@@ -209,7 +235,7 @@ describe('the work-thread drawer — checks', () => {
 describe('the work-thread drawer — actions', () => {
   it('opens the terminal, the pull request and the ticket, and parks the work', async () => {
     const drawer = within(await openBuilding())
-    fireEvent.click(drawer.getByRole('button', { name: 'Open terminal' }))
+    fireEvent.click(drawer.getAllByRole('button', { name: 'Open terminal' })[0])
     expect(spies.open).toHaveBeenCalledWith('building')
     fireEvent.click(drawer.getByRole('button', { name: 'Open pull request #275' }))
     expect(openExternal).toHaveBeenCalledWith('https://github.com/o/r/pull/275')
@@ -268,5 +294,194 @@ describe('filtering from the Desk header', () => {
     expect(
       screen.getAllByRole('button', { name: /./ }).filter((b) => b.dataset.threadKey)
     ).toHaveLength(rows)
+  })
+})
+
+const rightClickRow = (title: string) => {
+  const row = inFlightRowNamed(title)
+  fireEvent.contextMenu(within(row).getByRole('button', { name: 'Work actions' }))
+  return row
+}
+
+const openScratchRow = () => {
+  fireEvent.click(screen.getByRole('button', { name: /Parked · 1/ }))
+  return rightClickRow('Scratch shell')
+}
+
+const contextMenuItemNames = () =>
+  within(document.body)
+    .getAllByRole('button')
+    .filter((b) => b.className.includes('ctx-menu__item'))
+    .map((b) => b.textContent)
+
+const openMenuItem = (name: string) => within(document.body).getByRole('button', { name })
+
+const TICKETED_MENU = [
+  'Open terminal',
+  'Rename…',
+  'Park',
+  'Dismiss',
+  'Close sessions',
+  'Remove worktree…',
+]
+const SCRATCH_MENU = [
+  'Open terminal',
+  'Rename…',
+  'Link ticket…',
+  'Unpark',
+  'Dismiss',
+  'Close sessions',
+]
+
+describe('the row menu — which items', () => {
+  it('opens on right click with the actions for a ticketed thread with sessions', () => {
+    render(<InFlight />)
+    rightClickRow('PR overview shows status before story')
+    expect(contextMenuItemNames()).toEqual(TICKETED_MENU)
+  })
+
+  it('omits ticket-only actions for a scratch terminal and worktree removal for its session', () => {
+    render(<InFlight />)
+    openScratchRow()
+    expect(contextMenuItemNames()).toEqual(SCRATCH_MENU)
+  })
+
+  it('opens from the row’s ⋯ button without opening the drawer', () => {
+    render(<InFlight />)
+    const row = inFlightRowNamed('Make all text in the app scale with settings')
+    fireEvent.click(within(row).getByRole('button', { name: 'Work actions' }))
+    expect(contextMenuItemNames()).toEqual(['Park', 'Dismiss'])
+    expect(
+      screen.queryByRole('dialog', { name: 'Make all text in the app scale with settings' })
+    ).toBeNull()
+  })
+})
+
+const openRenameField = (title: string, text: string, key: string): HTMLElement => {
+  rightClickRow(title)
+  fireEvent.click(openMenuItem('Rename…'))
+  const field = screen.getByDisplayValue(title)
+  fireEvent.change(field, { target: { value: text } })
+  fireEvent.keyDown(field, { key })
+  return field
+}
+
+describe('the row menu — Open terminal and Close sessions', () => {
+  it('Open terminal reveals the thread’s lead session', () => {
+    render(<InFlight />)
+    rightClickRow('PR overview shows status before story')
+    fireEvent.click(openMenuItem('Open terminal'))
+    expect(spies.open).toHaveBeenCalledWith('building')
+  })
+
+  it('Close sessions closes each open session in the thread', () => {
+    render(<InFlight />)
+    rightClickRow('PR overview shows status before story')
+    fireEvent.click(openMenuItem('Close sessions'))
+    expect(spies.closeSession).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: 'building' })
+    )
+  })
+})
+
+describe('the row menu — Rename', () => {
+  it('Escape cancels; Enter saves the typed title as the lead session’s description', () => {
+    render(<InFlight />)
+    openRenameField('PR overview shows status before story', 'PR overview', 'Escape')
+    expect(spies.saveDescription).not.toHaveBeenCalled()
+    openRenameField('PR overview shows status before story', 'PR overview', 'Enter')
+    expect(spies.saveDescription).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: 'building' }),
+      'PR overview'
+    )
+  })
+})
+
+describe('the row menu — Link ticket', () => {
+  it('opens the link dialog for the scratch session', () => {
+    render(<InFlight />)
+    openScratchRow()
+    fireEvent.click(openMenuItem('Link ticket…'))
+    expect(screen.getByRole('dialog', { name: 'Link a work item' })).toBeTruthy()
+  })
+})
+
+const parkViaMenu = (title: string, item: string): void => {
+  rightClickRow(title)
+  fireEvent.click(openMenuItem(item))
+}
+
+describe('the row menu — Park and Dismiss', () => {
+  it('Park moves the thread under Parked and the menu then offers Unpark', () => {
+    render(<InFlight />)
+    parkViaMenu('Reproduce staging 429s before release', 'Park')
+    expect(useParkedThreads.getState().keys).toEqual(['linear:TAV-31'])
+    expect(
+      screen.queryByRole('button', { name: 'Reproduce staging 429s before release' })
+    ).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Parked · / }))
+    parkViaMenu('Reproduce staging 429s before release', 'Unpark')
+    expect(useParkedThreads.getState().keys).toEqual([])
+  })
+
+  it('Dismiss hides the row and keeps it hidden while nothing new happens', () => {
+    render(<InFlight />)
+    parkViaMenu('Reproduce staging 429s before release', 'Dismiss')
+    expect(
+      screen.queryByRole('button', { name: 'Reproduce staging 429s before release' })
+    ).toBeNull()
+    expect(useDismissedThreads.getState().dismissed['linear:TAV-31']).toBeDefined()
+  })
+})
+
+describe('the row menu — a dismissed thread coming back', () => {
+  it('a dismissed thread reappears when its last activity moves past the dismissal', () => {
+    const { rerender } = render(<InFlight />)
+    parkViaMenu('Reproduce staging 429s before release', 'Dismiss')
+    expect(
+      screen.queryByRole('button', { name: 'Reproduce staging 429s before release' })
+    ).toBeNull()
+    spies.facts = FACTS.map((f: { sessionId: string }) =>
+      f.sessionId === 'asking' ? { ...f, lastActivityAt: Date.now() } : f
+    )
+    rerender(<InFlight />)
+    expect(
+      screen.getByRole('button', { name: 'Reproduce staging 429s before release' })
+    ).toBeTruthy()
+  })
+})
+
+const confirmRemoveWorktree = async (deleteProject: () => void): Promise<void> => {
+  rightClickRow('PR overview shows status before story')
+  fireEvent.click(openMenuItem('Remove worktree…'))
+  fireEvent.click(await screen.findByRole('button', { name: 'Remove' }))
+  expect(deleteProject).toHaveBeenCalledWith('p20')
+}
+
+describe('the row menu — Remove worktree', () => {
+  it('asks first, then deletes the lead project', async () => {
+    const deleteProject = vi.fn()
+    useWorkspaceStore.setState({ deleteProject })
+    render(<InFlight />)
+    rightClickRow('PR overview shows status before story')
+    fireEvent.click(openMenuItem('Remove worktree…'))
+    const confirm = await screen.findByRole('dialog', {
+      name: 'Remove worktree for "PR overview shows status before story"?',
+    })
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Cancel' }))
+    expect(deleteProject).not.toHaveBeenCalled()
+    await confirmRemoveWorktree(deleteProject)
+  })
+})
+
+describe('the row grid', () => {
+  it('starts every cell on the row’s first line', () => {
+    const css = readFileSync(
+      resolve(__dirname, '../../../../src/renderer/components/home/InFlight.css'),
+      'utf8'
+    )
+    expect(css).toContain('grid-template-columns: minmax(0, 1fr) 150px 112px 124px 40px')
+    const rowBlock = css.slice(css.indexOf('.desk-tr {\n  position: relative;'))
+    expect(rowBlock.slice(0, rowBlock.indexOf('\n}'))).toContain('align-items: start')
   })
 })
