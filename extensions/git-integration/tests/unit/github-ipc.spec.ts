@@ -3394,6 +3394,27 @@ async function widgetsDashboard() {
   }
 }
 
+describe('github:dashboard-search hands Home its rows', () => {
+  it('hands over the rows and failed sections of each search, and refreshDashboard runs one', async () => {
+    const onDashboard = vi.fn()
+    mockDashboardExec(
+      { mine: [widgetsNode] },
+      { '/Users/me/repos/widgets': 'https://github.com/acme/widgets.git' }
+    )
+    const { refreshDashboard } = registerGithubHandlers(
+      () => {},
+      { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: GLOBAL_STORAGE },
+      { listProjectRoots: () => ['/Users/me/repos/widgets'], onDashboard }
+    )
+    await refreshDashboard()
+    expect(onDashboard).toHaveBeenCalledTimes(1)
+    expect(onDashboard.mock.calls[0][0]).toMatchObject({
+      failed: [],
+      prs: [{ number: 5, section: 'mine', localRepoRoot: '/Users/me/repos/widgets' }],
+    })
+  })
+})
+
 describe('github:dashboard-search sessions and cap', () => {
   beforeEach(() => {
     vi.clearAllMocks()

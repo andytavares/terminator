@@ -51,6 +51,10 @@ Every command goes through the core (ADR 094). git runs through `runGit` (`src/s
 
 The Git, Code Reviews, Reviews and review-agent flows have e2e specs (`tests/e2e/git-commit-flow`, `merge-flow-resolve`, `pr-review-diff`, `pr-review-queue`, `review-agent`, `review-dashboard`). They run against a local bare `origin` and the stub GitHub (`tests/e2e/github-stub.ts`, reached through `tests/e2e/fixtures/bin/gh`); a gh call it has no route for fails (REST answers 404, GraphQL "stub GitHub cannot answer this query"), so a new gh call needs a route in `tests/e2e/github-stub-gh.ts`. The review agent's `claude -p` answers with the file `E2E_CLAUDE_REVIEW_REPLY` names.
 
+### Home feed (ADR 117)
+
+`src/home/` publishes to Home through `api.home` from data already fetched: `feed.ts` builds asks (review requests, failing checks of my pull requests), pull request facets and the merged measure; `publisher.ts` keeps the latest dashboard and calendar and publishes after each `github:dashboard-search` and all-repositories `github:contributions` fetch (hooks in `GithubHandlerOptions`), and runs one dashboard refresh at activation and every two minutes, since the dashboard otherwise refreshes only while Reviews is open. Add no search for Home: aliased searches run serially and Reviews has hit 502s. `actions.ts` answers `start-review`, `send-to-agent` (an agent terminal on the branch's worktree, else `claude` in a new one) and `open-log` (`gh pr checks --web`).
+
 ### Stores
 
 The electron-store files (`config.json` for merge flow, `pr-review-sessions.json`, `pr-active-reviews.json`, `pr-agent-reviews.json`) live in `api.paths.globalStorage`. `openStorageDirectory` (`src/storage-directory.ts`) creates the folder at activation and first moves the files earlier builds kept in the shared userData folder, unless the new one exists (ADR 103). A store is opened with `namedStore`, whose name must be one of `STORE_NAMES`, the list activation moves.

@@ -1,5 +1,13 @@
 import type { DashboardPR, DashboardSection } from '../schemas/pr-review.schema'
 import { queueRiskLevel } from './pr-review-service'
+import {
+  CHECKS_FIELDS,
+  REVIEW_REQUEST_FIELDS,
+  checksOf,
+  reviewRequestedAtOf,
+  type RawContext,
+  type RawReviewRequest,
+} from './dashboard-checks'
 
 // ─── Dashboard search queries (R1) ─────────────────────────────────────────────
 //
@@ -28,7 +36,15 @@ const SECTION_ALIASES: Record<DashboardSection, string> = {
 // 'mine' is independent — it never competes with the others.
 const DEDUPE_ORDER: DashboardSection[] = ['requested', 're-review', 'team', 'involved']
 
-const PR_FIELDS = `fragment prFields on PullRequest {
+/** Fields only some sections read, so the others do not pay for them. */
+const SECTION_FIELDS: Partial<Record<DashboardSection, string>> = {
+  mine: CHECKS_FIELDS,
+  requested: REVIEW_REQUEST_FIELDS,
+  're-review': REVIEW_REQUEST_FIELDS,
+}
+
+const prFields = (section: DashboardSection) => `fragment prFields on PullRequest {
+    ${SECTION_FIELDS[section] ?? ''}
     number
     title
     url
@@ -74,7 +90,7 @@ export function buildSectionQueries(
         query: `query {
     ${SECTION_ALIASES[section]}: search(query: ${JSON.stringify(search)}, type: ISSUE, first: 50) { issueCount nodes { ...prFields } }
   }
-  ${PR_FIELDS}`,
+  ${prFields(section)}`,
       }
     })
   )
@@ -109,6 +125,10 @@ interface RawPrNode {
       commit: { oid: string } | null
     }>
   }
+  latestChecks?: {
+    nodes: Array<{ commit: { statusCheckRollup: { contexts: { nodes: RawContext[] } } | null } }>
+  }
+  reviewRequestEvents?: { nodes: RawReviewRequest[] }
 }
 
 interface RawSearchResult {
@@ -182,12 +202,23 @@ function reviewProgressOf(node: RawPrNode, login: string) {
   }
 }
 
+/** What only some sections ask for: my checks, and when a review was requested of me. */
+function sectionExtrasOf(node: RawPrNode, viewer: DashboardViewer) {
+  const contexts = node.latestChecks?.nodes.at(-1)?.commit.statusCheckRollup?.contexts.nodes
+  const requestedAt = reviewRequestedAtOf(node.reviewRequestEvents?.nodes ?? [], viewer.login)
+  return {
+    ...(contexts ? { checks: checksOf(contexts) } : {}),
+    ...(requestedAt ? { reviewRequestedAt: requestedAt } : {}),
+  }
+}
+
 function mapNode(node: RawPrNode, section: DashboardSection, viewer: DashboardViewer): DashboardPR {
   const { additions, deletions } = node
   const repo = node.repository.nameWithOwner
   return {
     repo,
     localRepoRoot: viewer.localRoots.get(repo) ?? null,
+    headRefName: node.headRefName ?? '',
     section,
     number: node.number,
     title: node.title,
@@ -201,6 +232,7 @@ function mapNode(node: RawPrNode, section: DashboardSection, viewer: DashboardVi
     riskLevel: queueRiskLevel(additions + deletions),
     estimatedMinutes: Math.max(1, Math.ceil((additions + deletions) / 60)),
     ...reviewProgressOf(node, viewer.login),
+    ...sectionExtrasOf(node, viewer),
     sessionStatus: 'not-started',
     viewedFileCount: 0,
   }

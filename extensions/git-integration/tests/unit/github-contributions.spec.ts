@@ -18,7 +18,7 @@ vi.mock('fs/promises', () => ({
 }))
 
 import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
-import { registerGithubHandlers } from '../../src/ipc/github.ipc'
+import { registerGithubHandlers, type GithubHandlerOptions } from '../../src/ipc/github.ipc'
 import { bindWorkspaceRoots } from '../../src/ipc/repo-root'
 import { githubOverStub, bindShellToStub, stubAnswering } from './support/shell'
 
@@ -32,13 +32,14 @@ const GLOBAL_STORAGE =
 type Handler = (payload: unknown) => Promise<unknown>
 
 /** Registers each channel into `handlers`, answered as the core answers an invoke. */
-function captureHandlers(): Record<string, Handler> {
+function captureHandlers(options: GithubHandlerOptions = {}): Record<string, Handler> {
   const handlers: Record<string, Handler> = {}
   registerGithubHandlers(
     (spec: ChannelSpec) => {
       handlers[spec.channel] = (payload) => dispatchChannel(spec, payload)
     },
-    { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: GLOBAL_STORAGE }
+    { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: GLOBAL_STORAGE },
+    options
   )
   return handlers
 }
@@ -318,5 +319,24 @@ describe('github:contributions — parses the line-delimited pages gh --jq print
     mockSearches([openedNode(3, '2026-10-13T10:00:00Z')], [], [])
     const result = await invoke(handlers)
     expect(result.period.opened).toBe(1)
+  })
+})
+
+describe('github:contributions — hands Home the calendar', () => {
+  it('hands over the all-repositories calendar after a fetch', async () => {
+    const onContributions = vi.fn()
+    const handlers = captureHandlers({ onContributions })
+    mockSearches([openedNode(1, '2026-10-15T09:00:00Z')], [], [])
+    await invoke(handlers)
+    expect(onContributions).toHaveBeenCalledTimes(1)
+    expect(onContributions.mock.calls[0][0].total).toBe(1)
+  })
+
+  it('hands over nothing for a calendar narrowed to one repository', async () => {
+    const onContributions = vi.fn()
+    const handlers = captureHandlers({ onContributions })
+    mockSearches([openedNode(1, '2026-10-15T09:00:00Z')], [], [])
+    await invoke(handlers, { ...PAYLOAD, repo: 'acme/widgets' })
+    expect(onContributions).not.toHaveBeenCalled()
   })
 })

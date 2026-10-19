@@ -179,7 +179,7 @@ function withSessionProgress(prs: DashboardPR[], stored: Record<string, unknown>
   })
 }
 
-async function runDashboardSearch(ctx: GithubContext) {
+export async function runDashboardSearch(ctx: GithubContext) {
   const login = await ctx.viewer(ctx.noCheckoutCwd)
   const repos = ctx.options.getReviewRepos?.() ?? []
   const requests = buildSectionQueries(login, repos)
@@ -198,7 +198,7 @@ async function runDashboardSearch(ctx: GithubContext) {
   const capped = [...results.matched]
     .filter(([, { issueCount, returned }]) => issueCount > returned)
     .map(([section]) => section)
-  return {
+  const answer = {
     prs: withSessionProgress(prs, await storedSessions()),
     capped,
     login,
@@ -206,6 +206,8 @@ async function runDashboardSearch(ctx: GithubContext) {
     failed: [...results.failed].map(([section, error]) => ({ section, error })),
     scopedTo: repos.length,
   }
+  ctx.options.onDashboard?.(answer)
+  return answer
 }
 
 export function dashboardChannels(ctx: GithubContext): ChannelSpec[] {

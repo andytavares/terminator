@@ -15,6 +15,7 @@ import { VALIDATION_ERROR, type RegisterFn } from './ipc/register.js'
 import { registerGithubHandlers, type GithubHandlerOptions } from './ipc/github.ipc.js'
 import { registerReviewAgentHandlers, type OpenTerminalInput } from './ipc/review-agent.ipc.js'
 import { consumePendingViewRequest, registerQuickActionCommands } from './commands.js'
+import { createHomePublisher } from './home/publisher.js'
 import { remoteAccessFor } from './remote-access.js'
 import { bindShell } from './shell/run-git.js'
 import { openStorageDirectory } from './storage-directory.js'
@@ -187,6 +188,7 @@ interface ChannelRoots {
 }
 
 function registerGithub(api: ExtensionAPI, registerFn: RegisterFn, roots: ChannelRoots) {
+  const home = createHomePublisher(api, roots.storage)
   const access = {
     github: api.github,
     getToken: () => api.settings.get<string>(`${SETTING}.git.githubToken`) ?? '',
@@ -200,8 +202,11 @@ function registerGithub(api: ExtensionAPI, registerFn: RegisterFn, roots: Channe
     getReviewRepos: () => api.settings.get<string[]>(`${SETTING}.review.repos`) ?? [],
     // Settings → Git → Branch Exclude Patterns, matched by the core.
     isBranchExcluded: (branch, repoPath) => api.settings.isBranchExcluded(branch, repoPath),
+    ...home.hooks,
   }
-  registerGithubHandlers(registerFn, access, options)
+  const { refreshDashboard } = registerGithubHandlers(registerFn, access, options)
+  // Home's asks must not wait for the Reviews view to open; one search set per dashboard interval.
+  disposables.push(home.actions, home.refreshEvery(refreshDashboard))
 }
 
 /** Every channel this extension answers, each with its remote-access rule. */

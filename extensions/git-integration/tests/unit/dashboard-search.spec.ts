@@ -376,3 +376,69 @@ describe('dashboardBranches', () => {
     ])
   })
 })
+
+describe('buildSectionQueries — asks only the sections that need them for checks and request times', () => {
+  const queryOf = (section: string) =>
+    buildSectionQueries('bob').find((q) => q.section === section)!.query
+
+  it('asks for the latest commit checks on my pull requests only', () => {
+    expect(queryOf('mine')).toContain('latestChecks')
+    expect(queryOf('mine')).toContain('contexts(first: 50)')
+    for (const other of ['requested', 're-review', 'team', 'involved']) {
+      expect(queryOf(other)).not.toContain('latestChecks')
+    }
+  })
+
+  it('asks for the review request time on requested and re-review only', () => {
+    expect(queryOf('requested')).toContain('REVIEW_REQUESTED_EVENT')
+    expect(queryOf('re-review')).toContain('REVIEW_REQUESTED_EVENT')
+    expect(queryOf('mine')).not.toContain('REVIEW_REQUESTED_EVENT')
+  })
+})
+
+describe('parseDashboard — checks and request time', () => {
+  const viewer = { login: 'alice', localRoots: new Map<string, string>() }
+
+  it('maps my pull request checks from the latest commit', () => {
+    const latestChecks = {
+      nodes: [
+        {
+          commit: {
+            statusCheckRollup: {
+              contexts: {
+                nodes: [
+                  {
+                    __typename: 'CheckRun',
+                    name: 'e2e',
+                    status: 'COMPLETED',
+                    conclusion: 'FAILURE',
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ],
+    }
+    const raw = { data: { mine: { nodes: [prNode({ latestChecks })] } } }
+    expect(parseDashboard(raw, viewer)[0].checks).toEqual([{ name: 'e2e', state: 'failed' }])
+  })
+})
+
+describe('parseDashboard — request time', () => {
+  const viewer = { login: 'alice', localRoots: new Map<string, string>() }
+
+  it('maps when a review was requested of me', () => {
+    const reviewRequestEvents = {
+      nodes: [{ createdAt: '2026-10-17T10:00:00Z', requestedReviewer: { login: 'alice' } }],
+    }
+    const raw = { data: { requested: { nodes: [prNode({ reviewRequestEvents })] } } }
+    expect(parseDashboard(raw, viewer)[0].reviewRequestedAt).toBe('2026-10-17T10:00:00Z')
+  })
+
+  it('leaves them out when the section did not ask', () => {
+    const [pr] = parseDashboard({ data: { mine: { nodes: [prNode()] } } }, viewer)
+    expect(pr).not.toHaveProperty('checks')
+    expect(pr).not.toHaveProperty('reviewRequestedAt')
+  })
+})
