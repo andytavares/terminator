@@ -35,12 +35,19 @@ vi.mock('../src/navigation.js', () => ({
   popPendingNavigation: vi.fn(),
 }))
 
+function emptyDb() {
+  return partialFake<ExtensionAPI['db']>({
+    get: vi.fn(async () => undefined),
+    query: vi.fn(async () => []),
+  })
+}
+
 /** The API Task Vault activates with; settings not in `settings` read as '0'. */
 function makeApi(settings: Record<string, unknown> = {}) {
   const commandsRegister = vi.fn<ExtensionAPI['commands']['register']>(disposableSpy)
   const globalShortcutRegister = vi.fn(async () => disposableSpy())
   const api = partialFake<ExtensionAPI>({
-    db: partialFake<ExtensionAPI['db']>({ get: vi.fn(async () => undefined) }),
+    db: emptyDb(),
     ipc: partialFake<ExtensionAPI['ipc']>({ registerHandler: vi.fn(disposableSpy) }),
     settings: partialFake<ExtensionAPI['settings']>({
       register: vi.fn(disposableSpy),
@@ -60,6 +67,7 @@ function makeApi(settings: Record<string, unknown> = {}) {
       register: globalShortcutRegister,
     }),
     commands: partialFake<ExtensionAPI['commands']>({ register: commandsRegister }),
+    home: { publish: vi.fn(), onAction: vi.fn(disposableSpy) },
   })
   return { api, commandsRegister, globalShortcutRegister }
 }
@@ -294,3 +302,25 @@ function taskVaultActivateQuickActionsDisposingTests() {
     expect(disposable.dispose).toHaveBeenCalled()
   })
 }
+
+describe('task-vault activate() Home feed', () => {
+  it('publishes 500 ms after the vault says its index changed, and registers the open command', async () => {
+    const { api, commandsRegister } = makeApi()
+    const { activate } = await import('../src/index.ts')
+    const { bindBroadcast } = await import('../src/notifications/task-scheduler.js')
+    await activate(api)
+    const publish = vi.mocked(api.home.publish)
+    await vi.advanceTimersByTimeAsync(500)
+    publish.mockClear()
+
+    const send = vi.mocked(bindBroadcast).mock.calls.at(-1)![0]
+    send('task-vault:push:index-updated', {})
+    await vi.advanceTimersByTimeAsync(500)
+
+    expect(publish).toHaveBeenCalledTimes(1)
+    expect(commandsRegister).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'task-vault:open' }),
+      expect.any(Function)
+    )
+  })
+})

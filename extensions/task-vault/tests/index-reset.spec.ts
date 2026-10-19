@@ -61,6 +61,7 @@ function taskVaultApi(handlers: Map<string, Handler>, settings: Map<string, unkn
       register: vi.fn(async () => disposableSpy()),
     }),
     commands: partialFake<ExtensionAPI['commands']>({ register: vi.fn(disposableSpy) }),
+    home: { publish: vi.fn(), onAction: vi.fn(disposableSpy) },
   })
 }
 

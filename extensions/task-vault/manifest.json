@@ -24,6 +24,11 @@
         "label": "Capture to inbox",
         "description": "Quick-capture a task to the vault inbox",
         "mnemonic": "c"
+      },
+      {
+        "id": "task-vault:open",
+        "label": "Open Task Vault",
+        "description": "Open the vault on a task or on the weekly review"
       }
     ],
     "quickActions": { "group": { "mnemonic": "v", "label": "Task Vault" } }

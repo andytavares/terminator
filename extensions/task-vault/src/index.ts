@@ -29,6 +29,8 @@ import {
 } from './notifications/task-scheduler.js'
 import { openInVault, popPendingNavigation } from './navigation.js'
 import { zonedNow } from './vault/clock.js'
+import { startHomePublisher, type HomePublisher } from './home/publisher.js'
+import { OPEN_COMMAND } from './home/feed.js'
 
 // Every notification kind task-vault ever raises, so the user can independently
 // choose its delivery target(s) (system/in-app/toast) in this extension's own
@@ -288,15 +290,44 @@ function registerCaptureCommand(api: ExtensionAPI): void {
   )
 }
 
+/** The command a Home item runs to open the vault, on a task or on the weekly review. */
+function registerOpenCommand(api: ExtensionAPI): void {
+  disposables.push(
+    api.commands.register(
+      {
+        id: OPEN_COMMAND,
+        label: 'Open Task Vault',
+        description: 'Open the vault on a task or on the weekly review',
+        args: z.object({
+          taskId: z.string().optional(),
+          view: z.enum(['daily', 'review']).optional(),
+        }),
+      },
+      (_context, args) => openInVault(api, args ?? {})
+    )
+  )
+}
+
 function weeklyReviewDay(api: ExtensionAPI): number {
   return parseInt(api.settings.get<string>('terminator.task-vault.weeklyReviewDay') ?? '0', 10)
+}
+
+/** Publishes to Home now and whenever the vault says its index changed. */
+function startHome(api: ExtensionAPI, db: ExtensionDB): HomePublisher {
+  const home = startHomePublisher(api, db)
+  disposables.push(home)
+  bindBroadcast((channel, data) => {
+    api.window.broadcast(channel, data)
+    if (channel === 'task-vault:push:index-updated') home.schedule()
+  })
+  return home
 }
 
 /** Activates task-vault; returns what other extensions may use, through extensionDependencies (ADR 094). */
 export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
   _api = api
-  bindBroadcast((channel, data) => api.window.broadcast(channel, data))
   const db: ExtensionDB = api.db
+  const home = startHome(api, db)
   disposables.push(
     api.settings.register({
       label: 'Task Vault',
@@ -308,12 +339,14 @@ export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
   registerDbActions(ownIpc, db)
   registerFeatureIpc(api, db)
   await initializeSchema(api, db)
+  home.schedule()
   registerNavigation(ownIpc, api)
   addCalendarMenuItem(api)
   scheduleWeeklyReviewNudge(api)
   registerPendingCapture(ownIpc)
   await registerCaptureShortcut(api)
   registerCaptureCommand(api)
+  registerOpenCommand(api)
   return {
     open: (destination) => openInVault(api, destination),
     openCapture: () => openCaptureOverlay(api),
