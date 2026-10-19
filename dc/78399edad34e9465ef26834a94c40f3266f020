@@ -1,0 +1,37 @@
+extensions/git-integration/src/home/publisher.ts
+  s_d918463020569b::t_6fe6cfa89f0c42 66,72
+extensions/git-integration/src/github/dashboard-search.ts
+  s_d918463020569b::t_6fe6cfa89f0c42 56,111,232
+extensions/git-integration/src/home/feed.ts
+  s_d918463020569b::t_6fe6cfa89f0c42 135,145,154-155,245,248
+extensions/git-integration/src/schemas/pr-review.schema.ts
+  s_d918463020569b::t_30567db483c0b2 292
+extensions/git-integration/tests/unit/ReviewDashboard.spec.tsx
+  s_d918463020569b::t_b32e5b14037867 20
+extensions/git-integration/tests/unit/dashboard-search.spec.ts
+  s_d918463020569b::t_23ded3261c5eb5 32,136
+extensions/git-integration/tests/unit/home-feed.spec.ts
+  s_d918463020569b::t_82b1c088865d2a 1,102,162-163,165-172,178,189,232
+extensions/git-integration/tests/unit/home-publisher.spec.ts
+  s_d918463020569b::t_0cb679ff104b20 58-70
+extensions/git-integration/tests/unit/support/dashboard-pr.ts
+  s_d918463020569b::t_e421aa9eaec5e0 17
+tests/e2e/git-integration-contrast.entry.tsx
+  s_d918463020569b::t_2b51e81e8b1b57 196
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dc78399edad34e9465ef26834a94c40f3266f020",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
