@@ -62,12 +62,19 @@ export function SidebarDialogs({ dialog, close, factsBySessionId }: SidebarDialo
 
 interface Removal {
   title: string
+  description?: string
   remove: () => void
 }
 
 function workspaceRemoval(workspace: Workspace): Removal {
+  const projects = useWorkspaceStore.getState().projectsByWorkspaceId.get(workspace.id) ?? []
+  const folders = projects.flatMap((p) => (p.isWorktree && p.worktreePath ? [p.worktreePath] : []))
   return {
     title: `Remove workspace "${workspace.name}"?`,
+    description:
+      folders.length > 0
+        ? `Also deletes these worktree folders from disk:\n${folders.join('\n')}`
+        : undefined,
     remove: () => void useWorkspaceStore.getState().deleteWorkspace(workspace.id),
   }
 }
@@ -79,10 +86,16 @@ function removeBranch(projectId: string, name: string): Removal {
   }
 }
 
-function ConfirmRemoval({ title, remove, close }: Removal & { close: () => void }): JSX.Element {
+function ConfirmRemoval({
+  title,
+  description,
+  remove,
+  close,
+}: Removal & { close: () => void }): JSX.Element {
   return (
     <ConfirmDialog
       title={title}
+      description={description}
       confirmLabel="Remove"
       danger
       onConfirm={() => {

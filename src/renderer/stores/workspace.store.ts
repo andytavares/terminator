@@ -1,6 +1,7 @@
 import { create, type StoreApi } from 'zustand'
 import type { Workspace, Project } from '../../shared/types/index'
 import { useSessionStore } from './session.store'
+import { useToastStore } from './toast.store'
 
 interface WorkspaceState {
   workspaces: Workspace[]
@@ -192,12 +193,26 @@ async function saveWorkspaceEdit(set: SetWorkspaces, input: unknown): Promise<Wo
 }
 
 async function removeWorkspace(set: SetWorkspaces, id: string): Promise<void> {
-  await window.electronAPI.workspace.delete(id)
+  const result = await window.electronAPI.workspace.delete(id)
+  if (result.worktreesKept?.length) {
+    const folders = result.worktreesKept.map((kept) => kept.path).join('\n')
+    useToastStore.getState().addToast({
+      type: 'warning',
+      message: `Workspace removed, folders kept. git could not remove:\n${folders}. Clean them up from Git → Worktrees.`,
+    })
+  }
   set((s) => withoutWorkspace(s, id))
 }
 
 async function removeProject(set: SetWorkspaces, id: string): Promise<void> {
-  await window.electronAPI.project.delete(id)
+  const result = await window.electronAPI.project.delete(id)
+  if (result.worktreeKept) {
+    const { path, reason } = result.worktreeKept
+    useToastStore.getState().addToast({
+      type: 'warning',
+      message: `Branch removed, folder kept. git could not remove ${path}: ${reason}. Clean it up from Git → Worktrees.`,
+    })
+  }
   set((s) => withProjectRemoved(s, id))
 }
 

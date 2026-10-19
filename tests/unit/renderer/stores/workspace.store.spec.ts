@@ -45,6 +45,7 @@ Object.defineProperty(globalThis, 'localStorage', {
 })
 
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
+import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 
 const ws1 = {
   id: 'ws-1',
@@ -419,6 +420,78 @@ describe('useWorkspaceStore — deleteProject', () => {
     mockElectronAPI.project.delete.mockResolvedValue({})
     await useWorkspaceStore.getState().deleteProject('p-1')
     expect(useWorkspaceStore.getState().activeProjectId).toBe('p-2')
+  })
+})
+
+describe('useWorkspaceStore — deleteProject — kept worktree toasts', () => {
+  setUpUseWorkspaceStore()
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    useToastStore.setState({ toasts: [] })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('queues a warning toast when the branch worktree folder was kept', async () => {
+    useWorkspaceStore.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1]]]) })
+    mockElectronAPI.project.delete.mockResolvedValue({
+      success: true,
+      worktreeKept: { path: '/repos/alpha-feature', reason: 'worktree is dirty' },
+    })
+
+    await useWorkspaceStore.getState().deleteProject('p-1')
+
+    const toasts = useToastStore.getState().toasts
+    expect(toasts).toHaveLength(1)
+    expect(toasts[0].type).toBe('warning')
+    expect(toasts[0].message).toContain('Branch removed, folder kept')
+    expect(toasts[0].message).toContain('/repos/alpha-feature')
+    expect(toasts[0].message).toContain('worktree is dirty')
+  })
+
+  it('queues no toast when nothing was kept', async () => {
+    useWorkspaceStore.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1]]]) })
+    mockElectronAPI.project.delete.mockResolvedValue({ success: true })
+
+    await useWorkspaceStore.getState().deleteProject('p-1')
+
+    expect(useToastStore.getState().toasts).toEqual([])
+  })
+})
+
+describe('useWorkspaceStore — deleteWorkspace — kept worktree toasts', () => {
+  setUpUseWorkspaceStore()
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    useToastStore.setState({ toasts: [] })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('queues a warning toast listing each folder a workspace removal kept', async () => {
+    useWorkspaceStore.setState({ workspaces: [ws1] })
+    mockElectronAPI.workspace.delete.mockResolvedValue({
+      success: true,
+      worktreesKept: [
+        { path: '/repos/alpha-feature', reason: 'worktree is dirty' },
+        { path: '/repos/alpha-feature-2', reason: 'worktree is dirty' },
+      ],
+    })
+
+    await useWorkspaceStore.getState().deleteWorkspace('ws-1')
+
+    const toasts = useToastStore.getState().toasts
+    expect(toasts).toHaveLength(1)
+    expect(toasts[0].type).toBe('warning')
+    expect(toasts[0].message).toContain('Workspace removed, folders kept')
+    expect(toasts[0].message).toContain('/repos/alpha-feature')
+    expect(toasts[0].message).toContain('/repos/alpha-feature-2')
   })
 })
 
