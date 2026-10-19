@@ -41,7 +41,7 @@ beforeEach(() => {
   world.facts = FACTS
   seedDesk()
   useHomeFeedStore.setState({ facets: [...FACETS, shipped] })
-  useFocusStore.setState({ days: {}, lastLeftHomeAt: null })
+  useFocusStore.setState({ days: {} })
   useHomeView.setState({ view: 'desk' })
   installElectronApi({
     attention: { measures: vi.fn().mockResolvedValue(week(3)) },

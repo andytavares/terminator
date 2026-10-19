@@ -457,26 +457,21 @@ describe('HomeScreen — search results, continued', () => {
   })
 })
 
-describe('HomeScreen — Since you left', () => {
-  it('lists what finished while Home was closed in Plan the day', async () => {
+describe('HomeScreen — Plan today', () => {
+  it('says what waits on the operator and has no Since you left column', async () => {
     const { PlanTheDay: RealPlanTheDay } = await vi.importActual<
       typeof import('../../../../src/renderer/components/home/PlanTheDay')
     >('../../../../src/renderer/components/home/PlanTheDay')
-    useFocusStore.setState({ days: {}, lastLeftHomeAt: null, planDismissedOn: null })
-    render(<HomeScreen />).unmount()
-    const leftAt = useFocusStore.getState().lastLeftHomeAt as number
-    expect(leftAt).toBeGreaterThan(0)
+    useFocusStore.setState({ days: {}, planDismissedOn: null })
     const finished = homeFeedAsk({
       id: 'done',
       kind: 'finished',
       title: 'Agent finished',
-      detail: 'Cache work is ready for review',
-      since: new Date(leftAt + 1000).toISOString(),
       actions: [],
     })
     useHomeFeedStore.setState({ asks: [finished] })
     render(<RealPlanTheDay />)
-    const column = screen.getByText('SINCE YOU LEFT').parentElement as HTMLElement
-    expect(within(column).getByText('Cache work is ready for review')).toBeTruthy()
+    expect(screen.getByText(/Waiting on you: 1 agent finished/)).toBeTruthy()
+    expect(screen.queryByText('SINCE YOU LEFT')).toBeNull()
   })
 })

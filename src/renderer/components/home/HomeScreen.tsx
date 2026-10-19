@@ -10,7 +10,6 @@ import { useHomeView } from './home-view'
 import { useDeskModel, type DeskState } from './useDeskModel'
 import { useDeskController, type DeskController } from './use-desk-controller'
 import { useDeskKeys } from './use-desk-keys'
-import { useMarkLeftHome } from './use-mark-left-home'
 import { useOpenRequestedResume } from './desk-selection'
 import './HomeScreen.css'
 
@@ -36,7 +35,6 @@ export function HomeScreen(_props: HomeScreenProps = {}): JSX.Element {
   const controller = useDeskController(desk)
   const onKeyDown = useRootKeys(controller, searchRef)
   useOpenRequestedResume()
-  useMarkLeftHome()
 
   useEffect(() => rootRef.current?.focus({ preventScroll: true }), [])
 

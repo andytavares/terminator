@@ -9,9 +9,10 @@ const KEPT_DAYS = 7
 
 interface Persisted {
   days: Record<string, FocusItem[]>
-  lastLeftHomeAt: number | null
   /** The local day whose Plan today band was started or skipped. */
   planDismissedOn: string | null
+  /** The Plan today band stays folded until it is expanded again, across days. */
+  planCollapsed: boolean
 }
 
 interface FocusState extends Persisted {
@@ -19,10 +20,10 @@ interface FocusState extends Persisted {
   pickFocus: (item: Omit<FocusItem, 'doneByHand'>) => void
   removeFocus: (id: string) => void
   toggleDone: (id: string) => void
-  /** Remembers when the operator last looked at Home, for "Since you left". */
-  markLeftHome: (now: number) => void
   /** Hides the Plan today band for the rest of the local day of `now`. */
   dismissPlan: (now: number) => void
+  /** Folds the Plan today band to its head, or opens it again. */
+  togglePlanCollapsed: () => void
 }
 
 function newestDays(days: Persisted['days']): Persisted['days'] {
@@ -33,8 +34,8 @@ function newestDays(days: Persisted['days']): Persisted['days'] {
 function persist(state: Persisted): Persisted {
   writeStoredJson(FOCUS_KEY, {
     days: state.days,
-    lastLeftHomeAt: state.lastLeftHomeAt,
     planDismissedOn: state.planDismissedOn,
+    planCollapsed: state.planCollapsed,
   })
   return state
 }
@@ -49,7 +50,7 @@ function updateToday(state: Persisted, change: (items: FocusItem[]) => FocusItem
 export const useFocusStore = create<FocusState>((set) => ({
   ...readStoredJson<Persisted>(
     FOCUS_KEY,
-    { days: {}, lastLeftHomeAt: null, planDismissedOn: null },
+    { days: {}, planDismissedOn: null, planCollapsed: false },
     storedFocusOf
   ),
   pickFocus: (item) =>
@@ -67,6 +68,6 @@ export const useFocusStore = create<FocusState>((set) => ({
         items.map((i) => (i.id === id ? { ...i, doneByHand: !i.doneByHand } : i))
       )
     ),
-  markLeftHome: (now) => set((s) => persist({ ...s, lastLeftHomeAt: now })),
   dismissPlan: (now) => set((s) => persist({ ...s, planDismissedOn: localDateKey(now) })),
+  togglePlanCollapsed: () => set((s) => persist({ ...s, planCollapsed: !s.planCollapsed })),
 }))

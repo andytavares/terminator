@@ -90,7 +90,7 @@ describe('focus store', () => {
     ).toHaveLength(3)
   })
 
-  it('removes, toggles done by hand, and remembers when you left Home', async () => {
+  it('removes and toggles done by hand', async () => {
     const store = await load()
     store.getState().pickFocus({ id: 'a', title: 'a' })
     store.getState().pickFocus({ id: 'b', title: 'b' })
@@ -99,15 +99,26 @@ describe('focus store', () => {
     expect(store.getState().days[today]).toEqual([{ id: 'b', title: 'b', doneByHand: true }])
     store.getState().toggleDone('b')
     expect(store.getState().days[today][0].doneByHand).toBe(false)
-    store.getState().markLeftHome(123)
-    expect(store.getState().lastLeftHomeAt).toBe(123)
+  })
+})
+
+describe('focus store: the Plan today band', () => {
+  it('toggles the band collapsed and persists it across days', async () => {
+    const store = await load()
+    expect(store.getState().planCollapsed).toBe(false)
+    store.getState().togglePlanCollapsed()
+    expect(store.getState().planCollapsed).toBe(true)
+    const stored = JSON.parse(localStorage.getItem('terminator.home.focus') as string)
+    expect(stored.planCollapsed).toBe(true)
+    vi.resetModules()
+    expect((await load()).getState().planCollapsed).toBe(true)
   })
 })
 
 describe('focus store: storage', () => {
   it('keeps only the newest seven days', async () => {
     const days = Object.fromEntries([1, 2, 3, 4, 5, 6, 7].map((d) => [`2026-10-0${d}`, []]))
-    localStorage.setItem('terminator.home.focus', JSON.stringify({ days, lastLeftHomeAt: null }))
+    localStorage.setItem('terminator.home.focus', JSON.stringify({ days }))
     const store = await load()
     store.getState().pickFocus({ id: 'a', title: 'a' })
     expect(Object.keys(store.getState().days)).toHaveLength(7)

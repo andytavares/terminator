@@ -22,24 +22,21 @@ describe('the focus store reading what was stored', () => {
   it.each([
     ['an empty object', '{}'],
     ['a list', '[1,2]'],
-    [
-      'days of the wrong shape',
-      '{"days":{"2026-10-17":"x"},"lastLeftHomeAt":null,"planDismissedOn":null}',
-    ],
+    ['days of the wrong shape', '{"days":{"2026-10-17":"x"},"planDismissedOn":null}'],
     ['text that is not JSON', 'not json'],
   ])('starts empty when storage holds %s', async (_label, stored) => {
     localStorage.setItem(FOCUS_KEY, stored)
     const state = (await loadFocusStore()).getState()
     expect(state.days).toEqual({})
-    expect(state.lastLeftHomeAt).toBeNull()
     expect(state.planDismissedOn).toBeNull()
+    expect(state.planCollapsed).toBe(false)
   })
 
   it('keeps a well-formed record', async () => {
     const saved = {
       days: { '2026-10-17': [{ id: 'a', title: 'Ship TAV-20', doneByHand: false }] },
-      lastLeftHomeAt: 1_700_000_000_000,
       planDismissedOn: '2026-10-17',
+      planCollapsed: true,
     }
     localStorage.setItem(FOCUS_KEY, JSON.stringify(saved))
     const state = (await loadFocusStore()).getState()
