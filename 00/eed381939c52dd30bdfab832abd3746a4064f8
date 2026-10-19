@@ -1,0 +1,21 @@
+src/renderer/components/home/WorkspacePicker.tsx
+  s_d918463020569b::t_60a7de76b7ec67 20
+tests/e2e/github-stub-gh.ts
+  s_d918463020569b::t_d9fef8e3d0fc29 224
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "00eed381939c52dd30bdfab832abd3746a4064f8",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
