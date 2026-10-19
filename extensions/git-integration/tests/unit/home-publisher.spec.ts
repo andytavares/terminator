@@ -1,3 +1,4 @@
+import { HOME_MEASURES } from '@terminator/extension-sdk'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import type { ExtensionAPI, HomeFeed } from '@terminator/extension-sdk'
 import { partialFake } from '../../../../tests/support/fakes'
@@ -69,12 +70,15 @@ describe('dashboard refresh: tickets', () => {
 })
 
 describe('contributions fetch', () => {
-  it('publishes the merged measure beside the asks already read', () => {
+  it('publishes the shipped measure beside the asks already read', () => {
     const { published, publisher } = setupPublisher()
     publisher.hooks.onDashboard({ prs: [dashboardPrFixture({ ciStatus: 'failing' })], failed: [] })
     publisher.hooks.onContributions(buildContributionCalendar([], '2026-10-18', 'UTC'))
     expect(published.at(-1)?.asks).toHaveLength(1)
-    expect(published.at(-1)?.measures.map((m) => m.id)).toEqual(['merged', 'contributions-days'])
+    expect(published.at(-1)?.measures.map((m) => m.id)).toEqual([
+      HOME_MEASURES.shipped,
+      HOME_MEASURES.contributionsDays,
+    ])
   })
 })
 
