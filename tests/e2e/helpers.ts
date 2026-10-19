@@ -6,7 +6,7 @@ import {
   Page,
   expect,
 } from '@playwright/test'
-import type { ChildProcess } from 'node:child_process'
+import { spawnSync, type ChildProcess } from 'node:child_process'
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { dirname, delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -379,7 +379,9 @@ export async function closeApp(
 /**
  * Create a workspace via the sidebar dialog. `folderPath` is required by the
  * schema; pass a non-git directory (e.g. the test's userDataDir) to avoid the
- * auto-create-branch-project path.
+ * auto-create-branch-project path. A git checkout gets its first branch card after the app has
+ * asked git about it, which is after the workspace's header shows, so this returns once the card
+ * is there too: a caller that acts on `main` straight away is not racing those git calls.
  */
 export async function createWorkspace(page: Page, name: string, folderPath: string): Promise<void> {
   await page.click('.sidebar-header__add')
@@ -388,6 +390,18 @@ export async function createWorkspace(page: Page, name: string, folderPath: stri
   await page.getByPlaceholder('/path/to/folder').fill(folderPath)
   await page.click('.tmui-dialog__actions .tmui-button--primary')
   await expect(workspaceRow(page, name)).toBeVisible()
+  const branch = checkedOutBranchOf(folderPath)
+  if (branch !== null) await expect(projectGroup(page, branch)).toBeVisible()
+}
+
+/** The branch a folder has checked out, or null when it is not a git checkout. */
+function checkedOutBranchOf(folderPath: string): string | null {
+  if (!existsSync(join(folderPath, '.git'))) return null
+  const result = spawnSync('git', ['-C', folderPath, 'rev-parse', '--abbrev-ref', 'HEAD'], {
+    encoding: 'utf8',
+  })
+  const branch = result.stdout.trim()
+  return result.status === 0 && branch !== '' && branch !== 'HEAD' ? branch : null
 }
 
 /**
