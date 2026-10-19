@@ -108,7 +108,10 @@ function WorkspaceChoices(props: WorkspacePickerProps): JSX.Element {
         value={filter}
         placeholder="Filter workspaces"
         aria-label="Filter workspaces"
-        onChange={(e) => (setFilter(e.target.value), setCursor(0))}
+        onChange={(e) => {
+          setFilter(e.target.value)
+          setCursor(0)
+        }}
       />
       <WorkspaceList {...props} shown={shown} at={at} />
     </div>
