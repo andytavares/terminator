@@ -1,8 +1,8 @@
 import { describe, it, expect, afterAll } from 'vitest'
-import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { makeTempDir } from '../../support/temp-dir'
-import { isProcessAlive } from '../../support/processes'
+import { expectProcessGone, recordedPid } from '../../support/processes'
 
 // The core's own git commands end with the app: one in flight at quit, with the xcodebuild
 // its xcrun shim started, outlived it (macOS run 38382115775). The stand-in git records a sleep's pid.
@@ -28,11 +28,10 @@ describe('git-service on quit', () => {
       () => 'resolved',
       () => 'rejected'
     )
-    await expect.poll(() => existsSync(pidFile) && readFileSync(pidFile, 'utf8') !== '').toBe(true)
-    const grandchild = Number(readFileSync(pidFile, 'utf8'))
+    const grandchild = await recordedPid(pidFile)
     stopRunningCommands()
 
     expect(await fetch).toBe('rejected')
-    await expect.poll(() => isProcessAlive(grandchild)).toBe(false)
+    await expectProcessGone(grandchild)
   })
 })

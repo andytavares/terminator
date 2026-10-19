@@ -52,25 +52,41 @@ function useCreateWorkspace(onClose: () => void) {
       tags: form.tagList(),
     })
     if (showSaveError(form, result, 'Failed to create workspace')) return
-    await addCheckout(result.workspace.id, folderPath)
-    onClose()
+    const failure = await addCheckoutOrUndo(result.workspace.id, folderPath)
+    if (failure === null) return onClose()
+    form.setError(failure)
   }
 
   return { form, create: submitWorkspace }
 }
 
-/** A folder that is a git checkout becomes the workspace's first branch. */
-async function addCheckout(workspaceId: string, folderPath: string): Promise<void> {
+/** Gives a new workspace its first branch, or takes the workspace back and says why not: one left
+ * with no branches would keep its name from the retry the message asks for. */
+async function addCheckoutOrUndo(workspaceId: string, folderPath: string): Promise<string | null> {
+  const failure = await addCheckout(workspaceId, folderPath)
+  if (failure !== null) await useWorkspaceStore.getState().deleteWorkspace(workspaceId)
+  return failure
+}
+
+const GIT_UNREADABLE = 'Could not read the git repository. Try again.'
+const BRANCH_NOT_ADDED = 'Could not add the branch to the workspace. Try again.'
+
+/** A folder that is a git checkout becomes the workspace's first branch. Null when it did or
+ * the folder is not a checkout; otherwise why not, because git failing to answer is not the
+ * folder being a plain one, and a branch git could not name is not `main`. */
+async function addCheckout(workspaceId: string, folderPath: string): Promise<string | null> {
   const gitInfo = await window.electronAPI.git.isRepo(folderPath)
-  if (!gitInfo.isRepo) return
+  if ('error' in gitInfo) return GIT_UNREADABLE
+  if (!gitInfo.isRepo) return null
   const root = gitInfo.root ?? folderPath
   const branchInfo = await window.electronAPI.git.currentBranch(root)
-  const branch = 'branch' in branchInfo ? branchInfo.branch : 'main'
-  await useWorkspaceStore.getState().createProject({
+  if ('error' in branchInfo) return GIT_UNREADABLE
+  const created = await useWorkspaceStore.getState().createProject({
     workspaceId,
-    name: branch,
-    gitBranch: branch,
+    name: branchInfo.branch,
+    gitBranch: branchInfo.branch,
     worktreePath: root,
     isWorktree: false,
   })
+  return 'error' in created ? BRANCH_NOT_ADDED : null
 }

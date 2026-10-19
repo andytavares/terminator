@@ -32,7 +32,7 @@ const repositoryChannels: ChannelSpec[] = [
       if (!isRepo) return { isRepo: false }
       return { isRepo: true, root: await getGitRoot(path) }
     },
-    onError: () => ({ isRepo: false }),
+    onError: (e) => ({ error: String(e) }),
   }),
   defineChannel({
     channel: 'git:change-stats',

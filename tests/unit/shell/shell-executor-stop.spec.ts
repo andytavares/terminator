@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { execShell } from '../../../src/main/shell/shell-executor'
 import { stopRunningCommands } from '../../../src/main/shell/command-runner'
 import { makeTempDir } from '../../support/temp-dir'
-import { isProcessAlive } from '../../support/processes'
+import { PROCESS_WAIT_MS, expectProcessGone, recordedPid } from '../../support/processes'
 
 // A git or gh command running at quit ends with the app, with what it started (macOS's git
 // shim started an xcodebuild that outlived it, run 38382115775). The stand-in gh records a sleep's pid.
@@ -25,32 +25,23 @@ afterEach(() => {
   process.env.PATH = originalPath
 })
 
-/** How long the stand-in gh may take to start its sleep: it writes its pid in 10-15 ms, 342 ms at
- * worst in 40 starts on a loaded machine. The command's own timeout starts when it is spawned, so
- * it must outlast this: otherwise a slow start is killed before it writes the pid. */
-const STAND_IN_STARTS_WITHIN_MS = 4000
+/** The command's own timeout starts when it is spawned and has to elapse in real time, so it is
+ * short but well past a start: the stand-in writes its pid in 10-15 ms, 342 ms at worst in 40
+ * starts on a busy machine. A timeout under that kills a slow start before it writes the pid. */
+const COMMAND_TIMEOUT_MS = 4000
 
-/** The command's timeout, the wait for its child to start, and time to stop what it started. */
-const TIMEOUT_TEST_LIMIT_MS = STAND_IN_STARTS_WITHIN_MS + 1000 + 5000
-
-async function grandchildPid(): Promise<number> {
-  await expect
-    .poll(() => existsSync(pidFile) && readFileSync(pidFile, 'utf8').trim() !== '', {
-      timeout: STAND_IN_STARTS_WITHIN_MS,
-    })
-    .toBe(true)
-  return Number(readFileSync(pidFile, 'utf8'))
-}
+/** The command's timeout, then time to stop what it started. */
+const TIMEOUT_TEST_LIMIT_MS = COMMAND_TIMEOUT_MS + PROCESS_WAIT_MS
 
 describe('stopRunningCommands', () => {
   it('ends a running command and every process it started', async () => {
     const run = execShell({ command: 'gh', args: [], cwd: scratch, timeoutMs: 60_000 })
-    const grandchild = await grandchildPid()
+    const grandchild = await recordedPid(pidFile)
 
     stopRunningCommands()
 
     expect((await run).exitCode).not.toBe(0)
-    await expect.poll(() => isProcessAlive(grandchild)).toBe(false)
+    await expectProcessGone(grandchild)
   })
 
   it('leaves nothing to stop once a command has finished', async () => {
@@ -68,12 +59,12 @@ describe('execShell timeout', () => {
         command: 'gh',
         args: [],
         cwd: scratch,
-        timeoutMs: STAND_IN_STARTS_WITHIN_MS + 1000,
+        timeoutMs: COMMAND_TIMEOUT_MS,
       })
-      const grandchild = await grandchildPid()
+      const grandchild = await recordedPid(pidFile)
 
       expect(await run).toMatchObject({ timedOut: true, exitCode: 124 })
-      await expect.poll(() => isProcessAlive(grandchild)).toBe(false)
+      await expectProcessGone(grandchild)
     },
     TIMEOUT_TEST_LIMIT_MS
   )

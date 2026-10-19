@@ -59,13 +59,18 @@ export async function getChangeStats(cwd: string): Promise<ChangeStats> {
   return { added, removed, files }
 }
 
+/** True or false only when git answered; rejects when it did not (timed out, never started, ended
+ * by a signal). Git documents a nonzero exit outside a repository but no code or message, so any
+ * nonzero answer means no (https://git-scm.com/docs/git-rev-parse). */
 export async function isGitRepo(dirPath: string): Promise<boolean> {
-  try {
-    await git(['rev-parse', '--git-dir'], dirPath)
-    return true
-  } catch {
-    return false
-  }
+  const result = await runTextCommand(
+    { command: 'git', args: ['rev-parse', '--git-dir'], cwd: dirPath, timeoutMs: GIT_TIMEOUT },
+    GIT_ENV
+  )
+  if (result.timedOut)
+    throw new Error(`git rev-parse timed out after ${GIT_TIMEOUT} ms in ${dirPath}`)
+  if (result.didNotRun) throw new Error(`git could not run in ${dirPath}: ${result.stderr.trim()}`)
+  return result.exitCode === 0
 }
 
 export async function getGitRoot(dirPath: string): Promise<string> {

@@ -855,6 +855,18 @@ describe('CreateProjectDialog — names outside a repo — treats a repo with no
   })
 })
 
+describe('CreateProjectDialog — git could not say whether the folder is a repository', () => {
+  it('says so rather than offering a plain-folder form for what may be a repository', async () => {
+    gitApi.isRepo.mockResolvedValue({ error: 'git rev-parse timed out' })
+    seedStore(useWorkspaceStore, {
+      workspaces: [workspaceFixture({ id: 'ws-1', name: 'My WS', folderPath: '/repo' })],
+    })
+    render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
+    await screen.findByText(/could not read the git repository/i)
+    expect(gitApi.listBranches).not.toHaveBeenCalled()
+  })
+})
+
 /** The branch picker's items, in order, with the current-branch tick stripped. */
 const listedBranches = (): string[] =>
   [...document.querySelectorAll('.branch-select__item-name')].map((el) => el.textContent ?? '')

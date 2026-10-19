@@ -66,7 +66,9 @@ export interface ElectronAPI {
     reorder(workspaceId: string, ids: string[]): Promise<{ success: boolean }>
   }
   git: {
-    isRepo(path: string): Promise<{ isRepo: boolean; root?: string }>
+    /** `error` when git could not answer (it timed out or did not run), which is not the same as
+     * `isRepo: false`: that is git saying the folder is not a repository. */
+    isRepo(path: string): Promise<{ isRepo: boolean; root?: string } | { error: string }>
     currentBranch(path: string): Promise<{ branch: string } | { error: string }>
     listBranches(
       path: string

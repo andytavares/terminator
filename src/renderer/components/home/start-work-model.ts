@@ -56,7 +56,8 @@ export function useRepoGit(workspace: Workspace | null): RepoGit {
 
 async function readRepoGit(folderPath: string): Promise<RepoGit> {
   const repo = await window.electronAPI.git.isRepo(folderPath)
-  if (!repo.isRepo || !repo.root) return NO_GIT
+  // No answer shows no branches, as a plain folder does; the launcher reads again each time it opens.
+  if ('error' in repo || !repo.isRepo || !repo.root) return NO_GIT
   const [{ branches }, { worktrees }] = await Promise.all([
     window.electronAPI.git.listBranches(repo.root),
     window.electronAPI.git.listWorktrees(repo.root),

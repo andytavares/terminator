@@ -77,6 +77,11 @@ null }` whatever was on screen: nothing told the core what the main window showe
   what a command had started outlived it (on macOS `/usr/bin/git` is an xcrun shim that can start
   `xcodebuild`). Each command now runs in a process group of its own, which a timeout and the
   app quitting stop whole. The result is unchanged.
+- `git.isRepo` answered `{ isRepo: false }` when git could not answer (it timed out, did not
+  start, or a signal ended it), so a real repository looked like a plain folder. It now answers
+  `{ error }` then, and `{ isRepo: false }` only when git said the path is not a repository. The
+  return type gains the `{ error: string }` member, as `git.currentBranch`'s has; code that reads
+  `isRepo` must now narrow with `'error' in answer` first.
 
 ## 4.0.0
 

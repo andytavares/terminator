@@ -394,16 +394,16 @@ export async function createWorkspace(page: Page, name: string, folderPath: stri
   if (branch !== null) await expectCheckoutCard(page, folderPath, branch)
 }
 
-/** The checkout's branch card, or a failure that says what the app answered about the folder: the
- * app makes the card only when git:is-repo says the folder is one, and it answers false for any
- * git failure, so a missing card is otherwise a bare timeout. */
+/** The checkout's branch card, or a failure that says what the app answers about the folder now.
+ * The app makes the card when git:is-repo and git:current-branch answer; when git cannot, the
+ * dialog says so and takes the workspace back, so a missing card is a bare timeout otherwise. */
 async function expectCheckoutCard(page: Page, folderPath: string, branch: string): Promise<void> {
   try {
     await expect(projectGroup(page, branch)).toBeVisible()
   } catch (error) {
     const answer = await page.evaluate((path) => window.electronAPI.git.isRepo(path), folderPath)
     throw new Error(
-      `${folderPath} is a git checkout on ${branch}, but no "${branch}" card appeared; the app now answers git:is-repo with ${JSON.stringify(answer)}`,
+      `${folderPath} is a git checkout on ${branch}, but no "${branch}" card appeared; git:is-repo now answers ${JSON.stringify(answer)}`,
       { cause: error }
     )
   }

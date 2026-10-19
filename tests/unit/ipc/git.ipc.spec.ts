@@ -70,11 +70,16 @@ describe('git:is-repo', () => {
     })
   })
 
-  it('returns isRepo false for non-repos and thrown errors', async () => {
+  it('returns isRepo false when git said the path is not a repository', async () => {
     gitService.isGitRepo.mockResolvedValue(false)
     await expect(handler('git:is-repo')({}, { path: '/x' })).resolves.toEqual({ isRepo: false })
-    gitService.isGitRepo.mockRejectedValue(new Error('io'))
-    await expect(handler('git:is-repo')({}, { path: '/x' })).resolves.toEqual({ isRepo: false })
+  })
+
+  it('returns an error, not isRepo false, when git could not answer', async () => {
+    gitService.isGitRepo.mockRejectedValue(new Error('git rev-parse timed out'))
+    await expect(handler('git:is-repo')({}, { path: '/x' })).resolves.toEqual({
+      error: 'Error: git rev-parse timed out',
+    })
   })
 })
 

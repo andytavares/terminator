@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { existsSync, readFileSync, writeFileSync, rmSync } from 'fs'
+import { writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { adoptLoginShellPath } from '../../../src/main/shell/login-shell-path'
 import { stopRunningCommands } from '../../../src/main/shell/command-runner'
 import { makeTempDir } from '../../support/temp-dir'
-import { isProcessAlive } from '../../support/processes'
+import { expectProcessGone, recordedPid } from '../../support/processes'
 
 let dir: string
 
@@ -72,12 +72,11 @@ describe('adoptLoginShellPath while the app quits', () => {
     const env: NodeJS.ProcessEnv = { SHELL: shell, PATH: '/usr/bin:/bin' }
 
     const adopting = adoptLoginShellPath(env)
-    await expect.poll(() => existsSync(pidFile) && readFileSync(pidFile, 'utf8') !== '').toBe(true)
-    const grandchild = Number(readFileSync(pidFile, 'utf8'))
+    const grandchild = await recordedPid(pidFile)
     stopRunningCommands()
     await adopting
 
     expect(env.PATH).toBe('/usr/bin:/bin')
-    await expect.poll(() => isProcessAlive(grandchild)).toBe(false)
+    await expectProcessGone(grandchild)
   })
 })

@@ -117,7 +117,11 @@ async function rectangleIsSaved(): Promise<void> {
     .locator('canvas')
     .last()
     .click({ position: { x: box.width / 2, y: Math.min(box.height - 20, 400) } })
-  await notepad.keyboard.press('r')
+  // Pick the tool the way a person does, and wait until it is the one selected. The R shortcut
+  // works only once Excalidraw has attached its keyboard handler, which is after its canvas shows.
+  const rectangleTool = notepad.getByRole('radio', { name: /rectangle/i })
+  await notepad.locator('label', { has: rectangleTool }).click()
+  await expect(rectangleTool).toBeChecked()
   await notepad.mouse.move(box.x + box.width / 2 - 80, box.y + box.height / 2 - 50)
   await notepad.mouse.down()
   await notepad.mouse.move(box.x + box.width / 2 + 80, box.y + box.height / 2 + 50, { steps: 8 })
