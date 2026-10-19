@@ -7,12 +7,11 @@ import {
 } from '../../../../src/renderer/home/work-threads'
 import { fact } from '../sidebar/fixtures/facts'
 import { facet } from './fixtures'
+import { ticket } from './desk-world'
 import type { IssueSummary } from '../../../../src/shared/types/index'
 
 const NOW = Date.parse('2026-10-18T12:00:00.000Z')
 const hoursBeforeNow = (hours: number) => NOW - hours * 3_600_000
-const ticket = (key: string, source: 'project' | 'session' = 'project') =>
-  ({ source, ref: { tracker: 'linear' as const, key } }) as const
 const issue = (key: string, title: string) => ({ tracker: 'linear', key, title }) as IssueSummary
 
 function input(patch: Partial<WorkThreadInput>): WorkThreadInput {

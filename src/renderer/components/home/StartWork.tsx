@@ -41,8 +41,9 @@ export function StartWorkHost(): JSX.Element | null {
 
 /** What the person has typed, picked and been told so far. */
 function useLauncherFields() {
+  const prefill = useStartWorkStore.getState().prefill
   const [tab, setTab] = useState<LauncherTab>('tickets')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(prefill)
   const [runAs, setRunAs] = useState<RunAs>('agent')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [pickedRepoId, setPickedRepoId] = useState<string | null>(null)

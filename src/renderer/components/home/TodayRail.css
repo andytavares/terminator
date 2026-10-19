@@ -1,0 +1,121 @@
+/* The Today rail (approved Home design). */
+.desk-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.desk-card {
+  padding: 12px 13px;
+  border: 1px solid var(--tm-border);
+  border-radius: 10px;
+  background: var(--tm-bg-card);
+}
+.desk-sec-h--tight {
+  margin-bottom: 9px;
+}
+.desk-focus {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.desk-focus--candidates:empty {
+  display: none;
+}
+.desk-focus--candidates {
+  margin-top: 7px;
+}
+.desk-focus li {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 8px;
+  align-items: start;
+  margin: 0;
+  font-size: 12px;
+}
+.desk-focus__done span {
+  color: var(--tm-text-muted);
+  text-decoration: line-through;
+}
+.desk-focus small {
+  display: block;
+  color: var(--tm-text-muted);
+  font-size: 11px;
+}
+
+.desk-kpis {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 10px;
+}
+.desk-kpi small {
+  display: block;
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+}
+.desk-kpi b {
+  display: block;
+  margin-top: 1px;
+  font-size: 19px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.desk-kpi__note {
+  color: var(--tm-text-muted);
+  font-size: 10.5px;
+  font-style: normal;
+}
+.desk-kpi__note--up {
+  color: var(--tm-success);
+}
+.desk-kpi__note--down {
+  color: var(--tm-warning);
+}
+
+.desk-heat {
+  display: grid;
+  grid-template-columns: repeat(18, 1fr);
+  grid-auto-rows: 9px;
+  gap: 2px;
+  margin-top: 8px;
+}
+.desk-heat i {
+  display: block;
+  border-radius: 2px;
+}
+.desk-heat__0 {
+  background: var(--tm-heat-0);
+}
+.desk-heat__1 {
+  background: var(--tm-heat-1);
+}
+.desk-heat__2 {
+  background: var(--tm-heat-2);
+}
+.desk-heat__3 {
+  background: var(--tm-heat-3);
+}
+.desk-heat__4 {
+  background: var(--tm-heat-4);
+}
+
+.desk-card__foot {
+  margin-top: 10px;
+}
+.desk-link {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tm-accent-text);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.desk-link svg {
+  width: 11px;
+  height: 11px;
+}

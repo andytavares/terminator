@@ -1,0 +1,156 @@
+/* The Desk's lower area: In flight on the left, the Today rail on the right (approved Home design). */
+.desk-lower {
+  display: grid;
+  grid-template-columns: 1fr 296px;
+  gap: 18px;
+  padding: 16px 18px 18px;
+  min-height: 0;
+}
+
+.desk-sec-h {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.desk-sec-h h5 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.desk-sec-h span {
+  color: var(--tm-text-muted);
+  font-size: 11.5px;
+}
+.desk-sec-h .desk-sec-h__right {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.desk-group-menu .sidebar-menu__button {
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tm-text-primary);
+  font: inherit;
+  font-size: 11.5px;
+}
+.desk-group-menu .sidebar-menu__button svg {
+  width: 11px;
+  height: 11px;
+}
+
+.desk-grp {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 10px 5px;
+  border: 0;
+  background: transparent;
+  color: var(--tm-text-secondary);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: left;
+}
+.desk-grp--collapsible {
+  color: var(--tm-text-muted);
+  cursor: pointer;
+}
+.desk-grp svg {
+  width: 11px;
+  height: 11px;
+}
+
+.desk-th,
+.desk-tr {
+  display: grid;
+  grid-template-columns: 1fr 156px 108px 128px 46px;
+  gap: 12px;
+}
+.desk-th {
+  padding: 0 10px 6px;
+  border-bottom: 1px solid var(--tm-border);
+  color: var(--tm-text-muted);
+  font-size: 11px;
+}
+.desk-th__last {
+  text-align: right;
+}
+
+.desk-tr {
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.desk-tr:hover,
+.desk-tr--selected {
+  background: var(--tm-bg-card-hover);
+}
+.desk-tr__work {
+  min-width: 0;
+}
+.desk-tr__work b {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.desk-tr__key {
+  color: var(--tm-text-secondary);
+  font-family: var(--tm-font-mono);
+  font-size: 11px;
+  font-weight: 500;
+}
+.desk-tr__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.desk-tr__work small {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--tm-text-muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.desk-tr__work small svg {
+  width: 11px;
+  height: 11px;
+  flex: none;
+}
+.desk-tr__now {
+  overflow: hidden;
+  color: var(--tm-text-secondary);
+  text-overflow: ellipsis;
+}
+.desk-sw {
+  display: inline-block;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+}
+.desk-tr__agents {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  color: var(--tm-text-secondary);
+  font-size: 11.5px;
+}
+.desk-tr__age {
+  color: var(--tm-text-muted);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}

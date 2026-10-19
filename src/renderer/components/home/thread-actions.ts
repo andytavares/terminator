@@ -1,0 +1,38 @@
+import { useHomeFeedStore } from '../../stores/home-feed.store'
+import { startSessionInBranch } from '../../terminal/start-session'
+import { agentCommand } from './start-work'
+import { workKeyId, type WorkThread } from '../../home/work-threads'
+import type { SessionFacts } from '../../sidebar/session-facts'
+
+/** The session to open first: the one that most recently did something. */
+export function leadSessionOf(thread: WorkThread): SessionFacts | undefined {
+  return [...thread.sessions].sort((a, b) => b.lastActivityAt - a.lastActivityAt)[0]
+}
+
+export function openLinkExternally(url: string): void {
+  void window.electronAPI?.shell?.openExternal(url)
+}
+
+/** Starts a Claude session in the thread's branch, telling it the ticket when there is one. */
+export async function startAgentOnBranch(thread: WorkThread): Promise<void> {
+  const projectId = leadSessionOf(thread)?.projectId
+  if (!projectId) return
+  const prompt = thread.ticketKey ? `Work on ${thread.ticketKey}: ${thread.title}` : null
+  await startSessionInBranch(projectId, agentCommand(prompt) ?? undefined)
+}
+
+const SEND_TO_AGENT = 'send-to-agent'
+
+/** Runs the extension's own "send to agent" for this thread, when one published it; null when none did. */
+export function useSendToAgent(thread: WorkThread): (() => Promise<boolean>) | null {
+  const asks = useHomeFeedStore((s) => s.asks)
+  const runAction = useHomeFeedStore((s) => s.runAction)
+  const ids = [thread.key, ...thread.facets.map((f) => workKeyId(f.workKey))]
+  const ask = asks.find(
+    (a) =>
+      a.workKey !== null &&
+      ids.includes(workKeyId(a.workKey)) &&
+      a.actions.some((action) => action.id === SEND_TO_AGENT)
+  )
+  return ask ? () => runAction(ask.source, ask.id, SEND_TO_AGENT) : null
+}

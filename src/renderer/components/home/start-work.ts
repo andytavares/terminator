@@ -14,12 +14,15 @@ import type { IssueSummary, Workspace } from '../../../shared/types/index'
 /** Whether the launcher is showing; ⌘N, the Home button and the Quick actions entry open it. */
 export const useStartWorkStore = create<{
   open: boolean
-  openLauncher: () => void
+  /** Text the launcher opens with in its prompt box. */
+  prefill: string
+  openLauncher: (prefill?: string) => void
   closeLauncher: () => void
 }>((set) => ({
   open: false,
-  openLauncher: () => set({ open: true }),
-  closeLauncher: () => set({ open: false }),
+  prefill: '',
+  openLauncher: (prefill = '') => set({ open: true, prefill }),
+  closeLauncher: () => set({ open: false, prefill: '' }),
 }))
 
 export type RunAs = 'agent' | 'terminal' | 'foundry'

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { isoMinutesBefore } from './desk-world'
 import {
   ageLabel,
   askSignature,
@@ -9,7 +10,6 @@ import {
 import type { HomeAsk } from '../../../../src/shared/schemas/home-feed.schema'
 
 const NOW = Date.parse('2026-10-18T12:00:00.000Z')
-const minutesAgo = (m: number) => new Date(NOW - m * 60_000).toISOString()
 
 interface AskSpec {
   id: string
@@ -27,7 +27,7 @@ function ask(spec: AskSpec): HomeAsk {
     detail,
     facts: ['f'],
     workKey: null,
-    since: minutesAgo(ageMinutes),
+    since: isoMinutesBefore(NOW, ageMinutes),
     actions: [],
     open: { command: 'x' },
   }
@@ -108,7 +108,7 @@ describe('ageLabel', () => {
     [180, '3 h'],
     [60 * 48, '2 d'],
   ])('%i minutes reads %s', (m, label) => {
-    expect(ageLabel(minutesAgo(m), NOW)).toBe(label)
+    expect(ageLabel(isoMinutesBefore(NOW, m), NOW)).toBe(label)
   })
 })
 

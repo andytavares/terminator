@@ -130,9 +130,14 @@ const WORKSPACE_KEYS: CoreKey[] = [
 ]
 
 const TERMINAL_KEYS: CoreKey[] = [
-  // Cmd+K: clear terminal screen (skip if typing — Cmd+K kills to line start in text fields)
+  // Cmd+K: clear terminal screen (skip if typing — Cmd+K kills to line start in text fields).
+  // On Home it is the search field's key.
   {
-    test: (e, at) => at.isMeta && e.key === 'k' && !at.inTextField,
+    test: (e, at) =>
+      at.isMeta &&
+      e.key === 'k' &&
+      !at.inTextField &&
+      useExtensionRegistry.getState().activeGlobalTabId !== 'core.home',
     actionId: 'core.clear',
     run: (c) => clearTerminal(effectiveProjectOf(c), useSessionStore.getState()),
   },

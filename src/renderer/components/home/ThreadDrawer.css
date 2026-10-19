@@ -1,0 +1,131 @@
+/* The work-thread drawer's content (approved Home design); the panel itself is the design system's Drawer. */
+.desk-dr-h {
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid var(--tm-border);
+}
+.desk-dr-h__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--tm-text-secondary);
+  font-size: 11.5px;
+}
+.desk-dr-h__top svg {
+  width: 11px;
+  height: 11px;
+}
+.desk-dr-h__branch {
+  font-family: var(--tm-font-mono);
+}
+.desk-dr-h__esc {
+  margin-left: auto;
+}
+.desk-dr-h h4 {
+  margin: 6px 0 0;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.desk-dr-h__key {
+  color: var(--tm-text-secondary);
+  font-family: var(--tm-font-mono);
+  font-size: 13px;
+  font-weight: 500;
+}
+.desk-dr-h__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.desk-pipe {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.desk-dr-b {
+  display: grid;
+  gap: 14px;
+  padding: 4px 18px 18px;
+  overflow-y: auto;
+}
+.desk-dr-s h6 {
+  margin: 12px 0 7px;
+  color: var(--tm-text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.desk-dr-text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.desk-dr-note {
+  margin-top: 8px;
+  color: var(--tm-text-secondary);
+}
+.desk-dr-muted {
+  color: var(--tm-text-muted);
+}
+
+.desk-lr {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  gap: 9px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--tm-border);
+  font-size: 12px;
+}
+.desk-lr:last-child {
+  border-bottom: 0;
+}
+.desk-lr small {
+  color: var(--tm-text-muted);
+}
+.desk-lr__actions {
+  display: flex;
+  gap: 4px;
+}
+.desk-lr__icon {
+  width: 14px;
+  height: 14px;
+  color: var(--tm-text-muted);
+}
+.desk-lr__icon--bad {
+  color: var(--tm-danger);
+}
+.desk-lr__icon--good {
+  color: var(--tm-success);
+}
+
+.desk-tl {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.desk-tl li {
+  display: grid;
+  grid-template-columns: 46px 12px 1fr;
+  gap: 8px;
+  margin: 0;
+  padding: 3px 0;
+  color: var(--tm-text-secondary);
+  font-size: 11.5px;
+}
+.desk-tl time {
+  color: var(--tm-text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.desk-tl .tmui-status-dot {
+  margin-top: 4px;
+}
+.desk-tl b {
+  color: var(--tm-text-primary);
+  font-weight: 500;
+}
