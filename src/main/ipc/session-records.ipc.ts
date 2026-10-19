@@ -1,5 +1,5 @@
 import type { BrowserWindow } from 'electron'
-import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
+import { defineChannel, validationError, type ChannelSpec } from '@terminator/extension-sdk'
 import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { sendToWindow } from '../safe-send.js'
 import * as fs from 'node:fs'
@@ -33,10 +33,6 @@ function fail(error: unknown): { error: string; message: string } {
   }
 }
 
-function invalid(error: { message: string }): { error: string; message: string } {
-  return { error: 'VALIDATION_ERROR', message: error.message }
-}
-
 /**
  * Whether the conversation can be brought back on this machine right now.
  *
@@ -62,7 +58,7 @@ const recordReadChannels: ChannelSpec[] = [
   defineChannel({
     channel: 'session-records:list',
     schema: noPayload,
-    invalid,
+    invalid: validationError,
     run: () => ({
       data: pruneRecords(listRecords(), Date.now())
         .sort(byCloseTime)
@@ -75,7 +71,7 @@ const recordWriteChannels: ChannelSpec[] = [
   defineChannel({
     channel: 'session-records:set-description',
     schema: SetDescriptionInputSchema,
-    invalid,
+    invalid: validationError,
     run: async ({ session, description }) => ({
       data: listing(await setDescription(session, description)),
     }),
@@ -84,7 +80,7 @@ const recordWriteChannels: ChannelSpec[] = [
   defineChannel({
     channel: 'session-records:set-link',
     schema: SetLinkInputSchema,
-    invalid,
+    invalid: validationError,
     run: async ({ session, link }) => {
       const record = await setLink(session, link)
       // The session's own link feeds its agent's SessionStart context and wins over the project's.
@@ -98,14 +94,14 @@ const recordWriteChannels: ChannelSpec[] = [
   defineChannel({
     channel: 'session-records:forget',
     schema: ForgetInputSchema,
-    invalid,
+    invalid: validationError,
     run: async ({ sessionId }) => ({ data: await forget(sessionId) }),
     onError: fail,
   }),
   defineChannel({
     channel: 'session-records:transfer',
     schema: TransferInputSchema,
-    invalid,
+    invalid: validationError,
     run: async ({ fromSessionId, session }) => ({
       data: listing(await transfer(fromSessionId, session)),
     }),

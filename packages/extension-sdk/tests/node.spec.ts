@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { moveFromUserData, shellQuote, writeJsonAtomic } from '@terminator/extension-sdk/node'
+import {
+  envWithoutParentClaude,
+  moveFromUserData,
+  shellQuote,
+  writeJsonAtomic,
+} from '@terminator/extension-sdk/node'
 import { makeTempDir } from '../../../tests/support/temp-dir'
 
 describe('writeJsonAtomic', () => {
@@ -120,5 +125,21 @@ describe('shellQuote', () => {
 
   it("closes, escapes and reopens the quotes around a value's own single quote", () => {
     expect(shellQuote("it's")).toBe("'it'\\''s'")
+  })
+})
+
+describe('envWithoutParentClaude', () => {
+  it('drops CLAUDECODE and CLAUDE_CODE_* and keeps everything else', () => {
+    const env = {
+      CLAUDECODE: '1',
+      CLAUDE_CODE_BRIDGE_SESSION_ID: 'b',
+      PATH: '/bin',
+      CLAUDE_HOME: '/c',
+    }
+    expect(envWithoutParentClaude(env)).toEqual({ PATH: '/bin', CLAUDE_HOME: '/c' })
+  })
+
+  it('leaves out variables that are set but undefined', () => {
+    expect(envWithoutParentClaude({ HOME: undefined, PATH: '/bin' })).toEqual({ PATH: '/bin' })
   })
 })

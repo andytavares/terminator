@@ -27,6 +27,8 @@ import { registerAttentionHandlers } from './ipc/attention.ipc.js'
 import { loadAttentionLog } from './home/attention-log.js'
 import { startAskWatcher } from './agents/ask-watcher.js'
 import { installAskHooks, installAskScript } from './agents/agent-ask-hook.js'
+import { registerAgentUsageHandlers } from './ipc/agent-usage.ipc.js'
+import { registerThreadSummaryHandler } from './ipc/thread-summary.ipc.js'
 import { registerHomeFeedHandlers } from './ipc/home-feed.ipc.js'
 import { ensureHookScript } from './integrations/context-sync.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
@@ -368,6 +370,8 @@ function registerSessionHandlers(): OutputRelay {
   registerSessionRecordsHandlers(() => mainWindow)
   registerAgentAskHandlers(() => mainWindow)
   registerAttentionHandlers()
+  registerAgentUsageHandlers()
+  registerThreadSummaryHandler()
   registerHomeFeedHandlers(() => mainWindow)
   return terminalRelay
 }

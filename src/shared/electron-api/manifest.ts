@@ -52,6 +52,8 @@ import type {
   SetMineInputSchema,
   StatusInputSchema,
 } from '../schemas/integrations.schema'
+import type { AgentUsageInputSchema, ThreadSummaryInputSchema } from '../schemas/agent-usage.schema'
+import type { AgentUsage } from '../agents/agent-usage'
 import type {
   ForgetInputSchema,
   SetDescriptionInputSchema,
@@ -1118,6 +1120,32 @@ export const ELECTRON_API_MANIFEST = [
           handler: (payload: { sessionId: string; record: SessionRecordListing | null }) => void
         ) => Unsubscribe
       >(),
+  }),
+
+  // ── agent usage and work-thread summaries (core only) ─────────────────────
+  method({
+    path: 'agentUsage.get',
+    kind: 'invoke',
+    channel: 'agents:usage',
+    signature:
+      signature<
+        (
+          input: z.input<typeof AgentUsageInputSchema>
+        ) => Promise<{ data: AgentUsage } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'homeThreadSummary.get',
+    kind: 'invoke',
+    channel: 'home:thread-summary',
+    signature:
+      signature<
+        (
+          input: z.input<typeof ThreadSummaryInputSchema>
+        ) => Promise<{ text: string; generatedAt: string } | { error: string }>
+      >(),
+    remote: 'omit',
   }),
 
   // ── agent asks (a Claude Code Notification hook says the agent is waiting on you) ──
