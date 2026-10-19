@@ -67,7 +67,7 @@ function dialogActions({ busy, fields, submit }: Form, onClose: () => void): Dia
 function useCreateProjectForm(workspaceId: string, onClose: () => void) {
   const target = useTarget(workspaceId)
   const fields = useProjectFields(target.hasNonWorktreeProject)
-  const repo = useRepoInfo(target.folderPath, fields.update)
+  const repo = useRepoInfo(target.folderPath, fields)
   const fetch = useBranchFetch(repo, fields.setError)
   useWorktreePath(fields, { gitRoot: repo.gitRoot, baseDir: target.worktreeBaseDir })
   const [busy, setBusy] = useState(false)
@@ -101,6 +101,7 @@ function useTarget(workspaceId: string) {
 }
 
 type Update = (patch: Partial<ProjectDraft>) => void
+type ProjectFields = ReturnType<typeof useProjectFields>
 
 /** The draft, its two errors, and the issue it was started from. */
 function useProjectFields(hasNonWorktreeProject: boolean) {
@@ -137,7 +138,10 @@ function useStartingIssue(update: Update, setNameError: (error: string) => void)
 }
 
 /** Whether the folder is a git repo and, if so, its branches and worktrees. */
-function useRepoInfo(folderPath: string | undefined, update: Update) {
+function useRepoInfo(
+  folderPath: string | undefined,
+  { update, setError }: Pick<ProjectFields, 'update' | 'setError'>
+) {
   const [gitRoot, setGitRoot] = useState<string | null>(null)
   const [branches, setBranches] = useState<Branch[]>([])
   const [worktrees, setWorktrees] = useState<WorktreeInfo[]>([])
@@ -145,6 +149,8 @@ function useRepoInfo(folderPath: string | undefined, update: Update) {
   useEffect(() => {
     if (!folderPath) return
     void window.electronAPI.git.isRepo(folderPath).then((info) => {
+      // No answer is not "not a repository": a form for a plain folder here would be wrong.
+      if ('error' in info) return setError('Could not read the git repository. Try again.')
       if (!info.isRepo || !info.root) return
       setGitRoot(info.root)
       void window.electronAPI.git.listBranches(info.root).then((r) => {
@@ -154,7 +160,7 @@ function useRepoInfo(folderPath: string | undefined, update: Update) {
       })
       void window.electronAPI.git.listWorktrees(info.root).then((r) => setWorktrees(r.worktrees))
     })
-  }, [folderPath, update])
+  }, [folderPath, update, setError])
 
   return { gitRoot, branches, setBranches, worktrees }
 }

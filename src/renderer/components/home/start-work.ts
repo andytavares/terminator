@@ -151,6 +151,7 @@ async function projectForBranch(workspace: Workspace, branch: string): Promise<s
   const existing = branchCardsOf(workspace.id).find((p) => p.gitBranch === branch)
   if (existing !== undefined) return existing.id
   const repo = await window.electronAPI.git.isRepo(workspace.folderPath)
+  if ('error' in repo) return new Error(`Could not read the git repository of ${workspace.name}.`)
   if (!repo.isRepo || !repo.root) return new Error(`${workspace.name} is not a git repo.`)
   const { branches } = await window.electronAPI.git.listBranches(repo.root)
   const created = await createFromDraft({
