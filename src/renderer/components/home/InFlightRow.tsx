@@ -3,7 +3,7 @@ import { CircleCheck, CircleX, Factory, GitBranch } from 'lucide-react'
 import { Chip, StageBar, StatusDot } from '@terminator/extension-ui'
 import { compactAge, stageCaption } from './thread-format'
 import { useDeskSelection } from './desk-selection'
-import { InFlightMenu } from './InFlightMenu'
+import { InFlightMenu, useWorkMenu, type WorkMenuState } from './InFlightMenu'
 import { SESSION_ACTIONS } from '../session/session-actions'
 import { leadSessionOf } from './thread-actions'
 import type { WorkThread } from '../../home/work-threads'
@@ -136,10 +136,11 @@ interface RowCellsProps {
   thread: WorkThread
   now: number
   rename: ReturnType<typeof useTitleRename>
+  workMenu: WorkMenuState
 }
 
 /** The row's cells and its menu: work, stage, agents, pull request, age. */
-function RowCells({ thread, now, rename }: RowCellsProps): JSX.Element {
+function RowCells({ thread, now, rename, workMenu }: RowCellsProps): JSX.Element {
   return (
     <>
       <WorkCell
@@ -158,7 +159,7 @@ function RowCells({ thread, now, rename }: RowCellsProps): JSX.Element {
         <PullRequestCell thread={thread} />
       </div>
       <div className="desk-tr__age">{compactAge(now - thread.lastActivity)}</div>
-      <InFlightMenu thread={thread} onStartRename={rename.beginTitleRename} />
+      <InFlightMenu thread={thread} onStartRename={rename.beginTitleRename} workMenu={workMenu} />
     </>
   )
 }
@@ -167,6 +168,7 @@ function RowCells({ thread, now, rename }: RowCellsProps): JSX.Element {
 export function InFlightRow({ thread, now, selected }: InFlightRowProps): JSX.Element {
   const openThread = useDeskSelection((s) => s.openThread)
   const rename = useTitleRename(thread)
+  const workMenu = useWorkMenu()
   return (
     <div
       role="button"
@@ -176,11 +178,12 @@ export function InFlightRow({ thread, now, selected }: InFlightRowProps): JSX.El
       data-thread-key={thread.key}
       className={selected ? 'desk-tr desk-tr--selected' : 'desk-tr'}
       onClick={() => openThread(thread.key)}
+      onContextMenu={workMenu.openWorkMenu}
       onKeyDown={(event) => {
         if (event.key === 'Enter' && event.target === event.currentTarget) openThread(thread.key)
       }}
     >
-      <RowCells thread={thread} now={now} rename={rename} />
+      <RowCells thread={thread} now={now} rename={rename} workMenu={workMenu} />
     </div>
   )
 }

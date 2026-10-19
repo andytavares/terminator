@@ -159,10 +159,16 @@
   line-height: 1.53;
   text-align: right;
 }
+/* A layer for the menu and its dialogs that takes no pointer hits of its own, so a click on the
+   row reaches the row; what it holds (the button, the menu, a dialog) takes them back. */
 .desk-tr__controls {
   position: absolute;
   inset: 0;
   border-radius: inherit;
+  pointer-events: none;
+}
+.desk-tr__controls > * {
+  pointer-events: auto;
 }
 .desk-tr__menu {
   position: absolute;

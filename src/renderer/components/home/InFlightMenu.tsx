@@ -12,9 +12,12 @@ import { ConfirmDialog } from '../ConfirmDialog'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import type { WorkThread } from '../../home/work-threads'
 
+export type WorkMenuState = ReturnType<typeof useWorkMenu>
+
 interface InFlightMenuProps {
   thread: WorkThread
   onStartRename: () => void
+  workMenu: WorkMenuState
 }
 
 interface ItemActions {
@@ -132,7 +135,7 @@ function MenuDialogs({
 }
 
 /** Where the row's menu is open, if it is. Opening closes any other menu first. */
-function useWorkMenu() {
+export function useWorkMenu() {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const openWorkMenu = (e: React.MouseEvent): void => {
     e.preventDefault()
@@ -170,9 +173,10 @@ function WorkMenuButton({ onOpen }: { onOpen: (e: React.MouseEvent) => void }): 
   )
 }
 
-/** The row's ⋯ button and right-click menu, with the link and worktree-removal dialogs. */
-export function InFlightMenu({ thread, onStartRename }: InFlightMenuProps): JSX.Element {
-  const { menu, openWorkMenu, closeWorkMenu } = useWorkMenu()
+/** The row's ⋯ button and menu, with the link and worktree-removal dialogs. The row opens the
+ *  menu on right-click; this layer ignores pointer hits itself, so a left click reaches the row. */
+export function InFlightMenu({ thread, onStartRename, workMenu }: InFlightMenuProps): JSX.Element {
+  const { menu, openWorkMenu, closeWorkMenu } = workMenu
   const dialogs = useMenuDialogs()
   const items = buildItems(thread, {
     closeMenu: closeWorkMenu,
@@ -181,13 +185,7 @@ export function InFlightMenu({ thread, onStartRename }: InFlightMenuProps): JSX.
     onRemoveWorktree: dialogs.openRemoval,
   })
   return (
-    // The right-click that opens the menu reaches window as a click; without
-    // stopPropagation here the menu's own dismiss listener would close it at once.
-    <span
-      className="desk-tr__controls"
-      onClick={(e) => e.stopPropagation()}
-      onContextMenu={openWorkMenu}
-    >
+    <span className="desk-tr__controls" onClick={(e) => e.stopPropagation()}>
       <WorkMenuButton onOpen={openWorkMenu} />
       {menu && <ContextMenu x={menu.x} y={menu.y} items={items} onDismiss={closeWorkMenu} />}
       <MenuDialogs thread={thread} {...dialogs} />

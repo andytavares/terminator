@@ -235,7 +235,7 @@ describe('the work-thread drawer — checks', () => {
 describe('the work-thread drawer — actions', () => {
   it('opens the terminal, the pull request and the ticket, and parks the work', async () => {
     const drawer = within(await openBuilding())
-    fireEvent.click(drawer.getAllByRole('button', { name: 'Open terminal' })[0])
+    fireEvent.click(drawer.getByRole('button', { name: 'Open terminal' }))
     expect(spies.open).toHaveBeenCalledWith('building')
     fireEvent.click(drawer.getByRole('button', { name: 'Open pull request #275' }))
     expect(openExternal).toHaveBeenCalledWith('https://github.com/o/r/pull/275')
