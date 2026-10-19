@@ -8,6 +8,7 @@ import { useExtensionCommandsStore } from '../stores/extension-commands.store'
 import { useMetricsStore } from '../stores/metrics.store'
 import { useActiveScope } from '../quick-actions/use-active-scope'
 import { useBranchSync } from '../hooks/useBranchSync'
+import { useAgentAttention } from './agent-attention'
 
 // What the window loads when it opens, and what it keeps in step with the
 // stores for as long as it is open.
@@ -18,6 +19,8 @@ export function useInitialLoad(): void {
     void useWorkspaceStore.getState().loadWorkspaces()
     void useSettingsStore.getState().loadSettings()
   }, [])
+
+  useAgentAttention()
 
   useEffect(() => {
     const records = useSessionRecordsStore.getState()

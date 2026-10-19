@@ -1126,6 +1126,7 @@ export const ELECTRON_API_MANIFEST = [
     kind: 'invoke',
     channel: 'agent-ask:list',
     signature: signature<() => Promise<{ data: Array<{ sessionId: string; ask: AgentAsk }> }>>(),
+    remote: 'omit',
   }),
   method({
     path: 'agentAsk.onChanged',
@@ -1135,6 +1136,7 @@ export const ELECTRON_API_MANIFEST = [
       signature<
         (handler: (payload: { sessionId: string; ask: AgentAsk | null }) => void) => Unsubscribe
       >(),
+    remote: 'omit',
   }),
 
   // ── attention log (when sessions worked and when they waited on you) ──────
@@ -1148,6 +1150,7 @@ export const ELECTRON_API_MANIFEST = [
           input: z.input<typeof RecordStateInputSchema>
         ) => Promise<{ data: true } | { error: string; message: string }>
       >(),
+    remote: 'omit',
   }),
   method({
     path: 'attention.measures',
@@ -1157,6 +1160,7 @@ export const ELECTRON_API_MANIFEST = [
       signature<
         (input: z.input<typeof MeasuresInputSchema>) => Promise<{ data: AttentionMeasures }>
       >(),
+    remote: 'omit',
   }),
 
   // ── home feed (what extensions publish for Home to draw; core only) ───────

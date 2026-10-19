@@ -290,7 +290,25 @@ describe('buildSessionFacts — carries a choice prompt from the session', () =>
     })
     expect(facts.choicePrompt).toEqual(prompt)
   })
+})
 
+describe('buildSessionFacts — carries an agent ask from the session', () => {
+  it('carries what the agent asked, and nothing for a session with no ask', () => {
+    const agentAsk = { message: 'Allow Bash?', since: '2026-10-18T10:00:00.000Z' }
+    const [asking, quiet] = buildSessionFacts({
+      ...empty,
+      sessions: [
+        { ...session, agentAsk },
+        { ...session, id: 'quiet' },
+      ],
+    })
+    expect(asking.askMessage).toBe('Allow Bash?')
+    expect(asking.state).toBe('awaiting-input')
+    expect(quiet.askMessage).toBeNull()
+  })
+})
+
+describe('buildSessionFacts — carries the conversation from the record', () => {
   it('carries the conversation that ran in the session, and whether it can come back', () => {
     const conversation = {
       provider: 'claude' as const,

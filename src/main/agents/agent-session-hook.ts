@@ -119,7 +119,7 @@ export interface CaptureHookOptions {
   scriptPath: string
 }
 
-function userSettingsPath(): string {
+export function userSettingsPath(): string {
   return path.join(app.getPath('home'), '.claude', 'settings.json')
 }
 

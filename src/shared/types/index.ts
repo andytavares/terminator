@@ -1,4 +1,5 @@
 export type { NotificationTarget } from '../notifications/resolve-targets'
+import type { AgentAsk } from '../agent-sessions/ask'
 import type { NotificationTarget, NotificationType } from '../notifications/resolve-targets'
 
 export interface NotificationAction {
@@ -98,6 +99,8 @@ export interface TerminalSession {
   latestLine?: string
   /** A numbered-choice prompt read off the visible screen at the last busy → idle (renderer-side view state). */
   choicePrompt?: ChoicePrompt
+  /** What the agent said it is waiting on, from its Notification hook (renderer-side view state). */
+  agentAsk?: AgentAsk
 }
 
 /** One option in a numbered-choice prompt, numbered as on screen. */

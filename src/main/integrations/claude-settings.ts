@@ -42,18 +42,25 @@ export async function writeClaudeSettings(
   await fs.writeFile(file, `${JSON.stringify(settings, null, 2)}\n`, 'utf8')
 }
 
-/** Every SessionStart entry `marker` identifies goes, then one comes back with `command`. The
- * timeout is in seconds; a hook that hung would hold up every session start it covers. */
-export async function putSessionStartHook(
+/** Every `event` entry `marker` identifies goes, then one comes back with `command`. The
+ * timeout is in seconds; a hook that hung would hold up every session it covers. */
+export async function putHook(
   file: string,
-  marker: string,
-  command: string
+  event: string,
+  ours: { marker: string; command: string }
 ): Promise<void> {
   const settings = (await readClaudeSettings(file)) ?? {}
   const hooks = settings.hooks ?? {}
-  const sessionStart = Array.isArray(hooks.SessionStart) ? hooks.SessionStart : []
-  const theirs = sessionStart.filter((entry) => !runsCommandContaining(entry, marker))
-  const ours = { matcher: '*', hooks: [{ type: 'command', command, timeout: 10 }] }
-  settings.hooks = { ...hooks, SessionStart: [...theirs, ours] }
+  const current = hooks[event]
+  const theirs = (Array.isArray(current) ? current : []).filter(
+    (entry) => !runsCommandContaining(entry, ours.marker)
+  )
+  const entry = { matcher: '*', hooks: [{ type: 'command', command: ours.command, timeout: 10 }] }
+  settings.hooks = { ...hooks, [event]: [...theirs, entry] }
   await writeClaudeSettings(file, settings)
+}
+
+/** Every SessionStart entry `marker` identifies goes, then one comes back with `command`. */
+export function putSessionStartHook(file: string, marker: string, command: string): Promise<void> {
+  return putHook(file, 'SessionStart', { marker, command })
 }

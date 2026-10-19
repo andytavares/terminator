@@ -23,6 +23,7 @@ export function fact(patch: Partial<SessionFacts> = {}): SessionFacts {
     closedAt: null,
     latestLine: '',
     choicePrompt: null,
+    askMessage: null,
     agent: null,
     resumable: false,
     snapshot: snapshotOf(sessionId),

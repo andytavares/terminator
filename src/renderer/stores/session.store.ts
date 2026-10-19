@@ -1,6 +1,7 @@
 import { create, type StoreApi } from 'zustand'
 import type { ChoicePrompt, TerminalSession, PaneNode } from '../../shared/types/index'
 import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
+import type { AgentAsk } from '../../shared/agent-sessions/ask'
 import {
   splitLeaf,
   removeLeaf,
@@ -203,6 +204,8 @@ interface SessionState {
   getBellCountForProject: (projectId: string) => number
   setSessionBusy: (sessionId: string) => void
   setSessionIdle: (sessionId: string) => void
+  /** What the agent says it is waiting on, or null once it is answered. */
+  setAgentAsk: (sessionId: string, ask: AgentAsk | null) => void
   /** What a session's screen showed when its output last settled. */
   setSessionScreen: (
     sessionId: string,
@@ -574,6 +577,14 @@ function signalSlice(
   }
 }
 
+/** What a session's agent says it is waiting on. */
+function agentAskSlice(set: SetSessions): Slice<'setAgentAsk'> {
+  return {
+    setAgentAsk: (sessionId, ask) =>
+      set((s) => patchSession(s, sessionId, { agentAsk: ask ?? undefined }) ?? s),
+  }
+}
+
 /** Reads over the sessions and their views. */
 function querySlice(
   get: GetSessions
@@ -647,6 +658,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   ...activitySlice(set),
   ...terminalSlice(set),
   ...signalSlice(set),
+  ...agentAskSlice(set),
   ...querySlice(get),
   ...splitSlice(set, get),
 }))
