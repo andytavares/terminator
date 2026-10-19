@@ -1,0 +1,24 @@
+/* ── Issue details (Home) ────────────────────────────────────── */
+
+.issue-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.issue-details__esc {
+  margin-left: auto;
+}
+
+.issue-details__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.issue-details__actions svg {
+  width: 13px;
+  height: 13px;
+  vertical-align: -2px;
+  margin-right: 4px;
+}

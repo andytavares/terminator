@@ -1,9 +1,10 @@
 import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useState } from 'react'
 import { ExternalLink, RefreshCw, X } from 'lucide-react'
-import { Markdown, RelativeTime } from '@terminator/extension-ui'
 import { useIntegrationsStore } from '../../stores/integrations.store'
-import type { AgentContext, Issue, IssueLink, TrackerId } from '../../../shared/types/index'
+import { TRACKER_LABELS } from './use-issue-search'
+import { CommentsSection, IssueDescriptionSection, IssueTags } from './issue-sections'
+import type { AgentContext, Issue, IssueLink } from '../../../shared/types/index'
 import './IssueDrawer.css'
 
 // The attached issue, read without leaving the app.
@@ -13,16 +14,9 @@ import './IssueDrawer.css'
 // inspects here is produced by the same function that writes the file a
 // session reads — not a second rendering of the same idea (FR-023).
 
-const TRACKER_LABELS: Record<TrackerId, string> = { linear: 'Linear', jira: 'Jira' }
 const CONTEXT_LIMIT = 10_000
 /** Where the counter starts warning: close enough that trimming is imminent. */
 const CONTEXT_WARN_AT = 0.85
-
-// Issue text is written by anyone who can comment on the ticket, so it renders
-// with `fetchesNothing` and its links leave through the shell, never navigation.
-function openExternalUrl(url: string): void {
-  void window.electronAPI?.shell?.openExternal(url)
-}
 
 export interface IssueDrawerProps {
   projectId: string
@@ -41,7 +35,7 @@ export function IssueDrawer({ projectId, projectName, onClose }: IssueDrawerProp
   return (
     <aside className="issue-drawer" aria-label={`Issue ${link.key}`}>
       <DrawerHeader {...{ link, issue, projectName, onClose }} actions={actions} />
-      {issue !== null && <DescriptionSection issue={issue} />}
+      {issue !== null && <IssueDescriptionSection issue={issue} />}
       {issue !== null && issue.comments.length > 0 && <CommentsSection issue={issue} />}
       <ContextSection {...{ link, context, projectName }} actions={actions} />
       <CommentSection
@@ -206,59 +200,6 @@ function HeaderButtons({ link, issue, onClose, actions }: Omit<HeaderProps, 'pro
         <X />
       </button>
     </div>
-  )
-}
-
-function IssueTags({ issue, tracker }: { issue: Issue; tracker: TrackerId }): JSX.Element {
-  return (
-    <div className="issue-drawer__meta">
-      <span className="issue-drawer__tag">{TRACKER_LABELS[tracker]}</span>
-      <span className="issue-drawer__tag">{issue.assignee?.name ?? 'Unassigned'}</span>
-      {issue.labels.map((label) => (
-        <span key={label} className="issue-drawer__tag">
-          {label}
-        </span>
-      ))}
-      {issue.updatedAt !== '' && (
-        <span className="issue-drawer__tag">
-          updated <RelativeTime value={issue.updatedAt} />
-        </span>
-      )}
-    </div>
-  )
-}
-
-function DescriptionSection({ issue }: { issue: Issue }): JSX.Element {
-  return (
-    <section className="issue-drawer__section">
-      {issue.description.trim().length > 0 ? (
-        <Markdown fetchesNothing className="issue-markdown" onOpenLink={openExternalUrl}>
-          {issue.description}
-        </Markdown>
-      ) : (
-        <p className="issue-drawer__empty">No description.</p>
-      )}
-    </section>
-  )
-}
-
-function CommentsSection({ issue }: { issue: Issue }): JSX.Element {
-  return (
-    <section className="issue-drawer__section">
-      <h3 className="issue-drawer__heading">
-        Comments <span className="issue-drawer__count">{issue.comments.length}</span>
-      </h3>
-      {issue.comments.map((c, i) => (
-        <div key={`${c.author}-${c.createdAt}-${i}`} className="issue-drawer__comment">
-          <span className="issue-drawer__who">
-            {c.author} · <RelativeTime value={c.createdAt} />
-          </span>
-          <Markdown fetchesNothing className="issue-markdown" onOpenLink={openExternalUrl}>
-            {c.body}
-          </Markdown>
-        </div>
-      ))}
-    </section>
   )
 }
 
