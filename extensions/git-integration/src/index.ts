@@ -13,6 +13,7 @@ import { bindWorkspaceRoots } from './ipc/repo-root.js'
 import { projectForCheckout } from './review/terminal-project.js'
 import { VALIDATION_ERROR, type RegisterFn } from './ipc/register.js'
 import { registerGithubHandlers, type GithubHandlerOptions } from './ipc/github.ipc.js'
+import { registerWorktreesHandlers } from './ipc/worktrees.ipc.js'
 import { registerReviewAgentHandlers, type OpenTerminalInput } from './ipc/review-agent.ipc.js'
 import { consumePendingViewRequest, registerQuickActionCommands } from './commands.js'
 import { createHomePublisher } from './home/publisher.js'
@@ -222,6 +223,7 @@ function registerChannels(api: ExtensionAPI, roots: ChannelRoots): void {
     disposables.push(api.ipc.registerHandler(gated, remoteAccessFor(spec.channel)))
   }
   registerGitExtensionHandlers(registerFn, gitSettings(api))
+  registerWorktreesHandlers(registerFn, api.workspace)
   registerFn(pendingRequestChannel())
   registerGithub(api, registerFn, roots)
   // Read-only review agent: headless `claude -p` in a detached PR-head worktree.

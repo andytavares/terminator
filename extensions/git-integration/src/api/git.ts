@@ -2,6 +2,8 @@
 // through extensionBridge, never via window.electronAPI.git directly.
 
 import { invoke } from '@terminator/extension-sdk/renderer'
+import type { LocalInventoryRow } from '../git/local-inventory'
+import type { RemoveItem, RemoveResult } from '../git/remove-local'
 
 export type CommitResult =
   | { commitHash: string }
@@ -32,4 +34,12 @@ export const gitAPI = {
   prStatus: (repoRoot: string) => bridge().invoke('git:pr-status', { repoRoot }),
 
   push: (repoRoot: string) => bridge().invoke('git:push', { repoRoot }),
+
+  /** The Worktrees tab's rows: every local branch and worktree of `repoRoot`. */
+  localInventory: (repoRoot: string) =>
+    invoke<{ rows: LocalInventoryRow[] }>('git:local-inventory', { repoRoot }),
+
+  /** Removes the worktrees and branches the Worktrees tab has checked. */
+  removeLocal: (repoRoot: string, items: RemoveItem[]) =>
+    invoke<{ results: RemoveResult[] }>('git:remove-local', { repoRoot, items }),
 }
