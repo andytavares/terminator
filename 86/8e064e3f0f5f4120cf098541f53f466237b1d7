@@ -1,0 +1,39 @@
+packages/extension-ui/src/toast-store.ts
+  s_d918463020569b::t_dec00b1ace8c3a 2,10,20,31,33
+src/renderer/components/ToastContainer.tsx
+  s_d918463020569b::t_a1ab947713d6de 13-19
+src/renderer/components/home/InFlightMenu.tsx
+  s_d918463020569b::t_806cda11388908 12,61-72,83
+src/renderer/components/home/dismissed-threads.ts
+  s_d918463020569b::t_108267cf6143cd 10,12,29,45-47
+src/renderer/components/home/start-work.ts
+  s_d918463020569b::t_a5da89411fbe81 14-15,220,238-248,260
+src/renderer/components/home/useWorkThreads.ts
+  s_d918463020569b::t_56f92b7b88a055 80,87
+tests/unit/packages/extension-ui/toast-store.spec.ts
+  s_d918463020569b::t_e661206c64f340 1-21
+tests/unit/renderer/components/InFlight.spec.tsx
+  s_d918463020569b::t_9e9906a6823400 10-11,439-453,455,457-465
+tests/unit/renderer/components/StartWork.spec.tsx
+  s_d918463020569b::t_118319a88c0819 9,272-300
+tests/unit/renderer/components/ToastContainer.spec.tsx
+  s_d918463020569b::t_4c6f63158fdf1f 46-57
+tests/unit/renderer/home/dismissed-threads.spec.ts
+  s_d918463020569b::t_35e64fbeb01665 6,20,29,32-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "868e064e3f0f5f4120cf098541f53f466237b1d7",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
