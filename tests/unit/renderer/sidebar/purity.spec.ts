@@ -16,11 +16,11 @@ const DIR = join(__dirname, '../../../../src/renderer/sidebar')
 
 const modules = readdirSync(DIR).filter((f) => f.endsWith('.ts') && !f.endsWith('.d.ts'))
 
-const sourceOf = (file: string): string => readFileSync(join(DIR, file), 'utf8')
+const sourceOf = (file: string, dir = DIR): string => readFileSync(join(dir, file), 'utf8')
 
 /** Strip comments so prose about React or `Date.now()` cannot fail the test. */
-function code(file: string): string {
-  return sourceOf(file)
+function code(file: string, dir = DIR): string {
+  return sourceOf(file, dir)
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^\s*\/\/.*$/gm, '')
 }
@@ -64,5 +64,34 @@ describe('the sidebar pure layer imports nothing but types', () => {
   it.each(modules)('%s does not read the clock — `now` is always a parameter', (file) => {
     expect(code(file)).not.toMatch(/Date\.now\s*\(/)
     expect(code(file)).not.toMatch(/new\s+Date\s*\(\s*\)/)
+  })
+})
+
+// The Desk's pure layer; its stores hold what the operator did, so they may use the clock.
+const HOME = join(__dirname, '../../../../src/renderer/home')
+const STATEFUL = new Set(['dismissals.ts', 'focus-store.ts', 'local-storage.ts'])
+const homeModules = readdirSync(HOME).filter((f) => f.endsWith('.ts') && !STATEFUL.has(f))
+
+describe('the Desk pure layer imports nothing but types, siblings and the sidebar layer', () => {
+  it('has modules to check', () => {
+    expect(homeModules.length).toBeGreaterThan(0)
+  })
+
+  it.each(homeModules)('%s value-imports only siblings or the sidebar pure layer', (file) => {
+    const imports = [...code(file, HOME).matchAll(/^\s*import\s+([\s\S]*?)from\s+'([^']+)'/gm)]
+    for (const [, clause, specifier] of imports) {
+      if (/^\s*type\b/.test(clause)) continue
+      expect(
+        specifier.startsWith('./') || specifier.startsWith('../sidebar/'),
+        `${file} value-imports '${specifier}'`
+      ).toBe(true)
+    }
+  })
+
+  it.each(homeModules)('%s uses no React, zustand, store or clock', (file) => {
+    const text = code(file, HOME)
+    expect(text).not.toMatch(/from\s+'(react|zustand)'/)
+    expect(text).not.toMatch(/stores\/|\buse[A-Z]\w*Store\b/)
+    expect(text).not.toMatch(/Date\.now\s*\(|new\s+Date\s*\(\s*\)/)
   })
 })
