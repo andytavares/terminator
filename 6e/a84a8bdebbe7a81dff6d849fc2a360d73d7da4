@@ -1,0 +1,136 @@
+src/renderer/components/home/start-work.ts
+  s_3ced19ecaa16dd::t_0160565f039524 140,151,176
+  s_3ced19ecaa16dd::t_36ed4c14c97693 1,7,10-11,32-33,35-41,50-65,67-69,120,125-126,197,200-201,207-208,211-216,236-237
+extensions/foundry/tests/home/feed.spec.ts
+  s_3ced19ecaa16dd::t_23874bb6e0a077 241-242,247
+extensions/foundry/manifest.json
+  s_3ced19ecaa16dd::t_23874bb6e0a077 18-25
+docs/adr/117-extensions-send-home-data-core-draws-it.md
+  s_3ced19ecaa16dd::t_7eb9f8169270e1 27
+tests/unit/renderer/components/Insights.spec.tsx
+  s_3ced19ecaa16dd::t_5baf21a69a7cd3 187
+  s_3ced19ecaa16dd::t_14539f2890456d 37,47-49,189,194,238
+extensions/foundry/src/home/feed.ts
+  s_3ced19ecaa16dd::t_23874bb6e0a077 1,174,176,185-187
+src/renderer/components/home/InsightsCards.tsx
+  s_3ced19ecaa16dd::t_0160565f039524 143-146
+  s_3ced19ecaa16dd::t_a710e3f2a5e0c8 2,46,140,142,147-148,150-156,160,164
+docs/EXTENSION-DEVELOPMENT.md
+  s_3ced19ecaa16dd::t_23874bb6e0a077 97-108
+extensions/git-integration/src/home/feed.ts
+  s_3ced19ecaa16dd::t_23874bb6e0a077 1,80,226,235
+docs/ARCHITECTURE.md
+  s_3ced19ecaa16dd::t_4cc3c42bed6630 507
+extensions/git-integration/CLAUDE.md
+  s_3ced19ecaa16dd::t_1cff117ba5f284 56
+extensions/git-integration/tests/unit/home-feed.spec.ts
+  s_3ced19ecaa16dd::t_b50b8899dd81de 256
+packages/extension-sdk/CHANGELOG.md
+  s_3ced19ecaa16dd::t_5ae846b3771996 17-19
+packages/extension-sdk/src/home-contract.ts
+  s_3ced19ecaa16dd::t_4c68c721fd2c0f 1-18
+packages/extension-sdk/src/index.ts
+  s_3ced19ecaa16dd::t_a84cd760888158 8
+packages/extension-sdk/tests/index.spec.ts
+  s_3ced19ecaa16dd::t_b3122961c59bea 6,8,116-127
+packages/extension-sdk/types/api.d.ts
+  s_3ced19ecaa16dd::t_265ffb5c41f2e4 322-323,352-353
+src/renderer/components/AppShellParts.tsx
+  s_3ced19ecaa16dd::t_dddf13af2cd783 8,13,15
+src/renderer/components/home/HomeScreen.tsx
+  s_3ced19ecaa16dd::t_62cc86bae93192 12,15,30,37
+src/renderer/components/home/InsightsLower.tsx
+  s_3ced19ecaa16dd::t_20f0b816a9cf63 2,48-55,91
+src/renderer/components/home/PlanTheDay.tsx
+  s_3ced19ecaa16dd::t_a0cbb46fb5b716 8,24,46,56
+src/renderer/components/home/QuietDesk.tsx
+  s_3ced19ecaa16dd::t_9f6ad4c8a89f80 5
+src/renderer/components/home/StartWork.tsx
+  s_3ced19ecaa16dd::t_1f3297738fa9b9 10,76-77,173,343
+src/renderer/components/home/SummaryLine.tsx
+  s_3ced19ecaa16dd::t_936600683add79 9
+src/renderer/components/home/WeekCard.tsx
+  s_3ced19ecaa16dd::t_25ea70feba1bbd 2,88-89,102
+src/renderer/components/home/YourMove.tsx
+  s_3ced19ecaa16dd::t_0b6888cb1c8ff6 16
+src/renderer/components/home/desk-actions.ts
+  s_3ced19ecaa16dd::t_5834c80b270a6a 1,43,45-60,75
+src/renderer/components/home/parked-threads.ts
+  s_3ced19ecaa16dd::t_3e63756dd4b679 2,6-12,17-18,21-22,25-29,32-33,35-51
+src/renderer/components/home/thread-actions.ts
+  s_3ced19ecaa16dd::t_d73d558310a6a8 1,4-6,26-31,42,44
+src/renderer/components/home/use-desk-controller.ts
+  s_3ced19ecaa16dd::t_656fa08afca3c1 6
+src/renderer/components/home/use-mark-left-home.ts
+  s_3ced19ecaa16dd::t_b9116c87ddc703 1-7
+src/renderer/components/home/useDeskModel.ts
+  s_3ced19ecaa16dd::t_82ac51d79a00a5 46-47,49-58,61-68,76,90
+src/renderer/components/home/useWorkThreads.ts
+  s_3ced19ecaa16dd::t_7b256936dc137f 93,102-106
+src/renderer/components/terminal/dropped-paths.ts
+  s_3ced19ecaa16dd::t_89638c949b5f64 1-2,11
+src/renderer/extensions/loader.ts
+  s_3ced19ecaa16dd::t_7d8944e7452c3c 115-131,162
+src/renderer/extensions/registry.ts
+  s_3ced19ecaa16dd::t_b25fa695282960 48-58,88,107,164-176,362,377
+src/renderer/home/focus-store.ts
+  s_3ced19ecaa16dd::t_66462fdce4fcb1 2-3,10-26,67-71
+src/renderer/home/local-storage.ts
+  s_3ced19ecaa16dd::t_d2feb40d79f82f 1-8,11-15
+src/renderer/home/work-threads.ts
+  s_3ced19ecaa16dd::t_12db851d5b3b78 78
+src/renderer/quick-actions/custom-actions.ts
+  s_3ced19ecaa16dd::t_4df3531be11d58 3,30
+src/renderer/shell/bootstrap.ts
+  s_3ced19ecaa16dd::t_a4617312a2bb51 8,17-24,40-41
+src/renderer/stores/home-feed.store.ts
+  s_3ced19ecaa16dd::t_2245cc98a3f3b1 6-8,12,39-40
+src/renderer/terminal/typed-input.ts
+  s_3ced19ecaa16dd::t_5a517b5fb5565e 1-11
+src/shared/schemas/extension.schema.ts
+  s_3ced19ecaa16dd::t_e55f486f6a8d96 13-20,48-49,64,76
+src/shared/types/index.ts
+  s_3ced19ecaa16dd::t_0e93f5b3320745 143-144
+tests/unit/home/home-feed.fixtures.ts
+  s_3ced19ecaa16dd::t_af65fe8c26abac 35
+tests/unit/renderer/components/DeskModel.spec.tsx
+  s_3ced19ecaa16dd::t_6540590cca1bc7 67-69
+tests/unit/renderer/components/HomeScreen.spec.tsx
+  s_3ced19ecaa16dd::t_b04a7654d1e907 129,228,457-480
+tests/unit/renderer/components/PlanTheDay.spec.tsx
+  s_3ced19ecaa16dd::t_d59d351772569b 4,12-13
+tests/unit/renderer/components/StartWork.spec.tsx
+  s_3ced19ecaa16dd::t_3f0dfb49ffdca3 8,128,136-140,202,204-210,212-225,303-315,336-350
+tests/unit/renderer/components/TodayRail.spec.tsx
+  s_3ced19ecaa16dd::t_33465082b8f122 142,148
+tests/unit/renderer/components/extension-surfaces.spec.tsx
+  s_3ced19ecaa16dd::t_11f24b466cc034 251
+tests/unit/renderer/home/agent-command.spec.ts
+  s_3ced19ecaa16dd::t_b1470e7e772a84 1-56
+tests/unit/renderer/home/desk-actions.spec.ts
+  s_3ced19ecaa16dd::t_4abad732c14298 71,75-82,98,109-125
+tests/unit/renderer/home/insights.spec.ts
+  s_3ced19ecaa16dd::t_5850b26ba8b051 27,52-55,59,63,67-68
+tests/unit/renderer/home/stored-state.spec.ts
+  s_3ced19ecaa16dd::t_2a5eaf00b5e1b3 1-75
+tests/unit/renderer/shell/initial-load-home-feed.spec.tsx
+  s_3ced19ecaa16dd::t_2d440b18ebe280 1-67
+tests/unit/renderer/stores/home-feed.store.spec.ts
+  s_3ced19ecaa16dd::t_41a8d06bd4017c 56,59,61-63,70-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6ea84a8bdebbe7a81dff6d849fc2a360d73d7da4",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
