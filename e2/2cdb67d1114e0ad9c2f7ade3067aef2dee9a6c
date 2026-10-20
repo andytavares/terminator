@@ -1,0 +1,19 @@
+tests/e2e/monitor-wall.spec.ts
+  s_d918463020569b::t_61cf4e4cb2ad49 36-38,40-41,44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e22cdb67d1114e0ad9c2f7ade3067aef2dee9a6c",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
