@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // The E2E job of .github/workflows/ci.yml, run here step for step (selection, five shards at
-// CI=1, burn-in of changed specs). `npm run ci:local` runs all of it; `-- 3` runs only shard 3.
+// CI=1, burn-in of changed specs). `npm run ci:local:e2e` runs all of it; `-- 3` runs only shard 3.
 
 import { execFileSync, spawnSync } from 'node:child_process'
 import { cpus, loadavg } from 'node:os'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { computeChanged, listSpecs, select } from './e2e-select.mjs'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -23,12 +23,28 @@ const run = (command, args, env = {}) =>
   spawnSync(command, args, { cwd: REPO_ROOT, stdio: 'inherit', env: { ...process.env, ...env } })
     .status === 0
 
-/** A loaded machine fails timing-dependent specs for reasons CI would not have. */
-function requireQuietMachine() {
-  const load = loadavg()[0]
-  if (load <= cpus().length / 2) return
+const QUIET_WAIT_MS = 180_000
+const QUIET_POLL_MS = 5_000
+
+/**
+ * True once the one-minute load average is at most half the cores, false if it is not
+ * within `limitMs`. A loaded machine fails timing-dependent specs for reasons CI would not
+ * have, and `ci:local` runs the unit suite just before this, which leaves the load high.
+ */
+export async function waitForQuiet({ readLoad, cores, pause, limitMs }) {
+  for (let waited = 0; ; waited += QUIET_POLL_MS) {
+    if (readLoad() <= cores / 2) return true
+    if (waited >= limitMs) return false
+    await pause(QUIET_POLL_MS)
+  }
+}
+
+async function requireQuietMachine() {
+  const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+  const machine = { readLoad: () => loadavg()[0], cores: cpus().length, pause }
+  if (await waitForQuiet({ ...machine, limitMs: QUIET_WAIT_MS })) return
   console.error(
-    `Load average is ${load.toFixed(1)} on ${cpus().length} cores. Quiet the machine and run again.`
+    `Load average is ${loadavg()[0].toFixed(1)} on ${cpus().length} cores after ${QUIET_WAIT_MS / 1000}s. Quiet the machine and run again.`
   )
   process.exit(2)
 }
@@ -78,9 +94,9 @@ function burnIn(changedSpecs) {
   return playwright(files, [`--repeat-each=${BURN_IN_REPEATS}`])
 }
 
-function main() {
+async function main() {
   const only = process.argv[2] ? Number(process.argv[2]) : null
-  requireQuietMachine()
+  await requireQuietMachine()
   if (!run('npm', ['run', 'build'])) process.exit(1)
   const { specs, changedSpecs } = selection()
   console.log(`${specs.length} spec(s) selected against ${BASE}`)
@@ -91,4 +107,4 @@ function main() {
   process.exit(failed.length === 0 && burnInPassed ? 0 : 1)
 }
 
-main()
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main()

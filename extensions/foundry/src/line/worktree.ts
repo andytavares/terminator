@@ -72,21 +72,43 @@ const inFlight = new Map<string, Promise<Checkout>>()
  * get a second worktree, and `git worktree add` onto an existing path fails
  * rather than reusing it. Callers asking at once share one preparation.
  */
-export async function ensureCheckout(
+export function ensureCheckout(
   order: WorkOrder,
   lane: number,
   deps: CheckoutDeps
 ): Promise<Checkout> {
+  return sharedCheckout({ order, lane, reattachOnly: false }, deps)
+}
+
+/** The lane's checkout on its existing branch, never a new or reset one: for pushed work,
+ * a branch cut afresh from the base and force-pushed would replace the pull request. */
+export function reattachCheckout(
+  order: WorkOrder,
+  lane: number,
+  deps: CheckoutDeps
+): Promise<Checkout> {
+  return sharedCheckout({ order, lane, reattachOnly: true }, deps)
+}
+
+interface CheckoutRequest {
+  readonly order: WorkOrder
+  readonly lane: number
+  readonly reattachOnly: boolean
+}
+
+function sharedCheckout(
+  { order, lane, reattachOnly }: CheckoutRequest,
+  deps: CheckoutDeps
+): Promise<Checkout> {
   const repo = order.context.repos.find((r) => r.lane === lane)
   if (repo === undefined)
-    throw new CheckoutFailedError(`lane ${lane}`, 'the order has no such lane')
+    return Promise.reject(new CheckoutFailedError(`lane ${lane}`, 'the order has no such lane'))
 
   const target = checkoutPath(deps.root, order, repo.name)
   const pending = inFlight.get(target)
   if (pending !== undefined) return pending
-  const preparing = prepareCheckout({ repo, target, branch: branchFor(order, lane) }, deps).finally(
-    () => inFlight.delete(target)
-  )
+  const plan = { repo, target, branch: branchFor(order, lane), reattachOnly }
+  const preparing = prepareCheckout(plan, deps).finally(() => inFlight.delete(target))
   inFlight.set(target, preparing)
   return preparing
 }
@@ -96,47 +118,102 @@ interface CheckoutPlan {
   readonly repo: WorkOrder['context']['repos'][number]
   readonly target: string
   readonly branch: string
+  /** Only check out the existing branch; refuse when it is gone. */
+  readonly reattachOnly: boolean
 }
 
-// Whether git has a worktree registered at `target`. Asked of git: a directory that
-// exists but is not registered is not a checkout git knows.
-async function isRegistered(origin: string, target: string, deps: CheckoutDeps): Promise<boolean> {
+type WorktreeState = 'absent' | 'present' | 'stale'
+
+// Asked of git, since an unregistered directory is not a checkout. Stale: registered with
+// the folder gone. Records are matched whole, so `<target>@baseline` is not `<target>`.
+async function worktreeState(
+  origin: string,
+  target: string,
+  deps: CheckoutDeps
+): Promise<WorktreeState> {
   const listed = await deps.exec({
     command: 'git',
     args: ['worktree', 'list', '--porcelain'],
     cwd: origin,
     timeoutMs: 30_000,
   })
-  return listed.exitCode === 0 && listed.stdout.includes(`worktree ${target}`)
+  if (listed.exitCode !== 0) return 'absent'
+  const record = listed.stdout
+    .split(/\r?\n\r?\n/)
+    .map((block) => block.split(/\r?\n/))
+    .find((lines) => lines.includes(`worktree ${target}`))
+  if (record === undefined) return 'absent'
+  const gone = record.some((line) => line.startsWith('prunable')) || !isDirectoryAt(target)
+  return gone ? 'stale' : 'present'
 }
 
-// Adds `target` as a worktree of `repo` at its base branch as `how` says, unless it
-// already is one; whether it already was.
-async function addWorktree(
+async function branchExists(
   repo: CheckoutPlan['repo'],
-  { target, how }: { target: string; how: readonly string[] },
+  branch: string,
   deps: CheckoutDeps
 ): Promise<boolean> {
-  const existing = await isRegistered(repo.path, target, deps)
-  if (existing) return true
+  const found = await deps.exec({
+    command: 'git',
+    args: ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`],
+    cwd: repo.path,
+    timeoutMs: 30_000,
+  })
+  return found.exitCode === 0
+}
+
+interface WorktreeAddition {
+  readonly target: string
+  /** The flags for a fresh add, before the target. */
+  readonly how: readonly string[]
+  /** The lane's branch: a stale checkout is re-attached to it, commits kept. */
+  readonly branch?: string
+  readonly reattachOnly?: boolean
+}
+
+async function runAdd(
+  repo: CheckoutPlan['repo'],
+  args: readonly string[],
+  deps: CheckoutDeps
+): Promise<void> {
   const added = await deps.exec({
     command: 'git',
-    args: ['worktree', 'add', ...how, target, repo.baseBranch],
+    args: ['worktree', 'add', ...args],
     cwd: repo.path,
     timeoutMs: 120_000,
   })
   if (added.exitCode !== 0) throw new CheckoutFailedError(repo.name, added.stderr)
+}
+
+// Whether `target` was already a worktree. A stale one is replaced with `--force`, never
+// `git worktree prune`: that drops every lane's stale registration, and those lanes would
+// then be cut afresh from the base, losing their commits.
+async function addWorktree(
+  repo: CheckoutPlan['repo'],
+  addition: WorktreeAddition,
+  deps: CheckoutDeps
+): Promise<boolean> {
+  const { target, how, branch, reattachOnly } = addition
+  const state = await worktreeState(repo.path, target, deps)
+  if (state === 'present') return true
+  const force = state === 'stale' ? ['--force'] : []
+  const attach = branch !== undefined && (state === 'stale' || reattachOnly === true)
+  if (attach && (await branchExists(repo, branch, deps))) {
+    await runAdd(repo, [...force, target, branch], deps)
+    return false
+  }
+  if (reattachOnly === true)
+    throw new CheckoutFailedError(repo.name, `the branch ${branch ?? ''} no longer exists`)
+  await runAdd(repo, [...force, ...how, target, repo.baseBranch], deps)
   return false
 }
 
-async function prepareCheckout(
-  { repo, target, branch }: CheckoutPlan,
-  deps: CheckoutDeps
-): Promise<Checkout> {
-  // `-B` rather than `-b`: a branch left over from a previous attempt is reset
-  // onto the base rather than failing the run with "already exists". The base
-  // is named explicitly so this does not depend on what is checked out.
-  const existing = await addWorktree(repo, { target, how: ['-B', branch] }, deps)
+async function prepareCheckout(plan: CheckoutPlan, deps: CheckoutDeps): Promise<Checkout> {
+  const { repo, target, branch, reattachOnly } = plan
+  // `-B` rather than `-b`: when nothing was registered at the target, a branch left over
+  // from a previous attempt is reset onto the base rather than failing with "already
+  // exists". The base is named explicitly so this does not depend on what is checked out.
+  const addition = { target, how: ['-B', branch], branch, reattachOnly }
+  const existing = await addWorktree(repo, addition, deps)
   const checkout = { repo: repo.name, origin: repo.path, path: target, branch, created: !existing }
   await provisionDependencies(checkout, deps)
   return checkout

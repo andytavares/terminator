@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { FullConfig } from '@playwright/test'
+import { forgetGitHookEnvironment } from '../support/git-hook-env'
 
 // One directory holds every profile this whole run creates, across every
 // worker. Playwright forks workers from this same process, so an env var set
@@ -11,6 +12,8 @@ import type { FullConfig } from '@playwright/test'
 // spec's cleanup (closeApp) never has to delete anything and can never fail
 // a test over a directory that is still being written to.
 export default function globalSetup(_config: FullConfig): void {
+  // Run from a git hook (the pre-push hook runs ci:local), a spec's git would act on this repo.
+  forgetGitHookEnvironment()
   const root = join(tmpdir(), `terminator-e2e-run-${process.pid}`)
   mkdirSync(root, { recursive: true })
   process.env.TERMINATOR_E2E_RUN_ROOT = root

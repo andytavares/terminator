@@ -172,13 +172,14 @@ npm run test:visual -- --update-snapshots # (inside this package) write new base
 the story's play function and the fonts have finished, at 1280×800. Baselines are
 per platform (`visual/__screenshots__/{platform}/`), as the
 [Playwright docs](https://playwright.dev/docs/test-snapshots) advise, and CI
-compares on Linux only, in the Stories job. Generate them on Linux with the
-Chromium build the pinned Playwright installs (`npx playwright install chromium`).
+compares on macOS only, in the Stories job, since Terminator ships only for macOS.
+Generate them on macOS with the Chromium build the pinned Playwright installs
+(`npx playwright install chromium`).
 The Stories job runs with `--update-snapshots=missing`: every committed baseline is
 compared, and a story without one fails and gets one written, which the job uploads
-as the `story-baselines-linux` artifact. To commit them, add the
+as the `story-baselines-macos` artifact. To commit them, add the
 `update-story-baselines` label to the pull request: the Story baselines workflow
-(`.github/workflows/story-baselines.yml`) writes the missing baselines on Linux into `__screenshots__/linux/` under `visual/`
+(`.github/workflows/story-baselines.yml`) writes the missing baselines on macOS into `__screenshots__/darwin/` under `visual/`
 (`snapshotPathTemplate` in `playwright.visual.config.ts`),
 commits them to the branch and removes the label. It never overwrites an existing
 baseline; review the committed images in the pull request's diff.

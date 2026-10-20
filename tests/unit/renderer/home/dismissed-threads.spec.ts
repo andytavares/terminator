@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 
 import {
   DISMISSED_THREADS_KEY,
+  isDismissed,
   useDismissedThreads,
 } from '../../../../src/renderer/components/home/dismissed-threads'
 import { storedDismissedOf } from '../../../../src/renderer/home/stored-shapes'
@@ -16,7 +17,7 @@ describe('useDismissedThreads', () => {
     useDismissedThreads.setState({ dismissed: {} })
   })
 
-  it('dismisses a thread at its last activity and restores it', () => {
+  it('dismisses a thread at the time given and restores it', () => {
     useDismissedThreads.getState().dismiss('linear:TAV-20', 100)
     expect(useDismissedThreads.getState().dismissed).toEqual({ 'linear:TAV-20': 100 })
     expect(storedDismissed()).toEqual({ 'linear:TAV-20': 100 })
@@ -25,13 +26,17 @@ describe('useDismissedThreads', () => {
     expect(localStorage.getItem(DISMISSED_THREADS_KEY)).toBe('{}')
   })
 
-  it('a dismissed thread stays hidden until its activity passes the dismissal', () => {
+  it('a dismissed thread stays dismissed whatever its activity does afterwards', () => {
     useDismissedThreads.getState().dismiss('session:scratch', 100)
     const dismissed = useDismissedThreads.getState().dismissed
-    const hiddenWhile = (lastActivity: number): boolean =>
-      dismissed['session:scratch'] !== undefined && lastActivity <= dismissed['session:scratch']
-    expect(hiddenWhile(100)).toBe(true)
-    expect(hiddenWhile(101)).toBe(false)
+    expect(isDismissed(dismissed, 'session:scratch')).toBe(true)
+    expect(isDismissed(dismissed, 'session:other')).toBe(false)
+  })
+
+  it('a restored thread is no longer dismissed', () => {
+    useDismissedThreads.getState().dismiss('session:scratch', 100)
+    useDismissedThreads.getState().restore('session:scratch')
+    expect(isDismissed(useDismissedThreads.getState().dismissed, 'session:scratch')).toBe(false)
   })
 })
 

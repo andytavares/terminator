@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   buildAsks,
   buildFacets,
@@ -98,9 +98,8 @@ describe('buildAsks: fix', () => {
   })
 })
 
-const at = '2026-10-18T10:00:00Z'
 const firstFacetOf = (overrides: Parameters<typeof dashboardPrFixture>[0]) =>
-  buildFacets([dashboardPrFixture(overrides)], NO_ISSUES, at)[0]
+  buildFacets([dashboardPrFixture(overrides)], NO_ISSUES)[0]
 
 const STATE_ROWS = [
   {
@@ -160,14 +159,23 @@ describe('buildFacets: stage and whose move', () => {
   })
 })
 
+afterEach(() => vi.useRealTimers())
+
 describe('buildFacets: shape', () => {
-  it('describes the pull request and when it was read', () => {
+  it("carries GitHub's updatedAt, not the time the feed is built", () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2030-01-01T00:00:00Z'))
+    const facet = firstFacetOf({ updatedAt: '2026-10-12T08:00:00Z' })
+    expect(facet.updatedAt).toBe('2026-10-12T08:00:00Z')
+  })
+
+  it('describes the pull request and when GitHub last updated it', () => {
     expect(firstFacetOf({})).toMatchObject({
       kind: 'pull-request',
       title: 'Add login redirect',
       url: 'https://github.com/acme/widgets/pull/275',
       closedAt: null,
-      updatedAt: at,
+      updatedAt: '2026-10-16T09:00:00Z',
       workKey: { repoRoot: '/work/widgets', branch: 'feat/login' },
     })
   })
@@ -178,7 +186,7 @@ describe('buildFacets: shape', () => {
       dashboardPrFixture({ number: 2, localRepoRoot: null, headRefName: 'x', title: 'no key' }),
       dashboardPrFixture({ number: 3, ciStatus: 'none' }),
     ]
-    expect(buildFacets(prs, NO_ISSUES, at).map((f) => f.line)).toEqual(['#3 waiting for review'])
+    expect(buildFacets(prs, NO_ISSUES).map((f) => f.line)).toEqual(['#3 waiting for review'])
   })
 })
 
@@ -221,7 +229,7 @@ describe('buildAsks: what the data says about the checks and the request', () =>
 
 describe('buildFacets: checks', () => {
   it('lists failed and running checks one by one and passed checks as one line', () => {
-    const [facet] = buildFacets([dashboardPrFixture({ checks: [...CHECKS] })], NO_ISSUES, at)
+    const [facet] = buildFacets([dashboardPrFixture({ checks: [...CHECKS] })], NO_ISSUES)
     expect(facet.checks).toEqual([
       { name: 'End-to-end tests', state: 'failed' },
       { name: 'Visual diff', state: 'failed' },
@@ -298,7 +306,6 @@ describe('buildGitHomeFeed', () => {
       tickets: NO_ISSUES,
       calendar: null,
       merged: [],
-      updatedAt: '2026-10-18T10:00:00Z',
     })
     expect(feed.asks.map((a) => a.kind)).toEqual(['fix'])
     expect(feed.facets).toHaveLength(1)

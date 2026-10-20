@@ -6,6 +6,7 @@ import { useIntegrationsStore } from '../../../../src/renderer/stores/integratio
 import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
+import { useDismissedThreads } from '../../../../src/renderer/components/home/dismissed-threads'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { installElectronApi } from '../../../support/electron-api'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
@@ -38,6 +39,13 @@ const workspace: Workspace = {
   tags: [],
   createdAt: '',
   updatedAt: '',
+}
+const secondWorkspace: Workspace = {
+  ...workspace,
+  id: 'ws-2',
+  name: 'atlas',
+  folderPath: '/atlas',
+  color: '#0f0',
 }
 const mainProject: Project = {
   id: 'p-main',
@@ -230,11 +238,10 @@ describe('StartWork — run it as, with an extension option', () => {
     expect(checked()).toBe('Claude agent')
   })
 
-  it('summarises the repo, branch and worktree of the selected ticket', async () => {
+  it('summarises the branch and worktree of the selected ticket', async () => {
     await open()
     const summary = screen.getByRole('group', { name: 'Where it runs' })
     await waitFor(() => expect(within(summary).getByText('main')).toBeTruthy())
-    expect(within(summary).getByText('terminator')).toBeTruthy()
     expect(within(summary).getByText('tav-33-retry')).toBeTruthy()
     expect(within(summary).getByText('.worktrees/tav-33-retry')).toBeTruthy()
   })
@@ -265,6 +272,35 @@ describe('StartWork — Enter on a ticket', () => {
       tracker: 'linear',
       key: 'TAV-33',
     })
+  })
+})
+
+describe('StartWork — starting dismissed work', () => {
+  it('brings a dismissed ticket back to In flight once it has started', async () => {
+    useDismissedThreads.setState({ dismissed: { 'linear:TAV-33': 1, 'linear:TAV-99': 1 } })
+    const onClose = await open()
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(Object.keys(useDismissedThreads.getState().dismissed)).toEqual(['linear:TAV-99'])
+  })
+
+  it('brings a dismissed branch back once a session started on it', async () => {
+    useDismissedThreads.setState({ dismissed: { '/repo#main': 1 } })
+    const onClose = await open()
+    goToTab('Branch')
+    await screen.findByRole('option', { name: /main/ })
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(useDismissedThreads.getState().dismissed).toEqual({})
+  })
+
+  it('leaves a dismissed ticket dismissed when starting it failed', async () => {
+    useDismissedThreads.setState({ dismissed: { 'linear:TAV-33': 1 } })
+    launched.createFromDraft.mockResolvedValue({ field: 'form', message: 'Worktree error: nope' })
+    await open()
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await waitFor(() => expect(launched.createFromDraft).toHaveBeenCalled())
+    expect(Object.keys(useDismissedThreads.getState().dismissed)).toEqual(['linear:TAV-33'])
   })
 })
 
@@ -420,3 +456,136 @@ describe('StartWork — scratch and branch tabs', () => {
     expect(launched.inBranch).toHaveBeenCalledWith('p-dev', expect.stringMatching(/^claude$/))
   })
 })
+
+function seedTwoWorkspaces(): void {
+  useWorkspaceStore.setState({ workspaces: [workspace, secondWorkspace] })
+  git.isRepo.mockImplementation(async (path) => ({ isRepo: true, root: path }))
+  git.listBranches.mockImplementation(async (root) => ({
+    branches: [
+      { name: root === '/atlas' ? 'atlas-main' : 'main', isCurrent: true, isRemote: false },
+    ],
+  }))
+}
+
+const pickerButton = () => screen.getByRole('button', { name: /^Workspace:/ })
+const listbox = () => screen.getByRole('listbox', { name: 'Workspace' })
+
+describe('StartWork — workspace picker', () => {
+  beforeEach(seedTwoWorkspaces)
+
+  it('shows the suggested workspace on the button', async () => {
+    await open()
+    expect(pickerButton().getAttribute('aria-label')).toBe('Workspace: terminator')
+    expect(pickerButton().textContent).toMatch(/terminator/)
+  })
+
+  it('opens the workspace list on click and on Command R', async () => {
+    await open()
+    fireEvent.click(pickerButton())
+    expect(listbox()).toBeTruthy()
+    expect(pickerButton().getAttribute('aria-expanded')).toBe('true')
+    fireEvent.keyDown(searchBox(), { key: 'r', metaKey: true })
+    expect(screen.queryByRole('listbox', { name: 'Workspace' })).toBeNull()
+    fireEvent.keyDown(searchBox(), { key: 'r', metaKey: true })
+    expect(listbox()).toBeTruthy()
+  })
+
+  it('marks the current workspace and says the first one is suggested because it is open', async () => {
+    await open()
+    fireEvent.click(pickerButton())
+    const options = within(listbox()).getAllByRole('option')
+    expect(options.map((o) => o.getAttribute('aria-selected'))).toEqual(['true', 'false'])
+    expect(within(listbox()).getByText('/atlas')).toBeTruthy()
+    expect(screen.getByText('suggested · open in the sidebar')).toBeTruthy()
+  })
+})
+
+describe('StartWork — workspace picker, picking', () => {
+  beforeEach(seedTwoWorkspaces)
+
+  it('picking another workspace changes the button and the branches listed', async () => {
+    await open()
+    fireEvent.click(pickerButton())
+    fireEvent.click(within(listbox()).getByRole('option', { name: /atlas/ }))
+    expect(screen.queryByRole('listbox', { name: 'Workspace' })).toBeNull()
+    expect(pickerButton().getAttribute('aria-label')).toBe('Workspace: atlas')
+    goToTab('Branch')
+    expect(await screen.findByRole('option', { name: /atlas-main/ })).toBeTruthy()
+  })
+})
+
+describe('StartWork — workspace picker, the list', () => {
+  beforeEach(seedTwoWorkspaces)
+
+  it('closes only the list on Escape, and the launcher stays open', async () => {
+    const onClose = await open()
+    fireEvent.click(pickerButton())
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Filter workspaces' }), {
+      key: 'Escape',
+    })
+    await waitFor(() => expect(screen.queryByRole('listbox', { name: 'Workspace' })).toBeNull())
+    expect(screen.getByRole('dialog', { name: 'Start work' })).toBeTruthy()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
+describe('StartWork — workspace picker, filtering', () => {
+  beforeEach(seedTwoWorkspaces)
+
+  it('filters by name as the person types', async () => {
+    await open()
+    fireEvent.click(pickerButton())
+    fireEvent.change(screen.getByRole('textbox', { name: 'Filter workspaces' }), {
+      target: { value: 'atl' },
+    })
+    expect(
+      within(listbox())
+        .getAllByRole('option')
+        .map((o) => o.textContent)
+    ).toEqual([expect.stringContaining('atlas')])
+  })
+
+  it('moves with the arrow keys and picks with Enter without starting work', async () => {
+    await open()
+    fireEvent.click(pickerButton())
+    const filter = screen.getByRole('textbox', { name: 'Filter workspaces' })
+    fireEvent.keyDown(filter, { key: 'ArrowDown' })
+    fireEvent.keyDown(filter, { key: 'Enter' })
+    expect(pickerButton().getAttribute('aria-label')).toBe('Workspace: atlas')
+    expect(launched.createFromDraft).not.toHaveBeenCalled()
+  })
+})
+
+describe('StartWork — workspace picker, where it shows', () => {
+  beforeEach(seedTwoWorkspaces)
+
+  it('is not offered on the Scratch terminal tab', async () => {
+    await open()
+    goToTab('Scratch terminal')
+    expect(screen.queryByRole('button', { name: /^Workspace:/ })).toBeNull()
+  })
+
+  it('names the team of a linked ticket as the reason', async () => {
+    useWorkspaceStore.setState({
+      activeWorkspaceId: 'ws-1',
+      projectsByWorkspaceId: new Map([
+        ['ws-1', [mainProject]],
+        ['ws-2', [{ ...secondWorkspaceProject, updatedAt: '2026-10-01' }]],
+      ]),
+    })
+    useIntegrationsStore.setState({
+      links: new Map([['p-atlas', { tracker: 'linear', key: 'TAV-1' }]]),
+    } as never)
+    await open()
+    expect(pickerButton().getAttribute('aria-label')).toBe('Workspace: atlas')
+    fireEvent.click(pickerButton())
+    expect(screen.getByText('suggested · TAV ticket linked here')).toBeTruthy()
+  })
+})
+
+const secondWorkspaceProject: Project = {
+  ...mainProject,
+  id: 'p-atlas',
+  workspaceId: 'ws-2',
+  gitBranch: 'tav-1',
+}

@@ -48,11 +48,7 @@ export function Toast({
   return (
     <div className="tmui-toast" data-tone={tone} role="status">
       <span className="tmui-toast__message">{message}</span>
-      {action && (
-        <button type="button" className="tmui-toast__action" onClick={action.onSelect}>
-          {action.label}
-        </button>
-      )}
+      {action && <ToastAction action={action} onDismiss={onDismiss} />}
       <button
         type="button"
         className="tmui-icon-button tmui-toast__dismiss"
@@ -63,6 +59,25 @@ export function Toast({
         <X aria-hidden="true" />
       </button>
     </div>
+  )
+}
+
+/** The toast's one action; once it has run the toast has nothing left to offer, so it closes. */
+function ToastAction({
+  action,
+  onDismiss,
+}: {
+  action: NonNullable<ToastItem['action']>
+  onDismiss: () => void
+}): JSX.Element {
+  const run = (): void => {
+    action.onSelect()
+    onDismiss()
+  }
+  return (
+    <button type="button" className="tmui-toast__action" onClick={run}>
+      {action.label}
+    </button>
   )
 }
 

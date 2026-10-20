@@ -1,6 +1,6 @@
 name: Story baselines
 
-# Writes the Linux screenshot baselines for stories that have none and commits
+# Writes the macOS screenshot baselines for stories that have none and commits
 # them to the pull request's branch (ADR 098). Baselines are per platform, so
 # they are made on the platform that compares them
 # (https://playwright.dev/docs/test-snapshots). Runs only when a maintainer adds
@@ -23,7 +23,7 @@ jobs:
     if: >-
       github.event.label.name == 'update-story-baselines' &&
       github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
+    runs-on: macos-14
     permissions:
       contents: write
       pull-requests: write
@@ -42,7 +42,7 @@ jobs:
         run: npm ci
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
 
       # test:visual serves the built Storybook (playwright.visual.config.ts).
       - name: Build Storybook
@@ -59,14 +59,14 @@ jobs:
 
       - name: Commit the baselines
         run: |
-          git add packages/extension-ui/visual/__screenshots__/linux
+          git add packages/extension-ui/visual/__screenshots__/darwin
           if git diff --cached --quiet; then
             echo "Every story already has a baseline."
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'test(extension-ui): Linux baselines for the stories that had none'
+          git commit -m 'test(extension-ui): macOS baselines for the stories that had none'
           git push
 
       - name: Remove the label

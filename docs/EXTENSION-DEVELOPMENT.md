@@ -390,8 +390,7 @@ await vault.getByRole('button', { name: 'Add task', exact: true }).click()
 
 - Read back what an action stored with `invokeChannel(page, channel, payload)`, which calls your channel exactly as your view does. Perform the action itself the way a user does.
 - A native file dialog cannot be clicked. `answerNextOpenDialog` and `answerNextSaveDialog` answer the next one in main with the path a user would pick.
-- Playwright's keyboard reaches one page and never the X server, so it cannot fire an `api.globalShortcut`. On Linux `tests/e2e/x11-keys.ts` presses the chord through XTEST; the spec skips where there is no X server. CI runs such specs in the E2E (Linux, X11) job, under xvfb; add yours to its command in `.github/workflows/ci.yml`.
-- `E2E_ELECTRON_ARGS` passes extra Electron switches to every launch, space-separated. A Linux runner without Chromium's sandbox sets `E2E_ELECTRON_ARGS=--no-sandbox`.
+- Playwright's keyboard reaches one page and never the operating system, so it cannot fire an `api.globalShortcut`, and a macOS runner cannot press a system-wide key without Accessibility consent. Test a global shortcut's handler in a unit test.
 - `tests/e2e/task-vault-harness.ts` and `tests/e2e/notepad-harness.ts` are worked examples.
 
 ---

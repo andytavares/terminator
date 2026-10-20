@@ -7,6 +7,8 @@ import { InFlight } from '../../../../src/renderer/components/home/InFlight'
 import { useDeskSelection } from '../../../../src/renderer/components/home/desk-selection'
 import { useParkedThreads } from '../../../../src/renderer/components/home/parked-threads'
 import { useDismissedThreads } from '../../../../src/renderer/components/home/dismissed-threads'
+import { useToastStore } from '../../../../src/renderer/stores/toast.store'
+import { ToastContainer } from '../../../../src/renderer/components/ToastContainer'
 import { useHomeFeedStore } from '../../../../src/renderer/stores/home-feed.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { installElectronApi } from '../../../support/electron-api'
@@ -434,20 +436,33 @@ describe('the row menu — Park and Dismiss', () => {
   })
 })
 
-describe('the row menu — a dismissed thread coming back', () => {
-  it('a dismissed thread reappears when its last activity moves past the dismissal', () => {
-    const { rerender } = render(<InFlight />)
-    parkViaMenu('Reproduce staging 429s before release', 'Dismiss')
-    expect(
-      screen.queryByRole('button', { name: 'Reproduce staging 429s before release' })
-    ).toBeNull()
-    spies.facts = FACTS.map((f: { sessionId: string }) =>
-      f.sessionId === 'asking' ? { ...f, lastActivityAt: Date.now() } : f
+describe('the row menu — a dismissed thread stays gone', () => {
+  const TITLE = 'Reproduce staging 429s before release'
+  const rowShown = (): boolean => screen.queryByRole('button', { name: TITLE }) !== null
+
+  it('stays hidden when its activity moves on, and Undo on the toast brings it back', () => {
+    useToastStore.setState({ toasts: [] })
+    const { rerender } = render(
+      <>
+        <InFlight />
+        <ToastContainer />
+      </>
     )
-    rerender(<InFlight />)
-    expect(
-      screen.getByRole('button', { name: 'Reproduce staging 429s before release' })
-    ).toBeTruthy()
+    parkViaMenu(TITLE, 'Dismiss')
+    expect(rowShown()).toBe(false)
+    expect(screen.getByRole('status').textContent).toContain(`Dismissed "${TITLE}"`)
+    spies.facts = FACTS.map((f: { sessionId: string }) =>
+      f.sessionId === 'asking' ? { ...f, lastActivityAt: Date.now() + 60_000 } : f
+    )
+    rerender(
+      <>
+        <InFlight />
+        <ToastContainer />
+      </>
+    )
+    expect(rowShown()).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(rowShown()).toBe(true)
   })
 })
 

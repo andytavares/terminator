@@ -14,6 +14,7 @@ export function dashboardPrFixture(overrides: Partial<DashboardPR> = {}): Dashbo
     isDraft: false,
     reviewedByMe: false,
     createdAt: '2026-10-15T09:00:00Z',
+    updatedAt: '2026-10-16T09:00:00Z',
     additions: 120,
     deletions: 30,
     fileCount: 6,

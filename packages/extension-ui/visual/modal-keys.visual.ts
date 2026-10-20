@@ -42,7 +42,8 @@ for (const id of ['default', 'not-dismissible']) {
     await page.keyboard.press('Escape')
     await page.keyboard.press('Escape')
     await expect(page.getByRole('dialog', { name: 'Settings' })).toBeVisible()
-    expect(await page.locator('dialog:modal').count()).toBe(1)
+    // The shell shows itself again from the dialog's close event, after the browser closed it.
+    await expect(page.locator('dialog:modal')).toHaveCount(1)
   })
 }
 

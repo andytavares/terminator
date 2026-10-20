@@ -10,7 +10,13 @@ export function ToastContainer(): JSX.Element | null {
   return (
     <ToastRegion
       // The store expires each toast itself, so the region keeps no timer of its own.
-      toasts={toasts.map(({ id, message, type }) => ({ id, message, tone: type, duration: 0 }))}
+      toasts={toasts.map(({ id, message, type, action }) => ({
+        id,
+        message,
+        tone: type,
+        duration: 0,
+        action,
+      }))}
       onDismiss={removeToast}
     />
   )

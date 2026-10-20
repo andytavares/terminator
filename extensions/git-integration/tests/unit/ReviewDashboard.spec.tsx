@@ -17,6 +17,7 @@ function makePr(overrides: Partial<DashboardPR> = {}): DashboardPR {
     author: 'alice',
     isDraft: false,
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     additions: 10,
     deletions: 5,
     fileCount: 2,

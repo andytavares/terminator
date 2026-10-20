@@ -94,6 +94,10 @@ function e2eEnv(): Record<string, string> {
     // runners default to bash), so ZDOTDIR below is guaranteed to apply.
     SHELL: '/bin/zsh',
     ZDOTDIR: CLAUDE_STUB_ZDOTDIR,
+    // Hidden windows that keep drawing, no Dock icon, no OS notifications
+    // (src/main/background-mode.ts): a run leaves the machine usable, and the
+    // real cursor, which Chromium reports to a window under it, never reaches one.
+    TERMINATOR_RUN_IN_BACKGROUND: '1',
   }
 }
 
@@ -111,15 +115,7 @@ const LAUNCH_DEADLINE_MS = 25_000
 const WINDOW_STATE_READ_MS = 1000
 const FAILED_LAUNCH_CLOSE_MS = 2500
 
-/** Extra Electron switches for this machine, space-separated in
- * E2E_ELECTRON_ARGS. A Linux runner sets `--no-sandbox`: Chromium's sandbox
- * needs a setuid helper or user namespaces the runner does not grant. */
-function machineArgs(): string[] {
-  return (process.env.E2E_ELECTRON_ARGS ?? '').split(' ').filter(Boolean)
-}
-
-/** Starts Electron on the profile, with this machine's switches and the e2e
- * environment beneath `env`. */
+/** Starts Electron on the profile, with the e2e environment beneath `env`. */
 function startElectron(
   userDataDir: string,
   env: Record<string, string>,
@@ -130,13 +126,7 @@ function startElectron(
     // modal "reopen windows?" alert on the next launch of the same bundle,
     // which blocks startup until firstWindow times out. The argument domain
     // turns that restore off for this process only.
-    args: [
-      '.',
-      ...machineArgs(),
-      `--user-data-dir=${userDataDir}`,
-      '-ApplePersistenceIgnoreState',
-      'YES',
-    ],
+    args: ['.', `--user-data-dir=${userDataDir}`, '-ApplePersistenceIgnoreState', 'YES'],
     env: { ...e2eEnv(), ...env },
     timeout,
   })
@@ -160,7 +150,6 @@ async function firstReadyWindow(app: ElectronApplication, remaining: () => numbe
   const page = await app.firstWindow({ timeout: remaining() })
   await page.waitForLoadState('domcontentloaded', { timeout: remaining() })
   await page.waitForSelector('.unified-sidebar', { timeout: remaining() })
-  await moveWindowOffPointer(app)
   return page
 }
 
@@ -178,29 +167,6 @@ async function launchFailure(
       `--- the app's own output ---\n${output.join('').slice(-6000) || '(nothing)'}`,
     { cause: error }
   )
-}
-
-/**
- * Moves each window of the app, now and later, beside the real cursor rather than under it.
- * Chromium sends a window a pointer move to where the cursor rests whenever a view's layout
- * changes; with several apps open at once that ended hovers and drags mid-test.
- */
-async function keepWindowsClearOfTheCursor(app: ElectronApplication): Promise<void> {
-  await app.evaluate(({ app: electronApp, BrowserWindow, screen }) => {
-    const clear = (window: Electron.BrowserWindow): void => {
-      const cursor = screen.getCursorScreenPoint()
-      const { x, y, width, height } = window.getBounds()
-      const under = cursor.x >= x && cursor.x < x + width && cursor.y >= y && cursor.y < y + height
-      if (!under) return
-      const display = screen.getDisplayNearestPoint(cursor).workArea
-      const rightOfCursor = cursor.x - display.x < display.width / 2
-      window.setPosition(rightOfCursor ? cursor.x + 1 : cursor.x - width, y)
-    }
-    for (const window of BrowserWindow.getAllWindows()) clear(window)
-    electronApp.on('browser-window-created', (_event, window) =>
-      window.once('show', () => clear(window))
-    )
-  })
 }
 
 /** Each extension frame's focus emulation, keyed by the frame, settled once it is on. */
@@ -237,6 +203,34 @@ function emulateFocusInExtensionFrames(page: Page): void {
   })
 }
 
+const POINTER_ACTIONS = [
+  'click',
+  'dblclick',
+  'hover',
+  'check',
+  'uncheck',
+  'setChecked',
+  'tap',
+  'dragTo',
+] as const
+let drawsBeforePointerActions = false
+
+/** Makes every locator's pointer action wait for the window to draw first (see `untilDrawn`).
+ * The app's windows are hidden in an e2e run, and on CI a hidden window drew late: a click on
+ * Task Vault's sidebar went to the frame drawn before it and did nothing. */
+function drawBeforePointerActions(page: Page): void {
+  if (drawsBeforePointerActions) return
+  drawsBeforePointerActions = true
+  const prototype = Object.getPrototypeOf(page.locator('body')) as Record<string, unknown>
+  for (const name of POINTER_ACTIONS) {
+    const act = prototype[name] as (this: Locator, ...args: unknown[]) => Promise<unknown>
+    prototype[name] = async function (this: Locator, ...args: unknown[]) {
+      await untilDrawn(this.page())
+      return act.apply(this, args)
+    }
+  }
+}
+
 /** Home hides the branch tree by default (`ui.hideSidebarOnHome`); a spec that clicks the
  * sidebar from Home would find nothing there. A new profile is seeded with the tree shown,
  * unless the spec is about the default and asks for it. */
@@ -264,8 +258,8 @@ export async function launchApp(
   const output = keepOutput(app)
   try {
     const page = await firstReadyWindow(app, remaining)
-    await keepWindowsClearOfTheCursor(app)
     emulateFocusInExtensionFrames(page)
+    drawBeforePointerActions(page)
     return { app, page, userDataDir, launchId: marker.launchId }
   } catch (error) {
     throw await launchFailure(app, output, error)
@@ -301,19 +295,6 @@ async function windowStates(app: ElectronApplication): Promise<string> {
     .catch((error: unknown) => `(could not ask the main process: ${String(error)})`)
   const unanswered = deadline(WINDOW_STATE_READ_MS).then(() => '(the main process did not answer)')
   return Promise.race([read, unanswered])
-}
-
-/** Moves the window off the X server's pointer on Linux: Chromium synthesizes a button-less
- * mousemove there whenever a view under it changes, which abandons a drag in progress
- * (docs/CONTRIBUTING.md, "E2E rules"). */
-async function moveWindowOffPointer(app: ElectronApplication): Promise<void> {
-  if (process.platform !== 'linux') return
-  await app.evaluate(({ BrowserWindow, screen }) => {
-    const pointer = screen.getCursorScreenPoint()
-    for (const window of BrowserWindow.getAllWindows()) {
-      window.setPosition(window.getBounds().x, pointer.y + 1)
-    }
-  })
 }
 
 // How long to wait for a graceful Electron shutdown before force-killing. A

@@ -7,7 +7,7 @@ const PORT = 6007
 
 // Screenshots of every built story, dark and light, at the app's default window size (ADR 098).
 // Fonts are bundled, but the browser build and OS still change pixels, so each platform keeps its
-// own baselines (https://playwright.dev/docs/test-snapshots); CI compares on Linux only.
+// own baselines (https://playwright.dev/docs/test-snapshots); CI compares on macOS only.
 export default defineConfig({
   testDir: 'visual',
   testMatch: '**/*.visual.ts',

@@ -5,7 +5,8 @@ import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { executePlan as execute, opensPullRequest, skillsFor } from '../../src/line/executor.js'
 import type { ExecutorDeps, ExecutorEvent, RunPlan, StartedRun } from '../../src/line/executor.js'
-import { buildRunGraph } from '../../src/line/run-graph.js'
+import { buildRunGraph, withNode } from '../../src/line/run-graph.js'
+import { Execution } from '../../src/line/execution.js'
 import { idleExecutorSeams } from './idle-executor-seams.js'
 import { retry } from '../../src/line/scheduler.js'
 import type { CommitOutcome } from '../../src/line/commit.js'
@@ -1974,6 +1975,7 @@ describe('writing the graph down as it changes', () => {
   describe('every state', everyStateTests)
   describe('running before passed', runningBeforePassedTests)
   describe('an unwritable graph', anUnwritableGraphTests)
+  describe('a slow write', aSlowWriteTests)
 })
 
 function everyStateTests() {
@@ -2012,6 +2014,32 @@ function runningBeforePassedTests() {
     })
     expect(states).toContain('running')
     expect(states.indexOf('running')).toBeLessThan(states.indexOf('passed'))
+  })
+}
+
+function aSlowWriteTests() {
+  it('writes the graph in the order it changed, so a slow write never lands last', async () => {
+    const plan = planOf(order([unit('U-1')]))
+    const started = withNode(plan.graph, 'build:U-1', { state: 'running', sessionId: 'sess-1' })
+    const passed = withNode(started, 'build:U-1', { state: 'passed' })
+    let disk: unknown = null
+    let releaseFirst = (): void => undefined
+    const firstLanded = new Promise<void>((resolve) => (releaseFirst = resolve))
+    const run = new Execution(plan, {
+      ...deps(vi.fn(ok)),
+      // The first write is slow, as a busy disk is: it lands only when the test says so.
+      persist: async (graph) => {
+        if (graph === started) await firstLanded
+        disk = graph
+      },
+    })
+
+    const first = run.advance(started)
+    const second = run.advance(passed)
+    releaseFirst()
+    await Promise.all([first, second])
+
+    expect(disk).toBe(passed)
   })
 }
 

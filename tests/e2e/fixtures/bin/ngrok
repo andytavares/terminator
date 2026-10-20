@@ -1,0 +1,5 @@
+#!/bin/sh
+# Stand-in for ngrok, beside the claude and gh stubs. An e2e run must never open a public
+# tunnel from the developer's machine, whose ngrok.yml holds a real authtoken; CI has no ngrok.
+echo "ngrok is not available in e2e runs" >&2
+exit 1

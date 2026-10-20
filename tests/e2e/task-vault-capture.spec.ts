@@ -2,7 +2,6 @@ import { test, expect, type Locator, type TestStepInfo } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
 import { invokeChannel, type ExtensionView } from './extension-page'
 import { goToSection, openVault, storedTask, type StoredTask } from './task-vault-harness'
-import { canPressGlobalKeys, pressGlobalChord } from './x11-keys'
 import { expectCentredInWindow } from './modal-centre'
 
 // Capturing into the Task Vault inbox and clarifying what was captured, the
@@ -157,25 +156,6 @@ async function captureFromQuickActions(): Promise<void> {
   await expect(vault.locator('.vault-sidebar__badge')).toHaveText('1')
 }
 
-/** The global capture shortcut opens the capture overlay from any window. */
-async function captureByGlobalShortcut(step: TestStepInfo): Promise<void> {
-  step.skip(
-    !canPressGlobalKeys,
-    'pressing a system-wide chord needs an X server; macOS needs Accessibility consent for the runner'
-  )
-  // Focus is in the main window, not the vault: the shortcut is global.
-  await handle.page.bringToFront()
-  pressGlobalChord('Control_L', 'Shift_L', 'o')
-
-  const dialog = vault.getByRole('dialog', { name: 'Capture to Inbox' })
-  await expect(dialog).toBeVisible({ timeout: 15_000 })
-  await dialog.getByRole('textbox').fill('Renew the passport')
-  await dialog.getByRole('button', { name: /Capture/ }).click()
-
-  await expect(dialog).toHaveCount(0)
-  expect(await inboxTexts()).toContain('Renew the passport')
-}
-
 const THE_INBOX_LOOP: [string, (step: TestStepInfo) => Promise<void>][] = [
   ['an item captured in the inbox is listed, counted and stored', captureIntoInbox],
   ['editing an inbox item rewrites its text and parses its tags', editInboxItem],
@@ -183,13 +163,8 @@ const THE_INBOX_LOOP: [string, (step: TestStepInfo) => Promise<void>][] = [
   ['deleting an inbox item asks first, then removes it for good', deleteAfterConfirm],
   ['clarifying the inbox trashes, incubates, does now and files each item', clarifyInbox],
   ['Capture to inbox from Quick Actions saves what was typed', captureFromQuickActions],
-  [
-    'the global capture shortcut opens the capture overlay from any window',
-    captureByGlobalShortcut,
-  ],
 ]
 
-// CI's X11 job runs this file by name for the global shortcut step (.github/workflows/ci.yml).
 test('the inbox is captured into, clarified and captured into again', async () => {
   for (const [title, step] of THE_INBOX_LOOP) await test.step(title, step)
 })

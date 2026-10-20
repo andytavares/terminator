@@ -423,6 +423,8 @@ Questions from Claude Code arrive through its `Notification` and `Stop` hooks. O
 
 **In flight** lists the work behind your terminals, Foundry orders and pull requests, one row per piece of work: a ticket with its sessions and pull request, a branch, or an order. A row shows the work, its stage (Shaping, Building, In review, Merging, Shipped) with a caption, its agents, its pull request and when it last moved. Rows are grouped by whose move it is — **Agents working**, **Waiting on others** — or by repo; **Group** at the right changes it. Scratch terminals and work untouched for two days sit under a collapsed **Parked** group.
 
+Right-click a row for its menu. **Dismiss** hides the row from Home for good: nothing that happens on the work brings it back, not a push, a review or a failing check. The toast that confirms it has **Undo**, and starting that ticket or branch again from **Start work** brings the row back.
+
 Press a row, or `Enter` on it, to open its **drawer**. The drawer holds a short written summary of what is happening and what blocks it (Terminator asks Claude Code, with no tools, to read the agents' latest messages and the pull request), the agents and terminals on it with how long they have run and their tokens, the pull request and its checks with **Send to agent** on a failing one, and a timeline. Its buttons are **Open terminal**, **New agent on this branch**, the pull request and ticket links, and **Park**. `Esc` closes the drawer.
 
 #### Today
@@ -442,7 +444,7 @@ The **Today** rail holds **Today's focus** — up to three items you chose with 
 - **Branch** starts on an existing branch.
 - **Scratch terminal** opens a terminal that belongs to no branch.
 
-Choose how to run it — as a **Claude agent**, **Terminal only**, or a **Foundry** order — with `Tab`, and the repo with `Cmd+R`. `Enter` starts it, and Terminator opens what it started so you land in it.
+Choose how to run it — as a **Claude agent**, **Terminal only**, or a **Foundry** order — with `Tab`. The **Workspace** button at the right of the tabs shows where the work will run and why that workspace was suggested; press it or `Cmd+R` to pick another, type to filter, and `Enter` to choose. `Enter` starts it, and Terminator opens what it started so you land in it.
 
 #### Keyboard
 

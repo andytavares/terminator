@@ -6,6 +6,7 @@ import type {
   NotificationType,
 } from '../../shared/notifications/resolve-targets'
 import { getGlobalSettings } from '../storage/settings-store'
+import { runsInBackground } from '../background-mode'
 import type { NotificationAction, SerializedNotification } from '../../shared/types/index'
 
 export type { NotificationTarget }
@@ -98,6 +99,7 @@ function clickHandler(opts: CreateNotificationOptions): (() => void) | undefined
 }
 
 function showSystemNotification(opts: CreateNotificationOptions): void {
+  if (runsInBackground()) return
   const notif = new Notification({ title: opts.title, body: opts.message ?? '' })
   notif.on('failed', (_e, error) => {
     console.warn('[notifications] system notification failed:', error)

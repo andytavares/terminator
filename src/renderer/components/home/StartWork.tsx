@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import { Bot, GitBranch, Plus } from 'lucide-react'
 import { Button, Chip, Kbd, ModalShell } from '@terminator/extension-ui'
+import { WorkspacePicker } from './WorkspacePicker'
 import { startScratchSession } from '../../terminal/start-session'
-import { useWorkspaceStore } from '../../stores/workspace.store'
 import {
   branchOf,
   cycleRunAs,
@@ -56,11 +56,22 @@ function useLauncherData(fields: Fields) {
   const { tab, query, selectedIndex, pickedRepoId } = fields
   const issues = useMyTickets()
   const ticketRows = useRows({ tab, query, issues, git: NO_GIT }).rows
-  const repo = useChosenRepo(ticketRows[selectedIndex], pickedRepoId)
+  const { workspace: repo, reason: repoReason } = useChosenRepo(
+    ticketRows[selectedIndex],
+    pickedRepoId
+  )
   const git = useRepoGit(repo)
   const { groups, rows } = useRows({ tab, query, issues, git })
   const index = Math.max(0, Math.min(selectedIndex, rows.length - 1))
-  return { repo, git, groups, rows, selected: rows[index] as LauncherRow | undefined, index }
+  return {
+    repo,
+    repoReason,
+    git,
+    groups,
+    rows,
+    selected: rows[index] as LauncherRow | undefined,
+    index,
+  }
 }
 
 function useLauncher(onClose: () => void) {
@@ -133,7 +144,7 @@ async function submit({ view, onClose, setError }: SubmitInput): Promise<void> {
     onClose()
     return void startScratchSession()
   }
-  if (view.repo === null) return setError('Add a repo in the sidebar first.')
+  if (view.repo === null) return setError('Add a workspace in the sidebar first.')
   const request = requestFor(view, view.repo)
   if (request === null) return
   const message = await startWork(request)
@@ -201,6 +212,7 @@ function SearchRow({ view, actions }: PartProps): JSX.Element {
 }
 
 function TabRow({ view, actions }: PartProps): JSX.Element {
+  const ticketKey = view.selected?.kind === 'ticket' ? view.selected.issue.key : null
   return (
     <div className="start-work__tabs" role="tablist">
       {TABS.map((tab) => (
@@ -215,6 +227,17 @@ function TabRow({ view, actions }: PartProps): JSX.Element {
           {tab.label}
         </button>
       ))}
+      {view.tab !== 'scratch' && (
+        <WorkspacePicker
+          current={view.repo}
+          reason={view.repoReason}
+          ticketKey={ticketKey}
+          open={view.picking}
+          onToggle={actions.togglePicker}
+          onPick={actions.pickRepo}
+          onClose={() => actions.dismiss()}
+        />
+      )}
     </div>
   )
 }
@@ -367,33 +390,17 @@ function summaryOf(view: Launcher['view']): { branch: string; worktree: string }
   return { branch: view.git.base ?? '', worktree: 'the repo folder' }
 }
 
-function Summary({ view, actions }: PartProps): JSX.Element {
+function Summary({ view }: PartProps): JSX.Element {
   const { branch, worktree } = summaryOf(view)
-  const workspaces = useWorkspaceStore((s) => s.workspaces)
   return (
-    <>
-      <dl className="start-work__summary" role="group" aria-label="Where it runs">
-        <dt>Repo</dt>
-        <dd>{view.repo?.name ?? 'none'}</dd>
-        <dt>Branch</dt>
-        <dd>{branch}</dd>
-        <dt>Worktree</dt>
-        <dd>{worktree}</dd>
-        <dt>From</dt>
-        <dd>{view.git.base ?? ''}</dd>
-      </dl>
-      {view.picking && (
-        <ul className="start-work__repos" role="listbox" aria-label="Repo">
-          {workspaces.map((w) => (
-            <li key={w.id} role="option" aria-selected={w.id === view.repo?.id}>
-              <button type="button" onClick={() => actions.pickRepo(w.id)}>
-                {w.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
+    <dl className="start-work__summary" role="group" aria-label="Where it runs">
+      <dt>Branch</dt>
+      <dd>{branch}</dd>
+      <dt>Worktree</dt>
+      <dd>{worktree}</dd>
+      <dt>From</dt>
+      <dd>{view.git.base ?? ''}</dd>
+    </dl>
   )
 }
 
@@ -414,7 +421,7 @@ function Footer({ view, actions }: Launcher): JSX.Element {
         <Kbd>Tab</Kbd> run as
       </span>
       <span>
-        <Kbd>⌘R</Kbd> change repo
+        <Kbd>⌘R</Kbd> workspace
       </span>
       {view.error !== null && (
         <span role="alert" className="start-work__error">
