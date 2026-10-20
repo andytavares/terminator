@@ -4,6 +4,7 @@ import { defineChannel, type ChannelSpec, validationError } from '@terminator/ex
 import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { notificationManager } from '../notifications/notification-manager'
 import { sendToWindow } from '../safe-send'
+import { revealWindow } from '../background-mode'
 
 /**
  * Clicking a notification about a session shows/focuses every window and
@@ -15,8 +16,7 @@ function revealSessionOnClick(sessionId: string): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (win.isDestroyed()) continue
     if (win.isMinimized()) win.restore()
-    win.show()
-    win.focus()
+    revealWindow(win)
     sendToWindow(win, 'terminal:navigate-to-session', { sessionId })
   }
 }

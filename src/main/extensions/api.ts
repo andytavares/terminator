@@ -71,6 +71,7 @@ import { defaultShellFor } from '../terminal/default-shell.js'
 import { basename } from 'path'
 import { randomUUID } from 'crypto'
 import { makeLogger } from '../logger.js'
+import { focusWindow, revealWindow, windowOptions } from '../background-mode.js'
 import { clearFeed, publishFeed, setActionHandler } from '../home/home-feed.js'
 
 const apiLog = makeLogger('extension-api')
@@ -372,8 +373,7 @@ function raiseAllWindows(): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (win.isDestroyed()) continue
     if (win.isMinimized()) win.restore()
-    win.show()
-    win.focus()
+    revealWindow(win)
   }
 }
 
@@ -881,15 +881,17 @@ function navigateAuxiliary(
 }
 
 function newAuxiliaryWindow(view: string, rendererUrl: string | undefined): BrowserWindow {
-  const win = new BrowserWindow({
-    width: 1400,
-    height: 900,
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      preload: join(__dirname, '../preload/index.js'),
-    },
-  })
+  const win = new BrowserWindow(
+    windowOptions({
+      width: 1400,
+      height: 900,
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        preload: join(__dirname, '../preload/index.js'),
+      },
+    })
+  )
   auxiliaryWindows.set(view, win)
   win.on('closed', () => {
     auxiliaryWindows.delete(view)
@@ -916,7 +918,7 @@ function openAuxiliaryWindow(
     // through specific context (e.g. the active PR being reviewed) —
     // otherwise a bare re-open (no params) just refocuses it as-is.
     if (params && Object.keys(params).length > 0) navigateAuxiliary(existing, query, rendererUrl)
-    existing.focus()
+    focusWindow(existing)
     return
   }
   navigateAuxiliary(newAuxiliaryWindow(view, rendererUrl), query, rendererUrl)

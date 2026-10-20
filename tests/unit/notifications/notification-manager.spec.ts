@@ -498,3 +498,19 @@ describe('acting on a notification settles it — repeat and unknown answers', (
     expect(notificationManager.triggerAction(id, 'nope')).toEqual({ error: 'UNKNOWN_ACTION' })
   })
 })
+
+describe('NotificationManager.create — running in the background', () => {
+  it('shows no OS notification and bounces no Dock icon, and still lists it', async () => {
+    process.env.TERMINATOR_RUN_IN_BACKGROUND = '1'
+    vi.resetModules()
+    const { notificationManager: background } = await import(
+      '../../../src/main/notifications/notification-manager'
+    )
+    delete process.env.TERMINATOR_RUN_IN_BACKGROUND
+    withDefaultTargets('system', 'center')
+    background.create({ type: 'info', title: 'Task done', key: 'k' })
+    expect(MockNotification).not.toHaveBeenCalled()
+    expect(mockDockBounce).not.toHaveBeenCalled()
+    expect(background.list().map((n) => n.title)).toEqual(['Task done'])
+  })
+})

@@ -94,6 +94,10 @@ function e2eEnv(): Record<string, string> {
     // runners default to bash), so ZDOTDIR below is guaranteed to apply.
     SHELL: '/bin/zsh',
     ZDOTDIR: CLAUDE_STUB_ZDOTDIR,
+    // Hidden windows that keep drawing, no Dock icon, no OS notifications
+    // (src/main/background-mode.ts): a run leaves the machine usable, and the
+    // real cursor, which Chromium reports to a window under it, never reaches one.
+    TERMINATOR_RUN_IN_BACKGROUND: '1',
   }
 }
 
@@ -180,29 +184,6 @@ async function launchFailure(
   )
 }
 
-/**
- * Moves each window of the app, now and later, beside the real cursor rather than under it.
- * Chromium sends a window a pointer move to where the cursor rests whenever a view's layout
- * changes; with several apps open at once that ended hovers and drags mid-test.
- */
-async function keepWindowsClearOfTheCursor(app: ElectronApplication): Promise<void> {
-  await app.evaluate(({ app: electronApp, BrowserWindow, screen }) => {
-    const clear = (window: Electron.BrowserWindow): void => {
-      const cursor = screen.getCursorScreenPoint()
-      const { x, y, width, height } = window.getBounds()
-      const under = cursor.x >= x && cursor.x < x + width && cursor.y >= y && cursor.y < y + height
-      if (!under) return
-      const display = screen.getDisplayNearestPoint(cursor).workArea
-      const rightOfCursor = cursor.x - display.x < display.width / 2
-      window.setPosition(rightOfCursor ? cursor.x + 1 : cursor.x - width, y)
-    }
-    for (const window of BrowserWindow.getAllWindows()) clear(window)
-    electronApp.on('browser-window-created', (_event, window) =>
-      window.once('show', () => clear(window))
-    )
-  })
-}
-
 /** Each extension frame's focus emulation, keyed by the frame, settled once it is on. */
 const frameFocusEmulation = new WeakMap<Frame, Promise<void>>()
 
@@ -264,7 +245,6 @@ export async function launchApp(
   const output = keepOutput(app)
   try {
     const page = await firstReadyWindow(app, remaining)
-    await keepWindowsClearOfTheCursor(app)
     emulateFocusInExtensionFrames(page)
     return { app, page, userDataDir, launchId: marker.launchId }
   } catch (error) {

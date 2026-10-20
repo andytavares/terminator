@@ -2,6 +2,7 @@ import './claim-profile.js'
 import { onChannel } from './ipc/channel-registrar.js'
 import { registerAppInfoHandlers, registerDialogHandlers } from './ipc/app.ipc.js'
 import { app, BrowserWindow, dialog, Menu, shell, session, protocol } from 'electron'
+import { enterBackgroundMode, revealWindow, windowOptions } from './background-mode.js'
 import { join } from 'path'
 import {
   registerWorkspaceHandlers,
@@ -165,16 +166,18 @@ function handleWindowClose(win: BrowserWindow): void {
 }
 
 function createWindow(): void {
-  const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      preload: join(__dirname, '../preload/index.js'),
-      webviewTag: true,
-    },
-  })
+  const win = new BrowserWindow(
+    windowOptions({
+      width: 1280,
+      height: 800,
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        preload: join(__dirname, '../preload/index.js'),
+        webviewTag: true,
+      },
+    })
+  )
   mainWindow = win
   loadRenderer(win)
   relayPushes(win)
@@ -303,8 +306,7 @@ function registerAppHandlers(): void {
 app.on('second-instance', () => {
   if (!mainWindow) return
   if (mainWindow.isMinimized()) mainWindow.restore()
-  mainWindow.show()
-  mainWindow.focus()
+  revealWindow(mainWindow)
 })
 
 // Must be called before app.ready so Chromium treats ext:// as a secure standard
@@ -490,6 +492,8 @@ function startExtensions(
     .catch((error) => logger.error('extension startup failed', { error: String(error) }))
 }
 
+enterBackgroundMode()
+
 app.whenReady().then(async () => {
   logger.info('App ready', { version: app.getVersion() })
   // Slow (a login shell starts) and only extensions need its result, so it runs
@@ -520,7 +524,7 @@ app.whenReady().then(async () => {
 
   app.on('activate', () => {
     if (mainWindow) {
-      mainWindow.show()
+      revealWindow(mainWindow)
     } else {
       createWindow()
     }

@@ -103,6 +103,8 @@ Prints the median start-up milestones (process attached, window, DOM ready, side
 
 E2E runs with no retries, so a test that fails once fails the build ([ADR 070](adr/070-e2e-is-deterministic-and-selective.md)). An e2e test is a user flow, not a check of one thing ([ADR 115](adr/115-e2e-tests-are-user-flows.md)).
 
+The suite runs in the background, so the machine stays usable while it runs. `launchApp()` sets `TERMINATOR_RUN_IN_BACKGROUND=1` (`src/main/background-mode.ts`). Every window is then created hidden with `backgroundThrottling: false`, which keeps it drawing and visible to the page ([Electron, Page visibility](https://github.com/electron/electron/blob/main/docs/api/browser-window.md#page-visibility)). The app is an `accessory` app, with no Dock icon and no menu bar, so launching it never makes it the active application. Showing or focusing a window does nothing, and no OS notification is shown. Your real cursor never sits over a test window either. Playwright clicks, types and takes screenshots through the DevTools protocol, which needs no visible window. `tests/e2e/fixtures/bin` holds stubs that win over the real tools on the app's PATH: `claude`, `gh`, and `ngrok`, which refuses, so a run never opens a public tunnel with your own ngrok token.
+
 - A flow is one `test()` named for what the user achieves, made of `test.step()`s that each name a behaviour. A spec file launches the app once; a flow restarts it only when surviving the restart is what it checks. A check of one component or one channel is a unit or component test, not a new e2e test.
 
 - Never sleep. Wait on the condition you assert next: a locator assertion, or `expect.poll`. ESLint rejects `waitForTimeout` in `tests/e2e`.
