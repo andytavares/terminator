@@ -1,0 +1,21 @@
+src/main/extensions/api.ts
+  s_d918463020569b::t_74e3722431b1a2 74
+src/main/index.ts
+  s_d918463020569b::t_3051c5d78094a8 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4d7c6555e8fc1422aac45e665845e8fb437f3995",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
