@@ -33,10 +33,15 @@ async function overviewIconNamedOnFocus(page: Page): Promise<void> {
   // Focus, not hover: other apps launched at once move the real pointer. A pointer press anywhere
   // before the focus makes it a click's focus, which names nothing; a key press is what a keyboard
   // user did last, so the test says so rather than relying on nothing having been clicked.
+  // Home still mounting can take focus as it settles, which hides the tooltip (CI, twice); the
+  // step is about keyboard focus, so it starts once Home has drawn, and says if focus moved.
+  await expect(page.getByRole('region', { name: 'In flight' })).toBeVisible()
   await page.keyboard.press('Shift')
-  await page.getByRole('button', { name: 'Overview' }).focus()
+  const overview = page.getByRole('button', { name: 'Overview' })
+  await overview.focus()
   await expect(page.locator('.tmui-tooltip')).toHaveText('Overview')
   await expect(page.locator('.tmui-tooltip')).toBeVisible()
+  await expect(overview).toBeFocused()
 }
 
 /** Large before any tile exists, so the tile is placed once, at the size it keeps. */
