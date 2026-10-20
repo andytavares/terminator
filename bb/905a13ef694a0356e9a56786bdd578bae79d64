@@ -1,0 +1,41 @@
+src/main/notifications/notification-manager.ts
+  s_d918463020569b::t_339e5fc6048e99 9
+  s_d918463020569b::t_0892ad2e50d5b1 102
+tests/e2e/helpers.ts
+  s_d918463020569b::t_22328eb9fcffa0 97-100
+docs/CONTRIBUTING.md
+  s_d918463020569b::t_97f1105457e491 106-107
+tests/unit/main/background-mode.spec.ts
+  s_d918463020569b::t_13b901ff440d45 6,32,65
+  s_d918463020569b::t_1d22c32f745057 1-5,7-31,33-37,45-64,66-67,75,77-84
+  s_d918463020569b::t_15b604d0b7cd42 38-44,68-74,76
+src/main/ipc/notification.ipc.ts
+  s_d918463020569b::t_0892ad2e50d5b1 19
+  s_d918463020569b::t_339e5fc6048e99 7
+tests/unit/notifications/notification-manager.spec.ts
+  s_d918463020569b::t_7dda96884b91bf 501-516
+src/main/index.ts
+  s_d918463020569b::t_0892ad2e50d5b1 5,169-180,309,495-496,527
+src/main/background-mode.ts
+  s_d918463020569b::t_3ac3cdfb9c2490 1-30,36-39
+  s_d918463020569b::t_2121f96056838f 31-35
+src/main/extensions/api.ts
+  s_d918463020569b::t_b5712d1339bb29 74,921
+  s_d918463020569b::t_0892ad2e50d5b1 376,884-894
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bb905a13ef694a0356e9a56786bdd578bae79d64",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
