@@ -1,47 +1,38 @@
 #!/usr/bin/env node
-// Every check .github/workflows/ci.yml runs, run here, so a failure shows on this machine, not
-// in CI. Cheapest first; stops at the first failure. A pass on a clean tree is recorded for its
-// commit, and the pre-push hook (`--check-push`) refuses a commit with no recorded pass.
-// tests/unit/scripts/ci-local.spec.ts fails when ci.yml gains a command this does not run.
+// What .github/workflows/ci.yml runs, run here, so a failure shows on this machine and not in CI.
+// Its Ubuntu jobs run in a Linux container (scripts/docker/ci-linux.Dockerfile), its macOS jobs
+// here; scripts/ci-plan.mjs reads their steps from the workflow. Stops at the first failure. A
+// pass on a clean tree is recorded for its commit; the pre-push hook (`--check-push`) refuses a
+// commit with none.
 
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { planFor, readWorkflow, SKIPPED_JOBS } from './ci-plan.mjs'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+const WORKFLOW = join(REPO_ROOT, '.github/workflows/ci.yml')
+const IMAGE = 'terminator-ci-linux'
 
-const npmRun = (script) => ({ command: 'npm', args: ['run', script] })
-
-/** In the order they run; the Lint job's steps first, as CI orders them. */
-export const CHECKS = [
-  { command: 'npm', args: ['audit', '--audit-level=high'] },
-  npmRun('lint:deps'),
-  npmRun('lint:unused'),
-  npmRun('lint:unused:production'),
-  npmRun('lint:duplicates'),
-  npmRun('lint'),
-  npmRun('format:check'),
-  npmRun('typecheck'),
-  { command: 'node', args: ['scripts/check-temp-leaks.mjs', 'npx', 'vitest', 'run', '--coverage'] },
-  npmRun('test:perf'),
-  npmRun('test:stories'),
-  npmRun('build-storybook'),
-  { command: 'node', args: ['scripts/smoke-start.mjs', 'dev'] },
-  { command: 'node', args: ['scripts/ci-e2e-local.mjs'] },
-  { command: 'node', args: ['scripts/smoke-start.mjs', 'preview'] },
-]
-
-/** Commands in ci.yml this does not run itself, and why. */
+/** What CI checks that ci:local does not, and why. */
 export const NOT_RUN_HERE = {
-  'npm run build': 'scripts/ci-e2e-local.mjs builds before the e2e suite',
-  'npm run dev': 'an argument of smoke-start.mjs, which runs above',
-  'npm run preview': 'an argument of smoke-start.mjs, which runs above',
-  'node scripts/e2e-select.mjs': 'scripts/ci-e2e-local.mjs selects specs with it',
-  'node scripts/e2e-shard.mjs': 'scripts/ci-e2e-local.mjs shards with it',
-  'npm run test:visual':
-    'its baselines are Linux screenshots and macOS renders them differently; regenerate them in Docker',
+  ...SKIPPED_JOBS,
+  e2e: 'runs here through scripts/ci-e2e-local.mjs, its shards and burn-in step for step',
+  'codecov/patch': 'Codecov works it out from the uploaded coverage; the Test job runs here',
 }
+
+// The tracked and new files go into the container as a tar, so nothing in it touches this
+// checkout's node_modules. A git repository of one commit stands for CI's shallow checkout.
+const LINUX_CONTAINER = [
+  `docker build -q -t ${IMAGE} -f scripts/docker/ci-linux.Dockerfile scripts/docker > /dev/null`,
+  'git ls-files -co --exclude-standard -z | COPYFILE_DISABLE=1 tar --no-xattrs -cf - --null -T - |',
+  `docker run --rm -i -v terminator-ci-npm:/root/.npm -v terminator-ci-electron:/root/.cache/electron`,
+  `-v terminator-ci-browsers:/root/.cache/ms-playwright ${IMAGE} bash -ec '`,
+  'tar -xf - -C /work --warning=no-unknown-keyword && cd /work && git init -q && git add -A &&',
+  'git -c user.name=ci -c user.email=ci@localhost commit -qm ci &&',
+  "npm ci --no-audit --no-fund && node scripts/ci-local.mjs --linux'",
+].join(' ')
 
 /**
  * The environment a check runs in: this one without the GIT_ variables git gives a hook. With
@@ -51,13 +42,27 @@ export function checkEnvironment(env) {
   return Object.fromEntries(Object.entries(env).filter(([name]) => !name.startsWith('GIT_')))
 }
 
-function runOne({ command, args }) {
-  const line = [command, ...args].join(' ')
-  console.log(`\n== ${line}`)
-  const options = { cwd: REPO_ROOT, stdio: 'inherit', env: checkEnvironment(process.env) }
-  const status = spawnSync(command, args, options).status
-  if (status !== 0) console.error(`\nci:local failed: ${line} exited ${status}`)
+function runStep({ job, name, script, env = {} }) {
+  console.log(`\n== ${job}: ${name}`)
+  const options = {
+    cwd: REPO_ROOT,
+    stdio: 'inherit',
+    env: checkEnvironment({ ...process.env, ...env }),
+  }
+  const status = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', script], options).status
+  if (status !== 0) console.error(`\nci:local failed: ${job}: ${name} exited ${status}`)
   return status === 0
+}
+
+const runPlan = (os) => planFor(readWorkflow(WORKFLOW), os).every(runStep)
+
+const LOCAL_STEPS = [
+  { job: 'linux', name: "ci.yml's Ubuntu jobs, in a Linux container", script: LINUX_CONTAINER },
+]
+const E2E_STEP = {
+  job: 'e2e',
+  name: 'the five shards and the burn-in',
+  script: 'node scripts/ci-e2e-local.mjs',
 }
 
 const NO_COMMIT = /^0+$/
@@ -107,13 +112,17 @@ function checkPush() {
 
 function main() {
   const before = treeState()
-  if (!CHECKS.every(runOne)) process.exit(1)
+  const passed = LOCAL_STEPS.every(runStep) && runPlan('mac') && runStep(E2E_STEP)
+  if (!passed) process.exit(1)
   console.log('\nci:local passed. Not run here:')
-  for (const [command, why] of Object.entries(NOT_RUN_HERE)) console.log(`  ${command}: ${why}`)
+  for (const [check, why] of Object.entries(NOT_RUN_HERE)) console.log(`  ${check}: ${why}`)
   recordPass(before)
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  if (process.argv.includes('--check-push')) checkPush()
-  else main()
+function command() {
+  if (process.argv.includes('--check-push')) return checkPush()
+  if (process.argv.includes('--linux')) return runPlan('linux') || process.exit(1)
+  return main()
 }
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) command()
