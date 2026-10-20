@@ -1,0 +1,22 @@
+tests/unit/scripts/smoke-start.spec.ts
+  s_d918463020569b::t_af03620d57798f 9,161-168
+  s_d918463020569b::t_2cb0e888671a2a 169-170
+scripts/smoke-start.mjs
+  s_d918463020569b::t_af03620d57798f 90-95,100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "83c2d57fb9105dadeab1b49361c5af043700e1e8",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
