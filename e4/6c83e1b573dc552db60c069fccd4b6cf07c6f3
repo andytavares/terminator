@@ -1,0 +1,31 @@
+tests/setup.ts
+  s_d918463020569b::t_180ec87a66d621 6,8
+tests/unit/scripts/ci-local.spec.ts
+  s_d918463020569b::t_65d051c4304bdc 4,45-56
+  s_d918463020569b::t_4121f825c36921 57-58
+tests/unit/support/git-hook-env.spec.ts
+  s_d918463020569b::t_96eaa15be284c5 1,3-5,13-16,19-37
+  s_d918463020569b::t_180ec87a66d621 2,6-12,17-18
+tests/support/git-hook-env.ts
+  s_d918463020569b::t_180ec87a66d621 1-25
+tests/e2e/global-setup.ts
+  s_d918463020569b::t_180ec87a66d621 5,15-16
+scripts/ci-local.mjs
+  s_d918463020569b::t_39a7a0eee813fb 44-51,55-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e46c83e1b573dc552db60c069fccd4b6cf07c6f3",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
