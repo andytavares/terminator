@@ -5,16 +5,6 @@ vi.mock('electron', () => ({ app }))
 
 const fakeWindow = () => ({ show: vi.fn(), focus: vi.fn() })
 
-/** A window that records what it is asked to do once it is ready to show. */
-function readyWindow() {
-  const handlers: Array<() => void> = []
-  return {
-    showInactive: vi.fn(),
-    once: vi.fn((_event: 'ready-to-show', handler: () => void) => void handlers.push(handler)),
-    becomeReady: () => handlers.forEach((handler) => handler()),
-  }
-}
-
 async function loadWith(value: string | undefined) {
   vi.resetModules()
   if (value === undefined) delete process.env.TERMINATOR_RUN_IN_BACKGROUND
@@ -51,27 +41,6 @@ describe('running in the background, as the e2e harness asks', () => {
     focusWindow(win)
     expect(win.focus).not.toHaveBeenCalled()
   })
-})
-
-describe('a new window, running in the background', () => {
-  beforeEach(() => app.setActivationPolicy.mockReset())
-  afterEach(() => delete process.env.TERMINATOR_RUN_IN_BACKGROUND)
-
-  it('shows a window without focus on Linux, whose unshown windows cannot be clicked', async () => {
-    const { presentWindow } = await loadWith('1')
-    const win = readyWindow()
-    presentWindow(win, 'linux')
-    win.becomeReady()
-    expect(win.showInactive).toHaveBeenCalledOnce()
-  })
-
-  it('keeps a window hidden on macOS, where a hidden window still draws', async () => {
-    const { presentWindow } = await loadWith('1')
-    const win = readyWindow()
-    presentWindow(win, 'darwin')
-    win.becomeReady()
-    expect(win.showInactive).not.toHaveBeenCalled()
-  })
 
   it('keeps the app out of the Dock so it never becomes the active app', async () => {
     const { enterBackgroundMode } = await loadWith('1')
@@ -106,17 +75,6 @@ describe('running normally', () => {
     expect(win.focus).toHaveBeenCalledOnce()
     expect(win.show).not.toHaveBeenCalled()
   })
-
-  it('leaves a window to show itself', async () => {
-    const { presentWindow } = await loadWith(undefined)
-    const win = readyWindow()
-    presentWindow(win, 'linux')
-    expect(win.once).not.toHaveBeenCalled()
-  })
-})
-
-describe('running normally, the Dock', () => {
-  beforeEach(() => app.setActivationPolicy.mockReset())
 
   it('stays in the Dock', async () => {
     const { enterBackgroundMode } = await loadWith('0')

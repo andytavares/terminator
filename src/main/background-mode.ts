@@ -21,23 +21,6 @@ export function windowOptions(
   }
 }
 
-interface ReadyWindow {
-  once: (event: 'ready-to-show', listener: () => void) => void
-  showInactive: () => void
-}
-
-/** In the background on Linux, shows a new window without focus once ready: an X window never
- * shown composites none of its out-of-process frames, and Chromium routes a click by the last
- * frame drawn, so clicks into an extension view landed nowhere. macOS stays hidden. */
-export function presentWindow(
-  window: ReadyWindow,
-  platform: NodeJS.Platform = process.platform
-): void {
-  if (RUNS_IN_BACKGROUND && platform === 'linux') {
-    window.once('ready-to-show', () => window.showInactive())
-  }
-}
-
 /** Shows and focuses a window, unless the app runs in the background. */
 export function revealWindow(window: { show: () => void; focus: () => void }): void {
   if (RUNS_IN_BACKGROUND) return
