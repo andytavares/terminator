@@ -94,21 +94,18 @@ describe('errorLines', () => {
 describe('startCommand', () => {
   const profile = '/tmp/profile'
 
-  it('turns the sandbox off through electron-vite on Linux only', () => {
-    const linux = startCommand({ mode: 'dev', platform: 'linux', userDataDirectory: profile })
-    const mac = startCommand({ mode: 'dev', platform: 'darwin', userDataDirectory: profile })
-    expect(linux).toEqual([
+  it('starts the app through electron-vite with the profile it was given', () => {
+    expect(startCommand({ mode: 'dev', userDataDirectory: profile })).toEqual([
       'npm',
-      ['run', 'dev', '--', '--noSandbox', '--', `--user-data-dir=${profile}`],
+      ['run', 'dev', '--', '--', `--user-data-dir=${profile}`],
     ])
-    expect(mac).toEqual(['npm', ['run', 'dev', '--', '--', `--user-data-dir=${profile}`]])
   })
 
   it('runs a packaged executable directly', () => {
-    const command = { mode: 'exec', platform: 'linux', userDataDirectory: profile }
-    expect(startCommand({ ...command, executable: '/app/terminator' })).toEqual([
-      '/app/terminator',
-      [`--user-data-dir=${profile}`, '--no-sandbox'],
+    const command = { mode: 'exec', userDataDirectory: profile }
+    expect(startCommand({ ...command, executable: '/app/Terminator' })).toEqual([
+      '/app/Terminator',
+      [`--user-data-dir=${profile}`],
     ])
   })
 })
@@ -150,10 +147,8 @@ describe('electronMainPid', () => {
 })
 
 describe('mainLogPath', () => {
-  it('is inside the profile on Linux and under ~/Library/Logs on macOS', () => {
-    const where = { userDataDirectory: '/tmp/profile', appName: 'Terminator' }
-    expect(mainLogPath({ ...where, platform: 'linux' })).toBe('/tmp/profile/logs/terminator.log')
-    expect(mainLogPath({ ...where, platform: 'darwin' })).toBe(
+  it('is under ~/Library/Logs, where macOS keeps app logs', () => {
+    expect(mainLogPath({ appName: 'Terminator' })).toBe(
       join(homedir(), 'Library/Logs/Terminator/terminator.log')
     )
   })

@@ -91,9 +91,11 @@ jobs:
   # Every story is a test (ADR 098): it renders in Chromium and runs its play
   # function, in the light and the dark theme. The build proves the Storybook
   # site itself still compiles.
+  # On macOS, where Terminator runs: it ships only as a macOS DMG, and the
+  # screenshots below are compared with baselines made on macOS.
   stories:
     name: Stories
-    runs-on: ubuntu-latest
+    runs-on: macos-14
 
     steps:
       - uses: actions/checkout@v4
@@ -107,7 +109,7 @@ jobs:
         run: npm ci
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
 
       - name: Test stories
         run: npm run test:stories
@@ -116,12 +118,11 @@ jobs:
       - name: Build Storybook
         run: npm run build-storybook
 
-      # Screenshots of every story against the Linux baselines in
-      # packages/extension-ui/visual/__screenshots__/linux (ADR 098). Baselines
-      # are per platform, so this job compares on Linux only; a macOS run would
-      # look for .../darwin and is not made. A story with no baseline fails and
-      # gets one written here (--update-snapshots=missing); the step below
-      # uploads them so they can be reviewed and committed.
+      # Screenshots of every story against the macOS baselines in
+      # packages/extension-ui/visual/__screenshots__/darwin (ADR 098). A story
+      # with no baseline fails and gets one written here
+      # (--update-snapshots=missing); the step below uploads them so they can be
+      # reviewed and committed.
       - name: Compare story screenshots
         run: npm run test:visual -w @terminator/extension-ui -- --update-snapshots=missing
         timeout-minutes: 5
@@ -130,13 +131,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: story-baselines-linux
-          path: packages/extension-ui/visual/__screenshots__/linux/
+          name: story-baselines-macos
+          path: packages/extension-ui/visual/__screenshots__/darwin/
           if-no-files-found: ignore
           retention-days: 14
 
-  # On Linux: GitHub allows five macOS jobs at once, and those go to the build
-  # and E2E, which drive the real app. Tests of macOS behaviour pin
+  # On Linux runners, though the app is macOS-only: GitHub allows five macOS
+  # jobs at once, and those go to the jobs that drive the real app (Start,
+  # Stories, E2E). Tests of macOS behaviour pin
   # process.platform rather than inheriting the host's. Each shard writes a
   # blob; the coverage threshold only means something over the whole suite, so
   # it is enforced once, in the merge.
@@ -295,12 +297,8 @@ jobs:
   # scripts/smoke-start.mjs checks for App ready, every extension activated, and
   # no error or uncaught exception, then quits the app.
   start:
-    name: Start (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-14, ubuntu-latest]
+    name: Start
+    runs-on: macos-14
 
     steps:
       - uses: actions/checkout@v4
@@ -312,60 +310,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Electron needs a display on Linux; macOS has one.
       - name: npm run dev
-        run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}node scripts/smoke-start.mjs dev
+        run: node scripts/smoke-start.mjs dev
         timeout-minutes: 8
 
       - name: npm run build
         run: npm run build
 
       - name: npm run preview
-        run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}node scripts/smoke-start.mjs preview
+        run: node scripts/smoke-start.mjs preview
         timeout-minutes: 8
 
-      # The packaged app, unsigned, from the same electron-builder.cjs the
-      # release uses. It once started with no extensions at all: they were not
-      # in app.asar. Linux only: macOS packaging signs and notarizes.
+      # The packaged app from the same electron-builder.cjs the release uses,
+      # unsigned and not notarized. It once started with no extensions at all:
+      # they were not in app.asar.
       - name: Packaged app
-        if: runner.os == 'Linux'
         run: |
-          npx electron-builder --linux dir --publish never
-          xvfb-run -a node scripts/smoke-start.mjs exec "$PWD/dist/linux-unpacked/@andytavaresterminator"
+          npx electron-builder --mac dir --publish never -c.mac.identity=null -c.mac.notarize=false
+          node scripts/smoke-start.mjs exec "$PWD/dist/mac-arm64/Terminator.app/Contents/MacOS/Terminator"
         timeout-minutes: 15
-
-  # The specs that press keys at the X server (tests/e2e/x11-keys.ts), such as
-  # Task Vault's global capture shortcut. The E2E job runs on macOS, where they
-  # skip: synthesising a system-wide key there needs Accessibility consent for
-  # the runner. Chromium's sandbox needs a setuid helper or user namespaces this
-  # runner does not grant, so the app starts with --no-sandbox, as Start does.
-  e2e-x11:
-    name: E2E (Linux, X11)
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      # The e2e harness runs terminals under zsh; XTEST presses the keys.
-      - name: Install zsh and the X test extension
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh libxtst6
-
-      - name: Build
-        run: npm run build
-
-      - name: Run X11 specs
-        env:
-          E2E_ELECTRON_ARGS: --no-sandbox
-        run: xvfb-run -a npx playwright test tests/e2e/task-vault-capture.spec.ts --reporter=dot
-        timeout-minutes: 10
 
   e2e-select:
     name: E2E select

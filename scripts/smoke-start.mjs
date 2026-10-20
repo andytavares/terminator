@@ -57,25 +57,19 @@ export function startupProblems(output, extensionIds) {
   ]
 }
 
-/** The main log file: app.getPath('logs') is inside userData except on macOS, where it is
- * ~/Library/Logs/<app name> (https://www.electronjs.org/docs/latest/api/app#appsetapplogspathpath). */
-export function mainLogPath({ platform, userDataDirectory, appName }) {
-  const directory =
-    platform === 'darwin'
-      ? join(homedir(), 'Library', 'Logs', appName)
-      : join(userDataDirectory, 'logs')
-  return join(directory, 'terminator.log')
+/** The main log file: on macOS app.getPath('logs') is ~/Library/Logs/<app name>
+ * (https://www.electronjs.org/docs/latest/api/app#appsetapplogspathpath). */
+export function mainLogPath({ appName }) {
+  return join(homedir(), 'Library', 'Logs', appName, 'terminator.log')
 }
 
-/** The command that starts the app for `mode`, sandbox off on Linux only.
- * @param {{ mode: string, platform: string, userDataDirectory: string, executable?: string }} options */
-export function startCommand({ mode, platform, userDataDirectory, executable }) {
-  const linux = platform === 'linux'
+/** The command that starts the app for `mode`: electron-vite, or a packaged executable.
+ * @param {{ mode: string, userDataDirectory: string, executable?: string }} options */
+export function startCommand({ mode, userDataDirectory, executable }) {
   const appArguments = [`--user-data-dir=${userDataDirectory}`]
-  if (mode === 'exec') return [executable, [...appArguments, ...(linux ? ['--no-sandbox'] : [])]]
-  // electron-vite's --noSandbox, and `--` for the arguments it hands Electron
-  // (https://electron-vite.org/guide/cli).
-  return ['npm', ['run', mode, '--', ...(linux ? ['--noSandbox'] : []), '--', ...appArguments]]
+  if (mode === 'exec') return [executable, appArguments]
+  // `--` for the arguments electron-vite hands Electron (https://electron-vite.org/guide/cli).
+  return ['npm', ['run', mode, '--', '--', ...appArguments]]
 }
 
 function readFrom(path, offset) {
@@ -173,12 +167,10 @@ async function main([mode, executable]) {
     throw new Error('usage: smoke-start.mjs dev | preview | exec <executable>')
   }
   const userDataDirectory = mkdtempSync(join(tmpdir(), 'terminator-smoke-'))
-  const logPath = mainLogPath({ platform: process.platform, userDataDirectory, appName: appName() })
+  const logPath = mainLogPath({ appName: appName() })
   const logOffset = sizeOf(logPath)
   const extensionIds = bundledExtensionIds(join(REPO_ROOT, 'extensions'))
-  const run = launch(
-    startCommand({ mode, platform: process.platform, userDataDirectory, executable })
-  )
+  const run = launch(startCommand({ mode, userDataDirectory, executable }))
   const outputSoFar = () => `${readFrom(logPath, logOffset)}\n${run.output}`
 
   await awaitStartup(run, outputSoFar, extensionIds)

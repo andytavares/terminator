@@ -115,15 +115,7 @@ const LAUNCH_DEADLINE_MS = 25_000
 const WINDOW_STATE_READ_MS = 1000
 const FAILED_LAUNCH_CLOSE_MS = 2500
 
-/** Extra Electron switches for this machine, space-separated in
- * E2E_ELECTRON_ARGS. A Linux runner sets `--no-sandbox`: Chromium's sandbox
- * needs a setuid helper or user namespaces the runner does not grant. */
-function machineArgs(): string[] {
-  return (process.env.E2E_ELECTRON_ARGS ?? '').split(' ').filter(Boolean)
-}
-
-/** Starts Electron on the profile, with this machine's switches and the e2e
- * environment beneath `env`. */
+/** Starts Electron on the profile, with the e2e environment beneath `env`. */
 function startElectron(
   userDataDir: string,
   env: Record<string, string>,
@@ -134,13 +126,7 @@ function startElectron(
     // modal "reopen windows?" alert on the next launch of the same bundle,
     // which blocks startup until firstWindow times out. The argument domain
     // turns that restore off for this process only.
-    args: [
-      '.',
-      ...machineArgs(),
-      `--user-data-dir=${userDataDir}`,
-      '-ApplePersistenceIgnoreState',
-      'YES',
-    ],
+    args: ['.', `--user-data-dir=${userDataDir}`, '-ApplePersistenceIgnoreState', 'YES'],
     env: { ...e2eEnv(), ...env },
     timeout,
   })
@@ -164,7 +150,6 @@ async function firstReadyWindow(app: ElectronApplication, remaining: () => numbe
   const page = await app.firstWindow({ timeout: remaining() })
   await page.waitForLoadState('domcontentloaded', { timeout: remaining() })
   await page.waitForSelector('.unified-sidebar', { timeout: remaining() })
-  await moveWindowOffPointer(app)
   return page
 }
 
@@ -281,19 +266,6 @@ async function windowStates(app: ElectronApplication): Promise<string> {
     .catch((error: unknown) => `(could not ask the main process: ${String(error)})`)
   const unanswered = deadline(WINDOW_STATE_READ_MS).then(() => '(the main process did not answer)')
   return Promise.race([read, unanswered])
-}
-
-/** Moves the window off the X server's pointer on Linux: Chromium synthesizes a button-less
- * mousemove there whenever a view under it changes, which abandons a drag in progress
- * (docs/CONTRIBUTING.md, "E2E rules"). */
-async function moveWindowOffPointer(app: ElectronApplication): Promise<void> {
-  if (process.platform !== 'linux') return
-  await app.evaluate(({ BrowserWindow, screen }) => {
-    const pointer = screen.getCursorScreenPoint()
-    for (const window of BrowserWindow.getAllWindows()) {
-      window.setPosition(window.getBounds().x, pointer.y + 1)
-    }
-  })
 }
 
 // How long to wait for a graceful Electron shutdown before force-killing. A
