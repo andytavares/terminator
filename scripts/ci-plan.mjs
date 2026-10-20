@@ -34,6 +34,7 @@ const CONDITIONS = {
 
 const SETUP = /^npm ci\b/
 
+/** @returns {{ jobs: Record<string, object> }} */
 export function readWorkflow(path) {
   return yaml.load(readFileSync(path, 'utf8'))
 }
