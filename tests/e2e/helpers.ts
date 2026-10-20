@@ -203,6 +203,34 @@ function emulateFocusInExtensionFrames(page: Page): void {
   })
 }
 
+const POINTER_ACTIONS = [
+  'click',
+  'dblclick',
+  'hover',
+  'check',
+  'uncheck',
+  'setChecked',
+  'tap',
+  'dragTo',
+] as const
+let drawsBeforePointerActions = false
+
+/** Makes every locator's pointer action wait for the window to draw first (see `untilDrawn`).
+ * The app's windows are hidden in an e2e run, and on CI a hidden window drew late: a click on
+ * Task Vault's sidebar went to the frame drawn before it and did nothing. */
+function drawBeforePointerActions(page: Page): void {
+  if (drawsBeforePointerActions) return
+  drawsBeforePointerActions = true
+  const prototype = Object.getPrototypeOf(page.locator('body')) as Record<string, unknown>
+  for (const name of POINTER_ACTIONS) {
+    const act = prototype[name] as (this: Locator, ...args: unknown[]) => Promise<unknown>
+    prototype[name] = async function (this: Locator, ...args: unknown[]) {
+      await untilDrawn(this.page())
+      return act.apply(this, args)
+    }
+  }
+}
+
 /** Home hides the branch tree by default (`ui.hideSidebarOnHome`); a spec that clicks the
  * sidebar from Home would find nothing there. A new profile is seeded with the tree shown,
  * unless the spec is about the default and asks for it. */
@@ -231,6 +259,7 @@ export async function launchApp(
   try {
     const page = await firstReadyWindow(app, remaining)
     emulateFocusInExtensionFrames(page)
+    drawBeforePointerActions(page)
     return { app, page, userDataDir, launchId: marker.launchId }
   } catch (error) {
     throw await launchFailure(app, output, error)
