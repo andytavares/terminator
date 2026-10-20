@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 // What .github/workflows/ci.yml runs, run here, so a failure shows on this machine and not in CI.
-// Its Ubuntu jobs run in a Linux container (scripts/docker/ci-linux.Dockerfile), its macOS jobs
-// here; scripts/ci-plan.mjs reads their steps from the workflow. Stops at the first failure. A
+// scripts/ci-plan.mjs reads each job's steps from the workflow. Stops at the first failure. A
 // pass on a clean tree is recorded for its commit; the pre-push hook (`--check-push`) refuses a
 // commit with none.
 
@@ -13,7 +12,6 @@ import { planFor, readWorkflow, SKIPPED_JOBS } from './ci-plan.mjs'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const WORKFLOW = join(REPO_ROOT, '.github/workflows/ci.yml')
-const IMAGE = 'terminator-ci-linux'
 
 /** What CI checks that ci:local does not, and why. */
 export const NOT_RUN_HERE = {
@@ -21,26 +19,6 @@ export const NOT_RUN_HERE = {
   e2e: 'runs here through scripts/ci-e2e-local.mjs, its shards and burn-in step for step',
   'codecov/patch': 'Codecov works it out from the uploaded coverage; the Test job runs here',
 }
-
-// The tracked and new files go into the container as a tar, so nothing in it touches this
-// checkout's node_modules. A git repository of one commit stands for CI's shallow checkout.
-const BUILD_IMAGE = `docker build -q -t ${IMAGE} -f scripts/docker/ci-linux.Dockerfile scripts/docker`
-const SHIP_TREE =
-  'git ls-files -co --exclude-standard -z | COPYFILE_DISABLE=1 tar --no-xattrs -cf - --null -T -'
-const IN_CONTAINER = [
-  'tar -xf - -C /work --warning=no-unknown-keyword && cd /work && git init -q && git add -A',
-  'git -c user.name=ci -c user.email=ci@localhost commit -qm ci',
-  'npm ci --no-audit --no-fund',
-  'node scripts/ci-local.mjs --linux',
-].join(' && ')
-const CACHES = [
-  'npm:/root/.npm',
-  'electron:/root/.cache/electron',
-  'browsers:/root/.cache/ms-playwright',
-]
-  .map((cache) => `-v terminator-ci-${cache}`)
-  .join(' ')
-export const LINUX_CONTAINER = `${BUILD_IMAGE} > /dev/null && ${SHIP_TREE} | docker run --rm -i ${CACHES} ${IMAGE} bash -ec '${IN_CONTAINER}'`
 
 /**
  * The environment a check runs in: this one without the GIT_ variables git gives a hook. With
@@ -62,11 +40,8 @@ function runStep({ job, name, script, env = {} }) {
   return status === 0
 }
 
-const runPlan = (os) => planFor(readWorkflow(WORKFLOW), os).every(runStep)
+const runPlan = () => planFor(readWorkflow(WORKFLOW)).every(runStep)
 
-const LOCAL_STEPS = [
-  { job: 'linux', name: "ci.yml's Ubuntu jobs, in a Linux container", script: LINUX_CONTAINER },
-]
 const E2E_STEP = {
   job: 'e2e',
   name: 'the five shards and the burn-in',
@@ -120,7 +95,7 @@ function checkPush() {
 
 function main() {
   const before = treeState()
-  const passed = LOCAL_STEPS.every(runStep) && runPlan('mac') && runStep(E2E_STEP)
+  const passed = runPlan() && runStep(E2E_STEP)
   if (!passed) process.exit(1)
   console.log('\nci:local passed. Not run here:')
   for (const [check, why] of Object.entries(NOT_RUN_HERE)) console.log(`  ${check}: ${why}`)
@@ -129,7 +104,6 @@ function main() {
 
 function command() {
   if (process.argv.includes('--check-push')) return checkPush()
-  if (process.argv.includes('--linux')) return runPlan('linux') || process.exit(1)
   return main()
 }
 
