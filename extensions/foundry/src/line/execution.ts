@@ -50,6 +50,8 @@ export class Execution {
   private gateSeq: number
   /** Nodes whose session is already on the graph, so a late write is not a second start. */
   private readonly announced = new Set<string>()
+  /** The graph write in flight, which the next one waits for. */
+  private writing: Promise<void> = Promise.resolve()
 
   constructor(
     readonly plan: { readonly order: WorkOrder; readonly recipe: Recipe; readonly graph: RunGraph },
@@ -77,9 +79,12 @@ export class Execution {
 
   // Move to the graph's next state and say so. Never fatal: a run that cannot write
   // its graph is still a run.
+  // Writes wait for the one before: steps running at once advance at once, and a write that
+  // finished late put an older graph on disk last, losing a session the graph had named.
   async advance(next: RunGraph): Promise<void> {
     this.current = next
-    await this.deps.persist(this.current).catch(() => undefined)
+    this.writing = this.writing.then(() => this.deps.persist(next)).catch(() => undefined)
+    await this.writing
   }
 
   // Put a node's session on the graph as soon as the agent exists, so the Floor's
