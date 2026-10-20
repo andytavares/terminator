@@ -1,0 +1,28 @@
+tests/unit/main/background-mode.spec.ts
+  s_d918463020569b::t_ba099209bbb058 54-58,116-119
+  s_d918463020569b::t_c0914e7e207a37 8-17,59-74,110-115
+  s_d918463020569b::t_92115782e0ef0d 120
+src/main/extensions/api.ts
+  s_d918463020569b::t_30e1d0900ebccd 74,895
+src/main/index.ts
+  s_d918463020569b::t_30e1d0900ebccd 5-10,187
+src/main/background-mode.ts
+  s_d918463020569b::t_ba099209bbb058 29-31
+  s_d918463020569b::t_7dc2d7733747fd 24-28,32-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a89909afc6da6a8b304453ee1b97a4d0d4100783",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
