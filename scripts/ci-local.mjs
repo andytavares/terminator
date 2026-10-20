@@ -41,10 +41,19 @@ export const NOT_RUN_HERE = {
     'its baselines are Linux screenshots and macOS renders them differently; regenerate them in Docker',
 }
 
+/**
+ * The environment a check runs in: this one without the GIT_ variables git gives a hook. With
+ * GIT_DIR set, every git command a spec runs in its temporary repository acts on this one.
+ */
+export function checkEnvironment(env) {
+  return Object.fromEntries(Object.entries(env).filter(([name]) => !name.startsWith('GIT_')))
+}
+
 function runOne({ command, args }) {
   const line = [command, ...args].join(' ')
   console.log(`\n== ${line}`)
-  const status = spawnSync(command, args, { cwd: REPO_ROOT, stdio: 'inherit' }).status
+  const options = { cwd: REPO_ROOT, stdio: 'inherit', env: checkEnvironment(process.env) }
+  const status = spawnSync(command, args, options).status
   if (status !== 0) console.error(`\nci:local failed: ${line} exited ${status}`)
   return status === 0
 }

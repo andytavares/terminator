@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { CHECKS, NOT_RUN_HERE } from '../../../scripts/ci-local.mjs'
+import { CHECKS, NOT_RUN_HERE, checkEnvironment } from '../../../scripts/ci-local.mjs'
 
 const REPO_ROOT = resolve(__dirname, '../../..')
 
@@ -40,5 +40,19 @@ describe('ci:local runs what CI runs', () => {
 
   it('runs the selected e2e specs and their burn-in', () => {
     expect(localCommands).toContain('node scripts/ci-e2e-local.mjs')
+  })
+})
+
+describe('ci:local runs each check as CI would, outside any git hook', () => {
+  it('drops the GIT_ variables a pre-push hook is given, and keeps the rest', () => {
+    const fromHook = {
+      GIT_DIR: '/repo/.git/worktrees/branch',
+      GIT_PREFIX: '',
+      GIT_EXEC_PATH: '/git-core',
+      GIT_TRACE2_PARENT_SID: 'sid',
+      PATH: '/usr/bin',
+      HOME: '/Users/someone',
+    }
+    expect(checkEnvironment(fromHook)).toEqual({ PATH: '/usr/bin', HOME: '/Users/someone' })
   })
 })
