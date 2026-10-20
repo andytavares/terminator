@@ -1,0 +1,23 @@
+scripts/ci-local.mjs
+  s_d918463020569b::t_650d4d49219a27 27-42
+  s_d918463020569b::t_60705a258cd914 43
+tests/unit/scripts/ci-local.spec.ts
+  s_d918463020569b::t_60705a258cd914 2,4,11-22
+  s_d918463020569b::t_6b370c5bca29fb 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c942b92539ebebaf9ceb8e7e3d7bf1d748db5690",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
