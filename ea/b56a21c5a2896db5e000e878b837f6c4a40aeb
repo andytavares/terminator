@@ -1,0 +1,19 @@
+tests/e2e/fixtures/bin/ngrok
+  s_d918463020569b::t_4d05d4ea75ac45 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "eab56a21c5a2896db5e000e878b837f6c4a40aeb",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
