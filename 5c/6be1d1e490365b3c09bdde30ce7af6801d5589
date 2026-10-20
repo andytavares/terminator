@@ -1,0 +1,24 @@
+extensions/foundry/tests/line/executor.spec.ts
+  s_d918463020569b::t_f961e00ac5898d 1978,2020-2021,2025,2031,2033-2035
+  s_d918463020569b::t_47c66f971018dd 8-9,2022-2024,2026-2030,2032,2036-2042
+  s_d918463020569b::t_cb775d28f7c961 2043-2045
+extensions/foundry/src/line/execution.ts
+  s_d918463020569b::t_3a453872bad28a 82-83,86-87
+  s_d918463020569b::t_1b5afb245b63c4 53-54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5c6be1d1e490365b3c09bdde30ce7af6801d5589",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
