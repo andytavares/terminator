@@ -64,7 +64,9 @@ npm run ci:local        # Every check CI runs, cheapest first; stops at the firs
 npm run ci:local:e2e    # Only the e2e job: specs selected by the diff, five shards, burn-in
 ```
 
-The pre-push hook (`.husky/pre-push`) runs `npm run ci:local`, so a check that would fail in CI fails on your machine first. It runs the Lint job's steps (audit, syncpack, knip, jscpd, ESLint), format, typecheck, the unit suite with coverage under the temp-leak check, perf budgets, stories, the Storybook build, the start smoke tests and the e2e specs this diff selects. It prints what it leaves out and why: the design system's visual baselines are Linux screenshots, so they run in CI only. `tests/unit/scripts/ci-local.spec.ts` fails when `ci.yml` gains a command `ci:local` does not run.
+`npm run ci:local` runs the Lint job's steps (audit, syncpack, knip, jscpd, ESLint), format, typecheck, the unit suite with coverage under the temp-leak check, perf budgets, stories, the Storybook build, the start smoke tests and the e2e specs this diff selects. It prints what it leaves out and why: the design system's visual baselines are Linux screenshots, so they run in CI only. It runs every check without the `GIT_` variables a git hook sets, as CI does. `tests/unit/scripts/ci-local.spec.ts` fails when `ci.yml` gains a command `ci:local` does not run.
+
+A pass on a clean tree is recorded for its commit, in the worktree's git directory (`git rev-parse --git-path ci-local-passed`). The pre-push hook (`.husky/pre-push`) refuses to push a commit with no recorded pass and names the command to run. The hook only checks the record: git opens the connection to the remote before it runs the hook, and a hook that ran the whole suite left that connection idle until it dropped. So commit, run `npm run ci:local`, then push.
 
 ### Run tests
 
