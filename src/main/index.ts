@@ -2,7 +2,12 @@ import './claim-profile.js'
 import { onChannel } from './ipc/channel-registrar.js'
 import { registerAppInfoHandlers, registerDialogHandlers } from './ipc/app.ipc.js'
 import { app, BrowserWindow, dialog, Menu, shell, session, protocol } from 'electron'
-import { enterBackgroundMode, revealWindow, windowOptions } from './background-mode.js'
+import {
+  enterBackgroundMode,
+  presentWindow,
+  revealWindow,
+  windowOptions,
+} from './background-mode.js'
 import { join } from 'path'
 import {
   registerWorkspaceHandlers,
@@ -179,6 +184,7 @@ function createWindow(): void {
     })
   )
   mainWindow = win
+  presentWindow(win)
   loadRenderer(win)
   relayPushes(win)
   openLinksInBrowser(win)

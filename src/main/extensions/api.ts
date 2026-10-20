@@ -71,7 +71,7 @@ import { defaultShellFor } from '../terminal/default-shell.js'
 import { basename } from 'path'
 import { randomUUID } from 'crypto'
 import { makeLogger } from '../logger.js'
-import { focusWindow, revealWindow, windowOptions } from '../background-mode.js'
+import { focusWindow, presentWindow, revealWindow, windowOptions } from '../background-mode.js'
 import { clearFeed, publishFeed, setActionHandler } from '../home/home-feed.js'
 
 const apiLog = makeLogger('extension-api')
@@ -892,6 +892,7 @@ function newAuxiliaryWindow(view: string, rendererUrl: string | undefined): Brow
       },
     })
   )
+  presentWindow(win)
   auxiliaryWindows.set(view, win)
   win.on('closed', () => {
     auxiliaryWindows.delete(view)
