@@ -1,0 +1,38 @@
+docs/EXTENSION-DEVELOPMENT.md
+  s_d918463020569b::t_e24c3d2249e607 393
+tests/unit/scripts/smoke-start.spec.ts
+  s_d918463020569b::t_9625b9b54dddc6 150
+  s_d918463020569b::t_a97ab35993b37c 97-98,100,105-108,151
+.github/workflows/ci.yml
+  s_d918463020569b::t_5b4d0ac3c1df72 139-141
+  s_d918463020569b::t_2ab5dae3463a2a 94-95,98,112,121-125,134-135,300-301,314,321,324-326,329-330
+.github/workflows/story-baselines.yml
+  s_d918463020569b::t_c28ab5bc1e8a70 3,26,45,62,69
+scripts/smoke-start.mjs
+  s_d918463020569b::t_9625b9b54dddc6 60-63,66-68,70-72,170,173
+tests/e2e/helpers.ts
+  s_d918463020569b::t_cc4bec01df5c4e 118,129
+docs/CONTRIBUTING.md
+  s_d918463020569b::t_584cbaeb03e2b6 40
+  s_d918463020569b::t_e24c3d2249e607 67,117
+packages/extension-ui/playwright.visual.config.ts
+  s_d918463020569b::t_e24c3d2249e607 10
+packages/extension-ui/README.md
+  s_d918463020569b::t_e24c3d2249e607 175-177,180,182
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "466ee142aa0c04b0c9b0357a4ee9aaf952f64792",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
