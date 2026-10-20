@@ -24,15 +24,23 @@ export const NOT_RUN_HERE = {
 
 // The tracked and new files go into the container as a tar, so nothing in it touches this
 // checkout's node_modules. A git repository of one commit stands for CI's shallow checkout.
-const LINUX_CONTAINER = [
-  `docker build -q -t ${IMAGE} -f scripts/docker/ci-linux.Dockerfile scripts/docker > /dev/null`,
-  'git ls-files -co --exclude-standard -z | COPYFILE_DISABLE=1 tar --no-xattrs -cf - --null -T - |',
-  `docker run --rm -i -v terminator-ci-npm:/root/.npm -v terminator-ci-electron:/root/.cache/electron`,
-  `-v terminator-ci-browsers:/root/.cache/ms-playwright ${IMAGE} bash -ec '`,
-  'tar -xf - -C /work --warning=no-unknown-keyword && cd /work && git init -q && git add -A &&',
-  'git -c user.name=ci -c user.email=ci@localhost commit -qm ci &&',
-  "npm ci --no-audit --no-fund && node scripts/ci-local.mjs --linux'",
-].join(' ')
+const BUILD_IMAGE = `docker build -q -t ${IMAGE} -f scripts/docker/ci-linux.Dockerfile scripts/docker`
+const SHIP_TREE =
+  'git ls-files -co --exclude-standard -z | COPYFILE_DISABLE=1 tar --no-xattrs -cf - --null -T -'
+const IN_CONTAINER = [
+  'tar -xf - -C /work --warning=no-unknown-keyword && cd /work && git init -q && git add -A',
+  'git -c user.name=ci -c user.email=ci@localhost commit -qm ci',
+  'npm ci --no-audit --no-fund',
+  'node scripts/ci-local.mjs --linux',
+].join(' && ')
+const CACHES = [
+  'npm:/root/.npm',
+  'electron:/root/.cache/electron',
+  'browsers:/root/.cache/ms-playwright',
+]
+  .map((cache) => `-v terminator-ci-${cache}`)
+  .join(' ')
+export const LINUX_CONTAINER = `${BUILD_IMAGE} > /dev/null && ${SHIP_TREE} | docker run --rm -i ${CACHES} ${IMAGE} bash -ec '${IN_CONTAINER}'`
 
 /**
  * The environment a check runs in: this one without the GIT_ variables git gives a hook. With

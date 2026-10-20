@@ -1,10 +1,25 @@
 import { describe, it, expect } from 'vitest'
+import { execFileSync } from 'node:child_process'
 import {
+  LINUX_CONTAINER,
   NOT_RUN_HERE,
   checkEnvironment,
   recordablePass,
   unverifiedPushes,
 } from '../../../scripts/ci-local.mjs'
+
+describe('the Linux container ci:local starts', () => {
+  it('is one command bash can parse', () => {
+    expect(() => execFileSync('bash', ['-n', '-c', LINUX_CONTAINER])).not.toThrow()
+  })
+
+  it('builds the image, then sends the tree into a container that runs the Linux plan', () => {
+    const [build, rest] = LINUX_CONTAINER.split(' && git ls-files')
+    expect(build).toMatch(/^docker build .* > \/dev\/null$/)
+    expect(rest).toMatch(/\| docker run --rm -i /)
+    expect(rest).toContain('node scripts/ci-local.mjs --linux')
+  })
+})
 
 describe('what ci:local leaves to CI', () => {
   it('gives a reason for everything it does not run', () => {
