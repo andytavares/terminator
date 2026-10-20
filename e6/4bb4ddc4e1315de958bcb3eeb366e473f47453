@@ -1,0 +1,37 @@
+docs/CONTRIBUTING.md
+  s_d918463020569b::t_d910c2569ea93d 67
+scripts/ci-plan.mjs
+  s_d918463020569b::t_846b77e01556eb 1-21,26-49,51-56,58-75
+  s_d918463020569b::t_875790048d1ca9 22-25,50,57
+tests/unit/scripts/ci-local.spec.ts
+  s_d918463020569b::t_93e918963df164 9-10
+package.json
+  s_d918463020569b::t_ac0231756213a6 100
+scripts/ci-local.mjs
+  s_d918463020569b::t_187918b9e3ef2b 2-6,12,15-16,18,20-22,25-36,45-53,57-67,115-116,118,122-125,127-128
+tests/unit/scripts/ci-plan.spec.ts
+  s_d918463020569b::t_38ef970e8e7717 1-35,39-45,49-97
+  s_d918463020569b::t_875790048d1ca9 46-48
+  s_d918463020569b::t_709260fe00faae 36-38
+scripts/docker/ci-linux.Dockerfile
+  s_d918463020569b::t_d910c2569ea93d 7
+  s_d918463020569b::t_90f84444587ade 1-6,8-12
+package-lock.json
+  s_d918463020569b::t_b9937e7fed2925 53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e64bb4ddc4e1315de958bcb3eeb366e473f47453",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
