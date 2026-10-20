@@ -1,0 +1,26 @@
+tests/unit/scripts/ci-local.spec.ts
+  s_d918463020569b::t_d9daeecf1a8bfc 4-10,65-106
+docs/CONTRIBUTING.md
+  s_d918463020569b::t_213498237b1165 67-69
+scripts/ci-local.mjs
+  s_d918463020569b::t_d3679bbf19b987 2-4,7-8,63-83,85-107,109,113,116-119
+  s_d918463020569b::t_8aa20ac1597cfe 9,84
+.husky/pre-push
+  s_d918463020569b::t_d3679bbf19b987 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1d5002f14d674b2e05babd195a7016d3992a5286",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
