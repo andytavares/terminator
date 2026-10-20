@@ -1,0 +1,19 @@
+packages/extension-ui/visual/modal-keys.visual.ts
+  s_d918463020569b::t_a660c2a130e902 45-46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a0e4e1be1d69270de67e74b96f9be9d03d85598c",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
