@@ -87,11 +87,17 @@ function sizeOf(path) {
   return existsSync(path) ? readFileSync(path).length : 0
 }
 
+/** The app's environment: logging on, and in the background (src/main/background-mode.ts), so a
+ * smoke run neither shows a window nor takes focus from whoever is using the machine. */
+export function launchEnvironment(env) {
+  return { ...env, ELECTRON_ENABLE_LOGGING: '1', TERMINATOR_RUN_IN_BACKGROUND: '1' }
+}
+
 function launch([command, args]) {
   const child = spawn(command, args, {
     cwd: REPO_ROOT,
     detached: true,
-    env: { ...process.env, ELECTRON_ENABLE_LOGGING: '1' },
+    env: launchEnvironment(process.env),
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   const run = { child, output: '', exitCode: undefined }

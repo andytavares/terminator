@@ -6,6 +6,7 @@ import {
   bundledExtensionIds,
   electronMainPid,
   errorLines,
+  launchEnvironment,
   mainLogPath,
   startCommand,
   startupProblems,
@@ -155,5 +156,15 @@ describe('mainLogPath', () => {
     expect(mainLogPath({ ...where, platform: 'darwin' })).toBe(
       join(homedir(), 'Library/Logs/Terminator/terminator.log')
     )
+  })
+})
+
+describe('the app the smoke test starts', () => {
+  it('runs in the background, with Electron logging on and the rest of the environment kept', () => {
+    expect(launchEnvironment({ PATH: '/bin' })).toEqual({
+      PATH: '/bin',
+      ELECTRON_ENABLE_LOGGING: '1',
+      TERMINATOR_RUN_IN_BACKGROUND: '1',
+    })
   })
 })
