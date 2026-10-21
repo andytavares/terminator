@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { describeDocument, documentOutcome } from '../../src/line/document-outcome.js'
+import {
+  describeDocument,
+  documentKindOf,
+  documentOutcome,
+} from '../../src/line/document-outcome.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
 import type { Recipe } from '../../src/recipe/parse.js'
 
@@ -67,5 +71,25 @@ describe('describeDocument', () => {
     expect(describeDocument({ path: 'x', url: 'https://e.com', location: 'published' })).toBe(
       'published: x (https://e.com)'
     )
+  })
+})
+
+describe('documentKindOf', () => {
+  it('names a claude.ai artifact link in either of its forms', () => {
+    for (const url of [
+      'https://claude.ai/artifact/YJeSCmFWK1GJC8X9ZXUpVf',
+      'https://claude.ai/code/artifact/5fbea6f3-2c1d-4b8e-9a77-0d4e2b6c1f20',
+    ]) {
+      expect(documentKindOf({ path: '/o/doc.html', url, location: 'published' })).toBe(
+        'claude-artifact'
+      )
+    }
+  })
+
+  it('calls any other published link a link, and a document without one a file', () => {
+    const elsewhere = 'https://claude.ai.example.com/artifact/abc'
+    expect(documentKindOf({ path: 'a.md', url: elsewhere, location: 'published' })).toBe('link')
+    expect(documentKindOf({ path: '/o/a.md', location: 'outputs' })).toBe('file')
+    expect(documentKindOf({ path: 'docs/a.md', location: 'checkout' })).toBe('file')
   })
 })

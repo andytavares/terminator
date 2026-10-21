@@ -13,6 +13,17 @@ export type DocumentOutcome =
   | { readonly kind: 'ready'; readonly where: string }
   | { readonly kind: 'ships' }
 
+/** What a handed-back document is, which decides what every surface calls it and how it opens. */
+export type DocumentKind = 'claude-artifact' | 'link' | 'file'
+
+// Both forms Claude Code hands out: `/artifact/<id>` from a publish, `/code/artifact/<uuid>` in its docs.
+const CLAUDE_ARTIFACT = /^https:\/\/claude\.ai\/(code\/)?artifact\/[\w-]+$/
+
+export function documentKindOf(document: DocumentHandBack): DocumentKind {
+  if (document.url === undefined) return 'file'
+  return CLAUDE_ARTIFACT.test(document.url) ? 'claude-artifact' : 'link'
+}
+
 /** Where a document is, in one line: its place, what it is called, its link. */
 export function describeDocument(document: DocumentHandBack): string {
   return `${document.location}: ${document.path}${document.url === undefined ? '' : ` (${document.url})`}`
