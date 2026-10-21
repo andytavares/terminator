@@ -3,6 +3,7 @@ import { ArrowLeft, Plus, CheckCircle2, AlertCircle, Loader } from 'lucide-react
 import { Button, SegmentedControl } from '@terminator/extension-ui'
 import { GateAnswers } from './GateCard.js'
 import { OrderLinks } from './OrderLinks.js'
+import type { DocumentLink } from '../line/document-outcome.js'
 import { ciLabel } from '../line/ci-label.js'
 import type { CiState } from '../line/ci-state.js'
 import type { Gate, GateOption } from '../gates/rules.js'
@@ -45,6 +46,8 @@ interface OrderRow {
   readonly source: { kind: string; tracker: string | null; key: string | null; url?: string | null }
   /** The pull requests this order opened. */
   readonly pulls?: readonly { readonly number: number; readonly url: string }[]
+  /** The document the author handed back, when it lives outside the checkout. */
+  readonly document?: DocumentLink | null
   /** Where CI stands, with how many of the checks have finished. */
   readonly ci?:
     | (Pick<CiState, 'status' | 'round' | 'max' | 'reason'> & {
@@ -833,6 +836,10 @@ function OrderState({ row }: { readonly row: OrderRow }) {
   )
 }
 
+function hasLinks(row: OrderRow): boolean {
+  return (row.pulls?.length ?? 0) > 0 || row.source.url != null || row.document != null
+}
+
 /** A row's links, and the answers to its open gate, when it has either. */
 function OrderExtras({
   row,
@@ -840,11 +847,12 @@ function OrderExtras({
   onAnswer,
 }: { readonly row: OrderRow } & Pick<OrderListProps, 'answering' | 'onAnswer'>) {
   const gate = row.gate
-  if ((row.pulls?.length ?? 0) === 0 && row.source.url == null && gate == null) return null
+  if (!hasLinks(row) && gate == null) return null
   return (
     <div className="fdry-order-extras">
       <span className="fdry-order-links">
         <OrderLinks
+          document={row.document}
           pulls={row.pulls}
           source={
             row.source.key !== null && row.source.url != null

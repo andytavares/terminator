@@ -209,6 +209,7 @@ describe('foundry:run.observe', () => {
   describe('CI', runChannelsCiTests)
   describe('pull requests', pullRequestsTests)
   describe('no pulls and the ticket', noPullsAndTheTicketTests)
+  describe('the document handed back', documentOnTheFloorTests)
   describe('no CI and skills', noCiAndSkillsTests)
   describe('unresolved skills and no queue', unresolvedSkillsAndNoQueueTests)
   describe('the queue position', runChannelsTheQueuePositionTests)
@@ -1378,5 +1379,28 @@ function theTimelineTests() {
     await freshRunChannels().start({ id: 'WO-1' })
     const r = (await freshRunChannels().timeline({ id: 'WO-1' })) as { gates: unknown[] }
     expect(r.gates).toEqual([])
+  })
+}
+
+function documentOnTheFloorTests() {
+  async function observedDocument(document: WorkOrder['document']): Promise<unknown> {
+    await store.save(order({ document }))
+    await freshRunChannels().start({ id: 'WO-1' })
+    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as { document: unknown }
+    return r.document
+  }
+
+  it('reports a published document with its kind, link and local copy', async () => {
+    const url = 'https://example.com/report'
+    expect(await observedDocument({ path: 'r.md', url, location: 'published' })).toEqual({
+      kind: 'link',
+      url,
+      path: 'r.md',
+    })
+  })
+
+  it('reports none for a document in the checkout, and none handed back', async () => {
+    expect(await observedDocument({ path: 'docs/a.md', location: 'checkout' })).toBeNull()
+    expect(await observedDocument(null)).toBeNull()
   })
 }

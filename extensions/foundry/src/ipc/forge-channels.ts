@@ -6,6 +6,7 @@ import { strikeAssumption } from '../forge/assumptions.js'
 import { applyFindings, acceptFinding } from '../forge/red-team.js'
 import { compileOrder, agreeOrder } from '../order/compile.js'
 import type { OrderStore } from '../order/store.js'
+import { documentLinkOf } from '../line/document-outcome.js'
 import { readStanding } from '../order/standing.js'
 import { orderStandingSources } from '../order/order-standing-sources.js'
 import {
@@ -831,6 +832,7 @@ async function listRow(
     // a pull yet.
     ci: await rowCi(deps, order.id),
     pulls: await rowPulls(deps, order),
+    document: documentLinkOf(order),
     // Where this order stands in the refinery's file-overlap queue.
     // Null when it is not in a queue at all.
     queue: queuePositions.find((position) => position.orderId === order.id) ?? null,

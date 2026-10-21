@@ -2710,6 +2710,23 @@
   min-width: 160px;
 }
 
+.fdry-hall-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fdry-hall-slot > .fdry-hall-card {
+  flex: 1;
+}
+
+.fdry-doc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .fdry-hall-card {
   position: relative;
   display: flex;

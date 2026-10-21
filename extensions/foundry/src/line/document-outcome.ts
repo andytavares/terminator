@@ -24,6 +24,21 @@ export function documentKindOf(document: DocumentHandBack): DocumentKind {
   return CLAUDE_ARTIFACT.test(document.url) ? 'claude-artifact' : 'link'
 }
 
+/** What a surface needs to link to an order's document; none when it lives in the checkout and ships as a pull request. */
+export interface DocumentLink {
+  readonly kind: DocumentKind
+  readonly url: string | null
+  readonly path: string
+}
+
+export function documentLinkOf(order: {
+  readonly document: DocumentHandBack | null
+}): DocumentLink | null {
+  const { document } = order
+  if (document === null || document.location === 'checkout') return null
+  return { kind: documentKindOf(document), url: document.url ?? null, path: document.path }
+}
+
 /** Where a document is, in one line: its place, what it is called, its link. */
 export function describeDocument(document: DocumentHandBack): string {
   return `${document.location}: ${document.path}${document.url === undefined ? '' : ` (${document.url})`}`

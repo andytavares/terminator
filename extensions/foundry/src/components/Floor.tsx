@@ -25,7 +25,7 @@ import { Button, IconButton, Markdown, RelativeTime, usePolling } from '@termina
 import { usePushed } from '../renderer/use-pushed.js'
 import { openInBrowser } from '@terminator/extension-sdk/renderer'
 import { ExternalLink } from './ExternalLink.js'
-import { OrderLinks } from './OrderLinks.js'
+import { DocumentActions, OrderLinks } from './OrderLinks.js'
 import { attachTo } from '../renderer/attach-to-step.js'
 import {
   useRunObservation,
@@ -569,10 +569,11 @@ interface FloorLinksProps {
 function FloorLinks({ view, reviewable, review }: FloorLinksProps) {
   const pulls = view.pulls ?? []
   const source = view.source ?? null
-  if (pulls.length === 0 && source === null) return null
+  const document = view.document ?? null
+  if (pulls.length === 0 && source === null && document === null) return null
   return (
     <p className="fdry-order-links">
-      <OrderLinks pulls={pulls} source={source} />
+      <OrderLinks document={document} pulls={pulls} source={source} />
       {pulls.map((pull) => (
         <Button
           key={pull.url}
@@ -622,6 +623,7 @@ function StandingBand({ floor, view }: PageProps) {
     >
       <StandingHead standing={standing} />
       <StandingBar standing={standing} />
+      <DoneDocument standing={standing} view={view} />
       <LiveAgents floor={floor} view={view} />
       <StrandedGate floor={floor} view={view} />
       <AdriftGate floor={floor} view={view} />
@@ -630,6 +632,14 @@ function StandingBand({ floor, view }: PageProps) {
           A check that names a problem and offers no reachable control is a
           wall: this one was answerable only from a tab the operator had no
           reason to connect to the run they were looking at. */}
+      <WaitingGates floor={floor} view={view} />
+    </section>
+  )
+}
+
+function WaitingGates({ floor, view }: PageProps) {
+  return (
+    <>
       {(view.waiting ?? []).map((gate) => (
         <GateCard
           key={gate.id}
@@ -637,11 +647,23 @@ function StandingBand({ floor, view }: PageProps) {
           busy={floor.busy}
           pulls={view.pulls ?? []}
           source={view.source ?? null}
+          document={view.document ?? null}
           onDecide={(option, limit) => void floor.decideGate(gate.id, option, limit)}
         />
       ))}
-    </section>
+    </>
   )
+}
+
+function DoneDocument({
+  standing,
+  view,
+}: {
+  readonly standing: StandingOf
+  readonly view: FloorView
+}) {
+  if (standing.kind !== 'done' || !view.document) return null
+  return <DocumentActions document={view.document} />
 }
 
 function StandingHead({ standing }: { readonly standing: StandingOf }) {

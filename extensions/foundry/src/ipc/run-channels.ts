@@ -17,6 +17,7 @@ import type { WorkOrder } from '../order/schema.js'
 import { readStanding } from '../order/standing.js'
 import { runDocumentReady, runFailure } from '../line/run-outcome.js'
 import { skillsFor } from '../line/executor.js'
+import { documentLinkOf } from '../line/document-outcome.js'
 import { gradeInWords } from '../runtime/review/risk-grade.js'
 import { createRoleRegistry } from '../line/roles.js'
 import { readCiState } from '../line/ci-state.js'
@@ -496,6 +497,7 @@ async function observe(deps: RunDeps, payload: z.infer<typeof ObservePayload>): 
     ci: await readCiState(deps.dataRoot(), id),
     pulls: await observedPulls(deps, id),
     source: ticketOf(order),
+    document: order === null ? null : documentLinkOf(order),
     // What the operator called it. The surface's heading was the order id
     // and the recipe name — two identifiers nobody chose — so the screen
     // showing a run never said which piece of work it was.
