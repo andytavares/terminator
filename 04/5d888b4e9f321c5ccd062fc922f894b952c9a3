@@ -1,0 +1,21 @@
+extensions/foundry/src/line/run-control.ts
+  s_42e5fd6fba2257::t_5629b0e54d066d 60-64
+extensions/foundry/src/runtime/artifact-publishes.ts
+  s_42e5fd6fba2257::t_5629b0e54d066d 40-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "045d888b4e9f321c5ccd062fc922f894b952c9a3",
+  "prompts": {},
+  "sessions": {
+    "s_42e5fd6fba2257": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3af22355-9a92-4690-ab26-a4c5166b6c02",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
