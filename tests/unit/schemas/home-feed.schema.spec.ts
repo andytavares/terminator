@@ -60,3 +60,23 @@ describe('ThreadFacetSchema: a merged pull request', () => {
     expect(ThreadFacetSchema.safeParse({ ...open, checksMinutes: 'long' }).success).toBe(false)
   })
 })
+
+describe('ThreadFacetSchema: links', () => {
+  const [open] = fullFeed().facets
+  const link = { label: 'Open artifact', url: 'https://claude.ai/artifact/abc' }
+
+  it('accepts up to four labelled links, and a facet without any', () => {
+    expect(ThreadFacetSchema.parse({ ...open, links: [link] }).links).toEqual([link])
+    expect(ThreadFacetSchema.safeParse(open).success).toBe(true)
+    expect(ThreadFacetSchema.safeParse({ ...open, links: Array(5).fill(link) }).success).toBe(false)
+  })
+
+  it('rejects a link with no label or an address that is not a URL', () => {
+    expect(ThreadFacetSchema.safeParse({ ...open, links: [{ ...link, label: '' }] }).success).toBe(
+      false
+    )
+    expect(
+      ThreadFacetSchema.safeParse({ ...open, links: [{ ...link, url: 'nope' }] }).success
+    ).toBe(false)
+  })
+})

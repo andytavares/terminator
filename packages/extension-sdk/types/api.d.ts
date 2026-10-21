@@ -338,6 +338,8 @@ export interface ThreadFacet {
   line: string
   tone: 'neutral' | 'good' | 'bad' | 'waiting'
   url?: string
+  /** Where the thread's result is, as buttons on its drawer (since 5.1.0). */
+  links?: { label: string; url: string }[]
   closedAt: string | null
   checks?: { name: string; state: 'passed' | 'failed' | 'running'; detail?: string }[]
   /** What a merged pull request's timeline measured (ISO times; minutes for checks). */

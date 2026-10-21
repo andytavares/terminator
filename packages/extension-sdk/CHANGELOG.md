@@ -1,5 +1,12 @@
 # Changelog — @terminator/extension-sdk
 
+## 5.1.0
+
+### Added
+
+- `ThreadFacet.links`: up to four `{ label, url }` buttons on the thread's drawer in Home, for
+  where the work's result is (Foundry publishes a research order's artifact this way).
+
 ## 5.0.0
 
 Major, because a view's file watch changed owner (see Changed (breaking)): a view that relied on

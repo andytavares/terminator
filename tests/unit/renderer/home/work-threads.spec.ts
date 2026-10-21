@@ -349,3 +349,22 @@ describe('groupThreads: order', () => {
     expect(order({ a: 1, b: 5 })).toEqual(['b', 'a'])
   })
 })
+
+describe('thread links', () => {
+  const artifact = { label: 'Open artifact', url: 'https://claude.ai/artifact/abc' }
+
+  it("carries every facet's links, once per address", () => {
+    const duplicate = { label: 'Artifact again', url: artifact.url }
+    const other = { label: 'Open document', url: 'https://example.com/doc' }
+    const [thread] = buildWorkThreads(
+      input({
+        facets: [facet({ links: [artifact] }), facet({ kind: 'order', links: [duplicate, other] })],
+      })
+    )
+    expect(thread.links).toEqual([artifact, other])
+  })
+
+  it('has none when no facet publishes any', () => {
+    expect(buildWorkThreads(input({ facets: [facet()] }))[0].links).toEqual([])
+  })
+})

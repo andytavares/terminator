@@ -247,3 +247,29 @@ describe('measures', () => {
     expect(feedOf([]).measures.map((m) => m.id)).toEqual(['orders-shipped'])
   })
 })
+
+describe('facet links', () => {
+  const shipped = (document: WorkOrder['document']) =>
+    orderRow({
+      order: orderOnBranch('WO-1', { status: 'shipped', document }),
+      closedAt: '2026-10-18T10:00:00.000Z',
+    })
+
+  it('links a Claude artifact the order ended on', () => {
+    const url = 'https://claude.ai/artifact/abc'
+    const feed = feedOf([shipped({ path: 'findings.html', url, location: 'published' })])
+    expect(feed.facets[0].links).toEqual([{ label: 'Open artifact', url }])
+  })
+
+  it('links any other document with a link as a document', () => {
+    const url = 'https://example.com/report'
+    const feed = feedOf([shipped({ path: 'report.md', url, location: 'published' })])
+    expect(feed.facets[0].links).toEqual([{ label: 'Open document', url }])
+  })
+
+  it('publishes no links for a document with no link, or no document', () => {
+    const file = shipped({ path: 'report.md', location: 'outputs' })
+    expect(feedOf([file]).facets[0].links).toBeUndefined()
+    expect(feedOf([orderRow()]).facets[0].links).toBeUndefined()
+  })
+})
