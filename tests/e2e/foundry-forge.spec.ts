@@ -233,18 +233,23 @@ const SCROLL_EVERYTHING = `(function () {
       }
     })()`
 
-/** The open step does not decide how long the page is: the frame bounds it, whatever it holds. */
-async function expectStepWithinFrame(): Promise<void> {
-  const step = await inFoundry<{ height: number; viewport: number } | null>(
-    handle,
-    `(function () {
-      var el = document.querySelector('.fdry-main')
+/** Run in Foundry's view: the open step's height and the window's, or null before it draws. */
+const STEP_SIZE = `(function () {
+      var el = document.querySelector('section[aria-labelledby="fdry-step-h"]')
       if (!el) return null
       return { height: Math.round(el.getBoundingClientRect().height), viewport: window.innerHeight }
     })()`
-  )
-  expect(step, 'the Forge step did not render').not.toBeNull()
-  expect(step && step.height).toBeLessThanOrEqual((step as { viewport: number }).viewport)
+
+/** The open step does not decide how long the page is: the frame bounds it, whatever it holds. */
+async function expectStepWithinFrame(): Promise<void> {
+  // The order's controls draw before the Forge has read the order ("Loading the order…"),
+  // so the step is waited for, not read once after the controls appear.
+  const step = () => inFoundry<{ height: number; viewport: number } | null>(handle, STEP_SIZE)
+  await expect
+    .poll(step, { timeout: 15_000, message: 'the Forge step did not render' })
+    .not.toBeNull()
+  const drawn = (await step()) as { height: number; viewport: number }
+  expect(drawn.height).toBeLessThanOrEqual(drawn.viewport)
 }
 
 /** Runs `check` with the main window at `width` x `height`, restoring its size afterwards. */
