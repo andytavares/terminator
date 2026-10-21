@@ -1,0 +1,62 @@
+extensions/remote-control/package.json
+  s_42e5fd6fba2257::t_a6458570db2467 12
+src/renderer/home/work-threads.ts
+  s_42e5fd6fba2257::t_b880c02a2879ea 10,21-22,289-296,303
+package.json
+  s_42e5fd6fba2257::t_a6458570db2467 64
+extensions/foundry/tests/home/feed.spec.ts
+  s_42e5fd6fba2257::t_4182a85ccfc9ef 250-275
+tests/unit/schemas/home-feed.schema.spec.ts
+  s_42e5fd6fba2257::t_4182a85ccfc9ef 63-77,81-82
+  s_42e5fd6fba2257::t_5eb559019a87ed 78-80
+extensions/task-vault/package.json
+  s_42e5fd6fba2257::t_a6458570db2467 10
+extensions/foundry/package.json
+  s_42e5fd6fba2257::t_a6458570db2467 10
+tests/unit/renderer/components/ThreadDrawer.spec.tsx
+  s_42e5fd6fba2257::t_4182a85ccfc9ef 116-117,119-134
+  s_42e5fd6fba2257::t_5eb559019a87ed 118
+  s_42e5fd6fba2257::t_afd78627ce5b77 6,9,31,50
+  s_42e5fd6fba2257::t_6abc1489ea0a63 135-136
+tests/unit/renderer/home/work-threads.spec.ts
+  s_42e5fd6fba2257::t_4182a85ccfc9ef 352-370
+src/shared/schemas/home-feed.schema.ts
+  s_42e5fd6fba2257::t_5eb559019a87ed 39-42
+  s_42e5fd6fba2257::t_b880c02a2879ea 38
+src/renderer/components/home/ThreadDrawer.tsx
+  s_42e5fd6fba2257::t_b880c02a2879ea 35-39
+extensions/foundry/src/home/feed.ts
+  s_42e5fd6fba2257::t_b880c02a2879ea 6,140,147-150
+  s_42e5fd6fba2257::t_ee8d472f994f08 151-152
+packages/extension-sdk/CHANGELOG.md
+  s_42e5fd6fba2257::t_b880c02a2879ea 3-9
+packages/extension-sdk/README.md
+  s_42e5fd6fba2257::t_b880c02a2879ea 6
+extensions/notepad/package.json
+  s_42e5fd6fba2257::t_a6458570db2467 29
+extensions/git-integration/package.json
+  s_42e5fd6fba2257::t_a6458570db2467 16
+packages/extension-sdk/package.json
+  s_42e5fd6fba2257::t_b880c02a2879ea 3
+packages/extension-sdk/types/api.d.ts
+  s_42e5fd6fba2257::t_b880c02a2879ea 341
+  s_42e5fd6fba2257::t_5eb559019a87ed 342
+package-lock.json
+  s_42e5fd6fba2257::t_d3f7c8dd021f24 17,72,94,130,147,165,16765
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6446c00c225f4598acd7e45f5101ea2209df764d",
+  "prompts": {},
+  "sessions": {
+    "s_42e5fd6fba2257": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3af22355-9a92-4690-ab26-a4c5166b6c02",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
