@@ -40,7 +40,7 @@ export function OrderLinks({
 }
 
 /** Opens a document where it belongs: a link in the browser, a file with the system's own opener. */
-export function openDocument(document: DocumentLink): void {
+function openDocument(document: DocumentLink): void {
   if (document.url !== null) openInBrowser(document.url)
   else void window.electronAPI.shell.openPath(document.path)
 }
