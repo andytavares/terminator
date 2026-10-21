@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { IssueDrawer } from '../../../../src/renderer/components/integrations/IssueDrawer'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import type { Issue, IssueLink } from '../../../../src/shared/types/index'
+import { classesStyledFor, unstyledClasses } from './loaded-stylesheets'
 
 const P = '11111111-1111-4111-8111-111111111111'
 
@@ -322,5 +323,13 @@ describe('IssueDrawer — failures that say nothing of their own', () => {
   it('says nothing of when an issue was updated if the tracker did not say', async () => {
     await setupSettled({ issue: issue({ updatedAt: '' }) })
     expect(screen.queryByText(/updated/)).toBeNull()
+  })
+})
+
+describe('IssueDrawer — styling', () => {
+  it('styles every class it draws from a sheet loaded with it, without Settings', async () => {
+    const { container } = await setupSettled()
+    const styled = classesStyledFor('src/renderer/components/integrations/IssueDrawer.tsx')
+    expect(unstyledClasses(container, styled)).toEqual([])
   })
 })

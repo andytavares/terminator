@@ -2,6 +2,7 @@ import React from 'react'
 import { Markdown, RelativeTime } from '@terminator/extension-ui'
 import { TRACKER_LABELS } from './use-issue-search'
 import type { Issue, TrackerId } from '../../../shared/types/index'
+import './issue-sections.css'
 
 // The sections of an issue that the drawer and Home's details view both render.
 // Issue text is written by anyone who can comment on the ticket, so it renders

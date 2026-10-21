@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { ExternalLink, RefreshCw } from 'lucide-react'
-import { Kbd } from '@terminator/extension-ui'
+import { Button, Kbd } from '@terminator/extension-ui'
 import { useStartWorkStore } from '../home/start-work'
 import { ERROR_TEXT, TRACKER_LABELS } from './use-issue-search'
 import { CommentsSection, IssueDescriptionSection, IssueTags } from './issue-sections'
@@ -160,18 +160,18 @@ function DetailsActions({ issue, label, act }: DetailsActionsProps) {
   }
   return (
     <div className="issue-details__actions">
-      <button
-        className="ext-btn"
+      <Button
+        icon={ExternalLink}
         onClick={() => void window.electronAPI.shell.openExternal(issue.url)}
       >
-        <ExternalLink /> Open in {label}
-      </button>
-      <button className="ext-btn" onClick={act.refresh}>
-        <RefreshCw /> Refresh
-      </button>
-      <button className="ext-btn" onClick={startLauncher}>
+        Open in {label}
+      </Button>
+      <Button icon={RefreshCw} onClick={act.refresh}>
+        Refresh
+      </Button>
+      <Button variant="primary" onClick={startLauncher}>
         Start work
-      </button>
+      </Button>
     </div>
   )
 }
