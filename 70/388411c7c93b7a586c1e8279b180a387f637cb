@@ -1,0 +1,19 @@
+.github/dependabot.yml
+  s_a02c76f4241487::t_bf0a8d3c737e5d 8-9,11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "70388411c7c93b7a586c1e8279b180a387f637cb",
+  "prompts": {},
+  "sessions": {
+    "s_a02c76f4241487": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ae3c4244-2e42-407a-aeca-77b308bb1303",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
