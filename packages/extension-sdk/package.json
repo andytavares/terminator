@@ -41,7 +41,7 @@
     "zod": "3.23.8"
   },
   "devDependencies": {
-    "vite": "7.3.5"
+    "vite": "7.3.7"
   },
   "license": "MIT"
 }
