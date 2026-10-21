@@ -140,4 +140,7 @@ export interface NewIssueInput {
   readonly teamId: string
   readonly title: string
   readonly description: string
+  /** The user the issue is assigned to, found by email. Null leaves it unassigned. Set by the
+   * service from the configured assignee, so callers never pass it. */
+  readonly assigneeEmail?: string | null
 }
