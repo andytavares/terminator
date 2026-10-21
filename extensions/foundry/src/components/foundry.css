@@ -585,7 +585,7 @@
 
 .fdry-opt {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
+  grid-template-columns: 14px minmax(0, 1fr);
   gap: 10px;
   align-items: start;
   padding: 10px 12px;
@@ -609,12 +609,10 @@
   outline-offset: 1px;
 }
 
-/* The row owns the border; the shared text-field rule below must not box the radio too. */
+/* The design system draws the radio; the text-field rule below must not stretch it. */
 .fdry-fnd .fdry-opt input {
-  width: auto;
+  width: 14px;
   margin: 2px 0 0;
-  padding: 0;
-  accent-color: var(--tm-accent);
 }
 
 .fdry-opt-text {
