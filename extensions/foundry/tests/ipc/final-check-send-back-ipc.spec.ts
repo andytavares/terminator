@@ -87,7 +87,9 @@ async function seedFailedFinalCheck(gates: readonly Gate[]): Promise<void> {
 
 /** The graph once the executor the resume hands it to has started the reopened nodes. */
 async function graphOnceSentBack(): Promise<RunGraph> {
-  await vi.waitFor(() => expect(theRunner.start).toHaveBeenCalled())
+  // The resume runs after decide returns; awaiting the runner's own start has no clock to
+  // lose a race with on a slow machine, which a polled one-second waitFor did.
+  await runnerStarted
   return JSON.parse(fs.readFileSync(path.join(orderFolder(), 'run-graph.json'), 'utf8')) as RunGraph
 }
 
@@ -100,10 +102,18 @@ beforeAll(async () => {
   await activateFoundry(host)
 })
 
+/** Settles when the executor first starts an agent in this test. */
+let runnerStarted: Promise<void> = Promise.resolve()
+
 beforeEach(() => {
   orderId = `WO-${++orders}`
   theRunner.start.mockReset()
-  theRunner.start.mockImplementation(() => new Promise(() => {}))
+  runnerStarted = new Promise((started) => {
+    theRunner.start.mockImplementation(() => {
+      started()
+      return new Promise(() => {})
+    })
+  })
 })
 
 describe('sending a failed final check back', () => {
