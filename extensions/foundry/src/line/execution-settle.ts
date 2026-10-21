@@ -66,7 +66,13 @@ async function collectRung(run: Execution, ran: Ran): Promise<DocumentHandBack |
   if (outputPath === null || roleId === null) return null
   // The session this turn ran in: `node` is the graph as it was before the launch.
   const collected = await run.deps
-    .collect({ nodeId: node.id, role: roleId, outputPath, sessionId: result.sessionId })
+    .collect({
+      nodeId: node.id,
+      role: roleId,
+      outputPath,
+      sessionId: result.sessionId,
+      lane: node.lane,
+    })
     // Never fatal, for the reason `persist` is not: a run that cannot file
     // what a rung wrote is still a run.
     .catch(() => null)

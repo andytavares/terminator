@@ -145,7 +145,7 @@ async function recordLineEntry(
 async function collectRungOutput(
   context: RunContext,
   roleRegistry: RoleRegistry,
-  { nodeId, role, outputPath, sessionId }: Parameters<ExecutorDeps['collect']>[0]
+  { nodeId, role, outputPath, sessionId, lane }: Parameters<ExecutorDeps['collect']>[0]
 ): Promise<RungCollection | null> {
   const { store, order } = context
   const current = (await store.load(order.id)) ?? order
@@ -167,7 +167,7 @@ async function collectRungOutput(
   }
 
   const { note, defect, document } = result
-  if (!(await confirmPublished(context, { nodeId, sessionId, document }))) {
+  if (!(await confirmPublished(context, { nodeId, sessionId, lane, document }))) {
     await recordRungRefused(context, { role, nodeId, reason: UNPUBLISHED_REFUSAL })
     return null
   }
@@ -183,13 +183,16 @@ const UNPUBLISHED_REFUSAL =
 // remembered or invented URL otherwise reaches the operator as a dead link.
 async function confirmPublished(
   context: RunContext,
-  { nodeId, sessionId, document }: PublishClaim
+  { nodeId, sessionId, lane, document }: PublishClaim
 ): Promise<boolean> {
   if (document?.location !== 'published') return true
   const url = document.url
-  const publishes = [...context.checkouts.values()].flatMap((checkout) =>
-    sessionId === null ? [] : readPublishedArtifacts(transcriptPathFor(checkout.path, sessionId))
-  )
+  // The session ran in its own lane's checkout, so only that transcript can hold its publish.
+  const checkout = context.checkouts.get(lane ?? 1)
+  const publishes =
+    sessionId === null || checkout === undefined
+      ? []
+      : readPublishedArtifacts(transcriptPathFor(checkout.path, sessionId))
   const named = (publish: PublishedArtifact): boolean =>
     publish.url === url && (!isAbsolute(document.path) || publish.path === document.path)
   if (publishes.some(named)) return true
@@ -204,6 +207,7 @@ async function confirmPublished(
 interface PublishClaim {
   readonly nodeId: string
   readonly sessionId: string | null
+  readonly lane: number | null
   readonly document: DocumentHandBack | null
 }
 

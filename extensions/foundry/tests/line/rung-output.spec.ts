@@ -107,6 +107,14 @@ function declaringTests() {
     expect(text).toContain('`published`')
     expect(text).toContain('link the tool returned')
   })
+
+  it('keeps `published` for a Claude artifact, and sends any other destination to outputs', () => {
+    const text = rungOutputContract('/data/orders/WO-1/rungs/write.json', AUTHOR, {
+      outputsDir: '/data/orders/WO-1/outputs',
+    })
+    expect(text).toContain('`published` is only for a page you published with the Artifact tool')
+    expect(text).not.toContain('put it somewhere else and have a link for it')
+  })
 }
 
 function rungOutputAcceptingTests() {

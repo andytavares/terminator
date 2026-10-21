@@ -1,3 +1,4 @@
+import { issuesPortFor } from '../trackers/issues-port.js'
 import { noPayload } from '@terminator/extension-sdk'
 
 import { orderDir } from '../data-root.js'
@@ -50,7 +51,7 @@ export function registerInboxChannels(
     foundryChannel('foundry:inbox.list', noPayload, async () => {
       // Before the list is composed, not after: a run the last application left
       // in flight has to be on it the first time it is read, not the second.
-      await adoptInterruptedRuns(context.dataRoot())
+      await adoptInterruptedRuns(context.dataRoot(), issuesPortFor(context.api))
       return inbox.list()
     }),
     foundryChannel('foundry:inbox.decide', DecidePayload, inbox.decide)
@@ -258,7 +259,7 @@ function registerAttention(
     foundryChannel('foundry:attention', noPayload, async () => {
       // The chrome polls this from launch, the earliest place to notice a run the last
       // process left behind: seconds after opening rather than hours later.
-      await adoptInterruptedRuns(dataRoot())
+      await adoptInterruptedRuns(dataRoot(), issuesPortFor(api))
       const { orders, waiting } = await readLiveStandings(dataRoot, standingSources)
       return countAttention({
         gates: await attentionGates.list(),

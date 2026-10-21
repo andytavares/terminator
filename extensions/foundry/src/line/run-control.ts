@@ -4,6 +4,10 @@ import { orderStoreAt, gateStoreAt, readGraph } from '../state/live-index.js'
 import { runtime, isLiveSession } from '../runtime/runtime-state.js'
 import type { RunNode } from './run-graph.js'
 import type { OrderStore } from '../order/store.js'
+import type { WorkOrder } from '../order/schema.js'
+import type { IssuesPort } from '../trackers/write-back.js'
+import { writeBack } from '../trackers/write-back.js'
+import { writeBackDepsFor } from '../trackers/issues-port.js'
 
 // The orders this process's executor drives. A node is `running` a moment before its
 // agent reports a session, looking like one whose agent is gone; reclaiming it would
@@ -55,13 +59,17 @@ export async function stopOrder(root: string, orderId: string, reason: string): 
 
 // A run that ended on a ready document before it settled the order left it `running`
 // for good: nothing else is coming to finish it.
-export async function settleFinishedDocuments(store: OrderStore): Promise<void> {
+export async function settleFinishedDocuments(
+  store: OrderStore,
+  settled: (order: WorkOrder) => Promise<void> = async () => {}
+): Promise<void> {
   for (const order of await store.list()) {
     if (order.status !== 'running') continue
     const entries = await store.entries(order.id)
     const lastRunEntry = entries.filter((entry) => entry.action.startsWith('run.')).at(-1)
     if (lastRunEntry?.action !== 'run.document_ready') continue
-    await store.save({ ...order, status: 'shipped' })
+    const shipped: WorkOrder = { ...order, status: 'shipped' }
+    await store.save(shipped)
     await store.record({
       at: new Date().toISOString(),
       orderId: order.id,
@@ -71,18 +79,19 @@ export async function settleFinishedDocuments(store: OrderStore): Promise<void> 
       reason: 'its run ended on a ready document',
       evidence: [],
     })
+    await settled(shipped)
   }
 }
 
 // What the last application left behind, said the first time this one looks at a
 // records location: an agent's terminal dies with its process, while the graph goes
 // on saying `running`. Per records location, which follows the workspace.
-export async function adoptInterruptedRuns(root: string): Promise<void> {
+export async function adoptInterruptedRuns(root: string, issues: IssuesPort): Promise<void> {
   if (adoptedRoots.has(root)) return
   adoptedRoots.add(root)
 
   const store = orderStoreAt(root)
-  await settleFinishedDocuments(store)
+  await settleFinishedDocuments(store, (order) => toldDocumentReady(root, order, issues))
   const orders = await store.list()
   const onDisk = await Promise.all(
     orders.map(async (order) => ({ order, graph: await readGraph(root, order.id) }))
@@ -104,4 +113,14 @@ export async function adoptInterruptedRuns(root: string): Promise<void> {
       evidence: [],
     })
   }
+}
+
+// The ticket hears what a run that finished in this process would have told it.
+async function toldDocumentReady(root: string, order: WorkOrder, issues: IssuesPort) {
+  if (order.document === null) return
+  await writeBack(
+    order,
+    { event: 'document_ready', document: order.document },
+    writeBackDepsFor(root, order, issues)
+  )
 }

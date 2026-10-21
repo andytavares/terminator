@@ -235,14 +235,16 @@ function documentGuide(outputsDir: string | undefined): string[] {
     'wrote it in the repository, which ships as a pull request; `outputs` when',
     'you wrote it to the order\u2019s own directory',
     ...(outputsDir === undefined ? [] : [`(\`${outputsDir}\`), which ships nothing;`]),
-    'and `published` when you put it somewhere else and have a link for it. Give',
-    'that link as `url`. When the order names a target outside the checkout, or',
-    'in another repository, write the document to outputs and say so here.',
+    'and `published` when you published it as a Claude artifact. When the order',
+    'names a target outside the checkout, or in another repository, write the',
+    'document to outputs and say so here.',
     '',
     'When you can, write the document as an HTML page in the outputs directory and',
     'publish it with the Artifact tool. Hand back `published`, with `path` set to',
     'that file and `url` set to the link the tool returned. If the publish fails,',
     'because there is no claude.ai sign-in, hand back `outputs` instead.',
+    '`published` is only for a page you published with the Artifact tool: a link',
+    'from anywhere else is refused, so name that place in your note instead.',
   ]
 }
 

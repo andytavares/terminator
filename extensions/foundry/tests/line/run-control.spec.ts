@@ -45,6 +45,16 @@ describe('settling runs that ended on a ready document', () => {
     expect(settled?.reason).toBe('its run ended on a ready document')
   })
 
+  it('tells the ticket about each order it settles, as a finished run would', async () => {
+    await runningOrder('WO-4', ['run.started', 'run.document_ready'])
+    await runningOrder('WO-5', ['run.started'])
+    const told: string[] = []
+    await settleFinishedDocuments(store, async (order) => {
+      told.push(`${order.id}:${order.status}`)
+    })
+    expect(told).toEqual(['WO-4:shipped'])
+  })
+
   it('leaves a run that went on after the document alone', async () => {
     await runningOrder('WO-2', ['run.document_ready', 'run.started'])
     await settleFinishedDocuments(store)

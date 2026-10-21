@@ -413,10 +413,20 @@ function nothingWrittenTests() {
         role: 'scout',
         outputPath: outputPath(),
         sessionId: null,
+        lane: null,
       })
     ).toBeNull()
   })
 }
+
+/** What collecting the scout's rung is handed: it ran in no session this spec started. */
+const scoutCollecting = () => ({
+  nodeId: 'scout',
+  role: 'scout',
+  outputPath: outputPath(),
+  sessionId: null,
+  lane: null,
+})
 
 function whatItWroteTests() {
   it('goes onto the order when it is readable', async () => {
@@ -425,7 +435,7 @@ function whatItWroteTests() {
       outputPath(),
       JSON.stringify({ findings: { entryPoints: ['src/theme.ts'] }, note: 'read it' })
     )
-    const input = { nodeId: 'scout', role: 'scout', outputPath: outputPath(), sessionId: null }
+    const input = scoutCollecting()
     const collected = await deps.collect(input)
     expect(collected?.note).toBe('read it')
     expect((await createOrderStore(root).load('WO-1'))?.context.entryPoints).toEqual([
@@ -436,7 +446,7 @@ function whatItWroteTests() {
   it('is refused on the record when it is not readable', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     fs.writeFileSync(outputPath(), 'not json')
-    const input = { nodeId: 'scout', role: 'scout', outputPath: outputPath(), sessionId: null }
+    const input = scoutCollecting()
     expect(await deps.collect(input)).toBeNull()
     expect(await ledgerActions(root)).toContain('rung.refused')
   })
@@ -473,10 +483,10 @@ function sessionPublished(sessionId: string, url: string): void {
   )
 }
 
-async function collectAuthor() {
+async function collectAuthor(lane: number | null = 1) {
   const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
   const input = { nodeId: 'author', role: 'author', outputPath: authorOutput() }
-  return deps.collect({ ...input, sessionId: 'sess-1' })
+  return deps.collect({ ...input, sessionId: 'sess-1', lane })
 }
 
 const savedDocument = async () => (await createOrderStore(root).load('WO-1'))?.document
@@ -497,6 +507,12 @@ function publishedDocumentTests() {
       expect.arrayContaining(['document.link_unconfirmed', 'rung.refused'])
     )
     expect(await savedDocument()).toBeNull()
+  })
+
+  it('reads only the transcript in the author’s own lane', async () => {
+    sessionPublished('sess-1', PUBLISHED_LINK)
+    handBack(PUBLISHED_LINK)
+    expect(await collectAuthor(2)).toBeNull()
   })
 
   it('is refused when the session left no transcript', async () => {
