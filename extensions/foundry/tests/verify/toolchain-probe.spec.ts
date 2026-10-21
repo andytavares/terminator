@@ -35,6 +35,7 @@ describe('probeToolchain', () => {
   describe('coverage and configs', coverageAndConfigsTests)
   describe('other languages', otherLanguagesTests)
   describe('tool configs', toolConfigsTests)
+  describe('python tools', pythonToolsTests)
   describe('go', goTests)
   describe('makefiles and CI', makefilesAndCiTests)
   describe('precedence and e2e', precedenceAndE2eTests)
@@ -134,6 +135,32 @@ function toolConfigsTests() {
     write('vitest.config.ts', 'export default {}')
     write('Cargo.toml', '[package]\nname = "x"\n')
     expect(probeToolchain(repo).coverage).toBeNull()
+  })
+}
+
+function pythonToolsTests() {
+  it('reads pytest and ruff from their own config files, not only from a pyproject', () => {
+    write('pytest.ini', '[pytest]\ntestpaths = tests/\n')
+    write('ruff.toml', 'line-length = 100\n')
+    const t = probeToolchain(repo)
+    expect(t.test).toEqual({ command: 'pytest', source: 'config' })
+    expect(t.lint).toEqual({ command: 'ruff check .', source: 'config' })
+    expect(t.format).toEqual({ command: 'ruff format --check .', source: 'config' })
+  })
+
+  it('reads pytest from setup.cfg and tox.ini only where they have a pytest section', () => {
+    write('setup.cfg', '[tool:pytest]\naddopts = -q\n')
+    expect(probeToolchain(repo).test?.command).toBe('pytest')
+    fs.rmSync(path.join(repo, 'setup.cfg'))
+    write('tox.ini', '[flake8]\nmax-line-length = 100\n')
+    expect(probeToolchain(repo).test).toBeNull()
+    write('tox.ini', '[pytest]\naddopts = -q\n')
+    expect(probeToolchain(repo).test?.command).toBe('pytest')
+  })
+
+  it('reads ruff from a pyproject that configures it', () => {
+    write('pyproject.toml', '[tool.ruff]\nline-length = 100\n')
+    expect(probeToolchain(repo).lint?.command).toBe('ruff check .')
   })
 }
 

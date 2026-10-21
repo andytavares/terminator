@@ -676,6 +676,14 @@ function bugfixDetail(baseline: Baseline): string {
   return built ? `${starts} It builds.` : starts
 }
 
+/** Shapes that ship a document and never build or test anything. */
+const SHAPES_THAT_RUN_NO_CODE: readonly (string | null)[] = ['research']
+
+/** Nothing was measured, and the shape has no use for a measurement. */
+function nothingToMeasure(baseline: Baseline, shapeName: string | null): boolean {
+  return baseline.steps.length === 0 && SHAPES_THAT_RUN_NO_CODE.includes(shapeName)
+}
+
 function waivedRow(environment: EnvironmentFacts, waivedAt: string, clock: Clock): Row {
   const branch = environment.baseline?.baseBranch ?? 'the base branch'
   const detail = `You handed off without it at ${clock(waivedAt)}. Checks that fail on ${branch} will read “failing on base”.`
@@ -697,6 +705,12 @@ function checkedRow(baseline: Baseline, proving: boolean, shapeName: string | nu
   }
   if (baseline.state === 'proven') return row('passed', provenDetail(baseline))
   if (bugfixStartsHere(baseline, shapeName)) return row('passed', bugfixDetail(baseline))
+  if (nothingToMeasure(baseline, shapeName)) {
+    return row(
+      'passed',
+      `Nothing to measure on ${baseline.baseBranch}, and this shape runs no code.`
+    )
+  }
   return row('failing', failedDetail(baseline))
 }
 

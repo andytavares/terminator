@@ -4,8 +4,7 @@ description: Reproduce first, then fix, then prove the reproduction flips.
 # A root cause is the thing effort buys. A fix at the default is the fix
 # that makes the reproduction pass without finding why it failed.
 effort: high
-requires:
-  - toolchain: test
+requires: []
 ci:
   # A red CI goes back to the lane's builder with the failed logs twice, then to you.
   rounds: 2
@@ -34,10 +33,12 @@ steps:
     after: [fix]
     onFail: { rework: fix, max: 1 }
 
-  # And now it has to pass. The pair is the proof.
+  # And now it has to pass. The pair is the proof. A repository with no test
+  # command found gets the verifier below as its only check, as `direct` does.
   - id: flip
     kind: run
     command: '${toolchain.test}'
+    when: toolchain.test is set
     after: [lint]
     expect: { exit_code: '== 0' }
     onFail: { rework: fix, max: 1 }

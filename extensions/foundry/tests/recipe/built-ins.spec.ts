@@ -131,13 +131,14 @@ function requirementsTests() {
     expect(recipe('speckit.yaml').requires).toEqual([{ kind: 'path_exists', value: '.specify' }])
   })
 
-  it('requires a test command for the two shapes that depend on one', () => {
-    expect(recipe('bugfix.yaml').requires).toEqual([{ kind: 'toolchain', value: 'test' }])
-    expect(recipe('refactor.yaml').requires).toEqual([{ kind: 'toolchain', value: 'test' }])
-  })
-
-  it('asks nothing of a repository for the shapes that need nothing', () => {
-    for (const file of ['direct.yaml', 'standard.yaml', 'research.yaml']) {
+  it('asks nothing of a repository for every shape but speckit, which a verifier backs where no test command is found', () => {
+    for (const file of [
+      'direct.yaml',
+      'standard.yaml',
+      'research.yaml',
+      'bugfix.yaml',
+      'refactor.yaml',
+    ]) {
       expect(recipe(file).requires).toEqual([])
     }
   })
