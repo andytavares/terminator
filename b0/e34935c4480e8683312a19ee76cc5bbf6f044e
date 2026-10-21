@@ -1,0 +1,59 @@
+extensions/foundry/roles/author.yaml
+  s_42e5fd6fba2257::t_a6458570db2467 24-29
+extensions/foundry/src/runtime/claude-launch.ts
+  s_42e5fd6fba2257::t_a6458570db2467 156-158
+extensions/foundry/src/line/node-session.ts
+  s_42e5fd6fba2257::t_a6458570db2467 105,119-122
+  s_42e5fd6fba2257::t_d0a269c59b0523 123-124
+extensions/foundry/tests/line/executor-deps.spec.ts
+  s_42e5fd6fba2257::t_8a0d7d503d560b 202,428-429,439-440,445-509
+  s_42e5fd6fba2257::t_4182a85ccfc9ef 116,189-201
+  s_42e5fd6fba2257::t_ed84812a4a3a3e 145,188
+  s_42e5fd6fba2257::t_15c38f6a96f079 30,203,411-416,510
+extensions/foundry/src/order/schema.ts
+  s_42e5fd6fba2257::t_a6458570db2467 309-312
+extensions/foundry/src/line/executor-deps.ts
+  s_42e5fd6fba2257::t_83c456332b659d 33-37,148,170-175,179-208
+  s_42e5fd6fba2257::t_b475e8f7f48cbb 209
+extensions/foundry/src/runtime/tool-decision.ts
+  s_42e5fd6fba2257::t_a6458570db2467 243-251,283
+extensions/foundry/src/line/rung-output.ts
+  s_42e5fd6fba2257::t_a6458570db2467 241-245
+extensions/foundry/src/line/execution-settle.ts
+  s_42e5fd6fba2257::t_ed2502f80213e2 68
+extensions/foundry/tests/order/schema.spec.ts
+  s_42e5fd6fba2257::t_ed84812a4a3a3e 85,100-115
+  s_42e5fd6fba2257::t_169801e48f24ad 116
+extensions/foundry/tests/line/rung-output.spec.ts
+  s_42e5fd6fba2257::t_4182a85ccfc9ef 101-109
+extensions/foundry/tests/runtime/artifact-publishes.spec.ts
+  s_42e5fd6fba2257::t_b2848f436fd00d 41-43,72
+  s_42e5fd6fba2257::t_8a0d7d503d560b 21,69-71,73-74
+  s_42e5fd6fba2257::t_998ffbbfdfc555 1-20,22-40,44-68,75-88
+extensions/foundry/tests/runtime/claude-launch.spec.ts
+  s_42e5fd6fba2257::t_4182a85ccfc9ef 80,138-141
+extensions/foundry/tests/runtime/tool-decision.spec.ts
+  s_42e5fd6fba2257::t_ed84812a4a3a3e 832-834,860
+  s_42e5fd6fba2257::t_4182a85ccfc9ef 817,835-837,839-845,848-850,854-856,859
+  s_42e5fd6fba2257::t_99045e354fb799 818-831,838,846-847,851-853,857-858
+extensions/foundry/src/line/executor.ts
+  s_42e5fd6fba2257::t_9ee15fdc76a786 236-237
+extensions/foundry/src/runtime/artifact-publishes.ts
+  s_42e5fd6fba2257::t_d10092118c486a 1-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b0e34935c4480e8683312a19ee76cc5bbf6f044e",
+  "prompts": {},
+  "sessions": {
+    "s_42e5fd6fba2257": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3af22355-9a92-4690-ab26-a4c5166b6c02",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
