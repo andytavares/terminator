@@ -15,7 +15,8 @@ interface Block {
   content?: unknown
 }
 
-const PUBLISHED_LINE = /^Published (\S.*?) at (https?:\/\/\S+)/
+// Any line of the result, and a sentence's closing punctuation is not part of the link.
+const PUBLISHED_LINE = /^Published (\S.*?) at (https?:\/\/\S+?)[.,;:]?(?:\s|$)/m
 
 function blocksOf(line: string): Block[] {
   try {

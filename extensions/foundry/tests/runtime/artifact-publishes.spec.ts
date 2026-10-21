@@ -38,6 +38,17 @@ function publishedArtifactsTests() {
     ].join('\n')
     expect(publishedArtifacts(text).map((found) => found.url)).toEqual([URL_ONE, URL_TWO])
   })
+
+  it('reads a publish line that is not the first text part, and one ending in a full stop', () => {
+    const text = [
+      call('t1', 'Artifact', REPORT),
+      result('t1', [
+        { type: 'text', text: 'Uploading 1 file.' },
+        { type: 'text', text: `Published ${REPORT} at ${URL_ONE}.` },
+      ]),
+    ].join('\n')
+    expect(publishedArtifacts(text)).toEqual([{ path: REPORT, url: URL_ONE }])
+  })
 }
 
 function ignoredTests() {

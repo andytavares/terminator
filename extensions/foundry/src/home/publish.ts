@@ -134,9 +134,10 @@ async function readRows(root: string, sources: LiveStandingSources): Promise<Ord
   )
 }
 
-/** When the order's draft opened, the moment it left the line. */
-function draftOpenedAt(ledger: readonly { action: string; at: string }[]): string | null {
-  return ledger.find((entry) => entry.action === 'ship.draft_opened')?.at ?? null
+/** When the order left the line: its draft opened, or its run ended on a ready document. */
+function leftTheLineAt(ledger: readonly { action: string; at: string }[]): string | null {
+  const firstAt = (action: string) => ledger.find((entry) => entry.action === action)?.at
+  return firstAt('ship.draft_opened') ?? firstAt('run.document_ready') ?? null
 }
 
 async function homeOrderRowOf(
@@ -155,7 +156,7 @@ async function homeOrderRowOf(
     gate,
     since: gate?.raisedAt ?? updatedAt,
     updatedAt,
-    closedAt: draftOpenedAt(ledger),
+    closedAt: leftTheLineAt(ledger),
     pullUrl: pulls[0]?.url ?? null,
   }
 }
