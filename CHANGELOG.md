@@ -87,6 +87,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- A ticket opened on Home is drawn with its styles: its header, tags, sections and buttons took their rules from sheets only the sidebar's issue drawer and Settings load, so until one of those had opened it showed as unstyled text and browser buttons. The shared sections now load `issue-sections.css` themselves, and the buttons in the ticket view and the issue drawer are the design system's `Button`. Markdown lists, paragraphs and headings everywhere in the core window keep their spacing: the core reset now sits in `@layer reset`, where it had tied the design system's `:where()` rules and, loading after them, set their margins and padding to 0
 - Controls side by side line up everywhere: every control of a size is one height (`--tm-control-height` 28px, `--tm-control-height-sm` 22px) for fields, selects, `Button` and `IconButton`, which were sized by padding (31px and 23.6px) or fixed 26px and 20px. Rows that mixed sizes (review header and footer, merge flow, Task Vault edit and blocked rows) use one, and the core's work-item field, session buttons, extension buttons and the diff's line expanders take the tokens. An e2e audit (`control-alignment`) checks every main screen
 - Remote Control goes public while another ngrok runs: it gives its own agent an API port instead of reading 4040
 - Task Vault: a row's actions show for keyboard focus, not only for the pointer

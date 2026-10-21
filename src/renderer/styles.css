@@ -39,12 +39,16 @@
 }
 
 /* ── Reset ───────────────────────────────────────────────────── */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* Layered so it loses to every unlayered rule: unlayered, it tied the design
+   system's zero-specificity :where() rules and, loading later, wiped their spacing. */
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 }
 
 html,

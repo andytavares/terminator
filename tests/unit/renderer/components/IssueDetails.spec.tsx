@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { IssueDetails } from '../../../../src/renderer/components/integrations/IssueDetails'
 import { useStartWorkStore } from '../../../../src/renderer/components/home/start-work'
 import type { Issue } from '../../../../src/shared/types/index'
+import { classesStyledFor, unstyledClasses } from './loaded-stylesheets'
 
 const api = {
   getIssue: vi.fn(),
@@ -110,5 +111,16 @@ describe('IssueDetails — failure', () => {
     api.getIssue.mockResolvedValue({ error: 'not-connected' })
     render(<IssueDetails tracker="linear" issueKey="TAV-42" onClose={vi.fn()} />)
     expect((await screen.findByRole('alert')).textContent).toContain('not connected')
+  })
+})
+
+describe('IssueDetails — styling', () => {
+  it('styles every class it draws from a sheet Home has loaded, without the drawer or Settings', async () => {
+    const { container } = render(
+      <IssueDetails tracker="linear" issueKey="TAV-42" onClose={vi.fn()} />
+    )
+    await screen.findByText(/Unify Linear connections/)
+    const styled = classesStyledFor('src/renderer/components/integrations/IssueDetails.tsx')
+    expect(unstyledClasses(container, styled)).toEqual([])
   })
 })

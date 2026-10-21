@@ -1,6 +1,7 @@
 import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useState } from 'react'
 import { ExternalLink, RefreshCw, X } from 'lucide-react'
+import { Button } from '@terminator/extension-ui'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { TRACKER_LABELS } from './use-issue-search'
 import { CommentsSection, IssueDescriptionSection, IssueTags } from './issue-sections'
@@ -275,13 +276,13 @@ function CommentSection({ link, actions, onUnlink }: CommentSectionProps): JSX.E
         </p>
       )}
       <div className="issue-drawer__actions">
-        <button
-          className="ext-btn"
+        <Button
+          variant="primary"
           disabled={busy || commentText.trim().length === 0}
           onClick={() => void actions.comment(link)}
         >
           {busy ? 'Working…' : 'Post comment'}
-        </button>
+        </Button>
         <UnlinkButton issueKey={link.key} onUnlink={onUnlink} />
       </div>
     </section>
@@ -290,8 +291,8 @@ function CommentSection({ link, actions, onUnlink }: CommentSectionProps): JSX.E
 
 function UnlinkButton({ issueKey, onUnlink }: { issueKey: string; onUnlink: () => void }) {
   return (
-    <button className="ext-btn ext-btn--danger" onClick={onUnlink}>
+    <Button variant="danger" onClick={onUnlink}>
       Unlink {issueKey}
-    </button>
+    </Button>
   )
 }
