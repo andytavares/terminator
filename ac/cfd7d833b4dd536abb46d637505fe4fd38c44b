@@ -1,0 +1,19 @@
+extensions/foundry/src/components/OrderLinks.tsx
+  s_42e5fd6fba2257::t_614d7d8b50fecc 43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "accfd7d833b4dd536abb46d637505fe4fd38c44b",
+  "prompts": {},
+  "sessions": {
+    "s_42e5fd6fba2257": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3af22355-9a92-4690-ab26-a4c5166b6c02",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
