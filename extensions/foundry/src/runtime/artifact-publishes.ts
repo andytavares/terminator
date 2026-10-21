@@ -18,7 +18,7 @@ interface Block {
 // Any line of the result, and a sentence's closing punctuation is not part of the link.
 const PUBLISHED_LINE = /^Published (\S.*?) at (https?:\/\/\S+?)[.,;:]?(?:\s|$)/m
 
-function blocksOf(line: string): Block[] {
+function contentBlocksOf(line: string): Block[] {
   try {
     const content = (JSON.parse(line) as { message?: { content?: unknown } }).message?.content
     return Array.isArray(content) ? (content as Block[]) : []
@@ -27,7 +27,7 @@ function blocksOf(line: string): Block[] {
   }
 }
 
-function textOf(content: unknown): string {
+function resultTextOf(content: unknown): string {
   if (typeof content === 'string') return content
   if (!Array.isArray(content)) return ''
   return content
@@ -42,7 +42,7 @@ export function publishedArtifacts(transcriptText: string): PublishedArtifact[] 
   const artifactCalls = new Set<string>()
   const published: PublishedArtifact[] = []
   for (const line of transcriptText.split('\n')) {
-    for (const block of blocksOf(line)) {
+    for (const block of contentBlocksOf(line)) {
       if (block.type === 'tool_use' && block.name === 'Artifact' && typeof block.id === 'string') {
         artifactCalls.add(block.id)
       } else if (
@@ -50,7 +50,7 @@ export function publishedArtifacts(transcriptText: string): PublishedArtifact[] 
         typeof block.tool_use_id === 'string' &&
         artifactCalls.has(block.tool_use_id)
       ) {
-        const match = PUBLISHED_LINE.exec(textOf(block.content))
+        const match = PUBLISHED_LINE.exec(resultTextOf(block.content))
         if (match !== null) published.push({ path: match[1], url: match[2] })
       }
     }

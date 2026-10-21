@@ -137,14 +137,14 @@ function facetsOf(row: OrderRow, now: string): ThreadFacet[] {
       line: standing.headline,
       tone: toneOf(standing),
       ...(row.pullUrl === null ? {} : { url: row.pullUrl }),
-      ...linksOf(order),
+      ...documentLinksOf(order),
       closedAt: row.closedAt,
       updatedAt: row.updatedAt,
     },
   ]
 }
 
-function linksOf({ document }: WorkOrder): Pick<ThreadFacet, 'links'> {
+function documentLinksOf({ document }: WorkOrder): Pick<ThreadFacet, 'links'> {
   if (document?.url === undefined) return {}
   return { links: [{ label: OPEN_LABEL[documentKindOf(document)], url: document.url }] }
 }

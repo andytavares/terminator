@@ -181,24 +181,22 @@ const UNPUBLISHED_REFUSAL =
 
 // A link an author names must be one its session's Artifact tool returned: a
 // remembered or invented URL otherwise reaches the operator as a dead link.
-async function confirmPublished(
-  context: RunContext,
-  { nodeId, sessionId, lane, document }: PublishClaim
-): Promise<boolean> {
+async function confirmPublished(context: RunContext, claim: PublishClaim): Promise<boolean> {
+  const { document } = claim
   if (document?.location !== 'published') return true
   const url = document.url
   // The session ran in its own lane's checkout, so only that transcript can hold its publish.
-  const checkout = context.checkouts.get(lane ?? 1)
+  const checkout = context.checkouts.get(claim.lane ?? 1)
   const publishes =
-    sessionId === null || checkout === undefined
+    claim.sessionId === null || checkout === undefined
       ? []
-      : readPublishedArtifacts(transcriptPathFor(checkout.path, sessionId))
-  const named = (publish: PublishedArtifact): boolean =>
+      : readPublishedArtifacts(transcriptPathFor(checkout.path, claim.sessionId))
+  const isTheClaimedPublish = (publish: PublishedArtifact): boolean =>
     publish.url === url && (!isAbsolute(document.path) || publish.path === document.path)
-  if (publishes.some(named)) return true
+  if (publishes.some(isTheClaimedPublish)) return true
   await recordLineEntry(context, {
     action: 'document.link_unconfirmed',
-    subject: nodeId,
+    subject: claim.nodeId,
     reason: `the author named ${url}, which its session never published`,
   })
   return false
