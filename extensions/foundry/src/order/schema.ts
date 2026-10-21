@@ -306,6 +306,10 @@ export const DocumentHandBackSchema = z
     location: z.enum(DOCUMENT_LOCATIONS),
   })
   .strict()
+  .refine((document) => document.location !== 'published' || document.url !== undefined, {
+    message: 'A published document must carry its link.',
+    path: ['url'],
+  })
 
 export type DocumentHandBack = z.infer<typeof DocumentHandBackSchema>
 

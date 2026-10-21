@@ -238,6 +238,11 @@ function documentGuide(outputsDir: string | undefined): string[] {
     'and `published` when you put it somewhere else and have a link for it. Give',
     'that link as `url`. When the order names a target outside the checkout, or',
     'in another repository, write the document to outputs and say so here.',
+    '',
+    'When you can, write the document as an HTML page in the outputs directory and',
+    'publish it with the Artifact tool. Hand back `published`, with `path` set to',
+    'that file and `url` set to the link the tool returned. If the publish fails,',
+    'because there is no claude.ai sign-in, hand back `outputs` instead.',
   ]
 }
 

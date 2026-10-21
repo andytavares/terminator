@@ -98,6 +98,15 @@ function declaringTests() {
     expect(text).toContain('"location"')
     expect(text).toContain('url')
   })
+
+  it('tells the author to publish with the Artifact tool and hand back the returned link', () => {
+    const text = rungOutputContract('/data/orders/WO-1/rungs/write.json', AUTHOR, {
+      outputsDir: '/data/orders/WO-1/outputs',
+    })
+    expect(text).toContain('Artifact tool')
+    expect(text).toContain('`published`')
+    expect(text).toContain('link the tool returned')
+  })
 }
 
 function rungOutputAcceptingTests() {

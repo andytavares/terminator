@@ -65,7 +65,7 @@ async function collectRung(run: Execution, ran: Ran): Promise<DocumentHandBack |
   const { node, roleId, outputPath } = ran
   if (outputPath === null || roleId === null) return null
   const collected = await run.deps
-    .collect({ nodeId: node.id, role: roleId, outputPath })
+    .collect({ nodeId: node.id, role: roleId, outputPath, sessionId: node.sessionId })
     // Never fatal, for the reason `persist` is not: a run that cannot file
     // what a rung wrote is still a run.
     .catch(() => null)

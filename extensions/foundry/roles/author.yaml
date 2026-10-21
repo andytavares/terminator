@@ -21,6 +21,12 @@ prompt: |
   the document somewhere, such as a shared document or a hosted page, hand
   back location `published` and put the link in `url`.
 
+  When you can, write the document as an HTML page in the outputs directory
+  and publish it with the Artifact tool. Hand back location `published`, with
+  `path` set to that file and `url` set to the link the tool returned. If the
+  publish is not possible, because there is no claude.ai sign-in, hand back
+  location `outputs`.
+
   Lead with the answer or the decision. Every claim that could be false
   carries the evidence for it: a file path, a command and its output, or a
   source you fetched during this run. A claim you could not verify is listed

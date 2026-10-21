@@ -240,6 +240,15 @@ function docsOnlyWrite(request: ToolRequest, target: string | null): PolicyDecis
   }
 }
 
+/** A role with a document to hand back publishes its own file, wherever it was written. */
+function publishDocumentRule(request: ToolRequest): PolicyDecision | undefined {
+  if (request.tool !== 'Artifact' || (request.outputsDir ?? null) === null) return undefined
+  const target = pathOf(request.input)
+  const ownFile =
+    isInsideMount(target, request.outputsDir ?? null) || isInsideMount(target, request.worktreePath)
+  return ownFile ? { allow: true, reason: "publishing the order's own document" } : undefined
+}
+
 // FR-029's automatic half: without it every ordinary edit went to the operator at
 // every setting, and no run finished unattended.
 function autonomyRule(request: ToolRequest): PolicyDecision | undefined {
@@ -271,6 +280,7 @@ const TOOL_RULES: readonly ToolRule[] = [
   readOnlyRule,
   roleToolRule,
   docsOnlyRule,
+  publishDocumentRule,
   autonomyRule,
   modeRule,
 ]

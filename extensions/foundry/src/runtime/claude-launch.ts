@@ -153,6 +153,9 @@ interface HookCommandOptions {
  */
 export function buildSettings(options: HookCommandOptions): unknown {
   return {
+    // Nobody is watching an unattended run, so a browser tab opening on each
+    // published artifact would only pile up.
+    env: { CLAUDE_CODE_ARTIFACT_AUTO_OPEN: '0' },
     hooks: {
       PreToolUse: [
         {

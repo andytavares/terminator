@@ -814,3 +814,47 @@ function otherGhCommandsTests() {
     }
   )
 }
+
+const outputsDir = '/orders/WO-1/outputs'
+
+function authorPublishing(over: Partial<ToolRequest> = {}) {
+  return decideTool(
+    request({
+      tool: 'Artifact',
+      role: 'author',
+      outputsDir,
+      input: { file_path: `${outputsDir}/doc.html` },
+      ...over,
+    })
+  )
+}
+
+describe('publishing the order’s own document', publishingTests)
+
+function publishingTests() {
+  it.each(['escorted', 'standard', 'lights-out'] as const)(
+    'lets an author publish a file in its outputs at %s',
+    (autonomy) => {
+      expect(authorPublishing({ autonomy })).toEqual({
+        allow: true,
+        reason: "publishing the order's own document",
+      })
+    }
+  )
+
+  it('lets an author publish a file in the checkout', () => {
+    const input = { file_path: '/work/checkout/docs/a.html' }
+    expect(authorPublishing({ input })).toMatchObject({ allow: true })
+  })
+
+  it('does not let a role with no document to hand back publish at lights-out', () => {
+    expect(authorPublishing({ outputsDir: null, autonomy: 'lights-out' })).toMatchObject({
+      allow: false,
+    })
+  })
+
+  it('does not let an author publish a file outside its outputs and the checkout', () => {
+    const input = { file_path: '/etc/passwd' }
+    expect(authorPublishing({ autonomy: 'lights-out', input })).toMatchObject({ allow: false })
+  })
+}

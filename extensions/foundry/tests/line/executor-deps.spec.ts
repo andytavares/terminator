@@ -27,6 +27,7 @@ import { buildRunGraph, withNode, type RunGraph, type RunNode } from '../../src/
 import { resolveRecipe } from '../../src/recipe/resolve.js'
 import { resolveSources } from '../../src/workspace-root.js'
 import { checkoutPath } from '../../src/line/worktree.js'
+import { transcriptPathFor } from '../../src/runtime/claude-launch.js'
 import { readObservedFiles } from '../../src/line/observed-files.js'
 import { orderDir } from '../../src/data-root.js'
 import type { Recipe } from '../../src/recipe/parse.js'
@@ -112,6 +113,7 @@ function runInput(over: Partial<Parameters<ExecutorDeps['run']>[0]> = {}) {
 type StartInput = {
   worktreePath: string
   model: string
+  addDirs?: string[]
   autoDecide: (tool: string, input: unknown) => { allow: boolean } | 'mode' | null
   onRegistered: (run: { sessionId: string; transcriptFrom: number }) => void
   onTurnEnd: (turns: number) => void
@@ -140,6 +142,7 @@ function agentStarts(sessionId: string): { started: Promise<StartInput> } {
 
 describe('an agent node', () => {
   describe('launching', launchingTests)
+  describe('folders it may reach', foldersItMayReachTests)
   describe('failing and never starting', failingAndNeverStartingTests)
   describe('asking about a tool', askingAboutAToolTests)
   describe('refused tools', refusedToolsTests)
@@ -179,6 +182,22 @@ function launchingTests() {
     const { started } = agentStarts('scribe-1')
     void deps.run(runInput({ role: 'scribe', modelTier: 'fast' }))
     expect((await started).model).toBe('haiku')
+  })
+}
+
+function foldersItMayReachTests() {
+  it('lets the agent reach its outputs folder, so it can publish what it wrote there', async () => {
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
+    const { started } = agentStarts('author-1')
+    void deps.run(runInput({ outputsDir: '/orders/WO-1/outputs', skillsMount: '/mnt/skills' }))
+    expect((await started).addDirs).toEqual(['/mnt/skills', '/orders/WO-1/outputs'])
+  })
+
+  it('adds no folder to a node with no skills and no outputs', async () => {
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
+    const { started } = agentStarts('builder-2')
+    void deps.run(runInput())
+    expect((await started).addDirs).toBeUndefined()
   })
 }
 
@@ -389,7 +408,12 @@ function nothingWrittenTests() {
   it('is nothing when the rung wrote nothing', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     expect(
-      await deps.collect({ nodeId: 'scout', role: 'scout', outputPath: outputPath() })
+      await deps.collect({
+        nodeId: 'scout',
+        role: 'scout',
+        outputPath: outputPath(),
+        sessionId: null,
+      })
     ).toBeNull()
   })
 }
@@ -401,11 +425,8 @@ function whatItWroteTests() {
       outputPath(),
       JSON.stringify({ findings: { entryPoints: ['src/theme.ts'] }, note: 'read it' })
     )
-    const collected = await deps.collect({
-      nodeId: 'scout',
-      role: 'scout',
-      outputPath: outputPath(),
-    })
+    const input = { nodeId: 'scout', role: 'scout', outputPath: outputPath(), sessionId: null }
+    const collected = await deps.collect(input)
     expect(collected?.note).toBe('read it')
     expect((await createOrderStore(root).load('WO-1'))?.context.entryPoints).toEqual([
       'src/theme.ts',
@@ -415,12 +436,77 @@ function whatItWroteTests() {
   it('is refused on the record when it is not readable', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     fs.writeFileSync(outputPath(), 'not json')
-    expect(
-      await deps.collect({ nodeId: 'scout', role: 'scout', outputPath: outputPath() })
-    ).toBeNull()
+    const input = { nodeId: 'scout', role: 'scout', outputPath: outputPath(), sessionId: null }
+    expect(await deps.collect(input)).toBeNull()
     expect(await ledgerActions(root)).toContain('rung.refused')
   })
 }
+
+const PUBLISHED_LINK = 'https://claude.ai/artifact/YJeSCmFWK1GJC8X9ZXUpVf'
+const authorOutput = (): string => path.join(orderDir(root, 'WO-1'), 'author.json')
+
+function handBack(url: string): void {
+  fs.writeFileSync(
+    authorOutput(),
+    JSON.stringify({ document: { path: '/tmp/report.html', url, location: 'published' } })
+  )
+}
+
+function transcriptOf(entries: unknown[]): string {
+  return entries.map((entry) => JSON.stringify({ message: { content: [entry] } })).join('\n')
+}
+
+function sessionPublished(sessionId: string, url: string): void {
+  const file = transcriptPathFor(checkoutPath(root, order, 'app'), sessionId)
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  const input = { file_path: '/tmp/report.html' }
+  fs.writeFileSync(
+    file,
+    transcriptOf([
+      { type: 'tool_use', id: 'u1', name: 'Artifact', input },
+      {
+        type: 'tool_result',
+        tool_use_id: 'u1',
+        content: `Published /tmp/report.html at ${url} (Version 1, version id 1-ab)`,
+      },
+    ])
+  )
+}
+
+async function collectAuthor() {
+  const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
+  const input = { nodeId: 'author', role: 'author', outputPath: authorOutput() }
+  return deps.collect({ ...input, sessionId: 'sess-1' })
+}
+
+const savedDocument = async () => (await createOrderStore(root).load('WO-1'))?.document
+
+function publishedDocumentTests() {
+  it('is collected and saved when its session published that link', async () => {
+    sessionPublished('sess-1', PUBLISHED_LINK)
+    handBack(PUBLISHED_LINK)
+    expect((await collectAuthor())?.document?.url).toBe(PUBLISHED_LINK)
+    expect((await savedDocument())?.url).toBe(PUBLISHED_LINK)
+  })
+
+  it('is refused, on the record and unsaved, when its session never published the link', async () => {
+    sessionPublished('sess-1', PUBLISHED_LINK)
+    handBack('https://claude.ai/artifact/madeUpByTheAgent')
+    expect(await collectAuthor()).toBeNull()
+    expect(await ledgerActions(root)).toEqual(
+      expect.arrayContaining(['document.link_unconfirmed', 'rung.refused'])
+    )
+    expect(await savedDocument()).toBeNull()
+  })
+
+  it('is refused when the session left no transcript', async () => {
+    handBack(PUBLISHED_LINK)
+    expect(await collectAuthor()).toBeNull()
+    expect(await ledgerActions(root)).toContain('document.link_unconfirmed')
+  })
+}
+
+describe('a published document', publishedDocumentTests)
 
 describe('the run’s records', () => {
   describe('gates', executorDepsGatesTests)

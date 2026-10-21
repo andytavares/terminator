@@ -82,6 +82,7 @@ function valid(): unknown {
 
 describe('parseWorkOrder', () => {
   describe('documents', documentsTests)
+  describe('published documents', publishedDocumentsTests)
   describe('versions', versionsTests)
   describe('empty drafts and orphans', emptyDraftsAndOrphansTests)
   describe('statuses, nulls and blocks', statusesNullsAndBlocksTests)
@@ -95,6 +96,23 @@ describe('parseWorkOrder', () => {
   describe('rounds and categories', roundsAndCategoriesTests)
   describe('repositories', repositoriesTests)
 })
+
+function publishedDocumentsTests() {
+  it('refuses a published document that carries no link', () => {
+    expect(() =>
+      parseWorkOrder({
+        ...(valid() as Record<string, unknown>),
+        document: { path: 'a.html', location: 'published' },
+      })
+    ).toThrow('A published document must carry its link.')
+  })
+
+  it('keeps a published document with its link', () => {
+    const document = { path: 'a.html', url: 'https://claude.ai/artifact/1', location: 'published' }
+    const order = parseWorkOrder({ ...(valid() as Record<string, unknown>), document })
+    expect(order.document).toEqual(document)
+  })
+}
 
 function documentsTests() {
   it('accepts a well-formed order', () => {

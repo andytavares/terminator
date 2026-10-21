@@ -233,6 +233,8 @@ export interface ExecutorDeps {
     readonly nodeId: string
     readonly role: string
     readonly outputPath: string
+    /** The node's conversation, whose transcript says what its author really published. */
+    readonly sessionId: string | null
   }) => Promise<RungCollection | null>
 
   /**
