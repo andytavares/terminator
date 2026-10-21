@@ -3,6 +3,10 @@ import { runTextCommand } from './command-runner.js'
 
 const MARK = '__TERMINATOR_PATH__'
 
+/** A shell with heavy rc files (version managers, cloud CLIs) takes 2 to 5 seconds to start; a
+ * wait shorter than that loses the PATH for the whole session and `gh` fails with ENOENT. */
+export const LOGIN_SHELL_TIMEOUT_MS = 20_000
+
 /**
  * Put the user's login-shell PATH ahead of the app's own.
  *
@@ -15,14 +19,17 @@ const MARK = '__TERMINATOR_PATH__'
  * timeout, or the app quitting, also stops what the rc files started.
  * @internal
  */
-export async function adoptLoginShellPath(env: NodeJS.ProcessEnv = process.env): Promise<void> {
+export async function adoptLoginShellPath(
+  env: NodeJS.ProcessEnv = process.env,
+  timeoutMs = LOGIN_SHELL_TIMEOUT_MS
+): Promise<void> {
   if (!env.SHELL) return
   const probe = await runTextCommand(
     {
       command: env.SHELL,
       args: ['-ilc', `printf '${MARK}%s${MARK}' "$PATH"`],
       cwd: process.cwd(),
-      timeoutMs: 5000,
+      timeoutMs,
     },
     { ...env, DISABLE_AUTO_UPDATE: 'true' }
   )
