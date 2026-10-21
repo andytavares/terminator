@@ -1030,8 +1030,8 @@ function oneConvergeCallTests() {
     withQuestions()
     await waitFor(() => screen.getByText('which token?'))
 
-    fireEvent.click(screen.getByRole('button', { name: 'b' }))
-    fireEvent.click(screen.getByRole('button', { name: 'client' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'b' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'client' }))
     expect(screen.getByText(/2 of 2 decided/)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: /^Send( \d)? decisions?$/ }))
@@ -1057,7 +1057,7 @@ function sendUnavailableUntilAnsweredTests() {
     const send = () => screen.getByRole('button', { name: /^Send( \d)? decisions?$/ })
     expect(isUnavailable(send())).toBe(true)
     expect(reasonFor(send())).toBe('Choose an answer or a decision above first.')
-    fireEvent.click(screen.getByRole('button', { name: 'b' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'b' }))
     expect(isUnavailable(send())).toBe(false)
   })
 }
@@ -1642,11 +1642,8 @@ function otherMovesHeldTests() {
     fireEvent.click(await screen.findByRole('button', { name: 'Ask for proof' }))
     await screen.findByRole('status', { name: /Asked/ })
 
-    expect(screen.getByRole('button', { name: 'a (recommended)' })).toHaveProperty(
-      'disabled',
-      false
-    )
-    expect(screen.getByRole('button', { name: 'b' })).toHaveProperty('disabled', false)
+    expect(screen.getByRole('radio', { name: 'a Recommended' })).toHaveProperty('disabled', false)
+    expect(screen.getByRole('radio', { name: 'b' })).toHaveProperty('disabled', false)
     await openForgeStep('Plan')
     expect(isUnavailable(screen.getByRole('button', { name: /tokens are JWTs/ }))).toBe(true)
   })

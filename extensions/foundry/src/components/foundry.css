@@ -563,6 +563,78 @@
   margin-top: 4px;
 }
 
+/* A question's answers: one full-width row each, so a long answer wraps instead of
+   clipping, and the chosen one shows without colour alone. */
+.fdry-opts {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.fdry-opts-legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tm-text-muted);
+}
+
+.fdry-opt {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  background: var(--tm-bg-surface);
+  cursor: pointer;
+}
+
+.fdry-opt:hover {
+  background: var(--tm-bg-card);
+}
+
+.fdry-opt:has(input:checked) {
+  border-color: var(--tm-accent);
+  background: var(--tm-accent-dim);
+}
+
+.fdry-opt:focus-within {
+  outline: 2px solid var(--tm-accent);
+  outline-offset: 1px;
+}
+
+/* The row owns the border; the shared text-field rule below must not box the radio too. */
+.fdry-fnd .fdry-opt input {
+  width: auto;
+  margin: 2px 0 0;
+  padding: 0;
+  accent-color: var(--tm-accent);
+}
+
+.fdry-opt-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.fdry-opt-tag {
+  display: inline-block;
+  margin-left: 2px;
+  padding: 0 5px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tm-accent);
+  border: 1px solid var(--tm-accent);
+  border-radius: 4px;
+  vertical-align: 1px;
+}
+
 .fdry-fnd input,
 .fdry-fnd textarea {
   font: inherit;
