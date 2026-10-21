@@ -57,8 +57,11 @@ export async function stopOrder(root: string, orderId: string, reason: string): 
   })
 }
 
-// A run that ended on a ready document before it settled the order left it `running`
-// for good: nothing else is coming to finish it.
+/**
+ * A run that ended on a ready document before it settled the order left it `running`
+ * for good: nothing else is coming to finish it.
+ * @internal
+ */
 export async function settleFinishedDocuments(
   store: OrderStore,
   settled: (order: WorkOrder) => Promise<void> = async () => {}
