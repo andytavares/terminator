@@ -1,0 +1,41 @@
+extensions/foundry/src/line/executor-deps.ts
+  s_42e5fd6fba2257::t_d4cc425eb0ffd1 148
+  s_42e5fd6fba2257::t_c01223183ecc35 170,186,190-195,210
+extensions/foundry/src/line/rung-output.ts
+  s_42e5fd6fba2257::t_c53fedfd66ea65 238-240,246-247
+extensions/foundry/tests/line/run-control.spec.ts
+  s_42e5fd6fba2257::t_420926f3c822b2 48-57
+extensions/foundry/src/line/executor.ts
+  s_42e5fd6fba2257::t_98dabb4c443f4f 238-239
+extensions/foundry/tests/line/rung-output.spec.ts
+  s_42e5fd6fba2257::t_08a5355b32756c 110-117
+extensions/foundry/tests/line/executor-deps.spec.ts
+  s_42e5fd6fba2257::t_a690f92b62ebbd 416,512-514
+  s_42e5fd6fba2257::t_d4cc425eb0ffd1 438
+  s_42e5fd6fba2257::t_f329517d46c4d2 422-430,449,486,489,515-517
+extensions/foundry/src/line/run-control.ts
+  s_42e5fd6fba2257::t_8f34e9fe9fd784 7-10,62-65,71-72,82,89,94,117-125
+  s_42e5fd6fba2257::t_6a71a14ed4eb52 126
+extensions/foundry/src/ipc/inbox-registration.ts
+  s_42e5fd6fba2257::t_8f34e9fe9fd784 1,54,262
+extensions/foundry/src/line/execution-settle.ts
+  s_42e5fd6fba2257::t_d4cc425eb0ffd1 69-75
+extensions/foundry/roles/author.yaml
+  s_42e5fd6fba2257::t_c53fedfd66ea65 20,27-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cbb989c1e144f18c303c8261e5b06e18a9d626d0",
+  "prompts": {},
+  "sessions": {
+    "s_42e5fd6fba2257": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3af22355-9a92-4690-ab26-a4c5166b6c02",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
