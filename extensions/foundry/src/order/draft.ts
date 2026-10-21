@@ -14,18 +14,19 @@ export interface DraftOrderInput {
   readonly repoPaths: readonly string[]
   readonly now: string
   readonly baseBranch?: string
+  /** One per path, in the same order; wins over `baseBranch` where present. */
+  readonly baseBranches?: readonly string[]
 }
 
 type DraftRepo = WorkOrder['context']['repos'][number]
 
 /** One repository per path, each in its own lane, in the order given. */
 function reposOf(input: DraftOrderInput): DraftRepo[] {
-  const base = input.baseBranch ?? 'main'
   return input.repoPaths.map((repoPath, index) => ({
     name: path.basename(repoPath),
     path: repoPath,
     lane: index + 1,
-    baseBranch: base,
+    baseBranch: input.baseBranches?.[index] ?? input.baseBranch ?? 'main',
     headBranch: '',
   }))
 }
