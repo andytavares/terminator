@@ -928,6 +928,15 @@ A change that only touches documentation (markdown, `docs/`, `specs/`, a
 readme or a changelog) gets a short final check: format and lint, and the
 rest is marked not run, "documentation only".
 
+A `research` order ends on its document, not on a pull request. When the
+session is signed in to claude.ai, the author publishes the document as a
+Claude artifact and Foundry checks that the link is one the author actually
+published. The order then reads **Finished · published as a Claude artifact**,
+and the link is on the order's row, on the open order (**Open artifact**,
+**Open local copy**, **Copy link**), in the factory hall and on Home's drawer.
+The ticket moves to In Review with the link as a comment. Without a claude.ai
+sign-in the document stays with the order, and **Open document** opens it.
+
 Each shape also says how hard its agents think. `direct` and `research` run at
 `medium` effort; `standard`, `bugfix`, `refactor` and `speckit` run at `high`,
 because a second look, a root cause or a refactor that must prove behaviour
