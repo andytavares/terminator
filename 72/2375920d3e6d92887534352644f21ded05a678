@@ -1,0 +1,19 @@
+extensions/foundry/tests/ipc/final-check-send-back-ipc.spec.ts
+  s_42e5fd6fba2257::t_0ee02cd1e6b7ff 90-92,105-107,111-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "722375920d3e6d92887534352644f21ded05a678",
+  "prompts": {},
+  "sessions": {
+    "s_42e5fd6fba2257": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3af22355-9a92-4690-ab26-a4c5166b6c02",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
