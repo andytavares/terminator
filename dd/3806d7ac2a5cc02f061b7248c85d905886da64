@@ -1,0 +1,25 @@
+CHANGELOG.md
+  s_42e5fd6fba2257::t_bab16c2b607fbd 11
+docs/ARCHITECTURE.md
+  s_42e5fd6fba2257::t_16315f705ab693 1011-1014,1450
+docs/adr/119-research-ends-in-a-claude-artifact.md
+  s_42e5fd6fba2257::t_de6411f3ef1e21 1-26
+docs/user-guide/USER-GUIDE.md
+  s_42e5fd6fba2257::t_6c76a6165847b2 931-939
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dd3806d7ac2a5cc02f061b7248c85d905886da64",
+  "prompts": {},
+  "sessions": {
+    "s_42e5fd6fba2257": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3af22355-9a92-4690-ab26-a4c5166b6c02",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
