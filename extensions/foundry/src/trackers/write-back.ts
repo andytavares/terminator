@@ -1,5 +1,5 @@
 import { renderOrder } from '../order/render.js'
-import type { WorkOrder } from '../order/schema.js'
+import type { DocumentHandBack, WorkOrder } from '../order/schema.js'
 
 // Back to the issue the work came from.
 //
@@ -38,7 +38,13 @@ export interface IssuesPort {
   supportsTransitions(tracker: string): boolean
 }
 
-type WriteBackEvent = 'agreed' | 'amended' | 'started' | 'draft_opened' | 'merged'
+type WriteBackEvent =
+  | 'agreed'
+  | 'amended'
+  | 'started'
+  | 'draft_opened'
+  | 'document_ready'
+  | 'merged'
 
 /** What each moment in an order's life means in the tracker's terms. @internal */
 export const INTENT_FOR_EVENT: Record<WriteBackEvent, TransitionIntent | null> = {
@@ -46,6 +52,7 @@ export const INTENT_FOR_EVENT: Record<WriteBackEvent, TransitionIntent | null> =
   amended: null,
   started: 'started',
   draft_opened: 'in_review',
+  document_ready: 'in_review',
   merged: 'done',
 }
 
@@ -203,11 +210,17 @@ function linkComment(order: WorkOrder, pulls: readonly { repo: string; url: stri
   return lines.join('\n')
 }
 
+function documentComment(order: WorkOrder, document: DocumentHandBack): string {
+  return `Foundry finished \`${order.id}\`: ${document.url ?? document.path}`
+}
+
 /** A moment in an order's life worth telling the tracker about. */
 export interface WriteBackMoment {
   readonly event: WriteBackEvent
   /** The drafts just opened. Only meaningful for `draft_opened`. */
   readonly pulls?: readonly { repo: string; url: string }[]
+  /** The document the run ended on. Only meaningful for `document_ready`. */
+  readonly document?: DocumentHandBack
 }
 
 /** Everything one write-back reads: the order, its issue, the moment, and the tracker. */
@@ -287,16 +300,27 @@ async function moveIssue({ issue, deps }: WriteBackRun, intent: TransitionIntent
 
 async function prLink(run: WriteBackRun): Promise<WriteBackResult | null> {
   const { order, issue, moment, deps } = run
-  const pulls = moment.pulls ?? []
-  if (!order.writeBack.includes('pr_link') || moment.event !== 'draft_opened') return null
-  if (pulls.length === 0) return null
+  if (!order.writeBack.includes('pr_link')) return null
+  const comment = linkCommentFor(order, moment)
+  if (comment === null) return null
   return attempt(
-    {
-      write: 'pr_link',
-      subject: issue.key,
-      done: `${pulls.length} pull request link${pulls.length === 1 ? '' : 's'} commented on ${issue.key}`,
-    },
-    () => deps.issues.comment(issue, linkComment(order, pulls)),
+    { write: 'pr_link', subject: issue.key, done: `${comment.what} commented on ${issue.key}` },
+    () => deps.issues.comment(issue, comment.body),
     deps
   )
+}
+
+function linkCommentFor(
+  order: WorkOrder,
+  moment: WriteBackMoment
+): { what: string; body: string } | null {
+  const pulls = moment.pulls ?? []
+  if (moment.event === 'document_ready' && moment.document !== undefined) {
+    return { what: 'the document link', body: documentComment(order, moment.document) }
+  }
+  if (moment.event !== 'draft_opened' || pulls.length === 0) return null
+  return {
+    what: `${pulls.length} pull request link${pulls.length === 1 ? '' : 's'}`,
+    body: linkComment(order, pulls),
+  }
 }

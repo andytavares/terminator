@@ -102,7 +102,7 @@ function startOptions(launch: NodeLaunch, turn: NodeTurn): StartSupervisedRunOpt
     resumeSessionId: input.resumeSessionId,
     model: modelForTier(context.api, input.modelTier),
     effort: input.effort ?? undefined,
-    addDirs: input.skillsMount === null ? undefined : [input.skillsMount],
+    addDirs: addDirsFor(input),
     autoDecide: toolDecisionFor(launch),
     onPending: (pending) => onPending(context, pending),
     onResolved: (requestId, outcome) => recordResolution(context, turn, { requestId, outcome }),
@@ -114,6 +114,12 @@ function startOptions(launch: NodeLaunch, turn: NodeTurn): StartSupervisedRunOpt
     onEnd: (exitCode) => archiveEndedSession(turn, exitCode),
     onTurnEnd: (turns) => finishNodeTurn(turn, turns),
   }
+}
+
+/** The folders outside the checkout the agent is allowed to reach: its skills and its outputs. */
+function addDirsFor(input: NodeInput): string[] | undefined {
+  const dirs = [input.skillsMount, input.outputsDir].filter((dir) => dir != null)
+  return dirs.length === 0 ? undefined : dirs
 }
 
 // The hook's own decision, composed and tested in `runtime/tool-decision.ts`: the

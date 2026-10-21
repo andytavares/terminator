@@ -4,6 +4,8 @@ import type { FactoryMetrics } from '../../factory/metrics.js'
 import { MetricsTiles, WindowToggle } from '../MetricsTiles.js'
 import type { Signal } from '../../sensors/types.js'
 import type { CiState } from '../../line/ci-state.js'
+import { DocumentChip } from '../DocumentChip.js'
+import type { DocumentLink } from '../../line/document-kind.js'
 import { HallThumbnail } from './HallThumbnail.js'
 import { ciLabel } from '../../line/ci-label.js'
 import { Button } from '@terminator/extension-ui'
@@ -20,6 +22,8 @@ export interface FactoryOrderRow {
   readonly status: string
   /** Absent, like `standing`, from a host part way through an upgrade. */
   readonly createdAt?: string
+  /** The document the author handed back outside the checkout; absent or null when none. */
+  readonly document?: DocumentLink | null
   /**
    * Where the order stands, and whose move it is.
    *
@@ -175,7 +179,24 @@ function refreshKeyOf(row: FactoryOrderRow): string {
   return `${row.status}:${row.standing?.kind ?? ''}:${row.ci?.status ?? ''}:${row.ci?.round ?? ''}`
 }
 
+// A link cannot sit inside the card's button, so the document's link is its sibling.
 function HallCard({ row, onOpen }: { readonly row: FactoryOrderRow } & Pick<GridProps, 'onOpen'>) {
+  return (
+    <div className="fdry-hall-slot">
+      <HallCardButton row={row} onOpen={onOpen} />
+      {row.document ? (
+        <span className="fdry-order-links fdry-hall-slot-links">
+          <DocumentChip document={row.document} />
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+function HallCardButton({
+  row,
+  onOpen,
+}: { readonly row: FactoryOrderRow } & Pick<GridProps, 'onOpen'>) {
   return (
     <button
       type="button"

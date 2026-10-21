@@ -93,6 +93,32 @@ describe('publishing to Home when a record changes', () => {
   })
 })
 
+describe('a document order on Home', () => {
+  it('keeps an order that just shipped on its document on Home, with its link', async () => {
+    const url = 'https://claude.ai/artifact/abc'
+    const order = runningOrder('WO-2', ['src/a.ts'], {
+      status: 'shipped',
+      document: { path: '/tmp/findings.html', url, location: 'published' },
+      source: { kind: 'typed', tracker: null, key: null, url: null, branch: 'wo-2-findings' },
+    })
+    await orderStoreAt(dataDir).save(order)
+    await orderStoreAt(dataDir).record({
+      at: new Date().toISOString(),
+      orderId: 'WO-2',
+      actor: 'rule:run',
+      action: 'run.document_ready',
+      subject: 'WO-2',
+      reason: `published: /tmp/findings.html (${url})`,
+      evidence: [],
+    })
+    await vi.advanceTimersByTimeAsync(500)
+    await vi.waitFor(() => expect(host.homePublish).toHaveBeenCalledTimes(1))
+    expect(lastFeed().facets).toMatchObject([
+      { stage: 'shipped', links: [{ label: 'Open artifact', url }] },
+    ])
+  })
+})
+
 function publisherWithDecide(decide: ReturnType<typeof vi.fn>) {
   const direct = fakeHost(() => dataDir)
   const dataRoot = (): string => dataDir

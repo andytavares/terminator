@@ -1,5 +1,8 @@
+import * as path from 'node:path'
 import type { DocumentHandBack } from '../order/schema.js'
 import type { Recipe } from '../recipe/parse.js'
+import { documentKindOf } from './document-kind.js'
+import type { DocumentLink } from './document-kind.js'
 
 // How a run ends when its product is a document.
 //
@@ -12,6 +15,20 @@ export type DocumentOutcome =
   | { readonly kind: 'missing'; readonly reason: string }
   | { readonly kind: 'ready'; readonly where: string }
   | { readonly kind: 'ships' }
+
+export function documentLinkOf(
+  order: { readonly document: DocumentHandBack | null },
+  orderDirectory: string
+): DocumentLink | null {
+  const { document } = order
+  if (document === null || document.location === 'checkout') return null
+  return {
+    kind: documentKindOf(document),
+    url: document.url ?? null,
+    // The opener is handed this path as it is, so a relative one would open nothing.
+    path: path.resolve(orderDirectory, document.path),
+  }
+}
 
 /** Where a document is, in one line: its place, what it is called, its link. */
 export function describeDocument(document: DocumentHandBack): string {

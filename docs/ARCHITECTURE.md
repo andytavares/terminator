@@ -1008,7 +1008,10 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   when it has not), inspects on a risk trigger, documents unless the change is
   graded P3, and ships. `research` (scout, author, fresh verifier) is the one
   shape whose product is a document, and it is never proposed: an operator
-  picks it in the Forge.
+  picks it in the Forge. A research run that ends on a ready document saves
+  `shipped`. A `published` hand-back's link must appear in an `Artifact` result
+  in the author's transcript (`runtime/artifact-publishes.ts`), and the
+  verifier's brief names the document (ADR 119).
 - **Agents' work is committed by the line, and an empty change is a failure**
   (ADR 086). After an agent whose role may write the checkout passes, the
   executor commits its lane's worktree (`commitNode` → `commitWorktree`) with
@@ -1444,6 +1447,7 @@ layout and the belts through small state classes (`HallBuilder`, `BeltRouter`).
 - [ADR-065: skills are mounted, never installed](adr/065-skills-are-mounted-never-installed.md) — `skills:` on roles and steps, three rungs, copied per node and passed with `--add-dir`.
 - [ADR-087: the hall labels what it draws](adr/087-the-hall-labels-what-it-draws.md) — scoreboard, queue plate, junctions and CI tower say what they mean; aggregates replace per-check lamps; CI is recorded for replay.
 - [ADR-086: six shapes and a document hand-back](adr/086-six-shapes-and-a-document-hand-back.md) — design-doc, poc, spike and quick removed; Foundry commits what agents write; research finishes on a document.
+- [ADR-119: a research order ends in a Claude artifact](adr/119-research-ends-in-a-claude-artifact.md) — publish unattended, the link checked against the transcript, shipped on a ready document, links on every surface and Home's `links`.
 - [ADR-085: the draft opens before the final check](adr/085-the-draft-opens-before-the-final-check.md) — the final check runs beside CI; the scribe writes documentation only; repeated commands run once; the ship node stays running.
 - [ADR-084: shaping starts with the architect](adr/084-shaping-starts-with-the-architect.md) — the scout runs beside the first draft; small orders skip the red team; amends ADR 075.
 - [ADR-083: extension commands take validated arguments](adr/083-extension-commands-take-arguments.md) — `api.commands.register` accepts an `args` schema; views run another extension's command by id; v2.7.0.

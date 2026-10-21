@@ -253,6 +253,54 @@ function verifiersAndSilentRolesTests() {
   })
 }
 
+const documentVerifier = role({
+  id: 'verifier',
+  reads: ['unit_diff', 'criteria', 'toolchain', 'rules'],
+  writes: [],
+})
+
+function withDocument(document: WorkOrder['document'], who: Role = documentVerifier): string {
+  return brief({ order: order({ document }), role: who, units: [], rules: [] })
+}
+
+describe('a verifier is told where the document under review is', verifierDocumentTests)
+
+function verifierDocumentTests() {
+  it('names the path of a document filed in outputs', () => {
+    const text = withDocument({ path: '/out/WO-1/research.md', location: 'outputs' })
+    expect(text).toContain('The document under review is /out/WO-1/research.md.')
+    expect(text).toContain('the change in the checkout may be empty')
+    expect(text).not.toContain('published at')
+  })
+
+  it('names the path and the url of a published document', () => {
+    const text = withDocument({
+      path: '/out/WO-1/research.md',
+      url: 'https://docs.example/research',
+      location: 'published',
+    })
+    expect(text).toContain('The document under review is /out/WO-1/research.md.')
+    expect(text).toContain(
+      'It was published at https://docs.example/research; the file above is the copy that was published.'
+    )
+  })
+}
+
+describe('a verifier is told nothing when there is nothing to find', noDocumentTests)
+
+function noDocumentTests() {
+  it('adds nothing for a document in the checkout, which the diff already shows', () => {
+    const text = withDocument({ path: 'docs/research.md', location: 'checkout' })
+    expect(text).not.toContain('The document under review')
+  })
+
+  it('adds nothing for a role that does not read the diff', () => {
+    const author = role({ id: 'author', reads: ['unit', 'context'] })
+    const text = withDocument({ path: '/out/WO-1/research.md', location: 'outputs' }, author)
+    expect(text).not.toContain('The document under review')
+  })
+}
+
 function feedback(over: Partial<Feedback> = {}): Feedback {
   return {
     from: 'run:test',

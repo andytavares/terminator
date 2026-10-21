@@ -30,6 +30,11 @@ import {
   runStepOnBaseCheckout,
 } from './lane-commands.js'
 import { isoNow } from '../host-calls.js'
+import { isAbsolute } from 'path'
+import { readPublishedArtifacts } from '../runtime/artifact-publishes.js'
+import type { PublishedArtifact } from '../runtime/artifact-publishes.js'
+import { transcriptPathFor } from '../runtime/claude-launch.js'
+import type { DocumentHandBack } from '../order/schema.js'
 
 export type { OrderRun } from './run-context.js'
 
@@ -140,7 +145,7 @@ async function recordLineEntry(
 async function collectRungOutput(
   context: RunContext,
   roleRegistry: RoleRegistry,
-  { nodeId, role, outputPath }: Parameters<ExecutorDeps['collect']>[0]
+  { nodeId, role, outputPath, sessionId, lane }: Parameters<ExecutorDeps['collect']>[0]
 ): Promise<RungCollection | null> {
   const { store, order } = context
   const current = (await store.load(order.id)) ?? order
@@ -161,9 +166,47 @@ async function collectRungOutput(
     return null
   }
 
-  await store.save(result.order)
   const { note, defect, document } = result
+  if (!(await confirmPublished(context, { nodeId, sessionId, lane, document }))) {
+    await recordRungRefused(context, { role, nodeId, reason: UNPUBLISHED_REFUSAL })
+    return null
+  }
+
+  await store.save(result.order)
   return { order: result.order, note, defect, document }
+}
+
+const UNPUBLISHED_REFUSAL =
+  "The document's link was never published in this session. Publish it with the Artifact tool and hand back the link it returns."
+
+// A link an author names must be one its session's Artifact tool returned: a
+// remembered or invented URL otherwise reaches the operator as a dead link.
+async function confirmPublished(context: RunContext, claim: PublishClaim): Promise<boolean> {
+  const { document } = claim
+  if (document?.location !== 'published') return true
+  const url = document.url
+  // The session ran in its own lane's checkout, so only that transcript can hold its publish.
+  const checkout = context.checkouts.get(claim.lane ?? 1)
+  const publishes =
+    claim.sessionId === null || checkout === undefined
+      ? []
+      : readPublishedArtifacts(transcriptPathFor(checkout.path, claim.sessionId))
+  const isTheClaimedPublish = (publish: PublishedArtifact): boolean =>
+    publish.url === url && (!isAbsolute(document.path) || publish.path === document.path)
+  if (publishes.some(isTheClaimedPublish)) return true
+  await recordLineEntry(context, {
+    action: 'document.link_unconfirmed',
+    subject: claim.nodeId,
+    reason: `the author named ${url}, which its session never published`,
+  })
+  return false
+}
+
+interface PublishClaim {
+  readonly nodeId: string
+  readonly sessionId: string | null
+  readonly lane: number | null
+  readonly document: DocumentHandBack | null
 }
 
 async function recordRungRefused(

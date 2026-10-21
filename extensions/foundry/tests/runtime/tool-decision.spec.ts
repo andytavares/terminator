@@ -814,3 +814,68 @@ function otherGhCommandsTests() {
     }
   )
 }
+
+const outputsDir = '/orders/WO-1/outputs'
+
+function authorPublishing(over: Partial<ToolRequest> = {}) {
+  return decideTool(
+    request({
+      tool: 'Artifact',
+      role: 'author',
+      outputsDir,
+      input: { file_path: `${outputsDir}/doc.html` },
+      ...over,
+    })
+  )
+}
+
+describe('publishing the order’s own document', publishingTests)
+describe('publishing anything else', publishingElseTests)
+
+function publishingTests() {
+  it.each(['escorted', 'standard', 'lights-out'] as const)(
+    'lets an author publish a file in its outputs at %s',
+    (autonomy) => {
+      expect(authorPublishing({ autonomy })).toEqual({
+        allow: true,
+        reason: "publishing the order's own document",
+      })
+    }
+  )
+
+  it('does not let an author publish a file from the checkout, which ships as a pull request', () => {
+    const input = { file_path: '/work/checkout/.env' }
+    expect(authorPublishing({ autonomy: 'lights-out', input })).toMatchObject({ allow: false })
+  })
+
+  it('does not let an author publish a file in its outputs that is not a page', () => {
+    const input = { file_path: `${outputsDir}/notes.json` }
+    expect(authorPublishing({ autonomy: 'lights-out', input })).toMatchObject({ allow: false })
+  })
+
+  it('does not let an author attach further files to the publish', () => {
+    const input = {
+      file_path: `${outputsDir}/doc.html`,
+      files: { 'secrets.txt': '/work/checkout/.env' },
+    }
+    expect(authorPublishing({ autonomy: 'lights-out', input })).toMatchObject({ allow: false })
+  })
+
+  it.each(['doc.htm', 'doc.md'])('lets an author publish %s from its outputs', (name) => {
+    const input = { file_path: `${outputsDir}/${name}` }
+    expect(authorPublishing({ input })).toMatchObject({ allow: true })
+  })
+}
+
+function publishingElseTests() {
+  it('does not let a role with no document to hand back publish at lights-out', () => {
+    expect(authorPublishing({ outputsDir: null, autonomy: 'lights-out' })).toMatchObject({
+      allow: false,
+    })
+  })
+
+  it('does not let an author publish a file outside its outputs and the checkout', () => {
+    const input = { file_path: '/etc/passwd' }
+    expect(authorPublishing({ autonomy: 'lights-out', input })).toMatchObject({ allow: false })
+  })
+}

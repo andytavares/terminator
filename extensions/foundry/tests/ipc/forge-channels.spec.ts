@@ -328,6 +328,7 @@ describe('foundry:order.list', () => {
   describe('open questions', forgeChannelsOpenQuestionsTests)
   describe('when it was made', whenItWasMadeTests)
   describe('finished checks and pulls', finishedChecksAndPullsTests)
+  describe('the document handed back', documentOnTheRowTests)
   describe('the open gate', theOpenGateTests)
   describe('no CI yet', noCiYetTests)
   describe('the CI round', theCiRoundTests)
@@ -2219,5 +2220,46 @@ function whatCancelRefusesTests() {
     expect(await sendThroughSchema('foundry:order.cancel', { id: 'WO-nope' })).toEqual({
       error: 'No order WO-nope.',
     })
+  })
+}
+
+const published = {
+  path: 'research.md',
+  url: 'https://claude.ai/artifact/abc-123',
+  location: 'published' as const,
+}
+
+async function listedDocument(document: WorkOrder['document']): Promise<unknown> {
+  const c = channels()
+  const seeded = (await c.create({
+    source: { kind: 'typed', text: 'first idea' },
+    repoPaths: [repo],
+  })) as OrderView
+  const loaded = await store.load(seeded.order.id)
+  await store.save({ ...loaded!, document })
+  const r = (await c.list()) as { orders: { document: unknown }[] }
+  return r.orders[0].document
+}
+
+function documentOnTheRowTests() {
+  it('says what kind of document a published one is, where it opens, and where its copy is', async () => {
+    expect(await listedDocument(published)).toEqual({
+      kind: 'claude-artifact',
+      url: published.url,
+      path: expect.stringMatching(/\/orders\/WO-[^/]+\/research\.md$/),
+    })
+  })
+
+  it('has a file in the outputs folder open by its path', async () => {
+    expect(await listedDocument({ path: '/out/notes.md', location: 'outputs' })).toEqual({
+      kind: 'file',
+      url: null,
+      path: '/out/notes.md',
+    })
+  })
+
+  it('says nothing for a document in the checkout, which ships as a pull request, or for none', async () => {
+    expect(await listedDocument({ path: 'docs/a.md', location: 'checkout' })).toBeNull()
+    expect(await listedDocument(null)).toBeNull()
   })
 }

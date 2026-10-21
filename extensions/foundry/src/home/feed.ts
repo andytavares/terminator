@@ -3,6 +3,7 @@ import type { ExtensionAPI } from '@terminator/extension-sdk'
 
 import { surfacedQuestions } from '../forge/interview.js'
 import type { FactoryMetrics } from '../factory/metrics.js'
+import { documentKindOf, OPEN_LABEL } from '../line/document-kind.js'
 import type { Gate } from '../gates/rules.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { Standing } from '../order/standing.js'
@@ -136,10 +137,16 @@ function facetsOf(row: OrderRow, now: string): ThreadFacet[] {
       line: standing.headline,
       tone: toneOf(standing),
       ...(row.pullUrl === null ? {} : { url: row.pullUrl }),
+      ...documentLinksOf(order),
       closedAt: row.closedAt,
       updatedAt: row.updatedAt,
     },
   ]
+}
+
+function documentLinksOf({ document }: WorkOrder): Pick<ThreadFacet, 'links'> {
+  if (document?.url === undefined) return {}
+  return { links: [{ label: OPEN_LABEL[documentKindOf(document)], url: document.url }] }
 }
 
 function isLongShipped({ order, closedAt }: OrderRow, now: string): boolean {

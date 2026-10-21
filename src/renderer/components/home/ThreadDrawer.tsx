@@ -32,6 +32,11 @@ function LinkButtons({ thread }: { thread: WorkThread }): JSX.Element {
           {`Open pull request #${pr.number}`}
         </Button>
       )}
+      {thread.links.map((link) => (
+        <Button key={link.url} size="sm" onClick={() => openLinkExternally(link.url)}>
+          {link.label}
+        </Button>
+      ))}
       {issue && (
         <Button size="sm" variant="ghost" onClick={() => openLinkExternally(issue.url)}>
           {`Open in ${TRACKER_NAMES[issue.tracker] ?? 'tracker'}`}

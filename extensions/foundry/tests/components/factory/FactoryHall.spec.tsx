@@ -881,3 +881,36 @@ function aNewLimitTests() {
     expect(raise).toBeTruthy()
   })
 }
+
+describe('the document an order handed back', () => {
+  const document = {
+    kind: 'claude-artifact',
+    url: 'https://claude.ai/artifact/abc',
+    path: '/o/r.md',
+  }
+  const done = {
+    kind: 'done',
+    turn: 'foundry',
+    label: 'done',
+    headline: 'Done',
+    detail: 'd',
+    done: 1,
+    total: 1,
+    gateId: null,
+  }
+
+  it('links from the hall HUD, with a button to open it once the order is done', async () => {
+    mount({ view: hallView({ document, standing: done }) })
+    const link = await screen.findByRole('link', { name: 'Claude artifact' })
+    fireEvent.click(link)
+    expect(openExternal).toHaveBeenCalledWith(document.url)
+    fireEvent.click(screen.getByRole('button', { name: 'Open artifact' }))
+    expect(openExternal).toHaveBeenCalledTimes(2)
+  })
+
+  it('links without the button while the order is still running', async () => {
+    mount({ view: hallView({ document, standing: { ...done, kind: 'running' } }) })
+    await screen.findByRole('link', { name: 'Claude artifact' })
+    expect(screen.queryByRole('button', { name: 'Open artifact' })).toBeNull()
+  })
+})

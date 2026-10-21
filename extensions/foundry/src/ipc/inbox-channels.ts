@@ -9,6 +9,8 @@ import type { GateStore } from '../gates/store.js'
 import type { OrderStore } from '../order/store.js'
 import type { WorkOrder } from '../order/schema.js'
 import { pullNumber } from '../line/pull-number.js'
+import { documentLinkOf } from '../line/document-outcome.js'
+import type { DocumentLink } from '../line/document-kind.js'
 
 // The one surface the operator is required to visit.
 //
@@ -45,6 +47,8 @@ export interface InboxDeps {
    * The pull requests an order opened, so a gate can link them.
    */
   readonly readPulls: (orderId: string) => Promise<readonly { readonly url: string }[]>
+  /** The order's own directory, which a document's relative path is read against. */
+  readonly orderDirectory: (orderId: string) => string
   /**
    * Orders waiting on the operator that no gate stands for — a draft ready to
    * hand off, shaping that stopped, a run that did not start. Without them
@@ -149,6 +153,9 @@ async function orderRows(
 ): Promise<(orderId: string) => OrderRow> {
   const titleFor = new Map(orders.map((order) => [order.id, order.title]))
   const ticketFor = new Map(orders.map((order) => [order.id, ticketOf(order)]))
+  const documentFor = new Map(
+    orders.map((order) => [order.id, documentLinkOf(order, deps.orderDirectory(order.id))])
+  )
   // Once per order, not per gate: a queue of six gates on one order is one read.
   const pullsFor = new Map<string, { number: number; url: string }[]>()
   for (const orderId of new Set(gates.map((gate) => gate.orderId))) {
@@ -162,6 +169,7 @@ async function orderRows(
     orderTitle: titleFor.get(orderId) ?? null,
     pulls: pullsFor.get(orderId) ?? [],
     source: ticketFor.get(orderId) ?? null,
+    document: documentFor.get(orderId) ?? null,
   })
 }
 
@@ -169,6 +177,7 @@ interface OrderRow {
   readonly orderTitle: string | null
   readonly pulls: { number: number; url: string }[]
   readonly source: { key: string; url: string } | null
+  readonly document: DocumentLink | null
 }
 
 function ticketOf(order: WorkOrder): { key: string; url: string } | null {

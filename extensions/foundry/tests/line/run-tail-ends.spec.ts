@@ -103,11 +103,13 @@ describe('a research order whose document is outside the checkout', () => {
     await startResearch({ path: 'answers/why.md', location: 'outputs' })
     expect((await tailEntry('run.document_ready')).reason).toBe('outputs: answers/why.md')
     await shipSettledTo('passed')
+    await vi.waitFor(async () =>
+      expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('shipped')
+    )
     const prCreates = host.gh.mock.calls.filter(([call]) =>
       call.args.join(' ').includes('pr create')
     )
     expect(prCreates).toEqual([])
-    expect((await createOrderStore(dataDir).load('WO-1'))?.status).not.toBe('shipped')
   })
 })
 
@@ -116,6 +118,7 @@ describe('a research order whose author handed nothing back', () => {
     await startResearch(null)
     expect((await tailEntry('run.failed')).reason).toBe('the author handed back no document')
     await shipSettledTo('waiting')
+    expect((await createOrderStore(dataDir).load('WO-1'))?.status).not.toBe('shipped')
   })
 })
 

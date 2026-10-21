@@ -28,6 +28,7 @@ function inboxDeps(over: Partial<InboxDeps> = {}): InboxDeps {
     record: vi.fn(async () => undefined),
     act: async () => undefined,
     readPulls: async () => [],
+    orderDirectory: (orderId: string) => `/records/orders/${orderId}`,
     waiting: async () => [],
     ...over,
   }
@@ -77,6 +78,7 @@ describe('foundry:inbox.list', () => {
   describe('empty and orders waiting', emptyAndOrdersWaitingTests)
   describe('raised gates', raisedGatesTests)
   describe('links', inboxChannelsLinksTests)
+  describe('the document handed back', inboxDocumentTests)
   describe('typed orders and ranking', typedOrdersAndRankingTests)
   describe('silenced and unconditional rules', silencedAndUnconditionalRulesTests)
   describe('deadlines', inboxChannelsDeadlinesTests)
@@ -606,3 +608,25 @@ describe('what this setting is not asking about', () => {
     }
   })
 })
+
+function inboxDocumentTests() {
+  async function gateDocument(document: WorkOrder['document']): Promise<unknown> {
+    await createOrderStore(root).save(order({ document }))
+    await createGateStore(root).save(gate())
+    const r = (await channels().list()) as { gates: { document: unknown }[] }
+    return r.gates[0].document
+  }
+
+  it('carries the document on each gate of an order that handed one back', async () => {
+    expect(await gateDocument({ path: '/out/notes.md', location: 'outputs' })).toEqual({
+      kind: 'file',
+      url: null,
+      path: '/out/notes.md',
+    })
+  })
+
+  it('carries none for the checkout or no document', async () => {
+    expect(await gateDocument({ path: 'docs/a.md', location: 'checkout' })).toBeNull()
+    expect(await gateDocument(null)).toBeNull()
+  })
+}

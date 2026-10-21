@@ -103,7 +103,6 @@ const HOOK_TIMEOUT_SECONDS = 43_200
  *
  * The third time this pair of names has cost something here — the trust
  * dialog and the write-outside check were the other two.
- * @internal
  */
 export function transcriptPathFor(cwd: string, sessionId: string, home = homedir()): string {
   const encoded = realPath(cwd).replace(/[/.]/g, '-')
@@ -153,6 +152,9 @@ interface HookCommandOptions {
  */
 export function buildSettings(options: HookCommandOptions): unknown {
   return {
+    // Nobody is watching an unattended run, so a browser tab opening on each
+    // published artifact would only pile up.
+    env: { CLAUDE_CODE_ARTIFACT_AUTO_OPEN: '0' },
     hooks: {
       PreToolUse: [
         {

@@ -211,6 +211,7 @@ export function brief(input: BriefInput): string {
     `Work order \`${order.id}\`, risk ${order.risk.grade}.`,
     ...intentSections(order),
     ...workSections(input, reads),
+    ...documentSection(input.order, reads),
     ...knowledgeSections(input, reads),
     ...outputSection(input),
   ]
@@ -275,6 +276,23 @@ function knowledgeSections(input: BriefInput, reads: ReadonlySet<string>): strin
     lines.push('', '## Assumed, and not verified', '', ...assumed.map((a) => `- ${a.text}`), '')
     lines.push(
       'If one of these turns out to be wrong, stop and say so rather than working around it.'
+    )
+  }
+  return lines
+}
+
+// A document filed outside the checkout leaves the verifier an empty diff to judge.
+function documentSection({ document }: WorkOrder, reads: ReadonlySet<string>): string[] {
+  if (!reads.has('unit_diff') || document === null || document.location === 'checkout') return []
+  const lines = [
+    '',
+    '## The document',
+    '',
+    `The document under review is ${document.path}. Read it and judge it against the criteria; the change in the checkout may be empty.`,
+  ]
+  if (document.url !== undefined) {
+    lines.push(
+      `It was published at ${document.url}; the file above is the copy that was published.`
     )
   }
   return lines

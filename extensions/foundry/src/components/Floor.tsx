@@ -14,6 +14,9 @@ import {
   CheckCircle2,
   Eye,
   ExternalLink as OpenOutside,
+  Copy,
+  FileText,
+  Sparkles,
 } from 'lucide-react'
 import type { RunNode } from '../line/run-graph.js'
 import { ciLabel } from '../line/ci-label.js'
@@ -26,6 +29,9 @@ import { usePushed } from '../renderer/use-pushed.js'
 import { openInBrowser } from '@terminator/extension-sdk/renderer'
 import { ExternalLink } from './ExternalLink.js'
 import { OrderLinks } from './OrderLinks.js'
+import { DocumentChip, openDocument } from './DocumentChip.js'
+import { OPEN_LABEL } from '../line/document-kind.js'
+import type { DocumentLink } from '../line/document-kind.js'
 import { attachTo } from '../renderer/attach-to-step.js'
 import {
   useRunObservation,
@@ -565,13 +571,18 @@ interface FloorLinksProps {
   readonly review: (pull: Pull) => Promise<void>
 }
 
+function FloorDocument({ view }: { readonly view: FloorView }) {
+  return view.document == null ? null : <DocumentChip document={view.document} />
+}
+
 /** The pull requests the work opened and the ticket it came from, with a review of each. */
 function FloorLinks({ view, reviewable, review }: FloorLinksProps) {
   const pulls = view.pulls ?? []
   const source = view.source ?? null
-  if (pulls.length === 0 && source === null) return null
+  if (pulls.length === 0 && source === null && view.document == null) return null
   return (
     <p className="fdry-order-links">
+      <FloorDocument view={view} />
       <OrderLinks pulls={pulls} source={source} />
       {pulls.map((pull) => (
         <Button
@@ -622,6 +633,7 @@ function StandingBand({ floor, view }: PageProps) {
     >
       <StandingHead standing={standing} />
       <StandingBar standing={standing} />
+      <DoneDocument standing={standing} view={view} />
       <LiveAgents floor={floor} view={view} />
       <StrandedGate floor={floor} view={view} />
       <AdriftGate floor={floor} view={view} />
@@ -630,6 +642,14 @@ function StandingBand({ floor, view }: PageProps) {
           A check that names a problem and offers no reachable control is a
           wall: this one was answerable only from a tab the operator had no
           reason to connect to the run they were looking at. */}
+      <WaitingGates floor={floor} view={view} />
+    </section>
+  )
+}
+
+function WaitingGates({ floor, view }: PageProps) {
+  return (
+    <>
       {(view.waiting ?? []).map((gate) => (
         <GateCard
           key={gate.id}
@@ -640,8 +660,19 @@ function StandingBand({ floor, view }: PageProps) {
           onDecide={(option, limit) => void floor.decideGate(gate.id, option, limit)}
         />
       ))}
-    </section>
+    </>
   )
+}
+
+function DoneDocument({
+  standing,
+  view,
+}: {
+  readonly standing: StandingOf
+  readonly view: FloorView
+}) {
+  if (standing.kind !== 'done' || !view.document) return null
+  return <DocumentActions document={view.document} />
 }
 
 function StandingHead({ standing }: { readonly standing: StandingOf }) {
@@ -1411,5 +1442,38 @@ function BlockedPanel({ view }: { readonly view: FloorView }) {
         </p>
       ))}
     </section>
+  )
+}
+
+/** The moves on a finished order's document: open it, open the local copy, copy the link. */
+function DocumentActions({ document }: { readonly document: DocumentLink }): JSX.Element {
+  return (
+    <div className="fdry-doc-actions">
+      <Button variant="primary" icon={Sparkles} onClick={() => openDocument(document)}>
+        {OPEN_LABEL[document.kind]}
+      </Button>
+      {document.kind === 'file' ? null : (
+        <Button
+          variant="secondary"
+          icon={FileText}
+          onClick={() => void window.electronAPI.shell.openPath(document.path)}
+        >
+          Open local copy
+        </Button>
+      )}
+      {document.url === null ? null : <CopyLink url={document.url} />}
+    </div>
+  )
+}
+
+function CopyLink({ url }: { readonly url: string }) {
+  return (
+    <Button
+      variant="ghost"
+      icon={Copy}
+      onClick={() => void navigator.clipboard.writeText(url).catch(() => undefined)}
+    >
+      Copy link
+    </Button>
   )
 }

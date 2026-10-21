@@ -35,6 +35,11 @@ export const ThreadFacetSchema = z.object({
   line: z.string(),
   tone: z.enum(['neutral', 'good', 'bad', 'waiting']),
   url: z.string().optional(),
+  /** Where the thread's result is, as buttons on its drawer. */
+  links: z
+    .array(z.object({ label: z.string().min(1), url: z.string().url() }))
+    .max(4)
+    .optional(),
   closedAt: z.string().nullable(),
   checks: z
     .array(

@@ -89,6 +89,7 @@ describe('standingOf', () => {
   describe('draft wording', draftWordingTests)
   describe('agreed orders', agreedOrdersTests)
   describe('shipped', shippedTests)
+  describe('shipped on a document', finishedDocumentTests)
   describe('answered shipped gates', answeredShippedGatesTests)
   describe('always says something', alwaysSaysSomethingTests)
 })
@@ -486,6 +487,40 @@ function shippedTests() {
     expect(standing.turn).toBe('you')
     expect(standing.label).toBe('Mark the draft pull request ready?')
     expect(standing.gateId).toBe('WO-1-ready-for-review-1')
+  })
+}
+
+function finishedDocumentTests() {
+  it('says a document published as a Claude artifact is finished, not shipped', () => {
+    const document = {
+      path: 'why.md',
+      location: 'published' as const,
+      url: 'https://claude.ai/artifact/abc-123',
+    }
+    const standing = standingOf(input({ status: 'shipped', document }))
+    expect(standing.label).toBe('Finished · published')
+    expect(standing.headline).toBe('Finished · published as a Claude artifact')
+    expect(standing.detail).toBe(
+      "The verifier checked it against the order's criteria. A copy is kept with the order."
+    )
+  })
+
+  it('says a document published at another link is published', () => {
+    const document = { path: 'why.md', location: 'published' as const, url: 'https://x.test/a' }
+    const standing = standingOf(input({ status: 'shipped', document }))
+    expect(standing.headline).toBe('Finished · published')
+  })
+
+  it('says where a document kept with the order is', () => {
+    const document = { path: 'answers/why.md', location: 'outputs' as const }
+    const standing = standingOf(input({ status: 'shipped', document }))
+    expect(standing.label).toBe('Finished · document ready')
+    expect(standing.detail).toBe('The document is with the order: answers/why.md')
+  })
+
+  it('still says shipped when the document was in the checkout', () => {
+    const document = { path: 'why.md', location: 'checkout' as const }
+    expect(standingOf(input({ status: 'shipped', document })).label).toBe('shipped')
   })
 }
 

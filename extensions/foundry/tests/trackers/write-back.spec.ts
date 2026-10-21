@@ -260,6 +260,59 @@ describe('the pull request link (FR-061)', () => {
   })
 })
 
+describe('a run that ended on a document', () => {
+  describe('the link', documentLinkTests)
+  describe('the write-back switches', documentSwitchTests)
+})
+
+const document = {
+  path: 'answers/why.md',
+  location: 'published' as const,
+  url: 'https://x.test/a',
+}
+
+function documentLinkTests() {
+  it('moves the issue to in review and comments where the document is', async () => {
+    const issues = port()
+    await writeBack(order(), { event: 'document_ready', document }, deps({ issues }))
+    expect(issues.transition).toHaveBeenCalledWith(
+      { tracker: 'linear', key: 'TAV-42' },
+      'in_review',
+      undefined
+    )
+    expect(issues.comment).toHaveBeenCalledWith(
+      { tracker: 'linear', key: 'TAV-42' },
+      'Foundry finished `WO-1`: https://x.test/a'
+    )
+  })
+
+  it('names the path when the document has no link', async () => {
+    const issues = port()
+    await writeBack(
+      order(),
+      { event: 'document_ready', document: { path: 'answers/why.md', location: 'outputs' } },
+      deps({ issues })
+    )
+    expect(issues.comment).toHaveBeenCalledWith(
+      { tracker: 'linear', key: 'TAV-42' },
+      'Foundry finished `WO-1`: answers/why.md'
+    )
+  })
+}
+
+function documentSwitchTests() {
+  it('comments nothing when the link write is turned off', async () => {
+    const issues = port()
+    await writeBack(
+      order({ writeBack: ['status'] }),
+      { event: 'document_ready', document },
+      deps({ issues })
+    )
+    expect(issues.comment).not.toHaveBeenCalled()
+    expect(issues.transition).toHaveBeenCalledTimes(1)
+  })
+}
+
 describe('a failed write never affects the work (FR-063)', () => {
   describe('failure', failureTests)
   describe('retries', retriesTests)
@@ -373,6 +426,7 @@ function theStateNamedTests() {
       amended: null,
       started: 'started',
       draft_opened: 'in_review',
+      document_ready: 'in_review',
       merged: 'done',
     })
   })

@@ -7,6 +7,7 @@ import { planResume } from '../sidebar/resume'
 type Stage = ThreadFacet['stage']
 type WhoseMove = ThreadFacet['whoseMove']
 type Tone = ThreadFacet['tone']
+type ThreadLink = NonNullable<ThreadFacet['links']>[number]
 
 export interface WorkThread {
   key: string
@@ -17,6 +18,8 @@ export interface WorkThread {
   branch: string | null
   sessions: SessionFacts[]
   facets: ThreadFacet[]
+  /** Where the thread's results are, from every facet, one per address. */
+  links: ThreadLink[]
   stage: Stage
   whoseMove: WhoseMove
   nowLine: string
@@ -283,12 +286,21 @@ function statusOf(draft: Draft, now: number) {
   }
 }
 
+function linksOf(facets: readonly ThreadFacet[]): ThreadLink[] {
+  const byUrl = new Map<string, ThreadLink>()
+  for (const link of facets.flatMap((f) => f.links ?? [])) {
+    if (!byUrl.has(link.url)) byUrl.set(link.url, link)
+  }
+  return [...byUrl.values()]
+}
+
 function toThread(draft: Draft, input: WorkThreadInput): WorkThread {
   return {
     ...identityOf(draft, input),
     ...statusOf(draft, input.now),
     sessions: draft.sessions,
     facets: draft.facets,
+    links: linksOf(draft.facets),
   }
 }
 

@@ -2342,6 +2342,7 @@ function callersThatNeverReportAStartTests() {
 describe('what a read-only rung hands back', () => {
   describe('where to write', whereToWriteTests)
   describe('collecting', collectingTests)
+  describe('collecting with the session', collectingSessionTests)
   describe('a contradicting rung', aContradictingRungTests)
   describe('silenced defects and failures to collect', silencedDefectsAndFailuresToCollectTests)
 })
@@ -2390,6 +2391,24 @@ function whereToWriteTests() {
 
     const build = run.mock.calls.find((c) => c[0].node.id === 'build:U-1')?.[0]
     expect(build?.outputPath).toBeNull()
+  })
+}
+
+function collectingSessionTests() {
+  it('collects with the session the rung just ran in, so its transcript can be read', async () => {
+    const o = order([unit('U-1')])
+    const sessions: (string | null)[] = []
+    await execute(planOf(o, recipe(READS)), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async () => 0,
+      collect: async ({ sessionId }) => {
+        sessions.push(sessionId)
+        return null
+      },
+    })
+
+    expect(sessions).toContain('sess-challenge')
   })
 }
 

@@ -240,6 +240,37 @@ function docsOnlyWrite(request: ToolRequest, target: string | null): PolicyDecis
   }
 }
 
+/** An agent publishes only its order's document page; nothing else in reach leaves the machine. */
+function publishDocumentRule(request: ToolRequest): PolicyDecision | undefined {
+  if (request.tool !== 'Artifact' || !isPublish(request.input)) return undefined
+  if (publishesOwnDocument(request)) {
+    return { allow: true, reason: "publishing the order's own document" }
+  }
+  return {
+    allow: false,
+    reason: `publish only the order's document: one page (.html, .htm or .md) in ${request.outputsDir ?? 'the outputs directory of a role that hands back a document'}, with no other files attached`,
+  }
+}
+
+const PAGE = /\.(html?|md)$/i
+
+/** A publish is the tool's default action; reading or listing artifacts is not one. */
+function isPublish(input: unknown): boolean {
+  const action = (input as { action?: unknown } | null)?.action
+  return action === undefined || action === 'publish'
+}
+
+function publishesOwnDocument(request: ToolRequest): boolean {
+  const target = pathOf(request.input)
+  const attaches = (request.input as { files?: unknown } | null)?.files !== undefined
+  return (
+    !attaches &&
+    target !== null &&
+    PAGE.test(target) &&
+    isInsideMount(target, request.outputsDir ?? null)
+  )
+}
+
 // FR-029's automatic half: without it every ordinary edit went to the operator at
 // every setting, and no run finished unattended.
 function autonomyRule(request: ToolRequest): PolicyDecision | undefined {
@@ -271,6 +302,7 @@ const TOOL_RULES: readonly ToolRule[] = [
   readOnlyRule,
   roleToolRule,
   docsOnlyRule,
+  publishDocumentRule,
   autonomyRule,
   modeRule,
 ]

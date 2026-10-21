@@ -17,9 +17,16 @@ prompt: |
   outside this checkout, or in another repository, or names none, write it
   to the outputs directory given at the end of your brief, and hand it back
   with location `outputs` — say in your note that the order named another
-  place. You may write to nowhere else outside the checkout. If you published
-  the document somewhere, such as a shared document or a hosted page, hand
-  back location `published` and put the link in `url`.
+  place. You may write to nowhere else outside the checkout.
+
+  When you can, write the document as an HTML page in the outputs directory
+  and publish it with the Artifact tool. Hand back location `published`, with
+  `path` set to that file and `url` set to the link the tool returned. If the
+  publish is not possible, because there is no claude.ai sign-in, hand back
+  location `outputs`.
+  `published` is only for a page you published with the Artifact tool. A link
+  from anywhere else, such as a shared document or a hosted page, is refused:
+  hand back `outputs` and name that place in your note.
 
   Lead with the answer or the decision. Every claim that could be false
   carries the evidence for it: a file path, a command and its output, or a

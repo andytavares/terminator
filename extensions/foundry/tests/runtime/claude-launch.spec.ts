@@ -77,6 +77,7 @@ const settings = () =>
     sessionId: 's1',
     nodePath: '/opt/node',
   }) as {
+    env: Record<string, string>
     hooks: Record<
       'PreToolUse' | 'Stop' | 'SessionEnd',
       Array<{ matcher: string; hooks: Array<{ command: string; timeout: number }> }>
@@ -134,6 +135,10 @@ function resolvingTheDirectoryTests() {
 }
 
 describe('buildSettings', () => {
+  it('stops the browser opening on every artifact an unattended agent publishes', () => {
+    expect(settings().env).toEqual({ CLAUDE_CODE_ARTIFACT_AUTO_OPEN: '0' })
+  })
+
   describe('the PreToolUse hook', thePretooluseHookTests)
   describe('lifecycle hooks', lifecycleHooksTests)
 })

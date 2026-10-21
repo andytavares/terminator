@@ -47,7 +47,10 @@ import { openInBrowser } from '@terminator/extension-sdk/renderer'
 import { attachTo } from '../../renderer/attach-to-step.js'
 import { GateCard } from '../GateCard.js'
 import { OrderLinks } from '../OrderLinks.js'
-import { Markdown, usePolling, everyWhileVisible } from '@terminator/extension-ui'
+import { DocumentChip, openDocument } from '../DocumentChip.js'
+import { OPEN_LABEL } from '../../line/document-kind.js'
+import type { DocumentLink } from '../../line/document-kind.js'
+import { Button, Markdown, usePolling, everyWhileVisible } from '@terminator/extension-ui'
 import { usePushed, ANY_RECORD } from '../../renderer/use-pushed.js'
 import './hall.css'
 import { invoke } from '@terminator/extension-sdk/renderer'
@@ -1217,17 +1220,38 @@ function HallHud(props: HallHudProps): JSX.Element {
           <History aria-hidden="true" /> Replay
         </button>
       )}
-      {(view.pulls?.length ?? 0) > 0 || view.source != null ? (
-        <span className="fdry-hall-hud__links">
-          <OrderLinks pulls={view.pulls} source={view.source} />
-        </span>
-      ) : null}
+      <HudLinks view={view} standing={standing} />
       {note !== null ? <span className="fdry-hall-hud__note">{note}</span> : null}
       {!replaying && waitingCount > 0 ? (
         <span className="fdry-hall-hud__needs">{waitingCount} need you</span>
       ) : null}
       <HudAlert standing={standing} waitingCount={waitingCount} onOpenInList={props.onOpenInList} />
     </div>
+  )
+}
+
+function hasHudLinks(view: FloorView): boolean {
+  return (view.pulls?.length ?? 0) > 0 || view.source != null || view.document != null
+}
+
+/** The order's links, and the one move on a finished order's document. */
+function HudLinks({
+  view,
+  standing,
+}: {
+  readonly view: FloorView
+  readonly standing: FloorView['standing']
+}) {
+  const document = view.document ?? null
+  if (!hasHudLinks(view)) return null
+  return (
+    <span className="fdry-hall-hud__links">
+      {document === null ? null : <DocumentChip document={document} />}
+      <OrderLinks pulls={view.pulls} source={view.source} />
+      {document !== null && standing?.kind === 'done' ? (
+        <OpenDocumentButton document={document} />
+      ) : null}
+    </span>
   )
 }
 
@@ -1402,5 +1426,14 @@ function AskActions({ item, busy, onAllow, onDeny, onTerminal }: InterruptionCar
         </button>
       )}
     </div>
+  )
+}
+
+/** The primary "Open ..." move alone, for a surface too small for the whole row. */
+function OpenDocumentButton({ document }: { readonly document: DocumentLink }) {
+  return (
+    <Button variant="primary" size="sm" onClick={() => openDocument(document)}>
+      {OPEN_LABEL[document.kind]}
+    </Button>
   )
 }

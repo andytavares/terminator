@@ -3,9 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ThreadDrawer } from '../../../../src/renderer/components/home/ThreadDrawer'
 import { useDeskSelection } from '../../../../src/renderer/components/home/desk-selection'
+import { useHomeFeedStore } from '../../../../src/renderer/stores/home-feed.store'
 import { useParkedThreads } from '../../../../src/renderer/components/home/parked-threads'
 import { installElectronApi } from '../../../support/electron-api'
-import { FACTS, seedDesk, ticket } from '../home/desk-world'
+import { FACETS, FACTS, seedDesk, ticket } from '../home/desk-world'
 import { fact } from '../sidebar/fixtures/facts'
 import type { SessionFacts } from '../../../../src/renderer/sidebar/session-facts'
 
@@ -27,6 +28,7 @@ vi.mock('../../../../src/renderer/components/session/session-actions', () => ({
 
 const summaryGet = vi.fn()
 const usageGet = vi.fn()
+const openExternal = vi.fn()
 
 function resetDrawerWorld(): void {
   localStorage.clear()
@@ -45,7 +47,7 @@ beforeEach(() => {
   installElectronApi({
     homeThreadSummary: { get: summaryGet },
     agentUsage: { get: usageGet },
-    shell: { openExternal: vi.fn() },
+    shell: { openExternal },
   })
 })
 
@@ -109,5 +111,26 @@ describe('ThreadDrawer terminal section lifecycle', () => {
     expect(screen.getByTestId('preview-s9')).toBeTruthy()
     unmount()
     expect(screen.queryByTestId('preview-s9')).toBeNull()
+  })
+})
+
+describe('ThreadDrawer links', () => {
+  it('shows a button for each link a facet publishes and opens its address', () => {
+    const url = 'https://claude.ai/artifact/abc'
+    useHomeFeedStore.setState({
+      facets: [
+        ...FACETS,
+        {
+          ...FACETS[0],
+          source: 'foundry',
+          kind: 'order',
+          links: [{ label: 'Open artifact', url }],
+        },
+      ],
+    })
+    openDrawerFor([fact({ ...OPEN_SESSION })], 'linear:TAV-20')
+    render(<ThreadDrawer />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open artifact' }))
+    expect(openExternal).toHaveBeenCalledWith(url)
   })
 })

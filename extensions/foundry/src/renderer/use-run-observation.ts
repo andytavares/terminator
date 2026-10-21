@@ -4,6 +4,7 @@ import type { RunGraph } from '../line/run-graph.js'
 import type { Standing } from '../order/standing.js'
 import type { Gate } from '../gates/rules.js'
 import type { CiState } from '../line/ci-state.js'
+import type { DocumentLink } from '../line/document-kind.js'
 import { invoke } from '@terminator/extension-sdk/renderer'
 
 /** One repository this order spans, and what it is waiting for. */
@@ -62,6 +63,8 @@ export interface FloorView {
   pulls?: { repo: string; url: string; number: number; cwd: string }[]
   /** The ticket the order came from; null for an idea typed in. */
   source?: { key: string; url: string } | null
+  /** The document the author handed back outside the checkout; null when there is none. */
+  document?: DocumentLink | null
   /** The draft's CI, from the ship tail's own file. Absent means no run has shipped yet. */
   ci?: CiState | null
   /** Skills each node gets, keyed by node id. Absent nodes have none. */

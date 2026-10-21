@@ -94,6 +94,7 @@ async function toggleFromQuickActions(): Promise<void> {
 async function seedAndRestart(): Promise<string> {
   const watched = await seedWatchedDraft()
   await seedShippedOrder()
+  await seedPublishedResearch()
   handle = await restartFoundry(handle, 'Foundry Floor')
   await openForge(handle)
   return watched
@@ -297,6 +298,68 @@ async function seedShippedOrder(): Promise<void> {
     missing: 'no order was created to measure',
   })
   writeShippedFirstTime(id)
+}
+
+const RESEARCH_TITLE = 'why the overview reads as one long scroll'
+const RESEARCH_LINK = 'https://claude.ai/artifact/YJeSCmFWK1GJC8X9ZXUpVf'
+
+/** A research order that ended on a published Claude artifact, written as the line leaves it. */
+async function seedPublishedResearch(): Promise<void> {
+  const id = await createTypedOrder(handle, {
+    repo,
+    text: RESEARCH_TITLE,
+    missing: 'no research order was created',
+  })
+  const dir = join(repo, '.foundry', 'orders', id)
+  const file = join(dir, 'order.json')
+  const document = {
+    path: join(dir, 'outputs', 'answer.html'),
+    url: RESEARCH_LINK,
+    location: 'published',
+  }
+  const order = JSON.parse(readFileSync(file, 'utf8'))
+  writeFileSync(file, JSON.stringify({ ...order, recipe: 'research', status: 'shipped', document }))
+  const nodes = ['scout', 'write', 'verify'].map((step) =>
+    passedNode({ id: step, kind: 'agent', role: step === 'write' ? 'author' : step, lane: 1 })
+  )
+  writeFileSync(
+    join(dir, 'run-graph.json'),
+    JSON.stringify({ orderId: id, recipe: 'research', nodes })
+  )
+}
+
+/** Run in Foundry's view: whether a link of that name exists, and whether any sits inside a button. */
+function artifactLinks(): Promise<{ count: number; insideButton: boolean }> {
+  return inFoundry(
+    handle,
+    `(function () {
+    var links = Array.prototype.filter.call(document.querySelectorAll('a'), function (a) {
+      return a.textContent.trim() === 'Claude artifact' && a.getAttribute('href') === ${JSON.stringify(RESEARCH_LINK)}
+    })
+    return { count: links.length, insideButton: links.some(function (a) { return !!a.closest('button') }) }
+  })()`
+  )
+}
+
+/** The factory site's card links the artifact beside the hall, and the hall's HUD offers it. */
+async function researchArtifactInTheFactory(): Promise<void> {
+  await expect.poll(async () => (await artifactLinks()).count, { timeout: 15_000 }).toBe(1)
+  expect((await artifactLinks()).insideButton).toBe(false)
+  await captureFoundry(handle, 'foundry-factory-research-card.png')
+  await expect
+    .poll(() => clickContaining(handle, 'button', RESEARCH_TITLE), { timeout: 15_000 })
+    .toBe(true)
+  // The hall loads after the click: wait for its HUD, not for the card's link still on screen.
+  await expect.poll(() => bodyText(handle), { timeout: 20_000 }).toContain('Open artifact')
+  expect((await artifactLinks()).count).toBe(1)
+  await captureFoundry(handle, 'foundry-factory-research-hall.png')
+  expect(await clickByName(handle, 'button', 'All halls')).toBe(true)
+}
+
+/** The order list's row links the artifact too. */
+async function researchArtifactOnTheList(): Promise<void> {
+  await expect.poll(async () => (await artifactLinks()).count, { timeout: 15_000 }).toBe(1)
+  await captureFoundry(handle, 'foundry-list-research-row.png')
 }
 
 async function ledgerFactoryNumbers(): Promise<void> {
@@ -669,8 +732,13 @@ test('what runs recorded is shown in the factory hall, on the Floor and in the L
   const watched = await step('records written by hand are read after a restart', seedAndRestart)
   await step('Factory view survives a restart', () => expectFactoryPressed(15_000))
   await step('the factory site’s status wall reads the recorded numbers', expectStatusWall)
+  await step(
+    'a research order’s Claude artifact is linked on its hall card and in its hall',
+    researchArtifactInTheFactory
+  )
   await hallShowsTheRunGraph()
   await step('List view switches the Forge back', backToList)
+  await step('the order list links the research order’s artifact', researchArtifactOnTheList)
   await step('a draft’s CI is on the Floor while it is watched', () => ciOnTheFloor(watched))
   await step(
     'the Ledger’s Factory tab reads the numbers off what was recorded',
