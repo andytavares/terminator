@@ -1,0 +1,23 @@
+tests/e2e/design-system-fields.spec.ts
+  s_42e5fd6fba2257::t_2d94c92bd325f4 112-130
+src/renderer/styles.css
+  s_42e5fd6fba2257::t_997cc3a97980d3 42-51
+CHANGELOG.md
+  s_42e5fd6fba2257::t_d3e0b6594d41e5 90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c5290904ae64c75e3a3af78b64db362402987a7b",
+  "prompts": {},
+  "sessions": {
+    "s_42e5fd6fba2257": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3af22355-9a92-4690-ab26-a4c5166b6c02",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
