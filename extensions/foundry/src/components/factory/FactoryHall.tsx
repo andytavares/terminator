@@ -46,9 +46,11 @@ import type { TranscriptLine } from '../../runtime/transcript-excerpt.js'
 import { openInBrowser } from '@terminator/extension-sdk/renderer'
 import { attachTo } from '../../renderer/attach-to-step.js'
 import { GateCard } from '../GateCard.js'
-import { OpenDocumentButton, OrderLinks } from '../OrderLinks.js'
+import { OrderLinks } from '../OrderLinks.js'
+import { DocumentChip, openDocument } from '../DocumentChip.js'
+import { OPEN_LABEL } from '../../line/document-kind.js'
 import type { DocumentLink } from '../../line/document-kind.js'
-import { Markdown, usePolling, everyWhileVisible } from '@terminator/extension-ui'
+import { Button, Markdown, usePolling, everyWhileVisible } from '@terminator/extension-ui'
 import { usePushed, ANY_RECORD } from '../../renderer/use-pushed.js'
 import './hall.css'
 import { invoke } from '@terminator/extension-sdk/renderer'
@@ -1016,7 +1018,6 @@ function HallInterruption({ hall, model, item }: StageProps & { readonly item: I
       onDecide={(option, limit) => void answer(item.id, gateDecided(item.id, [option, limit]))}
       pulls={view.pulls}
       source={view.source}
-      document={view.document}
       onTerminal={() =>
         void answer(item.id, terminalOpened(terminalSessionOf(item, hall.observed.pending)))
       }
@@ -1229,6 +1230,10 @@ function HallHud(props: HallHudProps): JSX.Element {
   )
 }
 
+function hasHudLinks(view: FloorView): boolean {
+  return (view.pulls?.length ?? 0) > 0 || view.source != null || view.document != null
+}
+
 /** The order's links, and the one move on a finished order's document. */
 function HudLinks({
   view,
@@ -1238,11 +1243,11 @@ function HudLinks({
   readonly standing: FloorView['standing']
 }) {
   const document = view.document ?? null
-  const hasLinks = (view.pulls?.length ?? 0) > 0 || view.source != null || document !== null
-  if (!hasLinks) return null
+  if (!hasHudLinks(view)) return null
   return (
     <span className="fdry-hall-hud__links">
-      <OrderLinks document={document} pulls={view.pulls} source={view.source} />
+      {document === null ? null : <DocumentChip document={document} />}
+      <OrderLinks pulls={view.pulls} source={view.source} />
       {document !== null && standing?.kind === 'done' ? (
         <OpenDocumentButton document={document} />
       ) : null}
@@ -1308,7 +1313,6 @@ interface InterruptionCardProps {
   readonly onDecide: (option: string, limit?: number | null) => void
   readonly pulls?: readonly { readonly number: number; readonly url: string }[]
   readonly source?: { readonly key: string; readonly url: string } | null
-  readonly document?: DocumentLink | null
   readonly onTerminal: () => void
 }
 
@@ -1356,7 +1360,6 @@ function GateInterruption(props: InterruptionCardProps & { readonly item: GateIt
         busy={props.busy || readOnly}
         pulls={props.pulls}
         source={props.source}
-        document={props.document}
         onDecide={props.onDecide}
       />
       {problem !== null ? <p className="fdry-card__problem">{problem}</p> : null}
@@ -1423,5 +1426,14 @@ function AskActions({ item, busy, onAllow, onDeny, onTerminal }: InterruptionCar
         </button>
       )}
     </div>
+  )
+}
+
+/** The primary "Open ..." move alone, for a surface too small for the whole row. */
+function OpenDocumentButton({ document }: { readonly document: DocumentLink }) {
+  return (
+    <Button variant="primary" size="sm" onClick={() => openDocument(document)}>
+      {OPEN_LABEL[document.kind]}
+    </Button>
   )
 }

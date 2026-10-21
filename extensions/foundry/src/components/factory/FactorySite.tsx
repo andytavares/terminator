@@ -4,7 +4,7 @@ import type { FactoryMetrics } from '../../factory/metrics.js'
 import { MetricsTiles, WindowToggle } from '../MetricsTiles.js'
 import type { Signal } from '../../sensors/types.js'
 import type { CiState } from '../../line/ci-state.js'
-import { OrderLinks } from '../OrderLinks.js'
+import { DocumentChip } from '../DocumentChip.js'
 import type { DocumentLink } from '../../line/document-kind.js'
 import { HallThumbnail } from './HallThumbnail.js'
 import { ciLabel } from '../../line/ci-label.js'
@@ -186,7 +186,7 @@ function HallCard({ row, onOpen }: { readonly row: FactoryOrderRow } & Pick<Grid
       <HallCardButton row={row} onOpen={onOpen} />
       {row.document ? (
         <span className="fdry-order-links fdry-hall-slot-links">
-          <OrderLinks document={row.document} />
+          <DocumentChip document={row.document} />
         </span>
       ) : null}
     </div>

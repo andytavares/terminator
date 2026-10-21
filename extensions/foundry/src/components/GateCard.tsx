@@ -8,7 +8,6 @@ import { RaiseBudgetForm } from './BudgetForm.js'
 import { Button, IconButton, Markdown } from '@terminator/extension-ui'
 import { openInBrowser } from '@terminator/extension-sdk/renderer'
 import { OrderLinks } from './OrderLinks.js'
-import type { DocumentLink } from '../line/document-kind.js'
 
 // One gate, one line.
 //
@@ -25,7 +24,6 @@ export interface GateCardProps {
   readonly onDecide: (option: string, limit?: number | null) => void
   readonly pulls?: readonly { readonly number: number; readonly url: string }[]
   readonly source?: { readonly key: string; readonly url: string } | null
-  readonly document?: DocumentLink | null
   /** What leads the row when several orders share a list: an icon, the rule's name. */
   readonly lead?: React.ReactNode
   /** Further facts for the line under the question: which order, how many units wait. */
@@ -177,8 +175,7 @@ function GateText({
   meta,
   pulls = [],
   source = null,
-  document = null,
-}: Pick<GateCardProps, 'gate' | 'meta' | 'pulls' | 'source' | 'document'>) {
+}: Pick<GateCardProps, 'gate' | 'meta' | 'pulls' | 'source'>) {
   return (
     <div className="fdry-gate-text">
       <b className="fdry-gate-summary" title={gate.summary}>
@@ -187,7 +184,7 @@ function GateText({
       <div className="fdry-gate-meta">
         {meta}
         <span>{gradeInWords(gate.riskGrade)}</span>
-        <OrderLinks document={document} pulls={pulls} source={source} />
+        <OrderLinks pulls={pulls} source={source} />
         <span className="fdry-gate-default">
           If nobody answers: {defaultInWords(gate)}
           {gate.deadline === null ? ' (it waits for you)' : ''}

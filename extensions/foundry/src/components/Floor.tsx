@@ -14,6 +14,9 @@ import {
   CheckCircle2,
   Eye,
   ExternalLink as OpenOutside,
+  Copy,
+  FileText,
+  Sparkles,
 } from 'lucide-react'
 import type { RunNode } from '../line/run-graph.js'
 import { ciLabel } from '../line/ci-label.js'
@@ -25,7 +28,10 @@ import { Button, IconButton, Markdown, RelativeTime, usePolling } from '@termina
 import { usePushed } from '../renderer/use-pushed.js'
 import { openInBrowser } from '@terminator/extension-sdk/renderer'
 import { ExternalLink } from './ExternalLink.js'
-import { DocumentActions, OrderLinks } from './OrderLinks.js'
+import { OrderLinks } from './OrderLinks.js'
+import { DocumentChip, openDocument } from './DocumentChip.js'
+import { OPEN_LABEL } from '../line/document-kind.js'
+import type { DocumentLink } from '../line/document-kind.js'
 import { attachTo } from '../renderer/attach-to-step.js'
 import {
   useRunObservation,
@@ -573,7 +579,8 @@ function FloorLinks({ view, reviewable, review }: FloorLinksProps) {
   if (pulls.length === 0 && source === null && document === null) return null
   return (
     <p className="fdry-order-links">
-      <OrderLinks document={document} pulls={pulls} source={source} />
+      {document === null ? null : <DocumentChip document={document} />}
+      <OrderLinks pulls={pulls} source={source} />
       {pulls.map((pull) => (
         <Button
           key={pull.url}
@@ -647,7 +654,6 @@ function WaitingGates({ floor, view }: PageProps) {
           busy={floor.busy}
           pulls={view.pulls ?? []}
           source={view.source ?? null}
-          document={view.document ?? null}
           onDecide={(option, limit) => void floor.decideGate(gate.id, option, limit)}
         />
       ))}
@@ -1433,5 +1439,38 @@ function BlockedPanel({ view }: { readonly view: FloorView }) {
         </p>
       ))}
     </section>
+  )
+}
+
+/** The moves on a finished order's document: open it, open the local copy, copy the link. */
+function DocumentActions({ document }: { readonly document: DocumentLink }): JSX.Element {
+  return (
+    <div className="fdry-doc-actions">
+      <Button variant="primary" icon={Sparkles} onClick={() => openDocument(document)}>
+        {OPEN_LABEL[document.kind]}
+      </Button>
+      {document.kind === 'file' ? null : (
+        <Button
+          variant="secondary"
+          icon={FileText}
+          onClick={() => void window.electronAPI.shell.openPath(document.path)}
+        >
+          Open local copy
+        </Button>
+      )}
+      {document.url === null ? null : <CopyLink url={document.url} />}
+    </div>
+  )
+}
+
+function CopyLink({ url }: { readonly url: string }) {
+  return (
+    <Button
+      variant="ghost"
+      icon={Copy}
+      onClick={() => void navigator.clipboard.writeText(url).catch(() => undefined)}
+    >
+      Copy link
+    </Button>
   )
 }

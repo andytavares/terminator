@@ -3,6 +3,7 @@ import { ArrowLeft, Plus, CheckCircle2, AlertCircle, Loader } from 'lucide-react
 import { Button, SegmentedControl } from '@terminator/extension-ui'
 import { GateAnswers } from './GateCard.js'
 import { OrderLinks } from './OrderLinks.js'
+import { DocumentChip } from './DocumentChip.js'
 import type { DocumentLink } from '../line/document-kind.js'
 import { ciLabel } from '../line/ci-label.js'
 import type { CiState } from '../line/ci-state.js'
@@ -851,8 +852,8 @@ function OrderExtras({
   return (
     <div className="fdry-order-extras">
       <span className="fdry-order-links">
+        {row.document == null ? null : <DocumentChip document={row.document} />}
         <OrderLinks
-          document={row.document}
           pulls={row.pulls}
           source={
             row.source.key !== null && row.source.url != null
