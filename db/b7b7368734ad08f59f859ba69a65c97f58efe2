@@ -1,0 +1,71 @@
+extensions/foundry/src/order/standing.ts
+  s_42e5fd6fba2257::t_ec204aa3dac72b 6
+extensions/foundry/tests/components/order-document.spec.tsx
+  s_42e5fd6fba2257::t_bee7eda6f5df36 8
+extensions/foundry/tests/home/feed.spec.ts
+  s_42e5fd6fba2257::t_ec204aa3dac72b 1
+  s_42e5fd6fba2257::t_f99151e00d417f 265,268
+extensions/foundry/src/components/factory/FactorySite.tsx
+  s_42e5fd6fba2257::t_ec204aa3dac72b 8
+extensions/foundry/src/home/feed.ts
+  s_42e5fd6fba2257::t_995802c67da1ef 149
+  s_42e5fd6fba2257::t_ec204aa3dac72b 6
+extensions/foundry/src/line/document-kind.ts
+  s_42e5fd6fba2257::t_ec204aa3dac72b 1-29
+extensions/foundry/src/components/factory/FactoryHall.tsx
+  s_42e5fd6fba2257::t_ec204aa3dac72b 50
+extensions/foundry/src/ipc/inbox-channels.ts
+  s_42e5fd6fba2257::t_52fe89b44d2403 156-158
+  s_42e5fd6fba2257::t_11fa20407ec076 50-51
+  s_42e5fd6fba2257::t_ec204aa3dac72b 13
+extensions/foundry/src/components/Orders.tsx
+  s_42e5fd6fba2257::t_ec204aa3dac72b 6
+extensions/foundry/src/ipc/forge-channels.ts
+  s_42e5fd6fba2257::t_11fa20407ec076 836
+  s_42e5fd6fba2257::t_52fe89b44d2403 2
+extensions/foundry/src/components/GateCard.tsx
+  s_42e5fd6fba2257::t_ec204aa3dac72b 11
+extensions/foundry/src/line/document-outcome.ts
+  s_42e5fd6fba2257::t_ec204aa3dac72b 4-5
+  s_42e5fd6fba2257::t_995802c67da1ef 1,19-22,25-30
+extensions/foundry/tests/runtime/tool-decision.spec.ts
+  s_42e5fd6fba2257::t_34dd76fae88548 833,868,870
+  s_42e5fd6fba2257::t_a5a29fc89b9337 846-865
+extensions/foundry/tests/line/document-outcome.spec.ts
+  s_42e5fd6fba2257::t_f99151e00d417f 4,97-127
+  s_42e5fd6fba2257::t_ec204aa3dac72b 7
+  s_42e5fd6fba2257::t_129a32e812d4e9 128
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_42e5fd6fba2257::t_6ac011f329d9ac 1398
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_42e5fd6fba2257::t_6ac011f329d9ac 2249
+extensions/foundry/src/renderer/use-run-observation.ts
+  s_42e5fd6fba2257::t_ec204aa3dac72b 7
+extensions/foundry/src/ipc/inbox-registration.ts
+  s_42e5fd6fba2257::t_52fe89b44d2403 3
+  s_42e5fd6fba2257::t_11fa20407ec076 70
+extensions/foundry/src/components/OrderLinks.tsx
+  s_42e5fd6fba2257::t_ec204aa3dac72b 6-7
+extensions/foundry/tests/ipc/inbox-channels.spec.ts
+  s_42e5fd6fba2257::t_11fa20407ec076 31
+extensions/foundry/src/runtime/tool-decision.ts
+  s_42e5fd6fba2257::t_34dd76fae88548 243,245-263,265-271
+extensions/foundry/src/ipc/run-channels.ts
+  s_42e5fd6fba2257::t_11fa20407ec076 500
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dbb7b7368734ad08f59f859ba69a65c97f58efe2",
+  "prompts": {},
+  "sessions": {
+    "s_42e5fd6fba2257": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3af22355-9a92-4690-ab26-a4c5166b6c02",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
