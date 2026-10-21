@@ -193,6 +193,26 @@ const ledgerE: LedgerEntry[] = [
 ]
 const recordsE: OrderRecords = { order: orderE, ledger: ledgerE, gates: [], graph: null }
 
+describe('an order whose run ended on a ready document', () => {
+  const ledger = [
+    entry({ orderId: 'WO-E', action: 'order.seeded', at: '2026-09-01T00:00:00.000Z' }),
+    entry({ orderId: 'WO-E', action: 'run.started', at: '2026-09-01T01:00:00.000Z' }),
+    entry({ orderId: 'WO-E', action: 'run.document_ready', at: '2026-09-01T03:00:00.000Z' }),
+  ]
+
+  it('counts as shipped, at the moment the document was ready', () => {
+    const metrics = orderMetrics({
+      order: order('WO-E', 'Order E', '2026-08-31T23:00:00.000Z'),
+      ledger,
+      gates: [],
+      graph: null,
+    })
+    expect(metrics.shipped).toBe(true)
+    expect(metrics.leadTimeMs).toBe(3 * 3600_000)
+    expect(metrics.buildTimeMs).toBe(2 * 3600_000)
+  })
+})
+
 describe('orderMetrics', () => {
   describe('clean ships and reworks', cleanShipsAndReworksTests)
   describe('CI rounds and Forge decisions', ciRoundsAndForgeDecisionsTests)

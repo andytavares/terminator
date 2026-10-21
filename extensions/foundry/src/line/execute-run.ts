@@ -279,7 +279,20 @@ async function endedOnDocument(tail: RunTail, outcome: RunOutcome): Promise<bool
     reason: documentEnd.kind === 'missing' ? documentEnd.reason : documentEnd.where,
   })
   await settleShipNode(tail, documentEnd.kind === 'ready')
+  if (documentEnd.kind === 'ready' && latest !== null) await shipDocument(tail, latest)
   return true
+}
+
+// A run that ended on a ready document is finished: no pull request follows it.
+async function shipDocument(tail: RunTail, latest: WorkOrder): Promise<void> {
+  const { root, order, store } = tail
+  await store.save({ ...latest, status: 'shipped' })
+  if (latest.document === null) return
+  await writeBack(
+    latest,
+    { event: 'document_ready', document: latest.document },
+    writeBackDepsFor(root, order, tail.issuesPort)
+  )
 }
 
 async function shipFinishedRun(

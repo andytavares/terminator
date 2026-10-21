@@ -2,7 +2,8 @@ import { plural } from '@terminator/extension-sdk'
 import type { Gate } from '../gates/rules.js'
 import type { RunGraph } from '../line/run-graph.js'
 import { nodeLabel } from '../line/run-graph.js'
-import type { WorkOrder } from './schema.js'
+import type { DocumentHandBack, WorkOrder } from './schema.js'
+import { documentKindOf } from '../line/document-outcome.js'
 
 // What an order is doing, and whose move it is.
 //
@@ -116,6 +117,8 @@ export interface StandingInput {
    * ship it.
    */
   readonly documentReady?: string | null
+  /** The document the author handed back. Shipped orders read it to say what finished. */
+  readonly document?: DocumentHandBack | null
   /**
    * Whether an architect or red-team turn is live on this draft, or Foundry is
    * deciding what to start next. Draft orders only.
@@ -187,6 +190,8 @@ const shippedRule: Rule = (input, { counts, holding }) => {
       detail: 'The work shipped. One decision is still open, and it is yours.',
     }
   }
+  const finished = finishedDocument(input.document)
+  if (finished !== null) return { ...counts, kind: 'done', turn: 'foundry', ...finished }
   return {
     ...counts,
     kind: 'done',
@@ -194,6 +199,32 @@ const shippedRule: Rule = (input, { counts, holding }) => {
     label: 'shipped',
     headline: 'Shipped',
     detail: 'This order shipped. Nothing is left to do.',
+  }
+}
+
+const PUBLISHED_DETAIL =
+  "The verifier checked it against the order's criteria. A copy is kept with the order."
+
+// A document outside the checkout has no pull request: it finished by being handed back.
+function finishedDocument(
+  document: DocumentHandBack | null | undefined
+): Pick<Standing, 'label' | 'headline' | 'detail'> | null {
+  if (document === undefined || document === null || document.location === 'checkout') return null
+  const kind = documentKindOf(document)
+  if (kind === 'file') {
+    return {
+      label: 'Finished · document ready',
+      headline: 'Finished · document ready',
+      detail: `The document is with the order: ${document.path}`,
+    }
+  }
+  return {
+    label: 'Finished · published',
+    headline:
+      kind === 'claude-artifact'
+        ? 'Finished · published as a Claude artifact'
+        : 'Finished · published',
+    detail: PUBLISHED_DETAIL,
   }
 }
 
@@ -499,6 +530,7 @@ export async function readStanding(order: WorkOrder, sources: StandingSources): 
     ...openCounts(order, sources),
     ...(await draftFacts(order, sources)),
     ...(await runFacts(order, sources)),
+    document: order.document,
   })
 }
 

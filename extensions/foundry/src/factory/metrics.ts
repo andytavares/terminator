@@ -73,13 +73,17 @@ function mean(values: readonly number[]): number | null {
   return values.reduce((sum, v) => sum + v, 0) / values.length
 }
 
+function shippedAtOf(ledger: readonly LedgerEntry[]): string | null {
+  return firstAt(ledger, 'ship.draft_opened') ?? firstAt(ledger, 'run.document_ready')
+}
+
 /** How long the order took to ship, its run took to build, and the operator spent deciding. */
 function timesOf({
   ledger,
   gates,
 }: OrderRecords): Pick<OrderMetrics, 'leadTimeMs' | 'buildTimeMs' | 'yourTimeMs'> {
   const seeded = firstAt(ledger, 'order.seeded')
-  const shippedAt = firstAt(ledger, 'ship.draft_opened')
+  const shippedAt = shippedAtOf(ledger)
   const started = firstAt(ledger, 'run.started')
   const between = (from: string | null, to: string | null): number | null =>
     from !== null && to !== null ? Date.parse(to) - Date.parse(from) : null
@@ -96,7 +100,7 @@ function timesOf({
 /** @internal */
 export function orderMetrics(records: OrderRecords): OrderMetrics {
   const { order, ledger, gates, graph } = records
-  const shipped = ledger.some((e) => e.action === 'ship.draft_opened')
+  const shipped = shippedAtOf(ledger) !== null
   const reworks = countOf(ledger, 'rework.started')
   const ciRounds = countOf(ledger, 'ci.round')
   const sentBack = gates.filter((g) => g.decision?.option === 'send_back').length
