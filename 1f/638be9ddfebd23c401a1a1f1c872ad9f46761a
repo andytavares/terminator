@@ -1,0 +1,36 @@
+tests/unit/renderer/components/loaded-stylesheets.ts
+  s_42e5fd6fba2257::t_df6dee433a6fa4 2-3,7-21,23-45,49-50,52
+  s_42e5fd6fba2257::t_0c1c71dc74b1c5 4-6
+  s_42e5fd6fba2257::t_9ff3ad3310d01c 1,22
+  s_42e5fd6fba2257::t_1eff00a9d20021 46-48,51
+src/renderer/components/integrations/IssueDetails.tsx
+  s_42e5fd6fba2257::t_104ea7ab79d076 3,163-164,167-172,174
+tests/unit/renderer/components/IssueDetails.spec.tsx
+  s_42e5fd6fba2257::t_14cee6d9c39832 7,116-124
+  s_42e5fd6fba2257::t_697e9fbe92e389 125-126
+tests/unit/renderer/components/IssueDrawer.spec.tsx
+  s_42e5fd6fba2257::t_14cee6d9c39832 7,328-333
+  s_42e5fd6fba2257::t_ec2baac612bbd0 334-335
+src/renderer/components/integrations/issue-sections.tsx
+  s_42e5fd6fba2257::t_104ea7ab79d076 5
+src/renderer/components/integrations/issue-sections.css
+  s_42e5fd6fba2257::t_7f43c41985a603 1-103
+src/renderer/components/integrations/IssueDrawer.tsx
+  s_42e5fd6fba2257::t_104ea7ab79d076 4,279-280,285,294,296
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1f638be9ddfebd23c401a1a1f1c872ad9f46761a",
+  "prompts": {},
+  "sessions": {
+    "s_42e5fd6fba2257": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3af22355-9a92-4690-ab26-a4c5166b6c02",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
