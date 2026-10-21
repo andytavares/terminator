@@ -83,7 +83,13 @@ function recordPass(before) {
   console.log(`Recorded the pass for ${after.head}; it can be pushed.`)
 }
 
+/** Whether the pre-push hook checks a push. A CI job pushing its own commit is CI already. */
+export function checksPushes(env) {
+  return !env.CI
+}
+
 function checkPush() {
+  if (!checksPushes(process.env)) return
   const file = passFile()
   const passed = existsSync(file) ? readFileSync(file, 'utf8').trim() : null
   const refused = unverifiedPushes(readFileSync(0, 'utf8'), passed)

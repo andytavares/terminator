@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   NOT_RUN_HERE,
   checkEnvironment,
+  checksPushes,
   recordablePass,
   unverifiedPushes,
 } from '../../../scripts/ci-local.mjs'
@@ -48,6 +49,16 @@ describe('the pre-push hook lets through only what ci:local passed on', () => {
 
   it('lets a deleted ref through, since it pushes no code', () => {
     expect(unverifiedPushes(pushLine(DELETED), null)).toEqual([])
+  })
+})
+
+describe("the pre-push hook runs only on a person's machine", () => {
+  it('checks a push made outside CI', () => {
+    expect(checksPushes({ PATH: '/usr/bin' })).toBe(true)
+  })
+
+  it('lets a CI job push its own commit, since CI runs the checks itself', () => {
+    expect(checksPushes({ CI: 'true', PATH: '/usr/bin' })).toBe(false)
   })
 })
 
