@@ -109,3 +109,22 @@ test('form controls under the shared sheet are themed, one height, and audited f
     auditReportsOnlyMisalignedControls
   )
 })
+
+/** Markdown under the core sheets in the bundle's order: the design system first, then core's. */
+async function markdownListIndent(): Promise<number> {
+  const sheet = (path: string) => readFileSync(join(ROOT, path), 'utf8')
+  await page.setContent(
+    `<!doctype html><html><head><style>${sheet('packages/extension-ui/src/extension-ui.css')}</style>
+     <style>${sheet('src/renderer/styles.css')}</style></head>
+     <body><div class="tmui-markdown"><ul><li id="item">Changes to the design system</li></ul></div>
+     </body></html>`
+  )
+  return page.evaluate(() => {
+    const list = document.querySelector('.tmui-markdown ul')!
+    return parseFloat(getComputedStyle(list).paddingLeft)
+  })
+}
+
+test("core's reset leaves Markdown its list indent, so bullets sit inside the pane", async () => {
+  expect(await markdownListIndent()).toBe(20)
+})
