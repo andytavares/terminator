@@ -107,8 +107,19 @@ const anyOf =
     existsAny(repo, rels)
 const CARGO = anyOf(['Cargo.toml'])
 const GO = anyOf(['go.mod'])
+/** A file that carries the tool's own section, or whose presence alone means the tool. */
+const configuresTool =
+  (rel: string, section: RegExp) =>
+  (repo: string): boolean =>
+    section.test(readText(repo, rel) ?? '')
 const PYTEST = (repo: string): boolean =>
-  readText(repo, 'pyproject.toml')?.includes('pytest') ?? false
+  exists(repo, 'pytest.ini') ||
+  configuresTool('pyproject.toml', /pytest/)(repo) ||
+  configuresTool('setup.cfg', /^\[tool:pytest\]/m)(repo) ||
+  configuresTool('tox.ini', /^\[pytest\]/m)(repo)
+const RUFF = (repo: string): boolean =>
+  existsAny(repo, ['ruff.toml', '.ruff.toml']) ||
+  configuresTool('pyproject.toml', /\[tool\.ruff/)(repo)
 
 /** In preference order: the first tool present names the check. */
 const CONFIG_PROBES: Record<CheckName, readonly ConfigProbe[]> = {
@@ -121,10 +132,12 @@ const CONFIG_PROBES: Record<CheckName, readonly ConfigProbe[]> = {
   ],
   lint: [
     { present: anyOf(ESLINT_CONFIGS), command: 'npx eslint .' },
+    { present: RUFF, command: 'ruff check .' },
     { present: CARGO, command: 'cargo clippy' },
   ],
   format: [
     { present: anyOf(PRETTIER_CONFIGS), command: 'npx prettier --check .' },
+    { present: RUFF, command: 'ruff format --check .' },
     { present: CARGO, command: 'cargo fmt --check' },
   ],
   e2e: [{ present: anyOf(PLAYWRIGHT_CONFIGS), command: 'npx playwright test' }],

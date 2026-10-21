@@ -49,7 +49,9 @@ function fakeProvider(id: TrackerId, over: Partial<TrackerProvider> = {}): Track
   } as TrackerProvider
 }
 
-function build(over: { linear?: TrackerProvider; jira?: TrackerProvider } = {}) {
+function build(
+  over: { linear?: TrackerProvider; jira?: TrackerProvider; mineEmail?: string } = {}
+) {
   const linear =
     over.linear ??
     fakeProvider('linear', {
@@ -66,7 +68,7 @@ function build(over: { linear?: TrackerProvider; jira?: TrackerProvider } = {}) 
       tracker === 'linear'
         ? { tracker: 'linear', apiKey: 'k' }
         : { tracker: 'jira', site: 's', email: 'e@x.c', apiToken: 't' },
-    getMine: async () => ({ kind: 'assignee', email: null }),
+    getMine: async () => ({ kind: 'assignee', email: over.mineEmail ?? null }),
     onTrackerError: () => {},
     now: () => 1_000_000,
   })
@@ -190,9 +192,26 @@ describe('create (ADR-061)', () => {
     const { service, linear } = build()
     const input = { teamId: 't1', title: 'Only open tickets', description: 'body' }
     await expect(service.create('linear', input)).resolves.toMatchObject({ key: 'TAV-7' })
-    expect(linear.create).toHaveBeenCalledWith({ tracker: 'linear', apiKey: 'k' }, input)
+    expect(linear.create).toHaveBeenCalledWith(
+      { tracker: 'linear', apiKey: 'k' },
+      { ...input, assigneeEmail: null }
+    )
   })
+})
 
+describe('create files under the configured assignee', () => {
+  it('passes the configured assignee email so the ticket is not left to the key owner', async () => {
+    const { service, linear } = build({ mineEmail: 'andrew.tavares@klaviyo.com' })
+    const input = { teamId: 't1', title: 'Only open tickets', description: 'body' }
+    await service.create('linear', input)
+    expect(linear.create).toHaveBeenCalledWith(
+      { tracker: 'linear', apiKey: 'k' },
+      { ...input, assigneeEmail: 'andrew.tavares@klaviyo.com' }
+    )
+  })
+})
+
+describe('create caching', () => {
   it('serves the created issue from cache rather than fetching it again', async () => {
     const { service, linear } = build()
     await service.create('linear', { teamId: 't1', title: 'x', description: '' })

@@ -337,7 +337,7 @@ const RENDERED_MARKDOWN = `(function () {
       bold: has('strong', 'done'),
       code: has('code', 'completed'),
       list: has('li', 'Grey them out'),
-      option: has('button em', 'them'),
+      option: has('.fdry-opt em', 'them'),
       noAsterisks: document.body.innerText.indexOf('**') === -1,
     }
   })()`

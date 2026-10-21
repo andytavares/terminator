@@ -1299,7 +1299,8 @@ function QuestionCard({ forge, question }: ForgeProp & { readonly question: Ques
           {question.why}
         </Markdown>
       ) : null}
-      <div className="fdry-fnd-acts">
+      <fieldset className="fdry-opts">
+        <legend className="fdry-opts-legend">Choose one</legend>
         {question.options.map((option, optionIndex) => (
           <QuestionOption
             key={option}
@@ -1308,7 +1309,7 @@ function QuestionCard({ forge, question }: ForgeProp & { readonly question: Ques
             at={[option, optionIndex]}
           />
         ))}
-      </div>
+      </fieldset>
     </div>
   )
 }
@@ -1321,22 +1322,30 @@ interface QuestionOptionProps extends ForgeProp {
 function QuestionOption({ forge, question, at: [option, optionIndex] }: QuestionOptionProps) {
   const chosen = forge.questionChoices[question.id] === optionIndex
   return (
-    <Button
-      size="sm"
-      aria-pressed={chosen}
-      variant={chosen ? 'primary' : 'secondary'}
-      onClick={() =>
-        forge.setQuestionChoices((current) => ({
-          ...current,
-          [question.id]: optionIndex,
-        }))
-      }
-    >
-      <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
-        {option}
-      </Markdown>
-      {optionIndex === question.recommended ? ' (recommended)' : ''}
-    </Button>
+    <label className="fdry-opt">
+      <input
+        type="radio"
+        name={`question-${question.id}`}
+        checked={chosen}
+        onChange={() =>
+          forge.setQuestionChoices((current) => ({
+            ...current,
+            [question.id]: optionIndex,
+          }))
+        }
+      />
+      <span className="fdry-opt-text">
+        <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
+          {option}
+        </Markdown>
+        {optionIndex === question.recommended ? (
+          <>
+            {' '}
+            <span className="fdry-opt-tag">Recommended</span>
+          </>
+        ) : null}
+      </span>
+    </label>
   )
 }
 

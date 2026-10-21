@@ -595,11 +595,11 @@ function directAndRefusedChoicesTests() {
   // why not, because a silent substitution is a decision nobody made.
   it('refuses an operator choice this repository cannot run, rather than stepping down', async () => {
     await store.save(order())
-    const result = (await freshRunChannels().start({ id: 'WO-1', recipe: 'bugfix' })) as {
+    const result = (await freshRunChannels().start({ id: 'WO-1', recipe: 'speckit' })) as {
       error?: string
     }
-    expect(result.error).toContain('bugfix')
-    expect(result.error).toContain('no test command')
+    expect(result.error).toContain('speckit')
+    expect(result.error).toContain('.specify')
   })
 }
 

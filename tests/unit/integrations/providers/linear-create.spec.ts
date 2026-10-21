@@ -61,6 +61,48 @@ describe('linear provider — create', () => {
   })
 })
 
+const created = () =>
+  vi.fn().mockResolvedValue({ success: true, issue: Promise.resolve(makeIssue()) })
+const NEW_ISSUE = { teamId: 't1', title: 'Unify', description: 'body' }
+
+describe('linear provider — create assigns the configured user', () => {
+  it('assigns the new issue to the user found by the configured email, not the key owner', async () => {
+    const createIssue = created()
+    const users = vi.fn().mockResolvedValue({ nodes: [{ id: 'user-andrew' }] })
+    await providerWith({ createIssue, users }).create?.(CRED, {
+      ...NEW_ISSUE,
+      assigneeEmail: 'andrew.tavares@klaviyo.com',
+    })
+    expect(users).toHaveBeenCalledWith({
+      filter: { email: { eq: 'andrew.tavares@klaviyo.com' } },
+      first: 1,
+    })
+    expect(createIssue).toHaveBeenCalledWith(expect.objectContaining({ assigneeId: 'user-andrew' }))
+  })
+})
+
+describe('linear provider — create with an unknown or absent assignee', () => {
+  it('refuses to file the issue when no user has that email, rather than leaving it on the key owner', async () => {
+    const createIssue = created()
+    const users = vi.fn().mockResolvedValue({ nodes: [] })
+    await expect(
+      providerWith({ createIssue, users }).create?.(CRED, {
+        ...NEW_ISSUE,
+        assigneeEmail: 'nobody@x.c',
+      })
+    ).rejects.toMatchObject({ kind: 'failed' })
+    expect(createIssue).not.toHaveBeenCalled()
+  })
+
+  it('leaves the issue unassigned and looks nobody up when no email is configured', async () => {
+    const createIssue = created()
+    const users = vi.fn()
+    await providerWith({ createIssue, users }).create?.(CRED, { ...NEW_ISSUE, assigneeEmail: null })
+    expect(users).not.toHaveBeenCalled()
+    expect(createIssue.mock.calls[0][0]).not.toHaveProperty('assigneeId')
+  })
+})
+
 describe('linear provider — create refusals', () => {
   it('rejects when Linear reports the create failed', async () => {
     const createIssue = vi.fn().mockResolvedValue({ success: false })

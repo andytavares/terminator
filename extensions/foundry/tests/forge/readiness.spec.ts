@@ -1408,6 +1408,8 @@ const failing = provenBaseline({
   steps: [baseStep('Lint', { result: 'fail', exitCode: 1 })],
 })
 
+const nothingMeasurable = provenBaseline({ state: 'failing', steps: [] })
+
 const passesCases: [string, EnvironmentFacts, string | null, boolean][] = [
   ['never checked', { baseline: null, waivedAt: null }, null, false],
   ['checking', { baseline: provenBaseline({ state: 'checking' }), waivedAt: null }, null, false],
@@ -1426,6 +1428,24 @@ const passesCases: [string, EnvironmentFacts, string | null, boolean][] = [
     { baseline: testsFailOnBase, waivedAt: null },
     'bugfix',
     true,
+  ],
+  [
+    'nothing measurable on a research order, which runs no code',
+    { baseline: nothingMeasurable, waivedAt: null },
+    'research',
+    true,
+  ],
+  [
+    'nothing measurable on a shape that runs code',
+    { baseline: nothingMeasurable, waivedAt: null },
+    'direct',
+    false,
+  ],
+  [
+    'a lint failure on a research order is still the base branch failing',
+    { baseline: failing, waivedAt: null },
+    'research',
+    false,
   ],
   [
     'only tests failing on another shape',

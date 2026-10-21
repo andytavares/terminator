@@ -44,7 +44,14 @@ const MAX_PAGE_SIZE = 100
 /** The part of the SDK client the provider calls; specs pass a fake of it. */
 type LinearLike = Pick<
   LinearClient,
-  'viewer' | 'issues' | 'searchIssues' | 'issue' | 'createComment' | 'updateIssue' | 'createIssue'
+  | 'viewer'
+  | 'issues'
+  | 'searchIssues'
+  | 'issue'
+  | 'createComment'
+  | 'updateIssue'
+  | 'createIssue'
+  | 'users'
 >
 
 export type LinearClientFactory = (apiKey: string) => LinearLike
@@ -448,12 +455,27 @@ function teams(client: LinearLike): Promise<TrackerTeam[]> {
   })
 }
 
+/** The id of the user with this email, or none when no email is configured. A configured email
+ * nobody has fails the create: filing under the key's owner is the bug this prevents. */
+async function assigneeIdOf(client: LinearLike, email: string | null | undefined) {
+  if (email === null || email === undefined) return {}
+  const found = (await client.users({ filter: { email: { eq: email } }, first: 1 })) as {
+    nodes?: { id?: unknown }[]
+  } | null
+  const id = found?.nodes?.[0]?.id
+  if (typeof id !== 'string') {
+    throw new TrackerError('failed', `No Linear user has the email ${email}`)
+  }
+  return { assigneeId: id }
+}
+
 function create(client: LinearLike, input: NewIssueInput): Promise<Issue> {
   return run(async () => {
     const payload = (await client.createIssue({
       teamId: input.teamId,
       title: input.title,
       description: input.description,
+      ...(await assigneeIdOf(client, input.assigneeEmail)),
     })) as { success?: boolean; issue?: unknown } | null
     if (payload?.success !== true) {
       throw new TrackerError('failed', `Linear refused to create "${input.title}"`)

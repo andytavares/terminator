@@ -279,7 +279,11 @@ function createMethods(
     async create(tracker, input): Promise<Issue> {
       const file = deps.providers[tracker]?.create
       if (file === undefined) throw unsupported(tracker, 'create an issue')
-      const issue = await context.call(tracker, (cred) => file(cred, input))
+      // The configured assignee owns the ticket, so Linear's branch name is theirs and not the
+      // API key owner's.
+      const mine = await deps.getMine(tracker)
+      const assigneeEmail = mine.kind === 'assignee' ? mine.email : null
+      const issue = await context.call(tracker, (cred) => file(cred, { ...input, assigneeEmail }))
       cache.set(cacheKey(tracker, issue.key), { issue, at: now() })
       return issue
     },
