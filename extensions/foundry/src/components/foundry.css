@@ -3825,6 +3825,9 @@
   grid-template-columns: minmax(0, 1fr) 240px;
   gap: 16px;
   align-items: start;
+  /* Its parent clips, so a window shorter than the halls scrolls here. */
+  height: 100%;
+  overflow: auto;
 }
 
 .fdry-site > .fdry-status-wall {
