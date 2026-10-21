@@ -1,1 +1,0 @@
-node scripts/ci-local.mjs --check-push

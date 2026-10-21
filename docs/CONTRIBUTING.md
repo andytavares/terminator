@@ -66,7 +66,7 @@ npm run ci:local:e2e    # Only the e2e job: specs selected by the diff, five sha
 
 `npm run ci:local` runs what `.github/workflows/ci.yml` runs, on this Mac: Terminator ships only as a macOS DMG. `scripts/ci-plan.mjs` reads each job's own `run` steps from the workflow, so the two cannot drift. A GitHub expression or condition it does not know stops it, naming the job and step. It runs the jobs in workflow order (Lint, Typecheck, Format, Stories with the screenshot comparison, Unit, Perf, Test, Build, Start with the packaged app), then the e2e specs this diff selects, through `scripts/ci-e2e-local.mjs`. Every step runs without the `GIT_` variables a git hook sets, as CI does. It prints what it leaves to CI and why.
 
-A pass on a clean tree is recorded for its commit, in the worktree's git directory (`git rev-parse --git-path ci-local-passed`). The pre-push hook (`.husky/pre-push`) refuses to push a commit with no recorded pass and names the command to run. The hook only checks the record: git opens the connection to the remote before it runs the hook, and a hook that ran the whole suite left that connection idle until it dropped. So commit, run `npm run ci:local`, then push. The hook does nothing where `CI` is set: the release and story-baseline jobs push their own commits, and CI is already the check there.
+Nothing in git runs it: the pre-commit hook checks what a commit touches (`lint-staged`), and CI checks the pull request. Run `ci:local` when you want the whole of CI on this Mac before opening a PR.
 
 ### Run tests
 
