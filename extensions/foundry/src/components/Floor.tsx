@@ -571,15 +571,18 @@ interface FloorLinksProps {
   readonly review: (pull: Pull) => Promise<void>
 }
 
+function FloorDocument({ view }: { readonly view: FloorView }) {
+  return view.document == null ? null : <DocumentChip document={view.document} />
+}
+
 /** The pull requests the work opened and the ticket it came from, with a review of each. */
 function FloorLinks({ view, reviewable, review }: FloorLinksProps) {
   const pulls = view.pulls ?? []
   const source = view.source ?? null
-  const document = view.document ?? null
-  if (pulls.length === 0 && source === null && document === null) return null
+  if (pulls.length === 0 && source === null && view.document == null) return null
   return (
     <p className="fdry-order-links">
-      {document === null ? null : <DocumentChip document={document} />}
+      <FloorDocument view={view} />
       <OrderLinks pulls={pulls} source={source} />
       {pulls.map((pull) => (
         <Button
