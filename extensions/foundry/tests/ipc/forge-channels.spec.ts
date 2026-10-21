@@ -2246,7 +2246,7 @@ function documentOnTheRowTests() {
     expect(await listedDocument(published)).toEqual({
       kind: 'claude-artifact',
       url: published.url,
-      path: 'research.md',
+      path: expect.stringMatching(/\/orders\/WO-[^/]+\/research\.md$/),
     })
   })
 

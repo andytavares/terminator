@@ -3,7 +3,7 @@ import { ArrowLeft, Plus, CheckCircle2, AlertCircle, Loader } from 'lucide-react
 import { Button, SegmentedControl } from '@terminator/extension-ui'
 import { GateAnswers } from './GateCard.js'
 import { OrderLinks } from './OrderLinks.js'
-import type { DocumentLink } from '../line/document-outcome.js'
+import type { DocumentLink } from '../line/document-kind.js'
 import { ciLabel } from '../line/ci-label.js'
 import type { CiState } from '../line/ci-state.js'
 import type { Gate, GateOption } from '../gates/rules.js'

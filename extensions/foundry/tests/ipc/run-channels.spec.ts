@@ -1395,7 +1395,7 @@ function documentOnTheFloorTests() {
     expect(await observedDocument({ path: 'r.md', url, location: 'published' })).toEqual({
       kind: 'link',
       url,
-      path: 'r.md',
+      path: expect.stringMatching(/\/orders\/WO-1\/r\.md$/),
     })
   })
 

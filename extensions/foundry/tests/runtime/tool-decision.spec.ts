@@ -830,6 +830,7 @@ function authorPublishing(over: Partial<ToolRequest> = {}) {
 }
 
 describe('publishing the order’s own document', publishingTests)
+describe('publishing anything else', publishingElseTests)
 
 function publishingTests() {
   it.each(['escorted', 'standard', 'lights-out'] as const)(
@@ -842,11 +843,31 @@ function publishingTests() {
     }
   )
 
-  it('lets an author publish a file in the checkout', () => {
-    const input = { file_path: '/work/checkout/docs/a.html' }
-    expect(authorPublishing({ input })).toMatchObject({ allow: true })
+  it('does not let an author publish a file from the checkout, which ships as a pull request', () => {
+    const input = { file_path: '/work/checkout/.env' }
+    expect(authorPublishing({ autonomy: 'lights-out', input })).toMatchObject({ allow: false })
   })
 
+  it('does not let an author publish a file in its outputs that is not a page', () => {
+    const input = { file_path: `${outputsDir}/notes.json` }
+    expect(authorPublishing({ autonomy: 'lights-out', input })).toMatchObject({ allow: false })
+  })
+
+  it('does not let an author attach further files to the publish', () => {
+    const input = {
+      file_path: `${outputsDir}/doc.html`,
+      files: { 'secrets.txt': '/work/checkout/.env' },
+    }
+    expect(authorPublishing({ autonomy: 'lights-out', input })).toMatchObject({ allow: false })
+  })
+
+  it.each(['doc.htm', 'doc.md'])('lets an author publish %s from its outputs', (name) => {
+    const input = { file_path: `${outputsDir}/${name}` }
+    expect(authorPublishing({ input })).toMatchObject({ allow: true })
+  })
+}
+
+function publishingElseTests() {
   it('does not let a role with no document to hand back publish at lights-out', () => {
     expect(authorPublishing({ outputsDir: null, autonomy: 'lights-out' })).toMatchObject({
       allow: false,

@@ -497,7 +497,7 @@ async function observe(deps: RunDeps, payload: z.infer<typeof ObservePayload>): 
     ci: await readCiState(deps.dataRoot(), id),
     pulls: await observedPulls(deps, id),
     source: ticketOf(order),
-    document: order === null ? null : documentLinkOf(order),
+    document: order === null ? null : documentLinkOf(order, orderDir(deps.dataRoot(), id)),
     // What the operator called it. The surface's heading was the order id
     // and the recipe name — two identifiers nobody chose — so the screen
     // showing a run never said which piece of work it was.

@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   describeDocument,
-  documentKindOf,
+  documentLinkOf,
   documentOutcome,
 } from '../../src/line/document-outcome.js'
+import { documentKindOf, OPEN_LABEL } from '../../src/line/document-kind.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
 import type { Recipe } from '../../src/recipe/parse.js'
 
@@ -91,5 +92,37 @@ describe('documentKindOf', () => {
     expect(documentKindOf({ path: 'a.md', url: elsewhere, location: 'published' })).toBe('link')
     expect(documentKindOf({ path: '/o/a.md', location: 'outputs' })).toBe('file')
     expect(documentKindOf({ path: 'docs/a.md', location: 'checkout' })).toBe('file')
+  })
+})
+
+describe('documentLinkOf', () => {
+  const orderDirectory = '/records/orders/WO-1'
+
+  it('opens a file the author named relative to the order by its full path', () => {
+    const order = { document: { path: 'outputs/report.md', location: 'outputs' as const } }
+    expect(documentLinkOf(order, orderDirectory)).toEqual({
+      kind: 'file',
+      url: null,
+      path: '/records/orders/WO-1/outputs/report.md',
+    })
+  })
+
+  it('keeps a full path as it is, and links nothing for a checkout document', () => {
+    const published = {
+      path: '/records/orders/WO-1/outputs/doc.html',
+      url: 'https://claude.ai/artifact/abc',
+      location: 'published' as const,
+    }
+    expect(documentLinkOf({ document: published }, orderDirectory)?.path).toBe(published.path)
+    const checkout = { path: 'docs/a.md', location: 'checkout' as const }
+    expect(documentLinkOf({ document: checkout }, orderDirectory)).toBeNull()
+  })
+
+  it('names each kind of document by one set of words', () => {
+    expect(OPEN_LABEL).toEqual({
+      'claude-artifact': 'Open artifact',
+      link: 'Open link',
+      file: 'Open document',
+    })
   })
 })

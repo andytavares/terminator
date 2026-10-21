@@ -3,7 +3,8 @@ import { Copy, FileText, GitPullRequest, Sparkles, Ticket } from 'lucide-react'
 import { Button } from '@terminator/extension-ui'
 import { ExternalLink } from './ExternalLink.js'
 import { openInBrowser } from '@terminator/extension-sdk/renderer'
-import type { DocumentLink } from '../line/document-outcome.js'
+import { OPEN_LABEL } from '../line/document-kind.js'
+import type { DocumentLink } from '../line/document-kind.js'
 
 // Where an order's document, pull requests and ticket are, as links that open
 // outside the application. One component because the gate card, the order list
@@ -37,12 +38,6 @@ export function OrderLinks({
     </>
   )
 }
-
-const OPEN_LABEL = {
-  'claude-artifact': 'Open artifact',
-  link: 'Open link',
-  file: 'Open document',
-} as const
 
 /** Opens a document where it belongs: a link in the browser, a file with the system's own opener. */
 export function openDocument(document: DocumentLink): void {

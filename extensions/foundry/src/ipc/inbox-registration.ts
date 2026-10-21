@@ -1,5 +1,6 @@
 import { noPayload } from '@terminator/extension-sdk'
 
+import { orderDir } from '../data-root.js'
 import { createInboxChannels, DecidePayload } from './inbox-channels.js'
 import type { InboxChannels } from './inbox-channels.js'
 import { foundryChannel } from './channel.js'
@@ -66,6 +67,7 @@ function createInbox(context: ActivationContext, deps: InboxRegistrationDeps): I
     waiting: () => ordersWaitingOnSomething(dataRoot, deps.standingSources),
     autonomy: () => autonomyFor(api),
     readPulls: (orderId) => readPulls(dataRoot(), orderId),
+    orderDirectory: (orderId) => orderDir(dataRoot(), orderId),
     now: isoNow,
     record: async (orderId, line) => {
       await orderStoreAt(dataRoot()).record({

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { orderDir } from '../data-root.js'
 import { seedOrder, newOrderId } from '../forge/intake-source.js'
 import type { IssueLike, SeedInput } from '../forge/intake-source.js'
 import { answerQuestion, surfacedQuestions } from '../forge/interview.js'
@@ -832,7 +833,7 @@ async function listRow(
     // a pull yet.
     ci: await rowCi(deps, order.id),
     pulls: await rowPulls(deps, order),
-    document: documentLinkOf(order),
+    document: documentLinkOf(order, orderDir(deps.dataRoot(), order.id)),
     // Where this order stands in the refinery's file-overlap queue.
     // Null when it is not in a queue at all.
     queue: queuePositions.find((position) => position.orderId === order.id) ?? null,

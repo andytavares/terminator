@@ -28,6 +28,7 @@ function inboxDeps(over: Partial<InboxDeps> = {}): InboxDeps {
     record: vi.fn(async () => undefined),
     act: async () => undefined,
     readPulls: async () => [],
+    orderDirectory: (orderId: string) => `/records/orders/${orderId}`,
     waiting: async () => [],
     ...over,
   }

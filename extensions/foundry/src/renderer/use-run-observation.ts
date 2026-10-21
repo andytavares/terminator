@@ -4,7 +4,7 @@ import type { RunGraph } from '../line/run-graph.js'
 import type { Standing } from '../order/standing.js'
 import type { Gate } from '../gates/rules.js'
 import type { CiState } from '../line/ci-state.js'
-import type { DocumentLink } from '../line/document-outcome.js'
+import type { DocumentLink } from '../line/document-kind.js'
 import { invoke } from '@terminator/extension-sdk/renderer'
 
 /** One repository this order spans, and what it is waiting for. */

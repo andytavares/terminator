@@ -1,5 +1,8 @@
+import * as path from 'node:path'
 import type { DocumentHandBack } from '../order/schema.js'
 import type { Recipe } from '../recipe/parse.js'
+import { documentKindOf } from './document-kind.js'
+import type { DocumentLink } from './document-kind.js'
 
 // How a run ends when its product is a document.
 //
@@ -13,30 +16,18 @@ export type DocumentOutcome =
   | { readonly kind: 'ready'; readonly where: string }
   | { readonly kind: 'ships' }
 
-/** What a handed-back document is, which decides what every surface calls it and how it opens. */
-export type DocumentKind = 'claude-artifact' | 'link' | 'file'
-
-// Both forms Claude Code hands out: `/artifact/<id>` from a publish, `/code/artifact/<uuid>` in its docs.
-const CLAUDE_ARTIFACT = /^https:\/\/claude\.ai\/(code\/)?artifact\/[\w-]+$/
-
-export function documentKindOf(document: DocumentHandBack): DocumentKind {
-  if (document.url === undefined) return 'file'
-  return CLAUDE_ARTIFACT.test(document.url) ? 'claude-artifact' : 'link'
-}
-
-/** What a surface needs to link to an order's document; none when it lives in the checkout and ships as a pull request. */
-export interface DocumentLink {
-  readonly kind: DocumentKind
-  readonly url: string | null
-  readonly path: string
-}
-
-export function documentLinkOf(order: {
-  readonly document: DocumentHandBack | null
-}): DocumentLink | null {
+export function documentLinkOf(
+  order: { readonly document: DocumentHandBack | null },
+  orderDirectory: string
+): DocumentLink | null {
   const { document } = order
   if (document === null || document.location === 'checkout') return null
-  return { kind: documentKindOf(document), url: document.url ?? null, path: document.path }
+  return {
+    kind: documentKindOf(document),
+    url: document.url ?? null,
+    // The opener is handed this path as it is, so a relative one would open nothing.
+    path: path.resolve(orderDirectory, document.path),
+  }
 }
 
 /** Where a document is, in one line: its place, what it is called, its link. */

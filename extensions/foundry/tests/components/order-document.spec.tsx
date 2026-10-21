@@ -5,7 +5,7 @@ import { createChangeBus } from '../helpers/change-bus.js'
 import { Orders } from '../../src/components/Orders.js'
 import { Floor } from '../../src/components/Floor.js'
 import { FactorySite } from '../../src/components/factory/FactorySite.js'
-import type { DocumentLink } from '../../src/line/document-outcome.js'
+import type { DocumentLink } from '../../src/line/document-kind.js'
 
 // A research order ends on a document. Every surface that names the order is
 // one click from it: a link for something published, the file itself otherwise.

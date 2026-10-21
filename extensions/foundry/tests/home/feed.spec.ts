@@ -1,3 +1,4 @@
+import { OPEN_LABEL } from '../../src/line/document-kind.js'
 import { describe, it, expect } from 'vitest'
 
 import { buildFoundryHomeFeed } from '../../src/home/feed.js'
@@ -261,10 +262,10 @@ describe('facet links', () => {
     expect(feed.facets[0].links).toEqual([{ label: 'Open artifact', url }])
   })
 
-  it('links any other document with a link as a document', () => {
+  it('links any other published document by the same words Foundry uses', () => {
     const url = 'https://example.com/report'
     const feed = feedOf([shipped({ path: 'report.md', url, location: 'published' })])
-    expect(feed.facets[0].links).toEqual([{ label: 'Open document', url }])
+    expect(feed.facets[0].links).toEqual([{ label: OPEN_LABEL.link, url }])
   })
 
   it('publishes no links for a document with no link, or no document', () => {

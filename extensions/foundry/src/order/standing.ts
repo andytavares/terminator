@@ -3,7 +3,7 @@ import type { Gate } from '../gates/rules.js'
 import type { RunGraph } from '../line/run-graph.js'
 import { nodeLabel } from '../line/run-graph.js'
 import type { DocumentHandBack, WorkOrder } from './schema.js'
-import { documentKindOf } from '../line/document-outcome.js'
+import { documentKindOf } from '../line/document-kind.js'
 
 // What an order is doing, and whose move it is.
 //

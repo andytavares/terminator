@@ -8,7 +8,7 @@ import { RaiseBudgetForm } from './BudgetForm.js'
 import { Button, IconButton, Markdown } from '@terminator/extension-ui'
 import { openInBrowser } from '@terminator/extension-sdk/renderer'
 import { OrderLinks } from './OrderLinks.js'
-import type { DocumentLink } from '../line/document-outcome.js'
+import type { DocumentLink } from '../line/document-kind.js'
 
 // One gate, one line.
 //
