@@ -1,6 +1,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { draftOrder } from '../order/draft.js'
+import { baseBranchOfRepo } from './base-branch.js'
 import { acceptanceFromTicket } from './acceptance-from-ticket.js'
 import type { OrderSource, WorkOrder } from '../order/schema.js'
 import { probeToolchain, unavailableChecks } from '../verify/toolchain-probe.js'
@@ -119,6 +120,7 @@ export async function seedOrder(input: SeedInput, deps: SeedDeps): Promise<SeedR
     title: origin.title,
     source: origin.source,
     repoPaths: input.repoPaths,
+    baseBranches: await Promise.all(input.repoPaths.map(baseBranchOfRepo)),
     now: deps.now(),
   })
   // Scout's pack, before any question could be asked.
