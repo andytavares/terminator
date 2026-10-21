@@ -37,10 +37,8 @@ function resultTextOf(content: unknown): string {
     .join('\n')
 }
 
-/**
- * Every Artifact publish the transcript records, from its tool_use/tool_result pairs.
- * @internal
- */
+/** Every Artifact publish the transcript records, from its tool_use/tool_result pairs.
+ * @internal */
 export function publishedArtifacts(transcriptText: string): PublishedArtifact[] {
   const artifactCalls = new Set<string>()
   const published: PublishedArtifact[] = []
