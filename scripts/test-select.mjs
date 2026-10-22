@@ -186,15 +186,31 @@ async function unitImpact(file, tools, unitSpecs) {
   return { specs: [...specs, ...related, ...scanners], unknown: !claimed && related.length === 0 }
 }
 
+/** How many changed files are looked up at once: each lookup starts a vitest instance. */
+const LOOKUPS_AT_ONCE = 4
+
+/** `work` over each item, at most `limit` at a time, results in the items' order. */
+async function eachLimited(items, limit, work) {
+  const results = new Array(items.length)
+  let next = 0
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++
+      results[index] = await work(items[index])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  return results
+}
+
 async function unitSelection(changed, tools) {
   const unitSpecs = await tools.unitSpecs()
-  const selected = new Set()
-  for (const file of changed) {
-    const impact = await unitImpact(file, tools, unitSpecs)
-    if (impact.unknown) return { unknown: file }
-    impact.specs.forEach((spec) => selected.add(spec))
-  }
-  return { unit: [...selected].sort() }
+  const impacts = await eachLimited(changed, LOOKUPS_AT_ONCE, (file) =>
+    unitImpact(file, tools, unitSpecs)
+  )
+  const unknown = impacts.findIndex((impact) => impact.unknown)
+  if (unknown !== -1) return { unknown: changed[unknown] }
+  return { unit: [...new Set(impacts.flatMap((impact) => impact.specs))].sort() }
 }
 
 function alwaysAllHit(changed) {
@@ -268,26 +284,38 @@ function isScanner(text) {
   return READS_FILES.test(text) && NAMES_THE_REPOSITORY.test(text)
 }
 
-/** Tools over vitest's own import graph: `relatedSpecs(file)` is what `vitest related` runs. */
+/** The spec files `files` reach through vitest's import graph, by its public API: an instance
+ * made with `related`, as `vitest related` makes one (https://vitest.dev/api/advanced/vitest). */
+async function specsRelatedTo(createVitest, files) {
+  const options = { watch: false, run: true, related: files.map((file) => join(REPO_ROOT, file)) }
+  const vitest = await createVitest('test', options)
+  try {
+    const specs = await vitest.getRelevantTestSpecifications()
+    return specs.map((spec) => relative(REPO_ROOT, spec.moduleId))
+  } finally {
+    await vitest.close()
+  }
+}
+
+/** Tools over vitest's own import graph, through its public Node API only. */
 export async function vitestTools() {
   const { createVitest } = await import('vitest/node')
-  const vitest = await createVitest('test', { watch: false, run: true, reporters: ['dot'] })
-  const relativeToRoot = (spec) => relative(REPO_ROOT, spec.moduleId)
-  const unitSpecs = (await vitest.globTestSpecifications()).map(relativeToRoot)
+  const vitest = await createVitest('test', { watch: false, run: true })
+  const unitSpecs = (await vitest.globTestSpecifications()).map((spec) =>
+    relative(REPO_ROOT, spec.moduleId)
+  )
+  await vitest.close()
   let scanners = null
   return {
     unitSpecs: async () => unitSpecs,
     e2eSpecs: () => listSpecs(),
-    relatedSpecs: async (file) => {
-      vitest.config.related = [join(REPO_ROOT, file)]
-      return (await vitest.specifications.getRelevantTestSpecifications()).map(relativeToRoot)
-    },
+    relatedSpecs: (file) => specsRelatedTo(createVitest, [file]),
     // Read once: every changed file asks.
     scanners: async () =>
       (scanners ??= unitSpecs.filter((spec) =>
         isScanner(readFileSync(join(REPO_ROOT, spec), 'utf8'))
       )),
-    close: () => vitest.close(),
+    close: async () => undefined,
   }
 }
 
