@@ -31,6 +31,11 @@ jobs:
       - name: Security audit
         run: npm audit --audit-level=high
 
+      # No locked version under 14 days old, unless .release-age-exceptions.json
+      # lists it with a reason (scripts/check-release-age.mjs).
+      - name: Release age
+        run: npm run lint:release-age
+
       - name: Dependency versions
         run: npm run lint:deps
 
