@@ -71,7 +71,7 @@ import { defaultShellFor } from '../terminal/default-shell.js'
 import { basename } from 'path'
 import { randomUUID } from 'crypto'
 import { makeLogger } from '../logger.js'
-import { focusWindow, revealWindow, windowOptions } from '../background-mode.js'
+import { focusWindow, revealWindow, newWindow } from '../background-mode.js'
 import { announceWindowReadiness } from '../e2e-readiness.js'
 import { clearFeed, publishFeed, setActionHandler } from '../home/home-feed.js'
 
@@ -882,17 +882,15 @@ function navigateAuxiliary(
 }
 
 function newAuxiliaryWindow(view: string, rendererUrl: string | undefined): BrowserWindow {
-  const win = new BrowserWindow(
-    windowOptions({
-      width: 1400,
-      height: 900,
-      webPreferences: {
-        contextIsolation: true,
-        nodeIntegration: false,
-        preload: join(__dirname, '../preload/index.js'),
-      },
-    })
-  )
+  const win = newWindow({
+    width: 1400,
+    height: 900,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: join(__dirname, '../preload/index.js'),
+    },
+  })
   auxiliaryWindows.set(view, win)
   announceWindowReadiness(win)
   win.on('closed', () => {

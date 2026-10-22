@@ -1,7 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const app = { setActivationPolicy: vi.fn() }
-vi.mock('electron', () => ({ app }))
+const created: Array<{ width?: number; height?: number }> = []
+class FakeBrowserWindow {
+  size: number[]
+  constructor(options: { width?: number; height?: number }) {
+    created.push(options)
+    // As macOS does: a window is created no larger than the screen's work area.
+    this.size = [Math.min(options.width ?? 0, 1024), Math.min(options.height ?? 0, 674)]
+  }
+  setSize(width: number, height: number): void {
+    this.size = [width, height]
+  }
+  getSize(): number[] {
+    return this.size
+  }
+}
+vi.mock('electron', () => ({ app, BrowserWindow: FakeBrowserWindow }))
 
 const fakeWindow = () => ({ show: vi.fn(), focus: vi.fn() })
 
@@ -30,12 +45,9 @@ describe('a window created in the background', () => {
   // macOS clamps a window to the screen's work area; a CI runner's screen is smaller than a
   // laptop's, so the same test laid out a different, narrower window there.
   it('keeps the size asked for whatever the screen', async () => {
-    const { windowOptions } = await loadWith('1')
-    expect(windowOptions({ width: 1280, height: 800 })).toMatchObject({
-      width: 1280,
-      height: 800,
-      enableLargerThanScreen: true,
-    })
+    const { newWindow } = await loadWith('1')
+    expect(newWindow({ width: 1280, height: 800 }).getSize()).toEqual([1280, 800])
+    expect(created.at(-1)).toMatchObject({ enableLargerThanScreen: true, show: false })
   })
 })
 
