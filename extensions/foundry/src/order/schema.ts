@@ -60,6 +60,8 @@ const ProbedCommandSchema = z.object({
     (value) => (LEGACY_SOURCES.includes(value as (typeof LEGACY_SOURCES)[number]) ? 'hint' : value),
     z.enum([...LEGACY_SOURCES, 'operator', 'repository', 'scout', 'hint'])
   ),
+  /** Where the command was read from (`README.md:38`, `package.json`), when known. */
+  evidence: z.string().optional(),
 })
 
 const ToolchainSchema = z.object(
@@ -200,6 +202,8 @@ const UnitSchema = z.object({
   satisfies: z.array(z.string()).default([]),
   touches: z.array(z.string()).default([]),
   verify: z.array(VerifySchema).default([]),
+  /** The architect's word that this unit changes something a person looks at. */
+  touchesInterface: z.boolean().optional(),
 })
 
 /**
