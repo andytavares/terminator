@@ -473,6 +473,8 @@ function readinessOpenQuestionsTests() {
           answer: null,
           rank: 0,
           confidence: null,
+          multiple: false,
+          chosen: [],
         },
       ],
     })
@@ -589,6 +591,8 @@ function questionsAnsweredTests() {
           answer: 'yes',
           rank: 0,
           confidence: null,
+          multiple: false,
+          chosen: [],
         },
       ],
     })
@@ -610,6 +614,8 @@ function questionsFailingTests() {
           answer: null,
           rank: 0,
           confidence: null,
+          multiple: false,
+          chosen: [],
         },
       ],
     })
@@ -1007,6 +1013,8 @@ const UNANSWERED: WorkOrder['openQuestions'][number] = {
   answer: null,
   rank: 0,
   confidence: null,
+  multiple: false,
+  chosen: [],
 }
 
 function handoffLockAcrossStatesTests() {
@@ -1395,6 +1403,8 @@ function questionsStillShowTests() {
           answer: null,
           rank: 1,
           confidence: 0.5,
+          multiple: false,
+          chosen: [],
         },
       ],
     })

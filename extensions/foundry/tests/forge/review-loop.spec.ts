@@ -234,6 +234,8 @@ function unansweredQuestionsTests() {
           answer: null,
           rank: 1,
           confidence: 0.5,
+          multiple: false,
+          chosen: [],
         },
       ],
     })
@@ -355,6 +357,8 @@ function otherChecksAndQuestionsTests() {
           options: ['a', 'b'],
           recommended: null,
           confidence: null,
+          multiple: false,
+          chosen: [],
           answer: null,
           rank: 0,
         },

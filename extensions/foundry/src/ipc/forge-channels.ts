@@ -64,6 +64,9 @@ const CancelPayload = z.object({
   reason: z.string().optional(),
 })
 
+/** A typed answer, one option index, or several indices for a multiple-choice question. */
+const AnswerOption = z.union([z.string(), z.number(), z.array(z.number().int())])
+
 /**
  * Everything the operator decided in the "Needs you" band, in one submit.
  *
@@ -75,9 +78,7 @@ const CancelPayload = z.object({
  * it carries.
  */
 const SettlePayload = z.object({
-  answers: z
-    .array(z.object({ questionId: z.string(), option: z.union([z.string(), z.number()]) }))
-    .optional(),
+  answers: z.array(z.object({ questionId: z.string(), option: AnswerOption })).optional(),
   accepts: z.array(z.object({ findingId: z.string(), reason: z.string() })).optional(),
   fixes: z.array(z.object({ findingId: z.string(), how: z.string() })).optional(),
   asks: z.array(z.string()).optional(),
@@ -89,9 +90,7 @@ const TurnPayload = z.object({
   id: z.string(),
   message: z.string().optional(),
   strike: z.string().optional(),
-  answer: z
-    .object({ questionId: z.string(), option: z.union([z.string(), z.number()]) })
-    .optional(),
+  answer: z.object({ questionId: z.string(), option: AnswerOption }).optional(),
   /**
    * Accept an adversarial finding: it stands, and the operator has said why.
    *

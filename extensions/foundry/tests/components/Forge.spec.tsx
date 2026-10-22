@@ -830,6 +830,7 @@ function nothingMovedTests() {
 // band's own Send button collects every decision into one turn.
 describe('deciding a blocking finding, in the band', () => {
   describe('the decide button', theDecideButtonTests)
+  describe('the moves', findingMovesTests)
   describe('sending a fix', sendingAFixTests)
   describe('the fix box and clearing', theFixBoxAndClearingTests)
   describe('while the architect works', whileTheArchitectWorksTests)
@@ -846,6 +847,8 @@ const TWO_QUESTIONS = [
     answer: null,
     rank: 2,
     confidence: null,
+    multiple: false,
+    chosen: [],
   },
   {
     id: 'Q-2',
@@ -856,6 +859,8 @@ const TWO_QUESTIONS = [
     answer: null,
     rank: 1,
     confidence: null,
+    multiple: false,
+    chosen: [],
   },
 ]
 
@@ -868,9 +873,26 @@ function theDecideButtonTests() {
     withFinding()
     await openForgeStep('Red team')
     await waitFor(() => screen.getByText('the outcome restates the problem'))
-    expect(screen.getByRole('button', { name: 'Ask the architect' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Fix it…' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Accept it' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: /^Ask the architect/ })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: /^Fix it my way/ })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: /^Accept it/ })).toBeTruthy()
+  })
+}
+
+function findingMovesTests() {
+  it('offers the three moves as a choose-one group of radios, and Fix it my way opens the box', async () => {
+    withFinding()
+    await openForgeStep('Red team')
+    await waitFor(() => screen.getByText('the outcome restates the problem'))
+    const card = screen
+      .getByText('the outcome restates the problem')
+      .closest('.fdry-fnd') as HTMLElement
+    expect(within(card).getByRole('group', { name: 'Choose one' })).toBeTruthy()
+    expect(within(card).getAllByRole('radio')).toHaveLength(3)
+    expect(within(card).queryByRole('textbox')).toBeNull()
+
+    fireEvent.click(within(card).getByRole('radio', { name: 'Fix it my way' }))
+    expect(within(card).getByRole('textbox')).toBeTruthy()
   })
 }
 
@@ -882,7 +904,7 @@ function sendingAFixTests() {
     withFinding()
     await openForgeStep('Red team')
     await waitFor(() => screen.getByText('the outcome restates the problem'))
-    fireEvent.click(screen.getByRole('button', { name: 'Fix it…' }))
+    fireEvent.click(screen.getByRole('radio', { name: /^Fix it my way/ }))
     const how = screen.getByLabelText(/How should "the outcome restates the problem" be fixed/)
     fireEvent.change(how, { target: { value: 'state what will be observably different' } })
     expect(invoke).not.toHaveBeenCalledWith('foundry:order.converge', expect.anything())
@@ -905,7 +927,7 @@ function theFixBoxAndClearingTests() {
     withFinding()
     await openForgeStep('Red team')
     await waitFor(() => screen.getByText('the outcome restates the problem'))
-    fireEvent.click(screen.getByRole('button', { name: 'Fix it…' }))
+    fireEvent.click(screen.getByRole('radio', { name: /^Fix it my way/ }))
     const finding = screen.getByText(/the outcome restates the problem/).closest('.fdry-fnd')
     expect(finding?.querySelector('textarea')).toBeTruthy()
   })
@@ -917,7 +939,7 @@ function theFixBoxAndClearingTests() {
     withFinding()
     await openForgeStep('Red team')
     await waitFor(() => screen.getByText('the outcome restates the problem'))
-    fireEvent.click(screen.getByRole('button', { name: 'Ask the architect' }))
+    fireEvent.click(screen.getByRole('radio', { name: /^Ask the architect/ }))
     expect(invoke).not.toHaveBeenCalledWith('foundry:order.converge', expect.anything())
 
     fireEvent.click(screen.getByRole('button', { name: /Send \d decision/ }))
@@ -947,11 +969,11 @@ function whileTheArchitectWorksTests() {
     })
     await openForgeStep('Red team')
     await waitFor(() => screen.getByText('the outcome restates the problem'))
-    fireEvent.click(screen.getByRole('button', { name: 'Ask the architect' }))
+    fireEvent.click(screen.getByRole('radio', { name: /^Ask the architect/ }))
     fireEvent.click(screen.getByRole('button', { name: /Send \d decision/ }))
     await waitFor(() => expect(converges()).toBe(1))
 
-    expect(screen.getByRole('button', { name: 'Ask the architect' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: /^Ask the architect/ })).toBeTruthy()
     // The choice just sent was cleared, and nothing new is decided — Send is
     // unavailable for that ordinary reason, not because anything is queued:
     // this fixture's turn only starts once the send itself calls converge.
@@ -966,7 +988,7 @@ function forgeAcceptingTests() {
     withFinding()
     await openForgeStep('Red team')
     await waitFor(() => screen.getByText('the outcome restates the problem'))
-    fireEvent.click(screen.getByRole('button', { name: 'Accept it' }))
+    fireEvent.click(screen.getByRole('radio', { name: /^Accept it/ }))
     const box = await screen.findByLabelText(/Why "the outcome restates the problem" is accepted/)
 
     // Nothing is sent until there is one — a shrug is not a decision.
@@ -997,6 +1019,8 @@ function forgeAcceptingTests() {
 // Replaced below with one "collects everything on this step" test per step.
 describe('answering the open questions on the Plan step, one submit', () => {
   describe('one converge call', oneConvergeCallTests)
+  describe('choosing several', choosingSeveralTests)
+  describe('clearing a choice', clearingAChoiceTests)
   describe('send unavailable until answered', sendUnavailableUntilAnsweredTests)
 })
 
@@ -1023,6 +1047,57 @@ const TWO_FINDINGS = [
 
 function withFindings() {
   mountShowing({ ...trackerDraft(), redTeam: TWO_FINDINGS })
+}
+
+function choosingSeveralTests() {
+  it('shows a multiple-answer question as checkboxes and sends every box ticked', async () => {
+    mountShowing({
+      ...trackerDraft(),
+      acceptance: [criterion()],
+      openQuestions: [{ ...TWO_QUESTIONS[0], options: ['api', 'web', 'cli'], multiple: true }],
+    })
+    await waitFor(() => screen.getByText('which token?'))
+    const asked = screen.getByRole('group', { name: 'Choose any' })
+    expect(within(asked).getAllByRole('checkbox')).toHaveLength(3)
+    expect(within(asked).queryAllByRole('radio')).toHaveLength(0)
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /^api/ }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /^cli/ }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /^web/ }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /^web/ }))
+    expect(screen.getByText(/1 of 1 decided/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /^Send( \d)? decisions?$/ }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        'foundry:order.converge',
+        converged({ answers: [{ questionId: 'Q-1', option: [0, 2] }] })
+      )
+    )
+  })
+}
+
+function clearingAChoiceTests() {
+  it('shows a single-answer question as radios', async () => {
+    withQuestions()
+    await waitFor(() => screen.getByText('which token?'))
+    const asked = screen.getAllByRole('group', { name: 'Choose one' })
+    expect(asked).toHaveLength(2)
+    expect(within(asked[0]).getAllByRole('radio')).toHaveLength(2)
+    expect(within(asked[0]).queryAllByRole('checkbox')).toHaveLength(0)
+  })
+
+  it('counts a multiple question undecided once every box is cleared', async () => {
+    mountShowing({
+      ...trackerDraft(),
+      acceptance: [criterion()],
+      openQuestions: [{ ...TWO_QUESTIONS[0], multiple: true }],
+    })
+    await waitFor(() => screen.getByText('which token?'))
+    fireEvent.click(screen.getByRole('checkbox', { name: /^a/ }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /^a/ }))
+    expect(screen.getByText(/0 of 1 decided/)).toBeTruthy()
+  })
 }
 
 function oneConvergeCallTests() {
@@ -1068,9 +1143,9 @@ describe('deciding two red-team findings on the Red team step, one submit', () =
 })
 
 /** Opens a decision on the finding that says `text`, and types what it is. */
-function decideFinding(text: string, decision: { button: string; field: RegExp; value: string }) {
+function decideFinding(text: string, decision: { move: RegExp; field: RegExp; value: string }) {
   const card = screen.getByText(text).closest('.fdry-fnd') as HTMLElement
-  fireEvent.click(within(card).getByRole('button', { name: decision.button }))
+  fireEvent.click(within(card).getByRole('radio', { name: decision.move }))
   fireEvent.change(within(card).getByLabelText(decision.field), {
     target: { value: decision.value },
   })
@@ -1083,12 +1158,12 @@ function oneConvergeCallForEveryDecisionTests() {
     await waitFor(() => screen.getByText('finding one'))
 
     decideFinding('finding one', {
-      button: 'Fix it…',
+      move: /^Fix it my way/,
       field: /How should "finding one" be fixed/,
       value: 'do it this way',
     })
     decideFinding('finding two', {
-      button: 'Accept it',
+      move: /^Accept it/,
       field: /Why "finding two" is accepted/,
       value: 'priced in',
     })
@@ -1119,7 +1194,7 @@ function sendUnavailableUntilDecidedTests() {
     expect(isUnavailable(send())).toBe(true)
 
     const findingOne = screen.getByText('finding one').closest('.fdry-fnd') as HTMLElement
-    fireEvent.click(within(findingOne).getByRole('button', { name: 'Ask the architect' }))
+    fireEvent.click(within(findingOne).getByRole('radio', { name: /^Ask the architect/ }))
     expect(isUnavailable(send())).toBe(false)
   })
 }
@@ -1157,7 +1232,7 @@ describe('a settle made while the architect is drafting', () => {
 
     await openForgeStep('Red team')
     await vi.waitFor(() => screen.getByText('finding one'))
-    fireEvent.click(screen.getByRole('button', { name: 'Ask the architect' }))
+    fireEvent.click(screen.getByRole('radio', { name: /^Ask the architect/ }))
     fireEvent.click(screen.getByRole('button', { name: /^Send( \d)? decisions?$/ }))
 
     // ReasonButton swaps in a new DOM node once it renders as unavailable
@@ -1635,6 +1710,8 @@ function otherMovesHeldTests() {
           answer: null,
           rank: 1,
           confidence: null,
+          multiple: false,
+          chosen: [],
         },
       ],
       assumptions: [{ id: 'A-1', text: 'tokens are JWTs', struck: false, affects: [] }],
@@ -1846,6 +1923,8 @@ const md = {
       answer: null,
       rank: 1,
       confidence: 0.5,
+      multiple: false,
+      chosen: [],
     },
   ],
   acceptance: [
@@ -2120,9 +2199,9 @@ describe('findings grouped by who acts on them', () => {
     expect(screen.getByText('note one')).toBeTruthy()
     expect(screen.getByText('Needs your decision')).toBeTruthy()
     const finding = screen.getByText('blocking one').closest('.fdry-fnd') as HTMLElement
-    expect(within(finding).getByRole('button', { name: 'Ask the architect' })).toBeTruthy()
-    expect(within(finding).getByRole('button', { name: 'Fix it…' })).toBeTruthy()
-    expect(within(finding).getByRole('button', { name: 'Accept it' })).toBeTruthy()
+    expect(within(finding).getByRole('radio', { name: /^Ask the architect/ })).toBeTruthy()
+    expect(within(finding).getByRole('radio', { name: /^Fix it my way/ })).toBeTruthy()
+    expect(within(finding).getByRole('radio', { name: /^Accept it/ })).toBeTruthy()
   })
 })
 

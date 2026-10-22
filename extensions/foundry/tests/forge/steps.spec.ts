@@ -107,6 +107,8 @@ function criteriaAndQuestionsTests() {
           answer: null,
           rank: 1,
           confidence: 0.6,
+          multiple: false,
+          chosen: [],
         },
       ],
     })

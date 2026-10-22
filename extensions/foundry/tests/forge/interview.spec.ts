@@ -18,6 +18,8 @@ function q(over: Partial<OpenQuestion> = {}): OpenQuestion {
     answer: null,
     rank: 1,
     confidence: null,
+    multiple: false,
+    chosen: [],
     ...over,
   }
 }
@@ -88,5 +90,35 @@ describe('answerQuestion', () => {
   it('ignores an option index that is out of range', () => {
     const after = answerQuestion([q({ id: 'Q-1', options: ['No'] })], 'Q-1', 7)
     expect(after[0].answer).toBeNull()
+  })
+})
+
+describe('answerQuestion with options chosen', () => {
+  it('records which option an index chose', () => {
+    const after = answerQuestion([q({ options: ['No', 'Yes'] })], 'Q-1', 1)
+    expect(after[0].chosen).toEqual([1])
+  })
+
+  it('joins several chosen options in option order, however they were given', () => {
+    const question = q({ options: ['api', 'web', 'cli'], multiple: true })
+    const after = answerQuestion([question], 'Q-1', [2, 0])
+    expect(after[0]).toMatchObject({ chosen: [0, 2], answer: 'api; cli' })
+  })
+
+  it('keeps only valid, distinct indices of a list', () => {
+    const question = q({ options: ['api', 'web'], multiple: true })
+    const after = answerQuestion([question], 'Q-1', [1, 1, 9, -1, 0])
+    expect(after[0]).toMatchObject({ chosen: [0, 1], answer: 'api; web' })
+  })
+
+  it('ignores a list with no valid index, like a bad single index', () => {
+    const after = answerQuestion([q({ options: ['api'] })], 'Q-1', [4, 7])
+    expect(after[0]).toMatchObject({ answer: null, chosen: [] })
+    expect(answerQuestion([q()], 'Q-1', [])[0].answer).toBeNull()
+  })
+
+  it('leaves nothing chosen for a typed answer', () => {
+    const after = answerQuestion([q({ chosen: [0] })], 'Q-1', 'something else')
+    expect(after[0]).toMatchObject({ answer: 'something else', chosen: [] })
   })
 })

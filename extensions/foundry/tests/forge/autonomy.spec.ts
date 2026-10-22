@@ -82,6 +82,7 @@ function autonomyDecidingTests() {
       order({ openQuestions: [hideOrGreyQuestion({ confidence: 0.92 })] })
     )
     expect(next.openQuestions[0].answer).toBe('Hide them')
+    expect(next.openQuestions[0].chosen).toEqual([0])
   })
 
   it('says what it decided as an assumption the operator can strike', () => {

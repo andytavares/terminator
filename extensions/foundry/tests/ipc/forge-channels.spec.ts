@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { queueEntry } from '../helpers/queue-entries.js'
-import { builderUnit, testCriterion } from '../helpers/order-parts.js'
+import { builderUnit, openQuestion, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { dispatchChannel } from '@terminator/extension-sdk'
@@ -85,6 +85,8 @@ async function seeded(): Promise<WorkOrder> {
         answer: null,
         rank: 1,
         confidence: null,
+        multiple: false,
+        chosen: [],
       },
     ],
   }
@@ -163,6 +165,16 @@ function strikesAndAnswersTests() {
     const r = (await channels().turn({ id: order.id, strike: 'A-1' })) as OrderView
     expect(r.changed).toEqual(['U-1'])
     expect(r.order.assumptions[0].struck).toBe(true)
+  })
+
+  it('answers a multiple-choice question by the indices of its options', async () => {
+    const order = await seeded()
+    const r = (await channels().turn({
+      id: order.id,
+      answer: { questionId: 'Q-1', option: [1, 0] },
+    })) as OrderView
+    expect(r.order.openQuestions[0]).toMatchObject({ chosen: [0, 1], answer: 'No; Yes' })
+    expect((await store.load(order.id))?.openQuestions[0].chosen).toEqual([0, 1])
   })
 
   it('answers a question by the index of its option', async () => {
@@ -442,18 +454,7 @@ function forgeChannelsOpenQuestionsTests() {
     if (loaded === null) throw new Error('the order this test needs was not saved')
     await store.save({
       ...loaded,
-      openQuestions: [
-        {
-          id: 'Q-1',
-          text: 'a?',
-          why: '',
-          options: ['x', 'y'],
-          recommended: 0,
-          answer: null,
-          rank: 1,
-          confidence: null,
-        },
-      ],
+      openQuestions: [openQuestion('Q-1', { text: 'a?', options: ['x', 'y'], recommended: 0 })],
     })
 
     const r = (await c.list()) as { orders: { standing: Standing; openQuestions: number }[] }
@@ -928,6 +929,8 @@ const UNSETTLED: Pick<WorkOrder, 'openQuestions' | 'redTeam'> = {
       answer: null,
       rank: 1,
       confidence: null,
+      multiple: false,
+      chosen: [],
     },
     {
       id: 'Q-2',
@@ -938,6 +941,8 @@ const UNSETTLED: Pick<WorkOrder, 'openQuestions' | 'redTeam'> = {
       answer: null,
       rank: 1,
       confidence: null,
+      multiple: false,
+      chosen: [],
     },
   ],
   redTeam: [

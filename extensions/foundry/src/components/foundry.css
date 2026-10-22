@@ -559,13 +559,6 @@
   color: var(--tm-text-muted);
 }
 
-.fdry-fnd-acts {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 4px;
-}
-
 /* A question's answers: one full-width row each, so a long answer wraps instead of
    clipping, and the chosen one shows without colour alone. */
 .fdry-opts {
@@ -612,9 +605,8 @@
   outline-offset: 1px;
 }
 
-/* The design system draws the radio; the text-field rule below must not stretch it. */
+/* The design system draws the radio and checkbox; this only lines them up with the first line of text. */
 .fdry-fnd .fdry-opt input {
-  width: 14px;
   margin: 2px 0 0;
 }
 
@@ -636,7 +628,7 @@
   vertical-align: 1px;
 }
 
-.fdry-fnd input,
+.fdry-fnd input:not([type='radio'], [type='checkbox']),
 .fdry-fnd textarea {
   font: inherit;
   font-size: 13px;

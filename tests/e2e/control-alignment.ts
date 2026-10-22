@@ -73,7 +73,7 @@ function afterDrawnFrame(): Promise<void> {
   )
 }
 
-/** The misaligned control pairs on `page` (or an extension frame), read after a drawn frame so a
+/** The misaligned control pairs, and any radio or checkbox drawn wrong, on `page` (or an extension frame), read after a drawn frame so a
  * layout still being applied is not measured, labelled with `screen`. */
 export async function misalignedOn(
   page: Pick<Page, 'evaluate'> | Pick<Frame, 'evaluate'>,
@@ -84,9 +84,47 @@ export async function misalignedOn(
     await afterDrawnFrame()
     return misalignedControls(${JSON.stringify(CONTROLS)}) })()`
   const found = (await page.evaluate(script)) as Misalignment[]
-  return found.map(
+  const misaligned = found.map(
     (m) =>
       `${screen}: ${m.first} (${m.heights[0]}px) beside ${m.second} (${m.heights[1]}px), ` +
       `centres ${m.centres[0].toFixed(1)} / ${m.centres[1].toFixed(1)}`
+  )
+  return [...misaligned, ...(await wronglyDrawnTogglesOn(page, screen))]
+}
+
+/** A radio or checkbox that is not drawn at the design system's size and corner. */
+interface DrawnWrong {
+  control: string
+  size: [number, number]
+  radius: string
+}
+
+function wronglyDrawnToggles(): DrawnWrong[] {
+  const drawn = { radio: '50%', checkbox: '3px' }
+  const toggles = [...document.querySelectorAll('input[type="radio"], input[type="checkbox"]')]
+  return toggles
+    .filter((el) => visibleOnScreen(el) && !el.closest('.xterm, .cm-editor, .tmui-tooltip'))
+    .flatMap((el) => {
+      const box = el.getBoundingClientRect()
+      const radius = getComputedStyle(el).borderTopLeftRadius
+      const kind = (el as HTMLInputElement).type as keyof typeof drawn
+      const right = box.width === 14 && box.height === 14 && radius === drawn[kind]
+      return right ? [] : [{ control: described(el), size: [box.width, box.height], radius }]
+    })
+}
+
+/** The radios and checkboxes on `page` not drawn as 14px circles and 14px rounded squares: a
+ * stylesheet written for text fields can stretch them into pills, which looks like a switch. */
+export async function wronglyDrawnTogglesOn(
+  page: Pick<Page, 'evaluate'> | Pick<Frame, 'evaluate'>,
+  screen: string
+): Promise<string[]> {
+  const helpers = [visibleOnScreen, described, wronglyDrawnToggles]
+  const script = `(async () => { ${[afterDrawnFrame, ...helpers].map(String).join('\n')}
+    await afterDrawnFrame()
+    return wronglyDrawnToggles() })()`
+  const found = (await page.evaluate(script)) as DrawnWrong[]
+  return found.map(
+    (t) => `${screen}: ${t.control} is ${t.size[0]}x${t.size[1]}, radius ${t.radius}`
   )
 }

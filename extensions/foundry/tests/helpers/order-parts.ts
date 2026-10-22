@@ -48,6 +48,8 @@ export function openQuestion(id: string, over: Partial<Question> = {}): Question
     options: [],
     recommended: null,
     answer: null,
+    multiple: false,
+    chosen: [],
     rank: 1,
     confidence: null,
     ...over,

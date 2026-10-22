@@ -33,6 +33,8 @@ const QUESTIONS: OpenQuestion[] = [
     answer: null,
     rank: 9,
     confidence: null,
+    multiple: false,
+    chosen: [],
   },
   {
     id: 'q-2',
@@ -43,6 +45,8 @@ const QUESTIONS: OpenQuestion[] = [
     answer: null,
     rank: 4,
     confidence: null,
+    multiple: false,
+    chosen: [],
   },
 ]
 
@@ -174,7 +178,7 @@ function needsYouBlockingFindingsTests() {
     await waitFor(() => screen.getByText('Needs your decision'))
     const group = screen.getByText('Needs your decision').closest('.fdry-group') as HTMLElement
     expect(within(group).getByText('the change would leave the outcome false')).toBeTruthy()
-    expect(within(group).getByRole('button', { name: 'Ask the architect' })).toBeTruthy()
+    expect(within(group).getByRole('radio', { name: /^Ask the architect/ })).toBeTruthy()
   })
 }
 

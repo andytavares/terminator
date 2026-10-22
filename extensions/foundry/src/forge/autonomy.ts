@@ -39,7 +39,7 @@ export function decideConfidentQuestions(order: WorkOrder): WorkOrder {
       struck: false,
       affects: [],
     })
-    return { ...question, answer: option }
+    return { ...question, answer: option, chosen: [question.recommended as number] }
   })
   if (decided.length === 0) return order
   return { ...order, openQuestions, assumptions: [...order.assumptions, ...decided] }

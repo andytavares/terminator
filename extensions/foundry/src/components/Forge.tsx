@@ -204,7 +204,10 @@ function findingDecided(choice: FindingChoice | undefined): boolean {
 
 /** What one settle turn asks the backend to do in a single converge call. */
 interface Settle {
-  readonly answers: readonly { readonly questionId: string; readonly option: number }[]
+  readonly answers: readonly {
+    readonly questionId: string
+    readonly option: number | readonly number[]
+  }[]
   readonly accepts: readonly { readonly findingId: string; readonly reason: string }[]
   readonly fixes: readonly { readonly findingId: string; readonly how: string }[]
   readonly asks: readonly string[]
@@ -218,13 +221,16 @@ interface Settle {
  * is not a fix, the same shrug a blank accept reason always was.
  */
 function buildSettle(
-  questionChoices: Readonly<Record<string, number>>,
-  findingChoice: Readonly<Record<string, FindingChoice>>
+  questionChoices: Readonly<Record<string, readonly number[]>>,
+  findingChoice: Readonly<Record<string, FindingChoice>>,
+  questions: readonly Pick<Question, 'id' | 'multiple'>[]
 ): Settle {
-  const answers = Object.entries(questionChoices).map(([questionId, option]) => ({
-    questionId,
-    option,
-  }))
+  const answers = Object.entries(questionChoices)
+    .filter(([, picked]) => picked.length > 0)
+    .map(([questionId, picked]) => ({
+      questionId,
+      option: questions.find((q) => q.id === questionId)?.multiple === true ? picked : picked[0],
+    }))
   const accepts: { findingId: string; reason: string }[] = []
   const fixes: { findingId: string; how: string }[] = []
   const asks: string[] = []
@@ -404,7 +410,7 @@ function useFocusTarget() {
 /** What the operator has chosen on this screen and not yet sent. */
 function useChoices() {
   const [draft, setDraft] = useState('')
-  const [questionChoices, setQuestionChoices] = useState<Record<string, number>>({})
+  const [questionChoices, setQuestionChoices] = useState<Record<string, number[]>>({})
   const [findingChoice, setFindingChoice] = useState<Record<string, FindingChoice>>({})
   const [queuedSettle, setQueuedSettle] = useState<Settle | null>(null)
   const [picked, setPicked] = useState<StepId | null>(null)
@@ -814,9 +820,9 @@ function decidedFindings(
 
 function decidedQuestions(
   questions: readonly { readonly id: string }[],
-  questionChoices: Readonly<Record<string, number>>
+  questionChoices: Readonly<Record<string, readonly number[]>>
 ): number {
-  return questions.filter((q) => questionChoices[q.id] !== undefined).length
+  return questions.filter((q) => (questionChoices[q.id] ?? []).length > 0).length
 }
 
 interface StepDecisions extends Pick<ForgeState, 'findingChoice' | 'questionChoices'> {
@@ -852,12 +858,12 @@ function openStep(forge: ForgeModel, id: StepId): void {
 /** The decisions made on this step, as one settle, cleared from the screen. */
 function takeDecisions(forge: ForgeModel): Settle | null {
   if (forge.stepView.id === 'redTeam') {
-    const settle = buildSettle({}, forge.findingChoice)
+    const settle = buildSettle({}, forge.findingChoice, [])
     forge.setFindingChoice({})
     return settle
   }
   if (forge.stepView.id === 'plan') {
-    const settle = buildSettle(forge.questionChoices, {})
+    const settle = buildSettle(forge.questionChoices, {}, forge.order.openQuestions)
     forge.setQuestionChoices({})
     return settle
   }
@@ -1300,7 +1306,9 @@ function QuestionCard({ forge, question }: ForgeProp & { readonly question: Ques
         </Markdown>
       ) : null}
       <fieldset className="fdry-opts">
-        <legend className="fdry-opts-legend">Choose one</legend>
+        <legend className="fdry-opts-legend">
+          {question.multiple ? 'Choose any' : 'Choose one'}
+        </legend>
         {question.options.map((option, optionIndex) => (
           <QuestionOption
             key={option}
@@ -1319,20 +1327,34 @@ interface QuestionOptionProps extends ForgeProp {
   readonly at: readonly [option: string, optionIndex: number]
 }
 
+/** The options a question has ticked: one for a single choice, any number for a multiple one. */
+function pickOption(
+  picked: readonly number[],
+  optionIndex: number,
+  multiple: boolean
+): readonly number[] {
+  if (!multiple) return [optionIndex]
+  return picked.includes(optionIndex)
+    ? picked.filter((index) => index !== optionIndex)
+    : [...picked, optionIndex].sort((a, b) => a - b)
+}
+
+function toggleOption(forge: ForgeProp['forge'], question: Question, optionIndex: number): void {
+  forge.setQuestionChoices((current) => ({
+    ...current,
+    [question.id]: [...pickOption(current[question.id] ?? [], optionIndex, question.multiple)],
+  }))
+}
+
 function QuestionOption({ forge, question, at: [option, optionIndex] }: QuestionOptionProps) {
-  const chosen = forge.questionChoices[question.id] === optionIndex
+  const chosen = (forge.questionChoices[question.id] ?? []).includes(optionIndex)
   return (
     <label className="fdry-opt">
       <input
-        type="radio"
+        type={question.multiple ? 'checkbox' : 'radio'}
         name={`question-${question.id}`}
         checked={chosen}
-        onChange={() =>
-          forge.setQuestionChoices((current) => ({
-            ...current,
-            [question.id]: optionIndex,
-          }))
-        }
+        onChange={() => toggleOption(forge, question, optionIndex)}
       />
       <span className="fdry-opt-text">
         <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
@@ -1643,23 +1665,14 @@ function NeedsYouGroup({ forge }: ForgeProp) {
   )
 }
 
-/** The three answers to a blocking finding, as the buttons offer them. */
+/** The three answers to a blocking finding, as the radios offer them. */
 const FINDING_MOVES: readonly {
   readonly mode: FindingChoice['mode']
   readonly label: string
-  readonly title: string
 }[] = [
-  {
-    mode: 'ask',
-    label: 'Ask the architect',
-    title: 'Have the architect change the order so this no longer holds',
-  },
-  {
-    mode: 'fix',
-    label: 'Fix it…',
-    title: 'Say how, and the architect changes the order that way',
-  },
-  { mode: 'accept', label: 'Accept it', title: 'It stands, and here is why' },
+  { mode: 'ask', label: 'Ask the architect to change the order so this no longer holds' },
+  { mode: 'fix', label: 'Fix it my way' },
+  { mode: 'accept', label: 'Accept it, and say why' },
 ]
 
 interface FindingProps {
@@ -1680,20 +1693,20 @@ function NeedsYouFinding({ forge, finding }: ForgeProp & { readonly finding: Fin
         </Markdown>
       </span>
       <span className="fdry-fnd-meta">{finding.meta}</span>
-      <div className="fdry-fnd-acts">
+      <fieldset className="fdry-opts">
+        <legend className="fdry-opts-legend">Choose one</legend>
         {FINDING_MOVES.map((move) => (
-          <Button
-            key={move.mode}
-            size="sm"
-            aria-pressed={choice?.mode === move.mode}
-            variant={choice?.mode === move.mode ? 'primary' : 'secondary'}
-            title={move.title}
-            onClick={() => choose({ mode: move.mode, text: keptText(choice, move.mode) })}
-          >
-            {move.label}
-          </Button>
+          <label key={move.mode} className="fdry-opt">
+            <input
+              type="radio"
+              name={`finding-${finding.id}`}
+              checked={choice?.mode === move.mode}
+              onChange={() => choose({ mode: move.mode, text: keptText(choice, move.mode) })}
+            />
+            <span className="fdry-opt-text">{move.label}</span>
+          </label>
         ))}
-      </div>
+      </fieldset>
       <FindingText finding={finding} choice={choice} choose={choose} />
     </div>
   )
