@@ -115,7 +115,7 @@ function wronglyDrawnToggles(): DrawnWrong[] {
 
 /** The radios and checkboxes on `page` not drawn as 14px circles and 14px rounded squares: a
  * stylesheet written for text fields can stretch them into pills, which looks like a switch. */
-export async function wronglyDrawnTogglesOn(
+async function wronglyDrawnTogglesOn(
   page: Pick<Page, 'evaluate'> | Pick<Frame, 'evaluate'>,
   screen: string
 ): Promise<string[]> {

@@ -26,6 +26,15 @@ function finalGlyph(): WorkOrder['acceptance'][number] {
   })
 }
 
+const EMPTY_ENVIRONMENT: WorkOrder['context']['environment'] = {
+  resolved: true,
+  prepare: null,
+  share: [],
+  pictures: null,
+  paths: { interface: [], manifests: [], lockfiles: [], formatting: [] },
+  additional: [],
+}
+
 /** One repository, nothing probed and nothing read yet. */
 function validContext(): WorkOrder['context'] {
   return {
@@ -39,14 +48,7 @@ function validContext(): WorkOrder['context'] {
       },
     ],
     toolchain: { test: null, lint: null, format: null, coverage: null, e2e: null, build: null },
-    environment: {
-      resolved: true,
-      prepare: null,
-      share: [],
-      pictures: null,
-      paths: { interface: [], manifests: [], lockfiles: [], formatting: [] },
-      additional: [],
-    },
+    environment: EMPTY_ENVIRONMENT,
     entryPoints: [],
     priorArt: [],
     conventions: [],

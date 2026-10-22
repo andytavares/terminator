@@ -57,11 +57,7 @@ function commandStep(name: string, command: string, rung: LadderStep['rung']): L
   return { rung, name, command, status: 'runnable', reason: '', check: null }
 }
 
-/**
- * What the order says to run, in order: the preparation, the checks it has a
- * command for, then the repository's additional checks.
- * @internal
- */
+/** The preparation, the checks the order has a command for, then its added checks. @internal */
 export function baselineSteps({ toolchain, environment }: WorkOrder['context']): LadderStep[] {
   const prepare =
     environment.prepare === null ? [] : [commandStep(PREPARE_STEP, environment.prepare, 'L0')]
@@ -375,10 +371,8 @@ async function runCommandsOnBase(proof: Proof, commands: readonly string[]): Pro
   }
 }
 
-/**
- * Each command in a terminal tab of its own on a fresh checkout of the order's first
- * repository, after any proof already running for the order. Throws when it cannot check out.
- */
+// Queued behind any proof already running for the order: two would remove each
+// other's @baseline checkout. Throws when it cannot check out.
 export function runOnFreshBase(
   order: WorkOrder,
   deps: BaselineDeps,

@@ -141,7 +141,7 @@ interface CheckRun {
   readonly log: string | undefined
 }
 
-function runOf(step: StepOutcome, logs: Map<string, string>): CheckRun {
+function checkRunOf(step: StepOutcome, logs: Map<string, string>): CheckRun {
   return { exitCode: step.exitCode, log: logs.get(step.name) }
 }
 
@@ -287,8 +287,8 @@ class FinalClimb {
     const passed = retry.outcome.steps.find((s) => s.name === firstFailed.name)
     this.flaky = flakyOf(
       firstFailed,
-      runOf(firstFailed, first.logs),
-      runOf(passed ?? firstFailed, retry.logs)
+      checkRunOf(firstFailed, first.logs),
+      checkRunOf(passed ?? firstFailed, retry.logs)
     )
     return isFlakyAccepted(this.run.priorGates, firstFailed.name) ? retry : first
   }

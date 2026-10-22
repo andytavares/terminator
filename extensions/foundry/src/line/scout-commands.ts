@@ -93,10 +93,7 @@ function skipped(deps: ScoutProofDeps, { orderId, proposal, why }: Verdict): Pro
   })
 }
 
-/**
- * Run what the scout proposed on the base branch. A command that exits 0 goes into the
- * repository's profile and the order's toolchain; one that does not is said so in the ledger.
- */
+/** Prove the scout's commands on the base branch; only one that exits 0 is kept. */
 export async function proveScoutCommands(
   orderId: string,
   proposals: readonly CommandProposal[],
@@ -113,7 +110,7 @@ export async function proveScoutCommands(
   ).catch((error: unknown) => error as Error)
   for (const proposal of wanted) {
     if (run instanceof Error) await unproved(deps, { orderId, proposal, why: run.message })
-    else await settle(deps, { order, proposal, run })
+    else await settleProposal(deps, { order, proposal, run })
   }
 }
 
@@ -123,24 +120,28 @@ interface Settling {
   readonly run: FreshBaseRun
 }
 
-async function settle(deps: ScoutProofDeps, settling: Settling): Promise<void> {
+/** The failed proof's log, as evidence the ledger keeps. */
+async function failureEvidence(run: FreshBaseRun, command: string, code: number | null) {
+  const logPath = run.logPaths[command] ?? ''
+  const log = await fs.promises.readFile(logPath, 'utf8').catch(() => '')
+  return {
+    kind: 'stdout',
+    path: logPath,
+    exitCode: code ?? undefined,
+    excerpt: lastLines(log, EXCERPT_LINES),
+  }
+}
+
+async function settleProposal(deps: ScoutProofDeps, settling: Settling): Promise<void> {
   const { order, proposal, run } = settling
   const code = run.exitCodes[proposal.command] ?? null
-  if (code !== 0) {
-    const why = code === null ? 'did not run to an exit' : `exited ${code}`
-    const log = await fs.promises
-      .readFile(run.logPaths[proposal.command] ?? '', 'utf8')
-      .catch(() => '')
-    const evidence = {
-      kind: 'stdout',
-      path: run.logPaths[proposal.command] ?? '',
-      exitCode: code ?? undefined,
-      excerpt: lastLines(log, EXCERPT_LINES),
-    }
-    await unproved(deps, { orderId: order.id, proposal, why, evidence })
+  if (code === 0) {
+    await keep(deps, settling)
     return
   }
-  await keep(deps, settling)
+  const why = code === null ? 'did not run to an exit' : `exited ${code}`
+  const evidence = await failureEvidence(run, proposal.command, code)
+  await unproved(deps, { orderId: order.id, proposal, why, evidence })
 }
 
 function unproved(deps: ScoutProofDeps, verdict: Verdict): Promise<void> {

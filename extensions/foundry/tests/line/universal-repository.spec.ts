@@ -102,11 +102,8 @@ async function glyphRepository(): Promise<void> {
   })
 }
 
-/**
- * What the next runs of `./glyph test` exit with, one after another; the last repeats.
- * The recipe's own `check` step runs it first, so `0, …` lets that pass and leaves the
- * codes after it to the final check.
- */
+// The exits of the next `./glyph test` runs; the last repeats. The recipe's own check
+// step runs it first, so a leading 0 leaves the rest to the final check.
 function glyphExits(...codes: number[]): void {
   fs.writeFileSync(control, `${codes.join('\n')}\n`)
 }

@@ -3,6 +3,7 @@ import * as path from 'node:path'
 import { z } from 'zod'
 import { CHECK_NAMES, type CheckName } from '../verify/check-names.js'
 import { checkVersion, loadYaml, yamlFailure, type ParseResult } from '../recipe/yaml-file.js'
+import { globPattern } from './glob.js'
 import type { Entry, ProfilePaths } from './schema.js'
 
 // Hints: what a toolchain looks like, as data shipped with the extension
@@ -115,16 +116,11 @@ export function defaultHintsDir(): string {
 
 // ---- Reading a repository (read only) ----
 
-function globToRegExp(pattern: string): RegExp {
-  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')
-  return new RegExp(`^${escaped}$`)
-}
-
 /** A file or directory at the repository root; a `*` matches within a root entry's name. */
 function present(repo: string, pattern: string): boolean {
   if (!pattern.includes('*')) return fs.existsSync(path.join(repo, pattern))
   try {
-    const matcher = globToRegExp(pattern)
+    const matcher = globPattern(pattern)
     return fs.readdirSync(repo).some((entry) => matcher.test(entry))
   } catch {
     return false
@@ -140,7 +136,7 @@ function readText(repo: string, rel: string): string | null {
 }
 
 /** Where a command came from, so the ones the old probe named keep their names. */
-export type HintTier = 'scripts' | 'tools' | 'targets' | 'ciRuns'
+type HintTier = 'scripts' | 'tools' | 'targets' | 'ciRuns'
 
 export interface HintProposal extends Entry {
   readonly source: 'hint'

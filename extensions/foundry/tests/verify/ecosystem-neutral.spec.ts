@@ -4,10 +4,8 @@ import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
-// Rule 2 (CLAUDE.md): nothing is assumed about a repository's toolchain. A
-// literal that names an ecosystem's tool belongs in `hints/` as data, not in
-// code. This reads every string, template and regex literal in `src/` and
-// fails on one that does; comments are never tokens of those kinds.
+// Rule 2 (CLAUDE.md): a literal naming an ecosystem's tool belongs in `hints/`, not in
+// code. Comments are never string, template or regex tokens, so they are not read.
 
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src')
 

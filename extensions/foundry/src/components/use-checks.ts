@@ -9,7 +9,7 @@ import {
   interfaceTouched,
   nothingFound,
   waitingOnYou,
-  withAdditional,
+  addedCheckChange,
   type CheckRowView,
   type CheckTarget,
   type NewCheck,
@@ -19,9 +19,7 @@ import {
 import { leadRepo } from '../order/lead-repo.js'
 import { usePushed } from '../renderer/use-pushed.js'
 
-// The Checks step's state: the repository's profile as Foundry resolves it, the
-// row being edited, and the two decisions an operator can make about what
-// cannot be measured. The profile is read once and again when Foundry says a
+// The Checks step's state. The profile is read once and again when Foundry says a
 // profile changed; the renderer never polls it.
 
 /** A decision about what cannot be measured, kept for the order. */
@@ -121,7 +119,7 @@ function useProfileSaves(profile: ProfileFacts | null, save: Save) {
   )
   const addCheck = useCallback(
     (check: NewCheck) =>
-      profile === null ? Promise.resolve(null) : save(withAdditional(profile, check)),
+      profile === null ? Promise.resolve(null) : save(addedCheckChange(profile, check)),
     [profile, save]
   )
   const removeRow = useCallback(

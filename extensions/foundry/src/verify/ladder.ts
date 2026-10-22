@@ -83,7 +83,7 @@ export interface LadderInput {
   readonly additional?: readonly AdditionalStep[]
 }
 
-export interface AdditionalStep {
+interface AdditionalStep {
   readonly name: string
   readonly command: string
   readonly rung: Rung
@@ -95,7 +95,7 @@ function additionalStep({ name, command, rung }: AdditionalStep): LadderStep {
 }
 
 /** Each added step goes after the last step already at its rung. */
-function withAdditional(steps: LadderStep[], additional: readonly AdditionalStep[]): LadderStep[] {
+function placeAdditional(steps: LadderStep[], additional: readonly AdditionalStep[]): LadderStep[] {
   const placed = [...steps]
   for (const added of additional) {
     const lastAtRung = placed.map((step) => step.rung).lastIndexOf(added.rung)
@@ -190,7 +190,7 @@ export function ladderFor(input: LadderInput): LadderStep[] {
     ...pictures,
     HUMAN_DECISION,
   ]
-  const rungs = withAdditional(base, additional)
+  const rungs = placeAdditional(base, additional)
 
   // Words cannot break a build or a test, so a change that only touches them
   // is held to Format and Lint. Said on each step rather than dropped, so the

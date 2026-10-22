@@ -11,7 +11,7 @@ export const SCHEMA_VERSION = 1
 export const ENTRY_SOURCES = ['operator', 'repository', 'scout', 'hint'] as const
 export type EntrySource = (typeof ENTRY_SOURCES)[number]
 
-export const EntrySchema = z.object({
+const EntrySchema = z.object({
   command: z.string().min(1),
   source: z.enum(ENTRY_SOURCES),
   /** The file the command was read from, where there is one. */
@@ -39,14 +39,14 @@ export const isRemoved = (entry: StoredEntry | null): entry is RemovedEntry =>
 
 const nullableEntry = z.union([EntrySchema, RemovedEntrySchema]).nullable().default(null)
 
-export const ChecksSchema = z.object(
+const ChecksSchema = z.object(
   Object.fromEntries(CHECK_NAMES.map((name) => [name, nullableEntry])) as Record<
     CheckName,
     typeof nullableEntry
   >
 )
 
-export const PathsSchema = z.object({
+const PathsSchema = z.object({
   interface: z.array(z.string()).default([]),
   manifests: z.array(z.string()).default([]),
   lockfiles: z.array(z.string()).default([]),

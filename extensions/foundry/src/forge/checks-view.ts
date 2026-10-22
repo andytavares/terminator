@@ -3,11 +3,10 @@ import type { ResolvedProfile } from '../profile/resolve.js'
 import type { Entry } from '../profile/schema.js'
 import type { CheckName } from '../verify/check-names.js'
 import type { Rung } from '../verify/ladder.js'
+import { globPattern } from '../profile/glob.js'
 
-// The Checks step, as data: one row per command Foundry runs in a repository,
-// the words for where it came from, and what running it on the base branch did.
-// A command nobody has run is "Not yet run"; a missing one is "None" and reports
-// "not measured" — neither is ever a pass.
+// The Checks step as data. A command nobody has run is "Not yet run"; a missing one
+// is "None" and reports "not measured" — neither is ever a pass.
 
 /** What `foundry:profile-read` answers: the resolved profile and the proof stored with it. */
 export interface ProfileFacts extends ResolvedProfile {
@@ -82,7 +81,7 @@ export function sourceInWords(entry: Pick<Entry, 'source' | 'evidence'>): string
   return SOURCE_WORDS[entry.source](entry.evidence)
 }
 
-function proofOf(command: string, exitCodes: ProfileFacts['proof'], base: string) {
+function proofPillOf(command: string, exitCodes: ProfileFacts['proof'], base: string) {
   const known = exitCodes !== null && command in exitCodes.exitCodes
   if (!known) return { word: 'Not yet run', state: 'untried' as const }
   const code = exitCodes.exitCodes[command]
@@ -100,7 +99,7 @@ interface RowInput {
   readonly sourceNote?: string
 }
 
-const keyOf = (target: CheckTarget): string =>
+const rowKey = (target: CheckTarget): string =>
   target.kind === 'check' || target.kind === 'additional'
     ? `${target.kind}:${target.name}`
     : target.kind
@@ -110,7 +109,7 @@ const partOf = (target: CheckTarget): string | null =>
 
 function rowOf(input: RowInput, profile: ProfileFacts, base: string): CheckRowView {
   const { label, entry, target, sourceNote } = input
-  const key = keyOf(target)
+  const key = rowKey(target)
   const part = partOf(target)
   const removed = part !== null && (profile.removed ?? []).includes(part)
   if (entry === null) {
@@ -118,7 +117,7 @@ function rowOf(input: RowInput, profile: ProfileFacts, base: string): CheckRowVi
     const none = { command: null, proofWord: 'None', state: 'missing' as const, yours: false }
     return { key, label, source, target, removed, ...none }
   }
-  const proof = proofOf(entry.command, profile.proof, base)
+  const proof = proofPillOf(entry.command, profile.proof, base)
   const source = sourceNote ?? sourceInWords(entry)
   const yours = entry.source === 'operator'
   const state = proof.state
@@ -212,16 +211,6 @@ export function provenCounts(rows: readonly CheckRowView[]): { proven: number; t
   }
 }
 
-const GLOB_PIECES: Record<string, string> = { '**/': '(?:.*/)?', '**': '.*', '*': '[^/]*' }
-
-const globPattern = (glob: string): RegExp => {
-  const body = glob.replace(
-    /\*\*\/|\*\*|\*|[.+^${}()|[\]\\?]/g,
-    (piece) => GLOB_PIECES[piece] ?? `\\${piece}`
-  )
-  return new RegExp(`^${glob.includes('/') ? '' : '(?:.*/)?'}${body}$`)
-}
-
 /** A unit says it changes the interface, or touches a path the profile names as interface. */
 export function interfaceTouched(order: WorkOrder, interfaceGlobs: readonly string[]): boolean {
   const patterns = interfaceGlobs.map(globPattern)
@@ -267,7 +256,7 @@ export function changeFor(
 }
 
 /** Another check added to the profile, alongside the ones already there. */
-export function withAdditional(profile: ProfileFacts, check: NewCheck): SaveChange {
+export function addedCheckChange(profile: ProfileFacts, check: NewCheck): SaveChange {
   return { additional: [...plainAdditional(profile), check] }
 }
 

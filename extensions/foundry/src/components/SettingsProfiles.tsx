@@ -14,7 +14,7 @@ interface ProfileSummary {
   readonly provedAt: string | null
 }
 
-const nameOf = (repository: string): string =>
+const repositoryName = (repository: string): string =>
   repository.split('/').filter(Boolean).pop() ?? repository
 
 function provenWords({ proofCommit, provedAt }: ProfileSummary): string {
@@ -74,9 +74,9 @@ function ProfileItem({ summary, forget }: ItemProps) {
   const [open, setOpen] = useState(false)
   const commands = `${summary.commands} command${summary.commands === 1 ? '' : 's'}`
   return (
-    <div role="group" aria-label={nameOf(summary.repository)} className="fdry-setrow">
+    <div role="group" aria-label={repositoryName(summary.repository)} className="fdry-setrow">
       <div>
-        <b>{nameOf(summary.repository)}</b>
+        <b>{repositoryName(summary.repository)}</b>
         <small>{`${summary.repository} · ${commands} · ${provenWords(summary)}`}</small>
         {open ? <CommandList repoPath={summary.repository} /> : null}
       </div>

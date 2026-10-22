@@ -97,7 +97,7 @@ export function createProfileChannels(deps: ProfileChannelDeps): ProfileChannels
   return {
     read: ({ repoPath }) => read(deps, repoPath),
     save: (payload) => save(deps, payload),
-    prove: (payload) => prove(deps, payload),
+    prove: (payload) => proveCommand(deps, payload),
     list: () => list(deps),
     forget: (payload) => forget(deps, payload.repoPath),
     logTail: ({ path: target }) => logTail(deps.dataRoot(), target),
@@ -208,7 +208,7 @@ async function seedDrafts(deps: ProfileChannelDeps, repoPath: string): Promise<v
   }
 }
 
-async function prove(
+async function proveCommand(
   deps: ProfileChannelDeps,
   { repoPath, command }: z.infer<typeof ProvePayload>
 ): Promise<unknown> {
@@ -264,7 +264,7 @@ const LOG_TAIL_LINES = 40
 const NOT_A_RECORD = 'Foundry only reads logs it kept in its own records.'
 
 /** Whether `child` is `parent` or inside it, both already resolved through symlinks. */
-const isInside = (parent: string, child: string): boolean =>
+const liesUnder = (parent: string, child: string): boolean =>
   child === parent || child.startsWith(parent + path.sep)
 
 /** The last lines of a log, only when its real path lies under the data root's records. */
@@ -276,7 +276,7 @@ async function logTail(root: string, target: string): Promise<unknown> {
     return { error: 'No log was kept at that place.' }
   }
   const records = await fs.promises.realpath(root).catch(() => null)
-  if (records === null || !isInside(records, real)) return { error: NOT_A_RECORD }
+  if (records === null || !liesUnder(records, real)) return { error: NOT_A_RECORD }
   const text = await fs.promises.readFile(real, 'utf8').catch(() => null)
   if (text === null) return { error: 'No log was kept at that place.' }
   return { tail: text.replace(/\n$/, '').split('\n').slice(-LOG_TAIL_LINES).join('\n') }

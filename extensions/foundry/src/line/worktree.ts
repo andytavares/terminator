@@ -246,13 +246,8 @@ async function trackedDirs(checkout: Checkout, deps: CheckoutDeps): Promise<stri
   return [...new Set(dirs)]
 }
 
-/**
- * Every place a share entry may stand: beside each tracked directory.
- *
- * An entry is a folder name matched beside every directory that holds a tracked file,
- * the root included, so a monorepo's per-package installs are covered by one entry.
- * A directory inside the shared folder itself is never a place.
- */
+// Beside every directory holding a tracked file, the root included, so one entry covers
+// a monorepo's per-package installs; never inside the shared folder itself.
 async function lendingPlaces(checkout: Checkout, deps: CheckoutDeps): Promise<string[] | null> {
   const dirs = await trackedDirs(checkout, deps)
   if (dirs === null) return null

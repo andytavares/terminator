@@ -299,13 +299,13 @@ function useNewCheck(checks: ChecksModel) {
   const [command, setCommand] = useState('')
   const [rung, setRung] = useState<Rung>('L1')
   const [problem, setProblem] = useState<string | null>(null)
-  const add = async (): Promise<void> => {
+  const addCheck = async (): Promise<void> => {
     const failed = await checks.addCheck({ name: name.trim(), command: command.trim(), rung })
     if (failed === null) checks.edit(null)
     else setProblem(failed)
   }
   const ready = name.trim() !== '' && command.trim() !== ''
-  return { name, setName, command, setCommand, rung, setRung, problem, add, ready }
+  return { name, setName, command, setCommand, rung, setRung, problem, addCheck, ready }
 }
 
 function NewCheckFields({ form }: { readonly form: ReturnType<typeof useNewCheck> }) {
@@ -343,7 +343,12 @@ function AddCheckForm({ checks }: { readonly checks: ChecksModel }) {
     <div className="fdry-chk-add">
       <NewCheckFields form={form} />
       <div className="fdry-chk-moves">
-        <ReasonButton size="sm" variant="primary" reason={reason} onClick={() => void form.add()}>
+        <ReasonButton
+          size="sm"
+          variant="primary"
+          reason={reason}
+          onClick={() => void form.addCheck()}
+        >
           Add check
         </ReasonButton>
         <Button size="sm" variant="ghost" onClick={() => checks.edit(null)}>
