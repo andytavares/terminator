@@ -420,4 +420,18 @@ describe('stopping the extension host', () => {
 
     expect(spawned).toHaveBeenCalledTimes(2)
   })
+
+  it('kills a host that has not exited after the request to stop, so quitting never hangs on it', async () => {
+    const { process, record, spawned, crash } = hostHarness()
+    await process.activate(record)
+    const host = spawned.mock.results[0].value as SpawnedHost
+    vi.useFakeTimers()
+
+    const stopped = process.stopHost()
+    expect(host.kill).toHaveBeenLastCalledWith()
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(host.kill).toHaveBeenLastCalledWith('SIGKILL')
+    crash(137)
+    await stopped
+  })
 })

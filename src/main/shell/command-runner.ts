@@ -44,25 +44,32 @@ const OWN_PROCESS_GROUP = process.platform !== 'win32'
 /** Commands started and not yet ended, for stopRunningCommands. */
 const running = new Set<ChildProcess>()
 
-function stopGroup(child: ChildProcess): void {
+/** How long a command has to end after SIGTERM before it and its group get SIGKILL: one that
+ * ignores the request would otherwise hold up quitting for as long as it likes. */
+const KILL_AFTER_MS = 2000
+
+function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
   if (child.pid === undefined) return
   try {
-    process.kill(OWN_PROCESS_GROUP ? -child.pid : child.pid, 'SIGTERM')
+    process.kill(OWN_PROCESS_GROUP ? -child.pid : child.pid, signal)
   } catch {
     // Already gone.
   }
+}
+
+/** Asks the command to stop, kills it if it has not by KILL_AFTER_MS, and settles once it has closed. */
+function stopGroup(child: ChildProcess): Promise<void> {
+  const closed = new Promise<void>((resolve) => child.once('close', () => resolve()))
+  const kill = setTimeout(() => signalGroup(child, 'SIGKILL'), KILL_AFTER_MS)
+  signalGroup(child, 'SIGTERM')
+  return closed.finally(() => clearTimeout(kill))
 }
 
 /** Stops every command still running (git, gh, the login-shell probe, the metrics' ps), with
  * everything each one started, and settles once each has closed. The app calls it as it quits: on macOS /usr/bin/git is an xcrun
  * shim that can start xcodebuild, which outlived the app (run 38382115775). */
 export async function stopRunningCommands(): Promise<void> {
-  const stopping = [...running]
-  const closed = stopping.map(
-    (child) => new Promise<void>((resolve) => child.once('close', resolve))
-  )
-  for (const child of stopping) stopGroup(child)
-  await Promise.all(closed)
+  await Promise.all([...running].map(stopGroup))
 }
 
 interface CommandRun {
