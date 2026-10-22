@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 import * as os from 'node:os'
 import { makeTempDir } from '../../support/temp-dir'
 
@@ -33,6 +33,7 @@ import { createProject, createWorkspace } from '../../../src/main/storage/worksp
 import * as records from '../../../src/main/sessions/session-record-store.js'
 import * as links from '../../../src/main/integrations/issue-link-store.js'
 import { writeContextFile } from '../../../src/main/integrations/agent-context.js'
+import { flushLogs } from '../../../src/main/logger.js'
 import { notificationManager } from '../../../src/main/notifications/notification-manager.js'
 
 /** Each test starts from an empty user-data directory and an empty notification centre. */
@@ -44,6 +45,9 @@ beforeEach(async () => {
     notificationManager.dismissNotification(notification.id)
   updateGlobalSettings({ terminal: { defaultShell: '/bin/zsh' } })
 })
+
+/** The log file lives in the first test's user-data directory: its last lines land before that is removed. */
+afterAll(flushLogs)
 
 /** A window that is open, and what was sent to it. */
 function openWindow() {
