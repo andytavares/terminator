@@ -16,7 +16,19 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
     repoPaths: ['/repos/a'],
     now: '2026-09-06T10:00:00.000Z',
   })
-  return { ...base, ...over }
+  return withPaths({ ...base, ...over }, NODE_PATHS)
+}
+
+const NODE_PATHS = {
+  interface: [],
+  manifests: ['package.json', 'Cargo.toml', 'go.mod', 'pyproject.toml', 'Gemfile'],
+  lockfiles: ['package-lock.json'],
+  formatting: ['.prettierrc*'],
+}
+
+function withPaths(base: WorkOrder, paths: typeof NODE_PATHS): WorkOrder {
+  const context = { ...base.context, environment: { ...base.context.environment, paths } }
+  return { ...base, context }
 }
 
 function input(files: string[], over: Partial<Parameters<typeof inspectionFor>[1]> = {}) {
@@ -26,6 +38,7 @@ function input(files: string[], over: Partial<Parameters<typeof inspectionFor>[1
 describe('inspectionFor', () => {
   describe('risky areas', riskyAreasTests)
   describe('dependencies and critical paths', dependenciesAndCriticalPathsTests)
+  describe("the repository's own lists", theRepositorysOwnListsTests)
   describe('the blast radius', theBlastRadiusTests)
   describe('unplanned triggers', unplannedTriggersTests)
   describe('staying inside', stayingInsideTests)
@@ -79,6 +92,24 @@ function dependenciesAndCriticalPathsTests() {
     expect(inspectionFor(order(), input(['src/anything.ts'])).triggers).not.toContain(
       'critical_path'
     )
+  })
+}
+
+function theRepositorysOwnListsTests() {
+  it('trips new_dependency on a manifest the order lists, whatever the language', () => {
+    const o = withPaths(order(), { ...NODE_PATHS, manifests: ['build.gradle'] })
+    expect(inspectionFor(o, input(['app/build.gradle'])).triggers).toContain('new_dependency')
+    expect(inspectionFor(o, input(['package.json'])).triggers).not.toContain('new_dependency')
+  })
+
+  it('trips nothing for a manifest when the order lists none', () => {
+    const o = withPaths(order(), { ...NODE_PATHS, manifests: [] })
+    expect(inspectionFor(o, input(['Cargo.toml'])).triggers).not.toContain('new_dependency')
+  })
+
+  it('grades a Cargo.lock-only change P3 when the order lists the lockfile', () => {
+    const o = withPaths(order(), { ...NODE_PATHS, lockfiles: ['Cargo.lock'] })
+    expect(inspectionFor(o, input(['Cargo.lock'])).grade).toBe('P3')
   })
 }
 

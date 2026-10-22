@@ -139,6 +139,10 @@ function order(units = [unit('U-1'), unit('U-2')], over: Partial<WorkOrder> = {}
         lint: { command: 'npm run lint', source: 'package.json' },
         format: { command: 'npm run format', source: 'package.json' },
       },
+      environment: {
+        ...base.context.environment,
+        paths: { ...base.context.environment.paths, manifests: ['package.json'] },
+      },
     },
     acceptance: [testCriterion('AC-1', { statement: 'a' })],
     plan: { ...base.plan, units },

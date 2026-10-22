@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { gradeRisk, type ChangeSummary } from '../../../src/runtime/review/risk-grader.js'
+import {
+  gradeRisk,
+  isLockfile,
+  type ChangeSummary,
+} from '../../../src/runtime/review/risk-grader.js'
 
 // Grading is evaluated strictly top-down, first match wins. The order is the
 // point: a lockfile change that also touches a critical path is P0, not P3.
@@ -11,6 +15,8 @@ function change(over: Partial<ChangeSummary> = {}): ChangeSummary {
     checkState: 'passing',
     sharedContractFiles: [],
     criticalPaths: [],
+    lockfiles: ['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'],
+    formattingFiles: ['.prettierrc*', '.editorconfig'],
     ...over,
   }
 }
@@ -125,5 +131,34 @@ describe('critical-path globs', () => {
   ])('%s vs %s -> P0 is %s', (glob, file, expected) => {
     const graded = gradeRisk(change({ files: [file], criticalPaths: [glob] }))
     expect(graded.grade === 'P0').toBe(expected)
+  })
+})
+
+describe('P3 — the repository names its own lockfiles and formatting files', () => {
+  it('grades a Cargo.lock-only change with green checks as P3 when the paths list it', () => {
+    const graded = gradeRisk(change({ files: ['Cargo.lock'], lockfiles: ['Cargo.lock'] }))
+    expect(graded.grade).toBe('P3')
+  })
+
+  it('finds the lockfile in a subdirectory', () => {
+    const graded = gradeRisk(change({ files: ['app/Cargo.lock'], lockfiles: ['Cargo.lock'] }))
+    expect(graded.grade).toBe('P3')
+  })
+
+  it('does not grade it P3 when the paths are empty', () => {
+    const graded = gradeRisk(change({ files: ['Cargo.lock'], lockfiles: [], formattingFiles: [] }))
+    expect(graded.grade).toBe('P2')
+  })
+
+  it('grades a formatting-config change as P3 only by the listed names', () => {
+    expect(
+      gradeRisk(change({ files: ['rustfmt.toml'], formattingFiles: ['rustfmt.toml'] })).grade
+    ).toBe('P3')
+    expect(gradeRisk(change({ files: ['.prettierrc'], formattingFiles: [] })).grade).toBe('P2')
+  })
+
+  it('knows a lockfile by the list it was given', () => {
+    expect(isLockfile('Cargo.lock', ['Cargo.lock'])).toBe(true)
+    expect(isLockfile('package-lock.json', ['Cargo.lock'])).toBe(false)
   })
 })

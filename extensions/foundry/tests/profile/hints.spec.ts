@@ -87,3 +87,16 @@ describe('evaluateHints on other stacks and lockfiles', () => {
     expect(evaluateHints(repo, hints).prepare?.command).toBe('pnpm install --frozen-lockfile')
   })
 })
+
+describe('formatting files in the shipped hints', () => {
+  const { hints } = loadHints(defaultHintsDir())
+
+  it('lends the node formatting names and the rust ones, each only where its stack is present', () => {
+    const node = temporaryDirectory('foundry-hint-repo')
+    write(node, 'package.json', '{}')
+    expect(evaluateHints(node, hints).paths.formatting).toContain('.prettierrc*')
+    const rust = temporaryDirectory('foundry-hint-repo')
+    write(rust, 'Cargo.toml', '[package]\n')
+    expect(evaluateHints(rust, hints).paths.formatting).toEqual(['rustfmt.toml', '.rustfmt.toml'])
+  })
+})

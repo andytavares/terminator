@@ -237,6 +237,12 @@ function unitsBudgetsAndRefusingChecksTests() {
     expect(plan.prompt).toContain('never a bare command string')
   })
 
+  it('shows each unit as touchesInterface false and says when to set it true', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
+    expect(plan.prompt).toContain('"touchesInterface": false')
+    expect(plan.prompt).toMatch(/Set `touchesInterface` to true .*a person sees/s)
+  })
+
   it('does not offer budgets, and says the plan has to fit the ones it has', () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
     expect(plan.prompt).not.toContain('"budgets"')

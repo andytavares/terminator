@@ -29,7 +29,7 @@ describe('order schema migration', () => {
       prepare: null,
       share: [],
       pictures: null,
-      paths: { interface: [], manifests: [], lockfiles: [] },
+      paths: { interface: [], manifests: [], lockfiles: [], formatting: [] },
       additional: [],
     })
   })

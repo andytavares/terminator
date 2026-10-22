@@ -88,6 +88,7 @@ function pathsFrom({ stored, repository, hinted }: Layers): ProfilePaths {
     interface: [...given('interface')],
     manifests: [...given('manifests')],
     lockfiles: [...given('lockfiles')],
+    formatting: [...given('formatting')],
   }
 }
 

@@ -40,12 +40,16 @@ export const PathsSchema = z.object({
   interface: z.array(z.string()).default([]),
   manifests: z.array(z.string()).default([]),
   lockfiles: z.array(z.string()).default([]),
+  formatting: z.array(z.string()).default([]),
 })
 export type ProfilePaths = z.infer<typeof PathsSchema>
 
 const ProofSchema = z.object({
   commit: z.string(),
+  /** By command: the exit code it ended with on that commit, or null when it did not exit. */
   exitCodes: z.record(z.number().nullable()),
+  /** When the proof ran, ISO 8601. */
+  at: z.string().optional(),
 })
 
 export const ProfileSchema = z.object({

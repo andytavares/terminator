@@ -15,3 +15,4 @@ paths:
   interface: []
   manifests: [Cargo.toml]
   lockfiles: [Cargo.lock]
+  formatting: [rustfmt.toml, .rustfmt.toml]

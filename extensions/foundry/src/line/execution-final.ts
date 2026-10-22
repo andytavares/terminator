@@ -3,10 +3,11 @@ import * as path from 'node:path'
 import { isComplete } from './scheduler.js'
 import { stepFor } from './run-graph.js'
 import type { RunNode } from './run-graph.js'
-import type { RiskAssessment } from '../order/schema.js'
+import type { RiskAssessment, WorkOrder } from '../order/schema.js'
 import { summarise } from '../verify/verdict.js'
 import type { Evidence } from '../verify/verdict.js'
 import { inspectionFor, regrade } from '../verify/inspection-triggers.js'
+import { matchesAnyGlob } from '../runtime/review/risk-grader.js'
 import type { Inspection } from '../verify/inspection-triggers.js'
 import { ladderFor, climb } from '../verify/ladder.js'
 import { brokenInstall } from '../verify/broken-install.js'
@@ -30,6 +31,15 @@ interface Change {
   // The grade the change turned out to deserve, which shipping reads: a P3 plan that
   // touches authentication must reach the operator before the remote.
   readonly risk: RiskAssessment
+}
+
+/** A person looks at this change: a changed file is interface, or a unit says it is. */
+export function touchesUi(order: WorkOrder, files: readonly string[]): boolean {
+  const { interface: interfaceGlobs } = order.context.environment.paths
+  return (
+    files.some((file) => matchesAnyGlob(file, interfaceGlobs)) ||
+    order.plan.units.some((unit) => unit.touchesInterface === true)
+  )
 }
 
 export async function finishExecution(run: Execution): Promise<RunOutcome> {
@@ -175,7 +185,7 @@ class FinalClimb {
     this.steps = ladderFor({
       toolchain: run.order.context.toolchain,
       risk: change.risk,
-      touchesUi: change.touched.some((p) => /\.(tsx|css|html|svelte|vue)$/.test(p)),
+      touchesUi: touchesUi(run.order, change.touched),
       changedFiles: change.touched,
     })
   }

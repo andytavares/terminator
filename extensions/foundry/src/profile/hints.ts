@@ -60,6 +60,7 @@ const HintSchema = z
         interface: names.default([]),
         manifests: names.default([]),
         lockfiles: names.default([]),
+        formatting: names.default([]),
       })
       .strict()
       .optional(),
@@ -293,6 +294,7 @@ export function evaluateHints(repo: string, hints: readonly Hint[]): HintEvaluat
       interface: pathsOf('interface'),
       manifests: pathsOf('manifests'),
       lockfiles: pathsOf('lockfiles'),
+      formatting: pathsOf('formatting'),
     },
   }
 }

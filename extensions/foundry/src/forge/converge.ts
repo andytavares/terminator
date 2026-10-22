@@ -32,6 +32,7 @@ function outputContract(file: string, order: WorkOrder): string {
     ...exampleIntentAndUnits(),
     ...exampleLanesAndRest(order),
     ...verifyKinds(),
+    ...interfaceFlag(),
     ...closedLabels(),
     ...fixedFields(order),
     ...refusals(order),
@@ -74,6 +75,13 @@ function exampleIntentAndUnits(): string[] {
     '    }',
     '  ],',
     '  "risk":     { "grade": "P0|P1|P2|P3", "triggers": [], "blastRadius": ["src/"], "criticalPaths": [] },',
+    ...exampleUnits(),
+  ]
+}
+
+/** The example's plan, down to its one unit. */
+function exampleUnits(): string[] {
+  return [
     '  "plan": {',
     '    "units": [',
     '      {',
@@ -84,6 +92,7 @@ function exampleIntentAndUnits(): string[] {
     '        "dependsOn": [],',
     '        "satisfies": ["AC-1"],',
     '        "touches": ["src/…"],',
+    '        "touchesInterface": false,',
     '        "verify": [{ "kind": "command", "command": "…", "assert": "exit_code == 0" }]',
     '      }',
     '    ],',
@@ -136,6 +145,16 @@ function verifyKinds(): string[] {
     'in the `rubric` — `evidence: ["report_file"]` with the path in the rubric,',
     'never `evidence: ["src/app.css"]`. A path written here is refused, and the',
     'whole proposal with it.',
+    '',
+  ]
+}
+
+/** The one flag that asks for pictures of a unit's result. */
+function interfaceFlag(): string[] {
+  return [
+    'Set `touchesInterface` to true when the unit changes something a person sees',
+    '(a screen, a page, a dialog, a terminal UI), in any language — Foundry asks',
+    'for pictures of those.',
     '',
   ]
 }

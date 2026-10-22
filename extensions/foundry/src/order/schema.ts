@@ -90,6 +90,7 @@ const EnvironmentSchema = z.object({
       interface: z.array(z.string()).default([]),
       manifests: z.array(z.string()).default([]),
       lockfiles: z.array(z.string()).default([]),
+      formatting: z.array(z.string()).default([]),
     })
     .default({}),
   additional: z

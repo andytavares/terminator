@@ -43,7 +43,7 @@ function validContext(): WorkOrder['context'] {
       prepare: null,
       share: [],
       pictures: null,
-      paths: { interface: [], manifests: [], lockfiles: [] },
+      paths: { interface: [], manifests: [], lockfiles: [], formatting: [] },
       additional: [],
     },
     entryPoints: [],

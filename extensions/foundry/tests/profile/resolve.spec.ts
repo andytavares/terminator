@@ -78,7 +78,7 @@ describe('resolveProfile where nothing is known', () => {
     expect(resolved.prepare).toBeNull()
     expect(resolved.pictures).toBeNull()
     expect(resolved.share).toEqual([])
-    expect(resolved.paths).toEqual({ interface: [], manifests: [], lockfiles: [] })
+    expect(resolved.paths).toEqual({ interface: [], manifests: [], lockfiles: [], formatting: [] })
   })
 })
 
@@ -86,7 +86,7 @@ describe('resolveProfile for paths and prepare', () => {
   it('takes the operator paths over the hinted ones, and hinted ones otherwise', () => {
     const repo = repoWith({ 'package.json': '{}' })
     const stored = storedWith(null, {
-      paths: { interface: ['ui/**'], manifests: [], lockfiles: [] },
+      paths: { interface: ['ui/**'], manifests: [], lockfiles: [], formatting: [] },
     })
     const { paths } = resolveProfile({ repoPath: repo, hintsDir, stored })
     expect(paths.interface).toEqual(['ui/**'])
