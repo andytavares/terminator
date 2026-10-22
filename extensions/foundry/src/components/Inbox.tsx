@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   Unplug,
   Hand,
-  Dices,
 } from 'lucide-react'
 import type { Gate, GateRuleId } from '../gates/rules.js'
 import { ExternalLink } from './ExternalLink.js'
@@ -51,7 +50,7 @@ const RULE_ICON: Record<GateRuleId, React.ComponentType> = {
   'ready-for-review': GitPullRequest,
   'verify.repeat-fail': AlertTriangle,
   'verify.base-fail': AlertTriangle,
-  'verify.flaky': Dices,
+  'verify.flaky': AlertTriangle,
   'forge-defect': HelpCircle,
   'unit.boundary': CheckCircle2,
   'run.interrupted': Unplug,
