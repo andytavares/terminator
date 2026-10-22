@@ -1,0 +1,134 @@
+tests/e2e/review-agent.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 139,170,185,190,193,195,201,215
+tests/e2e/tools/measure-echo-latency.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 36,52
+tests/e2e/extension-settings.spec.ts
+  s_f6f18e5557b141::t_3990f89839656c 14,131
+  s_f6f18e5557b141::t_5bc9f683284620 126-130,132
+tests/e2e/resume-session.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 129-130,149,155,177
+tests/e2e/task-vault-capture.spec.ts
+  s_f6f18e5557b141::t_3990f89839656c 2
+  s_f6f18e5557b141::t_466b001dddcfb4 150
+  s_f6f18e5557b141::t_5bc9f683284620 77-79
+tests/e2e/task-vault-projects.spec.ts
+  s_f6f18e5557b141::t_5bc9f683284620 177,179,226-228,251-253,255-257,296-298
+  s_f6f18e5557b141::t_41cd270a8838eb 178
+  s_f6f18e5557b141::t_3990f89839656c 2
+tests/e2e/core-quick-actions.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 46,54,61,100,117
+tests/e2e/task-vault-data.spec.ts
+  s_f6f18e5557b141::t_3990f89839656c 5
+  s_f6f18e5557b141::t_41cd270a8838eb 132
+tests/e2e/extension-smoke.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 36,92
+tests/e2e/branch-name.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 101,175,182
+tests/e2e/live/ci-rounds-live.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 168
+tests/e2e/task-vault-review.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 180
+tests/e2e/desk.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 62,76
+tests/e2e/monitor-wall.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 77,91,93
+tests/e2e/core-ipc.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 44,129
+tests/e2e/notepad-notes.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 304,315,433
+tests/e2e/settings.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 114
+tests/e2e/live/sensors-live.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 189
+tests/e2e/git-integration-contrast.spec.ts
+  s_f6f18e5557b141::t_8eb546e4364dfc 109,163
+tests/e2e/tracker-stub.ts
+  s_f6f18e5557b141::t_8eb546e4364dfc 72-81
+tests/e2e/merge-flow.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 110,207
+tests/e2e/foundry-floor.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 68,105,235,286,343,346,348,356,362,364,636,640-644,650,657,668,671-675,681,688,691
+  s_f6f18e5557b141::t_0f3f4fc776515c 51-52,57-58,65,67,84,87,104,717
+tests/e2e/pr-review-queue.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 143,149
+tests/e2e/live/resume-live.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 67,71,80,85,104,107-108,110
+tests/e2e/live/rework-live.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 164
+tests/e2e/extension-escape.spec.ts
+  s_f6f18e5557b141::t_c9efcc5e374387 38-40,42-50,122-125,139,142
+  s_f6f18e5557b141::t_466b001dddcfb4 15,104-105,130,366
+tests/e2e/git-harness.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 61,94
+tests/e2e/task-vault-harness.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 35
+tests/e2e/foundry-intake.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 37,56-57,95,108,117,143-144,205,297,335,351
+tests/e2e/quick-actions.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 29,150,216,218,253,304,318,334,340,352
+tests/e2e/notepad-library.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 108,130,179
+tests/e2e/issue-trackers.spec.ts
+  s_f6f18e5557b141::t_8eb546e4364dfc 103
+  s_f6f18e5557b141::t_466b001dddcfb4 197
+tests/e2e/git-commit-flow.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 205,218,254,258,296,377,427,434
+tests/e2e/live/choice-prompt.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 69,95-96
+tests/e2e/terminal.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 70,79,201,207,229,244,251,255,264,324,343
+  s_f6f18e5557b141::t_41cd270a8838eb 240-241
+tests/e2e/workspace.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 32,37,51
+tests/e2e/helpers.ts
+  s_f6f18e5557b141::t_3990f89839656c 490-494
+tests/e2e/github-stub.ts
+  s_f6f18e5557b141::t_8eb546e4364dfc 81-88
+tests/e2e/jira-stub.ts
+  s_f6f18e5557b141::t_8eb546e4364dfc 181,187
+tests/e2e/extension-lifecycle.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 150,167,229,280,297,332,365
+  s_f6f18e5557b141::t_41cd270a8838eb 175
+  s_f6f18e5557b141::t_3990f89839656c 19
+tests/e2e/foundry-resume.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 296,336,359-362,409,418,437,445,461
+tests/e2e/foundry-harness.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 166,178,181,188,196-202,208-209,240,243
+tests/e2e/app-menu.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 110
+tests/e2e/tools/capture-session-home-screenshots.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 71,88
+tests/e2e/home-contributions-setting.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 30,32
+tests/e2e/notepad-harness.ts
+  s_f6f18e5557b141::t_3990f89839656c 2
+  s_f6f18e5557b141::t_466b001dddcfb4 23,84
+  s_f6f18e5557b141::t_41cd270a8838eb 100
+tests/e2e/foundry-forge.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 140,178,247,345,362-366,373-377,403,438,440,444
+  s_f6f18e5557b141::t_0f3f4fc776515c 214,220,286,289
+tests/e2e/leftover-processes.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 101
+tests/e2e/live/refinery-live.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 148,199
+tests/e2e/git-status-watch.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 81
+tests/e2e/live/full-run.spec.ts
+  s_f6f18e5557b141::t_466b001dddcfb4 167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "22ce996b44ce901e15a6ad7bb883942643136e63",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
