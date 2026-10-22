@@ -12,6 +12,8 @@ import { installIfLockChanged } from './ci-install.mjs'
 const DOCKERFILE = join(dirname(fileURLToPath(import.meta.url)), 'ci-linux.Dockerfile')
 const CONTAINER = 'terminator-ci-linux'
 const PLATFORM = 'linux/arm64'
+const RUNNER = 'runner'
+const RUNNER_HOME = '/home/runner'
 
 /** The image's tag: a hash of the Dockerfile and the Node it installs. */
 export function imageTag(dockerfile, nodeVersion) {
@@ -27,7 +29,7 @@ export function containerArguments(container) {
     `${gitCommonDir}:${gitCommonDir}`,
     `terminator-ci-linux-modules:${checkout}/node_modules`,
     `terminator-ci-linux-ui-modules:${checkout}/packages/extension-ui/node_modules`,
-    'terminator-ci-linux-cache:/root/.cache',
+    `terminator-ci-linux-cache:${RUNNER_HOME}/.cache`,
   ]
   const volumes = mounts.flatMap((mount) => ['-v', mount])
   const where = ['--platform', PLATFORM, '-w', checkout]
@@ -42,7 +44,7 @@ export function stepArguments(name, step, checkout) {
     `${key}=${value}`,
   ])
   const bash = ['bash', '-e', '-o', 'pipefail', '-c', step.script]
-  return ['exec', '-w', checkout, ...variables, name, ...bash]
+  return ['exec', '-u', RUNNER, '-w', checkout, ...variables, name, ...bash]
 }
 
 const docker = (args, options = {}) => spawnSync('docker', args, { stdio: 'inherit', ...options })
@@ -73,6 +75,17 @@ function installInContainer(checkout) {
   })
 }
 
+/** Docker makes a new volume root's; the runner user installs into them. */
+function givesVolumesToRunner(checkout) {
+  const volumes = [
+    `${checkout}/node_modules`,
+    `${checkout}/packages/extension-ui/node_modules`,
+    `${RUNNER_HOME}/.cache`,
+  ]
+  const chown = ['exec', CONTAINER, 'chown', '-R', `${RUNNER}:${RUNNER}`, ...volumes]
+  if (docker(chown).status !== 0) throw new Error('ci:local could not hand its volumes to runner.')
+}
+
 /** Starts the container on `checkout`, installed; returns how to run a step in it and stop it. */
 export function startLinux(setup) {
   const { checkout, gitCommonDir, nodeVersion } = setup
@@ -80,6 +93,7 @@ export function startLinux(setup) {
   docker(['rm', '-f', CONTAINER], { stdio: 'ignore' })
   const started = docker(containerArguments({ name: CONTAINER, image, checkout, gitCommonDir }))
   if (started.status !== 0) throw new Error('ci:local could not start its Linux container.')
+  givesVolumesToRunner(checkout)
   installInContainer(checkout)
   return {
     run: (step) => docker(stepArguments(CONTAINER, step, checkout)).status,

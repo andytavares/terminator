@@ -29,6 +29,7 @@ describe('the container', () => {
     expect(mounts).toContain(
       `terminator-ci-linux-ui-modules:${checkout}/packages/extension-ui/node_modules`
     )
+    expect(mounts).toContain('terminator-ci-linux-cache:/home/runner/.cache')
   })
 
   it('runs as the arm64 Linux CI runs on, from the checkout', () => {
@@ -50,6 +51,12 @@ describe('a step in the container', () => {
       'npm run lint',
     ])
     expect(args).toEqual(expect.arrayContaining(['-w', checkout]))
+  })
+
+  // CI's runner is the user `runner` with sudo, not root: root writes where a spec expects a
+  // refusal, so a container step as root passed and failed different specs than CI.
+  it('runs as the runner user, as CI does', () => {
+    expect(args.slice(0, args.indexOf('ci'))).toEqual(expect.arrayContaining(['-u', 'runner']))
   })
 
   it("passes the step's own environment and CI's, and nothing from the Mac", () => {
