@@ -39,8 +39,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TITLE: 'Security audit: high or critical advisory in the dependencies'
+          FENCE: '```'
         run: |
-          printf 'Found by the daily audit (%s).\n\n```\n%s\n```\n' "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" "$(cat audit.txt)" > body.md
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          printf 'Found by the daily audit (%s).\n\n%s\n%s\n%s\n' "$run_url" "$FENCE" "$(cat audit.txt)" "$FENCE" > body.md
           number=$(gh issue list --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')
           if [ -n "$number" ]; then
             gh issue edit "$number" --body-file body.md

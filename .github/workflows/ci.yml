@@ -62,6 +62,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # The workflows themselves, and the scripts in their run steps, by pinned actionlint and
+      # shellcheck (scripts/workflow-lint.mjs): the same binaries here and in ci:local.
+      - name: Workflows
+        run: npm run lint:workflows
+
   typecheck:
     name: Typecheck
     runs-on: macos-26
@@ -207,13 +212,13 @@ jobs:
       - name: Test
         env:
           TEST_ALL: "${{ contains(github.event.pull_request.labels.*.name, 'test: all') && '1' || '' }}"
-        run: >-
-          node scripts/check-temp-leaks.mjs
-          npx vitest run --coverage --shard=${{ matrix.shard }}/${{ needs.select.outputs.shard_count }}
-          $(node scripts/test-select.mjs --print unit)
-          --reporter=blob --reporter=dot
-          --coverage.thresholds.lines=0 --coverage.thresholds.functions=0
-          --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
+        run: |
+          read -r -a selected <<< "$(node scripts/test-select.mjs --print unit)"
+          node scripts/check-temp-leaks.mjs \
+            npx vitest run --coverage --shard=${{ matrix.shard }}/${{ needs.select.outputs.shard_count }} \
+            "${selected[@]}" --reporter=blob --reporter=dot \
+            --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 \
+            --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
         timeout-minutes: 5
 
       - name: Upload blob report
@@ -280,9 +285,10 @@ jobs:
         if: needs.unit.result == 'success'
         env:
           TEST_ALL: "${{ contains(github.event.pull_request.labels.*.name, 'test: all') && '1' || '' }}"
-        run: >-
-          npx vitest run --merge-reports --coverage $(node scripts/test-select.mjs --print coverage)
-          --reporter=dot --reporter=junit --outputFile.junit=test-report.junit.xml
+        run: |
+          read -r -a coverage <<< "$(node scripts/test-select.mjs --print coverage)"
+          npx vitest run --merge-reports --coverage "${coverage[@]}" \
+            --reporter=dot --reporter=junit --outputFile.junit=test-report.junit.xml
 
       - name: Upload test report
         if: needs.unit.result == 'success'
@@ -432,13 +438,15 @@ jobs:
           PLAYWRIGHT_BLOB_OUTPUT_NAME: report-${{ matrix.shard }}.zip
         run: |
           if [ "$MODE" = all ]; then SPECS=""; fi
-          ARGS=$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 5 $SPECS)
+          read -r -a specs <<< "$SPECS"
+          ARGS=$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 5 "${specs[@]}")
           if [ -z "$ARGS" ]; then echo "Nothing selected for this shard."; exit 0; fi
+          read -r -a shard <<< "$ARGS"
           # remote-control.spec.ts drives the browser remote renderer in Chromium, and
           # git-integration-contrast.spec.ts and git-integration-stacking.spec.ts
           # render the extension views in it, and design-system-fields.spec.ts renders the shared field styles.
           case "$ARGS" in *remote-control.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts* | *design-system-fields.spec.ts*) npx playwright install chromium ;; esac
-          npx playwright test $ARGS --reporter=blob,dot
+          npx playwright test "${shard[@]}" --reporter=blob,dot
         timeout-minutes: 10
 
       - name: Process census (after the suite)

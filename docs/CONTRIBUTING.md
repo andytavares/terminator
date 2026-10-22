@@ -151,6 +151,7 @@ npm run lint:deps  # syncpack: exact versions, one per package
 npm run lint:unused  # knip: no unused files, exports or dependencies
 npm run lint:unused:production  # knip --production: no code that only tests reach
 npm run lint:duplicates  # jscpd: no copy-pasted code
+npm run lint:workflows   # actionlint + shellcheck on .github/workflows, pinned versions
 npm run typecheck  # TypeScript type check (no emit — zero errors required)
 npm run format     # Prettier (auto-fixes)
 ```
@@ -180,6 +181,8 @@ Tests are functions too, so a `describe` callback longer than 30 lines is split 
 - It is a test seam (a clock setter, a reset): fake what the app reads instead (`vi.useFakeTimers`, `vi.resetModules`) and delete the seam.
 - The app runs it from inside its own file, and a spec tests it directly: drop the `export` and test it through its caller, or tag it `/** @internal */` ([knip](https://knip.dev/reference/jsdoc-tsdoc-tags#internal)).
 - A new production entry (an extension's `src/index.ts`, a file loaded by path): end its pattern in `knip.jsonc` with `!`.
+
+`npm run lint:workflows` runs actionlint 1.7.12 with shellcheck 0.11.0 over `.github/workflows`, the `run:` scripts included. `scripts/workflow-lint.mjs` downloads both once into `node_modules/.cache/workflow-lint` and checks each archive's sha256 first, so CI and this Mac run the same binaries whatever else is on `PATH`. To move to a new version, change its version, URL and checksum there together.
 
 `npm run lint:duplicates` runs [jscpd](https://github.com/kucherenko/jscpd) with `.jscpd.json` and must find no clones ([ADR 105](adr/105-duplicate-code-is-a-ci-gate.md)). A clone is a block of at least 6 lines and 60 tokens that appears twice in `src`, `packages` or `extensions`. Specs, `tests` and `stories` folders are not checked. When it reports one, move the code to the one place both copies may import:
 
@@ -316,7 +319,7 @@ Per the constitution (Principle IV):
 Before opening a PR, verify:
 
 - [ ] All tests pass (`npm test`)
-- [ ] `npm run lint`, `npm run lint:deps`, `npm run lint:unused`, `npm run lint:unused:production`, `npm run lint:duplicates` and `npm run typecheck` pass with 0 errors
+- [ ] `npm run lint`, `npm run lint:deps`, `npm run lint:unused`, `npm run lint:unused:production`, `npm run lint:duplicates`, `npm run lint:workflows` and `npm run typecheck` pass with 0 errors
 - [ ] `npm run format:check` passes
 - [ ] `npm run build:extensions` succeeds (no compile errors)
 - [ ] No unused imports, variables, or dead code introduced
