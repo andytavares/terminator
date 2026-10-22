@@ -40,7 +40,9 @@ export function announce(kind: Announcement, subject: string): void {
   if (enabled()) pendingFor(kind, subject).resolve()
 }
 
-/** Resolves once `subject` has reached `kind`; rejects outside an e2e run, where nothing announces. */
+/** Resolves once `subject` has reached `kind`; rejects outside an e2e run, where nothing announces.
+ * The app hands it to e2e through the test-only global; specs import it.
+ * @internal */
 export function whenAnnounced(kind: Announcement, subject: string): Promise<void> {
   if (!enabled()) return Promise.reject(new Error('TERMINATOR_E2E is not set: nothing announces'))
   return pendingFor(kind, subject).promise
