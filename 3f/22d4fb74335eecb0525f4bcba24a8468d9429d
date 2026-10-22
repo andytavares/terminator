@@ -1,0 +1,54 @@
+extensions/foundry/src/verify/rules.ts
+  s_f6f18e5557b141::t_9ec2bd9ed662cf 13-15
+README.md
+  s_f6f18e5557b141::t_93248bd2fc0bc7 48-67
+extensions/foundry/rules/reachability.yaml
+  s_f6f18e5557b141::t_2b74744e81c7c8 6-8
+extensions/foundry/CLAUDE.md
+  s_f6f18e5557b141::t_93248bd2fc0bc7 23-27
+extensions/foundry/tests/line/universal-repository.spec.ts
+  s_f6f18e5557b141::t_1a0b5f008fcb93 10,33,38,53-54,70,72,102,127,136,173,181-182,185,188,190-191,193-222
+  s_f6f18e5557b141::t_e705560a7598a8 55,83,103,112,120,129,137,144-170
+  s_f6f18e5557b141::t_14430aab386762 105-109,175-179,187
+  s_f6f18e5557b141::t_3c13341583f887 172
+  s_f6f18e5557b141::t_5d4b2cfecc9215 1-9,11-32,34-37,39-52,56-69,71,73-82,84-101,104,110-111,113-119,121-126,128,130-135,138-143,171,174,180,183-184,186,189,192
+extensions/foundry/tests/verify/ladder.spec.ts
+  s_f6f18e5557b141::t_df21117eae8fee 403
+  s_f6f18e5557b141::t_e705560a7598a8 469,471
+extensions/foundry/src/order/schema.ts
+  s_f6f18e5557b141::t_494e8d155408cf 56-58
+extensions/foundry/rules/tests-wait-on-signals.yaml
+  s_f6f18e5557b141::t_2b74744e81c7c8 1-9
+extensions/foundry/rules/render-not-call.yaml
+  s_f6f18e5557b141::t_2b74744e81c7c8 6-8
+extensions/foundry/tests/verify/ecosystem-neutral.spec.ts
+  s_f6f18e5557b141::t_e705560a7598a8 70-76,80-83,85-103
+  s_f6f18e5557b141::t_704d15afd9072c 104-108
+  s_f6f18e5557b141::t_4fd7b465d0ec47 1-69,77-79,84,109-134
+.foundry/rules/delete-unreachable.yaml
+  s_f6f18e5557b141::t_eaeaf4a26cf544 10
+.foundry/rules/docs-in-pr.yaml
+  s_f6f18e5557b141::t_7bb1b6ac87708f 10
+.foundry/rules/flat-icons.yaml
+  s_f6f18e5557b141::t_14f104e9062d41 9
+.foundry/rules/screenshot-the-app.yaml
+  s_f6f18e5557b141::t_79649f9213b001 10-11
+eslint.config.mjs
+  s_f6f18e5557b141::t_4ceea9efaedc27 142
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3f22d4fb74335eecb0525f4bcba24a8468d9429d",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
