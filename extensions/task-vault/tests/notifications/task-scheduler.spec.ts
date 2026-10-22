@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
+import { isPending, unfinishedWork } from '../../../../tests/support/pending'
 import { partialFake } from '../../../../tests/support/fakes'
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -130,7 +131,7 @@ describe('startTaskScheduler — dispose', () => {
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
     expect(setInterval).toHaveBeenCalled()
-    scheduler.dispose()
+    await scheduler.dispose()
   })
 
   it('returns a tick function', async () => {
@@ -138,7 +139,27 @@ describe('startTaskScheduler — dispose', () => {
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
     expect(typeof scheduler.tick).toBe('function')
-    scheduler.dispose()
+    await scheduler.dispose()
+  })
+})
+
+describe('startTaskScheduler — stopping', () => {
+  it('settles once a tick in flight has finished', async () => {
+    const query = unfinishedWork()
+    let queryAnswered = false
+    mock.mockAll.mockImplementation(async () => {
+      await query.done
+      queryAnswered = true
+      return []
+    })
+    const scheduler = startTaskScheduler(makeApi(), mock.db)
+
+    const disposed = scheduler.dispose()
+    expect(await isPending(disposed)).toBe(true)
+    query.finish()
+    await disposed
+
+    expect(queryAnswered).toBe(true)
   })
 })
 
@@ -154,7 +175,7 @@ async function notifyOneDueTask() {
   mock.mockAll.mockResolvedValueOnce([{ id: 't-action', text: 'Action task', metadata: '{}' }])
   const scheduler = startTaskScheduler(api, mock.db)
   await scheduler.startupPromise
-  scheduler.dispose()
+  await scheduler.dispose()
   const call = createNotification.mock.calls[0]?.[0] as {
     actions?: unknown[]
     onClick?: () => void
@@ -246,7 +267,7 @@ describe('startTaskScheduler — action handler navigation', () => {
 
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
-    scheduler.dispose()
+    await scheduler.dispose()
 
     const call = createNotification.mock.calls[0]?.[0] as { onClick?: () => void }
     expect(call?.onClick).toBeTypeOf('function')
@@ -279,7 +300,7 @@ describe('startTaskScheduler — midnight dedup reset', () => {
     // Advance past midnight → dedup set clears → fires again
     vi.setSystemTime(new Date('2026-05-27T10:00:00'))
     await scheduler.tickAsync()
-    scheduler.dispose()
+    await scheduler.dispose()
 
     expect(createNotification.mock.calls.length).toBeGreaterThanOrEqual(2)
   })
@@ -305,7 +326,7 @@ describe('running a pass on demand', () => {
     await scheduler.startupPromise
     expect(() => scheduler.tick()).not.toThrow()
     await scheduler.tickAsync()
-    scheduler.dispose()
+    await scheduler.dispose()
   })
 })
 
@@ -338,7 +359,7 @@ function startTaskSchedulerDueTasksAlertTimePastTheAlertTests() {
     await scheduler.startupPromise
     // Second tick to confirm dedup
     await scheduler.tickAsync()
-    scheduler.dispose()
+    await scheduler.dispose()
 
     expect(createNotification).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -362,7 +383,7 @@ function startTaskSchedulerDueTasksAlertTimeAtStartupTests() {
 
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
-    scheduler.dispose()
+    await scheduler.dispose()
 
     expect(createNotification).toHaveBeenCalledWith(
       expect.objectContaining({ title: expect.stringContaining('Early task') })
@@ -387,7 +408,7 @@ function startTaskSchedulerDueTasksBeforeAlertTests() {
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
     await scheduler.tickAsync() // non-startup tick — should not fire (before alert time)
-    scheduler.dispose()
+    await scheduler.dispose()
 
     expect(createNotification).not.toHaveBeenCalled()
   })
@@ -406,7 +427,7 @@ function startTaskSchedulerDueTasksOverdueTests() {
 
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
-    scheduler.dispose()
+    await scheduler.dispose()
 
     expect(createNotification).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -429,7 +450,7 @@ function startTaskSchedulerDueTasksDedupDayTests() {
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
     await scheduler.tickAsync() // second tick
-    scheduler.dispose()
+    await scheduler.dispose()
 
     // Should only fire once despite two ticks (in-memory dedup set)
     const warningCalls = createNotification.mock.calls.filter(
@@ -460,7 +481,7 @@ function startTaskSchedulerDueTasksDedupSessionTests() {
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
     await scheduler.tickAsync() // second tick
-    scheduler.dispose()
+    await scheduler.dispose()
 
     const warningCalls = createNotification.mock.calls.filter(
       (c) => (c[0] as { type: string }).type === 'warning'
@@ -487,7 +508,7 @@ function startTaskSchedulerDueTasksNoMetadataWritesTests() {
 
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
-    scheduler.dispose()
+    await scheduler.dispose()
 
     // The scheduler must NOT write notification_notified_date to metadata
     const updateCalls = mock.mockRun.mock.calls.filter((args) => {
@@ -516,7 +537,7 @@ function startTaskSchedulerBlockedTasksElapsedTests() {
 
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
-    scheduler.dispose()
+    await scheduler.dispose()
 
     expect(createNotification).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -543,7 +564,7 @@ function startTaskSchedulerBlockedTasksNotElapsedTests() {
 
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
-    scheduler.dispose()
+    await scheduler.dispose()
 
     const infoCalls = createNotification.mock.calls.filter(
       (c) => (c[0] as { type: string }).type === 'info'
@@ -571,7 +592,7 @@ function startTaskSchedulerBlockedTasksBadMetadataHandlesInvalidMetadataTests() 
 
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
-    scheduler.dispose()
+    await scheduler.dispose()
 
     expect(createNotification).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'info' }))
   })
@@ -590,7 +611,7 @@ function startTaskSchedulerBlockedTasksBadMetadataSkipsBlockedTaskTests() {
 
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
-    scheduler.dispose()
+    await scheduler.dispose()
 
     expect(createNotification).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'info' }))
   })
@@ -620,7 +641,7 @@ function startTaskSchedulerBlockedTasksCustomDatesHandlesCustomIsoTests() {
 
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
-    scheduler.dispose()
+    await scheduler.dispose()
 
     expect(createNotification).toHaveBeenCalledWith(expect.objectContaining({ type: 'info' }))
   })
@@ -636,7 +657,7 @@ function startTaskSchedulerBlockedTasksCustomDatesSkipsNotificationWhenTests() {
 
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise // should not throw
-    scheduler.dispose()
+    await scheduler.dispose()
   })
 }
 
@@ -656,7 +677,7 @@ function startTaskSchedulerPerTaskRecurrenceNotifyReachedTests() {
 
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
-    scheduler.dispose()
+    await scheduler.dispose()
 
     expect(createNotification).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'warning', title: expect.stringContaining('Recurring task') })
@@ -687,7 +708,7 @@ function startTaskSchedulerPerTaskRecurrenceNotifyNotReachedSuppressesNotificati
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
     await scheduler.tickAsync() // non-startup tick
-    scheduler.dispose()
+    await scheduler.dispose()
 
     expect(createNotification).not.toHaveBeenCalled()
   })
@@ -704,7 +725,7 @@ function startTaskSchedulerPerTaskRecurrenceNotifyNotReachedFallsBackToTests() {
 
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
-    scheduler.dispose()
+    await scheduler.dispose()
 
     expect(createNotification).toHaveBeenCalled()
   })
@@ -725,7 +746,7 @@ function startTaskSchedulerSchedulerNeverInsertsTaskNoInsertsTests() {
 
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
-    scheduler.dispose()
+    await scheduler.dispose()
 
     // Notification fired
     expect(createNotification).toHaveBeenCalled()
@@ -753,7 +774,7 @@ function startTaskSchedulerSchedulerNeverInsertsTaskNotifyColumnTests() {
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
     await scheduler.tickAsync() // non-startup tick
-    scheduler.dispose()
+    await scheduler.dispose()
 
     expect(createNotification).not.toHaveBeenCalled()
   })
@@ -783,7 +804,7 @@ function startTaskSchedulerAutoDismissFinishedTasksTests() {
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
     await scheduler.tickAsync() // second tick — auto-dismiss fires
-    scheduler.dispose()
+    await scheduler.dispose()
 
     expect(disposeMock).toHaveBeenCalledTimes(1)
   })
@@ -806,7 +827,7 @@ function startTaskSchedulerAutoDismissUnblockedTasksTests() {
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
     await scheduler.tickAsync() // second tick — auto-dismiss fires
-    scheduler.dispose()
+    await scheduler.dispose()
 
     expect(disposeMock).toHaveBeenCalledTimes(1)
   })
@@ -824,7 +845,7 @@ async function checkInsRaised(interval: string, blockedAt: string, now: string):
   ])
   const scheduler = startTaskScheduler(api, mock.db)
   await scheduler.startupPromise
-  scheduler.dispose()
+  await scheduler.dispose()
   return vi.mocked(api.notifications.createNotification).mock.calls.length
 }
 
@@ -866,7 +887,7 @@ describe('a blocked task whose blocked time is not a date', () => {
     mock.mockBlockedAll.mockResolvedValue([blockedRow({ updated_at: 'yesterday' }), blockedRow()])
     const scheduler = startTaskScheduler(api, mock.db)
     await scheduler.startupPromise
-    scheduler.dispose()
+    await scheduler.dispose()
 
     expect(vi.mocked(api.notifications.createNotification)).toHaveBeenCalledTimes(1)
   })
