@@ -1,0 +1,23 @@
+docs/CONTRIBUTING.md
+  s_f6f18e5557b141::t_db8c1b10f94c3f 64,74-75,84-85,123
+docs/adr/070-e2e-is-deterministic-and-selective.md
+  s_f6f18e5557b141::t_cedb8e5f8777ee 3,7-8,25
+docs/adr/123-tests-run-once-sealed-and-selected.md
+  s_f6f18e5557b141::t_ecf90b5613bf3c 1-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e9bed90f9936fde1bf711410645ebe93fb2468f8",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

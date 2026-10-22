@@ -1,0 +1,27 @@
+extensions/foundry/src/index.ts
+  s_f6f18e5557b141::t_6a8d37b5e1f8d5 86-87,90-91
+extensions/foundry/src/line/refinery-run.ts
+  s_f6f18e5557b141::t_76e4dc8043fd4b 23-24,166-167,171-172,175
+extensions/foundry/src/sensors/sensor-tick.ts
+  s_f6f18e5557b141::t_1c8047c7896536 17-18,91-92,97-98,101
+extensions/foundry/tests/line/stop-refinery-tick.spec.ts
+  s_f6f18e5557b141::t_c7b8905d89fc96 1-52
+extensions/foundry/tests/sensors/stop-sensor-tick.spec.ts
+  s_f6f18e5557b141::t_aad14ba79c37d6 1-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4ea4a33344c3331d7ebb7dba2d8c431518ea6ced",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

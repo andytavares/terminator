@@ -1,0 +1,51 @@
+packages/extension-sdk/src/renderer.tsx
+  s_f6f18e5557b141::t_b1f96926639b39 18-21
+packages/extension-sdk/tests/renderer.spec.tsx
+  s_f6f18e5557b141::t_22e1de535d1ba0 71
+tests/integration/foundry-portability.spec.ts
+  s_f6f18e5557b141::t_0f614a42c30837 162-165
+tests/unit/extension-frame/frame-shim.spec.ts
+  s_f6f18e5557b141::t_5c091b654c16c4 118,128-129,139,144-145
+tests/unit/extensions/api-supervised-runs.spec.ts
+  s_f6f18e5557b141::t_d7f399a57d2199 151-152,238-239,243-244,248,251,275,278
+tests/unit/extensions/api-v1.2.0.spec.ts
+  s_f6f18e5557b141::t_1926adcc90e261 105
+tests/unit/integrations/tracker-store.spec.ts
+  s_f6f18e5557b141::t_005d7ac7151143 161,164
+tests/unit/renderer-remote/electron-api-shim.spec.ts
+  s_f6f18e5557b141::t_4a4454f0467eae 100,104-106,347-349,355-356
+tests/unit/renderer/App.spec.tsx
+  s_f6f18e5557b141::t_276f134c04fe30 369-371,668,677,688,692,696,700,704,713,717,797,800,1131,1135,1233,1236,1239,1244,1247,1250,1266,1270,1280,1541,1555
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_f6f18e5557b141::t_d77fe452b416c4 862,868-869
+tests/unit/renderer/quick-actions/core-actions.spec.ts
+  s_f6f18e5557b141::t_b52af993b67ee8 122,124,140,142,150,153,155,235,237
+tests/unit/renderer/quick-actions/custom-runtime.spec.ts
+  s_f6f18e5557b141::t_e5d9f5c74cd154 76,83
+tests/unit/renderer/quick-actions/extension-actions.spec.ts
+  s_f6f18e5557b141::t_03b1f06a234e2b 70,78,108,117
+tests/unit/renderer/quick-actions/surface-actions.spec.ts
+  s_f6f18e5557b141::t_bc923edaa988cf 58,62
+tests/unit/renderer/quick-actions/use-core-quick-actions.spec.tsx
+  s_f6f18e5557b141::t_f840af6760cc2c 78,80-81,98-99,103-104,108-109,122,130,132,138-139,143,148,154,156,159,175,177,181,183,190,192,196,199,203,205
+tests/unit/renderer/stores/extension-commands.store.spec.ts
+  s_f6f18e5557b141::t_a56690b03afa04 54-57,59,63-64
+tests/unit/shell/shell-executor-login-path.spec.ts
+  s_f6f18e5557b141::t_d6364e828aad62 38,40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1ca847f513584043f445a6fdac19257881cb23dc",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
