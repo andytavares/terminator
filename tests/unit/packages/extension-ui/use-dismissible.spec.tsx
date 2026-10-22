@@ -1,5 +1,5 @@
 import React, { useRef } from 'react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { useDismissible } from '../../../../packages/extension-ui/src/useDismissible'
 import { MODAL_DEPTH_KEY } from '../../../../packages/extension-ui/src/modal-depth'
@@ -25,9 +25,18 @@ function Panel({
   )
 }
 
-const settle = async () =>
-  act(async () => {
-    await new Promise((r) => setTimeout(r, 0))
+// The outside-click listener binds a timer tick after mount: the tests run that tick by hand.
+beforeEach(() => {
+  vi.useFakeTimers()
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+const settle = () =>
+  act(() => {
+    vi.advanceTimersByTime(0)
   })
 
 describe('useDismissible', () => {

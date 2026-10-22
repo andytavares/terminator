@@ -35,17 +35,17 @@ import {
 } from '../../../../src/main/extensions/frame-bridge.js'
 import { nodePortAsFramePort } from '../../../support/frame-port.js'
 
-/** Lets a Node port deliver what was posted to it: its messages arrive on a later turn, and under
- * load one timer tick is not always enough, so it waits a few. */
-async function portTurn(): Promise<void> {
-  for (let tick = 0; tick < 5; tick++) await new Promise((resolve) => setTimeout(resolve, 2))
-}
+/** Answered by the bridge once it has handled everything the frame posted before asking. */
+const BARRIER_CHANNEL = 'frame:barrier'
 
 interface Opened {
   surface: { extensionId: string; viewParam: string }
   received: FrameReply[]
   gone: Promise<void>
   post(message: unknown): void
+  /** Resolves once the bridge has handled what was posted so far and the frame has received what
+   * the bridge sent first: a port delivers in order, so the barrier's reply arrives last. */
+  settled(): Promise<void>
   /** Simulates the port 'close' reaching main (Node delivers it asynchronously). */
   dropForTest(): void
 }
@@ -54,7 +54,13 @@ interface Opened {
 function openFrame(bridge: FrameBridge, extensionId: string, viewParam: string): Opened {
   const { port1, port2 } = new MessageChannel()
   const received: FrameReply[] = []
-  port1.on('message', (data) => received.push(data as FrameReply))
+  const barriers = new Map<string, () => void>()
+  port1.on('message', (data) => {
+    const message = data as FrameReply
+    const release = message.type === 'result' ? barriers.get(message.id) : undefined
+    if (release) release()
+    else received.push(message)
+  })
   const port = nodePortAsFramePort(port2)
   bridge.open({ extensionId, viewParam, frameToken: 't' }, port)
   const caller = bridge.viewCallerOf({ extensionId, viewParam })!
@@ -63,6 +69,12 @@ function openFrame(bridge: FrameBridge, extensionId: string, viewParam: string):
     received,
     gone: new Promise((resolve) => caller.onGone(resolve)),
     post: (message) => port1.postMessage(message),
+    settled: () =>
+      new Promise((resolve) => {
+        const id = `barrier-${barriers.size}`
+        barriers.set(id, resolve)
+        port1.postMessage({ type: 'invoke', id, channel: BARRIER_CHANNEL })
+      }),
     dropForTest: () => (port as unknown as { dropForTest(): void }).dropForTest(),
   }
 }
@@ -86,7 +98,9 @@ function invokeFrame(frame: Opened, channel: string, payload?: unknown): Promise
 
 function makeCallbacks() {
   return {
-    invokeRegistry: new Map<string, IpcRegistryEntry>(),
+    invokeRegistry: new Map<string, IpcRegistryEntry>([
+      [BARRIER_CHANNEL, { handler: () => null, remoteAccessible: false }],
+    ]),
     sendRegistry: new Map<string, IpcSendHandler>(),
     onExitRequest: vi.fn(),
     onQuickActionsOpen: vi.fn(),
@@ -125,14 +139,14 @@ describe('FrameBridge — what a new frame is sent', () => {
   it('sends a new frame the current theme', async () => {
     rig.frameBridge().setTheme('dark')
     const frame = rig.open('ext.a', 'main')
-    await portTurn()
+    await frame.settled()
     expect(frame.received).toContainEqual({ type: 'theme', theme: 'dark' })
   })
 
   it('sends a new frame the last broadcast workspace:changed', async () => {
     rig.frameBridge().broadcast('workspace:changed', { workspaceId: 'w1' })
     const frame = rig.open('ext.a', 'main')
-    await portTurn()
+    await frame.settled()
     expect(frame.received).toContainEqual({
       type: 'event',
       channel: 'workspace:changed',
@@ -142,7 +156,7 @@ describe('FrameBridge — what a new frame is sent', () => {
 
   it('does not send a workspace:changed when none was broadcast', async () => {
     const frame = rig.open('ext.a', 'main')
-    await portTurn()
+    await frame.settled()
     expect(
       frame.received.filter((m) => m.type === 'event' && m.channel === 'workspace:changed')
     ).toEqual([])
@@ -229,7 +243,7 @@ describe('FrameBridge — send', () => {
     const a = rig.open('ext.a', 'main')
     const b = rig.open('ext.b', 'main')
     rig.frameBridge().viewCallerOf(a.surface)!.send('fs:changed', { filename: 'a.ts' })
-    await portTurn()
+    await Promise.all([a.settled(), b.settled()])
     expect(a.received).toContainEqual({
       type: 'event',
       channel: 'fs:changed',
@@ -246,9 +260,9 @@ describe('FrameBridge — broadcast and theme', () => {
     const a = rig.open('ext.a', 'main')
     const b = rig.open('ext.b', 'main')
     a.post({ type: 'subscribe', channel: 'workspace:changed' })
-    await portTurn()
+    await a.settled()
     rig.frameBridge().broadcast('workspace:changed', { workspaceId: 'w9' })
-    await portTurn()
+    await Promise.all([a.settled(), b.settled()])
     expect(
       a.received.filter(
         (m) => m.type === 'event' && (m.args[0] as { workspaceId: string }).workspaceId === 'w9'
@@ -265,7 +279,7 @@ describe('FrameBridge — broadcast and theme', () => {
     const a = rig.open('ext.a', 'main')
     const b = rig.open('ext.b', 'main')
     rig.frameBridge().setTheme('light')
-    await portTurn()
+    await Promise.all([a.settled(), b.settled()])
     expect(a.received.at(-1)).toEqual({ type: 'theme', theme: 'light' })
     expect(b.received.at(-1)).toEqual({ type: 'theme', theme: 'light' })
   })
@@ -277,7 +291,7 @@ describe('FrameBridge — exit and quick actions', () => {
   it('request-exit calls onExitRequest with the frame surface', async () => {
     const frame = rig.open('ext.a', 'sidebar')
     frame.post({ type: 'request-exit' })
-    await portTurn()
+    await frame.settled()
     expect(rig.spies().onExitRequest).toHaveBeenCalledWith({
       extensionId: 'ext.a',
       viewParam: 'sidebar',
@@ -287,14 +301,14 @@ describe('FrameBridge — exit and quick actions', () => {
   it('quick-actions-open calls onQuickActionsOpen', async () => {
     const frame = rig.open('ext.a', 'main')
     frame.post({ type: 'quick-actions-open' })
-    await portTurn()
+    await frame.settled()
     expect(rig.spies().onQuickActionsOpen).toHaveBeenCalled()
   })
 
   it('settings-open calls onSettingsOpen, not onQuickActionsOpen', async () => {
     const frame = rig.open('ext.a', 'main')
     frame.post({ type: 'settings-open' })
-    await portTurn()
+    await frame.settled()
     expect(rig.spies().onSettingsOpen).toHaveBeenCalled()
     expect(rig.spies().onQuickActionsOpen).not.toHaveBeenCalled()
   })
@@ -316,7 +330,7 @@ describe('FrameBridge — closing', () => {
     a.dropForTest()
     await expect(a.gone).resolves.toBeUndefined()
     rig.frameBridge().viewCallerOf(b.surface)!.send('fs:changed', null)
-    await portTurn()
+    await b.settled()
     expect(b.received.some((m) => m.type === 'event' && m.channel === 'fs:changed')).toBe(true)
   })
 })

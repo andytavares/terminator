@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { once } from 'node:events'
 import { chmodSync, symlinkSync, writeFileSync } from 'node:fs'
 import { delimiter, dirname, join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -20,7 +21,7 @@ function fakeRealGh(): string {
 
 /** Runs the stub with `path` as PATH, in a process group of its own so a stub
  * that keeps starting itself is killed whole when the deadline passes. */
-function runStub(path: string[]): Promise<string> {
+async function runStub(path: string[]): Promise<string> {
   const env = {
     PATH: [...path, dirname(process.execPath)].join(delimiter),
     XDG_CONFIG_HOME: makeTempDir('gh-config-'),
@@ -28,16 +29,13 @@ function runStub(path: string[]): Promise<string> {
   const stub = spawn(process.execPath, [join(STUB_DIR, 'gh'), '--version'], { env, detached: true })
   let stdout = ''
   stub.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString()))
-  return new Promise((done, fail) => {
-    const deadline = setTimeout(() => {
-      process.kill(-(stub.pid ?? 0), 'SIGKILL')
-      fail(new Error(`the gh stub was still running after ${STUB_TIMEOUT_MS} ms`))
-    }, STUB_TIMEOUT_MS)
-    stub.once('exit', () => {
-      clearTimeout(deadline)
-      done(stdout)
-    })
-  })
+  try {
+    await once(stub, 'exit', { signal: AbortSignal.timeout(STUB_TIMEOUT_MS) })
+  } catch {
+    process.kill(-(stub.pid ?? 0), 'SIGKILL')
+    throw new Error(`the gh stub was still running after ${STUB_TIMEOUT_MS} ms`)
+  }
+  return stdout
 }
 
 describe('the gh stub without a stub GitHub', () => {

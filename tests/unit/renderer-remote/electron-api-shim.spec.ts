@@ -37,11 +37,23 @@ async function loadShim(): Promise<{ api: API; ws: MockWebSocket }> {
   })
   global.fetch = mockFetch
   await import('../../../src/renderer-remote/electron-api-shim')
-  // Flush the async connectBridge microtask (fetch + WebSocket creation)
-  await new Promise((r) => setTimeout(r, 0))
+  // connectBridge is async (fetch, then WebSocket creation)
+  await vi.waitFor(() => expect(MockWebSocket.instances).toHaveLength(1))
   const ws = MockWebSocket.instances[0]
   ws.onopen?.()
   return { api: window.electronAPI, ws }
+}
+
+/** Loads the shim under fake timers, so its retry timer is held and can be counted. */
+async function expectRetryScheduledWithoutSocket(): Promise<void> {
+  vi.useFakeTimers()
+  global.fetch = mockFetch
+  await import('../../../src/renderer-remote/electron-api-shim')
+  await vi.advanceTimersByTimeAsync(0)
+  expect(mockFetch).toHaveBeenCalledTimes(1)
+  // Retry is scheduled but not yet fired — no WebSocket yet
+  expect(vi.getTimerCount()).toBe(1)
+  expect(MockWebSocket.instances).toHaveLength(0)
 }
 
 beforeEach(() => {
@@ -53,6 +65,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.resetModules()
 })
 
@@ -80,7 +93,7 @@ describe('electron-api-shim bootstrap', () => {
     })
     global.fetch = mockFetch
     await import('../../../src/renderer-remote/electron-api-shim')
-    await new Promise((r) => setTimeout(r, 0))
+    await vi.waitFor(() => expect(MockWebSocket.instances).toHaveLength(1))
     const ws = MockWebSocket.instances[0]
     const api = window.electronAPI
     void api.workspace.list()
@@ -111,12 +124,13 @@ describe('electron-api-shim connection edge cases', () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
     global.fetch = mockFetch
     // Stub out location.replace so jsdom doesn't throw
+    const replace = vi.fn()
     Object.defineProperty(window, 'location', {
-      value: { ...window.location, replace: vi.fn() },
+      value: { ...window.location, replace },
       writable: true,
     })
     await import('../../../src/renderer-remote/electron-api-shim')
-    await new Promise((r) => setTimeout(r, 10))
+    await vi.waitFor(() => expect(replace).toHaveBeenCalledWith('/'))
     // No WebSocket should be created — the shim returned early after redirect
     expect(MockWebSocket.instances).toHaveLength(0)
   })
@@ -127,22 +141,14 @@ describe('electron-api-shim connection edge cases — does not open WebSocket wh
     vi.resetModules()
     MockWebSocket.instances = []
     mockFetch.mockResolvedValueOnce({ ok: false, status: 503 })
-    global.fetch = mockFetch
-    await import('../../../src/renderer-remote/electron-api-shim')
-    await new Promise((r) => setTimeout(r, 10))
-    // Retry is scheduled but not yet fired — no WebSocket yet
-    expect(MockWebSocket.instances).toHaveLength(0)
+    await expectRetryScheduledWithoutSocket()
   })
 
   it('does not open WebSocket when fetch itself throws (retry scheduled)', async () => {
     vi.resetModules()
     MockWebSocket.instances = []
     mockFetch.mockRejectedValueOnce(new Error('network error'))
-    global.fetch = mockFetch
-    await import('../../../src/renderer-remote/electron-api-shim')
-    await new Promise((r) => setTimeout(r, 10))
-    // Retry is scheduled but not yet fired — no WebSocket yet
-    expect(MockWebSocket.instances).toHaveLength(0)
+    await expectRetryScheduledWithoutSocket()
   })
 
   it('rejects pending invokes on ws.onclose', async () => {

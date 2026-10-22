@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { EditWorkspaceDialog } from '../../../../src/renderer/components/sidebar/EditWorkspaceDialog'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
@@ -86,7 +86,9 @@ describe('EditWorkspaceDialog — does not update folder path when Browse is can
     mockOpenDirectory.mockResolvedValue({ cancelled: true })
     render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Browse'))
-    await new Promise((r) => setTimeout(r, 50))
+    await act(async () => {
+      await mockOpenDirectory.mock.results[0].value
+    })
     expect(screen.getByDisplayValue('/home/work')).toBeTruthy()
   })
 

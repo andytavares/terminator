@@ -39,6 +39,9 @@ function extensionImportBoundary() {
   })
 }
 
+const SLEEP_MESSAGE =
+  'Tests never sleep (ADR 070, ADR 120). Wait on the condition you assert next: a locator assertion, expect.poll, vi.waitFor, fake timers, or the callback the code under test calls.'
+
 export default defineConfig([
   // Build output and other tools' trees. extensions/*/src/index.js is the
   // esbuild bundle of each extension (see .gitignore).
@@ -117,19 +120,27 @@ export default defineConfig([
   },
   ...extensionImportBoundary(),
   {
-    files: ['tests/e2e/*.ts'],
+    // No test sleeps (ADR 070, ADR 120): a fixed delay is a race the test hopes to win. Every
+    // spec and every e2e file waits on the condition it asserts next.
+    files: ['**/*.spec.ts', '**/*.spec.tsx', 'tests/e2e/**/*.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',
         {
+          selector: "JSXAttribute[name.name='style'] Literal[value=/^#[0-9a-fA-F]{3,8}$/]",
+          message: "Don't hardcode hex colors in inline `style` — use a theme token.",
+        },
+        {
           selector: "CallExpression[callee.property.name='waitForTimeout']",
-          message:
-            'E2E never sleeps (ADR 070). Wait on the condition you assert next: a locator assertion or expect.poll.',
+          message: SLEEP_MESSAGE,
         },
         {
           selector: "NewExpression[callee.name='Promise'] CallExpression[callee.name='setTimeout']",
-          message:
-            'E2E never sleeps (ADR 070). Wait on the condition you assert next: a locator assertion or expect.poll.',
+          message: SLEEP_MESSAGE,
+        },
+        {
+          selector: "CallExpression[callee.name=/^(sleep|delay)$/]",
+          message: SLEEP_MESSAGE,
         },
       ],
     },

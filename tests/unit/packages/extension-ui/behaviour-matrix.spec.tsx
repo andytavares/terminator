@@ -1,6 +1,6 @@
 import React, { useRef } from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { Dialog } from '../../../../packages/extension-ui/src/Dialog'
 import { ConfirmDialog } from '../../../../packages/extension-ui/src/ConfirmDialog'
 import { Popover } from '../../../../packages/extension-ui/src/Popover'
@@ -126,32 +126,39 @@ describe('behaviour matrix: ConfirmDialog', () => {
  * which is why the audit's count of 19 "modal surfaces" was the wrong shape.
  * So it passes three of the five and must fail the other two on purpose.
  */
-describe('behaviour matrix: Popover', () => {
-  function Harness({ onDismiss }: { onDismiss: () => void }) {
-    return (
-      <Popover onDismiss={onDismiss} label="Options">
-        <button>One</button>
-      </Popover>
-    )
-  }
+function PopoverHarness({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <Popover onDismiss={onDismiss} label="Options">
+      <button>One</button>
+    </Popover>
+  )
+}
 
+describe('behaviour matrix: Popover', () => {
   it(CHECKS[0], () => {
     const onDismiss = vi.fn()
-    render(<Harness onDismiss={onDismiss} />)
+    render(<PopoverHarness onDismiss={onDismiss} />)
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onDismiss).toHaveBeenCalled()
   })
 
-  it(`${CHECKS[4]}, and is not announced as modal`, async () => {
-    const onDismiss = vi.fn()
-    const { container } = render(<Harness onDismiss={onDismiss} />)
-    const surface = container.querySelector('[data-tmui-surface]') as HTMLElement
-    expect(surface.getAttribute('aria-modal')).toBeNull()
-    // The outside-click listener binds a tick late on purpose: the click that
-    // opened the surface is still propagating when it mounts.
-    await new Promise((r) => setTimeout(r, 0))
-    fireEvent.mouseDown(document.body)
-    expect(onDismiss).toHaveBeenCalled()
+  it(`${CHECKS[4]}, and is not announced as modal`, () => {
+    vi.useFakeTimers()
+    try {
+      const onDismiss = vi.fn()
+      const { container } = render(<PopoverHarness onDismiss={onDismiss} />)
+      const surface = container.querySelector('[data-tmui-surface]') as HTMLElement
+      expect(surface.getAttribute('aria-modal')).toBeNull()
+      // The outside-click listener binds a tick late on purpose: the click that
+      // opened the surface is still propagating when it mounts.
+      act(() => {
+        vi.advanceTimersByTime(0)
+      })
+      fireEvent.mouseDown(document.body)
+      expect(onDismiss).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

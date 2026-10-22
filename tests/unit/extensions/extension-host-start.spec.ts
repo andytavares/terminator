@@ -87,16 +87,8 @@ describe('ExtensionHost.start', () => {
     let markPeerStarted = () => {}
     const peerStarted = new Promise<void>((resolve) => (markPeerStarted = resolve))
     const { host, backendHost } = await newExtensionHost({
-      'com.waiter': async () => {
-        // Started here, not before newHost: importing the host can take longer
-        // than the timeout, and a rejection nothing awaits yet fails the run.
-        // Cleared once the race is decided, for the same reason.
-        let timer: ReturnType<typeof setTimeout> | undefined
-        const timeout = new Promise((_, reject) => {
-          timer = setTimeout(() => reject(new Error('peer never started')), 1000)
-        })
-        await Promise.race([peerStarted, timeout]).finally(() => clearTimeout(timer))
-      },
+      // Never settles if the peer is not activated alongside it: the test's own timeout fails it.
+      'com.waiter': () => peerStarted,
       'com.peer': () => markPeerStarted(),
     })
 
@@ -261,7 +253,7 @@ describe('ExtensionHost.start — afterActivation', () => {
         events.push('first')
       },
       'com.second': async () => {
-        await new Promise((resolve) => setTimeout(resolve, 20))
+        await Promise.resolve()
         events.push('second')
       },
     })
@@ -294,7 +286,7 @@ describe('ExtensionHost.start with extensionDependencies (ADR 094)', () => {
         events.push('consumer')
       },
       'com.z-provider': async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10))
+        await Promise.resolve()
         events.push('provider')
       },
     })

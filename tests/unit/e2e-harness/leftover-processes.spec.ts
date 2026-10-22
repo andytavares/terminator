@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import {
   appProcessTree,
   descendantsOf,
@@ -85,8 +85,7 @@ describe('expectNoProcessesLeft', () => {
     const root = spawn('sh', [script, '400'], { stdio: 'ignore' })
     const started = [{ pid: root.pid ?? -1, ppid: process.pid, command: `sh ${script} 400` }]
     const failure = await expectNoProcessesLeft(launchMarker().launchId, started).catch(String)
-    await new Promise((settle) => setTimeout(settle, 200))
-    expect(chainMembers(script)).toEqual([])
+    await vi.waitFor(() => expect(chainMembers(script)).toEqual([]))
     expect(failure).toMatch(/left 1 process\(es\) running, and killed \d+ it started/)
   }, 10_000)
 })

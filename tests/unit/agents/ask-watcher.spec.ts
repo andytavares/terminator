@@ -63,8 +63,8 @@ describe('the ask watcher', () => {
     stop = mod.startAskWatcher()
     write('s1', { event: 'notification', notificationType: 'idle_prompt' })
     write('s2', { event: 'notification', message: 'Q?', notificationType: 'elicitation_dialog' })
+    // One pass over the directory handles both files, so s2 announced means s1 was passed over.
     await seen(1)
-    await new Promise((r) => setTimeout(r, 200))
     expect(changes.map((c) => c[0])).toEqual(['s2'])
   })
 })
@@ -88,8 +88,10 @@ describe('the ask watcher — answers and leftovers', () => {
     const mod = await load()
     stop = mod.startAskWatcher()
     fs.writeFileSync(path.join(asksDir, 'junk.json'), 'not json')
-    await new Promise((r) => setTimeout(r, 300))
-    expect(changes).toEqual([])
+    write('s1', { event: 'notification', message: 'Q?', notificationType: 'elicitation_dialog' })
+    // s1 is a real ask written after the junk: once it is announced the pass has seen both.
+    await seen(1)
+    expect(changes.map((c) => c[0])).toEqual(['s1'])
     expect(fs.readdirSync(asksDir)).toEqual([])
   })
 })
