@@ -3,7 +3,7 @@
  * ticket for a typed idea, an order from a tracker issue, agreeing it, and
  * deleting it outright.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
@@ -16,7 +16,7 @@ import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
 import { priorArtInRecords } from '../../src/ipc/forge-registration.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-import { isProving } from '../../src/line/baseline.js'
+import { settleProofs } from '../../src/line/baseline.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
@@ -37,6 +37,9 @@ afterAll(async () => {
   deactivate()
   vi.unstubAllEnvs()
 })
+
+// Creating an order starts its base-branch proof, which writes into the spec's folder until it ends.
+afterEach(settleProofs)
 
 beforeEach(() => {
   parent = temporaryDirectory('fdry-forge-reg-order')
@@ -128,8 +131,6 @@ function readingTheIssueTests() {
       title: 'Make text red',
       source: { tracker: 'linear', key: 'ENG-3', branch: 'eng-3-red' },
     })
-    // Creating an order starts the base-branch proof; it writes into this folder until it ends.
-    await vi.waitFor(() => expect(isProving(created.order.id)).toBe(false), { timeout: 20_000 })
   })
 }
 

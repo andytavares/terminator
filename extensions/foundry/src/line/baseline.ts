@@ -402,6 +402,11 @@ export function isProving(orderId: string): boolean {
   return inFlight.has(orderId)
 }
 
+/** Every proof running now, settled; a spec waits for it before its folder goes. @internal */
+export async function settleProofs(): Promise<void> {
+  await Promise.allSettled([...inFlight.values()])
+}
+
 /** Never throws: a failure is recorded. A second call joins the running proof. */
 export function proveEnvironment(order: WorkOrder, deps: BaselineDeps): Promise<void> {
   const running = inFlight.get(order.id)

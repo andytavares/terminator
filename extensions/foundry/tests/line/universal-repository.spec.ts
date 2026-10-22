@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 import { execFile } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -12,6 +12,7 @@ import { theRunner } from '../helpers/supervision-mocks.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { createGateStore } from '../../src/gates/store.js'
 import { orderStoreAt } from '../../src/state/live-index.js'
+import { settleProofs } from '../../src/line/baseline.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
 vi.setConfig({ testTimeout: 45_000 })
@@ -31,6 +32,9 @@ beforeAll(async () => {
   host = fakeHost(() => dataDir)
   await activateFoundry(host)
 })
+
+// Each order starts its base-branch proof, which writes into the spec's folder until it ends.
+afterEach(settleProofs)
 
 afterAll(() => {
   deactivate()
