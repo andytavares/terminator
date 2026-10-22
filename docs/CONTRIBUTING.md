@@ -61,7 +61,7 @@ Starts the app on a fresh profile and passes when the main log says `App ready`,
 
 ```bash
 npm run ci:local        # Every check CI runs, cheapest first; stops at the first failure
-npm run ci:local:e2e    # Only the e2e job: specs selected by the diff, five shards, burn-in
+npm run ci:local:e2e    # Only the e2e job: specs selected by the diff, five shards, each spec once
 ```
 
 `npm run ci:local` runs what `.github/workflows/ci.yml` runs, on this Mac: Terminator ships only as a macOS DMG. `scripts/ci-plan.mjs` reads each job's own `run` steps from the workflow, so the two cannot drift. A GitHub expression or condition it does not know stops it, naming the job and step. It runs the jobs in workflow order (Lint, Typecheck, Format, Stories with the screenshot comparison, Unit, Perf, Test, Build, Start with the packaged app), then the e2e specs this diff selects, through `scripts/ci-e2e-local.mjs`. Every step runs without the `GIT_` variables a git hook sets, as CI does. It prints what it leaves to CI and why.
@@ -71,7 +71,8 @@ Nothing in git runs it: the pre-commit hook checks what a commit touches (`lint-
 ### Run tests
 
 ```bash
-npm test                # Unit + integration (Vitest), core and extensions
+npm test                # The unit + integration specs your branch can reach (Vitest), with coverage
+npm test -- --all       # Every spec
 npm run test:watch      # Watch mode
 npm run test:e2e        # E2E — launches real Electron app (Playwright)
 npm run test:perf       # Wall-clock budgets (*.perf.spec.ts), one file at a time
@@ -79,6 +80,8 @@ npm run test:coverage   # Coverage report in coverage/
 npm run test:stories    # The design system's Storybook stories, run as tests
 npm run test:visual     # The design system's screenshot tests
 ```
+
+**Which tests run.** `npm test` runs what `scripts/test-select.mjs` selects for the commits on your branch since `origin/main` (not uncommitted work), and CI runs the same command ([ADR 123](adr/123-tests-run-once-sealed-and-selected.md)). Everything runs for `--all`, for a pull request labelled `test: all`, on a push to main, and when a path that can change every result changes (`ALWAYS_ALL` in the script: test config and setup, `tests/support`, the lockfile, `package.json`, the e2e helpers). A source or data file that no spec imports and no map claims also runs everything. Read the choice with `node scripts/test-select.mjs`, which prints `mode`, `unit`, `e2e`, `base` and `reason`. A data file the source reads with `fs`, which no import shows, goes in `RUNTIME_READS` in that script, with the specs that read it; its unit test fails for one that is listed nowhere. The suite runs once, in a fixed order, with no retry, repeat or shuffle, on macOS in CI as here. With a selection, coverage covers the changed files only.
 
 **Temporary directories.** A spec makes one with `makeTempDir(prefix)` from `tests/support/temp-dir.ts`, never with `mkdtempSync` in `os.tmpdir()`: `tests/setup.ts` removes every one after the spec file ends, passed or failed. An E2E spec uses `e2eTempDir(prefix)` from `tests/e2e/helpers.ts`, which `tests/e2e/global-teardown.ts` removes with the run's root. CI runs each unit shard through `node scripts/check-temp-leaks.mjs`, which points `TMPDIR` at an empty directory (read by [`os.tmpdir()`](https://nodejs.org/api/os.html#ostmpdir), git, sh and mktemp) and fails if anything is left in it; run it locally the same way, `node scripts/check-temp-leaks.mjs npx vitest run`. Specs that skipped this once left ~22,000 folders in `/tmp` in a day and filled the disk.
 
@@ -117,7 +120,7 @@ The suite runs in the background, so the machine stays usable while it runs. `la
 - Read what a terminal shows with `readTerminalRows(page)` from `tests/e2e/helpers.ts`, never from `.xterm-rows`. A visible terminal draws with WebGL into a canvas and the DOM holds none of its text; `readTerminalRows` reads xterm's buffer through `window.terminatorE2E`, which the app sets up in `src/renderer/terminal/terminal-rows.ts`. It reads every open terminal, hidden ones too, one after another; when the row's terminal or its place on screen matters, read one pane with `readTerminalRowsIn(screen)`, where `screen` is that pane's `.xterm-screen` (`visibleTerminalScreen(page)` for the first one on screen).
 - A new spec goes in `scripts/e2e-select.mjs`: under the extension it covers, or in `CORE_SPECS`. The selector's unit test fails for a spec that is in neither.
 - **Live specs** (`tests/e2e/live/`) run a real agent on an order (`live-order.ts`). `full-run.spec.ts` polls until the run says it is over, never until the graph settles: the ladder's climb, then the push and the draft pull request, all come after the last node leaves the graph. Breaking on a settled graph once asserted against GitHub mid-climb and closed the app, killing the step the test is named after. Its polling deadline (45 minutes) is longer than the order's budget, so the budget gate is seen when it fires, and its test timeout is longer than the deadline, so the test reports the run instead of Playwright killing it. The order's budget leaves room for the pipeline plus the climb: four agents and eight rungs take fifteen minutes on a good run, and at twenty minutes a slow builder hit the gate instead of shipping.
-- CI runs only the specs your diff selects, plus the smoke set. Changed specs run three times. To see what your branch selects: `node scripts/e2e-select.mjs origin/main`.
+- CI runs only the specs your diff selects, plus the smoke set, each once ([ADR 123](adr/123-tests-run-once-sealed-and-selected.md)). To see what your branch selects: `node scripts/test-select.mjs` (the `e2e` list).
 
 ### Build extensions
 

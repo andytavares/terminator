@@ -1,8 +1,10 @@
 # ADR 070: E2E is deterministic and selective
 
-**Status**: Accepted
+**Status**: Accepted; superseded in part by ADR 123
 
 **Date**: 2026-09-27
+
+Superseded in part by ADR 123: changed specs no longer run three times, and the burn-in is gone. The no-retry rule and the selection stand; the selector is now `scripts/test-select.mjs`, which calls `scripts/e2e-select.mjs`.
 
 ## Context
 
@@ -20,7 +22,7 @@ The merge of PR #210 went red in E2E ([run 36290488257](https://github.com/andyt
   - Launches pass `-ApplePersistenceIgnoreState YES`. Without it, macOS's crash-restore alert blocks startup after an earlier app was force-killed.
   - A modal that opens while a terminal refocus is queued keeps its focus.
 - `scripts/e2e-select.mjs` maps the changed paths to spec files. A core path, a push to `main` or any path the map does not know runs everything. A docs-only diff runs nothing.
-- Changed specs run three times in a row before they can merge.
+- ~~Changed specs run three times in a row before they can merge.~~ (Removed by ADR 123.)
 - Build starts alongside the other checks. E2E runs in two shards and reports through one `E2E result` job. That job is the check branch protection requires. (Shard count and splitting: ADR 071.)
 
 ## Motivation
