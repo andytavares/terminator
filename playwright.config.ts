@@ -3,7 +3,8 @@ import { e2eWorkerCount } from './tests/e2e/worker-count'
 
 // Specs that use something one machine has only one of: the system clipboard, the remote-control
 // port 17683, the keychain. Running two at once makes one read the other's clipboard or lose the
-// port, so they run alone, one file at a time, after the rest.
+// port, so they run one at a time, in a project limited to one worker. The other specs touch
+// none of the three and stay parallel beside it.
 const SHARED_MACHINE_RESOURCES = [
   '**/core-quick-actions.spec.ts',
   '**/issue-trackers.spec.ts',
@@ -43,9 +44,6 @@ export default defineConfig({
     {
       name: 'electron',
       testIgnore: [...NOT_IN_THE_SUITE, ...SHARED_MACHINE_RESOURCES],
-      // A teardown project runs once the project has finished, pass or fail; a dependency
-      // would skip the rest of the suite when one of these specs failed.
-      teardown: 'shared-machine-resources',
     },
     {
       name: 'shared-machine-resources',
