@@ -1,0 +1,17 @@
+# The only global git config a test's git reads (scripts/test-env.mjs, ADR 123). The developer's
+# ~/.gitconfig (signing, hooks paths, trace2 targets, maintenance) never reaches a spec.
+[user]
+	name = Terminator Test
+	email = test@terminator.invalid
+[init]
+	defaultBranch = main
+[commit]
+	gpgsign = false
+[tag]
+	gpgsign = false
+[maintenance]
+	auto = false
+[gc]
+	auto = 0
+[advice]
+	detachedHead = false
