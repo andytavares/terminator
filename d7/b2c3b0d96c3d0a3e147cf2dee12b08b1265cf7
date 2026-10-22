@@ -1,0 +1,25 @@
+extensions/foundry/src/forge/checks-view.ts
+  s_f6f18e5557b141::t_4f32d6780d66a6 79
+extensions/foundry/src/verify/toolchain-probe.ts
+  s_f6f18e5557b141::t_4f32d6780d66a6 31
+extensions/foundry/src/profile/resolve.ts
+  s_f6f18e5557b141::t_4f32d6780d66a6 38
+extensions/foundry/src/line/execution-final.ts
+  s_f6f18e5557b141::t_4f32d6780d66a6 37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d7b2c3b0d96c3d0a3e147cf2dee12b08b1265cf7",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
