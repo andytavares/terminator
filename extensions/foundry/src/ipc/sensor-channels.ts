@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { seedOrder } from '../forge/intake-source.js'
+import { defaultHintsDir } from '../profile/hints.js'
 import { dismiss, promote, ranked } from '../sensors/cluster.js'
 import { everyMs } from '../sensors/schema.js'
 import { runSensor } from '../sensors/schedule.js'
@@ -46,6 +47,8 @@ export interface SensorChannelDeps {
   readonly collectDepsFor: (repoPath: string) => CollectDeps
   readonly now: () => string
   readonly newId: () => string
+  /** Where the stored profiles are, resolved when a signal is promoted. */
+  readonly dataRoot: () => string
 }
 
 export interface SensorChannels {
@@ -106,6 +109,7 @@ async function promoteSignal(
       now: deps.now,
       newId: deps.newId,
       readSignal: async (signalId) => deps.store.get(signalId),
+      profile: { dataRoot: deps.dataRoot(), hintsDir: defaultHintsDir() },
     }
   )
   if ('error' in seeded) return seeded

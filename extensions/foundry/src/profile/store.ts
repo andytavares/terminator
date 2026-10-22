@@ -24,13 +24,7 @@ function profilePath(root: string, repoPath: string): string {
 
 /** A missing or unreadable profile is none, never a thrown surface. */
 export async function readProfile(root: string, repoPath: string): Promise<Profile | null> {
-  try {
-    const text = await fs.promises.readFile(profilePath(root, repoPath), 'utf8')
-    const parsed = ProfileSchema.safeParse(JSON.parse(text))
-    return parsed.success ? parsed.data : null
-  } catch {
-    return null
-  }
+  return readProfileFile(profilePath(root, repoPath))
 }
 
 /** Disk first, then the windows are told (the index holds no profile, so it only announces). */
@@ -42,5 +36,33 @@ export async function writeProfile(
   const target = profilePath(root, repoPath)
   await fs.promises.mkdir(path.dirname(target), { recursive: true })
   await writeJsonAtomic(target, ProfileSchema.parse(profile))
+  indexFor(root).announce({ kind: 'profile', orderId: '' })
+}
+
+/** Every stored profile; one that does not parse is left out. */
+export async function listProfiles(root: string): Promise<Profile[]> {
+  const directory = path.join(root, 'profiles')
+  const files = await fs.promises.readdir(directory).catch(() => [] as string[])
+  const read = await Promise.all(
+    files
+      .filter((file) => file.endsWith('.json'))
+      .sort()
+      .map((file) => readProfileFile(path.join(directory, file)))
+  )
+  return read.filter((profile): profile is Profile => profile !== null)
+}
+
+async function readProfileFile(file: string): Promise<Profile | null> {
+  try {
+    const parsed = ProfileSchema.safeParse(JSON.parse(await fs.promises.readFile(file, 'utf8')))
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
+  }
+}
+
+/** Disk first, then the windows are told. Nothing stored is nothing to do. */
+export async function deleteProfile(root: string, repoPath: string): Promise<void> {
+  await fs.promises.rm(profilePath(root, repoPath), { force: true })
   indexFor(root).announce({ kind: 'profile', orderId: '' })
 }

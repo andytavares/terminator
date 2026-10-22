@@ -13,6 +13,8 @@ import {
 } from './scouted-converge.js'
 import type { ConvergeOutcome, ConvergeStarted } from '../ipc/forge-channels.js'
 import { rungOutputPath } from '../line/rung-output.js'
+import { baselineDepsFor } from '../line/baseline-deps.js'
+import { proveScoutCommands } from '../line/scout-commands.js'
 import {
   MAX_REVIEW_ROUNDS,
   reviewPrompt,
@@ -617,6 +619,11 @@ function startScout(forge: Forge, root: string, scoutOrder: WorkOrder): Promise<
           rules: houseRulesAt(forge.api, root, scoutOrder),
           outputPath: rungOutputPath(orderDir(root, scoutOrder.id), 'forge-scout'),
         }),
+      onCommands: (orderId, commands) => {
+        const store = orderStoreAt(root)
+        const base = baselineDepsFor(forge.api, root, store)
+        return proveScoutCommands(orderId, commands, { base, store })
+      },
       startedAction: 'scout.started',
       startedReason: 'reading the repository beside the first draft',
       onFinished: async (updated) => {

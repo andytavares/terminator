@@ -68,6 +68,7 @@ function registerSensors({ api, dataRoot }: ActivationContext, signalStore: Sign
     collectDepsFor: (repoPath) => sensorCollectDepsFor(api, repoPath),
     now: isoNow,
     newId: () => newOrderId(new Date()),
+    dataRoot,
   })
   reg(api, ...sensorChannelSpecs(sensors))
 }

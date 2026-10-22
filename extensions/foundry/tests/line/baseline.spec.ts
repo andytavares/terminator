@@ -60,13 +60,15 @@ afterEach(() => {
 })
 
 function orderOn(repoPath: string): WorkOrder {
-  return draftOrder({
+  const order = draftOrder({
     id: 'WO-1',
     title: 'x',
     source: { kind: 'typed', tracker: null, key: null, url: null },
     repoPaths: [repoPath],
     now: '2026-09-06T10:00:00.000Z',
   })
+  const toolchain = fs.existsSync(repoPath) ? probeToolchain(repoPath) : order.context.toolchain
+  return { ...order, context: { ...order.context, toolchain } }
 }
 
 interface Terminal {
@@ -185,11 +187,9 @@ describe('proveEnvironment on a base that cannot be checked', () => {
 
 describe('baselineSteps', () => {
   it('keeps only the checks the repository has', () => {
-    const toolchain = probeToolchain(repo)
-    expect(baselineSteps({ ...toolchain, lint: null, build: null }).map((s) => s.name)).toEqual([
-      'Format',
-      'Tests',
-    ])
+    const { context } = orderOn(repo)
+    const toolchain = { ...context.toolchain, lint: null, build: null }
+    expect(baselineSteps({ ...context, toolchain }).map((s) => s.name)).toEqual(['Format', 'Tests'])
   })
 })
 

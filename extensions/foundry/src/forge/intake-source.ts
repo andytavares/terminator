@@ -147,7 +147,7 @@ async function resolvedProfileOf(repoPath: string, deps: SeedDeps): Promise<Reso
 }
 
 /** The part of a resolved profile an order carries: commands only, no provenance. */
-function environmentOf(resolved: ResolvedProfile): WorkOrder['context']['environment'] {
+export function environmentOf(resolved: ResolvedProfile): WorkOrder['context']['environment'] {
   return {
     prepare: resolved.prepare?.command ?? null,
     share: [...resolved.share],

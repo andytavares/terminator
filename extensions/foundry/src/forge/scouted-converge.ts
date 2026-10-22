@@ -1,5 +1,6 @@
 import type { ConvergeStarted } from '../ipc/forge-channels.js'
 import type { WorkOrder } from '../order/schema.js'
+import { CHECK_NAMES } from '../verify/check-names.js'
 
 /**
  * Before the very first draft, the scout reads the repository — beside the
@@ -104,9 +105,23 @@ export function withScoutContext(drafted: WorkOrder, stored: WorkOrder | null): 
     priorArt: union(priorArt, stored.context.priorArt),
     conventions: union(conventions, stored.context.conventions),
   }
+  const toolchain = withProvedCommands(drafted.context.toolchain, stored.context.toolchain)
   const unchanged =
     next.entryPoints.length === entryPoints.length &&
     next.priorArt.length === priorArt.length &&
-    next.conventions.length === conventions.length
-  return unchanged ? drafted : { ...drafted, context: { ...drafted.context, ...next } }
+    next.conventions.length === conventions.length &&
+    toolchain === drafted.context.toolchain
+  return unchanged ? drafted : { ...drafted, context: { ...drafted.context, ...next, toolchain } }
+}
+
+/** A command the scout proved while the architect wrote fills a check the draft left empty. */
+function withProvedCommands(
+  drafted: WorkOrder['context']['toolchain'],
+  stored: WorkOrder['context']['toolchain']
+): WorkOrder['context']['toolchain'] {
+  const proved = CHECK_NAMES.filter(
+    (check) => drafted[check] === null && stored[check]?.source === 'scout'
+  )
+  if (proved.length === 0) return drafted
+  return { ...drafted, ...Object.fromEntries(proved.map((check) => [check, stored[check]])) }
 }

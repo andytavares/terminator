@@ -113,6 +113,22 @@ describe('withScoutContext', () => {
   })
 })
 
+describe('withScoutContext and a command the scout proved', () => {
+  const proved = { command: 'make lint', source: 'scout' as const, evidence: 'Makefile:12' }
+  const stored = order({
+    context: { ...order().context, toolchain: { ...order().context.toolchain, lint: proved } },
+  })
+
+  it('fills a check the draft left empty, and keeps one the draft has', () => {
+    expect(withScoutContext(order(), stored).context.toolchain.lint).toEqual(proved)
+    const given = { command: 'npm run lint', source: 'operator' as const }
+    const drafted = order({
+      context: { ...order().context, toolchain: { ...order().context.toolchain, lint: given } },
+    })
+    expect(withScoutContext(drafted, stored)).toBe(drafted)
+  })
+})
+
 describe('waitForScout', () => {
   describe('waiting', scoutedConvergeWaitingTests)
   describe('giving up', givingUpTests)
