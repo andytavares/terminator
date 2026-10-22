@@ -2,6 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { IntegrationsSettings } from '../../../../src/renderer/components/settings/IntegrationsSettings'
+import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import type { TrackerConnection } from '../../../../src/shared/types/index'
 
 const api = {
@@ -36,19 +37,15 @@ async function renderWith(connections: TrackerConnection[]) {
   return view
 }
 
-beforeEach(async () => {
+beforeEach(() => {
   vi.clearAllMocks()
-  vi.resetModules()
   Object.defineProperty(window, 'electronAPI', {
     value: { integrations: api },
     writable: true,
     configurable: true,
   })
-  // A fresh store per test — zustand state is module-level and would otherwise
-  // leak a previous test's connections into the next one.
-  const { useIntegrationsStore } = await import(
-    '../../../../src/renderer/stores/integrations.store'
-  )
+  // The component imports this same store instance; zustand state is
+  // module-level and would otherwise leak into the next test.
   useIntegrationsStore.setState({ connections: [], connectError: {}, loading: false })
 })
 

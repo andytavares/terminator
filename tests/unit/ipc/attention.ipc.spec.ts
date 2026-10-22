@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 type Handler = (event: unknown, payload?: unknown) => unknown
 const handlers = vi.hoisted(() => new Map<string, Handler>())
@@ -13,6 +13,11 @@ vi.mock('../../../src/main/home/attention-log', () => ({
   listIntervals: () => stored,
   recordState,
 }))
+
+beforeEach(() => {
+  stored.length = 0
+  recordState.mockReset()
+})
 
 const attentionIntervalAt = (sessionId: string, start: string, end: string | null) => ({
   sessionId,
@@ -66,7 +71,6 @@ describe('attention:record', () => {
   })
 
   it('refuses a report whose time is not a time, and stores nothing', async () => {
-    recordState.mockClear()
     const call = await registeredHandlers()
     const answer = (await call('attention:record', { ...report, at: 'soon' })) as { error: string }
     expect(answer.error).toBe('VALIDATION_ERROR')
@@ -85,6 +89,7 @@ describe('attention:record', () => {
 
 describe('attention:measures', () => {
   it('answers the measures over the stored intervals for the window', async () => {
+    stored.push(attentionIntervalAt('a', '2026-10-12T09:00:00.000Z', '2026-10-12T10:00:00.000Z'))
     const call = await registeredHandlers()
     const window = {
       from: Date.parse('2026-10-10T00:00:00Z'),

@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
+const stores = vi.hoisted(() => ({}) as Record<string, Record<string, unknown>>)
+
 vi.mock('electron-store', () => {
-  const stores: Record<string, Record<string, unknown>> = {}
   return {
     default: class MockStore {
       onDidAnyChange() {
@@ -28,6 +29,7 @@ vi.mock('electron', () => ({ app: { getPath: () => '/tmp' } }))
 
 function useEmptyStores(): void {
   beforeEach(() => {
+    for (const name of Object.keys(stores)) delete stores[name]
     vi.resetModules()
   })
 }

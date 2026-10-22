@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   carriedOver,
   focusDone,
@@ -71,6 +71,10 @@ beforeEach(() => {
   vi.resetModules()
   vi.useFakeTimers()
   vi.setSystemTime(new Date(2026, 9, 18, 12))
+})
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.useRealTimers()
 })
 const load = async () => (await import('../../../../src/renderer/home/focus-store')).useFocusStore
 const today = '2026-10-18'
