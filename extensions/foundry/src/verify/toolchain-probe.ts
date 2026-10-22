@@ -99,6 +99,8 @@ const PLAYWRIGHT_CONFIGS = ['playwright.config.ts', 'playwright.config.js']
 interface ConfigProbe {
   readonly present: (repo: string) => boolean
   readonly command: string
+  /** Installed in the project's own environment, so `uv run` reaches it where a bare name cannot. */
+  readonly python?: true
 }
 
 const anyOf =
@@ -126,18 +128,18 @@ const CONFIG_PROBES: Record<CheckName, readonly ConfigProbe[]> = {
   test: [
     { present: anyOf(VITEST_CONFIGS), command: 'npx vitest run' },
     { present: anyOf(JEST_CONFIGS), command: 'npx jest' },
-    { present: PYTEST, command: 'pytest' },
+    { present: PYTEST, command: 'pytest', python: true },
     { present: CARGO, command: 'cargo test' },
     { present: GO, command: 'go test ./...' },
   ],
   lint: [
     { present: anyOf(ESLINT_CONFIGS), command: 'npx eslint .' },
-    { present: RUFF, command: 'ruff check .' },
+    { present: RUFF, command: 'ruff check .', python: true },
     { present: CARGO, command: 'cargo clippy' },
   ],
   format: [
     { present: anyOf(PRETTIER_CONFIGS), command: 'npx prettier --check .' },
-    { present: RUFF, command: 'ruff format --check .' },
+    { present: RUFF, command: 'ruff format --check .', python: true },
     { present: CARGO, command: 'cargo fmt --check' },
   ],
   e2e: [{ present: anyOf(PLAYWRIGHT_CONFIGS), command: 'npx playwright test' }],
@@ -154,7 +156,9 @@ const CONFIG_PROBES: Record<CheckName, readonly ConfigProbe[]> = {
 /** The tool's own presence, when no script named the check. */
 function fromConfig(repo: string, check: CheckName): ProbedCommand | null {
   const probe = CONFIG_PROBES[check].find((candidate) => candidate.present(repo))
-  return probe === undefined ? null : { command: probe.command, source: 'config' }
+  if (probe === undefined) return null
+  const throughUv = probe.python === true && exists(repo, 'uv.lock')
+  return { command: throughUv ? `uv run ${probe.command}` : probe.command, source: 'config' }
 }
 
 /** A Makefile target whose name is the check. */

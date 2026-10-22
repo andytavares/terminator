@@ -36,6 +36,7 @@ describe('probeToolchain', () => {
   describe('other languages', otherLanguagesTests)
   describe('tool configs', toolConfigsTests)
   describe('python tools', pythonToolsTests)
+  describe('python tools in a uv project', uvPythonToolsTests)
   describe('go', goTests)
   describe('makefiles and CI', makefilesAndCiTests)
   describe('precedence and e2e', precedenceAndE2eTests)
@@ -161,6 +162,23 @@ function pythonToolsTests() {
   it('reads ruff from a pyproject that configures it', () => {
     write('pyproject.toml', '[tool.ruff]\nline-length = 100\n')
     expect(probeToolchain(repo).lint?.command).toBe('ruff check .')
+  })
+}
+
+function uvPythonToolsTests() {
+  it('runs the python tools through uv where the repository locks its environment with uv', () => {
+    write('uv.lock', 'version = 1\n')
+    write('pyproject.toml', '[tool.ruff]\nline-length = 100\n[tool.pytest.ini_options]\n')
+    const t = probeToolchain(repo)
+    expect(t.test).toEqual({ command: 'uv run pytest', source: 'config' })
+    expect(t.lint).toEqual({ command: 'uv run ruff check .', source: 'config' })
+    expect(t.format).toEqual({ command: 'uv run ruff format --check .', source: 'config' })
+  })
+
+  it('leaves a non-python tool alone in a repository that has a uv lockfile', () => {
+    write('uv.lock', 'version = 1\n')
+    write('Cargo.toml', '[package]\nname = "x"\n')
+    expect(probeToolchain(repo).test?.command).toBe('cargo test')
   })
 }
 
