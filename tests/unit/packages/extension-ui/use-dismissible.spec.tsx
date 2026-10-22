@@ -35,8 +35,8 @@ afterEach(() => {
 })
 
 const settle = () =>
-  act(() => {
-    vi.advanceTimersByTime(0)
+  act(async () => {
+    await vi.advanceTimersByTimeAsync(0)
   })
 
 describe('useDismissible', () => {

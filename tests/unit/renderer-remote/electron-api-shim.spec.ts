@@ -84,7 +84,9 @@ describe('electron-api-shim bootstrap', () => {
       expect.objectContaining({ method: 'POST' })
     )
   })
+})
 
+describe('electron-api-shim before the socket opens', () => {
   it('queues messages before ws is open and flushes on open', async () => {
     vi.resetModules()
     MockWebSocket.instances = []
@@ -342,6 +344,9 @@ describe('electron-api-shim: what reaches a handler, and the local stand-ins —
     expect(ws.sentMessages).toEqual([])
     expect(handler).not.toHaveBeenCalled()
   })
+})
+
+describe('electron-api-shim extensionBridge.invoke', () => {
   it('extensionBridge.invoke calls invoke with channel', async () => {
     const { api, ws } = await loadShim()
     const pending = api.extensionBridge.invoke('custom:channel', { data: 1 }) as Promise<unknown>
