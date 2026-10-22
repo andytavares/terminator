@@ -68,10 +68,11 @@ async function fetchPublished(ids) {
 
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'))
 
-function baseLockfile(branch) {
-  execFileSync('git', ['fetch', '--no-tags', '--depth=1', 'origin', branch], { stdio: 'ignore' })
+export function baseLockfile(branch, cwd = process.cwd()) {
+  execFileSync('git', ['fetch', '--no-tags', 'origin', branch], { cwd, stdio: 'ignore' })
   return JSON.parse(
     execFileSync('git', ['show', 'FETCH_HEAD:package-lock.json'], {
+      cwd,
       encoding: 'utf8',
       maxBuffer: 1 << 28,
     })
