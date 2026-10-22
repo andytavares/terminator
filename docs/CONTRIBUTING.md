@@ -61,14 +61,15 @@ Starts the app on a fresh profile and passes when the main log says `App ready`,
 
 ```bash
 npm run ci:local        # Every check CI runs, cheapest first; stops at the first failure
-npm run ci:local:e2e    # Only the e2e job: specs selected by the diff, five shards, each spec once
+npm run ci:local:e2e    # Only the e2e job: specs selected by the diff, ci.yml's shards, each spec once
 ```
 
-`npm run ci:local` runs what `.github/workflows/ci.yml` runs, on this Mac: Terminator ships only as a macOS DMG. A local pass must predict a CI pass, so it tests what CI tests:
+`npm run ci:local` runs what `.github/workflows/ci.yml` runs, where CI runs it. A local pass must predict a CI pass, so it tests what CI tests:
 
 - **The same commit.** It fetches `origin/main`, merges your `HEAD` with it in the persistent check worktree `.worktrees/.ci-local`, and runs there. It never tests your dirty working tree, and it prints the `HEAD` and `origin/main` shas first. If the merge conflicts it stops and says so.
+- **The same machine.** CI runs the app (E2E, Start, story screenshots) on macOS and every other job on `ubuntu-24.04-arm`. ci:local runs the macOS steps on this Mac and the Ubuntu steps in a Docker container of Ubuntu 24.04 on arm64 with the `.nvmrc` Node (`scripts/ci-linux.Dockerfile`, `scripts/ci-linux.mjs`), so it needs Docker running. The container shares the check worktree; its `node_modules` are Docker volumes of Linux installs.
 - **The same Node.** It refuses to start unless `node -v` is `v` plus the version in `.nvmrc`, and names both.
-- **The same install.** In the check worktree it runs `npm ci` when the hash of `package-lock.json` differs from the one recorded in `node_modules/.lock-hash` after the last install; otherwise it keeps `node_modules`.
+- **The same install.** In the check worktree, on the Mac and in the container, it runs `npm ci` when the hash of `package-lock.json` differs from the one recorded in `node_modules/.lock-hash` after the last install; otherwise it keeps `node_modules`.
 - **The same checks.** `scripts/ci-plan.mjs` reads each job's own `run` steps from the workflow, so the two cannot drift. A GitHub expression or condition it does not know stops it, naming the job and step. It runs the jobs in workflow order, then the e2e specs. Without a flag the diff selects the specs; `--all` runs every test and sets `TEST_ALL=1` for the e2e step. Every step runs without the `GIT_` variables a git hook sets, as CI does. It prints what it leaves to CI and why.
 
 `--prepare-only` does the Node check, the fetch, the merge and the install, prints the shas, and exits.
