@@ -35,19 +35,18 @@ const REMOTE_CONTROL: Surface = {
 }
 
 /**
- * Moves the extension frame's clock on. The double-Escape gesture is timed against
- * `performance.now()` inside the frame (frame-shim.ts), which Playwright's page clock cannot
- * reach, so the frame's own clock is shifted instead of waiting out `DOUBLE_ESCAPE_WINDOW_MS`.
+ * Moves the clocks on that time the double-Escape gesture. Both the extension frame
+ * (frame-shim.ts) and the host window (ExtensionPanelPortal.tsx) pair presses by
+ * `performance.now()`, and Playwright's page clock cannot reach the frame, so each one's own
+ * clock is shifted instead of waiting out `DOUBLE_ESCAPE_WINDOW_MS`.
  */
-async function advanceFrameClock(part: string, ms: number): Promise<void> {
-  await inView(
-    part,
-    `(() => {
-      const now = performance.now.bind(performance)
-      performance.now = () => now() + ${ms}
-      return true
-    })()`
-  )
+async function advanceClocks(part: string, ms: number): Promise<void> {
+  const shift = (offset: number) => {
+    const now = performance.now.bind(performance)
+    performance.now = () => now() + offset
+  }
+  await handle.page.evaluate(shift, ms)
+  await inView(part, `(${shift})(${ms})`)
 }
 
 /** Run `script` inside the extension frame whose URL contains `part`. */
@@ -136,10 +135,10 @@ async function singleAndSlowEscapesStay(): Promise<void> {
   await showPanel(NOTES)
   await nothingClaimsTheKey(NOTES.part)
   await key(NOTES.part, 'Escape')
-  await advanceFrameClock(NOTES.part, 900)
+  await advanceClocks(NOTES.part, 900)
   await stillShowing(NOTES, 'a single Escape closed the extension')
   await key(NOTES.part, 'Escape')
-  await advanceFrameClock(NOTES.part, 600)
+  await advanceClocks(NOTES.part, 600)
   await stillShowing(NOTES, 'two Escapes further apart than the gesture window paired')
 }
 
