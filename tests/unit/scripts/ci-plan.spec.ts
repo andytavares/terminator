@@ -94,8 +94,8 @@ describe('the deterministic workflow (ADR 123)', () => {
 
   it('runs every spec once: no burn-in, no census of one, every shard reported', () => {
     expect(workflowText).not.toMatch(/Burn in|repeat-each|--retries/)
-    expect(workflow.jobs.unit.strategy['fail-fast']).toBe(false)
-    expect(workflow.jobs.e2e.strategy['fail-fast']).toBe(false)
+    expect(workflow.jobs.unit.strategy?.['fail-fast']).toBe(false)
+    expect(workflow.jobs.e2e.strategy?.['fail-fast']).toBe(false)
   })
 })
 
@@ -120,7 +120,8 @@ describe('the deterministic workflow, outside services and baselines', () => {
   })
 
   it('runs on a label change, so test: all takes effect', () => {
-    expect(workflow.on.pull_request.types).toEqual(
+    expect(workflow.on?.pull_request).toHaveProperty(
+      'types',
       expect.arrayContaining(['opened', 'synchronize', 'reopened', 'labeled', 'unlabeled'])
     )
   })

@@ -35,7 +35,13 @@ const CONDITIONS = { 'always()': true, "needs.unit.result == 'success'": true }
 
 const SETUP = /^npm ci\b/
 
-/** @returns {{ jobs: Record<string, object> }} */
+/**
+ * @typedef {{ name?: string, run?: string, if?: string, env?: Record<string, string>, uses?: string, with?: Record<string, unknown> }} Step
+ * @typedef {{ name?: string, 'runs-on'?: string, if?: string, needs?: string | string[], strategy?: Record<string, unknown>, permissions?: Record<string, string>, steps?: Step[] }} Job
+ * @typedef {{ on?: Record<string, unknown>, jobs: Record<string, Job> }} Workflow
+ */
+
+/** @returns {Workflow} */
 export function readWorkflow(path) {
   return yaml.load(readFileSync(path, 'utf8'))
 }
