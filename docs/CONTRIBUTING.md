@@ -64,9 +64,18 @@ npm run ci:local        # Every check CI runs, cheapest first; stops at the firs
 npm run ci:local:e2e    # Only the e2e job: specs selected by the diff, five shards, each spec once
 ```
 
-`npm run ci:local` runs what `.github/workflows/ci.yml` runs, on this Mac: Terminator ships only as a macOS DMG. `scripts/ci-plan.mjs` reads each job's own `run` steps from the workflow, so the two cannot drift. A GitHub expression or condition it does not know stops it, naming the job and step. It runs the jobs in workflow order (Lint, Typecheck, Format, Stories with the screenshot comparison, Unit, Perf, Test, Build, Start with the packaged app), then the e2e specs this diff selects, through `scripts/ci-e2e-local.mjs`. Every step runs without the `GIT_` variables a git hook sets, as CI does. It prints what it leaves to CI and why.
+`npm run ci:local` runs what `.github/workflows/ci.yml` runs, on this Mac: Terminator ships only as a macOS DMG. A local pass must predict a CI pass, so it tests what CI tests:
 
-Nothing in git runs it: the pre-commit hook checks what a commit touches (`lint-staged`), and CI checks the pull request. Run `ci:local` when you want the whole of CI on this Mac before opening a PR.
+- **The same commit.** It fetches `origin/main`, merges your `HEAD` with it in the persistent check worktree `.worktrees/.ci-local`, and runs there. It never tests your dirty working tree, and it prints the `HEAD` and `origin/main` shas first. If the merge conflicts it stops and says so.
+- **The same Node.** It refuses to start unless `node -v` is `v` plus the version in `.nvmrc`, and names both.
+- **The same install.** In the check worktree it runs `npm ci` when the hash of `package-lock.json` differs from the one recorded in `node_modules/.lock-hash` after the last install; otherwise it keeps `node_modules`.
+- **The same checks.** `scripts/ci-plan.mjs` reads each job's own `run` steps from the workflow, so the two cannot drift. A GitHub expression or condition it does not know stops it, naming the job and step. It runs the jobs in workflow order, then the e2e specs. Without a flag the diff selects the specs; `--all` runs every test and sets `TEST_ALL=1` for the e2e step. Every step runs without the `GIT_` variables a git hook sets, as CI does. It prints what it leaves to CI and why.
+
+`--prepare-only` does the Node check, the fetch, the merge and the install, prints the shas, and exits.
+
+On a pass it records `<HEAD sha> <origin/main sha>` in your repository (`git rev-parse --git-path ci-local-passed`) and sets a `local-check` commit status on `HEAD` through `gh` (a failure to set it only warns). The pre-push hook (`.husky/pre-push`) reads the record and refuses to push a commit with no recorded pass, naming `npm run ci:local`. The hook only checks the record: git opens the connection to the remote before it runs the hook, and a hook that ran the whole suite left that connection idle until it dropped. So commit, run `npm run ci:local`, then push. A deleted ref passes, and the hook does nothing where `CI` is set: the release and story-baseline jobs push their own commits.
+
+To see whether local passes have predicted CI, run `node scripts/ci-parity-report.mjs --since 2026-10-15`. It lists every failed CI job on a commit that had a `local-check` success (a parity break) and every commit whose same job both failed and passed (a flip), prints the counts, and exits 1 when either is non-zero.
 
 ### Run tests
 
