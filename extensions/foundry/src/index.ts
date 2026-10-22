@@ -83,10 +83,10 @@ export async function deactivate(): Promise<void> {
   // in a records location it has already seen this process.
   adoptedRoots.clear()
   executingOrders.clear()
-  stopSensorTick()
-  stopRefineryTick()
+  const sensorsStopped = stopSensorTick()
+  const refineryStopped = stopRefineryTick()
   clearPendingNewOrder()
   stopSupervisionRuntime()
-  // Last, so everything else is already stopped while a read in flight ends.
-  await homeStopped
+  // Last, so everything else is already stopped while a read or a tick in flight ends.
+  await Promise.all([homeStopped, sensorsStopped, refineryStopped])
 }
