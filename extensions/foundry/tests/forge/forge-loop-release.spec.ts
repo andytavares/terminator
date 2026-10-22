@@ -31,6 +31,7 @@ import {
 } from '../helpers/forge-turns.js'
 import { orderLedger, untilLedgerHas } from '../helpers/order-ledger.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
+import { executingOrders } from '../../src/line/run-control.js'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
@@ -73,12 +74,15 @@ beforeEach(async () => {
 
 const READY = 'Make it red is ready to hand off.'
 
-/** Until the run the order restarted has failed or halted. */
+/** Until the run the order restarted has failed or halted, and its executor has returned:
+ * it writes the run's graph and timeline after the ledger entry. */
 async function untilTheRunEnds(): Promise<void> {
   const ends = ['run.failed', 'run.halted']
   await vi.waitFor(
-    async () =>
-      expect((await orderLedger(dataDir)).some((entry) => ends.includes(entry.action))).toBe(true),
+    async () => {
+      expect((await orderLedger(dataDir)).some((entry) => ends.includes(entry.action))).toBe(true)
+      expect(executingOrders.has('WO-1')).toBe(false)
+    },
     { timeout: 10_000, interval: 50 }
   )
 }
