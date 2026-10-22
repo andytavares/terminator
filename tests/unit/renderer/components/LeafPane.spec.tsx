@@ -9,6 +9,7 @@ import { terminalSessionOf } from '../../../support/renderer-stores'
 import { installElectronApi } from '../../../support/electron-api'
 import { partialFake } from '../../../support/fakes'
 import type { Terminal } from '@xterm/xterm'
+import { eventually } from '../../../support/eventually'
 
 const mockTerminalInput = vi.fn()
 
@@ -201,7 +202,7 @@ describe('LeafPane — closing one pane', () => {
     const { getByRole } = render(<LeafPane sessionId="sess-2" projectId="proj-1" />)
     fireEvent.click(getByRole('button', { name: 'Close Terminal 2' }))
     expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
-    await vi.waitFor(() => expect(useSessionStore.getState().sessions.has('sess-2')).toBe(false))
+    await eventually(() => expect(useSessionStore.getState().sessions.has('sess-2')).toBe(false))
     expect(useSessionStore.getState().sessions.has('sess-1')).toBe(true)
   })
 })

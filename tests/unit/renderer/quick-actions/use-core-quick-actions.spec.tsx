@@ -19,6 +19,7 @@ import {
   workspaceFixture,
 } from '../../../support/renderer-stores'
 import { installElectronApi } from '../../../support/electron-api'
+import { eventually } from '../../../support/eventually'
 
 // The issue a focused terminal resolves to comes from the facts and the tracker;
 // both are given here so the actions can be read against them.
@@ -119,7 +120,7 @@ describe('useCoreQuickActions — the focused terminal', () => {
       .getState()
       .activateSplit('p1', { targetId: 's1', newId: 's2', direction: 'vertical' })
     runCoreAction('core.close-tab')
-    await vi.waitFor(() => expect(useSessionStore.getState().sessions.has('s2')).toBe(false))
+    await eventually(() => expect(useSessionStore.getState().sessions.has('s2')).toBe(false))
     expect(useSessionStore.getState().getPaneLayout('p1')).toBeNull()
     expect(useSessionStore.getState().getActiveSessionForProject('p1')).toBe('s1')
   })

@@ -30,6 +30,7 @@ import * as records from '../../../src/main/sessions/session-record-store.js'
 import * as links from '../../../src/main/integrations/issue-link-store.js'
 import { writeContextFile } from '../../../src/main/integrations/agent-context.js'
 import { notificationManager } from '../../../src/main/notifications/notification-manager.js'
+import { eventually } from '../../support/eventually'
 
 /** Each test starts from an empty user-data directory and an empty notification centre. */
 beforeEach(async () => {
@@ -564,7 +565,7 @@ describe('terminal:create — linked issue notices', () => {
     await writeContextFile(injectedContext(2143, false))
     await createTerminal(makeFakePtyManager())
 
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(notificationManager.list()).toEqual([
         expect.objectContaining({ title: expect.stringContaining('TAV-42') }),
       ])
@@ -577,7 +578,7 @@ describe('terminal:create — linked issue notices', () => {
     await writeContextFile(injectedContext(9900, true))
     await createTerminal(makeFakePtyManager())
 
-    await vi.waitFor(() => expect(notificationManager.list()).toHaveLength(1))
+    await eventually(() => expect(notificationManager.list()).toHaveLength(1))
     const [notice] = notificationManager.list()
     expect(notice.message).toContain('9,900')
     expect(notice.message).toContain('shortened')

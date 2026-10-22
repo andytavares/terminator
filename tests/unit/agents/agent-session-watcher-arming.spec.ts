@@ -3,6 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { SessionRecord } from '../../../src/shared/types/index'
 import { makeTempDir } from '../../support/temp-dir'
+import { eventually } from '../../support/eventually'
 
 // macOS arms fs.watch a moment after it returns and has no event for it
 // (https://nodejs.org/api/fs.html#caveats), so a report written in that moment has no event.
@@ -73,7 +74,7 @@ describe('the agent session watcher, before its watch is armed', () => {
     const probe = fs.readdirSync(directory).find((name) => !name.endsWith('.json'))
     reportToWatcher(probe ?? 'no probe was written')
 
-    await vi.waitFor(() => expect(recorded.map((r) => r.agent?.sessionId)).toEqual(['conv-1']))
+    await eventually(() => expect(recorded.map((r) => r.agent?.sessionId)).toEqual(['conv-1']))
     expect(fs.readdirSync(directory)).toEqual([])
   })
 })

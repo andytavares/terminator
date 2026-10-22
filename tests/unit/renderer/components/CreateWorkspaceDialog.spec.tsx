@@ -11,6 +11,7 @@ import {
 } from '../../../../src/shared/schemas/workspace.schema'
 import { installElectronApi } from '../../../support/electron-api'
 import { pressOutside } from '../../../support/modal'
+import { eventually } from '../../../support/eventually'
 
 // The main process's side of the two writes the real store makes, each payload
 // read by the schema main reads it with.
@@ -93,7 +94,7 @@ describe('CreateWorkspaceDialog — adds the workspace it creates to the list', 
       target: { value: '/repos/my-ws' },
     })
     fireEvent.click(screen.getByText('Create'))
-    await vi.waitFor(() => expect(storedWorkspaceNames()).toEqual(['My WS']))
+    await eventually(() => expect(storedWorkspaceNames()).toEqual(['My WS']))
   })
 
   it('renders folder path input', () => {
@@ -111,7 +112,7 @@ describe('CreateWorkspaceDialog — adds the workspace it creates to the list', 
   it('calls openDirectory when Browse is clicked and updates folder path', async () => {
     render(<CreateWorkspaceDialog onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Browse'))
-    await vi.waitFor(() => expect(screen.getByDisplayValue('/selected/path')).toBeTruthy())
+    await eventually(() => expect(screen.getByDisplayValue('/selected/path')).toBeTruthy())
     expect(mockOpenDirectory).toHaveBeenCalled()
   })
 })
@@ -222,7 +223,7 @@ describe('CreateWorkspaceDialog — auto-creates a branch project when the chose
       target: { value: '/repo/root' },
     })
     fireEvent.click(screen.getByText('Create'))
-    await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
+    await eventually(() => expect(onClose).toHaveBeenCalled())
     expect(useWorkspaceStore.getState().projectsByWorkspaceId.get(REPO_WORKSPACE)).toEqual([
       expect.objectContaining({
         name: 'develop',

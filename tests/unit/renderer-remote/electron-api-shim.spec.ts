@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ELECTRON_API_MANIFEST, type ChannelSpec } from '../../../src/shared/electron-api/manifest'
 import { methodAt } from '../../../src/shared/electron-api/__tests__/method-at'
 import { methodPathsOf } from '../../support/electron-api'
+import { eventually } from '../../support/eventually'
 
 class MockWebSocket {
   static instances: MockWebSocket[] = []
@@ -38,7 +39,7 @@ async function loadShim(): Promise<{ api: API; ws: MockWebSocket }> {
   global.fetch = mockFetch
   await import('../../../src/renderer-remote/electron-api-shim')
   // connectBridge is async (fetch, then WebSocket creation)
-  await vi.waitFor(() => expect(MockWebSocket.instances).toHaveLength(1))
+  await eventually(() => expect(MockWebSocket.instances).toHaveLength(1))
   const ws = MockWebSocket.instances[0]
   ws.onopen?.()
   return { api: window.electronAPI, ws }
@@ -93,7 +94,7 @@ describe('electron-api-shim bootstrap', () => {
     })
     global.fetch = mockFetch
     await import('../../../src/renderer-remote/electron-api-shim')
-    await vi.waitFor(() => expect(MockWebSocket.instances).toHaveLength(1))
+    await eventually(() => expect(MockWebSocket.instances).toHaveLength(1))
     const ws = MockWebSocket.instances[0]
     const api = window.electronAPI
     void api.workspace.list()
@@ -130,7 +131,7 @@ describe('electron-api-shim connection edge cases', () => {
       writable: true,
     })
     await import('../../../src/renderer-remote/electron-api-shim')
-    await vi.waitFor(() => expect(replace).toHaveBeenCalledWith('/'))
+    await eventually(() => expect(replace).toHaveBeenCalledWith('/'))
     // No WebSocket should be created — the shim returned early after redirect
     expect(MockWebSocket.instances).toHaveLength(0)
   })

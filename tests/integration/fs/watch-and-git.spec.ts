@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -6,6 +6,7 @@ import { makeTempDir } from '../../support/temp-dir'
 import { FsWatcherService, type FsChangeBatch } from '../../../src/main/fs/fs-watcher'
 import { execShell } from '../../../src/main/shell/shell-executor'
 import { getChangeStats } from '../../../src/main/git/git-service'
+import { eventually } from '../../support/eventually'
 
 // The Git tab reads status when the watch reports a change. `git status` and `git diff` rewrite
 // `.git/index` unless told not to (https://git-scm.com/docs/git-status#_background_refresh), which
@@ -13,7 +14,7 @@ import { getChangeStats } from '../../../src/main/git/git-service'
 
 const FENCE = 'fence.txt'
 /** Looks less often than a burst takes to settle, or each look's write would keep it open. */
-const LOOKS = { interval: 250, timeout: 10_000 }
+const LOOK_INTERVAL_MS = 250
 
 function repositoryWithOneTrackedFile(): string {
   const repo = makeTempDir('status-read-')
@@ -52,7 +53,7 @@ async function readsAfterOneSave(repo: string, read: () => Promise<unknown>): Pr
   await passFence(repo, batches)
   following = true
   saveUnchanged(repo)
-  await vi.waitFor(() => expect(reads).toBeGreaterThan(0), LOOKS)
+  await eventually(() => expect(reads).toBeGreaterThan(0))
   await read()
   await passFence(repo, batches)
   return reads
@@ -63,11 +64,16 @@ async function readsAfterOneSave(repo: string, read: () => Promise<unknown>): Pr
  * each look because macOS arms a watch a moment after `fs.watch` returns. */
 async function passFence(repo: string, batches: FsChangeBatch[]): Promise<void> {
   const from = batches.length
-  await vi.waitFor(() => {
-    const passed = batches.slice(from).some((batch) => batch.filenames.includes(FENCE))
-    if (!passed) fs.writeFileSync(path.join(repo, FENCE), String(Math.random()))
-    expect(passed).toBe(true)
-  }, LOOKS)
+  await expect
+    .poll(
+      () => {
+        const passed = batches.slice(from).some((batch) => batch.filenames.includes(FENCE))
+        if (!passed) fs.writeFileSync(path.join(repo, FENCE), String(Math.random()))
+        return passed
+      },
+      { interval: LOOK_INTERVAL_MS }
+    )
+    .toBe(true)
 }
 
 describe('git commands run outside the app', () => {
@@ -84,7 +90,7 @@ describe('git commands run outside the app', () => {
       const from = batches.length
       execFileSync('git', ['add', name], { cwd: repo })
       const namesIndex = () => batches.slice(from).some((batch) => batch.filenames.includes(index))
-      await vi.waitFor(() => expect(namesIndex()).toBe(true), LOOKS)
+      await eventually(() => expect(namesIndex()).toBe(true))
     }
   })
 })

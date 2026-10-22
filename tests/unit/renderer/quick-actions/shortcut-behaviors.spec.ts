@@ -18,6 +18,7 @@ import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 import { resetStore, terminalSessionOf, workspaceFixture } from '../../../support/renderer-stores'
 import { installElectronApi } from '../../../support/electron-api'
 import { registryState, sessionState, workspaceState } from '../../../support/store-state'
+import { eventually } from '../../../support/eventually'
 
 // What reaches the main process: keystrokes for a terminal, and notifications.
 const input = vi.fn<ElectronAPI['terminal']['input']>()
@@ -186,7 +187,7 @@ describe('splitPane', () => {
 
   it('reports a failure that is not an Error with a stock message', async () => {
     splitPane('p1', 'vertical', { ...base, splitSession: () => Promise.reject('nope') })
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(createNotification).toHaveBeenCalledWith(
         expect.objectContaining({ message: 'Could not create split pane' })
       )
@@ -198,7 +199,7 @@ describe('splitPane', () => {
       ...base,
       splitSession: () => Promise.reject(new Error('no pty')),
     })
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(createNotification).toHaveBeenCalledWith(
         expect.objectContaining({ message: 'no pty' })
       )
@@ -226,7 +227,7 @@ describe('closeFocusedPane', () => {
     })
     closeFocusedPane('p1', d)
     expect(d.closeSplitLeaf).toHaveBeenCalledWith('p1', 's2')
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(createNotification).toHaveBeenCalledWith(
         expect.objectContaining({ key: 'closeTerminalFailed' })
       )

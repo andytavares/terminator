@@ -9,6 +9,7 @@ import {
   watchNativeRecursive,
   type TreeWatch,
 } from '../../../src/main/fs/tree-watch'
+import { eventually } from '../../support/eventually'
 
 // Node's own recursive watch on Linux is the one this module replaces, so it is not run there.
 const implementations: Array<[string, TreeWatch]> = [
@@ -34,7 +35,7 @@ function watched(watchTree: TreeWatch): { root: string; reported: Array<string |
 /** Makes the change again on each look: macOS arms a watch a moment after `fs.watch` returns, and
  * a change made before that has no event. */
 async function reportedAfter(change: () => void, reported: unknown[], expected: string) {
-  await vi.waitFor(() => {
+  await eventually(() => {
     change()
     expect(reported).toContain(expected)
   })
@@ -71,7 +72,7 @@ describe.each(implementations)('watching a tree that grows with %s', (_name, wat
       fs.mkdirSync(path.dirname(files.at(-1)!), { recursive: true })
       for (const file of files) fs.writeFileSync(file, String(Math.random()))
     }
-    await vi.waitFor(() => {
+    await eventually(() => {
       makeAnotherAndWriteInAll()
       expect(reported.filter((changed) => changed?.endsWith('b.ts'))).not.toEqual([])
     })

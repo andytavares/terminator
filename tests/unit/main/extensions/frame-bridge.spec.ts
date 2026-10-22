@@ -34,6 +34,7 @@ import {
   registerFramePortChannel,
 } from '../../../../src/main/extensions/frame-bridge.js'
 import { nodePortAsFramePort } from '../../../support/frame-port.js'
+import { eventually } from '../../../support/eventually'
 
 /** Answered by the bridge once it has handled everything the frame posted before asking. */
 const BARRIER_CHANNEL = 'frame:barrier'
@@ -236,7 +237,7 @@ describe('FrameBridge — send', () => {
     rig.spies().sendRegistry.set('terminal:input', send)
     const frame = rig.open('ext.a', 'main')
     frame.post({ type: 'send', channel: 'terminal:input', payload: 'ls' })
-    await vi.waitFor(() => expect(send).toHaveBeenCalledWith(expect.anything(), 'ls'))
+    await eventually(() => expect(send).toHaveBeenCalledWith(expect.anything(), 'ls'))
   })
 
   it('a frame ViewCaller.send reaches only that frame', async () => {

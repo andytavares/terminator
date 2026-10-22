@@ -3,6 +3,7 @@ import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { RpcEndpoint } from '../../../../../src/main/extensions/host/rpc-endpoint'
 import { CwdOutOfScopeError } from '../../../../../src/main/shell/shell-executor'
 import { workerPortLink } from '../../../../support/message-ports'
+import { eventually } from '../../../../support/eventually'
 
 const ports: MessagePort[] = []
 
@@ -89,7 +90,7 @@ describe('RpcEndpoint — failures', () => {
     })
     host.notify('callback')
     host.notify('api')
-    await vi.waitFor(() => expect(onEventError).toHaveBeenCalledTimes(2))
+    await eventually(() => expect(onEventError).toHaveBeenCalledTimes(2))
     expect(onEventError).toHaveBeenCalledWith('callback', expect.any(Error))
     expect(onEventError).toHaveBeenCalledWith('api', expect.any(Error))
   })

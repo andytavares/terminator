@@ -5,6 +5,7 @@ import {
 } from '../../../../src/renderer/stores/change-stats.store'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 import { electronApiOf } from '../../../support/electron-api'
+import { eventually } from '../../../support/eventually'
 
 const changeStats = vi.fn<ElectronAPI['git']['changeStats']>()
 
@@ -22,7 +23,7 @@ afterEach(() => {
 const store = () => useChangeStatsStore.getState()
 /** Resolves once every named branch has an answer recorded, which a request does only when its call settles. */
 const stored = (...branchIds: string[]) =>
-  vi.waitFor(() => branchIds.forEach((id) => expect(store().statsFor(id)).toBeDefined()))
+  eventually(() => branchIds.forEach((id) => expect(store().statsFor(id)).toBeDefined()))
 
 describe('change-stats store — lazy, cached, never awaited by render', () => {
   it('returns nothing for a branch that was never requested', () => {

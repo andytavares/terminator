@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import {
   appProcessTree,
   descendantsOf,
@@ -12,6 +12,7 @@ import {
   type ProcessRow,
 } from '../../e2e/leftover-processes'
 import { makeTempDir } from '../../support/temp-dir'
+import { eventually } from '../../support/eventually'
 
 const processRow = (pid: number, ppid: number, command: string): ProcessRow => ({
   pid,
@@ -85,7 +86,7 @@ describe('expectNoProcessesLeft', () => {
     const root = spawn('sh', [script, '400'], { stdio: 'ignore' })
     const started = [{ pid: root.pid ?? -1, ppid: process.pid, command: `sh ${script} 400` }]
     const failure = await expectNoProcessesLeft(launchMarker().launchId, started).catch(String)
-    await vi.waitFor(() => expect(chainMembers(script)).toEqual([]))
+    await eventually(() => expect(chainMembers(script)).toEqual([]))
     expect(failure).toMatch(/left 1 process\(es\) running, and killed \d+ it started/)
-  }, 10_000)
+  })
 })
