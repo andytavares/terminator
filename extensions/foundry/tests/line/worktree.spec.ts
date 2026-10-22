@@ -539,6 +539,10 @@ describe('provisioning dependencies', () => {
   describe('reused checkouts', reusedCheckoutsTests)
   describe('git unable to list', gitUnableToListTests)
   describe('odd checkouts', oddCheckoutsTests)
+  describe('the share list', shareListTests)
+  describe('the share list edges', shareListEdgeTests)
+  describe('the share list ignored', shareIgnoreTests)
+  describe('the share list taken back', shareTakeBackTests)
 })
 
 /** git refusing every command, as in a directory that is no longer a repository. */
@@ -554,7 +558,7 @@ function gitUnableToListTests() {
     const origin = tmpDir('foundry-origin-')
     const wt = tmpDir('foundry-wt-')
     fs.mkdirSync(path.join(origin, 'node_modules'))
-    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+    const checkout = lending(origin, wt, 'node_modules')
 
     const linked = await provisionDependencies(checkout, deps({ exec: refusingGit as never }))
 
@@ -567,7 +571,7 @@ function gitUnableToListTests() {
     const wt = tmpDir('foundry-wt-')
     fs.mkdirSync(path.join(origin, 'node_modules'))
     fs.symlinkSync(path.join(origin, 'node_modules'), path.join(wt, 'node_modules'), 'dir')
-    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+    const checkout = lending(origin, wt, 'node_modules')
 
     const unlinked = await unlinkBorrowedDependencies(
       checkout,
@@ -585,7 +589,7 @@ function oddCheckoutsTests() {
     const wt = tmpDir('foundry-wt-')
     fs.mkdirSync(path.join(origin, 'packages', 'gone', 'node_modules'), { recursive: true })
     const exec = lsFilesAnd('packages/gone/package.json')
-    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+    const checkout = lending(origin, wt, 'node_modules')
 
     const linked = await provisionDependencies(checkout, deps({ exec: exec as never }))
 
@@ -596,7 +600,14 @@ function oddCheckoutsTests() {
     const exec = vi.fn(async () => {
       throw new Error('spawn git ENOENT')
     })
-    const checkout: Checkout = { repo: 'app', origin: '/o', path: '/w', branch: 'b', created: true }
+    const checkout: Checkout = {
+      repo: 'app',
+      origin: '/o',
+      path: '/w',
+      branch: 'b',
+      created: true,
+      share: ['node_modules'],
+    }
 
     await expect(provisionDependencies(checkout, deps({ exec: exec as never }))).resolves.toEqual(
       []
@@ -604,6 +615,113 @@ function oddCheckoutsTests() {
     await expect(
       unlinkBorrowedDependencies(checkout, deps({ exec: exec as never }))
     ).resolves.toEqual([])
+  })
+}
+
+/** A fresh checkout in `wt` of the repository at `origin`, whose order shares `share`. */
+function lending(origin: string, wt: string, ...share: string[]): Checkout {
+  return { repo: 'app', origin, path: wt, branch: 'b', created: true, share }
+}
+
+function shareListTests() {
+  it('lends the shared folder where git ignores it, and nothing named node_modules', async () => {
+    const origin = tmpDir('foundry-origin-')
+    const wt = tmpDir('foundry-wt-')
+    fs.mkdirSync(path.join(origin, 'vendor'))
+    fs.mkdirSync(path.join(origin, 'node_modules'))
+    const exec = lsFilesAnd('package.json')
+
+    const linked = await provisionDependencies(
+      lending(origin, wt, 'vendor'),
+      deps({ exec: exec as never })
+    )
+
+    expect(linked).toEqual(['vendor'])
+    expect(fs.lstatSync(path.join(wt, 'vendor')).isSymbolicLink()).toBe(true)
+    expect(fs.existsSync(path.join(wt, 'node_modules'))).toBe(false)
+  })
+
+  it('lends the shared folder beside every tracked directory that has it in the origin', async () => {
+    const origin = tmpDir('foundry-origin-')
+    const wt = tmpDir('foundry-wt-')
+    fs.mkdirSync(path.join(origin, 'services', 'api', 'vendor'), { recursive: true })
+    fs.mkdirSync(path.join(wt, 'services', 'api'), { recursive: true })
+    const exec = lsFilesAnd('services/api/main.go', 'README.md')
+
+    const linked = await provisionDependencies(
+      lending(origin, wt, 'vendor'),
+      deps({ exec: exec as never })
+    )
+
+    expect(linked).toEqual(['services/api/vendor'])
+  })
+}
+
+function shareIgnoreTests() {
+  it('removes the link where git does not ignore the shared folder', async () => {
+    const origin = tmpDir('foundry-origin-')
+    const wt = tmpDir('foundry-wt-')
+    fs.mkdirSync(path.join(origin, 'vendor'))
+    const exec = vi.fn(async (options: { args: string[] }) => ({
+      exitCode: options.args[0] === 'check-ignore' ? 1 : 0,
+      stdout: options.args[0] === 'ls-files' ? 'go.mod\0' : '',
+      stderr: '',
+      timedOut: false,
+    }))
+
+    const linked = await provisionDependencies(
+      lending(origin, wt, 'vendor'),
+      deps({ exec: exec as never })
+    )
+
+    expect(linked).toEqual([])
+    expect(fs.existsSync(path.join(wt, 'vendor'))).toBe(false)
+  })
+}
+
+function shareListEdgeTests() {
+  it('lends nothing when the share list is empty', async () => {
+    const origin = tmpDir('foundry-origin-')
+    const wt = tmpDir('foundry-wt-')
+    fs.mkdirSync(path.join(origin, 'node_modules'))
+    fs.mkdirSync(path.join(origin, 'vendor'))
+
+    const linked = await provisionDependencies(
+      lending(origin, wt),
+      deps({ exec: lsFilesAnd('package.json') as never })
+    )
+
+    expect(linked).toEqual([])
+    expect(fs.readdirSync(wt)).toEqual([])
+  })
+}
+
+function shareTakeBackTests() {
+  it('takes back only the links of the shared folders', async () => {
+    const origin = tmpDir('foundry-origin-')
+    const wt = tmpDir('foundry-wt-')
+    fs.mkdirSync(path.join(origin, 'vendor'))
+    fs.mkdirSync(path.join(origin, 'node_modules'))
+    fs.symlinkSync(path.join(origin, 'vendor'), path.join(wt, 'vendor'), 'dir')
+    fs.symlinkSync(path.join(origin, 'node_modules'), path.join(wt, 'node_modules'), 'dir')
+
+    const unlinked = await unlinkBorrowedDependencies(
+      lending(origin, wt, 'vendor'),
+      deps({ exec: lsFilesAnd('package.json') as never })
+    )
+
+    expect(unlinked).toEqual(['vendor'])
+    expect(fs.existsSync(path.join(wt, 'node_modules'))).toBe(true)
+  })
+
+  it('hands the order share list to the checkout it cuts', async () => {
+    const base = order()
+    const shared: WorkOrder = {
+      ...base,
+      context: { ...base.context, environment: { ...base.context.environment, share: ['vendor'] } },
+    }
+    expect((await ensureCheckout(shared, 1, deps())).share).toEqual(['vendor'])
+    expect((await ensureBaseCheckout(shared, 1, deps())).share).toEqual(['vendor'])
   })
 }
 
@@ -615,7 +733,7 @@ function linkingTests() {
     const wt = tmpDir('foundry-wt-')
     fs.mkdirSync(path.join(origin, 'node_modules'))
     const exec = lsFilesAnd('package.json')
-    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+    const checkout = lending(origin, wt, 'node_modules')
 
     const linked = await provisionDependencies(checkout, deps({ exec: exec as never }))
 
@@ -629,7 +747,7 @@ function linkingTests() {
     fs.mkdirSync(path.join(origin, 'packages', 'foo', 'node_modules'), { recursive: true })
     fs.mkdirSync(path.join(wt, 'packages', 'foo'), { recursive: true })
     const exec = lsFilesAnd('packages/foo/package.json')
-    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+    const checkout = lending(origin, wt, 'node_modules')
 
     const linked = await provisionDependencies(checkout, deps({ exec: exec as never }))
 
@@ -650,7 +768,7 @@ function unlinkingTests() {
     fs.mkdirSync(path.join(wt, 'packages', 'foo', 'node_modules'), { recursive: true })
     fs.symlinkSync(path.join(origin, 'node_modules'), path.join(wt, 'node_modules'), 'dir')
     const exec = lsFilesAnd('package.json', 'packages/foo/package.json')
-    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+    const checkout = lending(origin, wt, 'node_modules')
 
     const unlinked = await unlinkBorrowedDependencies(checkout, deps({ exec: exec as never }))
 
@@ -666,7 +784,7 @@ function nothingToLinkTests() {
     const origin = tmpDir('foundry-origin-')
     const wt = tmpDir('foundry-wt-')
     const exec = lsFilesAnd('package.json')
-    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+    const checkout = lending(origin, wt, 'node_modules')
 
     const linked = await provisionDependencies(checkout, deps({ exec: exec as never }))
 
@@ -680,7 +798,7 @@ function nothingToLinkTests() {
     fs.mkdirSync(path.join(origin, 'node_modules'))
     fs.mkdirSync(path.join(wt, 'node_modules'))
     const exec = lsFilesAnd('package.json')
-    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+    const checkout = lending(origin, wt, 'node_modules')
 
     const linked = await provisionDependencies(checkout, deps({ exec: exec as never }))
 
@@ -701,7 +819,7 @@ function checkIgnoreTests() {
         return { exitCode: 1, stdout: '', stderr: '', timedOut: false }
       return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
     })
-    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+    const checkout = lending(origin, wt, 'node_modules')
 
     const linked = await provisionDependencies(checkout, deps({ exec: exec as never }))
 
@@ -719,7 +837,11 @@ function reusedCheckoutsTests() {
     const base = order()
     const ord: WorkOrder = {
       ...base,
-      context: { ...base.context, repos: [{ ...base.context.repos[0], path: origin }] },
+      context: {
+        ...base.context,
+        repos: [{ ...base.context.repos[0], path: origin }],
+        environment: { ...base.context.environment, share: ['node_modules'] },
+      },
     }
     const target = checkoutPath(root, ord, 'app')
     fs.mkdirSync(target, { recursive: true })

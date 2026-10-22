@@ -1,7 +1,6 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import { installCommandFor } from '../verify/toolchain-probe.js'
 import type { LadderStep } from '../verify/ladder.js'
 import { agentTitle } from '../runtime/agent-title.js'
 import { runtime } from '../runtime/runtime-state.js'
@@ -51,6 +50,8 @@ export async function runLaneStep(
   const runner = runtime.supervisedRunner
   // Nothing ran, so nothing was measured — never a pass.
   if (checkout === undefined || runner === null) return null
+  if (context.prepareFailed.has(firstLane(context.checkouts)))
+    return notMeasuredBecauseUnprepared(logPath)
   // A repeat run exists to see whether the answer holds, so the cache must not give it.
   if (fresh !== true && (await context.passes.passed(checkout.path, step.command))) {
     await fs.promises.mkdir(path.dirname(logPath), { recursive: true })
@@ -65,6 +66,54 @@ export async function runLaneStep(
   )
   await context.passes.record(checkout.path, step.command, exitCode)
   return exitCode
+}
+
+// A check on a checkout whose dependencies never arrived says nothing about the change.
+async function notMeasuredBecauseUnprepared(logPath: string): Promise<null> {
+  await fs.promises.mkdir(path.dirname(logPath), { recursive: true })
+  await fs.promises.writeFile(logPath, 'not measured: the checkout could not be prepared.\n')
+  return null
+}
+
+/** What the line writes in the order's ledger: an action, what it was about, and why. */
+export type LineRecorder = (action: string, subject: string, reason: string) => Promise<void>
+
+/** The order's prepare command, run once in each checkout cut just now; a reattached one is left. */
+export async function prepareNewCheckouts(
+  context: RunContext,
+  record: LineRecorder
+): Promise<void> {
+  const prepare = context.order.context.environment.prepare
+  if (prepare === null) return
+  for (const [lane, checkout] of context.checkouts) {
+    if (checkout.created) await runPrepare(context, { lane, checkout, prepare }, record)
+  }
+}
+
+async function runPrepare(
+  context: RunContext,
+  { lane, checkout, prepare }: { lane: number; checkout: Checkout; prepare: string },
+  record: LineRecorder
+): Promise<void> {
+  const runner = runtime.supervisedRunner
+  const logPath = path.join(context.featureDir, 'runs', `prepare-lane-${lane}.log`)
+  const exitCode =
+    runner === null
+      ? null
+      : await runner.runCommand(
+          commandIn(context, checkout, { title: 'Prepare the checkout', command: prepare, logPath })
+        )
+  if (exitCode === 0) {
+    await record('checkout.prepared', checkout.repo, `\`${prepare}\` exited 0 in lane ${lane}`)
+    return
+  }
+  context.prepareFailed.add(lane)
+  const outcome = exitCode === null ? 'did not run' : `exited ${exitCode}`
+  await record(
+    'checkout.prepare-failed',
+    checkout.repo,
+    `\`${prepare}\` ${outcome} in lane ${lane}`
+  )
 }
 
 // The same rung on the base branch, to tell a failure the change caused
@@ -137,7 +186,7 @@ export async function reinstallDependencies(
   const lane = firstLane(context.checkouts)
   const checkout = where === 'base' ? context.base.current : (context.checkouts.get(lane) ?? null)
   if (checkout === null) return null
-  const command = installCommandFor(checkout.path)
+  const command = context.order.context.environment.prepare
   if (command === null) return null
   await unlinkBorrowedDependencies(checkout, { exec: context.exec, root: context.root })
   return runner.runCommand(

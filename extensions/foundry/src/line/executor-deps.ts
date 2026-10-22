@@ -28,6 +28,7 @@ import {
   runRecipeCommand,
   runLaneStep,
   runStepOnBaseCheckout,
+  prepareNewCheckouts,
 } from './lane-commands.js'
 import { isoNow } from '../host-calls.js'
 import { isAbsolute } from 'path'
@@ -74,6 +75,9 @@ export async function buildExecutorDeps(
   }).rules
   const gates = createLiveGateStore(() => run.root, indexFor)
   const parts = { sources, roleRegistry, houseRules, gates, startedAt }
+  await prepareNewCheckouts(context, (action, subject, reason) =>
+    recordLineEntry(context, { action, subject, reason })
+  )
   return {
     deps: await executorDepsFor(context, parts, run.graph),
     exec: context.exec,
@@ -323,7 +327,7 @@ async function readObservedChange(
     // A lockfile's lines would turn every new dependency into a "large change".
     const summary = await readDiffSummary(checkout.path, against, {
       run: context.diffCommand,
-      weighLines: (file) => !isLockfile(file),
+      weighLines: (file) => !isLockfile(file, context.order.context.environment.paths.lockfiles),
     })
     linesChanged += summary.added + summary.removed
   }

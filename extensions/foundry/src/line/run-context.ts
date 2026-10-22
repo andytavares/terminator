@@ -38,6 +38,8 @@ export interface RunContext {
   // taken away by `releaseBase` — most runs never need one.
   readonly base: { current: Checkout | null }
   readonly conversations: Map<string, string>
+  // Lanes whose prepare command failed or did not run: their checks are not measured.
+  readonly prepareFailed: Set<number>
 }
 
 export async function createRunContext(api: ExtensionAPI, run: OrderRun): Promise<RunContext> {
@@ -61,6 +63,7 @@ export async function createRunContext(api: ExtensionAPI, run: OrderRun): Promis
     }),
     base: { current: null },
     conversations: seededConversations(run.graph),
+    prepareFailed: new Set(),
   }
 }
 

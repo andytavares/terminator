@@ -34,7 +34,7 @@ import type { Recipe } from '../../src/recipe/parse.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { LadderStep } from '../../src/verify/ladder.js'
 import type { ExecutorDeps } from '../../src/line/executor.js'
-import { ledgerActions } from '../helpers/order-ledger.js'
+import { ledgerActions, orderLedger } from '../helpers/order-ledger.js'
 
 let root: string
 let repo: string
@@ -355,7 +355,7 @@ function nothingToMeasureAndTheBaseBranchTests() {
   })
 }
 
-describe('a recipe command and a reinstall', () => {
+describe('a recipe command', () => {
   it('runs a recipe command in the lane checkout', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     runner.runCommand.mockResolvedValueOnce(2)
@@ -374,14 +374,79 @@ describe('a recipe command and a reinstall', () => {
       })
     )
   })
+})
 
-  it('reinstalls with the lockfile the checkout has, and does nothing without one', async () => {
-    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
-    expect(await deps.reinstall('change', path.join(root, 'install.log'))).toBeNull()
-    expect(await deps.reinstall('base', path.join(root, 'install.log'))).toBeNull()
-    fs.writeFileSync(path.join(checkoutPath(root, order, 'app'), 'package-lock.json'), '{}')
-    expect(await deps.reinstall('change', path.join(root, 'install.log'))).toBe(0)
-    expect(runner.runCommand).toHaveBeenCalledWith(expect.objectContaining({ command: 'npm ci' }))
+describe('a reinstall', () => {
+  it("reinstalls with the order's prepare command, and does nothing without one", async () => {
+    const log = path.join(root, 'install.log')
+    const bare = await buildExecutorDeps(host.api, { root, order, recipe, graph })
+    expect(await bare.deps.reinstall('change', log)).toBeNull()
+    expect(await bare.deps.reinstall('base', log)).toBeNull()
+    expect(runner.runCommand).not.toHaveBeenCalled()
+
+    const { deps } = await buildWithPrepare('make deps')
+    runner.runCommand.mockClear()
+    expect(await deps.reinstall('change', log)).toBe(0)
+    expect(runner.runCommand).toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'make deps' })
+    )
+  })
+})
+
+const withPrepare = (prepare: string): WorkOrder => ({
+  ...order,
+  context: { ...order.context, environment: { ...order.context.environment, prepare } },
+})
+
+const buildWithPrepare = (prepare: string) =>
+  buildExecutorDeps(host.api, { root, order: withPrepare(prepare), recipe, graph })
+
+describe('preparing a lane checkout', () => {
+  it('runs the order prepare once, in a tab of its own, in a new checkout only', async () => {
+    const prepared = withPrepare('make deps')
+    await buildExecutorDeps(host.api, { root, order: prepared, recipe, graph })
+    expect(runner.runCommand).toHaveBeenCalledTimes(1)
+    expect(runner.runCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'make deps',
+        worktreePath: checkoutPath(root, order, 'app'),
+        title: 'Prepare the checkout',
+      })
+    )
+    expect(await ledgerActions(root)).toContain('checkout.prepared')
+
+    await buildExecutorDeps(host.api, { root, order: prepared, recipe, graph })
+    expect(runner.runCommand).toHaveBeenCalledTimes(1)
+  })
+
+  it('runs nothing when the order has no prepare command', async () => {
+    await buildExecutorDeps(host.api, { root, order, recipe, graph })
+    expect(runner.runCommand).not.toHaveBeenCalled()
+  })
+})
+
+describe('a checkout that could not be prepared', () => {
+  it('records the exit code of a prepare that failed, and measures no check in that lane', async () => {
+    runner.runCommand.mockResolvedValueOnce(2)
+    const { deps } = await buildWithPrepare('make deps')
+    const entries = await orderLedger(root)
+    expect(entries.find((entry) => entry.action === 'checkout.prepare-failed')?.reason).toContain(
+      'exited 2'
+    )
+    const log = path.join(root, 'logs', 'test.log')
+    expect(await deps.runStep(step, log)).toBeNull()
+    expect(runner.runCommand).toHaveBeenCalledTimes(1)
+    expect(fs.readFileSync(log, 'utf8')).toContain(
+      'not measured: the checkout could not be prepared'
+    )
+  })
+
+  it('counts a prepare that could not run as a failed prepare', async () => {
+    runtime.supervisedRunner = null
+    const { deps } = await buildWithPrepare('make deps')
+    expect(await ledgerActions(root)).toContain('checkout.prepare-failed')
+    runtime.supervisedRunner = runner as never
+    expect(await deps.runStep(step, path.join(root, 'test.log'))).toBeNull()
   })
 })
 
@@ -606,7 +671,23 @@ function executorDepsTheGraphTests() {
 
 function measuringTheChangeTests() {
   it('measures what the work changed, leaving lockfiles out of the line count', async () => {
-    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
+    const { paths } = order.context.environment
+    const withLockfiles = {
+      ...order,
+      context: {
+        ...order.context,
+        environment: {
+          ...order.context.environment,
+          paths: { ...paths, lockfiles: ['package-lock.json'] },
+        },
+      },
+    }
+    const { deps } = await buildExecutorDeps(host.api, {
+      root,
+      order: withLockfiles,
+      recipe,
+      graph,
+    })
     const checkout = checkoutPath(root, order, 'app')
     fs.writeFileSync(path.join(checkout, 'a.ts'), 'one\ntwo\n')
     fs.writeFileSync(path.join(checkout, 'package-lock.json'), '{\n}\n')
