@@ -53,7 +53,8 @@ function trackShellCalls(api: FoundryHost['api']): void {
   api.shell.exec = ((options: Parameters<typeof exec>[0]) => {
     const call = exec(options)
     shellCalls.add(call)
-    void call.finally(() => shellCalls.delete(call))
+    const forget = () => shellCalls.delete(call)
+    call.then(forget, forget)
     return call
   }) as typeof exec
 }
