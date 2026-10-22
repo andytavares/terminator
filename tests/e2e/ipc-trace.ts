@@ -1,6 +1,7 @@
 import { test, type ElectronApplication } from '@playwright/test'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { basename, join } from 'node:path'
+import { orOnHang } from '../support/hang-bound'
 
 // With E2E_IPC_TRACE=<dir>, writes <spec>.jsonl per spec file there: one [kind, channel, payload]
 // line per renderer invoke or send and per event main pushed, the evidence behind
@@ -73,12 +74,7 @@ export async function saveIpcTrace(app: ElectronApplication): Promise<void> {
   const read = app
     .evaluate(() => [...((globalThis as { __ipcTrace?: Set<string> }).__ipcTrace ?? [])])
     .catch(() => [] as string[])
-  const lines = await Promise.race([
-    read,
-    // A deadline, not a sleep: the race ends as soon as the trace is read.
-    // eslint-disable-next-line no-restricted-syntax
-    new Promise<string[]>((resolve) => setTimeout(() => resolve([]), TRACE_READ_MS)),
-  ])
+  const lines = await orOnHang(read, TRACE_READ_MS, () => [] as string[])
   mkdirSync(directory, { recursive: true })
   const spec = basename(test.info().file)
   appendFileSync(join(directory, `${spec}.jsonl`), lines.map((line) => `${line}\n`).join(''))

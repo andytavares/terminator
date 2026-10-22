@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { makeTempDir } from '../../support/temp-dir'
-import { nextLoopTurn, openWatches } from '../../support/watches'
+import { openWatches } from '../../support/watches'
 import {
   isUnwatchedPath,
   watchDirectoryTree,
@@ -97,14 +97,12 @@ describe.each(implementations)('watching a tree that grows with %s', (_name, wat
 
 describe('watching a tree with one watch per directory', () => {
   it('closes every watch it opened when it stops', async () => {
-    await nextLoopTurn()
     const before = openWatches()
     const { root } = watched(watchDirectoryTree)
     expect(openWatches()).toBe(before + 3)
     fs.rmSync(path.join(root, 'src'), { recursive: true })
     stop?.()
-    await nextLoopTurn()
-    expect(openWatches()).toBe(before)
+    await expect.poll(() => openWatches()).toBe(before)
   })
 })
 

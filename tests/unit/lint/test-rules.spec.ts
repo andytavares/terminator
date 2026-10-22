@@ -53,6 +53,16 @@ const rejected: [string, string, string][] = [
     "it('a', { timeout: 20_000 }, () => { expect(1).toBe(1) })",
     'no-restricted-syntax',
   ],
+  [
+    'a test time limit by name',
+    "const LIMIT = 5000\nit('a', () => { expect(1).toBe(1) }, LIMIT)",
+    'no-restricted-syntax',
+  ],
+  [
+    'a hook time limit by name',
+    'const LIMIT = 5000\nbeforeEach(() => undefined, LIMIT)',
+    'no-restricted-syntax',
+  ],
   ['vi.setConfig', "it('a', () => { vi.setConfig({ testTimeout: 1 }) })", 'no-restricted-syntax'],
   [
     'vi.waitFor and its one-second default',

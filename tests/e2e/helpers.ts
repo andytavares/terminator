@@ -11,6 +11,8 @@ import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { sealedAppEnvironment } from './e2e-environment'
 import { saveIpcTrace, startIpcTrace } from './ipc-trace'
+import { orOnHang } from '../support/hang-bound'
+import { E2E_LAUNCH_HANG_MS } from '../support/bounds'
 import { appProcessTree, expectNoProcessesLeft, launchMarker } from './leftover-processes'
 
 // Shared e2e harness. Every spec launches the real Electron app in an isolated,
@@ -77,9 +79,10 @@ function e2eEnv(userDataDir: string): Record<string, string> {
  * stub GitHub's (`tests/e2e/github-stub.ts`).
  */
 // Bounds a launch that hangs so it fails with the app's own output and its windows' state,
-// instead of a bare test timeout that says nothing about why. What a failed launch spends
-// after it: 1 s reading the windows + 2.5 s to close + 1 s for a kill.
-const LAUNCH_DEADLINE_MS = 25_000
+// instead of a bare test timeout that says nothing about why. A hang bound, far above a slow
+// start (25 s once failed two CI launches that were only slow); what a failed launch spends
+// after it: 1 s reading the windows + 2.5 s to close + 1 s for a kill, inside the test's bound.
+const LAUNCH_DEADLINE_MS = E2E_LAUNCH_HANG_MS
 const WINDOW_STATE_READ_MS = 1000
 const FAILED_LAUNCH_CLOSE_MS = 2500
 
@@ -125,10 +128,7 @@ async function firstReadyWindow(app: ElectronApplication): Promise<Page> {
 
 /** Settles as `work` does, or fails once `ms` has passed: the launch's diagnostic bound. */
 function within<T>(ms: number, work: Promise<T>): Promise<T> {
-  const expired = deadline(ms).then(() =>
-    Promise.reject(new Error(`no answer within ${ms / 1000}s`))
-  )
-  return Promise.race([work, expired])
+  return orOnHang(work, ms, () => Promise.reject(new Error(`no answer within ${ms / 1000}s`)))
 }
 
 /** Stops an app that did not finish starting, and says what its windows were doing and what it printed. */
@@ -260,15 +260,6 @@ export function untilAnnounced(
   )
 }
 
-/** Resolves after `ms`: the losing side of a race that bounds a wait. */
-function deadline(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    // A deadline, not a sleep: whatever it races ends the wait as soon as it settles.
-    // eslint-disable-next-line no-restricted-syntax
-    setTimeout(resolve, ms)
-  })
-}
-
 /** What each window was doing when a launch gave up (its document, still loading, renderer
  * gone), or that main no longer answers: so a hung main, a dead renderer and a page that
  * never loaded can be told apart. */
@@ -287,8 +278,7 @@ async function windowStates(app: ElectronApplication): Promise<string> {
     )
     .then((states) => states.join('\n') || '(no windows)')
     .catch((error: unknown) => `(could not ask the main process: ${String(error)})`)
-  const unanswered = deadline(WINDOW_STATE_READ_MS).then(() => '(the main process did not answer)')
-  return Promise.race([read, unanswered])
+  return orOnHang(read, WINDOW_STATE_READ_MS, () => '(the main process did not answer)')
 }
 
 // How long to wait for a graceful Electron shutdown before force-killing. A
@@ -322,10 +312,14 @@ function processExited(proc: ChildProcess): Promise<void> {
 async function stopApp(app: ElectronApplication, graceMs: number): Promise<void> {
   // Taken up front: once app.close() resolves, app.process() throws.
   const proc = app.process()
-  await Promise.race([app.close().catch(() => {}), deadline(graceMs)])
+  await orOnHang(
+    app.close().catch(() => {}),
+    graceMs,
+    () => undefined
+  )
   if (hasExited(proc)) return
   proc.kill('SIGKILL')
-  await Promise.race([processExited(proc), deadline(KILLED_EXIT_MS)])
+  await orOnHang(processExited(proc), KILLED_EXIT_MS, () => undefined)
   if (!hasExited(proc)) {
     throw new Error(
       `The app (pid ${proc.pid}) was still running ${KILLED_EXIT_MS} ms after SIGKILL`

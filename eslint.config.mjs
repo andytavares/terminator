@@ -65,6 +65,10 @@ const TIMEOUT_OVERRIDES = [
   `CallExpression[callee.property.name=${TIMED_CALLS}] > ObjectExpression > Property[key.name='timeout']`,
   'CallExpression[callee.name=/^(it|test|beforeAll|beforeEach|afterAll|afterEach)$/] > Literal[raw=/^[0-9_]+$/]',
   'CallExpression[callee.object.name=/^(it|test|describe)$/] > Literal[raw=/^[0-9_]+$/]',
+  // A limit passed by name: the argument after a test's function, or after a hook's.
+  'CallExpression[callee.name=/^(it|test)$/][arguments.length=3] > Identifier.arguments:last-child',
+  'CallExpression[callee.name=/^(beforeAll|beforeEach|afterAll|afterEach)$/][arguments.length=2] > Identifier.arguments:last-child',
+  'CallExpression[callee.name=/^(it|test)$/][arguments.length=3] > MemberExpression.arguments:last-child',
   "CallExpression[callee.object.name='test'][callee.property.name=/^(setTimeout|slow)$/]",
   "CallExpression[callee.object.name='vi'][callee.property.name='setConfig']",
   "CallExpression[callee.object.name='vi'][callee.property.name='waitFor']",
@@ -162,7 +166,21 @@ export default defineConfig([
   {
     // No test sleeps (ADR 070, ADR 120): a fixed delay is a race the test hopes to win. Every
     // spec and every e2e file waits on the condition it asserts next.
-    files: ['**/*.spec.ts', '**/*.spec.tsx', 'tests/e2e/**/*.ts'],
+    files: [
+      '**/*.spec.ts',
+      '**/*.spec.tsx',
+      'tests/**/*.{ts,tsx}',
+      'extensions/*/tests/**/*.{ts,tsx}',
+      'packages/*/tests/**/*.{ts,tsx}',
+    ],
+    // The places a wait's bound is set (ADR 123), and the leak guard, which reads Node's own
+    // schedule: a closed handle's destroy hook is emitted on the check phase after its close
+    // callback, so a fixed count of loop turns is exact there, not a race.
+    ignores: [
+      'tests/support/eventually.ts',
+      'tests/support/hang-bound.ts',
+      'tests/support/leak-guard.ts',
+    ],
     rules: {
       'no-restricted-syntax': [
         'error',
