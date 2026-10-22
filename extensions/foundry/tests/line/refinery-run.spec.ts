@@ -3,7 +3,7 @@
  * the order queued behind it on the same files is rebased and checked again —
  * or, when it no longer rebases, put in front of the operator.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
@@ -30,19 +30,8 @@ let repo = ''
 let host: FoundryHost
 const merged = new Set<string>()
 
-beforeAll(async () => {
-  const parent = temporaryDirectory('fdry-refinery')
-  vi.stubEnv('HOME', path.join(parent, 'home'))
-  host = fakeHost(() => dataDir)
-  // Only the minute ticks are held; every agent and git call runs on real time.
-  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
-  await activateFoundry(host)
-})
-
-afterAll(async () => {
+afterEach(async () => {
   await deactivate()
-  vi.useRealTimers()
-  vi.unstubAllEnvs()
 })
 
 /** GitHub: one draft per order's branch, green checks, and merged once `merged` says so. */
@@ -82,14 +71,21 @@ async function mergeFirst(): Promise<void> {
   merged.add(pullOf('WO-1'))
 }
 
+// Each test activates Foundry afresh: the fake clock only lasts one test (tests/setup.ts), and the
+// interval the minute ticks run on is made at activation.
 beforeEach(async () => {
   const parent = temporaryDirectory('fdry-refinery-order')
+  vi.stubEnv('HOME', path.join(parent, 'home'))
+  host = fakeHost(() => dataDir)
+  // Only the minute ticks are held; every agent and git call runs on real time.
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
   dataDir = path.join(parent, 'records')
   repo = await repositoryWithRemote(parent)
   merged.clear()
   theRunner.runCommand.mockReset().mockResolvedValue(0)
   agentsAnswer(theRunner, parent)
   githubWithADraftPerOrder()
+  await activateFoundry(host)
 })
 
 describe('a minute after an order merged', () => {

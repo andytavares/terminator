@@ -44,6 +44,19 @@ let runner: ReturnType<typeof fakeRunner>
 let order: WorkOrder
 let recipe: Recipe
 let graph: RunGraph
+/** The host's shell calls still running: the executor measures a started run's diff in the
+ * background, and a test that ends before git does leaves a process behind. */
+const shellCalls = new Set<Promise<unknown>>()
+
+function trackShellCalls(api: FoundryHost['api']): void {
+  const exec = api.shell.exec.bind(api.shell)
+  api.shell.exec = ((options: Parameters<typeof exec>[0]) => {
+    const call = exec(options)
+    shellCalls.add(call)
+    void call.finally(() => shellCalls.delete(call))
+    return call
+  }) as typeof exec
+}
 
 function agreed(repoPath: string): WorkOrder {
   const base = draftOrder({
@@ -70,6 +83,7 @@ beforeEach(async () => {
   root = path.join(parent, 'records')
   repo = await seededRepository(parent)
   host = fakeHost(() => root)
+  trackShellCalls(host.api)
   runner = fakeRunner()
   runtime.supervisedRunner = runner as never
   runtime.supervision = createSupervision({
@@ -85,7 +99,9 @@ beforeEach(async () => {
   graph = buildRunGraph(order, recipe)
 })
 
-afterEach(() => {
+afterEach(async () => {
+  // A measurement runs several git commands one after the other.
+  while (shellCalls.size > 0) await Promise.allSettled([...shellCalls])
   runtime.supervisedRunner = null
   runtime.supervision = null
   strandedAgents.clear()

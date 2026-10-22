@@ -2,7 +2,7 @@
  * Signals and the record, through `activate`: the sensor tick that reads the
  * product back once a minute, and the checks the operator accepted.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
@@ -18,24 +18,20 @@ vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervis
 let dataDir = ''
 let host: FoundryHost
 
-beforeAll(async () => {
+// Each test activates Foundry afresh: the fake clock only lasts one test (tests/setup.ts), and the
+// interval the sensors tick on is made at activation.
+beforeEach(async () => {
   const parent = temporaryDirectory('fdry-sensors')
   vi.stubEnv('HOME', path.join(parent, 'home'))
+  dataDir = temporaryDirectory('fdry-sensors-records')
   host = fakeHost(() => dataDir)
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+  vi.mocked(host.issues.listMine).mockReset().mockResolvedValue({ issues: [], failures: [] })
   await activateFoundry(host)
 })
 
-afterAll(async () => {
+afterEach(async () => {
   await deactivate()
-  vi.useRealTimers()
-  vi.unstubAllEnvs()
-})
-
-beforeEach(() => {
-  dataDir = temporaryDirectory('fdry-sensors-records')
-  host.gh.mockReset()
-  vi.mocked(host.issues.listMine).mockReset().mockResolvedValue({ issues: [], failures: [] })
 })
 
 type Signals = { signals: Array<{ id: string; title: string; sensorId: string }> }

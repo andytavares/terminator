@@ -1,38 +1,53 @@
 // Runs once per Vitest project, in the main process, before any spec file
 // (https://vitest.dev/config/globalsetup). What it makes it also removes, so a
 // run leaves nothing in the temporary directory.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import type { TestProject } from 'vitest/node'
+import { testEnvironment } from '../scripts/test-env.mjs'
 
 declare module 'vitest' {
   export interface ProvidedContext {
-    /** The XDG_CONFIG_HOME every spec runs git under; tests/setup.ts sets it. */
-    xdgConfigHome: string
+    /** The whole environment of a spec's process; tests/support/seal-worker-environment.ts applies it. */
+    sealedEnvironment: Record<string, string>
   }
 }
 
-// Turns off `git maintenance run --auto --detach`, which writes into a spec's repository after
-// the command returns (cleanup then fails with ENOTEMPTY), through git's XDG config: specs scrub
-// GIT_* variables. Includes the operator's own, and is written before any worker starts.
-function writeXdgGitConfig(): string {
-  const operatorConfig = join(
-    process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'),
-    'git',
-    'config'
-  )
-  const xdgHome = mkdtempSync(join(tmpdir(), 'terminator-vitest-xdg-'))
-  mkdirSync(join(xdgHome, 'git'))
-  writeFileSync(
-    join(xdgHome, 'git', 'config'),
-    `[include]\n\tpath = ${operatorConfig}\n[maintenance]\n\tauto = false\n`
-  )
-  return xdgHome
+// Electron 42 downloads its binary on the first require('electron'), which specs reach through
+// externalised dependencies vi.mock cannot intercept. No unit test runs the binary; the override
+// makes the require a path join.
+const ELECTRON_DIST = resolve(__dirname, '../node_modules/electron/dist')
+
+// The home is fresh and empty. XDG_CONFIG_HOME sits inside it, empty too: git reads
+// GIT_CONFIG_GLOBAL (tests/fixtures/git/gitconfig) and never the developer's config.
+function sealedEnvironmentFor(home: string): Record<string, string> {
+  const xdgConfigHome = join(home, '.config')
+  mkdirSync(xdgConfigHome)
+  // The inherited TMPDIR is the sandbox scripts/check-temp-leaks.mjs set up, if any.
+  const tmpdirOfTheRun = process.env.TMPDIR ?? tmpdir()
+  return {
+    ...testEnvironment({ home, tmpdir: tmpdirOfTheRun }),
+    ELECTRON_OVERRIDE_DIST_PATH: ELECTRON_DIST,
+    XDG_CONFIG_HOME: xdgConfigHome,
+  }
 }
 
-export default function setupSpecGitConfig(project: TestProject): () => void {
-  const xdgHome = writeXdgGitConfig()
-  project.provide('xdgConfigHome', xdgHome)
-  return () => rmSync(xdgHome, { recursive: true, force: true })
+// Every project runs this file, each with its own copy of the module; the order is one for the
+// whole run, so the flag is on the process.
+const SEED_ANNOUNCED = Symbol.for('terminator.test-order-announced')
+
+function announceTestOrder(project: TestProject): void {
+  const flags = globalThis as { [SEED_ANNOUNCED]?: boolean }
+  if (flags[SEED_ANNOUNCED]) return
+  flags[SEED_ANNOUNCED] = true
+  const seed = project.vitest.config.sequence.seed
+  console.log(`Test order seed: ${seed} (rerun this order: TEST_SEED=${seed})`)
+}
+
+export default function sealSpecEnvironment(project: TestProject): () => void {
+  announceTestOrder(project)
+  const home = mkdtempSync(join(tmpdir(), 'terminator-vitest-home-'))
+  project.provide('sealedEnvironment', sealedEnvironmentFor(home))
+  return () => rmSync(home, { recursive: true, force: true })
 }

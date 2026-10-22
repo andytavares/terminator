@@ -1,31 +1,38 @@
 // Global test setup — runs before every test file regardless of environment.
 // CSS modules are not processed in tests; mock them to return an empty object.
-import { afterAll, inject, vi } from 'vitest'
+import './support/seal-worker-environment'
+import { afterAll, afterEach, beforeEach, vi } from 'vitest'
 import { configure } from '@testing-library/dom'
+import { WAIT_BOUND_MS } from './support/bounds'
 import { installNativeDialog } from './support/native-dialog'
 import { removeTempDirs } from './support/temp-dir'
 import { forgetGitHookEnvironment } from './support/git-hook-env'
+import { installNetworkGuard } from './support/network-guard'
+import { createLeakGuard } from './support/leak-guard'
 
 forgetGitHookEnvironment()
-
-// git maintenance is off under this XDG config; tests/global-setup.ts says why.
-process.env.XDG_CONFIG_HOME = inject('xdgConfigHome')
 
 // Registered before the spec's own hooks so it runs after them (afterAll runs in reverse,
 // https://vitest.dev/config/sequence#sequence-hooks): they close what is inside first.
 afterAll(removeTempDirs)
 
-// A trace2 event target in the operator's global git config (git-ai's daemon)
-// answers every commit and fetch by writing notes and objects into `.git` for
-// seconds after git returns, so a spec that deletes its temporary repository
-// races it and fails with ENOTEMPTY. trace2 is read only from global config and
-// the environment, so the environment is the one place to turn it off. Specs
-// that scrub GIT_* from git's environment keep this one.
-process.env.GIT_TRACE2_EVENT = '0'
+// Node project only: the DOM projects reach neither the network nor handles of their own.
+if (typeof window === 'undefined') {
+  installNetworkGuard()
+  // Registered before every other afterEach, so it runs after all of them (hooks run in reverse).
+  const leakGuard = createLeakGuard()
+  beforeEach(leakGuard.begin)
+  afterEach(leakGuard.check)
+}
+
+// A fake clock a test left running does not reach the next test.
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 // findBy* and waitFor wait on a condition; one second failed lazy views on a cold CI runner.
 // The bound only catches a hang.
-configure({ asyncUtilTimeout: 30_000 })
+configure({ asyncUtilTimeout: WAIT_BOUND_MS })
 
 vi.mock('*.css', () => ({}))
 vi.mock('*.module.css', () => ({ default: {} }))

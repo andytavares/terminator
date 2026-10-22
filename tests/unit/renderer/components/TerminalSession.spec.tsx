@@ -8,13 +8,7 @@ import { MAX_WEBGL_CONTEXTS } from '../../../../src/renderer/terminal/webgl-cont
 import { installElectronApi } from '../../../support/electron-api'
 import { partialFake } from '../../../support/fakes'
 
-const mockResizeObserver = vi.fn().mockImplementation(function () {
-  return {
-    observe: vi.fn(),
-    disconnect: vi.fn(),
-  }
-})
-vi.stubGlobal('ResizeObserver', mockResizeObserver)
+const mockResizeObserver = vi.fn()
 
 // Mock xterm and its addons
 /** An 80 by 24 buffer whose every line reads `lineText`. */
@@ -139,6 +133,10 @@ let mockPlatform = 'MacIntel'
 Object.defineProperty(navigator, 'platform', { get: () => mockPlatform, configurable: true })
 
 beforeEach(async () => {
+  mockResizeObserver.mockImplementation(function () {
+    return { observe: vi.fn(), disconnect: vi.fn() }
+  })
+  vi.stubGlobal('ResizeObserver', mockResizeObserver)
   const { WebglContextBudget, MAX_WEBGL_CONTEXTS } = await import(
     '../../../../src/renderer/terminal/webgl-contexts'
   )

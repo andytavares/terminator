@@ -2,16 +2,16 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 // Mock electronAPI before importing stores
 const mockInvoke = vi.fn()
-vi.stubGlobal('window', {
-  electronAPI: {
-    extensionBridge: { invoke: mockInvoke },
-  },
-})
 
 import { useVaultDataStore } from '../../src/stores/vault-data.store'
 import { useVaultNavStore } from '../../src/stores/vault-nav.store'
 
 function resetStores() {
+  vi.stubGlobal('window', {
+    electronAPI: {
+      extensionBridge: { invoke: mockInvoke },
+    },
+  })
   useVaultDataStore.setState({
     todayLog: null,
     inboxCount: 0,

@@ -11,7 +11,7 @@ import { freshFoundryStorage, idleHome } from '../helpers/foundry-host.js'
 
 const GLOBAL_STORAGE = freshFoundryStorage()
 
-import { describe, it, expect, vi, beforeAll, afterEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { partialFake } from '../../../../tests/support/fakes'
 import { activate, deactivate } from '../../src/index.ts'
 import type { ExtensionAPI, CommandContribution } from '@terminator/extension-sdk'
@@ -106,7 +106,10 @@ function paletteApi(): ExtensionAPI {
   })
 }
 
-beforeAll(async () => {
+// Each test activates Foundry afresh: the fake clock only lasts one test (tests/setup.ts), and the
+// palette's refresh timer is made at activation.
+beforeEach(async () => {
+  registered.clear()
   vi.useFakeTimers()
   api = paletteApi()
   const { startSupervisionRuntime } = await import('../../src/runtime/supervision-runtime.ts')
@@ -118,12 +121,8 @@ beforeAll(async () => {
   await vi.advanceTimersByTimeAsync(0)
 })
 
-afterAll(async () => {
+afterEach(async () => {
   await deactivate()
-})
-
-afterEach(() => {
-  vi.clearAllMocks()
 })
 
 describe('the go-to-run entries', () => {

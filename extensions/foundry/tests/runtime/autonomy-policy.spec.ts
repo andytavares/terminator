@@ -364,7 +364,7 @@ function everywhereElseTests() {
   it('still asks about everywhere else outside the checkout', () => {
     expect(writesOutside('Write', { file_path: '/etc/hosts' }, WT)).toBe(true)
     expect(writesOutside('Write', { file_path: '/work/other/src/a.ts' }, WT)).toBe(true)
-    expect(writesOutside('Write', { file_path: path.join(os.homedir(), '.zshrc') }, WT)).toBe(true)
+    expect(writesOutside('Write', { file_path: '/Users/operator/.zshrc' }, WT)).toBe(true)
   })
 
   it('does not make a destructive command ordinary just because it is in temp', () => {

@@ -33,10 +33,14 @@ function clonedRepository(): string {
   return join(dir, 'clone')
 }
 
-/** This process's environment without GIT_* variables, the trace2 one aside. */
+/** The variables of the sealed environment (scripts/test-env.mjs) that git needs to read the
+ * fixture config; a spec that scrubs GIT_* from git's environment keeps them. */
+const KEPT_GIT_VARIABLES = new Set(['GIT_TRACE2_EVENT', 'GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM'])
+
+/** This process's environment without GIT_* variables, the sealed ones aside. */
 function scrubbedGitEnv(): NodeJS.ProcessEnv {
   return Object.fromEntries(
-    Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_') || k === 'GIT_TRACE2_EVENT')
+    Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_') || KEPT_GIT_VARIABLES.has(k))
   ) as NodeJS.ProcessEnv
 }
 

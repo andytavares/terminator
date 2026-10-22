@@ -1,6 +1,8 @@
 import { defineConfig, configDefaults } from 'vitest/config'
+import { availableParallelism } from 'node:os'
 import { resolve } from 'path'
 import { HANG_BOUND_MS, WAIT_BOUND_MS } from './tests/support/bounds'
+import { testSeed } from './tests/support/test-seed'
 
 // Tests that require a DOM. vitest 4 removed `environmentMatchGlobs`, so the
 // node/jsdom split is expressed as two projects instead.
@@ -39,12 +41,6 @@ export default defineConfig({
     // Vitest turns every stylesheet into an empty string, `?raw` imports included.
     // The design system's token file is read as text, so those keep their content.
     css: { include: [/\.css\?raw$/] },
-    // Electron 42 downloads its binary on the first require('electron'), which
-    // specs reach through externalised dependencies vi.mock cannot intercept.
-    // No unit test runs the binary; the override makes the require a path join.
-    env: {
-      ELECTRON_OVERRIDE_DIST_PATH: resolve(__dirname, 'node_modules/electron/dist'),
-    },
     // Task Vault's backend uses Temporal (ADR 108). Electron 44 has it; Node 24
     // only behind this flag. Remove it when .nvmrc reaches Node 26, which ships it.
     execArgv: ['--harmony-temporal'],
@@ -53,9 +49,16 @@ export default defineConfig({
     testTimeout: HANG_BOUND_MS,
     hookTimeout: HANG_BOUND_MS,
     expect: { poll: { timeout: WAIT_BOUND_MS } },
-    // At the default (one worker per core, 16 here) the real-git specs starve and hit the 5 s
-    // timeout, a different few on each run; 8 workers pass every run for 6 s more wall time.
-    maxWorkers: 8,
+    // Every core, here and on CI: the hang bound makes it safe, and a spec that fails with more
+    // workers than 8 has a timing dependency to fix, not a worker count to lower (ADR 123).
+    maxWorkers: availableParallelism(),
+    // A spy, a stubbed variable or a stubbed global does not outlive its test.
+    // Files and the tests inside them run in a new random order every run (ADR 123): a test that
+    // needs another to have run first fails on some run. tests/global-setup.ts prints the seed.
+    sequence: { shuffle: { files: true, tests: true }, seed: testSeed() },
+    restoreMocks: true,
+    unstubEnvs: true,
+    unstubGlobals: true,
     projects: [
       {
         extends: true,
