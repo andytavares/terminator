@@ -44,6 +44,7 @@ import { endLiveSession } from '../runtime/runtime-state.js'
 import { convergeOnce, readOnlyRound } from './intake-turn.js'
 import type { Deciding } from '../ipc/standing.js'
 import { plural } from '@terminator/extension-sdk'
+import { inBackground } from '../background.js'
 
 /** What the loop needs that is built after it: the channels an order is agreed and started through. */
 export interface ForgeLoopDeps {
@@ -115,7 +116,7 @@ export function createForgeLoop(
     convergeWithFollowUps: (ask) => convergeWithFollowUps(forge, ask),
     convergeMaybeScouted: (order, message, recordStart) =>
       convergeForForge(forge, { order, message, recordStart }),
-    onReleased: (order) => void resumeAfterRelease(forge, order),
+    onReleased: (order) => inBackground(resumeAfterRelease(forge, order)),
   }
 }
 
@@ -601,38 +602,44 @@ function convergeForForge(
   )
 }
 
+/** What the scout is told: the order, read beside the first draft, written to its own output. */
+function scoutBrief(
+  forge: Forge,
+  root: string,
+  { order, role }: { order: WorkOrder; role: Parameters<typeof brief>[0]['role'] }
+): string {
+  const outputPath = rungOutputPath(orderDir(root, order.id), 'forge-scout')
+  const rules = houseRulesAt(forge.api, root, order)
+  return brief({ order, role, units: [], rules, outputPath })
+}
+
 // Settles when the scout's turn ends, so a red team that would start
 // meanwhile can wait for what it found.
 function startScout(forge: Forge, root: string, scoutOrder: WorkOrder): Promise<void> {
   return new Promise<void>((settled) => {
-    void readOnlyRound({
-      api: forge.api,
-      root,
-      order: scoutOrder,
-      roleId: 'scout',
-      nodeId: 'forge-scout',
-      prompt: (role) =>
-        brief({
-          order: scoutOrder,
-          role,
-          units: [],
-          rules: houseRulesAt(forge.api, root, scoutOrder),
-          outputPath: rungOutputPath(orderDir(root, scoutOrder.id), 'forge-scout'),
-        }),
-      onCommands: (orderId, commands) => {
-        const store = orderStoreAt(root)
-        const base = baselineDepsFor(forge.api, root, store)
-        return proveScoutCommands(orderId, commands, { base, store })
-      },
-      startedAction: 'scout.started',
-      startedReason: 'reading the repository beside the first draft',
-      onFinished: async (updated) => {
-        // A failure or an empty write was already recorded as
-        // `scout.refused`; the architect never waited on it.
-        if (updated !== null) await recordScoutCollected(root, updated)
-        settled()
-      },
-    }).catch(settled)
+    inBackground(
+      readOnlyRound({
+        api: forge.api,
+        root,
+        order: scoutOrder,
+        roleId: 'scout',
+        nodeId: 'forge-scout',
+        prompt: (role) => scoutBrief(forge, root, { order: scoutOrder, role }),
+        onCommands: (orderId, commands) => {
+          const store = orderStoreAt(root)
+          const base = baselineDepsFor(forge.api, root, store)
+          return proveScoutCommands(orderId, commands, { base, store })
+        },
+        startedAction: 'scout.started',
+        startedReason: 'reading the repository beside the first draft',
+        onFinished: async (updated) => {
+          // A failure or an empty write was already recorded as
+          // `scout.refused`; the architect never waited on it.
+          if (updated !== null) await recordScoutCollected(root, updated)
+          settled()
+        },
+      }).catch(settled)
+    )
   })
 }
 

@@ -22,6 +22,7 @@ import {
 } from './runtime-state.js'
 import { notifyPerson } from './held-calls.js'
 import { gotoRun, startPaletteRefresh, stopPaletteRefresh } from './palette-commands.js'
+import { inBackground } from '../background.js'
 
 // A stall, written to the order's ledger. The feature directory is
 // `<root>/orders/<id>`; a firing for any other writes nothing rather than invent a place.
@@ -159,7 +160,7 @@ function onStallFiring(api: ExtensionAPI, firing: StallFiring, featureDir: strin
   // On the order's record as well as the console's, so the silence is legible
   // afterwards. It does not stop the run, which would need a gate rule (FR-049).
   // Why: SUPERVISION.md, "Incidents behind the code".
-  void recordStall(featureDir, firing)
+  inBackground(recordStall(featureDir, firing))
 
   // Attributed to the pilot, not the agent: the agent did not say this,
   // and a feed that blurs the two is one you stop trusting.

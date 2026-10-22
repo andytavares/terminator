@@ -12,7 +12,7 @@ import { eventually } from '../../../../tests/support/eventually'
 import { activate } from '../../src/index.ts'
 import { runtime } from '../../src/runtime/runtime-state.ts'
 import { settleProofs } from '../../src/line/baseline.ts'
-import { settleRuns } from '../../src/line/run-control.ts'
+import { settleBackground } from '../../src/background.ts'
 import type { FoundryHost } from './foundry-host.js'
 
 export { deactivate } from '../../src/index.ts'
@@ -26,8 +26,8 @@ export async function activateFoundry(host: FoundryHost): Promise<void> {
   })
 }
 
-/** Settles once the base-branch proofs and the runs a test started have ended: each writes into
- * the records until it does, so a test that shares the activation awaits it before the next. */
+/** Settles once the base-branch proofs and the background work (runs, Forge turns, ledger lines) a
+ * test started have ended: each writes records until it does, so the next test waits for it. */
 export async function settleFoundryWork(): Promise<void> {
-  await Promise.all([settleProofs(), settleRuns()])
+  await Promise.all([settleProofs(), settleBackground()])
 }

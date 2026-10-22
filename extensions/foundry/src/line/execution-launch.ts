@@ -8,6 +8,7 @@ import type { Step } from '../recipe/parse.js'
 import { promptFor, safeFilename, skillsFor } from './execution-parts.js'
 import type { Execution } from './execution.js'
 import type { ExecutorDeps, StartedRun } from './executor.js'
+import { inBackground } from '../background.js'
 
 // Starting one node of a wave: a command run as a command, anything else as an
 // agent in the conversation its role may carry on, with its skills mounted.
@@ -161,6 +162,6 @@ function agentInput(
     outputsDir,
     // Reported as it happens rather than waited for: this is what puts a
     // session on a node while there is still an agent in it.
-    onStarted: (sessionId) => void run.noteStarted(node.id, sessionId),
+    onStarted: (sessionId) => inBackground(run.noteStarted(node.id, sessionId)),
   }
 }

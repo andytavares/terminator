@@ -27,6 +27,7 @@ import { runtime } from '../runtime/runtime-state.js'
 import { notePending, noteResolved } from '../runtime/held-calls.js'
 import { shellExecOf } from '../host-calls.js'
 import type { CommandProposal } from '../profile/command-proposal.js'
+import { inBackground } from '../background.js'
 
 /** One architect turn: the order, what it is told, and who hears how it ended. */
 export interface ArchitectTurn {
@@ -158,25 +159,27 @@ function launchArchitect(launch: ArchitectLaunch): void {
   const { api, turn, memory, answer, progress } = launch
   const { order } = turn
   trustRepository(api, launch.plan.cwd, { orderId: order.id, store: orderStoreAt(turn.root) })
-  void launch.runner
-    .start(architectStartOptions(launch))
-    .then((run) => {
-      if (run === null) {
-        collectProposal(launch, true, null)
-        return
-      }
-      memory.remember(run.sessionId)
-      answer({ ok: true, sessionId: run.sessionId })
-    })
-    .catch((error: unknown) => {
-      progress.done = true
-      intakeSessions.delete(order.id)
-      announceLive(order.id)
-      answer({
-        ok: false,
-        reason: error instanceof Error ? error.message : 'The architect could not be started.',
+  inBackground(
+    launch.runner
+      .start(architectStartOptions(launch))
+      .then((run) => {
+        if (run === null) {
+          collectProposal(launch, true, null)
+          return
+        }
+        memory.remember(run.sessionId)
+        answer({ ok: true, sessionId: run.sessionId })
       })
-    })
+      .catch((error: unknown) => {
+        progress.done = true
+        intakeSessions.delete(order.id)
+        announceLive(order.id)
+        answer({
+          ok: false,
+          reason: error instanceof Error ? error.message : 'The architect could not be started.',
+        })
+      })
+  )
 }
 
 function architectStartOptions(launch: ArchitectLaunch): StartSupervisedRunOptions {
@@ -293,7 +296,7 @@ function collectProposal(launch: ArchitectLaunch, deadline: boolean, code: numbe
     announceLive(order.id)
   }
   const outcome = endedOutcome(launch, deadline, code)
-  void launch.memory.remembered().then(() => turn.onFinished(outcome))
+  inBackground(launch.memory.remembered().then(() => turn.onFinished(outcome)))
   launch.answer({ ok: false, reason: 'The architect ended before it started.' })
 }
 
@@ -392,33 +395,39 @@ function announceRound(launch: RoundLaunch, subject: string): void {
   const { input, progress } = launch
   if (progress.announced) return
   progress.announced = true
-  void recordRound(input, launch.store, {
-    action: input.startedAction,
-    reason: input.startedReason,
-    subject,
-  })
+  inBackground(
+    recordRound(input, launch.store, {
+      action: input.startedAction,
+      reason: input.startedReason,
+      subject,
+    })
+  )
   input.onStarted?.(subject)
 }
 
 function startRound(launch: RoundLaunch): void {
   const { input } = launch
-  void launch.runner
-    .start(roundStartOptions(launch))
-    .then((run) => {
-      if (run === null) {
-        void collectRound(launch, true)
-        return
-      }
-      announceRound(launch, run.sessionId)
-    })
-    .catch((error: unknown) => {
-      void recordRound(input, launch.store, {
-        action: `${input.roleId}.refused`,
-        reason: reasonOf(error),
-        subject: input.order.id,
+  inBackground(
+    launch.runner
+      .start(roundStartOptions(launch))
+      .then((run) => {
+        if (run === null) {
+          inBackground(collectRound(launch, true))
+          return
+        }
+        announceRound(launch, run.sessionId)
       })
-      void input.onFinished(null)
-    })
+      .catch((error: unknown) => {
+        inBackground(
+          recordRound(input, launch.store, {
+            action: `${input.roleId}.refused`,
+            reason: reasonOf(error),
+            subject: input.order.id,
+          })
+        )
+        inBackground(input.onFinished(null))
+      })
+  )
 }
 
 function roundStartOptions(launch: RoundLaunch): StartSupervisedRunOptions {
@@ -439,8 +448,8 @@ function roundStartOptions(launch: RoundLaunch): StartSupervisedRunOptions {
       launch.progress.roundSession = run.sessionId
       announceRound(launch, run.sessionId)
     },
-    onTurnEnd: () => void collectRound(launch, false),
-    onEnd: () => void collectRound(launch, true),
+    onTurnEnd: () => inBackground(collectRound(launch, false)),
+    onEnd: () => inBackground(collectRound(launch, true)),
   }
 }
 
