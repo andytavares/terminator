@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { isPending } from '../../../../tests/support/pending'
 import { eventually } from '../../../../tests/support/eventually'
 
 const mockSpawn = vi.fn()
@@ -73,8 +74,11 @@ async function startManagerTunnel(): Promise<void> {
   await startPromise
 }
 
-function processExitHandler() {
-  return mockProcess.on.mock.calls.find(([event]) => event === 'exit')?.[1]
+/** The process exiting: every 'exit' listener hears it. Returns how many there were. */
+function exitProcess(code: number): number {
+  const listeners = mockProcess.on.mock.calls.filter(([event]) => event === 'exit')
+  for (const [, listener] of listeners) listener(code, null)
+  return listeners.length
 }
 
 /** Run timers past the agent API poll limit (MAX_POLLS=60). */
@@ -298,11 +302,28 @@ function ngrokStartAuthTokenTests() {
   })
 }
 
+/** What `kill` does to a process: it exits, and every 'exit' listener hears it. */
+function exitOnKill(): void {
+  mockProcess.kill.mockImplementation(() => void exitProcess(0))
+}
+
 function ngrokStopTests() {
+  it('settles once the process has exited', async () => {
+    mockTunnelUrl('https://xyz.ngrok.io')
+    await startManagerTunnel()
+
+    const stopped = manager.stop()
+    expect(await isPending(stopped)).toBe(true)
+    exitProcess(0)
+
+    await expect(stopped).resolves.toBeUndefined()
+  })
+
   it('sends SIGTERM to the child process', async () => {
     mockTunnelUrl('https://xyz.ngrok.io')
     await startManagerTunnel()
-    manager.stop()
+    exitOnKill()
+    await manager.stop()
     expect(mockProcess.kill).toHaveBeenCalledWith('SIGTERM')
   })
 
@@ -310,7 +331,8 @@ function ngrokStopTests() {
     mockTunnelUrl('https://xyz.ngrok.io')
     await startManagerTunnel()
     mockRmSync.mockClear()
-    manager.stop()
+    exitOnKill()
+    await manager.stop()
     expect(mockRmSync).toHaveBeenCalledWith(mockWriteFileSync.mock.calls.at(-1)![0], {
       force: true,
     })
@@ -333,9 +355,7 @@ function ngrokCrashExitTests() {
 
     await startManagerTunnel()
 
-    const exitHandler = processExitHandler()
-    expect(exitHandler).toBeDefined()
-    exitHandler?.(1, null)
+    expect(exitProcess(1)).toBeGreaterThan(0)
     expect(onCrash).toHaveBeenCalled()
   })
 }
@@ -349,11 +369,11 @@ function ngrokCrashStopTests() {
 
     await startManagerTunnel()
 
-    // Intentional stop — should clear the crash callback before killing
-    manager.stop()
+    // Intentional stop — should clear the crash callback before killing; the exit that follows
+    // is the process's answer to the kill.
+    exitOnKill()
+    await manager.stop()
 
-    const exitHandler = processExitHandler()
-    exitHandler?.(130, null) // SIGTERM typically exits with 130
     expect(onCrash).not.toHaveBeenCalled()
   })
 }
@@ -364,11 +384,10 @@ function ngrokCrashSelfExitTests() {
 
     await startManagerTunnel()
 
-    const exitHandler = processExitHandler()
-    exitHandler?.(1, null) // process exits on its own
+    exitProcess(1) // process exits on its own
 
     // stop() should be a no-op now — process reference was cleared by the exit handler
-    manager.stop()
+    await manager.stop()
     expect(mockProcess.kill).not.toHaveBeenCalled()
   })
 
@@ -376,7 +395,7 @@ function ngrokCrashSelfExitTests() {
     mockTunnelUrl('https://ref.ngrok.io')
     await startManagerTunnel()
     mockRmSync.mockClear()
-    processExitHandler()?.(1, null)
+    exitProcess(1)
     expect(mockRmSync).toHaveBeenCalledWith(mockWriteFileSync.mock.calls.at(-1)![0], {
       force: true,
     })
@@ -393,10 +412,12 @@ function ngrokCrashPollingStopTests() {
     // Complete first poll iteration (500ms wait + fetch rejection)
     await vi.advanceTimersByTimeAsync(500)
     // Now waiting on second-iteration 500ms timer — call stop so stopped=true
-    manager.stop()
+    exitOnKill()
+    const stopped = manager.stop()
     // Fire the second-iteration timer; post-check sees stopped=true and throws immediately
     await vi.advanceTimersByTimeAsync(500)
 
     await expect(urlPromise).rejects.toThrow('ngrok stopped')
+    await stopped
   })
 }
