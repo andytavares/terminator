@@ -1019,7 +1019,11 @@ const LOG_SHELLS = ['/bin/sh', ...(existsSync('/bin/zsh') ? ['/bin/zsh'] : [])]
 let logDir: string
 
 /** The script the runner hands the terminal for `commandLine`, teeing to `logPath` if given. */
-async function scriptFor(commandLine: string, logPath?: string): Promise<string> {
+async function scriptFor(
+  commandLine: string,
+  logPath?: string,
+  env?: Record<string, string>
+): Promise<string> {
   void runner().runCommand({
     worktreePath: '/wt/feat-thing',
     workspaceId: 'ws-1',
@@ -1027,6 +1031,7 @@ async function scriptFor(commandLine: string, logPath?: string): Promise<string>
     title: 'Check',
     command: commandLine,
     logPath,
+    env,
   })
   await coreCallsSettled()
   return scriptOf(ran[ran.length - 1])
@@ -1042,6 +1047,7 @@ describe('running a command with a log file', () => {
   })
 
   for (const shell of LOG_SHELLS) loggedCommandTests(shell)
+  for (const shell of LOG_SHELLS) exportedEnvironmentTests(shell)
 
   it('has no tee when logPath is absent', async () => {
     expect(readFileSync(await scriptFor('npm run lint'), 'utf8')).not.toContain('tee')
@@ -1061,6 +1067,29 @@ function loggedCommandTests(shell: string) {
     const result = spawnSync(shell, [await scriptFor('echo hello; exit 3', logPath)])
     expect(result.status).toBe(3)
     expect(readFileSync(logPath, 'utf8')).toContain('hello')
+  })
+}
+
+// A line like `exec VAR=1 cmd` once broke every agent (exit 127), so the variables are
+// real `export` lines, and this runs them in a real shell with a value that needs quoting.
+function exportedEnvironmentTests(shell: string) {
+  const awkward = `my folder/it's "quoted" $HOME`
+
+  it(`(${shell}) gives the command the variable exactly as set, with and without a log`, async () => {
+    const out = join(logDir, 'seen.txt')
+    const printing = `printf '%s' "$FOUNDRY_PICTURES" > '${out}'`
+    for (const logPath of [undefined, join(logDir, 'env.log')]) {
+      const script = await scriptFor(printing, logPath, { FOUNDRY_PICTURES: awkward })
+      expect(spawnSync(shell, [script]).status).toBe(0)
+      expect(readFileSync(out, 'utf8')).toBe(awkward)
+      rmSync(out)
+    }
+  })
+
+  it(`(${shell}) exports each variable on its own line before the command runs`, async () => {
+    const script = readFileSync(await scriptFor('true', undefined, { ONE: '1', TWO: '2' }), 'utf8')
+    expect(script).toMatch(/^export ONE='1'\nexport TWO='2'$/m)
+    expect(script.indexOf("export TWO='2'")).toBeLessThan(script.lastIndexOf('true'))
   })
 }
 

@@ -77,6 +77,8 @@ export interface LadderInput {
    * changed, which is never a reason to run less.
    */
   readonly changedFiles?: readonly string[]
+  /** The command that leaves pictures of the running application, or null when there is none. */
+  readonly pictures?: string | null
   /** Checks the repository's profile adds, each run at its own rung. */
   readonly additional?: readonly AdditionalStep[]
 }
@@ -136,6 +138,22 @@ function inspectionStep(risk: RiskAssessment): LadderStep {
   }
 }
 
+/** The step that takes pictures of the application; the line runs it with a folder to leave them in. */
+export const PICTURES_STEP_NAME = 'Pictures'
+
+/** Runnable with the profile's command; without one it is not measured, never a pass. */
+function picturesStep(command: string | null): LadderStep {
+  const base = { rung: 'L5', name: PICTURES_STEP_NAME, check: null } as const
+  return command === null
+    ? {
+        ...base,
+        command,
+        status: 'unavailable',
+        reason: 'this repository has no pictures command',
+      }
+    : { ...base, command, status: 'runnable', reason: '' }
+}
+
 /** End-to-end tests run against the built application, so a step builds it first. */
 function integrationSteps(toolchain: Toolchain, touchesUi: boolean): LadderStep[] {
   const build =
@@ -148,7 +166,7 @@ function integrationSteps(toolchain: Toolchain, touchesUi: boolean): LadderStep[
 
 /** A step that is not a command this climb runs: the verifier's, the inspection's, the human's. */
 function isDecidedElsewhere(step: LadderStep): boolean {
-  return step.check === null && step.status !== 'runnable'
+  return step.check === null && (step.status === 'elsewhere' || step.status === 'not_triggered')
 }
 
 /**
@@ -160,6 +178,7 @@ function isDecidedElsewhere(step: LadderStep): boolean {
  */
 export function ladderFor(input: LadderInput): LadderStep[] {
   const { toolchain, risk, touchesUi, changedFiles = [], additional = [] } = input
+  const pictures = touchesUi ? [picturesStep(input.pictures ?? null)] : []
   const base: LadderStep[] = [
     probedStep(toolchain, 'format', { rung: 'L0', name: 'Format' }),
     probedStep(toolchain, 'lint', { rung: 'L0', name: 'Lint' }),
@@ -168,6 +187,7 @@ export function ladderFor(input: LadderInput): LadderStep[] {
     INDEPENDENT_VERIFICATION,
     inspectionStep(risk),
     ...integrationSteps(toolchain, touchesUi),
+    ...pictures,
     HUMAN_DECISION,
   ]
   const rungs = withAdditional(base, additional)
@@ -185,6 +205,12 @@ export function ladderFor(input: LadderInput): LadderStep[] {
   )
 }
 
+/** The folder the pictures step was given and the images found in it, sorted. */
+export interface PicturesTaken {
+  readonly folder: string
+  readonly images: readonly string[]
+}
+
 export interface StepOutcome {
   readonly rung: Rung
   readonly name: string
@@ -195,6 +221,8 @@ export interface StepOutcome {
   readonly command: string | null
   /** The earlier step this one reused the result of: the same command string, run once. */
   readonly reusedFrom?: string
+  /** What the pictures step left, when this is that step and its command ran to the end. */
+  readonly pictures?: PicturesTaken
 }
 
 export interface LadderOutcome {

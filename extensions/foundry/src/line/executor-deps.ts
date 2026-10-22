@@ -91,6 +91,17 @@ function settingsDeps(api: ExtensionAPI): Pick<ExecutorDeps, 'autonomy' | 'final
   return { autonomy: autonomyFor(api), finalRuns: finalRuns(api) }
 }
 
+/** The deps that run a failed rung again on the base branch, and let that checkout go. */
+function baseCheckoutDeps(
+  context: RunContext
+): Pick<ExecutorDeps, 'runStepOnBase' | 'reinstall' | 'releaseBase'> {
+  return {
+    runStepOnBase: (step, logPath) => runStepOnBaseCheckout(context, step, logPath),
+    reinstall: (where, logPath) => reinstallDependencies(context, where, logPath),
+    releaseBase: () => releaseBaseCheckout(context),
+  }
+}
+
 async function executorDepsFor(
   context: RunContext,
   parts: DepsParts,
@@ -111,9 +122,8 @@ async function executorDepsFor(
     priorGates: await parts.gates.list(),
     raise: (gate) => raiseGate(context, parts.gates, gate),
     runStep: (step, logPath, options) => runLaneStep(context, step, { logPath, ...options }),
-    runStepOnBase: (step, logPath) => runStepOnBaseCheckout(context, step, logPath),
-    reinstall: (where, logPath) => reinstallDependencies(context, where, logPath),
-    releaseBase: () => releaseBaseCheckout(context),
+    picturesTaken: () => context.pictures.current,
+    ...baseCheckoutDeps(context),
     runCommand: (input) => runRecipeCommand(context, input),
     endSession: endPreviousProcess,
     observe: async () => ({ elapsedMinutes: minutesSince(parts.startedAt) }),

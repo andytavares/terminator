@@ -10,7 +10,9 @@ import { inspectionFor, regrade } from '../verify/inspection-triggers.js'
 import { matchesAnyGlob } from '../runtime/review/risk-grader.js'
 import type { Inspection } from '../verify/inspection-triggers.js'
 import { ladderFor, climb } from '../verify/ladder.js'
-import type { LadderOutcome, LadderStep, StepOutcome } from '../verify/ladder.js'
+import { PICTURES_STEP_NAME } from '../verify/ladder.js'
+import type { LadderOutcome, LadderStep, PicturesTaken, StepOutcome } from '../verify/ladder.js'
+import { NO_IMAGES_REASON } from './pictures.js'
 import { gradeInWords } from '../runtime/review/risk-grade.js'
 import { lastLines, opensPullRequest, safeFilename } from './execution-parts.js'
 import type { Gate } from '../gates/rules.js'
@@ -55,6 +57,18 @@ export async function finishExecution(run: Execution): Promise<RunOutcome> {
   if (!run.halted) await raiseAfterWork(run, { change, climbed, climber })
   if (draftsOpen && !climbed.ladder.ok) await recordFinalCheckFailed(run, climbed.ladder)
   return runOutcomeOf(run, { change, workDone, ladder: climbed.ladder })
+}
+
+/** The pictures step's outcome carries what it left, or why it measured nothing. */
+function withPictures(ladder: LadderOutcome, taken: PicturesTaken | null): LadderOutcome {
+  if (taken === null) return ladder
+  const steps = ladder.steps.map((step) => {
+    if (step.name !== PICTURES_STEP_NAME || step.result === 'fail') return step
+    return taken.images.length === 0
+      ? { ...step, reason: NO_IMAGES_REASON }
+      : { ...step, pictures: taken }
+  })
+  return { ...ladder, steps }
 }
 
 // Opens the drafts first when nothing needs the operator before they exist (no
@@ -186,6 +200,7 @@ class FinalClimb {
       risk: change.risk,
       touchesUi: touchesUi(run.order, change.touched),
       changedFiles: change.touched,
+      pictures: run.order.context.environment.pictures,
     })
   }
 
@@ -221,7 +236,8 @@ class FinalClimb {
     // A check that disagreed with itself needs a decision, not a retry or a new preparation.
     const retried = this.isUndecided() ? first : await this.retryFailure(first)
     const settled = this.isUndecided() ? retried : await this.prepareAgain(first, retried)
-    return { ladder: settled.outcome, logs: settled.logs, flaky: this.flaky }
+    const ladder = withPictures(settled.outcome, this.run.deps.picturesTaken?.() ?? null)
+    return { ladder, logs: settled.logs, flaky: this.flaky }
   }
 
   private isUndecided(): boolean {

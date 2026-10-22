@@ -2,6 +2,9 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 import type { LadderStep } from '../verify/ladder.js'
+import { PICTURES_STEP_NAME } from '../verify/ladder.js'
+import { runPicturesStep } from './pictures.js'
+import type { PicturesRecord } from './pictures.js'
 import { agentTitle } from '../runtime/agent-title.js'
 import { runtime } from '../runtime/runtime-state.js'
 import type { RunCommandOptions } from '../runtime/supervised-runner.js'
@@ -19,6 +22,7 @@ interface CheckoutCommand {
   readonly title: string
   readonly command: string
   readonly logPath: string
+  readonly env?: Record<string, string>
 }
 
 function commandIn(
@@ -34,6 +38,7 @@ function commandIn(
     title: run.title,
     command: run.command,
     logPath: run.logPath,
+    env: run.env,
   }
 }
 
@@ -61,11 +66,52 @@ export async function runLaneStep(
     )
     return 0
   }
+  if (step.name === PICTURES_STEP_NAME) return runPictures(context, step.command, logPath)
   const exitCode = await runner.runCommand(
     commandIn(context, checkout, { title: step.name, command: step.command, logPath })
   )
   await context.passes.record(checkout.path, step.command, exitCode)
   return exitCode
+}
+
+// Never from the pass cache: a cached pass would leave no images. The command is told where
+// to leave them, and what it left is recorded on the order and kept for the pull request.
+async function runPictures(
+  context: RunContext,
+  command: string,
+  logPath: string
+): Promise<number | null> {
+  const checkout = context.checkouts.get(firstLane(context.checkouts))
+  const runner = runtime.supervisedRunner
+  if (checkout === undefined || runner === null) return null
+  const { exitCode, taken } = await runPicturesStep({
+    featureDir: context.featureDir,
+    now: Date.now,
+    run: (folder) =>
+      runner.runCommand(
+        commandIn(context, checkout, {
+          title: PICTURES_STEP_NAME,
+          command,
+          logPath,
+          env: { FOUNDRY_PICTURES: folder },
+        })
+      ),
+    record: (entry) => recordPictures(context, entry),
+  })
+  context.pictures.current = taken
+  return exitCode
+}
+
+function recordPictures(context: RunContext, entry: PicturesRecord): Promise<void> {
+  return context.store.record({
+    at: new Date().toISOString(),
+    orderId: context.order.id,
+    actor: 'rule:line',
+    action: 'verify.pictures',
+    subject: PICTURES_STEP_NAME,
+    reason: entry.reason,
+    evidence: [...entry.evidence],
+  })
 }
 
 // A check on a checkout whose dependencies never arrived says nothing about the change.

@@ -137,6 +137,8 @@ export interface RunCommandOptions {
   command: string
   /** Absolute path to tee the command's combined stdout+stderr into. */
   logPath?: string
+  /** Variables the command runs with, exported by the tab's script before it starts. */
+  env?: Record<string, string>
 }
 
 export interface SupervisedRunner {
@@ -354,11 +356,15 @@ interface CommandScript {
   readonly id: string
   readonly command: string
   readonly logPath?: string
+  readonly env?: Readonly<Record<string, string>>
 }
 
 // A script that shows the command, runs it and exits with its status, which is the
 // tab's. Run by the shell, not `exec`ed, so `&&` in a command still works.
-function writeCommandScript(stateDir: string, { id, command, logPath }: CommandScript): string {
+function writeCommandScript(
+  stateDir: string,
+  { id, command, logPath, env = {} }: CommandScript
+): string {
   const dir = path.join(stateDir, 'launch')
   fs.mkdirSync(dir, { recursive: true })
   const file = path.join(dir, `${id}.sh`)
@@ -367,6 +373,8 @@ function writeCommandScript(stateDir: string, { id, command, logPath }: CommandS
     [
       '#!/bin/sh',
       '# Written by Terminator. One per command; overwritten on every run.',
+      // Real `export` lines: `exec VAR=1 cmd` once broke every agent with exit 127.
+      ...Object.entries(env).map(([name, value]) => `export ${name}=${shellQuote(value)}`),
       "cat <<'TERMINATOR_LAUNCH'",
       command,
       'TERMINATOR_LAUNCH',
@@ -627,11 +635,7 @@ async function runCommandInTab(
 
   // The script is the tab's own process, so the exit the core reports is
   // the command's, and null when a signal or a closed tab ended it first.
-  const script = writeCommandScript(stateDir, {
-    id: randomUUID(),
-    command: options.command,
-    logPath: options.logPath,
-  })
+  const script = writeCommandScript(stateDir, { ...options, id: randomUUID() })
   const shell = process.env.SHELL ?? '/bin/sh'
   const exit = await api.pty.runInTerminal({
     projectId: project.id,

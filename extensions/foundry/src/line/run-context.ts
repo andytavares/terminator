@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from '@terminator/extension-sdk'
 
+import type { PicturesTaken } from '../verify/ladder.js'
 import { createPassCache } from '../verify/pass-cache.js'
 import type { PassCache } from '../verify/pass-cache.js'
 import type { OrderStore } from '../order/store.js'
@@ -37,6 +38,8 @@ export interface RunContext {
   // Made the first time a failed rung is run again on the base branch, and
   // taken away by `releaseBase` — most runs never need one.
   readonly base: { current: Checkout | null }
+  // What the last pictures step left, for the pull request body to count.
+  readonly pictures: { current: PicturesTaken | null }
   readonly conversations: Map<string, string>
   // Lanes whose prepare command failed or did not run: their checks are not measured.
   readonly prepareFailed: Set<number>
@@ -62,6 +65,7 @@ export async function createRunContext(api: ExtensionAPI, run: OrderRun): Promis
       return { exitCode: result.exitCode, stdout: result.stdout }
     }),
     base: { current: null },
+    pictures: { current: null },
     conversations: seededConversations(run.graph),
     prepareFailed: new Set(),
   }

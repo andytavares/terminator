@@ -815,6 +815,7 @@ describe('a repeated failure becomes a decision', () => {
 describe('the ladder', () => {
   describe('when it is climbed', whenItIsClimbedTests)
   describe('what it reports', whatItReportsTests)
+  describe('the pictures step', picturesStepTests)
   describe('step output', stepOutputTests)
   describe('the question it asks', theQuestionItAsksTests)
   describe('lights-out runs', lightsOutRunsTests)
@@ -888,6 +889,47 @@ function whenItIsClimbedTests() {
     })
     expect(outcome.ladder).toBeNull()
     expect(runStep).not.toHaveBeenCalled()
+  })
+}
+
+const interfaceOrder = (pictures: string | null) => {
+  const o = order([unit('U-1', { touchesInterface: true })])
+  const environment = { ...o.context.environment, pictures }
+  return { ...o, context: { ...o.context, environment } }
+}
+const climbWith = (pictures: string | null, taken: { folder: string; images: string[] } | null) =>
+  execute(planOf(interfaceOrder(pictures)), {
+    ...deps(vi.fn(ok)),
+    autonomy: 'lights-out',
+    runStep: async (step) => (step.name === 'Pictures' && taken?.images.length === 0 ? null : 0),
+    picturesTaken: () => taken,
+  })
+const picturesOf = (outcome: Awaited<ReturnType<typeof climbWith>>) =>
+  outcome.ladder?.steps.find((s) => s.name === 'Pictures')
+
+function picturesStepTests() {
+  it('carries the images the step left onto its outcome', async () => {
+    const taken = { folder: '/runs/pictures-1', images: ['/runs/pictures-1/a.png'] }
+    expect(picturesOf(await climbWith('npm run shots', taken))).toMatchObject({
+      result: 'pass',
+      pictures: taken,
+    })
+  })
+
+  it('reports exit 0 with no images as not measured, naming why', async () => {
+    const none = { folder: '/runs/pictures-1', images: [] }
+    expect(picturesOf(await climbWith('npm run shots', none))).toMatchObject({
+      result: 'not_measured',
+      reason: 'the pictures command left no images',
+    })
+  })
+
+  it('is not measured, never a pass, when there is no pictures command', async () => {
+    const outcome = await climbWith(null, null)
+    expect(picturesOf(outcome)).toMatchObject({
+      result: 'not_measured',
+      reason: 'this repository has no pictures command',
+    })
   })
 }
 
