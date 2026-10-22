@@ -1,0 +1,35 @@
+.github/workflows/ci.yml
+  s_f6f18e5557b141::t_e25fdf9795a271 21-22,73-74,95-96,115-116,119-120,134,143-165,173-174,212-213,262-263,287-288,354-355,387,417,422,426,431,471,479,507-508,522-523
+scripts/ci-e2e-local.mjs
+  s_f6f18e5557b141::t_9a45b62f2aea21 2,10,13
+scripts/ci-install.mjs
+  s_f6f18e5557b141::t_a6d10a49e1ae59 1-22
+scripts/ci-linux.Dockerfile
+  s_f6f18e5557b141::t_f5a79457403347 1-9
+scripts/ci-linux.mjs
+  s_f6f18e5557b141::t_b0241ee8f1a05a 1-88
+scripts/ci-local.mjs
+  s_f6f18e5557b141::t_daaa78a9d21beb 11,13,32,34-41,49,53-64,84,144-145,147-155,172
+scripts/ci-plan.mjs
+  s_f6f18e5557b141::t_1da709c3af76d7 12,40,79,95-99
+tests/unit/scripts/ci-linux.spec.ts
+  s_f6f18e5557b141::t_0b3b4962f10dcc 1-60
+tests/unit/scripts/ci-plan.spec.ts
+  s_f6f18e5557b141::t_62d61e8a780b05 4,22,48-58,108-112,114-132,149,152-154,160
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6481702184a7215143a37735cc2d98d7d69e0236",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
