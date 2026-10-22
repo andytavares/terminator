@@ -38,7 +38,8 @@ async function runStub(path: string[], args: string[]): Promise<StubRun> {
   try {
     await once(stub, 'exit', { signal: AbortSignal.timeout(STUB_TIMEOUT_MS) })
   } catch {
-    process.kill(-(stub.pid ?? 0), 'SIGKILL')
+    // No pid means it never started; -0 would be this test's own process group.
+    if (stub.pid !== undefined) process.kill(-stub.pid, 'SIGKILL')
     throw new Error(`the gh stub was still running after ${STUB_TIMEOUT_MS} ms`)
   }
   run.status = stub.exitCode
