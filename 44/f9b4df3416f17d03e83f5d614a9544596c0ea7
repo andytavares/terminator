@@ -18,6 +18,7 @@ extensions/foundry/tests/forge/forge-loop-order.spec.ts
   s_f6f18e5557b141::t_82d0c5c34679bd 9,11,14,16-19,22-30,35,53-55,68,70,74-75,88,93,101-103
 extensions/foundry/tests/forge/forge-loop-release.spec.ts
   s_f6f18e5557b141::t_497605782fff37 35,55-56,81,104,179,182-185
+  s_f6f18e5557b141::t_f4bdc222593292 80,82
 extensions/foundry/tests/forge/forge-loop.spec.ts
   s_f6f18e5557b141::t_292a36b4ce1f78 30,50,159-160,263,300
 extensions/foundry/tests/forge/intake-turn-ends.spec.ts
