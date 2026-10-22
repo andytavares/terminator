@@ -1,0 +1,139 @@
+extensions/foundry/tests/channel-schemas.spec.ts
+  s_f6f18e5557b141::t_fc0011897fda54 13-14,91-94
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_f6f18e5557b141::t_0c3fbf6beff1c5 11,571,575,577,1235,1248,1394,1399,1417,1422,1433,1438
+extensions/foundry/tests/components/Inbox.spec.tsx
+  s_f6f18e5557b141::t_5cd9d58159f39d 1,15
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_f6f18e5557b141::t_251841cbc168b9 2,368-369,387-390
+extensions/foundry/tests/factory/art/glyphs.spec.ts
+  s_f6f18e5557b141::t_a8c601420f33c9 45-46,52,102,121
+extensions/foundry/tests/factory/layout.spec.ts
+  s_f6f18e5557b141::t_0972dc174cb748 665-666,670
+extensions/foundry/tests/factory/timeline-store.spec.ts
+  s_f6f18e5557b141::t_ab2af0259e9815 14,127
+extensions/foundry/tests/forge/acceptance-from-ticket.spec.ts
+  s_f6f18e5557b141::t_75318307da8cee 70
+extensions/foundry/tests/forge/forge-loop-order.spec.ts
+  s_f6f18e5557b141::t_82d0c5c34679bd 9,11,14,16-19,22-30,35,53-55,68,70,74-75,88,93,101-103
+extensions/foundry/tests/forge/forge-loop-release.spec.ts
+  s_f6f18e5557b141::t_497605782fff37 34,54-55,78-79,101,176,179-182
+extensions/foundry/tests/forge/forge-loop.spec.ts
+  s_f6f18e5557b141::t_292a36b4ce1f78 30,50,159-160,263,300
+extensions/foundry/tests/forge/intake-turn-ends.spec.ts
+  s_f6f18e5557b141::t_5f42d6f3bf6062 41-42
+extensions/foundry/tests/forge/scouted-converge.spec.ts
+  s_f6f18e5557b141::t_237da92d075a35 148-151,154
+extensions/foundry/tests/gates/attention.spec.ts
+  s_f6f18e5557b141::t_8f6f8da816c224 141
+extensions/foundry/tests/helpers/foundry-activation.ts
+  s_f6f18e5557b141::t_e62c18dc04ca81 11,22
+extensions/foundry/tests/helpers/foundry-host.ts
+  s_f6f18e5557b141::t_f731da4c27e5d9 12-13,100,284
+extensions/foundry/tests/helpers/order-ledger.ts
+  s_f6f18e5557b141::t_665da2a7259b9b 4,30-36
+extensions/foundry/tests/home/commands.spec.ts
+  s_f6f18e5557b141::t_f7d6ae78a334a3 1,6-7,24-27,52,66
+extensions/foundry/tests/home/publish-single-flight.spec.ts
+  s_f6f18e5557b141::t_cf8f5187ff0ca7 6,62,64
+extensions/foundry/tests/home/publish.spec.ts
+  s_f6f18e5557b141::t_4d86cc35fb2f2f 2,7,13,21-22,27,32-33,69,88,90,114
+extensions/foundry/tests/ipc/final-check-send-back-ipc.spec.ts
+  s_f6f18e5557b141::t_f19ce924b92631 12,16,105-108
+extensions/foundry/tests/ipc/forge-defect-answer-ipc.spec.ts
+  s_f6f18e5557b141::t_73c1e91f8eee53 14,18,29,81-84,241-246,254,271-278,295-296
+extensions/foundry/tests/ipc/forge-registration.spec.ts
+  s_f6f18e5557b141::t_92ab419a06f6d4 37
+extensions/foundry/tests/ipc/interrupted-run-ipc.spec.ts
+  s_f6f18e5557b141::t_f391d0b7d6700d 13,17,27,113-116,122,129
+extensions/foundry/tests/ipc/line-registration-ipc.spec.ts
+  s_f6f18e5557b141::t_e4efa406f26781 37-38
+extensions/foundry/tests/ipc/order-delete-intake-ipc.spec.ts
+  s_f6f18e5557b141::t_0cf65e56e1c0fa 13,17,46-49
+extensions/foundry/tests/ipc/read-path-ipc.spec.ts
+  s_f6f18e5557b141::t_e81bd4882e6729 10,14,35-38
+extensions/foundry/tests/ipc/record-registration-ipc.spec.ts
+  s_f6f18e5557b141::t_e4d370ce32adb8 28-29
+extensions/foundry/tests/ipc/run-actions-ipc.spec.ts
+  s_f6f18e5557b141::t_dd989aaec72294 17,19,132-135
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_f6f18e5557b141::t_78462afee90ee8 21,1028
+extensions/foundry/tests/line/early-ship.spec.ts
+  s_f6f18e5557b141::t_9a7bab029d0b5b 10,192
+extensions/foundry/tests/line/execute-run.spec.ts
+  s_f6f18e5557b141::t_128c50c533df56 28,48,71-72,254,261,270-271,282-283
+extensions/foundry/tests/line/executor-deps.spec.ts
+  s_f6f18e5557b141::t_501790e3906d19 38,176,184-188,196-202,208-212,222,249,269-270,278,287-288,666
+extensions/foundry/tests/line/executor.spec.ts
+  s_f6f18e5557b141::t_b0a8077fc8c7e1 22,233,281,2410-2411
+extensions/foundry/tests/line/refinery-run.spec.ts
+  s_f6f18e5557b141::t_9ffa2feaf5dc4b 20,43,72,108-109,113,139-140,163,168
+extensions/foundry/tests/line/roles.spec.ts
+  s_f6f18e5557b141::t_5889bc9c6224c7 110,152
+extensions/foundry/tests/line/run-tail-ends.spec.ts
+  s_f6f18e5557b141::t_1f83c6d7848de6 19,35-36,77-82,87-90,98
+extensions/foundry/tests/line/ship-tail.spec.ts
+  s_f6f18e5557b141::t_07916185232c4b 459-461
+extensions/foundry/tests/line/universal-repository.spec.ts
+  s_f6f18e5557b141::t_c11db87103a338 17,38-39,124,162,175,187,199
+extensions/foundry/tests/line/worktree.spec.ts
+  s_f6f18e5557b141::t_5e72dceb822f05 22,422
+extensions/foundry/tests/live/ship-live.spec.ts
+  s_f6f18e5557b141::t_8fb09396386390 218,226,259,278,280,291,302,311,313
+extensions/foundry/tests/order/budget-setting.spec.ts
+  s_f6f18e5557b141::t_59f5e7644279d8 18
+extensions/foundry/tests/order/proposal.spec.ts
+  s_f6f18e5557b141::t_f4e87dc7666f9b 62,248
+extensions/foundry/tests/recipe/built-ins.spec.ts
+  s_f6f18e5557b141::t_aeab2f0ec1a697 64,401,429,460
+extensions/foundry/tests/recipe/parse.spec.ts
+  s_f6f18e5557b141::t_7812a7cbf5d21d 267,476,533,568
+extensions/foundry/tests/renderer/node-free.spec.ts
+  s_f6f18e5557b141::t_9de4d5b003894f 36
+extensions/foundry/tests/renderer/use-run-observation.spec.tsx
+  s_f6f18e5557b141::t_5e6fdfb48451f2 99
+extensions/foundry/tests/runtime/agent-policy.spec.ts
+  s_f6f18e5557b141::t_a683e0ca4c9313 16,99,103
+extensions/foundry/tests/runtime/autonomy-policy.spec.ts
+  s_f6f18e5557b141::t_ac598a3e17bf5f 83,104-105
+extensions/foundry/tests/runtime/permission-bridge.spec.ts
+  s_f6f18e5557b141::t_38db24c086f060 208,216-220,249-250,256-257,269-270,279-280,284,287-290,295,297,303,305,310-311,316,320,326-327,331-332,339-340,344-345,402,404,412-413,416,419,429-430,435,437,439-440,443,445,447-448
+extensions/foundry/tests/runtime/quick-actions.spec.ts
+  s_f6f18e5557b141::t_fd8870b5ea497a 14,16,121-124
+extensions/foundry/tests/runtime/read-only-policy.spec.ts
+  s_f6f18e5557b141::t_f0b595118445bd 182,202,253,265,276,297,307,313,319,340,350,403,416
+extensions/foundry/tests/runtime/supervised-runner.spec.ts
+  s_f6f18e5557b141::t_cd5d2967d77c60 12,296,299-300,309-311,953-954,959-960,973-974,1027-1028,1234,1237-1240
+extensions/foundry/tests/runtime/supervision-console.spec.ts
+  s_f6f18e5557b141::t_ba0bd3971dbd57 16,37,122,302
+extensions/foundry/tests/runtime/supervision-unavailable.spec.ts
+  s_f6f18e5557b141::t_99092c3ab84450 15,33,37,78
+extensions/foundry/tests/runtime/tool-decision.spec.ts
+  s_f6f18e5557b141::t_32054ae43009b3 119,156,314,318,336,343
+extensions/foundry/tests/sensors/built-ins.spec.ts
+  s_f6f18e5557b141::t_a4fba784c36de6 27,37
+extensions/foundry/tests/sensors/sensor-tick.spec.ts
+  s_f6f18e5557b141::t_de0ac33a55871a 13,30,65,96
+extensions/foundry/tests/sensors/store.spec.ts
+  s_f6f18e5557b141::t_f4c57c6d1a0f12 113
+extensions/foundry/tests/storage-folder.spec.ts
+  s_f6f18e5557b141::t_88fbeccd218778 15,23,106
+extensions/foundry/tests/verify/ladder.spec.ts
+  s_f6f18e5557b141::t_c85a02840dcc07 179-180
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "83b8903d1435e86c3ac986bade920fd84310aef8",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
