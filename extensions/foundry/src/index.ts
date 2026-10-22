@@ -74,8 +74,8 @@ export function activate(api: ExtensionAPI): void {
 // The publisher of the active session, so deactivation can stop its pending publish.
 let homePublisher: HomePublisher | null = null
 
-export function deactivate(): void {
-  homePublisher?.dispose()
+export async function deactivate(): Promise<void> {
+  const homeStopped = homePublisher?.dispose()
   homePublisher = null
   disposables.forEach((d) => d.dispose())
   disposables.length = 0
@@ -87,4 +87,6 @@ export function deactivate(): void {
   stopRefineryTick()
   clearPendingNewOrder()
   stopSupervisionRuntime()
+  // Last, so everything else is already stopped while a read in flight ends.
+  await homeStopped
 }

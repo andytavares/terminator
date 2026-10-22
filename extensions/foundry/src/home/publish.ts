@@ -25,7 +25,8 @@ const DEBOUNCE_MS = 500
 export interface HomePublisher {
   /** Publish after the debounce; a call while one is pending joins it. */
   scheduleFoundryPublish(): void
-  dispose(): void
+  /** Stops publishing; settles once a read already in flight has ended. */
+  dispose(): Promise<void>
 }
 
 export interface HomePublisherDeps {
@@ -46,6 +47,8 @@ interface Flight {
   reading: boolean
   changedWhileReading: boolean
   disposed: boolean
+  /** The running read-and-publish loop, which never rejects; null when none runs. */
+  inFlight: Promise<void> | null
   /** The root of the latest change: a read of an older one could index a location early. */
   root: string
 }
@@ -61,6 +64,7 @@ function singleFlightPublisher(
     reading: false,
     changedWhileReading: false,
     disposed: false,
+    inFlight: null,
     root: dataRoot(),
   }
   return {
@@ -70,13 +74,14 @@ function singleFlightPublisher(
       else
         timer ??= setTimeout(() => {
           timer = null
-          void publishUntilCaughtUp(api, sources, flight)
+          flight.inFlight = publishUntilCaughtUp(api, sources, flight)
         }, DEBOUNCE_MS)
     },
-    dispose() {
+    async dispose() {
       flight.disposed = true
       if (timer !== null) clearTimeout(timer)
       timer = null
+      await flight.inFlight
     },
   }
 }

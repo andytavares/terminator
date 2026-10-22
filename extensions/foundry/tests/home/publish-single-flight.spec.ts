@@ -63,18 +63,31 @@ describe('publishing to Home while a read is slow', () => {
     await vi.waitFor(() => expect(host.homePublish).toHaveBeenCalledTimes(2))
     expect(publishedInOrder(host)).toEqual([1, 2])
   })
+})
 
+describe('disposing the publisher', () => {
   it('publishes nothing once disposed, whether the read was pending or running', async () => {
     const { host, publisher } = publisherAt({ current: '/records/first' })
     publisher.scheduleFoundryPublish()
     await vi.advanceTimersByTimeAsync(500)
-    publisher.dispose()
+    const stopped = publisher.dispose()
     publisher.scheduleFoundryPublish()
     finishRead(0)
     await vi.advanceTimersByTimeAsync(2000)
-    // The rest of the feed is read from disk; a publish would land well within this wait.
-    await new Promise((resolve) => setImmediate(resolve))
+    await stopped
     expect(host.homePublish).not.toHaveBeenCalled()
     expect(rootsRead).toEqual(['/records/first'])
+  })
+
+  it('settles dispose only once the read in flight has ended', async () => {
+    const { host, publisher } = publisherAt({ current: '/records/first' })
+    publisher.scheduleFoundryPublish()
+    await vi.advanceTimersByTimeAsync(500)
+    const stopped = publisher.dispose()
+    finishRead(0)
+    await stopped
+    // The feed is built at the end of the read: it has finished, and published nothing.
+    expect(feedCounter.built).toBe(1)
+    expect(host.homePublish).not.toHaveBeenCalled()
   })
 })
