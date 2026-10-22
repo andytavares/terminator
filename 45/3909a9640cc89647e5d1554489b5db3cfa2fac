@@ -1,0 +1,67 @@
+extensions/foundry/src/profile/schema.ts
+  s_f6f18e5557b141::t_1489592198f420 30-40
+extensions/foundry/src/components/Forge.tsx
+  s_f6f18e5557b141::t_46ec8fedf41a68 33,618,631-634
+extensions/foundry/tests/forge/checks-view.spec.ts
+  s_f6f18e5557b141::t_e6e9a0fe56dc2a 5,122-153
+  s_f6f18e5557b141::t_79d3246b111707 154
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_f6f18e5557b141::t_c57cc3e00e113f 2039,2061,2092
+  s_f6f18e5557b141::t_851095e61da71c 2058-2060,2062-2066
+  s_f6f18e5557b141::t_f8399c53855b4c 2004-2009,2038,2040-2055,2057,2070-2077,2091
+  s_f6f18e5557b141::t_704d15afd9072c 2067-2069
+  s_f6f18e5557b141::t_26ad6696e6bc3a 2056,2093
+extensions/foundry/tests/components/ForgeChecks.spec.tsx
+  s_f6f18e5557b141::t_601b6f58f052bd 58-68,80,83-84
+  s_f6f18e5557b141::t_a5ba1af3f080d2 178-192,195,203
+  s_f6f18e5557b141::t_851095e61da71c 385,387,447
+  s_f6f18e5557b141::t_e6e9a0fe56dc2a 48-50,53-54,74-79,81,135,142,197-202,204,236,339-341,404-412,421-446
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_f6f18e5557b141::t_3fce29efa7963c 543,547,549,561-568,573
+  s_f6f18e5557b141::t_275a99486ad615 574
+extensions/foundry/src/components/ForgeChecks.tsx
+  s_f6f18e5557b141::t_f091bc620fec49 1,17,71,75,83-84,106,162-189,195,214,216-218,223-229,238,251-255
+extensions/foundry/src/components/foundry.css
+  s_f6f18e5557b141::t_f091bc620fec49 4191-4205
+extensions/foundry/src/ipc/profile-channels.ts
+  s_f6f18e5557b141::t_704d15afd9072c 113-118,238-241
+  s_f6f18e5557b141::t_4f476c937ae9ac 1-2,14-20,40-43,45-46,75,92,102,119-129,133-136,163-171,173-176,261-282,291
+extensions/foundry/src/components/use-checks.ts
+  s_f6f18e5557b141::t_601b6f58f052bd 116-119,130-137,151
+  s_f6f18e5557b141::t_46ec8fedf41a68 7,37-38,50,52-54,66-69,84-90,150,154-156,192,195,198,204-205
+  s_f6f18e5557b141::t_28976f50c85db2 108-109,114-115
+  s_f6f18e5557b141::t_dda434fe96821b 138-149
+extensions/foundry/tests/ipc/profile-channels.spec.ts
+  s_f6f18e5557b141::t_f8399c53855b4c 174-196,198,200-211,215-221,234,236-238,240,242,246-267
+  s_f6f18e5557b141::t_dca76dc3ea5cb0 197,199
+  s_f6f18e5557b141::t_58b88ef2464d23 222-233,235,239,244-245
+  s_f6f18e5557b141::t_851095e61da71c 212-214,241,243
+extensions/foundry/src/ipc/forge-channels.ts
+  s_f6f18e5557b141::t_704d15afd9072c 19-21,139-142,300,1000-1017,1030-1031
+extensions/foundry/src/profile/resolve.ts
+  s_f6f18e5557b141::t_1489592198f420 11-12,53-54,57-58,74-78,80
+extensions/foundry/src/forge/checks-view.ts
+  s_f6f18e5557b141::t_36bf7b34cb8c13 15-16,43-44,66-67,108-110,114-115,117-119,124,240,273-278
+  s_f6f18e5557b141::t_f091bc620fec49 131,134
+  s_f6f18e5557b141::t_df97de44de7752 279
+extensions/foundry/src/forge/intake-outcome.ts
+  s_f6f18e5557b141::t_abd61e9bc254f4 199-200,300-311
+extensions/foundry/src/forge/readiness.ts
+  s_f6f18e5557b141::t_7e4563dd113a0e 54-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "453909a9640cc89647e5d1554489b5db3cfa2fac",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
