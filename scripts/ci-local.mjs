@@ -16,7 +16,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 /** What CI checks that ci:local does not, and why. */
 export const NOT_RUN_HERE = {
   ...SKIPPED_JOBS,
-  e2e: 'runs here through scripts/ci-e2e-local.mjs, its shards and burn-in step for step',
+  e2e: 'runs here through scripts/ci-e2e-local.mjs, its shards step for step',
   'codecov/patch': 'Codecov works it out from the uploaded coverage; the Test job runs here',
 }
 
@@ -40,7 +40,7 @@ function runChecks(checkout, { all }) {
   const workflow = readWorkflow(join(checkout, '.github/workflows/ci.yml'))
   const e2eStep = {
     job: 'e2e',
-    name: 'the five shards and the burn-in',
+    name: 'the five shards',
     script: 'node scripts/ci-e2e-local.mjs',
     env: all ? { TEST_ALL: '1' } : {},
   }
