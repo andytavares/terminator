@@ -228,3 +228,19 @@ describe('useMetricsStore — restarting and stray answers', () => {
     expect(useMetricsStore.getState().processesBySessionId.size).toBe(0)
   })
 })
+
+describe('an answer that lands after polling stopped', () => {
+  it('is dropped: the sessions it measured are no longer shown', async () => {
+    mockGetSystem.mockResolvedValue({ data: sysData })
+    let answer: (value: unknown) => void = () => undefined
+    mockGetProcesses.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    useMetricsStore.getState().startPolling([{ sessionId: 's1', pid: 101 }])
+    await answered(mockGetSystem)
+
+    useMetricsStore.getState().stopPolling()
+    answer({ data: [{ pid: 101, cpuPercent: 5, memBytes: 1e6 }] })
+    await answered(mockGetProcesses)
+
+    expect(useMetricsStore.getState().processesBySessionId.size).toBe(0)
+  })
+})

@@ -21,21 +21,27 @@ interface MetricsState {
 
 // Held outside Zustand state — interval handles are not serializable
 let intervalId: ReturnType<typeof setInterval> | null = null
+// Which polling run is current: an answer from an earlier one lands after it stopped, and is dropped.
+let generation = 0
 
-async function pollSystem(getState: () => MetricsState): Promise<void> {
+async function pollSystem(getState: () => MetricsState, run: number): Promise<void> {
   try {
     const sysResult = await window.electronAPI.metrics.getSystem()
-    if ('data' in sysResult) getState().setSystem(sysResult.data)
+    if (run === generation && 'data' in sysResult) getState().setSystem(sysResult.data)
   } catch {
     // IPC failure — keep stale value
   }
 }
 
-async function pollProcesses(sessions: SessionRef[], getState: () => MetricsState): Promise<void> {
+async function pollProcesses(
+  sessions: SessionRef[],
+  getState: () => MetricsState,
+  run: number
+): Promise<void> {
   const pidToSessionId = new Map(sessions.map(({ sessionId, pid }) => [pid, sessionId]))
   try {
     const procResult = await window.electronAPI.metrics.getProcesses(sessions.map((s) => s.pid))
-    if (!('data' in procResult)) return
+    if (run !== generation || !('data' in procResult)) return
     for (const pm of procResult.data) {
       const sessionId = pidToSessionId.get(pm.pid)
       if (sessionId) getState().setProcessMetrics(sessionId, pm)
@@ -47,9 +53,10 @@ async function pollProcesses(sessions: SessionRef[], getState: () => MetricsStat
 
 /** Samples now and every two seconds: the system, and the sessions' processes when there are any. */
 function startInterval(sessions: SessionRef[], getState: () => MetricsState): void {
+  const run = generation
   async function poll(): Promise<void> {
-    await pollSystem(getState)
-    if (sessions.length > 0) await pollProcesses(sessions, getState)
+    await pollSystem(getState, run)
+    if (sessions.length > 0 && run === generation) await pollProcesses(sessions, getState, run)
   }
 
   void poll()
@@ -57,6 +64,7 @@ function startInterval(sessions: SessionRef[], getState: () => MetricsState): vo
 }
 
 function clearPoll(): void {
+  generation += 1
   if (intervalId !== null) {
     clearInterval(intervalId)
     intervalId = null
@@ -93,7 +101,7 @@ export const useMetricsStore = create<MetricsState>((set, get) => ({
     }),
 
   startPolling: (sessions) => {
-    if (intervalId !== null) clearInterval(intervalId)
+    clearPoll()
     set({ pollingActive: true })
     startInterval(sessions, get)
   },
