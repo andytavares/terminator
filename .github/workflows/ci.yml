@@ -11,6 +11,10 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# Every job reads the repository and nothing else; none writes with the token.
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint
