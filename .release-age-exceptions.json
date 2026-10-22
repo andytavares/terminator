@@ -4,5 +4,6 @@
   "@storybook/react-dom-shim@10.6.2": "approved exception: patches critical GHSA-f2ph-cmg5-wxc8 (PR 285)",
   "@storybook/react-vite@10.6.2": "approved exception: patches critical GHSA-f2ph-cmg5-wxc8 (PR 285)",
   "@storybook/react@10.6.2": "approved exception: patches critical GHSA-f2ph-cmg5-wxc8 (PR 285)",
+  "dompurify@3.4.17": "approved exception: patches critical GHSA-cg2g-xh64-v4q7, GHSA-mrv2-3pqr-j5jr, GHSA-c6gr-qvv4-5v3f (PR 287)",
   "storybook@10.6.2": "approved exception: patches critical GHSA-f2ph-cmg5-wxc8 (PR 285)"
 }
