@@ -1,8 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { once } from 'node:events'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { SessionRecord } from '../../../src/shared/types/index'
 import { makeTempDir } from '../../support/temp-dir'
+
+// Every watch the code under test opens, so a test can wait for one to close.
+const watchers = vi.hoisted(() => [] as import('node:fs').FSWatcher[])
+vi.mock('node:fs', async (importOriginal) => {
+  const real = await importOriginal<typeof import('node:fs')>()
+  const watch = ((...args: Parameters<typeof real.watch>) => {
+    const watcher = real.watch(...args)
+    watchers.push(watcher)
+    return watcher
+  }) as typeof real.watch
+  return { ...real, default: { ...real, watch }, watch }
+})
 
 let userData: string
 
@@ -68,10 +81,18 @@ async function folded(times = 1): Promise<void> {
   })
 }
 
-/** Long enough for a watch event to have arrived, for asserting one did not. */
-async function quiet(): Promise<void> {
-  await new Promise((r) => setTimeout(r, 400))
+/** Waits until the watcher has passed over everything written so far, for asserting it did not
+ * record something: a placeable report written last is recorded only after the pass that read the
+ * files written before it, and a pass runs to its end before the next record can be observed. */
+async function drained(): Promise<void> {
+  await write('sentinel', 'conv-sentinel')
+  await folded(recorded.length + 1)
 }
+
+const SENTINEL = ['sentinel', 'conv-sentinel']
+
+/** Places every terminal but `gone`. */
+const placeAllBut = (unplaced: string) => (id: string) => (id === unplaced ? null : snapshot(id))
 
 describe('the agent session watcher', () => {
   it('records a conversation reported for a session it can place', async () => {
@@ -90,8 +111,8 @@ describe('the agent session watcher', () => {
     const mod = await load()
     stop = mod.startAgentSessionWatcher({ snapshotFor: (id) => snapshot(id) })
     await folded()
-    await quiet()
-    expect(recorded).toHaveLength(1)
+    await drained()
+    expect(conversations()).toEqual([['sess-1', 'conv-0'], SENTINEL])
   })
 })
 
@@ -130,10 +151,10 @@ describe('the agent session watcher — several conversations and terminals', ()
 describe('the agent session watcher — unplaceable reports and stopping', () => {
   it('ignores a report for a session it cannot place', async () => {
     const mod = await load()
-    stop = mod.startAgentSessionWatcher({ snapshotFor: () => null })
+    stop = mod.startAgentSessionWatcher({ snapshotFor: placeAllBut('gone') })
     await write('gone', 'conv-1')
-    await quiet()
-    expect(recorded).toEqual([])
+    await drained()
+    expect(conversations()).toEqual([SENTINEL])
   })
 
   it('ignores a file it cannot read, and keeps watching', async () => {
@@ -141,20 +162,27 @@ describe('the agent session watcher — unplaceable reports and stopping', () =>
     stop = mod.startAgentSessionWatcher({ snapshotFor: (id) => snapshot(id) })
     fs.mkdirSync(dir, { recursive: true })
     fs.writeFileSync(path.join(dir, 'sess-1.json'), 'not json')
-    await quiet()
-    expect(recorded).toEqual([])
+    await drained()
+    expect(conversations()).toEqual([SENTINEL])
     await write('sess-2', 'conv-2')
-    await folded()
+    await folded(2)
   })
+})
 
+describe('the agent session watcher — stopping', () => {
   it('stops watching when told to', async () => {
     const mod = await load()
+    watchers.length = 0
     const off = mod.startAgentSessionWatcher({ snapshotFor: (id) => snapshot(id) })
+    // A closed watch delivers nothing more: its own close event is the signal, not time.
+    const closed = watchers.map((watcher) => once(watcher, 'close'))
     off()
     stop = undefined
+    await Promise.all(closed)
     await write('sess-1', 'conv-1')
-    await quiet()
+    expect(closed.length).toBeGreaterThan(0)
     expect(recorded).toEqual([])
+    expect(fs.readdirSync(dir)).toEqual(['sess-1.json'])
   })
 })
 
@@ -164,8 +192,8 @@ describe('the agent session watcher — deleting reports', () => {
     stop = mod.startAgentSessionWatcher({ snapshotFor: (id) => snapshot(id) })
     fs.mkdirSync(dir, { recursive: true })
     fs.writeFileSync(path.join(dir, 'notes.txt'), 'hello')
-    await quiet()
-    expect(recorded).toEqual([])
+    await drained()
+    expect(conversations()).toEqual([SENTINEL])
   })
 
   it('deletes a report once it has been recorded', async () => {
@@ -190,8 +218,9 @@ describe('the agent session watcher — startup and other files', () => {
     await write('sess-1', 'conv-0')
     const mod = await load()
     stop = mod.startAgentSessionWatcher({ snapshotFor: (id) => snapshot(id) })
-    await quiet()
-    expect(recorded).toHaveLength(1)
+    await folded()
+    await drained()
+    expect(conversations()).toEqual([['sess-1', 'conv-0'], SENTINEL])
     expect(fs.readdirSync(dir)).toEqual([])
   })
 
@@ -199,7 +228,7 @@ describe('the agent session watcher — startup and other files', () => {
     const mod = await load()
     stop = mod.startAgentSessionWatcher({ snapshotFor: (id) => snapshot(id) })
     fs.writeFileSync(path.join(dir, 'notes.txt'), 'hello')
-    await quiet()
+    await drained()
     expect(fs.readdirSync(dir)).toEqual(['notes.txt'])
   })
 

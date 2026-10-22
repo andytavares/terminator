@@ -47,6 +47,14 @@ describe('what a step becomes', () => {
     expect(unit).not.toContain('--shard')
   })
 
+  it('runs every unit spec once, in a fixed order: no shuffle, seed or second pass', () => {
+    const scripts = plan.map((step) => step.script).join('\n')
+    expect(scripts).not.toMatch(/--sequence\.(shuffle|seed)|--repeat|--changed/)
+    expect(plan.filter((step) => /\bvitest run\b(?!.*--merge-reports)/.test(step.script))).toEqual([
+      expect.objectContaining({ job: 'unit', name: 'Test' }),
+    ])
+  })
+
   it('starts the packaged macOS app the release builds', () => {
     expect(stepOf('start', 'Packaged app')?.script).toContain('electron-builder --mac dir')
   })

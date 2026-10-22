@@ -158,6 +158,8 @@ function anUnansweredQuestionTests() {
           answer: null,
           rank: 1,
           confidence: null,
+          multiple: false,
+          chosen: [],
         },
       ],
     })

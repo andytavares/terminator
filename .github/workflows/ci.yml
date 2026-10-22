@@ -151,6 +151,8 @@ jobs:
     name: Unit (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     strategy:
+      # Every shard runs to the end, so one run reports every failing spec rather than the first.
+      fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
 

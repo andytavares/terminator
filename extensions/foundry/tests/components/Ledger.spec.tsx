@@ -115,8 +115,11 @@ describe('the record while it is open', () => {
     mount()
     await waitFor(() => expect(queries()).toBe(1))
 
+    // The settle window is a timer; run it out on a fake clock to prove no read is scheduled.
+    vi.useFakeTimers()
     bus.emit({ kind: 'gates', orderId: 'WO-1' })
-    await new Promise((resolve) => setTimeout(resolve, 300))
+    await vi.advanceTimersByTimeAsync(1000)
+    vi.useRealTimers()
     expect(queries()).toBe(1)
 
     bus.emit({ kind: 'ledger', orderId: 'WO-1' })

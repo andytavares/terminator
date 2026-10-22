@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 
 // ── hoisted mocks ─────────────────────────────────────────────────────────────
 
@@ -49,6 +49,14 @@ const GLOBAL_STORAGE =
   '/Users/me/Library/Application Support/Terminator/extensions/terminator.git-integration'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+// Vitest hands the real electron-store to a dynamic import that runs while the first one is still
+// loading the mock, and remove-active-review opens two stores at once. Open each store alone first.
+beforeAll(async () => {
+  const handlers = captureHandlers()
+  await handlers['github:sessions-for-repo']({ repoRoot: '/repo' })
+  await handlers['github:active-reviews-for-repo']({ repoRoot: '/repo' })
+})
 
 type Handler = (payload: unknown) => Promise<unknown>
 /** Registers each channel into `handlers`, answered as the core answers an invoke. */

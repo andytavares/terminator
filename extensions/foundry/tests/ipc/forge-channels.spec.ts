@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { queueEntry } from '../helpers/queue-entries.js'
-import { builderUnit, testCriterion } from '../helpers/order-parts.js'
+import { builderUnit, openQuestion, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { dispatchChannel } from '@terminator/extension-sdk'
@@ -85,6 +85,8 @@ async function seeded(): Promise<WorkOrder> {
         answer: null,
         rank: 1,
         confidence: null,
+        multiple: false,
+        chosen: [],
       },
     ],
   }
@@ -163,6 +165,21 @@ function strikesAndAnswersTests() {
     const r = (await channels().turn({ id: order.id, strike: 'A-1' })) as OrderView
     expect(r.changed).toEqual(['U-1'])
     expect(r.order.assumptions[0].struck).toBe(true)
+  })
+
+  it('answers a multiple-choice question by the indices of its options', async () => {
+    const seededOrder = await seeded()
+    const order = {
+      ...seededOrder,
+      openQuestions: seededOrder.openQuestions.map((q) => ({ ...q, multiple: q.id === 'Q-1' })),
+    }
+    await store.save(order)
+    const r = (await channels().turn({
+      id: order.id,
+      answer: { questionId: 'Q-1', option: [1, 0] },
+    })) as OrderView
+    expect(r.order.openQuestions[0]).toMatchObject({ chosen: [0, 1], answer: 'No; Yes' })
+    expect((await store.load(order.id))?.openQuestions[0].chosen).toEqual([0, 1])
   })
 
   it('answers a question by the index of its option', async () => {
@@ -442,18 +459,7 @@ function forgeChannelsOpenQuestionsTests() {
     if (loaded === null) throw new Error('the order this test needs was not saved')
     await store.save({
       ...loaded,
-      openQuestions: [
-        {
-          id: 'Q-1',
-          text: 'a?',
-          why: '',
-          options: ['x', 'y'],
-          recommended: 0,
-          answer: null,
-          rank: 1,
-          confidence: null,
-        },
-      ],
+      openQuestions: [openQuestion('Q-1', { text: 'a?', options: ['x', 'y'], recommended: 0 })],
     })
 
     const r = (await c.list()) as { orders: { standing: Standing; openQuestions: number }[] }
@@ -928,6 +934,8 @@ const UNSETTLED: Pick<WorkOrder, 'openQuestions' | 'redTeam'> = {
       answer: null,
       rank: 1,
       confidence: null,
+      multiple: false,
+      chosen: [],
     },
     {
       id: 'Q-2',
@@ -938,6 +946,8 @@ const UNSETTLED: Pick<WorkOrder, 'openQuestions' | 'redTeam'> = {
       answer: null,
       rank: 1,
       confidence: null,
+      multiple: false,
+      chosen: [],
     },
   ],
   redTeam: [
@@ -1996,7 +2006,12 @@ function readingTests() {
     const r = (await channels().compile(compiling(seed.order.id, false))) as {
       environment: unknown
     }
-    expect(r.environment).toEqual({ baseline: null, waivedAt: null, proving: false })
+    expect(r.environment).toEqual({
+      baseline: null,
+      waivedAt: null,
+      proving: false,
+      decisions: { continueUnmeasured: false, declinePictures: false },
+    })
   })
 }
 
@@ -2025,6 +2040,46 @@ function theMovesTests() {
   })
 }
 
+function theDecisionMovesTests() {
+  const decide = async (move: 'continue-unmeasured') => {
+    const seed = await drafted()
+    const proveEnvironment = vi.fn(async () => undefined)
+    const c = createForgeChannels(forgeDeps({ proveEnvironment }))
+    const r = (await c.environment({ id: seed.order.id, move })) as {
+      environment: { decisions: Record<string, boolean> }
+    }
+    return { seed, r, proveEnvironment }
+  }
+
+  it('records "checks.continue-unmeasured" and answers the decision from the ledger', async () => {
+    const { seed, r, proveEnvironment } = await decide('continue-unmeasured')
+    expect((await store.entries(seed.order.id)).at(-1)).toMatchObject({
+      actor: 'operator',
+      action: 'checks.continue-unmeasured',
+    })
+    expect(r.environment.decisions).toEqual({ continueUnmeasured: true, declinePictures: false })
+    expect(proveEnvironment).not.toHaveBeenCalled()
+  })
+}
+
+function thePicturesDecisionTests() {
+  it('records "pictures.declined" and answers the decision from the ledger', async () => {
+    const seed = await drafted()
+    const c = createForgeChannels(forgeDeps({}))
+    const r = (await c.environment({ id: seed.order.id, move: 'decline-pictures' })) as {
+      environment: { decisions: Record<string, boolean> }
+    }
+    expect((await store.entries(seed.order.id)).at(-1)).toMatchObject({
+      action: 'pictures.declined',
+    })
+    expect(r.environment.decisions).toEqual({ continueUnmeasured: false, declinePictures: true })
+    const again = (await channels().compile(compiling(seed.order.id, false))) as {
+      environment: { decisions: Record<string, boolean> }
+    }
+    expect(again.environment.decisions.declinePictures).toBe(true)
+  })
+}
+
 function theMoveErrorsTests() {
   it('refuses a move other than check or waive, and errors on an unknown order', async () => {
     const seed = await drafted()
@@ -2037,6 +2092,9 @@ function theMoveErrorsTests() {
     expect(r.error).toBe('No order WO-nope.')
   })
 }
+
+describe('the decisions about what cannot be measured', theDecisionMovesTests)
+describe('the decision to ship without pictures', thePicturesDecisionTests)
 
 describe('handing off waits for the base branch check', () => {
   describe('the manual hand-off', manualHandOffTests)

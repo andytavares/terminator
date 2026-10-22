@@ -67,6 +67,7 @@ beforeEach(() => {
   mockReadConflictBlocks.mockReset()
   mockListConflictedFiles.mockReset()
   mockReadFile.mockReset()
+  mockWriteFile.mockReset()
   mockWriteFile.mockResolvedValue(undefined)
   mockStoreGet.mockReset()
   mockStoreSet.mockReset()

@@ -1,0 +1,15 @@
+schemaVersion: 1
+id: github-actions
+priority: 60
+when: ['.github/workflows']
+# What CI runs is what the project gates on, but it is the least precise source: consulted last.
+ciRuns:
+  dir: .github/workflows
+  extensions: [yml, yaml]
+  words:
+    test: '(^|\s)tests?(\s|$)'
+    lint: '(^|\s)lint(\s|$)'
+    format: '(^|\s)(format|fmt)(\s|$)'
+    coverage: '(^|\s)coverage(\s|$)'
+    e2e: '(^|\s)(e2e|playwright|cypress)(\s|$)'
+    build: '(^|\s)build(\s|$)'

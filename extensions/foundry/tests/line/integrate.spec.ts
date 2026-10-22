@@ -1013,6 +1013,79 @@ describe('the body reports the climb (FR-056)', () => {
   })
 })
 
+const bodyWithPicturesStep = (step: Partial<LadderOutcome['steps'][number]>) =>
+  prBody(refreshTokenOrder(), {
+    verdicts: [verdict()],
+    findings: [],
+    ladder: ladderWith([
+      {
+        rung: 'L5',
+        name: 'Pictures',
+        result: 'pass',
+        reason: '',
+        exitCode: 0,
+        command: 'npm run shots',
+        ...step,
+      },
+    ]),
+  })
+
+describe('the pictures line', () => {
+  describe('images were taken', picturesTakenTests)
+  describe('nothing was measured', picturesNotMeasuredTests)
+})
+
+function picturesTakenTests() {
+  it('counts the images and says where they are kept', () => {
+    const body = bodyWithPicturesStep({
+      pictures: { folder: '/records/WO-1/runs/pictures-1', images: ['/a.png', '/b.png'] },
+    })
+    expect(body).toContain('Pictures: 2 images, kept in `/records/WO-1/runs/pictures-1`.')
+  })
+
+  it('says one image in the singular', () => {
+    const body = bodyWithPicturesStep({ pictures: { folder: '/records/p', images: ['/a.png'] } })
+    expect(body).toContain('Pictures: 1 image, kept in `/records/p`.')
+  })
+}
+
+function picturesNotMeasuredTests() {
+  const unmeasured = { result: 'not_measured', exitCode: null } as const
+
+  it('says not measured, with the reason, when the command left none', () => {
+    const body = bodyWithPicturesStep({
+      ...unmeasured,
+      reason: 'the pictures command left no images',
+    })
+    expect(body).toContain('Pictures: not measured — the pictures command left no images')
+  })
+
+  it('says not measured when the repository has no pictures command', () => {
+    const body = bodyWithPicturesStep({
+      ...unmeasured,
+      reason: 'this repository has no pictures command',
+      command: null,
+    })
+    expect(body).toContain('Pictures: not measured — this repository has no pictures command')
+  })
+
+  it('has no pictures line when the interface was not touched', () => {
+    const body = prBody(refreshTokenOrder(), {
+      verdicts: [verdict()],
+      findings: [],
+      ladder: CLIMB_WITHOUT_PICTURES,
+    })
+    expect(body).not.toContain('Pictures:')
+  })
+}
+
+const CLIMB_WITHOUT_PICTURES: LadderOutcome = {
+  steps: [{ rung: 'L0', name: 'Lint', result: 'pass', reason: '', exitCode: 0, command: null }],
+  stoppedAt: null,
+  unmeasured: [],
+  ok: true,
+}
+
 // Three rungs are not commands: independent verification is the verifier's own
 // node, the inspection is the inspector's, and the human decision is a gate.
 // They used to climb as "runnable" with nothing to run, so every body reported

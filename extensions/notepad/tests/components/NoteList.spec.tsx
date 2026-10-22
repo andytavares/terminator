@@ -71,6 +71,7 @@ describe('NoteList archived section', () => {
     const archived = { ...note2, archivedAt: '2026-01-04T00:00:00Z' }
     useNotesStore.setState({
       notes: [note1, archived],
+      folders: [],
       selectedNoteId: null,
       archivedVisible: false,
     })
@@ -90,7 +91,7 @@ function noteListTests() {
   beforeEach(() => {
     cleanup()
     mockInvoke.mockClear()
-    useNotesStore.setState({ notes: [], selectedNoteId: null, archivedVisible: false })
+    useNotesStore.setState({ notes: [], folders: [], selectedNoteId: null, archivedVisible: false })
     useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
   })
 
@@ -131,7 +132,12 @@ function noteListSearchBarTests() {
   beforeEach(() => {
     cleanup()
     mockInvoke.mockClear()
-    useNotesStore.setState({ notes: [note1, note2], selectedNoteId: null, archivedVisible: false })
+    useNotesStore.setState({
+      notes: [note1, note2],
+      folders: [],
+      selectedNoteId: null,
+      archivedVisible: false,
+    })
     useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
   })
 
@@ -175,7 +181,12 @@ function noteListTagFilterDropdownTests() {
   beforeEach(() => {
     cleanup()
     mockInvoke.mockClear()
-    useNotesStore.setState({ notes: [note1, note3], selectedNoteId: null, archivedVisible: false })
+    useNotesStore.setState({
+      notes: [note1, note3],
+      folders: [],
+      selectedNoteId: null,
+      archivedVisible: false,
+    })
     useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
   })
 
@@ -273,7 +284,12 @@ function noteListEditDialogTests() {
     cleanup()
     mockInvoke.mockReset()
     mockInvoke.mockResolvedValue({ data: { body: 'Body' } })
-    useNotesStore.setState({ notes: [note1], selectedNoteId: null, archivedVisible: false })
+    useNotesStore.setState({
+      notes: [note1],
+      folders: [],
+      selectedNoteId: null,
+      archivedVisible: false,
+    })
     useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
   })
 

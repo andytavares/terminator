@@ -31,6 +31,8 @@ export interface Checkout {
   readonly branch: string
   /** False when the worktree was already there — a resumed run. */
   readonly created: boolean
+  /** The folders the origin's install lends, from the order's environment. */
+  readonly share: readonly string[]
 }
 
 export interface CheckoutDeps {
@@ -107,7 +109,8 @@ function sharedCheckout(
   const target = checkoutPath(deps.root, order, repo.name)
   const pending = inFlight.get(target)
   if (pending !== undefined) return pending
-  const plan = { repo, target, branch: branchFor(order, lane), reattachOnly }
+  const share = order.context.environment.share
+  const plan = { repo, target, branch: branchFor(order, lane), reattachOnly, share }
   const preparing = prepareCheckout(plan, deps).finally(() => inFlight.delete(target))
   inFlight.set(target, preparing)
   return preparing
@@ -120,6 +123,7 @@ interface CheckoutPlan {
   readonly branch: string
   /** Only check out the existing branch; refuse when it is gone. */
   readonly reattachOnly: boolean
+  readonly share: readonly string[]
 }
 
 type WorktreeState = 'absent' | 'present' | 'stale'
@@ -208,38 +212,56 @@ async function addWorktree(
 }
 
 async function prepareCheckout(plan: CheckoutPlan, deps: CheckoutDeps): Promise<Checkout> {
-  const { repo, target, branch, reattachOnly } = plan
+  const { repo, target, branch, reattachOnly, share } = plan
   // `-B` rather than `-b`: when nothing was registered at the target, a branch left over
   // from a previous attempt is reset onto the base rather than failing with "already
   // exists". The base is named explicitly so this does not depend on what is checked out.
   const addition = { target, how: ['-B', branch], branch, reattachOnly }
   const existing = await addWorktree(repo, addition, deps)
-  const checkout = { repo: repo.name, origin: repo.path, path: target, branch, created: !existing }
+  const checkout = {
+    repo: repo.name,
+    origin: repo.path,
+    path: target,
+    branch,
+    created: !existing,
+    share,
+  }
   await provisionDependencies(checkout, deps)
   return checkout
 }
 
-/** The directories holding a tracked package.json, or null when git cannot say. */
-async function manifestDirs(checkout: Checkout, deps: CheckoutDeps): Promise<string[] | null> {
+/** Every directory holding a tracked file, the root as `.`; null when git cannot say. */
+async function trackedDirs(checkout: Checkout, deps: CheckoutDeps): Promise<string[] | null> {
   const listed = await deps.exec({
     command: 'git',
-    args: ['ls-files', '-z', '--', 'package.json', '*/package.json'],
+    args: ['ls-files', '-z'],
     cwd: checkout.path,
     timeoutMs: 30_000,
   })
   if (listed.exitCode !== 0) return null
-  return listed.stdout
+  const dirs = listed.stdout
     .split('\0')
-    .filter((p) => p !== '' && !p.includes('node_modules'))
-    .map((manifest) => path.dirname(manifest))
+    .filter((file) => file !== '')
+    .map((file) => path.dirname(file))
+  return [...new Set(dirs)]
+}
+
+// Beside every directory holding a tracked file, the root included, so one entry covers
+// a monorepo's per-package installs; never inside the shared folder itself.
+async function lendingPlaces(checkout: Checkout, deps: CheckoutDeps): Promise<string[] | null> {
+  const dirs = await trackedDirs(checkout, deps)
+  if (dirs === null) return null
+  return checkout.share.flatMap((entry) =>
+    dirs.filter((dir) => !dir.split('/').includes(entry)).map((dir) => path.join(dir, entry))
+  )
 }
 
 /**
  * Give a lane's worktree the origin's installed dependencies.
  *
- * `git worktree add` copies no `node_modules`, so every check command in the
- * lane — vitest, tsc — fails before it ever reads the change. Symlinking the
- * origin's `node_modules` in is safe only where the repository already
+ * `git worktree add` copies no installed dependencies, so every check command in
+ * the lane fails before it ever reads the change. Symlinking each folder of the
+ * order's share list in from the origin is safe only where the repository already
  * ignores it: anything else would leave an untracked file in a target
  * repository, which is the one thing rule 1 forbids, so a link that
  * `git check-ignore` disowns is removed again immediately. Never throws — a
@@ -252,9 +274,10 @@ export async function provisionDependencies(
   deps: CheckoutDeps
 ): Promise<string[]> {
   const linked: string[] = []
+  if (checkout.share.length === 0) return linked
   try {
-    for (const dir of (await manifestDirs(checkout, deps)) ?? []) {
-      if (await lendModules(checkout, dir, deps)) linked.push(path.join(dir, 'node_modules'))
+    for (const place of (await lendingPlaces(checkout, deps)) ?? []) {
+      if (await lendFolder(checkout, place, deps)) linked.push(place)
     }
   } catch {
     return linked
@@ -262,25 +285,25 @@ export async function provisionDependencies(
   return linked
 }
 
-/** Links the origin's `node_modules` for `dir` into the checkout, where git ignores it. */
-async function lendModules(checkout: Checkout, dir: string, deps: CheckoutDeps): Promise<boolean> {
-  const originModules = path.join(checkout.origin, dir, 'node_modules')
-  const worktreeModules = path.join(checkout.path, dir, 'node_modules')
-  if (!isDirectoryAt(originModules) || entryExists(worktreeModules)) return false
+/** Links the origin's folder at `place` into the checkout, where git ignores it. */
+async function lendFolder(checkout: Checkout, place: string, deps: CheckoutDeps): Promise<boolean> {
+  const originFolder = path.join(checkout.origin, place)
+  const worktreeFolder = path.join(checkout.path, place)
+  if (!isDirectoryAt(originFolder) || entryExists(worktreeFolder)) return false
   try {
-    fs.symlinkSync(originModules, worktreeModules, 'dir')
+    fs.symlinkSync(originFolder, worktreeFolder, 'dir')
   } catch {
     return false
   }
   const ignored = await deps.exec({
     command: 'git',
-    args: ['check-ignore', '-q', path.join(dir, 'node_modules')],
+    args: ['check-ignore', '-q', place],
     cwd: checkout.path,
     timeoutMs: 30_000,
   })
   if (ignored.exitCode === 0) return true
   try {
-    fs.unlinkSync(worktreeModules)
+    fs.unlinkSync(worktreeFolder)
   } catch {
     // best effort — nothing else to do if this fails too
   }
@@ -306,7 +329,7 @@ function entryExists(target: string): boolean {
 }
 
 /**
- * Take back the `node_modules` links `provisionDependencies` lent a checkout.
+ * Take back the links `provisionDependencies` lent a checkout.
  *
  * Only links: an install the checkout made itself stays. Run before a
  * reinstall, which would otherwise write through the link into the origin's
@@ -318,9 +341,8 @@ export async function unlinkBorrowedDependencies(
 ): Promise<string[]> {
   const unlinked: string[] = []
   try {
-    for (const dir of (await manifestDirs(checkout, deps)) ?? []) {
-      const rel = path.join(dir, 'node_modules')
-      if (unlinkIfLink(path.join(checkout.path, rel))) unlinked.push(rel)
+    for (const place of (await lendingPlaces(checkout, deps)) ?? []) {
+      if (unlinkIfLink(path.join(checkout.path, place))) unlinked.push(place)
     }
   } catch {
     return unlinked
@@ -409,7 +431,14 @@ async function detachedBaseCheckout(
     throw new CheckoutFailedError(`lane ${lane}`, 'the order has no such lane')
 
   const target = `${checkoutPath(deps.root, order, repo.name)}${suffix}`
-  const leftover = { repo: repo.name, origin: repo.path, path: target, branch: repo.baseBranch }
+  const share = order.context.environment.share
+  const leftover = {
+    repo: repo.name,
+    origin: repo.path,
+    path: target,
+    branch: repo.baseBranch,
+    share,
+  }
   if (fresh) await removeBaseCheckout({ ...leftover, created: false }, deps)
   const existing = await addWorktree(repo, { target, how: ['--detach'] }, deps)
 

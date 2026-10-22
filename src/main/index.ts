@@ -54,7 +54,7 @@ import { createExtProtocolHandler } from './extensions/ext-protocol.js'
 import { EXTENSION_BASE_CSS } from '@terminator/extension-ui/extension-base-css'
 import { FrameBridge, registerFramePortChannel } from './extensions/frame-bridge.js'
 import { routeExtensionExitRequest, type ExtensionSurface } from './extensions/extension-exit.js'
-import { logger } from './logger.js'
+import { flushLogs, logger } from './logger.js'
 import { sendToWindow } from './safe-send.js'
 import { buildWindowMenu } from './window-menu.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
@@ -554,6 +554,8 @@ app.on('before-quit', async (event) => {
   stopRunningCommands()
   await ptyManager.killAll()
   closeAppDb()
+  // Last, so what the steps above logged reaches the file before the process ends.
+  await flushLogs()
   app.exit(0)
 })
 

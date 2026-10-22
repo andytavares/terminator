@@ -31,6 +31,8 @@ import {
   settleShipNode,
 } from './ship-deps.js'
 import { buildExecutorDeps } from './executor-deps.js'
+import { orderStoreAt } from '../state/live-index.js'
+import { withProfileEnvironment } from '../profile/environment.js'
 import type { OrderRun } from './executor-deps.js'
 
 type HouseRules = Awaited<ReturnType<typeof buildExecutorDeps>>['houseRules']
@@ -70,7 +72,7 @@ interface Found {
 }
 
 export async function executeOrderRun(api: ExtensionAPI, run: OrderRun): Promise<void> {
-  const tail = await prepareRun(api, run)
+  const tail = await prepareRun(api, await withEnvironment(run))
   const { order } = tail
 
   // The issue moves the moment work starts, not when somebody remembers.
@@ -90,9 +92,23 @@ export async function executeOrderRun(api: ExtensionAPI, run: OrderRun): Promise
   await finishTail(tail, { early, shipDeps, outcome })
 }
 
+// An order from before profiles runs with what its repository's profile resolves to, kept.
+async function withEnvironment(run: OrderRun): Promise<OrderRun> {
+  const resolved = await withProfileEnvironment(run.root, run.order)
+  if (resolved === run.order) return run
+  // Onto the order as it is now: a stop that landed meanwhile is kept.
+  const { environment } = resolved.context
+  const order = await orderStoreAt(run.root).update(run.order.id, (latest) => ({
+    ...latest,
+    context: { ...latest.context, environment },
+  }))
+  return { ...run, order: order ?? resolved }
+}
+
 async function prepareRun(api: ExtensionAPI, run: OrderRun): Promise<RunTail> {
   const { root, order, recipe, graph } = run
   const built = await buildExecutorDeps(api, run)
+  const gates = createLiveGateStore(() => root, indexFor)
   return {
     api,
     root,
@@ -103,7 +119,7 @@ async function prepareRun(api: ExtensionAPI, run: OrderRun): Promise<RunTail> {
     store: built.store,
     houseRules: built.houseRules,
     issuesPort: issuesPortFor(api),
-    gates: createLiveGateStore(() => root, indexFor),
+    gates,
     graphRef: { current: graph },
     shippedOrderRef: { current: order },
     finalCheck: settledOnce<boolean>(),
@@ -286,7 +302,7 @@ async function endedOnDocument(tail: RunTail, outcome: RunOutcome): Promise<bool
 // A run that ended on a ready document is finished: no pull request follows it.
 async function shipDocument(tail: RunTail, latest: WorkOrder): Promise<void> {
   const { root, order, store } = tail
-  await store.save({ ...latest, status: 'shipped' })
+  await store.update(latest.id, (now) => ({ ...now, status: 'shipped' }))
   if (latest.document === null) return
   await writeBack(
     latest,
@@ -310,11 +326,7 @@ async function shipFinishedRun(
 
   if (shipped === null || shipped.held || shipped.pulls.length === 0) return
 
-  await store.save({
-    ...order,
-    document: (await store.load(order.id))?.document ?? order.document,
-    status: 'shipped',
-  })
+  await store.update(order.id, (latest) => ({ ...latest, status: 'shipped' }))
 }
 
 async function shipOnce(

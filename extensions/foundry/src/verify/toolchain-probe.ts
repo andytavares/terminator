@@ -1,6 +1,6 @@
-import * as fs from 'node:fs'
-import * as path from 'node:path'
+import { defaultHintsDir, evaluateHints, loadHints } from '../profile/hints.js'
 import { CHECK_NAMES, type CheckName } from './check-names.js'
+import type { EntrySource } from '../profile/schema.js'
 
 // What this project actually runs, discovered rather than assumed.
 //
@@ -15,217 +15,28 @@ import { CHECK_NAMES, type CheckName } from './check-names.js'
 // and a check that reports a pass it did not earn is the failure mode that
 // makes an unattended factory dangerous.
 
-type ProbeSource = 'package.json' | 'config' | 'makefile' | 'ci'
-
 interface ProbedCommand {
   readonly command: string
-  readonly source: ProbeSource
+  readonly source: EntrySource
+  /** The file the command was read from, where there is one. */
+  readonly evidence?: string
 }
 
 export type Toolchain = Record<CheckName, ProbedCommand | null>
-
-/** Script names that mean each check, in preference order. Exact keys only. */
-const SCRIPT_NAMES: Record<CheckName, readonly string[]> = {
-  test: ['test'],
-  lint: ['lint'],
-  format: ['format'],
-  coverage: ['test:coverage', 'coverage'],
-  e2e: ['test:e2e', 'e2e'],
-  build: ['build'],
-}
-
-function readText(repo: string, rel: string): string | null {
-  try {
-    return fs.readFileSync(path.join(repo, rel), 'utf8')
-  } catch {
-    return null
-  }
-}
-
-function exists(repo: string, rel: string): boolean {
-  return fs.existsSync(path.join(repo, rel))
-}
-
-function existsAny(repo: string, rels: readonly string[]): boolean {
-  return rels.some((rel) => exists(repo, rel))
-}
-
-/**
- * A project's declared scripts.
- *
- * Tolerant by design, as the retiring self-review reader was: a package.json
- * that will not parse means "no scripts", not a thrown probe.
- */
-function scriptsOf(repo: string): Record<string, string> {
-  const raw = readText(repo, 'package.json')
-  if (raw === null) return {}
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    if (typeof parsed !== 'object' || parsed === null) return {}
-    const scripts = (parsed as { scripts?: unknown }).scripts
-    if (typeof scripts !== 'object' || scripts === null) return {}
-    const out: Record<string, string> = {}
-    for (const [key, value] of Object.entries(scripts as Record<string, unknown>)) {
-      if (typeof value === 'string') out[key] = value
-    }
-    return out
-  } catch {
-    return {}
-  }
-}
-
-function fromScripts(scripts: Record<string, string>, check: CheckName): ProbedCommand | null {
-  for (const name of SCRIPT_NAMES[check]) {
-    if (Object.hasOwn(scripts, name)) {
-      return { command: `npm run ${name}`, source: 'package.json' }
-    }
-  }
-  return null
-}
-
-const VITEST_CONFIGS = ['vitest.config.ts', 'vitest.config.js', 'vitest.config.mts']
-const JEST_CONFIGS = ['jest.config.ts', 'jest.config.js', 'jest.config.cjs']
-const ESLINT_CONFIGS = [
-  '.eslintrc.json',
-  '.eslintrc.js',
-  '.eslintrc.cjs',
-  'eslint.config.js',
-  'eslint.config.mjs',
-]
-const PRETTIER_CONFIGS = ['.prettierrc', '.prettierrc.json', '.prettierrc.js', 'prettier.config.js']
-const PLAYWRIGHT_CONFIGS = ['playwright.config.ts', 'playwright.config.js']
-
-/** A tool's presence in a repository, and the command that means it. */
-interface ConfigProbe {
-  readonly present: (repo: string) => boolean
-  readonly command: string
-  /** Installed in the project's own environment, so `uv run` reaches it where a bare name cannot. */
-  readonly python?: true
-}
-
-const anyOf =
-  (rels: readonly string[]) =>
-  (repo: string): boolean =>
-    existsAny(repo, rels)
-const CARGO = anyOf(['Cargo.toml'])
-const GO = anyOf(['go.mod'])
-/** A file that carries the tool's own section, or whose presence alone means the tool. */
-const configuresTool =
-  (rel: string, section: RegExp) =>
-  (repo: string): boolean =>
-    section.test(readText(repo, rel) ?? '')
-const PYTEST = (repo: string): boolean =>
-  exists(repo, 'pytest.ini') ||
-  configuresTool('pyproject.toml', /pytest/)(repo) ||
-  configuresTool('setup.cfg', /^\[tool:pytest\]/m)(repo) ||
-  configuresTool('tox.ini', /^\[pytest\]/m)(repo)
-const RUFF = (repo: string): boolean =>
-  existsAny(repo, ['ruff.toml', '.ruff.toml']) ||
-  configuresTool('pyproject.toml', /\[tool\.ruff/)(repo)
-
-/** In preference order: the first tool present names the check. */
-const CONFIG_PROBES: Record<CheckName, readonly ConfigProbe[]> = {
-  test: [
-    { present: anyOf(VITEST_CONFIGS), command: 'npx vitest run' },
-    { present: anyOf(JEST_CONFIGS), command: 'npx jest' },
-    { present: PYTEST, command: 'pytest', python: true },
-    { present: CARGO, command: 'cargo test' },
-    { present: GO, command: 'go test ./...' },
-  ],
-  lint: [
-    { present: anyOf(ESLINT_CONFIGS), command: 'npx eslint .' },
-    { present: RUFF, command: 'ruff check .', python: true },
-    { present: CARGO, command: 'cargo clippy' },
-  ],
-  format: [
-    { present: anyOf(PRETTIER_CONFIGS), command: 'npx prettier --check .' },
-    { present: RUFF, command: 'ruff format --check .', python: true },
-    { present: CARGO, command: 'cargo fmt --check' },
-  ],
-  e2e: [{ present: anyOf(PLAYWRIGHT_CONFIGS), command: 'npx playwright test' }],
-  build: [
-    { present: CARGO, command: 'cargo build' },
-    { present: GO, command: 'go build ./...' },
-  ],
-  // Deliberately not inferred. A test runner's presence says nothing about
-  // whether this project measures coverage, and guessing a command here would
-  // produce a check that fails for a reason the project never chose.
-  coverage: [],
-}
-
-/** The tool's own presence, when no script named the check. */
-function fromConfig(repo: string, check: CheckName): ProbedCommand | null {
-  const probe = CONFIG_PROBES[check].find((candidate) => candidate.present(repo))
-  if (probe === undefined) return null
-  const throughUv = probe.python === true && exists(repo, 'uv.lock')
-  return { command: throughUv ? `uv run ${probe.command}` : probe.command, source: 'config' }
-}
-
-/** A Makefile target whose name is the check. */
-function fromMakefile(repo: string, check: CheckName): ProbedCommand | null {
-  const makefile = readText(repo, 'Makefile') ?? readText(repo, 'makefile')
-  if (makefile === null) return null
-  const target = new RegExp(`^${check}:`, 'm')
-  return target.test(makefile) ? { command: `make ${check}`, source: 'makefile' } : null
-}
-
-/** Words that identify a run step as belonging to a check. */
-const CI_WORDS: Record<CheckName, RegExp> = {
-  test: /(^|\s)tests?(\s|$)/i,
-  lint: /(^|\s)lint(\s|$)/i,
-  format: /(^|\s)(format|fmt)(\s|$)/i,
-  coverage: /(^|\s)coverage(\s|$)/i,
-  e2e: /(^|\s)(e2e|playwright|cypress)(\s|$)/i,
-  build: /(^|\s)build(\s|$)/i,
-}
-
-/**
- * The CI workflow, last.
- *
- * What CI runs is by definition what the project considers its gate, so it is
- * a legitimate source — but it is the least precise one, which is why it is
- * consulted only when nothing better named the check.
- */
-function fromCi(repo: string, check: CheckName): ProbedCommand | null {
-  const dir = path.join(repo, '.github', 'workflows')
-  let files: string[]
-  try {
-    files = fs.readdirSync(dir).filter((f) => f.endsWith('.yml') || f.endsWith('.yaml'))
-  } catch {
-    return null
-  }
-  for (const file of files.sort()) {
-    let body: string
-    try {
-      body = fs.readFileSync(path.join(dir, file), 'utf8')
-    } catch {
-      continue
-    }
-    for (const line of body.split('\n')) {
-      const run = /^\s*-?\s*run:\s*(.+?)\s*$/.exec(line)
-      if (run === null) continue
-      const command = run[1].replace(/^['"]|['"]$/g, '')
-      if (command.startsWith('|') || command === '') continue
-      if (CI_WORDS[check].test(command)) return { command, source: 'ci' }
-    }
-  }
-  return null
-}
 
 /**
  * The commands this project actually uses, or null where it has none.
  *
  * Reads only. Executes nothing. Writes nothing.
+ * @internal
  */
-export function probeToolchain(repoPath: string): Toolchain {
-  const scripts = scriptsOf(repoPath)
-  const out = {} as Record<CheckName, ProbedCommand | null>
+export function probeToolchain(repoPath: string, hintsDir: string = defaultHintsDir()): Toolchain {
+  const { checks } = evaluateHints(repoPath, loadHints(hintsDir).hints)
+  const out = {} as Toolchain
   for (const check of CHECK_NAMES) {
+    const found = checks[check]
     out[check] =
-      fromScripts(scripts, check) ??
-      fromConfig(repoPath, check) ??
-      fromMakefile(repoPath, check) ??
-      fromCi(repoPath, check)
+      found === null ? null : { command: found.command, source: 'hint', evidence: found.evidence }
   }
   return out
 }
@@ -233,12 +44,4 @@ export function probeToolchain(repoPath: string): Toolchain {
 /** The checks this project cannot run, so the operator learns before work starts. */
 export function unavailableChecks(toolchain: Toolchain): CheckName[] {
   return CHECK_NAMES.filter((name) => toolchain[name] === null)
-}
-
-/** How to install exactly what the lockfile pins, or null when there is no lockfile. */
-export function installCommandFor(repo: string): string | null {
-  if (exists(repo, 'pnpm-lock.yaml')) return 'pnpm install --frozen-lockfile'
-  if (exists(repo, 'yarn.lock')) return 'yarn install --frozen-lockfile'
-  if (exists(repo, 'package-lock.json')) return 'npm ci'
-  return null
 }

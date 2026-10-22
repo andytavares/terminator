@@ -332,7 +332,8 @@ function passwordStorageTests() {
 
 function passwordGateTests() {
   it('never returns the password from get-settings, only whether one is set', async () => {
-    const { channelHandler } = await activateWithSettings({ [`${EXT}.passwordHash`]: currentHash })
+    const passwordHash = await hashPassword('existing-password')
+    const { channelHandler } = await activateWithSettings({ [`${EXT}.passwordHash`]: passwordHash })
     const settings = await channelHandler('remote:get-settings')()
     expect(settings.hasPassword).toBe(true)
     expect(JSON.stringify(settings)).not.toContain('existing-password')

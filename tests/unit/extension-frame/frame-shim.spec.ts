@@ -43,6 +43,8 @@ async function loadShimInFrame(): Promise<{ port: FakePort }> {
 beforeEach(() => {
   Reflect.deleteProperty(window, 'electronAPI')
   document.documentElement.removeAttribute('data-theme')
+  document.documentElement.style.height = ''
+  document.body.style.height = ''
   document.body.innerHTML = ''
 })
 

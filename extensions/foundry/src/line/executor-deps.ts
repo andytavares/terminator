@@ -28,6 +28,7 @@ import {
   runRecipeCommand,
   runLaneStep,
   runStepOnBaseCheckout,
+  prepareNewCheckouts,
 } from './lane-commands.js'
 import { isoNow } from '../host-calls.js'
 import { isAbsolute } from 'path'
@@ -74,11 +75,30 @@ export async function buildExecutorDeps(
   }).rules
   const gates = createLiveGateStore(() => run.root, indexFor)
   const parts = { sources, roleRegistry, houseRules, gates, startedAt }
+  await prepareNewCheckouts(context, (action, subject, reason) =>
+    recordLineEntry(context, { action, subject, reason })
+  )
   return {
     deps: await executorDepsFor(context, parts, run.graph),
     exec: context.exec,
     store: context.store,
     houseRules,
+  }
+}
+
+/** The operator's settings the executor reads, once per run. */
+function settingsDeps(api: ExtensionAPI): Pick<ExecutorDeps, 'autonomy'> {
+  return { autonomy: autonomyFor(api) }
+}
+
+/** The deps that run a failed rung again on the base branch, and let that checkout go. */
+function baseCheckoutDeps(
+  context: RunContext
+): Pick<ExecutorDeps, 'runStepOnBase' | 'reinstall' | 'releaseBase'> {
+  return {
+    runStepOnBase: (step, logPath) => runStepOnBaseCheckout(context, step, logPath),
+    reinstall: (where, logPath) => reinstallDependencies(context, where, logPath),
+    releaseBase: () => releaseBaseCheckout(context),
   }
 }
 
@@ -93,7 +113,7 @@ async function executorDepsFor(
     run: (input) => runNodeSession(context, input),
     sessionFor: (lane, role) => context.conversations.get(conversationKey(lane, role)),
     record: (action, subject, reason) => recordLineEntry(context, { action, subject, reason }),
-    autonomy: autonomyFor(context.api),
+    ...settingsDeps(context.api),
     // Loaded once, so what an agent is told the house rules are and what the
     // change is judged against are the same list.
     rules: parts.houseRules,
@@ -101,10 +121,9 @@ async function executorDepsFor(
     commitNode: (input) => commitNode(context, input),
     priorGates: await parts.gates.list(),
     raise: (gate) => raiseGate(context, parts.gates, gate),
-    runStep: (step, logPath) => runLaneStep(context, step, logPath),
-    runStepOnBase: (step, logPath) => runStepOnBaseCheckout(context, step, logPath),
-    reinstall: (where, logPath) => reinstallDependencies(context, where, logPath),
-    releaseBase: () => releaseBaseCheckout(context),
+    runStep: (step, logPath, options) => runLaneStep(context, step, { logPath, ...options }),
+    picturesTaken: () => context.pictures.current,
+    ...baseCheckoutDeps(context),
     runCommand: (input) => runRecipeCommand(context, input),
     endSession: endPreviousProcess,
     observe: async () => ({ elapsedMinutes: minutesSince(parts.startedAt) }),
@@ -318,7 +337,7 @@ async function readObservedChange(
     // A lockfile's lines would turn every new dependency into a "large change".
     const summary = await readDiffSummary(checkout.path, against, {
       run: context.diffCommand,
-      weighLines: (file) => !isLockfile(file),
+      weighLines: (file) => !isLockfile(file, context.order.context.environment.paths.lockfiles),
     })
     linesChanged += summary.added + summary.removed
   }

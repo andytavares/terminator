@@ -309,7 +309,7 @@ describe('extension backends — dependencies across a restart', () => {
     const seen: unknown[] = []
     const provider: BackendModule = {
       async activate() {
-        await new Promise((resolve) => setTimeout(resolve, 10))
+        await Promise.resolve()
         return { greet: () => 'hello' }
       },
     }

@@ -135,9 +135,13 @@ function order(units = [unit('U-1'), unit('U-2')], over: Partial<WorkOrder> = {}
       ...base.context,
       toolchain: {
         ...base.context.toolchain,
-        test: { command: 'npm test', source: 'package.json' },
-        lint: { command: 'npm run lint', source: 'package.json' },
-        format: { command: 'npm run format', source: 'package.json' },
+        test: { command: 'npm test', source: 'hint' },
+        lint: { command: 'npm run lint', source: 'hint' },
+        format: { command: 'npm run format', source: 'hint' },
+      },
+      environment: {
+        ...base.context.environment,
+        paths: { ...base.context.environment.paths, manifests: ['package.json'] },
       },
     },
     acceptance: [testCriterion('AC-1', { statement: 'a' })],
@@ -205,23 +209,32 @@ function runningUnitsTests() {
     expect(outcome.complete).toBe(true)
   })
 
-  it('honours the agent budget rather than starting everything at once', async () => {
-    let peak = 0
-    let live = 0
-    const run = vi.fn(async (input: { node: { id: string } }) => {
-      live += 1
-      peak = Math.max(peak, live)
-      await new Promise((r) => setTimeout(r, 5))
-      live -= 1
-      return { sessionId: `s-${input.node.id}`, exitCode: 0 }
-    })
-    const o = order([unit('U-1'), unit('U-2'), unit('U-3'), unit('U-4')], {
-      budgets: { agents: 2, wallClockMinutes: 45, tokens: null },
-    })
-    await execute(planOf(o), deps(run))
-    expect(peak).toBeLessThanOrEqual(2)
-    expect(run).toHaveBeenCalledTimes(4)
+  it('honours the agent budget rather than starting everything at once', agentBudgetTest)
+}
+
+/** Agents finish only when released, so more than the budget are live only if the executor lets them. */
+async function agentBudgetTest(): Promise<void> {
+  let peak = 0
+  let live = 0
+  const held: Array<() => void> = []
+  const run = vi.fn(async (input: { node: { id: string } }) => {
+    live += 1
+    peak = Math.max(peak, live)
+    await new Promise<void>((resolve) => held.push(resolve))
+    live -= 1
+    return { sessionId: `s-${input.node.id}`, exitCode: 0 }
   })
+  const o = order([unit('U-1'), unit('U-2'), unit('U-3'), unit('U-4')], {
+    budgets: { agents: 2, wallClockMinutes: 45, tokens: null },
+  })
+  const executing = execute(planOf(o), deps(run))
+  for (const _wave of [1, 2]) {
+    await vi.waitFor(() => expect(held).toHaveLength(2))
+    held.splice(0).forEach((release) => release())
+  }
+  await executing
+  expect(peak).toBeLessThanOrEqual(2)
+  expect(run).toHaveBeenCalledTimes(4)
 }
 
 function sessionsAndReadOnlyRolesTests() {
@@ -802,6 +815,8 @@ describe('a repeated failure becomes a decision', () => {
 describe('the ladder', () => {
   describe('when it is climbed', whenItIsClimbedTests)
   describe('what it reports', whatItReportsTests)
+  describe('the pictures step', picturesStepTests)
+  describe("the profile's added checks", profileChecksTests)
   describe('step output', stepOutputTests)
   describe('the question it asks', theQuestionItAsksTests)
   describe('lights-out runs', lightsOutRunsTests)
@@ -840,8 +855,6 @@ function sentBack(o: WorkOrder, n: number) {
     },
   }))
 }
-// Logs as WO-1008-6fe wrote them: neither failure was the code's.
-const MISSING = "Error: Cannot find package '@axe-core/playwright' imported from /w/a.spec.ts"
 function logRunner(log: (n: number) => { code: number; text: string }) {
   let n = 0
   return async (step: { name: string }, logPath: string) => {
@@ -877,6 +890,68 @@ function whenItIsClimbedTests() {
     })
     expect(outcome.ladder).toBeNull()
     expect(runStep).not.toHaveBeenCalled()
+  })
+}
+
+function profileChecksTests() {
+  it("runs the checks the repository's profile adds, at their rung", async () => {
+    const ran: string[] = []
+    const o = order([unit('U-1')])
+    const additional = [{ name: 'Type check', command: 'make types', rung: 'L1' as const }]
+    const environment = { ...o.context.environment, additional }
+    const outcome = await execute(planOf({ ...o, context: { ...o.context, environment } }), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async (step) => {
+        ran.push(step.command ?? '')
+        return 0
+      },
+    })
+    expect(ran).toContain('make types')
+    expect(outcome.ladder?.steps.find((s) => s.name === 'Type check')).toMatchObject({
+      result: 'pass',
+    })
+  })
+}
+
+const interfaceOrder = (pictures: string | null) => {
+  const o = order([unit('U-1', { touchesInterface: true })])
+  const environment = { ...o.context.environment, pictures }
+  return { ...o, context: { ...o.context, environment } }
+}
+const climbWith = (pictures: string | null, taken: { folder: string; images: string[] } | null) =>
+  execute(planOf(interfaceOrder(pictures)), {
+    ...deps(vi.fn(ok)),
+    autonomy: 'lights-out',
+    runStep: async (step) => (step.name === 'Pictures' && taken?.images.length === 0 ? null : 0),
+    picturesTaken: () => taken,
+  })
+const picturesOf = (outcome: Awaited<ReturnType<typeof climbWith>>) =>
+  outcome.ladder?.steps.find((s) => s.name === 'Pictures')
+
+function picturesStepTests() {
+  it('carries the images the step left onto its outcome', async () => {
+    const taken = { folder: '/runs/pictures-1', images: ['/runs/pictures-1/a.png'] }
+    expect(picturesOf(await climbWith('npm run shots', taken))).toMatchObject({
+      result: 'pass',
+      pictures: taken,
+    })
+  })
+
+  it('reports exit 0 with no images as not measured, naming why', async () => {
+    const none = { folder: '/runs/pictures-1', images: [] }
+    expect(picturesOf(await climbWith('npm run shots', none))).toMatchObject({
+      result: 'not_measured',
+      reason: 'the pictures command left no images',
+    })
+  })
+
+  it('is not measured, never a pass, when there is no pictures command', async () => {
+    const outcome = await climbWith(null, null)
+    expect(picturesOf(outcome)).toMatchObject({
+      result: 'not_measured',
+      reason: 'this repository has no pictures command',
+    })
   })
 }
 
@@ -980,37 +1055,63 @@ function lightsOutRunsTests() {
 }
 
 describe('a failed final climb', () => {
-  describe('flaky checks', flakyChecksTests)
+  describe('a check that fails once', failedOnceTests)
   describe('the base branch fails too', theBaseBranchFailsTooTests)
   describe('sending back', sendingBackTests)
   describe('the send-back limit', theSendBackLimitTests)
   describe('an unchecked base', anUncheckedBaseTests)
   describe('releasing the base checkout', releasingTheBaseCheckoutTests)
-  describe('reinstalling', reinstallingTests)
-  describe('an install that stays broken', anInstallThatStaysBrokenTests)
-  describe('the base checkout install', theBaseCheckoutInstallTests)
-  describe('a mended base', aMendedBaseTests)
+  describe('preparing the checkout again', preparingAgainTests)
+  describe('the question after it', afterPreparingTests)
+  describe('the base fails too', aFailingBaseTests)
+  describe('without a prepare command', withoutPrepareTests)
+  describe('a log is never read', noLogReadingTests)
   describe('a passing ladder', aPassingLadderTests)
 })
 
-function flakyChecksTests() {
-  it('records a flaky check that passes on a re-run, and ships', async () => {
+const TESTS = "The unit's own tests"
+
+/** Runs the unit tests with `exit(n)` for the n-th run, and every other step green. */
+function testsRunner(exit: (n: number) => number, seen: { options: unknown[] } = { options: [] }) {
+  let n = 0
+  return async (
+    step: { name: string },
+    logPath: string,
+    options?: { fresh?: boolean }
+  ): Promise<number> => {
+    fs.mkdirSync(path.dirname(logPath), { recursive: true })
+    const code = step.name === TESTS ? exit((n += 1)) : 0
+    if (step.name === TESTS) seen.options.push(options)
+    fs.writeFileSync(logPath, `${step.name} exited ${code} at ${path.basename(logPath)}\n`)
+    return code
+  }
+}
+
+function failedOnceTests() {
+  it('a check that fails once fails the final check, with no second run of it on the same commit', async () => {
     const o = order([unit('U-1')])
-    const record = vi.fn(async () => undefined)
+    const seen = { options: [] as unknown[] }
     const outcome = await execute(
       planOf(o),
-      base({ runStep: lintRunner((n) => (n === 1 ? 1 : 0)), record })
+      base({ runStep: testsRunner((n) => (n === 1 ? 1 : 0), seen) })
     )
-    expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.repeat-fail')
+    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
+    expect(seen.options).toEqual([undefined])
+    expect(gate?.why).toContain(`${TESTS} failed with exit code 1`)
+    expect(gate?.evidence).toEqual([
+      expect.objectContaining({ exitCode: 1, excerpt: expect.stringContaining('exited 1') }),
+    ])
+    expect(outcome.ladder?.ok).toBe(false)
+    expect(outcome.shippable).toBe(false)
+  })
+
+  it('runs a passing test step once', async () => {
+    const o = order([unit('U-1')])
+    const seen = { options: [] as unknown[] }
+    const outcome = await execute(planOf(o), base({ runStep: testsRunner(() => 0, seen) }))
+    expect(seen.options).toEqual([undefined])
+    expect(outcome.gates).toEqual([])
     expect(outcome.ladder?.ok).toBe(true)
-    expect(outcome.shippable).toBe(true)
-    expect(record).toHaveBeenCalledWith(
-      'verify.flaky',
-      'Lint',
-      expect.stringMatching(
-        /^Lint failed once and passed on a re-run: .*\.log then .*\.retry\.log$/
-      )
-    )
   })
 }
 
@@ -1023,7 +1124,7 @@ function expectBlockedOnBase(gate: Gate | undefined): void {
   expect(gate.options.map((o) => o.id)).toEqual(['send_back', 'accept_debt', 'hold'])
   expect(gate.evidence).toHaveLength(2)
   expect(gate.evidence[0]).toMatchObject({ exitCode: 1 })
-  expect(gate.evidence[0].excerpt).toContain('.retry.log')
+  expect(gate.evidence[0].excerpt).toContain('Lint exited 1')
   expect(gate.evidence[1]).toMatchObject({ exitCode: 2, step: 'Lint' })
   expect(gate.evidence[1].command).toBeTruthy()
   expect(gate.evidence[1].excerpt).toContain('.base.log')
@@ -1121,96 +1222,117 @@ function releasingTheBaseCheckoutTests() {
   })
 }
 
-/** What a check prints when the install it runs against lost part of Electron. */
-const TRUNCATED =
-  'dyld[1]: Library not loaded: @rpath/Electron Framework.framework/Electron Framework'
+/** A log the old rule read as a broken install; nothing reads it now. */
+const MISSING = "Error: Cannot find package '@axe-core/playwright' imported from /w/a.spec.ts"
 
-function reinstallingTests() {
-  it('reinstalls a broken install in its own checkout and checks again without asking', async () => {
-    const o = order([unit('U-1')])
-    let healed = false
+const withPrepare = (o: WorkOrder, prepare: string | null): WorkOrder => ({
+  ...o,
+  context: { ...o.context, environment: { ...o.context.environment, prepare } },
+})
+
+function preparingAgainTests() {
+  it('records verify.reprepared and ships when the check passes after the checkout is prepared again', async () => {
+    const o = withPrepare(order([unit('U-1')]), 'make deps')
+    let prepared = false
     const reinstall = vi.fn(async () => {
-      healed = true
+      prepared = true
       return 0
     })
     const record = vi.fn(async () => undefined)
     const outcome = await execute(
       planOf(o),
-      base({
-        runStep: logRunner(() => (healed ? { code: 0, text: 'ok' } : { code: 1, text: TRUNCATED })),
-        reinstall,
-        record,
-      })
+      base({ runStep: lintRunner(() => (prepared ? 0 : 1)), reinstall, record })
     )
     expect(reinstall).toHaveBeenCalledTimes(1)
     expect(reinstall).toHaveBeenCalledWith('change', expect.stringMatching(/\.log$/))
     expect(outcome.gates).toEqual([])
     expect(outcome.ladder?.ok).toBe(true)
     expect(record).toHaveBeenCalledWith(
-      'verify.reinstalled',
+      'verify.reprepared',
       'Lint',
-      expect.stringContaining('Electron Framework could not be loaded')
+      expect.stringMatching(/the checkout was broken, not the code\. Earlier log: .*\.log\./)
     )
   })
 }
 
-function anInstallThatStaysBrokenTests() {
-  it('says the install is broken when reinstalling did not mend it', async () => {
-    const o = order([unit('U-1')])
-    const reinstall = vi.fn(async () => 1)
+function afterPreparingTests() {
+  it('asks the base branch when the check still fails after the checkout is prepared again', async () => {
+    const o = withPrepare(order([unit('U-1')]), 'make deps')
+    const reinstall = vi.fn(async () => 0)
+    const record = vi.fn(async () => undefined)
+    const runStepOnBase = vi.fn(async () => 0)
     const outcome = await execute(
       planOf(o),
-      base({ runStep: logRunner(() => ({ code: 1, text: MISSING })), reinstall })
+      base({ runStep: lintRunner(() => 1), reinstall, record, runStepOnBase })
     )
     expect(reinstall).toHaveBeenCalledTimes(1)
-    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
-    expect(gate?.why).toContain(
-      'the package @axe-core/playwright is not installed, and reinstalling did not fix it'
+    expect(runStepOnBase).toHaveBeenCalled()
+    expect(record).not.toHaveBeenCalledWith(
+      'verify.reprepared',
+      expect.anything(),
+      expect.anything()
     )
-    expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.base-fail')
+    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
+    expect(gate?.why).toMatch(/It passes on main without this change\.$/)
   })
 }
 
-function theBaseCheckoutInstallTests() {
-  it('never blames the base branch for a broken install in the base checkout', async () => {
-    const o = order([unit('U-1')])
-    const reinstall = vi.fn(async () => 1)
+function aFailingBaseTests() {
+  it('names the base failure when the base fails too', async () => {
+    const o = withPrepare(order([unit('U-1')]), 'make deps')
     const outcome = await execute(
       planOf(o),
       base({
         runStep: lintRunner(() => 1),
-        runStepOnBase: logRunner(() => ({ code: 1, text: MISSING })),
-        reinstall,
+        runStepOnBase: lintRunner(() => 1),
+        reinstall: vi.fn(async () => 0),
       })
     )
-    expect(reinstall).toHaveBeenCalledWith('base', expect.stringMatching(/\.log$/))
-    expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.base-fail')
-    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
-    expect(gate?.why).toContain(
-      'main could not be checked: the package @axe-core/playwright is not installed'
-    )
+    expect(outcome.gates.map((g) => g.rule)).toContain('verify.base-fail')
   })
 }
 
-function aMendedBaseTests() {
-  it('checks the base again once its install is mended', async () => {
-    const o = order([unit('U-1')])
-    let healed = false
-    const reinstall = vi.fn(async () => {
-      healed = true
-      return 0
-    })
+function withoutPrepareTests() {
+  it('skips the question when the order has no prepare command', async () => {
+    const o = withPrepare(order([unit('U-1')]), null)
+    const reinstall = vi.fn(async () => 0)
+    const runStepOnBase = vi.fn(async () => 0)
+    const outcome = await execute(
+      planOf(o),
+      base({ runStep: lintRunner(() => 1), reinstall, runStepOnBase })
+    )
+    expect(reinstall).not.toHaveBeenCalled()
+    expect(runStepOnBase).toHaveBeenCalled()
+    expect(outcome.gates.map((g) => g.rule)).toContain('verify.repeat-fail')
+  })
+}
+
+function noLogReadingTests() {
+  const missingPackage = (n: number) => ({ code: n > 0 ? 1 : 0, text: MISSING })
+
+  it('treats a missing-package log like any other failure when there is no prepare command', async () => {
+    const o = withPrepare(order([unit('U-1')]), null)
+    const reinstall = vi.fn(async () => 0)
+    const outcome = await execute(
+      planOf(o),
+      base({ runStep: logRunner(missingPackage), runStepOnBase: lintRunner(() => 1), reinstall })
+    )
+    expect(reinstall).not.toHaveBeenCalled()
+    expect(outcome.gates.map((g) => g.rule)).toContain('verify.base-fail')
+  })
+
+  it('never says the dependencies are broken, whatever the log says', async () => {
+    const o = withPrepare(order([unit('U-1')]), 'make deps')
     const outcome = await execute(
       planOf(o),
       base({
-        runStep: lintRunner(() => 1),
-        runStepOnBase: logRunner(() =>
-          healed ? { code: 0, text: 'ok' } : { code: 1, text: MISSING }
-        ),
-        reinstall,
+        runStep: logRunner(missingPackage),
+        runStepOnBase: async () => 0,
+        reinstall: vi.fn(async () => 1),
       })
     )
     const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
+    expect(gate?.why).not.toMatch(/install|dependencies/)
     expect(gate?.why).toMatch(/It passes on main without this change\.$/)
   })
 }

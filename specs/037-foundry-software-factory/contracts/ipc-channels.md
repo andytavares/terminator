@@ -532,6 +532,56 @@ Run one sensor once, immediately, outside its own schedule.
 
 ---
 
+## Repository profiles
+
+What Foundry knows about one repository's toolchain. The operator's entries outrank the repository's own `.foundry/profile.yaml`, then what the scout proved, then the shipped hints. Stored under the data root, never in the repository.
+
+### `foundry:profile-read`
+
+**Payload**: `{ repoPath: string }`
+
+**Response**: `{ repository, prepare, share, checks, additional, pictures, paths, removed, proof }` — `removed` lists the parts (check names, `prepare`, `pictures`) the operator took the command away from, which resolve to `null`; each command entry is `{ command, source: 'operator' | 'repository' | 'scout' | 'hint', evidence? }` or `null`; `proof` is `{ commit, at?, exitCodes: Record<command, number | null> }` or `null`.
+
+### `foundry:profile-save`
+
+Write the operator's entries. A string sets one (source `operator`); `null` clears an operator entry and leaves any other source alone; an absent key is left as it is; `remove` lists parts the operator says have no command, stored as `{ command: null, source: 'operator' }`, which beats every other source until a `null` in `checks` / `prepare` / `pictures` clears it. A draft order on that repository is re-seeded from the profile as it now resolves.
+
+**Payload**: `{ repoPath: string; remove?: (check | 'prepare' | 'pictures')[]; checks?: { [check]: string | null }; prepare?: string | null; pictures?: string | null; additional?: { name; command; rung }[] | null; share?: string[] | null; paths?: { interface?; manifests?; lockfiles? } | null }`
+
+**Response**: the same as `foundry:profile-read`.
+
+### `foundry:profile-prove`
+
+Run one command in a terminal tab on a fresh checkout of the repository's base branch and record its exit code in the profile's proof.
+
+**Payload**: `{ repoPath: string; command: string }`
+
+**Response**: `{ exitCode: number | null; logPath: string | null; commit: string | null }`, or `{ error }` when the base branch could not be checked out.
+
+### `foundry:log-tail`
+
+The last 40 lines of a log Foundry kept. The path is resolved through symlinks and refused with `{ error }` in plain words unless it lies under the data root's records, so a `..` escape or a link pointing out reads nothing.
+
+**Payload**: `{ path: string }`
+
+**Response**: `{ tail: string }` or `{ error: string }`
+
+### `foundry:profiles-list`
+
+**Response**: `{ profiles: { repository: string; commands: number; proofCommit: string | null; provedAt: string | null }[] }`
+
+The Forge's `foundry:forge.environment` also takes the moves `continue-unmeasured` and `decline-pictures`: each writes an operator ledger line (`checks.continue-unmeasured`, `pictures.declined`) and the order view answers `environment.decisions: { continueUnmeasured, declinePictures }` read back from the ledger.
+
+### `foundry:profile-forget`
+
+Delete the stored profile. The repository's own file and the hints are untouched.
+
+**Payload**: `{ repoPath: string }`
+
+**Response**: `{ ok: true }`
+
+---
+
 ## Settings
 
 Registered via `api.settings.register`; not channels, but part of the surface. **Every key here is read by the extension** — a setting nothing reads is a control the operator can move while the factory ignores it, and `channel-registry.spec.ts` now fails on one.

@@ -1,4 +1,4 @@
-import { test, type Page } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -9,6 +9,7 @@ import {
   addAndSelectProject,
   type AppHandle,
   e2eTempDir,
+  readTerminalRows,
 } from '../helpers'
 
 // SC-005: typing stays responsive while other terminals print continuously.
@@ -32,7 +33,9 @@ async function startBusyTerminals(page: Page): Promise<void> {
     }
   }
   await page.locator('.terminal-pane').click()
-  await page.waitForTimeout(3000)
+  await expect
+    .poll(async () => (await readTerminalRows(page)).join('\n'), { timeout: 30_000 })
+    .toContain('busy')
 }
 
 /** Milliseconds from each of ten keystrokes to its echo in the idle terminal. */

@@ -307,9 +307,10 @@ describe('ExtensionsSection — lists an installed extension once when the list 
     api.dialog.openDirectory.mockResolvedValue({ filePath: '/path/to/ext' })
     api.extension.install.mockImplementation(async () => {
       api.extension.list.mockResolvedValue({ extensions: [newExt] })
+      const readsBefore = api.extension.list.mock.calls.length
       const announce = api.extension.onListChanged.mock.calls[0][0] as () => void
       announce()
-      await new Promise((resolve) => setTimeout(resolve, 0))
+      await waitFor(() => expect(api.extension.list.mock.calls.length).toBeGreaterThan(readsBefore))
       return { extension: newExt }
     })
     render(<SettingsPanel onClose={vi.fn()} />)
@@ -442,12 +443,14 @@ describe('ExtensionsSection — does not uninstall when confirm is declined', ()
       status: 'enabled',
     })
     api.extension.list.mockResolvedValue({ extensions: [ext] })
-    vi.stubGlobal('confirm', vi.fn().mockReturnValue(false))
+    const declined = vi.fn().mockReturnValue(false)
+    vi.stubGlobal('confirm', declined)
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByText('Uninstall'))
     fireEvent.click(screen.getByText('Uninstall'))
-    await new Promise((r) => setTimeout(r, 50))
+    // The handler asks before its first await, so the refusal has already been acted on.
+    expect(declined).toHaveBeenCalledTimes(1)
     expect(api.extension.uninstall).not.toHaveBeenCalled()
     vi.unstubAllGlobals()
   })
@@ -547,7 +550,10 @@ describe('ExtensionsSection — skips upgrade when directory dialog is cancelled
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByText('Upgrade'))
     fireEvent.click(screen.getByText('Upgrade'))
-    await new Promise((r) => setTimeout(r, 50))
+    await waitFor(() => expect(api.dialog.openDirectory).toHaveBeenCalledTimes(1))
+    await act(async () => {
+      await api.dialog.openDirectory.mock.results[0].value
+    })
     expect(api.extension.uninstall).not.toHaveBeenCalled()
   })
 })
@@ -788,13 +794,14 @@ describe('ExtensionsSection — ActionSettingRow — shows success toast when re
   })
 
   it('cancels action when confirm dialog is rejected', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const declined = vi.spyOn(window, 'confirm').mockReturnValue(false)
     await openActionSettings({
       confirmMessage: 'Are you sure?',
       danger: true,
     })
     fireEvent.click(screen.getByText('Do Thing'))
-    await new Promise((r) => setTimeout(r, 50))
+    // The handler asks before its first await, so the refusal has already been acted on.
+    expect(declined).toHaveBeenCalledWith('Are you sure?')
     expect(api.extensionBridge.invoke).not.toHaveBeenCalled()
     vi.restoreAllMocks()
   })

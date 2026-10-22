@@ -26,6 +26,7 @@ import { trustRepository, readOnlyAutoDecide } from '../runtime/agent-policy.js'
 import { runtime } from '../runtime/runtime-state.js'
 import { notePending, noteResolved } from '../runtime/held-calls.js'
 import { shellExecOf } from '../host-calls.js'
+import type { CommandProposal } from '../profile/command-proposal.js'
 
 /** One architect turn: the order, what it is told, and who hears how it ended. */
 export interface ArchitectTurn {
@@ -308,6 +309,8 @@ export interface ReadOnlyRound {
   readonly startedReason: string
   /** `anotherPass` is the red team asking to attack the fix for its findings. */
   readonly onFinished: (order: WorkOrder | null, anotherPass?: boolean) => Promise<void>
+  /** Commands the round proposed for the checks. Not waited for: proving them takes a run each. */
+  readonly onCommands?: (orderId: string, commands: readonly CommandProposal[]) => Promise<void>
   /** Stamped onto every fresh finding — only meaningful for the red team. */
   readonly round?: number
   /** Called once the round's session exists, before its turn ends; absent if unneeded. */
@@ -441,6 +444,12 @@ function roundStartOptions(launch: RoundLaunch): StartSupervisedRunOptions {
   }
 }
 
+// Not waited for: the scout is done when it has read, and proving a command takes a run.
+// Nobody awaits it, so a failure to write the profile must not become an unhandled rejection.
+function proposeCommands(input: ReadOnlyRound, commands: readonly CommandProposal[]): void {
+  if (commands.length > 0) void input.onCommands?.(input.order.id, commands).catch(() => undefined)
+}
+
 async function collectRound(launch: RoundLaunch, deadline: boolean): Promise<void> {
   const { input, store, progress, outputPath } = launch
   const { order, roleId } = input
@@ -467,5 +476,6 @@ async function collectRound(launch: RoundLaunch, deadline: boolean): Promise<voi
     return
   }
   await store.save(result.order)
+  proposeCommands(input, result.commands)
   await input.onFinished(result.order, result.anotherPass)
 }

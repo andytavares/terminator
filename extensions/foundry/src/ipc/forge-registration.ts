@@ -2,13 +2,15 @@ import { noPayload } from '@terminator/extension-sdk'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
 
 import { createForgeChannels, forgeChannelSpecs } from './forge-channels.js'
+import { createProfileChannels, profileChannelSpecs } from './profile-channels.js'
+import { defaultHintsDir } from '../profile/hints.js'
 import { foundryChannel } from './channel.js'
 import { IssuesMinePayload, OrderIdPayload, TicketCreatePayload } from './payloads.js'
 import { createLiveOrderStore } from '../order/store.js'
 import type { OrderStore } from '../order/store.js'
 import { deleteOrder } from '../line/teardown.js'
 import { projectRemover } from '../line/order-project.js'
-import { workspaceOf } from '../line/run-context.js'
+import { baselineDepsFor } from '../line/baseline-deps.js'
 import { proveEnvironment } from '../line/baseline.js'
 import { fileTicket, ticketOffer } from '../forge/ticket-offer.js'
 import { checkCapability, writeBack } from '../trackers/write-back.js'
@@ -56,8 +58,20 @@ export function registerForgeChannels(
   const forge = createForge(context, deps)
   registerIssueChannels(context.api)
   reg(context.api, ...forgeChannelSpecs(forge))
+  registerProfileChannels(context)
   registerOrderDelete(context)
   return forge
+}
+
+function registerProfileChannels({ api, dataRoot }: ActivationContext): void {
+  const store = createLiveOrderStore(dataRoot, indexFor)
+  const channels = createProfileChannels({
+    dataRoot,
+    hintsDir: defaultHintsDir(),
+    store,
+    baseline: () => baselineDepsFor(api, dataRoot(), store),
+  })
+  reg(api, ...profileChannelSpecs(channels))
 }
 
 function createForge(
@@ -98,16 +112,7 @@ function environmentProver(
   dataRoot: ActivationContext['dataRoot'],
   store: OrderStore
 ): NonNullable<ForgeDeps['proveEnvironment']> {
-  return (order) =>
-    proveEnvironment(order, {
-      root: dataRoot(),
-      now: isoNow,
-      exec: shellExecOf(api),
-      runCommand: (options) =>
-        runtime.supervisedRunner?.runCommand(options) ?? Promise.resolve(null),
-      workspaceOf: (origin) => workspaceOf(api, { origin }),
-      record: store.record,
-    })
+  return (order) => proveEnvironment(order, baselineDepsFor(api, dataRoot(), store))
 }
 
 async function readTrackerIssue(

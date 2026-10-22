@@ -1,6 +1,6 @@
 # ADR 042: Foundry installs nothing into a repository, and its records live where you say
 
-**Status**: Accepted
+**Status**: Accepted; Amended by ADR 121
 
 **Date**: 2026-09-06
 

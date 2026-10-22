@@ -45,11 +45,12 @@ const dataRootMemo = new Map<string, string>()
 
 export function resolveFoundryDataRoot(api: ExtensionAPI): string {
   const { configured, workdir } = configuredLocation(api)
-  const key = `${configured}\u0000${workdir ?? ''}`
+  const base = workdir ?? fallbackRecordsBase(api)
+  const key = `${configured}\u0000${base}`
   const memo = dataRootMemo.get(key)
   if (memo !== undefined) return memo
 
-  const root = rootUnder(configured, workdir ?? fallbackRecordsBase(api))
+  const root = rootUnder(configured, base)
   dataRootMemo.set(key, root)
   return root
 }

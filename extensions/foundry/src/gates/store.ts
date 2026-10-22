@@ -33,11 +33,23 @@ function withoutRetiredBreach(gate: Gate): Gate {
   return { ...gate, breach: null }
 }
 
+/**
+ * `verify.flaky` is gone: a check that fails once is a failure. A gate an earlier
+ * build raised under it reads as the failed-check question, which offers the same options.
+ */
+function withoutRetiredRule(gate: Gate): Gate {
+  return (gate.rule as string) === 'verify.flaky' ? { ...gate, rule: 'verify.repeat-fail' } : gate
+}
+
+function readAsCurrent(gate: Gate): Gate {
+  return withoutRetiredRule(withoutRetiredBreach(gate))
+}
+
 async function readGates(root: string, orderId: string): Promise<Gate[]> {
   try {
     const raw = await fs.promises.readFile(gatesPath(root, orderId), 'utf8')
     const parsed: unknown = JSON.parse(raw)
-    return Array.isArray(parsed) ? (parsed as Gate[]).map(withoutRetiredBreach) : []
+    return Array.isArray(parsed) ? (parsed as Gate[]).map(readAsCurrent) : []
   } catch {
     // A missing or unreadable file is no gates, never a thrown surface.
     return []
@@ -76,7 +88,7 @@ export function createGateStore(root: string, index?: FoundryIndex): GateStore {
       await fs.promises.mkdir(orderDir(root, gate.orderId), { recursive: true })
       const json = JSON.stringify(next)
       await writeJsonAtomic(gatesPath(root, gate.orderId), next)
-      index?.gatesWritten(gate.orderId, (JSON.parse(json) as Gate[]).map(withoutRetiredBreach))
+      index?.gatesWritten(gate.orderId, (JSON.parse(json) as Gate[]).map(readAsCurrent))
     },
 
     async list() {

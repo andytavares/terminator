@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { readdirSync, rmSync } from 'node:fs'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { makeTempDir } from '../support/temp-dir'
 
@@ -69,18 +69,16 @@ describe('git run by the test suite', () => {
 describe('git run by the test suite — after a commit', () => {
   useRemovedDir()
 
-  it('leaves nothing writing into .git after a commit returns', async () => {
+  it('starts nothing that writes into .git after a commit returns', () => {
     dir = makeTempDir('git-test-env-')
     execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: dir })
-    execFileSync(
-      'git',
-      ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'c'],
-      { cwd: dir }
+    // A process left writing after the commit shows in the trace as a command git started.
+    const trace = execFileSync(
+      'sh',
+      ['-c', 'GIT_TRACE=1 git -c user.name=t -c user.email=t@t commit -q --allow-empty -m c 2>&1'],
+      { cwd: dir, encoding: 'utf-8' }
     )
-    const files = (): string[] =>
-      readdirSync(join(dir, '.git'), { recursive: true }).map(String).sort()
-    const before = files()
-    await new Promise((settle) => setTimeout(settle, 1500))
-    expect(files()).toEqual(before)
+    expect(trace).toContain('commit')
+    expect(trace).not.toMatch(/maintenance run --auto|gc --auto/)
   })
 })

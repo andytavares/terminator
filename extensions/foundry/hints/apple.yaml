@@ -1,0 +1,8 @@
+schemaVersion: 1
+id: apple
+priority: 70
+when: [Package.swift, '*.xcodeproj', '*.xcworkspace']
+paths:
+  interface: ['**/*.swift', '**/*.storyboard', '**/*.xib']
+  manifests: [Package.swift, Podfile]
+  lockfiles: [Package.resolved, Podfile.lock]

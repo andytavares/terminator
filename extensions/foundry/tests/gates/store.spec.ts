@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
+import * as path from 'node:path'
+import { orderDir } from '../../src/data-root.js'
 import { askOnce, createGateStore } from '../../src/gates/store.js'
 import { decide, raiseGate } from '../../src/gates/rules.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
@@ -33,6 +35,8 @@ describe('askOnce', () => {
   describe('other orders', otherOrdersTests)
   describe('other questions', otherQuestionsTests)
 })
+
+describe('a gate an earlier build wrote', earlierBuildTests)
 
 function askingAndHoldingTests() {
   it('puts a new question in front of the operator and holds', async () => {
@@ -116,5 +120,34 @@ function otherQuestionsTests() {
     })
     await store.save(decide(budget, { option: 'raise', note: '', at: '2026-09-28T19:11:00.000Z' }))
     expect(await askOnce(store, shipGate())).toBe('hold')
+  })
+}
+
+function earlierBuildTests() {
+  it('loads a decided verify.flaky gate as the failed-check question it became', async () => {
+    const orderId = 'WO-0928-0bb'
+    const decided = decide(
+      raiseGate({
+        id: `${orderId}-verify.flaky-1`,
+        rule: 'verify.repeat-fail',
+        orderId,
+        summary: 'x has a check that does not agree with itself',
+        why: 'Tests failed with exit code 1 and passed with exit code 0 on the same commit.',
+        riskGrade: 'P1',
+        blockedUnits: 1,
+        at: '2026-09-28T19:10:00.000Z',
+      }),
+      { option: 'accept_debt', note: '', at: '2026-09-28T19:11:00.000Z' }
+    )
+    fs.mkdirSync(orderDir(root, orderId), { recursive: true })
+    fs.writeFileSync(
+      path.join(orderDir(root, orderId), 'gates.json'),
+      JSON.stringify([{ ...decided, rule: 'verify.flaky' }])
+    )
+    const loaded = await createGateStore(root).get(`${orderId}-verify.flaky-1`)
+    expect(loaded).toMatchObject({
+      rule: 'verify.repeat-fail',
+      decision: { option: 'accept_debt' },
+    })
   })
 }

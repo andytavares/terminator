@@ -28,7 +28,7 @@ function orderProbing(test: string | null): WorkOrder {
       ...base.context,
       toolchain: {
         ...base.context.toolchain,
-        test: test === null ? null : { command: test, source: 'package.json' },
+        test: test === null ? null : { command: test, source: 'hint' },
       },
     },
   } as WorkOrder

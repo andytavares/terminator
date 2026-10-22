@@ -1,4 +1,5 @@
 import React from 'react'
+import { setImmediate as nextEventLoopTurn } from 'node:timers/promises'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { screen, cleanup, fireEvent, within } from '@testing-library/react'
 import { installVaultBridge, eventually, task } from './helpers/bridge'
@@ -236,14 +237,15 @@ function jumpTestsPart2() {
   })
 }
 
-/** Collects the promise rejections nothing handled while `run` and a macrotask after it ran. */
+/** Collects the promise rejections nothing handled while `run` and the event-loop turn after it ran. */
 async function unhandledRejectionsDuring(run: () => Promise<void>): Promise<unknown[]> {
   const reasons: unknown[] = []
   const recordReason = (reason: unknown) => void reasons.push(reason)
   process.on('unhandledRejection', recordReason)
   try {
     await run()
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    // Node reports an unhandled rejection once the microtask queue has drained, on the next turn.
+    await nextEventLoopTurn()
   } finally {
     process.off('unhandledRejection', recordReason)
   }

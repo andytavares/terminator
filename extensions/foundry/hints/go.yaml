@@ -1,0 +1,13 @@
+schemaVersion: 1
+id: go
+priority: 40
+when: [go.mod]
+tools:
+  test:
+    - { command: 'go test ./...', files: [go.mod] }
+  build:
+    - { command: 'go build ./...', files: [go.mod] }
+paths:
+  interface: []
+  manifests: [go.mod]
+  lockfiles: [go.sum]

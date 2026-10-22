@@ -206,7 +206,7 @@ function everyOtherCheckPassingTests() {
         ...order().context,
         toolchain: {
           ...order().context.toolchain,
-          test: { command: 'npm test', source: 'package.json' as const },
+          test: { command: 'npm test', source: 'hint' as const },
         },
       },
       acceptance: [testCriterion('AC-1', { statement: 'it works', priority: 'P0' })],
@@ -234,6 +234,8 @@ function unansweredQuestionsTests() {
           answer: null,
           rank: 1,
           confidence: 0.5,
+          multiple: false,
+          chosen: [],
         },
       ],
     })
@@ -355,6 +357,8 @@ function otherChecksAndQuestionsTests() {
           options: ['a', 'b'],
           recommended: null,
           confidence: null,
+          multiple: false,
+          chosen: [],
           answer: null,
           rank: 0,
         },

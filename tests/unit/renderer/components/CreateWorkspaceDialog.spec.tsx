@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { CreateWorkspaceDialog } from '../../../../src/renderer/components/sidebar/CreateWorkspaceDialog'
 import { projectFixture, workspaceFixture } from '../../../support/renderer-stores'
@@ -101,10 +101,10 @@ describe('CreateWorkspaceDialog — adds the workspace it creates to the list', 
     expect(screen.getByPlaceholderText('/path/to/folder')).toBeTruthy()
   })
 
-  it('does not submit with empty name', async () => {
+  it('does not submit with empty name', () => {
     render(<CreateWorkspaceDialog onClose={vi.fn()} />)
+    // The name check returns before the handler's first await, so the click has decided by now.
     fireEvent.click(screen.getByText('Create'))
-    await new Promise((r) => setTimeout(r, 10))
     expect(mockCreateWorkspace).not.toHaveBeenCalled()
   })
 
@@ -121,7 +121,9 @@ describe('CreateWorkspaceDialog — does not update folder path when Browse is c
     mockOpenDirectory.mockResolvedValue({ cancelled: true })
     render(<CreateWorkspaceDialog onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Browse'))
-    await new Promise((r) => setTimeout(r, 50))
+    await act(async () => {
+      await mockOpenDirectory.mock.results[0].value
+    })
     // folder path input should remain at placeholder with empty value
     expect(screen.getByPlaceholderText('/path/to/folder')).toBeTruthy()
     expect((screen.getByPlaceholderText('/path/to/folder') as HTMLInputElement).value).toBe('')

@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
+import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { CreateProjectDialog } from '../../../../src/renderer/components/sidebar/CreateProjectDialog'
 import {
   issueSummaryOf,
@@ -46,6 +47,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockCreateProject.mockResolvedValue({ project: { id: 'proj-1' } })
   setupGitAPI()
+  // A spec that connects a tracker must not show its issue picker to the next one.
+  useIntegrationsStore.setState(useIntegrationsStore.getInitialState(), true)
   seedStore(useWorkspaceStore, {
     createProject: mockCreateProject,
     projectsByWorkspaceId: new Map([['ws-1', []]]),
@@ -536,9 +539,6 @@ const LINEAR = {
 }
 
 async function openWithIssues(connected = true, issues: IssueSummary[] = [ISSUE]) {
-  const { useIntegrationsStore } = await import(
-    '../../../../src/renderer/stores/integrations.store'
-  )
   listMine.mockResolvedValue({ issues, failures: [] })
   linkIssue.mockResolvedValue(true)
   useIntegrationsStore.setState({

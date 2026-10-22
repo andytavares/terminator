@@ -1,6 +1,6 @@
 # ADR 088: Foundry mends broken installs and never opens an order itself
 
-**Status**: Accepted
+**Status**: Accepted; Amended by ADR 122
 
 **Date**: 2026-10-07
 

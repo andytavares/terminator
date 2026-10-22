@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { orderDir } from '../data-root.js'
 import { seedOrder, newOrderId } from '../forge/intake-source.js'
+import { defaultHintsDir } from '../profile/hints.js'
 import type { IssueLike, SeedInput } from '../forge/intake-source.js'
 import { answerQuestion, surfacedQuestions } from '../forge/interview.js'
 import { strikeAssumption } from '../forge/assumptions.js'
@@ -15,6 +16,9 @@ import {
   loopFacts,
   agreedFacts,
   environmentWaivedAt,
+  checkDecisions,
+  CHECKS_CONTINUE_UNMEASURED,
+  PICTURES_DECLINED,
   turnEndedAt as turnEndedAtOf,
 } from '../forge/intake-outcome.js'
 import type { IntakeOutcome } from '../forge/intake-outcome.js'
@@ -64,6 +68,9 @@ const CancelPayload = z.object({
   reason: z.string().optional(),
 })
 
+/** A typed answer, one option index, or several indices for a multiple-choice question. */
+const AnswerOption = z.union([z.string(), z.number(), z.array(z.number().int())])
+
 /**
  * Everything the operator decided in the "Needs you" band, in one submit.
  *
@@ -75,9 +82,7 @@ const CancelPayload = z.object({
  * it carries.
  */
 const SettlePayload = z.object({
-  answers: z
-    .array(z.object({ questionId: z.string(), option: z.union([z.string(), z.number()]) }))
-    .optional(),
+  answers: z.array(z.object({ questionId: z.string(), option: AnswerOption })).optional(),
   accepts: z.array(z.object({ findingId: z.string(), reason: z.string() })).optional(),
   fixes: z.array(z.object({ findingId: z.string(), how: z.string() })).optional(),
   asks: z.array(z.string()).optional(),
@@ -89,9 +94,7 @@ const TurnPayload = z.object({
   id: z.string(),
   message: z.string().optional(),
   strike: z.string().optional(),
-  answer: z
-    .object({ questionId: z.string(), option: z.union([z.string(), z.number()]) })
-    .optional(),
+  answer: z.object({ questionId: z.string(), option: AnswerOption }).optional(),
   /**
    * Accept an adversarial finding: it stands, and the operator has said why.
    *
@@ -133,7 +136,10 @@ const CompilePayload = z.object({
 
 const RecipePayload = z.object({ id: z.string(), recipe: z.string().nullable() })
 const HoldPayload = z.object({ id: z.string(), held: z.boolean() })
-const EnvironmentPayload = z.object({ id: z.string(), move: z.enum(['check', 'waive']) })
+const EnvironmentPayload = z.object({
+  id: z.string(),
+  move: z.enum(['check', 'waive', 'continue-unmeasured', 'decline-pictures']),
+})
 
 const WriteBackPayload = z.object({
   id: z.string(),
@@ -291,6 +297,7 @@ async function readFacts(
       baseline,
       waivedAt: environmentWaivedAt(entries, baseline?.startedAt ?? null),
       proving: isProving(orderId),
+      decisions: checkDecisions(entries),
     },
   }
 }
@@ -354,6 +361,7 @@ async function create(deps: ForgeDeps, payload: CreateInput): Promise<unknown> {
     newId: () => newOrderId(new Date(deps.now())),
     readIssue: deps.readIssue,
     priorArtFor: deps.priorArtFor,
+    profile: { dataRoot: deps.dataRoot(), hintsDir: defaultHintsDir() },
   })
 
   if ('error' in seeded) return seeded
@@ -989,6 +997,24 @@ async function hold(deps: ForgeDeps, payload: z.infer<typeof HoldPayload>): Prom
 const WAIVED_REASON =
   'Handed off without a proven base branch; checks that fail there will read "failing on base".'
 
+/** What each move that is not a re-check writes to the order's ledger. */
+const MOVE_RECORDS: Record<
+  Exclude<z.infer<typeof EnvironmentPayload>['move'], 'check'>,
+  { action: string; reason: string }
+> = {
+  waive: { action: 'environment.waived', reason: WAIVED_REASON },
+  'continue-unmeasured': {
+    action: CHECKS_CONTINUE_UNMEASURED,
+
+    reason: 'Went on with nothing measured: no command was found and none was given.',
+  },
+  'decline-pictures': {
+    action: PICTURES_DECLINED,
+
+    reason: 'Ships without pictures although the plan changes the interface.',
+  },
+}
+
 // Check the base branch again, or hand off without it. A check runs on after the answer;
 // the Forge reads its result when baseline.json announces.
 async function environment(
@@ -1001,15 +1027,8 @@ async function environment(
     return { error: 'Only a draft order can check its base branch again.' }
   }
 
-  if (payload.move === 'check') {
-    void deps.proveEnvironment?.(order)
-  } else {
-    await recordOperator(deps, order.id, {
-      action: 'environment.waived',
-      subject: order.id,
-      reason: WAIVED_REASON,
-    })
-  }
+  if (payload.move === 'check') void deps.proveEnvironment?.(order)
+  else await recordOperator(deps, order.id, { ...MOVE_RECORDS[payload.move], subject: order.id })
 
   return { ...view(order), ...(await readFacts(deps, order.id)) }
 }

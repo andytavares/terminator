@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import Fastify from 'fastify'
 import type { FastifyInstance } from 'fastify'
 import websocketPlugin from '@fastify/websocket'
+import { once } from 'node:events'
 import { WebSocket } from 'ws'
 import { registerBridgeRoute } from '../../extensions/remote-control/src/server/routes/bridge.route'
 import { WsTicketStore } from '../../extensions/remote-control/src/server/ws-ticket-store'
@@ -16,20 +17,15 @@ import { REMOTE_ACCESSIBLE_CHANNELS } from '../../src/main/remote/remote-accessi
 //   - a non-allowlisted channel is rejected before its handler is ever called
 // If the allowlist were empty again, the first assertion would fail loudly.
 
-function waitForOpen(ws: WebSocket): Promise<void> {
-  return new Promise((resolve, reject) => {
-    ws.on('open', resolve)
-    ws.on('error', reject)
-    setTimeout(() => reject(new Error('timeout waiting for open')), 8000)
-  })
+const SOCKET_WAIT_MS = 8000
+
+async function waitForOpen(ws: WebSocket): Promise<void> {
+  await once(ws, 'open', { signal: AbortSignal.timeout(SOCKET_WAIT_MS) })
 }
 
-function waitForMessage(ws: WebSocket): Promise<Record<string, unknown>> {
-  return new Promise((resolve, reject) => {
-    ws.once('message', (data) => resolve(JSON.parse(data.toString())))
-    ws.on('error', reject)
-    setTimeout(() => reject(new Error('timeout waiting for message')), 8000)
-  })
+async function waitForMessage(ws: WebSocket): Promise<Record<string, unknown>> {
+  const [data] = await once(ws, 'message', { signal: AbortSignal.timeout(SOCKET_WAIT_MS) })
+  return JSON.parse(data.toString())
 }
 
 let app: FastifyInstance

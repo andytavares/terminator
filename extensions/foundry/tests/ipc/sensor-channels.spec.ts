@@ -4,6 +4,8 @@ import * as fs from 'node:fs'
 import { createSensorChannels } from '../../src/ipc/sensor-channels.js'
 import { createSignalStore } from '../../src/sensors/store.js'
 import type { SignalStore } from '../../src/sensors/store.js'
+import { emptyProfile } from '../../src/profile/schema.js'
+import { writeProfile } from '../../src/profile/store.js'
 import { createOrderStore } from '../../src/order/store.js'
 import type { Signal } from '../../src/sensors/types.js'
 import type { SensorDef } from '../../src/sensors/types.js'
@@ -73,6 +75,7 @@ function channels(sensors: readonly AvailableSensor[] = [{ def: sensorDef(), run
     collectDepsFor: () => collectDeps,
     now: () => '2026-01-01T00:20:00.000Z',
     newId: () => 'WO-0101-sig',
+    dataRoot: () => root,
   })
   return { c, store, orderStore }
 }
@@ -97,6 +100,21 @@ describe('foundry:signals.dismiss', () => {
     const result = (await c.dismiss({ id: 'sig-1' })) as { signal: Signal }
     expect(result.signal.status).toBe('dismissed')
     expect((await store.get('sig-1'))?.status).toBe('dismissed')
+  })
+
+  it('seeds the order from the repository profile stored under the data root', async () => {
+    const { c, store } = channels()
+    await seedSignal(store)
+    const profile = {
+      ...emptyProfile(repo),
+      prepare: { command: 'make setup', source: 'operator' as const },
+    }
+    await writeProfile(root, repo, profile)
+
+    const result = (await c.promote({ id: 'sig-1', repoPaths: [repo] })) as {
+      order: { context: { environment: { prepare: string | null } } }
+    }
+    expect(result.order.context.environment.prepare).toBe('make setup')
   })
 
   it('errors on an unknown signal', async () => {

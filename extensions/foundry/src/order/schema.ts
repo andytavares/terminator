@@ -1,5 +1,7 @@
 import { z } from 'zod'
+import { ENTRY_SOURCES, PathsSchema } from '../profile/schema.js'
 import { CHECK_NAMES } from '../verify/check-names.js'
+import { RUNGS } from '../verify/ladder.js'
 
 // The work order: the only object that crosses from the Forge to the Line.
 //
@@ -50,7 +52,14 @@ const IntentSchema = z.object({
 
 const ProbedCommandSchema = z.object({
   command: nonEmpty,
-  source: z.enum(['package.json', 'config', 'makefile', 'ci']),
+  source: z.preprocess(
+    // Orders written before profiles named the file kind a command came from;
+    // every such source is what the shipped hints now read.
+    (value) => (ENTRY_SOURCES.includes(value as (typeof ENTRY_SOURCES)[number]) ? value : 'hint'),
+    z.enum(ENTRY_SOURCES)
+  ),
+  /** Where the command was read from (`README.md:38`, `package.json`), when known. */
+  evidence: z.string().optional(),
 })
 
 const ToolchainSchema = z.object(
@@ -68,9 +77,30 @@ const RepoRefSchema = z.object({
   headBranch: z.string(),
 })
 
+// What the repository's profile resolved to when the order was seeded. Every
+// field defaults to empty so an order written before profiles still parses;
+// `resolved` false marks such an order, and its run resolves the profile first.
+const EnvironmentSchema = z.object({
+  resolved: z.boolean().default(false),
+  prepare: z.string().nullable().default(null),
+  share: z.array(z.string()).default([]),
+  pictures: z.string().nullable().default(null),
+  paths: PathsSchema.default({}),
+  additional: z
+    .array(
+      z.object({
+        name: nonEmpty,
+        command: nonEmpty,
+        rung: z.enum(RUNGS),
+      })
+    )
+    .default([]),
+})
+
 const ContextSchema = z.object({
   repos: z.array(RepoRefSchema).min(1),
   toolchain: ToolchainSchema,
+  environment: EnvironmentSchema.default({}),
   entryPoints: z.array(z.string()).default([]),
   priorArt: z.array(z.string()).default([]),
   conventions: z.array(z.string()).default([]),
@@ -166,6 +196,8 @@ const UnitSchema = z.object({
   satisfies: z.array(z.string()).default([]),
   touches: z.array(z.string()).default([]),
   verify: z.array(VerifySchema).default([]),
+  /** The architect's word that this unit changes something a person looks at. */
+  touchesInterface: z.boolean().optional(),
 })
 
 /**
@@ -210,6 +242,9 @@ const OpenQuestionSchema = z.object({
   options: z.array(z.string()).default([]),
   recommended: z.number().int().nullable().default(null),
   answer: z.string().nullable().default(null),
+  // True when more than one option can hold at once; `chosen` is the options picked.
+  multiple: z.boolean().default(false),
+  chosen: z.array(z.number().int()).default([]),
   rank: z.number().default(0),
   // How sure the architect is of `recommended`, 0–1. At the bar it is decided
   // rather than asked (spec 062); absent means "ask".

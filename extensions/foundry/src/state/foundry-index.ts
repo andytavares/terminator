@@ -7,9 +7,10 @@ import type { LedgerEntry } from '../ledger/append.js'
 // each piece loads on first ask and hears of every successful write, so polls stop
 // reparsing. A file edited by hand is not noticed until a restart.
 
+// `profile` is a plain file under the data root that the index holds nothing for: it only announces.
 // `live` has no file behind it: held calls, stalls, stranded agents and running
 // intakes live in the process. `orderId` is empty for a change tied to no order.
-export type ChangeKind = 'order' | 'graph' | 'gates' | 'ledger' | 'live'
+export type ChangeKind = 'order' | 'graph' | 'gates' | 'ledger' | 'live' | 'profile'
 
 export interface FoundryChange {
   readonly kind: ChangeKind

@@ -1,0 +1,30 @@
+schemaVersion: 1
+id: python
+priority: 20
+when: [pyproject.toml, setup.cfg, setup.py, pytest.ini, ruff.toml, .ruff.toml, tox.ini, uv.lock]
+tools:
+  test:
+    - command: pytest
+      files: [pytest.ini]
+      matches:
+        - { file: pyproject.toml, pattern: pytest }
+        - { file: setup.cfg, pattern: '^\[tool:pytest\]', flags: m }
+        - { file: tox.ini, pattern: '^\[pytest\]', flags: m }
+      # Installed in the project's own environment, so `uv run` reaches it where a bare name cannot.
+      prefix: { when: uv.lock, text: 'uv run ' }
+  lint:
+    - command: ruff check .
+      files: [ruff.toml, .ruff.toml]
+      matches:
+        - { file: pyproject.toml, pattern: '\[tool\.ruff' }
+      prefix: { when: uv.lock, text: 'uv run ' }
+  format:
+    - command: ruff format --check .
+      files: [ruff.toml, .ruff.toml]
+      matches:
+        - { file: pyproject.toml, pattern: '\[tool\.ruff' }
+      prefix: { when: uv.lock, text: 'uv run ' }
+paths:
+  interface: []
+  manifests: [pyproject.toml, setup.cfg, 'requirements*.txt']
+  lockfiles: [uv.lock, poetry.lock]

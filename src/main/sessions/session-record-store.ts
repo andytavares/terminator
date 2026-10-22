@@ -12,6 +12,9 @@ import { DESCRIPTION_MAX_LENGTH } from '../../shared/schemas/session-records.sch
 import { deleteSessionContext } from '../integrations/session-context.js'
 import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
+const logger = makeLogger('session-record-store')
+import { makeLogger } from '../logger.js'
+
 // What the operator wrote about a session, and the ticket they pinned to it.
 //
 // Sessions themselves live only in the renderer and die with the app, which is
@@ -247,13 +250,18 @@ export async function transfer(
   return record
 }
 
-/** Stamp a session's close time, once. A session without a record has nothing to keep. */
+// Stamps a session's close time, once. Never rejects: callers close a terminal
+// without waiting, so a failed write is logged instead.
 export async function markClosed(sessionId: string, at: Date): Promise<void> {
   const existing = records.get(sessionId)
   if (existing === undefined || existing.closedAt !== undefined) return
   records.set(sessionId, { ...existing, closedAt: at.toISOString() })
-  await persist()
-  await deleteSessionContext(sessionId)
+  try {
+    await persist()
+    await deleteSessionContext(sessionId)
+  } catch (error) {
+    logger.error('could not save a closed session record', { sessionId, error: String(error) })
+  }
   announce(sessionId)
 }
 

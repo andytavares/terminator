@@ -2,7 +2,7 @@
 // carries the safety property: P3 is checked LAST, so a lockfile change that
 // also touches authentication grades P0 rather than slipping into the only
 // lane that needs the least of your attention.
-import { matchesGlob } from 'node:path'
+import * as path from 'node:path'
 import type { RiskGrade } from './risk-grade.js'
 
 export type CheckState = 'passing' | 'failing' | 'pending' | 'unavailable'
@@ -15,6 +15,10 @@ export interface ChangeSummary {
   readonly sharedContractFiles: readonly string[]
   /** Operator-supplied, per repository. Never inferred (FR-055). */
   readonly criticalPaths: readonly string[]
+  /** The repository's generated dependency lockfiles, as globs (the order's `environment.paths`). */
+  readonly lockfiles: readonly string[]
+  /** The repository's formatting configuration, as globs. */
+  readonly formattingFiles: readonly string[]
 }
 
 export interface GradedChange {
@@ -32,17 +36,21 @@ const P0_PATTERNS: ReadonlyArray<{ label: string; pattern: RegExp }> = [
 ]
 
 const SCHEMA_PATTERN = /\.schema\.[jt]s$|(^|\/)schemas?\//i
-const FORMATTING_PATTERN = /^\.?[\w.]*(prettier|editorconfig|eslintignore|prettierignore)/i
 
 const LARGE_CHANGE_LINES = 300
 
-/** A generated lockfile: hundreds of lines nobody reviews line by line. */
-export function isLockfile(file: string): boolean {
-  return /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$/i.test(file)
+/** A glob with no directory in it names a file wherever it sits in the repository. */
+export function matchesAnyGlob(file: string, globs: readonly string[]): boolean {
+  return globs.some(
+    (glob) =>
+      path.matchesGlob(file, glob) ||
+      (!glob.includes('/') && path.matchesGlob(path.basename(file), glob))
+  )
 }
 
-function matchesAnyGlob(file: string, globs: readonly string[]): boolean {
-  return globs.some((glob) => matchesGlob(file, glob))
+/** A generated lockfile: hundreds of lines nobody reviews line by line. */
+export function isLockfile(file: string, lockfiles: readonly string[]): boolean {
+  return matchesAnyGlob(file, lockfiles)
 }
 
 export function gradeRisk(change: ChangeSummary): GradedChange {
@@ -87,7 +95,9 @@ function p3Of(change: ChangeSummary): GradedChange | null {
   if (
     change.files.length > 0 &&
     change.checkState === 'passing' &&
-    change.files.every((file) => isLockfile(file) || FORMATTING_PATTERN.test(file))
+    change.files.every(
+      (file) => isLockfile(file, change.lockfiles) || matchesAnyGlob(file, change.formattingFiles)
+    )
   ) {
     return { grade: 'P3', trigger: 'lockfile, formatting or dependency bump with green checks' }
   }

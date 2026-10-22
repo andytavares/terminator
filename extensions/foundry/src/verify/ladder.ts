@@ -77,6 +77,31 @@ export interface LadderInput {
    * changed, which is never a reason to run less.
    */
   readonly changedFiles?: readonly string[]
+  /** The command that leaves pictures of the running application, or null when there is none. */
+  readonly pictures?: string | null
+  /** Checks the repository's profile adds, each run at its own rung. */
+  readonly additional?: readonly AdditionalStep[]
+}
+
+interface AdditionalStep {
+  readonly name: string
+  readonly command: string
+  readonly rung: Rung
+}
+
+/** A step the profile added: runnable at its rung, tied to no probed check. */
+function additionalStep({ name, command, rung }: AdditionalStep): LadderStep {
+  return { rung, name, command, status: 'runnable', reason: '', check: null }
+}
+
+/** Each added step goes after the last step already at its rung. */
+function placeAdditional(steps: LadderStep[], additional: readonly AdditionalStep[]): LadderStep[] {
+  const placed = [...steps]
+  for (const added of additional) {
+    const lastAtRung = placed.map((step) => step.rung).lastIndexOf(added.rung)
+    placed.splice(lastAtRung + 1, 0, additionalStep(added))
+  }
+  return placed
 }
 
 // Not a command and not a gap: the verifier runs as its own node on every unit and its
@@ -113,6 +138,22 @@ function inspectionStep(risk: RiskAssessment): LadderStep {
   }
 }
 
+/** The step that takes pictures of the application; the line runs it with a folder to leave them in. */
+export const PICTURES_STEP_NAME = 'Pictures'
+
+/** Runnable with the profile's command; without one it is not measured, never a pass. */
+function picturesStep(command: string | null): LadderStep {
+  const base = { rung: 'L5', name: PICTURES_STEP_NAME, check: null } as const
+  return command === null
+    ? {
+        ...base,
+        command,
+        status: 'unavailable',
+        reason: 'this repository has no pictures command',
+      }
+    : { ...base, command, status: 'runnable', reason: '' }
+}
+
 /** End-to-end tests run against the built application, so a step builds it first. */
 function integrationSteps(toolchain: Toolchain, touchesUi: boolean): LadderStep[] {
   const build =
@@ -123,6 +164,11 @@ function integrationSteps(toolchain: Toolchain, touchesUi: boolean): LadderStep[
   return [...build, probedStep(toolchain, 'e2e', { rung: 'L5', name })]
 }
 
+/** A step that is not a command this climb runs: the verifier's, the inspection's, the human's. */
+function isDecidedElsewhere(step: LadderStep): boolean {
+  return step.check === null && (step.status === 'elsewhere' || step.status === 'not_triggered')
+}
+
 /**
  * The rungs for this repository and this change.
  *
@@ -131,8 +177,9 @@ function integrationSteps(toolchain: Toolchain, touchesUi: boolean): LadderStep[
  * people learn to skim security findings.
  */
 export function ladderFor(input: LadderInput): LadderStep[] {
-  const { toolchain, risk, touchesUi, changedFiles = [] } = input
-  const rungs: LadderStep[] = [
+  const { toolchain, risk, touchesUi, changedFiles = [], additional = [] } = input
+  const pictures = touchesUi ? [picturesStep(input.pictures ?? null)] : []
+  const base: LadderStep[] = [
     probedStep(toolchain, 'format', { rung: 'L0', name: 'Format' }),
     probedStep(toolchain, 'lint', { rung: 'L0', name: 'Lint' }),
     probedStep(toolchain, 'test', { rung: 'L1', name: "The unit's own tests" }),
@@ -140,8 +187,10 @@ export function ladderFor(input: LadderInput): LadderStep[] {
     INDEPENDENT_VERIFICATION,
     inspectionStep(risk),
     ...integrationSteps(toolchain, touchesUi),
+    ...pictures,
     HUMAN_DECISION,
   ]
+  const rungs = placeAdditional(base, additional)
 
   // Words cannot break a build or a test, so a change that only touches them
   // is held to Format and Lint. Said on each step rather than dropped, so the
@@ -150,10 +199,16 @@ export function ladderFor(input: LadderInput): LadderStep[] {
     return rungs
   }
   return rungs.map((rung) =>
-    rung.check === null || rung.check === 'format' || rung.check === 'lint'
+    rung.check === 'format' || rung.check === 'lint' || isDecidedElsewhere(rung)
       ? rung
       : { ...rung, command: null, status: 'not_triggered' as const, reason: 'documentation only' }
   )
+}
+
+/** The folder the pictures step was given and the images found in it, sorted. */
+export interface PicturesTaken {
+  readonly folder: string
+  readonly images: readonly string[]
 }
 
 export interface StepOutcome {
@@ -166,6 +221,8 @@ export interface StepOutcome {
   readonly command: string | null
   /** The earlier step this one reused the result of: the same command string, run once. */
   readonly reusedFrom?: string
+  /** What the pictures step left, when this is that step and its command ran to the end. */
+  readonly pictures?: PicturesTaken
 }
 
 export interface LadderOutcome {

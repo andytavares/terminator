@@ -184,10 +184,11 @@ function earlyShipCiTests() {
   it('waits for CI before asking, even when the check finished first', async () => {
     let release: (value: CiOutcome) => void = () => undefined
     const slow = new Promise<CiOutcome>((resolve) => (release = resolve))
-    const { early, raised } = setup({ watchCi: vi.fn(() => slow) })
+    const watchCi = vi.fn(() => slow)
+    const { early, raised } = setup({ watchCi })
     await early.beforeFinalCheck({ risk: risk('P3'), verdicts: [] })
     const finishing = early.finish(outcome())
-    await new Promise((resolve) => setTimeout(resolve, 10))
+    await vi.waitFor(() => expect(watchCi).toHaveBeenCalled())
     expect(raised).toEqual([])
     release({ kind: 'green', checks: [] })
     await finishing

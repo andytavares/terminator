@@ -1,0 +1,45 @@
+schemaVersion: 1
+id: node
+priority: 10
+# Gates paths and share only; the scripts and tools below carry their own file tests.
+when: [package.json, tsconfig.json]
+scripts:
+  file: package.json
+  key: scripts
+  run: 'npm run {name}'
+  checks:
+    test: [test]
+    lint: [lint]
+    format: [format]
+    coverage: ['test:coverage', coverage]
+    e2e: ['test:e2e', e2e]
+    build: [build]
+tools:
+  test:
+    - command: npx vitest run
+      files: [vitest.config.ts, vitest.config.js, vitest.config.mts]
+    - command: npx jest
+      files: [jest.config.ts, jest.config.js, jest.config.cjs]
+  lint:
+    - command: npx eslint .
+      files: [.eslintrc.json, .eslintrc.js, .eslintrc.cjs, eslint.config.js, eslint.config.mjs]
+  format:
+    - command: npx prettier --check .
+      files: [.prettierrc, .prettierrc.json, .prettierrc.js, prettier.config.js]
+  e2e:
+    - command: npx playwright test
+      files: [playwright.config.ts, playwright.config.js]
+prepare:
+  - when: pnpm-lock.yaml
+    command: pnpm install --frozen-lockfile
+  - when: yarn.lock
+    command: yarn install --frozen-lockfile
+  - when: package-lock.json
+    command: npm ci
+share: [node_modules]
+paths:
+  interface:
+    ['**/*.tsx', '**/*.jsx', '**/*.css', '**/*.scss', '**/*.html', '**/*.svelte', '**/*.vue']
+  manifests: [package.json]
+  lockfiles: [package-lock.json, pnpm-lock.yaml, yarn.lock]
+  formatting: ['.prettierrc*', 'prettier.config.*', .eslintignore, .prettierignore, .editorconfig]

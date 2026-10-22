@@ -15,8 +15,25 @@ function getStream(): WriteStream {
   const dir = app.getPath('logs')
   logPath = join(dir, 'terminator.log')
   rotatIfNeeded(logPath)
-  stream = createWriteStream(logPath, { flags: 'a' })
-  return stream
+  const opened = createWriteStream(logPath, { flags: 'a' })
+  // A stream reports a failed open or write as an event, which try/catch never sees: unheard,
+  // it is an uncaught exception. The next line opens the file again.
+  opened.on('error', () => {
+    if (stream === opened) stream = null
+  })
+  stream = opened
+  return opened
+}
+
+/** Settles once every line written so far has reached the file, or failed to. */
+export function flushLogs(): Promise<void> {
+  const closing = stream
+  stream = null
+  if (closing === null) return Promise.resolve()
+  return new Promise((resolve) => {
+    closing.once('close', () => resolve())
+    closing.end()
+  })
 }
 
 function rotatIfNeeded(path: string): void {

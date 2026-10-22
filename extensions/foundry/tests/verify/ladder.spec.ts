@@ -24,11 +24,11 @@ function toolchain(over: Partial<Toolchain> = {}): Toolchain {
 }
 
 const full = toolchain({
-  format: { command: 'npm run format', source: 'package.json' },
-  lint: { command: 'npm run lint', source: 'package.json' },
-  test: { command: 'npm test', source: 'package.json' },
-  coverage: { command: 'npm run coverage', source: 'package.json' },
-  e2e: { command: 'npm run e2e', source: 'package.json' },
+  format: { command: 'npm run format', source: 'hint' },
+  lint: { command: 'npm run lint', source: 'hint' },
+  test: { command: 'npm test', source: 'hint' },
+  coverage: { command: 'npm run coverage', source: 'hint' },
+  e2e: { command: 'npm run e2e', source: 'hint' },
 })
 
 const noRisk: RiskAssessment = { grade: 'P3', triggers: [], blastRadius: [], criticalPaths: [] }
@@ -42,6 +42,7 @@ const risky: RiskAssessment = {
 describe('ladderFor', () => {
   describe('rungs and commands', rungsAndCommandsTests)
   describe('builds', buildsTests)
+  describe('pictures', picturesTests)
   describe('inspection', ladderInspectionTests)
   describe('decided elsewhere', decidedElsewhereTests)
   describe('an empty repository', anEmptyRepositoryTests)
@@ -65,7 +66,7 @@ function rungsAndCommandsTests() {
 
   it('marks a rung unavailable where the repository has no command, with the reason', () => {
     const steps = ladderFor({
-      toolchain: toolchain({ test: { command: 'npm test', source: 'package.json' } }),
+      toolchain: toolchain({ test: { command: 'npm test', source: 'hint' } }),
       risk: noRisk,
       touchesUi: false,
     })
@@ -80,7 +81,7 @@ function buildsTests() {
     const steps = ladderFor({
       toolchain: toolchain({
         ...full,
-        build: { command: 'npm run build', source: 'package.json' },
+        build: { command: 'npm run build', source: 'hint' },
       }),
       risk: noRisk,
       touchesUi: false,
@@ -95,8 +96,8 @@ function buildsTests() {
   it('does not build when there are no end-to-end tests to run against the build', () => {
     const steps = ladderFor({
       toolchain: toolchain({
-        test: { command: 'npm test', source: 'package.json' },
-        build: { command: 'npm run build', source: 'package.json' },
+        test: { command: 'npm test', source: 'hint' },
+        build: { command: 'npm run build', source: 'hint' },
       }),
       risk: noRisk,
       touchesUi: false,
@@ -127,6 +128,40 @@ function ladderInspectionTests() {
       (s) => s.rung === 'L5'
     )
     expect(integration?.name).toMatch(/picture of the running application/)
+  })
+}
+
+function picturesTests() {
+  const steps = (over: Partial<Parameters<typeof ladderFor>[0]>) =>
+    ladderFor({ toolchain: full, risk: noRisk, touchesUi: true, ...over })
+  const picturesOf = (list: LadderStep[]) => list.find((s) => s.name === 'Pictures')
+
+  it('runs the pictures command at the integration rung when the interface changed', () => {
+    expect(picturesOf(steps({ pictures: 'npm run shots' }))).toMatchObject({
+      rung: 'L5',
+      command: 'npm run shots',
+      status: 'runnable',
+    })
+  })
+
+  it('is not measured, with the reason, when the repository has no pictures command', () => {
+    expect(picturesOf(steps({ pictures: null }))).toMatchObject({
+      command: null,
+      status: 'unavailable',
+      reason: 'this repository has no pictures command',
+    })
+  })
+
+  it('is absent when the interface was not touched', () => {
+    expect(picturesOf(steps({ touchesUi: false, pictures: 'npm run shots' }))).toBeUndefined()
+  })
+
+  it('is not triggered by a documentation-only change', () => {
+    const docs = steps({ pictures: 'npm run shots', changedFiles: ['README.md'] })
+    expect(picturesOf(docs)).toMatchObject({
+      status: 'not_triggered',
+      reason: 'documentation only',
+    })
   })
 }
 
@@ -271,6 +306,20 @@ describe('climb', () => {
 
 let dataRoot: string
 let repo: string
+
+/** Rules this repository carries: Terminator's own, at the repository root. */
+const terminatorRules = path.resolve(builtInDir, '../../.foundry/rules')
+
+function carryRules(...ids: string[]) {
+  fs.mkdirSync(path.join(repo, '.foundry', 'rules'), { recursive: true })
+  for (const id of ids) {
+    fs.copyFileSync(
+      path.join(terminatorRules, `${id}.yaml`),
+      path.join(repo, '.foundry', 'rules', `${id}.yaml`)
+    )
+  }
+}
+
 function sources() {
   return { dataRoot, repoPaths: [repo], builtInDir }
 }
@@ -351,6 +400,7 @@ describe('rulesFor', () => {
 
   describe('universal and project rules', universalAndProjectRulesTests)
   describe('conditions', conditionsTests)
+  describe('conditions nothing can evaluate', unevaluableConditionTests)
   describe('malformed rules', malformedRulesTests)
 })
 
@@ -368,11 +418,18 @@ function universalAndProjectRulesTests() {
         'no-stubs',
         'scope-as-asked',
         'outcome-first',
+        'tests-wait-on-signals',
       ])
     )
   })
 
+  it('ships no project rule: those come from a repository', () => {
+    const loaded = rulesFor(sources(), { repoPaths: [repo], houseDocs: [] })
+    expect(loaded.rules.filter((r) => r.scope === 'project')).toEqual([])
+  })
+
   it('withholds a project rule from a repository that carries nothing it rests on', () => {
+    carryRules('docs-in-pr')
     const loaded = rulesFor(sources(), { repoPaths: [repo], houseDocs: [] })
     expect(loaded.rules.map((r) => r.id)).not.toContain('docs-in-pr')
     expect(loaded.notApplicable.map((r) => r.id)).toContain('docs-in-pr')
@@ -381,6 +438,7 @@ function universalAndProjectRulesTests() {
 
 function conditionsTests() {
   it('applies a project rule once the repository carries what it rests on', () => {
+    carryRules('docs-in-pr', 'flat-icons')
     const loaded = rulesFor(sources(), {
       repoPaths: [repo],
       houseDocs: ['.specify/memory/constitution.md'],
@@ -390,15 +448,27 @@ function conditionsTests() {
   })
 
   it('applies a path-conditioned project rule only where that path exists', () => {
-    expect(
+    fs.mkdirSync(path.join(repo, '.foundry', 'rules'), { recursive: true })
+    fs.writeFileSync(
+      path.join(repo, '.foundry', 'rules', 'needs-config.yaml'),
+      "schemaVersion: 1\nid: needs-config\nscope: project\nrung: L5\nasserts: x\nappliesWhen: 'path_exists: playwright.config.ts'\n"
+    )
+    const ids = () =>
       rulesFor(sources(), { repoPaths: [repo], houseDocs: [] }).rules.map((r) => r.id)
-    ).not.toContain('screenshot-the-app')
+    expect(ids()).not.toContain('needs-config')
     fs.writeFileSync(path.join(repo, 'playwright.config.ts'), 'export default {}')
+    expect(ids()).toContain('needs-config')
+  })
+
+  it("carries Terminator's screenshot rule unconditionally", () => {
+    carryRules('screenshot-the-app')
     expect(
       rulesFor(sources(), { repoPaths: [repo], houseDocs: [] }).rules.map((r) => r.id)
     ).toContain('screenshot-the-app')
   })
+}
 
+function unevaluableConditionTests() {
   it('does not apply a rule whose condition nothing can evaluate', () => {
     fs.mkdirSync(path.join(dataRoot, 'rules'), { recursive: true })
     fs.writeFileSync(

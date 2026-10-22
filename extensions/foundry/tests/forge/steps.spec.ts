@@ -49,6 +49,7 @@ function orderAndGapsTests() {
       'intent',
       'plan',
       'redTeam',
+      'checks',
       'shape',
       'tracker',
       'handOff',
@@ -60,6 +61,7 @@ function orderAndGapsTests() {
       'intent',
       'plan',
       'redTeam',
+      'checks',
       'handOff',
     ])
   })
@@ -107,6 +109,8 @@ function criteriaAndQuestionsTests() {
           answer: null,
           rank: 1,
           confidence: 0.6,
+          multiple: false,
+          chosen: [],
         },
       ],
     })

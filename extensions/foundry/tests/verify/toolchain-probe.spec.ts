@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { probeToolchain, installCommandFor } from '../../src/verify/toolchain-probe.js'
+import { probeToolchain } from '../../src/verify/toolchain-probe.js'
 import { CHECK_NAMES } from '../../src/verify/check-names.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 
@@ -62,9 +62,9 @@ function packageJsonTests() {
       JSON.stringify({ scripts: { test: 'vitest run', lint: 'eslint .', build: 'tsc' } })
     )
     const t = probeToolchain(repo)
-    expect(t.test).toEqual({ command: 'npm run test', source: 'package.json' })
-    expect(t.lint).toEqual({ command: 'npm run lint', source: 'package.json' })
-    expect(t.build).toEqual({ command: 'npm run build', source: 'package.json' })
+    expect(t.test).toMatchObject({ command: 'npm run test', source: 'hint' })
+    expect(t.lint).toMatchObject({ command: 'npm run lint', source: 'hint' })
+    expect(t.build).toMatchObject({ command: 'npm run build', source: 'hint' })
     expect(t.e2e).toBeNull()
   })
 
@@ -81,30 +81,30 @@ function coverageAndConfigsTests() {
       'package.json',
       JSON.stringify({ scripts: { test: 'vitest run', 'test:coverage': 'vitest run --coverage' } })
     )
-    expect(probeToolchain(repo).coverage).toEqual({
+    expect(probeToolchain(repo).coverage).toMatchObject({
       command: 'npm run test:coverage',
-      source: 'package.json',
+      source: 'hint',
     })
   })
 
   it('falls back to a tool config when no script names the check', () => {
     write('package.json', JSON.stringify({ name: 'x' }))
     write('vitest.config.ts', 'export default {}')
-    expect(probeToolchain(repo).test).toEqual({ command: 'npx vitest run', source: 'config' })
+    expect(probeToolchain(repo).test).toMatchObject({ command: 'npx vitest run', source: 'hint' })
   })
 }
 
 function otherLanguagesTests() {
   it('recognises a python project with no package.json at all', () => {
     write('pyproject.toml', '[tool.pytest.ini_options]\ntestpaths = ["tests"]\n')
-    expect(probeToolchain(repo).test).toEqual({ command: 'pytest', source: 'config' })
+    expect(probeToolchain(repo).test).toMatchObject({ command: 'pytest', source: 'hint' })
   })
 
   it('recognises a rust project', () => {
     write('Cargo.toml', '[package]\nname = "x"\n')
     const t = probeToolchain(repo)
-    expect(t.test).toEqual({ command: 'cargo test', source: 'config' })
-    expect(t.build).toEqual({ command: 'cargo build', source: 'config' })
+    expect(t.test).toMatchObject({ command: 'cargo test', source: 'hint' })
+    expect(t.build).toMatchObject({ command: 'cargo build', source: 'hint' })
   })
 }
 
@@ -115,10 +115,10 @@ function toolConfigsTests() {
     write('.prettierrc', '{}')
     write('playwright.config.ts', 'export default {}')
     const t = probeToolchain(repo)
-    expect(t.test).toEqual({ command: 'npx jest', source: 'config' })
-    expect(t.lint).toEqual({ command: 'npx eslint .', source: 'config' })
-    expect(t.format).toEqual({ command: 'npx prettier --check .', source: 'config' })
-    expect(t.e2e).toEqual({ command: 'npx playwright test', source: 'config' })
+    expect(t.test).toMatchObject({ command: 'npx jest', source: 'hint' })
+    expect(t.lint).toMatchObject({ command: 'npx eslint .', source: 'hint' })
+    expect(t.format).toMatchObject({ command: 'npx prettier --check .', source: 'hint' })
+    expect(t.e2e).toMatchObject({ command: 'npx playwright test', source: 'hint' })
   })
 
   it('prefers vitest to jest when a repository has both configs', () => {
@@ -144,9 +144,9 @@ function pythonToolsTests() {
     write('pytest.ini', '[pytest]\ntestpaths = tests/\n')
     write('ruff.toml', 'line-length = 100\n')
     const t = probeToolchain(repo)
-    expect(t.test).toEqual({ command: 'pytest', source: 'config' })
-    expect(t.lint).toEqual({ command: 'ruff check .', source: 'config' })
-    expect(t.format).toEqual({ command: 'ruff format --check .', source: 'config' })
+    expect(t.test).toMatchObject({ command: 'pytest', source: 'hint' })
+    expect(t.lint).toMatchObject({ command: 'ruff check .', source: 'hint' })
+    expect(t.format).toMatchObject({ command: 'ruff format --check .', source: 'hint' })
   })
 
   it('reads pytest from setup.cfg and tox.ini only where they have a pytest section', () => {
@@ -170,9 +170,9 @@ function uvPythonToolsTests() {
     write('uv.lock', 'version = 1\n')
     write('pyproject.toml', '[tool.ruff]\nline-length = 100\n[tool.pytest.ini_options]\n')
     const t = probeToolchain(repo)
-    expect(t.test).toEqual({ command: 'uv run pytest', source: 'config' })
-    expect(t.lint).toEqual({ command: 'uv run ruff check .', source: 'config' })
-    expect(t.format).toEqual({ command: 'uv run ruff format --check .', source: 'config' })
+    expect(t.test).toMatchObject({ command: 'uv run pytest', source: 'hint' })
+    expect(t.lint).toMatchObject({ command: 'uv run ruff check .', source: 'hint' })
+    expect(t.format).toMatchObject({ command: 'uv run ruff format --check .', source: 'hint' })
   })
 
   it('leaves a non-python tool alone in a repository that has a uv lockfile', () => {
@@ -186,8 +186,8 @@ function goTests() {
   it('recognises a go module, and nothing for the checks go has no stock tool for', () => {
     write('go.mod', 'module example.com/x\n')
     const t = probeToolchain(repo)
-    expect(t.test).toEqual({ command: 'go test ./...', source: 'config' })
-    expect(t.build).toEqual({ command: 'go build ./...', source: 'config' })
+    expect(t.test).toMatchObject({ command: 'go test ./...', source: 'hint' })
+    expect(t.build).toMatchObject({ command: 'go build ./...', source: 'hint' })
     expect(t.lint).toBeNull()
     expect(t.format).toBeNull()
   })
@@ -207,13 +207,13 @@ function makefilesAndCiTests() {
   it('reads a Makefile target when nothing else supplies the check', () => {
     write('Makefile', 'test:\n\tgo test ./...\n\nlint:\n\tgolangci-lint run\n')
     const t = probeToolchain(repo)
-    expect(t.test).toEqual({ command: 'make test', source: 'makefile' })
-    expect(t.lint).toEqual({ command: 'make lint', source: 'makefile' })
+    expect(t.test).toMatchObject({ command: 'make test', source: 'hint' })
+    expect(t.lint).toMatchObject({ command: 'make lint', source: 'hint' })
   })
 
   it('falls back to the CI workflow last, since what CI runs is what the project gates on', () => {
     write('.github/workflows/ci.yml', 'jobs:\n  a:\n    steps:\n      - run: bun test\n')
-    expect(probeToolchain(repo).test).toEqual({ command: 'bun test', source: 'ci' })
+    expect(probeToolchain(repo).test).toMatchObject({ command: 'bun test', source: 'hint' })
   })
 }
 
@@ -222,7 +222,7 @@ function precedenceAndE2eTests() {
     write('package.json', JSON.stringify({ scripts: { test: 'vitest run' } }))
     write('vitest.config.ts', 'export default {}')
     write('.github/workflows/ci.yml', 'jobs:\n  a:\n    steps:\n      - run: bun test\n')
-    expect(probeToolchain(repo).test?.source).toBe('package.json')
+    expect(probeToolchain(repo).test?.source).toBe('hint')
   })
 
   it('finds an end-to-end command distinct from the unit test command', () => {
@@ -232,7 +232,7 @@ function precedenceAndE2eTests() {
     )
     const t = probeToolchain(repo)
     expect(t.test?.command).toBe('npm run test')
-    expect(t.e2e).toEqual({ command: 'npm run test:e2e', source: 'package.json' })
+    expect(t.e2e).toMatchObject({ command: 'npm run test:e2e', source: 'hint' })
   })
 }
 
@@ -251,25 +251,3 @@ function nothingExecutedOrWrittenTests() {
     expect(fs.readdirSync(repo).sort()).toEqual(before)
   })
 }
-
-// Read from the lockfile, like every other command here: a reinstall that
-// ignores the lockfile installs something other than what the project pinned.
-describe('installCommandFor', () => {
-  it('installs from each lockfile with the tool that wrote it', () => {
-    write('package-lock.json', '{}')
-    expect(installCommandFor(repo)).toBe('npm ci')
-  })
-
-  it('prefers pnpm and yarn lockfiles to a stray npm one', () => {
-    write('pnpm-lock.yaml', '')
-    expect(installCommandFor(repo)).toBe('pnpm install --frozen-lockfile')
-    fs.rmSync(path.join(repo, 'pnpm-lock.yaml'))
-    write('yarn.lock', '')
-    expect(installCommandFor(repo)).toBe('yarn install --frozen-lockfile')
-  })
-
-  it('has nothing to offer without a lockfile', () => {
-    write('package.json', '{}')
-    expect(installCommandFor(repo)).toBeNull()
-  })
-})

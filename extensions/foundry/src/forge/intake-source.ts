@@ -4,7 +4,11 @@ import { draftOrder } from '../order/draft.js'
 import { baseBranchOfRepo } from './base-branch.js'
 import { acceptanceFromTicket } from './acceptance-from-ticket.js'
 import type { OrderSource, WorkOrder } from '../order/schema.js'
-import { probeToolchain, unavailableChecks } from '../verify/toolchain-probe.js'
+import { unavailableChecks, type Toolchain } from '../verify/toolchain-probe.js'
+import { resolveProfile, type ResolvedProfile } from '../profile/resolve.js'
+import { environmentOf } from '../profile/environment.js'
+import { readProfile } from '../profile/store.js'
+import { defaultHintsDir } from '../profile/hints.js'
 import type { CheckName } from '../verify/check-names.js'
 import type { Signal } from '../sensors/types.js'
 
@@ -51,6 +55,8 @@ export interface SeedDeps {
   readonly priorArtFor?: (paths: readonly string[]) => Promise<string[]>
   /** A signal a sensor recorded, read back for a promotion (ADR-066). */
   readonly readSignal?: (id: string) => Promise<Signal | null>
+  /** Where the stored profiles and the shipped hints are. Absent: hints only, none stored. */
+  readonly profile?: { readonly dataRoot: string; readonly hintsDir: string }
 }
 
 export type SeedInput =
@@ -124,11 +130,21 @@ export async function seedOrder(input: SeedInput, deps: SeedDeps): Promise<SeedR
     now: deps.now(),
   })
   // Scout's pack, before any question could be asked.
-  const toolchain = probeToolchain(input.repoPaths[0])
+  const resolved = await resolvedProfileOf(input.repoPaths[0], deps)
+  const toolchain: Toolchain = resolved.checks
   const houseDocs = input.repoPaths.flatMap((repoPath) => houseDocsIn(repoPath))
   const priorArt = await priorArtForProblem(origin.problem, deps)
-  const seeded = seededFrom(order, { origin, context: { toolchain, houseDocs, priorArt } })
+  const seeded = seededFrom(order, {
+    origin,
+    context: { toolchain, environment: environmentOf(resolved), houseDocs, priorArt },
+  })
   return { order: seeded, unavailableChecks: unavailableChecks(toolchain) }
+}
+
+async function resolvedProfileOf(repoPath: string, deps: SeedDeps): Promise<ResolvedProfile> {
+  const { dataRoot, hintsDir } = deps.profile ?? { dataRoot: null, hintsDir: defaultHintsDir() }
+  const stored = dataRoot === null ? null : await readProfile(dataRoot, repoPath)
+  return resolveProfile({ repoPath, hintsDir, stored })
 }
 
 function readOrigin(input: SeedInput, deps: SeedDeps): Promise<Read> {
@@ -203,7 +219,10 @@ function seededFrom(
   {
     origin,
     context,
-  }: { origin: Origin; context: Pick<WorkOrder['context'], 'toolchain' | 'houseDocs' | 'priorArt'> }
+  }: {
+    origin: Origin
+    context: Pick<WorkOrder['context'], 'toolchain' | 'environment' | 'houseDocs' | 'priorArt'>
+  }
 ): WorkOrder {
   const { problem, branchName } = origin
   // What the ticket already said done looks like, so an order seeded from a ticket

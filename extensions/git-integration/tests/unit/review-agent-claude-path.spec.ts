@@ -123,12 +123,13 @@ describe('runAgentReview cancelled while claude is being resolved', () => {
     const { runAgentReview } = await import('../../src/review/review-agent.js')
     let found: (p: string) => void = () => {}
     const spawn = vi.fn()
+    const resolveClaude = vi.fn(() => new Promise<string>((r) => (found = r)))
     const { done, cancel } = runAgentReview(input, {
       exec: async () => ({ stdout: 'diff' }),
       spawn,
-      resolveClaude: () => new Promise<string>((r) => (found = r)),
+      resolveClaude,
     })
-    await new Promise((r) => setTimeout(r, 0))
+    await vi.waitFor(() => expect(resolveClaude).toHaveBeenCalled())
     cancel()
     found('/Users/me/.local/bin/claude')
 

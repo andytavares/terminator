@@ -16,3 +16,10 @@ prompt: |
 
   Where you had to decide something, say it as an assumption someone can
   strike, not as a fact.
+
+  Also report the commands this repository uses for its checks (test, lint,
+  format, coverage, e2e, build) in `findings.commands`: one entry per check,
+  `check` being exactly one of those six words, `command` the exact command, and
+  `evidence` the `path:line` you read it from (a README, a Makefile, a CI
+  workflow). Only a command you saw written down; never one you guessed. Each is
+  run on the base branch before it is used.

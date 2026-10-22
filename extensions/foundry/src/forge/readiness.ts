@@ -51,6 +51,8 @@ export interface EnvironmentFacts {
   readonly waivedAt: string | null
   /** Whether a check is running in this process; absent reads as running. */
   readonly proving?: boolean
+  /** What the operator decided about checks that cannot be measured; absent reads as nothing decided. */
+  readonly decisions?: { readonly continueUnmeasured: boolean; readonly declinePictures: boolean }
 }
 
 const NO_ENVIRONMENT: EnvironmentFacts = { baseline: null, waivedAt: null }
@@ -67,6 +69,8 @@ export interface ReadinessInput {
   readonly turnEndedAt: string | null
   /** The shape hand-off will run, and whether it is the operator's pick. */
   readonly shape: { readonly name: string | null; readonly yours: boolean }
+  /** How many rows of the Checks step wait on the operator. Absent while the profile is being read. */
+  readonly checks?: { readonly waiting: number }
   /** Which optional steps the Forge offers on this order. */
   readonly offers: { readonly shape: boolean; readonly tracker: boolean }
   /** Whose move it is on a run already under way, from the order's standing. Absent on a draft. */
@@ -203,7 +207,15 @@ const CHECK_LABEL: Record<CheckId, string> = {
   redTeam: 'red team',
 }
 
-const SEQUENCE: readonly StepId[] = ['intent', 'plan', 'redTeam', 'shape', 'tracker', 'handOff']
+const SEQUENCE: readonly StepId[] = [
+  'intent',
+  'plan',
+  'redTeam',
+  'checks',
+  'shape',
+  'tracker',
+  'handOff',
+]
 
 const PATH_RE = /\S+\.(spec|test)\.[cm]?[jt]sx?/
 
@@ -830,6 +842,7 @@ const NON_DRAFT_WORDS: Record<StepId, (context: StepContext) => string> = {
     if (last === null && loop.skipped !== undefined) return `Skipped: ${loop.skipped}`
     return last !== null ? `Clean after round ${last}` : 'Not reviewed'
   },
+  checks: () => 'Agreed',
   shape: ({ input, Shape }) => `${Shape}, ${input.shape.yours ? 'your choice' : 'proposed'}`,
   tracker: ({ input }) => trackerWord(input.order),
   handOff: ({ input: { order, agreed, clock } }) =>
@@ -915,6 +928,13 @@ function reviewedStep(loop: LoopFacts, openBlocking: number): BaseStep {
   return { state: 'not-yet', mark: 'number', word: 'Not reviewed yet' }
 }
 
+function checksStep({ input: { checks } }: StepContext): BaseStep {
+  if (checks === undefined)
+    return { state: 'not-yet', mark: 'number', word: 'Reading the repository' }
+  if (checks.waiting === 0) return { state: 'done', mark: 'check', word: 'Nothing waiting on you' }
+  return { state: 'you', mark: 'alert', word: `${checks.waiting} waiting on you` }
+}
+
 function handOffStep({ input: { intake }, canHandOff, holder }: StepContext): BaseStep {
   if (canHandOff) return { state: 'done', mark: 'number', word: 'Ready' }
   if (intake.kind === 'running') {
@@ -932,6 +952,7 @@ const BASE_STEPS: Record<StepId, (context: StepContext) => BaseStep> = {
   intent: intentStep,
   plan: planStep,
   redTeam: redTeamStep,
+  checks: checksStep,
   shape: ({ input, Shape }) => ({
     state: 'done',
     mark: 'check',
@@ -977,13 +998,17 @@ function draftSteps(ids: readonly StepId[], context: StepContext): StepView[] {
     } else {
       views.push({ id, state: 'not-yet', mark: 'number', word: waitingWord(id, base, trigger) })
     }
-    const stops =
-      base.state === 'bad' ||
-      base.state === 'you' ||
-      (base.state === 'work' && openBlocking.length > 0)
-    if (id !== 'handOff' && trigger === null && stops) trigger = { id, state: base.state }
+    if (trigger === null && stopsTheRest(id, base, openBlocking.length)) {
+      trigger = { id, state: base.state }
+    }
   }
   return views
+}
+
+/** Checks and hand-off never hold the steps after them back: they are for reading, not for clearing first. */
+function stopsTheRest(id: StepId, base: BaseStep, openBlocking: number): boolean {
+  if (id === 'handOff' || id === 'checks') return false
+  return base.state === 'bad' || base.state === 'you' || (base.state === 'work' && openBlocking > 0)
 }
 
 function waitingWord(

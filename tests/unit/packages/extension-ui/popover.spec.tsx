@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { Popover } from '../../../../packages/extension-ui/src/Popover'
 import { MODAL_DEPTH_KEY } from '../../../../packages/extension-ui/src/modal-depth'
@@ -21,7 +21,18 @@ function renderPopover(onDismiss = vi.fn()) {
 
 beforeEach(() => {
   delete window[MODAL_DEPTH_KEY]
+  vi.useFakeTimers()
 })
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+/** Runs the timer tick after which a popover listens for clicks outside it. */
+const bindOutsideListener = () =>
+  act(() => {
+    vi.advanceTimersByTime(0)
+  })
 
 describe('Popover', () => {
   it('takes an accessible name', () => {
@@ -35,22 +46,18 @@ describe('Popover', () => {
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 
-  it('closes on a click outside it', async () => {
+  it('closes on a click outside it', () => {
     const { onDismiss } = renderPopover()
     // The opening click is still propagating on the tick the popover mounts, so
     // the outside listener is attached one tick later.
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 0))
-    })
+    bindOutsideListener()
     fireEvent.mouseDown(document.body)
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 
-  it('does not close on a click inside it', async () => {
+  it('does not close on a click inside it', () => {
     const { onDismiss } = renderPopover()
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 0))
-    })
+    bindOutsideListener()
     fireEvent.mouseDown(screen.getByRole('button', { name: 'Today' }))
     expect(onDismiss).not.toHaveBeenCalled()
   })

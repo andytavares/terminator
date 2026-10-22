@@ -196,6 +196,8 @@ const REVIEW_HELD = 'review.held'
 const REVIEW_RELEASED = 'review.released'
 const ORDER_AGREED = 'order.agreed'
 const ENVIRONMENT_WAIVED = 'environment.waived'
+export const CHECKS_CONTINUE_UNMEASURED = 'checks.continue-unmeasured'
+export const PICTURES_DECLINED = 'pictures.declined'
 
 /** What the ledger has said about the review loop so far, read in order. */
 interface LoopTally {
@@ -293,6 +295,18 @@ export function environmentWaivedAt(
     return staleSinceCheck ? null : entries[i].at
   }
   return null
+}
+
+/** What the operator has decided about checks that cannot be measured, from the ledger. */
+export function checkDecisions(entries: readonly LedgerEntry[]): {
+  readonly continueUnmeasured: boolean
+  readonly declinePictures: boolean
+} {
+  const said = (action: string): boolean => entries.some((entry) => entry.action === action)
+  return {
+    continueUnmeasured: said(CHECKS_CONTINUE_UNMEASURED),
+    declinePictures: said(PICTURES_DECLINED),
+  }
 }
 
 /**

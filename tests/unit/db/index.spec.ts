@@ -159,17 +159,25 @@ describe('ExtensionDB ordering', () => {
     await Promise.all([failing, outside])
     expect(await itemIds()).toEqual(['outside'])
   })
+})
+
+describe('ExtensionDB ordering — overlapping transactions', () => {
+  beforeEach(openMemoryDb)
 
   it('runs overlapping transactions one after the other', async () => {
     const order: string[] = []
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
     const insertInTransaction = (label: string) =>
       db.transaction(async (tx) => {
         order.push(`${label}:start`)
         await tx.run('INSERT INTO items (id) VALUES (?)', [label])
-        await new Promise((resolve) => setTimeout(resolve, 5))
+        await gate
         order.push(`${label}:end`)
       })
-    await Promise.all([insertInTransaction('a'), insertInTransaction('b')])
+    const both = Promise.all([insertInTransaction('a'), insertInTransaction('b')])
+    release()
+    await both
     expect(order).toEqual(['a:start', 'a:end', 'b:start', 'b:end'])
   })
 })

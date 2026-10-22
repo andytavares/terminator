@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from '../helpers'
+import { openFoundry } from '../foundry-harness'
 import { writeLiveOrder } from './live-order'
 import { liveOrderDir, startLiveRun } from './live-run'
 
@@ -90,9 +91,7 @@ test.beforeAll(async () => {
 
   handle = await launchApp()
   await createWorkspace(handle.page, 'live', repo)
-  await handle.page.waitForTimeout(3000)
-  await handle.page.locator('button[aria-label="Foundry"]').click()
-  await handle.page.waitForTimeout(3000)
+  await openFoundry(handle)
 
   // This run is unattended, so it says so.
   //
@@ -159,17 +158,17 @@ function logCi(previous: string): string {
 
 /** Polls the CI record until shipping is over, or the deadline passes. */
 async function waitForShipping(): Promise<void> {
-  const deadline = Date.now() + 55 * 60_000
   let previous = ''
-  while (Date.now() < deadline) {
+  const shipped = (): boolean => {
     previous = logCi(previous)
     const over = shippingOver()
-    if (over !== null) {
-      console.log(`[run over] ${over}`)
-      break
-    }
-    await handle.page.waitForTimeout(15_000)
+    if (over !== null) console.log(`[run over] ${over}`)
+    return over !== null
   }
+  await expect
+    .poll(shipped, { timeout: 55 * 60_000, intervals: [15_000] })
+    .toBe(true)
+    .catch(() => console.log('[deadline] shipping did not finish'))
 }
 
 /** One fix round, CI green, and the ready gate raised with the checks that passed. */

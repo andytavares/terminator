@@ -3,8 +3,8 @@ id: render-not-call
 scope: universal
 rung: L3
 asserts: >
-  Interface behaviour is proven by reading the rendered output after a real
-  render, never by asserting that a mocked store was called. A mocked-store
-  assertion proves the write happened; it never proves anything was drawn.
+  Interface behaviour is proven from what was drawn or printed, never from a
+  mocked call. A mocked-call assertion proves the write happened; it never
+  proves anything was shown.
 appliesWhen: always
 origin: built-in

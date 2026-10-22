@@ -277,7 +277,7 @@ function resolveToolchainTests() {
 
   it('offers it once the probe found that command', () => {
     const o = order()
-    o.context.toolchain.test = { command: 'npm test', source: 'package.json' }
+    o.context.toolchain.test = { command: 'npm test', source: 'hint' }
     expect(checkRequirements([{ kind: 'toolchain', value: 'test' }], o).available).toBe(true)
   })
 

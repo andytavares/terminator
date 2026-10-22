@@ -1,6 +1,7 @@
 // Global test setup — runs before every test file regardless of environment.
 // CSS modules are not processed in tests; mock them to return an empty object.
 import { afterAll, inject, vi } from 'vitest'
+import { configure } from '@testing-library/dom'
 import { installNativeDialog } from './support/native-dialog'
 import { removeTempDirs } from './support/temp-dir'
 import { forgetGitHookEnvironment } from './support/git-hook-env'
@@ -21,6 +22,10 @@ afterAll(removeTempDirs)
 // the environment, so the environment is the one place to turn it off. Specs
 // that scrub GIT_* from git's environment keep this one.
 process.env.GIT_TRACE2_EVENT = '0'
+
+// findBy* and waitFor wait on a condition; one second failed lazy views on a cold CI runner.
+// The bound only catches a hang.
+configure({ asyncUtilTimeout: 30_000 })
 
 vi.mock('*.css', () => ({}))
 vi.mock('*.module.css', () => ({ default: {} }))

@@ -32,6 +32,7 @@ function outputContract(file: string, order: WorkOrder): string {
     ...exampleIntentAndUnits(),
     ...exampleLanesAndRest(order),
     ...verifyKinds(),
+    ...interfaceFlag(),
     ...closedLabels(),
     ...fixedFields(order),
     ...refusals(order),
@@ -74,6 +75,13 @@ function exampleIntentAndUnits(): string[] {
     '    }',
     '  ],',
     '  "risk":     { "grade": "P0|P1|P2|P3", "triggers": [], "blastRadius": ["src/"], "criticalPaths": [] },',
+    ...exampleUnits(),
+  ]
+}
+
+/** The example's plan, down to its one unit. */
+function exampleUnits(): string[] {
+  return [
     '  "plan": {',
     '    "units": [',
     '      {',
@@ -84,6 +92,7 @@ function exampleIntentAndUnits(): string[] {
     '        "dependsOn": [],',
     '        "satisfies": ["AC-1"],',
     '        "touches": ["src/…"],',
+    '        "touchesInterface": false,',
     '        "verify": [{ "kind": "command", "command": "…", "assert": "exit_code == 0" }]',
     '      }',
     '    ],',
@@ -107,7 +116,7 @@ function exampleLanesAndRest(order: WorkOrder): string[] {
     '  },',
     '  "assumptions":   [{ "id": "A-1", "text": "…", "struck": false, "affects": [] }],',
     '  "openQuestions": [',
-    '    { "id": "Q-1", "text": "…", "why": "…", "options": ["…"], "recommended": 0, "answer": null, "rank": 1, "confidence": 0.6 }',
+    '    { "id": "Q-1", "text": "…", "why": "…", "options": ["…"], "multiple": false, "recommended": 0, "answer": null, "rank": 1, "confidence": 0.6 }',
     '  ],',
     '  "dismissFindings": [{ "id": "RT-…", "reason": "why it does not apply here", "confidence": 0.95 }],',
     '  "resolveFindings": [{ "id": "RT-…", "how": "what you changed so it no longer holds, in one line" }],',
@@ -136,6 +145,16 @@ function verifyKinds(): string[] {
     'in the `rubric` — `evidence: ["report_file"]` with the path in the rubric,',
     'never `evidence: ["src/app.css"]`. A path written here is refused, and the',
     'whole proposal with it.',
+    '',
+  ]
+}
+
+/** The one flag that asks for pictures of a unit's result. */
+function interfaceFlag(): string[] {
+  return [
+    'Set `touchesInterface` to true when the unit changes something a person sees',
+    '(a screen, a page, a dialog, a terminal UI), in any language — Foundry asks',
+    'for pictures of those.',
     '',
   ]
 }
@@ -203,6 +222,8 @@ function decideNotAsk(): string[] {
     'question. Ask only when no option reaches 90% *and* the choice changes what',
     'gets built — never more than three, each with `recommended` and your',
     '`confidence` (0–1) in it. A question at 0.9 or above is decided for you.',
+    'Set `multiple` to true only when more than one option can be true at once;',
+    'the operator may then choose several.',
     '',
     'Fix each open finding in the plan where you can, and list every one you',
     'fixed in `resolveFindings` with what you changed — a finding you fixed but',

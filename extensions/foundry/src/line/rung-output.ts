@@ -13,6 +13,9 @@ import type { DocumentHandBack, WorkOrder } from '../order/schema.js'
 import type { Role } from '../recipe/parse.js'
 import { findingHeadline } from '../order/finding-headline.js'
 import { FindingsSchema } from '../order/proposal.js'
+import { CommandProposalSchema } from '../profile/command-proposal.js'
+import type { CommandProposal } from '../profile/command-proposal.js'
+import { CHECK_NAMES } from '../verify/check-names.js'
 
 // How a rung hands back what it found.
 //
@@ -80,8 +83,13 @@ const AgentFindingSchema = z
   })
   .strict()
 
+// What the scout reports beyond the architect's findings: commands to prove, never applied as read.
+const ScoutFindingsSchema = FindingsSchema.extend({
+  commands: z.array(CommandProposalSchema).optional(),
+})
+
 const SHAPES: Record<Collectable, z.ZodTypeAny> = {
-  context: FindingsSchema,
+  context: ScoutFindingsSchema,
   findings: z.array(AgentFindingSchema),
   plan: orderShape.plan,
   acceptance: orderShape.acceptance,
@@ -90,7 +98,7 @@ const SHAPES: Record<Collectable, z.ZodTypeAny> = {
 
 /** @internal */
 export interface RungOutput {
-  readonly findings?: z.infer<typeof FindingsSchema>
+  readonly findings?: z.infer<typeof ScoutFindingsSchema>
   readonly redTeam?: readonly z.infer<typeof AgentFindingSchema>[]
   readonly plan?: WorkOrder['plan']
   readonly acceptance?: WorkOrder['acceptance']
@@ -148,7 +156,10 @@ const EXAMPLE: Record<Collectable, string[]> = {
     '  "findings": {',
     '    "entryPoints": ["src/…"],',
     '    "conventions": ["what the surrounding code does, in a sentence"],',
-    '    "priorArt": ["commit or file, and what it did"]',
+    '    "priorArt": ["commit or file, and what it did"],',
+    '    "commands": [',
+    `      { "check": "${CHECK_NAMES.join(' | ')}", "command": "the exact command", "evidence": "path:line you read it from" }`,
+    '    ]',
     '  },',
   ],
   findings: [
@@ -352,6 +363,8 @@ export interface AppliedRungOutput {
   readonly document: DocumentHandBack | null
   /** The red team asked to attack the fix for its findings too. */
   readonly anotherPass: boolean
+  /** Commands the scout proposed for the checks; proved on the base branch, never taken as read. */
+  readonly commands: readonly CommandProposal[]
 }
 
 function normalise(text: string): string {
@@ -406,11 +419,7 @@ export function applyRungOutput(order: WorkOrder, input: ApplyRungInput): Applie
     next = { ...next, redTeam: [...merge.redTeam, ...merge.fresh] }
   }
   const blockingReasons = [...merge.blockingReasons, ...contestedReasons(output)]
-  const told = {
-    note: output.note.trim(),
-    document: output.document ?? null,
-    anotherPass: output.anotherPass === true,
-  }
+  const told = toldOf(output)
   if (blockingReasons.length === 0) {
     return {
       ...told,
@@ -420,6 +429,17 @@ export function applyRungOutput(order: WorkOrder, input: ApplyRungInput): Applie
     }
   }
   return disputed(next, { told, blockingReasons, redTeamBlocked: merge.redTeamBlocked, role, at })
+}
+
+function toldOf(
+  output: RungOutput
+): Pick<AppliedRungOutput, 'note' | 'document' | 'anotherPass' | 'commands'> {
+  return {
+    note: output.note.trim(),
+    document: output.document ?? null,
+    anotherPass: output.anotherPass === true,
+    commands: output.findings?.commands ?? [],
+  }
 }
 
 function notesWord(count: number): string {
@@ -570,7 +590,7 @@ function reopen(merge: RedTeamMerge, finding: IncomingFinding): void {
 function disputed(
   order: WorkOrder,
   dispute: {
-    told: Pick<AppliedRungOutput, 'note' | 'document' | 'anotherPass'>
+    told: Pick<AppliedRungOutput, 'note' | 'document' | 'anotherPass' | 'commands'>
     blockingReasons: readonly string[]
     redTeamBlocked: boolean
     role: string
@@ -607,6 +627,7 @@ export type CollectResult =
       readonly defect: string | null
       readonly document: DocumentHandBack | null
       readonly anotherPass: boolean
+      readonly commands: readonly CommandProposal[]
     }
   | { readonly ok: false; readonly reason: string }
 

@@ -128,7 +128,7 @@ function countsReachAndUnreadableTests() {
 function stepKindsToolchainTests() {
   it('is set when the toolchain probed a command for that check', () => {
     const o = order()
-    o.context.toolchain.test = { command: 'npm test', source: 'package.json' }
+    o.context.toolchain.test = { command: 'npm test', source: 'hint' }
     expect(evaluateWhen('toolchain.test is set', o)).toBe(true)
     expect(evaluateWhen('toolchain.test is not set', o)).toBe(false)
   })
@@ -148,7 +148,7 @@ function stepKindsToolchainTests() {
 describe('resolveCommand', () => {
   it('resolves a single placeholder to the probed command', () => {
     const o = order()
-    o.context.toolchain.test = { command: 'npm test', source: 'package.json' }
+    o.context.toolchain.test = { command: 'npm test', source: 'hint' }
     expect(resolveCommand('${toolchain.test}', o)).toBe('npm test')
   })
 
@@ -166,7 +166,7 @@ describe('resolveCommand', () => {
 
   it('is null for any other placeholder', () => {
     const o = order()
-    o.context.toolchain.test = { command: 'npm test', source: 'package.json' }
+    o.context.toolchain.test = { command: 'npm test', source: 'hint' }
     expect(resolveCommand('${toolchain.test} && ${x}', o)).toBeNull()
   })
 })

@@ -31,6 +31,7 @@ import {
 } from '../helpers/forge-turns.js'
 import { orderLedger, untilLedgerHas } from '../helpers/order-ledger.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
+import { executingOrders } from '../../src/line/run-control.js'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
@@ -73,12 +74,15 @@ beforeEach(async () => {
 
 const READY = 'Make it red is ready to hand off.'
 
-/** Until the run the order restarted has failed or halted. */
+/** Until the run the order restarted has failed or halted, and its executor has returned:
+ * it writes the run's graph and timeline after the ledger entry. */
 async function untilTheRunEnds(): Promise<void> {
   const ends = ['run.failed', 'run.halted']
   await vi.waitFor(
-    async () =>
-      expect((await orderLedger(dataDir)).some((entry) => ends.includes(entry.action))).toBe(true),
+    async () => {
+      expect((await orderLedger(dataDir)).some((entry) => ends.includes(entry.action))).toBe(true)
+      expect(executingOrders.has('WO-1')).toBe(false)
+    },
     { timeout: 10_000, interval: 50 }
   )
 }
@@ -90,6 +94,9 @@ async function firstTurnAfterRelease() {
   const turn = all.slice(released).find((entry) => entry.action.startsWith('converge.'))
   return turn === undefined ? undefined : { action: turn.action, reason: turn.reason }
 }
+
+/** The loop reads the order's ledger through the index; reading it here queues behind that. */
+const afterTheLoopHasRead = () => orderStoreAt(dataDir).entries('WO-1')
 
 const setOrderHeld = (held: boolean) => host.call('foundry:order.hold', { id: 'WO-1', held })
 
@@ -112,7 +119,7 @@ describe('a clean round that finishes while the order is held', () => {
   it('waits, and is handed off once the operator lets go', async () => {
     writes = { architect: () => ({ note: 'tightened' }), 'red-team': () => ({ redTeam: [] }) }
     await heldDuringTheRedTeam(readyDraft(repo))
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await afterTheLoopHasRead()
     expect(toastsShown(host)).not.toContain(READY)
     await setOrderHeld(false)
     await untilToastShown(host, READY)
@@ -191,7 +198,7 @@ describe('letting go of an order with nothing to pick up', () => {
     await orderStoreAt(dataDir).save({ ...readyDraft(repo), status: 'agreed' })
     await setOrderHeld(true)
     await setOrderHeld(false)
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await afterTheLoopHasRead()
     expect(theRunner.start).not.toHaveBeenCalled()
   })
 
@@ -202,10 +209,11 @@ describe('letting go of an order with nothing to pick up', () => {
     await convergeOrder(host, dataDir, readyDraft(repo))
     await setOrderHeld(true)
     await setOrderHeld(false)
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await afterTheLoopHasRead()
     expect(theRunner.start).toHaveBeenCalledTimes(1)
     letItFinish()
     await untilToastShown(host, READY)
+    expect(theRunner.start).toHaveBeenCalledTimes(2)
   })
 })
 

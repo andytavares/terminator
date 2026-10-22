@@ -109,8 +109,7 @@ describe('an architect turn that ends before its proposal is written', () => {
     expect((await convergeOrder(host, dataDir, readyDraft(repo))).converging).toBe('architect-1')
     const architect = seen.turn
     if (architect === undefined) throw new Error('the architect never started')
-    architect.onTurnEnd()
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    architect.onTurnEnd() // returns at once when no proposal file exists; nothing is left pending
     expect(await ledgerActions(dataDir)).not.toContain('order.redrafted')
     writeFileWithDirs(proposalPath(), { note: 'thought about it' })
     architect.onTurnEnd()

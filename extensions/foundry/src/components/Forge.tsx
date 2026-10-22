@@ -29,6 +29,8 @@ import { PROPOSAL_FILE } from '../order/proposal.js'
 import { openingStep, forgeSteps, type StepId } from '../forge/steps.js'
 import { budgetsInWords } from '../order/render.js'
 import { BudgetForm } from './BudgetForm.js'
+import { ChecksStep, HandOffChecks, type ChecksActions } from './ForgeChecks.js'
+import { useChecks, type Decision } from './use-checks.js'
 import { usePushed } from '../renderer/use-pushed.js'
 import { ReasonButton } from './ReasonButton.js'
 import {
@@ -120,6 +122,7 @@ const STEP_LABELS: Record<StepId, string> = {
   intent: 'Intent',
   plan: 'Plan',
   redTeam: 'Red team',
+  checks: 'Checks',
   shape: 'Shape',
   tracker: 'Tracker',
   handOff: 'Hand off',
@@ -129,6 +132,7 @@ const STEP_TITLES: Record<StepId, string> = {
   intent: 'What is being asked',
   plan: 'The plan and how it is proven',
   redTeam: 'Red team findings',
+  checks: 'How this change is proven',
   shape: 'Shape of work',
   tracker: 'Tracker write-back',
   handOff: 'Ready to hand off?',
@@ -204,7 +208,10 @@ function findingDecided(choice: FindingChoice | undefined): boolean {
 
 /** What one settle turn asks the backend to do in a single converge call. */
 interface Settle {
-  readonly answers: readonly { readonly questionId: string; readonly option: number }[]
+  readonly answers: readonly {
+    readonly questionId: string
+    readonly option: number | readonly number[]
+  }[]
   readonly accepts: readonly { readonly findingId: string; readonly reason: string }[]
   readonly fixes: readonly { readonly findingId: string; readonly how: string }[]
   readonly asks: readonly string[]
@@ -218,13 +225,16 @@ interface Settle {
  * is not a fix, the same shrug a blank accept reason always was.
  */
 function buildSettle(
-  questionChoices: Readonly<Record<string, number>>,
-  findingChoice: Readonly<Record<string, FindingChoice>>
+  questionChoices: Readonly<Record<string, readonly number[]>>,
+  findingChoice: Readonly<Record<string, FindingChoice>>,
+  questions: readonly Pick<Question, 'id' | 'multiple'>[]
 ): Settle {
-  const answers = Object.entries(questionChoices).map(([questionId, option]) => ({
-    questionId,
-    option,
-  }))
+  const answers = Object.entries(questionChoices)
+    .filter(([, picked]) => picked.length > 0)
+    .map(([questionId, picked]) => ({
+      questionId,
+      option: questions.find((q) => q.id === questionId)?.multiple === true ? picked : picked[0],
+    }))
   const accepts: { findingId: string; reason: string }[] = []
   const fixes: { findingId: string; how: string }[] = []
   const asks: string[] = []
@@ -370,7 +380,7 @@ function useForgeState(orderId: string, onStarted: ForgeProps['onStarted']) {
   const edits = useOrderEdits(orderId, shown)
   const talk = useConverge(orderId, shown)
   const moves = useOrderMoves(orderId, { shown, shapes })
-  const moveEnvironment = useEnvironmentMove(orderId, shown)
+  const environment = useEnvironment(orderId, shown)
   const handOff = useHandOff({ orderId, onStarted, shown, shapes })
   useQueuedSettle(shown.view, choices, talk.applySettle)
   return {
@@ -386,7 +396,7 @@ function useForgeState(orderId: string, onStarted: ForgeProps['onStarted']) {
     ...edits,
     ...talk,
     ...moves,
-    moveEnvironment,
+    ...environment,
   }
 }
 
@@ -404,7 +414,7 @@ function useFocusTarget() {
 /** What the operator has chosen on this screen and not yet sent. */
 function useChoices() {
   const [draft, setDraft] = useState('')
-  const [questionChoices, setQuestionChoices] = useState<Record<string, number>>({})
+  const [questionChoices, setQuestionChoices] = useState<Record<string, number[]>>({})
   const [findingChoice, setFindingChoice] = useState<Record<string, FindingChoice>>({})
   const [queuedSettle, setQueuedSettle] = useState<Settle | null>(null)
   const [picked, setPicked] = useState<StepId | null>(null)
@@ -605,7 +615,7 @@ function useEnvironmentMove(
   { setView, setProblem }: Pick<Shown, 'setView' | 'setProblem'>
 ) {
   return useCallback(
-    async (move: 'check' | 'waive') => {
+    async (move: 'check' | 'waive' | 'continue-unmeasured' | 'decline-pictures') => {
       const next = (await invoke('foundry:forge.environment', { id: orderId, move })) as
         | OrderView
         | { error: string }
@@ -614,6 +624,14 @@ function useEnvironmentMove(
     },
     [orderId, setView, setProblem]
   )
+}
+
+/** The base branch check, and the Checks step that reads and edits what it runs. */
+function useEnvironment(orderId: string, shown: Shown) {
+  const moveEnvironment = useEnvironmentMove(orderId, shown)
+  const record = (decision: Decision): void =>
+    void moveEnvironment(decision === 'unmeasured' ? 'continue-unmeasured' : 'decline-pictures')
+  return { moveEnvironment, checks: useChecks(shown.view, record) }
 }
 
 /** Holding the order, and picking its shape. */
@@ -772,6 +790,7 @@ function readinessOf(state: ForgeState, view: OrderView, standing: Standing | un
     ...settledFacts(view),
     shape: { name: shapeName, yours: ownChoice(state.recipes) !== null },
     offers,
+    checks: state.checks.waiting === undefined ? undefined : { waiting: state.checks.waiting },
     turn: standing?.turn,
     clock: clockOf,
   })
@@ -814,9 +833,9 @@ function decidedFindings(
 
 function decidedQuestions(
   questions: readonly { readonly id: string }[],
-  questionChoices: Readonly<Record<string, number>>
+  questionChoices: Readonly<Record<string, readonly number[]>>
 ): number {
-  return questions.filter((q) => questionChoices[q.id] !== undefined).length
+  return questions.filter((q) => (questionChoices[q.id] ?? []).length > 0).length
 }
 
 interface StepDecisions extends Pick<ForgeState, 'findingChoice' | 'questionChoices'> {
@@ -852,12 +871,12 @@ function openStep(forge: ForgeModel, id: StepId): void {
 /** The decisions made on this step, as one settle, cleared from the screen. */
 function takeDecisions(forge: ForgeModel): Settle | null {
   if (forge.stepView.id === 'redTeam') {
-    const settle = buildSettle({}, forge.findingChoice)
+    const settle = buildSettle({}, forge.findingChoice, [])
     forge.setFindingChoice({})
     return settle
   }
   if (forge.stepView.id === 'plan') {
-    const settle = buildSettle(forge.questionChoices, {})
+    const settle = buildSettle(forge.questionChoices, {}, forge.order.openQuestions)
     forge.setQuestionChoices({})
     return settle
   }
@@ -1068,9 +1087,26 @@ const STEP_BODIES: Record<StepId, (props: ForgeProp) => JSX.Element> = {
   intent: IntentStep,
   plan: PlanStep,
   redTeam: RedTeamStep,
+  checks: ChecksBody,
   shape: ShapeStep,
   tracker: TrackerStep,
   handOff: HandOffStep,
+}
+
+/** What the Checks step and the hand-off row can ask of the rest of the Forge. */
+const SCOUT_AGAIN =
+  'Read the repository again for how its checks are run: the README, CONTRIBUTING.md, the CI files and the Makefile. Put every command you find in the order’s toolchain.'
+
+function checksActions(forge: ForgeModel): ChecksActions {
+  return {
+    checkAgain: () => void forge.moveEnvironment('check'),
+    askScout: () => void forge.converge(SCOUT_AGAIN),
+    openChecks: () => openStep(forge, 'checks'),
+  }
+}
+
+function ChecksBody({ forge }: ForgeProp) {
+  return <ChecksStep checks={forge.checks} actions={checksActions(forge)} />
 }
 
 function CurrentStep({ forge }: ForgeProp) {
@@ -1300,7 +1336,9 @@ function QuestionCard({ forge, question }: ForgeProp & { readonly question: Ques
         </Markdown>
       ) : null}
       <fieldset className="fdry-opts">
-        <legend className="fdry-opts-legend">Choose one</legend>
+        <legend className="fdry-opts-legend">
+          {question.multiple ? 'Choose any' : 'Choose one'}
+        </legend>
         {question.options.map((option, optionIndex) => (
           <QuestionOption
             key={option}
@@ -1319,20 +1357,34 @@ interface QuestionOptionProps extends ForgeProp {
   readonly at: readonly [option: string, optionIndex: number]
 }
 
+/** The options a question has ticked: one for a single choice, any number for a multiple one. */
+function pickOption(
+  picked: readonly number[],
+  optionIndex: number,
+  multiple: boolean
+): readonly number[] {
+  if (!multiple) return [optionIndex]
+  return picked.includes(optionIndex)
+    ? picked.filter((index) => index !== optionIndex)
+    : [...picked, optionIndex].sort((a, b) => a - b)
+}
+
+function toggleOption(forge: ForgeProp['forge'], question: Question, optionIndex: number): void {
+  forge.setQuestionChoices((current) => ({
+    ...current,
+    [question.id]: [...pickOption(current[question.id] ?? [], optionIndex, question.multiple)],
+  }))
+}
+
 function QuestionOption({ forge, question, at: [option, optionIndex] }: QuestionOptionProps) {
-  const chosen = forge.questionChoices[question.id] === optionIndex
+  const chosen = (forge.questionChoices[question.id] ?? []).includes(optionIndex)
   return (
     <label className="fdry-opt">
       <input
-        type="radio"
+        type={question.multiple ? 'checkbox' : 'radio'}
         name={`question-${question.id}`}
         checked={chosen}
-        onChange={() =>
-          forge.setQuestionChoices((current) => ({
-            ...current,
-            [question.id]: optionIndex,
-          }))
-        }
+        onChange={() => toggleOption(forge, question, optionIndex)}
       />
       <span className="fdry-opt-text">
         <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
@@ -1643,23 +1695,14 @@ function NeedsYouGroup({ forge }: ForgeProp) {
   )
 }
 
-/** The three answers to a blocking finding, as the buttons offer them. */
+/** The three answers to a blocking finding, as the radios offer them. */
 const FINDING_MOVES: readonly {
   readonly mode: FindingChoice['mode']
   readonly label: string
-  readonly title: string
 }[] = [
-  {
-    mode: 'ask',
-    label: 'Ask the architect',
-    title: 'Have the architect change the order so this no longer holds',
-  },
-  {
-    mode: 'fix',
-    label: 'Fix it…',
-    title: 'Say how, and the architect changes the order that way',
-  },
-  { mode: 'accept', label: 'Accept it', title: 'It stands, and here is why' },
+  { mode: 'ask', label: 'Ask the architect to change the order so this no longer holds' },
+  { mode: 'fix', label: 'Fix it my way' },
+  { mode: 'accept', label: 'Accept it, and say why' },
 ]
 
 interface FindingProps {
@@ -1680,20 +1723,20 @@ function NeedsYouFinding({ forge, finding }: ForgeProp & { readonly finding: Fin
         </Markdown>
       </span>
       <span className="fdry-fnd-meta">{finding.meta}</span>
-      <div className="fdry-fnd-acts">
+      <fieldset className="fdry-opts">
+        <legend className="fdry-opts-legend">Choose one</legend>
         {FINDING_MOVES.map((move) => (
-          <Button
-            key={move.mode}
-            size="sm"
-            aria-pressed={choice?.mode === move.mode}
-            variant={choice?.mode === move.mode ? 'primary' : 'secondary'}
-            title={move.title}
-            onClick={() => choose({ mode: move.mode, text: keptText(choice, move.mode) })}
-          >
-            {move.label}
-          </Button>
+          <label key={move.mode} className="fdry-opt">
+            <input
+              type="radio"
+              name={`finding-${finding.id}`}
+              checked={choice?.mode === move.mode}
+              onChange={() => choose({ mode: move.mode, text: keptText(choice, move.mode) })}
+            />
+            <span className="fdry-opt-text">{move.label}</span>
+          </label>
         ))}
-      </div>
+      </fieldset>
       <FindingText finding={finding} choice={choice} choose={choose} />
     </div>
   )
@@ -1928,7 +1971,7 @@ function HandOffStep({ forge }: ForgeProp) {
       ) : (
         <AgreedRows forge={forge} />
       )}
-      <Unmeasured unavailable={view.unavailableChecks} />
+      {isDraft ? <HandOffChecks checks={forge.checks} actions={checksActions(forge)} /> : null}
     </>
   )
 }
@@ -1973,19 +2016,6 @@ function RunStartedRow({ forge }: ForgeProp) {
       </div>
       <span className="fdry-pill fdry-pill--work">{forge.r.runState}</span>
     </div>
-  )
-}
-
-function Unmeasured({ unavailable }: { readonly unavailable: string[] | undefined }) {
-  if (unavailable === undefined || unavailable.length === 0) return null
-  return (
-    <section className="fdry-field">
-      <h3 className="fdry-field-h">Not measurable here</h3>
-      <p className="fdry-note">
-        This repository has no command for {unavailable.join(', ')}. Those checks will report
-        &ldquo;not measured&rdquo; rather than passing.
-      </p>
-    </section>
   )
 }
 

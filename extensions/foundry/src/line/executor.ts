@@ -4,7 +4,7 @@ import type { ResolveSources } from '../recipe/resolve.js'
 import type { EffortLevel, Recipe, Rule } from '../recipe/parse.js'
 import type { DocumentHandBack, RiskAssessment, WorkOrder } from '../order/schema.js'
 import type { Verdict } from '../verify/verdict.js'
-import type { LadderOutcome, LadderStep } from '../verify/ladder.js'
+import type { LadderOutcome, LadderStep, PicturesTaken } from '../verify/ladder.js'
 import type { Gate } from '../gates/rules.js'
 import type { Autonomy } from '../gates/autonomy.js'
 import { Execution } from './execution.js'
@@ -193,7 +193,14 @@ export interface ExecutorDeps {
    * Null means it did not run, which the ladder reports as "not measured" and
    * never as a pass.
    */
-  readonly runStep: (step: LadderStep, logPath: string) => Promise<number | null>
+  readonly runStep: (
+    step: LadderStep,
+    logPath: string,
+    options?: { readonly fresh?: boolean }
+  ) => Promise<number | null>
+
+  /** What the pictures step left on the last run, for the ladder's outcome to carry. */
+  readonly picturesTaken?: () => PicturesTaken | null
 
   /**
    * Run one rung in a checkout of the order's base branch, without this change.

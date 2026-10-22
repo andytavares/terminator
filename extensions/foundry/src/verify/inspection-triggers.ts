@@ -1,5 +1,4 @@
-import { matchesGlob } from 'node:path'
-import { gradeRisk } from '../runtime/review/risk-grader.js'
+import { gradeRisk, matchesAnyGlob } from '../runtime/review/risk-grader.js'
 import type { CheckState } from '../runtime/review/risk-grader.js'
 import type { RiskAssessment, WorkOrder } from '../order/schema.js'
 import { isDocumentationRelative } from './documentation-path.js'
@@ -26,7 +25,6 @@ const TRIGGER_FROM_GRADER: ReadonlyArray<{
   { match: /public interface/i, trigger: 'public_interface' },
 ]
 
-const DEPENDENCY_MANIFEST = /(^|\/)(package\.json|Cargo\.toml|go\.mod|pyproject\.toml|Gemfile)$/
 const NETWORK = /(^|\/)(fetch|http|client|api-client|webhook)[.-]/i
 
 export interface InspectionInput {
@@ -59,10 +57,11 @@ type Trigger = RiskAssessment['triggers'][number]
 function whatTheChangeTripped(order: WorkOrder, files: readonly string[]): Trigger[] {
   const tripped: Trigger[] = []
   // About what the change brings in rather than where it lands.
-  if (files.some((f) => DEPENDENCY_MANIFEST.test(f))) tripped.push('new_dependency')
+  const { manifests } = order.context.environment.paths
+  if (files.some((f) => matchesAnyGlob(f, manifests))) tripped.push('new_dependency')
   if (files.some((f) => NETWORK.test(f))) tripped.push('network_egress')
   const { criticalPaths } = order.risk
-  if (files.some((file) => criticalPaths.some((glob) => matchesGlob(file, glob)))) {
+  if (files.some((file) => matchesAnyGlob(file, criticalPaths))) {
     tripped.push('critical_path')
   }
   if (outsideBlastRadius(order, files)) tripped.push('outside_blast_radius')
@@ -88,6 +87,8 @@ export function inspectionFor(order: WorkOrder, input: InspectionInput): Inspect
     checkState: input.checkState,
     sharedContractFiles: order.plan.sharedFiles,
     criticalPaths: order.risk.criticalPaths,
+    lockfiles: order.context.environment.paths.lockfiles,
+    formattingFiles: order.context.environment.paths.formatting,
   })
 
   const triggers = new Set<Trigger>(

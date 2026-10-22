@@ -231,7 +231,10 @@ async function repositoryReadFirst(): Promise<void> {
   })) as { order: { context: { toolchain: Record<string, unknown> } }; unavailableChecks: string[] }
   // The fixture declares `test` and `lint`, so those are probed and the rest
   // are honestly reported as unmeasurable here.
-  expect(created.order.context.toolchain.test).toMatchObject({ source: 'package.json' })
+  expect(created.order.context.toolchain.test).toMatchObject({
+    source: 'hint',
+    evidence: 'package.json',
+  })
   expect(created.unavailableChecks).toContain('coverage')
 }
 

@@ -32,20 +32,29 @@ export function surfacedQuestions(questions: readonly OpenQuestion[]): OpenQuest
  * Record an answer.
  *
  * A number is an index into the question's own options, so the cheapest
- * possible answer really is one keystroke. An index that names no option is
- * ignored rather than stored as an answer nobody gave.
+ * possible answer really is one keystroke; a list of numbers is several at
+ * once, for a question whose options can all be true together. An index that
+ * names no option is ignored rather than stored as an answer nobody gave.
  */
 export function answerQuestion(
   questions: readonly OpenQuestion[],
   id: string,
-  answer: string | number
+  answer: string | number | readonly number[]
 ): OpenQuestion[] {
   return questions.map((question) => {
     if (question.id !== id) return question
-    if (typeof answer === 'number') {
-      const chosen = question.options[answer]
-      return chosen === undefined ? question : { ...question, answer: chosen }
+    if (typeof answer === 'string') return { ...question, answer, chosen: [] }
+    const chosen = validIndices(question.options, typeof answer === 'number' ? [answer] : answer)
+    if (chosen.length === 0 || (chosen.length > 1 && !question.multiple)) return question
+    return {
+      ...question,
+      chosen,
+      answer: chosen.map((index) => question.options[index]).join('; '),
     }
-    return { ...question, answer }
   })
+}
+
+/** The distinct indices that name an option, in option order. */
+function validIndices(options: readonly string[], indices: readonly number[]): number[] {
+  return options.map((_, index) => index).filter((index) => indices.includes(index))
 }

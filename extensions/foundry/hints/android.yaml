@@ -1,0 +1,9 @@
+schemaVersion: 1
+id: android
+priority: 70
+when: [build.gradle, build.gradle.kts, settings.gradle, settings.gradle.kts]
+paths:
+  interface: ['**/res/layout/**/*.xml', '**/ui/**/*.kt']
+  manifests:
+    [build.gradle, build.gradle.kts, settings.gradle, settings.gradle.kts, '**/AndroidManifest.xml']
+  lockfiles: [gradle.lockfile]

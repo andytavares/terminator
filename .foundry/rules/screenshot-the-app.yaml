@@ -7,5 +7,5 @@ asserts: >
   evidence. Structural assertions pass while the interface renders broken, and
   every interface failure in this project's history passed its assertions
   first.
-appliesWhen: 'path_exists: playwright.config.ts'
-origin: built-in
+appliesWhen: always
+origin: repository

@@ -8,6 +8,7 @@ import { branchFor, checkoutPath } from './worktree.js'
 import type { Gate } from '../gates/rules.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { Verdict } from '../verify/verdict.js'
+import { PICTURES_STEP_NAME } from '../verify/ladder.js'
 import type { LadderOutcome } from '../verify/ladder.js'
 import type { CiOutcome } from './ship-tail.js'
 import { gradeInWords } from '../runtime/review/risk-grade.js'
@@ -419,6 +420,7 @@ function verificationLines(ladder: LadderOutcome | null): string[] {
     '| Step | Rung | Result |',
     '| --- | --- | --- |',
     ...rows,
+    ...picturesLines(ladder),
   ]
   const count = ladder.unmeasured.length
   if (count === 0) return lines
@@ -426,6 +428,19 @@ function verificationLines(ladder: LadderOutcome | null): string[] {
     ...lines,
     '',
     `**${count} ${count === 1 ? 'check was' : 'checks were'} not measured here**: ${ladder.unmeasured.join(', ')}. This repository has no command for them, so they are reported as unmeasured rather than as passing.`,
+  ]
+}
+
+// The images are named, not embedded: GitHub has no public API to upload an image into a
+// pull request body (attachments are web-UI only), and the repository is never given them.
+function picturesLines(ladder: LadderOutcome): string[] {
+  const step = ladder.steps.find((s) => s.name === PICTURES_STEP_NAME)
+  if (step === undefined) return []
+  if (step.pictures === undefined) return ['', `Pictures: not measured — ${step.reason}`]
+  const { folder, images } = step.pictures
+  return [
+    '',
+    `Pictures: ${images.length} ${images.length === 1 ? 'image' : 'images'}, kept in \`${folder}\`.`,
   ]
 }
 

@@ -93,9 +93,10 @@ const replies: Record<string, (payload: unknown) => unknown> = {
   'foundry:run.recipes': () => ({ recipes: [], proposed: 'standard' }),
 }
 
-const mockBridgeInvoke = vi.fn(async (channel: string, payload?: unknown) =>
+const answerFromReplies = async (channel: string, payload?: unknown): Promise<unknown> =>
   channel in replies ? replies[channel](payload) : {}
-)
+
+const mockBridgeInvoke = vi.fn(answerFromReplies)
 
 /** The canvas members the factory views draw with; jsdom has no canvas. */
 function fakeCanvasContext(): CanvasRenderingContext2D {
@@ -110,6 +111,8 @@ function fakeCanvasContext(): CanvasRenderingContext2D {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // clearAllMocks keeps an implementation a test installed, so the next test would inherit it.
+  mockBridgeInvoke.mockImplementation(answerFromReplies)
   pendingNewOrder = false
   orderRows = []
   inboxWaiting = []

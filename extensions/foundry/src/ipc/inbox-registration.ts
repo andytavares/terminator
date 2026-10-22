@@ -241,10 +241,16 @@ async function sendBackFinalCheck({ api, dataRoot }: ActivationContext, gate: Ga
       source: 'check',
       command: null,
       exitCode: output?.exitCode ?? null,
-      excerpt: [gate.why, output?.excerpt ?? ''].filter(Boolean).join('\n\n'),
+      excerpt: feedbackExcerpt(gate),
       logPath: output?.path ?? null,
     })
   )
+}
+
+// What the builder is told: the first failure, with its log.
+function feedbackExcerpt(gate: Gate): string {
+  const output = gate.evidence.find((e) => e.kind === 'stdout')
+  return [gate.why, output?.excerpt ?? ''].filter(Boolean).join('\n\n')
 }
 
 // How much is waiting for the operator, and where, read by every surface so "is

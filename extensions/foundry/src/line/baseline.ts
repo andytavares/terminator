@@ -7,11 +7,9 @@ import type { LedgerEntry } from '../ledger/append.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { RunCommandOptions } from '../runtime/supervised-runner.js'
 import { indexFor } from '../state/live-index.js'
-import { brokenInstall } from '../verify/broken-install.js'
 import { climb, probedStep } from '../verify/ladder.js'
 import type { LadderStep, StepOutcome } from '../verify/ladder.js'
-import { installCommandFor, probeToolchain } from '../verify/toolchain-probe.js'
-import type { Toolchain } from '../verify/toolchain-probe.js'
+import { recordExitCodes } from '../profile/proof.js'
 import { lastLines, safeFilename } from './execution-parts.js'
 import type { ShellExec } from './integrate.js'
 import { issueOf } from './order-project.js'
@@ -21,6 +19,7 @@ import {
   removeBaseCheckout,
   unlinkBorrowedDependencies,
 } from './worktree.js'
+import { leadRepo } from '../order/lead-repo.js'
 import type { Checkout } from './worktree.js'
 
 // Whether the base branch builds and passes its mechanical checks, proven while
@@ -36,7 +35,7 @@ export interface Baseline {
   readonly steps: readonly StepOutcome[]
   /** The log of each step that ran, by step name. */
   readonly logs: Readonly<Record<string, string>>
-  /** True when a broken install was reinstalled and the checks run again. */
+  /** True when a failed step passed after the checkout was prepared again. */
   readonly mended: boolean
 }
 
@@ -52,14 +51,26 @@ export interface BaselineDeps {
 
 const EXCERPT_LINES = 20
 
-/** @internal */
-export function baselineSteps(toolchain: Toolchain): LadderStep[] {
-  return [
+const PREPARE_STEP = 'Prepare the checkout'
+
+function commandStep(name: string, command: string, rung: LadderStep['rung']): LadderStep {
+  return { rung, name, command, status: 'runnable', reason: '', check: null }
+}
+
+/** The preparation, the checks the order has a command for, then its added checks. @internal */
+export function baselineSteps({ toolchain, environment }: WorkOrder['context']): LadderStep[] {
+  const prepare =
+    environment.prepare === null ? [] : [commandStep(PREPARE_STEP, environment.prepare, 'L0')]
+  const checks = [
     probedStep(toolchain, 'format', { rung: 'L0', name: 'Format' }),
     probedStep(toolchain, 'lint', { rung: 'L0', name: 'Lint' }),
     probedStep(toolchain, 'test', { rung: 'L1', name: 'Tests' }),
+    probedStep(toolchain, 'coverage', { rung: 'L2', name: 'Coverage' }),
     probedStep(toolchain, 'build', { rung: 'L5', name: 'Build' }),
+    probedStep(toolchain, 'e2e', { rung: 'L5', name: 'End-to-end tests' }),
   ].filter((step) => step.status === 'runnable')
+  const added = environment.additional.map((c) => commandStep(c.name, c.command, c.rung))
+  return [...prepare, ...checks, ...added]
 }
 
 function baselinePath(root: string, orderId: string): string {
@@ -100,6 +111,9 @@ export function recordedOnBase(
 interface Proof {
   readonly order: WorkOrder
   readonly deps: BaselineDeps
+  /** The lane whose repository is proved, and where its stored profile lives. */
+  readonly lane: number
+  readonly repoPath: string
   readonly baseBranch: string
   readonly startedAt: string
 }
@@ -161,22 +175,12 @@ function failedIn(pass: Pass): StepOutcome[] {
   return pass.steps.filter((step) => step.result === 'fail')
 }
 
-async function logsShowBrokenInstall(pass: Pass): Promise<boolean> {
-  for (const step of failedIn(pass)) {
-    const log = await fs.promises.readFile(pass.logs[step.name] ?? '', 'utf8').catch(() => '')
-    if (brokenInstall(log) !== null) return true
-  }
-  return false
-}
-
-async function reinstall(proof: Proof, checkout: Checkout): Promise<void> {
-  const command = installCommandFor(checkout.path)
-  if (command === null) return
+async function prepareAgain(proof: Proof, checkout: Checkout, command: string): Promise<void> {
   await unlinkBorrowedDependencies(checkout, { exec: proof.deps.exec, root: proof.deps.root })
   await runOnBase(proof, checkout, {
-    title: 'Reinstall dependencies',
+    title: 'Prepare the checkout again',
     command,
-    logPath: logPathFor(proof, 'Reinstall dependencies'),
+    logPath: logPathFor(proof, 'Prepare the checkout again'),
   })
 }
 
@@ -185,12 +189,35 @@ interface Finding {
   readonly mended: boolean
 }
 
+/** The first pass with each rerun step in place of the one that failed. */
+function withReruns(first: Pass, again: Pass): Finding {
+  const rerun = new Map(again.steps.map((step) => [step.name, step]))
+  return {
+    pass: {
+      steps: first.steps.map((step) => rerun.get(step.name) ?? step),
+      logs: { ...first.logs, ...again.logs },
+    },
+    mended: again.steps.some((step) => step.result === 'pass'),
+  }
+}
+
+// A step that failed is run once more after the preparation ran again: a checkout
+// broken by its install fails the same way a broken change does, so nothing reads a log.
 async function checkAndMend(proof: Proof, checkout: Checkout): Promise<Finding> {
-  const steps = baselineSteps(probeToolchain(checkout.path))
+  const steps = baselineSteps(proof.order.context)
   const first = await runSteps(proof, checkout, steps)
-  if (!(await logsShowBrokenInstall(first))) return { pass: first, mended: false }
-  await reinstall(proof, checkout)
-  return { pass: await runSteps(proof, checkout, steps), mended: true }
+  const failed = failedIn(first).map((step) => step.name)
+  const { prepare } = proof.order.context.environment
+  if (prepare === null || failed.length === 0 || failed.includes(PREPARE_STEP)) {
+    return { pass: first, mended: false }
+  }
+  await prepareAgain(proof, checkout, prepare)
+  const again = await runSteps(
+    proof,
+    checkout,
+    steps.filter((step) => failed.includes(step.name))
+  )
+  return withReruns(first, again)
 }
 
 function failureReason(proof: Proof, pass: Pass): string {
@@ -245,9 +272,26 @@ function baselineOf(proof: Proof, rest: Partial<Baseline>): Baseline {
   }
 }
 
-// Nothing failed and something passed: a step that did not run is not a pass.
+// Nothing failed and a check passed: a step that did not run is not a pass, and neither
+// is a preparation, which measures nothing.
 function isProven(pass: Pass): boolean {
-  return failedIn(pass).length === 0 && pass.steps.some((step) => step.result === 'pass')
+  return (
+    failedIn(pass).length === 0 &&
+    pass.steps.some((step) => step.result === 'pass' && step.name !== PREPARE_STEP)
+  )
+}
+
+function exitCodesOf(pass: Pass): Record<string, number | null> {
+  const ran = pass.steps.filter((step) => step.command !== null)
+  return Object.fromEntries(ran.map((step) => [step.command, step.exitCode]))
+}
+
+// The profile's copy is a courtesy to the next order: failing to write it must not
+// turn a proof that was recorded into one that could not be checked.
+async function keepInProfile(proof: Proof, commit: string | null, pass: Pass): Promise<void> {
+  if (commit === null) return
+  const result = { commit, at: proof.deps.now(), exitCodes: exitCodesOf(pass) }
+  await recordExitCodes(proof.deps.root, proof.repoPath, result).catch(() => undefined)
 }
 
 async function recordOutcome(proof: Proof, commit: string | null, found: Finding): Promise<void> {
@@ -264,6 +308,7 @@ async function recordOutcome(proof: Proof, commit: string | null, found: Finding
       mended: found.mended,
     })
   )
+  await keepInProfile(proof, commit, found.pass)
   await announce(proof, {
     action: `environment.${state}`,
     reason:
@@ -274,14 +319,66 @@ async function recordOutcome(proof: Proof, commit: string | null, found: Finding
   })
 }
 
-async function proveOnCheckout(proof: Proof, lane: number): Promise<void> {
-  const checkout = await ensureBaselineCheckout(proof.order, lane, proof.deps)
+async function proveOnCheckout(proof: Proof): Promise<void> {
+  const checkout = await ensureBaselineCheckout(proof.order, proof.lane, proof.deps)
   try {
     const commit = await readCommit(proof, checkout)
     await recordOutcome(proof, commit, await checkAndMend(proof, checkout))
   } finally {
     await removeBaseCheckout(checkout, proof.deps)
   }
+}
+
+// One base checkout per order: two things proving at once would each remove the other's.
+const queues = new Map<string, Promise<unknown>>()
+
+function inQueue<T>(orderId: string, task: () => Promise<T>): Promise<T> {
+  const next = (queues.get(orderId) ?? Promise.resolve()).catch(() => undefined).then(task)
+  queues.set(orderId, next)
+  const forget = (): void => {
+    if (queues.get(orderId) === next) queues.delete(orderId)
+  }
+  next.then(forget, forget)
+  return next
+}
+
+/** What commands ended with on a fresh checkout of the base branch. */
+export interface FreshBaseRun {
+  readonly commit: string | null
+  /** By command. */
+  readonly exitCodes: Readonly<Record<string, number | null>>
+  readonly logPaths: Readonly<Record<string, string>>
+}
+
+async function runCommandsOnBase(proof: Proof, commands: readonly string[]): Promise<FreshBaseRun> {
+  const checkout = await ensureBaselineCheckout(proof.order, proof.lane, proof.deps)
+  try {
+    const commit = await readCommit(proof, checkout)
+    const exitCodes: Record<string, number | null> = {}
+    const logPaths: Record<string, string> = {}
+    for (const [index, command] of commands.entries()) {
+      logPaths[command] = logPathFor(proof, `Command ${index + 1}`)
+      const title = `${command} on ${proof.baseBranch}`
+      exitCodes[command] = await runOnBase(proof, checkout, {
+        title,
+        command,
+        logPath: logPaths[command],
+      })
+    }
+    return { commit, exitCodes, logPaths }
+  } finally {
+    await removeBaseCheckout(checkout, proof.deps)
+  }
+}
+
+// Queued behind any proof already running for the order: two would remove each
+// other's @baseline checkout. Throws when it cannot check out.
+export function runOnFreshBase(
+  order: WorkOrder,
+  deps: BaselineDeps,
+  commands: readonly string[]
+): Promise<FreshBaseRun> {
+  return inQueue(order.id, () => runCommandsOnBase(proofOf(order, deps), commands))
 }
 
 async function recordCouldNotCheck(proof: Proof, error: unknown): Promise<void> {
@@ -305,6 +402,11 @@ export function isProving(orderId: string): boolean {
   return inFlight.has(orderId)
 }
 
+/** Every proof running now, settled; a spec waits for it before its folder goes. @internal */
+export async function settleProofs(): Promise<void> {
+  await Promise.allSettled([...inFlight.values()])
+}
+
 /** Never throws: a failure is recorded. A second call joins the running proof. */
 export function proveEnvironment(order: WorkOrder, deps: BaselineDeps): Promise<void> {
   const running = inFlight.get(order.id)
@@ -314,15 +416,22 @@ export function proveEnvironment(order: WorkOrder, deps: BaselineDeps): Promise<
   return proof
 }
 
-async function prove(order: WorkOrder, deps: BaselineDeps): Promise<void> {
-  const repo = [...order.context.repos].sort((a, b) => a.lane - b.lane)[0]
-  if (repo === undefined) return
-  const proof: Proof = {
+function proofOf(order: WorkOrder, deps: BaselineDeps): Proof {
+  const repo = leadRepo(order)
+  if (repo === undefined) throw new Error('The order has no repository.')
+  return {
     order,
     deps,
+    lane: repo.lane,
+    repoPath: repo.path,
     baseBranch: repo.baseBranch,
     startedAt: deps.now(),
   }
+}
+
+async function prove(order: WorkOrder, deps: BaselineDeps): Promise<void> {
+  if (order.context.repos.length === 0) return
+  const proof = proofOf(order, deps)
   try {
     await writeBaseline(deps.root, order.id, baselineOf(proof, {}))
     await announce(proof, {
@@ -330,7 +439,7 @@ async function prove(order: WorkOrder, deps: BaselineDeps): Promise<void> {
       reason: `Checking that ${proof.baseBranch} builds and passes its checks before any work starts.`,
       evidence: [],
     })
-    await proveOnCheckout(proof, repo.lane)
+    await inQueue(order.id, () => proveOnCheckout(proof))
   } catch (error) {
     await recordCouldNotCheck(proof, error).catch(() => undefined)
   }

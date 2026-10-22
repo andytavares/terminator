@@ -302,6 +302,7 @@ function reopensTests() {
 
 describe('applyRungOutput', () => {
   describe('what the scout read', whatTheScoutReadTests)
+  describe('commands the scout proposed', scoutCommandTests)
   describe('reports only', reportsOnlyTests)
   describe('red team findings', rungOutputRedTeamFindingsTests)
   describe('known findings', knownFindingsTests)
@@ -785,5 +786,34 @@ function nothingOrNotJsonTests() {
     expect(result?.ok).toBe(false)
     if (result?.ok !== false) throw new Error('expected a refusal')
     expect(result.reason).toContain('not readable')
+  })
+}
+
+function scoutCommandTests() {
+  const proposal = { check: 'lint', command: 'make lint', evidence: 'Makefile:12' }
+
+  it('shows the scout the closed set of checks to name', () => {
+    const text = rungOutputContract('/x.json', ['context'])
+    expect(text).toContain('"check": "test | lint | format | coverage | e2e | build"')
+    expect(text).toContain('path:line')
+  })
+
+  it('hands the proposals back and does not put them on the order', () => {
+    const before = order()
+    const after = applyRungOutput(before, {
+      role: 'scout',
+      output: parseRungOutput({ findings: { commands: [proposal] } }, ['context']),
+      writes: ['context'],
+      at: AT,
+    })
+    expect(after.commands).toEqual([proposal])
+    expect(after.order.context.toolchain).toEqual(before.context.toolchain)
+  })
+
+  it('refuses a check outside the closed set and a proposal without evidence', () => {
+    const parse = (command: object) => () =>
+      parseRungOutput({ findings: { commands: [command] } }, ['context'])
+    expect(parse({ ...proposal, check: 'deploy' })).toThrow(/check/)
+    expect(parse({ check: 'lint', command: 'make lint' })).toThrow(/evidence/)
   })
 }

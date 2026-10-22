@@ -7,7 +7,7 @@ import type { CheckId, CompileResult } from '../order/compile.js'
 // lives, so the step list is also the map of what is holding hand-off up. The
 // open questions are on no step: they have the band above all of them.
 
-export type StepId = 'intent' | 'plan' | 'redTeam' | 'shape' | 'tracker' | 'handOff'
+export type StepId = 'intent' | 'plan' | 'redTeam' | 'checks' | 'shape' | 'tracker' | 'handOff'
 
 export interface ForgeStep {
   readonly id: StepId
@@ -19,12 +19,21 @@ const STEP_CHECKS: Record<StepId, readonly CheckId[]> = {
   intent: [],
   plan: ['verifiable', 'coverage', 'risk'],
   redTeam: ['redTeam'],
+  checks: [],
   shape: [],
   tracker: [],
   handOff: [],
 }
 
-const SEQUENCE: readonly StepId[] = ['intent', 'plan', 'redTeam', 'shape', 'tracker', 'handOff']
+const SEQUENCE: readonly StepId[] = [
+  'intent',
+  'plan',
+  'redTeam',
+  'checks',
+  'shape',
+  'tracker',
+  'handOff',
+]
 
 export function forgeSteps(
   compile: CompileResult,

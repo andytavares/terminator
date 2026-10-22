@@ -37,7 +37,50 @@ describe('createOrderStore', () => {
   describe('listing', storeListingTests)
   describe('finding by issue', findingByIssueTests)
   describe('trackers and the ledger', trackersAndTheLedgerTests)
+  describe('updates made at once', concurrentUpdateTests)
+  describe('an update', updateResultTests)
 })
+
+// A stop that cancelled the order was once written over by a run saving the copy it loaded
+// when it started: the order came back `running`.
+function concurrentUpdateTests() {
+  it('keeps both of two updates made at once: neither works from a stale copy', async () => {
+    const store = createOrderStore(root)
+    await store.save(order({ status: 'running' }))
+    await Promise.all([
+      store.update('WO-0913-c71', (o) => ({ ...o, title: 'Renamed while running' })),
+      store.update('WO-0913-c71', (o) => ({ ...o, status: 'cancelled' })),
+    ])
+    expect(await store.load('WO-0913-c71')).toMatchObject({
+      status: 'cancelled',
+      title: 'Renamed while running',
+    })
+  })
+
+  it('serialises updates across stores that resolve the same root', async () => {
+    await createOrderStore(root).save(order({ status: 'running' }))
+    const live = createLiveOrderStore(() => root)
+    await Promise.all([
+      live.update('WO-0913-c71', (o) => ({ ...o, title: 'Renamed while running' })),
+      live.update('WO-0913-c71', (o) => ({ ...o, status: 'cancelled' })),
+    ])
+    expect(await live.load('WO-0913-c71')).toMatchObject({
+      status: 'cancelled',
+      title: 'Renamed while running',
+    })
+  })
+}
+
+function updateResultTests() {
+  it('returns the order as saved, and null for one that does not exist', async () => {
+    const store = createOrderStore(root)
+    await store.save(order())
+    expect(await store.update('WO-0913-c71', (o) => ({ ...o, title: 'B' }))).toMatchObject({
+      title: 'B',
+    })
+    expect(await store.update('WO-missing', (o) => o)).toBeNull()
+  })
+}
 
 function atomicSavesTests() {
   it('never shows a reader a half-written order while it is being saved', async () => {

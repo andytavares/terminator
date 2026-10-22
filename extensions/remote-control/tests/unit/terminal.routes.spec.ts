@@ -167,17 +167,15 @@ function connect(sessionId: string, ticket?: string): Promise<WebSocket> {
     const ws = new WebSocket(`${baseUrl}/ws/terminals/${sessionId}${qs}`)
     ws.on('open', () => resolve(ws))
     ws.on('error', reject)
-    setTimeout(() => reject(new Error('timeout')), 2000)
   })
 }
 
 function connectExpectClose(sessionId: string, ticket?: string): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const qs = ticket ? `?ticket=${ticket}` : ''
     const ws = new WebSocket(`${baseUrl}/ws/terminals/${sessionId}${qs}`)
     ws.on('close', () => resolve())
     ws.on('error', () => resolve())
-    setTimeout(() => reject(new Error('timeout')), 2000)
   })
 }
 

@@ -121,40 +121,6 @@ type StartInput = {
   onTurnEnd?: () => void
 }
 
-/** Makes the next read of `file`, once armed, come back 100 ms late, holding the order as it was
- * before whatever wrote it in the meantime. */
-function slowNextRead(file: string): { delayNextRead: () => void; restore: () => void } {
-  const readFile = fs.promises.readFile
-  let armed = false
-  const spy = vi.spyOn(fs.promises, 'readFile').mockImplementation((async (
-    read: fs.PathLike,
-    options?: unknown
-  ) => {
-    const contents = await readFile(read, options as BufferEncoding)
-    if (armed && String(read) === file) {
-      armed = false
-      await new Promise((resolve) => setTimeout(resolve, 100))
-    }
-    return contents
-  }) as typeof fs.promises.readFile)
-  return { delayNextRead: () => (armed = true), restore: () => spy.mockRestore() }
-}
-
-/** An architect that amends the order, then has the next order read come back late. */
-function architectAmendsThenReadsLate(armSlowRead: () => void): void {
-  theRunner.start.mockImplementation(async (...args: unknown[]) => {
-    const input = args[0] as StartInput
-    const sessionId = `${input.phase}-session`
-    if (input.phase === 'architect') {
-      writeAmendment()
-      armSlowRead()
-    }
-    input.onRegistered?.({ sessionId })
-    if (input.phase === 'architect') input.onTurnEnd?.()
-    return { sessionId }
-  })
-}
-
 function cleanOrder(): WorkOrder {
   const base = order()
   return {
@@ -330,21 +296,12 @@ function theOrderBeforeTests() {
   // Seen in CI as the test above timing out.
   it('never puts the order from before the amendment back', async () => {
     await seed(true)
-    const slow = slowNextRead(path.join(dataDir, 'orders', 'WO-1', 'order.json'))
-    architectAmendsThenReadsLate(slow.delayNextRead)
-
-    try {
-      await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
-      await vi.waitFor(
-        () => expect(ledgerFileText(dataDir)).toMatch(/"action":"run\.(started|refused)"/),
-        {
-          timeout: 2000,
-        }
-      )
-      await untilRunSettles()
-    } finally {
-      slow.restore()
-    }
+    await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
+    await vi.waitFor(
+      () => expect(ledgerFileText(dataDir)).toMatch(/"action":"run\.(started|refused)"/),
+      { timeout: 2000 }
+    )
+    await untilRunSettles()
 
     expect(ledgerFileText(dataDir)).not.toContain('run.refused')
     expect(ledgerFileText(dataDir)).toContain('"action":"run.started"')

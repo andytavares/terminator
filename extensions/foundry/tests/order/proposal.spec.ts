@@ -152,6 +152,8 @@ function whichStore(answer: string | null) {
     options: [],
     recommended: null,
     answer,
+    multiple: false,
+    chosen: [],
     rank: 0,
     confidence: null,
   }
