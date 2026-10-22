@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { ENTRY_SOURCES } from '../profile/schema.js'
+import { ENTRY_SOURCES, PathsSchema } from '../profile/schema.js'
 import { CHECK_NAMES } from '../verify/check-names.js'
 import { RUNGS } from '../verify/ladder.js'
 
@@ -85,14 +85,7 @@ const EnvironmentSchema = z.object({
   prepare: z.string().nullable().default(null),
   share: z.array(z.string()).default([]),
   pictures: z.string().nullable().default(null),
-  paths: z
-    .object({
-      interface: z.array(z.string()).default([]),
-      manifests: z.array(z.string()).default([]),
-      lockfiles: z.array(z.string()).default([]),
-      formatting: z.array(z.string()).default([]),
-    })
-    .default({}),
+  paths: PathsSchema.default({}),
   additional: z
     .array(
       z.object({

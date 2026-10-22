@@ -46,7 +46,7 @@ const ChecksSchema = z.object(
   >
 )
 
-const PathsSchema = z.object({
+export const PathsSchema = z.object({
   interface: z.array(z.string()).default([]),
   manifests: z.array(z.string()).default([]),
   lockfiles: z.array(z.string()).default([]),
