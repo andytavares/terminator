@@ -11,6 +11,7 @@ import {
   startupProblems,
 } from '../../../scripts/smoke-start.mjs'
 import { makeTempDir } from '../../support/temp-dir'
+import { userInfo } from 'node:os'
 
 const REPO_ROOT = resolve(__dirname, '../../..')
 const IDS = ['terminator.notepad', 'terminator.task-vault']
@@ -146,9 +147,11 @@ describe('electronMainPid', () => {
 })
 
 describe('mainLogPath', () => {
-  it("is under the app's home's Library/Logs, where macOS keeps app logs", () => {
-    expect(mainLogPath({ appName: 'Terminator', home: '/tmp/smoke-home' })).toBe(
-      '/tmp/smoke-home/Library/Logs/Terminator/terminator.log'
+  // Electron's logs path on macOS is under the account's home whatever HOME says, so the smoke
+  // start's own HOME does not move the log.
+  it("is under the account's Library/Logs, where Electron keeps the app's log", () => {
+    expect(mainLogPath({ appName: 'Terminator' })).toBe(
+      join(userInfo().homedir, 'Library/Logs/Terminator/terminator.log')
     )
   })
 })

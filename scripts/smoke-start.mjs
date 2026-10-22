@@ -5,7 +5,7 @@
 
 import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { tmpdir, userInfo } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -58,9 +58,10 @@ export function startupProblems(output, extensionIds) {
 }
 
 /** The main log file: on macOS app.getPath('logs') is ~/Library/Logs/<app name>
- * (https://www.electronjs.org/docs/latest/api/app#appsetapplogspathpath). */
-export function mainLogPath({ appName, home }) {
-  return join(home, 'Library', 'Logs', appName, 'terminator.log')
+ * (https://www.electronjs.org/docs/latest/api/app#appsetapplogspathpath), under the account's
+ * home: Electron does not read HOME, so the app's own HOME does not move it. */
+export function mainLogPath({ appName }) {
+  return join(userInfo().homedir, 'Library', 'Logs', appName, 'terminator.log')
 }
 
 /** The command that starts the app for `mode`: electron-vite, or a packaged executable.
@@ -169,7 +170,7 @@ async function main([mode, executable]) {
   }
   const userDataDirectory = mkdtempSync(join(tmpdir(), 'terminator-smoke-'))
   const home = mkdtempSync(join(tmpdir(), 'terminator-smoke-home-'))
-  const logPath = mainLogPath({ appName: appName(), home })
+  const logPath = mainLogPath({ appName: appName() })
   const logOffset = sizeOf(logPath)
   const extensionIds = bundledExtensionIds(join(REPO_ROOT, 'extensions'))
   const run = launch(startCommand({ mode, userDataDirectory, executable }), home)
