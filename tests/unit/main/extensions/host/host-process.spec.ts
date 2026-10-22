@@ -127,15 +127,17 @@ const signOffReader: BackendModule = {
 /** A host process whose "process" is a HostRuntime on the other end of a MessageChannel. */
 function hostHarness(modules: Record<string, BackendModule> = {}) {
   const main = mainApi()
-  const exits: Array<(code: number) => void> = []
+  const exits: Array<Array<(code: number) => void>> = []
   const spawned = vi.fn((initial: HostSnapshot): SpawnedHost => {
     const { port1, port2 } = new MessageChannel()
     const endpoint = new RpcEndpoint(workerPortLink(port2, ports))
     const loader = { load: (entry: string) => modules[entry] ?? backend, forget: () => {} }
     new HostRuntime(endpoint, { snapshot: initial, db: {} as ExtensionDB, loader })
+    const listeners: Array<(code: number) => void> = []
+    exits.push(listeners)
     return {
       link: workerPortLink(port1, ports),
-      onExit: (listener) => exits.push(listener),
+      onExit: (listener) => listeners.push(listener),
       kill: vi.fn(),
     }
   })
@@ -149,7 +151,7 @@ function hostHarness(modules: Record<string, BackendModule> = {}) {
     log: () => {},
   })
   const record = { id: 'demo', entryPoint: '/demo/main.cjs', directory: '/demo', dependencies: [] }
-  const crash = (code: number) => exits.at(-1)!(code)
+  const crash = (code: number) => exits.at(-1)!.forEach((listener) => listener(code))
   return { main, process, record, spawned, onBackendsFailed, crash }
 }
 
@@ -401,5 +403,19 @@ describe('commands a backend registers', () => {
     const { main, process, record } = hostHarness({ '/demo/main.cjs': once })
     await process.activate(record)
     await eventually(() => expect(main.commands.has('once')).toBe(false))
+  })
+})
+
+describe('stopping the extension host', () => {
+  it('settles once the host process has exited, so the next activation starts a new one', async () => {
+    const { process, record, spawned, crash } = hostHarness()
+    await process.activate(record)
+    const first = spawned.mock.results[0].value as SpawnedHost
+    vi.mocked(first.kill).mockImplementation(() => void setImmediate(() => crash(0)))
+
+    await process.stopHost()
+    await process.activate(record)
+
+    expect(spawned).toHaveBeenCalledTimes(2)
   })
 })

@@ -551,10 +551,10 @@ app.on('before-quit', async (event) => {
   event.preventDefault()
   isQuitting = true
   await extensionHost.unloadAll()
-  extensionHostProcess.stopHost()
+  await extensionHostProcess.stopHost()
   // After the extensions, which start most of them: a git or gh command still
   // running, and whatever it started, would outlive the app.
-  stopRunningCommands()
+  await stopRunningCommands()
   await ptyManager.killAll()
   closeAppDb()
   // Last, so what the steps above logged reaches the file before the process ends.

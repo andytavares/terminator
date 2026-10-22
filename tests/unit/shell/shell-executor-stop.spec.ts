@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { execShell } from '../../../src/main/shell/shell-executor'
 import { stopRunningCommands } from '../../../src/main/shell/command-runner'
 import { makeTempDir } from '../../support/temp-dir'
-import { PROCESS_WAIT_MS, expectProcessGone, recordedPid } from '../../support/processes'
+import { PROCESS_WAIT_MS, expectProcessGone, isProcessAlive, recordedPid } from '../../support/processes'
 
 // A git or gh command running at quit ends with the app, with what it started (macOS's git
 // shim started an xcodebuild that outlived it, run 38382115775). The stand-in gh records a sleep's pid.
@@ -38,16 +38,16 @@ describe('stopRunningCommands', () => {
     const run = execShell({ command: 'gh', args: [], cwd: scratch, timeoutMs: 60_000 })
     const grandchild = await recordedPid(pidFile)
 
-    stopRunningCommands()
+    await stopRunningCommands()
 
+    expect(isProcessAlive(grandchild)).toBe(false)
     expect((await run).exitCode).not.toBe(0)
-    await expectProcessGone(grandchild)
   })
 
   it('leaves nothing to stop once a command has finished', async () => {
     writeFileSync(join(scratch, 'gh'), '#!/bin/sh\necho done\n')
     expect((await execShell({ command: 'gh', args: [], cwd: scratch })).stdout).toBe('done\n')
-    expect(() => stopRunningCommands()).not.toThrow()
+    await expect(stopRunningCommands()).resolves.toBeUndefined()
   })
 })
 

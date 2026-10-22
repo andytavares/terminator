@@ -68,9 +68,14 @@ export class ExtensionHostProcess {
     this.running?.endpoint.notify('workspaces.changed', workspaces)
   }
 
-  stopHost(): void {
+  /** Settles once the host process has exited. */
+  async stopHost(): Promise<void> {
     this.stopping = true
-    this.running?.host.kill()
+    const host = this.running?.host
+    if (!host) return
+    const exited = new Promise<void>((resolve) => host.onExit(() => resolve()))
+    host.kill()
+    await exited
   }
 
   private forgetBackend(extensionId: string): void {

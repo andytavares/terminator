@@ -54,10 +54,13 @@ function stopGroup(child: ChildProcess): void {
 }
 
 /** Stops every command still running (git, gh, the login-shell probe, the metrics' ps), with
- * everything each one started. The app calls it as it quits: on macOS /usr/bin/git is an xcrun
+ * everything each one started, and settles once each has closed. The app calls it as it quits: on macOS /usr/bin/git is an xcrun
  * shim that can start xcodebuild, which outlived the app (run 38382115775). */
-export function stopRunningCommands(): void {
-  for (const child of running) stopGroup(child)
+export async function stopRunningCommands(): Promise<void> {
+  const stopping = [...running]
+  const closed = stopping.map((child) => new Promise<void>((resolve) => child.once('close', resolve)))
+  for (const child of stopping) stopGroup(child)
+  await Promise.all(closed)
 }
 
 interface CommandRun {

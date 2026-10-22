@@ -96,7 +96,7 @@ describe('adoptLoginShellPath while the app quits', () => {
 
     const adopting = adoptLoginShellPath(env)
     const grandchild = await recordedPid(pidFile)
-    stopRunningCommands()
+    await stopRunningCommands()
     await adopting
 
     expect(env.PATH).toBe('/usr/bin:/bin')
