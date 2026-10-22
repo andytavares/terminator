@@ -1,0 +1,59 @@
+extensions/git-integration/tests/unit/review-agent-claude-path.spec.ts
+  s_f6f18e5557b141::t_4c84705a74e196 126,130,132
+extensions/remote-control/tests/unit/terminal.routes.spec.ts
+  s_f6f18e5557b141::t_4c7c0c07548d40 174
+extensions/foundry/tests/ipc/forge-defect-answer-ipc.spec.ts
+  s_f6f18e5557b141::t_ea0391044d0ea3 299-304
+extensions/foundry/tests/components/Ledger.spec.tsx
+  s_f6f18e5557b141::t_e5a2b222cf88b6 118-119,121-122
+extensions/foundry/tests/runtime/control-server.spec.ts
+  s_f6f18e5557b141::t_f8cb563b3c5824 122-124
+extensions/task-vault/tests/components/InboxProcessor.spec.tsx
+  s_f6f18e5557b141::t_7f30f72be4109e 136
+extensions/task-vault/tests/components/DailyLogSubtasks.spec.tsx
+  s_f6f18e5557b141::t_7f30f72be4109e 240,247-248
+  s_f6f18e5557b141::t_0cf83db75e8c54 2
+extensions/foundry/tests/factory/timeline-store.spec.ts
+  s_f6f18e5557b141::t_4810fa903f1e00 116-117,121,126-130
+extensions/foundry/tests/runtime/supervised-runner.spec.ts
+  s_f6f18e5557b141::t_f8cb563b3c5824 1204-1214
+extensions/foundry/tests/line/worktree.spec.ts
+  s_f6f18e5557b141::t_b178bafd79eadd 389-407,414-416
+  s_f6f18e5557b141::t_da56a2987332af 419-425
+extensions/foundry/tests/forge/intake-turn-ends.spec.ts
+  s_f6f18e5557b141::t_813f321708d4db 112
+extensions/remote-control/tests/unit/bridge.route.spec.ts
+  s_f6f18e5557b141::t_064769c6dfbde2 62-67,171-173,182,263-268,277,284,293,332,336,358,367-370,428
+  s_f6f18e5557b141::t_4c7c0c07548d40 17,446
+extensions/git-integration/tests/unit/review-agent.spec.ts
+  s_f6f18e5557b141::t_4c84705a74e196 263-264
+  s_f6f18e5557b141::t_127ea8eb4d480d 412-414
+extensions/git-integration/tests/unit/ReviewDiffPane.spec.tsx
+  s_f6f18e5557b141::t_4c84705a74e196 695-697,701-702
+extensions/git-integration/tests/unit/PrReviewTab.spec.tsx
+  s_f6f18e5557b141::t_4c84705a74e196 324-330
+extensions/foundry/tests/ipc/order-delete-intake-ipc.spec.ts
+  s_f6f18e5557b141::t_f8cb563b3c5824 73-74
+extensions/foundry/tests/forge/forge-loop-release.spec.ts
+  s_f6f18e5557b141::t_64f213b8c4bdb0 94-96,118,197,208,212
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_f6f18e5557b141::t_cd847263c7e368 1024-1025,1027-1028
+extensions/foundry/tests/line/early-ship.spec.ts
+  s_f6f18e5557b141::t_ffee8fc3453d48 187-188,191
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d58cdbb3b0d3aeafe7816359343dae8d29b497b2",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
