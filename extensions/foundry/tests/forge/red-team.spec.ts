@@ -52,7 +52,7 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
       ...base.context,
       toolchain: {
         ...base.context.toolchain,
-        test: { command: 'npm test', source: 'package.json' as const },
+        test: { command: 'npm test', source: 'hint' as const },
       },
     },
     acceptance: [{ ...FINAL_GLYPH }],

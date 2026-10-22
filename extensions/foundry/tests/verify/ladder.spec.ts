@@ -24,11 +24,11 @@ function toolchain(over: Partial<Toolchain> = {}): Toolchain {
 }
 
 const full = toolchain({
-  format: { command: 'npm run format', source: 'package.json' },
-  lint: { command: 'npm run lint', source: 'package.json' },
-  test: { command: 'npm test', source: 'package.json' },
-  coverage: { command: 'npm run coverage', source: 'package.json' },
-  e2e: { command: 'npm run e2e', source: 'package.json' },
+  format: { command: 'npm run format', source: 'hint' },
+  lint: { command: 'npm run lint', source: 'hint' },
+  test: { command: 'npm test', source: 'hint' },
+  coverage: { command: 'npm run coverage', source: 'hint' },
+  e2e: { command: 'npm run e2e', source: 'hint' },
 })
 
 const noRisk: RiskAssessment = { grade: 'P3', triggers: [], blastRadius: [], criticalPaths: [] }
@@ -65,7 +65,7 @@ function rungsAndCommandsTests() {
 
   it('marks a rung unavailable where the repository has no command, with the reason', () => {
     const steps = ladderFor({
-      toolchain: toolchain({ test: { command: 'npm test', source: 'package.json' } }),
+      toolchain: toolchain({ test: { command: 'npm test', source: 'hint' } }),
       risk: noRisk,
       touchesUi: false,
     })
@@ -80,7 +80,7 @@ function buildsTests() {
     const steps = ladderFor({
       toolchain: toolchain({
         ...full,
-        build: { command: 'npm run build', source: 'package.json' },
+        build: { command: 'npm run build', source: 'hint' },
       }),
       risk: noRisk,
       touchesUi: false,
@@ -95,8 +95,8 @@ function buildsTests() {
   it('does not build when there are no end-to-end tests to run against the build', () => {
     const steps = ladderFor({
       toolchain: toolchain({
-        test: { command: 'npm test', source: 'package.json' },
-        build: { command: 'npm run build', source: 'package.json' },
+        test: { command: 'npm test', source: 'hint' },
+        build: { command: 'npm run build', source: 'hint' },
       }),
       risk: noRisk,
       touchesUi: false,

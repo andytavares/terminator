@@ -1,4 +1,4 @@
-import { defaultHintsDir, evaluateHints, loadHints, type HintTier } from '../profile/hints.js'
+import { defaultHintsDir, evaluateHints, loadHints } from '../profile/hints.js'
 import { CHECK_NAMES, type CheckName } from './check-names.js'
 import type { EntrySource } from '../profile/schema.js'
 
@@ -15,23 +15,14 @@ import type { EntrySource } from '../profile/schema.js'
 // and a check that reports a pass it did not earn is the failure mode that
 // makes an unattended factory dangerous.
 
-/** The legacy four are what an order written before profiles recorded; they read back as `hint`. */
-type ProbeSource = 'package.json' | 'config' | 'makefile' | 'ci' | EntrySource
-
 interface ProbedCommand {
   readonly command: string
-  readonly source: ProbeSource
+  readonly source: EntrySource
+  /** The file the command was read from, where there is one. */
+  readonly evidence?: string
 }
 
 export type Toolchain = Record<CheckName, ProbedCommand | null>
-
-/** The name the probe has always given each kind of evidence. */
-const SOURCE_OF_TIER: Record<HintTier, ProbeSource> = {
-  scripts: 'package.json',
-  tools: 'config',
-  targets: 'makefile',
-  ciRuns: 'ci',
-}
 
 /**
  * The commands this project actually uses, or null where it has none.
@@ -44,7 +35,7 @@ export function probeToolchain(repoPath: string, hintsDir: string = defaultHints
   for (const check of CHECK_NAMES) {
     const found = checks[check]
     out[check] =
-      found === null ? null : { command: found.command, source: SOURCE_OF_TIER[found.tier] }
+      found === null ? null : { command: found.command, source: 'hint', evidence: found.evidence }
   }
   return out
 }
@@ -52,12 +43,4 @@ export function probeToolchain(repoPath: string, hintsDir: string = defaultHints
 /** The checks this project cannot run, so the operator learns before work starts. */
 export function unavailableChecks(toolchain: Toolchain): CheckName[] {
   return CHECK_NAMES.filter((name) => toolchain[name] === null)
-}
-
-/** How to install exactly what the lockfile pins, or null when there is no lockfile. */
-export function installCommandFor(
-  repo: string,
-  hintsDir: string = defaultHintsDir()
-): string | null {
-  return evaluateHints(repo, loadHints(hintsDir).hints).prepare?.command ?? null
 }

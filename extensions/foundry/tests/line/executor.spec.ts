@@ -135,9 +135,9 @@ function order(units = [unit('U-1'), unit('U-2')], over: Partial<WorkOrder> = {}
       ...base.context,
       toolchain: {
         ...base.context.toolchain,
-        test: { command: 'npm test', source: 'package.json' },
-        lint: { command: 'npm run lint', source: 'package.json' },
-        format: { command: 'npm run format', source: 'package.json' },
+        test: { command: 'npm test', source: 'hint' },
+        lint: { command: 'npm run lint', source: 'hint' },
+        format: { command: 'npm run format', source: 'hint' },
       },
       environment: {
         ...base.context.environment,
@@ -853,8 +853,6 @@ function sentBack(o: WorkOrder, n: number) {
     },
   }))
 }
-// Logs as WO-1008-6fe wrote them: neither failure was the code's.
-const MISSING = "Error: Cannot find package '@axe-core/playwright' imported from /w/a.spec.ts"
 function logRunner(log: (n: number) => { code: number; text: string }) {
   let n = 0
   return async (step: { name: string }, logPath: string) => {
@@ -1002,10 +1000,11 @@ describe('a failed final climb', () => {
   describe('the send-back limit', theSendBackLimitTests)
   describe('an unchecked base', anUncheckedBaseTests)
   describe('releasing the base checkout', releasingTheBaseCheckoutTests)
-  describe('reinstalling', reinstallingTests)
-  describe('an install that stays broken', anInstallThatStaysBrokenTests)
-  describe('the base checkout install', theBaseCheckoutInstallTests)
-  describe('a mended base', aMendedBaseTests)
+  describe('preparing the checkout again', preparingAgainTests)
+  describe('the question after it', afterPreparingTests)
+  describe('the base fails too', aFailingBaseTests)
+  describe('without a prepare command', withoutPrepareTests)
+  describe('a log is never read', noLogReadingTests)
   describe('a passing ladder', aPassingLadderTests)
 })
 
@@ -1259,96 +1258,128 @@ function releasingTheBaseCheckoutTests() {
   })
 }
 
-/** What a check prints when the install it runs against lost part of Electron. */
-const TRUNCATED =
-  'dyld[1]: Library not loaded: @rpath/Electron Framework.framework/Electron Framework'
+/** A log the old rule read as a broken install; nothing reads it now. */
+const MISSING = "Error: Cannot find package '@axe-core/playwright' imported from /w/a.spec.ts"
 
-function reinstallingTests() {
-  it('reinstalls a broken install in its own checkout and checks again without asking', async () => {
-    const o = order([unit('U-1')])
-    let healed = false
+const withPrepare = (o: WorkOrder, prepare: string | null): WorkOrder => ({
+  ...o,
+  context: { ...o.context, environment: { ...o.context.environment, prepare } },
+})
+
+function preparingAgainTests() {
+  it('records verify.reprepared and ships when the check passes after the checkout is prepared again', async () => {
+    const o = withPrepare(order([unit('U-1')]), 'make deps')
+    let prepared = false
     const reinstall = vi.fn(async () => {
-      healed = true
+      prepared = true
       return 0
     })
     const record = vi.fn(async () => undefined)
     const outcome = await execute(
       planOf(o),
-      base({
-        runStep: logRunner(() => (healed ? { code: 0, text: 'ok' } : { code: 1, text: TRUNCATED })),
-        reinstall,
-        record,
-      })
+      base({ runStep: lintRunner(() => (prepared ? 0 : 1)), reinstall, record })
     )
     expect(reinstall).toHaveBeenCalledTimes(1)
     expect(reinstall).toHaveBeenCalledWith('change', expect.stringMatching(/\.log$/))
     expect(outcome.gates).toEqual([])
     expect(outcome.ladder?.ok).toBe(true)
     expect(record).toHaveBeenCalledWith(
-      'verify.reinstalled',
+      'verify.reprepared',
       'Lint',
-      expect.stringContaining('Electron Framework could not be loaded')
+      expect.stringMatching(/the checkout was broken, not the code.*\.log.*\.retry\.log/s)
     )
   })
 }
 
-function anInstallThatStaysBrokenTests() {
-  it('says the install is broken when reinstalling did not mend it', async () => {
-    const o = order([unit('U-1')])
-    const reinstall = vi.fn(async () => 1)
+function afterPreparingTests() {
+  it('asks the base branch when the check still fails after the checkout is prepared again', async () => {
+    const o = withPrepare(order([unit('U-1')]), 'make deps')
+    const reinstall = vi.fn(async () => 0)
+    const record = vi.fn(async () => undefined)
+    const runStepOnBase = vi.fn(async () => 0)
     const outcome = await execute(
       planOf(o),
-      base({ runStep: logRunner(() => ({ code: 1, text: MISSING })), reinstall })
+      base({ runStep: lintRunner(() => 1), reinstall, record, runStepOnBase })
     )
     expect(reinstall).toHaveBeenCalledTimes(1)
-    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
-    expect(gate?.why).toContain(
-      'the package @axe-core/playwright is not installed, and reinstalling did not fix it'
+    expect(runStepOnBase).toHaveBeenCalled()
+    expect(record).not.toHaveBeenCalledWith(
+      'verify.reprepared',
+      expect.anything(),
+      expect.anything()
     )
-    expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.base-fail')
+    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
+    expect(gate?.why).toMatch(/It passes on main without this change\.$/)
   })
 }
 
-function theBaseCheckoutInstallTests() {
-  it('never blames the base branch for a broken install in the base checkout', async () => {
-    const o = order([unit('U-1')])
-    const reinstall = vi.fn(async () => 1)
+function aFailingBaseTests() {
+  it('names the base failure when the base fails too', async () => {
+    const o = withPrepare(order([unit('U-1')]), 'make deps')
     const outcome = await execute(
       planOf(o),
       base({
         runStep: lintRunner(() => 1),
-        runStepOnBase: logRunner(() => ({ code: 1, text: MISSING })),
-        reinstall,
+        runStepOnBase: lintRunner(() => 1),
+        reinstall: vi.fn(async () => 0),
       })
     )
-    expect(reinstall).toHaveBeenCalledWith('base', expect.stringMatching(/\.log$/))
-    expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.base-fail')
-    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
-    expect(gate?.why).toContain(
-      'main could not be checked: the package @axe-core/playwright is not installed'
-    )
+    expect(outcome.gates.map((g) => g.rule)).toContain('verify.base-fail')
   })
 }
 
-function aMendedBaseTests() {
-  it('checks the base again once its install is mended', async () => {
-    const o = order([unit('U-1')])
-    let healed = false
-    const reinstall = vi.fn(async () => {
-      healed = true
-      return 0
-    })
+function withoutPrepareTests() {
+  it('skips the question when the order has no prepare command', async () => {
+    const o = withPrepare(order([unit('U-1')]), null)
+    const reinstall = vi.fn(async () => 0)
+    const runStepOnBase = vi.fn(async () => 0)
+    const outcome = await execute(
+      planOf(o),
+      base({ runStep: lintRunner(() => 1), reinstall, runStepOnBase })
+    )
+    expect(reinstall).not.toHaveBeenCalled()
+    expect(runStepOnBase).toHaveBeenCalled()
+    expect(outcome.gates.map((g) => g.rule)).toContain('verify.repeat-fail')
+  })
+
+  it('does not prepare again for a check that passed on a retry: that is flaky', async () => {
+    const o = withPrepare(order([unit('U-1')]), 'make deps')
+    const reinstall = vi.fn(async () => 0)
+    const outcome = await execute(
+      planOf(o),
+      base({ runStep: lintRunner((n) => (n === 1 ? 1 : 0)), reinstall })
+    )
+    expect(reinstall).not.toHaveBeenCalled()
+    expect(outcome.gates.map((g) => g.rule)).toContain('verify.flaky')
+  })
+}
+
+function noLogReadingTests() {
+  const missingPackage = (n: number) => ({ code: n > 0 ? 1 : 0, text: MISSING })
+
+  it('treats a missing-package log like any other failure when there is no prepare command', async () => {
+    const o = withPrepare(order([unit('U-1')]), null)
+    const reinstall = vi.fn(async () => 0)
+    const outcome = await execute(
+      planOf(o),
+      base({ runStep: logRunner(missingPackage), runStepOnBase: lintRunner(() => 1), reinstall })
+    )
+    expect(reinstall).not.toHaveBeenCalled()
+    expect(outcome.gates.map((g) => g.rule)).toContain('verify.base-fail')
+  })
+
+  it('never says the dependencies are broken, whatever the log says', async () => {
+    const o = withPrepare(order([unit('U-1')]), 'make deps')
     const outcome = await execute(
       planOf(o),
       base({
-        runStep: lintRunner(() => 1),
-        runStepOnBase: logRunner(() =>
-          healed ? { code: 0, text: 'ok' } : { code: 1, text: MISSING }
-        ),
-        reinstall,
+        runStep: logRunner(missingPackage),
+        runStepOnBase: async () => 0,
+        reinstall: vi.fn(async () => 1),
       })
     )
     const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
+    expect(gate?.why).not.toMatch(/install|dependencies/)
     expect(gate?.why).toMatch(/It passes on main without this change\.$/)
   })
 }

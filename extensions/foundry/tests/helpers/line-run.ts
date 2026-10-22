@@ -29,7 +29,7 @@ export function agreedLineOrder(repo: string, over: Partial<WorkOrder> = {}): Wo
     repoPaths: [repo],
     now: '2026-10-12T10:00:00.000Z',
   })
-  const test = { command: 'npm test', source: 'package.json' }
+  const test = { command: 'npm test', source: 'hint' }
   return {
     ...base,
     status: 'agreed',

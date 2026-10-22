@@ -206,7 +206,7 @@ function everyOtherCheckPassingTests() {
         ...order().context,
         toolchain: {
           ...order().context.toolchain,
-          test: { command: 'npm test', source: 'package.json' as const },
+          test: { command: 'npm test', source: 'hint' as const },
         },
       },
       acceptance: [testCriterion('AC-1', { statement: 'it works', priority: 'P0' })],

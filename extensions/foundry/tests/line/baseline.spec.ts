@@ -147,17 +147,55 @@ describe('proveEnvironment on a failing base', () => {
   })
 })
 
-describe('proveEnvironment on a broken install', () => {
-  it('reinstalls once and runs the checks again when a log shows a broken install', async () => {
+const withPrepare = (prepare: string | null): WorkOrder => {
+  const order = orderOn(repo)
+  return {
+    ...order,
+    context: { ...order.context, environment: { ...order.context.environment, prepare } },
+  }
+}
+const prove = async (h: ReturnType<typeof harness>, prepare: string | null) => {
+  await proveEnvironment(withPrepare(prepare), h.deps)
+  return readBaseline(h.deps.root, 'WO-1')
+}
+
+describe('proveEnvironment after a failed step', () => {
+  it('prepares again and reruns only the failed step, marking a pass as mended', async () => {
     let testRuns = 0
     const h = harness({
       exitFor: (c) => (c === commands.Tests && ++testRuns === 1 ? 1 : 0),
       logFor: (c) => (c === commands.Tests ? MISSING_PACKAGE_LOG : ''),
     })
-    const baseline = await baselineAfter(h)
-    expect(h.ran.filter((c) => c === 'npm ci')).toHaveLength(1)
-    expect(h.ran.filter((c) => c === commands.Format)).toHaveLength(2)
+    const baseline = await prove(h, 'make deps')
+    expect(h.ran.filter((c) => c === 'make deps')).toHaveLength(2)
+    expect(h.ran.filter((c) => c === commands.Tests)).toHaveLength(2)
+    expect(h.ran.filter((c) => c === commands.Format)).toHaveLength(1)
     expect(baseline).toMatchObject({ state: 'proven', mended: true })
+  })
+})
+
+describe('proveEnvironment when preparing again does not help', () => {
+  it('stays failing and unmended when the step fails after preparing again', async () => {
+    const h = harness({ exitFor: (c) => (c === commands.Tests ? 1 : 0) })
+    const baseline = await prove(h, 'make deps')
+    expect(h.ran.filter((c) => c === commands.Tests)).toHaveLength(2)
+    expect(baseline).toMatchObject({ state: 'failing', mended: false })
+  })
+
+  it('does not rerun anything without a prepare command, whatever the log says', async () => {
+    const h = harness({
+      exitFor: (c) => (c === commands.Tests ? 1 : 0),
+      logFor: (c) => (c === commands.Tests ? MISSING_PACKAGE_LOG : ''),
+    })
+    const baseline = await prove(h, null)
+    expect(h.ran.filter((c) => c === commands.Tests)).toHaveLength(1)
+    expect(baseline).toMatchObject({ state: 'failing', mended: false })
+  })
+
+  it('does not prepare again when nothing failed', async () => {
+    const h = harness()
+    await prove(h, 'make deps')
+    expect(h.ran.filter((c) => c === 'make deps')).toHaveLength(1)
   })
 })
 

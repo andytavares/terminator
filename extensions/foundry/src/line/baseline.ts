@@ -7,10 +7,8 @@ import type { LedgerEntry } from '../ledger/append.js'
 import type { WorkOrder } from '../order/schema.js'
 import type { RunCommandOptions } from '../runtime/supervised-runner.js'
 import { indexFor } from '../state/live-index.js'
-import { brokenInstall } from '../verify/broken-install.js'
 import { climb, probedStep } from '../verify/ladder.js'
 import type { LadderStep, StepOutcome } from '../verify/ladder.js'
-import { installCommandFor } from '../verify/toolchain-probe.js'
 import { recordExitCodes } from '../profile/proof.js'
 import { lastLines, safeFilename } from './execution-parts.js'
 import type { ShellExec } from './integrate.js'
@@ -36,7 +34,7 @@ export interface Baseline {
   readonly steps: readonly StepOutcome[]
   /** The log of each step that ran, by step name. */
   readonly logs: Readonly<Record<string, string>>
-  /** True when a broken install was reinstalled and the checks run again. */
+  /** True when a failed step passed after the checkout was prepared again. */
   readonly mended: boolean
 }
 
@@ -180,22 +178,12 @@ function failedIn(pass: Pass): StepOutcome[] {
   return pass.steps.filter((step) => step.result === 'fail')
 }
 
-async function logsShowBrokenInstall(pass: Pass): Promise<boolean> {
-  for (const step of failedIn(pass)) {
-    const log = await fs.promises.readFile(pass.logs[step.name] ?? '', 'utf8').catch(() => '')
-    if (brokenInstall(log) !== null) return true
-  }
-  return false
-}
-
-async function reinstall(proof: Proof, checkout: Checkout): Promise<void> {
-  const command = installCommandFor(checkout.path)
-  if (command === null) return
+async function prepareAgain(proof: Proof, checkout: Checkout, command: string): Promise<void> {
   await unlinkBorrowedDependencies(checkout, { exec: proof.deps.exec, root: proof.deps.root })
   await runOnBase(proof, checkout, {
-    title: 'Reinstall dependencies',
+    title: 'Prepare the checkout again',
     command,
-    logPath: logPathFor(proof, 'Reinstall dependencies'),
+    logPath: logPathFor(proof, 'Prepare the checkout again'),
   })
 }
 
@@ -204,12 +192,35 @@ interface Finding {
   readonly mended: boolean
 }
 
+/** The first pass with each rerun step in place of the one that failed. */
+function withReruns(first: Pass, again: Pass): Finding {
+  const rerun = new Map(again.steps.map((step) => [step.name, step]))
+  return {
+    pass: {
+      steps: first.steps.map((step) => rerun.get(step.name) ?? step),
+      logs: { ...first.logs, ...again.logs },
+    },
+    mended: again.steps.some((step) => step.result === 'pass'),
+  }
+}
+
+// A step that failed is run once more after the preparation ran again: a checkout
+// broken by its install fails the same way a broken change does, so nothing reads a log.
 async function checkAndMend(proof: Proof, checkout: Checkout): Promise<Finding> {
   const steps = baselineSteps(proof.order.context)
   const first = await runSteps(proof, checkout, steps)
-  if (!(await logsShowBrokenInstall(first))) return { pass: first, mended: false }
-  await reinstall(proof, checkout)
-  return { pass: await runSteps(proof, checkout, steps), mended: true }
+  const failed = failedIn(first).map((step) => step.name)
+  const { prepare } = proof.order.context.environment
+  if (prepare === null || failed.length === 0 || failed.includes(PREPARE_STEP)) {
+    return { pass: first, mended: false }
+  }
+  await prepareAgain(proof, checkout, prepare)
+  const again = await runSteps(
+    proof,
+    checkout,
+    steps.filter((step) => failed.includes(step.name))
+  )
+  return withReruns(first, again)
 }
 
 function failureReason(proof: Proof, pass: Pass): string {

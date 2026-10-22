@@ -10,7 +10,6 @@ import { inspectionFor, regrade } from '../verify/inspection-triggers.js'
 import { matchesAnyGlob } from '../runtime/review/risk-grader.js'
 import type { Inspection } from '../verify/inspection-triggers.js'
 import { ladderFor, climb } from '../verify/ladder.js'
-import { brokenInstall } from '../verify/broken-install.js'
 import type { LadderOutcome, LadderStep, StepOutcome } from '../verify/ladder.js'
 import { gradeInWords } from '../runtime/review/risk-grade.js'
 import { lastLines, opensPullRequest, safeFilename } from './execution-parts.js'
@@ -109,9 +108,10 @@ interface Flaky {
 interface Climb {
   readonly ladder: LadderOutcome
   readonly logs: Map<string, string>
-  /** What is wrong with the installed dependencies, when that is why it failed. */
-  readonly installFault: string | null
 }
+
+/** A climb's outcome as `climbWith` returns it. */
+type ClimbResult = Awaited<ReturnType<FinalClimb['climbWith']>>
 
 interface Climbed extends Climb {
   /** Set when a check disagreed with itself; the ladder then counts as failed unless the debt was accepted. */
@@ -166,10 +166,9 @@ interface BaseCheck {
   readonly onBase: 'fails' | 'passes' | 'unknown'
   readonly failed: StepOutcome | null
   readonly logs: Map<string, string>
-  readonly fault: string | null
 }
 
-const BASE_UNKNOWN: BaseCheck = { onBase: 'unknown', failed: null, logs: new Map(), fault: null }
+const BASE_UNKNOWN: BaseCheck = { onBase: 'unknown', failed: null, logs: new Map() }
 
 class FinalClimb {
   readonly steps: LadderStep[]
@@ -215,17 +214,18 @@ class FinalClimb {
     return { outcome, logs }
   }
 
-  /** The climb over the change, retried once on a failure and mended once for a broken install. */
+  /** The climb over the change: the same commit again, then the checkout prepared again. */
   async climbAll(): Promise<Climbed> {
     const first = await this.climbWith(this.steps, this.burnedInRunner(), '')
     this.run.deps.onEvent({ type: 'ladder', outcome: first.outcome })
-    // A check that disagreed with itself needs a decision, not a retry or a reinstall.
-    const undecided = this.flaky !== null && !isFlakyAccepted(this.run.priorGates, this.flaky.name)
-    const settled = undecided ? first : await this.retryFailure(first)
-    const climb: Climb = undecided
-      ? { ladder: settled.outcome, logs: settled.logs, installFault: null }
-      : await this.mendInstall(settled)
-    return { ...climb, flaky: this.flaky }
+    // A check that disagreed with itself needs a decision, not a retry or a new preparation.
+    const retried = this.isUndecided() ? first : await this.retryFailure(first)
+    const settled = this.isUndecided() ? retried : await this.prepareAgain(first, retried)
+    return { ladder: settled.outcome, logs: settled.logs, flaky: this.flaky }
+  }
+
+  private isUndecided(): boolean {
+    return this.flaky !== null && !isFlakyAccepted(this.run.priorGates, this.flaky.name)
   }
 
   // A test or end-to-end step runs `finalRuns` times on the same commit. The first run may
@@ -276,35 +276,24 @@ class FinalClimb {
     return isFlakyAccepted(this.run.priorGates, firstFailed.name) ? retry : first
   }
 
-  // A missing package or half-downloaded binary is mended, not asked about:
-  // reinstalling is the whole answer, and the code is not at fault.
-  private async mendInstall(climbed: {
-    outcome: LadderOutcome
-    logs: Map<string, string>
-  }): Promise<Climb> {
-    const installFault = climbed.outcome.ok ? null : this.installFaultIn(climbed)
-    if (installFault === null) return { ladder: climbed.outcome, logs: climbed.logs, installFault }
+  // A check that failed twice is run once more after the lane's own preparation ran
+  // again. Passing then means the checkout was broken, not the code; no log is read.
+  private async prepareAgain(first: ClimbResult, retried: ClimbResult): Promise<ClimbResult> {
     const { order, deps } = this.run
-    const failedName = climbed.outcome.steps.find((s) => s.result === 'fail')?.name ?? order.id
-    const installed = await deps.reinstall('change', this.logPath('reinstall', ''))
+    const failedName = retried.outcome.steps.find((s) => s.result === 'fail')?.name
+    if (failedName === undefined || order.context.environment.prepare === null) return retried
+    const prepared = await deps.reinstall('change', this.logPath('prepare', '.again'))
+    if (prepared !== 0) return retried
+    const again = await this.climbWith(this.steps, deps.runStep, '.reprepared')
+    deps.onEvent({ type: 'ladder', outcome: again.outcome })
+    if (!again.outcome.ok) return retried
+    const logs = [first.logs.get(failedName), retried.logs.get(failedName)]
     await deps.record(
-      'verify.reinstalled',
+      'verify.reprepared',
       failedName,
-      `${failedName} failed because ${installFault}; reinstalled the dependencies (exit ${installed ?? 'not run'}).`
+      `${failedName} failed twice and passed once the checkout was prepared again: the checkout was broken, not the code. Earlier logs: ${logs.join(', ')}.`
     )
-    if (installed !== 0) return { ladder: climbed.outcome, logs: climbed.logs, installFault }
-    const healed = await this.climbWith(this.steps, deps.runStep, '.reinstalled')
-    deps.onEvent({ type: 'ladder', outcome: healed.outcome })
-    const fault = healed.outcome.ok ? null : this.installFaultIn(healed)
-    return { ladder: healed.outcome, logs: healed.logs, installFault: fault }
-  }
-
-  /** What is wrong with the installed dependencies, read from a failed step's log. */
-  installFaultIn({ outcome, logs }: { outcome: LadderOutcome; logs: Map<string, string> }) {
-    const failed = outcome.steps.find((s) => s.result === 'fail')
-    const logPath = failed === undefined ? undefined : logs.get(failed.name)
-    if (logPath === undefined || !fs.existsSync(logPath)) return null
-    return brokenInstall(fs.readFileSync(logPath, 'utf8'))
+    return again
   }
 
   // The same rungs on the base branch, up to the failed one, so a failure already
@@ -313,40 +302,23 @@ class FinalClimb {
     const upTo = this.steps.findIndex((s) => s.name === failedStep.name)
     const baseSteps = this.steps.slice(0, upTo + 1)
     try {
-      const base = await this.climbBase(baseSteps)
+      const base = await this.climbWith(baseSteps, this.run.deps.runStepOnBase, '.base')
       const failed = base.outcome.steps.find((s) => s.result === 'fail') ?? null
       const atStep = base.outcome.steps.find((s) => s.name === failedStep.name)
-      return {
-        onBase: baseVerdict(base.fault, { failed, atStep }),
-        failed,
-        logs: base.logs,
-        fault: base.fault,
-      }
+      return { onBase: baseVerdict({ failed, atStep }), failed, logs: base.logs }
     } finally {
       await this.run.deps.releaseBase()
     }
   }
-
-  private async climbBase(baseSteps: readonly LadderStep[]) {
-    const { deps } = this.run
-    let base = await this.climbWith(baseSteps, deps.runStepOnBase, '.base')
-    let fault = this.installFaultIn(base)
-    if (fault !== null) {
-      const installed = await deps.reinstall('base', this.logPath('reinstall', '.base'))
-      if (installed === 0) {
-        base = await this.climbWith(baseSteps, deps.runStepOnBase, '.base.reinstalled')
-        fault = this.installFaultIn(base)
-      }
-    }
-    return { ...base, fault }
-  }
 }
 
-function baseVerdict(
-  fault: string | null,
-  { failed, atStep }: { failed: StepOutcome | null; atStep: StepOutcome | undefined }
-): BaseCheck['onBase'] {
-  if (fault !== null) return 'unknown'
+function baseVerdict({
+  failed,
+  atStep,
+}: {
+  failed: StepOutcome | null
+  atStep: StepOutcome | undefined
+}): BaseCheck['onBase'] {
   if (failed !== null) return 'fails'
   return atStep?.result === 'pass' ? 'passes' : 'unknown'
 }
@@ -437,10 +409,7 @@ function failedCheckOf({ ladder, logs }: Climbed): FailedCheck {
 
 async function raiseFailedCheck(run: Execution, { climbed, climber }: AfterWork): Promise<void> {
   const failed = failedCheckOf(climbed)
-  const base =
-    failed.step !== null && climbed.installFault === null
-      ? await climber.onBase(failed.step)
-      : BASE_UNKNOWN
+  const base = failed.step !== null ? await climber.onBase(failed.step) : BASE_UNKNOWN
   const baseBranch = run.order.context.repos[0]?.baseBranch ?? 'the base branch'
   if (base.onBase === 'fails' && base.failed !== null) {
     run.halted = await run.stopAtGate(
@@ -450,7 +419,7 @@ async function raiseFailedCheck(run: Execution, { climbed, climber }: AfterWork)
     return
   }
   const capped = sentBackCount(run, 'verify.repeat-fail') >= MAX_FINAL_SEND_BACKS
-  const note = baseNote({ failed, base, baseBranch, installFault: climbed.installFault })
+  const note = baseNote({ failed, base, baseBranch })
   run.halted = await run.stopAtGate('verify.repeat-fail', {
     evidence: failed.evidence,
     summary: `${run.order.title} did not pass verification`,
@@ -486,18 +455,9 @@ function baseFailAsk(run: Execution, { failed, base, baseBranch }: BaseFinding) 
   }
 }
 
-function baseNote({
-  failed,
-  base,
-  baseBranch,
-  installFault,
-}: BaseFinding & { installFault: string | null }): string {
+function baseNote({ failed, base, baseBranch }: BaseFinding): string {
   if (failed.step === null) return ''
-  if (installFault !== null) {
-    return ` The installed dependencies are broken: ${installFault}, and reinstalling did not fix it.`
-  }
   if (base.onBase === 'passes') return ` It passes on ${baseBranch} without this change.`
-  if (base.fault !== null) return ` ${baseBranch} could not be checked: ${base.fault}.`
   return ` ${baseBranch} could not be checked to see whether it fails there too.`
 }
 

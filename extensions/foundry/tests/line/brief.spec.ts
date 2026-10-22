@@ -65,7 +65,7 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
       ...base.context,
       toolchain: {
         ...base.context.toolchain,
-        test: { command: 'npm test', source: 'package.json' },
+        test: { command: 'npm test', source: 'hint' },
       },
       houseDocs: ['CLAUDE.md'],
     },

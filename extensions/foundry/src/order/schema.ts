@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ENTRY_SOURCES } from '../profile/schema.js'
 import { CHECK_NAMES } from '../verify/check-names.js'
 import { RUNGS } from '../verify/ladder.js'
 
@@ -50,15 +51,14 @@ const IntentSchema = z.object({
 })
 
 // Orders written before profiles named where a command came from by the file kind;
-// all four were what the shipped hints now read, so they read back as `hint`. The
-// type keeps the four names (callers still build them), the parse never yields one.
+// all four were what the shipped hints now read, so they read back as `hint`.
 const LEGACY_SOURCES = ['package.json', 'config', 'makefile', 'ci'] as const
 
 const ProbedCommandSchema = z.object({
   command: nonEmpty,
   source: z.preprocess(
     (value) => (LEGACY_SOURCES.includes(value as (typeof LEGACY_SOURCES)[number]) ? 'hint' : value),
-    z.enum([...LEGACY_SOURCES, 'operator', 'repository', 'scout', 'hint'])
+    z.enum(ENTRY_SOURCES)
   ),
   /** Where the command was read from (`README.md:38`, `package.json`), when known. */
   evidence: z.string().optional(),
