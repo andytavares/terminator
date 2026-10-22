@@ -1,20 +1,14 @@
 #!/usr/bin/env node
 // Which tests a change can reach, unit (vitest) and e2e (Playwright): one selector for CI and
 // `npm test` (ADR 123). Forms: no flag (JSON), --all, --print unit|coverage, --github-output, --run unit.
-// The diff is the commits since the merge base with origin/main. Unknown means everything.
+// The diff is the checkout against its merge base with origin/main: commits, uncommitted edits
+// and new files. Unknown means everything.
 
 import { execFileSync, spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import {
-  IMPACT_MAP,
-  computeChanged,
-  isMainPush,
-  listSpecs,
-  matchesAny,
-  select,
-} from './e2e-select.mjs'
+import { IMPACT_MAP, isMainPush, listSpecs, matchesAny, select } from './e2e-select.mjs'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const SHARDS_FOR_A_LARGE_SELECTION = 4
@@ -252,8 +246,16 @@ export function githubOutputs({ mode, unit, e2e, e2eMode }) {
   ].join('\n')
 }
 
-function gitOutput(args) {
-  return execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+function gitOutput(args, cwd = REPO_ROOT) {
+  return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
+}
+
+/** Every path the checkout changed since `base`: committed, edited but not committed, or new and
+ * untracked. CI's checkout is clean, so there it is the commits alone. */
+export function changedInCheckout(base, cwd = REPO_ROOT) {
+  const edited = gitOutput(['diff', '--name-only', base], cwd)
+  const untracked = gitOutput(['ls-files', '--others', '--exclude-standard'], cwd)
+  return [...new Set(`${edited}\n${untracked}`.split('\n').filter(Boolean))]
 }
 
 /** The commit this change forked from main: GITHUB_BASE_REF in CI, main elsewhere. */
@@ -273,6 +275,7 @@ export async function vitestTools() {
   const vitest = await createVitest('test', { watch: false, run: true, reporters: ['dot'] })
   const relativeToRoot = (spec) => relative(REPO_ROOT, spec.moduleId)
   const unitSpecs = (await vitest.globTestSpecifications()).map(relativeToRoot)
+  let scanners = null
   return {
     unitSpecs: async () => unitSpecs,
     e2eSpecs: () => listSpecs(),
@@ -280,8 +283,11 @@ export async function vitestTools() {
       vitest.config.related = [join(REPO_ROOT, file)]
       return (await vitest.specifications.getRelevantTestSpecifications()).map(relativeToRoot)
     },
+    // Read once: every changed file asks.
     scanners: async () =>
-      unitSpecs.filter((spec) => isScanner(readFileSync(join(REPO_ROOT, spec), 'utf8'))),
+      (scanners ??= unitSpecs.filter((spec) =>
+        isScanner(readFileSync(join(REPO_ROOT, spec), 'utf8'))
+      )),
     close: () => vitest.close(),
   }
 }
@@ -306,7 +312,7 @@ async function selectForCheckout(argv, env) {
   const early = decisionWithoutDiff(argv, env, main)
   if (early) return early
   const base = mergeBase(env)
-  const changed = computeChanged(base)
+  const changed = changedInCheckout(base)
   if (alwaysAllHit(changed)) return selectTests({ changed, base }, noTools)
   const tools = await vitestTools()
   try {

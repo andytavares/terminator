@@ -44,6 +44,13 @@ describe("ci:local runs ci.yml's own steps", () => {
   })
 })
 
+describe('the Test verdict', () => {
+  it('fails when the selection failed, not only when a shard did', () => {
+    const verdict = stepsOf('test').find((step) => step.name === 'Verdict')
+    expect(String(verdict?.run)).toContain('test "${{ needs.select.result }}" = success')
+  })
+})
+
 describe('what a step becomes', () => {
   it('runs the unit suite whole, once, rather than one of four shards', () => {
     const unit = stepOf('unit', 'Test')?.script ?? ''

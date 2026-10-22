@@ -85,3 +85,22 @@ describe('the e2e readiness of a window', () => {
     await expect(whenAnnounced('drawn', '7')).rejects.toThrow('TERMINATOR_E2E')
   })
 })
+
+describe('the e2e readiness of a window whose focus emulation fails', () => {
+  beforeEach(() => {
+    process.env.TERMINATOR_E2E = '1'
+    resetAnnouncements()
+  })
+  afterEach(() => {
+    delete process.env.TERMINATOR_E2E
+  })
+
+  it('fails the wait for focus, with the reason, when focus emulation cannot start', async () => {
+    const window = new FakeWindow()
+    window.webContents.debugger.attach.mockImplementation(() => {
+      throw new Error('Another debugger is already attached')
+    })
+    announceWindowReadiness(window as never)
+    await expect(whenAnnounced('focused', '7')).rejects.toThrow('Another debugger')
+  })
+})

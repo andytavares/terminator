@@ -75,6 +75,9 @@ function removeOwnConfig(): void {
   rmSync(ownConfigPath(), { force: true })
 }
 
+/** How long ngrok has to exit after SIGTERM before it gets SIGKILL. */
+const KILL_AFTER_MS = 2000
+
 export class NgrokManager {
   private process: ChildProcess | null = null
   private onCrashCallback: (() => void) | null = null
@@ -129,10 +132,13 @@ export class NgrokManager {
     })
   }
 
-  /** Settles once the ngrok process has exited. */
+  /** Settles once the ngrok process has exited; one that ignores SIGTERM for KILL_AFTER_MS is
+   * killed, so stopping never waits on it for ever. */
   async stop(): Promise<void> {
+    const child = this.process
     this.terminate()
-    await this.exited
+    const kill = child ? setTimeout(() => child.kill('SIGKILL'), KILL_AFTER_MS) : undefined
+    await this.exited.finally(() => clearTimeout(kill))
   }
 
   private terminate(): void {

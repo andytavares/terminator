@@ -10,6 +10,7 @@ export type Announcement = 'drawn' | 'focused' | 'ready'
 interface Pending {
   promise: Promise<void>
   resolve: () => void
+  reject: (error: unknown) => void
 }
 
 const pending = new Map<string, Pending>()
@@ -23,10 +24,14 @@ function pendingFor(kind: Announcement, subject: string): Pending {
   const existing = pending.get(key)
   if (existing) return existing
   let resolve = (): void => {}
-  const promise = new Promise<void>((done) => {
+  let reject = (_error: unknown): void => {}
+  const promise = new Promise<void>((done, fail) => {
     resolve = done
+    reject = fail
   })
-  const created = { promise, resolve }
+  // A failure nobody has waited for yet is not unhandled: the wait that comes reads it.
+  promise.catch(() => {})
+  const created = { promise, resolve, reject }
   pending.set(key, created)
   return created
 }
@@ -60,7 +65,11 @@ export function announceWindowReadiness(window: BrowserWindow): void {
   if (!enabled()) return
   const subject = String(window.id)
   window.once('ready-to-show', () => announce('drawn', subject))
-  void emulateFocus(window).then(() => announce('focused', subject))
+  // A failure fails the wait for focus with its reason, rather than leaving it to hang.
+  emulateFocus(window).then(
+    () => announce('focused', subject),
+    (error: unknown) => pendingFor('focused', subject).reject(error)
+  )
 }
 
 /** Lets a test's `app.evaluate` wait on an announcement from the main process. */

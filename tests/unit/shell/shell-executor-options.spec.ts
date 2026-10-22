@@ -99,6 +99,24 @@ describe('execShell per-call options — output encoding and limits', () => {
   })
 })
 
+describe('execShell past maxBuffer', () => {
+  it('stops a command once however much more it writes past maxBuffer', async () => {
+    // Ignores SIGTERM and keeps writing, one chunk at a time, so many chunks pass the limit.
+    fakeGh(
+      `trap '' TERM; i=0; while [ $i -lt 20 ]; do printf '%0100d' 0; sleep 0.01; i=$((i+1)); done`
+    )
+    const warnings: string[] = []
+    const onWarning = (warning: Error): void => void warnings.push(warning.name)
+    process.on('warning', onWarning)
+
+    const result = await execShell({ command: 'gh', args: [], cwd: scratch, maxBuffer: 50 })
+    process.off('warning', onWarning)
+
+    expect(result.exceededMaxBuffer).toBe(true)
+    expect(warnings).not.toContain('MaxListenersExceededWarning')
+  })
+})
+
 describe('execShell per-call options — limits and timeouts', () => {
   it('keeps output that fits in maxBuffer', async () => {
     fakeGh(`printf '%0100d' 0`)

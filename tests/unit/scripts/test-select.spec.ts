@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import {
   ALWAYS_ALL,
   RUNTIME_READS,
+  changedInCheckout,
   githubOutputs,
   isAllRequested,
   printArguments,
@@ -12,6 +13,7 @@ import {
   vitestTools,
 } from '../../../scripts/test-select.mjs'
 import { matchesAny } from '../../../scripts/e2e-select.mjs'
+import { makeTempDir } from '../../support/temp-dir'
 
 const REPO_ROOT = resolve(__dirname, '../../..')
 
@@ -135,6 +137,30 @@ describe('what a selection hands to vitest', () => {
     expect(all).toContain('shards=[1,2,3,4]\n')
     expect(few).toContain('run_e2e=false')
     expect(all).toContain('run_unit=true')
+  })
+})
+
+describe('the files a checkout has changed', () => {
+  it('counts commits, uncommitted edits and new files alike, so `npm test` sees work in progress', () => {
+    const repo = makeTempDir('test-select-changed-')
+    const git = (...args: string[]) =>
+      execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim()
+    git('init', '-q')
+    writeFileSync(join(repo, 'edited.ts'), 'one')
+    git('add', '.')
+    git('commit', '-qm', 'base')
+    const base = git('rev-parse', 'HEAD')
+    writeFileSync(join(repo, 'committed.ts'), 'two')
+    git('add', 'committed.ts')
+    git('commit', '-qm', 'next')
+    writeFileSync(join(repo, 'edited.ts'), 'changed')
+    writeFileSync(join(repo, 'untracked.spec.ts'), 'new')
+
+    expect(changedInCheckout(base, repo).sort()).toEqual([
+      'committed.ts',
+      'edited.ts',
+      'untracked.spec.ts',
+    ])
   })
 })
 

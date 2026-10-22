@@ -28,6 +28,8 @@ function expressionsFor(all) {
     ['--shard=${{ matrix.shard }}/${{ needs.select.outputs.shard_count }}', ''],
     // ci:local stops at the first failing step, so a later step only runs after unit passed.
     ['${{ needs.unit.result }}', 'success'],
+    // The unit step selects for itself, so the selection has succeeded by then.
+    ['${{ needs.select.result }}', 'success'],
   ]
 }
 

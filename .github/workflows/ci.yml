@@ -301,10 +301,13 @@ jobs:
           verbose: true
 
       # Runs even when a shard failed, so a shard that died before writing its
-      # blob cannot leave a green merge of the others.
+      # blob cannot leave a green merge of the others. A failed selection skips
+      # every shard, so it is checked too.
       - name: Verdict
         if: always()
-        run: case "${{ needs.unit.result }}" in success|skipped) ;; *) exit 1 ;; esac
+        run: |
+          test "${{ needs.select.result }}" = success
+          case "${{ needs.unit.result }}" in success|skipped) ;; *) exit 1 ;; esac
 
   # Nothing the build does depends on the other checks, and E2E waits on it,
   # so it starts with them rather than five minutes after them. Merge still

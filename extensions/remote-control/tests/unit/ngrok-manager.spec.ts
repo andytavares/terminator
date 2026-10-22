@@ -179,6 +179,7 @@ function ngrokManagerTests() {
   describe('isInstalled', ngrokIsInstalledTests)
   describe('start', ngrokStartTests)
   describe('stop', ngrokStopTests)
+  describe('stop, when ngrok ignores SIGTERM', ngrokStopKillTests)
   describe('onCrash callback', ngrokCrashTests)
 }
 
@@ -336,6 +337,22 @@ function ngrokStopTests() {
     expect(mockRmSync).toHaveBeenCalledWith(mockWriteFileSync.mock.calls.at(-1)![0], {
       force: true,
     })
+  })
+}
+
+function ngrokStopKillTests() {
+  it('kills a process that ignores SIGTERM, so stopping never waits on it for ever', async () => {
+    mockTunnelUrl('https://xyz.ngrok.io')
+    await startManagerTunnel()
+    mockProcess.kill.mockImplementation((signal: string) => {
+      if (signal === 'SIGKILL') exitProcess(0)
+    })
+
+    const stopped = manager.stop()
+    await vi.runAllTimersAsync()
+
+    await expect(stopped).resolves.toBeUndefined()
+    expect(mockProcess.kill).toHaveBeenLastCalledWith('SIGKILL')
   })
 }
 

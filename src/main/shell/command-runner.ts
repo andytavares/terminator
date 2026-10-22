@@ -92,8 +92,10 @@ function collectCommandOutput(run: CommandRun, input: ShellExecInput): void {
       if (input.onOutput) input.onOutput(decoder.write(chunk))
       bytes += chunk.length
       if (bytes <= limit) return void run[stream].push(chunk)
+      // Once: every chunk past the limit would otherwise add another listener and kill timer.
+      if (run.exceededMaxBuffer) return
       run.exceededMaxBuffer = true
-      stopGroup(run.child)
+      void stopGroup(run.child)
     }
   }
   run.child.stdout?.on('data', collectStream('stdout'))
@@ -151,7 +153,7 @@ function toOutput(
 
 function timeOut(run: CommandRun): void {
   run.timedOut = true
-  stopGroup(run.child)
+  void stopGroup(run.child)
 }
 
 /** A command's output, and whether it ran to an answer of its own. */
