@@ -1,4 +1,5 @@
 import * as fs from 'node:fs/promises'
+import * as os from 'node:os'
 import * as path from 'node:path'
 import { app } from 'electron'
 import { sessionContextDirectory } from '../integrations/session-context.js'
@@ -119,8 +120,10 @@ export interface CaptureHookOptions {
   scriptPath: string
 }
 
+/** The operator's Claude settings, under HOME. Not Electron's home: on macOS that is the account's
+ * whatever HOME says, so a sealed test run wrote the developer's own file. */
 export function userSettingsPath(): string {
-  return path.join(app.getPath('home'), '.claude', 'settings.json')
+  return path.join(os.homedir(), '.claude', 'settings.json')
 }
 
 /**
