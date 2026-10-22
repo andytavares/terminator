@@ -5,6 +5,7 @@ import { fakeHost } from '../helpers/foundry-host.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import { eventually } from '../../../../tests/support/eventually'
+import { settleProofs } from '../../src/line/baseline.js'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
@@ -21,8 +22,10 @@ beforeAll(async () => {
   await activateFoundry(host)
 })
 
+// Creating an order starts its base-branch proof, which writes into the folder until it ends.
 afterAll(async () => {
   await deactivate()
+  await settleProofs()
 })
 
 beforeEach(() => {

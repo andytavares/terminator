@@ -183,6 +183,7 @@ describe('a repository with only a Makefile', () => {
     await commitToMain({ Makefile: 'test:\n\t@echo the suite passed\n' })
     const order = await createOrder()
     expect(order.context.toolchain.test).toMatchObject({ command: 'make test', source: 'hint' })
+    await untilBaseProven('make test')
     await runAgreed(order)
     await eventually(async () => expect(await statusOf(order.id)).toBe('shipped'))
     expect(runsInLanes('make test').map((run) => run.exitCode)).toContain(0)
