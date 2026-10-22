@@ -1,0 +1,65 @@
+docs/CONTRIBUTING.md
+  s_f6f18e5557b141::t_614b329cc6b2e4 91-92
+extensions/foundry/tests/line/executor-deps.spec.ts
+  s_f6f18e5557b141::t_d805e4455388e0 46-58,85,101-103
+extensions/foundry/tests/line/refinery-run.spec.ts
+  s_f6f18e5557b141::t_43d0ba6b90de1a 6,36-37,80-81,84-87,94
+extensions/foundry/tests/runtime/autonomy-policy.spec.ts
+  s_f6f18e5557b141::t_da2728c24287be 367
+extensions/foundry/tests/runtime/quick-actions.spec.ts
+  s_f6f18e5557b141::t_5cf03945b0aaa8 14,16,109-112,124-125
+extensions/foundry/tests/sensors/sensor-tick.spec.ts
+  s_f6f18e5557b141::t_b05bdc5f69fa1a 5,20-22,25,28,32-33
+extensions/task-vault/tests/stores/vault-data.store.spec.ts
+  s_f6f18e5557b141::t_15e8a9906fdc74 10-14
+scripts/test-env.mjs
+  s_f6f18e5557b141::t_6a956cc627a3e4 45-48
+tests/global-setup.ts
+  s_f6f18e5557b141::t_433200cf053ecb 4-6,8,12-13,17-45,48-52
+tests/setup.ts
+  s_f6f18e5557b141::t_c4890ab9cdc990 3-4,8-9,17-29
+tests/support/leak-guard.ts
+  s_f6f18e5557b141::t_92a2a0ae8fc783 1-81
+tests/support/network-guard.ts
+  s_f6f18e5557b141::t_1c679b05422c78 1-38
+tests/support/seal-environment.ts
+  s_f6f18e5557b141::t_9b9362cea30f64 1-11
+tests/support/seal-worker-environment.ts
+  s_f6f18e5557b141::t_6397710d98b484 1-6
+tests/support/test-seed.ts
+  s_f6f18e5557b141::t_c7de5667f39567 1-9
+tests/unit/git-test-env.spec.ts
+  s_f6f18e5557b141::t_12cc3ee1849641 36-40,43
+tests/unit/renderer-remote/mobile/MobileTerminalView.spec.tsx
+  s_f6f18e5557b141::t_aecb45f28768a6 92
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_f6f18e5557b141::t_08fa06925abc27 11,136-139
+tests/unit/renderer/utils/pane-tree.spec.ts
+  s_f6f18e5557b141::t_0c5cc92fcb3bce 1,11-13
+tests/unit/support/leak-guard.spec.ts
+  s_f6f18e5557b141::t_f015af666a5845 1-56
+tests/unit/support/network-guard.spec.ts
+  s_f6f18e5557b141::t_be2ca50c267c32 1-38
+tests/unit/support/seal-environment.spec.ts
+  s_f6f18e5557b141::t_bf5ff05937a695 1-46
+tests/unit/support/test-seed.spec.ts
+  s_f6f18e5557b141::t_599f64ca1039f0 1-30
+vitest.config.ts
+  s_f6f18e5557b141::t_553194136b2e1f 2,5,52-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7a984fbb5d34bb0cf9865a6e5090fd56bfd64075",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
