@@ -8,6 +8,7 @@ import { compileOrder } from '../../src/order/compile.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { openForgeStep } from '../helpers/forge-steps.js'
 import { PROVEN_ENVIRONMENT } from '../helpers/environment.js'
+import { eventually } from '../../../../tests/support/eventually'
 
 // The mapping panel (FR-060): which of the tracker's own states each moment
 // means. Presented rather than assumed, because "In Review" is a decision
@@ -567,13 +568,13 @@ function choosingMidTurnTests() {
     expect(isUnavailable(shapeButton('Direct'))).toBe(false)
     expect(shapeButton('Direct').getAttribute('aria-pressed')).toBe('false')
     fireEvent.click(shapeButton('Direct'))
-    await vi.waitFor(() => expect(shapeButton('Direct').getAttribute('aria-pressed')).toBe('true'))
+    await eventually(() => expect(shapeButton('Direct').getAttribute('aria-pressed')).toBe('true'))
 
     await orderChanged()
     await openForgeStep('Hand off')
-    await vi.waitFor(() => expect(isUnavailable(handOffButton())).toBe(false))
+    await eventually(() => expect(isUnavailable(handOffButton())).toBe(false))
     fireEvent.click(handOffButton())
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:run.start', { id: 'WO-1', recipe: 'direct' })
     )
     vi.useRealTimers()
@@ -1231,7 +1232,7 @@ describe('a settle made while the architect is drafting', () => {
     mountWhileDrafting()
 
     await openForgeStep('Red team')
-    await vi.waitFor(() => screen.getByText('finding one'))
+    await eventually(() => screen.getByText('finding one'))
     fireEvent.click(screen.getByRole('radio', { name: /^Ask the architect/ }))
     fireEvent.click(screen.getByRole('button', { name: /^Send( \d)? decisions?$/ }))
 
@@ -1244,7 +1245,7 @@ describe('a settle made while the architect is drafting', () => {
     expect(reasonFor(send)).toContain('queued')
 
     await orderChanged()
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:order.converge', converged({ asks: ['RT-1'] }))
     )
     vi.useRealTimers()
@@ -1390,12 +1391,12 @@ function readingAgainTests() {
   it('reads again each time the order changes until the redraft lands, rather than giving up after one', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     landsAfter(3, REDRAFTED)
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(screen.getByRole('button', { name: /Draft the plan/ })).toBeTruthy()
     )
 
     fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
-    await vi.waitFor(() => expect(screen.getByText(/The architect is working/)).toBeTruthy())
+    await eventually(() => expect(screen.getByText(/The architect is working/)).toBeTruthy())
 
     // Three changes before the turn ends. A view that stopped listening after
     // one would never see it.
@@ -1413,12 +1414,12 @@ function forgeClearingTests() {
   it('clears "the architect is working" once the redraft lands', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     landsAfter(1, REDRAFTED)
-    await vi.waitFor(() => screen.getByRole('button', { name: /Draft the plan/ }))
+    await eventually(() => screen.getByRole('button', { name: /Draft the plan/ }))
     fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
     // The first read still sees the turn in flight; the second sees it end.
     await orderChanged()
     await orderChanged()
-    await vi.waitFor(() => expect(screen.queryByText(/The architect is working/)).toBeNull())
+    await eventually(() => expect(screen.queryByText(/The architect is working/)).toBeNull())
     vi.useRealTimers()
   })
 
@@ -1429,12 +1430,12 @@ function forgeClearingTests() {
   it('clears "the architect is working" when the turn was refused, though nothing was saved', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     landsAfter(1, REFUSED)
-    await vi.waitFor(() => screen.getByRole('button', { name: /Draft the plan/ }))
+    await eventually(() => screen.getByRole('button', { name: /Draft the plan/ }))
     fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
     // The first read still sees the turn in flight; the second sees it end.
     await orderChanged()
     await orderChanged()
-    await vi.waitFor(() => expect(screen.queryByText(/The architect is working/)).toBeNull())
+    await eventually(() => expect(screen.queryByText(/The architect is working/)).toBeNull())
     vi.useRealTimers()
   })
 }

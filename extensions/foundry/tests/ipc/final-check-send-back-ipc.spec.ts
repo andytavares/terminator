@@ -9,11 +9,11 @@
  */
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
 
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
-import { activateFoundry } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import { builderUnit } from '../helpers/order-parts.js'
 import { agentNode } from '../helpers/run-nodes.js'
 import { orderStoreAt } from '../../src/state/live-index.js'
@@ -100,6 +100,10 @@ beforeAll(async () => {
   host = fakeHost(() => dataDir)
   host.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
   await activateFoundry(host)
+})
+
+afterAll(async () => {
+  await deactivate()
 })
 
 /** Settles when the executor first starts an agent in this test. */

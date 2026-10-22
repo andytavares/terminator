@@ -10,11 +10,11 @@
  */
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
 
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
-import { activateFoundry } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import { builderUnit } from '../helpers/order-parts.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -24,6 +24,7 @@ import type { Gate } from '../../src/gates/rules.js'
 import { executingOrders } from '../../src/line/run-control.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 import { ledgerFileText } from '../helpers/order-ledger.js'
+import { eventually } from '../../../../tests/support/eventually'
 
 /**
  * Nothing is running. That is the state a fresh application is always in —
@@ -109,19 +110,23 @@ beforeAll(async () => {
   await activateFoundry(host)
 })
 
+afterAll(async () => {
+  await deactivate()
+})
+
 /**
  * Resuming hands the graph to an executor it does not wait for, which starts
  * the reclaimed node again. Read the graph after that, not while it races.
  */
 async function restarted(): Promise<RunGraph> {
-  await vi.waitFor(() => expect(theRunner.start).toHaveBeenCalledTimes(1))
+  await eventually(() => expect(theRunner.start).toHaveBeenCalledTimes(1))
   return graphOnDisk()
 }
 
 beforeEach(async () => {
   // A previous test's resume leaves its executor winding down; while it is marked executing,
   // no node of the order counts as orphaned.
-  await vi.waitFor(() => expect(executingOrders.size).toBe(0))
+  await eventually(() => expect(executingOrders.size).toBe(0))
   // This spec stops at the restart: a start that throws leaves the node as resuming put it
   // and ends that executor before the next test resumes the same order.
   theRunner.start.mockClear().mockImplementation(() => {

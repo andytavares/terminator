@@ -27,11 +27,10 @@ import {
 } from '../helpers/forge-turns.js'
 import { ledgerActions, untilLedgerHas } from '../helpers/order-ledger.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
+import { eventually } from '../../../../tests/support/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
-
-vi.setConfig({ testTimeout: 20_000 })
 
 let dataDir = ''
 let repo = ''
@@ -48,7 +47,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  deactivate()
+  await deactivate()
   vi.unstubAllEnvs()
 })
 
@@ -157,12 +156,8 @@ describe('a plan still failing its checks', () => {
     await convergeFromTheArchitect(
       readyDraft(repo, { risk: { grade: 'P2', triggers: [], blastRadius: [], criticalPaths: [] } })
     )
-    await vi.waitFor(
-      async () =>
-        expect((await ledgerActions(dataDir)).filter((a) => a === 'order.redrafted')).toHaveLength(
-          3
-        ),
-      { timeout: 10_000, interval: 50 }
+    await eventually(async () =>
+      expect((await ledgerActions(dataDir)).filter((a) => a === 'order.redrafted')).toHaveLength(3)
     )
     expect((await ledgerActions(dataDir)).filter((a) => a === 'converge.followed_up')).toHaveLength(
       2
@@ -265,7 +260,7 @@ describe('a turn that has started', () => {
     await orderStoreAt(dataDir).save(readyDraft(repo))
     host.broadcast.mockClear()
     await host.call('foundry:order.converge', { id: 'WO-1', message: 'go' })
-    await vi.waitFor(async () =>
+    await eventually(async () =>
       expect((await createOrderStore(dataDir).load('WO-1'))?.provenance.forgeSession).toBe(
         'architect-1'
       )
@@ -302,7 +297,7 @@ describe('a question the architect asks', () => {
     expect(await host.call('foundry:permissions-list')).toEqual({ pending: [] })
     // The session goes onto the order in a save nobody awaits. Waiting for it
     // keeps that save from landing after the spec file's records are removed.
-    await vi.waitFor(async () =>
+    await eventually(async () =>
       expect((await createOrderStore(dataDir).load('WO-1'))?.provenance.forgeSession).toBe(
         'architect-1'
       )

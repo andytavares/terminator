@@ -662,12 +662,12 @@ describe('layoutHall — station signs', () => {
     const stations = map.props.filter((p) => ['desk', 'rig', 'press', 'gate'].includes(p.kind))
     expect(stations.length).toBeGreaterThan(0)
     for (const p of stations) {
-      expect(p.sign, p.id).not.toBeNull()
-      expect((p.sign as string).length, p.id).toBeLessThanOrEqual(
+      expect(p.sign).not.toBeNull()
+      expect((p.sign as string).length).toBeLessThanOrEqual(
         SIGN_CHARS[p.kind as keyof typeof SIGN_CHARS]
       )
     }
-    for (const p of map.props.filter((q) => !stations.includes(q))) expect(p.sign, p.id).toBeNull()
+    for (const p of map.props.filter((q) => !stations.includes(q))) expect(p.sign).toBeNull()
   })
 
   it('sizes each sign to the stencil the station has room for', () => {

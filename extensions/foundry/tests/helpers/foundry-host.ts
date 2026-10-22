@@ -9,7 +9,8 @@
 import { execFile } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { expect, vi } from 'vitest'
+import { expect, vi, type Mock } from 'vitest'
+import { eventually } from '../../../../tests/support/eventually'
 import {
   dispatchChannel,
   type ChannelSpec,
@@ -96,7 +97,7 @@ export interface FoundryHost {
   /** Palette and menu commands by id, so a spec can run one. */
   readonly commands: Map<string, () => void>
   /** Every `gh` call goes here; git runs for real. */
-  readonly gh: ReturnType<typeof vi.fn>
+  readonly gh: Mock<ShellExec>
   readonly exec: ReturnType<typeof vi.fn>
   readonly issues: ExtensionAPI['issues']
   readonly workspaces: Array<{ id: string; folderPath: string }>
@@ -280,7 +281,7 @@ export function toastsShown(host: FoundryHost): string[] {
 
 /** Until the host has shown a toast saying `message`. */
 export async function untilToastShown(host: FoundryHost, message: string): Promise<void> {
-  await vi.waitFor(() => expect(toastsShown(host)).toContain(message), { timeout: 10_000 })
+  await eventually(() => expect(toastsShown(host)).toContain(message))
 }
 
 /** A fresh temporary directory under the OS temp directory. */

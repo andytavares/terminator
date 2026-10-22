@@ -107,7 +107,7 @@ describe('tool and write permissions', () => {
   it('refuses every writing tool to a role that did not declare editing', () => {
     const registry = createRoleRegistry(sources())
     for (const tool of ['Edit', 'MultiEdit', 'Write', 'NotebookEdit']) {
-      expect(registry.mayUseTool('red-team', tool), tool).toBe(false)
+      expect(registry.mayUseTool('red-team', tool)).toBe(false)
     }
   })
 
@@ -149,7 +149,7 @@ function whichRolesTests() {
   it('is not a role that produces an artefact but touches no file', () => {
     const registry = createRoleRegistry(sources())
     for (const role of ['red-team', 'architect', 'scout']) {
-      expect(registry.mayWrite(role), role).toBe(false)
+      expect(registry.mayWrite(role)).toBe(false)
     }
   })
 

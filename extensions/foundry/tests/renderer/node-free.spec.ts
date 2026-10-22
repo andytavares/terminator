@@ -33,5 +33,5 @@ describe('the Foundry renderer bundle', () => {
     })
 
     expect(reached).toEqual([])
-  }, 30_000)
+  })
 })

@@ -215,7 +215,7 @@ async function viewOnGitHub(url: string): Promise<PullView> {
     args: ['pr', 'view', url, '--json', 'isDraft,title,body,headRefName,state'],
     cwd: LIVE,
   })
-  expect(view.exitCode, view.stderr).toBe(0)
+  expect(view.exitCode).toBe(0)
   return JSON.parse(view.stdout) as PullView
 }
 
@@ -223,7 +223,7 @@ async function opensADraftGitHubCanShowBack(): Promise<void> {
   const raised: Gate[] = []
   const result = await shipOrder(liveOrder(), verifiedShipment(), liveShipDeps(raised))
 
-  expect(result.pulls, `shipOrder reported: ${JSON.stringify(result)}`).toHaveLength(1)
+  expect(result.pulls).toHaveLength(1)
   const pull = result.pulls[0]
   expect(pull.url).toMatch(/^https:\/\/github\.com\/andytavares\/foundry-live-check\/pull\/\d+$/)
   const pr = await viewOnGitHub(pull.url)
@@ -256,7 +256,7 @@ async function marksTheDraftReady(): Promise<void> {
     cwd: LIVE,
   })
   const [pull] = JSON.parse(opened.stdout) as { url: string; number: number }[]
-  expect(pull, 'the previous case did not leave a pull request to mark').toBeDefined()
+  expect(pull).toBeDefined()
 
   await markReady(
     { url: pull.url, cwd: LIVE },
@@ -275,9 +275,9 @@ async function marksTheDraftReady(): Promise<void> {
     args: ['pr', 'view', pull.url, '--json', 'isDraft,state'],
     cwd: LIVE,
   })
-  expect(after.exitCode, after.stderr).toBe(0)
+  expect(after.exitCode).toBe(0)
   const state = JSON.parse(after.stdout) as { isDraft: boolean; state: string }
-  expect(state.isDraft, 'gh pr ready did not take it out of draft').toBe(false)
+  expect(state.isDraft).toBe(false)
   expect(state.state).toBe('OPEN')
 
   // Put it back, so the repository does not accumulate review requests.
@@ -288,7 +288,7 @@ async function recordsTheDraftInTheOrdersLedger(): Promise<void> {
   // `ship.draft_opened`'s subject is the pull request URL; filing by subject once put it in
   // `orders/https:/github.com/…/ledger.jsonl`, not here (docs/ARCHITECTURE.md, "The ledger").
   const ledger = path.join(dataRoot, 'orders', liveOrder().id, 'ledger.jsonl')
-  expect(fs.existsSync(ledger), 'the order has no ledger').toBe(true)
+  expect(fs.existsSync(ledger)).toBe(true)
   const actions = fs
     .readFileSync(ledger, 'utf8')
     .split('\n')
@@ -299,7 +299,7 @@ async function recordsTheDraftInTheOrdersLedger(): Promise<void> {
 
   // And no order directory named after anything but an order.
   const orders = fs.readdirSync(path.join(dataRoot, 'orders'))
-  expect(orders, 'a ledger was filed somewhere that is not an order').toEqual([liveOrder().id])
+  expect(orders).toEqual([liveOrder().id])
 }
 
 describe.skipIf(LIVE === '')('shipping, for real', () => {
@@ -308,10 +308,9 @@ describe.skipIf(LIVE === '')('shipping, for real', () => {
 
   it(
     'pushes the branch and opens a draft pull request GitHub can show back',
-    opensADraftGitHubCanShowBack,
-    180_000
+    opensADraftGitHubCanShowBack
   )
-  it('turns the draft into a review request when the operator says so', marksTheDraftReady, 120_000)
+  it('turns the draft into a review request when the operator says so', marksTheDraftReady)
   it(
     "records the draft in the order's own ledger, and nowhere else",
     recordsTheDraftInTheOrdersLedger

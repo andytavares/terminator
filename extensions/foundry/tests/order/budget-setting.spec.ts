@@ -15,7 +15,7 @@ describe('budgetFromSetting', () => {
 
   it('falls back when nothing usable is configured', () => {
     for (const value of [undefined, null, 'ten', -1, Number.NaN, Infinity]) {
-      expect(budgetFromSetting(value, 25), String(value)).toBe(25)
+      expect(budgetFromSetting(value, 25)).toBe(25)
     }
   })
 

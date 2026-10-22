@@ -8,8 +8,7 @@
  * 10 s or the test's 5 s, and on a busy machine (four vitest processes on four
  * cores) it took longer than either.
  */
-import { vi } from 'vitest'
-
+import { eventually } from '../../../../tests/support/eventually'
 import { activate } from '../../src/index.ts'
 import { runtime } from '../../src/runtime/runtime-state.ts'
 import type { FoundryHost } from './foundry-host.js'
@@ -20,7 +19,7 @@ export { deactivate } from '../../src/index.ts'
  * finds the runner the way a call minutes after start does. */
 export async function activateFoundry(host: FoundryHost): Promise<void> {
   activate(host.api)
-  await vi.waitFor(() => {
+  await eventually(() => {
     if (runtime.supervision === null) throw new Error('the supervision runtime is not up yet')
   })
 }

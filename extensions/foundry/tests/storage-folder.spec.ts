@@ -12,6 +12,7 @@ import { activateFoundry, deactivate } from './helpers/foundry-activation.js'
 import type { FoundryHost } from './helpers/foundry-host.js'
 import { resolveFoundryDataRoot } from '../src/workspace-root.js'
 import { writeFileWithDirs } from './helpers/files.js'
+import { eventually } from '../../../tests/support/eventually'
 
 vi.mock('../src/runtime/supervised-runner.js', () => import('./helpers/supervision-mocks.js'))
 vi.mock('../src/runtime/control-server.js', () => import('./helpers/supervision-mocks.js'))
@@ -19,7 +20,7 @@ vi.mock('../src/runtime/control-server.js', () => import('./helpers/supervision-
 const userDataOf = (host: FoundryHost) => path.dirname(path.dirname(host.globalStorage))
 
 afterEach(async () => {
-  deactivate()
+  await deactivate()
 })
 
 describe('with no workspace open and no data directory set', () => {
@@ -102,7 +103,7 @@ function laneWorktreesTests() {
     const newLane = fs.realpathSync(path.join(host.globalStorage, 'records', ...lane))
     const worktrees = () =>
       realGit({ command: 'git', args: ['worktree', 'list', '--porcelain'], cwd: repo })
-    await vi.waitFor(async () => expect((await worktrees()).stdout).toContain(newLane))
+    await eventually(async () => expect((await worktrees()).stdout).toContain(newLane))
     await realGit({ command: 'git', args: ['worktree', 'prune'], cwd: repo })
     expect((await worktrees()).stdout).toContain(newLane)
   })

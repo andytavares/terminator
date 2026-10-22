@@ -61,7 +61,7 @@ function sixShapesTests() {
 
   it.each(recipeFiles)('%s parses', (file) => {
     const parsed = parseRecipe(readRecipeFile(recipesDir, file), file)
-    expect(parsed.ok, parsed.ok ? '' : parsed.reason).toBe(true)
+    expect(parsed.ok).toBe(true)
   })
 }
 
@@ -398,7 +398,7 @@ function theRolesTests() {
 
   it.each(roleFiles)('%s parses', (file) => {
     const parsed = parseRole(readRecipeFile(rolesDir, file), file)
-    expect(parsed.ok, parsed.ok ? '' : parsed.reason).toBe(true)
+    expect(parsed.ok).toBe(true)
   })
 }
 
@@ -426,9 +426,7 @@ function builtInsWritingTests() {
       const parsed = parseRole(readRecipeFile(rolesDir, file), file)
       if (!parsed.ok) throw new Error(parsed.reason)
       const touchesCheckout = parsed.value.writes.some((w) => CHECKOUT.includes(w))
-      expect(touchesCheckout, `${parsed.value.id} writes ${parsed.value.writes.join(', ')}`).toBe(
-        allowed.has(parsed.value.id)
-      )
+      expect(touchesCheckout).toBe(allowed.has(parsed.value.id))
     }
   })
 }
@@ -459,10 +457,7 @@ function toolsAndPromptsTests() {
       const parsed = parseRole(readRecipeFile(rolesDir, file), file)
       if (!parsed.ok) throw new Error(parsed.reason)
       if (parsed.value.tools.includes('edit')) {
-        expect(
-          parsed.value.writes.length,
-          `${parsed.value.id} can edit but writes nothing`
-        ).toBeGreaterThan(0)
+        expect(parsed.value.writes.length).toBeGreaterThan(0)
       }
     }
   })

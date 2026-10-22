@@ -16,9 +16,7 @@ import { createOrderStore } from '../../src/order/store.js'
 import { orderStoreAt, readGraph } from '../../src/state/live-index.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
-
-// Real git, and every step given up to 20 s; see execute-run.spec.ts.
-vi.setConfig({ testTimeout: 45_000 })
+import { eventually } from '../../../../tests/support/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
@@ -34,8 +32,8 @@ beforeAll(async () => {
   await activateFoundry(host)
 })
 
-afterAll(() => {
-  deactivate()
+afterAll(async () => {
+  await deactivate()
   vi.unstubAllEnvs()
 })
 
@@ -76,26 +74,20 @@ async function startResearch(document: WorkOrder['document']): Promise<void> {
 
 /** The tail's own ledger entry, once the run has reached it. */
 async function tailEntry(action: string): Promise<{ reason: string }> {
-  return vi.waitFor(
-    async () => {
-      const entries = await createOrderStore(dataDir).entries('WO-1')
-      const found = entries.find((entry) => entry.action === action)
-      if (found === undefined) throw new Error(`no ${action} yet`)
-      return found
-    },
-    { timeout: 20_000, interval: 100 }
-  )
+  return eventually(async () => {
+    const entries = await createOrderStore(dataDir).entries('WO-1')
+    const found = entries.find((entry) => entry.action === action)
+    if (found === undefined) throw new Error(`no ${action} yet`)
+    return found
+  })
 }
 
 /** The ship node, once the tail has settled it to `state`. */
 async function shipSettledTo(state: string): Promise<void> {
-  await vi.waitFor(
-    async () => {
-      const graph = await readGraph(dataDir, 'WO-1')
-      expect(graph?.nodes.find((node) => node.stepId === 'ship')?.state).toBe(state)
-    },
-    { timeout: 20_000, interval: 100 }
-  )
+  await eventually(async () => {
+    const graph = await readGraph(dataDir, 'WO-1')
+    expect(graph?.nodes.find((node) => node.stepId === 'ship')?.state).toBe(state)
+  })
 }
 
 describe('a research order whose document is outside the checkout', () => {
@@ -103,7 +95,7 @@ describe('a research order whose document is outside the checkout', () => {
     await startResearch({ path: 'answers/why.md', location: 'outputs' })
     expect((await tailEntry('run.document_ready')).reason).toBe('outputs: answers/why.md')
     await shipSettledTo('passed')
-    await vi.waitFor(async () =>
+    await eventually(async () =>
       expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('shipped')
     )
     const prCreates = host.gh.mock.calls.filter(([call]) =>

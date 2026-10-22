@@ -14,9 +14,9 @@ import { freshFoundryStorage, idleHome } from '../helpers/foundry-host.js'
 // folder under it.
 const GLOBAL_STORAGE = freshFoundryStorage()
 
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
 import { partialFake } from '../../../../tests/support/fakes'
-import { activate } from '../../src/index.ts'
+import { activate, deactivate } from '../../src/index.ts'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/runtime/supervision-runtime.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
@@ -127,6 +127,10 @@ beforeAll(async () => {
   const started = await startSupervisionRuntime(api)
   if (started === null) throw new Error('the supervision runtime did not start')
   supervision = started
+})
+
+afterAll(async () => {
+  await deactivate()
 })
 
 beforeEach(() => {

@@ -11,9 +11,9 @@ import { freshFoundryStorage, idleHome } from '../helpers/foundry-host.js'
 
 const GLOBAL_STORAGE = freshFoundryStorage()
 
-import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterEach, afterAll } from 'vitest'
 import { partialFake } from '../../../../tests/support/fakes'
-import { activate } from '../../src/index.ts'
+import { activate, deactivate } from '../../src/index.ts'
 import type { ExtensionAPI, CommandContribution } from '@terminator/extension-sdk'
 import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/runtime/supervision-runtime.js'
 import { disposableStub } from '../helpers/foundry-host.js'
@@ -116,6 +116,10 @@ beforeAll(async () => {
   supervision = started
   // The initial synchronous refresh runs with no runs on the register yet.
   await vi.advanceTimersByTimeAsync(0)
+})
+
+afterAll(async () => {
+  await deactivate()
 })
 
 afterEach(() => {

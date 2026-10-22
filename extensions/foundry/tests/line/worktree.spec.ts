@@ -19,6 +19,7 @@ import type { CheckoutDeps, Checkout } from '../../src/line/worktree.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { eventually } from '../../../../tests/support/eventually'
 
 // Somewhere for a lane's work to happen, cut from the lane's own repository
 // and living under the data root — never inside the repository, which is the
@@ -418,7 +419,7 @@ function concurrentCallersTests() {
 
     const asking = Promise.all([ensureCheckout(order(), 1, d), ensureCheckout(order(), 1, d)])
     // Both are asking while the one add is still running; only then does it finish.
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(calls(exec).filter((c) => c.args[1] === 'add').length).toBeGreaterThanOrEqual(1)
     )
     finishAdding()

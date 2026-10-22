@@ -7,11 +7,11 @@
  * what it changed so a window can read just that instead of polling.
  */
 import * as fs from 'node:fs'
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
 
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
-import { activateFoundry } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { checkoutPath } from '../../src/line/worktree.js'
 import { writeRunGraph } from '../../src/ipc/run-channels.js'
@@ -30,6 +30,10 @@ beforeAll(async () => {
   host = fakeHost(() => dataDir)
   host.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
   await activateFoundry(host)
+})
+
+afterAll(async () => {
+  await deactivate()
 })
 
 /** A records location with two in-flight orders, each with a checkout on disk. */

@@ -27,8 +27,6 @@ import { writeFileWithDirs } from '../helpers/files.js'
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
-vi.setConfig({ testTimeout: 20_000 })
-
 let dataDir = ''
 let repo = ''
 let host: FoundryHost
@@ -40,8 +38,8 @@ beforeAll(async () => {
   await activateFoundry(host)
 })
 
-afterAll(() => {
-  deactivate()
+afterAll(async () => {
+  await deactivate()
   vi.unstubAllEnvs()
 })
 

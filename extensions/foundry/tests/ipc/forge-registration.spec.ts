@@ -34,7 +34,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  deactivate()
+  await deactivate()
   vi.unstubAllEnvs()
 })
 

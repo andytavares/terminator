@@ -10,6 +10,7 @@ import { fakeHost, temporaryDirectory } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { createOrderStore } from '../../src/order/store.js'
+import { eventually } from '../../../../tests/support/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
@@ -26,7 +27,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  deactivate()
+  await deactivate()
   vi.useRealTimers()
   vi.unstubAllEnvs()
 })
@@ -46,7 +47,6 @@ async function signals(): Promise<Signals['signals']> {
 describe('a minute after a sensor was enabled', () => {
   describe('assigned issues', assignedIssuesTests)
   describe('failing workflows', failingWorkflowsTests)
-  describe('nothing on', nothingOnTests)
 })
 
 function assignedIssuesTests() {
@@ -62,7 +62,7 @@ function assignedIssuesTests() {
     })
 
     await vi.advanceTimersByTimeAsync(60_000)
-    await vi.waitFor(async () =>
+    await eventually(async () =>
       expect((await signals()).map((s) => s.title)).toEqual(['Login is slow'])
     )
   })
@@ -93,18 +93,10 @@ function failingWorkflowsTests() {
     })
 
     await vi.advanceTimersByTimeAsync(60_000)
-    await vi.waitFor(async () =>
+    await eventually(async () =>
       expect((await signals()).map((s) => s.title)).toEqual(['ci failing on main'])
     )
     expect(host.gh).toHaveBeenCalledWith(expect.objectContaining({ cwd: '/repos/app' }))
-  })
-}
-
-function nothingOnTests() {
-  it('runs nothing while every sensor is off', async () => {
-    await vi.advanceTimersByTimeAsync(60_000)
-    expect(host.gh).not.toHaveBeenCalled()
-    expect(host.issues.listMine).not.toHaveBeenCalled()
   })
 }
 

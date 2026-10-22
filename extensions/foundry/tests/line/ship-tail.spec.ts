@@ -456,7 +456,9 @@ function waitingForTheFinalCheckTests() {
     const guarded = afterFinalCheck(check.settled, sendBack)
 
     const pending = guarded(feedback)
-    await Promise.resolve()
+    await expect(Promise.race([pending, Promise.resolve('still waiting')])).resolves.toBe(
+      'still waiting'
+    )
     expect(sendBack).not.toHaveBeenCalled()
 
     check.settle(true)

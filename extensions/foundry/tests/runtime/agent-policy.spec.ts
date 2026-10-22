@@ -13,6 +13,7 @@ import type { WorkOrder } from '../../src/order/schema.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
 import { temporaryDirectory } from '../helpers/foundry-host.js'
 import { partialFake } from '../../../../tests/support/fakes'
+import { eventually } from '../../../../tests/support/eventually'
 
 function orderProbing(test: string | null): WorkOrder {
   const base = draftOrder({
@@ -95,17 +96,16 @@ function agentPolicyTrustingTests() {
     trustRepository(api, '/repos/app', { orderId: 'WO-1', store })
     const config = JSON.parse(fs.readFileSync(path.join(home, '.claude.json'), 'utf8'))
     expect(config.projects['/repos/app'].hasTrustDialogAccepted).toBe(true)
-    await vi.waitFor(() => expect(entries.map((e) => e.action)).toEqual(['workspace.trusted']))
+    await eventually(() => expect(entries.map((e) => e.action)).toEqual(['workspace.trusted']))
     expect(entries[0]).toMatchObject({ orderId: 'WO-1', subject: '/repos/app' })
   })
 
-  it('records nothing when it was already trusted', async () => {
+  it('records nothing when it was already trusted', () => {
     fs.writeFileSync(
       path.join(home, '.claude.json'),
       JSON.stringify({ projects: { '/repos/app': { hasTrustDialogAccepted: true } } })
     )
     trustRepository(api, '/repos/app', { orderId: 'WO-1', store })
-    await Promise.resolve()
     expect(entries).toEqual([])
     expect(api.log.error).not.toHaveBeenCalled()
   })

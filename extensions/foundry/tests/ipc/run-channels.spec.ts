@@ -18,6 +18,7 @@ import { readTimeline } from '../../src/factory/timeline-store.js'
 import { writeCiState } from '../../src/line/ci-state.js'
 import type { CiState } from '../../src/line/ci-state.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { eventually } from '../../../../tests/support/eventually'
 
 // Everything that can refuse a run refuses before any work begins. An order
 // that fails half way through because a recipe could not run here has already
@@ -1024,7 +1025,7 @@ function failuresAndRefusalsTests() {
     // awaiting it — so wait for the entry rather than assuming one turn of the
     // microtask queue is enough.
     const ledgerFile = path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl')
-    await vi.waitFor(() => expect(fs.readFileSync(ledgerFile, 'utf8')).toContain('run.failed'))
+    await eventually(() => expect(fs.readFileSync(ledgerFile, 'utf8')).toContain('run.failed'))
     const ledger = fs.readFileSync(ledgerFile, 'utf8')
     expect(ledger).toContain('run.failed')
     expect(ledger).toContain('no worktree could be prepared')

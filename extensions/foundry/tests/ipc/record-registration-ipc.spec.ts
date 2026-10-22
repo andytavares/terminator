@@ -25,8 +25,8 @@ beforeAll(async () => {
   await activateFoundry(host)
 })
 
-afterAll(() => {
-  deactivate()
+afterAll(async () => {
+  await deactivate()
   vi.unstubAllEnvs()
 })
 

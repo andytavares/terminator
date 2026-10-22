@@ -1,4 +1,5 @@
 import { createChangeBus } from '../../helpers/change-bus.js'
+import { eventually } from '../../../../../tests/support/eventually'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react'
@@ -364,9 +365,8 @@ function calloutsRaisedTogetherTests() {
     await screen.findByRole('button', { name: /Build the other/ })
     current = twoStations('passed')
     bus.emit({ kind: 'graph', orderId: 'WO-1' })
-    await waitFor(
-      () => expect(document.querySelectorAll('.fdry-hall-overlay .fdry-callout')).toHaveLength(2),
-      { timeout: 4000 }
+    await eventually(() =>
+      expect(document.querySelectorAll('.fdry-hall-overlay .fdry-callout')).toHaveLength(2)
     )
     const lifts = [...document.querySelectorAll<HTMLElement>('.fdry-callout')].map((c) =>
       c.style.getPropertyValue('--fdry-lift')
@@ -384,13 +384,10 @@ function calloutsOnStateChangeTests() {
       graph: { orderId: 'WO-1', recipe: 'standard', nodes: [hallNode({ state: 'passed' })] },
     })
     bus.emit({ kind: 'graph', orderId: 'WO-1' })
-    await waitFor(
-      () => {
-        const bubble = document.querySelector('.fdry-hall-overlay .fdry-callout') as HTMLElement
-        expect(bubble.textContent).toBe('Done')
-      },
-      { timeout: 4000 }
-    )
+    await eventually(() => {
+      const bubble = document.querySelector('.fdry-hall-overlay .fdry-callout') as HTMLElement
+      expect(bubble.textContent).toBe('Done')
+    })
     expect(document.querySelector('.fdry-hall-ticker')).toBeNull()
   })
 }

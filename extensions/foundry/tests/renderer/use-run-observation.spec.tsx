@@ -96,7 +96,7 @@ function runObservationReadingTests() {
       const before = timesInvoked(invoke, 'foundry:run.observe')
       bus.emit({ kind, orderId: 'WO-1' })
       await settlePushedReads()
-      expect(timesInvoked(invoke, 'foundry:run.observe'), kind).toBe(before + 1)
+      expect(timesInvoked(invoke, 'foundry:run.observe')).toBe(before + 1)
     }
   })
 }
