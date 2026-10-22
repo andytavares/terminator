@@ -7,21 +7,32 @@ import yaml from 'js-yaml'
 
 /** Jobs ci:local does not run as ci.yml writes them, and why. */
 export const SKIPPED_JOBS = {
-  'e2e-select': 'scripts/ci-e2e-local.mjs selects the specs with the same e2e-select.mjs',
-  e2e: 'scripts/ci-e2e-local.mjs runs its five shards and the burn-in, step for step',
+  select:
+    'the unit step runs the same scripts/test-select.mjs, and scripts/ci-e2e-local.mjs the e2e one',
+  'update-baselines': 'it rewrites the story baselines on a pull request label, and uploads them',
+  e2e: 'scripts/ci-e2e-local.mjs runs its five shards, step for step',
   'e2e-result': 'it only reads the results of the jobs above',
   'e2e-report': 'it only merges the e2e reports into one HTML page',
 }
 
-/** Expressions ci:local resolves, in the text CI writes them. */
-const EXPRESSIONS = [
-  // One unit run of the whole suite stands for the four shards.
-  ['--shard=${{ matrix.shard }}/4', ''],
-  // ci:local stops at the first failing step, so a later step only runs after unit passed.
-  ['${{ needs.unit.result }}', 'success'],
-]
+const TEST_ALL_LABEL =
+  "${{ contains(github.event.pull_request.labels.*.name, 'test: all') && '1' || '' }}"
 
-const CONDITIONS = { 'always()': true }
+/**
+ * Expressions ci:local resolves, in the text CI writes them. With `all`, the pull request
+ * carries the label `test: all`; push-to-main expressions resolve as a pull request does.
+ */
+function expressionsFor(all) {
+  return [
+    [TEST_ALL_LABEL, all ? '1' : ''],
+    // One unit run of the whole selection stands for its shards.
+    ['--shard=${{ matrix.shard }}/${{ needs.select.outputs.shard_count }}', ''],
+    // ci:local stops at the first failing step, so a later step only runs after unit passed.
+    ['${{ needs.unit.result }}', 'success'],
+  ]
+}
+
+const CONDITIONS = { 'always()': true, "needs.unit.result == 'success'": true }
 
 const SETUP = /^npm ci\b/
 
@@ -30,8 +41,8 @@ export function readWorkflow(path) {
   return yaml.load(readFileSync(path, 'utf8'))
 }
 
-function resolveScript(script, where) {
-  const resolved = EXPRESSIONS.reduce((text, [from, to]) => text.split(from).join(to), script)
+function resolveScript(script, where, expressions) {
+  const resolved = expressions.reduce((text, [from, to]) => text.split(from).join(to), script)
   const unknown = resolved.match(/\$\{\{[^}]*\}\}/)
   if (unknown) throw new Error(`ci:local, ${where}: cannot resolve ${unknown[0]}`)
   return resolved.trim()
@@ -44,19 +55,34 @@ function runs(step, where) {
   return CONDITIONS[step.if]
 }
 
-function stepsOf(id, job) {
+function resolveEnv(env, where, expressions) {
+  return Object.fromEntries(
+    Object.entries(env).map(([name, value]) => [
+      name,
+      resolveScript(String(value), `${where}, env ${name}`, expressions),
+    ])
+  )
+}
+
+function stepsOf(id, job, expressions) {
   return (job.steps ?? []).flatMap((step) => {
     const where = `job ${id}, step "${step.name}"`
     if (!step.run || SETUP.test(step.run) || !runs(step, where)) return []
     return [
-      { job: id, name: step.name, script: resolveScript(step.run, where), env: step.env ?? {} },
+      {
+        job: id,
+        name: step.name,
+        script: resolveScript(step.run, where, expressions),
+        env: resolveEnv(step.env ?? {}, where, expressions),
+      },
     ]
   })
 }
 
-/** Every step ci:local runs, in workflow order. */
-export function planFor(workflow) {
+/** Every step ci:local runs, in workflow order. `all` plans as if the pull request had `test: all`. */
+export function planFor(workflow, { all = false } = {}) {
+  const expressions = expressionsFor(all)
   return Object.entries(workflow.jobs)
     .filter(([id]) => !(id in SKIPPED_JOBS))
-    .flatMap(([id, job]) => stepsOf(id, job))
+    .flatMap(([id, job]) => stepsOf(id, job, expressions))
 }
