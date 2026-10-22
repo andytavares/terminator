@@ -4,7 +4,7 @@
 // .nvmrc Node and a lockfile-matched install, never the dirty tree. A pass is recorded for HEAD,
 // and the pre-push hook (`--check-push`) refuses a commit without one.
 
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -53,6 +53,7 @@ export function parseFlags(argv) {
     all: argv.includes('--all'),
     checkPush: argv.includes('--check-push'),
     prepareOnly: argv.includes('--prepare-only'),
+    publishStatus: argv.includes('--publish-status'),
   }
 }
 
@@ -103,7 +104,7 @@ function checkPush() {
   const file = passFile()
   const passed = passedHead(existsSync(file) ? readFileSync(file, 'utf8') : null)
   const refused = unverifiedPushes(readFileSync(0, 'utf8'), passed)
-  if (refused.length === 0) return
+  if (refused.length === 0) return publishInBackground()
   console.error(`ci:local has not passed on the commit of ${refused.join(', ')}.`)
   console.error('Run `npm run ci:local`, then push again.')
   process.exit(1)
@@ -156,36 +157,65 @@ function prepare() {
   return { checkout, headSha, mainSha }
 }
 
-function setCommitStatus(headSha, mainSha) {
-  try {
-    const repo = JSON.parse(
-      execFileSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], { encoding: 'utf8' })
-    )
-    execFileSync(
-      'gh',
-      [
-        'api',
-        `repos/${repo.nameWithOwner}/statuses/${headSha}`,
-        '-f',
-        'state=success',
-        '-f',
-        'context=local-check',
-        '-f',
-        `description=main ${mainSha.slice(0, 9)}`,
-      ],
-      { stdio: 'ignore' }
-    )
-  } catch {
-    console.warn(
-      'Warning: could not set the local-check status on GitHub; the local record is what the hook reads.'
-    )
+const STATUS_TRIES = 24
+const STATUS_PAUSE_MS = 5000
+
+/** Waits until GitHub has the commit, then posts its status; `tries` bounds the wait. */
+export async function publishWhenPushed({ exists, post, pause, tries }) {
+  for (let attempt = 0; attempt < tries; attempt += 1) {
+    if (await exists()) {
+      await post()
+      return true
+    }
+    await pause()
   }
+  return false
+}
+
+const gh = (...args) => execFileSync('gh', args, { encoding: 'utf8', stdio: 'pipe' })
+const repoName = () => JSON.parse(gh('repo', 'view', '--json', 'nameWithOwner')).nameWithOwner
+
+function commitOnGitHub(repo, sha) {
+  try {
+    gh('api', `repos/${repo}/commits/${sha}`, '--silent')
+    return true
+  } catch {
+    return false
+  }
+}
+
+function postStatus(repo, headSha, mainSha) {
+  const description = `description=main ${mainSha.slice(0, 9)}`
+  const fields = ['-f', 'state=success', '-f', 'context=local-check', '-f', description]
+  gh('api', `repos/${repo}/statuses/${headSha}`, ...fields)
+}
+
+/** The local-check status for the recorded pass, once the push that is starting reaches GitHub:
+ * a status needs the commit there, and the hook runs before it is. */
+async function publishStatus() {
+  const record = readFileSync(passFile(), 'utf8').trim().split(/\s+/)
+  const [headSha, mainSha] = record
+  const repo = repoName()
+  const posted = await publishWhenPushed({
+    exists: async () => commitOnGitHub(repo, headSha),
+    post: async () => postStatus(repo, headSha, mainSha),
+    pause: () => new Promise((resolve) => setTimeout(resolve, STATUS_PAUSE_MS)),
+    tries: STATUS_TRIES,
+  })
+  if (!posted) console.warn(`local-check: ${headSha} never reached GitHub; no status set.`)
+}
+
+/** Leaves the hook at once; the publisher outlives it and the push. */
+function publishInBackground() {
+  const script = fileURLToPath(import.meta.url)
+  spawn(process.execPath, [script, '--publish-status'], { detached: true, stdio: 'ignore' }).unref()
 }
 
 function recordPass(headSha, mainSha) {
   writeFileSync(passFile(), passRecord(headSha, mainSha))
-  setCommitStatus(headSha, mainSha)
-  console.log(`Recorded the pass for ${headSha} (main ${mainSha}); it can be pushed.`)
+  console.log(
+    `Recorded the pass for ${headSha} (main ${mainSha}); it can be pushed, and the push sets its local-check status.`
+  )
 }
 
 function main(flags) {
@@ -199,6 +229,7 @@ function main(flags) {
 
 function command() {
   const flags = parseFlags(process.argv.slice(2))
+  if (flags.publishStatus) return publishStatus()
   return flags.checkPush ? checkPush() : main(flags)
 }
 

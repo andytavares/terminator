@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   NOT_RUN_HERE,
   checkEnvironment,
@@ -10,6 +10,7 @@ import {
   passRecord,
   passedHead,
   unverifiedPushes,
+  publishWhenPushed,
 } from '../../../scripts/ci-local.mjs'
 
 describe('what ci:local leaves to CI', () => {
@@ -110,14 +111,42 @@ describe('ci:local reinstalls only when the lockfile changed', () => {
 
 describe('ci:local flags', () => {
   it('defaults to the selection', () => {
-    expect(parseFlags([])).toEqual({ all: false, checkPush: false, prepareOnly: false })
+    expect(parseFlags([])).toEqual({
+      all: false,
+      checkPush: false,
+      prepareOnly: false,
+      publishStatus: false,
+    })
   })
 
   it('reads each flag', () => {
-    expect(parseFlags(['--all', '--check-push', '--prepare-only'])).toEqual({
+    expect(parseFlags(['--all', '--check-push', '--prepare-only', '--publish-status'])).toEqual({
       all: true,
       checkPush: true,
       prepareOnly: true,
+      publishStatus: true,
     })
+  })
+})
+
+describe('publishing the local-check status once GitHub has the commit', () => {
+  it('posts as soon as the pushed commit exists there', async () => {
+    const asked: number[] = []
+    const exists = async () => asked.push(asked.length) >= 3
+    const post = vi.fn(async () => undefined)
+    expect(await publishWhenPushed({ exists, post, pause: async () => undefined, tries: 10 })).toBe(
+      true
+    )
+    expect(asked).toHaveLength(3)
+    expect(post).toHaveBeenCalledOnce()
+  })
+
+  it('gives up without posting when the commit never arrives', async () => {
+    const post = vi.fn(async () => undefined)
+    const exists = async () => false
+    expect(await publishWhenPushed({ exists, post, pause: async () => undefined, tries: 4 })).toBe(
+      false
+    )
+    expect(post).not.toHaveBeenCalled()
   })
 })
