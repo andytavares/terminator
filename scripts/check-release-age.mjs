@@ -41,7 +41,7 @@ export function tooYoung({ published, exceptions, now }) {
 }
 
 async function publishTimes(name) {
-  const response = await fetch(`${REGISTRY}${name.replace('/', '%2f')}`)
+  const response = await fetch(`${REGISTRY}${encodeURIComponent(name)}`)
   if (!response.ok) throw new Error(`${name}: the registry answered ${response.status}`)
   return (await response.json()).time ?? {}
 }
