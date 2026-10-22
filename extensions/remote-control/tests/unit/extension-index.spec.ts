@@ -48,6 +48,7 @@ function makeApi() {
       isRemoteAccessible: vi.fn().mockResolvedValue(false),
     },
     window: { broadcast: mockBroadcast },
+    log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     paths: { app: '/app', globalStorage: '/user-data/extensions/terminator.remote-control' },
     pty: {},
     workspace: { list: vi.fn(() => []), listProjects: vi.fn(() => []) },
@@ -305,6 +306,7 @@ function credentialHandlingTests() {
   })
 
   describe('storing a password', passwordStorageTests)
+  describe('changing the password while devices are connected', passwordRotationTests)
   describe('reading settings and refusing to start', passwordGateTests)
   describe('migrating a plaintext password', plaintextMigrationTests)
   describe('an unconvertible bcrypt hash', bcryptHashTests)
@@ -379,5 +381,26 @@ function bcryptHashTests() {
       error: 'PASSWORD_REQUIRED',
       message: expect.stringContaining('Set a new password'),
     })
+  })
+}
+
+function passwordRotationTests() {
+  it('reports the new password saved when closing the remote terminals fails', async () => {
+    currentHash = await hashPassword('the-old-one')
+    const serverHandle = makeServerHandle()
+    serverHandle.disconnectAllClients.mockRejectedValue(new Error('could not list the sessions'))
+    const toggleHandler = await setupAndGetToggleHandler(serverHandle)
+    await toggleHandler({ enabled: true })
+    await eventually(() => expect(serverHandle.start).toHaveBeenCalled())
+    await serverHandle.start.mock.results[0].value
+
+    const result = await registeredHandler('remote:update-password')({ password: 'the-new-one' })
+
+    expect(result).toEqual({ ok: true })
+    expect(mockBroadcast).toHaveBeenLastCalledWith(
+      'remote:status',
+      expect.objectContaining({ enabled: true })
+    )
+    await queueDrained()
   })
 }

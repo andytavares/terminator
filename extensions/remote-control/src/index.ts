@@ -280,7 +280,14 @@ function passwordChannel({ api, credentials }: RemoteControlContext): ChannelSpe
       const generated = !password
       const actual = password || randomBytes(16).toString('base64url')
       await credentials.setPassword(actual)
-      await remoteServer?.disconnectAllClients()
+      // The sessions are revoked before this can fail, so the old password is already useless;
+      // what failed is closing the remote terminals, not the change.
+      await remoteServer?.disconnectAllClients().catch((error: unknown) => {
+        api.log.error(
+          'The password changed, but the remote terminals could not all be closed',
+          error
+        )
+      })
       const listening = !!remoteServer?.isListening()
       const port = api.settings.get<number>(KEY.port) ?? 7681
       api.window.broadcast('remote:status', {

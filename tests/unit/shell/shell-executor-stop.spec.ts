@@ -62,6 +62,28 @@ describe('stopRunningCommands', () => {
   })
 })
 
+describe('stopRunningCommands and a helper a command detached', () => {
+  it('settles once the command has exited, even while a helper it detached holds its output open', async () => {
+    const helperPid = join(scratch, 'helper.pid')
+    const detach = `perl -e 'use POSIX; setsid(); open(F, ">", "${helperPid}"); print F $$; close F; exec "sleep", "30"'`
+    writeFileSync(
+      join(scratch, 'gh'),
+      `#!/bin/sh\n${detach} &\nsleep 30 &\necho $! > "${pidFile}"\nwait\n`
+    )
+    const run = execShell({ command: 'gh', args: [], cwd: scratch, timeoutMs: 60_000 })
+    const grandchild = await recordedPid(pidFile)
+    const helper = await recordedPid(helperPid)
+    try {
+      await stopRunningCommands()
+      expect(isProcessAlive(grandchild)).toBe(false)
+    } finally {
+      // Out of the group's reach by design; it holds the output open until it goes.
+      process.kill(helper, 'SIGKILL')
+      await run
+    }
+  })
+})
+
 describe('execShell timeout', () => {
   it('ends what the command started, not only the command', async () => {
     const run = execShell({

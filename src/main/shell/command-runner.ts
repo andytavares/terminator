@@ -57,16 +57,23 @@ function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
   }
 }
 
-/** Asks the command to stop, kills it if it has not by KILL_AFTER_MS, and settles once it has closed. */
+/** Settles once the process has ended. Not 'close': a helper it detached into another process
+ * group keeps its output open after it exits, and no signal to the group reaches that helper. */
+function exited(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve()
+  return new Promise<void>((resolve) => child.once('exit', () => resolve()))
+}
+
+/** Asks the command to stop, kills it if it has not by KILL_AFTER_MS, and settles once it has exited. */
 function stopGroup(child: ChildProcess): Promise<void> {
-  const closed = new Promise<void>((resolve) => child.once('close', () => resolve()))
+  const closed = exited(child)
   const kill = setTimeout(() => signalGroup(child, 'SIGKILL'), KILL_AFTER_MS)
   signalGroup(child, 'SIGTERM')
   return closed.finally(() => clearTimeout(kill))
 }
 
 /** Stops every command still running (git, gh, the login-shell probe, the metrics' ps), with
- * everything each one started, and settles once each has closed. The app calls it as it quits: on macOS /usr/bin/git is an xcrun
+ * everything each one started, and settles once each has exited. The app calls it as it quits: on macOS /usr/bin/git is an xcrun
  * shim that can start xcodebuild, which outlived the app (run 38382115775). */
 export async function stopRunningCommands(): Promise<void> {
   await Promise.all([...running].map(stopGroup))
