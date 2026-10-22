@@ -5,11 +5,12 @@
 // and the pre-push hook (`--check-push`) refuses a commit without one.
 
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { installIfLockChanged } from './ci-install.mjs'
 import { planFor, readWorkflow, SKIPPED_JOBS } from './ci-plan.mjs'
+import { startLinux } from './ci-linux.mjs'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -28,11 +29,16 @@ export function checkEnvironment(env) {
   return Object.fromEntries(Object.entries(env).filter(([name]) => !name.startsWith('GIT_')))
 }
 
-function runStep({ job, name, script, env = {} }, cwd) {
-  console.log(`\n== ${job}: ${name}`)
+function runOnMac({ script, env = {} }, cwd) {
   const options = { cwd, stdio: 'inherit', env: checkEnvironment({ ...process.env, ...env }) }
-  const status = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', script], options).status
-  if (status !== 0) console.error(`\nci:local failed: ${job}: ${name} exited ${status}`)
+  return spawnSync('bash', ['-e', '-o', 'pipefail', '-c', script], options).status
+}
+
+/** Runs a step where CI does: a step of an Ubuntu job in the Linux container, any other here. */
+function runStep(step, { checkout, linux }) {
+  console.log(`\n== ${step.job}: ${step.name} (${step.runner ?? 'macos'})`)
+  const status = step.runner?.startsWith('ubuntu') ? linux.run(step) : runOnMac(step, checkout)
+  if (status !== 0) console.error(`\nci:local failed: ${step.job}: ${step.name} exited ${status}`)
   return status === 0
 }
 
@@ -40,11 +46,22 @@ function runChecks(checkout, { all }) {
   const workflow = readWorkflow(join(checkout, '.github/workflows/ci.yml'))
   const e2eStep = {
     job: 'e2e',
-    name: 'the five shards',
+    name: 'its shards',
     script: 'node scripts/ci-e2e-local.mjs',
     env: all ? { TEST_ALL: '1' } : {},
   }
-  return [...planFor(workflow, { all }), e2eStep].every((step) => runStep(step, checkout))
+  const linux = startLinux({
+    checkout,
+    gitCommonDir: resolve(checkout, git(checkout, 'rev-parse', '--git-common-dir')),
+    nodeVersion: readFileSync(join(checkout, '.nvmrc'), 'utf8').trim(),
+  })
+  try {
+    return [...planFor(workflow, { all }), e2eStep].every((step) =>
+      runStep(step, { checkout, linux })
+    )
+  } finally {
+    linux.stop()
+  }
 }
 
 /** The flags ci:local takes: `--all` runs everything, `--check-push` is the pre-push hook. */
@@ -64,11 +81,7 @@ export function nodeMismatch(running, nvmrc) {
   return `ci:local needs Node ${wanted} (from .nvmrc) and this is Node ${running}. Switch with \`nvm use\`.`
 }
 
-export const lockHash = (lockfile) => createHash('sha256').update(lockfile).digest('hex')
-
-/** Whether the lockfile differs from the one the last install in node_modules was made from. */
-export const needsInstall = (currentHash, recordedHash) =>
-  recordedHash === null || recordedHash.trim() !== currentHash
+export { lockHash, needsInstall } from './ci-install.mjs'
 
 const NO_COMMIT = /^0+$/
 
@@ -128,15 +141,18 @@ function checkoutMerge(checkout, mainSha) {
   }
 }
 
-function installIfLockChanged(checkout) {
+/** The Mac's install in the check worktree. */
+function installOnMac(checkout) {
   const hashFile = join(checkout, 'node_modules/.lock-hash')
-  const current = lockHash(readFileSync(join(checkout, 'package-lock.json')))
-  const recorded = existsSync(hashFile) ? readFileSync(hashFile, 'utf8') : null
-  if (!needsInstall(current, recorded))
-    return console.log('Install: package-lock.json unchanged, keeping node_modules.')
-  console.log('Install: package-lock.json changed, running npm ci.')
-  if (spawnSync('npm', ['ci'], { cwd: checkout, stdio: 'inherit' }).status !== 0) process.exit(1)
-  writeFileSync(hashFile, `${current}\n`)
+  installIfLockChanged(checkout, {
+    where: 'macOS',
+    recorded: () => (existsSync(hashFile) ? readFileSync(hashFile, 'utf8') : null),
+    install: (hash) => {
+      if (spawnSync('npm', ['ci'], { cwd: checkout, stdio: 'inherit' }).status !== 0) return false
+      writeFileSync(hashFile, `${hash}\n`)
+      return true
+    },
+  })
 }
 
 /** Everything before the checks: Node, shas, the merged check worktree and its install. */
@@ -153,7 +169,7 @@ function prepare() {
   const checkout = join(mainCheckout(), '.worktrees/.ci-local')
   checkoutMerge(checkout, mainSha)
   console.log(`Testing ${git(checkout, 'rev-parse', 'HEAD')} in ${checkout}`)
-  installIfLockChanged(checkout)
+  installOnMac(checkout)
   return { checkout, headSha, mainSha }
 }
 

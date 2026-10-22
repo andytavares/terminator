@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The E2E job of .github/workflows/ci.yml, run here step for step (selection, five shards at
+// The E2E job of .github/workflows/ci.yml, run here step for step (selection, its shards at
 // CI=1, each spec once). `npm run ci:local:e2e` runs all of it; `-- 3` runs only shard 3.
 
 import { execFileSync, spawnSync } from 'node:child_process'
@@ -7,9 +7,10 @@ import { cpus, loadavg } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { listSpecs } from './e2e-select.mjs'
+import { e2eShardCount, readWorkflow } from './ci-plan.mjs'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const SHARDS = 5
+const SHARDS = e2eShardCount(readWorkflow(join(REPO_ROOT, '.github/workflows/ci.yml')))
 const NEEDS_CHROMIUM = [
   'remote-control.spec.ts',
   'git-integration-contrast.spec.ts',

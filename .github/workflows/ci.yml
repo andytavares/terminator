@@ -18,7 +18,8 @@ permissions:
 jobs:
   lint:
     name: Lint
-    runs-on: macos-26
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 6
 
     steps:
       - uses: actions/checkout@v4
@@ -69,7 +70,8 @@ jobs:
 
   typecheck:
     name: Typecheck
-    runs-on: macos-26
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@v4
@@ -90,7 +92,8 @@ jobs:
 
   format:
     name: Format
-    runs-on: macos-26
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 4
 
     steps:
       - uses: actions/checkout@v4
@@ -109,11 +112,42 @@ jobs:
   # Every story is a test (ADR 098): it renders in Chromium and runs its play
   # function, in the light and the dark theme. The build proves the Storybook
   # site itself still compiles.
-  # On macOS, where Terminator runs: it ships only as a macOS DMG, and the
-  # screenshots below are compared with baselines made on macOS. Every job here is macOS (ADR 123).
+  # E2E, the app's start and the story screenshots run on macOS, where Terminator runs; every
+  # other job on Ubuntu on ARM, which ci:local runs in a container of the same (ADR 123).
   stories:
     name: Stories
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 6
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Test stories
+        run: npm run test:stories
+        timeout-minutes: 5
+
+      - name: Build Storybook
+        run: npm run build-storybook
+
+  # Screenshots of every story against the macOS baselines in
+  # packages/extension-ui/visual/__screenshots__/darwin (ADR 098): what a Mac draws, so on a Mac.
+  # A story with no baseline fails, here and locally alike; the `update-story-baselines` label
+  # writes it (.github/workflows/story-baselines.yml).
+  story-screenshots:
+    name: Story screenshots
     runs-on: macos-26
+    timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@v4
@@ -129,26 +163,15 @@ jobs:
       - name: Install Chromium
         run: npx playwright install chromium
 
-      - name: Test stories
-        run: npm run test:stories
-        timeout-minutes: 5
-
-      - name: Build Storybook
-        run: npm run build-storybook
-
-      # Screenshots of every story against the macOS baselines in
-      # packages/extension-ui/visual/__screenshots__/darwin (ADR 098). A story with no
-      # baseline fails, here and locally alike; the `update-story-baselines` label writes it
-      # (.github/workflows/story-baselines.yml).
       - name: Compare story screenshots
         run: npm run test:visual -w @terminator/extension-ui -- --update-snapshots=none
-        timeout-minutes: 5
 
   # Which tests this change can reach (scripts/test-select.mjs, ADR 123): the same command
   # runs locally. Unit and E2E wait for it and run only what it names, or everything.
   select:
     name: Select tests
-    runs-on: macos-26
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 3
     outputs:
       mode: ${{ steps.select.outputs.mode }}
       run_unit: ${{ steps.select.outputs.run_unit }}
@@ -186,7 +209,8 @@ jobs:
     name: Unit (${{ matrix.shard }}/${{ needs.select.outputs.shard_count }})
     needs: select
     if: needs.select.outputs.run_unit == 'true'
-    runs-on: macos-26
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 6
     strategy:
       # Every shard runs to the end, so one run reports every failing spec.
       fail-fast: false
@@ -235,7 +259,8 @@ jobs:
   # measure the load rather than the code.
   perf:
     name: Perf budgets
-    runs-on: macos-26
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 4
 
     steps:
       - uses: actions/checkout@v4
@@ -259,7 +284,8 @@ jobs:
     name: Test
     needs: [select, unit]
     if: ${{ !cancelled() }}
-    runs-on: macos-26
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 4
 
     steps:
       - uses: actions/checkout@v4
@@ -325,7 +351,8 @@ jobs:
   # The build check. Each E2E shard builds for itself, so nothing waits on this.
   build:
     name: Build
-    runs-on: macos-26
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 4
 
     steps:
       - uses: actions/checkout@v4
@@ -357,6 +384,7 @@ jobs:
   start:
     name: Start
     runs-on: macos-26
+    timeout-minutes: 8
 
     steps:
       - uses: actions/checkout@v4
@@ -386,20 +414,21 @@ jobs:
         run: |
           npx electron-builder --mac dir --publish never -c.mac.identity=null -c.mac.notarize=false
           node scripts/smoke-start.mjs exec "$PWD/dist/mac-arm64/Terminator.app/Contents/MacOS/Terminator"
-        timeout-minutes: 15
+        timeout-minutes: 6
 
   # Builds its own copy of the app rather than waiting on the Build job: the
   # build takes 40s, the wait for the Build job and its artifact took 1m20s.
   e2e:
-    name: E2E (${{ matrix.shard }}/5)
+    name: E2E (${{ matrix.shard }}/3)
     needs: select
     if: needs.select.outputs.run_e2e == 'true'
     runs-on: macos-26
+    timeout-minutes: 8
     strategy:
       # Every shard runs to the end, so one run reports every failing spec rather than the first.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5]
+        shard: [1, 2, 3]
 
     steps:
       - uses: actions/checkout@v4
@@ -439,7 +468,7 @@ jobs:
         run: |
           if [ "$MODE" = all ]; then SPECS=""; fi
           read -r -a specs <<< "$SPECS"
-          ARGS=$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 5 "${specs[@]}")
+          ARGS=$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 3 "${specs[@]}")
           if [ -z "$ARGS" ]; then echo "Nothing selected for this shard."; exit 0; fi
           read -r -a shard <<< "$ARGS"
           # remote-control.spec.ts drives the browser remote renderer in Chromium, and
@@ -447,7 +476,7 @@ jobs:
           # render the extension views in it, and design-system-fields.spec.ts renders the shared field styles.
           case "$ARGS" in *remote-control.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts* | *design-system-fields.spec.ts*) npx playwright install chromium ;; esac
           npx playwright test "${shard[@]}" --reporter=blob,dot
-        timeout-minutes: 10
+        timeout-minutes: 7
 
       - name: Process census (after the suite)
         if: ${{ !cancelled() }}
@@ -475,7 +504,8 @@ jobs:
     name: E2E result
     needs: [select, e2e]
     if: always()
-    runs-on: macos-26
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 2
 
     steps:
       - name: Verdict
@@ -489,7 +519,8 @@ jobs:
     name: E2E report
     needs: e2e
     if: ${{ !cancelled() && needs.e2e.result != 'skipped' }}
-    runs-on: macos-26
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 4
 
     steps:
       - uses: actions/checkout@v4

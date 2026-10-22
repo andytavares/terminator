@@ -9,7 +9,7 @@ import yaml from 'js-yaml'
 export const SKIPPED_JOBS = {
   select:
     'the unit step runs the same scripts/test-select.mjs, and scripts/ci-e2e-local.mjs the e2e one',
-  e2e: 'scripts/ci-e2e-local.mjs runs its five shards, step for step',
+  e2e: 'scripts/ci-e2e-local.mjs runs its shards, step for step',
   'e2e-result': 'it only reads the results of the jobs above',
   'e2e-report': 'it only merges the e2e reports into one HTML page',
 }
@@ -37,7 +37,7 @@ const SETUP = /^npm ci\b/
 
 /**
  * @typedef {{ name?: string, run?: string, if?: string, env?: Record<string, string>, uses?: string, with?: Record<string, unknown> }} Step
- * @typedef {{ name?: string, 'runs-on'?: string, if?: string, needs?: string | string[], strategy?: Record<string, unknown>, permissions?: Record<string, string>, steps?: Step[] }} Job
+ * @typedef {{ name?: string, 'runs-on'?: string, 'timeout-minutes'?: number, if?: string, needs?: string | string[], strategy?: Record<string, unknown>, permissions?: Record<string, string>, steps?: Step[] }} Job
  * @typedef {{ on?: Record<string, unknown>, jobs: Record<string, Job> }} Workflow
  */
 
@@ -76,6 +76,7 @@ function stepsOf(id, job, expressions) {
     return [
       {
         job: id,
+        runner: job['runs-on'],
         name: step.name,
         script: resolveScript(step.run, where, expressions),
         env: resolveEnv(step.env ?? {}, where, expressions),
@@ -90,4 +91,9 @@ export function planFor(workflow, { all = false } = {}) {
   return Object.entries(workflow.jobs)
     .filter(([id]) => !(id in SKIPPED_JOBS))
     .flatMap(([id, job]) => stepsOf(id, job, expressions))
+}
+
+/** How many shards the e2e job runs in, for scripts/ci-e2e-local.mjs to run the same. */
+export function e2eShardCount(workflow) {
+  return workflow.jobs.e2e.strategy.matrix.shard.length
 }

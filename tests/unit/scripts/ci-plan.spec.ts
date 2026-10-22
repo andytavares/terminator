@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { planFor, readWorkflow, SKIPPED_JOBS } from '../../../scripts/ci-plan.mjs'
+import { e2eShardCount, planFor, readWorkflow, SKIPPED_JOBS } from '../../../scripts/ci-plan.mjs'
 
 const REPO_ROOT = resolve(__dirname, '../../..')
 const workflow = readWorkflow(resolve(REPO_ROOT, '.github/workflows/ci.yml'))
@@ -19,6 +19,7 @@ describe("ci:local runs ci.yml's own steps", () => {
       'typecheck',
       'format',
       'stories',
+      'story-screenshots',
       'unit',
       'perf',
       'test',
@@ -41,6 +42,17 @@ describe("ci:local runs ci.yml's own steps", () => {
 
   it('leaves out installing dependencies, which runs once before every job', () => {
     expect(plan.some((step) => /^npm ci\b/.test(step.script))).toBe(false)
+  })
+})
+
+describe('where ci:local runs a step', () => {
+  it("gives each step its job's runner, so a step CI runs on Ubuntu runs in the Linux container", () => {
+    expect(stepOf('unit', 'Test')?.runner).toBe('ubuntu-24.04-arm')
+    expect(stepOf('story-screenshots', 'Compare story screenshots')?.runner).toBe('macos-26')
+  })
+
+  it('reads the number of e2e shards from the e2e job, for the local e2e run', () => {
+    expect(e2eShardCount(workflow)).toBe(3)
   })
 })
 
@@ -93,10 +105,31 @@ describe('what a step becomes, selected and unselected', () => {
 })
 
 describe('the deterministic workflow (ADR 123)', () => {
-  it('runs every job on macOS 26 and installs nothing with apt', () => {
+  it('runs the app and what a Mac draws on macOS 26, and every other job on Ubuntu on ARM', () => {
+    const macJobs = Object.entries(workflow.jobs)
+      .filter(([, job]) => job['runs-on'] === 'macos-26')
+      .map(([id]) => id)
+    expect(macJobs).toEqual(['story-screenshots', 'start', 'e2e'])
     const runners = Object.values(workflow.jobs).map((job) => job['runs-on'])
-    expect(new Set(runners)).toEqual(new Set(['macos-26']))
-    expect(workflowText).not.toMatch(/apt-get|ubuntu/)
+    expect(new Set(runners)).toEqual(new Set(['macos-26', 'ubuntu-24.04-arm']))
+    expect(workflowText).not.toMatch(/apt-get/)
+  })
+
+  // GitHub runs five macOS jobs at a time on every plan below Enterprise: more queue.
+  it('asks for no more macOS runners at once than GitHub gives', () => {
+    const macRunners = Object.values(workflow.jobs)
+      .filter((job) => job['runs-on'] === 'macos-26')
+      .map((job) => (job.strategy?.matrix as { shard?: unknown[] } | undefined)?.shard?.length ?? 1)
+    expect(macRunners.reduce((sum, count) => sum + count, 0)).toBeLessThanOrEqual(5)
+  })
+
+  it('gives every job a time limit inside the eight minutes a run may take', () => {
+    for (const [id, job] of Object.entries(workflow.jobs))
+      expect({ id, limit: job['timeout-minutes'] }).toEqual({ id, limit: expect.any(Number) })
+    const over = Object.entries(workflow.jobs).filter(
+      ([, job]) => Number(job['timeout-minutes']) > 8
+    )
+    expect(over).toEqual([])
   })
 
   it('runs every spec once: no burn-in, no census of one, every shard reported', () => {
@@ -113,16 +146,18 @@ describe('the deterministic workflow, outside services and baselines', () => {
   })
 
   it('fails a story with no baseline instead of writing one, and has no upload of new ones', () => {
-    expect(stepOf('stories', 'Compare story screenshots')?.script).toContain(
+    expect(stepOf('story-screenshots', 'Compare story screenshots')?.script).toContain(
       '--update-snapshots=none'
     )
-    expect(stepsOf('stories').map((step) => step.name)).not.toContain('Upload new baselines')
+    expect(stepsOf('story-screenshots').map((step) => step.name)).not.toContain(
+      'Upload new baselines'
+    )
   })
 
   it('writes baselines only in the labelled workflow, on the macOS image CI compares on', () => {
     const baselines = readWorkflow(resolve(REPO_ROOT, '.github/workflows/story-baselines.yml'))
     const job = baselines.jobs.baselines
-    expect(job['runs-on']).toBe(workflow.jobs.stories['runs-on'])
+    expect(job['runs-on']).toBe(workflow.jobs['story-screenshots']['runs-on'])
     expect(JSON.stringify(job.steps)).toContain('--update-snapshots=changed')
   })
 
