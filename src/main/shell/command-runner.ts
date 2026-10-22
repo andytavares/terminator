@@ -58,7 +58,9 @@ function stopGroup(child: ChildProcess): void {
  * shim that can start xcodebuild, which outlived the app (run 38382115775). */
 export async function stopRunningCommands(): Promise<void> {
   const stopping = [...running]
-  const closed = stopping.map((child) => new Promise<void>((resolve) => child.once('close', resolve)))
+  const closed = stopping.map(
+    (child) => new Promise<void>((resolve) => child.once('close', resolve))
+  )
   for (const child of stopping) stopGroup(child)
   await Promise.all(closed)
 }

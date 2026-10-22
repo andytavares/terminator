@@ -21,6 +21,7 @@ import { RpcEndpoint } from '../../../../../src/main/extensions/host/rpc-endpoin
 import { hostSnapshot } from '../../../../support/host-snapshot'
 import type { HostSnapshot } from '../../../../../src/main/extensions/host/snapshot'
 import type { BackendModule } from '../../../../../src/main/extensions/host/backend-loader'
+import { isPending } from '../../../../support/pending'
 import { partialFake } from '../../../../support/fakes'
 import { workerPortLink } from '../../../../support/message-ports'
 import { eventually } from '../../../../support/eventually'
@@ -410,10 +411,11 @@ describe('stopping the extension host', () => {
   it('settles once the host process has exited, so the next activation starts a new one', async () => {
     const { process, record, spawned, crash } = hostHarness()
     await process.activate(record)
-    const first = spawned.mock.results[0].value as SpawnedHost
-    vi.mocked(first.kill).mockImplementation(() => void setImmediate(() => crash(0)))
 
-    await process.stopHost()
+    const stopped = process.stopHost()
+    expect(await isPending(stopped)).toBe(true)
+    crash(0)
+    await stopped
     await process.activate(record)
 
     expect(spawned).toHaveBeenCalledTimes(2)
