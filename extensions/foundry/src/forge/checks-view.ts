@@ -76,7 +76,7 @@ const SOURCE_WORDS: Record<Entry['source'], (evidence: string | undefined) => st
     evidence ? `Suggested by ${evidence}` : "Suggested by the repository's files",
 }
 
-/** Where a command came from, in words an operator would say. */
+/** Where a command came from, in words an operator would say. @internal */
 export function sourceInWords(entry: Pick<Entry, 'source' | 'evidence'>): string {
   return SOURCE_WORDS[entry.source](entry.evidence)
 }

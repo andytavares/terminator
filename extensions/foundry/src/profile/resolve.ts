@@ -35,7 +35,7 @@ export interface ResolveInput {
   readonly stored: Profile | null
 }
 
-/** `<repo>/.foundry/profile.yaml`, read only; absent or invalid reads as none. */
+/** `<repo>/.foundry/profile.yaml`, read only; absent or invalid reads as none. @internal */
 export function readRepositoryProfile(repoPath: string): Profile | null {
   const file = path.join(repoPath, '.foundry', 'profile.yaml')
   let text: string

@@ -28,6 +28,7 @@ export type Toolchain = Record<CheckName, ProbedCommand | null>
  * The commands this project actually uses, or null where it has none.
  *
  * Reads only. Executes nothing. Writes nothing.
+ * @internal
  */
 export function probeToolchain(repoPath: string, hintsDir: string = defaultHintsDir()): Toolchain {
   const { checks } = evaluateHints(repoPath, loadHints(hintsDir).hints)

@@ -34,7 +34,7 @@ interface Change {
   readonly risk: RiskAssessment
 }
 
-/** A person looks at this change: a changed file is interface, or a unit says it is. */
+/** A person looks at this change: a changed file is interface, or a unit says it is. @internal */
 export function touchesUi(order: WorkOrder, files: readonly string[]): boolean {
   const { interface: interfaceGlobs } = order.context.environment.paths
   return (
