@@ -16,7 +16,7 @@ CI was red on most pull requests for weeks, and the same commit gave different a
 | Timing           | Per-spec timeouts of 5 s to 120 s, and a machine busy with other specs, turned "slow" into "failed"                  |
 | Environment      | Unit shards ran on Linux, the app and E2E on macOS, and a laptop is a third; `HOME`, git config and `PATH` leaked in |
 | Outside services | `npm audit` and Codecov failed the build for what the pull request did not change                                    |
-| Selection        | CI ran the specs a diff selected plus burn-in, and `ci:local` ran its own               |
+| Selection        | CI ran the specs a diff selected plus burn-in, and `ci:local` ran its own                                            |
 
 ## Decision
 
