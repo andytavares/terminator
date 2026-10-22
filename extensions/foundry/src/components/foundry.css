@@ -432,7 +432,10 @@
   max-width: 760px;
 }
 
+/* `overflow: hidden` lets a flex child shrink below its content, so in the
+   scrolling `.fdry-main` the rows were clipped instead of scrolled to. */
 .fdry-checks {
+  flex: none;
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-radius-md);
   overflow: hidden;

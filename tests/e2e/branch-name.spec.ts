@@ -80,6 +80,8 @@ async function cancelDialog(): Promise<void> {
 async function listedBranches(): Promise<string[]> {
   await openCreateBranch()
   await handle.page.locator('.branch-select__trigger').click()
+  // The dialog opens before its branches arrive; allTextContents() does not wait for them.
+  await expect(handle.page.locator('.branch-select__item-name').first()).toBeVisible()
   const names = await handle.page.locator('.branch-select__item-name').allTextContents()
   await handle.page.locator('.branch-select__trigger').click()
   await cancelDialog()

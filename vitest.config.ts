@@ -47,6 +47,9 @@ export default defineConfig({
     // Task Vault's backend uses Temporal (ADR 108). Electron 44 has it; Node 24
     // only behind this flag. Remove it when .nvmrc reaches Node 26, which ships it.
     execArgv: ['--harmony-temporal'],
+    // At the default (one worker per core, 16 here) the real-git specs starve and hit the 5 s
+    // timeout, a different few on each run; 8 workers pass every run for 6 s more wall time.
+    maxWorkers: 8,
     projects: [
       {
         extends: true,
