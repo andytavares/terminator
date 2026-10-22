@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { orderDir } from '../data-root.js'
 import { seedOrder, newOrderId } from '../forge/intake-source.js'
+import { defaultHintsDir } from '../profile/hints.js'
 import type { IssueLike, SeedInput } from '../forge/intake-source.js'
 import { answerQuestion, surfacedQuestions } from '../forge/interview.js'
 import { strikeAssumption } from '../forge/assumptions.js'
@@ -353,6 +354,7 @@ async function create(deps: ForgeDeps, payload: CreateInput): Promise<unknown> {
     newId: () => newOrderId(new Date(deps.now())),
     readIssue: deps.readIssue,
     priorArtFor: deps.priorArtFor,
+    profile: { dataRoot: deps.dataRoot(), hintsDir: defaultHintsDir() },
   })
 
   if ('error' in seeded) return seeded

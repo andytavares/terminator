@@ -1,0 +1,8 @@
+schemaVersion: 1
+id: flutter
+priority: 70
+when: [pubspec.yaml]
+paths:
+  interface: ['**/*.dart']
+  manifests: [pubspec.yaml]
+  lockfiles: [pubspec.lock]

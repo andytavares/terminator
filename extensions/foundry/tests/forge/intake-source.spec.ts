@@ -71,7 +71,8 @@ function aCompleteDraftTests() {
     if (!('order' in r)) throw new Error('expected an order')
     expect(r.order.context.toolchain.test).toEqual({
       command: 'npm run test',
-      source: 'package.json',
+      source: 'hint',
+      evidence: 'package.json',
     })
     expect(r.order.context.toolchain.coverage).toBeNull()
   })

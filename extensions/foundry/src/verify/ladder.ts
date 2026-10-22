@@ -77,6 +77,29 @@ export interface LadderInput {
    * changed, which is never a reason to run less.
    */
   readonly changedFiles?: readonly string[]
+  /** Checks the repository's profile adds, each run at its own rung. */
+  readonly additional?: readonly AdditionalStep[]
+}
+
+export interface AdditionalStep {
+  readonly name: string
+  readonly command: string
+  readonly rung: Rung
+}
+
+/** A step the profile added: runnable at its rung, tied to no probed check. */
+function additionalStep({ name, command, rung }: AdditionalStep): LadderStep {
+  return { rung, name, command, status: 'runnable', reason: '', check: null }
+}
+
+/** Each added step goes after the last step already at its rung. */
+function withAdditional(steps: LadderStep[], additional: readonly AdditionalStep[]): LadderStep[] {
+  const placed = [...steps]
+  for (const added of additional) {
+    const lastAtRung = placed.map((step) => step.rung).lastIndexOf(added.rung)
+    placed.splice(lastAtRung + 1, 0, additionalStep(added))
+  }
+  return placed
 }
 
 // Not a command and not a gap: the verifier runs as its own node on every unit and its
@@ -123,6 +146,11 @@ function integrationSteps(toolchain: Toolchain, touchesUi: boolean): LadderStep[
   return [...build, probedStep(toolchain, 'e2e', { rung: 'L5', name })]
 }
 
+/** A step that is not a command this climb runs: the verifier's, the inspection's, the human's. */
+function isDecidedElsewhere(step: LadderStep): boolean {
+  return step.check === null && step.status !== 'runnable'
+}
+
 /**
  * The rungs for this repository and this change.
  *
@@ -131,8 +159,8 @@ function integrationSteps(toolchain: Toolchain, touchesUi: boolean): LadderStep[
  * people learn to skim security findings.
  */
 export function ladderFor(input: LadderInput): LadderStep[] {
-  const { toolchain, risk, touchesUi, changedFiles = [] } = input
-  const rungs: LadderStep[] = [
+  const { toolchain, risk, touchesUi, changedFiles = [], additional = [] } = input
+  const base: LadderStep[] = [
     probedStep(toolchain, 'format', { rung: 'L0', name: 'Format' }),
     probedStep(toolchain, 'lint', { rung: 'L0', name: 'Lint' }),
     probedStep(toolchain, 'test', { rung: 'L1', name: "The unit's own tests" }),
@@ -142,6 +170,7 @@ export function ladderFor(input: LadderInput): LadderStep[] {
     ...integrationSteps(toolchain, touchesUi),
     HUMAN_DECISION,
   ]
+  const rungs = withAdditional(base, additional)
 
   // Words cannot break a build or a test, so a change that only touches them
   // is held to Format and Lint. Said on each step rather than dropped, so the
@@ -150,7 +179,7 @@ export function ladderFor(input: LadderInput): LadderStep[] {
     return rungs
   }
   return rungs.map((rung) =>
-    rung.check === null || rung.check === 'format' || rung.check === 'lint'
+    rung.check === 'format' || rung.check === 'lint' || isDecidedElsewhere(rung)
       ? rung
       : { ...rung, command: null, status: 'not_triggered' as const, reason: 'documentation only' }
   )

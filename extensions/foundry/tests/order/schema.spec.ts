@@ -39,6 +39,13 @@ function validContext(): WorkOrder['context'] {
       },
     ],
     toolchain: { test: null, lint: null, format: null, coverage: null, e2e: null, build: null },
+    environment: {
+      prepare: null,
+      share: [],
+      pictures: null,
+      paths: { interface: [], manifests: [], lockfiles: [] },
+      additional: [],
+    },
     entryPoints: [],
     priorArt: [],
     conventions: [],

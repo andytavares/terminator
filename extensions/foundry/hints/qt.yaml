@@ -1,0 +1,8 @@
+schemaVersion: 1
+id: qt
+priority: 70
+when: ['*.pro', CMakeLists.txt, '*.qrc']
+paths:
+  interface: ['**/*.qml', '**/*.ui']
+  manifests: ['*.pro', CMakeLists.txt]
+  lockfiles: []

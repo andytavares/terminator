@@ -1,0 +1,17 @@
+schemaVersion: 1
+id: rust
+priority: 30
+when: [Cargo.toml]
+tools:
+  test:
+    - { command: cargo test, files: [Cargo.toml] }
+  lint:
+    - { command: cargo clippy, files: [Cargo.toml] }
+  format:
+    - { command: cargo fmt --check, files: [Cargo.toml] }
+  build:
+    - { command: cargo build, files: [Cargo.toml] }
+paths:
+  interface: []
+  manifests: [Cargo.toml]
+  lockfiles: [Cargo.lock]

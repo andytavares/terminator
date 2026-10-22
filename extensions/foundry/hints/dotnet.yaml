@@ -1,0 +1,8 @@
+schemaVersion: 1
+id: dotnet
+priority: 70
+when: ['*.csproj', '*.sln', '*.fsproj']
+paths:
+  interface: ['**/*.xaml', '**/*.razor', '**/*.cshtml']
+  manifests: ['*.csproj', '*.fsproj', '*.sln']
+  lockfiles: [packages.lock.json]

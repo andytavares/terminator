@@ -1,0 +1,7 @@
+schemaVersion: 1
+id: make
+priority: 50
+when: [Makefile, makefile]
+targets:
+  files: [Makefile, makefile]
+  run: 'make {name}'
