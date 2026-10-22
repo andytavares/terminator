@@ -5,16 +5,17 @@ import { startFoundryHomePublisher } from '../../src/home/publish.js'
 import { readLiveStandings } from '../../src/ipc/standing.js'
 
 vi.mock('../../src/ipc/standing.js', () => ({ readLiveStandings: vi.fn() }))
-vi.mock('../../src/home/feed.js', () => {
-  let built = 0
-  return { buildFoundryHomeFeed: vi.fn(() => ({ built: ++built })) }
-})
+const feedCounter = vi.hoisted(() => ({ built: 0 }))
+vi.mock('../../src/home/feed.js', () => ({
+  buildFoundryHomeFeed: vi.fn(() => ({ built: ++feedCounter.built })),
+}))
 
 type Records = { orders: never[]; waiting: never[] }
 let slowReads: Array<(records: Records) => void> = []
 let rootsRead: string[] = []
 
 beforeEach(() => {
+  feedCounter.built = 0
   slowReads = []
   rootsRead = []
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })

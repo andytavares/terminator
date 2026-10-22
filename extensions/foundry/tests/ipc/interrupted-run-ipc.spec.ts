@@ -21,6 +21,7 @@ import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import type { Gate } from '../../src/gates/rules.js'
+import { executingOrders } from '../../src/line/run-control.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 import { ledgerFileText } from '../helpers/order-ledger.js'
 
@@ -117,7 +118,10 @@ async function restarted(): Promise<RunGraph> {
   return graphOnDisk()
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  // A previous test's resume leaves its executor winding down; while it is marked executing,
+  // no node of the order counts as orphaned.
+  await vi.waitFor(() => expect(executingOrders.size).toBe(0))
   // This spec stops at the restart: a start that throws leaves the node as resuming put it
   // and ends that executor before the next test resumes the same order.
   theRunner.start.mockClear().mockImplementation(() => {
