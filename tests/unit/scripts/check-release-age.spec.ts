@@ -110,6 +110,11 @@ describe('reading the base branch lockfile', () => {
     const clone = join(makeTempDir('release-age-clone-'), 'repo')
     git(origin, 'clone', '-q', origin, clone)
 
+    // origin moves on after the clone: the check reads origin/main as fetched, and fetches nothing
+    // itself. CI's checkout and ci:local fetch first; ci:local's Linux container has no keys.
+    writeFileSync(join(origin, 'package-lock.json'), JSON.stringify({ version: '3' }))
+    git(origin, 'commit', '-qam', '3')
+
     expect(baseLockfile('main', clone)).toEqual({ version: '2' })
     expect(existsSync(join(clone, '.git/shallow'))).toBe(false)
   })
