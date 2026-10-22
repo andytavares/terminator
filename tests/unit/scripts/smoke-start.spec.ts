@@ -1,5 +1,4 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
@@ -147,19 +146,28 @@ describe('electronMainPid', () => {
 })
 
 describe('mainLogPath', () => {
-  it('is under ~/Library/Logs, where macOS keeps app logs', () => {
-    expect(mainLogPath({ appName: 'Terminator' })).toBe(
-      join(homedir(), 'Library/Logs/Terminator/terminator.log')
+  it("is under the app's home's Library/Logs, where macOS keeps app logs", () => {
+    expect(mainLogPath({ appName: 'Terminator', home: '/tmp/smoke-home' })).toBe(
+      '/tmp/smoke-home/Library/Logs/Terminator/terminator.log'
     )
   })
 })
 
 describe('the app the smoke test starts', () => {
   it('runs in the background, with Electron logging on and the rest of the environment kept', () => {
-    expect(launchEnvironment({ PATH: '/bin' })).toEqual({
+    expect(launchEnvironment({ PATH: '/bin', HOME: '/Users/dev' }, '/tmp/smoke-home')).toEqual({
       PATH: '/bin',
+      HOME: '/tmp/smoke-home',
       ELECTRON_ENABLE_LOGGING: '1',
       TERMINATOR_RUN_IN_BACKGROUND: '1',
     })
+  })
+
+  // The app installs hooks into ~/.claude/settings.json: with the developer's home it read their
+  // file and wrote to it, which CI's runner never has, so a local start and CI's differed.
+  it("starts in a home of its own, never the developer's", () => {
+    expect(launchEnvironment({ HOME: '/Users/dev' }, '/tmp/smoke-home').HOME).toBe(
+      '/tmp/smoke-home'
+    )
   })
 })
