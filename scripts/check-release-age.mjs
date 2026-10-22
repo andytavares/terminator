@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// node scripts/check-release-age.mjs [base-ref]: exits 1 if package-lock.json holds a version the
-// registry published fewer than 14 days ago that base-ref's lockfile (default origin/main) does not.
+// node scripts/check-release-age.mjs: exits 1 if package-lock.json holds a version the registry
+// published fewer than 14 days ago that the base branch's lockfile does not (GITHUB_BASE_REF in a
+// pull request, main anywhere else, fetched here because CI checks out one commit).
 // A version already on the base branch is not this change's to answer for. A new one that must stay
 // is listed, with a reason, in .release-age-exceptions.json.
 // `npm audit` sees known advisories only; this is the cooldown for what nobody has reported yet.
@@ -22,6 +23,11 @@ export function lockedVersions(lock) {
     ids.add(`${name}@${entry.version}`)
   }
   return [...ids]
+}
+
+/** The branch a change is measured against. */
+export function baseBranch(env) {
+  return env.GITHUB_BASE_REF || 'main'
 }
 
 /** `name@version` in `head`'s lockfile that `base`'s does not hold. */
@@ -62,20 +68,22 @@ async function fetchPublished(ids) {
 
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'))
 
-const baseLockfile = (ref) =>
-  JSON.parse(
-    execFileSync('git', ['show', `${ref}:package-lock.json`], {
+function baseLockfile(branch) {
+  execFileSync('git', ['fetch', '--no-tags', '--depth=1', 'origin', branch], { stdio: 'ignore' })
+  return JSON.parse(
+    execFileSync('git', ['show', 'FETCH_HEAD:package-lock.json'], {
       encoding: 'utf8',
       maxBuffer: 1 << 28,
     })
   )
+}
 
-async function main(baseRef) {
-  const ids = addedVersions(readJson('package-lock.json'), baseLockfile(baseRef))
+async function main(branch) {
+  const ids = addedVersions(readJson('package-lock.json'), baseLockfile(branch))
   const exceptions = readJson('.release-age-exceptions.json')
   const young = tooYoung({ published: await fetchPublished(ids), exceptions, now: Date.now() })
   console.log(
-    `check-release-age: ${ids.length} versions added since ${baseRef}, ${young.length} under ${COOLDOWN_DAYS} days old`
+    `check-release-age: ${ids.length} versions added since ${branch}, ${young.length} under ${COOLDOWN_DAYS} days old`
   )
   for (const { id, publishedAt } of young)
     console.error(`  ${id}  published ${publishedAt ?? 'at an unknown time'}`)
@@ -83,4 +91,4 @@ async function main(baseRef) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href)
-  process.exitCode = await main(process.argv[2] ?? 'origin/main')
+  process.exitCode = await main(baseBranch(process.env))

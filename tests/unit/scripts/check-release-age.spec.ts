@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { addedVersions, lockedVersions, tooYoung } from '../../../scripts/check-release-age.mjs'
+import {
+  addedVersions,
+  baseBranch,
+  lockedVersions,
+  tooYoung,
+} from '../../../scripts/check-release-age.mjs'
 
 const NOW = Date.parse('2026-10-21T00:00:00Z')
 const lock = {
@@ -43,6 +48,14 @@ describe('addedVersions', () => {
 
   it('leaves out every version the base lockfile already held', () => {
     expect(addedVersions(base, base)).toEqual([])
+  })
+})
+
+describe('baseBranch', () => {
+  it("is the pull request's base where GitHub names one, and main anywhere else", () => {
+    expect(baseBranch({ GITHUB_BASE_REF: 'release/2' })).toBe('release/2')
+    expect(baseBranch({ GITHUB_BASE_REF: '' })).toBe('main')
+    expect(baseBranch({})).toBe('main')
   })
 })
 
