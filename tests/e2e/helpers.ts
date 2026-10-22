@@ -363,9 +363,27 @@ export async function createWorkspace(page: Page, name: string, folderPath: stri
   await page.getByPlaceholder('My Workspace').fill(name)
   await page.getByPlaceholder('/path/to/folder').fill(folderPath)
   await page.click('.tmui-dialog__actions .tmui-button--primary')
+  await expectDialogClosed(page, folderPath)
   await expect(workspaceRow(page, name)).toBeVisible()
   const branch = checkedOutBranchOf(folderPath)
   if (branch !== null) await expectCheckoutCard(page, folderPath, branch)
+}
+
+/** The dialog closes once the workspace and its first branch exist. When git cannot answer, it
+ * stays open with a message and takes the workspace back: fail here, saying so, and not later as
+ * a click the open dialog blocks. Git's own words are in the app's log (git.ipc.ts). */
+async function expectDialogClosed(page: Page, folderPath: string): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: 'Create Workspace' })
+  try {
+    await expect(dialog).toBeHidden()
+  } catch (error) {
+    const said = await dialog.innerText()
+    const answer = await page.evaluate((path) => window.electronAPI.git.isRepo(path), folderPath)
+    throw new Error(
+      `Creating a workspace over ${folderPath} left its dialog open: ${JSON.stringify(said)}; git:is-repo now answers ${JSON.stringify(answer)}`,
+      { cause: error }
+    )
+  }
 }
 
 /** The checkout's branch card, or a failure that says what the app answers about the folder now.
