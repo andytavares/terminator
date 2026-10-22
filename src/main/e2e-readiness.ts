@@ -47,11 +47,6 @@ export function whenAnnounced(kind: Announcement, subject: string): Promise<void
   return pendingFor(kind, subject).promise
 }
 
-/** Forgets every announcement, for a spec that needs a clean slate. */
-export function resetAnnouncements(): void {
-  pending.clear()
-}
-
 /** Gives the window Chromium focus whatever the OS says, so no test depends on the active application.
  * https://chromedevtools.github.io/devtools-protocol/tot/Emulation/#method-setFocusEmulationEnabled */
 async function emulateFocus(window: BrowserWindow): Promise<void> {
