@@ -370,8 +370,7 @@ describe('registerFramePortChannel — waiting for the backend', () => {
     registerFramePortChannel(makeBridge(makeCallbacks()), whenActivated)
     const request = { extensionId: 'ext.slow', viewParam: 'main', frameToken: 'tok-2' }
     const { sender, settled } = openPortRequest(request)
-    await Promise.resolve()
-    expect(whenActivated).toHaveBeenCalledWith('ext.slow')
+    await eventually(() => expect(whenActivated).toHaveBeenCalledWith('ext.slow'))
     expect(sender.postMessage).not.toHaveBeenCalled()
     activate()
     await settled

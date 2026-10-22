@@ -310,7 +310,6 @@ describe('extension backends — dependencies across a restart', () => {
     const seen: unknown[] = []
     const provider: BackendModule = {
       async activate() {
-        await Promise.resolve()
         return { greet: () => 'hello' }
       },
     }

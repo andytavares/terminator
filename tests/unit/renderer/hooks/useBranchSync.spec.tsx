@@ -16,12 +16,17 @@ const target = (over: Partial<BranchSyncTarget> = {}): BranchSyncTarget => ({
   ...over,
 })
 
-/** The effect chains awaits per target; let them all settle. */
+/** The effect chains awaits per target: a read of the branch, then maybe a rename. Waits for each
+ * answer, including the ones that only get asked once an earlier one is in. */
 async function settle(): Promise<void> {
+  const answers = () =>
+    [...mockCurrentBranch.mock.results, ...mockUpdateProjectBranch.mock.results].map(
+      (call) => call.value
+    )
   await act(async () => {
-    await Promise.resolve()
-    await Promise.resolve()
-    await Promise.resolve()
+    for (let answered = 0; answered < answers().length; answered++) {
+      await Promise.allSettled([answers()[answered]])
+    }
   })
 }
 

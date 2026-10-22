@@ -15,7 +15,11 @@ vi.mock('electron-store', async () =>
   (await import('../../support/stores')).inMemoryElectronStore()
 )
 
-import { registerTerminalHandlers, sendToRenderer } from '../../../src/main/ipc/terminal.ipc.js'
+import {
+  issueContextAnnounced,
+  registerTerminalHandlers,
+  sendToRenderer,
+} from '../../../src/main/ipc/terminal.ipc.js'
 import { OutputRelay } from '../../../src/main/terminal/output-relay.js'
 import { MissingCwdError } from '../../../src/main/terminal/pty-manager.js'
 import type { SessionInfo, SpawnSessionOptions } from '@terminator/extension-sdk'
@@ -30,7 +34,6 @@ import * as records from '../../../src/main/sessions/session-record-store.js'
 import * as links from '../../../src/main/integrations/issue-link-store.js'
 import { writeContextFile } from '../../../src/main/integrations/agent-context.js'
 import { notificationManager } from '../../../src/main/notifications/notification-manager.js'
-import { eventually } from '../../support/eventually'
 
 /** Each test starts from an empty user-data directory and an empty notification centre. */
 beforeEach(async () => {
@@ -565,11 +568,10 @@ describe('terminal:create — linked issue notices', () => {
     await writeContextFile(injectedContext(2143, false))
     await createTerminal(makeFakePtyManager())
 
-    await eventually(() =>
-      expect(notificationManager.list()).toEqual([
-        expect.objectContaining({ title: expect.stringContaining('TAV-42') }),
-      ])
-    )
+    await issueContextAnnounced()
+    expect(notificationManager.list()).toEqual([
+      expect.objectContaining({ title: expect.stringContaining('TAV-42') }),
+    ])
     expect(sentChannels()).toContain('integrations:context-injected')
   })
 
@@ -578,7 +580,7 @@ describe('terminal:create — linked issue notices', () => {
     await writeContextFile(injectedContext(9900, true))
     await createTerminal(makeFakePtyManager())
 
-    await eventually(() => expect(notificationManager.list()).toHaveLength(1))
+    await issueContextAnnounced()
     const [notice] = notificationManager.list()
     expect(notice.message).toContain('9,900')
     expect(notice.message).toContain('shortened')
@@ -590,7 +592,7 @@ describe('terminal:create — linked issue, nothing to say', () => {
     await links.setLink({ projectId: P, tracker: 'linear', key: 'TAV-42', injectContext: false })
     await writeContextFile(injectedContext(10, false))
     await createTerminal(makeFakePtyManager())
-    await new Promise((r) => setImmediate(r))
+    await issueContextAnnounced()
 
     expect(notificationManager.list()).toEqual([])
     expect(sentChannels()).not.toContain('integrations:context-injected')
@@ -599,7 +601,7 @@ describe('terminal:create — linked issue, nothing to say', () => {
   it('says nothing when no context has been written yet', async () => {
     await links.setLink({ projectId: P, tracker: 'linear', key: 'TAV-42' })
     await createTerminal(makeFakePtyManager())
-    await new Promise((r) => setImmediate(r))
+    await issueContextAnnounced()
     expect(notificationManager.list()).toEqual([])
   })
 })

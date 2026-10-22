@@ -19,6 +19,11 @@ Object.defineProperty(globalThis, 'window', {
 
 import { useMetricsStore } from '../../../../src/renderer/stores/metrics.store'
 
+/** Waits for every call the mock has answered so far, whether it resolved or rejected. The store's
+ * own continuation was attached first, so it has run by the time this returns. */
+const answered = (mock: { mock: { results: Array<{ value: unknown }> } }) =>
+  Promise.allSettled(mock.mock.results.map((call) => call.value))
+
 const sysData = {
   cpuPercent: 42,
   memUsedBytes: 2e9,
@@ -85,7 +90,8 @@ describe('useMetricsStore — startPolling polls getProcesses with resolved pids
 
     useMetricsStore.getState().startPolling([{ sessionId: 'sess-1', pid: 100 }])
     await vi.advanceTimersByTimeAsync(2001)
-    await Promise.resolve()
+    await answered(mockGetSystem)
+    await answered(mockGetProcesses)
 
     expect(mockGetProcesses).toHaveBeenCalledWith([100])
     expect(useMetricsStore.getState().processesBySessionId.get('sess-1')?.cpuPercent).toBe(12)
@@ -97,7 +103,7 @@ describe('useMetricsStore — startPolling polls getProcesses with resolved pids
 
     useMetricsStore.getState().startPolling([])
     await vi.advanceTimersByTimeAsync(2001)
-    await Promise.resolve()
+    await answered(mockGetSystem)
 
     useMetricsStore.getState().setSystem(sysData)
     expect(useMetricsStore.getState().system).not.toBeNull()
@@ -158,7 +164,7 @@ describe('useMetricsStore — disableGlobalMetrics stops polling and clears stat
 
     expect(() => useMetricsStore.getState().startPolling([])).not.toThrow()
     await vi.advanceTimersByTimeAsync(2001)
-    await Promise.resolve()
+    await answered(mockGetSystem)
     // system stays null — no crash
     expect(useMetricsStore.getState().system).toBeNull()
   })

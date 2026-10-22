@@ -18,5 +18,8 @@ export function mountExtension(view: ReactElement): void {
 /** Opens an address in the person's browser: a view cannot open a window of its own. Settles
  * when the open has, whether or not it succeeded. */
 export function openInBrowser(url: string): Promise<void> {
-  return window.electronAPI.shell.openExternal(url).catch(() => {})
+  return window.electronAPI.shell.openExternal(url).then(
+    () => {},
+    () => {}
+  )
 }

@@ -1236,7 +1236,9 @@ describe('TerminalInstance — link interaction (hover overlay + cmd+click) — 
     const instance = makeDrawnTerminal({ 0: 'https://example.com', 1: '/tmp/a.txt' })
     fire(instance.element, 'mousedown', atCell(0, 0))
     fire(instance.element, 'mousedown', atCell(0, 1))
-    await Promise.resolve()
+    await Promise.allSettled(
+      [...mockOpenExternal.mock.results, ...mockOpenPath.mock.results].map((call) => call.value)
+    )
     expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com')
     expect(mockOpenPath).toHaveBeenCalledWith('/tmp/a.txt')
   })
