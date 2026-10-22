@@ -1,0 +1,25 @@
+eslint.config.mjs
+  s_f6f18e5557b141::t_94dd4cd9c883d0 10-11,82-89,91-100,227-230
+package.json
+  s_f6f18e5557b141::t_dfc5b1e88f3a0f 32
+scripts/lint.mjs
+  s_f6f18e5557b141::t_44391d23afd534 1-41
+tests/unit/scripts/lint.spec.ts
+  s_f6f18e5557b141::t_bb5a038402a049 1-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7eef1520bc12d8c6ac322b26ceffe9d3c21e233c",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
