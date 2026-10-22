@@ -7,8 +7,6 @@ import { useVaultNavStore } from '../../src/stores/vault-nav.store'
 import { useVaultDataStore } from '../../src/stores/vault-data.store'
 import { InboxView } from '../../src/components/InboxView'
 
-vi.setConfig({ testTimeout: 30_000 })
-
 let bridge: ReturnType<typeof installVaultBridge>
 
 const ITEMS = [

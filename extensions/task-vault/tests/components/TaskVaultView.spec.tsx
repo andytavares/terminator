@@ -36,8 +36,6 @@ import { useVaultFilterStore } from '../../src/stores/vault-filter.store'
 import { notify } from '../../src/utils/notify'
 import { partialFake } from '../../../../tests/support/fakes'
 
-vi.setConfig({ testTimeout: 30_000 })
-
 let bridge: ReturnType<typeof installVaultBridge>
 
 const LOG = {
@@ -169,13 +167,13 @@ function dailyTests() {
 function daySelectionTests() {
   it('moves between days and back to today', async () => {
     await renderVaultView()
-    act(() => dailyLogProps().onPrevDay())
+    act(() => void dailyLogProps().onPrevDay())
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:get-daily')).toEqual([{ date: dayFromToday(-1) }])
     )
     await eventually(() => expect(seen.daily.isToday).toBe(false))
     await act(async () => dailyLogProps().onRefresh())
-    act(() => dailyLogProps().onNextDay())
+    act(() => void dailyLogProps().onNextDay())
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:get-daily').at(-1)).toEqual({ date: dayFromToday() })
     )
@@ -183,15 +181,15 @@ function daySelectionTests() {
 
   it('selects a task into the detail panel, toggles it, and closes on Escape or backdrop', async () => {
     await renderVaultView()
-    act(() => dailyLogProps().onSelectTask('t1'))
+    act(() => void dailyLogProps().onSelectTask('t1'))
     expect(seen.detail.taskText).toBe('Write')
-    act(() => dailyLogProps().onSelectTask('t1'))
+    act(() => void dailyLogProps().onSelectTask('t1'))
     expect(screen.queryByTestId('detail')).toBeNull()
-    act(() => dailyLogProps().onSelectTask('s1'))
+    act(() => void dailyLogProps().onSelectTask('s1'))
     expect(seen.detail.taskText).toBe('Someday thing')
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByTestId('detail')).toBeNull()
-    act(() => dailyLogProps().onSelectTask('t2'))
+    act(() => void dailyLogProps().onSelectTask('t2'))
     fireEvent.click(document.querySelector('.tv-detail-panel__backdrop')!)
     expect(screen.queryByTestId('detail')).toBeNull()
   })

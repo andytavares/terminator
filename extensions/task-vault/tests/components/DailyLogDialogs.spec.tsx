@@ -9,8 +9,6 @@ vi.mock('../../src/components/DateTimePicker', () => import('./helpers/input-stu
 import { notify } from '../../src/utils/notify'
 import { pressOutside } from '../../../../tests/support/modal'
 
-vi.setConfig({ testTimeout: 30_000 })
-
 let bridge: ReturnType<typeof installVaultBridge>
 
 const modal = () => document.querySelector('.daily-log__block-modal') as HTMLElement

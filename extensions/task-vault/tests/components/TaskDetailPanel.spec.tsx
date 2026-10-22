@@ -5,8 +5,6 @@ import { installVaultBridge, eventually } from './helpers/bridge'
 
 import { TaskDetailPanel } from '../../src/components/TaskDetailPanel'
 
-vi.setConfig({ testTimeout: 30_000 })
-
 const openExternal = vi.fn(async () => ({ ok: true as const }))
 
 let bridge: ReturnType<typeof installVaultBridge>

@@ -9,8 +9,6 @@ vi.mock('../../src/components/SmartTaskInput', () => import('./helpers/input-stu
 
 import { DailyLog } from '../../src/components/DailyLog'
 
-vi.setConfig({ testTimeout: 30_000 })
-
 type Props = React.ComponentProps<typeof DailyLog>
 
 let bridge: ReturnType<typeof installVaultBridge>
