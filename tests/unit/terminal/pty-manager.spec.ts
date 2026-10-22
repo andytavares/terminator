@@ -35,6 +35,11 @@ vi.mock('fs', () => ({
   statSync: fsMock.statSync,
 }))
 
+// A test that makes a cwd missing or a file must not leave it so for the next.
+beforeEach(() => {
+  fsMock.statSync.mockImplementation(() => ({ isDirectory: () => true }))
+})
+
 async function makeManager() {
   const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
   return new PtyManager()
@@ -44,7 +49,6 @@ function usePtyMocks(): void {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
-    fsMock.statSync.mockImplementation(() => ({ isDirectory: () => true }))
     mockPty.onData.mockImplementation((_cb: unknown) => {})
     mockPty.onExit.mockImplementation((_cb: unknown) => {})
   })
