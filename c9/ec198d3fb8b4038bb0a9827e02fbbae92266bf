@@ -1,0 +1,21 @@
+src/main/integrations/claude-settings.ts
+  s_f6f18e5557b141::t_2cff2186b33efc 3,38-39,45-47
+tests/unit/integrations/claude-settings-write.spec.ts
+  s_f6f18e5557b141::t_ac4cdcb215431f 1-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c9ec198d3fb8b4038bb0a9827e02fbbae92266bf",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
