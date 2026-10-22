@@ -238,13 +238,6 @@ const WRITE_STEPS: Steps = [
   ['every value survives a restart, in main and on each settings page', valuesSurviveRestart],
 ]
 
-// The second flow reads what the first wrote, so the two run in order on one profile.
-test.describe.configure({ mode: 'serial' })
-
-test('every extension setting is written from its page and survives a restart', async () => {
-  for (const [title, body] of WRITE_STEPS) await test.step(title, body)
-})
-
 async function gitIntegrationOffRegistersNoCommands(): Promise<void> {
   const { page } = handle
   // Its page is the first thing it registers, so once the page is here its
@@ -341,6 +334,7 @@ const EFFECT_STEPS: Steps = [
   ["Remote Control's viewer limit is the one its page shows", remoteControlViewerLimitMatchesPage],
 ]
 
-test('what the settings change shows where a person looks for it', async () => {
-  for (const [title, body] of EFFECT_STEPS) await test.step(title, body)
+// The effects are read from what the writes left, so both are steps of one test on one profile.
+test('every extension setting is written from its page, survives a restart and shows where a person looks for it', async () => {
+  for (const [title, body] of [...WRITE_STEPS, ...EFFECT_STEPS]) await test.step(title, body)
 })

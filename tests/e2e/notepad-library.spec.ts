@@ -27,8 +27,6 @@ import { expectCentredInWindow } from './modal-centre'
 let handle: AppHandle
 let notepad: ExtensionView
 
-test.describe.configure({ mode: 'serial' })
-
 test.beforeAll(async () => {
   handle = await launchApp()
   notepad = await openNotepad(handle)

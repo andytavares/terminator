@@ -52,8 +52,6 @@ const REPLY = {
   },
 }
 
-test.describe.configure({ mode: 'serial' })
-
 test.beforeAll(async () => {
   ;({ repo, bare } = makeRepoWithRemote('terminator-e2e-agent'))
   pushBranchToOrigin(repo, 'feat/subtract', {

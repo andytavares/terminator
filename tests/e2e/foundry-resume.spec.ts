@@ -336,9 +336,8 @@ async function inboxRendersTheMove(): Promise<void> {
     .poll(async () => await bodyText().catch((e) => `ERR:${(e as Error).message}`))
     .toContain('Refresh the token on a 401')
 
-  const text = await bodyText()
-  expect(text, `the inbox rendered:\n${text}`).toContain('Pick it back up')
-  expect(text).toContain('Stop here')
+  await expect.poll(() => bodyText()).toContain('Pick it back up')
+  await expect.poll(() => bodyText()).toContain('Stop here')
 
   // The picture, because a structural assertion passes while the band renders
   // in the wrong place, off-screen, or unreadable.
@@ -406,11 +405,9 @@ async function floorCarriesTheMove(): Promise<void> {
   await expect.poll(() => clickByName('Forge')).toBe(true)
   await openOrderRowInView(ORDER_ID, 'no row for the running order')
 
-  await expect.poll(() => bodyText()).toContain('Halted — your move')
-  const text = await bodyText()
   // `Halted — your move`, not `Nothing is running this`: an orphan always raises
   // `run.interrupted` (adopt.ts), and ADR-045 puts an unanswered gate first.
-  expect(text, `the Floor rendered:\n${text}`).toContain('Halted — your move')
+  await expect.poll(() => bodyText()).toContain('Halted — your move')
   // A gate is one line until it is opened; its reason is behind the chevron.
   await expect
     .poll(() => inFoundry<boolean>(SHOW_THE_REASON), { message: 'no collapsed gate to open' })
@@ -418,8 +415,8 @@ async function floorCarriesTheMove(): Promise<void> {
   // The interrupted gate's own words, so this proves the resume band rendered
   // rather than any halt at any gate.
   await expect.poll(() => bodyText()).toContain('Nothing is moving this run')
-  expect(text).toContain('builder · U-1 refresh the token on a 401')
-  expect(text).toContain('Pick it back up')
+  await expect.poll(() => bodyText()).toContain('builder · U-1 refresh the token on a 401')
+  await expect.poll(() => bodyText()).toContain('Pick it back up')
 
   writeFileSync(
     join(process.cwd(), 'test-results', 'foundry-interrupted-floor.png'),
@@ -437,10 +434,10 @@ async function unshippedRunSaysSo(): Promise<void> {
   await openOrderRowInView(UNSHIPPED_ID, 'no row for the unshipped order')
 
   await expect.poll(() => bodyText()).toContain('Finished, but not shipped')
-  const text = await bodyText()
-  expect(text, `the Floor rendered:\n${text}`).toContain('Finished, but not shipped')
-  expect(text).toContain('Opening the pull request for fixture failed: exit code 1')
-  expect(text).not.toContain('Between steps')
+  await expect
+    .poll(() => bodyText())
+    .toContain('Opening the pull request for fixture failed: exit code 1')
+  await expect.poll(() => bodyText()).not.toContain('Between steps')
 
   // The standing text also shows in the order's list row, so it can be on
   // screen before the Floor renders its move: wait for the button itself.
@@ -461,7 +458,7 @@ async function answeringRequeuesTheStep(): Promise<void> {
   // asynchronous and cuts a worktree, so what is asserted here is the reclaim
   // itself: the state the scheduler can act on, and the attempt given back.
   await expect.poll(() => graphOnDisk().nodes[0].attempts).toBeLessThanOrEqual(1)
-  expect(['waiting', 'running']).toContain(graphOnDisk().nodes[0].state)
+  await expect.poll(() => graphOnDisk().nodes[0].state).toMatch(/^(waiting|running)$/)
 }
 
 async function stoppingStopsTheRun(): Promise<void> {

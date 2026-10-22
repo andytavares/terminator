@@ -42,8 +42,6 @@ const PASSING_HOOK =
   '#!/bin/sh\necho "lint: checking staged files"\nsleep 1\necho "lint: clean"\nsleep 1\n'
 const FAILING_HOOK = '#!/bin/sh\necho "lint: src/greeting.ts has a problem"\nexit 1\n'
 
-test.describe.configure({ mode: 'serial' })
-
 /** A feature branch with a pull request template pushed, and two files changed on top of it. */
 function makeFeatureBranchRepo(): void {
   ;({ repo, bare } = makeRepoWithRemote('terminator-e2e-commit'))
