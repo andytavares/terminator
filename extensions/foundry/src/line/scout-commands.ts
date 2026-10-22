@@ -6,8 +6,8 @@ import type { WorkOrder } from '../order/schema.js'
 import type { CommandProposal } from '../profile/command-proposal.js'
 import { defaultHintsDir } from '../profile/hints.js'
 import { recordExitCodes } from '../profile/proof.js'
-import { resolveProfile } from '../profile/resolve.js'
-import { emptyProfile, isRemoved } from '../profile/schema.js'
+import { resolveProfile, type ResolvedProfile } from '../profile/resolve.js'
+import { emptyProfile, isRemoved, type Profile } from '../profile/schema.js'
 import { readProfile, writeProfile } from '../profile/store.js'
 import { runOnFreshBase } from './baseline.js'
 import type { BaselineDeps, FreshBaseRun } from './baseline.js'
@@ -37,6 +37,27 @@ function record(
   })
 }
 
+interface Holding {
+  readonly order: WorkOrder
+  readonly stored: Profile | null
+  readonly resolved: ResolvedProfile
+}
+
+/** Why a proposal is not worth proving, or null when it is. */
+function skipReason(
+  proposal: CommandProposal,
+  holding: Holding,
+  wanted: readonly CommandProposal[]
+): string | null {
+  const { check } = proposal
+  if (isRemoved(holding.stored?.checks[check] ?? null)) {
+    return `the operator said ${check} has no command`
+  }
+  const held = holding.order.context.toolchain[check] ?? holding.resolved.checks[check]
+  if (held !== null) return `${check} already has \`${held.command}\` from ${held.source}`
+  return wanted.some((w) => w.check === check) ? `${check} was proposed twice` : null
+}
+
 /** The first proposal for each check, for the checks nobody has given a command. */
 async function worthProving(
   order: WorkOrder,
@@ -48,14 +69,7 @@ async function worthProving(
   const resolved = resolveProfile({ repoPath, hintsDir: defaultHintsDir(), stored })
   const wanted: CommandProposal[] = []
   for (const proposal of proposals) {
-    const held = order.context.toolchain[proposal.check] ?? resolved.checks[proposal.check]
-    const reason = isRemoved(stored?.checks[proposal.check] ?? null)
-      ? `the operator said ${proposal.check} has no command`
-      : held !== null
-        ? `${proposal.check} already has \`${held.command}\` from ${held.source}`
-        : wanted.some((w) => w.check === proposal.check)
-          ? `${proposal.check} was proposed twice`
-          : null
+    const reason = skipReason(proposal, { order, stored, resolved }, wanted)
     if (reason === null) wanted.push(proposal)
     else await skipped(deps, { orderId: order.id, proposal, why: reason })
   }
