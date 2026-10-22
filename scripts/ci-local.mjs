@@ -132,11 +132,11 @@ function checkoutMerge(checkout, mainSha) {
   git(checkout, 'clean', '-fdxq', '-e', 'node_modules')
   try {
     git(checkout, ...COMMITTER, 'merge', '--no-ff', '--no-edit', mainSha)
-  } catch {
-    git(checkout, 'merge', '--abort')
-    console.error(
-      `ci:local stopped: HEAD conflicts with origin/main (${mainSha}). Merge it, fix the conflicts, commit.`
-    )
+  } catch (error) {
+    // Only a conflict leaves a merge to abort; any other refusal is git's to explain.
+    spawnSync('git', ['merge', '--abort'], { cwd: checkout, stdio: 'ignore' })
+    console.error(`ci:local stopped: HEAD does not merge with origin/main (${mainSha}):`)
+    console.error(String(error.stderr ?? error.message).trim())
     process.exit(1)
   }
 }
