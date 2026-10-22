@@ -261,6 +261,12 @@ describe('foundry:log-tail refusing what is not a record', () => {
     expect(answer.tail).toBeUndefined()
   })
 
+  it('answers in words, not a rejection, before the data root exists', async () => {
+    fs.rmSync(root, { recursive: true, force: true })
+    const answer = await tail(path.join(parent, 'secret.txt'))
+    expect(answer.error).toMatch(/only reads logs/i)
+  })
+
   it('says so in plain words when the log is gone', async () => {
     expect((await tail(inRecords('gone.log'))).error).toMatch(/no log/i)
   })

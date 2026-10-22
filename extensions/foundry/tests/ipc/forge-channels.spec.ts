@@ -168,7 +168,12 @@ function strikesAndAnswersTests() {
   })
 
   it('answers a multiple-choice question by the indices of its options', async () => {
-    const order = await seeded()
+    const seededOrder = await seeded()
+    const order = {
+      ...seededOrder,
+      openQuestions: seededOrder.openQuestions.map((q) => ({ ...q, multiple: q.id === 'Q-1' })),
+    }
+    await store.save(order)
     const r = (await channels().turn({
       id: order.id,
       answer: { questionId: 'Q-1', option: [1, 0] },

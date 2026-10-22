@@ -6,6 +6,7 @@ import { acceptanceFromTicket } from './acceptance-from-ticket.js'
 import type { OrderSource, WorkOrder } from '../order/schema.js'
 import { unavailableChecks, type Toolchain } from '../verify/toolchain-probe.js'
 import { resolveProfile, type ResolvedProfile } from '../profile/resolve.js'
+import { environmentOf } from '../profile/environment.js'
 import { readProfile } from '../profile/store.js'
 import { defaultHintsDir } from '../profile/hints.js'
 import type { CheckName } from '../verify/check-names.js'
@@ -144,17 +145,6 @@ async function resolvedProfileOf(repoPath: string, deps: SeedDeps): Promise<Reso
   const { dataRoot, hintsDir } = deps.profile ?? { dataRoot: null, hintsDir: defaultHintsDir() }
   const stored = dataRoot === null ? null : await readProfile(dataRoot, repoPath)
   return resolveProfile({ repoPath, hintsDir, stored })
-}
-
-/** The part of a resolved profile an order carries: commands only, no provenance. */
-export function environmentOf(resolved: ResolvedProfile): WorkOrder['context']['environment'] {
-  return {
-    prepare: resolved.prepare?.command ?? null,
-    share: [...resolved.share],
-    pictures: resolved.pictures?.command ?? null,
-    paths: { ...resolved.paths },
-    additional: resolved.additional.map(({ name, command, rung }) => ({ name, command, rung })),
-  }
 }
 
 function readOrigin(input: SeedInput, deps: SeedDeps): Promise<Read> {

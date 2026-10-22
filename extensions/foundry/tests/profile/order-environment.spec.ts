@@ -26,6 +26,7 @@ describe('order schema migration', () => {
     const order = JSON.parse(JSON.stringify(draft()))
     delete order.context.environment
     expect(WorkOrderSchema.parse(order).context.environment).toEqual({
+      resolved: false,
       prepare: null,
       share: [],
       pictures: null,

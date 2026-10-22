@@ -19,6 +19,7 @@ import {
   removeBaseCheckout,
   unlinkBorrowedDependencies,
 } from './worktree.js'
+import { leadRepo } from '../order/lead-repo.js'
 import type { Checkout } from './worktree.js'
 
 // Whether the base branch builds and passes its mechanical checks, proven while
@@ -417,7 +418,7 @@ export function proveEnvironment(order: WorkOrder, deps: BaselineDeps): Promise<
 }
 
 function proofOf(order: WorkOrder, deps: BaselineDeps): Proof {
-  const repo = [...order.context.repos].sort((a, b) => a.lane - b.lane)[0]
+  const repo = leadRepo(order)
   if (repo === undefined) throw new Error('The order has no repository.')
   return {
     order,

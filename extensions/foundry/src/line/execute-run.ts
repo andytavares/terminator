@@ -32,6 +32,8 @@ import {
   settleShipNode,
 } from './ship-deps.js'
 import { buildExecutorDeps } from './executor-deps.js'
+import { orderStoreAt } from '../state/live-index.js'
+import { withProfileEnvironment } from '../profile/environment.js'
 import type { OrderRun } from './executor-deps.js'
 
 type HouseRules = Awaited<ReturnType<typeof buildExecutorDeps>>['houseRules']
@@ -73,7 +75,7 @@ interface Found {
 }
 
 export async function executeOrderRun(api: ExtensionAPI, run: OrderRun): Promise<void> {
-  const tail = await prepareRun(api, run)
+  const tail = await prepareRun(api, await withEnvironment(run))
   const { order } = tail
 
   // The issue moves the moment work starts, not when somebody remembers.
@@ -91,6 +93,13 @@ export async function executeOrderRun(api: ExtensionAPI, run: OrderRun): Promise
   await writeGraph(tail.root, outcome.graph)
   await recordRunEnd(tail, outcome)
   await finishTail(tail, { early, shipDeps, outcome })
+}
+
+// An order from before profiles runs with what its repository's profile resolves to, kept.
+async function withEnvironment(run: OrderRun): Promise<OrderRun> {
+  const order = await withProfileEnvironment(run.root, run.order)
+  if (order !== run.order) await orderStoreAt(run.root).save(order)
+  return { ...run, order }
 }
 
 async function prepareRun(api: ExtensionAPI, run: OrderRun): Promise<RunTail> {

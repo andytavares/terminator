@@ -149,3 +149,22 @@ describe('proveScoutCommands beside an operator command', () => {
     expect(ran).toEqual([])
   })
 })
+
+describe('proveScoutCommands beside an operator removal', () => {
+  it('never fills a check the operator said has no command', async () => {
+    const removed = { command: null, source: 'operator' as const }
+    await writeProfile(root, repo, {
+      ...emptyProfile(repo),
+      checks: { ...emptyProfile(repo).checks, lint: removed },
+    })
+    await proveScoutCommands(
+      'WO-1',
+      [lintProposal],
+      depsExiting(() => 0)
+    )
+    expect((await readProfile(root, repo))?.checks.lint).toEqual(removed)
+    expect((await store.load('WO-1'))?.context.toolchain.lint).toBeNull()
+    expect(ran).toEqual([])
+    expect(await ledgerActions()).toEqual(['scout.command.skipped'])
+  })
+})

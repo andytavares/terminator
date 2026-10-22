@@ -297,6 +297,15 @@ function executorDepsResumingTests() {
 
 describe('a check rung', () => {
   describe('running and re-running', runningAndReRunningTests)
+  describe('the pictures step', () => {
+    it('runs the pictures step though its command already passed on this commit', async () => {
+      const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
+      await deps.runStep(step, path.join(root, 'logs', 'test.log'))
+      const pictures = { ...step, name: 'Pictures', check: null }
+      await deps.runStep(pictures, path.join(root, 'logs', 'pictures.log'))
+      expect(runner.runCommand).toHaveBeenCalledTimes(2)
+    })
+  })
   describe('nothing to measure and the base branch', nothingToMeasureAndTheBaseBranchTests)
 })
 

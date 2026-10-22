@@ -78,8 +78,10 @@ const RepoRefSchema = z.object({
 })
 
 // What the repository's profile resolved to when the order was seeded. Every
-// field defaults to empty so an order written before profiles still parses.
+// field defaults to empty so an order written before profiles still parses;
+// `resolved` false marks such an order, and its run resolves the profile first.
 const EnvironmentSchema = z.object({
+  resolved: z.boolean().default(false),
   prepare: z.string().nullable().default(null),
   share: z.array(z.string()).default([]),
   pictures: z.string().nullable().default(null),

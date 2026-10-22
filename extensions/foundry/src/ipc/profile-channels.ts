@@ -3,7 +3,7 @@ import * as path from 'node:path'
 import { z } from 'zod'
 import type { ChannelSpec } from '@terminator/extension-sdk'
 
-import { environmentOf } from '../forge/intake-source.js'
+import { environmentOf } from '../profile/environment.js'
 import { baseBranchOfRepo } from '../forge/base-branch.js'
 import { runOnFreshBase } from '../line/baseline.js'
 import type { BaselineDeps } from '../line/baseline.js'
@@ -27,6 +27,7 @@ import {
 } from '../profile/store.js'
 import { CHECK_NAMES } from '../verify/check-names.js'
 import { RUNGS } from '../verify/ladder.js'
+import { leadRepo } from '../order/lead-repo.js'
 import { foundryChannel } from './channel.js'
 
 // A repository's profile, as the operator reads and edits it. Every entry the operator
@@ -196,7 +197,7 @@ async function seedDrafts(deps: ProfileChannelDeps, repoPath: string): Promise<v
   const { resolved } = await resolvedFor(deps, repoPath)
   const key = profileKey(repoPath)
   for (const order of await deps.store.list()) {
-    const lead = [...order.context.repos].sort((a, b) => a.lane - b.lane)[0]
+    const lead = leadRepo(order)
     if (order.status !== 'draft' || lead === undefined || profileKey(lead.path) !== key) continue
     const context = {
       ...order.context,
@@ -274,7 +275,8 @@ async function logTail(root: string, target: string): Promise<unknown> {
   } catch {
     return { error: 'No log was kept at that place.' }
   }
-  if (!isInside(await fs.promises.realpath(root), real)) return { error: NOT_A_RECORD }
+  const records = await fs.promises.realpath(root).catch(() => null)
+  if (records === null || !isInside(records, real)) return { error: NOT_A_RECORD }
   const text = await fs.promises.readFile(real, 'utf8').catch(() => null)
   if (text === null) return { error: 'No log was kept at that place.' }
   return { tail: text.replace(/\n$/, '').split('\n').slice(-LOG_TAIL_LINES).join('\n') }

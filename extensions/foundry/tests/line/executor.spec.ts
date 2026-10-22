@@ -816,6 +816,7 @@ describe('the ladder', () => {
   describe('when it is climbed', whenItIsClimbedTests)
   describe('what it reports', whatItReportsTests)
   describe('the pictures step', picturesStepTests)
+  describe("the profile's added checks", profileChecksTests)
   describe('step output', stepOutputTests)
   describe('the question it asks', theQuestionItAsksTests)
   describe('lights-out runs', lightsOutRunsTests)
@@ -889,6 +890,27 @@ function whenItIsClimbedTests() {
     })
     expect(outcome.ladder).toBeNull()
     expect(runStep).not.toHaveBeenCalled()
+  })
+}
+
+function profileChecksTests() {
+  it("runs the checks the repository's profile adds, at their rung", async () => {
+    const ran: string[] = []
+    const o = order([unit('U-1')])
+    const additional = [{ name: 'Type check', command: 'make types', rung: 'L1' as const }]
+    const environment = { ...o.context.environment, additional }
+    const outcome = await execute(planOf({ ...o, context: { ...o.context, environment } }), {
+      ...deps(vi.fn(ok)),
+      autonomy: 'lights-out',
+      runStep: async (step) => {
+        ran.push(step.command ?? '')
+        return 0
+      },
+    })
+    expect(ran).toContain('make types')
+    expect(outcome.ladder?.steps.find((s) => s.name === 'Type check')).toMatchObject({
+      result: 'pass',
+    })
   })
 }
 

@@ -64,6 +64,7 @@ const context = (): Partial<WorkOrder['context']> => ({
     build: entry('make build'),
   },
   environment: {
+    resolved: true,
     prepare: 'make setup',
     share: [],
     pictures: null,

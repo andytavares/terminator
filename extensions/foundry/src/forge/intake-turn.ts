@@ -445,8 +445,9 @@ function roundStartOptions(launch: RoundLaunch): StartSupervisedRunOptions {
 }
 
 // Not waited for: the scout is done when it has read, and proving a command takes a run.
+// Nobody awaits it, so a failure to write the profile must not become an unhandled rejection.
 function proposeCommands(input: ReadOnlyRound, commands: readonly CommandProposal[]): void {
-  if (commands.length > 0) void input.onCommands?.(input.order.id, commands)
+  if (commands.length > 0) void input.onCommands?.(input.order.id, commands).catch(() => undefined)
 }
 
 async function collectRound(launch: RoundLaunch, deadline: boolean): Promise<void> {

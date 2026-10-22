@@ -40,6 +40,7 @@ function validContext(): WorkOrder['context'] {
     ],
     toolchain: { test: null, lint: null, format: null, coverage: null, e2e: null, build: null },
     environment: {
+      resolved: true,
       prepare: null,
       share: [],
       pictures: null,

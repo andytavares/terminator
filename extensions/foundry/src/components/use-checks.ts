@@ -16,6 +16,7 @@ import {
   type ProfileFacts,
   type SaveChange,
 } from '../forge/checks-view.js'
+import { leadRepo } from '../order/lead-repo.js'
 import { usePushed } from '../renderer/use-pushed.js'
 
 // The Checks step's state: the repository's profile as Foundry resolves it, the
@@ -76,10 +77,6 @@ const errorOf = (answer: unknown): string | null =>
   typeof answer === 'object' && answer !== null && 'error' in answer
     ? String((answer as { error: unknown }).error)
     : null
-
-function leadRepo(order: WorkOrder) {
-  return [...order.context.repos].sort((a, b) => a.lane - b.lane)[0]
-}
 
 /** What the ledger says the operator decided, as the list the step reads. */
 function decidedFrom(facts: OrderFacts | null): Decision[] {

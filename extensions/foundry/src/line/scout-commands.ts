@@ -7,10 +7,11 @@ import type { CommandProposal } from '../profile/command-proposal.js'
 import { defaultHintsDir } from '../profile/hints.js'
 import { recordExitCodes } from '../profile/proof.js'
 import { resolveProfile } from '../profile/resolve.js'
-import { emptyProfile } from '../profile/schema.js'
+import { emptyProfile, isRemoved } from '../profile/schema.js'
 import { readProfile, writeProfile } from '../profile/store.js'
 import { runOnFreshBase } from './baseline.js'
 import type { BaselineDeps, FreshBaseRun } from './baseline.js'
+import { leadRepo } from '../order/lead-repo.js'
 import { lastLines } from './execution-parts.js'
 
 // What the scout proposed is proved on the base branch before the order or the
@@ -42,17 +43,15 @@ async function worthProving(
   proposals: readonly CommandProposal[],
   deps: ScoutProofDeps
 ): Promise<CommandProposal[]> {
-  const repoPath = leadRepoPath(order)
-  const resolved = resolveProfile({
-    repoPath,
-    hintsDir: defaultHintsDir(),
-    stored: await readProfile(deps.base.root, repoPath),
-  })
+  const repoPath = leadRepo(order)?.path ?? ''
+  const stored = await readProfile(deps.base.root, repoPath)
+  const resolved = resolveProfile({ repoPath, hintsDir: defaultHintsDir(), stored })
   const wanted: CommandProposal[] = []
   for (const proposal of proposals) {
     const held = order.context.toolchain[proposal.check] ?? resolved.checks[proposal.check]
-    const reason =
-      held !== null
+    const reason = isRemoved(stored?.checks[proposal.check] ?? null)
+      ? `the operator said ${proposal.check} has no command`
+      : held !== null
         ? `${proposal.check} already has \`${held.command}\` from ${held.source}`
         : wanted.some((w) => w.check === proposal.check)
           ? `${proposal.check} was proposed twice`
@@ -78,11 +77,6 @@ function skipped(deps: ScoutProofDeps, { orderId, proposal, why }: Verdict): Pro
     subject: proposal.check,
     reason: `Did not run the scout's \`${proposal.command}\`: ${why}.`,
   })
-}
-
-function leadRepoPath(order: WorkOrder): string {
-  const lead = [...order.context.repos].sort((a, b) => a.lane - b.lane)[0]
-  return lead?.path ?? ''
 }
 
 /**
@@ -149,7 +143,7 @@ function unproved(deps: ScoutProofDeps, verdict: Verdict): Promise<void> {
 async function keep(deps: ScoutProofDeps, { order, proposal, run }: Settling): Promise<void> {
   const { check, command, evidence } = proposal
   const entry = { command, source: 'scout' as const, evidence }
-  const repoPath = leadRepoPath(order)
+  const repoPath = leadRepo(order)?.path ?? ''
   const stored = (await readProfile(deps.base.root, repoPath)) ?? emptyProfile(repoPath)
   await writeProfile(deps.base.root, repoPath, {
     ...stored,

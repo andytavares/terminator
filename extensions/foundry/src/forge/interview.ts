@@ -45,7 +45,7 @@ export function answerQuestion(
     if (question.id !== id) return question
     if (typeof answer === 'string') return { ...question, answer, chosen: [] }
     const chosen = validIndices(question.options, typeof answer === 'number' ? [answer] : answer)
-    if (chosen.length === 0) return question
+    if (chosen.length === 0 || (chosen.length > 1 && !question.multiple)) return question
     return {
       ...question,
       chosen,

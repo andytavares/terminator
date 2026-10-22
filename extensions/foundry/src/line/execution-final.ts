@@ -201,6 +201,7 @@ class FinalClimb {
       touchesUi: touchesUi(run.order, change.touched),
       changedFiles: change.touched,
       pictures: run.order.context.environment.pictures,
+      additional: run.order.context.environment.additional,
     })
   }
 
@@ -255,11 +256,11 @@ class FinalClimb {
         const repeat = this.logPath(step.name, `.run${n}`)
         const exitCode = await this.run.deps.runStep(step, repeat, { fresh: true })
         if (exitCode === null || (exitCode === 0) === (first === 0)) continue
-        const runs = [
+        const pair = [
           { exitCode: first, log: logPath },
           { exitCode, log: repeat },
         ]
-        return this.disagreed(step, first === 0 ? runs.reverse() : runs)
+        return this.disagreed(step, first === 0 ? pair.reverse() : pair)
       }
       return first
     }

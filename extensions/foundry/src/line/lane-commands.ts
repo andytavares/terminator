@@ -57,6 +57,7 @@ export async function runLaneStep(
   if (checkout === undefined || runner === null) return null
   if (context.prepareFailed.has(firstLane(context.checkouts)))
     return notMeasuredBecauseUnprepared(logPath)
+  if (step.name === PICTURES_STEP_NAME) return runPictures(context, step.command, logPath)
   // A repeat run exists to see whether the answer holds, so the cache must not give it.
   if (fresh !== true && (await context.passes.passed(checkout.path, step.command))) {
     await fs.promises.mkdir(path.dirname(logPath), { recursive: true })
@@ -66,7 +67,6 @@ export async function runLaneStep(
     )
     return 0
   }
-  if (step.name === PICTURES_STEP_NAME) return runPictures(context, step.command, logPath)
   const exitCode = await runner.runCommand(
     commandIn(context, checkout, { title: step.name, command: step.command, logPath })
   )

@@ -105,6 +105,11 @@ describe('answerQuestion with options chosen', () => {
     expect(after[0]).toMatchObject({ chosen: [0, 2], answer: 'api; cli' })
   })
 
+  it('ignores several options given for a question that takes one', () => {
+    const question = q({ options: ['No', 'Yes'] })
+    expect(answerQuestion([question], 'Q-1', [0, 1])[0]).toEqual(question)
+  })
+
   it('keeps only valid, distinct indices of a list', () => {
     const question = q({ options: ['api', 'web'], multiple: true })
     const after = answerQuestion([question], 'Q-1', [1, 1, 9, -1, 0])
