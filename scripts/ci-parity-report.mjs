@@ -71,7 +71,9 @@ function main() {
     console.error('Usage: node scripts/ci-parity-report.mjs --since <date>')
     process.exit(2)
   }
-  const rows = rowsFromRuns(fetchRuns(since))
+  const runs = fetchRuns(since)
+  const rows = rowsFromRuns(runs)
+  console.log(`Looked at ${runs.length} runs and ${rows.length} jobs since ${since}.`)
   const failedShas = new Set(rows.filter((r) => r.conclusion === 'failure').map((r) => r.sha))
   const breaks = parityBreaks(rows, locallyPassedShas(failedShas))
   const flipped = flips(rows)
