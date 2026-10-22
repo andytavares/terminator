@@ -1,4 +1,23 @@
 <!--
+SYNC IMPACT REPORT (3.0.0)
+==========================
+Version change: 2.0.1 → 3.0.0 (MAJOR: Principle VI's coverage gate redefined; Principle XIV added)
+
+Modified principles:
+  - VI: the coverage gate is Vitest's threshold on the changed files, which CI and ci:local
+    both run. Codecov reports but no longer gates: an outside service never decides a check
+    (Principle XIV).
+
+Added sections:
+  - XIV. Deterministic Tests (NON-NEGOTIABLE): one run, random order on every run, no test
+    depends on another, signals never time, one sealed environment, CI and the local check
+    alike, outside services never gate, only the tests a change can reach. ADR 123.
+
+Removed sections: none
+Templates requiring updates: none
+Follow-up TODOs: none
+-->
+<!--
 SYNC IMPACT REPORT (2.0.1)
 ==========================
 Version change: 2.0.0 → 2.0.1 (PATCH: a file path corrected)
@@ -176,11 +195,10 @@ a failing test exists that demands it.
 - Passing tests do not constitute completion. Work MUST be verified against the agreed
   spec and validated manually before being marked done.
 - Test coverage MUST be scoped to behavior, not implementation internals.
-- **Coverage gate: Codecov.** The Codecov statuses on the pull request
-  (`codecov/patch` and `codecov/project`, configured in `codecov.yml`) MUST pass.
-  A failing Codecov status is a failed change. The patch gate measures the lines the
-  change adds or modifies; there is no whole-file gate and no separate branch or function
-  threshold.
+- **Coverage gate: Vitest, on the changed files.** The coverage threshold in
+  `vitest.config.ts` MUST pass for the files the change touches (`--coverage.changed`),
+  in CI and in `npm run ci:local` alike. Codecov reports coverage on the pull request but
+  does not gate it: an outside service never decides a check (Principle XIV).
 - **Tests cover reachable behavior only.** A test MUST exercise a scenario the running
   application can produce and assert what a user or caller observes. A test that only
   asserts a mock was called, restates a constant, tests a copy of production code, or
@@ -273,6 +291,53 @@ today) is published outward: the core consumes it exactly as an extension does.
 - Screenshot tests at the supported window sizes, in both themes, MUST guard the
   layout of every core and extension surface.
 
+### XIV. Deterministic Tests (NON-NEGOTIABLE)
+
+A test fails only when the code it covers is wrong. Its result depends on the code and the
+test, and on nothing else: not the order, the machine, the time, the developer's
+environment, an outside service, or another test. A test that fails and passes on the same
+code has no value; it is a defect. ADR 123 records the reasoning.
+
+- **No test depends on another.** A test MUST NOT read anything another test did: module
+  state, a mock or stub, a timer, an environment variable, a file, a database row, a
+  registered handler, or its position in the run. Each test sets up what it needs and
+  undoes what it changed.
+- **Random order, on every run, forever.** Every run of the suite, in CI and locally, MUST
+  shuffle the spec files and the tests inside each file with a new seed, and print it. A
+  failure reproduces with `TEST_SEED=<seed>`. A test that fails in some order MUST be
+  rewritten to be independent; pinning the order (`sequence.shuffle: false`, `.sequential`,
+  a fixed seed) is forbidden.
+- **One run.** The suite runs once. Retries, reruns, repeats, burn-in, quarantine and
+  skipping a failing test are forbidden, in CI, locally, and in Foundry's final check. A
+  failing test is fixed at its cause, or deleted together with the behavior it claimed to
+  cover.
+- **Signals, never time.** A test waits only on a signal from the code under test: an
+  awaited promise, an event, a locator assertion, or `eventually()`
+  (`tests/support/eventually.ts`). It never sleeps and never waits a tick. Work a test
+  starts MUST be awaited; stopping (`dispose`, `stop`, `close`, `deactivate`) returns a
+  promise that settles when the work it started has ended. The only time limits are the
+  hang bounds in `tests/support/bounds.ts` and `playwright.config.ts`, far above any real
+  duration; a spec MUST NOT set its own.
+- **One sealed environment.** Every test process runs in the environment
+  `scripts/test-env.mjs` builds: fixed time zone and locale, a fresh `HOME` and `TMPDIR`,
+  the fixture git config, stubs first on `PATH`. Nothing of the developer's environment
+  reaches a test. A spec connects only to loopback; a stub that has no answer fails, it
+  never falls through to the real tool.
+- **CI and the local check are the same check.** CI runs on macOS, as the product does,
+  with the Node in `.nvmrc` and the commands `.github/workflows/ci.yml` lists.
+  `npm run ci:local` runs those same commands on the commit merged with `origin/main`,
+  never the working tree, and the pre-push hook refuses a commit it has not passed. A CI
+  failure after a local pass is a parity defect and is fixed like any other defect.
+- **Outside services never gate.** An advisory database, Codecov, the artifact store or a
+  registry MUST NOT turn a change red that did not touch what they check.
+- **Only the tests a change can reach.** `scripts/test-select.mjs` picks the unit,
+  integration and end-to-end tests a diff can reach, the same way in CI and locally. A path
+  it cannot place runs everything. The pull request label `test: all`, `--all` locally, and
+  every push to `main` run everything.
+- **Enforced, not trusted.** `eslint.config.mjs` rejects sleeps, ticks, time limits and
+  promises left unawaited in specs. These rules MUST NOT be disabled, suppressed or
+  loosened.
+
 ## Development Environment & Workflow
 
 Isolation and process discipline prevent environment drift and protect the shared codebase.
@@ -298,4 +363,4 @@ This constitution supersedes all other practices, conventions, and ad-hoc guidan
 - The constitution version and amendment history are the authoritative record of governance
   decisions affecting this project.
 
-**Version**: 2.0.1 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-10-12
+**Version**: 3.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-10-22
