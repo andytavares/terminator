@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lockedVersions, tooYoung } from '../../../scripts/check-release-age.mjs'
+import { addedVersions, lockedVersions, tooYoung } from '../../../scripts/check-release-age.mjs'
 
 const NOW = Date.parse('2026-10-21T00:00:00Z')
 const lock = {
@@ -21,6 +21,28 @@ const lock = {
 describe('lockedVersions', () => {
   it('lists each registry package once, scoped names whole, and skips workspaces and links', () => {
     expect(lockedVersions(lock)).toEqual(['zod@4.6.7', '@storybook/react@10.6.2'])
+  })
+})
+
+describe('addedVersions', () => {
+  const entry = (name: string, version: string) => ({
+    version,
+    resolved: `https://registry.npmjs.org/${name}/-/${name}-${version}.tgz`,
+  })
+  const base = { packages: { 'node_modules/zod': entry('zod', '4.6.5') } }
+
+  it('names a version the base lockfile does not hold, an upgrade of a package already there included', () => {
+    const head = {
+      packages: {
+        'node_modules/zod': entry('zod', '4.6.7'),
+        'node_modules/ws': entry('ws', '8.18.0'),
+      },
+    }
+    expect(addedVersions(head, base)).toEqual(['zod@4.6.7', 'ws@8.18.0'])
+  })
+
+  it('leaves out every version the base lockfile already held', () => {
+    expect(addedVersions(base, base)).toEqual([])
   })
 })
 

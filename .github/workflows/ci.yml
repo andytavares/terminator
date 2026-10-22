@@ -31,10 +31,15 @@ jobs:
       - name: Security audit
         run: npm audit --audit-level=high
 
-      # No locked version under 14 days old, unless .release-age-exceptions.json
-      # lists it with a reason (scripts/check-release-age.mjs).
+      # A version this pull request adds to the lockfile must be 14 days old, unless
+      # .release-age-exceptions.json lists it with a reason (scripts/check-release-age.mjs).
       - name: Release age
-        run: npm run lint:release-age
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          npm run lint:release-age -- "origin/$BASE_REF"
 
       - name: Dependency versions
         run: npm run lint:deps
