@@ -16,6 +16,7 @@ import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
 import { priorArtInRecords } from '../../src/ipc/forge-registration.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { isProving } from '../../src/line/baseline.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
@@ -127,6 +128,8 @@ function readingTheIssueTests() {
       title: 'Make text red',
       source: { tracker: 'linear', key: 'ENG-3', branch: 'eng-3-red' },
     })
+    // Creating an order starts the base-branch proof; it writes into this folder until it ends.
+    await vi.waitFor(() => expect(isProving(created.order.id)).toBe(false), { timeout: 20_000 })
   })
 }
 

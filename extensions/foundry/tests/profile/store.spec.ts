@@ -34,7 +34,7 @@ describe('profile store', () => {
 
   it('keys a symlinked checkout like its target', () => {
     const repo = temporaryDirectory('foundry-profile-repo')
-    const link = `${repo}-link`
+    const link = path.join(temporaryDirectory('foundry-profile-link'), 'repo')
     fs.symlinkSync(repo, link)
     expect(profileKey(link)).toBe(profileKey(repo))
     expect(profileKey(repo)).toMatch(/^[A-Za-z0-9._-]+$/)
