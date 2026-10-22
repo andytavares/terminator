@@ -7,6 +7,8 @@ import vitest from '@vitest/eslint-plugin'
 import testingLibrary from 'eslint-plugin-testing-library'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
+import { readdirSync } from 'node:fs'
+import { join } from 'node:path'
 
 // Constitution II / ADR 094: a relative import may not climb out of the extension.
 // How many `../` that takes depends on the importing file's depth, so there is one
@@ -77,13 +79,25 @@ const TIMEOUT_OVERRIDES = [
 // Spec and e2e files, with type information: a promise that is not awaited is work that
 // outlives its test.
 const TEST_FILES = ['**/*.spec.ts', '**/*.spec.tsx', 'tests/**/*.ts', 'tests/**/*.tsx']
+
+const EXTENSIONS = readdirSync(join(import.meta.dirname, 'extensions'), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+
+// Each test file with the one TypeScript project that holds it. Given a list, typescript-eslint
+// builds each project in turn until one holds the file, so every program was in memory at once
+// (4.8 GB, and CI's 7 GB runner swapped for eight minutes).
 const TEST_PROJECTS = [
-  './tsconfig.test.json',
-  './tsconfig.main.json',
-  './tsconfig.shared.json',
-  './packages/extension-ui/tsconfig.test.json',
-  './packages/extension-sdk/tsconfig.json',
-  './extensions/*/tsconfig.test.json',
+  { files: ['tests/**/*.ts', 'tests/**/*.tsx'], project: './tsconfig.test.json' },
+  { files: ['src/**/*.spec.ts', 'src/**/*.spec.tsx'], project: './tsconfig.main.json' },
+  {
+    files: ['packages/extension-sdk/**/*.spec.ts', 'packages/extension-sdk/**/*.spec.tsx'],
+    project: './packages/extension-sdk/tsconfig.json',
+  },
+  ...EXTENSIONS.map((name) => ({
+    files: [`extensions/${name}/tests/**/*.ts`, `extensions/${name}/tests/**/*.tsx`],
+    project: `./extensions/${name}/tsconfig.test.json`,
+  })),
 ]
 
 export default defineConfig([
@@ -210,11 +224,12 @@ export default defineConfig([
       ],
     },
   },
+  ...TEST_PROJECTS.map(({ files, project }) => ({
+    files,
+    languageOptions: { parserOptions: { project, tsconfigRootDir: import.meta.dirname } },
+  })),
   {
     files: TEST_FILES,
-    languageOptions: {
-      parserOptions: { project: TEST_PROJECTS, tsconfigRootDir: import.meta.dirname },
-    },
     rules: {
       '@typescript-eslint/no-floating-promises': ['error', { ignoreVoid: false }],
       '@typescript-eslint/await-thenable': 'error',
