@@ -45,6 +45,26 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 
 - **Keyboard shortcuts** — `Cmd+B` (toggle sidebar), `Cmd+1–9` (switch workspace + expand it), `Cmd++/-` (cycle workspaces), `Cmd+T` (new tab), `Cmd+Shift+T` (new scratch terminal), `Cmd+Shift+H` (Home), ``Cmd+` `` (next window, e.g. a pop-out), `Cmd+W` (close focused pane / active tab), `Cmd+D` (split pane vertically), `Cmd+Shift+D` (split pane horizontally), `Cmd+Left/Right` (cycle tabs), `Cmd+K` (clear terminal), `Cmd+P` (quick actions), `Cmd+,` (settings), `Cmd+Shift+E` (toggle Overview), `Cmd+~` (open Home), `Esc Esc` (leave any extension and return to the last terminal session), `Cmd+Enter` (send newline to running program — always intercepted), `Shift+Enter` (send newline — only active when the running program has enabled bracketed paste mode, e.g. the `claude` CLI; passes through normally in a plain shell).
 
+### Foundry on any repository
+
+Foundry assumes no toolchain. For each check (test, lint, format, coverage, e2e, build), plus a prepare command and extra checks, it takes the first of these that answers: **your word** (set on the Forge's **Checks** step), the repository's own `.foundry/profile.yaml`, what the scout read from the README and proved, then the shipped **hints** (`extensions/foundry/hints/*.yaml`, one per ecosystem). A command is proven on the base branch before the work starts; a check with no command is reported **not measured**, never passed. A check that fails and then passes on the same commit is **flaky**, which is a failure: the order stops at a decision and is not retried a third time.
+
+A repository may carry `.foundry/profile.yaml`; every field is optional:
+
+```yaml
+schemaVersion: 1
+prepare: { command: ./glyph fetch, source: repository }
+share: [vendor]
+checks:
+  test: { command: ./glyph test, source: repository }
+  lint: { command: ./glyph lint, source: repository }
+additional:
+  - { name: Type check, command: ./glyph check, rung: L0, source: repository }
+paths:
+  interface: [src/ui]
+  manifests: [glyph.toml]
+```
+
 ## Tech Stack
 
 | Layer                  | Technology                                  |

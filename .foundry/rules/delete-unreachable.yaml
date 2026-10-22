@@ -7,4 +7,4 @@ asserts: >
   tests, and the deletion is said out loud. Wired-but-inert reads as shipped,
   which is worse than absent.
 appliesWhen: 'house_doc: .specify/memory/constitution.md'
-origin: built-in
+origin: repository

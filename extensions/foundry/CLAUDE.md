@@ -20,7 +20,11 @@ Foundry's folder holds `records/` and the supervision runtime's `runtime/`. Earl
 
 ### 2. Nothing is assumed about a repository's toolchain
 
-There is no hardcoded `npm run lint`. `src/verify/toolchain-probe.ts` reads the target project's manifests — never executes them — and records the real command, or `null`. A `null` means the matching check reports **"not measured"**, never a pass. Boolean-coercing that third value anywhere in the verification path turns "we did not check" into "it is fine", which is the bug the ladder exists to prevent.
+There is no hardcoded `npm run lint`, and no code that knows what a `package.json` is. What a repository's commands are comes from its **profile** (`src/profile/`), resolved per field from four sources, first to answer wins: `operator` (saved on the Checks step, stored under the data root), `repository` (the repository's own `.foundry/profile.yaml`, read only), `scout` (what an agent read from the README and proved), `hint`. Every entry carries its source, so a surface says where a command came from. Nothing is `null`-coerced: an empty entry means the matching check reports **"not measured"**, never a pass, and boolean-coercing that third value anywhere in the verification path turns "we did not check" into "it is fine", which is the bug the ladder exists to prevent.
+
+Knowledge of a toolchain is **data in `hints/*.yaml`**, one file per ecosystem, read by `src/profile/hints.ts` against the files a repository has — never executed. A new ecosystem is a new hint file; no `.ts` changes. A command is trusted only once it has been **proven on the base branch** (`src/line/baseline.ts` runs it there and the profile's `proof` keeps the exit code and commit); an order whose base already fails says so rather than blaming the change.
+
+`tests/verify/ecosystem-neutral.spec.ts` guards this: it tokenises every file under `src/` and fails on a string, template or regex literal naming an ecosystem's tool (`npm`, `node_modules`, `pytest`, `cargo`, `.tsx`, …). A code path that needs to know it is looking at one toolchain is a hint file or a profile field that has not been written yet. The guard reads literals, so a comment may still give an example.
 
 ### 3. A question this policy asks by accident costs five minutes
 

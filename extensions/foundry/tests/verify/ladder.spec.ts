@@ -400,6 +400,7 @@ describe('rulesFor', () => {
 
   describe('universal and project rules', universalAndProjectRulesTests)
   describe('conditions', conditionsTests)
+  describe('conditions nothing can evaluate', unevaluableConditionTests)
   describe('malformed rules', malformedRulesTests)
 })
 
@@ -465,7 +466,9 @@ function conditionsTests() {
       rulesFor(sources(), { repoPaths: [repo], houseDocs: [] }).rules.map((r) => r.id)
     ).toContain('screenshot-the-app')
   })
+}
 
+function unevaluableConditionTests() {
   it('does not apply a rule whose condition nothing can evaluate', () => {
     fs.mkdirSync(path.join(dataRoot, 'rules'), { recursive: true })
     fs.writeFileSync(

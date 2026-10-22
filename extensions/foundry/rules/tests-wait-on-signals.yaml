@@ -1,0 +1,9 @@
+schemaVersion: 1
+id: tests-wait-on-signals
+scope: universal
+rung: L3
+asserts: >
+  A test waits on the condition it asserts, never on a fixed delay. A test
+  that fails once and passes on a rerun is a defect, not bad luck.
+appliesWhen: always
+origin: built-in

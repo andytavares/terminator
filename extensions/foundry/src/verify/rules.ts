@@ -10,10 +10,9 @@ import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 // Which checks apply here.
 //
 // Universal rules ship with the tool and hold in any repository. Project rules
-// hold only where the repository carries what they depend on — `docs-in-pr`
-// and `flat-icons` come from one project's constitution, and in a repository
-// with no such document they are simply not loaded rather than enforced
-// against a standard nobody there agreed to.
+// come from the repository (`.foundry/rules`) and hold only where it carries
+// what they depend on, rather than being enforced against a standard nobody
+// there agreed to.
 
 export interface RuleContext {
   readonly repoPaths: readonly string[]

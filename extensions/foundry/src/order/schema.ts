@@ -50,14 +50,12 @@ const IntentSchema = z.object({
   nonGoals: z.array(z.string()),
 })
 
-// Orders written before profiles named where a command came from by the file kind;
-// all four were what the shipped hints now read, so they read back as `hint`.
-const LEGACY_SOURCES = ['package.json', 'config', 'makefile', 'ci'] as const
-
 const ProbedCommandSchema = z.object({
   command: nonEmpty,
   source: z.preprocess(
-    (value) => (LEGACY_SOURCES.includes(value as (typeof LEGACY_SOURCES)[number]) ? 'hint' : value),
+    // Orders written before profiles named the file kind a command came from;
+    // every such source is what the shipped hints now read.
+    (value) => (ENTRY_SOURCES.includes(value as (typeof ENTRY_SOURCES)[number]) ? value : 'hint'),
     z.enum(ENTRY_SOURCES)
   ),
   /** Where the command was read from (`README.md:38`, `package.json`), when known. */

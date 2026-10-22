@@ -7,4 +7,4 @@ asserts: >
   architecture notes, decision records, changelog. A feature is not complete
   until what is written about it is true.
 appliesWhen: 'house_doc: .specify/memory/constitution.md'
-origin: built-in
+origin: repository

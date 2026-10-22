@@ -139,7 +139,7 @@ export default defineConfig([
           message: SLEEP_MESSAGE,
         },
         {
-          selector: "CallExpression[callee.name=/^(sleep|delay)$/]",
+          selector: 'CallExpression[callee.name=/^(sleep|delay)$/]',
           message: SLEEP_MESSAGE,
         },
       ],
