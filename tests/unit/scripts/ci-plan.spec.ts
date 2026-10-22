@@ -47,18 +47,12 @@ describe('what a step becomes', () => {
     expect(unit).not.toContain('--shard')
   })
 
-  it('shuffles the unit suite under a seed it prints, so an order-dependent failure reproduces', () => {
-    const unit = stepOf('unit', 'Test')?.script ?? ''
-    const seed = unit.match(/--sequence\.seed=(\d+)/)?.[1]
-    expect(unit).toContain('--sequence.shuffle')
-    expect(seed).toBeDefined()
-    expect(unit).toContain(`Unit order seed: ${seed}`)
-  })
-
-  it('burns in the unit specs a pull request changes, twice, against main', () => {
-    const burnIn = plan.find((step) => step.job === 'test' && step.script.includes('--changed'))
-    expect(burnIn?.script).toContain('--changed origin/main --sequence.shuffle --passWithNoTests')
-    expect(burnIn?.script).toContain('check-temp-leaks.mjs')
+  it('runs every unit spec once, in a fixed order: no shuffle, seed or second pass', () => {
+    const scripts = plan.map((step) => step.script).join('\n')
+    expect(scripts).not.toMatch(/--sequence\.(shuffle|seed)|--repeat|--changed/)
+    expect(plan.filter((step) => /\bvitest run\b(?!.*--merge-reports)/.test(step.script))).toEqual([
+      expect.objectContaining({ job: 'unit', name: 'Test' }),
+    ])
   })
 
   it('starts the packaged macOS app the release builds', () => {

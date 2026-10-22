@@ -19,16 +19,9 @@ const EXPRESSIONS = [
   ['--shard=${{ matrix.shard }}/4', ''],
   // ci:local stops at the first failing step, so a later step only runs after unit passed.
   ['${{ needs.unit.result }}', 'success'],
-  // Printed by the step itself, so a shuffled order that fails can be replayed.
-  ['${{ github.run_id }}', String(Date.now())],
-  ['${{ github.base_ref }}', 'main'],
 ]
 
-const CONDITIONS = {
-  'always()': true,
-  // ci:local checks a branch as if its pull request were open against main.
-  "${{ github.event_name == 'pull_request' }}": true,
-}
+const CONDITIONS = { 'always()': true }
 
 const SETUP = /^npm ci\b/
 

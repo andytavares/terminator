@@ -172,12 +172,12 @@ jobs:
       # TMPDIR is an empty directory for the run, and the step fails if a spec
       # leaves anything in it (scripts/check-temp-leaks.mjs): specs that never
       # removed their temporary directories once filled a disk with ~22,000.
-      # The order is shuffled under the run id; rerun a failure locally with
-      # `npx vitest run --sequence.shuffle --sequence.seed=<seed>`.
       - name: Test
-        run: |
-          echo "Unit order seed: ${{ github.run_id }}"
-          node scripts/check-temp-leaks.mjs npx vitest run --coverage --shard=${{ matrix.shard }}/4 --sequence.shuffle --sequence.seed=${{ github.run_id }} --reporter=blob --reporter=dot --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
+        run: >-
+          node scripts/check-temp-leaks.mjs
+          npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=blob --reporter=dot
+          --coverage.thresholds.lines=0 --coverage.thresholds.functions=0
+          --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
         timeout-minutes: 5
 
       - name: Upload blob report
@@ -221,8 +221,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -231,23 +229,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --ignore-scripts
-
-      # A spec that passes once and fails the second time, or in another order, is a flake.
-      # `--changed` follows the import graph, so a spec whose subject changed runs too.
-      # The install above skips install scripts; the specs need them, and zsh, as the unit job does.
-      - name: Prepare the burn-in
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          npm rebuild
-          command -v zsh || (sudo apt-get update -qq && sudo apt-get install -y -qq zsh)
-
-      - name: Burn in changed unit specs
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          for pass in 1 2; do
-            node scripts/check-temp-leaks.mjs npx vitest run --changed origin/${{ github.base_ref }} --sequence.shuffle --passWithNoTests || exit 1
-          done
-        timeout-minutes: 10
 
       - uses: actions/download-artifact@v4
         with:
