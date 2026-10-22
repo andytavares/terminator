@@ -13,6 +13,7 @@ Object.defineProperty(window, 'electronAPI', {
 })
 
 import { CommentMargin } from '../../src/components/CommentMargin'
+import { eventually } from './helpers/note-surface'
 
 const baseComment: Comment = {
   id: 'c1',
@@ -120,11 +121,12 @@ function commentMarginThreadActionsTests() {
     render(<CommentMargin noteId="n1" anchorTops={{}} />)
     const resolveBtn = screen.getByText('Resolve')
     fireEvent.click(resolveBtn)
-    await Promise.resolve()
-    expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:comments.resolve', {
-      id: 'c1',
-      resolved: true,
-    })
+    await eventually(() =>
+      expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:comments.resolve', {
+        id: 'c1',
+        resolved: true,
+      })
+    )
   })
 
   it('Delete button calls comments.delete IPC', async () => {
@@ -132,8 +134,9 @@ function commentMarginThreadActionsTests() {
     render(<CommentMargin noteId="n1" anchorTops={{}} />)
     const deleteBtn = screen.getByTitle('Delete comment')
     fireEvent.click(deleteBtn)
-    await Promise.resolve()
-    expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:comments.delete', { id: 'c1' })
+    await eventually(() =>
+      expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:comments.delete', { id: 'c1' })
+    )
   })
 }
 

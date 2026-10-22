@@ -6,6 +6,7 @@ import { forceParsing, syntaxTree } from '@codemirror/language'
 import { GFM } from '@lezer/markdown'
 import { cursorCharRight, cursorCharLeft } from '@codemirror/commands'
 import { livePreviewPlugin } from '../../src/editor/livePreview'
+import { eventually } from '../../../../tests/support/eventually'
 
 // Exercises a real EditorView rather than buildDecorations alone, because the
 // reported bug was that the caret could not reach a rendered table by mouse or
@@ -85,9 +86,7 @@ describe('a table the first parse did not reach', () => {
     const v = createView(doc, 0)
     expect(syntaxTree(v.state).length).toBeLessThan(doc.length)
 
-    await vi.waitFor(() => expect(syntaxTree(v.state).length).toBe(doc.length), {
-      timeout: 10_000,
-    })
+    await eventually(() => expect(syntaxTree(v.state).length).toBe(doc.length))
     const widgets: string[] = []
     for (const source of v.state.facet(EditorView.decorations)) {
       const set = typeof source === 'function' ? source(v) : source

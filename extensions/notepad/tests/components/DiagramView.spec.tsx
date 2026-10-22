@@ -37,8 +37,6 @@ vi.mock('@excalidraw/excalidraw', async () => {
   return { Excalidraw }
 })
 
-vi.setConfig({ testTimeout: 30_000 })
-
 const bridge = installNotepadBridge()
 
 import { DiagramView } from '../../src/components/DiagramView'

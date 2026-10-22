@@ -45,7 +45,7 @@ describe('notepad remote access', () => {
       'terminator.notepad:search.query',
       'terminator.notepad:tags.list',
     ]) {
-      expect(channels.get(channel), channel).toBe(true)
+      expect(channels.get(channel)).toBe(true)
     }
   })
 })

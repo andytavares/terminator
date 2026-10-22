@@ -16,6 +16,7 @@ Object.defineProperty(window, 'electronAPI', {
 
 import { SearchOverlay } from '../../src/components/SearchOverlay'
 import { useNotesStore } from '../../src/stores/notes.store'
+import { eventually } from './helpers/note-surface'
 
 afterEach(() => {
   cleanup()
@@ -73,10 +74,9 @@ function searchOverlayResultsTests() {
     })
     await act(async () => {
       vi.runAllTimers()
-      await Promise.resolve()
     })
     vi.useRealTimers()
-    expect(screen.getByText(/1 result/)).toBeTruthy()
+    await eventually(() => expect(screen.getByText(/1 result/)).toBeTruthy())
   })
 }
 
@@ -99,9 +99,9 @@ function searchOverlayOpeningResultTests() {
     })
     await act(async () => {
       vi.runAllTimers()
-      await Promise.resolve()
     })
     vi.useRealTimers()
+    await eventually(() => expect(screen.getByText(/1 result/)).toBeTruthy())
     fireEvent.keyDown(document, { key: 'Enter' })
     expect(useNotesStore.getState().selectedNoteId).toBe('note-x')
     expect(onClose).toHaveBeenCalled()

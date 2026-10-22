@@ -9,6 +9,7 @@ import {
   setEditorHoverAnchor,
   type SelectionAnchor,
 } from '../../src/editor/NoteEditor'
+import { eventually } from '../../../../tests/support/eventually'
 
 // NoteEditor around a real CodeMirror view: what it reports to its owner, the code languages it
 // loads, and the comment highlights it draws.
@@ -89,7 +90,7 @@ function languageTests() {
       const doc = `\`\`\`${lang}\n${code}\n\`\`\`\n\nend`
       const { view } = renderEditor({ initialDoc: doc })
       const at = doc.indexOf(code) + code.indexOf(word)
-      await vi.waitFor(() => expect(nodeNamesAt(view, at)).toContain(node))
+      await eventually(() => expect(nodeNamesAt(view, at)).toContain(node))
     }
   )
 }
