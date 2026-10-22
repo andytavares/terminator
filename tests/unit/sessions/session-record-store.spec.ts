@@ -237,6 +237,19 @@ describe('session-record-store — closing', () => {
     await store.markClosed('nobody', new Date())
     expect(fs.existsSync(FILE())).toBe(false)
   })
+
+  // Callers close a terminal without waiting: a failed write must not become an unhandled rejection.
+  it('keeps the close in memory and resolves when the file cannot be written', async () => {
+    const store = await load()
+    await store.setDescription(SNAP, 'why')
+    // A folder where the records file goes: the atomic rename onto it fails.
+    fs.rmSync(FILE(), { force: true })
+    fs.mkdirSync(path.join(FILE(), 'occupied'), { recursive: true })
+    await expect(store.markClosed('s1', new Date('2026-09-15T11:00:00.000Z'))).resolves.toBe(
+      undefined
+    )
+    expect(store.listRecords()[0]?.closedAt).toBe('2026-09-15T11:00:00.000Z')
+  })
 })
 
 describe('session-record-store — closing once', () => {
