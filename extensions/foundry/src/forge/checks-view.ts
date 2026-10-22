@@ -99,7 +99,7 @@ interface RowInput {
   readonly sourceNote?: string
 }
 
-const rowKey = (target: CheckTarget): string =>
+const checkRowKey = (target: CheckTarget): string =>
   target.kind === 'check' || target.kind === 'additional'
     ? `${target.kind}:${target.name}`
     : target.kind
@@ -109,7 +109,7 @@ const partOf = (target: CheckTarget): string | null =>
 
 function rowOf(input: RowInput, profile: ProfileFacts, base: string): CheckRowView {
   const { label, entry, target, sourceNote } = input
-  const key = rowKey(target)
+  const key = checkRowKey(target)
   const part = partOf(target)
   const removed = part !== null && (profile.removed ?? []).includes(part)
   if (entry === null) {

@@ -250,10 +250,8 @@ export async function transfer(
   return record
 }
 
-/**
- * Stamp a session's close time, once. A session without a record has nothing to keep.
- * Never rejects: callers close a terminal without waiting, so a failed write is logged.
- */
+// Stamps a session's close time, once. Never rejects: callers close a terminal
+// without waiting, so a failed write is logged instead.
 export async function markClosed(sessionId: string, at: Date): Promise<void> {
   const existing = records.get(sessionId)
   if (existing === undefined || existing.closedAt !== undefined) return
