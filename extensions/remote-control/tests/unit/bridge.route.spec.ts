@@ -5,6 +5,7 @@ import type { FastifyInstance } from 'fastify'
 import websocketPlugin from '@fastify/websocket'
 import { WebSocket } from 'ws'
 import { WsTicketStore } from '../../src/server/ws-ticket-store'
+import { eventually } from '../../../../tests/support/eventually'
 
 type BridgeIpc = ExtensionAPI['ipc']
 
@@ -168,7 +169,7 @@ function bridgeSubscribeTests() {
     const ws = await openBridge()
 
     ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(mockOnWindowEvent).toHaveBeenCalledWith('terminal:output', expect.any(Function))
     )
     await closeBridge(ws)
@@ -260,7 +261,7 @@ function bridgeSendDispatchTests() {
         args: [{ sessionId: 's1', data: 'ls' }],
       })
     )
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(mockSendChannel).toHaveBeenCalledWith('terminal:input', {
         sessionId: 's1',
         data: 'ls',
@@ -274,7 +275,7 @@ function bridgeSendEdgeTests() {
   it('defaults to {} when a send message omits args', async () => {
     const ws = await openBridge()
     ws.send(JSON.stringify({ type: 'send', channel: 'terminal:input' }))
-    await vi.waitFor(() => expect(mockSendChannel).toHaveBeenCalledWith('terminal:input', {}))
+    await eventually(() => expect(mockSendChannel).toHaveBeenCalledWith('terminal:input', {}))
     await closeBridge(ws)
   })
 
@@ -290,7 +291,7 @@ function bridgeEventForwardingTests() {
   it('forwards onWindowEvent events to subscribed client', async () => {
     const ws = await openBridge()
     ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
-    await vi.waitFor(() => expect(mockOnWindowEvent).toHaveBeenCalled())
+    await eventually(() => expect(mockOnWindowEvent).toHaveBeenCalled())
 
     const [[, forwarder]] = mockOnWindowEvent.mock.calls as [[string, (...a: unknown[]) => void]]
     forwarder({ sessionId: 's1', data: 'hello' })
@@ -315,7 +316,7 @@ function bridgeDisconnectAllTests() {
 
     await waitForClose(ws1)
     await waitForClose(ws2)
-  }, 20000)
+  })
 
   it('is safe to call when no connections are open', () => {
     expect(() => bridgeCleanup.disconnectAll()).not.toThrow()
@@ -329,11 +330,11 @@ function bridgeCloseCleanupTests() {
 
     const ws = await openBridge()
     ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
-    await vi.waitFor(() => expect(mockOnWindowEvent).toHaveBeenCalled())
+    await eventually(() => expect(mockOnWindowEvent).toHaveBeenCalled())
 
     await closeBridge(ws)
 
-    await vi.waitFor(() => expect(unsub).toHaveBeenCalled())
+    await eventually(() => expect(unsub).toHaveBeenCalled())
   })
 }
 

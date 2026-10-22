@@ -9,12 +9,13 @@ import { WsTicketStore } from '../../src/server/ws-ticket-store'
 import { WsSubscriberManager } from '../../src/server/ws-subscriber-manager'
 import { ConnectedDeviceRegistry } from '../../src/server/connected-devices'
 import { createFakePtyManager, type FakePtyManager } from './helpers/fake-pty-manager'
+import { eventually } from '../../../../tests/support/eventually'
 
 let ptyManager: FakePtyManager
 let ticketStore: WsTicketStore
 let subscriberManager: WsSubscriberManager
 let app: FastifyInstance
-let routes: { cleanup: () => void }
+let routes: { cleanup: () => Promise<void> }
 let deviceRegistry: ConnectedDeviceRegistry
 
 beforeEach(async () => {
@@ -48,9 +49,6 @@ async function createSession(payload: Record<string, unknown> = {}): Promise<str
   return JSON.parse(res.body).sessionId
 }
 
-/** How long a socket's close may take to reach the server. */
-const SOCKET_CLOSE_WAIT = { timeout: 2000 }
-
 function injectTerminalRoute(method: 'POST' | 'PATCH', url: string, payload: unknown) {
   return app.inject({ method, url, payload: payload as Record<string, unknown> })
 }
@@ -77,7 +75,7 @@ describe('GET /api/terminals', () => {
   it('returns every live session with sessionId, cwd, createdAt, workspaceId', async () => {
     const remoteId = await createSession()
     ptyManager.addSession({ sessionId: 'app-1', cwd: '/native', origin: 'app' })
-    ptyManager.setWorkspace('app-1', 'ws-1')
+    await ptyManager.setWorkspace('app-1', 'ws-1')
     const res = await app.inject({ method: 'GET', url: '/api/terminals' })
     const body = JSON.parse(res.body) as Array<Record<string, unknown>>
     expect(body).toHaveLength(2)
@@ -332,7 +330,7 @@ function assignWorkspaceRemoteTests() {
 
   it('clears the workspaceId when null is sent', async () => {
     const sessionId = await createSession()
-    ptyManager.setWorkspace(sessionId, 'ws-42')
+    await ptyManager.setWorkspace(sessionId, 'ws-42')
     const res = await injectTerminalRoute('PATCH', `/api/terminals/${sessionId}`, {
       workspaceId: null,
     })
@@ -407,14 +405,14 @@ function terminalSocketSubscribeTests() {
     const ws = await connect(sessionId, await ticketFor(sessionId))
     expect(subscriberManager.getCount(sessionId)).toBe(1)
     await closed(ws)
-    await vi.waitFor(() => expect(subscriberManager.getCount(sessionId)).toBe(0))
+    await eventually(() => expect(subscriberManager.getCount(sessionId)).toBe(0))
   })
 
   it('forwards messages from the primary subscriber to ptyManager.write', async () => {
     const sessionId = await createSession()
     const ws = await connect(sessionId, await ticketFor(sessionId))
     ws.send('ls -la\n')
-    await vi.waitFor(() => expect(ptyManager.write).toHaveBeenCalledWith(sessionId, 'ls -la\n'))
+    await eventually(() => expect(ptyManager.write).toHaveBeenCalledWith(sessionId, 'ls -la\n'))
     await closed(ws)
   })
 }
@@ -475,10 +473,7 @@ function terminalSocketRemoteTeardownTests() {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     try {
       await closed(ws)
-      await vi.waitFor(
-        () => expect(subscriberManager.getCount(sessionId)).toBe(0),
-        SOCKET_CLOSE_WAIT
-      )
+      await eventually(() => expect(subscriberManager.getCount(sessionId)).toBe(0))
       await vi.advanceTimersByTimeAsync(30_000)
       expect(ptyManager.kill).toHaveBeenCalledWith(sessionId)
     } finally {
@@ -494,10 +489,7 @@ function terminalSocketAppTeardownTests() {
     vi.useFakeTimers()
     try {
       const closePromise = closed(ws)
-      await vi.waitFor(
-        () => expect(subscriberManager.getCount('app-grace')).toBe(0),
-        SOCKET_CLOSE_WAIT
-      )
+      await eventually(() => expect(subscriberManager.getCount('app-grace')).toBe(0))
       await closePromise
       await vi.advanceTimersByTimeAsync(30_000)
       expect(ptyManager.kill).not.toHaveBeenCalled()
@@ -538,7 +530,7 @@ function terminalSocketDeviceTests() {
     expect(device.viewing).toBe(sessionId)
     expect(deviceRegistry.disconnect(device.id)).toBe(true)
     expect(await wsClosed).toBe(4004)
-    await vi.waitFor(() => expect(deviceRegistry.count()).toBe(0))
+    await eventually(() => expect(deviceRegistry.count()).toBe(0))
   })
 }
 
@@ -549,7 +541,7 @@ function terminalSocketCleanupTests() {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     try {
       await closed(ws)
-      await vi.waitFor(() => expect(subscriberManager.getCount(sessionId)).toBe(0))
+      await eventually(() => expect(subscriberManager.getCount(sessionId)).toBe(0))
       await routes.cleanup()
       const lookups = ptyManager.getSession.mock.calls.length
       await vi.advanceTimersByTimeAsync(30_000)

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync, readdirSync, existsSync } from 'fs'
 import { createServer, type AddressInfo, type Server } from 'net'
 import { hashPassword } from '../../src/server/password-hash'
+import { eventually } from '../../../../tests/support/eventually'
 
 const PASSWORD = 'correct-password'
 
@@ -205,7 +206,7 @@ describe('RemoteServer disconnectAllClients', () => {
     const { sessionId } = JSON.parse(createRes.body) as { sessionId: string }
 
     remoteServer.disconnectAllClients()
-    await vi.waitFor(() => expect(mockPtyManager.kill).toHaveBeenCalledWith(sessionId))
+    await eventually(() => expect(mockPtyManager.kill).toHaveBeenCalledWith(sessionId))
   })
 })
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { eventually } from '../../../../tests/support/eventually'
 
 const mockSpawn = vi.fn()
 const mockExecSync = vi.fn()
@@ -275,7 +276,7 @@ function ngrokStartOutputTests() {
     urlPromise.catch(() => {})
 
     // Trigger output before polls exhaust, once ngrok has been started.
-    await vi.waitFor(() => expect(stdoutHandler && stderrHandler).toBeTruthy())
+    await eventually(() => expect(stdoutHandler && stderrHandler).toBeTruthy())
     stdoutHandler!(Buffer.from('ERR_NGROK_105'))
     stderrHandler!(Buffer.from('authentication failed'))
 
