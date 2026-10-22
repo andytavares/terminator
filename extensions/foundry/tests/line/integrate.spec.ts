@@ -465,7 +465,6 @@ describe('the pull request body (FR-056)', () => {
   describe('provenance', provenanceTests)
   describe("what's left for you", leftForYouTests)
   describe("what's left for you, edges", leftForYouEdgeTests)
-  describe('a check shipped as flaky', knownFlakyBodyTests)
 })
 
 function summaryAndVerdictsTests() {
@@ -1810,20 +1809,6 @@ function leftForYouTests() {
     expect(text).not.toContain('Q-2')
     expect(text).not.toContain('RT-2')
     expect(text).not.toContain('RT-3')
-  })
-}
-
-function knownFlakyBodyTests() {
-  it('names a check shipped as flaky with its command and both logs', () => {
-    const shipment = {
-      ...leftShipment(),
-      knownFlaky: [
-        { step: 'Tests', command: 'npm test', logs: ['/logs/one.log', '/logs/two.log'] },
-      ],
-    }
-    expect(leftForYou(prBody(leftOrder(), shipment))).toContain(
-      '- **Known flaky**: Tests (`npm test`) failed and passed on the same commit. Logs: /logs/one.log and /logs/two.log'
-    )
   })
 }
 

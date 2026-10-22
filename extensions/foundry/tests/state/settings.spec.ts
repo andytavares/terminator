@@ -11,7 +11,6 @@ import {
   stallShadowMode,
   defaultWriteBack,
   defaultBudgets,
-  finalRuns,
   declaredCriticalPaths,
   migrateLineListSettings,
 } from '../../src/state/settings.js'
@@ -161,17 +160,5 @@ describe('a new order', () => {
       'terminator.foundry.budgets.wallClockMinutes': 90,
     })
     expect(defaultBudgets(set)).toEqual({ agents: 5, wallClockMinutes: 90 })
-  })
-})
-
-describe('how often the final check runs its tests', () => {
-  it('is twice unless the operator says otherwise', () => {
-    expect(finalRuns(settingsHost())).toBe(2)
-    expect(finalRuns(settingsHost({ 'terminator.foundry.finalRuns': 3 }))).toBe(3)
-  })
-
-  it('reads anything below one as one', () => {
-    expect(finalRuns(settingsHost({ 'terminator.foundry.finalRuns': 0 }))).toBe(1)
-    expect(finalRuns(settingsHost({ 'terminator.foundry.finalRuns': -4 }))).toBe(1)
   })
 })

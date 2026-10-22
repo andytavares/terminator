@@ -58,11 +58,7 @@ export function finalCheckSendBacks(gates: readonly Gate[]): number {
   return gates.filter((g) => sendsBackFinalCheck(g, g.decision?.option)).length
 }
 
-const SENDS_BACK_FINAL_CHECK: readonly Gate['rule'][] = [
-  'verify.repeat-fail',
-  'verify.base-fail',
-  'verify.flaky',
-]
+const SENDS_BACK_FINAL_CHECK: readonly Gate['rule'][] = ['verify.repeat-fail', 'verify.base-fail']
 
 /**
  * Whether a decision gives the final check's failure back to the nodes that

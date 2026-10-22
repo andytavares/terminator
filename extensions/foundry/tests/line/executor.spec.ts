@@ -1055,10 +1055,7 @@ function lightsOutRunsTests() {
 }
 
 describe('a failed final climb', () => {
-  describe('flaky checks', flakyChecksTests)
-  describe('a check shipped with as flaky', acceptedFlakyTests)
-  describe('burn-in', burnInTests)
-  describe('burn-in agreement', burnInAgreementTests)
+  describe('a check that fails once', failedOnceTests)
   describe('the base branch fails too', theBaseBranchFailsTooTests)
   describe('sending back', sendingBackTests)
   describe('the send-back limit', theSendBackLimitTests)
@@ -1090,128 +1087,31 @@ function testsRunner(exit: (n: number) => number, seen: { options: unknown[] } =
   }
 }
 
-function flakyChecksTests() {
-  it('stops at verify.flaky when a check fails and then passes, and ships nothing', async () => {
+function failedOnceTests() {
+  it('a check that fails once fails the final check, with no second run of it on the same commit', async () => {
     const o = order([unit('U-1')])
+    const seen = { options: [] as unknown[] }
     const outcome = await execute(
       planOf(o),
-      base({ runStep: testsRunner((n) => (n === 1 ? 1 : 0)) })
+      base({ runStep: testsRunner((n) => (n === 1 ? 1 : 0), seen) })
     )
-    const gate = outcome.gates.find((g) => g.rule === 'verify.flaky')
-    expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.repeat-fail')
-    expect(gate?.options.map((o) => o.id)).toEqual(['send_back', 'accept_debt', 'hold'])
-    expect(gate?.why).toContain(`${TESTS} failed with exit code 1 and passed with exit code 0`)
-    expect(gate?.why).toContain('npm test')
+    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
+    expect(seen.options).toEqual([undefined])
+    expect(gate?.why).toContain(`${TESTS} failed with exit code 1`)
     expect(gate?.evidence).toEqual([
       expect.objectContaining({ exitCode: 1, excerpt: expect.stringContaining('exited 1') }),
-      expect.objectContaining({ exitCode: 0, excerpt: expect.stringContaining('.retry.log') }),
     ])
     expect(outcome.ladder?.ok).toBe(false)
     expect(outcome.shippable).toBe(false)
   })
 
-  it('raises nothing when the retry fails too: that is an ordinary failure', async () => {
-    const o = order([unit('U-1')])
-    const outcome = await execute(planOf(o), base({ runStep: testsRunner(() => 1) }))
-    expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.flaky')
-  })
-}
-
-/** The decision to ship with the unit tests named as flaky. */
-function shippedWithFlaky(o: WorkOrder): Gate {
-  return {
-    ...raiseGate({
-      id: 'WO-1-verify.flaky-1',
-      rule: 'verify.flaky',
-      orderId: o.id,
-      summary: 's',
-      why: 'w',
-      at: '2026-09-06T10:00:00.000Z',
-      evidence: [{ kind: 'stdout', step: TESTS }],
-    }),
-    decision: { option: 'accept_debt', by: 'operator', note: '', at: 'x' },
-  }
-}
-
-function acceptedFlakyTests() {
-  it('carries on when the operator already shipped with that check named', async () => {
-    const o = order([unit('U-1')])
-    const accepted = shippedWithFlaky(o)
-    const outcome = await execute(
-      planOf(o),
-      base({ runStep: testsRunner((n) => (n === 1 ? 1 : 0)), priorGates: [accepted] })
-    )
-    expect(outcome.gates).toEqual([])
-    expect(outcome.ladder?.ok).toBe(true)
-  })
-
-  it('stops offering send back after it was sent back twice', async () => {
-    const o = order([unit('U-1')])
-    const sent = sentBack(o, 2).map((g) => ({ ...g, rule: 'verify.flaky' as const }))
-    const outcome = await execute(
-      planOf(o),
-      base({ runStep: testsRunner((n) => (n === 1 ? 1 : 0)), priorGates: sent })
-    )
-    const gate = outcome.gates.find((g) => g.rule === 'verify.flaky')
-    expect(gate?.options.map((o) => o.id)).toEqual(['accept_debt', 'hold'])
-  })
-}
-
-function burnInTests() {
-  it('stops as flaky when two runs disagree, though a second climb would pass', async () => {
+  it('runs a passing test step once', async () => {
     const o = order([unit('U-1')])
     const seen = { options: [] as unknown[] }
-    const outcome = await execute(
-      planOf(o),
-      base({ finalRuns: 2, runStep: testsRunner((n) => (n === 2 ? 1 : 0), seen) })
-    )
-    const gate = outcome.gates.find((g) => g.rule === 'verify.flaky')
-    expect(gate).toBeDefined()
-    // Run one is a pass and run two the failure: no third climb was made.
-    expect(seen.options).toEqual([undefined, { fresh: true }])
-    expect(gate?.evidence.map((e) => e.exitCode)).toEqual([1, 0])
-    expect(gate?.evidence[0].path).toMatch(/\.run2\.log$/)
-    expect(outcome.shippable).toBe(false)
-  })
-
-  it('runs the tests once when finalRuns is 1', async () => {
-    const o = order([unit('U-1')])
-    const seen = { options: [] as unknown[] }
-    const outcome = await execute(
-      planOf(o),
-      base({ finalRuns: 1, runStep: testsRunner(() => 0, seen) })
-    )
+    const outcome = await execute(planOf(o), base({ runStep: testsRunner(() => 0, seen) }))
     expect(seen.options).toEqual([undefined])
     expect(outcome.gates).toEqual([])
     expect(outcome.ladder?.ok).toBe(true)
-  })
-}
-
-function burnInAgreementTests() {
-  it('passes when every run passes, and fails ordinarily when every run fails', async () => {
-    const o = order([unit('U-1')])
-    const green = await execute(planOf(o), base({ finalRuns: 3, runStep: testsRunner(() => 0) }))
-    expect(green.ladder?.ok).toBe(true)
-    const red = await execute(planOf(o), base({ finalRuns: 2, runStep: testsRunner(() => 1) }))
-    expect(red.gates.map((g) => g.rule)).not.toContain('verify.flaky')
-    expect(red.gates.map((g) => g.rule)).toContain('verify.repeat-fail')
-  })
-
-  it('repeats only tests and end-to-end, not lint', async () => {
-    const o = order([unit('U-1')])
-    const names: string[] = []
-    await execute(
-      planOf(o),
-      base({
-        finalRuns: 2,
-        runStep: async (step: { name: string }) => {
-          names.push(step.name)
-          return 0
-        },
-      })
-    )
-    expect(names.filter((n) => n === 'Lint')).toHaveLength(1)
-    expect(names.filter((n) => n === TESTS)).toHaveLength(2)
   })
 }
 
@@ -1224,7 +1124,7 @@ function expectBlockedOnBase(gate: Gate | undefined): void {
   expect(gate.options.map((o) => o.id)).toEqual(['send_back', 'accept_debt', 'hold'])
   expect(gate.evidence).toHaveLength(2)
   expect(gate.evidence[0]).toMatchObject({ exitCode: 1 })
-  expect(gate.evidence[0].excerpt).toContain('.retry.log')
+  expect(gate.evidence[0].excerpt).toContain('Lint exited 1')
   expect(gate.evidence[1]).toMatchObject({ exitCode: 2, step: 'Lint' })
   expect(gate.evidence[1].command).toBeTruthy()
   expect(gate.evidence[1].excerpt).toContain('.base.log')
@@ -1350,7 +1250,7 @@ function preparingAgainTests() {
     expect(record).toHaveBeenCalledWith(
       'verify.reprepared',
       'Lint',
-      expect.stringMatching(/the checkout was broken, not the code.*\.log.*\.retry\.log/s)
+      expect.stringMatching(/the checkout was broken, not the code\. Earlier log: .*\.log\./)
     )
   })
 }
@@ -1404,17 +1304,6 @@ function withoutPrepareTests() {
     expect(reinstall).not.toHaveBeenCalled()
     expect(runStepOnBase).toHaveBeenCalled()
     expect(outcome.gates.map((g) => g.rule)).toContain('verify.repeat-fail')
-  })
-
-  it('does not prepare again for a check that passed on a retry: that is flaky', async () => {
-    const o = withPrepare(order([unit('U-1')]), 'make deps')
-    const reinstall = vi.fn(async () => 0)
-    const outcome = await execute(
-      planOf(o),
-      base({ runStep: lintRunner((n) => (n === 1 ? 1 : 0)), reinstall })
-    )
-    expect(reinstall).not.toHaveBeenCalled()
-    expect(outcome.gates.map((g) => g.rule)).toContain('verify.flaky')
   })
 }
 

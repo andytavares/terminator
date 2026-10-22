@@ -15,8 +15,7 @@ import type { ExecutorDeps, RunOutcome } from './executor.js'
 import type { RunGraph } from './run-graph.js'
 import type { Recipe } from '../recipe/parse.js'
 import { documentOutcome } from './document-outcome.js'
-import type { IntegrateDeps, KnownFlaky, ShellExec, Shipment, ShipOutcome } from './integrate.js'
-import type { Gate } from '../gates/rules.js'
+import type { IntegrateDeps, ShellExec, Shipment, ShipOutcome } from './integrate.js'
 import { writeBack } from '../trackers/write-back.js'
 import type { IssuesPort } from '../trackers/write-back.js'
 import type { WorkOrder } from '../order/schema.js'
@@ -62,8 +61,6 @@ interface RunTail {
   readonly finalCheck: ReturnType<typeof settledOnce<boolean>>
   // Checks the base branch already failed, so the draft can say they are not this change's.
   readonly failingOnBase: readonly string[]
-  // Checks the operator shipped with named as flaky, so the draft names them too.
-  readonly knownFlaky: readonly KnownFlaky[]
 }
 
 /** What a shipment is drawn from: the run's verdicts, its ladder, and whether inspection is owed. */
@@ -121,7 +118,6 @@ async function prepareRun(api: ExtensionAPI, run: OrderRun): Promise<RunTail> {
     shippedOrderRef: { current: order },
     finalCheck: settledOnce<boolean>(),
     failingOnBase: await failingOnBaseOf({ root, order, recipe, exec: built.exec }),
-    knownFlaky: knownFlakyOf((await gates.list()).filter((g) => g.orderId === order.id)),
   }
 }
 
@@ -142,18 +138,6 @@ export async function failingOnBaseOf(run: {
   return baseline.steps.filter((s) => s.result === 'fail' && !leftOut(s)).map((s) => s.name)
 }
 
-/** The flaky checks the operator accepted, from their gates' two runs. */
-/** @internal */
-export function knownFlakyOf(gates: readonly Gate[]): KnownFlaky[] {
-  return gates
-    .filter((g) => g.rule === 'verify.flaky' && g.decision?.option === 'accept_debt')
-    .map((g) => ({
-      step: g.evidence[0]?.step ?? g.summary,
-      command: g.evidence[0]?.command ?? null,
-      logs: g.evidence.flatMap((e) => (e.path === undefined ? [] : [e.path])),
-    }))
-}
-
 function shipmentFor(tail: RunTail, found: Found): Shipment {
   return {
     verdicts: found.verdicts,
@@ -164,7 +148,6 @@ function shipmentFor(tail: RunTail, found: Found): Shipment {
     },
     ladder: found.ladder,
     failingOnBase: tail.failingOnBase,
-    knownFlaky: tail.knownFlaky,
     // Grouped by rung, so the record says what was in force where rather
     // than listing every rule as though they all applied at once.
     rulesInForce: RUNGS.flatMap((rung) =>

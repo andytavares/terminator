@@ -110,14 +110,6 @@ function isWorkDone(run: Execution): boolean {
   )
 }
 
-/** A check that failed and passed on the same commit, with both runs as evidence. */
-interface Flaky {
-  readonly name: string
-  readonly command: string | null
-  /** The failing run, then the passing one. */
-  readonly evidence: readonly [Evidence, Evidence]
-}
-
 /** A climb's outcome, with each step's log kept so a gate can show what it saw. */
 interface Climb {
   readonly ladder: LadderOutcome
@@ -126,54 +118,6 @@ interface Climb {
 
 /** A climb's outcome as `climbWith` returns it. */
 type ClimbResult = Awaited<ReturnType<FinalClimb['climbWith']>>
-
-interface Climbed extends Climb {
-  /** Set when a check disagreed with itself; the ladder then counts as failed unless the debt was accepted. */
-  readonly flaky: Flaky | null
-}
-
-/** The checks whose runs are repeated in the final check, to see whether they agree. */
-const BURNED_IN: readonly LadderStep['check'][] = ['test', 'e2e']
-
-/** One run of a check: how it ended and where it logged. */
-interface CheckRun {
-  readonly exitCode: number | null
-  readonly log: string | undefined
-}
-
-function checkRunOf(step: StepOutcome, logs: Map<string, string>): CheckRun {
-  return { exitCode: step.exitCode, log: logs.get(step.name) }
-}
-
-function flakyOf(
-  step: { name: string; command: string | null },
-  failed: CheckRun,
-  passed: CheckRun
-): Flaky {
-  const evidenceOf = (run: CheckRun): Evidence => ({
-    kind: 'stdout',
-    exitCode: run.exitCode ?? undefined,
-    step: step.name,
-    command: step.command ?? undefined,
-    path: run.log,
-    excerpt: excerptOf(run.log),
-  })
-  return {
-    name: step.name,
-    command: step.command,
-    evidence: [evidenceOf(failed), evidenceOf(passed)],
-  }
-}
-
-/** The operator already shipped with this check named as flaky, so it is not asked again. */
-function isFlakyAccepted(gates: readonly Gate[], stepName: string): boolean {
-  return gates.some(
-    (g) =>
-      g.rule === 'verify.flaky' &&
-      g.decision?.option === 'accept_debt' &&
-      g.evidence.some((e) => e.step === stepName)
-  )
-}
 
 /** Where the final check climbed on the base branch, and what that showed. */
 interface BaseCheck {
@@ -187,8 +131,6 @@ const BASE_UNKNOWN: BaseCheck = { onBase: 'unknown', failed: null, logs: new Map
 class FinalClimb {
   readonly steps: LadderStep[]
   private readonly climbedAt: number
-  /** The first check found to disagree with itself in this climb. */
-  private flaky: Flaky | null = null
 
   constructor(
     private readonly run: Execution,
@@ -230,85 +172,31 @@ class FinalClimb {
     return { outcome, logs }
   }
 
-  /** The climb over the change: the same commit again, then the checkout prepared again. */
-  async climbAll(): Promise<Climbed> {
-    const first = await this.climbWith(this.steps, this.burnedInRunner(), '')
+  /** The climb over the change; a failure gets the lane prepared again and one more climb. */
+  async climbAll(): Promise<Climb> {
+    const first = await this.climbWith(this.steps, this.run.deps.runStep, '')
     this.run.deps.onEvent({ type: 'ladder', outcome: first.outcome })
-    // A check that disagreed with itself needs a decision, not a retry or a new preparation.
-    const retried = this.isUndecided() ? first : await this.retryFailure(first)
-    const settled = this.isUndecided() ? retried : await this.prepareAgain(first, retried)
+    const settled = await this.prepareAgain(first)
     const ladder = withPictures(settled.outcome, this.run.deps.picturesTaken?.() ?? null)
-    return { ladder, logs: settled.logs, flaky: this.flaky }
+    return { ladder, logs: settled.logs }
   }
 
-  private isUndecided(): boolean {
-    return this.flaky !== null && !isFlakyAccepted(this.run.priorGates, this.flaky.name)
-  }
-
-  // A test or end-to-end step runs `finalRuns` times on the same commit. The first run may
-  // come from the pass cache; the repeats never do, or they would only repeat its answer.
-  private burnedInRunner(): ExecutorDeps['runStep'] {
-    const runs = this.run.deps.finalRuns ?? 1
-    return async (step, logPath) => {
-      const first = await this.run.deps.runStep(step, logPath)
-      if (first === null || runs < 2 || !BURNED_IN.includes(step.check)) return first
-      for (let n = 2; n <= runs; n += 1) {
-        const repeat = this.logPath(step.name, `.run${n}`)
-        const exitCode = await this.run.deps.runStep(step, repeat, { fresh: true })
-        if (exitCode === null || (exitCode === 0) === (first === 0)) continue
-        const pair = [
-          { exitCode: first, log: logPath },
-          { exitCode, log: repeat },
-        ]
-        return this.disagreed(step, first === 0 ? pair.reverse() : pair)
-      }
-      return first
-    }
-  }
-
-  // The failing exit code, so the ladder stops here; zero when the operator already
-  // accepted this check as flaky, so the debt is carried and the climb goes on.
-  private disagreed(step: LadderStep, [failed, passed]: CheckRun[]): number | null {
-    this.flaky ??= flakyOf(step, failed, passed)
-    return isFlakyAccepted(this.run.priorGates, step.name) ? 0 : failed.exitCode
-  }
-
-  // A check that fails once and passes on the same commit is flaky, which is a failure:
-  // the first result stands unless the operator already accepted this check as flaky.
-  // Passes on this commit are cached, so only the failed step and later ones rerun.
-  private async retryFailure(first: { outcome: LadderOutcome; logs: Map<string, string> }) {
-    const firstFailed = first.outcome.ok
-      ? undefined
-      : first.outcome.steps.find((s) => s.result === 'fail')
-    if (firstFailed === undefined) return first
-    const retry = await this.climbWith(this.steps, this.run.deps.runStep, '.retry')
-    this.run.deps.onEvent({ type: 'ladder', outcome: retry.outcome })
-    if (!retry.outcome.ok) return retry
-    const passed = retry.outcome.steps.find((s) => s.name === firstFailed.name)
-    this.flaky = flakyOf(
-      firstFailed,
-      checkRunOf(firstFailed, first.logs),
-      checkRunOf(passed ?? firstFailed, retry.logs)
-    )
-    return isFlakyAccepted(this.run.priorGates, firstFailed.name) ? retry : first
-  }
-
-  // A check that failed twice is run once more after the lane's own preparation ran
-  // again. Passing then means the checkout was broken, not the code; no log is read.
-  private async prepareAgain(first: ClimbResult, retried: ClimbResult): Promise<ClimbResult> {
+  // A check that failed is run once more after the lane's own preparation ran again: a
+  // different checkout, not a rerun. Passing then means the checkout was broken, not the
+  // code; no log is read.
+  private async prepareAgain(first: ClimbResult): Promise<ClimbResult> {
     const { order, deps } = this.run
-    const failedName = retried.outcome.steps.find((s) => s.result === 'fail')?.name
-    if (failedName === undefined || order.context.environment.prepare === null) return retried
+    const failedName = first.outcome.steps.find((s) => s.result === 'fail')?.name
+    if (failedName === undefined || order.context.environment.prepare === null) return first
     const prepared = await deps.reinstall('change', this.logPath('prepare', '.again'))
-    if (prepared !== 0) return retried
+    if (prepared !== 0) return first
     const again = await this.climbWith(this.steps, deps.runStep, '.reprepared')
     deps.onEvent({ type: 'ladder', outcome: again.outcome })
-    if (!again.outcome.ok) return retried
-    const logs = [first.logs.get(failedName), retried.logs.get(failedName)]
+    if (!again.outcome.ok) return first
     await deps.record(
       'verify.reprepared',
       failedName,
-      `${failedName} failed twice and passed once the checkout was prepared again: the checkout was broken, not the code. Earlier logs: ${logs.join(', ')}.`
+      `${failedName} failed and passed once the checkout was prepared again: the checkout was broken, not the code. Earlier log: ${first.logs.get(failedName)}.`
     )
     return again
   }
@@ -349,11 +237,11 @@ function excerptOf(logPath: string | undefined): string {
 
 interface AfterWork {
   readonly change: Change
-  readonly climbed: Climbed
+  readonly climbed: Climb
   readonly climber: FinalClimb
 }
 
-// The three rules that fire on what the change turned out to be, raised after the
+// The rules that fire on what the change turned out to be, raised after the
 // work, when that answer exists.
 async function raiseAfterWork(run: Execution, after: AfterWork): Promise<void> {
   const { inspection, risk } = after.change
@@ -370,24 +258,7 @@ async function raiseAfterWork(run: Execution, after: AfterWork): Promise<void> {
       why: `${inspection.reason} Triggered by ${inspection.unplanned.join(', ')}.`,
     })
   }
-  const { flaky } = after.climbed
-  if (!run.halted && flaky !== null && !isFlakyAccepted(run.priorGates, flaky.name)) {
-    await raiseFlaky(run, flaky)
-  } else if (!run.halted && !after.climbed.ladder.ok) await raiseFailedCheck(run, after)
-}
-
-// A check that gave two answers on one commit: the person decides between fixing the
-// test in this order and shipping with it named. Nothing is retried a third time.
-async function raiseFlaky(run: Execution, flaky: Flaky): Promise<void> {
-  const [failed, passed] = flaky.evidence
-  const capped = sentBackCount(run, 'verify.flaky') >= MAX_FINAL_SEND_BACKS
-  const command = flaky.command === null ? '' : `: \`${flaky.command}\``
-  run.halted = await run.stopAtGate('verify.flaky', {
-    evidence: [...flaky.evidence],
-    summary: `${run.order.title} has a check that does not agree with itself`,
-    why: `${flaky.name} failed with exit code ${failed.exitCode ?? 'unknown'} and passed with exit code ${passed.exitCode ?? 'unknown'} on the same commit${command}. A check that fails and passes on the same commit is a failure.${capped ? ' It has been sent back twice; accept it named, or hold.' : ''}`,
-    omitOptions: capped ? ['send_back'] : undefined,
-  })
+  if (!run.halted && !after.climbed.ladder.ok) await raiseFailedCheck(run, after)
 }
 
 /** How many times the operator sent the finished change back from a gate of this rule. */
@@ -404,7 +275,7 @@ interface FailedCheck {
   readonly why: string
 }
 
-function failedCheckOf({ ladder, logs }: Climbed): FailedCheck {
+function failedCheckOf({ ladder, logs }: Climb): FailedCheck {
   const step = ladder.steps.find((s) => s.result === 'fail') ?? null
   if (step === null) {
     return {

@@ -4,6 +4,8 @@
 
 **Date**: 2026-10-21
 
+Amended by ADR 123: question 1 (the same check again) is gone; the preparation again runs straight after the first failure.
+
 Amends ADR 088 (Foundry mends installs and never opens orders).
 
 ## Context

@@ -184,32 +184,6 @@ function whatTheyAreToldTests() {
   })
 }
 
-describe('sending a flaky check back', () => {
-  it('hands the builder both logs and says to make the check deterministic', async () => {
-    const flaky = raiseGate({
-      id: 'G-flaky',
-      rule: 'verify.flaky',
-      orderId,
-      nodeId: null,
-      summary: 'a check does not agree with itself',
-      why: 'npm test failed with exit code 1 and passed with exit code 0 on the same commit',
-      evidence: [
-        { kind: 'stdout', exitCode: 1, excerpt: '1 failed', path: '/logs/run1.log' },
-        { kind: 'stdout', exitCode: 0, excerpt: 'all passed', path: '/logs/run2.log' },
-      ],
-      at: AT,
-    })
-    await seedFailedFinalCheck([flaky])
-    await host.call('foundry:inbox.decide', { gateId: 'G-flaky', option: 'send_back' })
-
-    const [feedback] = nodeIn(await graphOnceSentBack(), 'build:U-1')?.feedback ?? []
-    expect(feedback).toMatchObject({ from: 'final check', source: 'check', exitCode: 1 })
-    expect(feedback?.excerpt).toContain('make it deterministic. Do not retry it')
-    expect(feedback?.excerpt).toContain('/logs/run1.log\n1 failed')
-    expect(feedback?.excerpt).toContain('/logs/run2.log\nall passed')
-  })
-})
-
 /** A step's own check failed twice: its gate names the node it holds. */
 function stepGate(id: string): Gate {
   return raiseGate({

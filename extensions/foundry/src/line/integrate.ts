@@ -106,15 +106,6 @@ export interface Shipment {
   readonly inspection?: { readonly ran: boolean; readonly reason: string }
   /** Checks that already failed on the base branch before this change, by name. */
   readonly failingOnBase?: readonly string[]
-  /** Checks that failed and passed on one commit and that the operator chose to ship with. */
-  readonly knownFlaky?: readonly KnownFlaky[]
-}
-
-export interface KnownFlaky {
-  readonly step: string
-  readonly command: string | null
-  /** The failing run's log, then the passing run's. */
-  readonly logs: readonly string[]
 }
 
 export interface LanePullRequest {
@@ -355,7 +346,6 @@ function leftForYouLines(order: WorkOrder, shipment: Shipment): string[] {
     ...failing.map((criterion) => criterionItem(criterion, shipment.verdicts)),
     ...unmeasuredStepItems(shipment.ladder ?? null),
     ...failingOnBaseItems(order, shipment.failingOnBase ?? []),
-    ...knownFlakyItems(shipment.knownFlaky ?? []),
     ...pendingDecisionItems(order),
   ]
   const bullets = items.length === 0 ? [] : ['', ...items]
@@ -398,13 +388,6 @@ function failingOnBaseItems(order: WorkOrder, names: readonly string[]): string[
   return names.map(
     (name) => `- **${name}**: fails on ${base} before this change. Not this pull request's to fix.`
   )
-}
-
-function knownFlakyItems(flaky: readonly KnownFlaky[]): string[] {
-  return flaky.map((f) => {
-    const command = f.command === null ? '' : ` (\`${f.command}\`)`
-    return `- **Known flaky**: ${f.step}${command} failed and passed on the same commit. Logs: ${f.logs.join(' and ')}`
-  })
 }
 
 function pendingDecisionItems(order: WorkOrder): string[] {

@@ -202,9 +202,6 @@ export interface ExecutorDeps {
   /** What the pictures step left on the last run, for the ladder's outcome to carry. */
   readonly picturesTaken?: () => PicturesTaken | null
 
-  /** Runs of a test or end-to-end step in the final check; runs that disagree are flaky. Absent is one. */
-  readonly finalRuns?: number
-
   /**
    * Run one rung in a checkout of the order's base branch, without this change.
    *

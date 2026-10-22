@@ -47,7 +47,7 @@ An extension-first, AI-focused terminal emulator built on Electron. Organizes wo
 
 ### Foundry on any repository
 
-Foundry assumes no toolchain. For each check (test, lint, format, coverage, e2e, build), plus a prepare command and extra checks, it takes the first of these that answers: **your word** (set on the Forge's **Checks** step), the repository's own `.foundry/profile.yaml`, what the scout read from the README and proved, then the shipped **hints** (`extensions/foundry/hints/*.yaml`, one per ecosystem). A command is proven on the base branch before the work starts; a check with no command is reported **not measured**, never passed. A check that fails and then passes on the same commit is **flaky**, which is a failure: the order stops at a decision and is not retried a third time.
+Foundry assumes no toolchain. For each check (test, lint, format, coverage, e2e, build), plus a prepare command and extra checks, it takes the first of these that answers: **your word** (set on the Forge's **Checks** step), the repository's own `.foundry/profile.yaml`, what the scout read from the README and proved, then the shipped **hints** (`extensions/foundry/hints/*.yaml`, one per ecosystem). A command is proven on the base branch before the work starts; a check with no command is reported **not measured**, never passed. A check runs once in the final check and its result stands: a check that fails is a failure, never rerun to see whether it passes.
 
 A repository may carry `.foundry/profile.yaml`; every field is optional:
 

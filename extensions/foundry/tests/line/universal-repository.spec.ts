@@ -167,7 +167,7 @@ describe('a repository with a script and no manifest', () => {
   })
 })
 
-describe('a script that fails or disagrees with itself in the final check', () => {
+describe('a script that fails in the final check', () => {
   beforeEach(glyphRepositoryWithOperatorTest)
 
   it('stops at a gate when the script exits 1 in the final check', async () => {
@@ -180,17 +180,6 @@ describe('a script that fails or disagrees with itself in the final check', () =
     })
     expect(await statusOf(order.id)).not.toBe('shipped')
     expect(runsInLanes('./glyph test').at(-1)?.exitCode).toBe(1)
-  })
-
-  it('raises verify.flaky when the script exits 1 and then 0 on the same commit', async () => {
-    const order = await createOrder()
-    await untilBaseProven('./glyph test')
-    glyphExits(0, 1, 0)
-    await runAgreed(order)
-    await vi.waitFor(async () => expect(await gateRules()).toContain('verify.flaky'), {
-      timeout: 20_000,
-    })
-    expect(await statusOf(order.id)).not.toBe('shipped')
   })
 })
 

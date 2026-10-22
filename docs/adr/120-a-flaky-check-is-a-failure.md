@@ -1,6 +1,6 @@
 # ADR 120: A flaky check is a failure
 
-**Status**: Accepted
+**Status**: Amended by ADR 123
 
 **Date**: 2026-10-21
 
@@ -27,3 +27,10 @@ ADR 070 rejected the same bargain for end-to-end tests: a retry is a policy of a
 - The final check's test and end-to-end steps take twice as long with the default. Setting `finalRuns` to 1 turns the burn-in off; the retry rule stays.
 - A repository with a known flaky test now asks the operator once per order, and the answer is carried in the draft instead of being lost in the ledger.
 - A resumed order that was shipped with a check named does not ask again about that check.
+
+## Amendment (ADR 123)
+
+Foundry no longer reruns a check. A check that fails once is a failure: the first result stands, whatever a rerun on the same commit would have said.
+
+- Gone: the `verify.flaky` rule, the setting `terminator.foundry.finalRuns`, the burn-in, the retry after a failure, and the "Known flaky" lines in a draft's description. A gate an earlier build raised under `verify.flaky` still loads, read as `verify.repeat-fail`, which offers the same moves.
+- Kept, because each runs something different from the failed run: the base-branch comparison (a different commit) and the preparation again of a lane (a re-prepared checkout, ADR 122). The preparation now runs straight after the first failure, as there is no retry before it.

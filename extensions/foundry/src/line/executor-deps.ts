@@ -17,7 +17,7 @@ import type { CommitOutcome } from './commit.js'
 import { collectableWrites, readRungOutput } from './rung-output.js'
 import { resolveSources } from '../workspace-root.js'
 import { indexFor, writeGraph } from '../state/live-index.js'
-import { autonomyFor, finalRuns } from '../state/settings.js'
+import { autonomyFor } from '../state/settings.js'
 import { endLiveSession } from '../runtime/runtime-state.js'
 import { baseBranchOf, conversationKey, createRunContext } from './run-context.js'
 import type { OrderRun, RunContext } from './run-context.js'
@@ -87,8 +87,8 @@ export async function buildExecutorDeps(
 }
 
 /** The operator's settings the executor reads, once per run. */
-function settingsDeps(api: ExtensionAPI): Pick<ExecutorDeps, 'autonomy' | 'finalRuns'> {
-  return { autonomy: autonomyFor(api), finalRuns: finalRuns(api) }
+function settingsDeps(api: ExtensionAPI): Pick<ExecutorDeps, 'autonomy'> {
+  return { autonomy: autonomyFor(api) }
 }
 
 /** The deps that run a failed rung again on the base branch, and let that checkout go. */

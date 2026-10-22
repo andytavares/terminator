@@ -15,8 +15,7 @@ import { agentsAnswer, agreedLineOrder, checks, repositoryWithRemote } from '../
 import { createOrderStore } from '../../src/order/store.js'
 import { createGateStore } from '../../src/gates/store.js'
 import { checkoutPath } from '../../src/line/worktree.js'
-import { failingOnBaseOf, knownFlakyOf } from '../../src/line/execute-run.js'
-import { raiseGate } from '../../src/gates/rules.js'
+import { failingOnBaseOf } from '../../src/line/execute-run.js'
 import type { Recipe } from '../../src/recipe/parse.js'
 import { writeBaseline } from '../../src/line/baseline.js'
 import type { Baseline } from '../../src/line/baseline.js'
@@ -355,34 +354,3 @@ function startingOverAndStoppingTests() {
     })
   })
 }
-
-describe('knownFlakyOf', () => {
-  const flakyGate = (option: string | undefined) => ({
-    ...raiseGate({
-      id: 'WO-1-verify.flaky-1',
-      rule: 'verify.flaky',
-      orderId: 'WO-1',
-      summary: 's',
-      why: 'w',
-      at: '2026-09-06T10:00:00.000Z',
-      evidence: [
-        { kind: 'stdout' as const, step: 'Tests', command: 'npm test', path: '/logs/one.log' },
-        { kind: 'stdout' as const, step: 'Tests', command: 'npm test', path: '/logs/two.log' },
-      ],
-    }),
-    decision:
-      option === undefined
-        ? null
-        : { option, by: 'operator' as const, note: '', at: '2026-09-06T10:05:00.000Z' },
-  })
-
-  it('lists the checks shipped with, by their two logs', () => {
-    expect(knownFlakyOf([flakyGate('accept_debt')])).toEqual([
-      { step: 'Tests', command: 'npm test', logs: ['/logs/one.log', '/logs/two.log'] },
-    ])
-  })
-
-  it('leaves out a flaky check sent back or not yet decided', () => {
-    expect(knownFlakyOf([flakyGate('send_back'), flakyGate(undefined)])).toEqual([])
-  })
-})
