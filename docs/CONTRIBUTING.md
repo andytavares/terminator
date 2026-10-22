@@ -104,6 +104,8 @@ Every other spec has to pass on a loaded machine too, where a test can run ten t
 
 Coverage is gated by Codecov on the pull request, not locally ([ADR 095](adr/095-coverage-is-gated-by-codecov.md)). `codecov/patch` needs 80% of the lines your change adds or modifies, and `codecov/project` must not drop. A test covers a scenario the running app can produce; a branch no real caller can reach is deleted, not tested.
 
+To see whether a test depends on the machine's speed, run it with every core kept busy: `node scripts/under-load.mjs -- npx vitest run <spec>` (`--threads N` to choose how many). The load is threads of that one process, so it ends when the command does. Never make load with background shell jobs (`yes > /dev/null &`): a non-interactive shell cannot kill them reliably, and ten such processes once ran for four hours, until the e2e check refused the machine as busy. That refusal now names the busiest processes.
+
 ### Measure performance
 
 ```bash

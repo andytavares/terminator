@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { e2eSpecsOf, waitForQuiet } from '../../../scripts/ci-e2e-local.mjs'
+import { busiestProcesses, e2eSpecsOf, waitForQuiet } from '../../../scripts/ci-e2e-local.mjs'
 
 /** A machine whose load reads each value in turn, then stays at the last. */
 function machine(loads: number[], cores = 16) {
@@ -51,5 +51,26 @@ describe('which e2e specs the local run gives its shards', () => {
   it('runs each spec once: no burn-in or repeat is left in the script', () => {
     const source = readFileSync(resolve(__dirname, '../../../scripts/ci-e2e-local.mjs'), 'utf8')
     expect(source).not.toMatch(/burn|repeat/i)
+  })
+})
+
+// A busy machine is refused; the refusal names what is busy, so a process left behind (ten
+// orphaned `yes` loads once ran for four hours) is seen at once rather than waited out.
+describe('what keeps the machine busy', () => {
+  const ps = [
+    '%CPU COMM',
+    '  0.4 /usr/sbin/cfprefsd',
+    '100.0 yes',
+    ' 99.6 yes',
+    ' 55.7 com.apple.Virtualization.VirtualMachine',
+    '  1.0 node',
+  ].join('\n')
+
+  it('lists the busiest processes, busiest first, with their share of a core', () => {
+    expect(busiestProcesses(ps, 3)).toEqual([
+      '100.0%  yes',
+      '99.6%  yes',
+      '55.7%  com.apple.Virtualization.VirtualMachine',
+    ])
   })
 })

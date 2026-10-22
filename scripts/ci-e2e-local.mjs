@@ -37,13 +37,29 @@ export async function waitForQuiet({ readLoad, cores, pause, limitMs }) {
   }
 }
 
+/** The `count` busiest processes in `ps -Ao pcpu,comm -r` output, as `<cpu>%  <command>`. */
+export function busiestProcesses(psOutput, count) {
+  return psOutput
+    .split('\n')
+    .slice(1)
+    .map((line) => line.trim().match(/^([\d.]+)\s+(.+)$/))
+    .filter((match) => match !== null)
+    .map(([, cpu, command]) => ({ cpu: Number(cpu), command }))
+    .sort((a, b) => b.cpu - a.cpu)
+    .slice(0, count)
+    .map(({ cpu, command }) => `${cpu.toFixed(1)}%  ${command}`)
+}
+
+const readProcesses = () => execFileSync('ps', ['-Ao', 'pcpu,comm', '-r'], { encoding: 'utf8' })
+
 async function requireQuietMachine() {
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
   const machine = { readLoad: () => loadavg()[0], cores: cpus().length, pause }
   if (await waitForQuiet({ ...machine, limitMs: QUIET_WAIT_MS })) return
   console.error(
-    `Load average is ${loadavg()[0].toFixed(1)} on ${cpus().length} cores after ${QUIET_WAIT_MS / 1000}s. Quiet the machine and run again.`
+    `Load average is ${loadavg()[0].toFixed(1)} on ${cpus().length} cores after ${QUIET_WAIT_MS / 1000}s. Quiet the machine and run again. Busiest now:`
   )
+  for (const line of busiestProcesses(readProcesses(), 8)) console.error(`  ${line}`)
   process.exit(2)
 }
 
