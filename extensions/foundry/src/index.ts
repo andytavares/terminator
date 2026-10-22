@@ -10,6 +10,7 @@ import { startSensorTick, stopSensorTick } from './sensors/sensor-tick.js'
 import { startRefineryTick, stopRefineryTick } from './line/refinery-run.js'
 import { executingOrders, adoptedRoots } from './line/run-control.js'
 import { settleProofs } from './line/baseline.js'
+import { settleBackground } from './background.js'
 import { createDeciding, createStandingSources } from './ipc/standing.js'
 import { createForgeLoop } from './forge/forge-loop.js'
 import { registerForgeChannels } from './ipc/forge-registration.js'
@@ -88,8 +89,9 @@ export async function deactivate(): Promise<void> {
   const refineryStopped = stopRefineryTick()
   clearPendingNewOrder()
   const supervisionStopped = stopSupervisionRuntime()
-  // Last, so everything else is already stopped while a read, a tick or a base-branch proof in
-  // flight ends: each writes into the records until it does.
+  // Last, so everything else is already stopped while a read, a tick, a base-branch proof, a run
+  // or a Forge turn in flight ends: each writes into the records until it does. The runner's
+  // dispose ended every agent session, so none waits on one.
   await Promise.all([homeStopped, sensorsStopped, refineryStopped, supervisionStopped])
-  await settleProofs()
+  await Promise.all([settleProofs(), settleBackground()])
 }

@@ -13,6 +13,7 @@ import { activate } from '../../src/index.ts'
 import { runtime } from '../../src/runtime/runtime-state.ts'
 import { settleProofs } from '../../src/line/baseline.ts'
 import { settleBackground } from '../../src/background.ts'
+import { endOpenTurns } from './supervision-mocks.ts'
 import type { FoundryHost } from './foundry-host.js'
 
 export { deactivate } from '../../src/index.ts'
@@ -29,5 +30,8 @@ export async function activateFoundry(host: FoundryHost): Promise<void> {
 /** Settles once the base-branch proofs and the background work (runs, Forge turns, ledger lines) a
  * test started have ended: each writes records until it does, so the next test waits for it. */
 export async function settleFoundryWork(): Promise<void> {
+  // A turn a test left running ends as the runner's dispose would end it; work that waits on it
+  // then ends too.
+  endOpenTurns()
   await Promise.all([settleProofs(), settleBackground()])
 }

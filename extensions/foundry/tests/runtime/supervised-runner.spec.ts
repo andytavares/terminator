@@ -453,6 +453,16 @@ function disposingTests() {
     r.dispose()
     expect(await pending).toMatchObject({ permissionDecision: 'deny' })
   })
+
+  // A run waiting for a turn to end waited for ever once the runner was gone: deactivating the
+  // extension left the run with no end and no record of why.
+  it('ends each running session, with no exit code, so nothing waits on it for ever', async () => {
+    const ends: Array<number | null> = []
+    const r = runner()
+    await r.start({ ...start, onEnd: (code) => ends.push(code) })
+    r.dispose()
+    expect(ends).toEqual([null])
+  })
 }
 
 describe('the environment the agent runs in', () => {

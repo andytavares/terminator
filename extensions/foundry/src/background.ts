@@ -12,7 +12,7 @@ export function inBackground(work: Promise<unknown>): void {
   work.then(forget, forget)
 }
 
-/** Settles once all the work started in the background has. @internal */
+/** Settles once all the work started in the background has. */
 export async function settleBackground(): Promise<void> {
   await Promise.allSettled([...inFlight])
 }
