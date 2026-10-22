@@ -13,7 +13,10 @@ export default defineConfig({
     ...(process.env.E2E_TOOLS === '1' ? [] : ['**/tools/**']),
     ...(process.env.E2E_LIVE === '1' ? [] : ['**/live/**']),
   ],
-  timeout: 30000,
+  // One bound per test and one per assertion, there only to catch a hang: far above any real
+  // duration, so a slower runner never changes a result (ADR 123). Specs may not set their own.
+  timeout: 180_000,
+  expect: { timeout: 30_000 },
   // No retries: a test that fails once fails the build. See
   // docs/research/e2e-deterministic-selective.md.
   retries: 0,

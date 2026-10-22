@@ -27,7 +27,4 @@ export function installExtensionBridge(fallback: unknown, extra: Record<string, 
   return { responses, invoke, push: pushToSubscriber, calls: payloadsSentTo }
 }
 
-/** Waits for an assertion to hold, allowing for a loaded machine. */
-export function eventually(assertion: () => void, timeout = 8000) {
-  return vi.waitFor(assertion, { timeout })
-}
+export { eventually } from './eventually'

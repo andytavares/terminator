@@ -39,13 +39,12 @@ const COVERED = [
   'packages/extension-sdk/src/example.ts',
   'packages/extension-ui/src/Example.tsx',
   'packages/extension-ui/stories/Example.stories.tsx',
-  'tests/unit/renderer/example.spec.tsx',
-  'tests/unit/renderer-remote/example.spec.ts',
-  'tests/unit/packages/example.spec.ts',
+  // Specs are linted with type information, so each is a spec a test project includes.
+  'tests/unit/renderer/App.render-count.spec.tsx',
+  'tests/unit/renderer-remote/App.spec.tsx',
   'tests/unit/ConfirmDialog.spec.tsx',
-  'tests/integration/example.spec.ts',
-  'tests/perf/example.spec.ts',
-  'tests/unit/example.spec.ts',
+  'tests/integration/foundry-portability.spec.ts',
+  'tests/unit/lint/size-limits.spec.ts',
   'scripts/perf/example.mts',
   'vitest.example.config.ts',
 ]

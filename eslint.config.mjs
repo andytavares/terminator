@@ -2,6 +2,9 @@ import js from '@eslint/js'
 import { defineConfig, globalIgnores } from 'eslint/config'
 import prettier from 'eslint-config-prettier'
 import reactHooks from 'eslint-plugin-react-hooks'
+import playwright from 'eslint-plugin-playwright'
+import vitest from '@vitest/eslint-plugin'
+import testingLibrary from 'eslint-plugin-testing-library'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
@@ -40,7 +43,44 @@ function extensionImportBoundary() {
 }
 
 const SLEEP_MESSAGE =
-  'Tests never sleep (ADR 070, ADR 120). Wait on the condition you assert next: a locator assertion, expect.poll, vi.waitFor, fake timers, or the callback the code under test calls.'
+  'Tests never sleep or wait a tick (ADR 123). Wait on the condition you assert next: a locator assertion, expect.poll, eventually() from tests/support/eventually.ts, fake timers, or the promise the code under test returns.'
+
+const TIMEOUT_MESSAGE =
+  'No per-test or per-wait time limit (ADR 123). One bound exists only to catch a hang: vitest.config.ts and playwright.config.ts set it far above any real duration. Wait on a signal instead.'
+
+// Waits that hope the work is done after a tick or a delay. A tick is not a signal.
+const TICK_WAITS = ['setTimeout', 'setImmediate', 'queueMicrotask'].flatMap((name) => [
+  `NewExpression[callee.name='Promise'] CallExpression[callee.name='${name}']`,
+  `NewExpression[callee.name='Promise'] > Identifier[name='${name}']`,
+])
+
+// Calls whose options may carry a time limit: Vitest's hooks and tests, waits and Playwright's
+// locator actions and assertions.
+const TIMED_CALLS =
+  '/^(it|test|describe|beforeAll|beforeEach|afterAll|afterEach|expect|waitFor|poll|toPass|toBeVisible|toBeHidden|toHaveText|toContainText|toHaveCount|toHaveValue|toHaveAttribute|toBeEnabled|toBeDisabled|toBeChecked|toHaveURL|toHaveTitle|toBeFocused|toHaveClass|toBeAttached|toBeEditable|toBeEmpty|toHaveScreenshot|waitForEvent|waitForSelector|waitForFunction|waitForURL|waitForLoadState|waitForRequest|waitForResponse|firstWindow|click|dblclick|fill|press|pressSequentially|type|check|uncheck|hover|focus|textContent|innerText|innerHTML|inputValue|getAttribute|selectOption|setInputFiles|dispatchEvent|scrollIntoViewIfNeeded|screenshot|evaluate|launch)$/'
+
+/** Every way a spec can set its own time limit. */
+const TIMEOUT_OVERRIDES = [
+  `CallExpression[callee.name=${TIMED_CALLS}] > ObjectExpression > Property[key.name='timeout']`,
+  `CallExpression[callee.property.name=${TIMED_CALLS}] > ObjectExpression > Property[key.name='timeout']`,
+  'CallExpression[callee.name=/^(it|test|beforeAll|beforeEach|afterAll|afterEach)$/] > Literal[raw=/^[0-9_]+$/]',
+  'CallExpression[callee.object.name=/^(it|test|describe)$/] > Literal[raw=/^[0-9_]+$/]',
+  "CallExpression[callee.object.name='test'][callee.property.name=/^(setTimeout|slow)$/]",
+  "CallExpression[callee.object.name='vi'][callee.property.name='setConfig']",
+  "CallExpression[callee.object.name='vi'][callee.property.name='waitFor']",
+]
+
+// Spec and e2e files, with type information: a promise that is not awaited is work that
+// outlives its test.
+const TEST_FILES = ['**/*.spec.ts', '**/*.spec.tsx', 'tests/**/*.ts', 'tests/**/*.tsx']
+const TEST_PROJECTS = [
+  './tsconfig.test.json',
+  './tsconfig.main.json',
+  './tsconfig.shared.json',
+  './packages/extension-ui/tsconfig.test.json',
+  './packages/extension-sdk/tsconfig.json',
+  './extensions/*/tsconfig.test.json',
+]
 
 export default defineConfig([
   // Build output and other tools' trees. extensions/*/src/index.js is the
@@ -135,14 +175,67 @@ export default defineConfig([
           message: SLEEP_MESSAGE,
         },
         {
-          selector: "NewExpression[callee.name='Promise'] CallExpression[callee.name='setTimeout']",
-          message: SLEEP_MESSAGE,
-        },
-        {
           selector: 'CallExpression[callee.name=/^(sleep|delay)$/]',
           message: SLEEP_MESSAGE,
         },
+        ...TICK_WAITS.map((selector) => ({ selector, message: SLEEP_MESSAGE })),
+        {
+          selector: "CallExpression[callee.object.name='process'][callee.property.name='nextTick']",
+          message: SLEEP_MESSAGE,
+        },
+        {
+          selector:
+            "AwaitExpression > CallExpression[callee.object.name='Promise'][callee.property.name='resolve'][arguments.length=0]",
+          message: SLEEP_MESSAGE,
+        },
+        ...TIMEOUT_OVERRIDES.map((selector) => ({ selector, message: TIMEOUT_MESSAGE })),
       ],
+    },
+  },
+  {
+    files: TEST_FILES,
+    languageOptions: {
+      parserOptions: { project: TEST_PROJECTS, tsconfigRootDir: import.meta.dirname },
+    },
+    rules: {
+      '@typescript-eslint/no-floating-promises': ['error', { ignoreVoid: false }],
+      '@typescript-eslint/await-thenable': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+    },
+  },
+  {
+    files: ['**/*.spec.ts', '**/*.spec.tsx'],
+    ignores: ['tests/e2e/**'],
+    plugins: { vitest },
+    rules: {
+      'vitest/valid-expect': 'error',
+      'vitest/valid-expect-in-promise': 'error',
+      'vitest/require-awaited-expect-poll': 'error',
+      'vitest/no-focused-tests': 'error',
+      'vitest/no-done-callback': 'error',
+    },
+  },
+  {
+    files: ['**/*.spec.tsx'],
+    plugins: { 'testing-library': testingLibrary },
+    rules: {
+      'testing-library/await-async-utils': 'error',
+      'testing-library/await-async-events': 'error',
+      'testing-library/no-wait-for-side-effects': 'error',
+    },
+  },
+  {
+    files: ['tests/e2e/**/*.ts'],
+    plugins: { playwright },
+    rules: {
+      'playwright/prefer-web-first-assertions': 'error',
+      'playwright/missing-playwright-await': 'error',
+      'playwright/no-wait-for-selector': 'error',
+      'playwright/no-wait-for-timeout': 'error',
+      'playwright/no-networkidle': 'error',
+      'playwright/no-force-option': 'error',
+      'playwright/no-element-handle': 'error',
+      'playwright/no-useless-await': 'error',
     },
   },
   {
