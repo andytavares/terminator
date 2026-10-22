@@ -21,7 +21,7 @@
     "build": "npm run clean && npm run build:extensions && npm run build:remote && electron-vite build",
     "prepreview": "install-electron",
     "preview": "electron-vite preview",
-    "test": "vitest run --coverage",
+    "test": "node scripts/test-select.mjs --run unit",
     "test:live": "vitest run --config vitest.live.config.ts",
     "test:perf": "vitest run --config vitest.perf.config.ts",
     "test:watch": "vitest",
