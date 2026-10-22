@@ -148,8 +148,8 @@ describe('workspace.addProject', () => {
     })
   })
 
-  it('treats the directory as a worktree unless told otherwise', () => {
-    build().workspace.addProject({ workspaceId: 'ws-1', name: 'a', worktreePath: '/wt/a' })
+  it('treats the directory as a worktree unless told otherwise', async () => {
+    await build().workspace.addProject({ workspaceId: 'ws-1', name: 'a', worktreePath: '/wt/a' })
     expect(projects[0].isWorktree).toBe(true)
   })
 })
@@ -235,20 +235,20 @@ describe('workspace.listProjects and deleteProject', () => {
 const openInput = { projectId: 'proj-1', cwd: '/wt/a', tabTitle: 'feat/x' }
 
 describe('pty.openTerminal', () => {
-  it('spawns in the directory it was given', () => {
-    build().pty.openTerminal(openInput)
+  it('spawns in the directory it was given', async () => {
+    await build().pty.openTerminal(openInput)
     expect(spawned[0]).toMatchObject({ cwd: '/wt/a', projectId: 'proj-1', tabTitle: 'feat/x' })
   })
 
-  it('marks it an agent terminal by default, though a person can still type in it', () => {
-    build().pty.openTerminal(openInput)
+  it('marks it an agent terminal by default, though a person can still type in it', async () => {
+    await build().pty.openTerminal(openInput)
     expect(spawned[0].type).toBe('agent')
   })
 
-  it('holds output until a tab is mounted to receive it', () => {
+  it('holds output until a tab is mounted to receive it', async () => {
     // The renderer has to be told, adopt it, render and mount an xterm first.
     // Delivered live, everything in that window goes to nobody.
-    build().pty.openTerminal(openInput)
+    await build().pty.openTerminal(openInput)
     expect(spawned[0].holdOutput).toBe(true)
   })
 
@@ -272,10 +272,10 @@ describe('pty.openTerminal — what it hands back and sends', () => {
     expect(relayed).toEqual([sessionId])
   })
 
-  it('does not broadcast its output or exit to every window and view', () => {
+  it('does not broadcast its output or exit to every window and view', async () => {
     // Each chunk used to go to every window and extension view, unbatched and
     // unacknowledged, so a chatty agent cost every one of them a message per chunk.
-    build().pty.openTerminal(openInput)
+    await build().pty.openTerminal(openInput)
     expect(subscribedToPty).toEqual([])
     expect(broadcasts.map((b) => b.channel)).toEqual(['terminal:adopt'])
   })

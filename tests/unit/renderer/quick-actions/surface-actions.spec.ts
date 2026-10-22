@@ -55,11 +55,11 @@ describe('buildSurfaceActions — never takes a letter another action in its gro
     expect(actions[0].mnemonic).toBe('i')
   })
 
-  it('activates the surface when run', () => {
+  it('activates the surface when run', async () => {
     const activate = vi.fn()
     const s = surface()
     const actions = buildSurfaceActions([s], activate, { groups: [gitGroup] })
-    actions[0].run()
+    await actions[0].run()
     expect(activate).toHaveBeenCalledWith(s)
   })
 })

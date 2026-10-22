@@ -75,10 +75,10 @@ const NOTHING_FOCUSED: QuickActionTarget = {
 }
 
 /** Runs one core action as the palette would, for a terminal focused in p1. */
-function runCoreAction(id: string, target: QuickActionTarget = FOCUSED) {
+async function runCoreAction(id: string, target: QuickActionTarget = FOCUSED): Promise<void> {
   const { result } = renderHook(() => useCoreQuickActions(target, shell))
-  act(() => {
-    void result.current.find((a) => a.id === id)!.run()
+  await act(async () => {
+    await result.current.find((a) => a.id === id)!.run()
   })
 }
 
@@ -95,18 +95,18 @@ beforeEach(() => {
 })
 
 describe('useCoreQuickActions — the focused terminal', () => {
-  it('Clear sends a form feed to the focused terminal', () => {
-    runCoreAction('core.clear')
+  it('Clear sends a form feed to the focused terminal', async () => {
+    await runCoreAction('core.clear')
     expect(terminal).toHaveBeenCalledWith('s1', '\x0c')
   })
 
-  it('Clear does nothing with no terminal focused', () => {
-    runCoreAction('core.clear', NOTHING_FOCUSED)
+  it('Clear does nothing with no terminal focused', async () => {
+    await runCoreAction('core.clear', NOTHING_FOCUSED)
     expect(terminal).not.toHaveBeenCalled()
   })
 
-  it('Edit session note opens the note of the focused terminal', () => {
-    runCoreAction('core.edit-note')
+  it('Edit session note opens the note of the focused terminal', async () => {
+    await runCoreAction('core.edit-note')
     expect(shell.onEditNote).toHaveBeenCalledWith('s1')
   })
 
@@ -119,7 +119,7 @@ describe('useCoreQuickActions — the focused terminal', () => {
     useSessionStore
       .getState()
       .activateSplit('p1', { targetId: 's1', newId: 's2', direction: 'vertical' })
-    runCoreAction('core.close-tab')
+    await runCoreAction('core.close-tab')
     await eventually(() => expect(useSessionStore.getState().sessions.has('s2')).toBe(false))
     expect(useSessionStore.getState().getPaneLayout('p1')).toBeNull()
     expect(useSessionStore.getState().getActiveSessionForProject('p1')).toBe('s1')
@@ -127,36 +127,36 @@ describe('useCoreQuickActions — the focused terminal', () => {
 })
 
 describe('useCoreQuickActions — the focused terminal — cycling tabs in a project with none open changes nothing', () => {
-  it('cycling tabs in a project with none open changes nothing', () => {
+  it('cycling tabs in a project with none open changes nothing', async () => {
     seedFocusedSessions([])
-    runCoreAction('core.next-tab')
+    await runCoreAction('core.next-tab')
     expect(useSessionStore.getState().getActiveSessionForProject('p1')).toBeNull()
   })
 })
 
 describe('useCoreQuickActions — sessions waiting on you', () => {
-  it('Next waiting does nothing when no session waits', () => {
-    runCoreAction('core.next-waiting')
+  it('Next waiting does nothing when no session waits', async () => {
+    await runCoreAction('core.next-waiting')
     expect(useSessionStore.getState().focusRequest).toBeNull()
   })
 
-  it('Next waiting reveals the waiting session after the focused one', () => {
+  it('Next waiting reveals the waiting session after the focused one', async () => {
     seedFocusedSessions([
       terminalSessionOf({ id: 's1', projectId: 'p1', bellCount: 1 }),
       terminalSessionOf({ id: 's2', projectId: 'p1', bellCount: 1 }),
     ])
-    runCoreAction('core.next-waiting')
+    await runCoreAction('core.next-waiting')
     expect(useSessionStore.getState().getActiveSessionForProject('p1')).toBe('s2')
   })
 })
 
 describe('useCoreQuickActions — the global tabs', () => {
-  it('Resume and Home both open Home', () => {
+  it('Resume and Home both open Home', async () => {
     useExtensionRegistry.getState().setActiveGlobalTab(null)
-    runCoreAction('core.resume')
+    await runCoreAction('core.resume')
     expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.home')
     useExtensionRegistry.getState().setActiveGlobalTab(null)
-    runCoreAction('core.open-home')
+    await runCoreAction('core.open-home')
     expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.home')
   })
 })
@@ -172,37 +172,37 @@ describe('useCoreQuickActions — resume', () => {
     useDeskSelection.setState({ resumeRequested: false })
   })
 
-  it('asks Home to open the latest conversation when one can be resumed', () => {
+  it('asks Home to open the latest conversation when one can be resumed', async () => {
     useSessionRecordsStore.setState({ records: new Map([record({})]) as never })
-    runCoreAction('core.resume')
+    await runCoreAction('core.resume')
     expect(useDeskSelection.getState().resumeRequested).toBe(true)
   })
 
-  it('only shows Home when nothing can be resumed', () => {
+  it('only shows Home when nothing can be resumed', async () => {
     useSessionRecordsStore.setState({ records: new Map([record({ resumable: false })]) as never })
-    runCoreAction('core.resume')
+    await runCoreAction('core.resume')
     expect(useDeskSelection.getState().resumeRequested).toBe(false)
     expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.home')
   })
 })
 
 describe('useCoreQuickActions — the linked issue', () => {
-  it('View issue opens the drawer for the active branch', () => {
+  it('View issue opens the drawer for the active branch', async () => {
     focused.workItem = { ref: { tracker: 'linear', key: 'ENG-1' } }
-    runCoreAction('core.view-issue')
+    await runCoreAction('core.view-issue')
     expect(useIntegrationsStore.getState().drawerProjectId).toBe('p1')
   })
 
-  it('Open issue opens the ticket in the tracker', () => {
+  it('Open issue opens the ticket in the tracker', async () => {
     focused.workItem = { ref: { tracker: 'linear', key: 'ENG-1' } }
     focused.issue = { url: 'https://linear.app/t/ENG-1' }
-    runCoreAction('core.open-issue')
+    await runCoreAction('core.open-issue')
     expect(openExternal).toHaveBeenCalledWith('https://linear.app/t/ENG-1')
   })
 
-  it('Open issue does nothing while the ticket has not loaded', () => {
+  it('Open issue does nothing while the ticket has not loaded', async () => {
     focused.workItem = { ref: { tracker: 'linear', key: 'ENG-1' } }
-    runCoreAction('core.open-issue')
+    await runCoreAction('core.open-issue')
     expect(openExternal).not.toHaveBeenCalled()
   })
 })

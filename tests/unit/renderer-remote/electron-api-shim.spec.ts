@@ -97,10 +97,13 @@ describe('electron-api-shim bootstrap', () => {
     await eventually(() => expect(MockWebSocket.instances).toHaveLength(1))
     const ws = MockWebSocket.instances[0]
     const api = window.electronAPI
-    void api.workspace.list()
+    const pending = api.workspace.list() as Promise<unknown>
     expect(ws.sentMessages.length).toBe(0)
     ws.onopen?.()
     expect(ws.sentMessages.length).toBeGreaterThan(0)
+    const id = (JSON.parse(ws.sentMessages[0]) as { id: string }).id
+    ws.onmessage?.({ data: JSON.stringify({ type: 'result', id, result: ['ws1'] }) })
+    await expect(pending).resolves.toEqual(['ws1'])
   })
 })
 
@@ -341,13 +344,16 @@ describe('electron-api-shim: what reaches a handler, and the local stand-ins —
   })
   it('extensionBridge.invoke calls invoke with channel', async () => {
     const { api, ws } = await loadShim()
-    void api.extensionBridge.invoke('custom:channel', { data: 1 })
-    expect(JSON.parse(ws.sentMessages[0])).toEqual({
+    const pending = api.extensionBridge.invoke('custom:channel', { data: 1 }) as Promise<unknown>
+    const sent = JSON.parse(ws.sentMessages[0]) as { id: string }
+    expect(sent).toEqual({
       type: 'invoke',
       id: expect.any(String),
       channel: 'custom:channel',
       args: [{ data: 1 }],
     })
+    ws.onmessage?.({ data: JSON.stringify({ type: 'result', id: sent.id, result: null }) })
+    await expect(pending).resolves.toBeNull()
   })
 })
 

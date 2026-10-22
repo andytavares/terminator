@@ -67,7 +67,7 @@ describe('buildExtensionActions — disables a repo-required command with "No re
     expect(actions[0].disabledReason).toBe('No terminal focused')
   })
 
-  it('calls execute with the command key and the given context', () => {
+  it('calls execute with the command key and the given context', async () => {
     const execute = vi.fn()
     const c = ctx()
     const actions = buildExtensionActions(
@@ -75,7 +75,7 @@ describe('buildExtensionActions — disables a repo-required command with "No re
       [gitGroup],
       { ctx: c, execute }
     )
-    actions[0].run()
+    await actions[0].run()
     expect(execute).toHaveBeenCalledWith('git.push', c)
   })
 })
@@ -105,7 +105,7 @@ describe('buildExtensionActions — shows a dimmed action for a declared command
 })
 
 describe('buildExtensionActions — shows a dimmed action for a declared command the extension never registered — converts renderer-registered commands into top-level actions without mnemonics', () => {
-  it('converts renderer-registered commands into top-level actions without mnemonics', () => {
+  it('converts renderer-registered commands into top-level actions without mnemonics', async () => {
     const action = vi.fn()
     const actions = buildExtensionActions(
       { registered: [], declared: [], renderer: [{ id: 'core.foo', label: 'Foo', action }] },
@@ -114,7 +114,7 @@ describe('buildExtensionActions — shows a dimmed action for a declared command
     )
     expect(actions[0]).toMatchObject({ id: 'renderer:core.foo', group: 'top', label: 'Foo' })
     expect(actions[0].mnemonic).toBeUndefined()
-    actions[0].run()
+    await actions[0].run()
     expect(action).toHaveBeenCalled()
   })
 })

@@ -102,7 +102,7 @@ describe('api.globalShortcut.register', () => {
     const api = createExtensionAPI('test.gs')
     const handler = vi.fn()
 
-    api.globalShortcut.register('CmdOrCtrl+Shift+Space', handler)
+    await api.globalShortcut.register('CmdOrCtrl+Shift+Space', handler)
 
     expect(electronGS.register).toHaveBeenCalledWith('CmdOrCtrl+Shift+Space', expect.any(Function))
   })

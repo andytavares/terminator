@@ -859,15 +859,14 @@ describe('UnifiedSidebar — what the branch-first sidebar draws', () => {
 
   it('draws none of the surfaces it retired', () => {
     const { container } = renderSidebar()
-    for (const retired of [
+    const stillRendered = [
       '.extension-footer',
       '.scratch-section',
       '.sidebar-header__tabs',
       '.ws-row',
       '.unified-sidebar__bulk-bar',
-    ]) {
-      expect(container.querySelector(retired), retired).toBeNull()
-    }
+    ].filter((retired) => container.querySelector(retired))
+    expect(stillRendered).toEqual([])
   })
 })
 

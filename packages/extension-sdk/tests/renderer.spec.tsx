@@ -68,8 +68,7 @@ describe('openInBrowser', () => {
     process.once('unhandledRejection', unhandled)
     shellOpening(() => Promise.reject(new Error('no browser')))
 
-    openInBrowser('https://example.com')
-    await new Promise((resolve) => setImmediate(resolve))
+    await openInBrowser('https://example.com')
 
     process.off('unhandledRejection', unhandled)
     expect(unhandled).not.toHaveBeenCalled()

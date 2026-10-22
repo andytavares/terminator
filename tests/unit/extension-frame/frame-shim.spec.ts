@@ -115,7 +115,7 @@ function fakeFramePort(): FakePort {
 describe('frame-shim transport queueing', () => {
   it('delivers a request made before the port arrives once the port is adopted', async () => {
     const { port } = await loadShimInFrame()
-    void frameApi().workspace.list()
+    const pending = frameApi().workspace.list() as Promise<unknown>
     frameApi().logger.write('info', 'test', 'queued')
     expect(port.posted).toEqual([])
     deliverPort(port as unknown as MessagePort)
@@ -125,6 +125,8 @@ describe('frame-shim transport queueing', () => {
       channel: 'log:write',
       payload: { level: 'info', namespace: 'test', message: 'queued' },
     })
+    port.onmessage?.({ data: { type: 'result', id: 'f1', result: ['ws1'] } })
+    await expect(pending).resolves.toEqual(['ws1'])
   })
 })
 
@@ -134,11 +136,13 @@ describe('frame-shim port replacement', () => {
     deliverPort(port as unknown as MessagePort)
     const replacement = fakeFramePort()
     deliverPort(replacement as unknown as MessagePort)
-    void frameApi().workspace.list()
+    const pending = frameApi().workspace.list() as Promise<unknown>
     expect(port.posted).toEqual([])
     expect(replacement.posted).toContainEqual(
       expect.objectContaining({ type: 'invoke', channel: 'workspace:list' })
     )
+    replacement.onmessage?.({ data: { type: 'result', id: 'f1', result: ['ws1'] } })
+    await expect(pending).resolves.toEqual(['ws1'])
   })
 })
 

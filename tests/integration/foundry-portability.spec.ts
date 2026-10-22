@@ -159,8 +159,9 @@ describe('Foundry in a repository it has never seen: where the records go', () =
     })) as { order: WorkOrder }
 
     const orderPath = path.join(dataRoot, 'orders', seeded.order.id)
-    for (const file of ['order.json', 'order.md', 'ledger.jsonl']) {
-      expect(fs.existsSync(path.join(orderPath, file)), file).toBe(true)
-    }
+    const missing = ['order.json', 'order.md', 'ledger.jsonl'].filter(
+      (file) => !fs.existsSync(path.join(orderPath, file))
+    )
+    expect(missing).toEqual([])
   })
 })
