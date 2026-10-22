@@ -1,0 +1,64 @@
+docs/adr/042-foundry-installs-nothing.md
+  s_f6f18e5557b141::t_aa44fc072272e5 3
+extensions/foundry/tests/verify/toolchain-probe.spec.ts
+  s_f6f18e5557b141::t_46727e999c6643 4,65-67,84,93,100,106-107,118-121,147-149,173-175,189-190,210-211,216,225,235
+  s_f6f18e5557b141::t_764f9eaee0ce02 86
+extensions/foundry/src/verify/toolchain-probe.ts
+  s_f6f18e5557b141::t_7fddf9cd0f212e 20-22
+  s_f6f18e5557b141::t_46727e999c6643 1,38
+extensions/foundry/src/order/schema.ts
+  s_f6f18e5557b141::t_46727e999c6643 54,61
+  s_f6f18e5557b141::t_6b94c63052a3e1 2
+extensions/foundry/src/line/execution-final.ts
+  s_f6f18e5557b141::t_75ab0364712515 113-115,171,217,221-228,279-281,283-290,292,294,296,305,308,315-321,412,422,458
+docs/adr/111-the-base-branch-is-proven-while-the-order-is-shaped.md
+  s_f6f18e5557b141::t_aa44fc072272e5 3
+docs/adr/122-whose-failure-is-it-by-exit-code.md
+  s_f6f18e5557b141::t_aa44fc072272e5 1-58
+docs/adr/121-a-repository-profile-proven-on-the-base-branch.md
+  s_f6f18e5557b141::t_aa44fc072272e5 1-56
+docs/adr/088-foundry-mends-installs-and-never-opens-orders.md
+  s_f6f18e5557b141::t_aa44fc072272e5 3
+extensions/foundry/tests/line/baseline.spec.ts
+  s_f6f18e5557b141::t_cf62f59d3f56a8 150-162
+  s_f6f18e5557b141::t_81f34e2b5e3674 163,169-172,177-201
+extensions/foundry/tests/line/executor.spec.ts
+  s_f6f18e5557b141::t_cf62f59d3f56a8 1004-1007,1261-1262,1264-1272,1274,1280,1287,1289,1294-1299,1302,1305-1309,1311-1312,1316-1318,1323-1324,1327-1331
+  s_f6f18e5557b141::t_2ffce94b5c4a63 138-140,1003,1332-1350,1352-1353,1357-1372,1376-1378,1382
+extensions/foundry/src/line/baseline.ts
+  s_f6f18e5557b141::t_7204b0d29a9e54 37,181,184,186,195-208,212-223
+extensions/foundry/tests/forge/red-team.spec.ts
+  s_f6f18e5557b141::t_bcbe5fde3ec160 55
+extensions/foundry/tests/forge/review-loop.spec.ts
+  s_f6f18e5557b141::t_6a9fa165d5f7d1 209
+extensions/foundry/tests/helpers/line-run.ts
+  s_f6f18e5557b141::t_002e11b7ec4f25 32
+extensions/foundry/tests/line/brief.spec.ts
+  s_f6f18e5557b141::t_405987b6d15ebd 68
+extensions/foundry/tests/recipe/built-ins.spec.ts
+  s_f6f18e5557b141::t_8d1bf6526269c9 258
+extensions/foundry/tests/recipe/resolve.spec.ts
+  s_f6f18e5557b141::t_4add283aea0b19 280
+extensions/foundry/tests/recipe/step-kinds.spec.ts
+  s_f6f18e5557b141::t_8edcd41fa85c76 131,151,169
+extensions/foundry/tests/runtime/agent-policy.spec.ts
+  s_f6f18e5557b141::t_f4194593d3a178 31
+extensions/foundry/tests/verify/ladder.spec.ts
+  s_f6f18e5557b141::t_73dc9e9efb9763 27-31,68,83,98-99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "63530f213eebaf444b3d26f4b13fd5e6594e790b",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
