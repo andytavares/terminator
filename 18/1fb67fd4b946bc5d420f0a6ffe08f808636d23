@@ -1,0 +1,83 @@
+extensions/foundry/src/verify/toolchain-probe.ts
+  s_f6f18e5557b141::t_4b7baa8430a43f 1,3,18-19,28-33,41-43,45,47,58-62
+extensions/foundry/hints/go.yaml
+  s_f6f18e5557b141::t_499cc5cb0271ec 1-13
+extensions/foundry/hints/github-actions.yaml
+  s_f6f18e5557b141::t_499cc5cb0271ec 1-15
+extensions/foundry/tests/order/schema.spec.ts
+  s_f6f18e5557b141::t_fedfb444998e44 42-48
+extensions/foundry/hints/node.yaml
+  s_f6f18e5557b141::t_499cc5cb0271ec 1-44
+extensions/foundry/src/profile/store.ts
+  s_f6f18e5557b141::t_07ca3eb0a7f34e 1-14,16,18-46
+  s_f6f18e5557b141::t_05cf022177fe85 15,17
+extensions/foundry/tests/profile/hints.spec.ts
+  s_f6f18e5557b141::t_05cf022177fe85 63-67
+  s_f6f18e5557b141::t_fedfb444998e44 1-62,68-89
+extensions/foundry/tests/profile/resolve.spec.ts
+  s_f6f18e5557b141::t_8089f170b2a3f4 106,108
+  s_f6f18e5557b141::t_fedfb444998e44 1-50,54-82,86-105,107,109-140
+  s_f6f18e5557b141::t_05cf022177fe85 51-53,83-85
+extensions/foundry/hints/flutter.yaml
+  s_f6f18e5557b141::t_499cc5cb0271ec 1-8
+extensions/foundry/tests/profile/store.spec.ts
+  s_f6f18e5557b141::t_fedfb444998e44 1-51
+extensions/foundry/hints/rust.yaml
+  s_f6f18e5557b141::t_499cc5cb0271ec 1-17
+extensions/foundry/src/profile/schema.ts
+  s_f6f18e5557b141::t_0dc8218df74d48 1-24,26-67
+  s_f6f18e5557b141::t_6f8e3d8a0060ef 25
+extensions/foundry/src/profile/resolve.ts
+  s_f6f18e5557b141::t_4b7baa8430a43f 58-62,114-118,121
+  s_f6f18e5557b141::t_07ca3eb0a7f34e 1-57,63-104,106-113,119-120,122-128
+  s_f6f18e5557b141::t_98635937dea0e1 105
+extensions/foundry/tests/profile/order-environment.spec.ts
+  s_f6f18e5557b141::t_fedfb444998e44 1,3-9,11-69
+  s_f6f18e5557b141::t_44830a7d02e71c 2,10
+extensions/foundry/src/profile/hints.ts
+  s_f6f18e5557b141::t_0dc8218df74d48 1-239,241-298
+  s_f6f18e5557b141::t_a55877eab03183 240
+extensions/foundry/hints/python.yaml
+  s_f6f18e5557b141::t_499cc5cb0271ec 1-30
+extensions/foundry/src/order/schema.ts
+  s_f6f18e5557b141::t_3e05ebd9ace343 53-55,60-61
+  s_f6f18e5557b141::t_6f8e3d8a0060ef 98
+  s_f6f18e5557b141::t_7bbe414cf27dce 52,56,59,62,80-97,99-103,107
+  s_f6f18e5557b141::t_ac9cf1e925b142 3
+extensions/foundry/hints/android.yaml
+  s_f6f18e5557b141::t_499cc5cb0271ec 1-9
+extensions/foundry/hints/apple.yaml
+  s_f6f18e5557b141::t_499cc5cb0271ec 1-8
+extensions/foundry/hints/make.yaml
+  s_f6f18e5557b141::t_499cc5cb0271ec 1-7
+extensions/foundry/hints/dotnet.yaml
+  s_f6f18e5557b141::t_499cc5cb0271ec 1-8
+extensions/foundry/hints/qt.yaml
+  s_f6f18e5557b141::t_499cc5cb0271ec 1-8
+extensions/foundry/src/state/foundry-index.ts
+  s_f6f18e5557b141::t_4b7baa8430a43f 10,13
+extensions/foundry/src/forge/intake-source.ts
+  s_f6f18e5557b141::t_e90728f88631d7 7-10,57-58,132-133,136-139,143-159,232-235
+extensions/foundry/src/ipc/forge-channels.ts
+  s_f6f18e5557b141::t_a4c3c7791f819e 4,357
+extensions/foundry/src/verify/ladder.ts
+  s_f6f18e5557b141::t_a95dcba1d53384 80-102,149-153,162-163,173,182
+extensions/foundry/tests/forge/intake-source.spec.ts
+  s_f6f18e5557b141::t_fcb21177e926d0 74-75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "181fb67fd4b946bc5d420f0a6ffe08f808636d23",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
