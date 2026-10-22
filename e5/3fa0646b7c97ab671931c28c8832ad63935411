@@ -1,0 +1,65 @@
+extensions/foundry/src/profile/schema.ts
+  s_f6f18e5557b141::t_2e702ff05b3f81 49,51-52
+  s_f6f18e5557b141::t_3c5c9e09a6ffe6 43
+extensions/foundry/src/forge/converge.ts
+  s_f6f18e5557b141::t_3c5c9e09a6ffe6 35,95,152-157
+  s_f6f18e5557b141::t_f526b9873f904b 78-84,159-160
+  s_f6f18e5557b141::t_3960254d42cbd6 158,161
+extensions/foundry/tests/line/touches-ui.spec.ts
+  s_f6f18e5557b141::t_3c5c9e09a6ffe6 22
+  s_f6f18e5557b141::t_607ab3d43ec180 1-21,23-42
+extensions/foundry/src/profile/resolve.ts
+  s_f6f18e5557b141::t_3c5c9e09a6ffe6 91
+extensions/foundry/hints/node.yaml
+  s_f6f18e5557b141::t_3c5c9e09a6ffe6 45
+extensions/foundry/src/profile/hints.ts
+  s_f6f18e5557b141::t_3c5c9e09a6ffe6 63,297
+extensions/foundry/tests/line/executor.spec.ts
+  s_f6f18e5557b141::t_a5be87f6b40ba0 142-145
+extensions/foundry/tests/runtime/review/risk-grader.spec.ts
+  s_f6f18e5557b141::t_677df555966e53 18-19,136-153,157-163
+  s_f6f18e5557b141::t_f526b9873f904b 2-6,154-156
+  s_f6f18e5557b141::t_921595ebf0d123 164
+extensions/foundry/tests/order/schema.spec.ts
+  s_f6f18e5557b141::t_677df555966e53 46
+extensions/foundry/src/order/schema.ts
+  s_f6f18e5557b141::t_3c5c9e09a6ffe6 93
+extensions/foundry/tests/profile/resolve.spec.ts
+  s_f6f18e5557b141::t_677df555966e53 81,89
+extensions/foundry/hints/rust.yaml
+  s_f6f18e5557b141::t_3c5c9e09a6ffe6 18
+extensions/foundry/src/line/execution-final.ts
+  s_f6f18e5557b141::t_3c5c9e09a6ffe6 6,10,36-44,188
+extensions/foundry/tests/profile/order-environment.spec.ts
+  s_f6f18e5557b141::t_677df555966e53 32
+extensions/foundry/tests/verify/inspection-triggers.spec.ts
+  s_f6f18e5557b141::t_f526b9873f904b 41,98
+  s_f6f18e5557b141::t_677df555966e53 19-31,99-114
+  s_f6f18e5557b141::t_b553be5bd5456c 115
+extensions/foundry/src/runtime/review/risk-grader.ts
+  s_f6f18e5557b141::t_3c5c9e09a6ffe6 5,18-21,42-45,48,51-53,98-100
+  s_f6f18e5557b141::t_f526b9873f904b 46-47
+extensions/foundry/tests/profile/hints.spec.ts
+  s_f6f18e5557b141::t_607ab3d43ec180 90-102
+extensions/foundry/src/verify/inspection-triggers.ts
+  s_f6f18e5557b141::t_3c5c9e09a6ffe6 1,60-61,64,90-91
+extensions/foundry/tests/forge/converge.spec.ts
+  s_f6f18e5557b141::t_607ab3d43ec180 240-242,244-245
+  s_f6f18e5557b141::t_a5be87f6b40ba0 243
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e53fa0646b7c97ab671931c28c8832ad63935411",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
