@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from '../helpers'
+import { openFoundry } from '../foundry-harness'
 import { writeLiveOrder } from './live-order'
 import { expectOneDraftPullRequest, liveOrderDir, liveRunOver, startLiveRun } from './live-run'
 
@@ -66,9 +67,7 @@ test.beforeAll(async () => {
 
   handle = await launchApp()
   await createWorkspace(handle.page, 'live', repo)
-  await handle.page.waitForTimeout(3000)
-  await handle.page.locator('button[aria-label="Foundry"]').click()
-  await handle.page.waitForTimeout(3000)
+  await openFoundry(handle)
 
   // This run is unattended, so it says so.
   //
@@ -147,27 +146,28 @@ function settledAt(observed: Observed, since: number | null): number | null {
  * order's budget) passes; never until the graph settles, since the climb and the shipping
  * come after. Why: docs/CONTRIBUTING.md, "Live specs". */
 async function observeUntilShippedOrStalled(): Promise<Observed> {
-  const deadline = Date.now() + 45 * 60_000
   let last: Observed = {}
   let previous = ''
   let settledSince: number | null = null
-  while (Date.now() < deadline) {
+  const finished = async (): Promise<boolean> => {
     last = (await foundry('foundry:run.observe', { id: ORDER })) as Observed
     previous = logGraphStates(last, previous)
     const over = liveRunOver(liveOrderDir(repo, ORDER))
     if (over !== null) {
       console.log(`[run over] ${over}`)
-      break
+      return true
     }
     settledSince = settledAt(last, settledSince)
     // The tail is not unbounded: an hour of ladder is a hung rung, not a slow
     // one, and the test should say which.
-    if (settledSince !== null && Date.now() - settledSince > 15 * 60_000) {
-      console.log('[gave up] the graph settled 15 minutes ago and nothing shipped')
-      break
-    }
-    await handle.page.waitForTimeout(10_000)
+    const hung = settledSince !== null && Date.now() - settledSince > 15 * 60_000
+    if (hung) console.log('[gave up] the graph settled 15 minutes ago and nothing shipped')
+    return hung
   }
+  await expect
+    .poll(finished, { timeout: 45 * 60_000, intervals: [10_000] })
+    .toBe(true)
+    .catch(() => console.log('[deadline] the run neither shipped nor stalled'))
   return last
 }
 

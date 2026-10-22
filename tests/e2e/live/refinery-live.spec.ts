@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from '../helpers'
+import { openFoundry } from '../foundry-harness'
 import { writeLiveOrder } from './live-order'
 
 // A failed check sends the work back, for real (ADR-063).
@@ -62,9 +63,7 @@ test.beforeAll(async () => {
 
   handle = await launchApp()
   await createWorkspace(handle.page, 'live', repo)
-  await handle.page.waitForTimeout(3000)
-  await handle.page.locator('button[aria-label="Foundry"]').click()
-  await handle.page.waitForTimeout(3000)
+  await openFoundry(handle)
 
   // This run is unattended, so it says so.
   //
@@ -142,13 +141,14 @@ async function runToDraft(id: string): Promise<string> {
   // queue, and this is one operator deliberately running two in a row.
   const started = (await foundry('foundry:run.start', { id, force: true })) as { error?: string }
   expect(started.error, `${id} was refused`).toBeUndefined()
-  const deadline = Date.now() + 25 * 60_000
-  while (Date.now() < deadline) {
+  const shippingEnded = (): boolean => {
     const ledger = ledgerOf(id)
-    if (ledger.includes('ship.ready_asked')) break
-    if (ledger.includes('ship.refused') || ledger.includes('ship.ci_halted')) break
-    await handle.page.waitForTimeout(10_000)
+    return ['ship.ready_asked', 'ship.refused', 'ship.ci_halted'].some((e) => ledger.includes(e))
   }
+  await expect
+    .poll(shippingEnded, { timeout: 25 * 60_000, intervals: [10_000] })
+    .toBe(true)
+    .catch(() => console.log(`[deadline] ${id} neither drafted nor stopped`))
   const pulls = JSON.parse(
     readFileSync(join(repo, '.foundry', 'orders', id, 'pulls.json'), 'utf8')
   ) as { url: string }[]
@@ -191,16 +191,16 @@ async function expectSecondQueuedBehindFirst(): Promise<void> {
 
 /** How the second order came out of the first one's merge: rebased, conflict, or '' by the deadline. */
 async function restackOutcome(): Promise<string> {
-  const deadline = Date.now() + 15 * 60_000
-  let outcome = ''
-  while (Date.now() < deadline) {
+  const outcomeSoFar = (): string => {
     const ledger = ledgerOf(SECOND)
-    if (ledger.includes('refinery.conflict')) outcome = 'conflict'
-    if (ledger.includes('refinery.rebased')) outcome = 'rebased'
-    if (outcome !== '') break
-    await handle.page.waitForTimeout(15_000)
+    if (ledger.includes('refinery.rebased')) return 'rebased'
+    return ledger.includes('refinery.conflict') ? 'conflict' : ''
   }
-  return outcome
+  await expect
+    .poll(outcomeSoFar, { timeout: 15 * 60_000, intervals: [15_000] })
+    .not.toBe('')
+    .catch(() => console.log('[deadline] the second order was neither rebased nor in conflict'))
+  return outcomeSoFar()
 }
 
 /** The restacked branch sits on the new main. Throws, failing the test, when it does not. */

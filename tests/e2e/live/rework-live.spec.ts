@@ -11,6 +11,7 @@ import {
   e2eRunRoot,
   e2eTempDir,
 } from '../helpers'
+import { openFoundry } from '../foundry-harness'
 import { writeLiveOrder } from './live-order'
 import { expectOneDraftPullRequest, liveOrderDir, liveRunOver, startLiveRun } from './live-run'
 
@@ -72,9 +73,7 @@ test.beforeAll(async () => {
 
   handle = await launchApp()
   await createWorkspace(handle.page, 'live', repo)
-  await handle.page.waitForTimeout(3000)
-  await handle.page.locator('button[aria-label="Foundry"]').click()
-  await handle.page.waitForTimeout(3000)
+  await openFoundry(handle)
 
   // This run is unattended, so it says so.
   //
@@ -153,19 +152,19 @@ function logGraphReworks(observed: Observed, previous: string): string {
 
 /** Polls the graph until the run says it is over, or the deadline passes. */
 async function observeUntilOverOrDeadline(): Promise<Observed> {
-  const deadline = Date.now() + 55 * 60_000
   let last: Observed = {}
   let previous = ''
-  while (Date.now() < deadline) {
+  const over = async (): Promise<boolean> => {
     last = (await foundry('foundry:run.observe', { id: ORDER })) as Observed
     previous = logGraphReworks(last, previous)
-    const over = liveRunOver(liveOrderDir(repo, ORDER))
-    if (over !== null) {
-      console.log(`[run over] ${over}`)
-      break
-    }
-    await handle.page.waitForTimeout(10_000)
+    const reason = liveRunOver(liveOrderDir(repo, ORDER))
+    if (reason !== null) console.log(`[run over] ${reason}`)
+    return reason !== null
   }
+  await expect
+    .poll(over, { timeout: 55 * 60_000, intervals: [10_000] })
+    .toBe(true)
+    .catch(() => console.log('[deadline] the run did not finish'))
   return last
 }
 

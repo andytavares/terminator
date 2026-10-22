@@ -77,7 +77,7 @@ async function startAndCapture(handle: AppHandle): Promise<unknown> {
 /** 3. Ends it, and its terminal with it. 4. Home offers to bring it back, and does. */
 async function endAndResume(page: Page): Promise<void> {
   await type(page, '/exit')
-  await page.waitForTimeout(3000)
+  await expect.poll(() => rows(page), { timeout: 30_000 }).not.toContain('? for shortcuts')
   await type(page, 'exit')
 
   await openHome(page)
@@ -106,7 +106,7 @@ test('a real conversation is captured, ended, and brought back', async () => {
 
   // 6. It remembers.
   await expect.poll(() => rows(page), { timeout: 120_000 }).toMatch(/resume|Claude Code/i)
-  await page.waitForTimeout(5000)
+  await expect.poll(() => rows(page), { timeout: 60_000 }).toContain('? for shortcuts')
   await type(page, 'what number did I ask you to remember? reply with digits only')
   await expect.poll(() => rows(page), { timeout: 120_000 }).toContain('4242')
   report.resumedAnswered = true

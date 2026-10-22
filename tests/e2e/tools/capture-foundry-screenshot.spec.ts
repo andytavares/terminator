@@ -1,9 +1,9 @@
-import { test } from '@playwright/test'
-import { writeFileSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
+import { test, expect } from '@playwright/test'
+import { writeFileSync, mkdirSync, readdirSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { writeFileSync as write } from 'node:fs'
 import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from '../helpers'
-import { git } from '../foundry-harness'
+import { git, openFoundry, stationCount } from '../foundry-harness'
 import { extensionPage, inExtensionView } from '../extension-page'
 
 // Retakes the user-guide screenshots of the Foundry surfaces.
@@ -81,7 +81,9 @@ async function openSurface(label: string): Promise<void> {
       label
     )})?.click()`
   )
-  await handle.page.waitForTimeout(1200)
+  const view = await extensionPage(handle, 'foundry')
+  const tab = view.locator('nav[aria-label="Foundry surfaces"] button', { hasText: label })
+  await expect(tab).toHaveAttribute('aria-pressed', 'true')
 }
 
 /** Run in the Foundry view: types an idea into the Forge, and makes it an order. */
@@ -212,10 +214,7 @@ function markOrderRunning(): void {
 async function openFoundryOnRepo(): Promise<void> {
   handle = await launchApp()
   await createWorkspace(handle.page, 'terminator', repo)
-  await handle.page.waitForTimeout(2500)
-
-  await handle.page.locator('button[aria-label="Foundry"]').click()
-  await handle.page.waitForTimeout(3500)
+  await openFoundry(handle)
   mkdirSync(SHOTS, { recursive: true })
 }
 
@@ -225,7 +224,10 @@ async function openFoundryOnRepo(): Promise<void> {
 async function captureForgeWithAnIdea(): Promise<void> {
   await openSurface('Forge')
   await runInFoundry(NEW_ORDER_FROM_IDEA)
-  await handle.page.waitForTimeout(4000)
+  const ordersDir = join(repo, '.foundry', 'orders')
+  await expect
+    .poll(() => (existsSync(ordersDir) ? readdirSync(ordersDir).length : 0))
+    .toBeGreaterThan(0)
   write(join(SHOTS, '08b-foundry-forge.png'), await captureWindow())
 }
 
@@ -234,7 +236,7 @@ async function captureFloor(): Promise<void> {
   await openSurface('Ledger')
   await openSurface('Forge')
   await runInFoundry(`document.querySelector('.fdry-orders button')?.click()`)
-  await handle.page.waitForTimeout(2500)
+  await expect.poll(() => stationCount(handle)).toBeGreaterThan(0)
   write(join(SHOTS, '08e-foundry-floor.png'), await captureWindow())
 }
 
@@ -243,7 +245,8 @@ async function captureFloor(): Promise<void> {
  * extension actually reads, and the panel is where that shows. */
 async function captureSettings(): Promise<void> {
   await runInFoundry(`document.querySelector('button[aria-label="Settings"]')?.click()`)
-  await handle.page.waitForTimeout(1500)
+  const view = await extensionPage(handle, 'foundry')
+  await expect(view.locator('.fdry-settings')).toBeVisible()
   write(join(SHOTS, '08d-foundry-settings.png'), await captureWindow())
 }
 

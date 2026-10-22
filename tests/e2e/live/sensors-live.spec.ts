@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from '../helpers'
+import { openFoundry } from '../foundry-harness'
 
 // A failed check sends the work back, for real (ADR-063).
 //
@@ -61,9 +62,7 @@ test.beforeAll(async () => {
 
   handle = await launchApp()
   await createWorkspace(handle.page, 'live', repo)
-  await handle.page.waitForTimeout(3000)
-  await handle.page.locator('button[aria-label="Foundry"]').click()
-  await handle.page.waitForTimeout(3000)
+  await openFoundry(handle)
 
   // This run is unattended, so it says so.
   //
@@ -187,7 +186,11 @@ async function inboxTextAndShot(): Promise<{ text: string; png: string }> {
  * own poll, so one open since before the sensor ran still shows the signal. */
 async function expectSignalInInbox(red: SignalRow | undefined): Promise<void> {
   await handle.page.locator('button[aria-label="Foundry"]').click()
-  await handle.page.waitForTimeout(6000)
+  await expect
+    .poll(async () => (await inboxTextAndShot().catch(() => ({ text: '' }))).text, {
+      timeout: 60_000,
+    })
+    .toContain(red?.title as string)
   const inbox = await inboxTextAndShot()
   mkdirSync('test-results', { recursive: true })
   writeFileSync(join('test-results', 'inbox-signals.png'), Buffer.from(inbox.png, 'base64'))
