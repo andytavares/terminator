@@ -499,7 +499,8 @@ function whereItIsOfferedAndStartsTests() {
     expect(screen.getByRole('button', { name: 'List view' }).getAttribute('aria-pressed')).toBe(
       'true'
     )
-    expect(screen.getByText(/no orders yet/i)).toBeTruthy()
+    // The order list loads after the view switcher draws.
+    expect(await screen.findByText(/no orders yet/i)).toBeTruthy()
   })
 }
 
