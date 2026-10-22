@@ -81,15 +81,23 @@ const GRAPH: RunGraph = {
   ],
 }
 
-/** A records location holding one run the last application left in flight. */
-async function seedInterruptedRun(over: Partial<WorkOrder> = {}): Promise<void> {
-  dataDir = makeTempDir('fdry-interrupted-')
-  const store = createOrderStore(dataDir)
-  await store.save(order(over))
+/**
+ * A records location holding one run the last application left in flight, and whatever `more`
+ * adds. The extension is pointed at it only once it is complete: records written by hand are
+ * not noticed once the extension has read the location (extensions/foundry/CLAUDE.md, rule 4).
+ */
+async function seedInterruptedRun(
+  over: Partial<WorkOrder> = {},
+  more: (records: string) => Promise<void> = async () => undefined
+): Promise<void> {
+  const records = makeTempDir('fdry-interrupted-')
+  await createOrderStore(records).save(order(over))
   fs.writeFileSync(
-    path.join(dataDir, 'orders', 'WO-1', 'run-graph.json'),
+    path.join(records, 'orders', 'WO-1', 'run-graph.json'),
     JSON.stringify(GRAPH, null, 2)
   )
+  await more(records)
+  dataDir = records
 }
 
 function gatesOnDisk(): Gate[] {
@@ -293,14 +301,15 @@ const RAISED = {
 describe('stopping a run whose agents are still alive', () => {
   it('ends each one, saying why, before the order is cancelled', async () => {
     theRunner.terminalFor.mockReturnValue({ terminalSessionId: 't1', projectId: 'p1' })
-    await seedInterruptedRun()
     // Raised by hand: with live agents nothing adopts it, which is the point.
+    await seedInterruptedRun({}, async (records) => {
+      await createOrderStore(records).record(RAISED)
+      fs.writeFileSync(
+        path.join(records, 'orders', 'WO-1', 'gates.json'),
+        JSON.stringify([BUDGET_GATE])
+      )
+    })
     const store = createOrderStore(dataDir)
-    await store.record(RAISED)
-    fs.writeFileSync(
-      path.join(dataDir, 'orders', 'WO-1', 'gates.json'),
-      JSON.stringify([BUDGET_GATE])
-    )
 
     await host.call('foundry:inbox.decide', { gateId: 'WO-1-budget', option: 'stop' })
     expect(theRunner.stop).toHaveBeenCalledWith(
