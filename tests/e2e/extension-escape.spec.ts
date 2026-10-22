@@ -123,7 +123,7 @@ async function stillShowing(surface: Surface, why: string): Promise<void> {
   await handle.page.evaluate(
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   )
-  expect(await activeExtensionPanel(), why).toBe(surface.id)
+  await expect.poll(() => activeExtensionPanel(), { message: why }).toBe(surface.id)
 }
 
 async function exitsToTheTerminal(surface: Surface, why: string): Promise<void> {
@@ -226,12 +226,16 @@ async function draftKeepsItOpen(surface: DraftSurface): Promise<void> {
   const { label, part } = surface
   await showPanel(surface)
   await bringUpTextField(surface)
-  expect(await inView<boolean>(part, TYPE_DRAFT), `${label} offered no field to type in`).toBe(true)
+  await expect
+    .poll(() => inView<boolean>(part, TYPE_DRAFT), {
+      message: `${label} offered no field to type in`,
+    })
+    .toBe(true)
   await key(part, 'Escape')
   await key(part, 'Escape')
   await stillShowing(surface, `${label} was closed by Escape while a draft was unsaved`)
   if (!surface.inline) return
-  expect(await inView<string>(part, `${FIELD}?.value ?? '<gone>'`)).toBe('UNSAVED DRAFT')
+  await expect.poll(() => inView<string>(part, `${FIELD}?.value ?? '<gone>'`)).toBe('UNSAVED DRAFT')
 }
 
 /** Remote Control's screen has no text field and no dialog: nothing to protect, so the gesture
@@ -316,15 +320,21 @@ async function openNotesComposer(): Promise<void> {
 
 async function dialogTrapsFocusAndClosesOnEscape(): Promise<void> {
   await openNotesComposer()
-  expect(await inView<boolean>(NOTES.part, FOCUS_IN_SURFACE), 'focus moves into the dialog').toBe(
-    true
-  )
+  await expect
+    .poll(() => inView<boolean>(NOTES.part, FOCUS_IN_SURFACE), {
+      message: 'focus moves into the dialog',
+    })
+    .toBe(true)
   for (let i = 0; i < 8; i++) await key(NOTES.part, 'Tab')
-  expect(await inView<boolean>(NOTES.part, FOCUS_IN_SURFACE), 'Tab never leaves the dialog').toBe(
-    true
-  )
+  await expect
+    .poll(() => inView<boolean>(NOTES.part, FOCUS_IN_SURFACE), {
+      message: 'Tab never leaves the dialog',
+    })
+    .toBe(true)
   await key(NOTES.part, 'Escape')
-  expect(await inView<boolean>(NOTES.part, `!document.querySelector('dialog[open]')`)).toBe(true)
+  await expect
+    .poll(() => inView<boolean>(NOTES.part, `!document.querySelector('dialog[open]')`))
+    .toBe(true)
   await stillShowing(NOTES, 'closing a dialog must not close the extension')
 }
 
@@ -365,9 +375,9 @@ async function quickActionsDrawsOverTheFrame(): Promise<void> {
   const dialog = page.getByRole('dialog', { name: 'Quick actions' })
   await expect(dialog).toBeVisible()
   await expectCentredInWindow(dialog, 'Quick actions over Task Vault')
-  expect(await taskVaultFrameBox(), 'the frame was resized or hidden for the modal').toEqual(
-    frameBox
-  )
+  await expect
+    .poll(() => taskVaultFrameBox(), { message: 'the frame was resized or hidden for the modal' })
+    .toEqual(frameBox)
   const hit = await page.evaluate(() => {
     const el = document.querySelector('dialog[open]')
     const r = el?.getBoundingClientRect()

@@ -44,7 +44,7 @@ async function captureIntoInbox(): Promise<void> {
 
   await expect(vault.locator('.inbox-view__count')).toHaveText('1 item')
   await expect(vault.locator('.vault-sidebar__badge')).toHaveText('1')
-  expect(await inboxTexts()).toEqual(['Call the plumber'])
+  await expect.poll(() => inboxTexts()).toEqual(['Call the plumber'])
 }
 
 /** Editing an inbox item rewrites its text and parses its tags. */
@@ -55,7 +55,7 @@ async function editInboxItem(): Promise<void> {
   await vault.locator('.inbox-item__edit').getByRole('button', { name: 'Save' }).click()
 
   await expect(inboxRow('Call the plumber about the leak')).toContainText('due:2031-05-04')
-  expect(await inboxTexts()).toEqual(['Call the plumber about the leak'])
+  await expect.poll(() => inboxTexts()).toEqual(['Call the plumber about the leak'])
 }
 
 /** Moving an item to the backlog takes it out of the inbox. */
@@ -79,7 +79,7 @@ async function deleteAfterConfirm(): Promise<void> {
   )
 
   await expect(inboxRow('Junk mail')).toHaveCount(0)
-  expect(await storedTask(vault, 'Junk mail')).toBeUndefined()
+  await expect.poll(() => storedTask(vault, 'Junk mail')).toBeUndefined()
 }
 
 /** Answers the clarify questions for each of the five inbox items, in the order they come. */
@@ -123,12 +123,18 @@ async function clarifyInbox(): Promise<void> {
   // Done with the last item, the view goes back to today's log.
   await expect(vault.locator('.daily-log')).toBeVisible()
   await expect(vault.locator('.daily-log__task-text', { hasText: 'Reply to Sam' })).toBeVisible()
-  expect(await inboxTexts()).toEqual([])
+  await expect.poll(() => inboxTexts()).toEqual([])
 
-  expect(await storedTask(vault, 'Call the plumber about the leak')).toMatchObject({ area: 'Home' })
-  expect(await storedTask(vault, 'Old flyer')).toMatchObject({ status: 'cancelled' })
-  expect(await storedTask(vault, 'Reply to Sam')).toMatchObject({ status: 'in-progress' })
-  expect(await storedTask(vault, 'Draft the budget')).toMatchObject({ project: 'Finances' })
+  await expect
+    .poll(() => storedTask(vault, 'Call the plumber about the leak'))
+    .toMatchObject({ area: 'Home' })
+  await expect.poll(() => storedTask(vault, 'Old flyer')).toMatchObject({ status: 'cancelled' })
+  await expect
+    .poll(() => storedTask(vault, 'Reply to Sam'))
+    .toMatchObject({ status: 'in-progress' })
+  await expect
+    .poll(() => storedTask(vault, 'Draft the budget'))
+    .toMatchObject({ project: 'Finances' })
   const backlog = await invokeChannel<{ tasks: StoredTask[] }>(
     vault,
     'task-vault:vault:list-someday'
@@ -153,7 +159,7 @@ async function captureFromQuickActions(): Promise<void> {
   await dialog.getByRole('textbox').press('Enter')
 
   await expect(dialog).toHaveCount(0)
-  expect(await inboxTexts()).toEqual(['Buy stamps'])
+  await expect.poll(() => inboxTexts()).toEqual(['Buy stamps'])
   await expect(vault.locator('.vault-sidebar__badge')).toHaveText('1')
 }
 

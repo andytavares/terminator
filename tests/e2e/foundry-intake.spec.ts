@@ -104,7 +104,9 @@ async function everySurfaceRenders(): Promise<void> {
     ['Ledger', 'What do I keep rejecting?'],
     ['Forge', 'New order'],
   ] as const) {
-    expect(await clickByName(handle, 'button', tab), `no control named "${tab}"`).toBe(true)
+    await expect
+      .poll(() => clickByName(handle, 'button', tab), { message: `no control named "${tab}"` })
+      .toBe(true)
     await expect.poll(() => bodyText(handle)).toContain(expected)
   }
   await settingsRendersAndGoesBack()
@@ -113,9 +115,9 @@ async function everySurfaceRenders(): Promise<void> {
 async function settingsRendersAndGoesBack(): Promise<void> {
   // The settings control draws only an icon, so it is addressed by its label.
   // `innerText` reflects `text-transform`, so a phrase is matched, not the heading.
-  expect(await clickByName(handle, 'button', 'Settings')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'Settings')).toBe(true)
   await expect.poll(() => bodyText(handle)).toContain('Use my Claude Code default')
-  expect(await clickByName(handle, 'button', 'Back')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'Back')).toBe(true)
 }
 
 async function ideaBecomesAnOrder(): Promise<void> {
@@ -201,7 +203,7 @@ async function noTextAtTheDefaultSize(): Promise<void> {
     ['Ledger', 'What do I keep rejecting?'],
     ['Forge', 'New order'],
   ] as const) {
-    expect(await clickByName(handle, 'button', surface)).toBe(true)
+    await expect.poll(() => clickByName(handle, 'button', surface)).toBe(true)
     await expect.poll(() => bodyText(handle)).toContain(shows)
     for (const item of await inFoundry<string[]>(handle, OVERSIZED_TEXT)) {
       found.push(`${surface}: ${item}`)
@@ -211,7 +213,7 @@ async function noTextAtTheDefaultSize(): Promise<void> {
 }
 
 async function nothingThrew(): Promise<void> {
-  expect(await inFoundry<string[]>(handle, 'window.__thrown || []')).toEqual([])
+  await expect.poll(() => inFoundry<string[]>(handle, 'window.__thrown || []')).toEqual([])
 }
 
 async function repositoryReadFirst(): Promise<void> {

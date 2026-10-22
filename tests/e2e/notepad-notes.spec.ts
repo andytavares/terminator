@@ -52,7 +52,7 @@ test('a note is written, organised and retired', async () => {
 async function createdNoteIsStored(): Promise<void> {
   await createItem(notepad, 'Note', 'Groceries')
   await expect(noteRow(notepad, 'Groceries')).toBeVisible()
-  expect(await storedNote(notepad, 'Groceries')).toMatchObject({ title: 'Groceries' })
+  await expect.poll(() => storedNote(notepad, 'Groceries')).toMatchObject({ title: 'Groceries' })
 }
 
 async function typingSaves(): Promise<void> {
@@ -90,7 +90,7 @@ async function titleAndTagsFromMenu(): Promise<void> {
   await dialog.getByRole('button', { name: 'Save' }).click()
 
   await expect(noteRow(notepad, 'Weekly groceries')).toContainText('#home')
-  expect(await storedNote(notepad, 'Weekly groceries')).toMatchObject({ tags: ['home'] })
+  await expect.poll(() => storedNote(notepad, 'Weekly groceries')).toMatchObject({ tags: ['home'] })
 }
 
 async function handSetTitleStays(): Promise<void> {
@@ -110,7 +110,7 @@ async function titleFollowsHeading(): Promise<void> {
   await waitForSave(notepad)
 
   await expect(noteRow(notepad, 'Packing list')).toBeVisible()
-  expect(await storedNote(notepad, 'Packing list')).toBeTruthy()
+  await expect.poll(() => storedNote(notepad, 'Packing list')).toBeTruthy()
 }
 
 async function archivedRestoredDeleted(): Promise<void> {
@@ -131,7 +131,7 @@ async function archivedRestoredDeleted(): Promise<void> {
     'true'
   )
   await deleteForGood(handle, notepad, 'Old draft')
-  expect(await storedNote(notepad, 'Old draft')).toBeUndefined()
+  await expect.poll(() => storedNote(notepad, 'Old draft')).toBeUndefined()
 }
 
 async function dragReorders(): Promise<void> {
@@ -167,7 +167,7 @@ async function folderHoldsAndGivesBack(): Promise<void> {
   await expect(folder).toBeVisible()
   await rowMenu(notepad, 'Reading list', 'Move to Household')
   await expect(folder.locator('.notepad-note-row')).toHaveText([/Reading list/])
-  expect(await folderOfReadingList()).toBeTruthy()
+  await expect.poll(() => folderOfReadingList()).toBeTruthy()
 
   await folderMenu('Rename')
   await notepad.locator('.notepad-folder-header__rename-input').fill('Home admin')
@@ -181,7 +181,7 @@ async function folderHoldsAndGivesBack(): Promise<void> {
     .click()
   await expect(notepad.locator('.notepad-folder-section')).toHaveCount(0)
   await expect(noteRow(notepad, 'Reading list')).toBeVisible()
-  expect(await folderOfReadingList()).toBeNull()
+  await expect.poll(() => folderOfReadingList()).toBeNull()
   const folders = await invokeChannel<{ data: unknown[] }>(
     notepad,
     'terminator.notepad:folders.list',
@@ -256,14 +256,16 @@ async function commentOn(text: string, body: string): Promise<void> {
 async function commentIsAnchored(): Promise<void> {
   await commentOn('brown fox', 'Which fox?')
   await expect(commentCard('Which fox?')).toContainText('“brown fox”')
-  expect(await storedComments()).toMatchObject([
-    {
-      body: 'Which fox?',
-      quote: 'brown fox',
-      status: 'open',
-      startOffset: REVIEW_BODY.indexOf('brown fox'),
-    },
-  ])
+  await expect
+    .poll(() => storedComments())
+    .toMatchObject([
+      {
+        body: 'Which fox?',
+        quote: 'brown fox',
+        status: 'open',
+        startOffset: REVIEW_BODY.indexOf('brown fox'),
+      },
+    ])
 }
 
 async function commentEditedRepliedResolved(): Promise<void> {
@@ -380,7 +382,7 @@ async function outlineIsNested(): Promise<void> {
 async function headingClickScrolls(): Promise<void> {
   const scroller = notepad.locator('.notepad-view__editor .cm-scroller')
   const scrollTop = () => scroller.evaluate((element) => element.scrollTop)
-  expect(await scrollTop()).toBe(0)
+  await expect.poll(() => scrollTop()).toBe(0)
   await outlineItems().filter({ hasText: 'Omega' }).click()
   await expect.poll(scrollTop).toBeGreaterThan(500)
   // Back to the top of the document, not merely somewhere above Omega.
@@ -459,7 +461,7 @@ const fontSize = () =>
     .evaluate((element) => getComputedStyle(element).fontSize)
 
 async function fontSizeApplies(): Promise<void> {
-  expect(await fontSize()).toBe('14px')
+  await expect.poll(() => fontSize()).toBe('14px')
   await changeNotepadSetting('Editor font size', '18')
   await expect.poll(fontSize).toBe('18px')
 }
@@ -469,10 +471,10 @@ async function debounceDelaysSave(): Promise<void> {
   await notepad.keyboard.press('ControlOrMeta+End')
   // A note's title follows its first heading, so the body opens with one.
   await notepad.keyboard.type('# Settings\nwaited')
-  const typedAt = Date.now()
 
+  // The save waits for the pause: until it lands the note shows as unsaved and the store lacks the text.
+  await expect(notepad.locator('.notepad-view__save-status')).toHaveText('Unsaved')
+  expect((await storedNote(notepad, 'Settings'))?.body ?? '').not.toContain('waited')
   await waitForSave(notepad)
-  // The default of 800 ms would have saved within about a second.
-  expect(Date.now() - typedAt).toBeGreaterThanOrEqual(2500)
   expect((await storedNote(notepad, 'Settings'))?.body).toContain('waited')
 }

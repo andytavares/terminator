@@ -50,20 +50,20 @@ test.afterAll(async () => {
 /** The Forge is in Factory view, and List is not pressed. */
 async function expectFactoryPressed(): Promise<void> {
   await expect.poll(() => pressedByLabel(handle, 'Factory view')).toBe('true')
-  expect(await pressedByLabel(handle, 'List view')).toBe('false')
+  await expect.poll(() => pressedByLabel(handle, 'List view')).toBe('false')
 }
 
 /** The Forge is in List view, and Factory is not pressed. */
 async function expectListPressed(): Promise<void> {
   await expect.poll(() => pressedByLabel(handle, 'List view')).toBe('true')
-  expect(await pressedByLabel(handle, 'Factory view')).toBe('false')
+  await expect.poll(() => pressedByLabel(handle, 'Factory view')).toBe('false')
 }
 
 /** From the default, List, to Factory: and the factory surface draws something. */
 async function switchToFactory(): Promise<void> {
   await openForge(handle)
   await expectListPressed()
-  expect(await clickByName(handle, 'button', 'Factory view')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'Factory view')).toBe(true)
   await expectFactoryPressed()
   await expect.poll(async () => (await bodyText(handle)).length).toBeGreaterThan(0)
   await captureFoundry(handle, 'foundry-factory-view.png')
@@ -78,7 +78,7 @@ async function storedView(): Promise<string> {
 }
 
 async function toggleFromQuickActions(): Promise<void> {
-  expect(await storedView()).toBe('factory')
+  await expect.poll(() => storedView()).toBe('factory')
   await runQuickActionFromPanel(handle.page, 'Toggle factory view')
   await expect.poll(storedView).toBe('list')
   await expectListPressed()
@@ -98,9 +98,9 @@ async function seedAndRestart(): Promise<string> {
 }
 
 async function backToList(): Promise<void> {
-  expect(await clickByName(handle, 'button', 'All halls')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'All halls')).toBe(true)
   await openForge(handle)
-  expect(await clickByName(handle, 'button', 'List view')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'List view')).toBe(true)
   await expectListPressed()
   await expect.poll(() => bodyText(handle)).toContain('New order')
 }
@@ -233,7 +233,7 @@ async function ciOnTheFloor(id: string): Promise<void> {
   expect(list).toContain('Fix 1 of 2')
 
   await expect.poll(ciBand).toContain('Fix 1 of 2')
-  expect(await ciBand()).toContain('Test')
+  await expect.poll(() => ciBand()).toContain('Test')
 
   await captureFoundry(handle, 'floor-ci.png')
 }
@@ -348,7 +348,7 @@ async function researchArtifactInTheFactory(): Promise<void> {
   await expect.poll(() => bodyText(handle)).toContain('Open artifact')
   expect((await artifactLinks()).count).toBe(1)
   await captureFoundry(handle, 'foundry-factory-research-hall.png')
-  expect(await clickByName(handle, 'button', 'All halls')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'All halls')).toBe(true)
 }
 
 /** The order list's row links the artifact too. */
@@ -358,14 +358,14 @@ async function researchArtifactOnTheList(): Promise<void> {
 }
 
 async function ledgerFactoryNumbers(): Promise<void> {
-  expect(await clickByName(handle, 'button', 'Ledger')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'Ledger')).toBe(true)
   await expect.poll(() => clickByName(handle, 'button', 'Factory')).toBe(true)
 
   await expect.poll(async () => (await metricTiles()).Shipped).toBe('1')
   const finalTiles = await metricTiles()
   expect(finalTiles['First-pass yield']).toBe('100%')
   expect(finalTiles['Median lead time']).toBe('30 min')
-  expect(await bodyText(handle)).toContain('a shipped order to measure')
+  await expect.poll(() => bodyText(handle)).toContain('a shipped order to measure')
 
   await captureFoundry(handle, 'ledger-factory.png')
 }
@@ -632,7 +632,7 @@ const ORPHAN_MONITOR = `(function () {
 /** From the Factory view's site, the hall's card and then the hall itself. */
 async function openHall(): Promise<void> {
   await openForge(handle)
-  expect(await clickByName(handle, 'button', 'Factory view')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'Factory view')).toBe(true)
   await expect.poll(() => pressedByLabel(handle, 'Factory view')).toBe('true')
 
   // The hall's card carries a still picture of its floor, drawn from the run graph.
@@ -664,7 +664,7 @@ async function expectEveryStation(): Promise<void> {
 /** A station opens as a monitor: its heading and its transcript are there by
  * role. `build:lane1` is orphaned, so its tube says the line is dead. */
 async function expectOrphanMonitor(): Promise<void> {
-  expect(await clickByName(handle, 'button', 'builder, builder, no agent')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'builder, builder, no agent')).toBe(true)
   await expect.poll(() => inFoundry<boolean>(handle, ORPHAN_MONITOR)).toBe(true)
   // The power-on takes 0.42s: wait for the tube to finish opening before the picture.
   await expect
@@ -676,7 +676,7 @@ async function expectOrphanMonitor(): Promise<void> {
     )
     .toBe(true)
   await captureFoundry(handle, 'foundry-station-monitor.png')
-  expect(await clickByName(handle, 'button', 'Close monitor')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'Close monitor')).toBe(true)
   await expect
     .poll(() => inFoundry<boolean>(handle, `!document.querySelector('[role="log"]')`))
     .toBe(true)
@@ -684,10 +684,10 @@ async function expectOrphanMonitor(): Promise<void> {
 
 /** The recording plays back in the same hall. */
 async function expectReplay(): Promise<void> {
-  expect(await clickByName(handle, 'button', 'Replay')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'Replay')).toBe(true)
   await expect.poll(() => bodyText(handle)).toContain('Back to live')
   await captureFoundry(handle, 'foundry-factory-replay.png')
-  expect(await clickByName(handle, 'button', 'Back to live')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'Back to live')).toBe(true)
   await expect.poll(() => bodyText(handle)).not.toContain('Back to live')
 }
 

@@ -83,7 +83,9 @@ async function clarifyCaptured(): Promise<void> {
   await vault.getByRole('button', { name: 'Yes' }).click()
   await vault.getByRole('button', { name: 'Do now — Today' }).click()
   await expect(vault.getByText('Inbox cleared!')).toBeVisible()
-  expect(await storedTask(vault, 'Pay the parking fine')).toMatchObject({ status: 'in-progress' })
+  await expect
+    .poll(() => storedTask(vault, 'Pay the parking fine'))
+    .toMatchObject({ status: 'in-progress' })
   await vault.getByRole('button', { name: 'Next: projects' }).click()
 }
 
@@ -92,8 +94,8 @@ async function reviewProjects(): Promise<void> {
   await reviewItem('Kitchen Remodel').getByRole('button', { name: 'Keep' }).click()
   await reviewItem('Garden Shed').getByRole('button', { name: 'Someday' }).click()
   await expect(vault.getByText('All projects reviewed!')).toBeVisible()
-  expect(await projectStatus('Kitchen Remodel')).toBe('active')
-  expect(await projectStatus('Garden Shed')).toBe('someday')
+  await expect.poll(() => projectStatus('Kitchen Remodel')).toBe('active')
+  await expect.poll(() => projectStatus('Garden Shed')).toBe('someday')
   await vault.getByRole('button', { name: 'Next: stale' }).click()
 }
 
@@ -139,8 +141,10 @@ async function reviewSomeday(): Promise<void> {
     'task-vault:vault:get-today'
   )
   expect(today.tasks.map((task) => task.text)).toContain('Read the backlog novel')
-  expect(await storedTask(vault, 'Retire the old laptop')).toMatchObject({ status: 'cancelled' })
-  expect(await projectStatus('Learn Piano')).toBe('active')
+  await expect
+    .poll(() => storedTask(vault, 'Retire the old laptop'))
+    .toMatchObject({ status: 'cancelled' })
+  await expect.poll(() => projectStatus('Learn Piano')).toBe('active')
   await vault.getByRole('button', { name: 'Next: reflect' }).click()
 }
 

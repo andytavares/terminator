@@ -94,7 +94,7 @@ async function refuseSchemaChange(): Promise<void> {
   await expect(dataTools().locator('.db-admin__error')).toHaveText(
     'DDL statements (DROP, CREATE, ALTER) are not permitted'
   )
-  expect(await allTasks(vault)).toHaveLength(2)
+  await expect.poll(() => allTasks(vault)).toHaveLength(2)
 }
 
 /** Export JSON downloads every task, project and area. */

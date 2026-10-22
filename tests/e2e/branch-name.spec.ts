@@ -158,7 +158,7 @@ async function setExcludePatterns(patterns: string[]): Promise<void> {
 /** Settings → Branch Exclude Patterns, through the real settings store and handler: the
  * setting once existed with nothing reading it, which a mocked unit test could not notice. */
 async function excludedBranchesLeaveThePicker(): Promise<void> {
-  expect(await listedBranches()).toEqual(expect.arrayContaining(['feat/x', ...EXCLUDED]))
+  await expect.poll(() => listedBranches()).toEqual(expect.arrayContaining(['feat/x', ...EXCLUDED]))
   await setExcludePatterns(['gh-readonly-queue/*', 'trunk-merge/*'])
   const listed = await listedBranches()
   expect(listed).toContain('feat/x')

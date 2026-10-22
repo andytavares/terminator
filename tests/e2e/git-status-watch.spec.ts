@@ -71,15 +71,12 @@ async function gitTabOf(checkout: Checkout): Promise<ExtensionView> {
 
 async function aSavedFileAppears(checkout: Checkout): Promise<void> {
   const view = await gitTabOf(checkout)
-  const shown = Date.now()
   let saves = 0
   const saveAndCount = () => {
     writeFile(checkout.path, 'saved-outside.txt', `save ${++saves}\n`)
     return view.getByText('saved-outside.txt').count()
   }
-  // Sooner than the three seconds the tab used to poll at.
   await expect.poll(saveAndCount).toBeGreaterThan(0)
-  test.info().annotations.push({ type: 'change shown', description: `${Date.now() - shown}ms` })
 }
 
 async function gitAddMovesAFileToStaged(checkout: Checkout): Promise<void> {

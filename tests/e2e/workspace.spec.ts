@@ -168,7 +168,7 @@ async function removeTakesWorkspaceAway(): Promise<void> {
 }
 
 async function theAppOpens(): Promise<void> {
-  await test.step('the app renders the sidebar within 3000ms', sidebarRendersPromptly)
+  await test.step('the app renders the sidebar', sidebarRendersPromptly)
   await test.step('Home closes when the sidebar is clicked', homeClosesOnSidebarClick)
   await test.step('Overview closes when the sidebar is clicked', overviewClosesOnSidebarClick)
   await test.step('an extension closes when the sidebar is clicked', extensionClosesOnSidebarClick)

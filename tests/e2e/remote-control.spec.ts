@@ -123,7 +123,7 @@ async function caddyfileProxiesTheRemoteRenderer(): Promise<void> {
   await openRemoteSettings()
   await view.getByRole('button', { name: 'Copy Caddyfile' }).click()
   await expect.poll(clipboardText).toContain(`reverse_proxy localhost:${PORT}`)
-  expect(await clipboardText()).toContain('tls internal')
+  await expect.poll(() => clipboardText()).toContain('tls internal')
   // The upstream it names serves the remote renderer's sign-in page.
   const upstream = /reverse_proxy (\S+)/.exec(await clipboardText())![1]
   const page = await browser.newPage()

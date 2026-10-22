@@ -288,7 +288,7 @@ async function expectContrastMeetsAA({ label, part }: Surface, theme: Theme): Pr
 }
 
 async function expectLinedUp(view: Pick<Frame, 'evaluate'>, screen: string): Promise<void> {
-  expect(await misalignedOn(view, screen)).toEqual([])
+  await expect.poll(() => misalignedOn(view, screen)).toEqual([])
 }
 
 /** One surface, opened once: its contrast in both themes, then lined up and styled in dark. */

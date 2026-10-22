@@ -386,7 +386,9 @@ async function setBudgets(id: string): Promise<void> {
     await fillByName(handle, 'Files touched', '60'),
     'a files-touched field is still offered'
   ).toBe(false)
-  expect(await fillByName(handle, 'Agents at once', '4'), 'no agents field').toBe(true)
+  await expect
+    .poll(() => fillByName(handle, 'Agents at once', '4'), { message: 'no agents field' })
+    .toBe(true)
   expect(
     await inFoundry<boolean>(
       handle,
@@ -398,7 +400,7 @@ async function setBudgets(id: string): Promise<void> {
     })()`
     )
   ).toBe(true)
-  expect(await clickByName(handle, 'button', 'Save budgets')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'Save budgets')).toBe(true)
   await expect
     .poll(() => budgetsOf(id))
     .toMatchObject({
@@ -436,11 +438,11 @@ function agentsBudgetGate(id: string) {
 async function raiseAtGate(id: string, summary: string): Promise<void> {
   // The gate is in the band above the Forge.
   await expect.poll(() => bodyText(handle)).toContain(summary)
-  expect(await clickByName(handle, 'button', 'Raise the budget')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'Raise the budget')).toBe(true)
   await expect.poll(() => bodyText(handle)).toContain('At least 6.')
 
-  expect(await fillByName(handle, 'Agents at once', '8')).toBe(true)
-  expect(await clickByName(handle, 'button', 'Raise and resume')).toBe(true)
+  await expect.poll(() => fillByName(handle, 'Agents at once', '8')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'Raise and resume')).toBe(true)
   await expect.poll(async () => (await budgetsOf(id)).agents).toBe(8)
   const decided = JSON.parse(
     readFileSync(join(repo, '.foundry', 'orders', id, 'gates.json'), 'utf8')

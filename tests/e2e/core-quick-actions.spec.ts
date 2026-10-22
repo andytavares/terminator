@@ -164,11 +164,11 @@ async function toggleLogWindowOpensLog(page: Page): Promise<void> {
 
 async function workspaceActionsMoveActive(page: Page): Promise<void> {
   await projectGroup(page, 'alpha').click()
-  expect(await activeWorkspaceName(page)).toBe('QA One')
+  await expect.poll(() => activeWorkspaceName(page)).toBe('QA One')
   await runQuickActionFromPanel(page, 'Next workspace')
-  expect(await activeWorkspaceName(page)).toBe('QA Two')
+  await expect.poll(() => activeWorkspaceName(page)).toBe('QA Two')
   await runQuickActionFromPanel(page, 'Previous workspace')
-  expect(await activeWorkspaceName(page)).toBe('QA One')
+  await expect.poll(() => activeWorkspaceName(page)).toBe('QA One')
 }
 
 async function navigationQuickActions(page: Page): Promise<void> {

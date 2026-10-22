@@ -403,7 +403,7 @@ async function floorCarriesTheMove(): Promise<void> {
   await openFoundry()
 
   // The Forge tab, then the running order — which opens on the Floor.
-  expect(await clickByName('Forge')).toBe(true)
+  await expect.poll(() => clickByName('Forge')).toBe(true)
   await openOrderRowInView(ORDER_ID, 'no row for the running order')
 
   await expect.poll(() => bodyText()).toContain('Halted — your move')
@@ -412,7 +412,9 @@ async function floorCarriesTheMove(): Promise<void> {
   // `run.interrupted` (adopt.ts), and ADR-045 puts an unanswered gate first.
   expect(text, `the Floor rendered:\n${text}`).toContain('Halted — your move')
   // A gate is one line until it is opened; its reason is behind the chevron.
-  expect(await inFoundry<boolean>(SHOW_THE_REASON), 'no collapsed gate to open').toBe(true)
+  await expect
+    .poll(() => inFoundry<boolean>(SHOW_THE_REASON), { message: 'no collapsed gate to open' })
+    .toBe(true)
   // The interrupted gate's own words, so this proves the resume band rendered
   // rather than any halt at any gate.
   await expect.poll(() => bodyText()).toContain('Nothing is moving this run')
@@ -430,7 +432,7 @@ async function unshippedRunSaysSo(): Promise<void> {
 
   // The interrupted order is still open from the step before: "All orders" is
   // the way back to the list, and the list refetches on its own 4s timer.
-  expect(await clickByName('Forge')).toBe(true)
+  await expect.poll(() => clickByName('Forge')).toBe(true)
   await clickByName('All orders')
   await openOrderRowInView(UNSHIPPED_ID, 'no row for the unshipped order')
 

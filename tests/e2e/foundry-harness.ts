@@ -236,7 +236,7 @@ function clickOrderRow(id: string): string {
 
 /** Shows every order in the Forge, and waits until the row for `id` is among them. */
 export async function listOrdersInForge(handle: AppHandle, id: string): Promise<void> {
-  expect(await clickByName(handle, 'button', 'Forge')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'Forge')).toBe(true)
   await expect.poll(() => bodyText(handle)).toMatch(/New order|Steps|All orders/)
   // An earlier order may already be open; get back to the list first.
   await clickByName(handle, 'button', 'All orders')

@@ -75,9 +75,11 @@ async function editTextAndTags(): Promise<void> {
   await expect(dailyLogTaskRow(vault, 'Write the 2.0 release notes')).toContainText(
     'due:2031-01-02'
   )
-  expect(await storedTaskNamed('Write the 2.0 release notes')).toMatchObject({
-    dueDate: '2031-01-02',
-  })
+  await expect
+    .poll(() => storedTaskNamed('Write the 2.0 release notes'))
+    .toMatchObject({
+      dueDate: '2031-01-02',
+    })
 }
 
 /** A subtask added to a task is listed under it. */
@@ -99,11 +101,11 @@ async function completeAndRestore(): Promise<void> {
     .getByRole('button', { name: 'Complete task' })
     .click()
   await expect(dailyLogTaskRow(vault, 'Book the venue')).toHaveClass(/daily-log__task--done/)
-  expect(await storedTaskNamed('Book the venue')).toMatchObject({ status: 'done' })
+  await expect.poll(() => storedTaskNamed('Book the venue')).toMatchObject({ status: 'done' })
 
   await rowAction('Book the venue', 'Restore to open')
   await expect(dailyLogTaskRow(vault, 'Book the venue')).not.toHaveClass(/daily-log__task--done/)
-  expect(await storedTaskNamed('Book the venue')).toMatchObject({ status: 'open' })
+  await expect.poll(() => storedTaskNamed('Book the venue')).toMatchObject({ status: 'open' })
 }
 
 /** Blocking a task records why, and unblocking clears it. */
@@ -117,14 +119,16 @@ async function blockAndUnblock(): Promise<void> {
   await vault.getByRole('button', { name: 'Mark blocked' }).click()
 
   await expect(dailyLogTaskRow(vault, 'Book the venue')).toContainText('Waiting on the budget')
-  expect(await storedTaskNamed('Book the venue')).toMatchObject({
-    status: 'blocked',
-    blockedReason: 'Waiting on the budget',
-  })
+  await expect
+    .poll(() => storedTaskNamed('Book the venue'))
+    .toMatchObject({
+      status: 'blocked',
+      blockedReason: 'Waiting on the budget',
+    })
 
   await rowAction('Book the venue', 'Unblock')
   await expect(dailyLogTaskRow(vault, 'Book the venue')).not.toContainText('Waiting on the budget')
-  expect(await storedTaskNamed('Book the venue')).toMatchObject({ status: 'open' })
+  await expect.poll(() => storedTaskNamed('Book the venue')).toMatchObject({ status: 'open' })
 }
 
 /** A recurrence can be set on a task and removed again. */
@@ -137,7 +141,9 @@ async function setAndRemoveRecurrence(): Promise<void> {
   await expect(
     dailyLogTaskRow(vault, 'Book the venue').locator('.daily-log__recurrence-badge')
   ).toBeVisible()
-  expect(await storedTaskNamed('Book the venue')).toMatchObject({ recurrenceRule: 'daily' })
+  await expect
+    .poll(() => storedTaskNamed('Book the venue'))
+    .toMatchObject({ recurrenceRule: 'daily' })
 
   await rowAction('Book the venue', 'Recurrence: Daily')
   await vault.getByRole('button', { name: 'Remove', exact: true }).click()
@@ -145,7 +151,9 @@ async function setAndRemoveRecurrence(): Promise<void> {
   await expect(
     dailyLogTaskRow(vault, 'Book the venue').locator('.daily-log__recurrence-badge')
   ).toHaveCount(0)
-  expect(await storedTaskNamed('Book the venue')).toHaveProperty('recurrenceRule', undefined)
+  await expect
+    .poll(() => storedTaskNamed('Book the venue'))
+    .toHaveProperty('recurrenceRule', undefined)
 }
 
 /** Migrating a task moves it to the day picked. */
@@ -180,11 +188,13 @@ async function archiveAndRemove(): Promise<void> {
   await expect(dailyLogTaskRow(vault, 'Order the banners')).toHaveClass(
     /daily-log__task--cancelled/
   )
-  expect(await storedTaskNamed('Order the banners')).toMatchObject({ status: 'cancelled' })
+  await expect
+    .poll(() => storedTaskNamed('Order the banners'))
+    .toMatchObject({ status: 'cancelled' })
 
   await rowAction('Order the banners', 'Remove')
   await expect(dailyLogTaskRow(vault, 'Order the banners')).toHaveCount(0)
-  expect(await storedTask(vault, 'Order the banners')).toBeUndefined()
+  await expect.poll(() => storedTask(vault, 'Order the banners')).toBeUndefined()
 }
 
 /** Dragging a task above another reorders the day. */
@@ -195,7 +205,7 @@ async function dragToReorder(): Promise<void> {
     (await todayTasks(vault))
       .map((task) => task.text)
       .filter((text) => ['Draft the agenda', 'Send the invites'].includes(text))
-  expect(await taskOrder()).toEqual(['Draft the agenda', 'Send the invites'])
+  await expect.poll(() => taskOrder()).toEqual(['Draft the agenda', 'Send the invites'])
 
   await dailyLogTaskRow(vault, 'Send the invites').dragTo(
     dailyLogTaskRow(vault, 'Draft the agenda')
@@ -252,7 +262,7 @@ async function pickUpAndDeleteBacklog(): Promise<void> {
 
   await pressRowAction(backlogRow('Draft the agenda').getByRole('button', { name: 'Delete' }))
   await expect(backlogRow('Draft the agenda')).toHaveCount(0)
-  expect(await storedTask(vault, 'Draft the agenda')).toBeUndefined()
+  await expect.poll(() => storedTask(vault, 'Draft the agenda')).toBeUndefined()
 }
 
 /** A task rolled over from last week is marked stale until kept. */

@@ -192,7 +192,7 @@ async function diagramRetired(): Promise<void> {
 
   await rowMenu(notepad, 'System architecture', 'Archive')
   await deleteForGood(handle, notepad, 'System architecture')
-  expect(await diagrams()).toEqual([])
+  await expect.poll(() => diagrams()).toEqual([])
 }
 
 // ── Notes are found and moved in and out ────────────────────────────────────
@@ -437,6 +437,6 @@ async function reinitialiseKeepsNotes(): Promise<void> {
       )
     )
     .toContain('Re-initialise database: Done')
-  expect(await storedNotes(notepad)).toHaveLength(4)
+  await expect.poll(() => storedNotes(notepad)).toHaveLength(4)
   await page.keyboard.press('Escape')
 }

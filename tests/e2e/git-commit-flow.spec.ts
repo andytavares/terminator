@@ -140,12 +140,14 @@ async function styleReport(): Promise<StyleReport | null> {
 async function everythingOnTheGitTabIsStyled(): Promise<void> {
   // The view is its own chunk (React.lazy), so it renders after the load event.
   await expect.poll(async () => (await styleReport())?.bodyLength ?? 0).toBeGreaterThan(20)
-  expect(await styleReport()).toMatchObject({
-    bareButtons: [],
-    unstyledInputs: [],
-    oversizedIcons: [],
-    sideScrollers: [],
-  })
+  await expect
+    .poll(() => styleReport())
+    .toMatchObject({
+      bareButtons: [],
+      unstyledInputs: [],
+      oversizedIcons: [],
+      sideScrollers: [],
+    })
 }
 
 async function selectingAFileShowsItsDiff(): Promise<void> {
@@ -153,7 +155,7 @@ async function selectingAFileShowsItsDiff(): Promise<void> {
   await fileRow(view, 'src/math.ts').click()
   await expect(view.locator('.diff-line--add')).toContainText('return b + a')
   await expect(view.locator('.diff-line--remove')).toContainText('return a + b')
-  expect(await misalignedOn(view, 'Git tab')).toEqual([])
+  await expect.poll(() => misalignedOn(view, 'Git tab')).toEqual([])
 }
 
 async function stagingFollowsTheCheckboxes(): Promise<void> {
