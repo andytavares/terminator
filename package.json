@@ -29,7 +29,7 @@
     "ci:local": "node scripts/ci-local.mjs",
     "ci:local:e2e": "node scripts/ci-e2e-local.mjs",
     "test:coverage": "vitest run --coverage --reporter=verbose --reporter=junit \"--outputFile.junit=test-report.junit.xml\"",
-    "lint": "eslint .",
+    "lint": "NODE_OPTIONS=--max-old-space-size=4096 eslint .",
     "lint:deps": "syncpack lint",
     "lint:unused": "knip",
     "lint:unused:production": "knip --production",

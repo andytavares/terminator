@@ -14,8 +14,7 @@ async function loadWith(value: string | undefined) {
 
 const preload = { preload: '/preload.js', contextIsolation: true }
 
-describe('running in the background, as the e2e harness asks', () => {
-  beforeEach(() => app.setActivationPolicy.mockReset())
+describe('a window created in the background', () => {
   afterEach(() => delete process.env.TERMINATOR_RUN_IN_BACKGROUND)
 
   it('creates windows hidden and still drawing, keeping their own preferences', async () => {
@@ -23,9 +22,26 @@ describe('running in the background, as the e2e harness asks', () => {
     expect(windowOptions({ width: 1280, webPreferences: preload })).toEqual({
       width: 1280,
       show: false,
+      enableLargerThanScreen: true,
       webPreferences: { ...preload, backgroundThrottling: false },
     })
   })
+
+  // macOS clamps a window to the screen's work area; a CI runner's screen is smaller than a
+  // laptop's, so the same test laid out a different, narrower window there.
+  it('keeps the size asked for whatever the screen', async () => {
+    const { windowOptions } = await loadWith('1')
+    expect(windowOptions({ width: 1280, height: 800 })).toMatchObject({
+      width: 1280,
+      height: 800,
+      enableLargerThanScreen: true,
+    })
+  })
+})
+
+describe('running in the background, as the e2e harness asks', () => {
+  beforeEach(() => app.setActivationPolicy.mockReset())
+  afterEach(() => delete process.env.TERMINATOR_RUN_IN_BACKGROUND)
 
   it('never shows or focuses a window', async () => {
     const { revealWindow } = await loadWith('1')

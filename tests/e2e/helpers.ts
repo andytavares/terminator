@@ -116,7 +116,13 @@ function keepOutput(app: ElectronApplication): string[] {
 async function firstReadyWindow(app: ElectronApplication): Promise<Page> {
   await startIpcTrace(app)
   const page = await app.firstWindow()
-  const windowId = String(await (await app.browserWindow(page)).evaluate((window) => window.id))
+  const window = await app.browserWindow(page)
+  const windowId = String(await window.evaluate((win) => win.id))
+  const size = await window.evaluate((win) => win.getSize())
+  // Every test lays out the same window, whatever this machine's screen (ADR 123).
+  if (size[0] !== 1280 || size[1] !== 800) {
+    throw new Error(`The app's window is ${size.join('×')}, not 1280×800: the screen resized it.`)
+  }
   await Promise.all([
     untilAnnounced(app, 'drawn', windowId),
     untilAnnounced(app, 'focused', windowId),

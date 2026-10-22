@@ -17,6 +17,9 @@ export function windowOptions(
   return {
     ...options,
     show: false,
+    // macOS clamps a window to the screen's work area: on a runner's smaller screen the same
+    // test would lay out a narrower window than on a laptop.
+    enableLargerThanScreen: true,
     webPreferences: { ...options.webPreferences, backgroundThrottling: false },
   }
 }
