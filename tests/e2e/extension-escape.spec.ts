@@ -35,11 +35,8 @@ const REMOTE_CONTROL: Surface = {
 }
 
 /**
- * Moves the clocks on that time the double-Escape gesture. Both the extension frame
- * (frame-shim.ts) and the host window (ExtensionPanelPortal.tsx) pair presses by
- * `performance.now()`, and Playwright's page clock cannot reach the frame, so each one's own
- * clock is shifted instead of waiting out `DOUBLE_ESCAPE_WINDOW_MS`.
- */
+ * Moves on both clocks that pair double-Escape presses (frame-shim.ts, ExtensionPanelPortal.tsx),
+ * which Playwright's page clock cannot reach, instead of waiting out DOUBLE_ESCAPE_WINDOW_MS. */
 async function advanceClocks(part: string, ms: number): Promise<void> {
   const shift = (offset: number) => {
     const now = performance.now.bind(performance)

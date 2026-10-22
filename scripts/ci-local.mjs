@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 // What .github/workflows/ci.yml runs, run here, so a failure shows on this machine and not in CI.
-// It tests what CI tests: HEAD merged with a freshly fetched origin/main, in the persistent check
-// worktree <repo>/.worktrees/.ci-local, on the Node in .nvmrc and an install matching the
-// lockfile. Never the dirty tree. A pass is recorded for HEAD; the pre-push hook (`--check-push`)
-// refuses a commit with none. scripts/ci-plan.mjs reads each job's steps from the workflow.
+// Tests what CI tests: HEAD merged with a fresh origin/main in <repo>/.worktrees/.ci-local, on the
+// .nvmrc Node and a lockfile-matched install, never the dirty tree. A pass is recorded for HEAD,
+// and the pre-push hook (`--check-push`) refuses a commit without one.
 
 import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -72,11 +71,8 @@ export const needsInstall = (currentHash, recordedHash) =>
 
 const NO_COMMIT = /^0+$/
 
-/**
- * The refs a push names whose commit ci:local has not passed on. `pushed` is what git hands a
- * pre-push hook on stdin, one `<local ref> <local sha> <remote ref> <remote sha>` per line; a
- * deleted ref pushes no code.
- */
+/** The refs a push names whose commit ci:local has not passed on. `pushed` is the hook's stdin,
+ * `<local ref> <local sha> <remote ref> <remote sha>` per line; a deleted ref pushes no code. */
 export function unverifiedPushes(pushed, passedSha) {
   return pushed
     .split('\n')

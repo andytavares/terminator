@@ -17,10 +17,8 @@ export const SKIPPED_JOBS = {
 const TEST_ALL_LABEL =
   "${{ contains(github.event.pull_request.labels.*.name, 'test: all') && '1' || '' }}"
 
-/**
- * Expressions ci:local resolves, in the text CI writes them. With `all`, the pull request
- * carries the label `test: all`; push-to-main expressions resolve as a pull request does.
- */
+/** Expressions ci:local resolves, as CI writes them. `all` stands for the label `test: all`;
+ * push-to-main expressions resolve as a pull request's. */
 function expressionsFor(all) {
   return [
     [TEST_ALL_LABEL, all ? '1' : ''],

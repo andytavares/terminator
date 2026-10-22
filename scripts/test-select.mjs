@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-// Which tests a change can reach, unit (vitest) and e2e (Playwright): one selector for CI and
-// `npm test` (ADR 123). Forms: no flag (JSON), --all, --print unit|coverage, --github-output, --run unit.
-// The diff is the checkout against its merge base with origin/main: commits, uncommitted edits
-// and new files. Unknown means everything.
+// The unit and e2e tests a change can reach, for CI and `npm test` alike (ADR 123): the checkout
+// against its merge base with origin/main, new files included; unknown means everything.
+// Forms: no flag (JSON), --all, --print unit|coverage, --github-output, --run unit.
 
 import { execFileSync, spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'

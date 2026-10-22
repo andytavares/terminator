@@ -1,9 +1,8 @@
 import type { BrowserWindow } from 'electron'
 
-// A test-only channel: with TERMINATOR_E2E=1 the main process announces that a window has
-// drawn its first frame, that it has Chromium focus, and that an extension view is connected, so
-// an e2e test waits on the app's own word instead of a sleep or a screenshot (ADR 123).
-// Unset, every function here does nothing.
+// Test-only: with TERMINATOR_E2E=1, main announces a window's first frame, its Chromium focus and
+// each connected extension view, so e2e waits on the app's word, not a sleep (ADR 123). Unset,
+// nothing here does anything.
 
 export type Announcement = 'drawn' | 'focused' | 'ready'
 

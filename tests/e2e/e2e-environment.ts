@@ -7,11 +7,8 @@ const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 /** Stand-ins for `claude`, `gh` and `ngrok`, first on the app's PATH so no run starts a real one. */
 const STUB_BIN_DIR = join(FIXTURES, 'bin')
 
-/**
- * A minimal zsh config the app's terminals read instead of the developer's. Terminals are login
- * shells (src/main/terminal/pty-manager.ts) whose own rc files would put a real `claude` ahead of
- * the stub; this one is read last and puts the stub first again.
- */
+/** The zsh config the app's login-shell terminals read instead of the developer's, whose rc files
+ * would put a real `claude` ahead of the stub. */
 const STUB_ZDOTDIR = join(FIXTURES, 'zdotdir')
 
 export interface AppDirectories {
@@ -20,10 +17,8 @@ export interface AppDirectories {
   tmpdir: string
 }
 
-/**
- * The environment an e2e app launches in, sealed (ADR 123): fixed values and a short allowlist
- * from `inherited`, never the developer's whole environment and never their real HOME.
- */
+/** The sealed environment an e2e app launches in (ADR 123): fixed values and a short allowlist
+ * from `inherited`, never the developer's environment or real HOME. */
 export function sealedAppEnvironment(
   directories: AppDirectories,
   inherited: NodeJS.ProcessEnv = process.env

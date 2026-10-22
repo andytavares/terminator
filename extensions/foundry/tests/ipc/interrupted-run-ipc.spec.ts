@@ -81,11 +81,8 @@ const GRAPH: RunGraph = {
   ],
 }
 
-/**
- * A records location holding one run the last application left in flight, and whatever `more`
- * adds. The extension is pointed at it only once it is complete: records written by hand are
- * not noticed once the extension has read the location (extensions/foundry/CLAUDE.md, rule 4).
- */
+/** One run the last application left in flight, plus `more`. The extension sees the location only
+ * once it is complete: it never notices a hand-written record later (foundry CLAUDE.md rule 4). */
 async function seedInterruptedRun(
   over: Partial<WorkOrder> = {},
   more: (records: string) => Promise<void> = async () => undefined

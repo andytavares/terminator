@@ -1,23 +1,16 @@
 import { defineConfig } from '@playwright/test'
 import { e2eWorkerCount } from './tests/e2e/worker-count'
 
-// Specs that use something one machine has only one of: the system clipboard, the remote-control
-// port 17683, the keychain. Running two at once makes one read the other's clipboard or lose the
-// port, so they run one at a time, in a project limited to one worker. The other specs touch
-// none of the three and stay parallel beside it.
+// Specs that use what a machine has one of (the clipboard, remote-control port 17683, the
+// keychain) run one at a time in their own project; two at once read each other's clipboard.
 const SHARED_MACHINE_RESOURCES = [
   '**/core-quick-actions.spec.ts',
   '**/issue-trackers.spec.ts',
   '**/remote-control.spec.ts',
 ]
 
-// `tools/` holds specs that write into the repository — screenshot capture
-// for the user guide. They are run deliberately, never as part of the suite,
-// because a CI run that rewrites a committed file leaves a dirty tree. Set
-// `E2E_TOOLS=1` to include them.
-// `live/` holds specs that launch real agents against a real remote. They
-// cost time and quota and are inherently non-deterministic, so they are run
-// deliberately: `E2E_LIVE=1 npx playwright test tests/e2e/live`.
+// Run only on purpose: `tools/` rewrites committed screenshots (E2E_TOOLS=1), and `live/` drives
+// real agents against a real remote, at a cost and not deterministic (E2E_LIVE=1).
 const NOT_IN_THE_SUITE = [
   ...(process.env.E2E_TOOLS === '1' ? [] : ['**/tools/**']),
   ...(process.env.E2E_LIVE === '1' ? [] : ['**/live/**']),

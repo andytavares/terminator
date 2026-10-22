@@ -78,10 +78,9 @@ function e2eEnv(userDataDir: string): Record<string, string> {
  * after a close just works. `env` adds to the app's environment, e.g. the
  * stub GitHub's (`tests/e2e/github-stub.ts`).
  */
-// Bounds a launch that hangs so it fails with the app's own output and its windows' state,
-// instead of a bare test timeout that says nothing about why. A hang bound, far above a slow
-// start (25 s once failed two CI launches that were only slow); what a failed launch spends
-// after it: 1 s reading the windows + 2.5 s to close + 1 s for a kill, inside the test's bound.
+// A launch hang fails with the app's output and windows, not a bare timeout. A hang bound, far
+// above a slow start (25 s failed two slow CI launches); a failed launch then spends ~4.5 s
+// reporting and closing, inside the test's bound.
 const LAUNCH_DEADLINE_MS = E2E_LAUNCH_HANG_MS
 const WINDOW_STATE_READ_MS = 1000
 const FAILED_LAUNCH_CLOSE_MS = 2500
