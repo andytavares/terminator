@@ -1479,3 +1479,24 @@ describe('environmentPasses', () => {
     expect(row?.state === 'passed').toBe(expected)
   })
 })
+
+describe('readiness — the Checks step', () => {
+  const checksStep = (waiting: number | undefined) =>
+    readiness(baseInput(waiting === undefined ? {} : { checks: { waiting } })).steps.find(
+      (s) => s.id === 'checks'
+    )
+
+  it('counts the rows waiting on the operator in the rail', () => {
+    expect(checksStep(1)).toMatchObject({ state: 'you', mark: 'alert', word: '1 waiting on you' })
+    expect(checksStep(3)?.word).toBe('3 waiting on you')
+  })
+
+  it('has nothing waiting when every row is settled', () => {
+    expect(checksStep(0)).toMatchObject({ state: 'done', word: 'Nothing waiting on you' })
+  })
+
+  it('does not hold the later steps back while checks wait', () => {
+    const steps = readiness(baseInput({ checks: { waiting: 2 } })).steps
+    expect(steps.find((s) => s.id === 'shape')?.state).not.toBe('not-yet')
+  })
+})

@@ -49,6 +49,7 @@ function orderAndGapsTests() {
       'intent',
       'plan',
       'redTeam',
+      'checks',
       'shape',
       'tracker',
       'handOff',
@@ -60,6 +61,7 @@ function orderAndGapsTests() {
       'intent',
       'plan',
       'redTeam',
+      'checks',
       'handOff',
     ])
   })

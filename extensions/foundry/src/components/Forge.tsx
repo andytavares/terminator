@@ -29,6 +29,8 @@ import { PROPOSAL_FILE } from '../order/proposal.js'
 import { openingStep, forgeSteps, type StepId } from '../forge/steps.js'
 import { budgetsInWords } from '../order/render.js'
 import { BudgetForm } from './BudgetForm.js'
+import { ChecksStep, HandOffChecks, type ChecksActions } from './ForgeChecks.js'
+import { useChecks } from './use-checks.js'
 import { usePushed } from '../renderer/use-pushed.js'
 import { ReasonButton } from './ReasonButton.js'
 import {
@@ -120,6 +122,7 @@ const STEP_LABELS: Record<StepId, string> = {
   intent: 'Intent',
   plan: 'Plan',
   redTeam: 'Red team',
+  checks: 'Checks',
   shape: 'Shape',
   tracker: 'Tracker',
   handOff: 'Hand off',
@@ -129,6 +132,7 @@ const STEP_TITLES: Record<StepId, string> = {
   intent: 'What is being asked',
   plan: 'The plan and how it is proven',
   redTeam: 'Red team findings',
+  checks: 'How this change is proven',
   shape: 'Shape of work',
   tracker: 'Tracker write-back',
   handOff: 'Ready to hand off?',
@@ -376,7 +380,7 @@ function useForgeState(orderId: string, onStarted: ForgeProps['onStarted']) {
   const edits = useOrderEdits(orderId, shown)
   const talk = useConverge(orderId, shown)
   const moves = useOrderMoves(orderId, { shown, shapes })
-  const moveEnvironment = useEnvironmentMove(orderId, shown)
+  const environment = useEnvironment(orderId, shown)
   const handOff = useHandOff({ orderId, onStarted, shown, shapes })
   useQueuedSettle(shown.view, choices, talk.applySettle)
   return {
@@ -392,7 +396,7 @@ function useForgeState(orderId: string, onStarted: ForgeProps['onStarted']) {
     ...edits,
     ...talk,
     ...moves,
-    moveEnvironment,
+    ...environment,
   }
 }
 
@@ -622,6 +626,11 @@ function useEnvironmentMove(
   )
 }
 
+/** The base branch check, and the Checks step that reads and edits what it runs. */
+function useEnvironment(orderId: string, shown: Shown) {
+  return { moveEnvironment: useEnvironmentMove(orderId, shown), checks: useChecks(shown.view) }
+}
+
 /** Holding the order, and picking its shape. */
 function useOrderMoves(orderId: string, { shown, shapes }: Pick<HandOffDeps, 'shown' | 'shapes'>) {
   const { setBusy, refresh } = shown
@@ -778,6 +787,7 @@ function readinessOf(state: ForgeState, view: OrderView, standing: Standing | un
     ...settledFacts(view),
     shape: { name: shapeName, yours: ownChoice(state.recipes) !== null },
     offers,
+    checks: state.checks.waiting === undefined ? undefined : { waiting: state.checks.waiting },
     turn: standing?.turn,
     clock: clockOf,
   })
@@ -1074,9 +1084,26 @@ const STEP_BODIES: Record<StepId, (props: ForgeProp) => JSX.Element> = {
   intent: IntentStep,
   plan: PlanStep,
   redTeam: RedTeamStep,
+  checks: ChecksBody,
   shape: ShapeStep,
   tracker: TrackerStep,
   handOff: HandOffStep,
+}
+
+/** What the Checks step and the hand-off row can ask of the rest of the Forge. */
+const SCOUT_AGAIN =
+  'Read the repository again for how its checks are run: the README, CONTRIBUTING.md, the CI files and the Makefile. Put every command you find in the order’s toolchain.'
+
+function checksActions(forge: ForgeModel): ChecksActions {
+  return {
+    checkAgain: () => void forge.moveEnvironment('check'),
+    askScout: () => void forge.converge(SCOUT_AGAIN),
+    openChecks: () => openStep(forge, 'checks'),
+  }
+}
+
+function ChecksBody({ forge }: ForgeProp) {
+  return <ChecksStep checks={forge.checks} actions={checksActions(forge)} />
 }
 
 function CurrentStep({ forge }: ForgeProp) {
@@ -1941,7 +1968,7 @@ function HandOffStep({ forge }: ForgeProp) {
       ) : (
         <AgreedRows forge={forge} />
       )}
-      <Unmeasured unavailable={view.unavailableChecks} />
+      {isDraft ? <HandOffChecks checks={forge.checks} actions={checksActions(forge)} /> : null}
     </>
   )
 }
@@ -1986,19 +2013,6 @@ function RunStartedRow({ forge }: ForgeProp) {
       </div>
       <span className="fdry-pill fdry-pill--work">{forge.r.runState}</span>
     </div>
-  )
-}
-
-function Unmeasured({ unavailable }: { readonly unavailable: string[] | undefined }) {
-  if (unavailable === undefined || unavailable.length === 0) return null
-  return (
-    <section className="fdry-field">
-      <h3 className="fdry-field-h">Not measurable here</h3>
-      <p className="fdry-note">
-        This repository has no command for {unavailable.join(', ')}. Those checks will report
-        &ldquo;not measured&rdquo; rather than passing.
-      </p>
-    </section>
   )
 }
 

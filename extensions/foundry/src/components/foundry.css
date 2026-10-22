@@ -4063,3 +4063,128 @@
     transition: none;
   }
 }
+
+/* ─── Foundry: the Checks step ───────────────────────────────────── */
+
+.fdry-cmd {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--tm-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.fdry-cmd--none {
+  font-family: inherit;
+  color: var(--tm-text-muted);
+}
+
+.fdry-chk-icon--passed {
+  color: var(--tm-success);
+}
+
+.fdry-chk-icon--failing {
+  color: var(--tm-danger);
+}
+
+.fdry-chk--you {
+  background: var(--tm-warning-dim);
+}
+
+.fdry-chk--you .fdry-chk-icon {
+  color: var(--tm-warning);
+}
+
+.fdry-chk-field {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 0 8px;
+  font: inherit;
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+}
+
+.fdry-chk-ask {
+  margin: 12px 0 0;
+}
+
+.fdry-chk-result {
+  margin-top: 8px;
+}
+
+.fdry-chk-result code,
+.fdry-chk small code {
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--tm-text-primary);
+}
+
+.fdry-chk-footer {
+  margin-top: 10px;
+}
+
+.fdry-chk-add {
+  margin-top: 10px;
+  max-width: 560px;
+}
+
+.fdry-chk-add .tmui-segmented {
+  margin-top: 8px;
+}
+
+/* ─── Foundry: repository checks in settings ─────────────────────── */
+
+.fdry-profiles {
+  margin-top: 10px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  overflow: hidden;
+}
+
+.fdry-setrow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.fdry-setrow:last-child {
+  border-bottom: 0;
+}
+
+.fdry-setrow b {
+  font-weight: 500;
+}
+
+.fdry-setrow small {
+  display: block;
+  color: var(--tm-text-secondary);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+.fdry-setrow .fdry-chk-moves {
+  margin-top: 0;
+  flex: none;
+}
+
+.fdry-profile-commands {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+
+.fdry-profile-commands code {
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 12px;
+}

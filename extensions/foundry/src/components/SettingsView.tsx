@@ -4,6 +4,7 @@ import { getFoundryAPI, type ModelChoiceView } from '../types/electron.js'
 import { rungInWords } from '../recipe/rung.js'
 import type { Rung } from '../recipe/rung.js'
 import { invoke } from '@terminator/extension-sdk/renderer'
+import { RepositoryChecks } from './SettingsProfiles.js'
 
 // What is left for a bespoke settings surface.
 //
@@ -55,6 +56,7 @@ export function SettingsView(): JSX.Element {
       <AskModelSection ask={ask} saving={saver.saving} />
       {saver.problem !== null ? <p className="fdry-problem">{saver.problem}</p> : null}
       <SensorsSection />
+      <RepositoryChecks />
       <h2 className="fdry-panel-h" style={{ marginTop: 20 }}>
         Everything else
       </h2>
