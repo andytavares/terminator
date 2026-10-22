@@ -1,0 +1,40 @@
+extensions/foundry/src/line/executor-deps.ts
+  s_f6f18e5557b141::t_3c5c9e09a6ffe6 330
+  s_f6f18e5557b141::t_c6b4ddc37391a0 31,78-80
+extensions/foundry/src/line/worktree.ts
+  s_f6f18e5557b141::t_f865ae94cc8ba7 34-35,112-113,126,215,221-228,233-234,237,242,244-261,267-269,282,284-285,293-297,299,305,311,337,349-350,439-446
+extensions/foundry/tests/line/executor-deps.spec.ts
+  s_f6f18e5557b141::t_c2178e6aab5d80 387,401-403,431,446
+  s_f6f18e5557b141::t_bf01a5cd7fae8a 434
+  s_f6f18e5557b141::t_f526b9873f904b 390-392,409,415,435,439-441,679-682,685-690
+  s_f6f18e5557b141::t_a5be87f6b40ba0 674-678,683-684
+  s_f6f18e5557b141::t_5c852cc8fa8c18 358,377,379,394,399,426-428
+  s_f6f18e5557b141::t_5e2676d7880ad0 37,380-386,388-389,393,395-398,400,404-408,410-414,416-425,429-430,432-433,436-438,442-445,447-449
+extensions/foundry/src/line/lane-commands.ts
+  s_f6f18e5557b141::t_c6b4ddc37391a0 53-54,71-118,189
+extensions/foundry/tests/line/worktree.spec.ts
+  s_f6f18e5557b141::t_454435fa3bca68 544-545,658-660,697,699
+  s_f6f18e5557b141::t_e234516910b41e 542,625,627-634,636-651,653-657,661-672,674-679,683-689,691-696,698,700-708,710-727,840-844
+  s_f6f18e5557b141::t_4bf7a6e5ee0687 543,561,574,592,621-624,626,635,652,673,680-682,690,709,736,750,771,787,801,822
+  s_f6f18e5557b141::t_c6b4ddc37391a0 603-610
+extensions/foundry/src/line/run-context.ts
+  s_f6f18e5557b141::t_c6b4ddc37391a0 41-42,66
+extensions/foundry/CLAUDE.md
+  s_f6f18e5557b141::t_df352f603531d3 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f3cab8e6abe2eba27552b6f055d7eac10958578c",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
