@@ -1,3 +1,5 @@
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { z } from 'zod'
 import type { ChannelSpec } from '@terminator/extension-sdk'
 
@@ -9,7 +11,13 @@ import { draftOrder } from '../order/draft.js'
 import type { OrderStore } from '../order/store.js'
 import { recordExitCodes } from '../profile/proof.js'
 import { resolveProfile } from '../profile/resolve.js'
-import { emptyProfile, type Entry, type Profile } from '../profile/schema.js'
+import {
+  emptyProfile,
+  isRemoved,
+  type Profile,
+  type RemovedEntry,
+  type StoredEntry,
+} from '../profile/schema.js'
 import {
   deleteProfile,
   listProfiles,
@@ -29,7 +37,13 @@ const RepoPayload = z.object({ repoPath: z.string().min(1) })
 /** A command to set, or null to clear what the operator set; absent leaves it be. */
 const OperatorCommand = z.string().trim().min(1).nullable().optional()
 
+/** The parts of a profile whose command the operator can take away. */
+const REMOVABLE = [...CHECK_NAMES, 'prepare', 'pictures'] as const
+type Removable = (typeof REMOVABLE)[number]
+
 const SavePayload = RepoPayload.extend({
+  /** Parts the operator says have no command, whatever else Foundry finds. */
+  remove: z.array(z.enum(REMOVABLE)).optional(),
   checks: z
     .object(Object.fromEntries(CHECK_NAMES.map((name) => [name, OperatorCommand])))
     .optional(),
@@ -58,6 +72,7 @@ const SavePayload = RepoPayload.extend({
 })
 type SaveInput = z.infer<typeof SavePayload>
 
+const LogPayload = z.object({ path: z.string().min(1) })
 const ProvePayload = RepoPayload.extend({ command: z.string().trim().min(1) })
 const NoPayload = z.strictObject({})
 
@@ -74,6 +89,7 @@ export interface ProfileChannels {
   prove(payload: z.infer<typeof ProvePayload>): Promise<unknown>
   list(): Promise<unknown>
   forget(payload: z.infer<typeof RepoPayload>): Promise<unknown>
+  logTail(payload: z.infer<typeof LogPayload>): Promise<unknown>
 }
 
 export function createProfileChannels(deps: ProfileChannelDeps): ProfileChannels {
@@ -83,6 +99,7 @@ export function createProfileChannels(deps: ProfileChannelDeps): ProfileChannels
     prove: (payload) => prove(deps, payload),
     list: () => list(deps),
     forget: (payload) => forget(deps, payload.repoPath),
+    logTail: ({ path: target }) => logTail(deps.dataRoot(), target),
   }
 }
 
@@ -93,11 +110,30 @@ async function resolvedFor(deps: ProfileChannelDeps, repoPath: string) {
 
 async function read(deps: ProfileChannelDeps, repoPath: string): Promise<unknown> {
   const { stored, resolved } = await resolvedFor(deps, repoPath)
-  return { repository: repoPath, ...resolved, proof: stored?.proof ?? null }
+  return {
+    repository: repoPath,
+    ...resolved,
+    removed: removedIn(stored),
+    proof: stored?.proof ?? null,
+  }
+}
+
+const REMOVED: RemovedEntry = { command: null, source: 'operator' }
+
+const storedOf = (profile: Profile, part: Removable): StoredEntry | null =>
+  part === 'prepare' || part === 'pictures' ? profile[part] : profile.checks[part]
+
+/** The parts the operator has taken the command away from. */
+function removedIn(stored: Profile | null): Removable[] {
+  if (stored === null) return []
+  return REMOVABLE.filter((part) => isRemoved(storedOf(stored, part)))
 }
 
 /** What the operator's word does to an entry: sets it, clears it if theirs, or leaves it. */
-function operatorEntry(current: Entry | null, change: string | null | undefined): Entry | null {
+function operatorEntry(
+  current: StoredEntry | null,
+  change: string | null | undefined
+): StoredEntry | null {
   if (change === undefined) return current
   if (change !== null) return { command: change, source: 'operator' }
   return current?.source === 'operator' ? null : current
@@ -124,7 +160,20 @@ function withOperatorLists(stored: Profile, payload: SaveInput): Partial<Profile
   }
 }
 
+function withRemovals(profile: Profile, remove: SaveInput['remove']): Profile {
+  const next = { ...profile, checks: { ...profile.checks } }
+  for (const part of remove ?? []) {
+    if (part === 'prepare' || part === 'pictures') next[part] = REMOVED
+    else next.checks[part] = REMOVED
+  }
+  return next
+}
+
 function operatorProfile(stored: Profile, payload: SaveInput): Profile {
+  return withRemovals(changedProfile(stored, payload), payload.remove)
+}
+
+function changedProfile(stored: Profile, payload: SaveInput): Profile {
   return {
     ...stored,
     ...withOperatorLists(stored, payload),
@@ -186,7 +235,10 @@ async function prove(
 
 function commandsIn(profile: Profile): number {
   const entries = [...Object.values(profile.checks), profile.prepare, profile.pictures]
-  return entries.filter((entry) => entry !== null).length + profile.additional.length
+  return (
+    entries.filter((entry) => entry !== null && !isRemoved(entry)).length +
+    profile.additional.length
+  )
 }
 
 async function list(deps: ProfileChannelDeps): Promise<unknown> {
@@ -206,6 +258,28 @@ async function forget(deps: ProfileChannelDeps, repoPath: string): Promise<unkno
   return { ok: true }
 }
 
+const LOG_TAIL_LINES = 40
+
+const NOT_A_RECORD = 'Foundry only reads logs it kept in its own records.'
+
+/** Whether `child` is `parent` or inside it, both already resolved through symlinks. */
+const isInside = (parent: string, child: string): boolean =>
+  child === parent || child.startsWith(parent + path.sep)
+
+/** The last lines of a log, only when its real path lies under the data root's records. */
+async function logTail(root: string, target: string): Promise<unknown> {
+  let real: string
+  try {
+    real = await fs.promises.realpath(path.resolve(target))
+  } catch {
+    return { error: 'No log was kept at that place.' }
+  }
+  if (!isInside(await fs.promises.realpath(root), real)) return { error: NOT_A_RECORD }
+  const text = await fs.promises.readFile(real, 'utf8').catch(() => null)
+  if (text === null) return { error: 'No log was kept at that place.' }
+  return { tail: text.replace(/\n$/, '').split('\n').slice(-LOG_TAIL_LINES).join('\n') }
+}
+
 /** The profile surface's channels, each with the schema its payload is parsed with (ADR 096). */
 export function profileChannelSpecs(channels: ProfileChannels): ChannelSpec[] {
   return [
@@ -214,5 +288,6 @@ export function profileChannelSpecs(channels: ProfileChannels): ChannelSpec[] {
     foundryChannel('foundry:profile-prove', ProvePayload, channels.prove),
     foundryChannel('foundry:profiles-list', NoPayload, channels.list),
     foundryChannel('foundry:profile-forget', RepoPayload, channels.forget),
+    foundryChannel('foundry:log-tail', LogPayload, channels.logTail),
   ]
 }

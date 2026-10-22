@@ -51,6 +51,8 @@ export interface EnvironmentFacts {
   readonly waivedAt: string | null
   /** Whether a check is running in this process; absent reads as running. */
   readonly proving?: boolean
+  /** What the operator decided about checks that cannot be measured; absent reads as nothing decided. */
+  readonly decisions?: { readonly continueUnmeasured: boolean; readonly declinePictures: boolean }
 }
 
 const NO_ENVIRONMENT: EnvironmentFacts = { baseline: null, waivedAt: null }

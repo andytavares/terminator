@@ -4188,3 +4188,18 @@
   font-family: var(--tm-font-mono, ui-monospace, monospace);
   font-size: 12px;
 }
+
+.fdry-chk-log {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  max-height: 220px;
+  overflow: auto;
+  font-family: var(--tm-font-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  white-space: pre-wrap;
+}

@@ -16,6 +16,9 @@ import {
   loopFacts,
   agreedFacts,
   environmentWaivedAt,
+  checkDecisions,
+  CHECKS_CONTINUE_UNMEASURED,
+  PICTURES_DECLINED,
   turnEndedAt as turnEndedAtOf,
 } from '../forge/intake-outcome.js'
 import type { IntakeOutcome } from '../forge/intake-outcome.js'
@@ -133,7 +136,10 @@ const CompilePayload = z.object({
 
 const RecipePayload = z.object({ id: z.string(), recipe: z.string().nullable() })
 const HoldPayload = z.object({ id: z.string(), held: z.boolean() })
-const EnvironmentPayload = z.object({ id: z.string(), move: z.enum(['check', 'waive']) })
+const EnvironmentPayload = z.object({
+  id: z.string(),
+  move: z.enum(['check', 'waive', 'continue-unmeasured', 'decline-pictures']),
+})
 
 const WriteBackPayload = z.object({
   id: z.string(),
@@ -291,6 +297,7 @@ async function readFacts(
       baseline,
       waivedAt: environmentWaivedAt(entries, baseline?.startedAt ?? null),
       proving: isProving(orderId),
+      decisions: checkDecisions(entries),
     },
   }
 }
@@ -990,6 +997,24 @@ async function hold(deps: ForgeDeps, payload: z.infer<typeof HoldPayload>): Prom
 const WAIVED_REASON =
   'Handed off without a proven base branch; checks that fail there will read "failing on base".'
 
+/** What each move that is not a re-check writes to the order's ledger. */
+const MOVE_RECORDS: Record<
+  Exclude<z.infer<typeof EnvironmentPayload>['move'], 'check'>,
+  { action: string; reason: string }
+> = {
+  waive: { action: 'environment.waived', reason: WAIVED_REASON },
+  'continue-unmeasured': {
+    action: CHECKS_CONTINUE_UNMEASURED,
+
+    reason: 'Went on with nothing measured: no command was found and none was given.',
+  },
+  'decline-pictures': {
+    action: PICTURES_DECLINED,
+
+    reason: 'Ships without pictures although the plan changes the interface.',
+  },
+}
+
 // Check the base branch again, or hand off without it. A check runs on after the answer;
 // the Forge reads its result when baseline.json announces.
 async function environment(
@@ -1002,15 +1027,8 @@ async function environment(
     return { error: 'Only a draft order can check its base branch again.' }
   }
 
-  if (payload.move === 'check') {
-    void deps.proveEnvironment?.(order)
-  } else {
-    await recordOperator(deps, order.id, {
-      action: 'environment.waived',
-      subject: order.id,
-      reason: WAIVED_REASON,
-    })
-  }
+  if (payload.move === 'check') void deps.proveEnvironment?.(order)
+  else await recordOperator(deps, order.id, { ...MOVE_RECORDS[payload.move], subject: order.id })
 
   return { ...view(order), ...(await readFacts(deps, order.id)) }
 }

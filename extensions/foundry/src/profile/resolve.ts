@@ -8,6 +8,8 @@ import {
   ProfileSchema,
   type AdditionalCheck,
   type Entry,
+  type StoredEntry,
+  isRemoved,
   type EntrySource,
   type Profile,
   type ProfilePaths,
@@ -48,12 +50,12 @@ export function readRepositoryProfile(repoPath: string): Profile | null {
   return parsed.success ? parsed.data : null
 }
 
-const asSource = (entry: Entry | null, source: EntrySource): Entry | null =>
-  entry === null ? null : { ...entry, source }
+const asSource = (entry: StoredEntry | null, source: EntrySource): Entry | null =>
+  entry === null || isRemoved(entry) ? null : { ...entry, source }
 
 /** The entries a stored profile may answer with: the operator's and the scout's, by source. */
-const storedEntry = (entry: Entry | null, source: EntrySource): Entry | null =>
-  entry !== null && entry.source === source ? entry : null
+const storedEntry = (entry: StoredEntry | null, source: EntrySource): Entry | null =>
+  entry !== null && !isRemoved(entry) && entry.source === source ? entry : null
 
 const hintEntry = (proposal: HintProposal | null): Entry | null =>
   proposal === null
@@ -69,8 +71,13 @@ interface Layers {
   readonly hinted: ReturnType<typeof evaluateHints>
 }
 
-function entryFrom(layers: Layers, pick: (profile: Profile) => Entry | null, hint: Entry | null) {
+function entryFrom(
+  layers: Layers,
+  pick: (profile: Profile) => StoredEntry | null,
+  hint: Entry | null
+) {
   const { stored, repository } = layers
+  if (stored !== null && isRemoved(pick(stored))) return null
   return firstOf([
     stored === null ? null : storedEntry(pick(stored), 'operator'),
     repository === null ? null : asSource(pick(repository), 'repository'),

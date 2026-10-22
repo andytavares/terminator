@@ -12,6 +12,8 @@ import type { Rung } from '../verify/ladder.js'
 /** What `foundry:profile-read` answers: the resolved profile and the proof stored with it. */
 export interface ProfileFacts extends ResolvedProfile {
   readonly repository: string
+  /** Parts the operator took the command away from: check names, 'prepare' or 'pictures'. */
+  readonly removed?: readonly string[]
   readonly proof: {
     readonly commit: string
     readonly at?: string
@@ -38,6 +40,8 @@ export interface CheckRowView {
   readonly target: CheckTarget
   /** True once the operator owns the command, so a failure on main is theirs to decide. */
   readonly yours: boolean
+  /** True when the operator took away the command Foundry found. */
+  readonly removed: boolean
 }
 
 const CHECK_LABELS: Record<CheckName, string> = {
@@ -58,6 +62,8 @@ export const RUNG_GROUPS: readonly { readonly rung: Rung; readonly words: string
   { rung: 'L1', words: 'with Tests' },
   { rung: 'L5', words: 'with Build' },
 ]
+
+const REMOVED_WORDS = 'You removed the one Foundry found'
 
 function groupWords(rung: Rung): string {
   return RUNG_GROUPS.find((group) => group.rung === rung)?.words ?? 'with Tests'
@@ -99,34 +105,33 @@ const keyOf = (target: CheckTarget): string =>
     ? `${target.kind}:${target.name}`
     : target.kind
 
+const partOf = (target: CheckTarget): string | null =>
+  target.kind === 'additional' ? null : target.kind === 'check' ? target.name : target.kind
+
 function rowOf(input: RowInput, profile: ProfileFacts, base: string): CheckRowView {
   const { label, entry, target, sourceNote } = input
   const key = keyOf(target)
+  const part = partOf(target)
+  const removed = part !== null && (profile.removed ?? []).includes(part)
   if (entry === null) {
-    const source = sourceNote ?? 'Will report “not measured”'
-    return {
-      key,
-      label,
-      command: null,
-      source,
-      proofWord: 'None',
-      state: 'missing',
-      target,
-      yours: false,
-    }
+    const source = removed ? REMOVED_WORDS : (sourceNote ?? 'Will report “not measured”')
+    const none = { command: null, proofWord: 'None', state: 'missing' as const, yours: false }
+    return { key, label, source, target, removed, ...none }
   }
   const proof = proofOf(entry.command, profile.proof, base)
   const source = sourceNote ?? sourceInWords(entry)
   const yours = entry.source === 'operator'
+  const state = proof.state
   return {
     key,
     label,
     command: entry.command,
     source,
     proofWord: proof.word,
-    state: proof.state,
+    state,
     target,
     yours,
+    removed,
   }
 }
 
@@ -232,6 +237,7 @@ export interface SaveChange {
   readonly checks?: Partial<Record<CheckName, string | null>>
   readonly prepare?: string | null
   readonly pictures?: string | null
+  readonly remove?: readonly string[]
   readonly additional?: readonly NewCheck[]
 }
 
@@ -263,4 +269,11 @@ export function changeFor(
 /** Another check added to the profile, alongside the ones already there. */
 export function withAdditional(profile: ProfileFacts, check: NewCheck): SaveChange {
   return { additional: [...plainAdditional(profile), check] }
+}
+
+/** Taking a row's command away: an operator's or an added one is dropped, any other is overruled. */
+export function removeChange(profile: ProfileFacts, row: CheckRowView): SaveChange {
+  const part = partOf(row.target)
+  if (part === null || row.yours) return changeFor(profile, row.target, null)
+  return { remove: [part] }
 }

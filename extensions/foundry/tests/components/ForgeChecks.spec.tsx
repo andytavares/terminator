@@ -45,24 +45,43 @@ window.HTMLElement.prototype.scrollIntoView = vi.fn()
 let invoke: ReturnType<typeof vi.fn>
 let bus = createChangeBus()
 let proveReply: unknown
+let tailReply: unknown
+/** What the ledger says the operator decided; the environment channel records into it. */
+let decisions: { continueUnmeasured: boolean; declinePictures: boolean }
 beforeEach(() => {
   bus = createChangeBus()
+  tailReply = { tail: 'checking 214 files\nall files formatted' }
+  decisions = { continueUnmeasured: false, declinePictures: false }
   proveReply = { exitCode: 0, logPath: '/logs/format.log', commit: '4be1c09aaaa' }
-  window.localStorage.clear()
 })
+
+const CONVERGING = new Set([
+  'foundry:forge.environment',
+  'foundry:order.compile',
+  'foundry:order.converge',
+])
+
+function recordDecision(move: string | undefined): void {
+  if (move === 'continue-unmeasured') decisions.continueUnmeasured = true
+  if (move === 'decline-pictures') decisions.declinePictures = true
+}
 
 function mount(
   profile: ProfileFacts,
   order = orderWithUnit(),
   environment = PROVEN_ENVIRONMENT
 ): void {
-  invoke = vi.fn(async (channel: string) => {
-    if (channel === 'foundry:order.compile' || channel === 'foundry:order.converge') {
-      return { order, compile: compileOrder(order), environment }
-    }
-    if (channel === 'foundry:profile-read' || channel === 'foundry:profile-save') return profile
+  const answer = () => ({
+    order,
+    compile: compileOrder(order),
+    environment: { ...environment, decisions },
+  })
+  invoke = vi.fn(async (channel: string, payload?: { move?: string }) => {
+    if (channel === 'foundry:forge.environment') recordDecision(payload?.move)
+    if (channel === 'foundry:log-tail') return tailReply
     if (channel === 'foundry:profile-prove') return proveReply
-    return {}
+    if (channel === 'foundry:profile-read' || channel === 'foundry:profile-save') return profile
+    return CONVERGING.has(channel) ? answer() : {}
   })
   Object.defineProperty(window, 'electronAPI', {
     value: { extensionBridge: { invoke, on: bus.on } },
@@ -113,14 +132,14 @@ describe('the Checks step moves', () => {
   it('offers the moves for a command that failed on main, and none for a passing one', async () => {
     await openChecks()
     const format = rowNamed('Format')
-    for (const name of ['Edit', 'Show the log', 'Use it anyway']) {
+    for (const name of ['Edit', 'Show the log', 'Use it anyway', 'Remove']) {
       expect(format.getByRole('button', { name })).toBeTruthy()
     }
     expect(
       rowNamed('Tests')
         .queryAllByRole('button')
         .map((b) => b.textContent)
-    ).toEqual(['Edit'])
+    ).toEqual(['Edit', 'Remove'])
   })
 
   it('counts the failing row on the step rail', async () => {
@@ -156,25 +175,33 @@ describe('Use it anyway and Remove', () => {
   })
 })
 
+/** Opens Checks on an order whose base branch check kept a log of the failing Format, and shows it. */
+async function showKeptLog(): Promise<void> {
+  mount(glyphProfile(), orderWithUnit(), {
+    waivedAt: null,
+    baseline: provenBaseline({
+      state: 'failing',
+      steps: [baseStep('Format', { result: 'fail', exitCode: 1, command: './glyph fmt --check' })],
+      logs: { Format: '/logs/format.log' },
+    }),
+  })
+  await openForgeStep('Checks')
+  const format = await screen.findByRole('group', { name: 'Format' })
+  fireEvent.click(await within(format).findByRole('button', { name: 'Show the log' }))
+}
+
 describe('Show the log', () => {
   it('names the log the base branch check kept for the command', async () => {
-    mount(glyphProfile(), orderWithUnit(), {
-      waivedAt: null,
-      baseline: provenBaseline({
-        state: 'failing',
-        steps: [
-          baseStep('Format', { result: 'fail', exitCode: 1, command: './glyph fmt --check' }),
-        ],
-        logs: { Format: '/logs/format.log' },
-      }),
-    })
-    await openForgeStep('Checks')
-    fireEvent.click(
-      await within(await screen.findByRole('group', { name: 'Format' })).findByRole('button', {
-        name: 'Show the log',
-      })
-    )
+    await showKeptLog()
     expect(await screen.findByText(/\/logs\/format\.log/)).toBeTruthy()
+    expect(await screen.findByText(/all files formatted/)).toBeTruthy()
+    expect(payloadsSentOn(invoke, 'foundry:log-tail')).toEqual([{ path: '/logs/format.log' }])
+  })
+
+  it('says why when the log cannot be read', async () => {
+    tailReply = { error: 'No log was kept at that place.' }
+    await showKeptLog()
+    expect(await screen.findByText('No log was kept at that place.')).toBeTruthy()
   })
 
   it('says so when no log was kept', async () => {
@@ -206,6 +233,7 @@ describe('running an edit on main', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Run on main' }))
     expect(await screen.findByText('Exit 0 on main at 4be1c09')).toBeTruthy()
     expect(screen.getByText(/\/logs\/format\.log/)).toBeTruthy()
+    expect(await screen.findByText(/all files formatted/)).toBeTruthy()
     expect(payloadsSentOn(invoke, 'foundry:profile-prove')).toEqual([
       { repoPath: '/repos/app', command: './glyph fmt --check src/' },
     ])
@@ -308,6 +336,9 @@ describe('when no way to check was found', () => {
     await waitFor(() => expect(checks().textContent).toContain('1 waiting on you'))
     fireEvent.click(await screen.findByRole('button', { name: 'Continue with nothing measured' }))
     await waitFor(() => expect(checks().textContent).toContain('Nothing waiting on you'))
+    expect(payloadsSentOn(invoke, 'foundry:forge.environment')).toEqual([
+      { id: 'WO-1', move: 'continue-unmeasured' },
+    ])
   })
 })
 
@@ -351,7 +382,9 @@ describe('the hand-off row for checks', () => {
     fireEvent.click(row.getByRole('button', { name: 'Open Checks' }))
     expect(await screen.findByRole('group', { name: 'Format' })).toBeTruthy()
   })
+})
 
+describe('the pictures row on hand-off', () => {
   it('leaves out the pictures row when the order changes no interface', async () => {
     await openHandOff(glyphProfile())
     expect(screen.queryByText('This order changes the interface')).toBeNull()
@@ -368,11 +401,47 @@ describe('the hand-off row for checks', () => {
     await openHandOff(glyphProfile(), orderWithUnit({ touchesInterface: true }))
     fireEvent.click(await screen.findByRole('button', { name: 'Ship without pictures' }))
     await waitFor(() => expect(screen.queryByText('This order changes the interface')).toBeNull())
+    expect(payloadsSentOn(invoke, 'foundry:forge.environment')).toEqual([
+      { id: 'WO-1', move: 'decline-pictures' },
+    ])
+  })
+
+  it('is not asked again once the ledger says the operator declined', async () => {
+    decisions.declinePictures = true
+    await openHandOff(glyphProfile(), orderWithUnit({ touchesInterface: true }))
+    expect(screen.queryByText('This order changes the interface')).toBeNull()
   })
 
   it('is not asked when the profile has a pictures command', async () => {
     const profile = glyphProfile({ pictures: { command: './glyph shots', source: 'operator' } })
     await openHandOff(profile, orderWithUnit({ touchesInterface: true }))
     expect(screen.queryByText('This order changes the interface')).toBeNull()
+  })
+})
+
+describe('removing a command Foundry found', () => {
+  it('says no command is wanted, from the Remove move on a command from another source', async () => {
+    await openChecks()
+    fireEvent.click(rowNamed('Format').getByRole('button', { name: 'Remove' }))
+    await waitFor(() =>
+      expect(payloadsSentOn(invoke, 'foundry:profile-save')).toEqual([
+        { repoPath: '/repos/app', remove: ['format'] },
+      ])
+    )
+  })
+
+  it('shows the removed state with a move to restore it', async () => {
+    const profile = glyphProfile({ removed: ['format'] })
+    profile.checks.format = null
+    await openChecks(profile)
+    const format = rowNamed('Format')
+    expect(format.getByText('No command')).toBeTruthy()
+    expect(format.getByText('You removed the one Foundry found')).toBeTruthy()
+    fireEvent.click(format.getByRole('button', { name: 'Restore' }))
+    await waitFor(() =>
+      expect(payloadsSentOn(invoke, 'foundry:profile-save')).toEqual([
+        { repoPath: '/repos/app', checks: { format: null } },
+      ])
+    )
   })
 })

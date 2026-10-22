@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   checkRows,
   interfaceTouched,
+  removeChange,
   sourceInWords,
   waitingOnYou,
 } from '../../src/forge/checks-view.js'
@@ -116,5 +117,38 @@ describe('interfaceTouched', () => {
 
   it('is false when neither holds', () => {
     expect(interfaceTouched(withUnit({ touches: ['src/parser.ts'] }), ['src/ui/**'])).toBe(false)
+  })
+})
+
+describe('a command the operator removed', () => {
+  const removedFormat = () => {
+    const profile = glyphProfile({ removed: ['format'] })
+    profile.checks.format = null
+    return profile
+  }
+
+  it('is a row with no command that says who removed it', () => {
+    const row = rowsOf(removedFormat()).find((each) => each.label === 'Format')
+    expect(row).toMatchObject({
+      command: null,
+      state: 'missing',
+      removed: true,
+      source: 'You removed the one Foundry found',
+    })
+  })
+
+  it('is removed by name when the command came from another source', () => {
+    const row = rowsOf().find((each) => each.label === 'Format')
+    expect(removeChange(glyphProfile(), row!)).toEqual({ remove: ['format'] })
+  })
+
+  it('is cleared back to the other sources when the operator set it', () => {
+    const row = rowsOf().find((each) => each.label === 'Prepare the checkout')
+    expect(removeChange(glyphProfile(), row!)).toEqual({ prepare: null })
+  })
+
+  it('drops an added check from the list', () => {
+    const row = rowsOf().find((each) => each.label === 'Type check')
+    expect(removeChange(glyphProfile(), row!)).toEqual({ additional: [] })
   })
 })

@@ -4,6 +4,7 @@ import type { Baseline } from '../line/baseline.js'
 import type { WorkOrder } from '../order/schema.js'
 import {
   changeFor,
+  removeChange,
   checkRows,
   interfaceTouched,
   nothingFound,
@@ -33,6 +34,8 @@ export interface Finished {
 
 export type ProveOutcome = { readonly running: true } | Finished | { readonly error: string }
 
+export type LogTail = { readonly tail: string } | { readonly error: string }
+
 export interface ChecksModel {
   readonly profile: ProfileFacts | null
   readonly rows: readonly CheckRowView[]
@@ -44,7 +47,11 @@ export interface ChecksModel {
   /** The key of the row being edited, or 'new' for the form that adds a check. */
   readonly editing: string | null
   readonly edit: (key: string | null) => void
+  /** Records the decision on the order's ledger; the view then answers it back. */
   readonly decide: (decision: Decision) => void
+  readonly removeRow: (row: CheckRowView) => Promise<string | null>
+  /** The last lines of a log, or why they cannot be shown. */
+  readonly tailOf: (path: string) => Promise<LogTail>
   /** Saves a change to the profile; the reason it could not be saved, or null. */
   readonly save: (change: SaveChange) => Promise<string | null>
   readonly saveCommand: (target: CheckTarget, command: string | null) => Promise<string | null>
@@ -56,7 +63,10 @@ export interface ChecksModel {
 
 interface OrderFacts {
   readonly order: WorkOrder
-  readonly environment?: { readonly baseline: Baseline | null }
+  readonly environment?: {
+    readonly baseline: Baseline | null
+    readonly decisions?: { readonly continueUnmeasured: boolean; readonly declinePictures: boolean }
+  }
 }
 
 const isProfile = (answer: unknown): answer is ProfileFacts =>
@@ -71,32 +81,13 @@ function leadRepo(order: WorkOrder) {
   return [...order.context.repos].sort((a, b) => a.lane - b.lane)[0]
 }
 
-function storedDecisions(key: string): Decision[] {
-  try {
-    return JSON.parse(window.localStorage.getItem(key) ?? '[]') as Decision[]
-  } catch {
-    return []
-  }
-}
-
-/** Decisions live in this browser: the order has no record to keep them in. */
-function useDecisions(orderId: string | null) {
-  const key = `foundry.checks.${orderId}`
-  const [chosen, setChosen] = useState<{ key: string; decided: Decision[] } | null>(null)
-  const decided = chosen?.key === key ? chosen.decided : storedDecisions(key)
-  const decide = useCallback(
-    (decision: Decision) => {
-      const next = [...decided.filter((each) => each !== decision), decision]
-      setChosen({ key, decided: next })
-      try {
-        window.localStorage.setItem(key, JSON.stringify(next))
-      } catch {
-        // Private windows refuse storage; the decision then lasts until the view closes.
-      }
-    },
-    [decided, key]
-  )
-  return { decided, decide }
+/** What the ledger says the operator decided, as the list the step reads. */
+function decidedFrom(facts: OrderFacts | null): Decision[] {
+  const decisions = facts?.environment?.decisions
+  return [
+    ...(decisions?.continueUnmeasured ? (['unmeasured'] as const) : []),
+    ...(decisions?.declinePictures ? (['noPictures'] as const) : []),
+  ]
 }
 
 /** The profile of the order's first repository, read again when a profile changes. */
@@ -114,6 +105,36 @@ function useProfile(repoPath: string | null) {
   return { profile, show }
 }
 
+function useProve(repoPath: string | null) {
+  return useCallback(
+    async (command: string): Promise<ProveOutcome> =>
+      (await invoke('foundry:profile-prove', { repoPath, command })) as ProveOutcome,
+    [repoPath]
+  )
+}
+
+type Save = (change: SaveChange) => Promise<string | null>
+
+/** The saves a row's moves make, each building its change from the profile as it stands. */
+function useProfileSaves(profile: ProfileFacts | null, save: Save) {
+  const saveCommand = useCallback(
+    (target: CheckTarget, command: string | null) =>
+      profile === null ? Promise.resolve(null) : save(changeFor(profile, target, command)),
+    [profile, save]
+  )
+  const addCheck = useCallback(
+    (check: NewCheck) =>
+      profile === null ? Promise.resolve(null) : save(withAdditional(profile, check)),
+    [profile, save]
+  )
+  const removeRow = useCallback(
+    (row: CheckRowView) =>
+      profile === null ? Promise.resolve(null) : save(removeChange(profile, row)),
+    [profile, save]
+  )
+  return { saveCommand, addCheck, removeRow }
+}
+
 function useProfileMoves(
   repoPath: string | null,
   profile: ProfileFacts | null,
@@ -127,23 +148,11 @@ function useProfileMoves(
     },
     [repoPath, show]
   )
-  const prove = useCallback(
-    async (command: string): Promise<ProveOutcome> =>
-      (await invoke('foundry:profile-prove', { repoPath, command })) as ProveOutcome,
-    [repoPath]
-  )
-  const saveCommand = useCallback(
-    (target: CheckTarget, command: string | null) =>
-      profile === null ? Promise.resolve(null) : save(changeFor(profile, target, command)),
-    [profile, save]
-  )
-  const addCheck = useCallback(
-    (check: NewCheck) =>
-      profile === null ? Promise.resolve(null) : save(withAdditional(profile, check)),
-    [profile, save]
-  )
-  return { save, prove, saveCommand, addCheck }
+  return { save, prove: useProve(repoPath), ...useProfileSaves(profile, save), tailOf }
 }
+
+const tailOf = async (path: string): Promise<LogTail> =>
+  (await invoke('foundry:log-tail', { path })) as LogTail
 
 function logFinder(baseline: Baseline | null | undefined) {
   return (command: string): string | null => {
@@ -180,19 +189,20 @@ function figuresOf(
 }
 
 /** Everything the Checks step, the rail count and the hand-off row draw from. */
-export function useChecks(facts: OrderFacts | null): ChecksModel {
+export function useChecks(facts: OrderFacts | null, record: (d: Decision) => void): ChecksModel {
   const repoPath = (facts && leadRepo(facts.order)?.path) || null
   const { profile, show } = useProfile(repoPath)
-  const decisions = useDecisions(facts?.order.id ?? null)
+  const decided = decidedFrom(facts)
   const [editing, edit] = useState<string | null>(null)
   const moves = useProfileMoves(repoPath, profile, show)
-  const figures = figuresOf(facts, profile, decisions.decided.includes('unmeasured'))
+  const figures = figuresOf(facts, profile, decided.includes('unmeasured'))
   return {
     profile,
     ...figures,
     editing,
     edit,
-    ...decisions,
+    decided,
+    decide: record,
     ...moves,
     logOf: logFinder(facts?.environment?.baseline),
   }

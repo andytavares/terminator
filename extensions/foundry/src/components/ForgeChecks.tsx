@@ -1,4 +1,4 @@
-import React, { useId, useState } from 'react'
+import React, { useEffect, useId, useState } from 'react'
 import { Button, SegmentedControl } from '@terminator/extension-ui'
 import { AlertCircle, Check, Image, Minus, Package, Play, X } from 'lucide-react'
 import {
@@ -14,7 +14,7 @@ import {
 } from '../forge/checks-view.js'
 import type { Rung } from '../verify/ladder.js'
 import { ReasonButton } from './ReasonButton.js'
-import type { ChecksModel, Finished, ProveOutcome } from './use-checks.js'
+import type { ChecksModel, Finished, LogTail, ProveOutcome } from './use-checks.js'
 
 // The Checks step: every command Foundry runs in this repository, where it came
 // from, and what running it on the base branch did. Every unknown has a move.
@@ -68,11 +68,11 @@ function useCommandRun(checks: ChecksModel, target: CheckTarget) {
 }
 
 function Outcome({
-  base,
+  checks,
   done,
   kept,
 }: {
-  readonly base: string
+  readonly checks: ChecksModel
   readonly done: Finished
   readonly kept: boolean
 }) {
@@ -80,12 +80,8 @@ function Outcome({
   const code = done.exitCode === null ? 'Did not finish' : `Exit ${done.exitCode}`
   return (
     <div className="fdry-chk-result">
-      <b>{`${code} on ${base}${commit}`}</b>
-      {done.logPath === null ? null : (
-        <small>
-          The output is in <code>{done.logPath}</code>
-        </small>
-      )}
+      <b>{`${code} on ${checks.base}${commit}`}</b>
+      {done.logPath === null ? null : <LogView checks={checks} path={done.logPath} />}
       {kept ? <small>Saved to this repository’s checks for every future order.</small> : null}
     </div>
   )
@@ -107,7 +103,7 @@ function ProveResult({ checks, outcome, kept }: ProveResultProps) {
     )
   }
   if ('error' in outcome) return <p className="fdry-problem">{outcome.error}</p>
-  return <Outcome base={checks.base} done={outcome} kept={kept} />
+  return <Outcome checks={checks} done={outcome} kept={kept} />
 }
 
 interface EditMovesProps {
@@ -163,17 +159,40 @@ function EditCheck({ checks, row }: RowProps) {
   )
 }
 
-function LogLine({ log }: { readonly log: string | null }) {
+/** The last lines of a log, read through the records-only channel. */
+function useLogTail(checks: ChecksModel, path: string): LogTail | null {
+  const [tail, setTail] = useState<LogTail | null>(null)
+  const { tailOf } = checks
+  useEffect(() => {
+    let current = true
+    void tailOf(path).then((answer) => current && setTail(answer))
+    return () => {
+      current = false
+    }
+  }, [tailOf, path])
+  return tail
+}
+
+function LogView({ checks, path }: { readonly checks: ChecksModel; readonly path: string }) {
+  const tail = useLogTail(checks, path)
+  return (
+    <>
+      <small>
+        The log is at <code>{path}</code>
+      </small>
+      {tail !== null && 'error' in tail ? <small>{tail.error}</small> : null}
+      {tail !== null && 'tail' in tail ? <pre className="fdry-chk-log">{tail.tail}</pre> : null}
+    </>
+  )
+}
+
+function LogLine({ checks, log }: { readonly checks: ChecksModel; readonly log: string | null }) {
   if (log === null) {
     return (
       <small>No log was kept for this command. Run every check on main again to make one.</small>
     )
   }
-  return (
-    <small>
-      The log is at <code>{log}</code>
-    </small>
-  )
+  return <LogView checks={checks} path={log} />
 }
 
 function FailureMoves({ checks, row }: RowProps) {
@@ -192,14 +211,22 @@ function FailureMoves({ checks, row }: RowProps) {
         <Button size="sm" onClick={() => void checks.saveCommand(row.target, row.command)}>
           Use it anyway
         </Button>
+        <RemoveMove checks={checks} row={row} />
       </div>
-      {shown ? <LogLine log={row.command === null ? null : checks.logOf(row.command)} /> : null}
+      {shown ? (
+        <LogLine checks={checks} log={row.command === null ? null : checks.logOf(row.command)} />
+      ) : null}
     </>
   )
 }
 
-/** A command the operator may take out: one they set, or a check they added. */
-const removable = (row: CheckRowView): boolean => row.yours || row.target.kind === 'additional'
+function RemoveMove({ checks, row }: RowProps) {
+  return (
+    <Button size="sm" variant="ghost" onClick={() => void checks.removeRow(row)}>
+      Remove
+    </Button>
+  )
+}
 
 function CommandMoves({ checks, row }: RowProps) {
   if (failsOnMain(row)) return <FailureMoves checks={checks} row={row} />
@@ -208,11 +235,7 @@ function CommandMoves({ checks, row }: RowProps) {
       <Button size="sm" onClick={() => checks.edit(row.key)}>
         Edit
       </Button>
-      {removable(row) ? (
-        <Button size="sm" variant="ghost" onClick={() => void checks.saveCommand(row.target, null)}>
-          Remove
-        </Button>
-      ) : null}
+      <RemoveMove checks={checks} row={row} />
     </div>
   )
 }
@@ -225,6 +248,11 @@ function RowMoves({ checks, row }: RowProps) {
       <Button size="sm" onClick={() => checks.edit(row.key)}>
         Add a command
       </Button>
+      {row.removed ? (
+        <Button size="sm" variant="ghost" onClick={() => void checks.saveCommand(row.target, null)}>
+          Restore
+        </Button>
+      ) : null}
     </div>
   )
 }

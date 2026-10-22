@@ -27,7 +27,17 @@ const AdditionalCheckSchema = z.object({
 })
 export type AdditionalCheck = z.infer<typeof AdditionalCheckSchema>
 
-const nullableEntry = EntrySchema.nullable().default(null)
+/** The operator saying "no command": it resolves the check to none, whatever the other sources found. */
+const RemovedEntrySchema = z.object({ command: z.null(), source: z.literal('operator') })
+export type RemovedEntry = z.infer<typeof RemovedEntrySchema>
+
+/** What a profile stores for one command: an entry, or the operator's removal of it. */
+export type StoredEntry = Entry | RemovedEntry
+
+export const isRemoved = (entry: StoredEntry | null): entry is RemovedEntry =>
+  entry !== null && entry.command === null
+
+const nullableEntry = z.union([EntrySchema, RemovedEntrySchema]).nullable().default(null)
 
 export const ChecksSchema = z.object(
   Object.fromEntries(CHECK_NAMES.map((name) => [name, nullableEntry])) as Record<

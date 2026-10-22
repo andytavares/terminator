@@ -171,3 +171,97 @@ describe('foundry:profiles-list and foundry:profile-forget', () => {
     expect(await channels.list()).toEqual({ profiles: [] })
   })
 })
+
+describe('foundry:profile-save removing a command', () => {
+  type Read = { checks: { lint: unknown }; removed: string[] }
+  const read = async () => (await channels.read({ repoPath: repo })) as Read
+
+  it('resolves a check to none, beating the hint, and says it was removed', async () => {
+    await channels.save({ repoPath: repo, remove: ['lint'] })
+    const after = await read()
+    expect(after.checks.lint).toBeNull()
+    expect(after.removed).toEqual(['lint'])
+    expect((await readProfile(root, repo))?.checks.lint).toEqual({
+      command: null,
+      source: 'operator',
+    })
+  })
+
+  it('restores what the other sources say when the removal is cleared with null', async () => {
+    await channels.save({ repoPath: repo, remove: ['lint'] })
+    await channels.save({ repoPath: repo, checks: { lint: null } })
+    const after = await read()
+    expect(after.checks.lint).toMatchObject({ source: 'hint' })
+    expect(after.removed).toEqual([])
+  })
+})
+
+describe('a removed command on a draft order', () => {
+  it('seeds a draft order with no command for the removed check', async () => {
+    const draft = draftOrder({
+      id: 'WO-DRAFT',
+      title: 'x',
+      source: { kind: 'typed', tracker: null, key: null, url: null },
+      repoPaths: [repo],
+      now: '2026-09-06T10:00:00.000Z',
+    })
+    await store.save(draft)
+    await channels.save({ repoPath: repo, remove: ['lint'] })
+    expect((await store.load('WO-DRAFT'))?.context.toolchain.lint).toBeNull()
+  })
+})
+
+describe('foundry:profile-save removing a command, in the lists', () => {
+  it('does not count a removed command among the repository’s commands', async () => {
+    await channels.save({ repoPath: repo, checks: { test: 'make test' }, remove: ['lint'] })
+    const listed = (await channels.list()) as { profiles: { commands: number }[] }
+    expect(listed.profiles[0].commands).toBe(1)
+  })
+})
+
+const LOG_LINES = Array.from({ length: 100 }, (_, index) => `line ${index + 1}`)
+const inRecords = (name: string) => path.join(root, 'logs', name)
+const tail = (target: string) =>
+  channels.logTail({ path: target }) as Promise<{ tail?: string; error?: string }>
+
+/** A 100-line log in the records, and a file beside the records that must stay unread. */
+function seedLogs(): void {
+  fs.mkdirSync(path.join(root, 'logs'), { recursive: true })
+  fs.writeFileSync(inRecords('a.log'), LOG_LINES.join('\n') + '\n')
+  fs.writeFileSync(path.join(parent, 'secret.txt'), 'secret')
+}
+
+describe('foundry:log-tail', () => {
+  beforeEach(seedLogs)
+
+  it('returns the last 40 lines of a log kept in the records', async () => {
+    const answer = await tail(inRecords('a.log'))
+    expect(answer.tail?.split('\n')).toEqual(LOG_LINES.slice(60))
+  })
+})
+
+describe('foundry:log-tail refusing what is not a record', () => {
+  beforeEach(seedLogs)
+
+  it('refuses a file outside the records', async () => {
+    expect((await tail(path.join(parent, 'secret.txt'))).error).toMatch(/only reads logs/i)
+  })
+
+  it('refuses a .. escape out of the records', async () => {
+    const escape = path.join(root, 'logs', '..', '..', 'secret.txt')
+    const answer = await tail(escape)
+    expect(answer.error).toMatch(/only reads logs/i)
+    expect(answer.tail).toBeUndefined()
+  })
+
+  it('refuses a symlink in the records that points out', async () => {
+    fs.symlinkSync(path.join(parent, 'secret.txt'), inRecords('link.log'))
+    const answer = await tail(inRecords('link.log'))
+    expect(answer.error).toMatch(/only reads logs/i)
+    expect(answer.tail).toBeUndefined()
+  })
+
+  it('says so in plain words when the log is gone', async () => {
+    expect((await tail(inRecords('gone.log'))).error).toMatch(/no log/i)
+  })
+})

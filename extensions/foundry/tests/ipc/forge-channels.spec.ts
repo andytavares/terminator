@@ -2001,7 +2001,12 @@ function readingTests() {
     const r = (await channels().compile(compiling(seed.order.id, false))) as {
       environment: unknown
     }
-    expect(r.environment).toEqual({ baseline: null, waivedAt: null, proving: false })
+    expect(r.environment).toEqual({
+      baseline: null,
+      waivedAt: null,
+      proving: false,
+      decisions: { continueUnmeasured: false, declinePictures: false },
+    })
   })
 }
 
@@ -2030,6 +2035,46 @@ function theMovesTests() {
   })
 }
 
+function theDecisionMovesTests() {
+  const decide = async (move: 'continue-unmeasured') => {
+    const seed = await drafted()
+    const proveEnvironment = vi.fn(async () => undefined)
+    const c = createForgeChannels(forgeDeps({ proveEnvironment }))
+    const r = (await c.environment({ id: seed.order.id, move })) as {
+      environment: { decisions: Record<string, boolean> }
+    }
+    return { seed, r, proveEnvironment }
+  }
+
+  it('records "checks.continue-unmeasured" and answers the decision from the ledger', async () => {
+    const { seed, r, proveEnvironment } = await decide('continue-unmeasured')
+    expect((await store.entries(seed.order.id)).at(-1)).toMatchObject({
+      actor: 'operator',
+      action: 'checks.continue-unmeasured',
+    })
+    expect(r.environment.decisions).toEqual({ continueUnmeasured: true, declinePictures: false })
+    expect(proveEnvironment).not.toHaveBeenCalled()
+  })
+}
+
+function thePicturesDecisionTests() {
+  it('records "pictures.declined" and answers the decision from the ledger', async () => {
+    const seed = await drafted()
+    const c = createForgeChannels(forgeDeps({}))
+    const r = (await c.environment({ id: seed.order.id, move: 'decline-pictures' })) as {
+      environment: { decisions: Record<string, boolean> }
+    }
+    expect((await store.entries(seed.order.id)).at(-1)).toMatchObject({
+      action: 'pictures.declined',
+    })
+    expect(r.environment.decisions).toEqual({ continueUnmeasured: false, declinePictures: true })
+    const again = (await channels().compile(compiling(seed.order.id, false))) as {
+      environment: { decisions: Record<string, boolean> }
+    }
+    expect(again.environment.decisions.declinePictures).toBe(true)
+  })
+}
+
 function theMoveErrorsTests() {
   it('refuses a move other than check or waive, and errors on an unknown order', async () => {
     const seed = await drafted()
@@ -2042,6 +2087,9 @@ function theMoveErrorsTests() {
     expect(r.error).toBe('No order WO-nope.')
   })
 }
+
+describe('the decisions about what cannot be measured', theDecisionMovesTests)
+describe('the decision to ship without pictures', thePicturesDecisionTests)
 
 describe('handing off waits for the base branch check', () => {
   describe('the manual hand-off', manualHandOffTests)

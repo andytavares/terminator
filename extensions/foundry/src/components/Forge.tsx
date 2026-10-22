@@ -30,7 +30,7 @@ import { openingStep, forgeSteps, type StepId } from '../forge/steps.js'
 import { budgetsInWords } from '../order/render.js'
 import { BudgetForm } from './BudgetForm.js'
 import { ChecksStep, HandOffChecks, type ChecksActions } from './ForgeChecks.js'
-import { useChecks } from './use-checks.js'
+import { useChecks, type Decision } from './use-checks.js'
 import { usePushed } from '../renderer/use-pushed.js'
 import { ReasonButton } from './ReasonButton.js'
 import {
@@ -615,7 +615,7 @@ function useEnvironmentMove(
   { setView, setProblem }: Pick<Shown, 'setView' | 'setProblem'>
 ) {
   return useCallback(
-    async (move: 'check' | 'waive') => {
+    async (move: 'check' | 'waive' | 'continue-unmeasured' | 'decline-pictures') => {
       const next = (await invoke('foundry:forge.environment', { id: orderId, move })) as
         | OrderView
         | { error: string }
@@ -628,7 +628,10 @@ function useEnvironmentMove(
 
 /** The base branch check, and the Checks step that reads and edits what it runs. */
 function useEnvironment(orderId: string, shown: Shown) {
-  return { moveEnvironment: useEnvironmentMove(orderId, shown), checks: useChecks(shown.view) }
+  const moveEnvironment = useEnvironmentMove(orderId, shown)
+  const record = (decision: Decision): void =>
+    void moveEnvironment(decision === 'unmeasured' ? 'continue-unmeasured' : 'decline-pictures')
+  return { moveEnvironment, checks: useChecks(shown.view, record) }
 }
 
 /** Holding the order, and picking its shape. */
