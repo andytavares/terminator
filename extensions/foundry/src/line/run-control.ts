@@ -17,6 +17,24 @@ export const executingOrders = new Set<string>()
 // process: activation precedes the workspace, and the records follow the workspace.
 export const adoptedRoots = new Set<string>()
 
+// Runs this process started that have not returned: one keeps writing its records until it does.
+const runsInFlight = new Set<Promise<void>>()
+
+/** Keeps `run` until it settles, whether it returns or fails; it is the caller's to report. */
+export function trackRun(run: Promise<void>): void {
+  const forget = (): void => {
+    runsInFlight.delete(run)
+  }
+  runsInFlight.add(run)
+  run.then(forget, forget)
+}
+
+/** Settles once every run this process started has returned or failed; a spec awaits it before
+ * its records go. @internal */
+export async function settleRuns(): Promise<void> {
+  await Promise.allSettled([...runsInFlight])
+}
+
 /** Stops every node's agent that is still alive, and names the nodes it stopped. */
 function stopLiveAgents(nodes: readonly RunNode[], reason: string): string[] {
   const stopped: string[] = []

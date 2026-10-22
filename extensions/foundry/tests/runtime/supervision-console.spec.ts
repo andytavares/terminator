@@ -2,12 +2,12 @@
  * The supervision console, through `activate`: what is held, what stalled, the
  * feed, answering a held call, and the actions on one run.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 import { fakeHost, temporaryDirectory, type FoundryHost } from '../helpers/foundry-host.js'
-import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import { orderStoreAt } from '../../src/state/live-index.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
@@ -32,6 +32,9 @@ beforeAll(async () => {
   host = fakeHost(() => dataDir)
   await activateFoundry(host)
 })
+
+// Each test's proofs and runs end before the next test, or the spec's folder, goes.
+afterEach(settleFoundryWork)
 
 afterAll(async () => {
   await deactivate()

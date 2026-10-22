@@ -8,7 +8,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 import { fakeHost, seededRepository, temporaryDirectory } from '../helpers/foundry-host.js'
-import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { orderStoreAt } from '../../src/state/live-index.js'
@@ -32,6 +32,9 @@ beforeAll(async () => {
   host = fakeHost(() => dataDir)
   await activateFoundry(host)
 })
+
+// Each test's proofs and runs end before the next test, or the spec's folder, goes.
+afterEach(settleFoundryWork)
 
 afterAll(async () => {
   await deactivate()

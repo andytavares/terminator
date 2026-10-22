@@ -1,11 +1,10 @@
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 import { fakeHost } from '../helpers/foundry-host.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
-import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import { eventually } from '../../../../tests/support/eventually'
-import { settleProofs } from '../../src/line/baseline.js'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
@@ -22,10 +21,11 @@ beforeAll(async () => {
   await activateFoundry(host)
 })
 
-// Creating an order starts its base-branch proof, which writes into the folder until it ends.
+// Each test's proofs and runs end before the next test, or the spec's folder, goes.
+afterEach(settleFoundryWork)
+
 afterAll(async () => {
   await deactivate()
-  await settleProofs()
 })
 
 beforeEach(() => {

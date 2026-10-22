@@ -10,11 +10,11 @@
  */
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
-import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import { builderUnit } from '../helpers/order-parts.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -114,6 +114,9 @@ beforeAll(async () => {
   host.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
   await activateFoundry(host)
 })
+
+// Each test's proofs and runs end before the next test, or the spec's folder, goes.
+afterEach(settleFoundryWork)
 
 afterAll(async () => {
   await deactivate()

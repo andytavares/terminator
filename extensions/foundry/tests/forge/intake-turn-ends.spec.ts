@@ -4,7 +4,7 @@
  * before its file is written, a session that ends with nothing, and a red team
  * round that could not start, wrote what it may not, or had no role to run.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
@@ -14,7 +14,7 @@ import {
   temporaryDirectory,
   untilToastShown,
 } from '../helpers/foundry-host.js'
-import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { orderDir } from '../../src/data-root.js'
@@ -37,6 +37,9 @@ beforeAll(async () => {
   host = fakeHost(() => dataDir)
   await activateFoundry(host)
 })
+
+// Each test's proofs and runs end before the next test, or the spec's folder, goes.
+afterEach(settleFoundryWork)
 
 afterAll(async () => {
   await deactivate()

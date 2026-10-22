@@ -9,6 +9,7 @@ import { startSupervisionRuntime, stopSupervisionRuntime } from './runtime/super
 import { startSensorTick, stopSensorTick } from './sensors/sensor-tick.js'
 import { startRefineryTick, stopRefineryTick } from './line/refinery-run.js'
 import { executingOrders, adoptedRoots } from './line/run-control.js'
+import { settleProofs } from './line/baseline.js'
 import { createDeciding, createStandingSources } from './ipc/standing.js'
 import { createForgeLoop } from './forge/forge-loop.js'
 import { registerForgeChannels } from './ipc/forge-registration.js'
@@ -87,6 +88,8 @@ export async function deactivate(): Promise<void> {
   const refineryStopped = stopRefineryTick()
   clearPendingNewOrder()
   const supervisionStopped = stopSupervisionRuntime()
-  // Last, so everything else is already stopped while a read or a tick in flight ends.
+  // Last, so everything else is already stopped while a read, a tick or a base-branch proof in
+  // flight ends: each writes into the records until it does.
   await Promise.all([homeStopped, sensorsStopped, refineryStopped, supervisionStopped])
+  await settleProofs()
 }

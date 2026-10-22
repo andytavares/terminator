@@ -5,7 +5,7 @@
  * a follow-up on a plan still failing its checks. Also an order released once
  * before whose restart is refused, and a review that asks to see the fix.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 import * as path from 'node:path'
 
 import {
@@ -15,7 +15,7 @@ import {
   toastsShown,
   untilToastShown,
 } from '../helpers/foundry-host.js'
-import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { writeBaseline } from '../../src/line/baseline.js'
 import { provenBaseline } from '../helpers/environment.js'
@@ -51,6 +51,9 @@ beforeAll(async () => {
   host = fakeHost(() => dataDir)
   await activateFoundry(host)
 })
+
+// Each test's proofs and runs end before the next test, or the spec's folder, goes.
+afterEach(settleFoundryWork)
 
 afterAll(async () => {
   await deactivate()

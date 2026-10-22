@@ -3,10 +3,10 @@
  * it earns, the red team's rounds, and the moment the order is ready to hand
  * off. Agents answer by writing the one file each is allowed to write.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 import * as path from 'node:path'
 
-import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { orderStoreAt } from '../../src/state/live-index.js'
@@ -45,6 +45,9 @@ beforeAll(async () => {
   host = fakeHost(() => dataDir)
   await activateFoundry(host)
 })
+
+// Each test's proofs and runs end before the next test, or the spec's folder, goes.
+afterEach(settleFoundryWork)
 
 afterAll(async () => {
   await deactivate()

@@ -11,6 +11,8 @@
 import { eventually } from '../../../../tests/support/eventually'
 import { activate } from '../../src/index.ts'
 import { runtime } from '../../src/runtime/runtime-state.ts'
+import { settleProofs } from '../../src/line/baseline.ts'
+import { settleRuns } from '../../src/line/run-control.ts'
 import type { FoundryHost } from './foundry-host.js'
 
 export { deactivate } from '../../src/index.ts'
@@ -22,4 +24,10 @@ export async function activateFoundry(host: FoundryHost): Promise<void> {
   await eventually(() => {
     if (runtime.supervision === null) throw new Error('the supervision runtime is not up yet')
   })
+}
+
+/** Settles once the base-branch proofs and the runs a test started have ended: each writes into
+ * the records until it does, so a test that shares the activation awaits it before the next. */
+export async function settleFoundryWork(): Promise<void> {
+  await Promise.all([settleProofs(), settleRuns()])
 }

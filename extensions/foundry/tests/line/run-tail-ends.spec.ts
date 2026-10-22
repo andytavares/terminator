@@ -4,12 +4,12 @@
  * document, and one put outside the checkout opens no pull request; an order
  * whose change turned out riskier waits on the operator before pushing.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 import { fakeHost, temporaryDirectory } from '../helpers/foundry-host.js'
-import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { agentsAnswer, agreedLineOrder, repositoryWithRemote } from '../helpers/line-run.js'
 import { createOrderStore } from '../../src/order/store.js'
@@ -31,6 +31,9 @@ beforeAll(async () => {
   host = fakeHost(() => dataDir)
   await activateFoundry(host)
 })
+
+// Each test's proofs and runs end before the next test, or the spec's folder, goes.
+afterEach(settleFoundryWork)
 
 afterAll(async () => {
   await deactivate()

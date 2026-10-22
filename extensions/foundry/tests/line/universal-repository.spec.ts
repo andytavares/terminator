@@ -5,14 +5,13 @@ import * as path from 'node:path'
 
 import { fakeHost, gitAt, temporaryDirectory, execSucceeded } from '../helpers/foundry-host.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
-import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import { agentsAnswer, agreedLineOrder, checks, repositoryWithRemote } from '../helpers/line-run.js'
 import { ledgerActions } from '../helpers/order-ledger.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { createGateStore } from '../../src/gates/store.js'
 import { orderStoreAt } from '../../src/state/live-index.js'
-import { settleProofs } from '../../src/line/baseline.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { eventually } from '../../../../tests/support/eventually'
 
@@ -32,8 +31,10 @@ beforeAll(async () => {
   await activateFoundry(host)
 })
 
+// Each test's proofs and runs end before the next test, or the spec's folder, goes.
+afterEach(settleFoundryWork)
+
 // Each order starts its base-branch proof, which writes into the spec's folder until it ends.
-afterEach(settleProofs)
 
 afterAll(async () => {
   await deactivate()
