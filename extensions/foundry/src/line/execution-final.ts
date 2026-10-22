@@ -13,6 +13,7 @@ import { brokenInstall } from '../verify/broken-install.js'
 import type { LadderOutcome, LadderStep, StepOutcome } from '../verify/ladder.js'
 import { gradeInWords } from '../runtime/review/risk-grade.js'
 import { lastLines, opensPullRequest, safeFilename } from './execution-parts.js'
+import type { Gate } from '../gates/rules.js'
 import type { Execution } from './execution.js'
 import type { ExecutorDeps, RunOutcome } from './executor.js'
 
@@ -86,12 +87,68 @@ function isWorkDone(run: Execution): boolean {
   )
 }
 
+/** A check that failed and passed on the same commit, with both runs as evidence. */
+interface Flaky {
+  readonly name: string
+  readonly command: string | null
+  /** The failing run, then the passing one. */
+  readonly evidence: readonly [Evidence, Evidence]
+}
+
 /** A climb's outcome, with each step's log kept so a gate can show what it saw. */
-interface Climbed {
+interface Climb {
   readonly ladder: LadderOutcome
   readonly logs: Map<string, string>
   /** What is wrong with the installed dependencies, when that is why it failed. */
   readonly installFault: string | null
+}
+
+interface Climbed extends Climb {
+  /** Set when a check disagreed with itself; the ladder then counts as failed unless the debt was accepted. */
+  readonly flaky: Flaky | null
+}
+
+/** The checks whose runs are repeated in the final check, to see whether they agree. */
+const BURNED_IN: readonly LadderStep['check'][] = ['test', 'e2e']
+
+/** One run of a check: how it ended and where it logged. */
+interface CheckRun {
+  readonly exitCode: number | null
+  readonly log: string | undefined
+}
+
+function runOf(step: StepOutcome, logs: Map<string, string>): CheckRun {
+  return { exitCode: step.exitCode, log: logs.get(step.name) }
+}
+
+function flakyOf(
+  step: { name: string; command: string | null },
+  failed: CheckRun,
+  passed: CheckRun
+): Flaky {
+  const evidenceOf = (run: CheckRun): Evidence => ({
+    kind: 'stdout',
+    exitCode: run.exitCode ?? undefined,
+    step: step.name,
+    command: step.command ?? undefined,
+    path: run.log,
+    excerpt: excerptOf(run.log),
+  })
+  return {
+    name: step.name,
+    command: step.command,
+    evidence: [evidenceOf(failed), evidenceOf(passed)],
+  }
+}
+
+/** The operator already shipped with this check named as flaky, so it is not asked again. */
+function isFlakyAccepted(gates: readonly Gate[], stepName: string): boolean {
+  return gates.some(
+    (g) =>
+      g.rule === 'verify.flaky' &&
+      g.decision?.option === 'accept_debt' &&
+      g.evidence.some((e) => e.step === stepName)
+  )
 }
 
 /** Where the final check climbed on the base branch, and what that showed. */
@@ -107,6 +164,8 @@ const BASE_UNKNOWN: BaseCheck = { onBase: 'unknown', failed: null, logs: new Map
 class FinalClimb {
   readonly steps: LadderStep[]
   private readonly climbedAt: number
+  /** The first check found to disagree with itself in this climb. */
+  private flaky: Flaky | null = null
 
   constructor(
     private readonly run: Execution,
@@ -148,12 +207,47 @@ class FinalClimb {
 
   /** The climb over the change, retried once on a failure and mended once for a broken install. */
   async climbAll(): Promise<Climbed> {
-    const first = await this.climbWith(this.steps, this.run.deps.runStep, '')
+    const first = await this.climbWith(this.steps, this.burnedInRunner(), '')
     this.run.deps.onEvent({ type: 'ladder', outcome: first.outcome })
-    return this.mendInstall(await this.retryFailure(first))
+    // A check that disagreed with itself needs a decision, not a retry or a reinstall.
+    const undecided = this.flaky !== null && !isFlakyAccepted(this.run.priorGates, this.flaky.name)
+    const settled = undecided ? first : await this.retryFailure(first)
+    const climb: Climb = undecided
+      ? { ladder: settled.outcome, logs: settled.logs, installFault: null }
+      : await this.mendInstall(settled)
+    return { ...climb, flaky: this.flaky }
   }
 
-  // A check that fails once and passes on the same commit is not the change's doing.
+  // A test or end-to-end step runs `finalRuns` times on the same commit. The first run may
+  // come from the pass cache; the repeats never do, or they would only repeat its answer.
+  private burnedInRunner(): ExecutorDeps['runStep'] {
+    const runs = this.run.deps.finalRuns ?? 1
+    return async (step, logPath) => {
+      const first = await this.run.deps.runStep(step, logPath)
+      if (first === null || runs < 2 || !BURNED_IN.includes(step.check)) return first
+      for (let n = 2; n <= runs; n += 1) {
+        const repeat = this.logPath(step.name, `.run${n}`)
+        const exitCode = await this.run.deps.runStep(step, repeat, { fresh: true })
+        if (exitCode === null || (exitCode === 0) === (first === 0)) continue
+        const runs = [
+          { exitCode: first, log: logPath },
+          { exitCode, log: repeat },
+        ]
+        return this.disagreed(step, first === 0 ? runs.reverse() : runs)
+      }
+      return first
+    }
+  }
+
+  // The failing exit code, so the ladder stops here; zero when the operator already
+  // accepted this check as flaky, so the debt is carried and the climb goes on.
+  private disagreed(step: LadderStep, [failed, passed]: CheckRun[]): number | null {
+    this.flaky ??= flakyOf(step, failed, passed)
+    return isFlakyAccepted(this.run.priorGates, step.name) ? 0 : failed.exitCode
+  }
+
+  // A check that fails once and passes on the same commit is flaky, which is a failure:
+  // the first result stands unless the operator already accepted this check as flaky.
   // Passes on this commit are cached, so only the failed step and later ones rerun.
   private async retryFailure(first: { outcome: LadderOutcome; logs: Map<string, string> }) {
     const firstFailed = first.outcome.ok
@@ -162,14 +256,14 @@ class FinalClimb {
     if (firstFailed === undefined) return first
     const retry = await this.climbWith(this.steps, this.run.deps.runStep, '.retry')
     this.run.deps.onEvent({ type: 'ladder', outcome: retry.outcome })
-    if (retry.outcome.ok) {
-      await this.run.deps.record(
-        'verify.flaky',
-        firstFailed.name,
-        `${firstFailed.name} failed once and passed on a re-run: ${first.logs.get(firstFailed.name) ?? 'no log'} then ${retry.logs.get(firstFailed.name) ?? 'no log'}`
-      )
-    }
-    return retry
+    if (!retry.outcome.ok) return retry
+    const passed = retry.outcome.steps.find((s) => s.name === firstFailed.name)
+    this.flaky = flakyOf(
+      firstFailed,
+      runOf(firstFailed, first.logs),
+      runOf(passed ?? firstFailed, retry.logs)
+    )
+    return isFlakyAccepted(this.run.priorGates, firstFailed.name) ? retry : first
   }
 
   // A missing package or half-downloaded binary is mended, not asked about:
@@ -177,7 +271,7 @@ class FinalClimb {
   private async mendInstall(climbed: {
     outcome: LadderOutcome
     logs: Map<string, string>
-  }): Promise<Climbed> {
+  }): Promise<Climb> {
     const installFault = climbed.outcome.ok ? null : this.installFaultIn(climbed)
     if (installFault === null) return { ladder: climbed.outcome, logs: climbed.logs, installFault }
     const { order, deps } = this.run
@@ -277,7 +371,31 @@ async function raiseAfterWork(run: Execution, after: AfterWork): Promise<void> {
       why: `${inspection.reason} Triggered by ${inspection.unplanned.join(', ')}.`,
     })
   }
-  if (!run.halted && !after.climbed.ladder.ok) await raiseFailedCheck(run, after)
+  const { flaky } = after.climbed
+  if (!run.halted && flaky !== null && !isFlakyAccepted(run.priorGates, flaky.name)) {
+    await raiseFlaky(run, flaky)
+  } else if (!run.halted && !after.climbed.ladder.ok) await raiseFailedCheck(run, after)
+}
+
+// A check that gave two answers on one commit: the person decides between fixing the
+// test in this order and shipping with it named. Nothing is retried a third time.
+async function raiseFlaky(run: Execution, flaky: Flaky): Promise<void> {
+  const [failed, passed] = flaky.evidence
+  const capped = sentBackCount(run, 'verify.flaky') >= MAX_FINAL_SEND_BACKS
+  const command = flaky.command === null ? '' : `: \`${flaky.command}\``
+  run.halted = await run.stopAtGate('verify.flaky', {
+    evidence: [...flaky.evidence],
+    summary: `${run.order.title} has a check that does not agree with itself`,
+    why: `${flaky.name} failed with exit code ${failed.exitCode ?? 'unknown'} and passed with exit code ${passed.exitCode ?? 'unknown'} on the same commit${command}. A check that fails and passes on the same commit is a failure.${capped ? ' It has been sent back twice; accept it named, or hold.' : ''}`,
+    omitOptions: capped ? ['send_back'] : undefined,
+  })
+}
+
+/** How many times the operator sent the finished change back from a gate of this rule. */
+function sentBackCount(run: Execution, rule: Gate['rule']): number {
+  return run.priorGates.filter(
+    (g) => g.rule === rule && g.nodeId === null && g.decision?.option === 'send_back'
+  ).length
 }
 
 /** The step the final check failed at, its log, and what to show of it. */
@@ -321,11 +439,7 @@ async function raiseFailedCheck(run: Execution, { climbed, climber }: AfterWork)
     )
     return
   }
-  const sentBack = run.priorGates.filter(
-    (g) =>
-      g.rule === 'verify.repeat-fail' && g.nodeId === null && g.decision?.option === 'send_back'
-  ).length
-  const capped = sentBack >= MAX_FINAL_SEND_BACKS
+  const capped = sentBackCount(run, 'verify.repeat-fail') >= MAX_FINAL_SEND_BACKS
   const note = baseNote({ failed, base, baseBranch, installFault: climbed.installFault })
   run.halted = await run.stopAtGate('verify.repeat-fail', {
     evidence: failed.evidence,

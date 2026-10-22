@@ -58,6 +58,12 @@ export function finalCheckSendBacks(gates: readonly Gate[]): number {
   return gates.filter((g) => sendsBackFinalCheck(g, g.decision?.option)).length
 }
 
+const SENDS_BACK_FINAL_CHECK: readonly Gate['rule'][] = [
+  'verify.repeat-fail',
+  'verify.base-fail',
+  'verify.flaky',
+]
+
 /**
  * Whether a decision gives the final check's failure back to the nodes that
  * wrote the work. A failure already on the base branch is fixed the same way,
@@ -65,8 +71,6 @@ export function finalCheckSendBacks(gates: readonly Gate[]): number {
  */
 export function sendsBackFinalCheck(gate: Gate, option: string | undefined): boolean {
   return (
-    option === 'send_back' &&
-    gate.nodeId === null &&
-    (gate.rule === 'verify.repeat-fail' || gate.rule === 'verify.base-fail')
+    option === 'send_back' && gate.nodeId === null && SENDS_BACK_FINAL_CHECK.includes(gate.rule)
   )
 }

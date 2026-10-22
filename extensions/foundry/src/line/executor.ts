@@ -193,7 +193,17 @@ export interface ExecutorDeps {
    * Null means it did not run, which the ladder reports as "not measured" and
    * never as a pass.
    */
-  readonly runStep: (step: LadderStep, logPath: string) => Promise<number | null>
+  readonly runStep: (
+    step: LadderStep,
+    logPath: string,
+    options?: { readonly fresh?: boolean }
+  ) => Promise<number | null>
+
+  /**
+   * How many times the final check runs a test or end-to-end step on one
+   * commit; two runs that disagree stop the order as flaky. Absent is one.
+   */
+  readonly finalRuns?: number
 
   /**
    * Run one rung in a checkout of the order's base branch, without this change.

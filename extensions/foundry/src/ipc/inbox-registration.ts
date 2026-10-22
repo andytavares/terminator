@@ -241,10 +241,23 @@ async function sendBackFinalCheck({ api, dataRoot }: ActivationContext, gate: Ga
       source: 'check',
       command: null,
       exitCode: output?.exitCode ?? null,
-      excerpt: [gate.why, output?.excerpt ?? ''].filter(Boolean).join('\n\n'),
+      excerpt: feedbackExcerpt(gate),
       logPath: output?.path ?? null,
     })
   )
+}
+
+const FLAKY_INSTRUCTION =
+  'This check is flaky: make it deterministic. Do not retry it, skip it or loosen it.'
+
+// What the builder is told: the first failure, or for a flaky check both runs, with their logs.
+function feedbackExcerpt(gate: Gate): string {
+  const outputs = gate.evidence.filter((e) => e.kind === 'stdout')
+  if (gate.rule !== 'verify.flaky') {
+    return [gate.why, outputs[0]?.excerpt ?? ''].filter(Boolean).join('\n\n')
+  }
+  const runs = outputs.map((e) => `${e.path ?? 'no log'}\n${e.excerpt ?? ''}`.trimEnd())
+  return [gate.why, FLAKY_INSTRUCTION, ...runs].join('\n\n')
 }
 
 // How much is waiting for the operator, and where, read by every surface so "is

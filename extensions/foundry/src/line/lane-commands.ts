@@ -44,14 +44,15 @@ function commandIn(
 export async function runLaneStep(
   context: RunContext,
   step: LadderStep,
-  logPath: string
+  { logPath, fresh }: { readonly logPath: string; readonly fresh?: boolean }
 ): Promise<number | null> {
   if (step.command === null) return null
   const checkout = context.checkouts.get(firstLane(context.checkouts))
   const runner = runtime.supervisedRunner
   // Nothing ran, so nothing was measured — never a pass.
   if (checkout === undefined || runner === null) return null
-  if (await context.passes.passed(checkout.path, step.command)) {
+  // A repeat run exists to see whether the answer holds, so the cache must not give it.
+  if (fresh !== true && (await context.passes.passed(checkout.path, step.command))) {
     await fs.promises.mkdir(path.dirname(logPath), { recursive: true })
     await fs.promises.writeFile(
       logPath,

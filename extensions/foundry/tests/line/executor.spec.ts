@@ -205,23 +205,32 @@ function runningUnitsTests() {
     expect(outcome.complete).toBe(true)
   })
 
-  it('honours the agent budget rather than starting everything at once', async () => {
-    let peak = 0
-    let live = 0
-    const run = vi.fn(async (input: { node: { id: string } }) => {
-      live += 1
-      peak = Math.max(peak, live)
-      await new Promise((r) => setTimeout(r, 5))
-      live -= 1
-      return { sessionId: `s-${input.node.id}`, exitCode: 0 }
-    })
-    const o = order([unit('U-1'), unit('U-2'), unit('U-3'), unit('U-4')], {
-      budgets: { agents: 2, wallClockMinutes: 45, tokens: null },
-    })
-    await execute(planOf(o), deps(run))
-    expect(peak).toBeLessThanOrEqual(2)
-    expect(run).toHaveBeenCalledTimes(4)
+  it('honours the agent budget rather than starting everything at once', agentBudgetTest)
+}
+
+/** Agents finish only when released, so more than the budget are live only if the executor lets them. */
+async function agentBudgetTest(): Promise<void> {
+  let peak = 0
+  let live = 0
+  const held: Array<() => void> = []
+  const run = vi.fn(async (input: { node: { id: string } }) => {
+    live += 1
+    peak = Math.max(peak, live)
+    await new Promise<void>((resolve) => held.push(resolve))
+    live -= 1
+    return { sessionId: `s-${input.node.id}`, exitCode: 0 }
   })
+  const o = order([unit('U-1'), unit('U-2'), unit('U-3'), unit('U-4')], {
+    budgets: { agents: 2, wallClockMinutes: 45, tokens: null },
+  })
+  const executing = execute(planOf(o), deps(run))
+  for (const _wave of [1, 2]) {
+    await vi.waitFor(() => expect(held).toHaveLength(2))
+    held.splice(0).forEach((release) => release())
+  }
+  await executing
+  expect(peak).toBeLessThanOrEqual(2)
+  expect(run).toHaveBeenCalledTimes(4)
 }
 
 function sessionsAndReadOnlyRolesTests() {
@@ -981,6 +990,9 @@ function lightsOutRunsTests() {
 
 describe('a failed final climb', () => {
   describe('flaky checks', flakyChecksTests)
+  describe('a check shipped with as flaky', acceptedFlakyTests)
+  describe('burn-in', burnInTests)
+  describe('burn-in agreement', burnInAgreementTests)
   describe('the base branch fails too', theBaseBranchFailsTooTests)
   describe('sending back', sendingBackTests)
   describe('the send-back limit', theSendBackLimitTests)
@@ -993,24 +1005,146 @@ describe('a failed final climb', () => {
   describe('a passing ladder', aPassingLadderTests)
 })
 
+const TESTS = "The unit's own tests"
+
+/** Runs the unit tests with `exit(n)` for the n-th run, and every other step green. */
+function testsRunner(exit: (n: number) => number, seen: { options: unknown[] } = { options: [] }) {
+  let n = 0
+  return async (
+    step: { name: string },
+    logPath: string,
+    options?: { fresh?: boolean }
+  ): Promise<number> => {
+    fs.mkdirSync(path.dirname(logPath), { recursive: true })
+    const code = step.name === TESTS ? exit((n += 1)) : 0
+    if (step.name === TESTS) seen.options.push(options)
+    fs.writeFileSync(logPath, `${step.name} exited ${code} at ${path.basename(logPath)}\n`)
+    return code
+  }
+}
+
 function flakyChecksTests() {
-  it('records a flaky check that passes on a re-run, and ships', async () => {
+  it('stops at verify.flaky when a check fails and then passes, and ships nothing', async () => {
     const o = order([unit('U-1')])
-    const record = vi.fn(async () => undefined)
     const outcome = await execute(
       planOf(o),
-      base({ runStep: lintRunner((n) => (n === 1 ? 1 : 0)), record })
+      base({ runStep: testsRunner((n) => (n === 1 ? 1 : 0)) })
     )
+    const gate = outcome.gates.find((g) => g.rule === 'verify.flaky')
     expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.repeat-fail')
-    expect(outcome.ladder?.ok).toBe(true)
-    expect(outcome.shippable).toBe(true)
-    expect(record).toHaveBeenCalledWith(
-      'verify.flaky',
-      'Lint',
-      expect.stringMatching(
-        /^Lint failed once and passed on a re-run: .*\.log then .*\.retry\.log$/
-      )
+    expect(gate?.options.map((o) => o.id)).toEqual(['send_back', 'accept_debt', 'hold'])
+    expect(gate?.why).toContain(`${TESTS} failed with exit code 1 and passed with exit code 0`)
+    expect(gate?.why).toContain('npm test')
+    expect(gate?.evidence).toEqual([
+      expect.objectContaining({ exitCode: 1, excerpt: expect.stringContaining('exited 1') }),
+      expect.objectContaining({ exitCode: 0, excerpt: expect.stringContaining('.retry.log') }),
+    ])
+    expect(outcome.ladder?.ok).toBe(false)
+    expect(outcome.shippable).toBe(false)
+  })
+
+  it('raises nothing when the retry fails too: that is an ordinary failure', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(planOf(o), base({ runStep: testsRunner(() => 1) }))
+    expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.flaky')
+  })
+}
+
+/** The decision to ship with the unit tests named as flaky. */
+function shippedWithFlaky(o: WorkOrder): Gate {
+  return {
+    ...raiseGate({
+      id: 'WO-1-verify.flaky-1',
+      rule: 'verify.flaky',
+      orderId: o.id,
+      summary: 's',
+      why: 'w',
+      at: '2026-09-06T10:00:00.000Z',
+      evidence: [{ kind: 'stdout', step: TESTS }],
+    }),
+    decision: { option: 'accept_debt', by: 'operator', note: '', at: 'x' },
+  }
+}
+
+function acceptedFlakyTests() {
+  it('carries on when the operator already shipped with that check named', async () => {
+    const o = order([unit('U-1')])
+    const accepted = shippedWithFlaky(o)
+    const outcome = await execute(
+      planOf(o),
+      base({ runStep: testsRunner((n) => (n === 1 ? 1 : 0)), priorGates: [accepted] })
     )
+    expect(outcome.gates).toEqual([])
+    expect(outcome.ladder?.ok).toBe(true)
+  })
+
+  it('stops offering send back after it was sent back twice', async () => {
+    const o = order([unit('U-1')])
+    const sent = sentBack(o, 2).map((g) => ({ ...g, rule: 'verify.flaky' as const }))
+    const outcome = await execute(
+      planOf(o),
+      base({ runStep: testsRunner((n) => (n === 1 ? 1 : 0)), priorGates: sent })
+    )
+    const gate = outcome.gates.find((g) => g.rule === 'verify.flaky')
+    expect(gate?.options.map((o) => o.id)).toEqual(['accept_debt', 'hold'])
+  })
+}
+
+function burnInTests() {
+  it('stops as flaky when two runs disagree, though a second climb would pass', async () => {
+    const o = order([unit('U-1')])
+    const seen = { options: [] as unknown[] }
+    const outcome = await execute(
+      planOf(o),
+      base({ finalRuns: 2, runStep: testsRunner((n) => (n === 2 ? 1 : 0), seen) })
+    )
+    const gate = outcome.gates.find((g) => g.rule === 'verify.flaky')
+    expect(gate).toBeDefined()
+    // Run one is a pass and run two the failure: no third climb was made.
+    expect(seen.options).toEqual([undefined, { fresh: true }])
+    expect(gate?.evidence.map((e) => e.exitCode)).toEqual([1, 0])
+    expect(gate?.evidence[0].path).toMatch(/\.run2\.log$/)
+    expect(outcome.shippable).toBe(false)
+  })
+
+  it('runs the tests once when finalRuns is 1', async () => {
+    const o = order([unit('U-1')])
+    const seen = { options: [] as unknown[] }
+    const outcome = await execute(
+      planOf(o),
+      base({ finalRuns: 1, runStep: testsRunner(() => 0, seen) })
+    )
+    expect(seen.options).toEqual([undefined])
+    expect(outcome.gates).toEqual([])
+    expect(outcome.ladder?.ok).toBe(true)
+  })
+}
+
+function burnInAgreementTests() {
+  it('passes when every run passes, and fails ordinarily when every run fails', async () => {
+    const o = order([unit('U-1')])
+    const green = await execute(planOf(o), base({ finalRuns: 3, runStep: testsRunner(() => 0) }))
+    expect(green.ladder?.ok).toBe(true)
+    const red = await execute(planOf(o), base({ finalRuns: 2, runStep: testsRunner(() => 1) }))
+    expect(red.gates.map((g) => g.rule)).not.toContain('verify.flaky')
+    expect(red.gates.map((g) => g.rule)).toContain('verify.repeat-fail')
+  })
+
+  it('repeats only tests and end-to-end, not lint', async () => {
+    const o = order([unit('U-1')])
+    const names: string[] = []
+    await execute(
+      planOf(o),
+      base({
+        finalRuns: 2,
+        runStep: async (step: { name: string }) => {
+          names.push(step.name)
+          return 0
+        },
+      })
+    )
+    expect(names.filter((n) => n === 'Lint')).toHaveLength(1)
+    expect(names.filter((n) => n === TESTS)).toHaveLength(2)
   })
 }
 

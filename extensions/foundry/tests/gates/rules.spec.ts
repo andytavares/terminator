@@ -38,6 +38,7 @@ function gate(over: Partial<Parameters<typeof raiseGate>[0]> = {}): Gate {
 
 describe('raiseGate', () => {
   describe('what a gate carries', whatAGateCarriesTests)
+  describe('a flaky check', aFlakyCheckTests)
   describe('refusals and options', refusalsAndOptionsTests)
   describe('defaults and budgets', defaultsAndBudgetsTests)
 })
@@ -61,6 +62,21 @@ function whatAGateCarriesTests() {
     const g = gate({ rule: 'verify.repeat-fail', omitOptions: ['send_back'] })
     expect(g.options.map((o) => o.id)).toEqual(['take_over', 'accept_debt', 'hold'])
     expect(() => gate({ rule: 'verify.repeat-fail', omitOptions: ['hold'] })).toThrow(/hold/)
+  })
+}
+
+function aFlakyCheckTests() {
+  it('offers to fix or ship with a check that failed and passed on the same commit', () => {
+    const g = gate({ rule: 'verify.flaky' })
+    expect(g.options.map((o) => [o.id, o.label])).toEqual([
+      ['send_back', 'Fix the flaky test in this order'],
+      ['accept_debt', 'Ship with it named'],
+      ['hold', expect.any(String)],
+    ])
+    expect(g.defaultIfIgnored).toBe('hold')
+    expect(ruleInWords('verify.flaky')).toBe('a check that failed and passed on the same commit')
+    expect(isLive('verify.flaky', 'standard')).toBe(true)
+    expect(isLive('verify.flaky', 'lights-out')).toBe(false)
   })
 }
 

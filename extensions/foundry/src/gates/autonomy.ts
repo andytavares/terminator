@@ -44,6 +44,7 @@ export const UNCONDITIONAL: readonly GateRuleId[] = [
 const STANDARD_EXTRA: readonly GateRuleId[] = [
   'verify.repeat-fail',
   'verify.base-fail',
+  'verify.flaky',
   'forge-defect',
 ]
 

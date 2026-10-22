@@ -147,6 +147,11 @@ describe('sendsBackFinalCheck', () => {
     expect(sendsBackFinalCheck(gate(), 'send_back')).toBe(true)
   })
 
+  it('sends a flaky check back to this order, but not when it is shipped with', () => {
+    expect(sendsBackFinalCheck(gate({ rule: 'verify.flaky' }), 'send_back')).toBe(true)
+    expect(sendsBackFinalCheck(gate({ rule: 'verify.flaky' }), 'accept_debt')).toBe(false)
+  })
+
   it('leaves a node’s own retry, other answers and other rules alone', () => {
     expect(sendsBackFinalCheck(gate({ nodeId: 'build' }), 'send_back')).toBe(false)
     expect(sendsBackFinalCheck(gate({ rule: 'verify.base-fail' }), 'accept_debt')).toBe(false)

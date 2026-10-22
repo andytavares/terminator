@@ -90,6 +90,12 @@ export function defaultWriteBack(api: ExtensionAPI): WriteBack[] {
   return enabled
 }
 
+/** How many times the final check runs its tests and end-to-end steps; never below one. */
+export function finalRuns(api: ExtensionAPI): number {
+  const value = api.settings?.get<number>('terminator.foundry.finalRuns')
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(1, Math.floor(value)) : 2
+}
+
 // A new order's budgets from settings (FR-030), read at seed time: the order carries
 // what was agreed, and a later setting must not re-price it.
 export function defaultBudgets(api: ExtensionAPI): Omit<Budgets, 'tokens'> {

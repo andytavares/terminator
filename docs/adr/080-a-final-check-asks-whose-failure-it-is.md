@@ -1,6 +1,6 @@
 # ADR 080: A final check asks whose failure it is
 
-**Status**: Accepted; "Fix it first" replaced by ADR 088
+**Status**: Accepted; "Fix it first" replaced by ADR 088; Amended by ADR 120
 
 **Date**: 2026-09-28
 

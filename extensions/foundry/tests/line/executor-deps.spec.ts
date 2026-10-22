@@ -311,6 +311,14 @@ function runningAndReRunningTests() {
     expect(fs.readFileSync(log, 'utf8')).toContain('already passed on this exact commit')
   })
 
+  it('runs a repeat fresh, though the same commit already passed', async () => {
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
+    const log = path.join(root, 'logs', 'test.log')
+    await deps.runStep(step, log)
+    expect(await deps.runStep(step, log, { fresh: true })).toBe(0)
+    expect(runner.runCommand).toHaveBeenCalledTimes(2)
+  })
+
   it('runs again once the checkout changed', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     await deps.runStep(step, path.join(root, 'test.log'))

@@ -77,6 +77,17 @@ const BUDGETS: SettingsProperties = {
   },
 }
 
+/** How hard the final check looks for a test that does not agree with itself. */
+const FINAL_CHECK: SettingsProperties = {
+  'terminator.foundry.finalRuns': {
+    type: 'number',
+    label: 'Runs of tests and end-to-end in the final check',
+    description: 'Two runs that disagree stop the order as flaky.',
+    default: 2,
+    min: 1,
+  },
+}
+
 /** What Foundry writes to an order's source issue. */
 const WRITE_BACKS: SettingsProperties = {
   // Three booleans rather than a list: each write-back is independently
@@ -161,6 +172,7 @@ export function registerSettings(api: ExtensionAPI): void {
         ...RECORDS,
         ...AUTONOMY,
         ...BUDGETS,
+        ...FINAL_CHECK,
         ...WRITE_BACKS,
         ...POLICY,
         ...VIEW,

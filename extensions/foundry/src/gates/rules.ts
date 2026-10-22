@@ -14,6 +14,7 @@ export const GATE_RULES = [
   'ready-for-review',
   'verify.repeat-fail',
   'verify.base-fail',
+  'verify.flaky',
   'forge-defect',
   'unit.boundary',
   'run.interrupted',
@@ -37,6 +38,7 @@ const RULE_IN_WORDS: Record<GateRuleId, string> = {
   'ready-for-review': 'whether a draft is ready for review',
   'verify.repeat-fail': 'work that keeps failing its checks',
   'verify.base-fail': 'a check that already fails on the base branch',
+  'verify.flaky': 'a check that failed and passed on the same commit',
   'forge-defect': 'an order that contradicts itself',
   'unit.boundary': 'each unit of work as it finishes',
   'run.interrupted': 'a run whose agents are gone, so nothing is moving it',
@@ -155,6 +157,24 @@ const RULE_SHAPE: Record<GateRuleId, { options: GateOption[]; defaultIfIgnored: 
         id: 'accept_debt',
         label: 'Accept the debt',
         consequence: 'The criterion is accepted unmet, in writing.',
+      },
+      HOLD,
+    ],
+    defaultIfIgnored: 'hold',
+  },
+  'verify.flaky': {
+    options: [
+      {
+        id: 'send_back',
+        label: 'Fix the flaky test in this order',
+        consequence:
+          'It goes back to the builder with both logs as work in this order, and the checks run again.',
+      },
+      {
+        id: 'accept_debt',
+        label: 'Ship with it named',
+        consequence:
+          'The draft opens and its description names the flaky check and links both logs.',
       },
       HOLD,
     ],

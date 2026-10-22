@@ -17,7 +17,7 @@ import type { CommitOutcome } from './commit.js'
 import { collectableWrites, readRungOutput } from './rung-output.js'
 import { resolveSources } from '../workspace-root.js'
 import { indexFor, writeGraph } from '../state/live-index.js'
-import { autonomyFor } from '../state/settings.js'
+import { autonomyFor, finalRuns } from '../state/settings.js'
 import { endLiveSession } from '../runtime/runtime-state.js'
 import { baseBranchOf, conversationKey, createRunContext } from './run-context.js'
 import type { OrderRun, RunContext } from './run-context.js'
@@ -82,6 +82,11 @@ export async function buildExecutorDeps(
   }
 }
 
+/** The operator's settings the executor reads, once per run. */
+function settingsDeps(api: ExtensionAPI): Pick<ExecutorDeps, 'autonomy' | 'finalRuns'> {
+  return { autonomy: autonomyFor(api), finalRuns: finalRuns(api) }
+}
+
 async function executorDepsFor(
   context: RunContext,
   parts: DepsParts,
@@ -93,7 +98,7 @@ async function executorDepsFor(
     run: (input) => runNodeSession(context, input),
     sessionFor: (lane, role) => context.conversations.get(conversationKey(lane, role)),
     record: (action, subject, reason) => recordLineEntry(context, { action, subject, reason }),
-    autonomy: autonomyFor(context.api),
+    ...settingsDeps(context.api),
     // Loaded once, so what an agent is told the house rules are and what the
     // change is judged against are the same list.
     rules: parts.houseRules,
@@ -101,7 +106,7 @@ async function executorDepsFor(
     commitNode: (input) => commitNode(context, input),
     priorGates: await parts.gates.list(),
     raise: (gate) => raiseGate(context, parts.gates, gate),
-    runStep: (step, logPath) => runLaneStep(context, step, logPath),
+    runStep: (step, logPath, options) => runLaneStep(context, step, { logPath, ...options }),
     runStepOnBase: (step, logPath) => runStepOnBaseCheckout(context, step, logPath),
     reinstall: (where, logPath) => reinstallDependencies(context, where, logPath),
     releaseBase: () => releaseBaseCheckout(context),
