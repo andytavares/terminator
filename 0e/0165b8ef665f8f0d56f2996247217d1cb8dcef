@@ -1,0 +1,82 @@
+extensions/foundry/tests/line/integrate.spec.ts
+  s_f6f18e5557b141::t_6a70eb8ff9c883 1744-1746,1750-1753
+  s_f6f18e5557b141::t_a18458fb368304 1743,1754-1756
+  s_f6f18e5557b141::t_cc0dd723879034 1747-1749
+  s_f6f18e5557b141::t_7ecf23070a38ff 468
+extensions/foundry/src/ipc/inbox-registration.ts
+  s_f6f18e5557b141::t_097f140dc2e790 244
+  s_f6f18e5557b141::t_bbf56c16bbc0a4 250-262
+extensions/foundry/tests/line/execute-run.spec.ts
+  s_f6f18e5557b141::t_6a70eb8ff9c883 18-19,358-388
+extensions/foundry/src/gates/autonomy.ts
+  s_f6f18e5557b141::t_db61100f7107b1 47
+extensions/foundry/tests/state/settings.spec.ts
+  s_f6f18e5557b141::t_ed166dc1951d20 14,166-176
+  s_f6f18e5557b141::t_23547b2d17cbee 177
+extensions/foundry/tests/line/refinery-state.spec.ts
+  s_f6f18e5557b141::t_ed166dc1951d20 150-154
+extensions/foundry/src/line/executor-deps.ts
+  s_f6f18e5557b141::t_af03b3026c0442 20
+  s_f6f18e5557b141::t_b178bafd79eadd 85-89,101,109
+extensions/foundry/tests/ipc/final-check-send-back-ipc.spec.ts
+  s_f6f18e5557b141::t_6a70eb8ff9c883 187-212
+extensions/foundry/src/gates/rules.ts
+  s_f6f18e5557b141::t_db61100f7107b1 17,41,165-178
+  s_f6f18e5557b141::t_877177326eb62a 179-182
+extensions/foundry/src/line/execute-run.ts
+  s_f6f18e5557b141::t_ba504eb0e84131 18-19,99,110,115
+  s_f6f18e5557b141::t_553a026e7dfbb6 63-64,136-147,158
+extensions/foundry/src/line/refinery-state.ts
+  s_f6f18e5557b141::t_db61100f7107b1 61-66
+  s_f6f18e5557b141::t_606ca5aec4c90f 74
+extensions/foundry/tests/line/executor.spec.ts
+  s_f6f18e5557b141::t_ed166dc1951d20 994,1008-1025,1027,1031,1033,1035-1050,1054-1077,1079-1115,1117,1119-1143
+  s_f6f18e5557b141::t_a18458fb368304 993,995,1051-1053,1116,1118,1144
+  s_f6f18e5557b141::t_dcfe7e5c5f7d27 208-221,223-233
+  s_f6f18e5557b141::t_147bdd1025fa98 1146-1147
+extensions/foundry/src/state/settings.ts
+  s_f6f18e5557b141::t_8b68c7d180dbf8 93-98
+extensions/foundry/src/line/executor.ts
+  s_f6f18e5557b141::t_af03b3026c0442 196-206
+docs/adr/120-a-flaky-check-is-a-failure.md
+  s_f6f18e5557b141::t_84221d3686300a 1-29
+extensions/foundry/tests/gates/rules.spec.ts
+  s_f6f18e5557b141::t_ed166dc1951d20 69-79
+  s_f6f18e5557b141::t_a18458fb368304 41,68
+  s_f6f18e5557b141::t_e57f5803367bc8 80-82
+extensions/foundry/src/components/Inbox.tsx
+  s_f6f18e5557b141::t_db61100f7107b1 54,68
+  s_f6f18e5557b141::t_0d38239cb36702 15
+extensions/foundry/src/line/execution-final.ts
+  s_f6f18e5557b141::t_1772fe59d2fe5b 90-97,99,106-113,125,130-135,167-168,210,212-231,237-243,245-246,249-250,259-266
+  s_f6f18e5557b141::t_af03b3026c0442 16,114-124,126-129,136-152,232-236,244,274,374-398,442
+  s_f6f18e5557b141::t_c21fc8d08dd96b 153
+extensions/foundry/tests/line/executor-deps.spec.ts
+  s_f6f18e5557b141::t_ed166dc1951d20 314-321
+extensions/foundry/src/state/settings-schema.ts
+  s_f6f18e5557b141::t_8b68c7d180dbf8 80-90,175
+extensions/foundry/src/line/lane-commands.ts
+  s_f6f18e5557b141::t_af03b3026c0442 54
+  s_f6f18e5557b141::t_b178bafd79eadd 47,55
+extensions/foundry/src/line/integrate.ts
+  s_f6f18e5557b141::t_553a026e7dfbb6 108-116,357,402-406
+  s_f6f18e5557b141::t_7e85f92681e070 407-408
+docs/adr/080-a-final-check-asks-whose-failure-it-is.md
+  s_f6f18e5557b141::t_d514af00a0d225 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0e0165b8ef665f8f0d56f2996247217d1cb8dcef",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
