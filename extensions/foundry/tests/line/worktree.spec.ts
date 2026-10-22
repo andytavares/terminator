@@ -386,30 +386,43 @@ const CANNOT_LOCK = {
   timedOut: false,
 }
 
+/** Git as it behaves when two callers add one worktree at once: a second add fails to lock. */
+function gitAddingSlowly(target: string, addFinishes: Promise<void>) {
+  let added = false
+  let adding = false
+  return vi.fn(async (options: { args: string[] }) => {
+    if (options.args[1] === 'list') {
+      const stdout = added ? `worktree ${target}\nHEAD abc\n` : ''
+      return { exitCode: 0, stdout, stderr: '', timedOut: false }
+    }
+    if (options.args[1] === 'add') {
+      if (adding || added) return CANNOT_LOCK
+      adding = true
+      await addFinishes
+      added = true
+    }
+    return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+  })
+}
+
 function concurrentCallersTests() {
   it('gives two callers asking at once the same checkout, not a second add', async () => {
     // The scout and the architect's first turn both prepare lane 1 as an order
     // starts. Real git lists no worktree to either, then fails the second add
     // with "cannot lock ref … reference already exists".
     const target = path.join(ROOT, 'orders', 'WO-1', 'worktrees', 'app')
-    let added = false
-    let adding = false
-    const exec = vi.fn(async (options: { args: string[] }) => {
-      if (options.args[1] === 'list') {
-        const stdout = added ? `worktree ${target}\nHEAD abc\n` : ''
-        return { exitCode: 0, stdout, stderr: '', timedOut: false }
-      }
-      if (options.args[1] === 'add') {
-        if (adding || added) return CANNOT_LOCK
-        adding = true
-        await new Promise((r) => setTimeout(r, 5))
-        added = true
-      }
-      return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
-    })
+    let finishAdding = (): void => undefined
+    const addFinishes = new Promise<void>((resolve) => (finishAdding = resolve))
+    const exec = gitAddingSlowly(target, addFinishes)
     const d = deps({ exec: exec as never })
 
-    const [a, b] = await Promise.all([ensureCheckout(order(), 1, d), ensureCheckout(order(), 1, d)])
+    const asking = Promise.all([ensureCheckout(order(), 1, d), ensureCheckout(order(), 1, d)])
+    // Both are asking while the one add is still running; only then does it finish.
+    await vi.waitFor(() =>
+      expect(calls(exec).filter((c) => c.args[1] === 'add').length).toBeGreaterThanOrEqual(1)
+    )
+    finishAdding()
+    const [a, b] = await asking
 
     expect(a.path).toBe(target)
     expect(b.path).toBe(target)

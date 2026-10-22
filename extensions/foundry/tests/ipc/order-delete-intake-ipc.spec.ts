@@ -70,10 +70,9 @@ describe('deleting an order while its scout is still reading', () => {
     const started = theRunner.start.mock.calls.map((c) => c[0] as Started)
 
     await host.call('foundry:order.delete', { id: 'WO-1' })
-    // Deleting the project closes both terminals.
+    // Deleting the project closes both terminals. Each end handler checks the deleted set before
+    // its first await, so nothing is left running once they return.
     for (const run of started) run.onEnd?.(0)
-    // What would follow is a chain of file reads and writes; let it run out.
-    await new Promise((settle) => setTimeout(settle, 200))
 
     expect(theRunner.start).toHaveBeenCalledTimes(2)
     expect(fs.existsSync(path.join(dataDir, 'orders', 'WO-1'))).toBe(false)

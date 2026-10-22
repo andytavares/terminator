@@ -91,6 +91,9 @@ async function firstTurnAfterRelease() {
   return turn === undefined ? undefined : { action: turn.action, reason: turn.reason }
 }
 
+/** The loop reads the order's ledger through the index; reading it here queues behind that. */
+const afterTheLoopHasRead = () => orderStoreAt(dataDir).entries('WO-1')
+
 const setOrderHeld = (held: boolean) => host.call('foundry:order.hold', { id: 'WO-1', held })
 
 /** Converges, and holds the order while the red team's first round is still running. */
@@ -112,7 +115,7 @@ describe('a clean round that finishes while the order is held', () => {
   it('waits, and is handed off once the operator lets go', async () => {
     writes = { architect: () => ({ note: 'tightened' }), 'red-team': () => ({ redTeam: [] }) }
     await heldDuringTheRedTeam(readyDraft(repo))
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await afterTheLoopHasRead()
     expect(toastsShown(host)).not.toContain(READY)
     await setOrderHeld(false)
     await untilToastShown(host, READY)
@@ -191,7 +194,7 @@ describe('letting go of an order with nothing to pick up', () => {
     await orderStoreAt(dataDir).save({ ...readyDraft(repo), status: 'agreed' })
     await setOrderHeld(true)
     await setOrderHeld(false)
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await afterTheLoopHasRead()
     expect(theRunner.start).not.toHaveBeenCalled()
   })
 
@@ -202,10 +205,11 @@ describe('letting go of an order with nothing to pick up', () => {
     await convergeOrder(host, dataDir, readyDraft(repo))
     await setOrderHeld(true)
     await setOrderHeld(false)
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await afterTheLoopHasRead()
     expect(theRunner.start).toHaveBeenCalledTimes(1)
     letItFinish()
     await untilToastShown(host, READY)
+    expect(theRunner.start).toHaveBeenCalledTimes(2)
   })
 })
 

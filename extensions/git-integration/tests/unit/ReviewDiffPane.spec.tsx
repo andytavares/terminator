@@ -692,11 +692,15 @@ describe('ReviewDiffPane — a background click after the drag has settled still
     const { container } = await renderDiffPane(diff)
 
     const rows = container.querySelectorAll<HTMLTableRowElement>('tr.diff-line')
+    // The drag ends with a zero-delay timer that lets the click after it through; run it on a
+    // fake clock so the click below comes after it has fired.
+    vi.useFakeTimers()
     fireEvent.mouseDown(rows[0].querySelector('.diff-gutter-btn')!)
     fireEvent.mouseEnter(rows[1])
     fireEvent.mouseUp(rows[1])
+    await vi.advanceTimersByTimeAsync(0)
+    vi.useRealTimers()
     await waitFor(() => expect(container.querySelectorAll('tr.rs-line--selected')).toHaveLength(2))
-    await new Promise((r) => setTimeout(r, 0))
 
     fireEvent.click(rows[0].querySelector('.diff-line__content')!)
 

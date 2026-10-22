@@ -113,14 +113,21 @@ function writeOrderTests() {
   it('writes frames in the order the graph was written, however long each write takes', async () => {
     const mkdir = fs.promises.mkdir
     let calls = 0
+    let releaseFirstWrite = (): void => undefined
+    const firstWriteHeld = new Promise<void>((resolve) => (releaseFirstWrite = resolve))
     vi.spyOn(fs.promises, 'mkdir').mockImplementation((async (
       ...args: Parameters<typeof mkdir>
     ) => {
-      if (++calls === 1) await new Promise((resolve) => setTimeout(resolve, 50))
+      if (++calls === 1) await firstWriteHeld
       return mkdir(...args)
     }) as typeof mkdir)
     const first = recordGraph(dir, graph({ a: 'running' }), 1000)
     const second = recordGraph(dir, graph({ a: 'passed' }), 1000)
+    await vi.waitFor(() => expect(calls).toBeGreaterThanOrEqual(1))
+    // A write that did not wait its turn would have overtaken the held one by now: a file
+    // read is a round trip through the same thread pool its reads and appends use.
+    await readTimeline(dir)
+    releaseFirstWrite()
     await Promise.all([first, second])
     vi.restoreAllMocks()
     expect((await readTimeline(dir)).frames.map((f) => f.nodes[0].state)).toEqual([

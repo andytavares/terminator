@@ -1201,19 +1201,17 @@ function runCheck(commandLine: string, logPath?: string): Promise<number | null>
 }
 
 async function checkOrTimeOut(commandLine: string, logPath?: string): Promise<number | null> {
-  const ended = runCheck(commandLine, logPath)
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const stuck = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error(`the check never ended; it printed:\n${printed}`)),
-      4_000
-    )
-  })
-  try {
-    return await Promise.race([ended, stuck])
-  } finally {
-    clearTimeout(timer)
-  }
+  const result: { ended: boolean; exitCode: number | null } = { ended: false, exitCode: null }
+  void runCheck(commandLine, logPath).then((exitCode) =>
+    Object.assign(result, { ended: true, exitCode })
+  )
+  await vi.waitFor(
+    () => {
+      if (!result.ended) throw new Error(`the check never ended; it printed:\n${printed}`)
+    },
+    { timeout: 4_000, interval: 20 }
+  )
+  return result.exitCode
 }
 
 /** Makes `startup.shell` the user's shell, in a HOME holding only its startup files. */

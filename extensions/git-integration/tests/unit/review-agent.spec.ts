@@ -260,8 +260,8 @@ async function startFakeRun(input: RunAgentReviewInput = baseInput) {
   const fake = makeFakeProcess()
   const spawn = vi.fn((..._args: Parameters<SpawnFn>) => fake)
   const { done, cancel } = runAgentReview(input, { exec, spawn, resolveClaude })
-  // let the diff/prompt build settle before the process "runs"
-  await new Promise((r) => setTimeout(r, 10))
+  // the diff/prompt build settles before the process "runs"
+  await vi.waitFor(() => expect(spawn).toHaveBeenCalled())
   return { fake, spawn, done, cancel }
 }
 
@@ -409,7 +409,9 @@ describe('runAgentReview — cancelling', () => {
     )
     const spawn = vi.fn()
     const { done, cancel } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
-    await new Promise((r) => setTimeout(r, 0))
+    await vi.waitFor(() =>
+      expect(exec.mock.calls.some(([, args]) => args[0] === 'diff')).toBe(true)
+    )
     cancel()
     diffPrinted({ stdout: 'diff' })
 

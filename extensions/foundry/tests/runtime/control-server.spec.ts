@@ -119,9 +119,9 @@ function holdingTheConnectionTests() {
     pending.catch(() => {})
 
     const answer = await asked
-    // A window for a premature reply to arrive in; nothing can settle it but
-    // the answer below, so a slow machine only makes the check stricter.
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    // A full round trip on the same server: a premature reply to the held request would have been
+    // written before this one is answered. Nothing can settle the held one but the answer below.
+    await post(server, { ...ask, sessionId: 'unregistered' })
     expect(settled).toBe(false)
     answer({ permissionDecision: 'allow' })
     expect((await pending).decision.permissionDecision).toBe('allow')

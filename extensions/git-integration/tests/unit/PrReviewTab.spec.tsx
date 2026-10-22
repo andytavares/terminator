@@ -321,14 +321,15 @@ describe('PrReviewTab — closes PR view and persists paused session when onClos
     })
     render(<PrReviewTab repoRoot="/repo" />)
     fireEvent.click(screen.getByText('Close PR'))
-    // Allow async handleClosePr to settle
-    await new Promise((r) => setTimeout(r, 0))
+    // handleClosePr is async: its last step is the paused session being persisted
+    await waitFor(() =>
+      expect(mockSetPaused).toHaveBeenCalledWith(
+        { repoRoot: '/repo', prNumber: 1, headSHA: 'abc123' },
+        expect.any(String)
+      )
+    )
     expect(mockSetActivePr).toHaveBeenCalledWith(null)
     expect(mockReset).toHaveBeenCalled()
-    expect(mockSetPaused).toHaveBeenCalledWith(
-      { repoRoot: '/repo', prNumber: 1, headSHA: 'abc123' },
-      expect.any(String)
-    )
   })
 })
 

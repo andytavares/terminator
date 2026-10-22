@@ -14,7 +14,7 @@ let mockOnWindowEvent: Mock<BridgeIpc['onWindowEvent']>
 let mockIsRemoteAccessible: Mock<BridgeIpc['isRemoteAccessible']>
 
 function waitForClose(ws: WebSocket): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     if (ws.readyState === WebSocket.CLOSED) {
       resolve()
       return
@@ -23,7 +23,6 @@ function waitForClose(ws: WebSocket): Promise<void> {
     // instead of a clean close frame — resolve on either, not reject on error
     ws.once('close', resolve)
     ws.once('error', resolve)
-    setTimeout(() => reject(new Error('timeout waiting for close')), 8000)
   })
 }
 
@@ -31,7 +30,6 @@ function waitForMessage(ws: WebSocket): Promise<string> {
   return new Promise((resolve, reject) => {
     ws.once('message', (data) => resolve(data.toString()))
     ws.on('error', reject)
-    setTimeout(() => reject(new Error('timeout waiting for message')), 8000)
   })
 }
 
@@ -39,7 +37,6 @@ function waitForOpen(ws: WebSocket): Promise<void> {
   return new Promise((resolve, reject) => {
     ws.on('open', resolve)
     ws.on('error', reject)
-    setTimeout(() => reject(new Error('timeout waiting for open')), 8000)
   })
 }
 
@@ -62,9 +59,12 @@ async function buildBridgeApp(): Promise<{
   return { app, ticketStore, bridgeCleanup }
 }
 
-/** Long enough for the server to act on a message that has no reply. */
-function settleBridge(): Promise<void> {
-  return new Promise((r) => setTimeout(r, 30))
+const SETTLE_CHANNEL = 'bridge:settle'
+
+/** The server answers one socket's messages in order: its reply to this request means it has acted
+ * on every message sent before it, however little those would have replied. */
+async function settleBridge(ws: WebSocket): Promise<void> {
+  await requestOverBridge(ws, { type: 'invoke', id: 'settle', channel: SETTLE_CHANNEL })
 }
 
 async function openBridge(): Promise<WebSocket> {
@@ -168,9 +168,9 @@ function bridgeSubscribeTests() {
     const ws = await openBridge()
 
     ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
-    await settleBridge()
-
-    expect(mockOnWindowEvent).toHaveBeenCalledWith('terminal:output', expect.any(Function))
+    await vi.waitFor(() =>
+      expect(mockOnWindowEvent).toHaveBeenCalledWith('terminal:output', expect.any(Function))
+    )
     await closeBridge(ws)
   })
 
@@ -179,7 +179,7 @@ function bridgeSubscribeTests() {
 
     ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
     ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
-    await settleBridge()
+    await settleBridge(ws)
 
     const calls = mockOnWindowEvent.mock.calls.filter(([ch]) => ch === 'terminal:output')
     expect(calls.length).toBe(1)
@@ -260,12 +260,12 @@ function bridgeSendDispatchTests() {
         args: [{ sessionId: 's1', data: 'ls' }],
       })
     )
-    await settleBridge()
-
-    expect(mockSendChannel).toHaveBeenCalledWith('terminal:input', {
-      sessionId: 's1',
-      data: 'ls',
-    })
+    await vi.waitFor(() =>
+      expect(mockSendChannel).toHaveBeenCalledWith('terminal:input', {
+        sessionId: 's1',
+        data: 'ls',
+      })
+    )
     await closeBridge(ws)
   })
 }
@@ -274,16 +274,14 @@ function bridgeSendEdgeTests() {
   it('defaults to {} when a send message omits args', async () => {
     const ws = await openBridge()
     ws.send(JSON.stringify({ type: 'send', channel: 'terminal:input' }))
-    await settleBridge()
-
-    expect(mockSendChannel).toHaveBeenCalledWith('terminal:input', {})
+    await vi.waitFor(() => expect(mockSendChannel).toHaveBeenCalledWith('terminal:input', {}))
     await closeBridge(ws)
   })
 
   it('ignores send for unknown channel (no crash)', async () => {
     const ws = await openBridge()
     ws.send(JSON.stringify({ type: 'send', channel: 'no:handler', args: [{}] }))
-    await settleBridge()
+    await settleBridge(ws)
     await closeBridge(ws)
   })
 }
@@ -292,7 +290,7 @@ function bridgeEventForwardingTests() {
   it('forwards onWindowEvent events to subscribed client', async () => {
     const ws = await openBridge()
     ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
-    await settleBridge()
+    await vi.waitFor(() => expect(mockOnWindowEvent).toHaveBeenCalled())
 
     const [[, forwarder]] = mockOnWindowEvent.mock.calls as [[string, (...a: unknown[]) => void]]
     forwarder({ sessionId: 's1', data: 'hello' })
@@ -331,12 +329,11 @@ function bridgeCloseCleanupTests() {
 
     const ws = await openBridge()
     ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
-    await settleBridge()
+    await vi.waitFor(() => expect(mockOnWindowEvent).toHaveBeenCalled())
 
     await closeBridge(ws)
-    await settleBridge()
 
-    expect(unsub).toHaveBeenCalled()
+    await vi.waitFor(() => expect(unsub).toHaveBeenCalled())
   })
 }
 
@@ -358,7 +355,7 @@ function bridgeInvalidMessageTests() {
   it('ignores non-JSON messages without crashing', async () => {
     const ws = await openBridge()
     ws.send('not json at all')
-    await settleBridge()
+    await settleBridge(ws)
     await closeBridge(ws)
   })
 
@@ -367,9 +364,10 @@ function bridgeInvalidMessageTests() {
     ws.send(JSON.stringify({ type: 'invoke', id: 'r1' }))
     ws.send(JSON.stringify({ type: 'invoke', channel: 'workspace:list' }))
     ws.send(JSON.stringify({ type: 'subscribe' }))
-    await settleBridge()
-    expect(mockInvokeChannel).not.toHaveBeenCalled()
-    expect(mockIsRemoteAccessible).not.toHaveBeenCalled()
+    await settleBridge(ws)
+    // Only the settling request got through the allowlist and to the main process.
+    expect(mockIsRemoteAccessible.mock.calls.map(([channel]) => channel)).toEqual([SETTLE_CHANNEL])
+    expect(mockInvokeChannel.mock.calls.map(([channel]) => channel)).toEqual([SETTLE_CHANNEL])
     await closeBridge(ws)
   })
 }
@@ -427,7 +425,7 @@ function bridgeAllowlistDenyTests() {
 
     ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
     ws.send(JSON.stringify({ type: 'send', channel: 'terminal:input', args: [{}] }))
-    await settleBridge()
+    await settleBridge(ws)
 
     expect(mockOnWindowEvent).not.toHaveBeenCalled()
     expect(mockSendChannel).not.toHaveBeenCalled()
@@ -445,7 +443,7 @@ function bridgeAllowlistAllowTests() {
 
     ws.send(JSON.stringify({ type: 'subscribe', channel: 'terminal:output' }))
     ws.send(JSON.stringify({ type: 'send', channel: 'terminal:input', args: [{}] }))
-    await settleBridge()
+    await settleBridge(ws)
 
     expect(mockOnWindowEvent).toHaveBeenCalledWith('terminal:output', expect.any(Function))
     expect(mockSendChannel).toHaveBeenCalledWith('terminal:input', {})

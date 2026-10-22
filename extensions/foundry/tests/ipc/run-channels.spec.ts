@@ -1021,15 +1021,11 @@ function failuresAndRefusalsTests() {
     ).start({ id: 'WO-1' })
 
     // The rejection is handled off the call — that is the point of not
-    // awaiting it — so poll for the entry rather than assuming one turn of the
-    // microtask queue is enough. One turn passed most of the time, which is
-    // the worst kind of enough.
+    // awaiting it — so wait for the entry rather than assuming one turn of the
+    // microtask queue is enough.
     const ledgerFile = path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl')
-    let ledger = ''
-    for (let attempt = 0; attempt < 50 && !ledger.includes('run.failed'); attempt++) {
-      await new Promise((r) => setTimeout(r, 10))
-      ledger = fs.readFileSync(ledgerFile, 'utf8')
-    }
+    await vi.waitFor(() => expect(fs.readFileSync(ledgerFile, 'utf8')).toContain('run.failed'))
+    const ledger = fs.readFileSync(ledgerFile, 'utf8')
     expect(ledger).toContain('run.failed')
     expect(ledger).toContain('no worktree could be prepared')
   })

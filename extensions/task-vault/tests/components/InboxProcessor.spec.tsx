@@ -133,9 +133,7 @@ function inboxProcessorFinishingTests() {
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:process-inbox-item')).toHaveLength(1)
     )
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    })
+    await act(async () => undefined)
     expect(screen.getByText('1 of 2')).toBeTruthy()
     bridge.responses['task-vault:vault:process-inbox-item'] = { error: 'STALE_ID' }
     fireEvent.click(screen.getByRole('button', { name: 'Trash it' }))
