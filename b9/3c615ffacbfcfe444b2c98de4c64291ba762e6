@@ -1,0 +1,39 @@
+tests/e2e/extension-escape.spec.ts
+  s_f6f18e5557b141::t_7b84001ac1e106 38-39
+scripts/ci-plan.mjs
+  s_f6f18e5557b141::t_7b84001ac1e106 20-21
+src/main/e2e-readiness.ts
+  s_f6f18e5557b141::t_7b84001ac1e106 3-5
+scripts/ci-local.mjs
+  s_f6f18e5557b141::t_7b84001ac1e106 3-5,74-75
+scripts/test-select.mjs
+  s_f6f18e5557b141::t_7b84001ac1e106 2-4
+playwright.config.ts
+  s_f6f18e5557b141::t_7b84001ac1e106 4-5,12-13
+tests/e2e/helpers.ts
+  s_f6f18e5557b141::t_7b84001ac1e106 81-83
+tests/e2e/worker-count.ts
+  s_f6f18e5557b141::t_7b84001ac1e106 3-4
+scripts/test-env.mjs
+  s_f6f18e5557b141::t_7b84001ac1e106 42
+extensions/foundry/tests/ipc/interrupted-run-ipc.spec.ts
+  s_f6f18e5557b141::t_7b84001ac1e106 84-85
+tests/e2e/e2e-environment.ts
+  s_f6f18e5557b141::t_7b84001ac1e106 10-11,20-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b93c615ffacbfcfe444b2c98de4c64291ba762e6",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
