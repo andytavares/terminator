@@ -72,6 +72,7 @@ import { basename } from 'path'
 import { randomUUID } from 'crypto'
 import { makeLogger } from '../logger.js'
 import { focusWindow, revealWindow, windowOptions } from '../background-mode.js'
+import { announceWindowReadiness } from '../e2e-readiness.js'
 import { clearFeed, publishFeed, setActionHandler } from '../home/home-feed.js'
 
 const apiLog = makeLogger('extension-api')
@@ -893,6 +894,7 @@ function newAuxiliaryWindow(view: string, rendererUrl: string | undefined): Brow
     })
   )
   auxiliaryWindows.set(view, win)
+  announceWindowReadiness(win)
   win.on('closed', () => {
     auxiliaryWindows.delete(view)
   })
