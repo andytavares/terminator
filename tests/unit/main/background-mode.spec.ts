@@ -33,8 +33,9 @@ describe('a window created in the background', () => {
   afterEach(() => delete process.env.TERMINATOR_RUN_IN_BACKGROUND)
 
   it('creates windows hidden and still drawing, keeping their own preferences', async () => {
-    const { windowOptions } = await loadWith('1')
-    expect(windowOptions({ width: 1280, webPreferences: preload })).toEqual({
+    const { newWindow } = await loadWith('1')
+    newWindow({ width: 1280, webPreferences: preload })
+    expect(created.at(-1)).toEqual({
       width: 1280,
       show: false,
       enableLargerThanScreen: true,
@@ -81,8 +82,9 @@ describe('running normally', () => {
   beforeEach(() => app.setActivationPolicy.mockReset())
 
   it('leaves window options as they are', async () => {
-    const { windowOptions } = await loadWith(undefined)
-    expect(windowOptions({ width: 1280, webPreferences: preload })).toEqual({
+    const { newWindow } = await loadWith(undefined)
+    newWindow({ width: 1280, webPreferences: preload })
+    expect(created.at(-1)).toEqual({
       width: 1280,
       webPreferences: preload,
     })
