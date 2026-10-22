@@ -58,7 +58,7 @@ export function pushBranchToOrigin(
 export async function openRepo(handle: AppHandle, name: string, repo: string): Promise<void> {
   await createWorkspace(handle.page, name, repo)
   await handle.page.locator('.branch-row').first().click()
-  await expect(projectTab(handle.page, 'Git')).toBeVisible({ timeout: 15000 })
+  await expect(projectTab(handle.page, 'Git')).toBeVisible()
 }
 
 export function projectTab(page: Page, label: string) {
@@ -91,9 +91,7 @@ export async function openCodeReviews(
   const view = await gitView(handle, 'code-reviews')
   // The queue or an open pull request: the tab reloads fresh on a re-open, so a
   // PR the test before left open shows again only from its queue row.
-  await expect(view.locator('.rd-row, [aria-label="Close review"]').first()).toBeVisible({
-    timeout: 30000,
-  })
+  await expect(view.locator('.rd-row, [aria-label="Close review"]').first()).toBeVisible()
   return view
 }
 

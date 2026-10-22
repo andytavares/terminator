@@ -8,11 +8,6 @@ import { randomUUID } from 'node:crypto'
 
 const LAUNCH_MARKER = 'TERMINATOR_E2E_LAUNCH'
 
-// A helper process can still be on its way out when main has exited, and the
-// claude stub notices its parent is gone within a second
-// (tests/e2e/fixtures/bin/claude), so the check waits this long first.
-const LEFT_BEHIND_MS = 3000
-
 /** One line of `ps`: the process, its parent, and how it was started. */
 export interface ProcessRow {
   pid: number
@@ -103,7 +98,7 @@ export async function expectNoProcessesLeft(
 ): Promise<void> {
   const describeLeft = (): string[] => leftovers(launchId, started).map(describeRow)
   try {
-    await expect.poll(describeLeft, { timeout: LEFT_BEHIND_MS }).toEqual([])
+    await expect.poll(describeLeft).toEqual([])
   } catch {
     const left = leftovers(launchId, started)
     if (left.length === 0) return

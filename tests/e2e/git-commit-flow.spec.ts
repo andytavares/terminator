@@ -202,7 +202,7 @@ async function aSlowHookStreamsThenCommitAndPushReachesTheRemote(): Promise<void
   await view.getByRole('button', { name: 'Commit & Push' }).click()
 
   await expect(view.locator('.git-view__hook-live')).toContainText('lint: checking staged files')
-  await expect(view.getByPlaceholder('Commit message…')).toHaveValue('', { timeout: 15000 })
+  await expect(view.getByPlaceholder('Commit message…')).toHaveValue('')
   await expect(view.locator('.git-view__commit-error')).toBeHidden()
   await expect.poll(() => git(bare, 'log', '-1', '--format=%s', BRANCH)).toBe('Add in either order')
   await expect(gitViewSection(view, /^Changes \(0\)/)).toBeVisible()
@@ -215,7 +215,7 @@ async function fillAndCreateDraftPr(dialog: Locator): Promise<void> {
   await dialog.getByPlaceholder('Describe your changes…').fill('Adds a greeting.')
   await dialog.getByLabel('Draft').check()
   await dialog.getByRole('button', { name: 'Create Draft PR' }).click()
-  await expect(dialog).toBeHidden({ timeout: 15000 })
+  await expect(dialog).toBeHidden()
 }
 
 async function openPrCreatesAPullRequest(): Promise<void> {
@@ -251,11 +251,11 @@ async function runGitQuickAction(mnemonic: string): Promise<void> {
   const { page } = handle
   await page.keyboard.press('Meta+p')
   const panel = page.getByRole('dialog', { name: 'Quick actions' })
-  await expect(panel.locator(':focus')).toHaveCount(1, { timeout: 10000 })
+  await expect(panel.locator(':focus')).toHaveCount(1)
   await page.keyboard.press('g')
   await expect(page.getByRole('listbox', { name: 'Git' })).toBeVisible()
   await page.keyboard.press(mnemonic)
-  await expect(panel).toBeHidden({ timeout: 10000 })
+  await expect(panel).toBeHidden()
 }
 
 async function commitQuickActionShowsTheMessageBox(): Promise<void> {
@@ -293,8 +293,7 @@ async function pullQuickActionFastForwards(): Promise<void> {
   // The Git tab is still on screen, so its view draws the toast: the core's would sit under it.
   const view = await gitView(handle, 'project')
   await expect(view.locator('.tmui-toast__message', { hasText: 'Pulled' })).toContainText(
-    `Pulled ${BRANCH}`,
-    { timeout: 15000 }
+    `Pulled ${BRANCH}`
   )
   expect(existsSync(join(repo, 'docs/notes.md'))).toBe(true)
   expect(readFileSync(join(repo, 'docs/notes.md'), 'utf8')).toBe('from a teammate\n')
@@ -341,7 +340,6 @@ const CHANGE_TO_PULL_REQUEST: Steps = [
 ]
 
 test('a change is diffed, staged, committed through its hooks, pushed and opened as a pull request', async () => {
-  test.setTimeout(120_000)
   await runSteps(CHANGE_TO_PULL_REQUEST)
 })
 
@@ -376,7 +374,7 @@ const globalDefaultButtonIn = (settings: Locator) =>
 async function commitAllFrom(branch: string, checkout: string, message: string): Promise<string> {
   await projectGroup(handle.page, branch).click()
   const view = await openGitTab(handle)
-  await expect(view.locator('.staging-area__file-row').first()).toBeVisible({ timeout: 15000 })
+  await expect(view.locator('.staging-area__file-row').first()).toBeVisible()
   await view.getByRole('button', { name: 'Stage All' }).click()
   await view.getByPlaceholder('Commit message…').fill(message)
   await view.getByRole('button', { name: 'Commit', exact: true }).click()
@@ -426,14 +424,14 @@ async function changedFilesStopAtTheLimit(plain: string): Promise<void> {
   for (let i = 0; i < 12; i++) writeFile(plain, `note-${String(i).padStart(2, '0')}.md`, `${i}\n`)
   await projectGroup(handle.page, 'plain-work').click()
   const view = await openGitTab(handle)
-  await expect(view.locator('.staging-area__file-row')).toHaveCount(12, { timeout: 15000 })
+  await expect(view.locator('.staging-area__file-row')).toHaveCount(12)
   await expect(view.locator('.staging-area__truncation-banner')).toBeHidden()
 
   const page = await openExtensionSettings(handle.page, 'Git Integration')
   await settingRow(page, 'Max displayed changed files').locator('input').fill('10')
   await closeSettingsPanel(handle.page)
 
-  await expect(view.locator('.staging-area__file-row')).toHaveCount(10, { timeout: 15000 })
+  await expect(view.locator('.staging-area__file-row')).toHaveCount(10)
   await expect(view.locator('.staging-area__truncation-banner')).toHaveText(
     'Showing first 10 files.'
   )
@@ -449,7 +447,6 @@ async function globalSignOffSignsCommits(plain: string): Promise<void> {
 }
 
 test('Git settings limit the changed-files list and sign commits off, globally and per workspace', async () => {
-  test.setTimeout(120_000)
   const signed = await openRepoOnBranch('Signed Repo', 'signed-work')
   const plain = await openRepoOnBranch('Plain Repo', 'plain-work')
   await runSteps([

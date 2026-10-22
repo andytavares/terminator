@@ -69,12 +69,16 @@ function makeCertificates(dir: string): { ca: string; key: Buffer; cert: Buffer 
 /** Answers TLS for both hosts itself, each request by the host it names. */
 function trackerServer(linear: LinearState, jira: JiraState, tls: { key: Buffer; cert: Buffer }) {
   return createHttpsServer(tls, (request, response) => {
-    void readJsonBody(request).then((body) => {
-      const host = request.headers.host ?? ''
-      const answer =
-        host === LINEAR_HOST ? answerLinear(linear, request, body) : answerJira(jira, request, body)
-      sendJson(response, answer.status, answer.body)
-    })
+    readJsonBody(request)
+      .then((body) => {
+        const host = request.headers.host ?? ''
+        const answer =
+          host === LINEAR_HOST
+            ? answerLinear(linear, request, body)
+            : answerJira(jira, request, body)
+        sendJson(response, answer.status, answer.body)
+      })
+      .catch((error: Error) => response.destroy(error))
   })
 }
 

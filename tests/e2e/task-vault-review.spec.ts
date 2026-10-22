@@ -177,7 +177,7 @@ async function exportReview(): Promise<void> {
   // Until the save lands the file is not there, and a poll whose callback
   // throws stops at once rather than trying again.
   await expect
-    .poll(() => (existsSync(file) ? readFileSync(file, 'utf8') : ''), { timeout: 10_000 })
+    .poll(() => (existsSync(file) ? readFileSync(file, 'utf8') : ''))
     .toContain('Mornings without meetings')
   expect(readFileSync(file, 'utf8')).toContain('Garden Shed')
 }

@@ -487,6 +487,11 @@ export async function untilDrawn(page: Page): Promise<void> {
   await page.screenshot({ clip: { x: 0, y: 0, width: 1, height: 1 } })
 }
 
+/** Runs `action`, which opens a confirm dialog, and accepts that dialog; settles when both have. */
+export async function acceptingDialog(page: Page, action: () => Promise<void>): Promise<void> {
+  await Promise.all([page.waitForEvent('dialog').then((dialog) => dialog.accept()), action()])
+}
+
 /** Opens Settings with ⌘, (Ctrl+, off macOS) on the named section. */
 export async function openSettingsSection(page: Page, section: string): Promise<void> {
   if (!(await page.locator('.settings-panel').isVisible())) {

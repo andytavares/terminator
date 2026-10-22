@@ -12,7 +12,7 @@ let handle: AppHandle
 test.beforeAll(async () => {
   handle = await launchApp()
   await createWorkspace(handle.page, 'terminator', process.cwd())
-  await expect(handle.page.locator('.app-band__entry').first()).toBeVisible({ timeout: 20000 })
+  await expect(handle.page.locator('.app-band__entry').first()).toBeVisible()
 })
 
 test.afterAll(async () => {
@@ -35,15 +35,19 @@ const REMOTE_CONTROL: Surface = {
 }
 
 /**
- * Waits out real wall-clock time. The double-Escape gesture is timed against `Date.now()`
- * inside the extension's frame, which Playwright cannot attach a fake clock to, so proving
- * presses fall outside `DOUBLE_ESCAPE_WINDOW_MS` genuinely requires that much time to elapse.
+ * Moves the extension frame's clock on. The double-Escape gesture is timed against
+ * `performance.now()` inside the frame (frame-shim.ts), which Playwright's page clock cannot
+ * reach, so the frame's own clock is shifted instead of waiting out `DOUBLE_ESCAPE_WINDOW_MS`.
  */
-async function realDelay(ms: number): Promise<void> {
-  const deadline = Date.now() + ms
-  while (Date.now() < deadline) {
-    await new Promise<void>((resolve) => setImmediate(resolve))
-  }
+async function advanceFrameClock(part: string, ms: number): Promise<void> {
+  await inView(
+    part,
+    `(() => {
+      const now = performance.now.bind(performance)
+      performance.now = () => now() + ${ms}
+      return true
+    })()`
+  )
 }
 
 /** Run `script` inside the extension frame whose URL contains `part`. */
@@ -97,10 +101,8 @@ async function showPanel({ id, label, part }: Surface): Promise<void> {
   if ((await activeExtensionPanel()) !== id) {
     await handle.page.locator(`button[aria-label="${label}"]`).click()
   }
-  await expect.poll(activeExtensionPanel, { timeout: 20000 }).toBe(id)
-  await expect
-    .poll(() => viewReady(part), { timeout: 20000, message: `${label} view never loaded` })
-    .toBe(true)
+  await expect.poll(activeExtensionPanel).toBe(id)
+  await expect.poll(() => viewReady(part), { message: `${label} view never loaded` }).toBe(true)
 }
 
 /** Neither a text field nor a dialog holds the key, so only the gesture itself is tested. */
@@ -117,11 +119,15 @@ async function nothingClaimsTheKey(part: string): Promise<void> {
 }
 
 async function stillShowing(surface: Surface, why: string): Promise<void> {
+  // Two frames on the host: an exit the key requested would have reached the panel by now.
+  await handle.page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  )
   expect(await activeExtensionPanel(), why).toBe(surface.id)
 }
 
 async function exitsToTheTerminal(surface: Surface, why: string): Promise<void> {
-  await expect.poll(activeExtensionPanel, { timeout: 6000, message: why }).not.toBe(surface.id)
+  await expect.poll(activeExtensionPanel, { message: why }).not.toBe(surface.id)
 }
 
 // ── Leaving with two Escapes ─────────────────────────────────────────────────
@@ -130,10 +136,10 @@ async function singleAndSlowEscapesStay(): Promise<void> {
   await showPanel(NOTES)
   await nothingClaimsTheKey(NOTES.part)
   await key(NOTES.part, 'Escape')
-  await realDelay(900)
+  await advanceFrameClock(NOTES.part, 900)
   await stillShowing(NOTES, 'a single Escape closed the extension')
   await key(NOTES.part, 'Escape')
-  await realDelay(600)
+  await advanceFrameClock(NOTES.part, 600)
   await stillShowing(NOTES, 'two Escapes further apart than the gesture window paired')
 }
 
@@ -154,7 +160,6 @@ async function openDialogsHoldTheKey(): Promise<void> {
     await nothingClaimsTheKey(FOUNDRY.part)
     await setModalDepth(FOUNDRY.part, depth)
     await pressEscapeTwice(FOUNDRY.part)
-    await realDelay(50)
     await stillShowing(FOUNDRY, `two Escapes with ${depth} dialog(s) open exited the extension`)
   }
   await setModalDepth(FOUNDRY.part, 0)
@@ -201,7 +206,6 @@ async function bringUpTextField({ label, part, open }: DraftSurface): Promise<vo
     .toBe(true)
   await expect
     .poll(() => inView<boolean>(part, `!!${FIELD}`), {
-      timeout: 10000,
       message: `${label} never showed a text field after opening "${open}"`,
     })
     .toBe(true)
@@ -277,7 +281,6 @@ const LEAVING_STEPS: Steps = [
 ]
 
 test('an extension is left with two quick Escapes, and only when nothing is at risk', async () => {
-  test.setTimeout(180_000)
   for (const [title, body] of LEAVING_STEPS) await test.step(title, body)
 })
 
@@ -306,7 +309,6 @@ async function openNotesComposer(): Promise<void> {
     .toBe(true)
   await expect
     .poll(() => inView<boolean>(NOTES.part, `!!document.querySelector('dialog[open]')`), {
-      timeout: 10000,
       message: 'the composer never opened',
     })
     .toBe(true)
@@ -361,7 +363,7 @@ async function quickActionsDrawsOverTheFrame(): Promise<void> {
   expect(frameBox, 'the Task Vault iframe has no box').not.toBeNull()
   await page.keyboard.press('ControlOrMeta+p')
   const dialog = page.getByRole('dialog', { name: 'Quick actions' })
-  await expect(dialog).toBeVisible({ timeout: 10000 })
+  await expect(dialog).toBeVisible()
   await expectCentredInWindow(dialog, 'Quick actions over Task Vault')
   expect(await taskVaultFrameBox(), 'the frame was resized or hidden for the modal').toEqual(
     frameBox
@@ -391,6 +393,5 @@ const KEYBOARD_STEPS: Steps = [
 ]
 
 test('an extension is worked from the keyboard, with Quick Actions drawn over it', async () => {
-  test.setTimeout(120_000)
   for (const [title, body] of KEYBOARD_STEPS) await test.step(title, body)
 })

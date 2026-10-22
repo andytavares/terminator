@@ -100,7 +100,7 @@ test.afterAll(async () => {
 async function openIntegrations(): Promise<Page> {
   const { page } = handle
   await page.keyboard.press('Meta+,')
-  await page.waitForSelector('.settings-panel')
+  await expect(page.locator('.settings-panel')).toBeVisible()
   await page.locator('.settings-panel__nav-item').filter({ hasText: 'Integrations' }).click()
   return page
 }
@@ -194,7 +194,7 @@ async function drawerFeedsAndComments(): Promise<void> {
 async function sessionStartsWith(key: string): Promise<void> {
   await expect(
     handle.page.locator('.tmui-toast__message', { hasText: `Session started with ${key}` })
-  ).toBeVisible({ timeout: 15000 })
+  ).toBeVisible()
 }
 
 async function newSessionStartsWithLinearIssue(): Promise<void> {
@@ -321,6 +321,5 @@ test('Linear and Jira issues are linked to a branch, read, commented on and fed 
   // The core stores a tracker credential only with OS encryption: macOS gets it from
   // --use-mock-keychain, Linux from allowCredentialsWithoutKeychain. The skip is for neither.
   test.skip(!credentialStore, 'safeStorage has no OS encryption under Playwright here')
-  test.setTimeout(180_000)
   for (const [title, body] of TRACKER_STEPS) await test.step(title, body)
 })

@@ -59,7 +59,7 @@ const yourMove = (page: Page) => page.getByRole('region', { name: 'Your move' })
 const inFlight = (page: Page) => page.getByRole('region', { name: 'In flight' })
 
 async function branchTreeHiddenUntilRevealed(page: Page): Promise<void> {
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible({ timeout: 15000 })
+  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
   await expect(sidebarHidden(page)).toHaveCount(1)
   // ⌘B is a menu accelerator, which a synthesized key does not reach; Quick actions runs the same action.
   await runQuickActionFromPanel(page, 'Toggle sidebar')
@@ -73,9 +73,7 @@ async function startAgentAsking(page: Page): Promise<void> {
 }
 
 async function questionAppearsInYourMove(page: Page): Promise<void> {
-  await expect(page.getByRole('button', { name: 'Home, 1 need you' })).toBeVisible({
-    timeout: 15000,
-  })
+  await expect(page.getByRole('button', { name: 'Home, 1 need you' })).toBeVisible()
   await openHome(page)
   await expect(yourMove(page).getByText('Do you want to create BoardScreen.tsx?')).toBeVisible()
 }
@@ -122,7 +120,6 @@ async function startWorkBeginsScratchTerminal(page: Page): Promise<void> {
 }
 
 test('an agent asks on Home, is answered there, and work is opened from the Desk', async () => {
-  test.setTimeout(120_000)
   const { page } = handle
   await test.step('the branch tree is hidden on Home by default, and ⌘B shows it', () =>
     branchTreeHiddenUntilRevealed(page))

@@ -74,7 +74,7 @@ async function fullscreenProgramLineShows(page: Page, folder: string): Promise<v
   await runInVisibleTerminal(page, `sh ${draw}`)
   await openOverview(page)
   const tile = page.getByRole('article', { name: 'Wall / live, Terminal 1' })
-  await expect(tile.locator('.live-preview')).toContainText('INPUT-LINE', { timeout: 10000 })
+  await expect(tile.locator('.live-preview')).toContainText('INPUT-LINE')
   await expect.poll(() => page.evaluate(rowInsidePreview, 'INPUT-LINE')).toBe(true)
 }
 
@@ -88,9 +88,9 @@ async function liveOutputArrives(page: Page): Promise<void> {
   const preview = page
     .getByRole('article', { name: 'Wall / live, Terminal 2' })
     .locator('.live-preview')
-  await expect(preview).toContainText('tick-', { timeout: 10000 })
+  await expect(preview).toContainText('tick-')
   const first = await preview.innerText()
-  await expect.poll(() => preview.innerText(), { timeout: 10000 }).not.toBe(first)
+  await expect.poll(() => preview.innerText()).not.toBe(first)
   await page.screenshot({ path: 'test-results/054/monitor-wall.png' })
 }
 
@@ -111,7 +111,6 @@ async function watchTheWall(page: Page, folder: string): Promise<void> {
 }
 
 test('the Overview wall watches every terminal, and keeps its arrangement across a restart', async () => {
-  test.setTimeout(90_000)
   let handle: AppHandle | undefined = await launchApp()
   try {
     const profile = handle.userDataDir

@@ -126,8 +126,8 @@ async function twoConversationsPairWithTheirSessions(
     conversationId: 'conv-second',
     transcriptPath: join(run.folder, 'missing.jsonl'),
   })
-  await expect.poll(() => conversationOf(page, run.first), { timeout: 15_000 }).toBe('conv-first')
-  await expect.poll(() => conversationOf(page, run.second), { timeout: 15_000 }).toBe('conv-second')
+  await expect.poll(() => conversationOf(page, run.first)).toBe('conv-first')
+  await expect.poll(() => conversationOf(page, run.second)).toBe('conv-second')
 }
 
 /** Ends the terminal in the tab at `index` the way an agent ending would. */
@@ -146,13 +146,13 @@ async function exitTerminal(page: Page, index: number): Promise<void> {
 
 async function goneTranscriptSaysSo(page: Page): Promise<void> {
   await exitTerminal(page, 1)
-  await expect(page.getByText('Conversation no longer available')).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText('Conversation no longer available')).toBeVisible()
   await expect(resumeButtons(page)).toHaveCount(0)
 }
 
 async function stoppedSessionOffersResume(page: Page): Promise<void> {
   await exitTerminal(page, 0)
-  await expect(resumeButtons(page)).toHaveCount(1, { timeout: 15_000 })
+  await expect(resumeButtons(page)).toHaveCount(1)
 }
 
 // Whether a transcript is there is only true as of the moment it was read, and
@@ -174,7 +174,7 @@ async function resumeFromKeyboard(page: Page, run: Conversations): Promise<void>
   await goToTerminal(page)
   await openOverview(page)
   const resume = resumeButtons(page)
-  await expect(resume).toHaveCount(1, { timeout: 15_000 })
+  await expect(resume).toHaveCount(1)
   await resume.focus()
   expect(
     await resume.evaluate((el) => getComputedStyle(el, ':focus-visible').outlineWidth)
@@ -246,7 +246,6 @@ async function resumedFromTheDrawer(page: Page): Promise<void> {
 }
 
 test('a conversation is resumed, and only when it can be', async () => {
-  test.setTimeout(180_000)
   const folder = e2eTempDir('resume-')
   const run: Conversations = {
     folder,

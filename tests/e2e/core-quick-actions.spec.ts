@@ -43,7 +43,7 @@ async function splitDownStacksPane(page: Page): Promise<void> {
   await expect(page.locator('.terminal-pane .xterm')).toHaveCount(1)
   await runQuickActionFromPanel(page, 'Split down')
   const panes = page.locator('.terminal-pane .xterm')
-  await expect(panes).toHaveCount(2, { timeout: 15000 })
+  await expect(panes).toHaveCount(2)
   const [top, bottom] = [await panes.nth(0).boundingBox(), await panes.nth(1).boundingBox()]
   expect(bottom!.y).toBeGreaterThan(top!.y + top!.height - 2)
   expect(Math.abs(bottom!.x - top!.x)).toBeLessThan(2)
@@ -51,14 +51,14 @@ async function splitDownStacksPane(page: Page): Promise<void> {
 
 async function closePaneKeepsOther(page: Page): Promise<void> {
   await runQuickActionFromPanel(page, 'Close pane')
-  await expect(page.locator('.terminal-pane .xterm')).toHaveCount(1, { timeout: 15000 })
+  await expect(page.locator('.terminal-pane .xterm')).toHaveCount(1)
 }
 
 async function clearWipesTerminal(page: Page): Promise<void> {
   await runInVisibleTerminal(page, 'echo qa-clear-marker')
   await expect.poll(() => screenText(page)).toContain('qa-clear-marker')
   await runQuickActionFromPanel(page, 'Clear')
-  await expect.poll(() => screenText(page), { timeout: 10000 }).not.toContain('qa-clear-marker')
+  await expect.poll(() => screenText(page)).not.toContain('qa-clear-marker')
 }
 
 async function terminalActions(page: Page): Promise<void> {
@@ -97,9 +97,7 @@ async function nextWaitingRevealsRungSession(page: Page): Promise<void> {
     await to.click()
     await runInVisibleTerminal(page, "sleep 2; printf '\\a'")
     await from.click()
-    await expect(to.locator('.tab-bar__state[aria-label="Waiting on you"]')).toBeVisible({
-      timeout: 15000,
-    })
+    await expect(to.locator('.tab-bar__state[aria-label="Waiting on you"]')).toBeVisible()
     await runQuickActionFromPanel(page, label)
     await expect(to).toHaveClass(/tab-bar__tab--active/)
   }
@@ -116,7 +114,7 @@ async function editSessionNoteShowsOnTab(page: Page): Promise<void> {
 
 async function newScratchTerminalOpens(page: Page): Promise<void> {
   await runQuickActionFromPanel(page, 'New scratch terminal')
-  await expect(activeTab(page)).toContainText('Scratch', { timeout: 15000 })
+  await expect(activeTab(page)).toContainText('Scratch')
   await projectGroup(page, 'alpha').click()
   await expect(activeTab(page)).toContainText('Terminal')
 }
@@ -265,7 +263,6 @@ test.describe('core quick actions', () => {
   })
 
   test('every core action changes what the operator sees, issue actions included', async () => {
-    test.setTimeout(180_000)
     const { page } = handle
     await createWorkspace(page, 'QA One', e2eTempDir('qa1-'))
     await createWorkspace(page, 'QA Two', e2eTempDir('qa2-'))

@@ -204,6 +204,5 @@ const REMOTE_STEPS: Steps = [
 ]
 
 test('Remote Control is turned on from its view and used from a phone and a browser', async () => {
-  test.setTimeout(180_000)
   for (const [title, body] of REMOTE_STEPS) await test.step(title, body)
 })

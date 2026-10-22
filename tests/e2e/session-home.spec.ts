@@ -129,7 +129,6 @@ async function outputLeavesInFlightOrder(page: Page): Promise<void> {
 }
 
 test('a session is kept on Home under the work it serves, and what is written about it names that work', async () => {
-  test.setTimeout(90_000)
   const { page } = handle
   await test.step('the app opens on Home with nothing open', () => opensOnHomeWithNothingOpen(page))
   await test.step('Home lists a terminal under In flight, as the branch it runs on', () =>

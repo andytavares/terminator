@@ -29,12 +29,12 @@ const newBranchButton = () =>
   workspaceRow(handle.page, WS).locator('.repo-header__action[aria-label^="New branch in"]')
 
 async function sidebarRendersPromptly(): Promise<void> {
-  await expect(handle.page.locator('.unified-sidebar')).toBeVisible({ timeout: 3000 })
+  await expect(handle.page.locator('.unified-sidebar')).toBeVisible()
 }
 
 async function homeClosesOnSidebarClick(): Promise<void> {
   const home = handle.page.getByRole('region', { name: 'Home' })
-  await expect(home).toBeVisible({ timeout: 15000 })
+  await expect(home).toBeVisible()
   await clickSidebarSearch()
   await expect(home).toHaveCount(0)
 }
@@ -48,7 +48,7 @@ async function overviewClosesOnSidebarClick(): Promise<void> {
 
 async function extensionClosesOnSidebarClick(): Promise<void> {
   await bandEntry('Notes').click()
-  await expect(handle.page.locator('[data-extension-panel]')).toHaveCount(1, { timeout: 10000 })
+  await expect(handle.page.locator('[data-extension-panel]')).toHaveCount(1)
   await clickSidebarSearch()
   await expect(handle.page.locator('[data-extension-panel]')).toHaveCount(0)
 }
@@ -214,7 +214,6 @@ async function itIsRenamedAndRemoved(): Promise<void> {
 }
 
 test('a workspace is created over a folder, given a branch and tabs, renamed and removed', async () => {
-  test.setTimeout(90_000)
   await theAppOpens()
   await aWorkspaceIsCreated()
   await itGetsABranchAndTabs()

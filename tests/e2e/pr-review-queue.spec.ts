@@ -140,15 +140,13 @@ async function aReviewMergedElsewhereLeavesTheQueue(): Promise<void> {
 async function aConflictedPullRequestIsMergedInAWorktree(): Promise<void> {
   const view = await openPrOverview('Rework greeting')
   await view.getByRole('button', { name: 'Resolve conflicts' }).click()
-  await expect(view.getByText('Merge conflicts need resolving')).toBeVisible({ timeout: 15000 })
+  await expect(view.getByText('Merge conflicts need resolving')).toBeVisible()
   await view.getByTestId('conflict-file-row').filter({ hasText: 'README.md' }).click()
   await view.getByRole('button', { name: /^Keep theirs/ }).click()
   await view.getByRole('button', { name: /^Confirm/ }).click()
   await view.getByRole('button', { name: 'Commit merge' }).click()
 
-  await expect(view.getByRole('heading', { level: 1 })).toContainText('Rework greeting', {
-    timeout: 15000,
-  })
+  await expect(view.getByRole('heading', { level: 1 })).toContainText('Rework greeting')
   await expect.poll(() => git(bare, 'log', '-1', '--format=%s', 'feat/greeting')).toMatch(/^Merge/)
   const head = git(bare, 'rev-parse', 'feat/greeting')
   expect(git(bare, 'rev-list', '--parents', '-n', '1', head).split(' ')).toHaveLength(3)
@@ -200,6 +198,5 @@ const STEPS: Array<[title: string, run: () => Promise<void>]> = [
 ]
 
 test('a pull request is found in the queue, discussed, brought up to date, merged and approved', async () => {
-  test.setTimeout(120_000)
   for (const [title, run] of STEPS) await test.step(title, run)
 })

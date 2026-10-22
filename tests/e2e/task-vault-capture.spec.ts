@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type TestStepInfo } from '@playwright/test'
-import { AppHandle, launchApp, closeApp } from './helpers'
+import { AppHandle, launchApp, closeApp, acceptingDialog } from './helpers'
 import { invokeChannel, type ExtensionView } from './extension-page'
 import { goToSection, openVault, storedTask, type StoredTask } from './task-vault-harness'
 import { expectCentredInWindow } from './modal-centre'
@@ -74,8 +74,9 @@ async function moveToBacklog(): Promise<void> {
 /** Deleting an inbox item asks first, then removes it for good. */
 async function deleteAfterConfirm(): Promise<void> {
   await captureFromInbox('Junk mail')
-  handle.page.once('dialog', (dialog) => void dialog.accept())
-  await inboxRow('Junk mail').getByRole('button', { name: 'Delete' }).click()
+  await acceptingDialog(handle.page, () =>
+    inboxRow('Junk mail').getByRole('button', { name: 'Delete' }).click()
+  )
 
   await expect(inboxRow('Junk mail')).toHaveCount(0)
   expect(await storedTask(vault, 'Junk mail')).toBeUndefined()
@@ -146,7 +147,7 @@ async function captureFromQuickActions(): Promise<void> {
   await handle.page.keyboard.press('c')
 
   const dialog = vault.getByRole('dialog', { name: 'Capture to Inbox' })
-  await expect(dialog).toBeVisible({ timeout: 15_000 })
+  await expect(dialog).toBeVisible()
   await expectCentredInWindow(dialog, 'Task Vault: Capture to Inbox')
   await dialog.getByRole('textbox').fill('Buy stamps')
   await dialog.getByRole('textbox').press('Enter')

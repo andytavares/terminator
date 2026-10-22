@@ -226,6 +226,5 @@ const STEPS: Array<[title: string, run: () => Promise<void>]> = [
 ]
 
 test('the review surfaces stack and size their parts so each can be seen and clicked', async () => {
-  test.setTimeout(60_000)
   for (const [title, run] of STEPS) await test.step(title, run)
 })

@@ -59,7 +59,6 @@ async function foundry(channel: string, payload: unknown = {}): Promise<unknown>
 test.skip(REMOTE === '', 'set LIVE_REMOTE to run this')
 
 test.beforeAll(async () => {
-  test.setTimeout(300_000)
   repo = e2eTempDir('foundry-live-run-')
   execFileSync('git', ['clone', REMOTE, repo])
   git('config', 'user.email', 'live@example.com')
@@ -165,7 +164,7 @@ async function observeUntilShippedOrStalled(): Promise<Observed> {
     return hung
   }
   await expect
-    .poll(finished, { timeout: 45 * 60_000, intervals: [10_000] })
+    .poll(finished, { intervals: [10_000] })
     .toBe(true)
     .catch(() => console.log('[deadline] the run neither shipped nor stalled'))
   return last
@@ -236,9 +235,6 @@ function expectTheClimbMeasured(ledger: string): void {
 }
 
 test('an agent takes an order to a draft pull request', async () => {
-  // Longer than the polling deadline, so the test reports the run rather than Playwright
-  // killing it with "timed out".
-  test.setTimeout(3_000_000)
   writeOrder()
   await startLiveRun(foundry, ORDER)
 

@@ -11,6 +11,7 @@ import {
   launchApp,
   projectGroup,
   runQuickActionFromPanel,
+  acceptingDialog,
 } from './helpers'
 import { foundryChannel, makeFixtureRepo } from './foundry-harness'
 import { answerFolderPicker } from './main-stubs'
@@ -122,8 +123,13 @@ async function pressActionSetting(
   panel: Locator,
   def: SettingDef
 ): Promise<void> {
-  if (def.confirmMessage) handle.page.once('dialog', (dialog) => void dialog.accept())
-  await panel.getByRole('button', { name: def.label, exact: true }).click()
+  if (def.confirmMessage) {
+    await acceptingDialog(handle.page, () =>
+      panel.getByRole('button', { name: def.label, exact: true }).click()
+    )
+  } else {
+    await panel.getByRole('button', { name: def.label, exact: true }).click()
+  }
   await expect
     .poll(async () =>
       (await handle.page.evaluate(() => window.electronAPI.notifications.list())).some(
@@ -236,7 +242,6 @@ const WRITE_STEPS: Steps = [
 test.describe.configure({ mode: 'serial' })
 
 test('every extension setting is written from its page and survives a restart', async () => {
-  test.setTimeout(600_000)
   for (const [title, body] of WRITE_STEPS) await test.step(title, body)
 })
 
@@ -337,6 +342,5 @@ const EFFECT_STEPS: Steps = [
 ]
 
 test('what the settings change shows where a person looks for it', async () => {
-  test.setTimeout(120_000)
   for (const [title, body] of EFFECT_STEPS) await test.step(title, body)
 })

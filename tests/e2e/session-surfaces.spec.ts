@@ -193,7 +193,6 @@ test.describe('session surfaces', () => {
   test.afterAll(() => closeApp(handle))
 
   test('three sessions are watched, linked and opened from every surface that names them', async () => {
-    test.setTimeout(120_000)
     const { page } = handle
     await createWorkspace(page, 'Surfaces', e2eTempDir('surfaces-'))
     await addAndSelectProject(page, 'Surfaces', 'ticket')

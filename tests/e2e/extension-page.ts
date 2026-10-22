@@ -61,7 +61,6 @@ export function gitIntegrationFrame(handle: AppHandle, viewParam: string): Frame
 export async function findExtensionFrame(handle: AppHandle, urlPart: string): Promise<Frame> {
   await expect
     .poll(() => Boolean(extensionFrame(handle, urlPart)), {
-      timeout: 20_000,
       message: `no ext:// frame for ${urlPart}`,
     })
     .toBe(true)
@@ -142,7 +141,6 @@ export async function popoutPage(handle: AppHandle, urlPart: string): Promise<Pa
       .find((page) => page.url().startsWith('ext://') && page.url().includes(urlPart))
   await expect
     .poll(() => Boolean(matchingWindow()), {
-      timeout: 20_000,
       message: `no ext:// window for ${urlPart}`,
     })
     .toBe(true)

@@ -27,9 +27,9 @@ async function switchShowContributions(on: boolean): Promise<void> {
 }
 
 test('the Contributions section follows its setting on Insights', async () => {
-  await expect(handle.page.getByRole('region', { name: 'Home' })).toBeVisible({ timeout: 15000 })
+  await expect(handle.page.getByRole('region', { name: 'Home' })).toBeVisible()
   await handle.page.getByRole('radio', { name: 'Insights' }).click()
-  await expect.poll(sectionHeight, { timeout: 15000 }).toBeGreaterThan(40)
+  await expect.poll(sectionHeight).toBeGreaterThan(40)
   await handle.page.screenshot({ path: test.info().outputPath('contributions-on.png') })
 
   await switchShowContributions(false)

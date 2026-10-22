@@ -30,7 +30,6 @@ let handle: AppHandle
 let repo: string
 
 test.beforeAll(async () => {
-  test.setTimeout(180_000)
   repo = makeFixtureRepo('foundry-forge-repo-')
   handle = await launchApp()
   await createWorkspace(handle.page, 'Foundry Forge', repo)
@@ -138,7 +137,7 @@ async function startForgeRun(id: string): Promise<void> {
 /** The agent's launch: supervised, with its settings and its whole brief, on its own. */
 async function expectSupervisedLaunch(): Promise<void> {
   const screen = handle.page.locator('.xterm-screen')
-  await expect.poll(() => hasAgentLaunchScript(handle), { timeout: 60_000 }).toBe(true)
+  await expect.poll(() => hasAgentLaunchScript(handle)).toBe(true)
   const launched = agentLaunchScript(handle)
   expect(launched).toContain('claude --session-id')
 
@@ -176,7 +175,7 @@ async function runLaunchesSupervisedAgent(): Promise<void> {
   // The worktree became a project in the sidebar, named for the branch the
   // run cut — which is what makes it findable at all.
   const project = handle.page.locator('.branch-row__name').filter({ hasText: 'wo-e2e-1' })
-  await expect(project.first()).toBeVisible({ timeout: 60_000 })
+  await expect(project.first()).toBeVisible()
 
   // And it is running in a terminal, with the launch script written — held
   // until the tab mounted rather than checked before anything was listening.
@@ -212,13 +211,13 @@ const END_CONTROLS = `(function () {
       })()`
 
 /** Both controls that end an order have rendered, and each is on screen. */
-async function expectEndControlsOnScreen(timeout: number, offScreen: string): Promise<void> {
+async function expectEndControlsOnScreen(offScreen: string): Promise<void> {
   const onScreen = (): Promise<Record<string, { inView: boolean }>> =>
     inFoundry(handle, END_CONTROLS)
   // Polled until both controls have rendered, rather than slept for a guessed
   // settle time.
   await expect
-    .poll(async () => Object.keys(await onScreen()).sort(), { timeout })
+    .poll(async () => Object.keys(await onScreen()).sort())
     .toEqual(['Delete this order', 'Discard this order'])
   for (const [label, box] of Object.entries(await onScreen())) {
     expect(box.inView, `"${label}" ${offScreen}`).toBe(true)
@@ -245,9 +244,7 @@ async function expectStepWithinFrame(): Promise<void> {
   // The order's controls draw before the Forge has read the order ("Loading the order…"),
   // so the step is waited for, not read once after the controls appear.
   const step = () => inFoundry<{ height: number; viewport: number } | null>(handle, STEP_SIZE)
-  await expect
-    .poll(step, { timeout: 15_000, message: 'the Forge step did not render' })
-    .not.toBeNull()
+  await expect.poll(step, { message: 'the Forge step did not render' }).not.toBeNull()
   const drawn = (await step()) as { height: number; viewport: number }
   expect(drawn.height).toBeLessThanOrEqual(drawn.viewport)
 }
@@ -286,10 +283,10 @@ async function openOrderIsAFrame(): Promise<void> {
   // A window small enough that the rail cannot fit in it, the size the report came from.
   await withWindowSize([1305, 800], async () => {
     await openOrderRow(id)
-    await expectEndControlsOnScreen(15_000, 'is off screen before anything is scrolled')
+    await expectEndControlsOnScreen('is off screen before anything is scrolled')
     // The half that used to fail: the controls were the last thing in the page's own scroll.
     await inFoundry(handle, SCROLL_EVERYTHING)
-    await expectEndControlsOnScreen(10_000, 'scrolled off the screen')
+    await expectEndControlsOnScreen('scrolled off the screen')
     await expectStepWithinFrame()
     expect(
       await misalignedOn(await extensionPage(handle, 'terminator.foundry'), 'Forge order')
@@ -345,7 +342,7 @@ const RENDERED_MARKDOWN = `(function () {
 async function markdownIsRendered(id: string): Promise<void> {
   await openOrderRow(id)
   await expect
-    .poll(() => inFoundry<Record<string, boolean>>(handle, RENDERED_MARKDOWN), { timeout: 15_000 })
+    .poll(() => inFoundry<Record<string, boolean>>(handle, RENDERED_MARKDOWN))
     .toEqual({ bold: true, code: true, list: true, option: true, noAsterisks: true })
   await captureFoundry(handle, 'forge-markdown.png')
 }
@@ -362,28 +359,22 @@ const CLICK_PLAN_STEP = `(function () {
 /** Opens the order's Plan step, and waits for its budget fields. */
 async function openPlanStep(): Promise<void> {
   await expect
-    .poll(
-      () =>
-        inFoundry<boolean>(
-          handle,
-          `document.querySelector('nav[aria-label="Steps"] button') !== null`
-        ),
-      { timeout: 15_000 }
+    .poll(() =>
+      inFoundry<boolean>(
+        handle,
+        `document.querySelector('nav[aria-label="Steps"] button') !== null`
+      )
     )
     .toBe(true)
 
   const plan = await inFoundry<boolean>(handle, CLICK_PLAN_STEP)
   expect(plan, 'no Plan step').toBe(true)
   await expect
-    .poll(
-      () =>
-        inFoundry<boolean>(
-          handle,
-          `document.querySelector('input[aria-label="Agents at once"]') !== null`
-        ),
-      {
-        timeout: 10_000,
-      }
+    .poll(() =>
+      inFoundry<boolean>(
+        handle,
+        `document.querySelector('input[aria-label="Agents at once"]') !== null`
+      )
     )
     .toBe(true)
 }
@@ -409,7 +400,7 @@ async function setBudgets(id: string): Promise<void> {
   ).toBe(true)
   expect(await clickByName(handle, 'button', 'Save budgets')).toBe(true)
   await expect
-    .poll(() => budgetsOf(id), { timeout: 10_000 })
+    .poll(() => budgetsOf(id))
     .toMatchObject({
       agents: 4,
       wallClockMinutes: null,
@@ -444,13 +435,13 @@ function agentsBudgetGate(id: string) {
 /** Raises the budget from the gate, and checks the order and the gate both say so. */
 async function raiseAtGate(id: string, summary: string): Promise<void> {
   // The gate is in the band above the Forge.
-  await expect.poll(() => bodyText(handle), { timeout: 10_000 }).toContain(summary)
+  await expect.poll(() => bodyText(handle)).toContain(summary)
   expect(await clickByName(handle, 'button', 'Raise the budget')).toBe(true)
-  await expect.poll(() => bodyText(handle), { timeout: 10_000 }).toContain('At least 6.')
+  await expect.poll(() => bodyText(handle)).toContain('At least 6.')
 
   expect(await fillByName(handle, 'Agents at once', '8')).toBe(true)
   expect(await clickByName(handle, 'button', 'Raise and resume')).toBe(true)
-  await expect.poll(async () => (await budgetsOf(id)).agents, { timeout: 10_000 }).toBe(8)
+  await expect.poll(async () => (await budgetsOf(id)).agents).toBe(8)
   const decided = JSON.parse(
     readFileSync(join(repo, '.foundry', 'orders', id, 'gates.json'), 'utf8')
   ) as { decision: { option: string } | null }[]
@@ -493,7 +484,6 @@ async function budgetRaisedAtGate(id: string, summary: string): Promise<void> {
 }
 
 test('an open order is a frame whose budgets are set on Plan and raised at the gate, and an agreed order runs as a supervised agent', async () => {
-  test.setTimeout(240_000)
   const step = test.step
   await step(
     'an open order is a frame, and the controls that end it never scroll away',

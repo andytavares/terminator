@@ -301,9 +301,7 @@ async function anchorFollowsEdits(): Promise<void> {
   await notepad.keyboard.type('Note: ')
 
   await expect
-    .poll(async () => (await storedComments()).find((c) => c.body === 'Over what?')?.startOffset, {
-      timeout: 10_000,
-    })
+    .poll(async () => (await storedComments()).find((c) => c.body === 'Over what?')?.startOffset)
     .toBe(REVIEW_BODY.indexOf('jumps over') + 'Note: '.length)
 }
 
@@ -314,9 +312,7 @@ async function orphanedCommentIsDeleted(): Promise<void> {
   await notepad.keyboard.press('Backspace')
 
   await expect
-    .poll(async () => (await storedComments()).find((c) => c.body === 'Too lazy?')?.status, {
-      timeout: 10_000,
-    })
+    .poll(async () => (await storedComments()).find((c) => c.body === 'Too lazy?')?.status)
     .toBe('orphaned')
   await expect(commentCard('Too lazy?')).toHaveClass(/notepad-comment--orphaned/)
 
@@ -434,9 +430,7 @@ async function popOutHasOutline(): Promise<void> {
   await noteRow(notepad, 'Outline fixture').dblclick()
   // The window loads its own copy of the renderer and fetches the note over the bridge.
   const window = await popoutPage(handle, 'view=note')
-  await expect(window.locator('.notepad-outline__item')).toHaveText(['Alpha', 'Beta', 'Omega'], {
-    timeout: 20_000,
-  })
+  await expect(window.locator('.notepad-outline__item')).toHaveText(['Alpha', 'Beta', 'Omega'])
   await window.close()
 }
 

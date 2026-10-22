@@ -106,7 +106,7 @@ const SURFACES: Surface[] = [
     ready: '.rd-row',
     act: async (page) => {
       await page.getByRole('tab', { name: /My PRs/ }).click()
-      await page.waitForSelector('.rd-row')
+      await page.locator('.rd-row').first().waitFor()
     },
   },
 ]
@@ -160,7 +160,7 @@ async function renderSurface(page: Page, surface: Surface, theme: 'dark' | 'ligh
     surface.name.replace('-mine', '')
   )
   await page.addScriptTag({ content: bundleJs })
-  await page.waitForSelector(surface.ready)
+  await page.locator(surface.ready).first().waitFor()
   await surface.act?.(page)
   await page.evaluate(() => document.fonts.ready)
 }
@@ -201,7 +201,6 @@ async function meetsContrast(surface: Surface, theme: 'dark' | 'light'): Promise
 }
 
 test('every review surface meets WCAG 2.1 AA contrast in both themes', async () => {
-  test.setTimeout(120_000)
   for (const theme of ['dark', 'light'] as const) {
     for (const surface of SURFACES) {
       await test.step(`${surface.name} meets WCAG 2.1 AA contrast in the ${theme} theme`, () =>

@@ -233,6 +233,5 @@ const STEPS: Array<[title: string, run: () => Promise<void>]> = [
 ]
 
 test("a pull request's diff is read in context, commented on, submitted and re-reviewed after a push", async () => {
-  test.setTimeout(150_000)
   for (const [title, run] of STEPS) await test.step(title, run)
 })

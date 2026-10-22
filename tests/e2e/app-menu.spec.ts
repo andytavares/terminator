@@ -107,7 +107,7 @@ async function vaultCalendarTogglesItsPanel(): Promise<void> {
   const panel = page.locator('[data-extension-panel="terminator.task-vault"]')
   await expect(panel).toHaveCount(0)
   await clickMenuItem(app, ['View', 'Toggle Vault Calendar'])
-  await expect(panel).toHaveCount(1, { timeout: 15000 })
+  await expect(panel).toHaveCount(1)
   await expect.poll(() => menuItemChecked(app, ['View', 'Toggle Vault Calendar'])).toBe(true)
   await clickMenuItem(app, ['View', 'Toggle Vault Calendar'])
   await expect(panel).toHaveCount(0)
@@ -121,7 +121,6 @@ async function viewOnGitHubOpensRepository(): Promise<void> {
 }
 
 test('the app menu drives the sidebar, Settings, Home, tabs, About, an extension and the browser', async () => {
-  test.setTimeout(90_000)
   await test.step(
     'View → Toggle Sidebar hides the sidebar, and shows it again',
     toggleSidebarHidesAndShows

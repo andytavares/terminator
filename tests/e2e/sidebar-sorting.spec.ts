@@ -185,7 +185,6 @@ async function theSidebarIsSortedAndReordered(): Promise<void> {
 }
 
 test('the sidebar is sorted, filtered and reordered by hand, and keeps the order', async () => {
-  test.setTimeout(90_000)
   await reposAndBranchesOutOfAlphabeticalOrder()
   await theSidebarIsLaidOut()
   await theSidebarIsSortedAndReordered()

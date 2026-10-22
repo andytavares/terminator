@@ -67,7 +67,7 @@ async function terminalFollowsOutput(): Promise<void> {
   await page.locator('.terminal-pane').click()
   await page.keyboard.type('seq 1 300')
   await page.keyboard.press('Enter')
-  await expect.poll(viewportAtBottom, { timeout: 8000 }).toBe(true)
+  await expect.poll(viewportAtBottom).toBe(true)
 }
 
 /** The persist-on-tab-switch architecture (ADR-004) moves the xterm element between
@@ -76,7 +76,7 @@ async function terminalFollowsOutput(): Promise<void> {
 async function terminalStaysAtBottomAcrossSwitch(): Promise<void> {
   await workspaceWithBranch('WS-Persist-B', 'Proj-B')
   await selectProject(handle.page, 'WS-Persist-A', 'Proj-A')
-  await expect.poll(viewportAtBottom, { timeout: 8000 }).toBe(true)
+  await expect.poll(viewportAtBottom).toBe(true)
 }
 
 async function terminalsSurviveSwitchingWorkspaces(): Promise<void> {
@@ -185,7 +185,6 @@ async function terminalsAreManaged(): Promise<void> {
 }
 
 test('terminals are opened, followed, navigated and closed across branches', async () => {
-  test.setTimeout(120_000)
   await terminalsOpenAndFollow()
   await terminalsAreManaged()
 })
@@ -199,13 +198,13 @@ const terminalRows = () => handle.page.locator('.terminal-row')
  * stopped at the branch, and the only way out was an invisible ⌘W. */
 async function splitPaneIsListedAndHideable(): Promise<void> {
   await handle.page.keyboard.press('ControlOrMeta+d')
-  await expect(visibleScreens()).toHaveCount(2, { timeout: 15000 })
+  await expect(visibleScreens()).toHaveCount(2)
   const disclosure = splitBranch().locator('.branch-row__disclosure')
   await expect(disclosure, 'a branch with terminals offers a disclosure').toBeVisible()
   // Collapsed by default: the sidebar still stops at the branch until asked.
   await expect(terminalRows()).toHaveCount(0)
   await disclosure.click()
-  await expect(terminalRows()).toHaveCount(2, { timeout: 10000 })
+  await expect(terminalRows()).toHaveCount(2)
   // The pane is nested under its root, not a sibling of it.
   await expect(terminalRows().nth(0)).not.toHaveClass(/terminal-row--nested/)
   await expect(terminalRows().nth(1)).toHaveClass(/terminal-row--nested/)
@@ -227,7 +226,7 @@ function treeDepths(): Record<'repo' | 'branch' | 'terminal' | 'pane', number> {
 
 async function treeStepsInAtEveryLevel(): Promise<void> {
   await splitBranch().locator('.branch-row__disclosure').click()
-  await expect(terminalRows()).toHaveCount(2, { timeout: 10000 })
+  await expect(terminalRows()).toHaveCount(2)
   const depths = await handle.page.evaluate(treeDepths)
   // Each level sits to the right of the one above it; without this a pane read as a sibling of
   // the branch rather than as something inside it.
@@ -238,21 +237,22 @@ async function treeStepsInAtEveryLevel(): Promise<void> {
 
 async function paneClosesFromSidebar(): Promise<void> {
   await expect(handle.page.locator('.leaf-pane__close').filter({ visible: true })).toHaveCount(2)
-  await terminalRows().last().locator('.terminal-row__close').click({ force: true })
+  await terminalRows().last().hover()
+  await terminalRows().last().locator('.terminal-row__close').click()
   await expect(terminalRows(), 'closing the pane removes its row').toHaveCount(1)
   // One pane left means no split, so no per-pane titlebars either.
-  await expect(visibleScreens()).toHaveCount(1, { timeout: 10000 })
+  await expect(visibleScreens()).toHaveCount(1)
   await splitBranch().locator('.branch-row__disclosure').click()
 }
 
 async function newTabBesideSplitTakesKeys(): Promise<void> {
   const { page } = handle
   await runQuickActionFromPanel(page, 'Split down')
-  await expect(visibleScreens()).toHaveCount(2, { timeout: 15000 })
+  await expect(visibleScreens()).toHaveCount(2)
   await runQuickActionFromPanel(page, 'New tab')
   await expect(sessionTabs()).toHaveCount(2)
   await expect(sessionTabs().last()).toHaveClass(/tab-bar__tab--active/)
-  await expect(visibleScreens()).toHaveCount(1, { timeout: 15000 })
+  await expect(visibleScreens()).toHaveCount(1)
   await page.keyboard.type('echo typed-into-new-tab')
   await page.keyboard.press('Enter')
   const visibleRows = async () => (await readTerminalRowsIn(visibleScreens().first())).join('\n')
@@ -261,14 +261,13 @@ async function newTabBesideSplitTakesKeys(): Promise<void> {
 
 async function firstTabShowsItsSplitAgain(): Promise<void> {
   await sessionTabs().first().click()
-  await expect(visibleScreens()).toHaveCount(2, { timeout: 15000 })
+  await expect(visibleScreens()).toHaveCount(2)
   for (const screen of await visibleScreens().all()) {
     expect((await readTerminalRowsIn(screen)).join('\n')).not.toContain('typed-into-new-tab')
   }
 }
 
 test('a terminal is split, its pane listed, reached and closed, and the split kept per tab', async () => {
-  test.setTimeout(90_000)
   await workspaceWithBranch('Split', 'panes')
   await test.step(
     'a split pane is listed under the terminal it came from, and can be hidden',
@@ -322,7 +321,7 @@ async function urlOpensOnModClick(): Promise<void> {
   await projectGroup(page, 'notebook').click()
   // Two terminals on screen, so the click has to find the row in the right one.
   await runQuickActionFromPanel(page, 'Split down')
-  await expect(visibleScreens()).toHaveCount(2, { timeout: 15000 })
+  await expect(visibleScreens()).toHaveCount(2)
   await printAndModClick(visibleScreens().last(), 'https://example.com/e2e-link')
   await expect.poll(() => shellOpens(app)).toContain('https://example.com/e2e-link')
 }
@@ -341,7 +340,7 @@ async function bellNotifiesAndRevealsTab(): Promise<void> {
   await page.keyboard.press('Enter')
   await sessionTabs().first().click()
   const bell = page.locator('.app-band__entry[aria-label^="Notifications"]')
-  await expect(bell).toHaveAttribute('aria-label', /unread/, { timeout: 15000 })
+  await expect(bell).toHaveAttribute('aria-label', /unread/)
   await bell.click()
   await page.locator('.notif-item', { hasText: 'needs attention' }).first().click()
   await expect(sessionTabs().last()).toHaveClass(/tab-bar__tab--active/)
@@ -360,7 +359,6 @@ async function dismissRemovesNotification(): Promise<void> {
 }
 
 test("a terminal's links open outside the app, its bell notifies, and a plain branch is renamed", async () => {
-  test.setTimeout(90_000)
   const folder = await workspaceWithBranch('Plain', 'scratchpad')
   await test.step(
     'Rename renames a branch that no git branch names, and the name survives a reload',

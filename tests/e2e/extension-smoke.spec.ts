@@ -33,7 +33,7 @@ test.beforeAll(async () => {
   await createWorkspace(page, LONG_REPO, process.cwd())
   await createWorkspace(page, 'Align', e2eTempDir('align-'))
   await addAndSelectProject(page, 'Align', TERMINAL_BRANCH)
-  await expect(page.locator('.repo-header__count')).toHaveCount(3, { timeout: 15000 })
+  await expect(page.locator('.repo-header__count')).toHaveCount(3)
 })
 
 test.afterAll(async () => {
@@ -89,10 +89,9 @@ async function openSurface({ id, label, part }: Surface): Promise<void> {
     // The band, or the repo header's action where the surface lives there; any repo will do.
     await handle.page.locator(`button[aria-label="${label}"]`).first().click()
   }
-  await expect(panel).toHaveCount(1, { timeout: 20000 })
+  await expect(panel).toHaveCount(1)
   await expect
     .poll(() => viewDrawn(part), {
-      timeout: 20000,
       message: `${label} view never finished loading`,
     })
     .toBe(true)
@@ -129,7 +128,6 @@ async function openDisclosure({ label, part, expand }: Surface): Promise<void> {
   expect(opened, `${label}: found no control matching /${expand}/i to open`).toBe(true)
   await expect
     .poll(() => inView<number>(part, 'document.body.innerText.length'), {
-      timeout: 5000,
       message: `${label}: opening "${expand}" changed nothing on screen`,
     })
     .not.toBe(before)
@@ -240,7 +238,6 @@ async function expectViewTheme(part: string, theme: Theme): Promise<void> {
     .poll(
       () => inView<string | null>(part, "document.documentElement.getAttribute('data-theme')"),
       {
-        timeout: 5000,
         message: `${part} view never adopted the ${theme} theme`,
       }
     )
@@ -479,6 +476,5 @@ const SURFACE_STEPS: Steps = [
 ]
 
 test('every extension view and core screen renders styled, reads in both themes and lines up', async () => {
-  test.setTimeout(300_000)
   for (const [title, body] of SURFACE_STEPS) await test.step(title, body)
 })

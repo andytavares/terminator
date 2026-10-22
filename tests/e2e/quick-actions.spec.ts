@@ -26,7 +26,7 @@ function dialog(page: Page) {
 async function openPanel(page: Page): Promise<void> {
   await page.keyboard.press('ControlOrMeta+p')
   const d = dialog(page)
-  await expect(d).toBeVisible({ timeout: 10000 })
+  await expect(d).toBeVisible()
   // Keys sent before the panel owns focus land in the terminal underneath.
   await expect(d.locator(':focus')).toHaveCount(1)
   await expectCentredInWindow(d, 'Quick actions')
@@ -147,7 +147,7 @@ async function leaderTDSplitsAndTeachesShortcut(page: Page): Promise<void> {
   await page.keyboard.press('t')
   await page.keyboard.press('d')
   await expect(dialog(page)).toBeHidden()
-  await expect(page.locator('.xterm').filter({ visible: true })).toHaveCount(2, { timeout: 15000 })
+  await expect(page.locator('.xterm').filter({ visible: true })).toHaveCount(2)
   await expect(page.locator('.tmui-toast__message', { hasText: 'Next time' })).toContainText(
     'Next time: ⌘D'
   )
@@ -213,10 +213,9 @@ async function gitPushCatchesOriginUp(page: Page, workDir: string): Promise<void
   await expect(page.getByRole('listbox', { name: 'Git' })).toBeVisible()
   await expect(page.getByRole('option', { name: /^p Push/ })).toBeVisible()
   await page.keyboard.press('p')
-  await expect(dialog(page)).toBeHidden({ timeout: 10000 })
+  await expect(dialog(page)).toBeHidden()
   await expect(page.locator('.tmui-toast__message', { hasText: 'Pushed' })).toContainText(
-    'Pushed main to origin',
-    { timeout: 15000 }
+    'Pushed main to origin'
   )
   git(workDir, 'fetch', 'origin')
   expect(git(workDir, 'rev-parse', 'origin/main')).toBe(headBefore)
@@ -251,10 +250,9 @@ async function customShellActionEchoesBranch(page: Page, workDir: string): Promi
   await page.keyboard.press('x')
   await page.keyboard.press('e')
   await expect(dialog(page)).toBeHidden()
-  await expect(tabs).toHaveCount(tabsBefore + 1, { timeout: 15000 })
+  await expect(tabs).toHaveCount(tabsBefore + 1)
   await expect
     .poll(() => (existsSync(echoed) ? readFileSync(echoed, 'utf8').trim() : ''), {
-      timeout: 15000,
       message: 'the new tab never echoed the branch name',
     })
     .toBe('main')
@@ -303,7 +301,7 @@ async function runGroupRow(
   await expect(page.getByRole('listbox', { name: group.label })).toBeVisible()
   await page.keyboard.press(rowKey)
   // Generous: the first time an extension's view is created it can cold-load.
-  await expect(dialog(page)).toBeHidden({ timeout: 15000 })
+  await expect(dialog(page)).toBeHidden()
 }
 
 // AC6: Notepad's and Task Vault's manifest commands.
@@ -317,13 +315,12 @@ async function extensionCommandsOpenTheirOverlays(handle: AppHandle): Promise<vo
           'notepad',
           `!!document.querySelector('dialog[open][aria-label="New note"]')`
         ).catch(() => false),
-      { timeout: 15000, message: 'Notepad quick-create overlay never appeared' }
+      { message: 'Notepad quick-create overlay never appeared' }
     )
     .toBe(true)
   await runGroupRow(handle.page, { key: 'v', label: 'Task Vault' }, 'c')
   await expect
     .poll(() => inView<string>(handle, 'task-vault', `document.body.innerText`).catch(() => ''), {
-      timeout: 15000,
       message: 'Task Vault capture overlay never appeared',
     })
     .toContain('Capture to Inbox')
@@ -334,14 +331,13 @@ async function notesViewFocused(handle: AppHandle): Promise<void> {
   const notesPanel = handle.page.locator('[data-extension-panel="terminator.notepad"]')
   if ((await notesPanel.count()) === 0)
     await handle.page.locator('button[aria-label="Notes"]').click()
-  await expect(notesPanel).toHaveCount(1, { timeout: 10000 })
+  await expect(notesPanel).toHaveCount(1)
   await expect
     .poll(
       () =>
         extensionFrame(handle, 'notepad')
           ?.evaluate(() => document.readyState === 'complete')
-          .catch(() => false) ?? false,
-      { timeout: 15000 }
+          .catch(() => false) ?? false
     )
     .toBe(true)
   await extensionFrame(handle, 'notepad')!.evaluate(() => (document.body as HTMLElement).focus())
@@ -353,7 +349,7 @@ async function leaderInsideNotesOpensPanel(handle: AppHandle): Promise<void> {
   const notesPanel = page.locator('[data-extension-panel="terminator.notepad"]')
   await notesViewFocused(handle)
   await page.keyboard.press('ControlOrMeta+p')
-  await expect(dialog(page)).toBeVisible({ timeout: 10000 })
+  await expect(dialog(page)).toBeVisible()
   // Escape pressed before focus has moved into the panel from the extension's view closes nothing.
   await expect(dialog(page).locator(':focus')).toHaveCount(1)
   await closePanel(page)
@@ -371,7 +367,6 @@ async function withExtensions(handle: AppHandle): Promise<void> {
 }
 
 test('Quick Actions drive the app from anywhere, and remember what was pinned', async () => {
-  test.setTimeout(180_000)
   let handle: AppHandle | undefined = await launchApp()
   try {
     const profile = handle.userDataDir

@@ -54,7 +54,6 @@ async function foundry(channel: string, payload: unknown = {}): Promise<unknown>
 test.skip(REMOTE === '', 'set LIVE_REMOTE to run this')
 
 test.beforeAll(async () => {
-  test.setTimeout(300_000)
   repo = e2eTempDir('foundry-live-sensors-')
   execFileSync('git', ['clone', REMOTE, repo])
   git('config', 'user.email', 'live@example.com')
@@ -187,9 +186,7 @@ async function inboxTextAndShot(): Promise<{ text: string; png: string }> {
 async function expectSignalInInbox(red: SignalRow | undefined): Promise<void> {
   await handle.page.locator('button[aria-label="Foundry"]').click()
   await expect
-    .poll(async () => (await inboxTextAndShot().catch(() => ({ text: '' }))).text, {
-      timeout: 60_000,
-    })
+    .poll(async () => (await inboxTextAndShot().catch(() => ({ text: '' }))).text)
     .toContain(red?.title as string)
   const inbox = await inboxTextAndShot()
   mkdirSync('test-results', { recursive: true })
@@ -219,7 +216,6 @@ async function expectPromotedToDraft(red: SignalRow | undefined): Promise<void> 
 
 test('a failing branch becomes one ranked signal, and promoting it starts nothing', async () => {
   test.skip(BRANCH === '', 'set LIVE_SENSOR_BRANCH to a branch with failed runs')
-  test.setTimeout(600_000)
 
   writeBranchSensor()
   await enableAndRunSensor()
