@@ -16,6 +16,7 @@ import {
 } from '../../src/review/review-agent.js'
 import type { AgentScope } from '../../src/schemas/review-agent.schema.js'
 import { FINDING_SEVERITIES } from '../../src/schemas/review-agent.schema.js'
+import { eventually } from '../../../../tests/support/eventually'
 
 type SpawnFn = NonNullable<RunAgentReviewDeps['spawn']>
 /** What an EventEmitter calls back with; SpawnedProcess.on takes one per event. */
@@ -261,7 +262,7 @@ async function startFakeRun(input: RunAgentReviewInput = baseInput) {
   const spawn = vi.fn((..._args: Parameters<SpawnFn>) => fake)
   const { done, cancel } = runAgentReview(input, { exec, spawn, resolveClaude })
   // the diff/prompt build settles before the process "runs"
-  await vi.waitFor(() => expect(spawn).toHaveBeenCalled())
+  await eventually(() => expect(spawn).toHaveBeenCalled())
   return { fake, spawn, done, cancel }
 }
 
@@ -409,7 +410,7 @@ describe('runAgentReview — cancelling', () => {
     )
     const spawn = vi.fn()
     const { done, cancel } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(exec.mock.calls.some(([, args]) => args[0] === 'diff')).toBe(true)
     )
     cancel()
@@ -499,7 +500,7 @@ async function startFakeSummary(input: RunSummaryInput = summaryInput) {
   const fake = makeFakeProcess()
   const spawn = vi.fn((..._args: Parameters<SpawnFn>) => fake)
   const { done, cancel } = runSummary(input, { spawn, resolveClaude })
-  await vi.waitFor(() => expect(spawn).toHaveBeenCalled())
+  await eventually(() => expect(spawn).toHaveBeenCalled())
   return { fake, spawn, done, cancel }
 }
 

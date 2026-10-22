@@ -313,5 +313,5 @@ describe('loadLocalInventory over real git', () => {
     expect(detached).toMatchObject({ worktreePath: agent, isAgent: true })
     expect(detached!.createdAt).not.toBeNull()
     expect(byBranch('feature-merged')!.createdAt).not.toBeNull()
-  }, 20000)
+  })
 })

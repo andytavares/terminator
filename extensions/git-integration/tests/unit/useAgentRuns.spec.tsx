@@ -3,6 +3,7 @@ import { renderHook } from '@testing-library/react'
 import { useAgentRuns } from '../../src/hooks/useAgentRuns'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
 import type { AgentRun } from '../../src/schemas/review-agent.schema'
+import { eventually } from '../../../../tests/support/eventually'
 
 const mockList = vi.fn()
 const mockOnEvent = vi.fn()
@@ -105,10 +106,10 @@ describe('useAgentRuns', () => {
     const pr = makePr()
     renderHook(() => useAgentRuns('/repo', pr))
 
-    await vi.waitFor(() => {
+    await eventually(() => {
       expect(mockList).toHaveBeenCalledWith('/repo', 42, 'abc123')
     })
-    await vi.waitFor(() => {
+    await eventually(() => {
       expect(mockSetAgentRuns).toHaveBeenCalledWith([listedRun])
     })
   })

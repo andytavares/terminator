@@ -125,9 +125,9 @@ describe("a remote-accessible channel's repoRoot", () => {
       const refused = await dispatchChannel({ ...spec, run }, 42)
       for (const root of [dirs.outside, join(dirs.project, 'escape'), '/']) {
         const answer = await dispatchChannel({ ...spec, run }, payloadAt(root))
-        expect(answer, `${spec.channel} at ${root}`).toEqual(refused)
+        expect(answer).toEqual(refused)
       }
-      expect(run, `${spec.channel} ran outside the workspace`).not.toHaveBeenCalled()
+      expect(run).not.toHaveBeenCalled()
     }
   })
 })
@@ -144,7 +144,7 @@ describe("a remote-accessible channel's repoRoot — inside the workspace", () =
       if (!payloadAt) continue
       const run = vi.fn()
       for (const root of roots) await dispatchChannel({ ...spec, run }, payloadAt(root))
-      expect(run, spec.channel).toHaveBeenCalledTimes(roots.length)
+      expect(run).toHaveBeenCalledTimes(roots.length)
     }
   })
 })

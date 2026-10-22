@@ -5,6 +5,7 @@ import { partialFake } from '../../../../tests/support/fakes'
 import { createHomePublisher, HOME_REFRESH_MS, MERGED_REFRESH_MS } from '../../src/home/publisher'
 import { buildContributionCalendar } from '../../src/review/contribution-calendar'
 import { dashboardPrFixture } from './support/dashboard-pr'
+import { eventually } from '../../../../tests/support/eventually'
 
 const issue = (key: string, tracker: 'linear' | 'jira' = 'linear') => ({ key, tracker })
 
@@ -77,7 +78,7 @@ describe('dashboard refresh: tickets', () => {
       repoRoot: '/work/widgets',
       branch: 'tav-20-pr-overview',
     })
-    await vi.waitFor(() => expect(published).toHaveLength(2))
+    await eventually(() => expect(published).toHaveLength(2))
     expect(published[1].asks[0].workKey).toEqual({ tracker: 'linear', key: 'TAV-20' })
   })
 })

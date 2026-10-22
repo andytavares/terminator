@@ -39,7 +39,7 @@ async function renderDiff(
 // than one test's 5 s; load it once here so every test times only its own work.
 beforeAll(async () => {
   await import('../../src/components/FileDiffView')
-}, 60_000)
+})
 
 describe('FileDiffView', () => {
   it('shows empty state when diff is null', async () => {

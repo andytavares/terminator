@@ -508,7 +508,7 @@ function useOneRowViewport() {
 // than one test's 5 s; load it once here so every test times only its own work.
 beforeAll(async () => {
   await import('../../src/components/pr-review/ReviewDiffPane')
-}, 60_000)
+})
 
 describe('ReviewDiffPane', () => {
   it('renders file path in header', async () => {
