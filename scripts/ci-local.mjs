@@ -9,7 +9,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { installIfLockChanged } from './ci-install.mjs'
-import { planFor, readWorkflow, SKIPPED_JOBS } from './ci-plan.mjs'
+import { artifactPaths, planFor, readWorkflow, SKIPPED_JOBS } from './ci-plan.mjs'
 import { startLinux } from './ci-linux.mjs'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -42,6 +42,22 @@ function runStep(step, { checkout, linux }) {
   return status === 0
 }
 
+/** `git clean` arguments that leave the checkout as a CI job starts it: node_modules, installed
+ * once here, and what CI hands between jobs as artifacts are all that stay. */
+export function cleanArguments(keep) {
+  return ['clean', '-fdxq', ...['node_modules', ...keep].flatMap((path) => ['-e', path])]
+}
+
+/** Each step, where CI runs it, from a checkout cleaned whenever a new job starts. */
+function runJobs(steps, { checkout, linux, keep }) {
+  let job = null
+  return steps.every((step) => {
+    if (step.job !== job) git(checkout, ...cleanArguments(keep))
+    job = step.job
+    return runStep(step, { checkout, linux })
+  })
+}
+
 function runChecks(checkout, { all }) {
   const workflow = readWorkflow(join(checkout, '.github/workflows/ci.yml'))
   const e2eStep = {
@@ -56,9 +72,8 @@ function runChecks(checkout, { all }) {
     nodeVersion: readFileSync(join(checkout, '.nvmrc'), 'utf8').trim(),
   })
   try {
-    return [...planFor(workflow, { all }), e2eStep].every((step) =>
-      runStep(step, { checkout, linux })
-    )
+    const steps = [...planFor(workflow, { all }), e2eStep]
+    return runJobs(steps, { checkout, linux, keep: artifactPaths(workflow) })
   } finally {
     linux.stop()
   }

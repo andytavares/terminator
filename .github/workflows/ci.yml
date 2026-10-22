@@ -163,6 +163,9 @@ jobs:
       - name: Install Chromium
         run: npx playwright install chromium
 
+      - name: Build Storybook
+        run: npm run build-storybook
+
       - name: Compare story screenshots
         run: npm run test:visual -w @terminator/extension-ui -- --update-snapshots=none
 

@@ -3,6 +3,7 @@ import {
   NOT_RUN_HERE,
   checkEnvironment,
   checksPushes,
+  cleanArguments,
   lockHash,
   needsInstall,
   nodeMismatch,
@@ -148,5 +149,20 @@ describe('publishing the local-check status once GitHub has the commit', () => {
       false
     )
     expect(post).not.toHaveBeenCalled()
+  })
+})
+
+describe('the checkout between jobs', () => {
+  it('is cleaned as a fresh one, keeping node_modules and what CI hands on as artifacts', () => {
+    expect(cleanArguments(['.vitest-reports', 'blob-report'])).toEqual([
+      'clean',
+      '-fdxq',
+      '-e',
+      'node_modules',
+      '-e',
+      '.vitest-reports',
+      '-e',
+      'blob-report',
+    ])
   })
 })

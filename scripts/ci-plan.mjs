@@ -97,3 +97,13 @@ export function planFor(workflow, { all = false } = {}) {
 export function e2eShardCount(workflow) {
   return workflow.jobs.e2e.strategy.matrix.shard.length
 }
+
+/** What CI hands from one job to another, as artifacts each job uploads or downloads: in ci:local,
+ * where the jobs share one checkout, the only files that outlive a job. */
+export function artifactPaths(workflow) {
+  const steps = Object.values(workflow.jobs).flatMap((job) => job.steps ?? [])
+  const paths = steps
+    .filter((step) => /^actions\/(upload|download)-artifact@/.test(step.uses ?? ''))
+    .map((step) => String(step.with?.path ?? '').replace(/\/$/, ''))
+  return [...new Set(paths.filter(Boolean))]
+}

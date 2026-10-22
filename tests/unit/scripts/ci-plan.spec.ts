@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { e2eShardCount, planFor, readWorkflow, SKIPPED_JOBS } from '../../../scripts/ci-plan.mjs'
+import {
+  artifactPaths,
+  e2eShardCount,
+  planFor,
+  readWorkflow,
+  SKIPPED_JOBS,
+} from '../../../scripts/ci-plan.mjs'
 
 const REPO_ROOT = resolve(__dirname, '../../..')
 const workflow = readWorkflow(resolve(REPO_ROOT, '.github/workflows/ci.yml'))
@@ -53,6 +59,25 @@ describe('where ci:local runs a step', () => {
 
   it('reads the number of e2e shards from the e2e job, for the local e2e run', () => {
     expect(e2eShardCount(workflow)).toBe(3)
+  })
+})
+
+// Each CI job starts from a fresh checkout; ci:local's jobs share one. The story screenshots
+// passed here on the Storybook the Linux job had built, and failed in CI, which had none.
+describe('what one job hands the next', () => {
+  it('is only what CI uploads as an artifact', () => {
+    expect(artifactPaths(workflow)).toEqual(
+      expect.arrayContaining(['.vitest-reports', 'blob-report', 'test-results'])
+    )
+    expect(artifactPaths(workflow)).not.toContain('storybook-static')
+  })
+
+  it('builds Storybook in the job that compares its screenshots', () => {
+    const steps = stepsOf('story-screenshots').map((step) => step.name)
+    expect(steps.indexOf('Build Storybook')).toBeGreaterThan(-1)
+    expect(steps.indexOf('Build Storybook')).toBeLessThan(
+      steps.indexOf('Compare story screenshots')
+    )
   })
 })
 
