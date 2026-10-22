@@ -5,7 +5,7 @@ import { testEnvironment } from '../../scripts/test-env.mjs'
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 
 /** Stand-ins for `claude`, `gh` and `ngrok`, first on the app's PATH so no run starts a real one. */
-export const STUB_BIN_DIR = join(FIXTURES, 'bin')
+const STUB_BIN_DIR = join(FIXTURES, 'bin')
 
 /**
  * A minimal zsh config the app's terminals read instead of the developer's. Terminals are login

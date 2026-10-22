@@ -117,7 +117,8 @@ function announceInBackground(
 }
 
 /** Settles when every issue-context notice a created terminal started has been sent, or has been
- * found to have nothing to send. */
+ * found to have nothing to send. The signal a spec awaits instead of a tick (ADR 123).
+ * @internal */
 export async function issueContextAnnounced(): Promise<void> {
   await Promise.all(announcements)
 }

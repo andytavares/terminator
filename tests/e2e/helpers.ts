@@ -244,7 +244,7 @@ export async function launchApp(
 
 /** Resolves once the main process announces `kind` for `subject` (src/main/e2e-readiness.ts):
  * a window's id for `drawn` and `focused`, `<extension id>:<view>` for `ready`. */
-export function untilAnnounced(
+function untilAnnounced(
   app: ElectronApplication,
   kind: 'drawn' | 'focused' | 'ready',
   subject: string
