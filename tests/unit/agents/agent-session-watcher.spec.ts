@@ -5,6 +5,18 @@ import * as path from 'node:path'
 import type { SessionRecord } from '../../../src/shared/types/index'
 import { makeTempDir } from '../../support/temp-dir'
 
+// Every watch the code under test opens, so a test can wait for one to close.
+const watchers = vi.hoisted(() => [] as import('node:fs').FSWatcher[])
+vi.mock('node:fs', async (importOriginal) => {
+  const real = await importOriginal<typeof import('node:fs')>()
+  const watch = ((...args: Parameters<typeof real.watch>) => {
+    const watcher = real.watch(...args)
+    watchers.push(watcher)
+    return watcher
+  }) as typeof real.watch
+  return { ...real, default: { ...real, watch }, watch }
+})
+
 let userData: string
 
 vi.mock('electron', () => ({ app: { getPath: () => userData } }))
@@ -160,16 +172,15 @@ describe('the agent session watcher — unplaceable reports and stopping', () =>
 describe('the agent session watcher — stopping', () => {
   it('stops watching when told to', async () => {
     const mod = await load()
+    watchers.length = 0
     const off = mod.startAgentSessionWatcher({ snapshotFor: (id) => snapshot(id) })
+    // A closed watch delivers nothing more: its own close event is the signal, not time.
+    const closed = watchers.map((watcher) => once(watcher, 'close'))
     off()
     stop = undefined
-    // A watch of the test's own sees the write at the moment a live watcher would.
-    fs.mkdirSync(dir, { recursive: true })
-    const observer = fs.watch(dir)
-    const written = once(observer, 'change')
+    await Promise.all(closed)
     await write('sess-1', 'conv-1')
-    await written
-    observer.close()
+    expect(closed.length).toBeGreaterThan(0)
     expect(recorded).toEqual([])
     expect(fs.readdirSync(dir)).toEqual(['sess-1.json'])
   })
