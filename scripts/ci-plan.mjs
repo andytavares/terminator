@@ -9,7 +9,6 @@ import yaml from 'js-yaml'
 export const SKIPPED_JOBS = {
   select:
     'the unit step runs the same scripts/test-select.mjs, and scripts/ci-e2e-local.mjs the e2e one',
-  'update-baselines': 'it rewrites the story baselines on a pull request label, and uploads them',
   e2e: 'scripts/ci-e2e-local.mjs runs its five shards, step for step',
   'e2e-result': 'it only reads the results of the jobs above',
   'e2e-report': 'it only merges the e2e reports into one HTML page',

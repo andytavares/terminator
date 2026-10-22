@@ -129,45 +129,11 @@ jobs:
 
       # Screenshots of every story against the macOS baselines in
       # packages/extension-ui/visual/__screenshots__/darwin (ADR 098). A story with no
-      # baseline fails, here and locally alike; the update-baselines job writes it.
+      # baseline fails, here and locally alike; the `update-story-baselines` label writes it
+      # (.github/workflows/story-baselines.yml).
       - name: Compare story screenshots
         run: npm run test:visual -w @terminator/extension-ui -- --update-snapshots=none
         timeout-minutes: 5
-
-  # Rewrites every baseline on a macOS runner when a pull request carries the label
-  # `update baselines`, and keeps them as an artifact to commit: nothing is pushed.
-  update-baselines:
-    name: Update story baselines
-    if: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'update baselines') }}
-    runs-on: macos-26
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Chromium
-        run: npx playwright install chromium
-
-      - name: Build Storybook
-        run: npm run build-storybook
-
-      - name: Rewrite the baselines
-        run: npm run test:visual -w @terminator/extension-ui -- --update-snapshots=all
-        timeout-minutes: 5
-
-      - name: Upload the baselines
-        uses: actions/upload-artifact@v4
-        with:
-          name: story-baselines-macos
-          path: packages/extension-ui/visual/__screenshots__/darwin/
-          retention-days: 14
 
   # Which tests this change can reach (scripts/test-select.mjs, ADR 123): the same command
   # runs locally. Unit and E2E wait for it and run only what it names, or everything.

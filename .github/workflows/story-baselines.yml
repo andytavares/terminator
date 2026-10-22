@@ -1,6 +1,6 @@
 name: Story baselines
 
-# Writes the macOS screenshot baselines for stories that have none and commits
+# Writes the macOS screenshot baselines for stories that have none or that changed, and commits
 # them to the pull request's branch (ADR 098). Baselines are per platform, so
 # they are made on the platform that compares them
 # (https://playwright.dev/docs/test-snapshots). Runs only when a maintainer adds
@@ -23,7 +23,7 @@ jobs:
     if: >-
       github.event.label.name == 'update-story-baselines' &&
       github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: macos-14
+    runs-on: macos-26
     permissions:
       contents: write
       pull-requests: write
@@ -53,7 +53,7 @@ jobs:
       # a failure, so the step may fail and the commit still runs; the Stories
       # check in ci.yml is the comparison that gates the pull request.
       - name: Write missing baselines
-        run: npm run test:visual -w @terminator/extension-ui -- --update-snapshots=missing
+        run: npm run test:visual -w @terminator/extension-ui -- --update-snapshots=changed
         timeout-minutes: 5
         continue-on-error: true
 

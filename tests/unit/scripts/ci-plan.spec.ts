@@ -70,7 +70,7 @@ describe('what a step becomes', () => {
     expect(audit).toContain('npm audit --audit-level=high')
   })
 
-  it('runs every unit spec once, in a fixed order: no shuffle, seed or second pass', () => {
+  it('runs every unit spec once, with the order from vitest.config.ts: no second pass, no seed of its own', () => {
     const scripts = plan.map((step) => step.script).join('\n')
     expect(scripts).not.toMatch(/--sequence\.(shuffle|seed)|--repeat|--changed/)
     expect(plan.filter((step) => /\bvitest run\b(?!.*--merge-reports)/.test(step.script))).toEqual([
@@ -112,9 +112,11 @@ describe('the deterministic workflow, outside services and baselines', () => {
     expect(stepsOf('stories').map((step) => step.name)).not.toContain('Upload new baselines')
   })
 
-  it('rewrites baselines only on the label, in a job ci:local skips', () => {
-    expect(workflow.jobs['update-baselines'].if).toContain('update baselines')
-    expect(SKIPPED_JOBS).toHaveProperty('update-baselines')
+  it('writes baselines only in the labelled workflow, on the macOS image CI compares on', () => {
+    const baselines = readWorkflow(resolve(REPO_ROOT, '.github/workflows/story-baselines.yml'))
+    const job = baselines.jobs.baselines
+    expect(job['runs-on']).toBe(workflow.jobs.stories['runs-on'])
+    expect(JSON.stringify(job.steps)).toContain('--update-snapshots=changed')
   })
 
   it('runs on a label change, so test: all takes effect', () => {
