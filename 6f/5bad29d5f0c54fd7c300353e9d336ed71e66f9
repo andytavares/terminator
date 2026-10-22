@@ -1,0 +1,21 @@
+tests/unit/testing-library-wait.spec.tsx
+  s_f6f18e5557b141::t_b6f39560a7df55 1-11
+tests/setup.ts
+  s_f6f18e5557b141::t_dcab2cc96c4fac 4,26-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6f5bad29d5f0c54fd7c300353e9d336ed71e66f9",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
