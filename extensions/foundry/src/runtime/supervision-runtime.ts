@@ -9,6 +9,7 @@ import { createSupervision, type Supervision } from './supervision.js'
 import { createMuteStore } from './feed/mutes.js'
 import { recordTools } from '../factory/timeline-store.js'
 import type { StallFiring } from './evaluate-stall.js'
+import type { ToolActivity } from './transcript-tailer.js'
 
 import { announceLive, orderStoreAt } from '../state/live-index.js'
 import { stallShadowMode } from '../state/settings.js'
@@ -51,6 +52,21 @@ export async function recordStall(
   }
 }
 
+// Recordings of tool calls begun by a stall-watcher tick and not yet written, so stopping
+// the runtime can wait for them.
+const recordingsInFlight = new Set<Promise<void>>()
+
+function recordToolsInFlight(
+  featureDir: string,
+  sessionId: string,
+  activity: readonly ToolActivity[]
+): void {
+  const recording = recordTools(featureDir, sessionId, activity)
+    .catch(() => {})
+    .finally(() => recordingsInFlight.delete(recording))
+  recordingsInFlight.add(recording)
+}
+
 // Brings up the control server, runner, supervision layer and stall detector, and
 // returns the layer; null when it cannot start, so phases run unsupervised and
 // surfaces read empty rather than throw.
@@ -79,16 +95,16 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
     startPaletteRefresh(api)
     return runtime.supervision
   } catch (error) {
-    runtimeUnavailable(api, error)
+    await runtimeUnavailable(api, error)
     return null
   }
 }
 
 // Without the runtime, phases fall back to the headless spawn. Said out loud: it
 // decides whether tool calls are asked about or approved silently.
-function runtimeUnavailable(api: ExtensionAPI, error: unknown): void {
+async function runtimeUnavailable(api: ExtensionAPI, error: unknown): Promise<void> {
   api.log.error('supervised runtime unavailable — phases will run unsupervised', error)
-  closeHalfStartedRuntime()
+  await closeHalfStartedRuntime()
   api.notifications.showToast(
     'error',
     'Supervision could not start — phases will run unsupervised, approving their own tool calls',
@@ -99,14 +115,15 @@ function runtimeUnavailable(api: ExtensionAPI, error: unknown): void {
 // Close what was opened. A failure after the control server bound left it
 // listening on a port nothing would ever answer on, and nothing would ever
 // close it either.
-function closeHalfStartedRuntime(): void {
-  void runtime.control?.close()
+async function closeHalfStartedRuntime(): Promise<void> {
+  const controlClosed = runtime.control?.close()
   runtime.control = null
   runtime.supervisedRunner?.dispose()
   runtime.supervisedRunner = null
   runtime.stallWatcher?.stop()
   runtime.stallWatcher = null
   runtime.supervision = null
+  await controlClosed
 }
 
 function watchForStalls(api: ExtensionAPI, runner: SupervisedRunner): StallWatcher {
@@ -119,7 +136,7 @@ function watchForStalls(api: ExtensionAPI, runner: SupervisedRunner): StallWatch
     // Each tool call, recorded once, beside the order's run graph — what the
     // Factory view plays back after the fact.
     onActivity: (run, activity) => {
-      void recordTools(run.featureDir, run.sessionId, activity).catch(() => {})
+      recordToolsInFlight(run.featureDir, run.sessionId, activity)
     },
     netChangeSince: (sessionId) => {
       const diff = runtime.supervision?.runs.get(sessionId)?.diff
@@ -176,8 +193,9 @@ function onStallFiring(api: ExtensionAPI, firing: StallFiring, featureDir: strin
   })
 }
 
-/** Everything `startSupervisionRuntime` brought up, taken down again. */
-export function stopSupervisionRuntime(): void {
+/** Everything `startSupervisionRuntime` brought up, taken down again; settles once the control
+ * server has closed and the recordings in flight are written. */
+export async function stopSupervisionRuntime(): Promise<void> {
   runtime.supervision = null
   runtime.mutes = null
   for (const notification of raisedNotifications.values()) notification.dispose()
@@ -187,6 +205,7 @@ export function stopSupervisionRuntime(): void {
   stopPaletteRefresh()
   runtime.supervisedRunner?.dispose()
   runtime.supervisedRunner = null
-  void runtime.control?.close()
+  const controlClosed = runtime.control?.close()
   runtime.control = null
+  await Promise.all([controlClosed, ...recordingsInFlight])
 }

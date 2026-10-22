@@ -86,7 +86,7 @@ export async function deactivate(): Promise<void> {
   const sensorsStopped = stopSensorTick()
   const refineryStopped = stopRefineryTick()
   clearPendingNewOrder()
-  stopSupervisionRuntime()
+  const supervisionStopped = stopSupervisionRuntime()
   // Last, so everything else is already stopped while a read or a tick in flight ends.
-  await Promise.all([homeStopped, sensorsStopped, refineryStopped])
+  await Promise.all([homeStopped, sensorsStopped, refineryStopped, supervisionStopped])
 }
