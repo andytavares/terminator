@@ -39,10 +39,9 @@ function stopLiveAgents(nodes: readonly RunNode[], reason: string): string[] {
 export async function stopOrder(root: string, orderId: string, reason: string): Promise<void> {
   const store = orderStoreAt(root)
   const stopped = stopLiveAgents((await readGraph(root, orderId))?.nodes ?? [], reason)
-  const order = await store.load(orderId)
-  if (order !== null && order.status === 'running') {
-    await store.save({ ...order, status: 'cancelled' })
-  }
+  await store.update(orderId, (order) =>
+    order.status === 'running' ? { ...order, status: 'cancelled' } : order
+  )
   await store.record({
     at: new Date().toISOString(),
     orderId,

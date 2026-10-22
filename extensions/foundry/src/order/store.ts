@@ -24,6 +24,11 @@ export interface OrderStore {
   findByIssue(tracker: string, key: string): Promise<{ id: string; title: string } | null>
   record(entry: LedgerEntry): Promise<void>
   /**
+   * Changes the order as it is now, never a copy loaded earlier, after any update to the same
+   * order already under way; null when there is no such order.
+   */
+  update(id: string, change: (latest: WorkOrder) => WorkOrder): Promise<WorkOrder | null>
+  /**
    * This order's ledger, oldest first.
    *
    * Reading it back is not bookkeeping. Some of what happens to an order is
@@ -54,6 +59,7 @@ export function createLiveOrderStore(
     findByIssue: (tracker, key) => orderStore().findByIssue(tracker, key),
     record: (entry) => orderStore().record(entry),
     entries: (orderId) => orderStore().entries(orderId),
+    update: (id, change) => orderStore().update(id, change),
   }
 }
 
@@ -81,7 +87,41 @@ export function createOrderStore(root: string, index?: FoundryIndex): OrderStore
     entries(orderId) {
       return index === undefined ? readEntries(ledgerPath(root, orderId)) : index.ledger(orderId)
     },
+    update: (id, change) => updateOrder({ root, index }, id, change),
   }
+}
+
+// The update last queued for each order, by its directory: every store over the same root
+// queues behind it, so no update reads an order another is about to replace.
+const updatesInFlight = new Map<string, Promise<unknown>>()
+
+function updateOrder(
+  at: { root: string; index?: FoundryIndex },
+  id: string,
+  change: (latest: WorkOrder) => WorkOrder
+): Promise<WorkOrder | null> {
+  const key = orderDir(at.root, id)
+  const queued = (updatesInFlight.get(key) ?? Promise.resolve()).then(() =>
+    applyUpdate(at, id, change)
+  )
+  const settled = queued.catch(() => undefined)
+  updatesInFlight.set(key, settled)
+  void settled.then(() => {
+    if (updatesInFlight.get(key) === settled) updatesInFlight.delete(key)
+  })
+  return queued
+}
+
+async function applyUpdate(
+  at: { root: string; index?: FoundryIndex },
+  id: string,
+  change: (latest: WorkOrder) => WorkOrder
+): Promise<WorkOrder | null> {
+  const latest = at.index === undefined ? await readOrder(at.root, id) : await at.index.order(id)
+  if (latest === null) return null
+  const next = change(latest)
+  await persistOrder(at.root, next, at.index)
+  return next
 }
 
 async function persistOrder(root: string, order: WorkOrder, index?: FoundryIndex): Promise<void> {

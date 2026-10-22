@@ -94,9 +94,15 @@ export async function executeOrderRun(api: ExtensionAPI, run: OrderRun): Promise
 
 // An order from before profiles runs with what its repository's profile resolves to, kept.
 async function withEnvironment(run: OrderRun): Promise<OrderRun> {
-  const order = await withProfileEnvironment(run.root, run.order)
-  if (order !== run.order) await orderStoreAt(run.root).save(order)
-  return { ...run, order }
+  const resolved = await withProfileEnvironment(run.root, run.order)
+  if (resolved === run.order) return run
+  // Onto the order as it is now: a stop that landed meanwhile is kept.
+  const { environment } = resolved.context
+  const order = await orderStoreAt(run.root).update(run.order.id, (latest) => ({
+    ...latest,
+    context: { ...latest.context, environment },
+  }))
+  return { ...run, order: order ?? resolved }
 }
 
 async function prepareRun(api: ExtensionAPI, run: OrderRun): Promise<RunTail> {
@@ -296,7 +302,7 @@ async function endedOnDocument(tail: RunTail, outcome: RunOutcome): Promise<bool
 // A run that ended on a ready document is finished: no pull request follows it.
 async function shipDocument(tail: RunTail, latest: WorkOrder): Promise<void> {
   const { root, order, store } = tail
-  await store.save({ ...latest, status: 'shipped' })
+  await store.update(latest.id, (now) => ({ ...now, status: 'shipped' }))
   if (latest.document === null) return
   await writeBack(
     latest,
@@ -320,11 +326,7 @@ async function shipFinishedRun(
 
   if (shipped === null || shipped.held || shipped.pulls.length === 0) return
 
-  await store.save({
-    ...order,
-    document: (await store.load(order.id))?.document ?? order.document,
-    status: 'shipped',
-  })
+  await store.update(order.id, (latest) => ({ ...latest, status: 'shipped' }))
 }
 
 async function shipOnce(
