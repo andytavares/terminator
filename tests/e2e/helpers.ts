@@ -8,8 +8,8 @@ import {
 } from '@playwright/test'
 import { spawnSync, type ChildProcess } from 'node:child_process'
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { dirname, delimiter, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
+import { sealedAppEnvironment } from './e2e-environment'
 import { saveIpcTrace, startIpcTrace } from './ipc-trace'
 import { appProcessTree, expectNoProcessesLeft, launchMarker } from './leftover-processes'
 
@@ -54,51 +54,20 @@ function e2eProfileDir(): string {
   return e2eTempDir('profile-')
 }
 
-/**
- * A stand-in `claude` binary that prints its argv and idles until killed.
- * Prepended to PATH by `launchApp` so a spec — however it drives the app's
- * terminals — can never start a real Claude Code agent.
- */
-const CLAUDE_STUB_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'bin')
+/** The home directory of each profile's app, kept so a relaunch onto the same profile finds
+ * what the first launch wrote under `~/.claude`. */
+const homesByProfile = new Map<string, string>()
 
-/**
- * A minimal zsh config the app's terminals read instead of the developer's
- * real ~/.zshenv, ~/.zprofile and ~/.zshrc. Terminals are login shells
- * (`pty.spawn(opts.shell, ['-l'], …)`, src/main/terminal/pty-manager.ts) run
- * against whatever `terminal.defaultShell` resolves to, which defaults to
- * `process.env.SHELL` — on a developer machine that's zsh, and the
- * developer's own ~/.zshrc typically re-prepends `~/.local/bin` (where a
- * real `claude` lives) ahead of anything this harness puts on PATH. Pointing
- * ZDOTDIR here, at a shell that is forced to zsh, makes the fixture rc files
- * below the only ones a spawned terminal ever reads.
- */
-const CLAUDE_STUB_ZDOTDIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'zdotdir')
-
-/** The app's PATH: the `claude` stub, then the runner's own. */
-function e2ePath(): string {
-  return [CLAUDE_STUB_DIR, process.env.PATH ?? ''].join(delimiter)
-}
-
-/** The environment every e2e-launched Electron process gets. */
-function e2eEnv(): Record<string, string> {
-  // Electron's launch takes defined strings only; an unset variable is left out.
-  const inherited = Object.entries(process.env).filter(
-    (entry): entry is [string, string] => entry[1] !== undefined
-  )
-  return {
-    ...Object.fromEntries(inherited),
-    NODE_ENV: 'test',
-    PATH: e2ePath(),
-    // Pins terminal.defaultShell's process.env.SHELL fallback to zsh
-    // regardless of the developer's or CI runner's own $SHELL (CI's macOS
-    // runners default to bash), so ZDOTDIR below is guaranteed to apply.
-    SHELL: '/bin/zsh',
-    ZDOTDIR: CLAUDE_STUB_ZDOTDIR,
-    // Hidden windows that keep drawing, no Dock icon, no OS notifications
-    // (src/main/background-mode.ts): a run leaves the machine usable, and the
-    // real cursor, which Chromium reports to a window under it, never reaches one.
-    TERMINATOR_RUN_IN_BACKGROUND: '1',
+/** The environment every e2e-launched Electron process gets: sealed, with a home of its own
+ * under this run's root, so the app's writes to `~/.claude/settings.json` never reach the
+ * developer's and parallel workers never race on one file (ADR 123). */
+function e2eEnv(userDataDir: string): Record<string, string> {
+  let home = homesByProfile.get(userDataDir)
+  if (home === undefined) {
+    home = e2eTempDir('home-')
+    homesByProfile.set(userDataDir, home)
   }
+  return sealedAppEnvironment({ home, tmpdir: e2eTempDir('tmp-') })
 }
 
 /**
@@ -107,10 +76,9 @@ function e2eEnv(): Record<string, string> {
  * after a close just works. `env` adds to the app's environment, e.g. the
  * stub GitHub's (`tests/e2e/github-stub.ts`).
  */
-// Inside the 30s hook timeout, so a launch that hangs fails with the app's own
-// output instead of a bare "hook timeout exceeded" that says nothing about why.
-// What a failed launch spends after it must fit in the rest:
-// 25 s + 1 s reading the windows + 2.5 s to close + 1 s for a kill = 29.5 s.
+// Bounds a launch that hangs so it fails with the app's own output and its windows' state,
+// instead of a bare test timeout that says nothing about why. What a failed launch spends
+// after it: 1 s reading the windows + 2.5 s to close + 1 s for a kill.
 const LAUNCH_DEADLINE_MS = 25_000
 const WINDOW_STATE_READ_MS = 1000
 const FAILED_LAUNCH_CLOSE_MS = 2500
@@ -118,8 +86,7 @@ const FAILED_LAUNCH_CLOSE_MS = 2500
 /** Starts Electron on the profile, with the e2e environment beneath `env`. */
 function startElectron(
   userDataDir: string,
-  env: Record<string, string>,
-  timeout: number
+  env: Record<string, string>
 ): Promise<ElectronApplication> {
   return electron.launch({
     // closeApp SIGKILLs an app that will not close, and macOS then shows a
@@ -127,8 +94,7 @@ function startElectron(
     // which blocks startup until firstWindow times out. The argument domain
     // turns that restore off for this process only.
     args: ['.', `--user-data-dir=${userDataDir}`, '-ApplePersistenceIgnoreState', 'YES'],
-    env: { ...e2eEnv(), ...env },
-    timeout,
+    env: { ...e2eEnv(userDataDir), ...env },
   })
 }
 
@@ -144,13 +110,25 @@ function keepOutput(app: ElectronApplication): string[] {
   return output
 }
 
-/** The first window, once it shows the sidebar, within what is left of the launch. */
-async function firstReadyWindow(app: ElectronApplication, remaining: () => number): Promise<Page> {
+/** The first window, once it has drawn, holds Chromium focus and shows the sidebar. */
+async function firstReadyWindow(app: ElectronApplication): Promise<Page> {
   await startIpcTrace(app)
-  const page = await app.firstWindow({ timeout: remaining() })
-  await page.waitForLoadState('domcontentloaded', { timeout: remaining() })
-  await page.waitForSelector('.unified-sidebar', { timeout: remaining() })
+  const page = await app.firstWindow()
+  const windowId = String(await (await app.browserWindow(page)).evaluate((window) => window.id))
+  await Promise.all([
+    untilAnnounced(app, 'drawn', windowId),
+    untilAnnounced(app, 'focused', windowId),
+  ])
+  await expect(page.locator('.unified-sidebar')).toBeVisible()
   return page
+}
+
+/** Settles as `work` does, or fails once `ms` has passed: the launch's diagnostic bound. */
+function within<T>(ms: number, work: Promise<T>): Promise<T> {
+  const expired = deadline(ms).then(() =>
+    Promise.reject(new Error(`no answer within ${ms / 1000}s`))
+  )
+  return Promise.race([work, expired])
 }
 
 /** Stops an app that did not finish starting, and says what its windows were doing and what it printed. */
@@ -251,19 +229,35 @@ export async function launchApp(
   options: LaunchOptions = {}
 ): Promise<AppHandle> {
   if (options.hideSidebarOnHome !== true) seedSidebarShownOnHome(userDataDir)
-  const deadline = Date.now() + LAUNCH_DEADLINE_MS
   const marker = launchMarker()
-  const remaining = () => Math.max(1, deadline - Date.now())
-  const app = await startElectron(userDataDir, { ...env, ...marker.env }, remaining())
+  const app = await startElectron(userDataDir, { ...env, ...marker.env })
   const output = keepOutput(app)
   try {
-    const page = await firstReadyWindow(app, remaining)
+    const page = await within(LAUNCH_DEADLINE_MS, firstReadyWindow(app))
     emulateFocusInExtensionFrames(page)
     drawBeforePointerActions(page)
     return { app, page, userDataDir, launchId: marker.launchId }
   } catch (error) {
     throw await launchFailure(app, output, error)
   }
+}
+
+/** Resolves once the main process announces `kind` for `subject` (src/main/e2e-readiness.ts):
+ * a window's id for `drawn` and `focused`, `<extension id>:<view>` for `ready`. */
+export function untilAnnounced(
+  app: ElectronApplication,
+  kind: 'drawn' | 'focused' | 'ready',
+  subject: string
+): Promise<void> {
+  return app.evaluate(
+    (_electron, key) =>
+      (
+        globalThis as unknown as {
+          __terminatorE2E: { whenAnnounced(kind: string, subject: string): Promise<void> }
+        }
+      ).__terminatorE2E.whenAnnounced(key.kind, key.subject),
+    { kind, subject }
+  )
 }
 
 /** Resolves after `ms`: the losing side of a race that bounds a wait. */
@@ -366,7 +360,7 @@ export async function closeApp(
  */
 export async function createWorkspace(page: Page, name: string, folderPath: string): Promise<void> {
   await page.click('.sidebar-header__add')
-  await page.waitForSelector('.tmui-dialog__title')
+  await expect(page.locator('.tmui-dialog__title')).toBeVisible()
   await page.getByPlaceholder('My Workspace').fill(name)
   await page.getByPlaceholder('/path/to/folder').fill(folderPath)
   await page.click('.tmui-dialog__actions .tmui-button--primary')
@@ -445,7 +439,7 @@ export async function addAndSelectProject(
   // its first terminal, which now shows in the tab bar rather than the sidebar.
   await row.click()
   // Session tabs carry no role; the mounted terminal's input is the accessible sign a session opened.
-  await page.getByRole('textbox', { name: 'Terminal input' }).first().waitFor({ timeout: 15000 })
+  await page.getByRole('textbox', { name: 'Terminal input' }).first().waitFor()
 }
 
 /** Re-select an existing branch. */
@@ -471,7 +465,7 @@ const exactly = (text: string): RegExp =>
 export async function runQuickActionFromPanel(page: Page, label: string): Promise<void> {
   await page.locator('.app-band__entry[aria-label="Quick actions (⌘P)"]').click()
   const panel = quickActionsPanel(page)
-  await expect(panel.locator(':focus')).toHaveCount(1, { timeout: 10000 })
+  await expect(panel.locator(':focus')).toHaveCount(1)
   await page.keyboard.press('/')
   await page.keyboard.type(label)
   const row = panel
@@ -482,7 +476,7 @@ export async function runQuickActionFromPanel(page: Page, label: string): Promis
   await expect(row).toBeVisible()
   await untilDrawn(page)
   await row.click()
-  await expect(panel).toBeHidden({ timeout: 15000 })
+  await expect(panel).toBeHidden()
 }
 
 /** Resolves once the window has drawn what the page shows. The browser routes a click by the

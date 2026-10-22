@@ -42,6 +42,10 @@ const FIXED = {
  * The environment of one run. `home` and `tmpdir` are fresh directories the caller made for
  * it; `stubs` are directories put first on PATH (fake `claude`, `gh`). `inherited` is read only
  * for the allowlist above.
+ *
+ * @param {{ home: string, tmpdir: string, stubs?: string[] }} directories
+ * @param {NodeJS.ProcessEnv} [inherited]
+ * @returns {Record<string, string>}
  */
 export function testEnvironment({ home, tmpdir, stubs = [] }, inherited = process.env) {
   const passed = PASSED_THROUGH.filter((name) => inherited[name] !== undefined).map((name) => [
