@@ -1,0 +1,72 @@
+extensions/foundry/tests/forge/steps.spec.ts
+  s_f6f18e5557b141::t_6699996197192a 110-111
+extensions/foundry/src/forge/interview.ts
+  s_f6f18e5557b141::t_fe15701b6c4bcf 49-52
+  s_f6f18e5557b141::t_8ce07f9056df3e 35-37,42,46-48,56-59
+  s_f6f18e5557b141::t_196f7e26490b71 60
+extensions/foundry/tests/forge/interview.spec.ts
+  s_f6f18e5557b141::t_775f6c6f2052ec 95-96
+  s_f6f18e5557b141::t_8ce07f9056df3e 21-22,97-123
+  s_f6f18e5557b141::t_ce1d2074a98e0f 124
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_f6f18e5557b141::t_6699996197192a 88-89,170-179,932-933,944-945
+  s_f6f18e5557b141::t_775f6c6f2052ec 457
+  s_f6f18e5557b141::t_5490526b2a520a 3
+extensions/foundry/tests/order/compile.spec.ts
+  s_f6f18e5557b141::t_6699996197192a 161-162
+extensions/foundry/src/components/Forge.tsx
+  s_f6f18e5557b141::t_775f6c6f2052ec 1340,1342-1348,1350,1354,1357
+  s_f6f18e5557b141::t_e5521420f87022 207-210,224-226,228-233
+  s_f6f18e5557b141::t_bf350ee5127f3c 413,823,825,861,866,1309-1311,1330-1339,1341,1668,1673-1675,1696-1697,1699-1707,1709
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_f6f18e5557b141::t_6699996197192a 1713-1714
+  s_f6f18e5557b141::t_4aca0258231025 850-851,862-863,1926-1927
+  s_f6f18e5557b141::t_bedabe586ac20c 876-878,907,930,942,972,976,991,1197,1235,2202-2204
+  s_f6f18e5557b141::t_fe15701b6c4bcf 1057
+  s_f6f18e5557b141::t_0c746f5485c8a6 1060-1087
+  s_f6f18e5557b141::t_775f6c6f2052ec 833,880,882,1022-1023,1052,1101
+  s_f6f18e5557b141::t_591a0bfc27c4c6 879,881,883-895,1053-1056,1058-1059,1088-1100,1102,1146,1148,1161,1166
+extensions/foundry/tests/forge/review-loop.spec.ts
+  s_f6f18e5557b141::t_6699996197192a 237-238,360-361
+extensions/foundry/src/forge/autonomy.ts
+  s_f6f18e5557b141::t_dcfe7e5c5f7d27 42
+extensions/foundry/tests/components/needs-you.spec.tsx
+  s_f6f18e5557b141::t_bedabe586ac20c 181
+  s_f6f18e5557b141::t_6699996197192a 36-37,48-49
+extensions/foundry/tests/forge/autonomy.spec.ts
+  s_f6f18e5557b141::t_b7b6923a979af5 85
+extensions/foundry/tests/helpers/order-parts.ts
+  s_f6f18e5557b141::t_6699996197192a 51-52
+extensions/foundry/src/ipc/forge-channels.ts
+  s_f6f18e5557b141::t_8ce07f9056df3e 67-69
+  s_f6f18e5557b141::t_fe15701b6c4bcf 81,93
+extensions/foundry/src/components/foundry.css
+  s_f6f18e5557b141::t_114a4451dcc2ba 608,631
+extensions/foundry/src/forge/converge.ts
+  s_f6f18e5557b141::t_114a4451dcc2ba 206-207
+  s_f6f18e5557b141::t_8ce07f9056df3e 110
+extensions/foundry/tests/forge/readiness.spec.ts
+  s_f6f18e5557b141::t_6699996197192a 476-477,594-595,617-618,1016-1017,1406-1407
+extensions/foundry/src/order/schema.ts
+  s_f6f18e5557b141::t_8ce07f9056df3e 213-215
+extensions/foundry/tests/order/proposal.spec.ts
+  s_f6f18e5557b141::t_1bd68b03e3f6c9 155-156
+tests/e2e/control-alignment.ts
+  s_f6f18e5557b141::t_f4aa413dbd834e 76,87,92-129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0012d84bea2438e0c631398c28c94060f2f57ce2",
+  "prompts": {},
+  "sessions": {
+    "s_f6f18e5557b141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eff42854-4eeb-48db-8bb9-450798c9490e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
