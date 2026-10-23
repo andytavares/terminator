@@ -63,6 +63,7 @@ Terminator is an Electron application with four kinds of process: the main proce
 - **Extension host.** One Electron [`utilityProcess`](https://www.electronjs.org/docs/latest/api/utility-process) that runs every extension backend, so extension work never shares the event loop that relays terminal output. Its entry is `src/main/extensions/host/entry.ts`, built to `out/main/extension-host.js`. It is the only place a backend runs: main never `require()`s an extension's entry point. See [Extension system](#extension-system).
 - **Main window renderer.** The core UI, with `contextIsolation: true` and `nodeIntegration: false`. It reaches main only through `window.electronAPI`, which `src/main/preload.ts` exposes.
 - **Extension views.** Each extension surface is an `<iframe>` in the main window's own page, loading the extension's document from `ext://`. It reaches main over a `MessagePort` that `FrameBridge` (`src/main/extensions/frame-bridge.ts`) hands it ([ADR 114](adr/114-extension-views-are-frames-in-the-window.md)).
+- **Breakout windows.** A terminal moved into its own window is a `window.open` child of the main window renderer, not a separate renderer ([ADR 126](adr/126-a-session-breaks-out-into-a-child-window.md)). The frame name carries the session id (`src/shared/breakout.ts`), `src/main/breakout-windows.ts` allows and tracks the windows, and `src/renderer/terminal/breakout.ts` moves the session's xterm element between pages. Stores, the pty relay and session state stay in the main renderer, so reloading it closes every breakout window.
 
 ---
 
