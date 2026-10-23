@@ -390,7 +390,7 @@ describe('TerminalInstance — mount()', () => {
 })
 
 /** A container in another document, as a window.open() child window would hold. */
-function containerInOtherWindow(view: Partial<Window> | null): HTMLElement {
+function containerInOtherWindow(view: Window | null): HTMLElement {
   const otherDocument = document.implementation.createHTMLDocument('breakout')
   Object.defineProperty(otherDocument, 'defaultView', { value: view })
   const container = otherDocument.createElement('div')
@@ -436,7 +436,7 @@ describe('TerminalInstance — mount() — in the window of its container', () =
       return { observe, disconnect: vi.fn() }
     })
     const childFrame = vi.fn()
-    const view = partialFake<Window>({
+    const view = partialFake<Window & typeof globalThis>({
       ResizeObserver: childResizeObserver as unknown as typeof ResizeObserver,
       requestAnimationFrame: childFrame,
     })
