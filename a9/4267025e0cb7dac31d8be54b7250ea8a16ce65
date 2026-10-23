@@ -1,0 +1,83 @@
+scripts/ci-plan.mjs
+  s_0565505ad6a275::t_b1da5ed1dd940b 15-16
+scripts/check-release-age.mjs
+  s_0565505ad6a275::t_b1da5ed1dd940b 8,11-13,20-23,29,46-90,135-174,176,178-188,190,192-193
+scripts/flaky-sweep.mjs
+  s_0565505ad6a275::t_b1da5ed1dd940b 1-139
+scripts/stability.mjs
+  s_0565505ad6a275::t_b1da5ed1dd940b 1-117
+tests/unit/scripts/stability.spec.ts
+  s_0565505ad6a275::t_b1da5ed1dd940b 1-150
+tests/support/launch-steps.ts
+  s_0565505ad6a275::t_b1da5ed1dd940b 1-24
+docs/adr/125-a-security-fix-skips-the-release-age-cooldown.md
+  s_0565505ad6a275::t_b1da5ed1dd940b 1-27
+tests/unit/support/launch-steps.spec.ts
+  s_0565505ad6a275::t_b1da5ed1dd940b 1-30
+tests/e2e/settings.spec.ts
+  s_0565505ad6a275::t_b1da5ed1dd940b 111-112,114-117
+tests/unit/scripts/ci-plan.spec.ts
+  s_0565505ad6a275::t_b1da5ed1dd940b 21-39,42,145,152,154,157,170,172-174,176
+scripts/check-quarantine.mjs
+  s_0565505ad6a275::t_b1da5ed1dd940b 1-192
+tests/e2e/helpers.ts
+  s_0565505ad6a275::t_b1da5ed1dd940b 16,117,120,128,130-131,134,244,246,251-256
+tests/quarantine.json
+  s_0565505ad6a275::t_b1da5ed1dd940b 1
+tests/unit/scripts/check-quarantine.spec.ts
+  s_0565505ad6a275::t_b1da5ed1dd940b 1-134
+docs/adr/124-flaky-tests-are-caught-before-merge-and-quarantined-with-an-expiry.md
+  s_0565505ad6a275::t_b1da5ed1dd940b 1-29
+tests/fixtures/flaky-sweep/playwright-run-1.json
+  s_0565505ad6a275::t_b1da5ed1dd940b 1-47
+.specify/memory/constitution.md
+  s_0565505ad6a275::t_b1da5ed1dd940b 2-16,325-337,390
+docs/adr/123-tests-run-once-sealed-and-selected.md
+  s_0565505ad6a275::t_b1da5ed1dd940b 3
+package.json
+  s_0565505ad6a275::t_b1da5ed1dd940b 38-39
+tests/unit/scripts/flaky-sweep.spec.ts
+  s_0565505ad6a275::t_b1da5ed1dd940b 1-135
+scripts/check-single-copies.mjs
+  s_0565505ad6a275::t_b1da5ed1dd940b 1-44
+tests/fixtures/flaky-sweep/vitest-run-1.json
+  s_0565505ad6a275::t_b1da5ed1dd940b 1-33
+vitest.config.ts
+  s_0565505ad6a275::t_b1da5ed1dd940b 40-47
+.github/workflows/ci.yml
+  s_0565505ad6a275::t_b1da5ed1dd940b 18-23,57-64,260-261,275-284,308-440,629,640,643-650
+  s_0565505ad6a275::t_943e7819c0b5f1 651
+.github/workflows/stability-sweep.yml
+  s_0565505ad6a275::t_b1da5ed1dd940b 1-156
+tests/unit/scripts/check-single-copies.spec.ts
+  s_0565505ad6a275::t_b1da5ed1dd940b 1-83
+scripts/ci-e2e-local.mjs
+  s_0565505ad6a275::t_b1da5ed1dd940b 90-93,95-102
+tests/fixtures/flaky-sweep/vitest-run-2.json
+  s_0565505ad6a275::t_b1da5ed1dd940b 1-33
+tests/unit/scripts/check-release-age.spec.ts
+  s_0565505ad6a275::t_b1da5ed1dd940b 10-11,98-135
+  s_0565505ad6a275::t_8d0af451cd7598 136
+.gitignore
+  s_0565505ad6a275::t_b1da5ed1dd940b 33-36
+.github/dependabot.yml
+  s_0565505ad6a275::t_b1da5ed1dd940b 1,6-7,12-26
+tests/fixtures/flaky-sweep/playwright-run-2.json
+  s_0565505ad6a275::t_b1da5ed1dd940b 1-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a94267025e0cb7dac31d8be54b7250ea8a16ce65",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
