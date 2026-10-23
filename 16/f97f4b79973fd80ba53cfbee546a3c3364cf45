@@ -1,0 +1,21 @@
+src/shared/breakout.ts
+  s_bcb87751443cd2::t_3ac3d2279ab647 1-17
+tests/unit/shared/breakout.spec.ts
+  s_bcb87751443cd2::t_3ac8d60355927c 1-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "16f97f4b79973fd80ba53cfbee546a3c3364cf45",
+  "prompts": {},
+  "sessions": {
+    "s_bcb87751443cd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b568ee83-ad51-4a54-9901-52cfcfa5b37f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
