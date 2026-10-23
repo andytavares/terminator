@@ -137,7 +137,7 @@ describe('MergeFlowView — renders CompletionScreen when restored session has a
     mockRestoreSession.mockResolvedValueOnce({ session })
     mockStoreState = { ...mockStoreState, session, activeFileIndex: -1 }
     render(<MergeFlowView repoRoot="/repo" onExit={vi.fn()} />)
-    await waitFor(() => expect(screen.getByTestId('completion-screen')).toBeTruthy())
+    expect(await screen.findByTestId('completion-screen')).toBeTruthy()
   })
 })
 

@@ -142,7 +142,7 @@ function weeklyReviewHistoryTests() {
 function weeklyReviewHistoryListingTests() {
   it('lists past reviews with their action count', async () => {
     render(<WeeklyReviewHistory />)
-    await waitFor(() => expect(screen.getByText('2 actions')).toBeTruthy())
+    expect(await screen.findByText('2 actions')).toBeTruthy()
   })
 
   it('singularises a one-action review', async () => {
@@ -152,13 +152,13 @@ function weeklyReviewHistoryListingTests() {
       return Promise.resolve({})
     })
     render(<WeeklyReviewHistory />)
-    await waitFor(() => expect(screen.getByText('1 action')).toBeTruthy())
+    expect(await screen.findByText('1 action')).toBeTruthy()
   })
 
   it('explains the empty state', async () => {
     mockInvoke.mockResolvedValue({ reviews: [] })
     render(<WeeklyReviewHistory />)
-    await waitFor(() => expect(screen.getByText(/No reviews recorded yet/i)).toBeTruthy())
+    expect(await screen.findByText(/No reviews recorded yet/i)).toBeTruthy()
   })
 }
 
@@ -172,7 +172,7 @@ function weeklyReviewHistoryStatusTests() {
       return Promise.resolve({})
     })
     render(<WeeklyReviewHistory />)
-    await waitFor(() => expect(screen.getByText('in progress')).toBeTruthy())
+    expect(await screen.findByText('in progress')).toBeTruthy()
   })
 }
 
@@ -184,11 +184,11 @@ function weeklyReviewHistoryExpandingTests() {
 function weeklyReviewHistoryExpandingOpeningTests() {
   it('shows what was done when a review is expanded', async () => {
     render(<WeeklyReviewHistory />)
-    await waitFor(() => screen.getByText('2 actions'))
+    await screen.findByText('2 actions')
 
     fireEvent.click(screen.getByText('2 actions'))
 
-    await waitFor(() => expect(screen.getByText('Write the spec')).toBeTruthy())
+    expect(await screen.findByText('Write the spec')).toBeTruthy()
     expect(screen.getByText('Promoted to today')).toBeTruthy()
     expect(screen.getByText('Project status')).toBeTruthy()
     expect(screen.getByText('Website rebuild')).toBeTruthy()
@@ -197,10 +197,10 @@ function weeklyReviewHistoryExpandingOpeningTests() {
 
   it('shows the reflection alongside the actions', async () => {
     render(<WeeklyReviewHistory />)
-    await waitFor(() => screen.getByText('2 actions'))
+    await screen.findByText('2 actions')
     fireEvent.click(screen.getByText('2 actions'))
 
-    await waitFor(() => expect(screen.getByText('Reflection')).toBeTruthy())
+    expect(await screen.findByText('Reflection')).toBeTruthy()
     expect(screen.getByText('shipping small')).toBeTruthy()
   })
 }
@@ -208,10 +208,10 @@ function weeklyReviewHistoryExpandingOpeningTests() {
 function weeklyReviewHistoryExpandingClosingTests() {
   it('collapses again on a second click', async () => {
     render(<WeeklyReviewHistory />)
-    await waitFor(() => screen.getByText('2 actions'))
+    await screen.findByText('2 actions')
 
     fireEvent.click(screen.getByText('2 actions'))
-    await waitFor(() => screen.getByText('Write the spec'))
+    await screen.findByText('Write the spec')
     fireEvent.click(screen.getByText('2 actions'))
 
     await waitFor(() => expect(screen.queryByText('Write the spec')).toBeNull())
@@ -228,10 +228,10 @@ function weeklyReviewHistoryEmptyDetailTests() {
       return Promise.resolve({})
     })
     render(<WeeklyReviewHistory />)
-    await waitFor(() => screen.getByText('0 actions'))
+    await screen.findByText('0 actions')
     fireEvent.click(screen.getByText('0 actions'))
 
-    await waitFor(() => expect(screen.getByText(/Nothing was recorded/i)).toBeTruthy())
+    expect(await screen.findByText(/Nothing was recorded/i)).toBeTruthy()
   })
 }
 
@@ -244,7 +244,7 @@ function weeklyReviewHistoryExportingTests() {
       return Promise.resolve({})
     })
     render(<WeeklyReviewHistory />)
-    await waitFor(() => screen.getByText('2 actions'))
+    await screen.findByText('2 actions')
 
     fireEvent.click(screen.getByRole('button', { name: /Export review/i }))
 
@@ -271,7 +271,7 @@ function weeklyReviewHistoryExportOutcomesCancellingTests() {
       return Promise.resolve({})
     })
     render(<WeeklyReviewHistory />)
-    await waitFor(() => screen.getByText('2 actions'))
+    await screen.findByText('2 actions')
 
     fireEvent.click(screen.getByRole('button', { name: /Export review/i }))
 
@@ -290,7 +290,7 @@ function weeklyReviewHistoryExportOutcomesFailingTests() {
       return Promise.resolve({})
     })
     render(<WeeklyReviewHistory />)
-    await waitFor(() => screen.getByText('2 actions'))
+    await screen.findByText('2 actions')
 
     fireEvent.click(screen.getByRole('button', { name: /Export review/i }))
 

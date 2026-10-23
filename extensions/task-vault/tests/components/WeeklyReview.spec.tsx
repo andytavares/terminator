@@ -121,7 +121,7 @@ function weeklyReviewStepTrailTests() {
   // are was never shown. Now the steps are named and position is stated once.
   it('names all six steps and states position once', async () => {
     render(<WeeklyReview />)
-    await waitFor(() => expect(screen.getByText('1 of 6')).toBeTruthy())
+    expect(await screen.findByText('1 of 6')).toBeTruthy()
     for (const name of ['Get clear', 'Inbox', 'Projects', 'Stale', 'Someday', 'Reflect']) {
       expect(screen.getByText(name)).toBeTruthy()
     }
@@ -129,7 +129,7 @@ function weeklyReviewStepTrailTests() {
 
   it('marks which step you are on', async () => {
     render(<WeeklyReview />)
-    await waitFor(() => expect(screen.getByText('1 of 6')).toBeTruthy())
+    expect(await screen.findByText('1 of 6')).toBeTruthy()
     expect(screen.getByText('Get clear').getAttribute('aria-current')).toBe('step')
   })
 }
@@ -142,14 +142,14 @@ function weeklyReviewProjectsTests() {
 function weeklyReviewProjectsListingTests() {
   it('step 3 shows all active projects', async () => {
     render(<WeeklyReview />)
-    await waitFor(() => screen.getByText('1 of 6'))
+    await screen.findByText('1 of 6')
 
     // Navigate using header nav button (aria-label="Next step")
     const nextStepBtn = screen.getByRole('button', { name: 'Next step' })
     fireEvent.click(nextStepBtn) // → step 2
-    await waitFor(() => screen.getByText('2 of 6'))
+    await screen.findByText('2 of 6')
     fireEvent.click(screen.getByRole('button', { name: 'Next step' })) // → step 3
-    await waitFor(() => screen.getByText('3 of 6'))
+    await screen.findByText('3 of 6')
 
     expect(screen.getByText('Alpha Project')).toBeTruthy()
     expect(screen.getByText('Stale Project')).toBeTruthy()
@@ -159,13 +159,13 @@ function weeklyReviewProjectsListingTests() {
 function weeklyReviewProjectsArchivingTests() {
   it('archiving stale project removes it from step 3 list', async () => {
     render(<WeeklyReview />)
-    await waitFor(() => screen.getByText('1 of 6'))
+    await screen.findByText('1 of 6')
 
     // Navigate to step 3
     fireEvent.click(screen.getByRole('button', { name: 'Next step' }))
-    await waitFor(() => screen.getByText('2 of 6'))
+    await screen.findByText('2 of 6')
     fireEvent.click(screen.getByRole('button', { name: 'Next step' }))
-    await waitFor(() => screen.getByText('3 of 6'))
+    await screen.findByText('3 of 6')
 
     const archiveBtn = screen.getAllByRole('button', { name: /archive/i })[0]
     fireEvent.click(archiveBtn)
@@ -211,10 +211,10 @@ function weeklyReviewInboxRefreshTests() {
   it('re-fetches inbox items when advancing from Step 1 so captures appear in Step 2', async () => {
     answerWithCapturedItem()
     render(<WeeklyReview />)
-    await waitFor(() => screen.getByText('1 of 6'))
+    await screen.findByText('1 of 6')
     fireEvent.click(screen.getByRole('button', { name: /next: inbox/i }))
 
-    await waitFor(() => screen.getByText('2 of 6'))
+    await screen.findByText('2 of 6')
 
     // weekly-review was called twice: once at mount, once on step 1 completion
     const reviewCalls = mockInvoke.mock.calls.filter(
@@ -239,7 +239,7 @@ function weeklyReviewReviewRecordTests() {
 
   it('offers a way into past reviews', async () => {
     render(<WeeklyReview />)
-    await waitFor(() => screen.getByText('1 of 6'))
+    await screen.findByText('1 of 6')
 
     fireEvent.click(screen.getByRole('button', { name: 'History' }))
     await waitFor(() => {
@@ -252,7 +252,7 @@ function weeklyReviewReviewRecordTests() {
 function weeklyReviewCompletingTests() {
   it('completing all steps records the reflection against the review', async () => {
     render(<WeeklyReview />)
-    await waitFor(() => screen.getByText('1 of 6'))
+    await screen.findByText('1 of 6')
 
     // Navigate through steps 1-5 using header nav
     for (let i = 0; i < 5; i++) {

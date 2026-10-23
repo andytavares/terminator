@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, act, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, act, fireEvent } from '@testing-library/react'
 import { RemoteControlView } from '../../../src/components/RemoteControlView'
 
 const qrValues = vi.hoisted(() => [] as string[])
@@ -75,20 +75,20 @@ function remoteViewTests() {
 function remoteViewBandTests() {
   it('says it is off, and offers one control to turn it on', async () => {
     render(<RemoteControlView />)
-    await waitFor(() => expect(screen.getByText('Off')).toBeTruthy())
+    expect(await screen.findByText('Off')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Turn on' })).toBeTruthy()
   })
 
   it('says it is starting while the server comes up', async () => {
     render(<RemoteControlView />)
-    await waitFor(() => screen.getByText('Off'))
+    await screen.findByText('Off')
     emit('remote:status', { enabled: true, port: 7681 })
     expect(screen.getByText('Starting…')).toBeTruthy()
   })
 
   it('shows the address and a way to stop once it is on', async () => {
     render(<RemoteControlView />)
-    await waitFor(() => screen.getByText('Off'))
+    await screen.findByText('Off')
     emit('remote:status', ON)
     expect(screen.getByText('On — reachable from any browser')).toBeTruthy()
     expect(screen.getByText('https://tender-lynx-42.ngrok.app')).toBeTruthy()
@@ -99,7 +99,7 @@ function remoteViewBandTests() {
 function remoteViewReachTests() {
   it('distinguishes local-only from public', async () => {
     render(<RemoteControlView />)
-    await waitFor(() => screen.getByText('Off'))
+    await screen.findByText('Off')
     emit('remote:status', {
       ...ON,
       publicUrl: null,
@@ -112,7 +112,7 @@ function remoteViewReachTests() {
   describe('the credential', () => {
     it('is never shown, and there is nothing to reveal or copy', async () => {
       render(<RemoteControlView />)
-      await waitFor(() => screen.getByText('Off'))
+      await screen.findByText('Off')
       emit('remote:status', ON)
       expect(screen.queryByRole('button', { name: 'Show password' })).toBeNull()
       expect(screen.queryByRole('button', { name: 'Copy password' })).toBeNull()
@@ -123,7 +123,7 @@ function remoteViewReachTests() {
 function remoteViewPermitTests() {
   it('states in plain language what the address and password permit', async () => {
     render(<RemoteControlView />)
-    await waitFor(() => screen.getByText('Off'))
+    await screen.findByText('Off')
     emit('remote:status', ON)
     expect(
       screen.getByText('Anyone with this address and password can type into your terminals.')
@@ -132,7 +132,7 @@ function remoteViewPermitTests() {
 
   it('renders a scannable code that carries the address and nothing else', async () => {
     render(<RemoteControlView />)
-    await waitFor(() => screen.getByText('Off'))
+    await screen.findByText('Off')
     emit('remote:status', ON)
     const address = ON.publicUrl
     expect(qrValues.length).toBeGreaterThan(0)
@@ -143,7 +143,7 @@ function remoteViewPermitTests() {
 function remoteViewRefusalTests() {
   it('explains a refusal to start for want of a password', async () => {
     render(<RemoteControlView />)
-    await waitFor(() => screen.getByText('Off'))
+    await screen.findByText('Off')
     emit('remote:status', { enabled: false, error: 'PASSWORD_REQUIRED' })
     expect(screen.getByRole('alert').textContent).toContain('password')
   })
@@ -157,7 +157,7 @@ function remoteViewFailureTests() {
   describe('failure', () => {
     it('names a port clash and offers a way forward', async () => {
       render(<RemoteControlView />)
-      await waitFor(() => screen.getByText('Off'))
+      await screen.findByText('Off')
       emit('remote:status', { error: 'PORT_IN_USE', port: 7681 })
       expect(screen.getByRole('alert')).toBeTruthy()
       expect(screen.getByText('Port 7681 is already in use.')).toBeTruthy()
@@ -166,7 +166,7 @@ function remoteViewFailureTests() {
 
     it('reports a dropped tunnel rather than continuing to show a dead address', async () => {
       render(<RemoteControlView />)
-      await waitFor(() => screen.getByText('Off'))
+      await screen.findByText('Off')
       emit('remote:status', ON)
       emit('remote:tunnel-disconnected', {})
       expect(screen.getByText('The public address stopped working.')).toBeTruthy()
@@ -185,14 +185,14 @@ function dropTunnel(): void {
 function remoteViewTunnelTests() {
   it('still says the public address stopped once the local address is broadcast', async () => {
     render(<RemoteControlView />)
-    await waitFor(() => screen.getByText('Off'))
+    await screen.findByText('Off')
     dropTunnel()
     expect(screen.getByText('The public address stopped working.')).toBeTruthy()
   })
 
   it('reconnects the tunnel alone, leaving the server and its viewers up', async () => {
     render(<RemoteControlView />)
-    await waitFor(() => screen.getByText('Off'))
+    await screen.findByText('Off')
     dropTunnel()
     fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }))
     expect(invoke).toHaveBeenCalledWith('remote:tunnel-reconnect', {})
@@ -201,7 +201,7 @@ function remoteViewTunnelTests() {
 
   it('offers the same for a public address that could not be created', async () => {
     render(<RemoteControlView />)
-    await waitFor(() => screen.getByText('Off'))
+    await screen.findByText('Off')
     emit('remote:status', { ...ON, publicUrl: null, ngrokError: 'ERR_NGROK_8012: upstream down' })
     fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }))
     expect(invoke).toHaveBeenCalledWith('remote:tunnel-reconnect', {})
@@ -211,7 +211,7 @@ function remoteViewTunnelTests() {
 function remoteViewControlTests() {
   it('keeps configuration out of the way until it is wanted', async () => {
     render(<RemoteControlView />)
-    await waitFor(() => screen.getByText('Off'))
+    await screen.findByText('Off')
     const toggle = screen.getByRole('button', { name: /Settings/ })
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     expect(screen.getByText(/port 7681 · up to 5 viewers/)).toBeTruthy()
@@ -219,7 +219,7 @@ function remoteViewControlTests() {
 
   it('counts against the viewer limit just saved in Settings', async () => {
     render(<RemoteControlView />)
-    await waitFor(() => screen.getByText('Off'))
+    await screen.findByText('Off')
     emit('remote:status', ON)
     fireEvent.click(screen.getByRole('button', { name: /Settings/ }))
     const viewers = await screen.findByLabelText('Viewers per terminal')
@@ -232,7 +232,7 @@ function remoteViewControlTests() {
 
   it('turns on through the bridge', async () => {
     render(<RemoteControlView />)
-    await waitFor(() => screen.getByText('Off'))
+    await screen.findByText('Off')
     fireEvent.click(screen.getByRole('button', { name: 'Turn on' }))
     expect(invoke).toHaveBeenCalledWith('remote:toggle', { enabled: true })
   })
@@ -246,7 +246,7 @@ function remoteViewDeviceListTests() {
 function remoteViewDeviceListingTests() {
   it('lists what is connected', async () => {
     render(<RemoteControlView />)
-    await waitFor(() => screen.getByText('Off'))
+    await screen.findByText('Off')
     emit('remote:status', ON)
     emit('remote:devices', {
       devices: [
@@ -259,7 +259,7 @@ function remoteViewDeviceListingTests() {
 
   it('offers to disconnect one', async () => {
     render(<RemoteControlView />)
-    await waitFor(() => screen.getByText('Off'))
+    await screen.findByText('Off')
     emit('remote:status', ON)
     emit('remote:devices', {
       devices: [{ id: 'a', label: 'iPad', viewing: 'scratch', connectedAt: Date.now() }],
@@ -272,7 +272,7 @@ function remoteViewDeviceListingTests() {
 function remoteViewNoDeviceTests() {
   it('says what to do when nothing is connected yet', async () => {
     render(<RemoteControlView />)
-    await waitFor(() => screen.getByText('Off'))
+    await screen.findByText('Off')
     emit('remote:status', ON)
     expect(screen.getByText(/Scan the code to add this phone/)).toBeTruthy()
   })

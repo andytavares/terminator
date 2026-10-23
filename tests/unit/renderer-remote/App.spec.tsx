@@ -33,7 +33,7 @@ describe('App', () => {
     render(<App />)
     fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'bad' } })
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
-    await waitFor(() => expect(screen.getByText('Wrong password')).toBeTruthy())
+    expect(await screen.findByText('Wrong password')).toBeTruthy()
   })
 
   it('shows "Access denied" on 403 response', async () => {
@@ -41,7 +41,7 @@ describe('App', () => {
     render(<App />)
     fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
-    await waitFor(() => expect(screen.getByText('Access denied')).toBeTruthy())
+    expect(await screen.findByText('Access denied')).toBeTruthy()
   })
 
   it('shows "Could not connect" on fetch error', async () => {
@@ -49,7 +49,7 @@ describe('App', () => {
     render(<App />)
     fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
-    await waitFor(() => expect(screen.getByText('Could not connect to server')).toBeTruthy())
+    expect(await screen.findByText('Could not connect to server')).toBeTruthy()
   })
 })
 
@@ -59,7 +59,7 @@ describe('App — shows "Could not connect" on non-success HTTP status (5xx)', (
     render(<App />)
     fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
-    await waitFor(() => expect(screen.getByText('Could not connect to server')).toBeTruthy())
+    expect(await screen.findByText('Could not connect to server')).toBeTruthy()
   })
 })
 
@@ -102,7 +102,7 @@ describe('App — says to wait after too many attempts (429)', () => {
     render(<App />)
     fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
-    await waitFor(() => expect(screen.getByText(/Too many attempts/)).toBeTruthy())
+    expect(await screen.findByText(/Too many attempts/)).toBeTruthy()
   })
 
   it('redirects to /mobile/ when viewport is narrower than 1400px', async () => {

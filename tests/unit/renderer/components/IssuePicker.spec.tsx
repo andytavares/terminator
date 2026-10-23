@@ -56,7 +56,7 @@ describe('IssuePicker — choosing', () => {
     })
     open()
     fireEvent.focus(screen.getByPlaceholderText(/Search/))
-    await waitFor(() => expect(screen.getByText('Jira')).toBeTruthy())
+    expect(await screen.findByText('Jira')).toBeTruthy()
     expect(screen.getByText('Linear')).toBeTruthy()
   })
 })
@@ -125,7 +125,7 @@ async function openList() {
   await act(async () => {
     fireEvent.focus(screen.getByPlaceholderText('Search, or type an issue key'))
   })
-  await waitFor(() => expect(screen.getByText('TAV-42')).toBeTruthy())
+  expect(await screen.findByText('TAV-42')).toBeTruthy()
   return view
 }
 
@@ -173,7 +173,7 @@ describe('IssuePicker — dismissing the list — stays open when the pointer go
     await act(async () => {
       fireEvent.focus(screen.getByPlaceholderText('Search, or type an issue key'))
     })
-    await waitFor(() => expect(screen.getByText('TAV-42')).toBeTruthy())
+    expect(await screen.findByText('TAV-42')).toBeTruthy()
   })
 })
 

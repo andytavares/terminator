@@ -63,7 +63,7 @@ describe('the orders list', () => {
 function standingsTests() {
   it('says where each order stands, in the standing own words', async () => {
     mount([row({ standing: standing({ label: '2 to answer', turn: 'you' }) })])
-    await waitFor(() => expect(screen.getByText('2 to answer')).toBeTruthy())
+    expect(await screen.findByText('2 to answer')).toBeTruthy()
   })
 
   it('marks the rows whose move is yours, and only those', async () => {
@@ -71,7 +71,7 @@ function standingsTests() {
       row({ id: 'WO-1', standing: standing({ turn: 'you', label: 'halted' }) }),
       row({ id: 'WO-2', title: 'Second', standing: standing({ turn: 'foundry' }) }),
     ])
-    await waitFor(() => expect(screen.getByText('halted')).toBeTruthy())
+    expect(await screen.findByText('halted')).toBeTruthy()
     expect(container.querySelectorAll('.fdry-order-state.is-waiting')).toHaveLength(1)
   })
 
@@ -87,7 +87,7 @@ function standingsTests() {
         standing: standing({ kind: 'halted', turn: 'you', label: 'halted' }),
       }),
     ])
-    await waitFor(() => expect(screen.getByText('halted')).toBeTruthy())
+    expect(await screen.findByText('halted')).toBeTruthy()
     expect(screen.queryByText('ready to hand off')).toBeNull()
   })
 }
@@ -97,7 +97,7 @@ function olderRowsAndRefetchingTests() {
   it('survives a row from an older shape that carries no standing', async () => {
     const { standing: _omitted, ...older } = row({ failures: 0 })
     mount([older])
-    await waitFor(() => expect(screen.getByText('Refuse an expired refresh token')).toBeTruthy())
+    expect(await screen.findByText('Refuse an expired refresh token')).toBeTruthy()
   })
 
   it('refetches when Foundry says a gate changed, so an answer given elsewhere lands here', async () => {
@@ -123,7 +123,7 @@ function olderRowsAndRefetchingTests() {
 describe('the New work order quick action', () => {
   it('leaves the idea box alone until asked', async () => {
     mount([], { focusIdeaSignal: 0 })
-    await waitFor(() => screen.getByLabelText('Describe what you want built or fixed'))
+    await screen.findByLabelText('Describe what you want built or fixed')
     expect(document.activeElement).not.toBe(
       screen.getByLabelText('Describe what you want built or fixed')
     )
@@ -131,10 +131,10 @@ describe('the New work order quick action', () => {
 
   it('focuses the idea box when the signal changes, and switches away from ticket search', async () => {
     const { rerender } = mount([], { focusIdeaSignal: 0 })
-    await waitFor(() => screen.getByLabelText('Describe what you want built or fixed'))
+    await screen.findByLabelText('Describe what you want built or fixed')
     // Leave the "typed" tab so the effect is proven to switch back to it.
     screen.getByRole('radio', { name: 'Ticket' }).click()
-    await waitFor(() => screen.getByLabelText('Search your tickets'))
+    await screen.findByLabelText('Search your tickets')
 
     rerender(<Orders repoRoot="/repos/app" focusIdeaSignal={1} />)
 
@@ -194,7 +194,7 @@ function seedingTests() {
   it('creates the ticket and seeds the order from it', async () => {
     const invoke = mountWith({ teams: [{ id: 't1', key: 'TAV', name: 'Team' }] })
     const fire = await submitIdea()
-    await waitFor(() => screen.getByText(/Create a Linear ticket for this/))
+    await screen.findByText(/Create a Linear ticket for this/)
     expect(orderCreates(invoke)).toHaveLength(0)
     expect(screen.queryByRole('combobox', { name: 'Linear team' })).toBeNull()
     fire.click(screen.getByRole('button', { name: 'Create ticket' }))
@@ -213,7 +213,7 @@ function decliningTests() {
   it('seeds a typed order when the operator declines', async () => {
     const invoke = mountWith({ teams: [{ id: 't1', key: 'TAV', name: 'Team' }] })
     const fire = await submitIdea()
-    await waitFor(() => screen.getByText(/Create a Linear ticket for this/))
+    await screen.findByText(/Create a Linear ticket for this/)
     fire.click(screen.getByRole('button', { name: 'No ticket' }))
     await waitFor(() => expect(orderCreates(invoke)).toHaveLength(1))
     expect(orderCreates(invoke)[0]).toMatchObject({ source: { kind: 'typed' } })
@@ -230,7 +230,7 @@ function teamsTests() {
       ],
     })
     const fire = await submitIdea()
-    const picker = await waitFor(() => screen.getByRole('combobox', { name: 'Linear team' }))
+    const picker = await screen.findByRole('combobox', { name: 'Linear team' })
     fire.change(picker, { target: { value: 't2' } })
     fire.click(screen.getByRole('button', { name: 'Create ticket' }))
     await waitFor(() =>
@@ -249,9 +249,9 @@ function failureTests() {
       { error: 'Linear refused' }
     )
     const fire = await submitIdea()
-    await waitFor(() => screen.getByText(/Create a Linear ticket for this/))
+    await screen.findByText(/Create a Linear ticket for this/)
     fire.click(screen.getByRole('button', { name: 'Create ticket' }))
-    await waitFor(() => screen.getByText('Linear refused'))
+    await screen.findByText('Linear refused')
     expect(orderCreates(invoke)).toHaveLength(0)
   })
 }
@@ -272,12 +272,12 @@ describe('opening an order that has a run', () => {
       },
     })
     render(<Orders repoRoot="/repos/app" openOrderId="WO-1" />)
-    await waitFor(() => expect(screen.getByRole('button', { name: 'All orders' })).toBeTruthy())
+    expect(await screen.findByRole('button', { name: 'All orders' })).toBeTruthy()
   }
 
   it.each(['running', 'shipped'])('opens a %s order on the Floor', async (status) => {
     await opened(status)
-    await waitFor(() => expect(screen.getByText('Loading the run…')).toBeTruthy())
+    expect(await screen.findByText('Loading the run…')).toBeTruthy()
   })
 
   it('opens a draft in the Forge, not the Floor', async () => {

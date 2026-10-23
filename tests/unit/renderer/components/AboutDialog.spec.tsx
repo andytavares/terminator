@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { AboutDialog } from '../../../../src/renderer/components/AboutDialog'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 import { installElectronApi } from '../../../support/electron-api'
@@ -35,7 +35,7 @@ describe('AboutDialog', () => {
 
   it('renders version info rows', async () => {
     render(<AboutDialog onClose={vi.fn()} />)
-    await waitFor(() => expect(screen.getByText('30.0.0')).toBeTruthy())
+    expect(await screen.findByText('30.0.0')).toBeTruthy()
     expect(screen.getByText('20.0.0')).toBeTruthy()
     expect(screen.getByText('124.0.0')).toBeTruthy()
     expect(screen.getByText('darwin')).toBeTruthy()
@@ -44,7 +44,7 @@ describe('AboutDialog', () => {
   it('calls onClose when Close button is clicked', async () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
-    await waitFor(() => expect(screen.getByText('Close')).toBeTruthy())
+    expect(await screen.findByText('Close')).toBeTruthy()
     fireEvent.click(screen.getByText('Close'))
     expect(onClose).toHaveBeenCalled()
   })
@@ -52,7 +52,7 @@ describe('AboutDialog', () => {
   it('calls onClose when overlay is clicked', async () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
-    await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy())
+    expect(await screen.findByRole('dialog')).toBeTruthy()
     pressOutside(screen.getByRole('dialog'))
     expect(onClose).toHaveBeenCalled()
   })
@@ -62,7 +62,7 @@ describe('AboutDialog — does not call onClose when dialog body is clicked', ()
   it('does not call onClose when dialog body is clicked', async () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
-    await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy())
+    expect(await screen.findByRole('dialog')).toBeTruthy()
     fireEvent.click(screen.getByRole('dialog'))
     expect(onClose).not.toHaveBeenCalled()
   })
@@ -70,7 +70,7 @@ describe('AboutDialog — does not call onClose when dialog body is clicked', ()
   it('calls onClose when Escape is pressed', async () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
-    await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy())
+    expect(await screen.findByRole('dialog')).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).toHaveBeenCalled()
   })
@@ -97,19 +97,19 @@ describe('AboutDialog — keeps the placeholders when the app info cannot be rea
   it('shows DB error with message when health returns ok:false', async () => {
     mockDbHealth.mockResolvedValue({ ok: false, message: 'disk full' })
     render(<AboutDialog onClose={vi.fn()} />)
-    await waitFor(() => expect(screen.getByText('Error — disk full')).toBeTruthy())
+    expect(await screen.findByText('Error — disk full')).toBeTruthy()
   })
 
   it('shows DB error with "unknown" when health returns ok:false without message', async () => {
     mockDbHealth.mockResolvedValue({ ok: false })
     render(<AboutDialog onClose={vi.fn()} />)
-    await waitFor(() => expect(screen.getByText('Error — unknown')).toBeTruthy())
+    expect(await screen.findByText('Error — unknown')).toBeTruthy()
   })
 
   it('shows IPC error when db.health rejects', async () => {
     mockDbHealth.mockRejectedValue(new Error('IPC failed'))
     render(<AboutDialog onClose={vi.fn()} />)
-    await waitFor(() => expect(screen.getByText('Error — IPC error')).toBeTruthy())
+    expect(await screen.findByText('Error — IPC error')).toBeTruthy()
   })
 })
 
@@ -117,7 +117,7 @@ describe('AboutDialog — does not close when non-Escape key is pressed', () => 
   it('does not close when non-Escape key is pressed', async () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
-    await waitFor(() => screen.getByRole('dialog'))
+    await screen.findByRole('dialog')
     fireEvent.keyDown(document, { key: 'Enter' })
     expect(onClose).not.toHaveBeenCalled()
   })

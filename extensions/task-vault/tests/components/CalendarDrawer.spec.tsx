@@ -156,7 +156,7 @@ function calendarDrawerOpeningTaskTests() {
     })
 
     await renderDrawer()
-    await waitFor(() => screen.getByText('My task'))
+    await screen.findByText('My task')
     await user.click(screen.getByText('My task'))
 
     expect(mockInvoke).toHaveBeenCalledWith('task-vault:open-panel', {
@@ -170,7 +170,7 @@ function calendarDrawerMonthsTests() {
   it('navigates to previous month on prev button click', async () => {
     const user = userEvent.setup()
     await renderDrawer()
-    await waitFor(() => screen.getByTitle('Previous month'))
+    await screen.findByTitle('Previous month')
     await user.click(screen.getByTitle('Previous month'))
 
     // 1: get-calendar-month on mount, 2: get-daily for today on mount, 3: get-calendar-month after prev
@@ -180,7 +180,7 @@ function calendarDrawerMonthsTests() {
   it('navigates to next month on next button click', async () => {
     const user = userEvent.setup()
     await renderDrawer()
-    await waitFor(() => screen.getByTitle('Next month'))
+    await screen.findByTitle('Next month')
     await user.click(screen.getByTitle('Next month'))
 
     // 1: get-calendar-month on mount, 2: get-daily for today on mount, 3: get-calendar-month after next
@@ -195,7 +195,7 @@ function calendarDrawerRefreshingTests() {
     answerDays([], { tasks: [dayTask('t1', 'Updated task')] })
 
     await renderDrawer()
-    await waitFor(() => screen.getByText('Updated task'))
+    await screen.findByText('Updated task')
 
     // Simulate a task update broadcast
     answerDays([], { tasks: [dayTask('t1', 'Reopened task')] })
@@ -204,7 +204,7 @@ function calendarDrawerRefreshingTests() {
       bridgeHandlers.get('task-vault:push:index-updated')?.({})
     })
 
-    await waitFor(() => expect(screen.getByText('Reopened task')).toBeTruthy())
+    expect(await screen.findByText('Reopened task')).toBeTruthy()
     expect(screen.queryByText('Updated task')).toBeNull()
 
     // Also verify today's date is still selected (selected-date not reset)

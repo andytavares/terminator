@@ -217,7 +217,7 @@ describe('a hand-off compile turns down', () => {
       compile: compileOrder(shown),
       environment: PROVEN_ENVIRONMENT,
     })
-    await waitFor(() => expect(screen.getByRole('button', { name: /^Hand off with/ })).toBeTruthy())
+    expect(await screen.findByRole('button', { name: /^Hand off with/ })).toBeTruthy()
     expect(payloadsSentOn(invoke, 'foundry:run.start')).toEqual([])
     expect(onStarted).not.toHaveBeenCalled()
   })

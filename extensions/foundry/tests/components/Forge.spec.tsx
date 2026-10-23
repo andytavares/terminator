@@ -278,13 +278,13 @@ function nowhereToGoTests() {
 function nothingToOfferTests() {
   it('offers no step at all for an order nobody seeded from a tracker', async () => {
     mountStates({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
-    await waitFor(() => screen.getByText('Refuse an expired refresh token'))
+    await screen.findByText('Refuse an expired refresh token')
     expect(within(stepList()).queryByRole('button', { name: /^Tracker/ })).toBeNull()
   })
 
   it('offers no step when the states channel answered with nothing', async () => {
     mountStates({})
-    await waitFor(() => screen.getByText('Refuse an expired refresh token'))
+    await screen.findByText('Refuse an expired refresh token')
     expect(within(stepList()).queryByRole('button', { name: /^Tracker/ })).toBeNull()
   })
 
@@ -310,13 +310,13 @@ describe('an order seeded from a sensor signal', () => {
         },
       }
     )
-    await waitFor(() => screen.getByText('Refuse an expired refresh token'))
+    await screen.findByText('Refuse an expired refresh token')
     expect(screen.getByText('From a sensor signal')).toBeTruthy()
   })
 
   it('shows no chip at all for a typed order', async () => {
     mountStates({}, { source: { kind: 'typed', tracker: null, key: null, url: null } })
-    await waitFor(() => screen.getByText('Refuse an expired refresh token'))
+    await screen.findByText('Refuse an expired refresh token')
     expect(screen.queryByText('From a sensor signal')).toBeNull()
     expect(document.querySelector('.fdry-chip')).toBeNull()
   })
@@ -413,7 +413,7 @@ function startingTheLineTests() {
     const onStarted = mountForStart({ start: { error: 'this repository has no test command' } })
     await waitFor(() => handOffButton())
     fireEvent.click(handOffButton())
-    await waitFor(() => expect(screen.getByText(/agreed, but the run did not start/)).toBeTruthy())
+    expect(await screen.findByText(/agreed, but the run did not start/)).toBeTruthy()
     expect(screen.getByText(/no test command/)).toBeTruthy()
     expect(onStarted).not.toHaveBeenCalled()
   })
@@ -592,7 +592,7 @@ describe('drafting the plan', () => {
 function askingTheArchitectTests() {
   it('offers the action, because nothing else writes the criteria', async () => {
     mountStates({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
-    await waitFor(() => expect(screen.getByRole('button', { name: /Draft the plan/ })).toBeTruthy())
+    expect(await screen.findByRole('button', { name: /Draft the plan/ })).toBeTruthy()
     // This order came from a ticket, and a ticket that names its criteria has
     // them lifted at intake. Saying "no criteria yet" to somebody who had just
     // written a heading called "Acceptance Criteria" read as the tool ignoring
@@ -602,7 +602,7 @@ function askingTheArchitectTests() {
 
   it('asks the architect for one', async () => {
     mountStates({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
-    await waitFor(() => screen.getByRole('button', { name: /Draft the plan/ }))
+    await screen.findByRole('button', { name: /Draft the plan/ })
     fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:order.converge', { id: 'WO-1' })
@@ -611,7 +611,7 @@ function askingTheArchitectTests() {
 
   it('sends what the operator typed to the architect', async () => {
     mountStates({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
-    await waitFor(() => screen.getByLabelText(/Tell the architect/))
+    await screen.findByLabelText(/Tell the architect/)
 
     fireEvent.change(screen.getByLabelText(/Tell the architect/), {
       target: { value: 'the second unit is not needed' },
@@ -644,9 +644,9 @@ function forgeRefusalsTests() {
     installForgeBridge()
     render(<Forge orderId="WO-1" />)
 
-    await waitFor(() => screen.getByRole('button', { name: /Draft the plan/ }))
+    await screen.findByRole('button', { name: /Draft the plan/ })
     fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
-    await waitFor(() => expect(screen.getByText('the proposal reached for a status')).toBeTruthy())
+    expect(await screen.findByText('the proposal reached for a status')).toBeTruthy()
   })
 }
 
@@ -672,7 +672,7 @@ function draftsTests() {
     })
     installForgeBridge()
     render(<Forge orderId="WO-1" />)
-    await waitFor(() => expect(screen.getByRole('button', { name: /Draft the plan/ })).toBeTruthy())
+    expect(await screen.findByRole('button', { name: /Draft the plan/ })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Redraft/ })).toBeNull()
   })
 }
@@ -682,7 +682,7 @@ function redraftsTests() {
     const base = trackerDraft()
     const units = [satisfyingUnit({ title: 'u', touches: [] })]
     mountShowing({ ...base, plan: { ...base.plan, units }, acceptance: [criterion()] })
-    await waitFor(() => expect(screen.getByRole('button', { name: /Redraft/ })).toBeTruthy())
+    expect(await screen.findByRole('button', { name: /Redraft/ })).toBeTruthy()
   })
 }
 
@@ -786,7 +786,7 @@ function aStruckAssumptionTests() {
   it('marks what a struck assumption moved, and nothing else', async () => {
     withChanged(['acceptance'])
     await openForgeStep('Plan')
-    await waitFor(() => screen.getByText(/sessions are stored in Redis/))
+    await screen.findByText(/sessions are stored in Redis/)
 
     // Striking one goes through `turn`, which is what carries the redraw list.
     fireEvent.click(
@@ -811,7 +811,7 @@ function nothingMovedTests() {
   it('marks nothing when nothing moved', async () => {
     withChanged([])
     await openForgeStep('Plan')
-    await waitFor(() => screen.getByText(/sessions are stored in Redis/))
+    await screen.findByText(/sessions are stored in Redis/)
     fireEvent.click(
       screen.getByText(/sessions are stored in Redis/).closest('button') as HTMLElement
     )
@@ -873,7 +873,7 @@ function theDecideButtonTests() {
   it('offers a way to decide it, on the Red team step', async () => {
     withFinding()
     await openForgeStep('Red team')
-    await waitFor(() => screen.getByText('the outcome restates the problem'))
+    await screen.findByText('the outcome restates the problem')
     expect(screen.getByRole('radio', { name: /^Ask the architect/ })).toBeTruthy()
     expect(screen.getByRole('radio', { name: /^Fix it my way/ })).toBeTruthy()
     expect(screen.getByRole('radio', { name: /^Accept it/ })).toBeTruthy()
@@ -884,7 +884,7 @@ function findingMovesTests() {
   it('offers the three moves as a choose-one group of radios, and Fix it my way opens the box', async () => {
     withFinding()
     await openForgeStep('Red team')
-    await waitFor(() => screen.getByText('the outcome restates the problem'))
+    await screen.findByText('the outcome restates the problem')
     const card = screen
       .getByText('the outcome restates the problem')
       .closest('.fdry-fnd') as HTMLElement
@@ -904,7 +904,7 @@ function sendingAFixTests() {
   it('sends the operator’s fix to the architect only once Send is pressed', async () => {
     withFinding()
     await openForgeStep('Red team')
-    await waitFor(() => screen.getByText('the outcome restates the problem'))
+    await screen.findByText('the outcome restates the problem')
     fireEvent.click(screen.getByRole('radio', { name: /^Fix it my way/ }))
     const how = screen.getByLabelText(/How should "the outcome restates the problem" be fixed/)
     fireEvent.change(how, { target: { value: 'state what will be observably different' } })
@@ -927,7 +927,7 @@ function theFixBoxAndClearingTests() {
   it('opens the fix box under the finding it is for', async () => {
     withFinding()
     await openForgeStep('Red team')
-    await waitFor(() => screen.getByText('the outcome restates the problem'))
+    await screen.findByText('the outcome restates the problem')
     fireEvent.click(screen.getByRole('radio', { name: /^Fix it my way/ }))
     const finding = screen.getByText(/the outcome restates the problem/).closest('.fdry-fnd')
     expect(finding?.querySelector('textarea')).toBeTruthy()
@@ -939,7 +939,7 @@ function theFixBoxAndClearingTests() {
   it('asks the architect to clear it, once Send is pressed', async () => {
     withFinding()
     await openForgeStep('Red team')
-    await waitFor(() => screen.getByText('the outcome restates the problem'))
+    await screen.findByText('the outcome restates the problem')
     fireEvent.click(screen.getByRole('radio', { name: /^Ask the architect/ }))
     expect(invoke).not.toHaveBeenCalledWith('foundry:order.converge', expect.anything())
 
@@ -969,7 +969,7 @@ function whileTheArchitectWorksTests() {
       ],
     })
     await openForgeStep('Red team')
-    await waitFor(() => screen.getByText('the outcome restates the problem'))
+    await screen.findByText('the outcome restates the problem')
     fireEvent.click(screen.getByRole('radio', { name: /^Ask the architect/ }))
     fireEvent.click(screen.getByRole('button', { name: /Send \d decision/ }))
     await waitFor(() => expect(converges()).toBe(1))
@@ -988,7 +988,7 @@ function forgeAcceptingTests() {
   it('asks for the reason before accepting one', async () => {
     withFinding()
     await openForgeStep('Red team')
-    await waitFor(() => screen.getByText('the outcome restates the problem'))
+    await screen.findByText('the outcome restates the problem')
     fireEvent.click(screen.getByRole('radio', { name: /^Accept it/ }))
     const box = await screen.findByLabelText(/Why "the outcome restates the problem" is accepted/)
 
@@ -1057,7 +1057,7 @@ function choosingSeveralTests() {
       acceptance: [criterion()],
       openQuestions: [{ ...TWO_QUESTIONS[0], options: ['api', 'web', 'cli'], multiple: true }],
     })
-    await waitFor(() => screen.getByText('which token?'))
+    await screen.findByText('which token?')
     const asked = screen.getByRole('group', { name: 'Choose any' })
     expect(within(asked).getAllByRole('checkbox')).toHaveLength(3)
     expect(within(asked).queryAllByRole('radio')).toHaveLength(0)
@@ -1081,7 +1081,7 @@ function choosingSeveralTests() {
 function clearingAChoiceTests() {
   it('shows a single-answer question as radios', async () => {
     withQuestions()
-    await waitFor(() => screen.getByText('which token?'))
+    await screen.findByText('which token?')
     const asked = screen.getAllByRole('group', { name: 'Choose one' })
     expect(asked).toHaveLength(2)
     expect(within(asked[0]).getAllByRole('radio')).toHaveLength(2)
@@ -1094,7 +1094,7 @@ function clearingAChoiceTests() {
       acceptance: [criterion()],
       openQuestions: [{ ...TWO_QUESTIONS[0], multiple: true }],
     })
-    await waitFor(() => screen.getByText('which token?'))
+    await screen.findByText('which token?')
     fireEvent.click(screen.getByRole('checkbox', { name: /^a/ }))
     fireEvent.click(screen.getByRole('checkbox', { name: /^a/ }))
     expect(screen.getByText(/0 of 1 decided/)).toBeTruthy()
@@ -1104,7 +1104,7 @@ function clearingAChoiceTests() {
 function oneConvergeCallTests() {
   it('issues one converge call carrying every answer', async () => {
     withQuestions()
-    await waitFor(() => screen.getByText('which token?'))
+    await screen.findByText('which token?')
 
     fireEvent.click(screen.getByRole('radio', { name: 'b' }))
     fireEvent.click(screen.getByRole('radio', { name: 'client' }))
@@ -1129,7 +1129,7 @@ function oneConvergeCallTests() {
 function sendUnavailableUntilAnsweredTests() {
   it('leaves Send unavailable until at least one question is answered', async () => {
     withQuestions()
-    await waitFor(() => screen.getByText('which token?'))
+    await screen.findByText('which token?')
     const send = () => screen.getByRole('button', { name: /^Send( \d)? decisions?$/ })
     expect(isUnavailable(send())).toBe(true)
     expect(reasonFor(send())).toBe('Choose an answer or a decision above first.')
@@ -1156,7 +1156,7 @@ function oneConvergeCallForEveryDecisionTests() {
   it('issues exactly one converge call carrying every decision', async () => {
     withFindings()
     await openForgeStep('Red team')
-    await waitFor(() => screen.getByText('finding one'))
+    await screen.findByText('finding one')
 
     decideFinding('finding one', {
       move: /^Fix it my way/,
@@ -1190,7 +1190,7 @@ function sendUnavailableUntilDecidedTests() {
   it('leaves Send unavailable until at least one finding is decided', async () => {
     withFindings()
     await openForgeStep('Red team')
-    await waitFor(() => screen.getByText('finding one'))
+    await screen.findByText('finding one')
     const send = () => screen.getByRole('button', { name: /^Send( \d)? decisions?$/ })
     expect(isUnavailable(send())).toBe(true)
 
@@ -1448,7 +1448,7 @@ describe('a turn that was refused', () => {
 function forgeTheReasonTests() {
   it('says so, and says why, in the validator\u2019s own words', async () => {
     refused()
-    await waitFor(() => expect(screen.getByText(/plan was refused/i)).toBeTruthy())
+    expect(await screen.findByText(/plan was refused/i)).toBeTruthy()
     expect(screen.getByText(/Invalid enum value/)).toBeTruthy()
     expect(screen.getByText(/Nothing on this order changed/)).toBeTruthy()
   })
@@ -1458,7 +1458,7 @@ function forgeTheReasonTests() {
   // own refusal: its turn ended before the validation ran.
   it('carries the reason back to the architect', async () => {
     refused()
-    await waitFor(() => screen.getByText(/plan was refused/i))
+    await screen.findByText(/plan was refused/i)
     fireEvent.click(screen.getByRole('button', { name: /Tell the architect what was wrong/ }))
 
     await waitFor(() => {
@@ -1474,7 +1474,7 @@ function forgeTheReasonTests() {
 function forgeStartingOverTests() {
   it('can also start the turn over, carrying nothing', async () => {
     refused()
-    await waitFor(() => screen.getByText(/plan was refused/i))
+    await screen.findByText(/plan was refused/i)
     fireEvent.click(screen.getByRole('button', { name: /Start the turn over/ }))
 
     await waitFor(() =>
@@ -1519,7 +1519,7 @@ describe('attaching to the architect', () => {
       {},
       { provenance: { forgeSession: 'sess-architect', decisions: [], amendments: [] } }
     )
-    await waitFor(() => expect(screen.getByRole('button', { name: /Attach/ })).toBeTruthy())
+    expect(await screen.findByRole('button', { name: /Attach/ })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Attach/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 'sess-architect' })
@@ -1528,16 +1528,16 @@ describe('attaching to the architect', () => {
 
   it('offers nothing for an order no architect has run on', async () => {
     mountStates({})
-    await waitFor(() => screen.getByRole('heading', { name: 'What is being asked' }))
+    await screen.findByRole('heading', { name: 'What is being asked' })
     expect(screen.queryByRole('button', { name: /Attach/ })).toBeNull()
   })
 
   it('says so when that conversation has no terminal left', async () => {
     terminalReply = { ok: false }
     mountStates({}, { provenance: { forgeSession: 'sess-gone', decisions: [], amendments: [] } })
-    await waitFor(() => screen.getByRole('button', { name: /Attach/ }))
+    await screen.findByRole('button', { name: /Attach/ })
     fireEvent.click(screen.getByRole('button', { name: /Attach/ }))
-    await waitFor(() => expect(screen.getByText(/no longer has a terminal/)).toBeTruthy())
+    expect(await screen.findByText(/no longer has a terminal/)).toBeTruthy()
   })
 })
 
@@ -1558,7 +1558,7 @@ describe('a start is never held back by finished turns', () => {
     mountForStart({ start: { error: 'this repository has no test command' } })
     await waitFor(() => handOffButton())
     fireEvent.click(handOffButton())
-    await waitFor(() => screen.getByText(/no test command/))
+    await screen.findByText(/no test command/)
     expect(screen.queryByRole('button', { name: /Start anyway/ })).toBeNull()
   })
 })
@@ -1738,12 +1738,12 @@ describe('a failing check says how to clear it', () => {
 function proofAndTheEscapeTests() {
   it('shows the falsifiable check failing, on the case an operator actually meets', async () => {
     mountBlocked()
-    await waitFor(() => expect(screen.getByText(/no criterion asks for a picture/)).toBeTruthy())
+    expect(await screen.findByText(/no criterion asks for a picture/)).toBeTruthy()
   })
 
   it('offers to ask the architect for proof', async () => {
     mountBlocked()
-    await waitFor(() => screen.getByRole('button', { name: 'Ask for proof' }))
+    await screen.findByRole('button', { name: 'Ask for proof' })
     fireEvent.click(screen.getByRole('button', { name: 'Ask for proof' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith(
@@ -1767,7 +1767,7 @@ function proofAndTheEscapeTests() {
 function acceptingAsUnverifiableTests() {
   it('accepts a criterion as unverifiable, with a reason', async () => {
     mountBlocked()
-    await waitFor(() => screen.getByRole('button', { name: 'Nothing here can prove this' }))
+    await screen.findByRole('button', { name: 'Nothing here can prove this' })
     fireEvent.click(screen.getByRole('button', { name: 'Nothing here can prove this' }))
 
     const box = screen.getByLabelText('Why AC-1 cannot be proven')
@@ -1787,7 +1787,7 @@ function acceptingAsUnverifiableTests() {
 
   it('will not accept one on a blank reason — a shrug is not a decision', async () => {
     mountBlocked()
-    await waitFor(() => screen.getByRole('button', { name: 'Nothing here can prove this' }))
+    await screen.findByRole('button', { name: 'Nothing here can prove this' })
     fireEvent.click(screen.getByRole('button', { name: 'Nothing here can prove this' }))
     const accept = screen.getByRole('button', { name: 'Accept it' })
     expect(isUnavailable(accept)).toBe(true)
@@ -1808,11 +1808,9 @@ function theAcceptedReasonTests() {
     })
     // Nothing blocks once it is accepted, so the order opens on hand-off.
     await openForgeStep('Plan')
-    await waitFor(() =>
-      expect(
-        screen.getByText(/accepted as unverifiable — no display in this environment/)
-      ).toBeTruthy()
-    )
+    expect(
+      await screen.findByText(/accepted as unverifiable — no display in this environment/)
+    ).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Nothing here can prove this' })).toBeNull()
   })
 }
@@ -1841,14 +1839,14 @@ function forgeOpenQuestionsTests() {
 function noRemedyTests() {
   it('offers no remedy on a check that passes', async () => {
     mountBlocked()
-    await waitFor(() => screen.getByRole('heading', { name: 'The plan and how it is proven' }))
+    await screen.findByRole('heading', { name: 'The plan and how it is proven' })
     // Risk is graded against this plan, so its row carries no button.
     expect(screen.queryByRole('button', { name: 'Ask for a regrade' })).toBeNull()
   })
 
   it('offers no remedy at all once the order has been handed off', async () => {
     mountBlocked({ status: 'running' as const })
-    await waitFor(() => screen.getByText('Refuse an expired refresh token'))
+    await screen.findByText('Refuse an expired refresh token')
     expect(screen.queryByRole('button', { name: 'Ask for proof' })).toBeNull()
     await openForgeStep('Plan')
     expect(screen.queryByRole('button', { name: 'Nothing here can prove this' })).toBeNull()
@@ -1866,7 +1864,7 @@ function thePlanStepTests() {
   it('shows them on the Plan step and saves what the operator sets', async () => {
     mountBlocked({ budgets: { agents: 2, wallClockMinutes: null, tokens: null } })
     await openForgeStep('Plan')
-    const section = await waitFor(() => screen.getByRole('region', { name: 'Budgets' }))
+    const section = await screen.findByRole('region', { name: 'Budgets' })
     expect(
       (within(section).getByRole('checkbox', { name: 'No limit on minutes' }) as HTMLInputElement)
         .checked
@@ -1892,7 +1890,7 @@ function noFilesBudgetAndNoControlsTests() {
   it('offers no files budget, and no check that a plan fits one', async () => {
     mountBlocked({ budgets: SET })
     await openForgeStep('Plan')
-    const section = await waitFor(() => screen.getByRole('region', { name: 'Budgets' }))
+    const section = await screen.findByRole('region', { name: 'Budgets' })
     expect(within(section).queryByRole('spinbutton', { name: 'Files touched' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Change the budget' })).toBeNull()
   })
@@ -1900,7 +1898,7 @@ function noFilesBudgetAndNoControlsTests() {
   it('shows them without controls once the order is no longer a draft', async () => {
     mountBlocked({ status: 'running' as const, budgets: SET })
     await openForgeStep('Plan')
-    const section = await waitFor(() => screen.getByRole('region', { name: 'Budgets' }))
+    const section = await screen.findByRole('region', { name: 'Budgets' })
     expect(within(section).getByText('3 agents · 45 minutes')).toBeTruthy()
     expect(within(section).queryByRole('button', { name: 'Save budgets' })).toBeNull()
   })
@@ -1956,9 +1954,9 @@ const md = {
 function theBlockingStepTests() {
   it('opens on the step that is blocking, not on the first one', async () => {
     mountBlocked()
-    await waitFor(() =>
-      expect(screen.getByRole('heading', { name: 'The plan and how it is proven' })).toBeTruthy()
-    )
+    expect(
+      await screen.findByRole('heading', { name: 'The plan and how it is proven' })
+    ).toBeTruthy()
     expect(
       within(stepList()).getByRole('button', { name: /^Plan/ }).getAttribute('aria-current')
     ).toBe('step')
@@ -1966,7 +1964,7 @@ function theBlockingStepTests() {
 
   it('marks the blocking step on the step list, and leaves the others alone', async () => {
     mountBlocked()
-    await waitFor(() => screen.getByRole('heading', { name: 'The plan and how it is proven' }))
+    await screen.findByRole('heading', { name: 'The plan and how it is proven' })
     const planStep = within(stepList()).getByRole('button', { name: /^Plan/ })
     expect(planStep.className).toContain('fdry-rail-step--bad')
     const intentStep = within(stepList()).getByRole('button', { name: /^Intent/ })
@@ -1977,7 +1975,7 @@ function theBlockingStepTests() {
 function movingBetweenStepsTests() {
   it('goes forward to the next step and back again', async () => {
     mountStates({})
-    await waitFor(() => screen.getByRole('heading', { name: 'What is being asked' }))
+    await screen.findByRole('heading', { name: 'What is being asked' })
     fireEvent.click(screen.getByRole('button', { name: 'Next: Plan' }))
     expect(screen.getByRole('heading', { name: 'The plan and how it is proven' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
@@ -1986,7 +1984,7 @@ function movingBetweenStepsTests() {
 
   it('offers no way back from the first step, and hand-off in place of next on the last', async () => {
     mountForStart()
-    await waitFor(() => screen.getByRole('heading', { name: 'Ready to hand off?' }))
+    await screen.findByRole('heading', { name: 'Ready to hand off?' })
     expect(screen.queryByRole('button', { name: /^Next/ })).toBeNull()
     await openForgeStep('Intent')
     expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
@@ -1995,7 +1993,7 @@ function movingBetweenStepsTests() {
 
   it('moves focus to the step it opened, for a keyboard user', async () => {
     mountStates({})
-    await waitFor(() => screen.getByRole('heading', { name: 'What is being asked' }))
+    await screen.findByRole('heading', { name: 'What is being asked' })
     await openForgeStep('Red team')
     expect(document.activeElement?.textContent).toBe('Red team findings')
   })
@@ -2010,7 +2008,7 @@ describe('agent text is rendered as markdown', () => {
 function eachStepTests() {
   it('renders a question, its reason and its options', async () => {
     mountStates({}, md)
-    await waitFor(() => screen.getByText('done'))
+    await screen.findByText('done')
     expect(screen.getByText('done').tagName).toBe('STRONG')
     expect(screen.getByText('completed').tagName).toBe('CODE')
     expect(screen.getByText('one').tagName).toBe('LI')
@@ -2020,7 +2018,7 @@ function eachStepTests() {
   it('renders criteria and assumptions on the Plan step', async () => {
     mountStates({}, md)
     await openForgeStep('Plan')
-    await waitFor(() => screen.getByText('open'))
+    await screen.findByText('open')
     expect(screen.getByText('open').tagName).toBe('STRONG')
     expect(screen.getByText('Orders.tsx').tagName).toBe('CODE')
   })
@@ -2028,7 +2026,7 @@ function eachStepTests() {
   it('renders a red-team finding on the Red team step', async () => {
     mountStates({}, md)
     await openForgeStep('Red team')
-    await waitFor(() => screen.getByText('the picker'))
+    await screen.findByText('the picker')
     expect(screen.getByText('the picker').tagName).toBe('STRONG')
   })
 }
@@ -2052,9 +2050,9 @@ describe('a red-team round running', () => {
         autoTurn: null,
       },
     })
-    await waitFor(() =>
-      expect(screen.getByText('The red team is reviewing the plan · round 2 of 3')).toBeTruthy()
-    )
+    expect(
+      await screen.findByText('The red team is reviewing the plan · round 2 of 3')
+    ).toBeTruthy()
     await openForgeStep('Hand off')
     const handOff = screen.getByRole('button', { name: 'Hand off' })
     expect(isUnavailable(handOff)).toBe(true)
@@ -2065,7 +2063,7 @@ describe('a red-team round running', () => {
 describe('the Hand off step', () => {
   it('offers no switch to hand off on its own: pressing Hand off is the only start', async () => {
     mountForStart()
-    await waitFor(() => expect(screen.getByText('Ready to hand off')).toBeTruthy())
+    expect(await screen.findByText('Ready to hand off')).toBeTruthy()
     await openForgeStep('Hand off')
     expect(handOffButton()).toBeTruthy()
     expect(screen.queryByRole('switch')).toBeNull()
@@ -2141,7 +2139,7 @@ describe('an order agreed and handed off automatically', () => {
     )
     installForgeBridge()
     render(<Forge orderId="WO-1" />)
-    await waitFor(() => expect(screen.getByText(/Handed off automatically at/)).toBeTruthy())
+    expect(await screen.findByText(/Handed off automatically at/)).toBeTruthy()
   })
 })
 
@@ -2195,7 +2193,7 @@ describe('findings grouped by who acts on them', () => {
       { intake, loop: EXHAUSTED_LOOP }
     )
     await openForgeStep('Red team')
-    await waitFor(() => screen.getByText('blocking one'))
+    await screen.findByText('blocking one')
     expect(screen.getByText('Notes, nothing to do')).toBeTruthy()
     expect(screen.getByText('note one')).toBeTruthy()
     expect(screen.getByText('Needs your decision')).toBeTruthy()
@@ -2318,7 +2316,7 @@ function aRefusedTurnTests() {
     )
     installForgeBridge()
     render(<Forge orderId="WO-1" />)
-    await waitFor(() => screen.getByText(/plan was refused/i))
+    await screen.findByText(/plan was refused/i)
     auditUnavailableControls()
   })
 }
@@ -2335,7 +2333,7 @@ function aFindingNeedingADecisionTests() {
     const loop = { rounds: [round], heldAt: null, exhausted: true }
     mountCompiled({ ...trackerDraft(), redTeam }, { intake, loop })
     await openForgeStep('Red team')
-    await waitFor(() => screen.getByText('blocking one'))
+    await screen.findByText('blocking one')
     // Nothing is decided yet, so Send is unavailable — the case under audit.
     auditUnavailableControls()
   })
@@ -2345,7 +2343,7 @@ function theShapeStepTests() {
   it('holds on the shape step even when the order is otherwise ready', async () => {
     mountForStart()
     await openForgeStep('Shape')
-    await waitFor(() => screen.getByText('Speckit'))
+    await screen.findByText('Speckit')
     auditUnavailableControls()
   })
 

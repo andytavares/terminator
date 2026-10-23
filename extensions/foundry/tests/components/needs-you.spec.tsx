@@ -91,7 +91,7 @@ window.HTMLElement.prototype.scrollIntoView = vi.fn()
 beforeEach(() => vi.clearAllMocks())
 
 async function openPlan(): Promise<void> {
-  await waitFor(() => screen.getByRole('button', { name: /^Plan/ }))
+  await screen.findByRole('button', { name: /^Plan/ })
   fireEvent.click(screen.getByRole('button', { name: /^Plan/ }))
 }
 
@@ -99,7 +99,7 @@ describe('the Forge puts its open questions on the Plan step', () => {
   it('renders them, with how many of them are decided in the group heading', async () => {
     mountForge(QUESTIONS)
     await openPlan()
-    await waitFor(() => screen.getByText('Needs your answer'))
+    await screen.findByText('Needs your answer')
     expect(screen.getByText(/0 of 2 decided/)).toBeTruthy()
     expect(screen.getByText(QUESTIONS[0].text)).toBeTruthy()
   })
@@ -107,7 +107,7 @@ describe('the Forge puts its open questions on the Plan step', () => {
   it('is inside the Plan step, not a band above every step', async () => {
     const { container } = mountForge(QUESTIONS)
     await openPlan()
-    await waitFor(() => screen.getByText('Needs your answer'))
+    await screen.findByText('Needs your answer')
     const group = screen.getByText('Needs your answer').closest('.fdry-group')
     expect(group?.closest('.fdry-wizard'), 'the group is inside the steps').not.toBeNull()
     expect(container.querySelector('.fdry-needs-you')).toBeNull()
@@ -116,7 +116,7 @@ describe('the Forge puts its open questions on the Plan step', () => {
   it('takes no room at all when nothing is being asked', async () => {
     mountForge([])
     await openPlan()
-    await waitFor(() => screen.getByRole('heading', { name: 'The plan and how it is proven' }))
+    await screen.findByRole('heading', { name: 'The plan and how it is proven' })
     expect(screen.queryByText('Needs your answer')).toBeNull()
   })
 })
@@ -128,7 +128,7 @@ describe('the Forge puts its open questions on the Plan step', () => {
 // the operator.
 
 async function openRedTeam(): Promise<void> {
-  await waitFor(() => screen.getByRole('button', { name: /^Red team/ }))
+  await screen.findByRole('button', { name: /^Red team/ })
   fireEvent.click(screen.getByRole('button', { name: /^Red team/ }))
 }
 
@@ -175,7 +175,7 @@ function needsYouBlockingFindingsTests() {
       ],
     })
     await openRedTeam()
-    await waitFor(() => screen.getByText('Needs your decision'))
+    await screen.findByText('Needs your decision')
     const group = screen.getByText('Needs your decision').closest('.fdry-group') as HTMLElement
     expect(within(group).getByText('the change would leave the outcome false')).toBeTruthy()
     expect(within(group).getByRole('radio', { name: /^Ask the architect/ })).toBeTruthy()
@@ -198,7 +198,7 @@ function needsYouNotesTests() {
       ],
     })
     await openRedTeam()
-    await waitFor(() => screen.getByText('Notes, nothing to do'))
+    await screen.findByText('Notes, nothing to do')
     expect(screen.queryByText('Needs your decision')).toBeNull()
   })
 }
@@ -256,13 +256,13 @@ function mountFloor(pending: unknown[]) {
 describe('the Floor puts a held tool call above the run graph', () => {
   it('renders the ask in the band', async () => {
     const { container } = mountFloor([ASK])
-    await waitFor(() => expect(screen.getByText('Waiting on you — 1')).toBeTruthy())
+    expect(await screen.findByText('Waiting on you — 1')).toBeTruthy()
     expect(container.querySelector('.fdry-needs-you')).not.toBeNull()
   })
 
   it('comes before the lanes rather than under all of them', async () => {
     const { container } = mountFloor([ASK])
-    await waitFor(() => screen.getByText('Waiting on you — 1'))
+    await screen.findByText('Waiting on you — 1')
     const band = container.querySelector('.fdry-needs-you')
     const lane = container.querySelector('.fdry-lane')
     expect(lane, 'no lane rendered, so the ordering assertion proves nothing').not.toBeNull()
@@ -315,20 +315,18 @@ describe('the tab strip says how much is waiting', () => {
 
   it('says what the number means, rather than reading out a bare digit', async () => {
     mountApp({ inbox: 3, forge: 0 })
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Forge, 3 waiting on you' })).toBeTruthy()
-    )
+    expect(await screen.findByRole('button', { name: 'Forge, 3 waiting on you' })).toBeTruthy()
   })
 
   it('shows no badge at all when nothing is waiting', async () => {
     const { container } = mountApp({ inbox: 0, forge: 0 })
-    await waitFor(() => screen.getByRole('button', { name: 'Forge' }))
+    await screen.findByRole('button', { name: 'Forge' })
     expect(container.querySelectorAll('.fdry-tab-count')).toHaveLength(0)
   })
 
   it('never puts a count on the Ledger, which holds nothing for anybody', async () => {
     mountApp({ inbox: 3, forge: 2 })
-    await waitFor(() => screen.getByRole('button', { name: 'Forge, 5 waiting on you' }))
+    await screen.findByRole('button', { name: 'Forge, 5 waiting on you' })
     expect(screen.getByRole('button', { name: 'Ledger' })).toBeTruthy()
   })
 })

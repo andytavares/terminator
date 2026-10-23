@@ -297,7 +297,7 @@ describe('ReviewDashboard — renders the three tabs with counts', () => {
     })
     render(<ReviewDashboard />)
     // The tab list renders while loading with zero counts; wait for the data.
-    await waitFor(() => within(screen.getByRole('tablist')).getByText('3'))
+    within(await screen.findByRole('tablist')).getByText('3')
     const tablist = screen.getByRole('tablist')
     expect(within(tablist).getByText('3')).toBeTruthy() // needs you: 211,210,212
     expect(within(tablist).getByText('1')).toBeTruthy() // mine: 213
