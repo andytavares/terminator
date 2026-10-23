@@ -254,22 +254,17 @@ function weeklyReviewCompletingTests() {
     render(<WeeklyReview />)
     await screen.findByText('1 of 6')
 
-    // Navigate through steps 1-5 using header nav
-    for (let i = 0; i < 5; i++) {
-      const nextBtn = screen.queryByRole('button', { name: 'Next step' })
-      if (nextBtn && !nextBtn.hasAttribute('disabled')) fireEvent.click(nextBtn)
-      await waitFor(() => {})
+    for (let step = 2; step <= 6; step++) {
+      fireEvent.click(await screen.findByRole('button', { name: 'Next step' }))
+      await screen.findByText(`${step} of 6`)
     }
 
-    const finishBtn = screen.queryByRole('button', { name: /finish/i })
-    if (finishBtn) {
-      fireEvent.click(finishBtn)
-      await waitFor(() => {
-        expect(mockInvoke).toHaveBeenCalledWith(
-          'task-vault:review:complete',
-          expect.objectContaining({ reviewId: 'review-1' })
-        )
-      })
-    }
+    fireEvent.click(await screen.findByRole('button', { name: /finish/i }))
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        'task-vault:review:complete',
+        expect.objectContaining({ reviewId: 'review-1' })
+      )
+    })
   })
 }

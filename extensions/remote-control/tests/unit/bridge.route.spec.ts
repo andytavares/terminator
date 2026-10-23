@@ -14,17 +14,19 @@ let mockSendChannel: Mock<BridgeIpc['sendChannel']>
 let mockOnWindowEvent: Mock<BridgeIpc['onWindowEvent']>
 let mockIsRemoteAccessible: Mock<BridgeIpc['isRemoteAccessible']>
 
-function waitForClose(ws: WebSocket): Promise<void> {
-  return new Promise((resolve) => {
+/** Waits until the socket ends, then asserts it is no longer open. */
+async function expectClosed(ws: WebSocket): Promise<void> {
+  await new Promise<void>((resolve) => {
     if (ws.readyState === WebSocket.CLOSED) {
       resolve()
       return
     }
     // terminate() on the server causes ECONNRESET (error) on the client before or
     // instead of a clean close frame — resolve on either, not reject on error
-    ws.once('close', resolve)
-    ws.once('error', resolve)
+    ws.once('close', () => resolve())
+    ws.once('error', () => resolve())
   })
+  expect(ws.readyState).not.toBe(WebSocket.OPEN)
 }
 
 function waitForMessage(ws: WebSocket): Promise<string> {
@@ -90,7 +92,7 @@ function invokeOverBridge(
 
 async function closeBridge(ws: WebSocket): Promise<void> {
   ws.close()
-  await waitForClose(ws)
+  await expectClosed(ws)
 }
 
 let app: FastifyInstance
@@ -143,16 +145,17 @@ function bridgeTicketEndpointTests() {
 function bridgeAuthenticationTests() {
   it('closes connection when no ticket provided', async () => {
     const ws = new WebSocket(`${baseUrl}/api/bridge`)
-    await waitForClose(ws)
+    await expectClosed(ws)
   })
 
   it('closes connection when invalid ticket provided', async () => {
     const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=invalid-ticket`)
-    await waitForClose(ws)
+    await expectClosed(ws)
   })
 
   it('accepts connection with a valid ticket', async () => {
     const ws = await openBridge()
+    expect(ws.readyState).toBe(WebSocket.OPEN)
     await closeBridge(ws)
   })
 
@@ -160,7 +163,7 @@ function bridgeAuthenticationTests() {
     const ticket = ticketStore.createTicket('__bridge__', 'bridge')
     ticketStore.consumeTicket(ticket, 'bridge')
     const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
-    await waitForClose(ws)
+    await expectClosed(ws)
   })
 }
 
@@ -283,6 +286,7 @@ function bridgeSendEdgeTests() {
     const ws = await openBridge()
     ws.send(JSON.stringify({ type: 'send', channel: 'no:handler', args: [{}] }))
     await settleBridge(ws)
+    expect(ws.readyState).toBe(WebSocket.OPEN)
     await closeBridge(ws)
   })
 }
@@ -314,8 +318,8 @@ function bridgeDisconnectAllTests() {
 
     bridgeCleanup.disconnectAll()
 
-    await waitForClose(ws1)
-    await waitForClose(ws2)
+    await expectClosed(ws1)
+    await expectClosed(ws2)
   })
 
   it('is safe to call when no connections are open', () => {
@@ -342,13 +346,13 @@ function bridgeTicketPurposeTests() {
   it('rejects a terminal-purpose ticket on the bridge endpoint', async () => {
     const terminalTicket = ticketStore.createTicket('some-session-id', 'terminal')
     const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${terminalTicket}`)
-    await waitForClose(ws)
+    await expectClosed(ws)
   })
 
   it('rejects an app-purpose ticket on the bridge endpoint', async () => {
     const appTicket = ticketStore.createTicket('__app__', 'app')
     const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${appTicket}`)
-    await waitForClose(ws)
+    await expectClosed(ws)
   })
 }
 
@@ -357,6 +361,8 @@ function bridgeInvalidMessageTests() {
     const ws = await openBridge()
     ws.send('not json at all')
     await settleBridge(ws)
+    expect(ws.readyState).toBe(WebSocket.OPEN)
+    expect(mockSendChannel).not.toHaveBeenCalled()
     await closeBridge(ws)
   })
 
