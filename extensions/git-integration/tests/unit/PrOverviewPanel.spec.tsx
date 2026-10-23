@@ -395,17 +395,17 @@ describe('PrOverviewPanel — clamping the description', () => {
   it('clamps the description once a summary is shown, and unclamps on request', async () => {
     const restore = stubDescriptionHeights(900, 300)
     try {
-      await clampThenExpand()
+      await expectClampThenExpand()
     } finally {
       restore()
     }
   })
 
-  async function clampThenExpand() {
+  async function expectClampThenExpand() {
     renderPanel()
     fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
     await screen.findByText('A summary.')
-    fireEvent.click(screen.getByRole('button', { name: 'Show full description' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Show full description' }))
     expect(screen.getByRole('button', { name: 'Show less' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Show full description' })).toBeNull()
   }

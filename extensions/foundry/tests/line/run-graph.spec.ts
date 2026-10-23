@@ -360,7 +360,7 @@ describe('stepFor', () => {
     const graph = buildRunGraph(order(), r)
     const child = nodeById(graph, 'build:U-1')
     expect(child).toBeDefined()
-    if (child !== undefined) expect(stepFor(r, child)?.id).toBe('build')
+    expect(child && stepFor(r, child)?.id).toBe('build')
   })
 })
 

@@ -189,7 +189,7 @@ function exportDialogSettingsChosenTests() {
     })
     render(<ExportDialog onClose={vi.fn()} />)
 
-    await waitFor(() => expect(screen.getByDisplayValue('/tmp/my-notes')).toBeTruthy())
+    await screen.findByDisplayValue('/tmp/my-notes')
     expect(screen.getByRole('button', { name: 'Inline HTML' }).className).toContain('--active')
     fireEvent.click(screen.getByRole('button', { name: 'Export 1 note' }))
     await waitFor(() =>

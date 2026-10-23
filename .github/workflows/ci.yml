@@ -306,11 +306,41 @@ jobs:
         timeout-minutes: 5
 
   # Every spec this change adds or edits, 30 times with a fresh seed each, every core busy. One
-  # failure fails the check and prints the seed that replays it (ADR 124). Nothing retries.
-  stability:
-    name: Stability
+  # failure fails the check and prints the seed that replays it (ADR 124). Nothing retries. The
+  # plan splits the 30 runs, and the specs when there are many, so each shard fits in 7 minutes.
+  stability-plan:
+    name: Stability plan
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 3
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Size the shards
+        id: plan
+        run: node scripts/stability.mjs --github-output >> "$GITHUB_OUTPUT"
+
+  stability-shard:
+    name: Stability (${{ matrix.shard }}, ${{ matrix.runs }} runs of part ${{ matrix.part }})
+    needs: stability-plan
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.stability-plan.outputs.shards) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -325,9 +355,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Changed specs, 30 runs
-        run: node scripts/stability.mjs
+      - name: Changed specs, this shard
+        run: node scripts/stability.mjs --runs ${{ matrix.runs }} --part ${{ matrix.part }}
         timeout-minutes: 7
+
+  # The one Stability check branch protection requires.
+  stability:
+    name: Stability
+    needs: [stability-plan, stability-shard]
+    if: always()
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 2
+
+    steps:
+      - name: Verdict
+        run: |
+          echo "plan: ${{ needs.stability-plan.result }}, shards: ${{ needs.stability-shard.result }}"
+          test "${{ needs.stability-plan.result }}" = success
+          test "${{ needs.stability-shard.result }}" = success
 
   # Every e2e spec this change adds or edits, five times. The build only happens when there is one.
   # It starts once the E2E shards end, so CI never asks for more than five macOS runners at once.
@@ -667,6 +712,16 @@ jobs:
         with:
           name: test-results-${{ matrix.shard }}
           path: test-results/
+          retention-days: 14
+
+      # The app logs git's own words when it cannot answer (git.ipc.ts); Electron writes the log
+      # under the runner's real home, not the sealed one, so it is kept here or not at all.
+      - name: Upload app log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-log-${{ matrix.shard }}
+          path: ~/Library/Logs/@andytavares/terminator/
           retention-days: 14
 
   # The one E2E check branch protection requires: green when every shard

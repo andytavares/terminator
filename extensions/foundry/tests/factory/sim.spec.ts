@@ -450,7 +450,7 @@ describe('breakroom walk paths', () => {
       expect(walked.length).toBeGreaterThan(0)
       for (const tile of walked) {
         const key = `${tile.x},${tile.y}`
-        if (beltTileKeys.has(key)) expect(crossoverKeys.has(key)).toBe(true)
+        expect(!beltTileKeys.has(key) || crossoverKeys.has(key)).toBe(true)
       }
       checked++
     }
@@ -838,11 +838,10 @@ function strollingTests() {
       w = tick(w, 100)
       for (const c of w.crew) {
         if (c.wander === 'out' || c.wander === 'back') walked = true
-        if (c.wander !== null && c.wander !== undefined) {
-          // the seat stays reserved for the whole stroll
-          expect(c.restSeat).not.toBeNull()
-        }
       }
+      // the seat stays reserved for the whole stroll
+      const strolling = w.crew.filter((c) => c.wander !== null && c.wander !== undefined)
+      for (const c of strolling) expect(c.restSeat).not.toBeNull()
       if (w.crew.some((c) => c.wander === 'there')) left = true
     }
     expect(walked).toBe(true)

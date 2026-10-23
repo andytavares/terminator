@@ -46,7 +46,7 @@ function detailLoadingTests() {
     bridge.responses['task-vault:vault:get-task-detail'] = { error: 'Task not found' }
     const { onClose } = renderDetailPanel()
     expect(await screen.findByText('Task not found')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Close detail panel' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Close detail panel' }))
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -92,7 +92,7 @@ function editingTogglingAndLinksTests() {
   it('saves from the preview toggle, and starts editing by clicking the text', async () => {
     renderDetailPanel()
     fireEvent.click(await screen.findByText('it'))
-    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Preview' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:save-task-detail')).toHaveLength(1)
     )

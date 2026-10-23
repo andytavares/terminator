@@ -98,7 +98,7 @@ function archiveProjectsAndAreasProjectsTests() {
       ])
     )
     fireEvent.click(await screen.findByRole('tab', { name: /Archived projects/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Delete permanently' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete permanently' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:projects:delete')).toEqual([
         { projectFilePath: 'Old launch' },
@@ -115,7 +115,7 @@ function archiveProjectsAndAreasAreasTests() {
       expect(bridge.calls('task-vault:vault:restore-area')).toEqual([{ areaName: 'Hobbies' }])
     )
     fireEvent.click(await screen.findByRole('tab', { name: /Archived areas/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Delete permanently' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete permanently' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:delete-area')).toEqual([{ areaFilePath: 'Hobbies' }])
     )
@@ -125,7 +125,7 @@ function archiveProjectsAndAreasAreasTests() {
     bridge.responses['task-vault:vault:list-archive'] = {}
     render(<ArchiveView />)
     expect(await screen.findByText('No completed tasks in the last 30 days.')).toBeTruthy()
-    fireEvent.click(screen.getByRole('tab', { name: /Archived projects/ }))
+    fireEvent.click(await screen.findByRole('tab', { name: /Archived projects/ }))
     expect(screen.getByText('No archived projects.')).toBeTruthy()
     fireEvent.click(screen.getByRole('tab', { name: /Archived areas/ }))
     expect(screen.getByText('No archived areas.')).toBeTruthy()

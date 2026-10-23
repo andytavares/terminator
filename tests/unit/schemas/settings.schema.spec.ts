@@ -115,11 +115,8 @@ describe('GlobalSettingsSchema — shell, ui and extensions', () => {
 
   it('applies default value for ui field when omitted', () => {
     const { ui: _ui, ...withoutUi } = validGlobal
-    const result = GlobalSettingsSchema.safeParse(withoutUi)
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.ui).toEqual({ hasSeenWelcome: false, editor: '', hideSidebarOnHome: true })
-    }
+    const result = GlobalSettingsSchema.parse(withoutUi)
+    expect(result.ui).toEqual({ hasSeenWelcome: false, editor: '', hideSidebarOnHome: true })
   })
 })
 
@@ -153,31 +150,25 @@ describe('GlobalSettingsSchema — required fields and welcome flag', () => {
 
 describe('GlobalSettingsSchema — notifications', () => {
   it('applies default value for notifications field when omitted', () => {
-    const result = GlobalSettingsSchema.safeParse(validGlobal)
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.notifications).toEqual({
-        defaultTargets: ['system', 'center', 'toast'],
-        overrides: {},
-      })
-    }
+    const result = GlobalSettingsSchema.parse(validGlobal)
+    expect(result.notifications).toEqual({
+      defaultTargets: ['system', 'center', 'toast'],
+      overrides: {},
+    })
   })
 
   it('accepts a custom notifications section keyed by core notification key', () => {
-    const result = GlobalSettingsSchema.safeParse({
+    const result = GlobalSettingsSchema.parse({
       ...validGlobal,
       notifications: {
         defaultTargets: ['toast'],
         overrides: { terminalBell: ['system', 'center'] },
       },
     })
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.notifications.defaultTargets).toEqual(['toast'])
-      expect(result.data.notifications.overrides).toEqual({
-        terminalBell: ['system', 'center'],
-      })
-    }
+    expect(result.notifications.defaultTargets).toEqual(['toast'])
+    expect(result.notifications.overrides).toEqual({
+      terminalBell: ['system', 'center'],
+    })
   })
 })
 
@@ -237,22 +228,16 @@ describe('WorkspaceSettingsSchema', () => {
 
   it('applies default empty object for overrides when omitted', () => {
     const { overrides: _o, ...without } = validWorkspace
-    const result = WorkspaceSettingsSchema.safeParse(without)
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.overrides).toEqual({})
-    }
+    const result = WorkspaceSettingsSchema.parse(without)
+    expect(result.overrides).toEqual({})
   })
 })
 
 describe('WorkspaceSettingsSchema — defaults and appearance overrides', () => {
   it('applies default empty record for extensions when omitted', () => {
     const { extensions: _e, ...without } = validWorkspace
-    const result = WorkspaceSettingsSchema.safeParse(without)
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.extensions).toEqual({})
-    }
+    const result = WorkspaceSettingsSchema.parse(without)
+    expect(result.extensions).toEqual({})
   })
 
   it('accepts overrides with appearance theme override', () => {
@@ -379,11 +364,8 @@ describe('GlobalSettingsSchema — sidebar staleness upper bound (FR-020)', () =
 
 describe('GlobalSettingsSchema — quick actions (057)', () => {
   it('defaults quickActions to empty arrays when omitted', () => {
-    const result = GlobalSettingsSchema.safeParse(validGlobal)
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.quickActions).toEqual({ pins: [], usage: [], directUse: [], custom: [] })
-    }
+    const result = GlobalSettingsSchema.parse(validGlobal)
+    expect(result.quickActions).toEqual({ pins: [], usage: [], directUse: [], custom: [] })
   })
 
   it('accepts a custom shell action', () => {

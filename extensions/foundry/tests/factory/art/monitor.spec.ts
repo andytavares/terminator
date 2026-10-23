@@ -89,12 +89,14 @@ function theTubeTests() {
   it.each(SIZES)('never paints the tube colour outside the tube at %ix%i', (w, h) => {
     const g = raster(w, h)
     const t = monitorTube(w, h)
+    const outside: unknown[] = []
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const inside = x >= t.x && x < t.x + t.w && y >= t.y && y < t.y + t.h
-        if (!inside) expect(g[y][x]).not.toBe(HALL.caseTube)
+        if (!inside) outside.push(g[y][x])
       }
     }
+    expect(outside).not.toContain(HALL.caseTube)
   })
 }
 

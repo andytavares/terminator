@@ -122,7 +122,7 @@ describe('an order waiting on you with no gate', () => {
 
   it('names the order and exactly why it is waiting', async () => {
     mount({ waiting })
-    await waitFor(() => screen.getByText('Ready to hand off'))
+    await screen.findByText('Ready to hand off')
     expect(screen.getByText('render html in comments')).toBeTruthy()
     expect(screen.getByText(/hand it off in the Forge/)).toBeTruthy()
   })
@@ -160,7 +160,7 @@ const budgetGate = () =>
 function theRuleAndTheEvidenceTests() {
   it('names the rule, the reason and what happens if it is ignored', async () => {
     mount({ gates: [gate()] })
-    await waitFor(() => expect(screen.getByText(ruleInWords('risk.p0'))).toBeTruthy())
+    await screen.findByText(ruleInWords('risk.p0'))
     expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
     // The reason is a click away rather than printed on every row.
     expect(screen.queryByText(/session\.ts/)).toBeNull()
@@ -172,7 +172,7 @@ function theRuleAndTheEvidenceTests() {
     mount({
       gates: [gate({ evidence: [{ kind: 'stdout', excerpt: 'Error: token refresh failed' }] })],
     })
-    await waitFor(() => screen.getByText(ruleInWords('risk.p0')))
+    await screen.findByText(ruleInWords('risk.p0'))
     expect(screen.queryByText(/token refresh failed/)).toBeNull()
     fireEvent.click(screen.getByText('U-4 rewrites session token refresh'))
     expect((document.querySelector('details') as HTMLDetailsElement).open).toBe(false)
@@ -194,7 +194,7 @@ function inboxLinksTests() {
       ],
     })
     fireEvent.click(await screen.findByRole('link', { name: '#233' }))
-    fireEvent.click(screen.getByRole('link', { name: 'TAV-15' }))
+    fireEvent.click(await screen.findByRole('link', { name: 'TAV-15' }))
     expect(openExternal).toHaveBeenCalledWith(pullUrl)
     expect(openExternal).toHaveBeenCalledWith(ticketUrl)
   })
@@ -203,13 +203,13 @@ function inboxLinksTests() {
 function optionsTests() {
   it('says how much work the decision unblocks', async () => {
     mount({ gates: [gate()] })
-    await waitFor(() => screen.getByText(ruleInWords('risk.p0')))
+    await screen.findByText(ruleInWords('risk.p0'))
     expect(screen.getByText('3 units waiting')).toBeTruthy()
   })
 
   it('offers each option with its consequence on the control itself', async () => {
     mount({ gates: [gate()] })
-    await waitFor(() => screen.getByText(ruleInWords('risk.p0')))
+    await screen.findByText(ruleInWords('risk.p0'))
     const approve = screen.getByRole('button', { name: 'Approve' })
     expect(approve.getAttribute('title')).toContain('proceeds')
   })
@@ -218,8 +218,8 @@ function optionsTests() {
 function inboxDecidingTests() {
   it('sends the decision, and asks again afterwards', async () => {
     mount({ gates: [gate()] })
-    await waitFor(() => screen.getByText(ruleInWords('risk.p0')))
-    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    await screen.findByText(ruleInWords('risk.p0'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
         gateId: 'G-1',
@@ -231,7 +231,7 @@ function inboxDecidingTests() {
 
   it('says a gate with no deadline waits, rather than implying a timer', async () => {
     mount({ gates: [gate()] })
-    await waitFor(() => screen.getByText(ruleInWords('risk.p0')))
+    await screen.findByText(ruleInWords('risk.p0'))
     expect(screen.getByText(/\(it waits for you\)/)).toBeTruthy()
   })
 }
@@ -244,8 +244,8 @@ describe('raising a budget from the inbox', () => {
 function inboxTheNewLimitTests() {
   it('asks for the new limit, then sends it with the decision', async () => {
     mount({ gates: [budgetGate()] })
-    await waitFor(() => screen.getByText(ruleInWords('budget.exceeded')))
-    fireEvent.click(screen.getByRole('button', { name: 'Raise the budget' }))
+    await screen.findByText(ruleInWords('budget.exceeded'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Raise the budget' }))
     expect(invoke).not.toHaveBeenCalledWith('foundry:inbox.decide', expect.anything())
     expect(screen.getByText('At least 46.')).toBeTruthy()
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Minutes' }), {
@@ -265,8 +265,8 @@ function inboxTheNewLimitTests() {
 function noRecordedBudgetTests() {
   it('decides straight away for a gate that never recorded its budget', async () => {
     mount({ gates: [gate({ rule: 'budget.exceeded' })] })
-    await waitFor(() => screen.getByText(ruleInWords('budget.exceeded')))
-    fireEvent.click(screen.getByRole('button', { name: 'Raise the budget' }))
+    await screen.findByText(ruleInWords('budget.exceeded'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Raise the budget' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
         gateId: 'G-1',
@@ -295,9 +295,9 @@ function nothingAtAllTests() {
 function aPromotionNoteTests() {
   it('keeps a promotion note up after the last signal goes', async () => {
     mount({ signals: [signal()] })
-    await waitFor(() => screen.getByText('test-foo flakes on main'))
-    fireEvent.click(screen.getByRole('button', { name: 'Promote' }))
-    fireEvent.change(screen.getByRole('textbox', { name: /repository/i }), {
+    await screen.findByText('test-foo flakes on main')
+    fireEvent.click(await screen.findByRole('button', { name: 'Promote' }))
+    fireEvent.change(await screen.findByRole('textbox', { name: /repository/i }), {
       target: { value: '/repos/app' },
     })
     invoke.mockImplementation(async (channel: string) => {
@@ -324,15 +324,13 @@ function aPromotionNoteTests() {
 describe('a decision the handler refused', () => {
   it('says why, rather than redrawing as though nothing happened', async () => {
     mount({ gates: [gate()], decide: { error: 'Gate G-1 was already decided (approve).' } })
-    await waitFor(() => screen.getByRole('button', { name: /Approve/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Approve/ }))
-    await waitFor(() => expect(screen.getByText(/already decided/)).toBeTruthy())
+    fireEvent.click(await screen.findByRole('button', { name: /Approve/ }))
+    await screen.findByText(/already decided/)
   })
 
   it('says nothing when the decision was taken', async () => {
     mount({ gates: [gate()] })
-    await waitFor(() => screen.getByRole('button', { name: /Approve/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Approve/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Approve/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', expect.anything())
     )
@@ -359,7 +357,7 @@ describe('every gate rule can be rendered', () => {
       silenced: [],
       summary: { waiting: 1, orders: 1, automatic: 0, building: 0, converging: 0 },
     })
-    await waitFor(() => expect(screen.getByText(ruleInWords(rule))).toBeTruthy())
+    await screen.findByText(ruleInWords(rule))
     // The stripe as well as the icon: a missing tone is a silent `undefined`
     // in the class list rather than a throw, so it needs its own assertion.
     expect(document.querySelector('.fdry-gate')?.className).toMatch(/\bis-(p0|warn|info|ok)\b/)
@@ -381,7 +379,7 @@ describe('ci.red', () => {
       silenced: [],
       summary: { waiting: 1, orders: 1, automatic: 0, building: 0, converging: 0 },
     })
-    await waitFor(() => expect(screen.getByText(ruleInWords('ci.red'))).toBeTruthy())
+    await screen.findByText(ruleInWords('ci.red'))
     expect(screen.getByText(/PR #200 has been red/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Another round' })).toBeTruthy()
     expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
@@ -403,7 +401,7 @@ describe('refinery.conflict', () => {
       silenced: [],
       summary: { waiting: 1, orders: 1, automatic: 0, building: 0, converging: 0 },
     })
-    await waitFor(() => expect(screen.getByText(ruleInWords('refinery.conflict'))).toBeTruthy())
+    await screen.findByText(ruleInWords('refinery.conflict'))
     expect(screen.getByText(/no longer rebases onto main/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Take it over' })).toBeTruthy()
     expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
@@ -450,7 +448,7 @@ function inboxListingTests() {
         },
       ],
     })
-    await waitFor(() => screen.getByText('test-foo flakes on main'))
+    await screen.findByText('test-foo flakes on main')
     expect(screen.getByText('×4')).toBeTruthy()
     expect(screen.getByText('high')).toBeTruthy()
     expect(screen.getByText('CI flake watch')).toBeTruthy()
@@ -464,7 +462,7 @@ function inboxListingTests() {
 function severalSignalsAndArrivalsTests() {
   it('renders more than one signal, in the order the channel ranked them', async () => {
     mount({ signals: [highSignal(), lowSignal()] })
-    await waitFor(() => screen.getByText('test-foo flakes on main'))
+    await screen.findByText('test-foo flakes on main')
     const titles = Array.from(document.querySelectorAll('.fdry-signal')).map(
       (el) => el.querySelector('b')?.textContent
     )
@@ -487,7 +485,7 @@ function severalSignalsAndArrivalsTests() {
       await act(async () => {
         vi.advanceTimersByTime(SIGNAL_POLL_MS)
       })
-      await waitFor(() => screen.getByText('test-foo flakes on main'))
+      await screen.findByText('test-foo flakes on main')
     } finally {
       vi.useRealTimers()
     }
@@ -509,7 +507,7 @@ function refreshingAndEmptyTests() {
       signals: [],
       waiting: [{ orderId: 'WO-1', title: 'an order', headline: 'Ready to hand off', detail: '' }],
     })
-    await waitFor(() => screen.getByText('Ready to hand off'))
+    await screen.findByText('Ready to hand off')
     expect(screen.queryByText("From the factory's sensors")).toBeNull()
   })
 }
@@ -527,8 +525,8 @@ function inboxPromotingTests() {
         },
       ],
     })
-    await waitFor(() => screen.getByText('test-foo flakes on main'))
-    fireEvent.click(screen.getByRole('button', { name: 'Promote' }))
+    await screen.findByText('test-foo flakes on main')
+    fireEvent.click(await screen.findByRole('button', { name: 'Promote' }))
     const repoInput = screen.getByRole('textbox', { name: /repository/i }) as HTMLInputElement
     expect(repoInput.value).toBe('/repos/app')
     fireEvent.click(screen.getByRole('button', { name: 'Confirm promote' }))
@@ -545,9 +543,9 @@ function inboxPromotingTests() {
 function changingTheRepositoryTests() {
   it('lets the repository be changed before promoting', async () => {
     mount({ signals: [highSignal()] })
-    await waitFor(() => screen.getByText('test-foo flakes on main'))
-    fireEvent.click(screen.getByRole('button', { name: 'Promote' }))
-    fireEvent.change(screen.getByRole('textbox', { name: /repository/i }), {
+    await screen.findByText('test-foo flakes on main')
+    fireEvent.click(await screen.findByRole('button', { name: 'Promote' }))
+    fireEvent.change(await screen.findByRole('textbox', { name: /repository/i }), {
       target: { value: '/repos/other' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Confirm promote' }))
@@ -563,8 +561,8 @@ function changingTheRepositoryTests() {
 function dismissingAndTheBadgeTests() {
   it('dismisses a signal and removes it from the list', async () => {
     mount({ signals: [highSignal()] })
-    await waitFor(() => screen.getByText('test-foo flakes on main'))
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    await screen.findByText('test-foo flakes on main')
+    fireEvent.click(await screen.findByRole('button', { name: 'Dismiss' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:signals.dismiss', { id: 'SIG-1' })
     )
@@ -573,7 +571,7 @@ function dismissingAndTheBadgeTests() {
 
   it('does not touch the attention badge — it never calls foundry:attention', async () => {
     mount({ signals: [highSignal()] })
-    await waitFor(() => screen.getByText('test-foo flakes on main'))
+    await screen.findByText('test-foo flakes on main')
     expect(invoke).not.toHaveBeenCalledWith('foundry:attention', expect.anything())
   })
 }

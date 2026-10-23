@@ -166,7 +166,7 @@ function kanbanBoardSwimlanesGroupingTests() {
   it('switches to project swimlane grouping', async () => {
     const user = userEvent.setup()
     render(<KanbanBoard />)
-    await waitFor(() => screen.getByText('Project'))
+    await screen.findByText('Project')
     await user.click(screen.getByText('Project'))
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith(
