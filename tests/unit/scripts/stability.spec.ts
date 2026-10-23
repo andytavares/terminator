@@ -37,15 +37,25 @@ describe('which specs a change burns in', () => {
 
 describe('reading the command line', () => {
   it('defaults to 30 unit runs and 5 end-to-end runs', () => {
-    expect(stabilityArguments([])).toEqual({ runs: 30, e2e: false, specs: [] })
-    expect(stabilityArguments(['--e2e'])).toEqual({ runs: 5, e2e: true, specs: [] })
+    expect(stabilityArguments([])).toEqual({ runs: 30, e2e: false, list: false, specs: [] })
+    expect(stabilityArguments(['--e2e'])).toEqual({ runs: 5, e2e: true, list: false, specs: [] })
   })
 
   it('takes --runs and the named specs', () => {
     expect(stabilityArguments(['--runs', '3', 'a.spec.ts', 'b.spec.ts'])).toEqual({
       runs: 3,
       e2e: false,
+      list: false,
       specs: ['a.spec.ts', 'b.spec.ts'],
+    })
+  })
+
+  it('takes --list, which names the specs without running them', () => {
+    expect(stabilityArguments(['--e2e', '--list'])).toEqual({
+      runs: 5,
+      e2e: true,
+      list: true,
+      specs: [],
     })
   })
 })

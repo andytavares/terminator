@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Burn-in gate: runs every spec a change adds or edits many times, shuffled, under CPU load, and
 // fails on the first failure, so a flaky test is caught on the PR that writes it (Constitution XIV).
-// `node scripts/stability.mjs [--runs N] [--e2e] [spec ...]`; with no specs it takes the
+// `node scripts/stability.mjs [--runs N] [--e2e] [--list] [spec ...]`; with no specs it takes the
 // *.spec.ts(x) files added or edited since origin/$GITHUB_BASE_REF (main), as last fetched.
 
 import { execFileSync, spawn } from 'node:child_process'
@@ -14,17 +14,17 @@ const UNIT_RUNS = 30
 const E2E_RUNS = 5
 const SPEC_FILE = /\.spec\.tsx?$/
 
-/** `--runs N`, `--e2e`, then the specs named; runs default per mode. */
+/** `--runs N`, `--e2e`, `--list` (print the specs, run nothing), then the specs named. */
 export function stabilityArguments(argv) {
   const specs = []
   let runs
-  let e2e = false
+  const flags = new Set(['--e2e', '--list'].filter((flag) => argv.includes(flag)))
   for (let at = 0; at < argv.length; at++) {
     if (argv[at] === '--runs') runs = Number(argv[++at])
-    else if (argv[at] === '--e2e') e2e = true
-    else specs.push(argv[at])
+    else if (!flags.has(argv[at])) specs.push(argv[at])
   }
-  return { runs: runs ?? (e2e ? E2E_RUNS : UNIT_RUNS), e2e, specs }
+  const e2e = flags.has('--e2e')
+  return { runs: runs ?? (e2e ? E2E_RUNS : UNIT_RUNS), e2e, list: flags.has('--list'), specs }
 }
 
 /** The spec files in a `git diff --name-only` listing: end-to-end ones or unit ones. */
@@ -92,6 +92,7 @@ async function main() {
   const specs = options.specs.length
     ? options.specs
     : changedSpecs(diffAgainstBase(process.env), options)
+  if (options.list) return specs.forEach((spec) => console.log(spec))
   const burn = options.e2e ? runE2eBurnIn : runUnitBurnIn
   const { code, message } = await burn({ ...options, specs })
   ;(code === 0 ? console.log : console.error)(message)

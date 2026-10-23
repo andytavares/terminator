@@ -90,7 +90,13 @@ function argumentsOfShard(shard, specs) {
 function playwright(args) {
   const needsChromium = NEEDS_CHROMIUM.some((spec) => args.some((arg) => arg.endsWith(spec)))
   if (needsChromium && !run('npx', ['playwright', 'install', 'chromium'])) return false
-  return run('npx', ['playwright', 'test', ...args, '--reporter=dot'], { CI: '1' })
+  return run(
+    'npx',
+    ['playwright', 'test', ...args, '--grep-invert', '@quarantine', '--reporter=dot'],
+    {
+      CI: '1',
+    }
+  )
 }
 
 function runShards(only, specs) {

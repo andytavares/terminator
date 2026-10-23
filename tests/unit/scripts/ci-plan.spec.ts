@@ -18,20 +18,25 @@ const stepOf = (job: string, name: string) =>
 const stepsOf = (id: string) => (workflow.jobs[id].steps ?? []) as Array<Record<string, unknown>>
 const workflowText = readFileSync(resolve(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8')
 
+/** The jobs ci:local runs, in ci.yml's order. */
+const PLANNED_JOBS = [
+  'lint',
+  'typecheck',
+  'format',
+  'stories',
+  'story-screenshots',
+  'unit',
+  'perf',
+  'stability',
+  'e2e-stability',
+  'test',
+  'build',
+  'start',
+]
+
 describe("ci:local runs ci.yml's own steps", () => {
   it('runs every job it does not skip, in the order ci.yml lists them', () => {
-    expect([...new Set(plan.map((step) => step.job))]).toEqual([
-      'lint',
-      'typecheck',
-      'format',
-      'stories',
-      'story-screenshots',
-      'unit',
-      'perf',
-      'test',
-      'build',
-      'start',
-    ])
+    expect([...new Set(plan.map((step) => step.job))]).toEqual(PLANNED_JOBS)
   })
 
   it('runs every job, or says why not', () => {
@@ -134,16 +139,19 @@ describe('the deterministic workflow (ADR 123)', () => {
     const macJobs = Object.entries(workflow.jobs)
       .filter(([, job]) => job['runs-on'] === 'macos-26')
       .map(([id]) => id)
-    expect(macJobs).toEqual(['story-screenshots', 'start', 'e2e'])
+    expect(macJobs).toEqual(['story-screenshots', 'e2e-stability', 'start', 'e2e'])
     const runners = Object.values(workflow.jobs).map((job) => job['runs-on'])
     expect(new Set(runners)).toEqual(new Set(['macos-26', 'ubuntu-24.04-arm']))
     expect(workflowText).not.toMatch(/apt-get/)
   })
 
   // GitHub runs five macOS jobs at a time on every plan below Enterprise: more queue.
+  // A macOS job that waits for another macOS job never runs beside it.
   it('asks for no more macOS runners at once than GitHub gives', () => {
+    const onMac = (id: string) => workflow.jobs[id]?.['runs-on'] === 'macos-26'
     const macRunners = Object.values(workflow.jobs)
       .filter((job) => job['runs-on'] === 'macos-26')
+      .filter((job) => ![job.needs ?? []].flat().some(onMac))
       .map((job) => (job.strategy?.matrix as { shard?: unknown[] } | undefined)?.shard?.length ?? 1)
     expect(macRunners.reduce((sum, count) => sum + count, 0)).toBeLessThanOrEqual(5)
   })
@@ -156,9 +164,13 @@ describe('the deterministic workflow (ADR 123)', () => {
     )
     expect(over).toEqual([])
   })
+})
 
-  it('runs every spec once: no burn-in, no census of one, every shard reported', () => {
+describe('the stability jobs (ADR 124)', () => {
+  // ADR 124: repeats only find flaky tests, in the stability jobs; nothing retries a failure.
+  it('repeats specs only in the stability jobs, retries nothing, and reports every shard', () => {
     expect(workflowText).not.toMatch(/Burn in|repeat-each|--retries/)
+    expect(stepsOf('stability').map((step) => step.run)).toContain('node scripts/stability.mjs')
     expect(workflow.jobs.unit.strategy?.['fail-fast']).toBe(false)
     expect(workflow.jobs.e2e.strategy?.['fail-fast']).toBe(false)
   })
