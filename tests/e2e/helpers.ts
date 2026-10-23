@@ -13,6 +13,7 @@ import { sealedAppEnvironment } from './e2e-environment'
 import { saveIpcTrace, startIpcTrace } from './ipc-trace'
 import { orOnHang } from '../support/hang-bound'
 import { E2E_LAUNCH_HANG_MS } from '../support/bounds'
+import { createLaunchSteps, type LaunchSteps } from '../support/launch-steps'
 import { appProcessTree, expectNoProcessesLeft, launchMarker } from './leftover-processes'
 
 // Shared e2e harness. Every spec launches the real Electron app in an isolated,
@@ -113,9 +114,10 @@ function keepOutput(app: ElectronApplication): string[] {
 }
 
 /** The first window, once it has drawn, holds Chromium focus and shows the sidebar. */
-async function firstReadyWindow(app: ElectronApplication): Promise<Page> {
+async function firstReadyWindow(app: ElectronApplication, steps: LaunchSteps): Promise<Page> {
   await startIpcTrace(app)
   const page = await app.firstWindow()
+  steps.reached('firstWindow')
   const window = await app.browserWindow(page)
   const windowId = String(await window.evaluate((win) => win.id))
   const size = await window.evaluate((win) => win.getSize())
@@ -123,11 +125,13 @@ async function firstReadyWindow(app: ElectronApplication): Promise<Page> {
   if (size[0] !== 1280 || size[1] !== 800) {
     throw new Error(`The app's window is ${size.join('×')}, not 1280×800: the screen resized it.`)
   }
+  steps.reached('size')
   await Promise.all([
-    untilAnnounced(app, 'drawn', windowId),
-    untilAnnounced(app, 'focused', windowId),
+    untilAnnounced(app, 'drawn', windowId).then(() => steps.reached('drawn')),
+    untilAnnounced(app, 'focused', windowId).then(() => steps.reached('focused')),
   ])
   await expect(page.locator('.unified-sidebar')).toBeVisible()
+  steps.reached('sidebar')
   return page
 }
 
@@ -237,13 +241,19 @@ export async function launchApp(
   const marker = launchMarker()
   const app = await startElectron(userDataDir, { ...env, ...marker.env })
   const output = keepOutput(app)
+  const steps = createLaunchSteps()
   try {
-    const page = await within(LAUNCH_DEADLINE_MS, firstReadyWindow(app))
+    const page = await within(LAUNCH_DEADLINE_MS, firstReadyWindow(app, steps))
     emulateFocusInExtensionFrames(page)
     drawBeforePointerActions(page)
     return { app, page, userDataDir, launchId: marker.launchId }
   } catch (error) {
-    throw await launchFailure(app, output, error)
+    const message = error instanceof Error ? error.message : String(error)
+    throw await launchFailure(
+      app,
+      output,
+      new Error(`${message} (${steps.describe()})`, { cause: error })
+    )
   }
 }
 

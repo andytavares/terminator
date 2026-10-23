@@ -30,3 +30,7 @@ playwright-report/
 *.tsbuildinfo
 .vitest-reports/
 storybook-static/
+
+# CI test-result files (ci.yml JUnit, stability-sweep.yml reports)
+junit/
+sweep/

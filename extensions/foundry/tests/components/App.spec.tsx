@@ -178,7 +178,6 @@ async function openWorkingHall() {
   render(<App />)
   fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
   fireEvent.click(await screen.findByRole('button', { name: 'Factory view' }))
-  await screen.findByText('Working order')
   fireEvent.click(await screen.findByRole('button', { name: /Working order/ }))
 }
 
@@ -610,7 +609,6 @@ function aShapingOrderTests() {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Factory view' }))
-    await screen.findByText('Still shaping')
     fireEvent.click(await screen.findByRole('button', { name: /Still shaping/ }))
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'List view' }).getAttribute('aria-pressed')).toBe(

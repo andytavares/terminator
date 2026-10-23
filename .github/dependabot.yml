@@ -1,13 +1,26 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
+# Dependabot version and security updates for the npm workspace.
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
 version: 2
 updates:
-  - package-ecosystem: 'npm' # See documentation for possible values
-    directory: '/' # Location of package manifests
+  - package-ecosystem: 'npm'
+    directory: '/'
     schedule:
       interval: 'daily'
     cooldown:
       default-days: 14
+    # Packages that only work in lockstep move in one pull request: one bumped alone installs a
+    # second copy of a shared package (#290) or breaks a peer range (#289).
+    groups:
+      codemirror:
+        patterns: ['@codemirror/*', '@lezer/*']
+      vitest:
+        patterns: ['vitest', '@vitest/*']
+        exclude-patterns: ['@vitest/eslint-plugin']
+      storybook:
+        patterns: ['storybook', '@storybook/*']
+      react:
+        patterns: ['react', 'react-dom', '@types/react', '@types/react-dom']
+      security:
+        applies-to: security-updates
+        patterns: ['*']
