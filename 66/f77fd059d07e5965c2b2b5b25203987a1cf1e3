@@ -1,0 +1,55 @@
+tests/unit/packages/extension-ui/tabs.spec.tsx
+  s_0565505ad6a275::t_bcca0163346aee 209-214
+tests/unit/terminal/project-sessions.spec.ts
+  s_0565505ad6a275::t_072c05f24fb9f5 10-13
+tests/unit/renderer-remote/mobile/useReconnect.spec.ts
+  s_0565505ad6a275::t_7ed4f7385d7309 310-312
+  s_0565505ad6a275::t_bcca0163346aee 286
+tests/unit/schemas/extension-contributes.spec.ts
+  s_0565505ad6a275::t_0f903a5bb291d7 54,57,93,97
+tests/unit/renderer/components/EditWorkspaceDialog.spec.tsx
+  s_0565505ad6a275::t_a6ff0331a2789f 181
+tests/unit/renderer/quick-actions/core-actions.spec.ts
+  s_0565505ad6a275::t_56f397156cc2f1 181-183,185-198
+tests/integration/ipc/fs.ipc.spec.ts
+  s_0565505ad6a275::t_1f9328a69d2872 43,78,81,89-90,103-104,111-112,126,167,177
+tests/unit/fs/tree-watch.spec.ts
+  s_0565505ad6a275::t_1f9328a69d2872 40,51,63,91
+  s_0565505ad6a275::t_0412fa8dba68c5 23-26
+tests/integration/ipc/shell.ipc.spec.ts
+  s_0565505ad6a275::t_0412fa8dba68c5 31-38,51,123,148,179
+tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_0565505ad6a275::t_ef93b25c77f01d 951,960,968,982,1004
+tests/unit/renderer/components/CreateWorkspaceDialog.spec.tsx
+  s_0565505ad6a275::t_c1be928fa316ee 208
+tests/unit/schemas/settings.schema.spec.ts
+  s_0565505ad6a275::t_0f903a5bb291d7 118-119,153-157,161,168-171,231-232,239-240,367-368
+tests/unit/shared/schemas/extension.schema.spec.ts
+  s_0565505ad6a275::t_0f903a5bb291d7 6,9,29,33-34,40,43,70,73
+tests/unit/support/network-guard.spec.ts
+  s_0565505ad6a275::t_b5a44fce8aea6c 31-35,43
+  s_0565505ad6a275::t_836d3fe2cc902d 19-29
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_0565505ad6a275::t_a86e0bc8e56515 400-401
+  s_0565505ad6a275::t_5e1ec10e5f35d9 427,818-820,926,935
+src/shared/electron-api/__tests__/manifest.spec.ts
+  s_0565505ad6a275::t_9b03ec2bf90b4f 21,24-27,29-32
+tests/integration/fs/watch-and-git.spec.ts
+  s_0565505ad6a275::t_072c05f24fb9f5 39-42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "66f77fd059d07e5965c2b2b5b25203987a1cf1e3",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
