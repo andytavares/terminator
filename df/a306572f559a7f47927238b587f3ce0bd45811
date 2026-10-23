@@ -1,0 +1,23 @@
+docs/adr/124-flaky-tests-are-caught-before-merge-and-quarantined-with-an-expiry.md
+  s_0565505ad6a275::t_3823b6589ea537 1-29
+docs/adr/123-tests-run-once-sealed-and-selected.md
+  s_0565505ad6a275::t_b0cb896de679b7 3
+.specify/memory/constitution.md
+  s_0565505ad6a275::t_a64b1b0ff4cf5e 2-16,325-337,390
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dfa306572f559a7f47927238b587f3ce0bd45811",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
