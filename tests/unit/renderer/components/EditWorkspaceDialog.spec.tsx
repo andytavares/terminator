@@ -178,6 +178,6 @@ describe('EditWorkspaceDialog — surfaces a generic error when updateWorkspace 
     render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
     fireEvent.change(screen.getByDisplayValue('My Work'), { target: { value: 'Renamed' } })
     fireEvent.click(screen.getByText('Save'))
-    await screen.findByText('Failed to update workspace')
+    expect(await screen.findByText('Failed to update workspace')).toBeTruthy()
   })
 })

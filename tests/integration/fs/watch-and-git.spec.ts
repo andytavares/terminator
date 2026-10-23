@@ -36,7 +36,10 @@ function saveUnchanged(repo: string): void {
 
 const service = new FsWatcherService()
 let stop: () => void = () => undefined
-afterEach(() => stop())
+afterEach(() => {
+  stop()
+  stop = () => undefined
+})
 
 /** Watches `repo`, reading with `read` on every reported change but the fence's, as the Git tab
  * reads status. Resolves with how many reads one save caused. */

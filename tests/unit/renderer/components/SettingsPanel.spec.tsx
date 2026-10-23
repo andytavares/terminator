@@ -948,7 +948,7 @@ async function openSettingsOf(
   return view
 }
 
-const savedSetting = (key: string, value: unknown) =>
+const expectSettingSaved = (key: string, value: unknown) =>
   eventually(() => expect(api.extension.updateSetting).toHaveBeenCalledWith(key, value))
 
 describe('ExtensionsSection — editing each kind of setting', () => {
@@ -957,7 +957,7 @@ describe('ExtensionsSection — editing each kind of setting', () => {
   it('saves a switched boolean as a boolean', async () => {
     await openSettingsOf({ 'com.test.on': { type: 'boolean', label: 'On', default: true } })
     fireEvent.click(screen.getByRole('switch', { name: 'On' }))
-    await savedSetting('com.test.on', false)
+    await expectSettingSaved('com.test.on', false)
   })
 
   it('saves the option picked from an enum', async () => {
@@ -965,7 +965,7 @@ describe('ExtensionsSection — editing each kind of setting', () => {
       'com.test.mode': { type: 'enum', label: 'Mode', default: 'fast', options: ['fast', 'safe'] },
     })
     fireEvent.click(screen.getByText('Safe'))
-    await savedSetting('com.test.mode', 'safe')
+    await expectSettingSaved('com.test.mode', 'safe')
   })
 
   it('masks a secret setting', async () => {
@@ -979,7 +979,7 @@ describe('ExtensionsSection — editing each kind of setting', () => {
     await openSettingsOf({ 'com.test.n': { type: 'number', label: 'N', default: 1 } })
     fireEvent.change(screen.getByDisplayValue('1'), { target: { value: '2' } })
     fireEvent.change(screen.getByDisplayValue('2'), { target: { value: '3' } })
-    await savedSetting('com.test.n', 3)
+    await expectSettingSaved('com.test.n', 3)
     expect(api.extension.updateSetting).toHaveBeenCalledTimes(1)
   })
 })
@@ -1001,7 +1001,7 @@ describe('ExtensionsSection — a list setting', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Paths' }), {
       target: { value: 'src/auth/**\n\n  docs/** ' },
     })
-    await savedSetting('com.test.paths', ['src/auth/**', 'docs/**'])
+    await expectSettingSaved('com.test.paths', ['src/auth/**', 'docs/**'])
   })
 })
 

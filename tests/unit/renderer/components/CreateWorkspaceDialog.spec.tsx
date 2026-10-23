@@ -205,7 +205,7 @@ describe('CreateWorkspaceDialog — surfaces a name error when createWorkspace r
       target: { value: '/repos/x' },
     })
     fireEvent.click(screen.getByText('Create'))
-    await screen.findByText('Failed to create workspace')
+    expect(await screen.findByText('Failed to create workspace')).toBeTruthy()
   })
 })
 

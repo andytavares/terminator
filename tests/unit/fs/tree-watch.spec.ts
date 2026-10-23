@@ -20,7 +20,10 @@ const implementations: Array<[string, TreeWatch]> = [
 ]
 
 let stop: (() => void) | undefined
-afterEach(() => stop?.())
+afterEach(() => {
+  stop?.()
+  stop = undefined
+})
 
 /** A watched temporary tree and every path the watch has reported. */
 function watched(watchTree: TreeWatch): { root: string; reported: Array<string | null> } {
@@ -34,7 +37,7 @@ function watched(watchTree: TreeWatch): { root: string; reported: Array<string |
 
 /** Makes the change again on each look: macOS arms a watch a moment after `fs.watch` returns, and
  * a change made before that has no event. */
-async function reportedAfter(change: () => void, reported: unknown[], expected: string) {
+async function expectReportedAfter(change: () => void, reported: unknown[], expected: string) {
   await eventually(() => {
     change()
     expect(reported).toContain(expected)
@@ -45,7 +48,7 @@ describe.each(implementations)('watching a tree with %s', (_name, watchTree) => 
   it('reports a file written in a nested directory', async () => {
     const { root, reported } = watched(watchTree)
     const file = path.join(root, 'src', 'deep', 'a.ts')
-    await reportedAfter(() => fs.writeFileSync(file, String(Math.random())), reported, file)
+    await expectReportedAfter(() => fs.writeFileSync(file, String(Math.random())), reported, file)
   })
 
   it('reports a file replaced by a rename, every time it is replaced', async () => {
@@ -57,7 +60,7 @@ describe.each(implementations)('watching a tree with %s', (_name, watchTree) => 
     }
     for (let round = 0; round < 3; round++) {
       reported.length = 0
-      await reportedAfter(replace, reported, index)
+      await expectReportedAfter(replace, reported, index)
     }
   })
 })
@@ -85,7 +88,7 @@ describe.each(implementations)('watching a tree that grows with %s', (_name, wat
       fs.writeFileSync(path.join(root, 'node_modules', 'package', 'index.js'), '1')
       fs.writeFileSync(fence, String(Math.random()))
     }
-    await reportedAfter(write, reported, fence)
+    await expectReportedAfter(write, reported, fence)
     expect(reported.filter((changed) => changed?.includes('node_modules'))).toEqual([])
   })
 

@@ -18,13 +18,18 @@ describe('ELECTRON_API_MANIFEST', () => {
   })
 
   it('never maps one channel to two different kinds', () => {
-    const kindByChannel = new Map<string, string>()
+    const kindsByChannel = new Map<string, Set<string>>()
     for (const spec of ELECTRON_API_MANIFEST) {
       if (!spec.channel) continue
-      const seen = kindByChannel.get(spec.channel)
-      if (seen) expect(`${spec.channel}: ${seen}`).toBe(`${spec.channel}: ${spec.kind}`)
-      kindByChannel.set(spec.channel, spec.kind)
+      kindsByChannel.set(
+        spec.channel,
+        (kindsByChannel.get(spec.channel) ?? new Set()).add(spec.kind)
+      )
     }
+    const mixed = [...kindsByChannel]
+      .filter(([, kinds]) => kinds.size > 1)
+      .map(([channel]) => channel)
+    expect(mixed).toEqual([])
   })
 })
 

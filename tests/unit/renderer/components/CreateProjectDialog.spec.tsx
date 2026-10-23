@@ -397,8 +397,8 @@ describe('CreateProjectDialog — branch mode selecting a branch via dropdown fi
   })
 })
 
-describe('CreateProjectDialog — worktree mode selecting existing branch then new branch fires onNewBranch', () => {
-  it('worktree mode selecting existing branch then new branch fires onNewBranch', async () => {
+describe('CreateProjectDialog — worktree mode choosing an existing branch, then + New branch, shows the new branch name field', () => {
+  it('worktree mode choosing an existing branch, then + New branch, shows the new branch name field', async () => {
     gitApi.isRepo.mockResolvedValue({ isRepo: true, root: '/repo' })
     gitApi.listBranches.mockResolvedValue({
       branches: [
@@ -424,7 +424,7 @@ describe('CreateProjectDialog — worktree mode selecting existing branch then n
     await eventually(() => screen.getByText('develop'))
     fireEvent.click(screen.getByText('develop'))
     fireEvent.click(screen.getAllByText('+ New branch…')[0])
-    await eventually(() => screen.getByPlaceholderText('feature/my-feature'))
+    expect(await screen.findByPlaceholderText('feature/my-feature')).toBeTruthy()
   })
 })
 
@@ -815,7 +815,9 @@ describe('CreateProjectDialog branch names and fetching — fetches and relists 
     git().fetch.mockResolvedValue({ error: 'Could not resolve host: github.com' })
     await openWorktreeMode()
     fireEvent.click(screen.getByRole('button', { name: 'Fetch branches' }))
-    await eventually(() => screen.getByText('Could not fetch: Could not resolve host: github.com'))
+    expect(
+      await screen.findByText('Could not fetch: Could not resolve host: github.com')
+    ).toBeTruthy()
   })
 })
 
@@ -921,7 +923,7 @@ describe('CreateProjectDialog — a refused branch in a repo', () => {
   ])('says the repo has that branch already (%s)', async (_, submit) => {
     mockCreateProject.mockResolvedValue({ error: 'DUPLICATE_NAME' })
     await submit()
-    await screen.findByText('This repo already has that branch')
+    expect(await screen.findByText('This repo already has that branch')).toBeTruthy()
   })
 
   it.each([
@@ -930,7 +932,7 @@ describe('CreateProjectDialog — a refused branch in a repo', () => {
   ])('says it could not create the branch otherwise (%s)', async (_, submit) => {
     mockCreateProject.mockResolvedValue({ error: 'DB_ERROR' })
     await submit()
-    await screen.findByText('Could not create the branch')
+    expect(await screen.findByText('Could not create the branch')).toBeTruthy()
   })
 })
 
