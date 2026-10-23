@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import { TrackerIdSchema } from './integrations.schema.js'
-
-export const DESCRIPTION_MAX_LENGTH = 500
+import { DESCRIPTION_MAX_LENGTH } from '../session-description.js'
 
 const SessionSnapshotSchema = z.object({
   sessionId: z.string().min(1),

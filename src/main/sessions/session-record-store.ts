@@ -8,7 +8,7 @@ import type {
   WorkItemRef,
 } from '../../shared/types/index.js'
 import { pruneRecords } from '../../shared/session-records/retention.js'
-import { DESCRIPTION_MAX_LENGTH } from '../../shared/schemas/session-records.schema.js'
+import { DESCRIPTION_MAX_LENGTH } from '../../shared/session-description.js'
 import { deleteSessionContext } from '../integrations/session-context.js'
 import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
