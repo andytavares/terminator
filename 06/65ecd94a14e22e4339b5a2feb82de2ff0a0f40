@@ -1,0 +1,99 @@
+tests/unit/renderer/components/LinkIssueDialog.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 158,173,232,241
+extensions/task-vault/tests/components/TaskDetailPanel.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 49,95
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 366,466,536,548,565,572,621,642,653,662,665,682,684,693,695,709,711,740,751,774,852,861,872,998,1005,1070,1077-1078,1106,1116-1117,1129,1177,1352,1472,1525,1535-1536,1554-1555,1569-1570,1867,1877
+tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 274,296,336,362,382,406,430,452,478,504,529,553,590,672,849,885,906
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 606,616,648,908,931,943,973-974,992,1098-1099,1109-1110,1462-1464,1480,1525,1541,1749,1773,1793,1981
+extensions/foundry/tests/components/Inbox.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 197,222,248,269,299-300,328,335,531,549-550,567
+extensions/task-vault/tests/components/InboxView.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 110,146,148
+extensions/task-vault/tests/components/KanbanBoardActions.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 145,161-162
+tests/unit/renderer-remote/mobile/MobileApp.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 78,88
+extensions/foundry/tests/components/Ledger.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 174,188,200,253,262,273,282,285,300,303,316,319,344,357,364,454,478,492,494
+extensions/remote-control/tests/unit/renderer/RemoteControlView.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 236
+extensions/git-integration/tests/unit/ReviewSubmitPanel.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 120
+extensions/foundry/tests/components/ForgeChecks.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 396
+extensions/task-vault/tests/components/ProjectsBrowser.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 117,164,281
+extensions/foundry/tests/components/App.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 181,183,245,266,302,418,512,611,613,628,630,669
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 626,635,706
+tests/unit/renderer/components/MoveSessionDialog.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 229
+tests/unit/renderer/components/AboutDialog.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 48,66
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 1579
+extensions/foundry/tests/components/SettingsView.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 99,110-115,159,169
+extensions/task-vault/tests/components/AreasView.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 124,126,160,194-195
+extensions/git-integration/tests/unit/ReviewDashboard.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 374,519
+extensions/foundry/tests/components/factory/FactorySite.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 282,306,347
+extensions/task-vault/tests/components/InboxProcessor.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 141
+extensions/task-vault/tests/components/ArchiveViewActions.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 101,118,128
+extensions/git-integration/tests/unit/RepoPicker.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 64,97-98,122,131
+extensions/git-integration/tests/unit/ContributionsSection.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 84-85
+extensions/git-integration/tests/unit/ReviewDiffPane.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 721
+extensions/task-vault/tests/components/ArchiveView.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 60
+extensions/task-vault/tests/components/DailyLogSubtasks.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 180
+extensions/git-integration/tests/unit/PrOverviewPanel.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 408
+tests/unit/extensions/PrDialog.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 69,168,193,201,212
+extensions/task-vault/tests/components/WeeklyReviewHistory.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 189,201,213,215,232,249,276,295
+extensions/remote-control/tests/unit/renderer/RemoteControlSettings.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 95
+extensions/foundry/tests/components/needs-you.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 95,132
+tests/unit/renderer/App.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 496,552,567,809,1054,1077
+extensions/task-vault/tests/components/CalendarDrawerMonths.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 100
+tests/unit/renderer/components/IntegrationsSettings.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 182
+extensions/git-integration/tests/unit/GitFullView.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 348
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 308,545,570,590,592
+extensions/task-vault/tests/components/WeeklyReview.spec.tsx
+  s_0565505ad6a275::t_cd5f0a150304ea 151,167,215,244
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0665ecd94a14e22e4339b5a2feb82de2ff0a0f40",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
