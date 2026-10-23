@@ -1,0 +1,47 @@
+{
+  "config": {
+    "configFile": "/Users/runner/work/terminator/terminator/playwright.config.ts",
+    "rootDir": "/Users/runner/work/terminator/terminator/tests/e2e"
+  },
+  "suites": [
+    {
+      "title": "settings.spec.ts",
+      "file": "settings.spec.ts",
+      "specs": [],
+      "suites": [
+        {
+          "title": "Settings",
+          "file": "settings.spec.ts",
+          "specs": [
+            {
+              "title": "saves a theme",
+              "file": "settings.spec.ts",
+              "tests": [
+                {
+                  "results": [
+                    {
+                      "status": "failed"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "skipped one",
+              "file": "settings.spec.ts",
+              "tests": [
+                {
+                  "results": [
+                    {
+                      "status": "skipped"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
