@@ -1,0 +1,20 @@
+tests/e2e/settings.spec.ts
+  s_0565505ad6a275::t_dc287619608826 116-117
+  s_0565505ad6a275::t_61846d1b3f56b0 111-112,114-115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "66ae0907bcba3fe3ee7143a253199377e084b15b",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
