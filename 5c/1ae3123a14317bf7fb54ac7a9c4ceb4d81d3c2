@@ -1,0 +1,19 @@
+tests/unit/renderer/App.spec.tsx
+  s_0565505ad6a275::t_ab2c7c39815456 445,448-449,944,947
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5c1ae3123a14317bf7fb54ac7a9c4ceb4d81d3c2",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
