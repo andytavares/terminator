@@ -74,15 +74,15 @@ function stepsAndRolesTests() {
 
   it.each(recipeFiles)('%s names a role for every agent step', (file) => {
     const known = new Set(roleFiles.map((f) => f.replace('.yaml', '')))
-    for (const step of recipe(file).steps) {
-      if (step.kind === 'agent') expect(known).toContain(step.role)
-    }
+    const roles = recipe(file).steps.flatMap((step) => (step.kind === 'agent' ? [step.role] : []))
+    for (const role of roles) expect(known).toContain(role)
   })
 
   it.each(recipeFiles)('%s gives every gate a default for being ignored', (file) => {
-    for (const step of recipe(file).steps) {
-      if (step.kind === 'gate') expect(step.defaultIfIgnored).toBeTruthy()
-    }
+    const defaults = recipe(file).steps.flatMap((step) =>
+      step.kind === 'gate' ? [step.defaultIfIgnored] : []
+    )
+    for (const defaultIfIgnored of defaults) expect(defaultIfIgnored).toBeTruthy()
   })
 }
 
@@ -453,13 +453,12 @@ function handBacksTests() {
 
 function toolsAndPromptsTests() {
   it('gives no role an editing tool unless it may write to a checkout', () => {
-    for (const file of roleFiles) {
+    const editors = roleFiles.flatMap((file) => {
       const parsed = parseRole(readRecipeFile(rolesDir, file), file)
       if (!parsed.ok) throw new Error(parsed.reason)
-      if (parsed.value.tools.includes('edit')) {
-        expect(parsed.value.writes.length).toBeGreaterThan(0)
-      }
-    }
+      return parsed.value.tools.includes('edit') ? [parsed.value] : []
+    })
+    for (const role of editors) expect(role.writes.length).toBeGreaterThan(0)
   })
 
   it.each(roleFiles)('%s carries a prompt that says what it is for', (file) => {

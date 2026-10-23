@@ -23,6 +23,10 @@ let dataDir = ''
 let repo = ''
 let host: FoundryHost
 
+async function toastShown(): Promise<void> {
+  await eventually(() => expect(host.showToast).toHaveBeenCalled())
+}
+
 beforeAll(async () => {
   const parent = temporaryDirectory('fdry-no-runtime')
   vi.stubEnv('HOME', path.join(parent, 'home'))
@@ -30,7 +34,7 @@ beforeAll(async () => {
   repo = await seededRepository(parent)
   host = fakeHost(() => dataDir)
   activate(host.api)
-  await eventually(() => expect(host.showToast).toHaveBeenCalled())
+  await toastShown()
 })
 
 afterAll(async () => {

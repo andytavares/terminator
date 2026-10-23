@@ -15,6 +15,12 @@ env:
 permissions:
   contents: read
 
+# A new event on a pull request (a push, or the labels Dependabot adds) replaces the run already
+# going, so a pull request has one result; every push to main keeps its own run.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   lint:
     name: Lint
@@ -47,6 +53,14 @@ jobs:
 
       - name: Dependency versions
         run: npm run lint:deps
+
+      # A package that must be single (one editor state, one React) installed twice (#290).
+      - name: Single copies
+        run: npm run lint:single-copies
+
+      # Quarantined tests: listed, at most 5, at most 7 days, none new to this change (ADR 124).
+      - name: Quarantine
+        run: npm run lint:quarantine
 
       # Unused files, exports and dependencies (knip.jsonc, ADR 104).
       - name: Unused code
@@ -243,7 +257,8 @@ jobs:
           read -r -a selected <<< "$(node scripts/test-select.mjs --print unit)"
           node scripts/check-temp-leaks.mjs \
             npx vitest run --coverage --shard=${{ matrix.shard }}/${{ needs.select.outputs.shard_count }} \
-            "${selected[@]}" --reporter=blob --reporter=dot \
+            "${selected[@]}" --tagsFilter='!quarantine' --reporter=blob --reporter=dot \
+            --reporter=junit --outputFile.junit=junit/unit.xml \
             --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 \
             --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
         timeout-minutes: 5
@@ -256,6 +271,16 @@ jobs:
           path: .vitest-reports/
           include-hidden-files: true
           retention-days: 1
+
+      # History for Codecov Test Analytics, failed runs included. It reports; it never gates.
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5
+        with:
+          report_type: test_results
+          files: junit/unit.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   # The wall-clock budgets (`*.perf.spec.ts`), one file at a time in a job of
   # their own: in the unit shards they share the CPU with every other spec and
@@ -279,6 +304,184 @@ jobs:
       - name: Perf budgets
         run: npm run test:perf
         timeout-minutes: 5
+
+  # Every spec this change adds or edits, 30 times with a fresh seed each, every core busy. One
+  # failure fails the check and prints the seed that replays it (ADR 124). Nothing retries. The
+  # plan splits the 30 runs, and the specs when there are many, so each shard fits in 7 minutes.
+  stability-plan:
+    name: Stability plan
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 3
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Size the shards
+        id: plan
+        run: node scripts/stability.mjs --github-output >> "$GITHUB_OUTPUT"
+
+  stability-shard:
+    name: Stability (${{ matrix.shard }}, ${{ matrix.runs }} runs of part ${{ matrix.part }})
+    needs: stability-plan
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.stability-plan.outputs.shards) }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Changed specs, this shard
+        run: node scripts/stability.mjs --runs ${{ matrix.runs }} --part ${{ matrix.part }}
+        timeout-minutes: 7
+
+  # The one Stability check branch protection requires.
+  stability:
+    name: Stability
+    needs: [stability-plan, stability-shard]
+    if: always()
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 2
+
+    steps:
+      - name: Verdict
+        run: |
+          echo "plan: ${{ needs.stability-plan.result }}, shards: ${{ needs.stability-shard.result }}"
+          test "${{ needs.stability-plan.result }}" = success
+          test "${{ needs.stability-shard.result }}" = success
+
+  # Every e2e spec this change adds or edits, five times. The build only happens when there is one.
+  # It starts once the E2E shards end, so CI never asks for more than five macOS runners at once.
+  e2e-stability:
+    name: E2E stability
+    needs: e2e
+    if: ${{ !cancelled() }}
+    runs-on: macos-26
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Changed e2e specs, 5 runs
+        run: |
+          if [ -z "$(node scripts/stability.mjs --e2e --list)" ]; then
+            echo "stability: no e2e spec added or edited"
+            exit 0
+          fi
+          npm run build
+          node node_modules/electron/install.js
+          codesign --force --deep --sign - node_modules/electron/dist/Electron.app
+          node scripts/stability.mjs --e2e
+        timeout-minutes: 7
+
+  # The quarantined tests (tests/quarantine.json, ADR 124), still run so a fix shows as passes.
+  # Not required: its result never blocks a pull request.
+  quarantine:
+    name: Quarantine
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 6
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Quarantined unit tests
+        run: |
+          npx vitest run --tagsFilter=quarantine --passWithNoTests --reporter=dot \
+            --reporter=junit --outputFile.junit=junit/quarantine.xml
+        timeout-minutes: 5
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5
+        with:
+          report_type: test_results
+          files: junit/quarantine.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # The quarantined e2e tests, run once the E2E shards end. Not required (ADR 124).
+  quarantine-e2e:
+    name: Quarantine (E2E)
+    needs: e2e
+    if: ${{ !cancelled() }}
+    runs-on: macos-26
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Quarantined e2e tests
+        env:
+          PLAYWRIGHT_JUNIT_OUTPUT_NAME: junit/quarantine-e2e.xml
+        run: |
+          if [ "$(jq '[.[] | select(.kind == "e2e")] | length' tests/quarantine.json)" = 0 ]; then
+            echo "Nothing quarantined in e2e."
+            exit 0
+          fi
+          npm run build
+          node node_modules/electron/install.js
+          codesign --force --deep --sign - node_modules/electron/dist/Electron.app
+          npx playwright test --grep @quarantine --reporter=dot,junit
+        timeout-minutes: 7
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5
+        with:
+          report_type: test_results
+          files: junit/quarantine-e2e.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   # The required "Test" check. Same OS as the shards, because the blobs carry
   # their absolute source paths and coverage is remapped against them. Green when
@@ -468,6 +671,7 @@ jobs:
           MODE: ${{ needs.select.outputs.e2e_mode }}
           SPECS: ${{ needs.select.outputs.e2e_specs }}
           PLAYWRIGHT_BLOB_OUTPUT_NAME: report-${{ matrix.shard }}.zip
+          PLAYWRIGHT_JUNIT_OUTPUT_NAME: junit/e2e-${{ matrix.shard }}.xml
         run: |
           if [ "$MODE" = all ]; then SPECS=""; fi
           read -r -a specs <<< "$SPECS"
@@ -478,8 +682,17 @@ jobs:
           # git-integration-contrast.spec.ts and git-integration-stacking.spec.ts
           # render the extension views in it, and design-system-fields.spec.ts renders the shared field styles.
           case "$ARGS" in *remote-control.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts* | *design-system-fields.spec.ts*) npx playwright install chromium ;; esac
-          npx playwright test "${shard[@]}" --reporter=blob,dot
+          npx playwright test "${shard[@]}" --grep-invert @quarantine --reporter=blob,dot,junit
         timeout-minutes: 7
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5
+        with:
+          report_type: test_results
+          files: junit/e2e-${{ matrix.shard }}.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Process census (after the suite)
         if: ${{ !cancelled() }}
@@ -499,6 +712,16 @@ jobs:
         with:
           name: test-results-${{ matrix.shard }}
           path: test-results/
+          retention-days: 14
+
+      # The app logs git's own words when it cannot answer (git.ipc.ts); Electron writes the log
+      # under the runner's real home, not the sealed one, so it is kept here or not at all.
+      - name: Upload app log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-log-${{ matrix.shard }}
+          path: ~/Library/Logs/@andytavares/terminator/
           retention-days: 14
 
   # The one E2E check branch protection requires: green when every shard

@@ -3,13 +3,10 @@ import { ExtensionContributesSchema } from '../../../../src/shared/schemas/exten
 
 describe('ExtensionContributesSchema — quick actions', () => {
   it('accepts a quickActions group with a one-char mnemonic', () => {
-    const result = ExtensionContributesSchema.safeParse({
+    const result = ExtensionContributesSchema.parse({
       quickActions: { group: { mnemonic: 'g', label: 'Git' } },
     })
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.quickActions).toEqual({ group: { mnemonic: 'g', label: 'Git' } })
-    }
+    expect(result.quickActions).toEqual({ group: { mnemonic: 'g', label: 'Git' } })
   })
 
   it('accepts a quickActions group without a mnemonic', () => {
@@ -29,27 +26,21 @@ describe('ExtensionContributesSchema — quick action mnemonics and transform', 
   })
 
   it('preserves quickActions through the transform alongside other keys', () => {
-    const result = ExtensionContributesSchema.safeParse({
+    const result = ExtensionContributesSchema.parse({
       globalTab: { label: 'Git' },
       quickActions: { group: { mnemonic: 'g', label: 'Git' } },
     })
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.quickActions?.group?.mnemonic).toBe('g')
-      expect(result.data.globalTab?.label).toBe('Git')
-    }
+    expect(result.quickActions?.group?.mnemonic).toBe('g')
+    expect(result.globalTab?.label).toBe('Git')
   })
 })
 
 describe('ExtensionContributesSchema — command mnemonics and requires', () => {
   it('accepts a command with a mnemonic and requires', () => {
-    const result = ExtensionContributesSchema.safeParse({
+    const result = ExtensionContributesSchema.parse({
       commands: [{ id: 'git:push', label: 'Push', mnemonic: 'p', requires: 'repo' }],
     })
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.commands?.[0]).toMatchObject({ mnemonic: 'p', requires: 'repo' })
-    }
+    expect(result.commands?.[0]).toMatchObject({ mnemonic: 'p', requires: 'repo' })
   })
 
   it('rejects a command mnemonic longer than one character', () => {
@@ -76,13 +67,10 @@ describe('ExtensionContributesSchema — command mnemonics and requires', () => 
 
 describe('ExtensionContributesSchema — Insights section', () => {
   it('keeps a insightsSection through the transform', () => {
-    const result = ExtensionContributesSchema.safeParse({
+    const result = ExtensionContributesSchema.parse({
       insightsSection: { label: 'Pull requests', view: 'prs' },
     })
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.insightsSection).toEqual({ label: 'Pull requests', view: 'prs' })
-    }
+    expect(result.insightsSection).toEqual({ label: 'Pull requests', view: 'prs' })
   })
 
   it('requires the label', () => {

@@ -131,10 +131,14 @@ async function restarted(): Promise<RunGraph> {
   return graphOnDisk()
 }
 
+async function previousExecutorWoundDown(): Promise<void> {
+  await eventually(() => expect(executingOrders.size).toBe(0))
+}
+
 beforeEach(async () => {
   // A previous test's resume leaves its executor winding down; while it is marked executing,
   // no node of the order counts as orphaned.
-  await eventually(() => expect(executingOrders.size).toBe(0))
+  await previousExecutorWoundDown()
   // This spec stops at the restart: a start that throws leaves the node as resuming put it
   // and ends that executor before the next test resumes the same order.
   theRunner.start.mockClear().mockImplementation(() => {

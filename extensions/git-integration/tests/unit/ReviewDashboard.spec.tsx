@@ -297,7 +297,7 @@ describe('ReviewDashboard — renders the three tabs with counts', () => {
     })
     render(<ReviewDashboard />)
     // The tab list renders while loading with zero counts; wait for the data.
-    await waitFor(() => within(screen.getByRole('tablist')).getByText('3'))
+    within(await screen.findByRole('tablist')).getByText('3')
     const tablist = screen.getByRole('tablist')
     expect(within(tablist).getByText('3')).toBeTruthy() // needs you: 211,210,212
     expect(within(tablist).getByText('1')).toBeTruthy() // mine: 213
@@ -371,7 +371,7 @@ describe('ReviewDashboard — omits an empty group', () => {
     mockInvoke({ prs: [pr211, pr213], login: 'andytavares', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
     await screen.findByText('RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED')
-    fireEvent.click(screen.getByRole('tab', { name: /My PRs/ }))
+    fireEvent.click(await screen.findByRole('tab', { name: /My PRs/ }))
     await screen.findByText('YOUR OPEN PRS')
     expect(screen.getByText('+1,385').closest('.rd-size')!.textContent).toBe(
       '+1,385 −246 · 109 files'
@@ -516,7 +516,7 @@ describe('ReviewDashboard — saving the picker sends the selection and reloads 
     expect(searches()).toBe(1)
     fireEvent.click(screen.getByRole('button', { name: /All repositories/ }))
     fireEvent.click(await screen.findByRole('checkbox', { name: 'acme/api' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Save' }))
     await waitFor(() => expect(searches()).toBe(2))
     expect(invoke).toHaveBeenCalledWith('github:review-repos-set', { repos: ['acme/api'] })
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())

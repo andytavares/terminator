@@ -140,7 +140,7 @@ describe('FactoryHall status wall plumbing', () => {
         { orderId: 'WO-2', title: 'Some other order', leadTimeMs: 1, reworks: 9, ciRounds: 9 },
       ],
     })
-    await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
+    await screen.findByRole('button', { name: /Build the thing/ })
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:factory.metrics', { window: 'all' })
     )
@@ -148,7 +148,7 @@ describe('FactoryHall status wall plumbing', () => {
 
   it('does not fail to render when there is no metrics row for this order', async () => {
     mount({ metrics: [] })
-    await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
+    await screen.findByRole('button', { name: /Build the thing/ })
     expect(screen.getByRole('button', { name: /Build the thing/ })).toBeTruthy()
   })
 })
@@ -200,23 +200,21 @@ describe('FactoryHall', () => {
 function addressingAndBadgesTests() {
   it('addresses a station by its label, role, state and attempt', async () => {
     mount()
-    await waitFor(() =>
-      expect(
-        screen.getByRole('button', { name: 'Build the thing, builder, Working, attempt 1' })
-      ).toBeTruthy()
-    )
+    expect(
+      await screen.findByRole('button', { name: 'Build the thing, builder, Working, attempt 1' })
+    ).toBeTruthy()
   })
 
   it('leaves the station unbadged when nothing is waiting on the operator', async () => {
     mount()
-    await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
+    await screen.findByRole('button', { name: /Build the thing/ })
     const station = screen.getByRole('button', { name: /Build the thing/ })
     expect(station.querySelector('.fdry-hall-flag')).toBeNull()
   })
 
   it('flags a station whose session is stranded', async () => {
     mount({ view: hallView({ stranded: ['s-1'] }) })
-    await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
+    await screen.findByRole('button', { name: /Build the thing/ })
     const station = screen.getByRole('button', { name: /Build the thing/ })
     expect(station.querySelector('.fdry-hall-flag')).not.toBeNull()
   })
@@ -229,7 +227,7 @@ function pendingAsksTests() {
         { requestId: 'r-1', sessionId: 's-1', toolName: 'Bash', summary: '', detail: null, at: 0 },
       ],
     })
-    await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
+    await screen.findByRole('button', { name: /Build the thing/ })
     const station = screen.getByRole('button', { name: /Build the thing/ })
     expect(station.querySelector('.fdry-hall-flag')).not.toBeNull()
   })
@@ -251,7 +249,7 @@ function theStandingBandTests() {
         },
       }),
     })
-    await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
+    await screen.findByRole('button', { name: /Build the thing/ })
     expect(screen.queryByText('Building')).toBeNull()
   })
 }
@@ -274,7 +272,7 @@ function gatedMovesTests() {
         },
       }),
     })
-    await waitFor(() => screen.getByText('Halted — your move'))
+    await screen.findByText('Halted — your move')
     expect(screen.queryByRole('button', { name: 'Open Inbox' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Open in List view' })).toBeNull()
   })
@@ -296,7 +294,7 @@ function movesWithoutAGateTests() {
         },
       }),
     })
-    await waitFor(() => screen.getByText('Nothing is running this'))
+    await screen.findByText('Nothing is running this')
     expect(screen.queryByRole('button', { name: 'Open Inbox' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Open in List view' }))
     expect(onOpenInList).toHaveBeenCalled()
@@ -306,9 +304,8 @@ function movesWithoutAGateTests() {
 function monitorsTests() {
   it('opens a station’s monitor and attaches to it', async () => {
     mount()
-    await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Build the thing/ }))
-    await waitFor(() => screen.getByRole('button', { name: /ATTACH/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
+    await screen.findByRole('button', { name: /ATTACH/ })
     expect(document.querySelector('.fdry-hall-inspector')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /ATTACH/ }))
     await waitFor(() =>
@@ -379,7 +376,7 @@ function calloutsOnStateChangeTests() {
   it('raises a callout at the station when its state changes, not a line under the picture', async () => {
     let current = hallView()
     const bus = mountLive(() => current)
-    await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
+    await screen.findByRole('button', { name: /Build the thing/ })
     current = hallView({
       graph: { orderId: 'WO-1', recipe: 'standard', nodes: [hallNode({ state: 'passed' })] },
     })
@@ -544,7 +541,7 @@ function playbackTests() {
     try {
       fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
       await screen.findByRole('button', { name: 'Pause' })
-      fireEvent.click(screen.getByRole('button', { name: '4x' }))
+      fireEvent.click(await screen.findByRole('button', { name: '4x' }))
       expect(screen.getByRole('button', { name: '4x' }).getAttribute('aria-pressed')).toBe('true')
       // 3 s of recording at 4x is 750 ms of replay, in steps of 100 ms
       await act(() => vi.advanceTimersByTimeAsync(700))
@@ -568,8 +565,8 @@ function playbackTests() {
 function theSiteAndFailuresTests() {
   it('goes back to the site', async () => {
     const { onBack } = mount()
-    await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'All halls' }))
+    await screen.findByRole('button', { name: /Build the thing/ })
+    fireEvent.click(await screen.findByRole('button', { name: 'All halls' }))
     expect(onBack).toHaveBeenCalled()
   })
 
@@ -588,11 +585,9 @@ function theSiteAndFailuresTests() {
       },
     })
     render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
-    await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Build the thing/ }))
-    await waitFor(() => screen.getByRole('button', { name: /ATTACH/ }))
-    fireEvent.click(screen.getByRole('button', { name: /ATTACH/ }))
-    await waitFor(() => screen.getByText('gone'))
+    fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /ATTACH/ }))
+    await screen.findByText('gone')
   })
 }
 
@@ -705,11 +700,9 @@ function factoryHallTheScoreboardTests() {
     mount({
       metrics: [{ orderId: 'WO-1', leadTimeMs: 25 * 60_000, reworks: 0, ciRounds: 0 }],
     })
-    await waitFor(() =>
-      expect(
-        screen.getByRole('img', { name: 'Lead time 25 min · 0 reworks · 0 CI fix rounds' })
-      ).toBeTruthy()
-    )
+    expect(
+      await screen.findByRole('img', { name: 'Lead time 25 min · 0 reworks · 0 CI fix rounds' })
+    ).toBeTruthy()
   })
 }
 
@@ -733,7 +726,7 @@ function towerCalloutsTests() {
 
   it('pins no wait when every check has landed', async () => {
     mount({ view: shipView(['pass', 'pass']) })
-    await waitFor(() => screen.getByRole('img', { name: 'Checks · 2 passed · 0 failed' }))
+    await screen.findByRole('img', { name: 'Checks · 2 passed · 0 failed' })
     expect(document.querySelector('.fdry-callout[data-pinned="true"]')).toBeNull()
   })
 }
@@ -762,7 +755,7 @@ function finishedMonitorsTests() {
       lines: [{ role: 'assistant', kind: 'text', text: 'All done.', at: 1 }],
     })
     fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
-    await waitFor(() => screen.getByText('All done.'))
+    await screen.findByText('All done.')
     expect(
       (screen.getByRole('button', { name: /Agent closed/i }) as HTMLButtonElement).disabled
     ).toBe(true)
@@ -819,11 +812,10 @@ function gateCardsTests() {
     const card = document.querySelector('.fdry-card--gate') as HTMLElement
     const top = Number.parseFloat(card.style.top)
     const room = card.style.getPropertyValue('--fdry-card-room')
-    if (card.classList.contains('is-below')) {
-      expect(room).toBe(`calc(${100 - top}% - 26px)`)
-    } else {
-      expect(room).toBe(`calc(${top}% - 50px)`)
-    }
+    const expectedRoom = card.classList.contains('is-below')
+      ? `calc(${100 - top}% - 26px)`
+      : `calc(${top}% - 50px)`
+    expect(room).toBe(expectedRoom)
   })
 }
 

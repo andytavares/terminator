@@ -81,8 +81,8 @@ async function renderSection(reply: unknown): Promise<ReturnType<typeof render>>
 async function openCustomRange(dates: { from: string; to: string }): Promise<void> {
   fireEvent.click(screen.getByRole('button', { name: 'This year' }))
   fireEvent.click(await screen.findByRole('radio', { name: 'Custom range…' }))
-  fireEvent.change(screen.getByLabelText('From'), { target: { value: dates.from } })
-  fireEvent.change(screen.getByLabelText('To'), { target: { value: dates.to } })
+  fireEvent.change(await screen.findByLabelText('From'), { target: { value: dates.from } })
+  fireEvent.change(await screen.findByLabelText('To'), { target: { value: dates.to } })
 }
 
 describe('ContributionsSection — renders the period stats and their change', () => {

@@ -95,9 +95,8 @@ describe('computeRiskScore() — all-null numeric metrics (except testFilePresen
     })
     const allSame = [m, m]
     const score = computeRiskScore(m, allSame)
-    // When all numeric metrics normalise to same value or all null, composite may be null
-    // The important rule: level defaults to 'low' when composite is null
-    if (score.composite === null) expect(score.level).toBe('low')
+    expect(score.composite).toBeNull()
+    expect(score.level).toBe('low')
   })
 
   it('missing test file adds the flat 20-point penalty', () => {
@@ -106,9 +105,8 @@ describe('computeRiskScore() — all-null numeric metrics (except testFilePresen
     const others = [withTest, withoutTest, baseMetrics({ churn90d: 50 })]
     const scoreWith = computeRiskScore(withTest, others)
     const scoreWithout = computeRiskScore(withoutTest, others)
-    if (scoreWith.composite != null && scoreWithout.composite != null) {
-      expect(scoreWithout.composite).toBeGreaterThan(scoreWith.composite)
-    }
+    expect(scoreWith.composite).toBe(0)
+    expect(scoreWithout.composite).toBe(20)
   })
 })
 
@@ -149,12 +147,8 @@ describe('computeRiskScore() — composite is between 0 and 100', () => {
     const both = [high, low]
     const scoreH = computeRiskScore(high, both)
     const scoreL = computeRiskScore(low, both)
-    for (const s of [scoreH, scoreL]) {
-      if (s.composite != null) {
-        expect(s.composite).toBeGreaterThanOrEqual(0)
-        expect(s.composite).toBeLessThanOrEqual(100)
-      }
-    }
+    expect(scoreH.composite).toBe(90)
+    expect(scoreL.composite).toBe(0)
   })
 })
 

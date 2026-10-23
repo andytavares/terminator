@@ -51,13 +51,10 @@ describe('ExtensionContributesSchema — workspace, project and sidebar tabs', (
   })
 
   it('accepts sidebarPanel with defaultOpen defaulting to false', () => {
-    const result = ExtensionContributesSchema.safeParse({
+    const result = ExtensionContributesSchema.parse({
       sidebarPanel: { label: 'Panel' },
     })
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.sidebarPanel?.defaultOpen).toBeUndefined()
-    }
+    expect(result.sidebarPanel?.defaultOpen).toBeUndefined()
   })
 })
 
@@ -93,14 +90,11 @@ describe('ExtensionContributesSchema — window views and commands', () => {
 
 describe('ExtensionContributesSchema — unknown keys and combined contributions', () => {
   it('silently ignores unknown keys', () => {
-    const result = ExtensionContributesSchema.safeParse({
+    const result = ExtensionContributesSchema.parse({
       unknownFutureContribution: { label: 'something' },
       globalTab: { label: 'Known' },
     })
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data).not.toHaveProperty('unknownFutureContribution')
-    }
+    expect(result).not.toHaveProperty('unknownFutureContribution')
   })
 
   it('accepts all contribution types together', () => {

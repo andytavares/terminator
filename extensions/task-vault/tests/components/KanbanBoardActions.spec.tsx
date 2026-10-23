@@ -142,7 +142,7 @@ function cardGroupingTests() {
     const onConfigChange = vi.fn()
     render(<KanbanBoard onConfigChange={onConfigChange} />)
     await screen.findByText('Write')
-    fireEvent.click(screen.getByRole('button', { name: 'Area' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Area' }))
     const headers = Array.from(document.querySelectorAll('.tv-kanban__swimlane-header')).map(
       (h) => h.textContent
     )
@@ -158,8 +158,8 @@ function cardLanesAndReloadsTests() {
   it('saves lanes from the lane editor', async () => {
     render(<KanbanBoard />)
     await screen.findByText('Write')
-    fireEvent.click(screen.getByTitle('Edit lanes'))
-    fireEvent.click(screen.getByRole('button', { name: 'Save lanes' }))
+    fireEvent.click(await screen.findByTitle('Edit lanes'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Save lanes' }))
     await eventually(() => expect(bridge.calls('task-vault:kanban:save-config')).toHaveLength(1))
     expect(screen.queryByRole('button', { name: 'Save lanes' })).toBeNull()
     expect(store.setKanbanLanes).toHaveBeenCalledWith(CONFIG.lanes)

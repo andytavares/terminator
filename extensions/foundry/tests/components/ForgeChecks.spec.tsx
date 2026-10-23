@@ -393,7 +393,7 @@ describe('the pictures row on hand-off', () => {
   it('asks for a pictures command when a unit changes the interface and there is none', async () => {
     await openHandOff(glyphProfile(), orderWithUnit({ touchesInterface: true }))
     expect(await screen.findByText('This order changes the interface')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Add a pictures command' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Add a pictures command' }))
     expect(await screen.findByRole('textbox', { name: 'Command for Pictures' })).toBeTruthy()
   })
 

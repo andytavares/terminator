@@ -57,7 +57,7 @@ describe('ArchiveView sections', () => {
   it('reads the window it shows as one choice and reloads for another', async () => {
     render(<ArchiveView />)
     await screen.findByRole('tab', { name: 'Completed tasks, 0' })
-    fireEvent.click(screen.getByRole('radio', { name: '90 days' }))
+    fireEvent.click(await screen.findByRole('radio', { name: '90 days' }))
     expect(await screen.findByRole('radio', { name: '90 days', checked: true })).toBeTruthy()
     expect(mockInvoke).toHaveBeenLastCalledWith('task-vault:vault:list-archive', { days: 90 })
   })

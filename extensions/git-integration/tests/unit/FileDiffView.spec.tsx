@@ -155,15 +155,16 @@ describe('FileDiffView — renders a diff with only adds correctly in split view
     expect(screen.getByText('@@ -0,0 +1 @@')).toBeTruthy()
   })
 
-  it('fires mousedown on split divider to start drag', async () => {
+  it('keeps the split position when the divider is pressed and released without moving', async () => {
     const { container } = await renderDiff()
     fireEvent.click(screen.getByText('Split'))
-    const divider = container.querySelector('.diff-table__split-divider')
-    if (divider) {
-      fireEvent.mouseDown(divider, { clientX: 300 })
-    }
-    // drag state activated — fire mouseup to deactivate
+    const scrollEl = container.querySelector('.file-diff-view__scroll') as HTMLElement
+    fireEvent.mouseDown(container.querySelector('.diff-table__split-divider') as Element, {
+      clientX: 300,
+    })
     fireEvent.mouseUp(window)
+    fireEvent.mouseMove(window, { clientX: 500 })
+    expect(scrollEl.style.getPropertyValue('--split-left')).toBe('50%')
   })
 })
 
@@ -172,25 +173,22 @@ describe('FileDiffView — moves split position on mousemove while dragging', ()
     const { container } = await renderDiff()
     fireEvent.click(screen.getByText('Split'))
     const scrollEl = container.querySelector('.file-diff-view__scroll') as HTMLElement
-    // Mock getBoundingClientRect
-    if (scrollEl) {
-      vi.spyOn(scrollEl, 'getBoundingClientRect').mockReturnValue({
-        width: 800,
-        height: 400,
-        top: 0,
-        left: 0,
-        right: 800,
-        bottom: 400,
-        x: 0,
-        y: 0,
-        toJSON: () => ({}),
-      })
-    }
-    const divider = container.querySelector('.diff-table__split-divider')
-    if (divider) {
-      fireEvent.mouseDown(divider, { clientX: 400 })
-      fireEvent.mouseMove(window, { clientX: 450 })
-    }
+    vi.spyOn(scrollEl, 'getBoundingClientRect').mockReturnValue({
+      width: 800,
+      height: 400,
+      top: 0,
+      left: 0,
+      right: 800,
+      bottom: 400,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+    fireEvent.mouseDown(container.querySelector('.diff-table__split-divider') as Element, {
+      clientX: 400,
+    })
+    fireEvent.mouseMove(window, { clientX: 450 })
     fireEvent.mouseUp(window)
+    expect(scrollEl.style.getPropertyValue('--split-left')).toBe('56.25%')
   })
 })

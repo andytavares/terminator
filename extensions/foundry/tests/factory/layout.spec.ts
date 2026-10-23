@@ -221,11 +221,7 @@ function beltsAndAnchorsTests({ map }: Pick<LaidOut, 'map'>) {
     const crossoverKeys = new Set(map.crossovers.map((t) => `${t.x},${t.y}`))
     for (const tile of map.beltTiles) {
       const k = `${tile.x},${tile.y}`
-      if (crossoverKeys.has(k)) {
-        expect(map.walk[tile.y][tile.x]).toBe(false)
-      } else {
-        expect(map.walk[tile.y][tile.x]).toBe(true)
-      }
+      expect(map.walk[tile.y][tile.x]).toBe(!crossoverKeys.has(k))
     }
   })
 

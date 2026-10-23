@@ -1,0 +1,33 @@
+{
+  "testResults": [
+    {
+      "name": "extensions/foundry/tests/components/App.spec.tsx",
+      "assertionResults": [
+        {
+          "fullName": "the Factory view toggle a shaping order sends a shaping order back to the list, open",
+          "status": "passed",
+          "ancestorTitles": ["the Factory view toggle", "a shaping order"],
+          "title": "sends a shaping order back to the list, open"
+        },
+        {
+          "fullName": "the Factory view toggle always fails",
+          "status": "failed",
+          "ancestorTitles": ["the Factory view toggle"],
+          "title": "always fails"
+        },
+        {
+          "fullName": "the Factory view toggle always passes",
+          "status": "passed",
+          "ancestorTitles": ["the Factory view toggle"],
+          "title": "always passes"
+        },
+        {
+          "fullName": "the Factory view toggle is skipped",
+          "status": "pending",
+          "ancestorTitles": ["the Factory view toggle"],
+          "title": "is skipped"
+        }
+      ]
+    }
+  ]
+}

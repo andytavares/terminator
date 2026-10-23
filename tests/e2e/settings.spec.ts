@@ -108,7 +108,13 @@ async function workspaceShellOpensNewTerminals(): Promise<void> {
   await shell.fill('/bin/bash')
   await shell.blur()
   await closeSettingsPanel(page)
+  const sessionTabs = page.locator('.tab-bar__tab--session')
+  const tabsBefore = await sessionTabs.count()
   await page.keyboard.press('ControlOrMeta+t')
+  await expect(sessionTabs).toHaveCount(tabsBefore + 1)
+  await expect(sessionTabs.last()).toHaveClass(/tab-bar__tab--active/)
+  const newPane = page.locator('.terminal-pane').filter({ visible: true })
+  await expect(newPane.locator('.xterm-helper-textarea')).toBeFocused()
   await page.keyboard.type('echo "shell:$0"\n')
   await expect
     .poll(async () => (await readTerminalRows(page)).join('\n'))

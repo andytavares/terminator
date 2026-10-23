@@ -107,7 +107,7 @@ function inboxItemEditingTests() {
   it('cancels an edit', async () => {
     render(<InboxView />)
     fireEvent.doubleClick(await screen.findByText('idea'))
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel edit' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel edit' }))
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
   })
 }
@@ -143,9 +143,9 @@ function inboxProcessingTests() {
     render(<InboxView />)
     fireEvent.click(await screen.findByRole('button', { name: 'Process inbox (GTD clarify)' }))
     expect(await screen.findByText('1 of 2')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Trash it' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Trash it' }))
     await screen.findByText('2 of 2')
-    fireEvent.click(screen.getByRole('button', { name: 'Trash it' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Trash it' }))
     await eventually(() => expect(useVaultNavStore.getState().activeView).toBe('daily'))
   })
 

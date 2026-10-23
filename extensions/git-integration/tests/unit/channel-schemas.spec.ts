@@ -91,12 +91,12 @@ describe('the rules the channel schemas carry', () => {
   afterAll(() => rmSync(repo, { recursive: true, force: true }))
 
   for (const [rule, channel, valid, broken] of RULE_CASES) {
-    it(`${rule} (${channel})`, () => checkRule(repo, channel, { valid, broken }))
+    it(`${rule} (${channel})`, () => expectRule(repo, channel, { valid, broken }))
   }
 })
 
 /** The valid payload reaches the channel's run; the broken one is refused before it. */
-async function checkRule(
+async function expectRule(
   repo: string,
   channel: string,
   payloads: { valid: Record<string, unknown>; broken: Record<string, unknown> }
