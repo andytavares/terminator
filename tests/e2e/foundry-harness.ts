@@ -163,7 +163,7 @@ export async function restartFoundry(handle: AppHandle, workspaceName: string): 
   const userDataDir = handle.userDataDir
   await closeApp(handle)
   const next = await launchApp(userDataDir)
-  await expect(workspaceRow(next.page, workspaceName)).toBeVisible({ timeout: 30_000 })
+  await expect(workspaceRow(next.page, workspaceName)).toBeVisible()
   await openFoundry(next)
   return next
 }
@@ -175,20 +175,17 @@ export async function openFoundry(handle: AppHandle): Promise<void> {
   const panel = handle.page.locator('[data-extension-panel="terminator.foundry"]')
   if ((await panel.count()) === 0) {
     const button = handle.page.locator('button[aria-label="Foundry"]')
-    await expect(button).toBeVisible({ timeout: 30_000 })
+    await expect(button).toBeVisible()
     await button.click()
   }
-  await expect(panel).toHaveCount(1, { timeout: 30_000 })
+  await expect(panel).toHaveCount(1)
   // The channel answers through the main window's own bridge, which needs
   // nothing from the extension's frame — so it is checked first, exactly as
   // every foundry spec's own `beforeAll` used to. Only once the extension has
   // activated is the frame `inFoundry` reaches worth polling for.
   await expect
     .poll(
-      async () => (await foundryChannel(handle, 'foundry:order.list').catch(() => null)) !== null,
-      {
-        timeout: 30_000,
-      }
+      async () => (await foundryChannel(handle, 'foundry:order.list').catch(() => null)) !== null
     )
     .toBe(true)
   // The channel answers as soon as the extension host has activated, but the
@@ -196,25 +193,20 @@ export async function openFoundry(handle: AppHandle): Promise<void> {
   // rejection caught, since `expect.poll` does not retry a callback that
   // throws, only one whose returned value mismatches.
   await expect
-    .poll(
-      async () => {
-        try {
-          return await inFoundry<number>(handle, `document.querySelectorAll('button').length`)
-        } catch {
-          return 0
-        }
-      },
-      { timeout: 30_000 }
-    )
+    .poll(async () => {
+      try {
+        return await inFoundry<number>(handle, `document.querySelectorAll('button').length`)
+      } catch {
+        return 0
+      }
+    })
     .toBeGreaterThan(0)
 }
 
 /** Opens the Forge tab and waits for its own content to have rendered. */
 export async function openForge(handle: AppHandle): Promise<void> {
-  await expect.poll(() => clickByName(handle, 'button', 'Forge'), { timeout: 15_000 }).toBe(true)
-  await expect
-    .poll(() => bodyText(handle), { timeout: 15_000 })
-    .toMatch(/New order|Steps|All orders|STATUS WALL/)
+  await expect.poll(() => clickByName(handle, 'button', 'Forge')).toBe(true)
+  await expect.poll(() => bodyText(handle)).toMatch(/New order|Steps|All orders|STATUS WALL/)
 }
 
 /** Run in Foundry's view: whether some button's text contains `id`. */
@@ -244,15 +236,11 @@ function clickOrderRow(id: string): string {
 
 /** Shows every order in the Forge, and waits until the row for `id` is among them. */
 export async function listOrdersInForge(handle: AppHandle, id: string): Promise<void> {
-  expect(await clickByName(handle, 'button', 'Forge')).toBe(true)
-  await expect
-    .poll(() => bodyText(handle), { timeout: 15_000 })
-    .toMatch(/New order|Steps|All orders/)
+  await expect.poll(() => clickByName(handle, 'button', 'Forge')).toBe(true)
+  await expect.poll(() => bodyText(handle)).toMatch(/New order|Steps|All orders/)
   // An earlier order may already be open; get back to the list first.
   await clickByName(handle, 'button', 'All orders')
-  await expect
-    .poll(() => inFoundry<boolean>(handle, orderRowListed(id)), { timeout: 15_000 })
-    .toBe(true)
+  await expect.poll(() => inFoundry<boolean>(handle, orderRowListed(id))).toBe(true)
 }
 
 /** Clicks the listed Forge row whose visible text contains `id`, opening it. */

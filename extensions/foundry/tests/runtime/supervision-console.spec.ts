@@ -2,17 +2,18 @@
  * The supervision console, through `activate`: what is held, what stalled, the
  * feed, answering a held call, and the actions on one run.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 import { fakeHost, temporaryDirectory, type FoundryHost } from '../helpers/foundry-host.js'
-import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import { orderStoreAt } from '../../src/state/live-index.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 import { ledgerActions } from '../helpers/order-ledger.js'
+import { eventually } from '../../../../tests/support/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
@@ -32,8 +33,11 @@ beforeAll(async () => {
   await activateFoundry(host)
 })
 
+// Each test's proofs and runs end before the next test, or the spec's folder, goes.
+afterEach(settleFoundryWork)
+
 afterAll(async () => {
-  deactivate()
+  await deactivate()
   vi.unstubAllEnvs()
 })
 
@@ -118,7 +122,7 @@ function questionsAndWordsTests() {
       id: 'WO-1',
       root: dataDir,
     })
-    await vi.waitFor(async () => expect(await ledgerActions(dataDir)).toContain('intake.defect'))
+    await eventually(async () => expect(await ledgerActions(dataDir)).toContain('intake.defect'))
     noteResolved('req-2')
   })
 
@@ -298,7 +302,7 @@ describe('a run that stops making progress', () => {
 function shadowModeTests() {
   it('in shadow mode is recorded on the order and listed, and interrupts nobody', async () => {
     watchStalledRun('quiet-1')
-    await vi.waitFor(async () => expect(await ledgerActions(dataDir)).toContain('run.stalled'))
+    await eventually(async () => expect(await ledgerActions(dataDir)).toContain('run.stalled'))
     const listed = (await host.call('foundry:stalls-list')) as {
       firings: Array<{ firing: { sessionId: string; signal: string }; shadow: boolean }>
       shadowMode: boolean

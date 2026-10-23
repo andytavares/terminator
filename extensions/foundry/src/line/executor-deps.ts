@@ -36,6 +36,7 @@ import { readPublishedArtifacts } from '../runtime/artifact-publishes.js'
 import type { PublishedArtifact } from '../runtime/artifact-publishes.js'
 import { transcriptPathFor } from '../runtime/claude-launch.js'
 import type { DocumentHandBack } from '../order/schema.js'
+import { inBackground } from '../background.js'
 
 export type { OrderRun } from './run-context.js'
 
@@ -283,15 +284,17 @@ function endPreviousProcess(sessionId: string): Promise<void> {
 function recordVerdict(context: RunContext, event: ExecutorEvent): void {
   if (event.type !== 'verdict') return
   const { verdict } = event
-  void context.store.record({
-    at: new Date().toISOString(),
-    orderId: context.order.id,
-    actor: `role:${verdict.producedBy.role}`,
-    action: 'verify.verdict',
-    subject: verdict.criterionId,
-    reason: `${verdict.result}${verdict.reason === '' ? '' : `: ${verdict.reason}`}`,
-    evidence: [...verdict.evidence],
-  })
+  inBackground(
+    context.store.record({
+      at: new Date().toISOString(),
+      orderId: context.order.id,
+      actor: `role:${verdict.producedBy.role}`,
+      action: 'verify.verdict',
+      subject: verdict.criterionId,
+      reason: `${verdict.result}${verdict.reason === '' ? '' : `: ${verdict.reason}`}`,
+      evidence: [...verdict.evidence],
+    })
+  )
 }
 
 const settledIn = (g: RunGraph): number =>

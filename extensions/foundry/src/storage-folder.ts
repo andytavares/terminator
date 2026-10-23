@@ -4,6 +4,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 import { DEFAULT_DIR_NAME } from './data-root.js'
+import { inBackground } from './background.js'
 
 // What earlier builds kept in the shared userData folder, and where it lives
 // in Foundry's own `api.paths.globalStorage` now (ADR 103).
@@ -23,7 +24,7 @@ export function fallbackRecordsBase(api: ExtensionAPI): string {
 export function moveFromSharedUserData(api: ExtensionAPI): void {
   const [records] = moveFromUserData(api, MOVES)
   if (records !== 'moved') return
-  void reconnectLaneWorktrees(api, path.join(fallbackRecordsBase(api), DEFAULT_DIR_NAME))
+  inBackground(reconnectLaneWorktrees(api, path.join(fallbackRecordsBase(api), DEFAULT_DIR_NAME)))
 }
 
 // A repository records each worktree's path; `git worktree repair` run inside

@@ -3,11 +3,11 @@
  * come from the workspace's own rule sources, and the time a removal is
  * stamped with is the time it happened.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 import * as path from 'node:path'
 
 import { fakeHost, temporaryDirectory } from '../helpers/foundry-host.js'
-import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -25,8 +25,11 @@ beforeAll(async () => {
   await activateFoundry(host)
 })
 
-afterAll(() => {
-  deactivate()
+// Each test's proofs and runs end before the next test, or the spec's folder, goes.
+afterEach(settleFoundryWork)
+
+afterAll(async () => {
+  await deactivate()
   vi.unstubAllEnvs()
 })
 

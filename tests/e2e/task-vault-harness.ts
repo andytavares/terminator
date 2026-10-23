@@ -32,7 +32,7 @@ export function localDate(offsetDays = 0): string {
 /** Opens Task Vault from the app band and waits for its navigation. */
 export async function openVault(handle: AppHandle): Promise<ExtensionView> {
   const vault = await openFromAppBand(handle, 'Task Vault', VAULT_URL)
-  await expect(vault.locator('.vault-sidebar')).toBeVisible({ timeout: 20_000 })
+  await expect(vault.locator('.vault-sidebar')).toBeVisible()
   return vault
 }
 

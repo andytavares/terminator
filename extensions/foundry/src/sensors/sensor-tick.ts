@@ -14,6 +14,8 @@ import { isoNow, shellExecOf } from '../host-calls.js'
 // The sensor tick (ADR-066): every due, enabled sensor, in turn, once a minute while
 // the app is open; `dueSensors` makes it nothing when none is enabled.
 let sensorTimer: NodeJS.Timeout | null = null
+/** Ticks running now; stopping waits for them. */
+const ticksInFlight = new Set<Promise<void>>()
 
 /** The tracker connection, narrowed to what a sensor's `tracker` source needs. */
 function sensorIssuesFor(api: ExtensionAPI): CollectDeps['issues'] {
@@ -86,12 +88,15 @@ async function tickSensors(api: ExtensionAPI, root: string, store: SignalStore):
 export function startSensorTick({ api, dataRoot }: ActivationContext): SignalStore {
   const signalStore = liveSignalStore(dataRoot)
   sensorTimer = setInterval(() => {
-    void tickSensors(api, dataRoot(), signalStore)
+    const tick = tickSensors(api, dataRoot(), signalStore).finally(() => ticksInFlight.delete(tick))
+    ticksInFlight.add(tick)
   }, 60_000)
   return signalStore
 }
 
-export function stopSensorTick(): void {
+/** Settles when the tick running now, if any, has ended. */
+export async function stopSensorTick(): Promise<void> {
   if (sensorTimer !== null) clearInterval(sensorTimer)
   sensorTimer = null
+  await Promise.allSettled([...ticksInFlight])
 }

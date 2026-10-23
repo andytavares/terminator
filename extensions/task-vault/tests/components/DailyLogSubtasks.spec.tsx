@@ -13,8 +13,6 @@ import { DailyLog } from '../../src/components/DailyLog'
 import { notify } from '../../src/utils/notify'
 import { useVaultNavStore } from '../../src/stores/vault-nav.store'
 
-vi.setConfig({ testTimeout: 30_000 })
-
 let bridge: ReturnType<typeof installVaultBridge>
 
 function withSubtasks(status: IndexedTask['status'] = 'open') {

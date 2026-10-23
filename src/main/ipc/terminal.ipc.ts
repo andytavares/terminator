@@ -103,6 +103,26 @@ async function announceIssueContext(
   })
 }
 
+const announcements = new Set<Promise<void>>()
+
+function announceInBackground(
+  projectId: string | undefined,
+  sessionId: string,
+  getWindow: () => BrowserWindow | null
+): void {
+  const announcement = announceIssueContext(projectId, sessionId, getWindow).finally(() =>
+    announcements.delete(announcement)
+  )
+  announcements.add(announcement)
+}
+
+/** Settles when every issue-context notice a created terminal started has been sent, or has been
+ * found to have nothing to send. The signal a spec awaits instead of a tick (ADR 123).
+ * @internal */
+export async function issueContextAnnounced(): Promise<void> {
+  await Promise.all(announcements)
+}
+
 interface TerminalContext {
   ptyManager: PtyManager
   getWindow: () => BrowserWindow | null
@@ -255,7 +275,7 @@ function createPtySession(
     env: { ...issueEnvFor(projectId), TERMINATOR_SESSION_ID: sessionId },
   })
   relay.startRelaying(sessionId)
-  void announceIssueContext(projectId, sessionId, getWindow)
+  announceInBackground(projectId, sessionId, getWindow)
 
   // Written straight in: the line discipline holds it until the shell reads
   // it, and a resume command is far inside the 1024-byte canonical limit that

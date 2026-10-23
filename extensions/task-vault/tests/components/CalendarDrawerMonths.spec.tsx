@@ -13,8 +13,6 @@ vi.mock('../../src/stores/vault.store', () => ({ useVaultStore: () => store }))
 
 import { CalendarDrawer, statusDotStyle } from '../../src/components/CalendarDrawer'
 
-vi.setConfig({ testTimeout: 30_000 })
-
 let bridge: ReturnType<typeof installVaultBridge>
 
 beforeEach(() => {

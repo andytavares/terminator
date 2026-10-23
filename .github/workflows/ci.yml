@@ -1,21 +1,30 @@
 name: CI
 
+# A label change runs it again, so `test: all` takes effect without a push (ADR 123).
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# Every job reads the repository and nothing else; none writes with the token.
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 6
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -25,11 +34,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Every dependency, shipped or tooling, must carry no high or critical
-      # advisory (Constitution IV). Overrides used to reach patched versions are
-      # listed with their advisories in docs/CONTRIBUTING.md.
+      # A change to the lockfile must leave no high or critical advisory (Constitution IV;
+      # overrides are listed in docs/CONTRIBUTING.md). A new advisory on an untouched
+      # lockfile is the daily audit's (audit.yml): an outside service never gates (ADR 123).
       - name: Security audit
-        run: npm audit --audit-level=high
+        run: git diff --quiet "$(git merge-base origin/main HEAD)" HEAD -- package-lock.json || npm audit --audit-level=high
 
       # A version this change adds to the lockfile must be 14 days old, unless
       # .release-age-exceptions.json lists it with a reason (scripts/check-release-age.mjs).
@@ -54,9 +63,15 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # The workflows themselves, and the scripts in their run steps, by pinned actionlint and
+      # shellcheck (scripts/workflow-lint.mjs): the same binaries here and in ci:local.
+      - name: Workflows
+        run: npm run lint:workflows
+
   typecheck:
     name: Typecheck
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@v4
@@ -77,7 +92,8 @@ jobs:
 
   format:
     name: Format
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 4
 
     steps:
       - uses: actions/checkout@v4
@@ -96,11 +112,42 @@ jobs:
   # Every story is a test (ADR 098): it renders in Chromium and runs its play
   # function, in the light and the dark theme. The build proves the Storybook
   # site itself still compiles.
-  # On macOS, where Terminator runs: it ships only as a macOS DMG, and the
-  # screenshots below are compared with baselines made on macOS.
+  # E2E, the app's start and the story screenshots run on macOS, where Terminator runs; every
+  # other job on Ubuntu on ARM, which ci:local runs in a container of the same (ADR 123).
   stories:
     name: Stories
-    runs-on: macos-14
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 6
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Test stories
+        run: npm run test:stories
+        timeout-minutes: 5
+
+      - name: Build Storybook
+        run: npm run build-storybook
+
+  # Screenshots of every story against the macOS baselines in
+  # packages/extension-ui/visual/__screenshots__/darwin (ADR 098): what a Mac draws, so on a Mac.
+  # A story with no baseline fails, here and locally alike; the `update-story-baselines` label
+  # writes it (.github/workflows/story-baselines.yml).
+  story-screenshots:
+    name: Story screenshots
+    runs-on: macos-26
+    timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@v4
@@ -116,48 +163,67 @@ jobs:
       - name: Install Chromium
         run: npx playwright install chromium
 
-      - name: Test stories
-        run: npm run test:stories
-        timeout-minutes: 5
-
       - name: Build Storybook
         run: npm run build-storybook
 
-      # Screenshots of every story against the macOS baselines in
-      # packages/extension-ui/visual/__screenshots__/darwin (ADR 098). A story
-      # with no baseline fails and gets one written here
-      # (--update-snapshots=missing); the step below uploads them so they can be
-      # reviewed and committed.
       - name: Compare story screenshots
-        run: npm run test:visual -w @terminator/extension-ui -- --update-snapshots=missing
-        timeout-minutes: 5
+        run: npm run test:visual -w @terminator/extension-ui -- --update-snapshots=none
 
-      - name: Upload new baselines
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: story-baselines-macos
-          path: packages/extension-ui/visual/__screenshots__/darwin/
-          if-no-files-found: ignore
-          retention-days: 14
-
-  # On Linux runners, though the app is macOS-only: GitHub allows five macOS
-  # jobs at once, and those go to the jobs that drive the real app (Start,
-  # Stories, E2E). Tests of macOS behaviour pin
-  # process.platform rather than inheriting the host's. Each shard writes a
-  # blob; the coverage threshold only means something over the whole suite, so
-  # it is enforced once, in the merge.
-  unit:
-    name: Unit (${{ matrix.shard }}/4)
-    runs-on: ubuntu-latest
-    strategy:
-      # Every shard runs to the end, so one run reports every failing spec rather than the first.
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4]
+  # Which tests this change can reach (scripts/test-select.mjs, ADR 123): the same command
+  # runs locally. Unit and E2E wait for it and run only what it names, or everything.
+  select:
+    name: Select tests
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 3
+    outputs:
+      mode: ${{ steps.select.outputs.mode }}
+      run_unit: ${{ steps.select.outputs.run_unit }}
+      run_e2e: ${{ steps.select.outputs.run_e2e }}
+      e2e_mode: ${{ steps.select.outputs.e2e_mode }}
+      e2e_specs: ${{ steps.select.outputs.e2e_specs }}
+      shard_count: ${{ steps.select.outputs.shard_count }}
+      shards: ${{ steps.select.outputs.shards }}
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Select tests
+        id: select
+        env:
+          TEST_ALL: "${{ contains(github.event.pull_request.labels.*.name, 'test: all') && '1' || '' }}"
+        run: |
+          node scripts/test-select.mjs | tee /dev/stderr
+          node scripts/test-select.mjs --github-output >> "$GITHUB_OUTPUT"
+
+  # One shard when the selection is under 100 specs, four otherwise. Each shard writes a
+  # blob; coverage is limited to the changed files when only some specs run, and is
+  # reported once, in the merge.
+  unit:
+    name: Unit (${{ matrix.shard }}/${{ needs.select.outputs.shard_count }})
+    needs: select
+    if: needs.select.outputs.run_unit == 'true'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 6
+    strategy:
+      # Every shard runs to the end, so one run reports every failing spec.
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.select.outputs.shards) }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -167,19 +233,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # The supervised-runner specs run each command under /bin/sh and /bin/zsh.
-      - name: Install zsh
-        run: command -v zsh || (sudo apt-get update -qq && sudo apt-get install -y -qq zsh)
-
       # TMPDIR is an empty directory for the run, and the step fails if a spec
       # leaves anything in it (scripts/check-temp-leaks.mjs): specs that never
       # removed their temporary directories once filled a disk with ~22,000.
       - name: Test
-        run: >-
-          node scripts/check-temp-leaks.mjs
-          npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=blob --reporter=dot
-          --coverage.thresholds.lines=0 --coverage.thresholds.functions=0
-          --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
+        env:
+          TEST_ALL: "${{ contains(github.event.pull_request.labels.*.name, 'test: all') && '1' || '' }}"
+        run: |
+          read -r -a selected <<< "$(node scripts/test-select.mjs --print unit)"
+          node scripts/check-temp-leaks.mjs \
+            npx vitest run --coverage --shard=${{ matrix.shard }}/${{ needs.select.outputs.shard_count }} \
+            "${selected[@]}" --reporter=blob --reporter=dot \
+            --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 \
+            --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
         timeout-minutes: 5
 
       - name: Upload blob report
@@ -196,7 +262,8 @@ jobs:
   # measure the load rather than the code.
   perf:
     name: Perf budgets
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 4
 
     steps:
       - uses: actions/checkout@v4
@@ -214,15 +281,19 @@ jobs:
         timeout-minutes: 5
 
   # The required "Test" check. Same OS as the shards, because the blobs carry
-  # their absolute source paths and coverage is remapped against them.
+  # their absolute source paths and coverage is remapped against them. Green when
+  # every shard passed or when the diff needed no unit spec at all.
   test:
     name: Test
-    needs: unit
+    needs: [select, unit]
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 4
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -233,29 +304,35 @@ jobs:
         run: npm ci --ignore-scripts
 
       - uses: actions/download-artifact@v4
+        if: needs.unit.result == 'success'
         with:
           pattern: unit-blob-*
           path: .vitest-reports
           merge-multiple: true
 
       - name: Merge reports and write coverage
-        run: >-
-          npx vitest run --merge-reports --coverage --reporter=dot --reporter=junit
-          --outputFile.junit=test-report.junit.xml
+        if: needs.unit.result == 'success'
+        env:
+          TEST_ALL: "${{ contains(github.event.pull_request.labels.*.name, 'test: all') && '1' || '' }}"
+        run: |
+          read -r -a coverage <<< "$(node scripts/test-select.mjs --print coverage)"
+          npx vitest run --merge-reports --coverage "${coverage[@]}" \
+            --reporter=dot --reporter=junit --outputFile.junit=test-report.junit.xml
 
       - name: Upload test report
-        if: always()
+        if: needs.unit.result == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: test-report.junit.xml
           path: test-report.junit.xml
           retention-days: 14
 
+      # An outside service never gates (ADR 123): a Codecov outage is not a test failure.
       - name: Upload coverage to Codecov
-        if: always()
+        if: needs.unit.result == 'success'
         uses: codecov/codecov-action@v5
         with:
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           files: coverage/lcov.info
           flags: unittests
           name: codecov-umbrella
@@ -263,10 +340,13 @@ jobs:
           verbose: true
 
       # Runs even when a shard failed, so a shard that died before writing its
-      # blob cannot leave a green merge of the other two.
+      # blob cannot leave a green merge of the others. A failed selection skips
+      # every shard, so it is checked too.
       - name: Verdict
         if: always()
-        run: test "${{ needs.unit.result }}" = success
+        run: |
+          test "${{ needs.select.result }}" = success
+          case "${{ needs.unit.result }}" in success|skipped) ;; *) exit 1 ;; esac
 
   # Nothing the build does depends on the other checks, and E2E waits on it,
   # so it starts with them rather than five minutes after them. Merge still
@@ -274,7 +354,8 @@ jobs:
   # The build check. Each E2E shard builds for itself, so nothing waits on this.
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 4
 
     steps:
       - uses: actions/checkout@v4
@@ -305,7 +386,8 @@ jobs:
   # no error or uncaught exception, then quits the app.
   start:
     name: Start
-    runs-on: macos-14
+    runs-on: macos-26
+    timeout-minutes: 8
 
     steps:
       - uses: actions/checkout@v4
@@ -335,51 +417,21 @@ jobs:
         run: |
           npx electron-builder --mac dir --publish never -c.mac.identity=null -c.mac.notarize=false
           node scripts/smoke-start.mjs exec "$PWD/dist/mac-arm64/Terminator.app/Contents/MacOS/Terminator"
-        timeout-minutes: 15
-
-  e2e-select:
-    name: E2E select
-    runs-on: ubuntu-latest
-    outputs:
-      mode: ${{ steps.select.outputs.mode }}
-      specs: ${{ steps.select.outputs.specs }}
-      changed: ${{ steps.select.outputs.changed }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-
-      # Which specs this diff can affect: scripts/e2e-select.mjs. A push to main
-      # runs everything, and any path the map does not know runs everything.
-      - name: Select specs
-        id: select
-        env:
-          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'HEAD~1' }}
-        run: |
-          result=$(node scripts/e2e-select.mjs "$BASE")
-          echo "$result"
-          echo "mode=$(echo "$result" | jq -r .mode)" >> "$GITHUB_OUTPUT"
-          echo "specs=$(echo "$result" | jq -r '.specs | join(" ")')" >> "$GITHUB_OUTPUT"
-          changed=$(git diff --name-only --diff-filter=AM "$BASE"...HEAD -- 'tests/e2e/*.spec.ts' | tr '\n' ' ')
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+        timeout-minutes: 6
 
   # Builds its own copy of the app rather than waiting on the Build job: the
   # build takes 40s, the wait for the Build job and its artifact took 1m20s.
   e2e:
-    name: E2E (${{ matrix.shard }}/5)
-    needs: e2e-select
-    if: needs.e2e-select.outputs.mode != 'none'
-    runs-on: macos-14
+    name: E2E (${{ matrix.shard }}/3)
+    needs: select
+    if: needs.select.outputs.run_e2e == 'true'
+    runs-on: macos-26
+    timeout-minutes: 8
     strategy:
       # Every shard runs to the end, so one run reports every failing spec rather than the first.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5]
+        shard: [1, 2, 3]
 
     steps:
       - uses: actions/checkout@v4
@@ -413,38 +465,25 @@ jobs:
       # recorded duration (scripts/e2e-shard.mjs), not Playwright's test count.
       - name: Run E2E suite
         env:
-          MODE: ${{ needs.e2e-select.outputs.mode }}
-          SPECS: ${{ needs.e2e-select.outputs.specs }}
+          MODE: ${{ needs.select.outputs.e2e_mode }}
+          SPECS: ${{ needs.select.outputs.e2e_specs }}
           PLAYWRIGHT_BLOB_OUTPUT_NAME: report-${{ matrix.shard }}.zip
         run: |
           if [ "$MODE" = all ]; then SPECS=""; fi
-          ARGS=$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 5 $SPECS)
+          read -r -a specs <<< "$SPECS"
+          ARGS=$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 3 "${specs[@]}")
           if [ -z "$ARGS" ]; then echo "Nothing selected for this shard."; exit 0; fi
+          read -r -a shard <<< "$ARGS"
           # remote-control.spec.ts drives the browser remote renderer in Chromium, and
           # git-integration-contrast.spec.ts and git-integration-stacking.spec.ts
           # render the extension views in it, and design-system-fields.spec.ts renders the shared field styles.
           case "$ARGS" in *remote-control.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts* | *design-system-fields.spec.ts*) npx playwright install chromium ;; esac
-          npx playwright test $ARGS --reporter=blob,dot
-        timeout-minutes: 10
+          npx playwright test "${shard[@]}" --reporter=blob,dot
+        timeout-minutes: 7
 
       - name: Process census (after the suite)
         if: ${{ !cancelled() }}
         run: scripts/process-census.sh "after the suite"
-
-      # A new or edited spec must pass three times before it merges: once in the
-      # suite above and twice here, split across the shards the same way.
-      - name: Burn in changed specs
-        if: needs.e2e-select.outputs.changed != ''
-        run: |
-          ARGS=$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 5 ${{ needs.e2e-select.outputs.changed }})
-          if [ -z "$ARGS" ]; then echo "Nothing changed on this shard."; exit 0; fi
-          case "$ARGS" in *remote-control.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts* | *design-system-fields.spec.ts*) npx playwright install chromium ;; esac
-          npx playwright test $ARGS --repeat-each=2 --reporter=dot
-        timeout-minutes: 10
-
-      - name: Process census (after the burn-in)
-        if: ${{ !cancelled() && needs.e2e-select.outputs.changed != '' }}
-        run: scripts/process-census.sh "after the burn-in"
 
       - name: Upload blob report
         if: ${{ !cancelled() }}
@@ -466,15 +505,16 @@ jobs:
   # passed or when the diff needed no E2E at all.
   e2e-result:
     name: E2E result
-    needs: [e2e-select, e2e]
+    needs: [select, e2e]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 2
 
     steps:
       - name: Verdict
         run: |
-          echo "select: ${{ needs.e2e-select.result }}, e2e: ${{ needs.e2e.result }}"
-          test "${{ needs.e2e-select.result }}" = success
+          echo "select: ${{ needs.select.result }}, e2e: ${{ needs.e2e.result }}"
+          test "${{ needs.select.result }}" = success
           case "${{ needs.e2e.result }}" in success|skipped) ;; *) exit 1 ;; esac
 
   # The merged HTML report, beside the verdict rather than in front of it.
@@ -482,7 +522,8 @@ jobs:
     name: E2E report
     needs: e2e
     if: ${{ !cancelled() && needs.e2e.result != 'skipped' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 4
 
     steps:
       - uses: actions/checkout@v4

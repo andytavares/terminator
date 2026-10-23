@@ -51,12 +51,16 @@ describe('useExtensionCommandsStore', () => {
 
   it('keeps what it last read while a refresh is still on its way', async () => {
     await useExtensionCommandsStore.getState().refresh()
-    getCommands.mockReturnValue(new Promise(() => {}))
-    list.mockReturnValue(new Promise(() => {}))
+    let finishReads = () => {}
+    const unfinished = new Promise<void>((resolve) => (finishReads = resolve))
+    getCommands.mockReturnValue(unfinished.then(() => ({ commands: [registered] })))
+    list.mockReturnValue(unfinished.then(() => ({ extensions: [] })))
 
-    void useExtensionCommandsStore.getState().refresh()
+    const refreshing = useExtensionCommandsStore.getState().refresh()
 
     expect(useExtensionCommandsStore.getState().registered).toEqual([registered])
     expect(useExtensionCommandsStore.getState().declared).toHaveLength(1)
+    finishReads()
+    await refreshing
   })
 })

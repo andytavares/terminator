@@ -61,17 +61,28 @@ Starts the app on a fresh profile and passes when the main log says `App ready`,
 
 ```bash
 npm run ci:local        # Every check CI runs, cheapest first; stops at the first failure
-npm run ci:local:e2e    # Only the e2e job: specs selected by the diff, five shards, burn-in
+npm run ci:local:e2e    # Only the e2e job: specs selected by the diff, ci.yml's shards, each spec once
 ```
 
-`npm run ci:local` runs what `.github/workflows/ci.yml` runs, on this Mac: Terminator ships only as a macOS DMG. `scripts/ci-plan.mjs` reads each job's own `run` steps from the workflow, so the two cannot drift. A GitHub expression or condition it does not know stops it, naming the job and step. It runs the jobs in workflow order (Lint, Typecheck, Format, Stories with the screenshot comparison, Unit, Perf, Test, Build, Start with the packaged app), then the e2e specs this diff selects, through `scripts/ci-e2e-local.mjs`. Every step runs without the `GIT_` variables a git hook sets, as CI does. It prints what it leaves to CI and why.
+`npm run ci:local` runs what `.github/workflows/ci.yml` runs, where CI runs it. A local pass must predict a CI pass, so it tests what CI tests:
 
-Nothing in git runs it: the pre-commit hook checks what a commit touches (`lint-staged`), and CI checks the pull request. Run `ci:local` when you want the whole of CI on this Mac before opening a PR.
+- **The same commit.** It fetches `origin/main`, merges your `HEAD` with it in the persistent check worktree `.worktrees/.ci-local`, and runs there. It never tests your dirty working tree, and it prints the `HEAD` and `origin/main` shas first. If the merge conflicts it stops and says so.
+- **The same machine.** CI runs the app (E2E, Start, story screenshots) on macOS and every other job on `ubuntu-24.04-arm`. ci:local runs the macOS steps on this Mac and the Ubuntu steps in a Docker container of Ubuntu 24.04 on arm64 with the `.nvmrc` Node (`scripts/ci-linux.Dockerfile`, `scripts/ci-linux.mjs`), so it needs Docker running. The container shares the check worktree; its `node_modules` are Docker volumes of Linux installs.
+- **The same Node.** It refuses to start unless `node -v` is `v` plus the version in `.nvmrc`, and names both.
+- **The same install.** In the check worktree, on the Mac and in the container, it runs `npm ci` when the hash of `package-lock.json` differs from the one recorded in `node_modules/.lock-hash` after the last install; otherwise it keeps `node_modules`.
+- **The same checks.** `scripts/ci-plan.mjs` reads each job's own `run` steps from the workflow, so the two cannot drift. A GitHub expression or condition it does not know stops it, naming the job and step. It runs the jobs in workflow order, then the e2e specs. Without a flag the diff selects the specs; `--all` runs every test and sets `TEST_ALL=1` for the e2e step. Every step runs without the `GIT_` variables a git hook sets, as CI does. It prints what it leaves to CI and why.
+
+`--prepare-only` does the Node check, the fetch, the merge and the install, prints the shas, and exits.
+
+On a pass it records `<HEAD sha> <origin/main sha>` in your repository (`git rev-parse --git-path ci-local-passed`) The pre-push hook (`.husky/pre-push`) reads the record and refuses to push a commit with no recorded pass, naming `npm run ci:local`. When it lets a push through, it leaves a background process that waits (up to two minutes) for GitHub to have the commit and then sets its `local-check` commit status through `gh`: GitHub takes a status only for a commit it has. The hook only checks the record: git opens the connection to the remote before it runs the hook, and a hook that ran the whole suite left that connection idle until it dropped. So commit, run `npm run ci:local`, then push. A deleted ref passes, and the hook does nothing where `CI` is set: the release and story-baseline jobs push their own commits.
+
+To see whether local passes have predicted CI, run `node scripts/ci-parity-report.mjs --since 2026-10-15`. It lists every failed CI job on a commit that had a `local-check` success (a parity break) and every commit whose same job both failed and passed (a flip), prints the counts, and exits 1 when either is non-zero.
 
 ### Run tests
 
 ```bash
-npm test                # Unit + integration (Vitest), core and extensions
+npm test                # The unit + integration specs your branch can reach (Vitest), with coverage
+npm test -- --all       # Every spec
 npm run test:watch      # Watch mode
 npm run test:e2e        # E2E — launches real Electron app (Playwright)
 npm run test:perf       # Wall-clock budgets (*.perf.spec.ts), one file at a time
@@ -79,6 +90,8 @@ npm run test:coverage   # Coverage report in coverage/
 npm run test:stories    # The design system's Storybook stories, run as tests
 npm run test:visual     # The design system's screenshot tests
 ```
+
+**Which tests run.** `npm test` runs what `scripts/test-select.mjs` selects for the commits on your branch since `origin/main` (not uncommitted work), and CI runs the same command ([ADR 123](adr/123-tests-run-once-sealed-and-selected.md)). Everything runs for `--all`, for a pull request labelled `test: all`, on a push to main, and when a path that can change every result changes (`ALWAYS_ALL` in the script: test config and setup, `tests/support`, the lockfile, `package.json`, the e2e helpers). A source or data file that no spec imports and no map claims also runs everything. Read the choice with `node scripts/test-select.mjs`, which prints `mode`, `unit`, `e2e`, `base` and `reason`. A data file the source reads with `fs`, which no import shows, goes in `RUNTIME_READS` in that script, with the specs that read it; its unit test fails for one that is listed nowhere. The suite runs once, in a fixed order, with no retry, repeat or shuffle, on macOS in CI as here. With a selection, coverage covers the changed files only.
 
 **Temporary directories.** A spec makes one with `makeTempDir(prefix)` from `tests/support/temp-dir.ts`, never with `mkdtempSync` in `os.tmpdir()`: `tests/setup.ts` removes every one after the spec file ends, passed or failed. An E2E spec uses `e2eTempDir(prefix)` from `tests/e2e/helpers.ts`, which `tests/e2e/global-teardown.ts` removes with the run's root. CI runs each unit shard through `node scripts/check-temp-leaks.mjs`, which points `TMPDIR` at an empty directory (read by [`os.tmpdir()`](https://nodejs.org/api/os.html#ostmpdir), git, sh and mktemp) and fails if anything is left in it; run it locally the same way, `node scripts/check-temp-leaks.mjs npx vitest run`. Specs that skipped this once left ~22,000 folders in `/tmp` in a day and filled the disk.
 
@@ -88,7 +101,11 @@ Notepad's and git-integration's DOM specs run in [happy-dom](https://vitest.dev/
 
 Every other spec has to pass on a loaded machine too, where a test can run ten times slower than on an idle one. It waits for the event it needs, never for a fixed time that hopes the event came first. A clock the code reads (a replay, a poll) is a fake one, `vi.useFakeTimers({ toFake: [...] })` with only the timers that code uses. A canvas whose pixels the spec does not check gets no 2D context (`getContext` returns `null`), because a `vi.fn()` fake records every call of every frame. `tests/setup.ts` makes jsdom parse its built-in stylesheet before the first test, so that test is not charged 300 ms for it. To find a flake, run 4–6 copies of the spec at once: `for i in 1 2 3 4 5 6; do npx vitest run <spec> & done; wait`.
 
+**Every run is sealed and shuffled (ADR 123).** A unit spec sees the same environment on every machine: `tests/global-setup.ts` makes an empty `HOME` for the run and `tests/setup.ts` replaces the worker's `process.env` with `testEnvironment()` from `scripts/test-env.mjs` (UTC, `en_US.UTF-8`, git reading `tests/fixtures/git/gitconfig`, a short PATH), so your shell, `~/.gitconfig` and time zone never reach it. Files and the tests inside them run in a new random order each run, with one worker per core. The run prints `Test order seed: <n> (rerun this order: TEST_SEED=<n>)`; a failure that depends on order reproduces with `TEST_SEED=<n> npx vitest run`, and is fixed by making the test not need what ran before it, never by fixing the order. Mocks are restored, stubbed env and globals are unstubbed, and fake timers are real again after every test, so a spy or stub is made in `beforeEach`, not `beforeAll`. In the node project a connection to any host but localhost throws, and a test that leaves an interval, a server, a socket, a watcher or a child process running fails, naming the line that started it. A spec that makes the logger write awaits `flushLogs()` (`src/main/logger.ts`) before its folder goes.
+
 Coverage is gated by Codecov on the pull request, not locally ([ADR 095](adr/095-coverage-is-gated-by-codecov.md)). `codecov/patch` needs 80% of the lines your change adds or modifies, and `codecov/project` must not drop. A test covers a scenario the running app can produce; a branch no real caller can reach is deleted, not tested.
+
+To see whether a test depends on the machine's speed, run it with every core kept busy: `node scripts/under-load.mjs -- npx vitest run <spec>` (`--threads N` to choose how many). The load is threads of that one process, so it ends when the command does. Never make load with background shell jobs (`yes > /dev/null &`): a non-interactive shell cannot kill them reliably, and ten such processes once ran for four hours, until the e2e check refused the machine as busy. That refusal now names the busiest processes.
 
 ### Measure performance
 
@@ -117,7 +134,7 @@ The suite runs in the background, so the machine stays usable while it runs. `la
 - Read what a terminal shows with `readTerminalRows(page)` from `tests/e2e/helpers.ts`, never from `.xterm-rows`. A visible terminal draws with WebGL into a canvas and the DOM holds none of its text; `readTerminalRows` reads xterm's buffer through `window.terminatorE2E`, which the app sets up in `src/renderer/terminal/terminal-rows.ts`. It reads every open terminal, hidden ones too, one after another; when the row's terminal or its place on screen matters, read one pane with `readTerminalRowsIn(screen)`, where `screen` is that pane's `.xterm-screen` (`visibleTerminalScreen(page)` for the first one on screen).
 - A new spec goes in `scripts/e2e-select.mjs`: under the extension it covers, or in `CORE_SPECS`. The selector's unit test fails for a spec that is in neither.
 - **Live specs** (`tests/e2e/live/`) run a real agent on an order (`live-order.ts`). `full-run.spec.ts` polls until the run says it is over, never until the graph settles: the ladder's climb, then the push and the draft pull request, all come after the last node leaves the graph. Breaking on a settled graph once asserted against GitHub mid-climb and closed the app, killing the step the test is named after. Its polling deadline (45 minutes) is longer than the order's budget, so the budget gate is seen when it fires, and its test timeout is longer than the deadline, so the test reports the run instead of Playwright killing it. The order's budget leaves room for the pipeline plus the climb: four agents and eight rungs take fifteen minutes on a good run, and at twenty minutes a slow builder hit the gate instead of shipping.
-- CI runs only the specs your diff selects, plus the smoke set. Changed specs run three times. To see what your branch selects: `node scripts/e2e-select.mjs origin/main`.
+- CI runs only the specs your diff selects, plus the smoke set, each once ([ADR 123](adr/123-tests-run-once-sealed-and-selected.md)). To see what your branch selects: `node scripts/test-select.mjs` (the `e2e` list).
 
 ### Build extensions
 
@@ -137,6 +154,7 @@ npm run lint:deps  # syncpack: exact versions, one per package
 npm run lint:unused  # knip: no unused files, exports or dependencies
 npm run lint:unused:production  # knip --production: no code that only tests reach
 npm run lint:duplicates  # jscpd: no copy-pasted code
+npm run lint:workflows   # actionlint + shellcheck on .github/workflows, pinned versions
 npm run typecheck  # TypeScript type check (no emit — zero errors required)
 npm run format     # Prettier (auto-fixes)
 ```
@@ -166,6 +184,8 @@ Tests are functions too, so a `describe` callback longer than 30 lines is split 
 - It is a test seam (a clock setter, a reset): fake what the app reads instead (`vi.useFakeTimers`, `vi.resetModules`) and delete the seam.
 - The app runs it from inside its own file, and a spec tests it directly: drop the `export` and test it through its caller, or tag it `/** @internal */` ([knip](https://knip.dev/reference/jsdoc-tsdoc-tags#internal)).
 - A new production entry (an extension's `src/index.ts`, a file loaded by path): end its pattern in `knip.jsonc` with `!`.
+
+`npm run lint:workflows` runs actionlint 1.7.12 with shellcheck 0.11.0 over `.github/workflows`, the `run:` scripts included. `scripts/workflow-lint.mjs` downloads both once into `node_modules/.cache/workflow-lint` and checks each archive's sha256 first, so CI and this Mac run the same binaries whatever else is on `PATH`. To move to a new version, change its version, URL and checksum there together.
 
 `npm run lint:duplicates` runs [jscpd](https://github.com/kucherenko/jscpd) with `.jscpd.json` and must find no clones ([ADR 105](adr/105-duplicate-code-is-a-ci-gate.md)). A clone is a block of at least 6 lines and 60 tokens that appears twice in `src`, `packages` or `extensions`. Specs, `tests` and `stories` folders are not checked. When it reports one, move the code to the one place both copies may import:
 
@@ -302,7 +322,7 @@ Per the constitution (Principle IV):
 Before opening a PR, verify:
 
 - [ ] All tests pass (`npm test`)
-- [ ] `npm run lint`, `npm run lint:deps`, `npm run lint:unused`, `npm run lint:unused:production`, `npm run lint:duplicates` and `npm run typecheck` pass with 0 errors
+- [ ] `npm run lint`, `npm run lint:deps`, `npm run lint:unused`, `npm run lint:unused:production`, `npm run lint:duplicates`, `npm run lint:workflows` and `npm run typecheck` pass with 0 errors
 - [ ] `npm run format:check` passes
 - [ ] `npm run build:extensions` succeeds (no compile errors)
 - [ ] No unused imports, variables, or dead code introduced

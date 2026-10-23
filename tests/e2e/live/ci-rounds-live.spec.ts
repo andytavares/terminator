@@ -82,7 +82,6 @@ function commitMarkerWorkflow(): void {
 }
 
 test.beforeAll(async () => {
-  test.setTimeout(300_000)
   repo = e2eTempDir('foundry-live-ci-')
   execFileSync('git', ['clone', REMOTE, repo])
   git('config', 'user.email', 'live@example.com')
@@ -166,7 +165,7 @@ async function waitForShipping(): Promise<void> {
     return over !== null
   }
   await expect
-    .poll(shipped, { timeout: 55 * 60_000, intervals: [15_000] })
+    .poll(shipped, { intervals: [15_000] })
     .toBe(true)
     .catch(() => console.log('[deadline] shipping did not finish'))
 }
@@ -206,7 +205,6 @@ function expectChecksGreenOnGitHub(): void {
 }
 
 test('a red CI goes back to the builder and the draft reaches the ready gate green', async () => {
-  test.setTimeout(3_600_000)
   writeOrder()
   await startLiveRun(foundry, ORDER)
   await waitForShipping()

@@ -13,8 +13,6 @@ vi.mock('../../src/stores/vault.store', () => ({ useVaultStore: () => store }))
 
 import { KanbanBoard } from '../../src/components/KanbanBoard'
 
-vi.setConfig({ testTimeout: 30_000 })
-
 const openExternal = vi.fn(async () => ({ ok: true as const }))
 
 class TestDragEvent extends MouseEvent {

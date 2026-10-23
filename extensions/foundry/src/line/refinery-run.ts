@@ -20,6 +20,8 @@ import { isoNow, shellExecOf } from '../host-calls.js'
 // The refinery tick: once a minute, watch merged predecessors and restack what queued
 // behind them (R4). Nothing runs until something has shipped a pull.
 let refineryTimer: NodeJS.Timeout | null = null
+/** Ticks running now; stopping waits for them. */
+const ticksInFlight = new Set<Promise<void>>()
 
 // One CI watch for an order whose lanes the refinery just rebased, as "another round"
 // does, but with the recipe's own round count: a full recheck of a moved change,
@@ -161,11 +163,14 @@ async function moveIssueToDone(
 /** R4: watch for merges, restack what queued behind, recheck it. */
 export function startRefineryTick({ api, dataRoot }: ActivationContext): void {
   refineryTimer = setInterval(() => {
-    void runRefineryTick(api, dataRoot())
+    const tick = runRefineryTick(api, dataRoot()).finally(() => ticksInFlight.delete(tick))
+    ticksInFlight.add(tick)
   }, 60_000)
 }
 
-export function stopRefineryTick(): void {
+/** Settles when the tick running now, if any, has ended. */
+export async function stopRefineryTick(): Promise<void> {
   if (refineryTimer !== null) clearInterval(refineryTimer)
   refineryTimer = null
+  await Promise.allSettled([...ticksInFlight])
 }

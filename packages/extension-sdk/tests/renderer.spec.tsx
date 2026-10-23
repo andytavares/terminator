@@ -54,11 +54,11 @@ describe('openInBrowser', () => {
     })
   }
 
-  it("hands the address to the person's browser", () => {
+  it("hands the address to the person's browser", async () => {
     const opened = vi.fn().mockResolvedValue(undefined)
     shellOpening(opened)
 
-    openInBrowser('https://example.com/pull/7')
+    await openInBrowser('https://example.com/pull/7')
 
     expect(opened).toHaveBeenCalledWith('https://example.com/pull/7')
   })
@@ -68,8 +68,7 @@ describe('openInBrowser', () => {
     process.once('unhandledRejection', unhandled)
     shellOpening(() => Promise.reject(new Error('no browser')))
 
-    openInBrowser('https://example.com')
-    await new Promise((resolve) => setImmediate(resolve))
+    await openInBrowser('https://example.com')
 
     process.off('unhandledRejection', unhandled)
     expect(unhandled).not.toHaveBeenCalled()

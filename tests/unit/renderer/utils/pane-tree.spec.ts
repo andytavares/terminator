@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   splitLeaf,
   removeLeaf,
@@ -8,7 +8,9 @@ import {
 import type { PaneNode } from '../../../../src/shared/types/index'
 
 // Deterministic UUIDs for snapshots
-vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'test-uuid') })
+beforeEach(() => {
+  vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'test-uuid') })
+})
 
 function leaf(sessionId: string): PaneNode {
   return { type: 'leaf', sessionId }

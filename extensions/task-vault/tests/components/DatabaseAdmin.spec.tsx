@@ -5,8 +5,6 @@ import { installVaultBridge, eventually } from './helpers/bridge'
 import { DatabaseAdmin } from '../../src/components/DatabaseAdmin'
 import { pressOutside } from '../../../../tests/support/modal'
 
-vi.setConfig({ testTimeout: 30_000 })
-
 let bridge: ReturnType<typeof installVaultBridge>
 
 beforeEach(() => {

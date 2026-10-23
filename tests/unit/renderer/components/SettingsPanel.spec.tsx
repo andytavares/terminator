@@ -7,6 +7,7 @@ import { extensionOf, seedStore } from '../../../support/renderer-stores'
 import { installElectronApi } from '../../../support/electron-api'
 import { pressOutside } from '../../../support/modal'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
+import { eventually } from '../../../support/eventually'
 
 const { mockDispatchNotification } = vi.hoisted(() => ({ mockDispatchNotification: vi.fn() }))
 vi.mock('../../../../src/renderer/lib/notifications', () => ({
@@ -588,9 +589,8 @@ describe('ExtensionsSection — ExtensionSettingRow calls updateSetting after de
     await waitFor(() => screen.getByDisplayValue('hello'))
     fireEvent.change(screen.getByDisplayValue('hello'), { target: { value: 'world' } })
     // Wait for debounce timer (400ms) to fire
-    await waitFor(
-      () => expect(api.extension.updateSetting).toHaveBeenCalledWith('com.test.myKey', 'world'),
-      { timeout: 2000 }
+    await eventually(() =>
+      expect(api.extension.updateSetting).toHaveBeenCalledWith('com.test.myKey', 'world')
     )
   })
 })
@@ -848,9 +848,8 @@ describe('ExtensionsSection — renders folder-type setting with Choose button a
     await waitFor(() => screen.getByText('Choose…'))
     fireEvent.click(screen.getByText('Choose…'))
     // Wait for the debounce timer (400ms) to fire so saveTimer is cleared before unmount
-    await waitFor(
-      () => expect(api.extension.updateSetting).toHaveBeenCalledWith('com.test.folder', '/my/path'),
-      { timeout: 2000 }
+    await eventually(() =>
+      expect(api.extension.updateSetting).toHaveBeenCalledWith('com.test.folder', '/my/path')
     )
   })
 })
@@ -950,9 +949,7 @@ async function openSettingsOf(
 }
 
 const savedSetting = (key: string, value: unknown) =>
-  waitFor(() => expect(api.extension.updateSetting).toHaveBeenCalledWith(key, value), {
-    timeout: 2000,
-  })
+  eventually(() => expect(api.extension.updateSetting).toHaveBeenCalledWith(key, value))
 
 describe('ExtensionsSection — editing each kind of setting', () => {
   setUpExtensionsSection()

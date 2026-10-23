@@ -76,7 +76,9 @@ describe('IntegrationsSettings — rendering', () => {
         mine: { kind: 'query', jql: 'x' },
       }),
     ])
-    await waitFor(() => expect(screen.getByText(/tav.atlassian.net/)).toBeTruthy())
+    await waitFor(() =>
+      expect(screen.getByText('tav.atlassian.net', { exact: false })).toBeTruthy()
+    )
   })
 })
 

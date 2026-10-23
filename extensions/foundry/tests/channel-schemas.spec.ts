@@ -10,8 +10,8 @@ import { fileURLToPath } from 'node:url'
 
 const GLOBAL_STORAGE = freshFoundryStorage()
 
-import { describe, it, expect, vi, beforeAll } from 'vitest'
-import { activate } from '../src/index.ts'
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
+import { activate, deactivate } from '../src/index.ts'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 
 vi.mock('../src/runtime/supervised-runner.js', () => import('./helpers/supervision-mocks.js'))
@@ -86,6 +86,10 @@ beforeAll(async () => {
   const { startSupervisionRuntime } = await import('../src/runtime/supervision-runtime.ts')
   activate(api)
   await startSupervisionRuntime(api)
+})
+
+afterAll(async () => {
+  await deactivate()
 })
 
 function registeredChannels(): string[] {

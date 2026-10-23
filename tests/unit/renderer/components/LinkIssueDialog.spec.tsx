@@ -132,7 +132,7 @@ describe('LinkIssueDialog — searching — goes back to assigned issues when th
     listMine.mockClear()
     fireEvent.change(input, { target: { value: '' } })
     await act(async () => {
-      await Promise.resolve()
+      await listMine.mock.results[0].value
     })
     expect(listMine).toHaveBeenCalled()
   })

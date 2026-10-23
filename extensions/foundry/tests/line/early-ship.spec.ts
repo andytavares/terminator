@@ -7,6 +7,7 @@ import type { LadderOutcome } from '../../src/verify/ladder.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { RiskAssessment, WorkOrder } from '../../src/order/schema.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { eventually } from '../../../../tests/support/eventually'
 
 // The draft opens before the final check, and the check runs while CI does —
 // except where the operator decides before anything reaches the remote.
@@ -188,7 +189,7 @@ function earlyShipCiTests() {
     const { early, raised } = setup({ watchCi })
     await early.beforeFinalCheck({ risk: risk('P3'), verdicts: [] })
     const finishing = early.finish(outcome())
-    await vi.waitFor(() => expect(watchCi).toHaveBeenCalled())
+    await eventually(() => expect(watchCi).toHaveBeenCalled())
     expect(raised).toEqual([])
     release({ kind: 'green', checks: [] })
     await finishing

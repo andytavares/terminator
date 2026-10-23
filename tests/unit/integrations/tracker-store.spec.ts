@@ -158,9 +158,10 @@ describe('tracker-store — concurrent writes', () => {
 
   it('answers a read after the writes already asked for', async () => {
     const store = await load()
-    void store.setLastError('linear', 'auth-failed')
+    const written = store.setLastError('linear', 'auth-failed')
     const linear = (await store.listConnections()).find((c) => c.tracker === 'linear')
     expect(linear?.lastError).toBe('auth-failed')
+    await written
   })
 })
 

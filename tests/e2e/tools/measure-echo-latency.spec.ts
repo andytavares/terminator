@@ -33,9 +33,7 @@ async function startBusyTerminals(page: Page): Promise<void> {
     }
   }
   await page.locator('.terminal-pane').click()
-  await expect
-    .poll(async () => (await readTerminalRows(page)).join('\n'), { timeout: 30_000 })
-    .toContain('busy')
+  await expect.poll(async () => (await readTerminalRows(page)).join('\n')).toContain('busy')
 }
 
 /** Milliseconds from each of ten keystrokes to its echo in the idle terminal. */
@@ -51,7 +49,7 @@ async function echoTimes(page: Page): Promise<number[]> {
     await page.waitForFunction(
       (expected) => window.terminatorE2E!.terminalRows().some((row) => row.includes(expected)),
       typed,
-      { polling: 'raf', timeout: 5000 }
+      { polling: 'raf' }
     )
     samples.push(Date.now() - started)
   }
@@ -59,7 +57,6 @@ async function echoTimes(page: Page): Promise<number[]> {
 }
 
 test('measure keystroke echo with six busy terminals', async () => {
-  test.setTimeout(240_000)
   handle = await launchApp()
   const { page } = handle
   await startBusyTerminals(page)

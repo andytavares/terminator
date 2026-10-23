@@ -138,7 +138,7 @@ async function renderWithPrDialogOpen() {
 // than one test's 5 s; load it once here so every test times only its own work.
 beforeAll(async () => {
   await import('../../src/components/GitFullView')
-}, 60_000)
+})
 
 describe('GitFullView', () => {
   it('shows "No project selected" when repoRoot is null', async () => {
@@ -302,7 +302,6 @@ describe('GitFullView — does not refetch when the same side of the file is alr
   it('does not refetch when the same side of the file is already cached', async () => {
     await renderView('/repo', { diffCache: new Map([['unstaged:src/foo.ts', { hunks: [] }]]) })
     fireEvent.click(screen.getByText('SelectFile'))
-    await Promise.resolve()
     expect(mockGitDiffFile).not.toHaveBeenCalled()
   })
 

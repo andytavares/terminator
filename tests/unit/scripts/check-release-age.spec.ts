@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest'
+import { execFileSync } from 'node:child_process'
+import { existsSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { makeTempDir } from '../../support/temp-dir'
 import {
   addedVersions,
   baseBranch,
+  baseLockfile,
   lockedVersions,
   tooYoung,
 } from '../../../scripts/check-release-age.mjs'
@@ -85,5 +90,32 @@ describe('tooYoung', () => {
     expect(tooYoung({ published: { 'zod@4.6.7': null }, exceptions: {}, now: NOW })).toEqual([
       { id: 'zod@4.6.7', publishedAt: null },
     ])
+  })
+})
+
+// Every worktree shares one .git: a --depth=1 fetch made the developer's whole repository shallow,
+// and the next merge with main refused "unrelated histories".
+describe('reading the base branch lockfile', () => {
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync('git', args, { cwd, encoding: 'utf8' })
+
+  it("reads the branch's lockfile and leaves the repository's history whole", () => {
+    const origin = makeTempDir('release-age-origin-')
+    git(origin, 'init', '-q', '-b', 'main')
+    for (const version of ['1', '2']) {
+      writeFileSync(join(origin, 'package-lock.json'), JSON.stringify({ version }))
+      git(origin, 'add', '.')
+      git(origin, 'commit', '-qm', version)
+    }
+    const clone = join(makeTempDir('release-age-clone-'), 'repo')
+    git(origin, 'clone', '-q', origin, clone)
+
+    // origin moves on after the clone: the check reads origin/main as fetched, and fetches nothing
+    // itself. CI's checkout and ci:local fetch first; ci:local's Linux container has no keys.
+    writeFileSync(join(origin, 'package-lock.json'), JSON.stringify({ version: '3' }))
+    git(origin, 'commit', '-qam', '3')
+
+    expect(baseLockfile('main', clone)).toEqual({ version: '2' })
+    expect(existsSync(join(clone, '.git/shallow'))).toBe(false)
   })
 })

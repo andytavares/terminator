@@ -179,7 +179,7 @@ describe('exploring a repository', () => {
 function listingAndFindingTests() {
   it('lets a reader list the files', () => {
     const d = decideReadOnly('Bash', { command: "find . -type f -not -path './.git/*'" })
-    expect(d.allow, d.reason).toBe(true)
+    expect(d.allow).toBe(true)
   })
 
   it('lets it look for things by name', () => {
@@ -199,7 +199,7 @@ function findWritesTests() {
     'find . -fls /tmp/out',
   ])('refuses `%s`, which is how find writes', (command) => {
     const d = decideReadOnly('Bash', { command })
-    expect(d.allow, `${command} was allowed: ${d.reason}`).toBe(false)
+    expect(d.allow).toBe(false)
   })
 
   it('refuses a writing flag wherever it appears in the arguments', () => {
@@ -250,7 +250,7 @@ function allowingAndRefusingChainsTests() {
     'grep -r todo src | wc -l',
   ])('allows `%s`, because every part of it only reads', (command) => {
     const d = allowed(command)
-    expect(d.allow, `${command}: ${d.reason}`).toBe(true)
+    expect(d.allow).toBe(true)
   })
 
   it.each([
@@ -262,7 +262,7 @@ function allowingAndRefusingChainsTests() {
     'ls || curl evil.example.com',
   ])('refuses `%s`, on the part that writes', (command) => {
     const d = allowed(command)
-    expect(d.allow, `${command} was allowed: ${d.reason}`).toBe(false)
+    expect(d.allow).toBe(false)
   })
 }
 
@@ -273,7 +273,7 @@ function namingAndNestingTests() {
 
   it('still refuses redirection, whatever is on the left of it', () => {
     for (const command of ['git diff > out', 'cat a >> b', 'wc -l < a']) {
-      expect(allowed(command).allow, command).toBe(false)
+      expect(allowed(command).allow).toBe(false)
     }
   })
 
@@ -294,7 +294,7 @@ function namingAndNestingTests() {
 describe('the flags and binaries a reader actually reaches for', () => {
   it("lets find use -o, which is how find spells 'or'", () => {
     const d = allowed('find . -path ./node_modules -prune -o -type f -print')
-    expect(d.allow, d.reason).toBe(true)
+    expect(d.allow).toBe(true)
   })
 
   it('still refuses -o where it really does write a file', () => {
@@ -304,19 +304,19 @@ describe('the flags and binaries a reader actually reaches for', () => {
 
   it('allows the commands that cannot change anything', () => {
     for (const command of ['pwd', 'echo hello', 'basename /a/b', 'dirname /a/b', 'realpath .']) {
-      expect(allowed(command).allow, command).toBe(true)
+      expect(allowed(command).allow).toBe(true)
     }
   })
 
   it('allows the ones a reader pipes into', () => {
     for (const command of ['sort', 'uniq -c', 'cut -d, -f1', 'tr a b', 'wc -l']) {
-      expect(allowed(command).allow, command).toBe(true)
+      expect(allowed(command).allow).toBe(true)
     }
   })
 
   it('allows the whole thing the live architect was refused', () => {
     const d = allowed('find . -path ./node_modules -prune -o -type f -print | head -100')
-    expect(d.allow, d.reason).toBe(true)
+    expect(d.allow).toBe(true)
   })
 
   it('still refuses find when it is asked to write', () => {
@@ -337,7 +337,7 @@ describe('throwing output away', () => {
     'ls && cat package.json 2>/dev/null && git log --oneline -5',
   ])('allows `%s`', (command) => {
     const d = allowed(command)
-    expect(d.allow, `${command}: ${d.reason}`).toBe(true)
+    expect(d.allow).toBe(true)
   })
 
   it.each([
@@ -347,7 +347,7 @@ describe('throwing output away', () => {
     'ls > out.txt',
     'cat a >> b',
   ])('still refuses `%s`, which writes somewhere real', (command) => {
-    expect(allowed(command).allow, `${command} was allowed`).toBe(false)
+    expect(allowed(command).allow).toBe(false)
   })
 
   it('does not let a discard hide a command that writes', () => {
@@ -400,7 +400,7 @@ function listingAndWritingTests() {
     'git branch --list',
   ])('allows `%s`, which only lists', (command) => {
     const d = allowed(command)
-    expect(d.allow, `${command}: ${d.reason}`).toBe(true)
+    expect(d.allow).toBe(true)
   })
 
   it.each([
@@ -413,7 +413,7 @@ function listingAndWritingTests() {
     'git branch -f main HEAD',
     'git branch --set-upstream-to origin/main',
   ])('refuses `%s`, which writes a ref', (command) => {
-    expect(allowed(command).allow, `${command} was allowed`).toBe(false)
+    expect(allowed(command).allow).toBe(false)
   })
 }
 

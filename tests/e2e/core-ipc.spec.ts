@@ -41,7 +41,7 @@ test.afterAll(async () => closeApp(handle))
 async function openNotesView(): Promise<void> {
   const panel = handle.page.locator(`[data-extension-panel="${NOTES}"]`)
   if ((await panel.count()) === 0) await handle.page.locator('button[aria-label="Notes"]').click()
-  await expect(panel).toHaveCount(1, { timeout: 15000 })
+  await expect(panel).toHaveCount(1)
   await expect
     .poll(() => inExtensionView<boolean>(handle, NOTES, '!!window.electronAPI').catch(() => false))
     .toBe(true)
@@ -126,7 +126,7 @@ async function checkoutMovesRepositoryAndCard(): Promise<void> {
   const result = await fromView(`api.git.checkout(${JSON.stringify(repo)}, 'made-in-app')`)
   expect(result).toEqual({ success: true })
   expect(git(repo, 'branch', '--show-current')).toBe('made-in-app')
-  await expect(projectGroup(handle.page, 'made-in-app')).toBeVisible({ timeout: 20000 })
+  await expect(projectGroup(handle.page, 'made-in-app')).toBeVisible()
 }
 
 async function worktreeRemovalDeletesIt(): Promise<void> {
@@ -218,7 +218,6 @@ async function theViewReachesTheApp(): Promise<void> {
 }
 
 test('an extension view reads the workspace, acts on its repository and ends its terminals', async () => {
-  test.setTimeout(90_000)
   await theViewReadsTheWorkspace()
   await theViewActsOnTheRepository()
   await theViewReachesTheApp()

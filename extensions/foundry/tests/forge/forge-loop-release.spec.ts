@@ -5,7 +5,7 @@
  * a follow-up on a plan still failing its checks. Also an order released once
  * before whose restart is refused, and a review that asks to see the fix.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 import * as path from 'node:path'
 
 import {
@@ -15,7 +15,7 @@ import {
   toastsShown,
   untilToastShown,
 } from '../helpers/foundry-host.js'
-import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { writeBaseline } from '../../src/line/baseline.js'
 import { provenBaseline } from '../helpers/environment.js'
@@ -32,11 +32,10 @@ import {
 import { orderLedger, untilLedgerHas } from '../helpers/order-ledger.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 import { executingOrders } from '../../src/line/run-control.js'
+import { eventually } from '../../../../tests/support/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
-
-vi.setConfig({ testTimeout: 20_000 })
 
 let dataDir = ''
 let repo = ''
@@ -53,8 +52,11 @@ beforeAll(async () => {
   await activateFoundry(host)
 })
 
-afterAll(() => {
-  deactivate()
+// Each test's proofs and runs end before the next test, or the spec's folder, goes.
+afterEach(settleFoundryWork)
+
+afterAll(async () => {
+  await deactivate()
   vi.unstubAllEnvs()
 })
 
@@ -78,13 +80,10 @@ const READY = 'Make it red is ready to hand off.'
  * it writes the run's graph and timeline after the ledger entry. */
 async function untilTheRunEnds(): Promise<void> {
   const ends = ['run.failed', 'run.halted']
-  await vi.waitFor(
-    async () => {
-      expect((await orderLedger(dataDir)).some((entry) => ends.includes(entry.action))).toBe(true)
-      expect(executingOrders.has('WO-1')).toBe(false)
-    },
-    { timeout: 10_000, interval: 50 }
-  )
+  await eventually(async () => {
+    expect((await orderLedger(dataDir)).some((entry) => ends.includes(entry.action))).toBe(true)
+    expect(executingOrders.has('WO-1')).toBe(false)
+  })
 }
 
 /** The first turn the ledger records after the operator let go. */
@@ -105,7 +104,7 @@ async function heldDuringTheRedTeam(order: WorkOrder): Promise<void> {
   let letItFinish = (): void => undefined
   heldTurn = { phase: 'red-team', release: new Promise((resolve) => (letItFinish = resolve)) }
   await convergeOrder(host, dataDir, order)
-  await vi.waitFor(() =>
+  await eventually(() =>
     expect(theRunner.start.mock.calls.map((c) => (c[0] as ForgeTurnInput).phase)).toContain(
       'red-team'
     )
@@ -180,15 +179,13 @@ describe('a plan still failing its checks when the operator lets go', () => {
     })
     // The follow-up that turn earns resumes the conversation, so the turn's
     // terminal, still open, is ended first.
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(theRunner.stop).toHaveBeenCalledWith('architect-2', 'continuing in a follow-up turn')
     )
-    await vi.waitFor(
-      async () =>
-        expect(
-          (await orderLedger(dataDir)).filter((e) => e.action === 'order.redrafted')
-        ).toHaveLength(3),
-      { timeout: 10_000, interval: 50 }
+    await eventually(async () =>
+      expect(
+        (await orderLedger(dataDir)).filter((e) => e.action === 'order.redrafted')
+      ).toHaveLength(3)
     )
   })
 })

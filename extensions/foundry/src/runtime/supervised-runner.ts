@@ -314,7 +314,11 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
     terminalFor: (sessionId) => terminalOf(running.get(sessionId)),
     watchable: () => watchableRuns(running),
     dispose: () => {
-      for (const sessionId of [...running.keys()]) end(context, sessionId, false)
+      for (const [sessionId, run] of [...running.entries()]) {
+        end(context, sessionId, false)
+        // The session is gone with no exit code of its own, so whatever waits on it can end.
+        run.phase.current.onEnd?.(null)
+      }
     },
   }
 }

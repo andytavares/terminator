@@ -52,8 +52,6 @@ const REPLY = {
   },
 }
 
-test.describe.configure({ mode: 'serial' })
-
 test.beforeAll(async () => {
   ;({ repo, bare } = makeRepoWithRemote('terminator-e2e-agent'))
   pushBranchToOrigin(repo, 'feat/subtract', {
@@ -136,9 +134,7 @@ async function cloneAndReviewOpensThePullRequest(): Promise<void> {
   await row.getByRole('button', { name: 'Clone and review' }).click()
 
   const review = await popoutPage(handle, 'view=pr-review')
-  await expect(review.getByRole('heading', { level: 1 })).toContainText('Add subtract', {
-    timeout: 20000,
-  })
+  await expect(review.getByRole('heading', { level: 1 })).toContainText('Add subtract')
   const clone = join(cloneFolder, 'widgets')
   expect(existsSync(join(clone, '.git'))).toBe(true)
   expect(git(clone, 'log', '-1', '--format=%s', 'origin/main')).toBe('initial')
@@ -146,7 +142,6 @@ async function cloneAndReviewOpensThePullRequest(): Promise<void> {
 }
 
 test('the Reviews dashboard is narrowed to a repository, and a pull request in it is cloned and reviewed', async () => {
-  test.setTimeout(60_000)
   await runSteps([
     [
       'choosing repositories narrows what the dashboard asks GitHub for',
@@ -170,7 +165,7 @@ async function openAgentWorkspace(): Promise<void> {
 async function askReviewAgent(): Promise<ExtensionView> {
   const view = await openCodeReviews(handle, 'Agent Review')
   const queueOrReview = view.locator('.rd-row, [aria-label="Close review"]').first()
-  await expect(queueOrReview).toBeVisible({ timeout: 15000 })
+  await expect(queueOrReview).toBeVisible()
   if (await view.locator('.rd-row').first().isVisible()) {
     await view.locator('.rd-row').filter({ hasText: 'Add subtract' }).click()
     await view.getByRole('button', { name: /^(Start|Continue|Resume) review/ }).click()
@@ -185,23 +180,23 @@ const panel = (view: Pick<ExtensionView, 'getByRole'>) =>
 async function aRunningReviewContinuesInATerminal(): Promise<void> {
   const view = await askReviewAgent()
   await panel(view).getByRole('button', { name: 'Run' }).click()
-  await expect(panel(view)).toContainText('Reviewing', { timeout: 15000 })
+  await expect(panel(view)).toContainText('Reviewing')
 
   await panel(view).getByRole('button', { name: 'Continue in terminal' }).click()
   await handle.page.locator('.branch-row').first().click()
   const tab = handle.page.locator('.tab-bar__tab').filter({ hasText: 'Review #1' })
-  await expect(tab).toBeVisible({ timeout: 15000 })
+  await expect(tab).toBeVisible()
   await tab.click()
   const screen = visibleTerminalScreen(handle.page)
-  await expect(screen).toBeVisible({ timeout: 15000 })
+  await expect(screen).toBeVisible()
   await expect
-    .poll(async () => (await readTerminalRowsIn(screen)).join('\n'), { timeout: 15000 })
+    .poll(async () => (await readTerminalRowsIn(screen)).join('\n'))
     .toContain('claude-stub --resume')
 }
 
 async function aRunningReviewIsCancelled(): Promise<void> {
   const view = await askReviewAgent()
-  await expect(panel(view)).toContainText('Reviewing', { timeout: 15000 })
+  await expect(panel(view)).toContainText('Reviewing')
   await panel(view).getByRole('button', { name: 'Cancel' }).click()
   await expect(panel(view)).not.toContainText('Reviewing')
 }
@@ -215,7 +210,7 @@ async function aFinishedReviewListsItsFinding(): Promise<ExtensionView> {
   if (await panel(view).getByRole('button', { name: 'Run' }).isVisible()) {
     await panel(view).getByRole('button', { name: 'Run' }).click()
   }
-  await expect(panel(view)).toContainText('1 findings', { timeout: 20000 })
+  await expect(panel(view)).toContainText('1 findings')
   await expect(panel(view)).toContainText('subtract swaps its operands')
   return view
 }
@@ -232,7 +227,6 @@ async function aDismissedFindingStaysDismissed(): Promise<void> {
 }
 
 test('the review agent runs on a pull request, moves to a terminal, and its dismissed finding stays dismissed', async () => {
-  test.setTimeout(90_000)
   await openAgentWorkspace()
   await runSteps([
     ['a running review can be continued in a terminal', aRunningReviewContinuesInATerminal],

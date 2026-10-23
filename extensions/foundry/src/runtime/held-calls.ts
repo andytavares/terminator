@@ -7,6 +7,7 @@ import { channelFor, type NotifiableEvent } from './feed/notification-channel.js
 import { announceLive, orderStoreAt } from '../state/live-index.js'
 import { runtime, pendingPermissions, raisedNotifications } from './runtime-state.js'
 import { gotoRun } from './palette-commands.js'
+import { inBackground } from '../background.js'
 
 /** Something to say, about which event, and what answering or clicking it does. */
 export interface Notice {
@@ -48,17 +49,19 @@ export function notePending(api: ExtensionAPI, ask: PendingAsk, order?: OrderRef
   // A question during execution is an intake defect (FR-083): questions belong in the
   // Forge. Recorded against the order as well as answered, so that fact is kept.
   if (order !== undefined && (ask.questions?.length ?? 0) > 0) {
-    void orderStoreAt(order.root).record({
-      at: new Date().toISOString(),
-      orderId: order.id,
-      actor: 'rule:forge-defect',
-      action: 'intake.defect',
-      subject: ask.sessionId,
-      reason: `asked during execution, which intake should have settled: ${ask.questions
-        ?.map((q) => q.question)
-        .join('; ')}`,
-      evidence: [{ kind: 'stdout', excerpt: ask.summary }],
-    })
+    inBackground(
+      orderStoreAt(order.root).record({
+        at: new Date().toISOString(),
+        orderId: order.id,
+        actor: 'rule:forge-defect',
+        action: 'intake.defect',
+        subject: ask.sessionId,
+        reason: `asked during execution, which intake should have settled: ${ask.questions
+          ?.map((q) => q.question)
+          .join('; ')}`,
+        evidence: [{ kind: 'stdout', excerpt: ask.summary }],
+      })
+    )
   }
   const notification = notifyPerson(api, {
     event: { kind: 'permission_requested', sessionId: ask.sessionId },

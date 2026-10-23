@@ -5,6 +5,7 @@ import { markdown } from '@codemirror/lang-markdown'
 import { forceParsing } from '@codemirror/language'
 import { GFM } from '@lezer/markdown'
 import { livePreviewPlugin } from '../../src/editor/livePreview'
+import { eventually } from '../../../../tests/support/eventually'
 
 // The live preview in a real EditorView: the widgets it draws, what they do when used, and how
 // focusing the editor turns on the raw markdown of the caret's line.
@@ -155,7 +156,7 @@ function mermaidTests() {
   it('replaces a finished mermaid block with the rendered diagram', async () => {
     const v = mountPreview('```mermaid\ngraph TD; A-->B\n```\n\nend')
     const container = v.dom.querySelector('.notepad-mermaid')!
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(container.querySelector('[data-testid="diagram"]')).not.toBeNull()
     )
   })
@@ -201,9 +202,7 @@ function redrawTests() {
     expect(before).not.toContain(null)
 
     v.dispatch({ changes: { from: v.state.doc.length, insert: '!' } })
-    WIDGET_SELECTORS.forEach((selector, i) =>
-      expect(v.dom.querySelector(selector), selector).toBe(before[i])
-    )
+    WIDGET_SELECTORS.forEach((selector, i) => expect(v.dom.querySelector(selector)).toBe(before[i]))
   })
 
   it('draws a widget again when its own markdown changes', () => {
@@ -222,12 +221,12 @@ function widgetPressTests() {
     const head = v.state.selection.main.head
     for (const selector of ['.notepad-list-bullet', '.notepad-hr', '.notepad-image-widget']) {
       pressOn(v.dom.querySelector(selector)!, 'mousedown')
-      expect(v.hasFocus, selector).toBe(false)
-      expect(v.state.selection.main.head, selector).toBe(head)
+      expect(v.hasFocus).toBe(false)
+      expect(v.state.selection.main.head).toBe(head)
     }
     for (const selector of ['.notepad-mermaid', '.notepad-table', '.notepad-alert__header']) {
       pressOn(v.dom.querySelector(selector)!, 'mousedown')
-      expect(v.hasFocus, selector).toBe(false)
+      expect(v.hasFocus).toBe(false)
     }
   })
 
@@ -247,10 +246,10 @@ function focusTests() {
     expect(v.contentDOM.textContent).not.toContain('**')
 
     v.focus()
-    await vi.waitFor(() => expect(v.contentDOM.textContent).toContain('**bold**'))
+    await eventually(() => expect(v.contentDOM.textContent).toContain('**bold**'))
 
     v.contentDOM.blur()
-    await vi.waitFor(() => expect(v.contentDOM.textContent).not.toContain('**'))
+    await eventually(() => expect(v.contentDOM.textContent).not.toContain('**'))
   })
 
   it('shows it at once when the preview is switched on in an editor that has focus', async () => {
@@ -258,9 +257,9 @@ function focusTests() {
     const v = mountWith(BOLD, [preview.of([])])
     v.dispatch({ selection: { anchor: 2 } })
     v.focus()
-    await vi.waitFor(() => expect(v.hasFocus).toBe(true))
+    await eventually(() => expect(v.hasFocus).toBe(true))
 
     v.dispatch({ effects: preview.reconfigure(livePreviewPlugin) })
-    await vi.waitFor(() => expect(v.contentDOM.textContent).toContain('**bold**'))
+    await eventually(() => expect(v.contentDOM.textContent).toContain('**bold**'))
   })
 }

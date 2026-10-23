@@ -176,8 +176,8 @@ function decidedElsewhereTests() {
     const steps = ladderFor({ toolchain: toolchain(), risk: risky, touchesUi: false })
     for (const rung of ['L3', 'L4', 'L6'] as const) {
       const step = steps.find((s) => s.rung === rung)
-      expect(step?.status, rung).toBe('elsewhere')
-      expect(step?.reason, rung).not.toBe('')
+      expect(step?.status).toBe('elsewhere')
+      expect(step?.reason).not.toBe('')
     }
   })
 

@@ -35,8 +35,9 @@ describe('execShell while the login-shell PATH is still being read', () => {
     executable(shell, `sleep 0.3\nprintf '__TERMINATOR_PATH__%s__TERMINATOR_PATH__' "${loginBin}"`)
     process.env.SHELL = shell
 
-    void startAdoptingLoginShellPath(process.env)
+    const adopting = startAdoptingLoginShellPath(process.env)
     const result = await execShell({ command: 'gh', args: [], cwd: scratch })
+    await adopting
 
     expect(result.stdout.trim()).toBe('from-login-path')
     expect(result.exitCode).toBe(0)

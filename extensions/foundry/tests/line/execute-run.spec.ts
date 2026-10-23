@@ -3,13 +3,13 @@
  * repository with a real remote, agents that answer the way the supervised
  * runner does, and `gh` answering as GitHub would.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 import { fakeHost, temporaryDirectory, execSucceeded } from '../helpers/foundry-host.js'
-import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { agentsAnswer, agreedLineOrder, checks, repositoryWithRemote } from '../helpers/line-run.js'
 import { createOrderStore } from '../../src/order/store.js'
@@ -25,10 +25,7 @@ import { orderStoreAt, readGraph } from '../../src/state/live-index.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 import { ledgerActions } from '../helpers/order-ledger.js'
-
-// These cases drive real git and give each step up to 20 s (the vi.waitFor
-// calls below); the 5 s default case timeout cut them off first on a busy machine.
-vi.setConfig({ testTimeout: 45_000 })
+import { eventually } from '../../../../tests/support/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
@@ -47,8 +44,11 @@ beforeAll(async () => {
   await activateFoundry(host)
 })
 
+// Each test's proofs and runs end before the next test, or the spec's folder, goes.
+afterEach(settleFoundryWork)
+
 afterAll(async () => {
-  deactivate()
+  await deactivate()
   vi.unstubAllEnvs()
 })
 
@@ -71,9 +71,8 @@ async function startOrderRun(saved: WorkOrder, recipe = 'direct'): Promise<void>
 }
 
 async function untilShipped(): Promise<void> {
-  await vi.waitFor(
-    async () => expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('shipped'),
-    { timeout: 20_000, interval: 100 }
+  await eventually(async () =>
+    expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('shipped')
   )
 }
 
@@ -255,20 +254,14 @@ function redCiSentBackTests() {
     let run = 20
     githubWithOneDraft(() => checks('fail', ++run))
     await startOrderRun(agreedLineOrder(repo), recipe)
-    await vi.waitFor(async () => expect(await gateIdFor('ci.red')).toBeTruthy(), {
-      timeout: 20_000,
-      interval: 100,
-    })
+    await eventually(async () => expect(await gateIdFor('ci.red')).toBeTruthy())
 
     githubWithOneDraft(() => checks('pass', 99))
     await host.call('foundry:inbox.decide', {
       gateId: await gateIdFor('ci.red'),
       option: 'send_back',
     })
-    await vi.waitFor(async () => expect(await gateIdFor('ready-for-review')).toBeTruthy(), {
-      timeout: 20_000,
-      interval: 100,
-    })
+    await eventually(async () => expect(await gateIdFor('ready-for-review')).toBeTruthy())
   })
 }
 
@@ -277,10 +270,8 @@ describe('an order whose check keeps failing', () => {
     githubWithOneDraft(() => '[]')
     theRunner.runCommand.mockResolvedValue(1)
     await startOrderRun(agreedLineOrder(repo))
-    await vi.waitFor(
-      async () =>
-        expect(await ledgerActions(dataDir)).toEqual(expect.arrayContaining(['run.halted'])),
-      { timeout: 20_000, interval: 100 }
+    await eventually(async () =>
+      expect(await ledgerActions(dataDir)).toEqual(expect.arrayContaining(['run.halted']))
     )
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('running')
     await expect(gateIdFor('ready-for-review')).rejects.toThrow()
@@ -291,10 +282,8 @@ async function untilHalted(): Promise<void> {
   githubWithOneDraft(() => '[]')
   theRunner.runCommand.mockResolvedValue(1)
   await startOrderRun(agreedLineOrder(repo))
-  await vi.waitFor(
-    async () =>
-      expect(await ledgerActions(dataDir)).toEqual(expect.arrayContaining(['run.halted'])),
-    { timeout: 20_000, interval: 100 }
+  await eventually(async () =>
+    expect(await ledgerActions(dataDir)).toEqual(expect.arrayContaining(['run.halted']))
   )
 }
 

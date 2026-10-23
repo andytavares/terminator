@@ -339,11 +339,10 @@ describe('useKeyboardShortcuts — Cmd+W closes focused split pane when in split
 })
 
 describe('useKeyboardShortcuts — Cmd+W closes focused split pane when in split mode — Cmd+W does nothing when no activeProjectId', () => {
-  it('Cmd+W does nothing when no activeProjectId', async () => {
+  it('Cmd+W does nothing when no activeProjectId', () => {
     withTabs('proj-1', ['ses-active'], 'ses-active')
     renderHook(() => useKeyboardShortcuts())
     pressKey('w', { metaKey: true })
-    await Promise.resolve()
     expect(sessionState().sessions.has('ses-active')).toBe(true)
   })
 })

@@ -4,6 +4,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'os'
 import { join } from 'path'
 import type { RunAgentReviewDeps } from '../../src/review/review-agent.js'
+import { eventually } from '../../../../tests/support/eventually'
 
 type SpawnFn = NonNullable<RunAgentReviewDeps['spawn']>
 /** What an EventEmitter calls back with; SpawnedProcess.on takes one per event. */
@@ -129,7 +130,7 @@ describe('runAgentReview cancelled while claude is being resolved', () => {
       spawn,
       resolveClaude,
     })
-    await vi.waitFor(() => expect(resolveClaude).toHaveBeenCalled())
+    await eventually(() => expect(resolveClaude).toHaveBeenCalled())
     cancel()
     found('/Users/me/.local/bin/claude')
 

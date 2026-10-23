@@ -67,10 +67,7 @@ function otherHeadingsAndListsTests() {
       '## Criteria',
     ]) {
       const found = acceptanceFromTicket(`${heading}\n- it works\n`)
-      expect(
-        found.map((c) => c.statement),
-        heading
-      ).toEqual(['it works'])
+      expect(found.map((c) => c.statement)).toEqual(['it works'])
     }
   })
 

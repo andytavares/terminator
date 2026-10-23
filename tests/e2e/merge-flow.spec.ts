@@ -107,7 +107,7 @@ async function openFileInSolver(view: ExtensionView, file: string): Promise<void
 async function theSolverOpensInSentenceCaseWithIcons(): Promise<void> {
   const view = await openGitTab(handle)
   await view.getByRole('button', { name: 'Resolve conflicts' }).click()
-  await expect(view.getByText('Merge conflicts need resolving')).toBeVisible({ timeout: 15000 })
+  await expect(view.getByText('Merge conflicts need resolving')).toBeVisible()
   await expect(view.locator('.conflict-hub__hero')).toContainText('3')
   const text = await view.evaluate(() => document.body.innerText)
   // ConflictHub's own headings, in sentence case rather than the caps they were.
@@ -204,7 +204,7 @@ async function resolvingEverythingCommitsTheMerge(): Promise<void> {
   // The Git view draws its own toast: the core's would sit under the view.
   await expect(
     view.locator('.tmui-toast__message', { hasText: 'Committed but push failed' })
-  ).toBeVisible({ timeout: 15000 })
+  ).toBeVisible()
   expect(git(repo, 'rev-list', '--parents', '-n', '1', 'HEAD').split(' ')).toHaveLength(3)
   expect(git(repo, 'status', '--porcelain')).toBe('')
   expect(fileText('app.ts')).toBe(appSource('good day', 2))
@@ -213,7 +213,6 @@ async function resolvingEverythingCommitsTheMerge(): Promise<void> {
 }
 
 test('a merge conflict is resolved in the Conflict Solver and committed', async () => {
-  test.setTimeout(90_000)
   const steps: Array<[string, () => Promise<void>]> = [
     [
       'MergeFlow opens on a real conflict, in sentence case and with icons for states',

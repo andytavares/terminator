@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, openSettingsSection } from './helpers'
+import { AppHandle, launchApp, closeApp, openSettingsSection, acceptingDialog } from './helpers'
 import { invokeChannel, type ExtensionView } from './extension-page'
 import { allTasks, openVault, todayTasks } from './task-vault-harness'
 import { expectCentredInWindow } from './modal-centre'
@@ -94,7 +94,7 @@ async function refuseSchemaChange(): Promise<void> {
   await expect(dataTools().locator('.db-admin__error')).toHaveText(
     'DDL statements (DROP, CREATE, ALTER) are not permitted'
   )
-  expect(await allTasks(vault)).toHaveLength(2)
+  await expect.poll(() => allTasks(vault)).toHaveLength(2)
 }
 
 /** Export JSON downloads every task, project and area. */
@@ -129,8 +129,7 @@ async function taskVaultSettingsAction(label: string): Promise<void> {
 
 /** Reset in Settings deletes every task, after asking. */
 async function resetInSettings(): Promise<void> {
-  handle.page.once('dialog', (dialog) => void dialog.accept())
-  await taskVaultSettingsAction('Reset (delete all data)')
+  await acceptingDialog(handle.page, () => taskVaultSettingsAction('Reset (delete all data)'))
   await expect.poll(() => allTasks(vault)).toEqual([])
 }
 

@@ -64,11 +64,11 @@ async function openHome(page: Page): Promise<void> {
 async function startAndCapture(handle: AppHandle): Promise<unknown> {
   const { page } = handle
   await type(page, 'claude "remember the number 4242. reply with ok"')
-  await expect.poll(() => rows(page), { timeout: 120_000 }).toContain('4242')
+  await expect.poll(() => rows(page)).toContain('4242')
 
   const captured = join(handle.userDataDir, 'agent-sessions')
   await expect
-    .poll(() => (existsSync(captured) ? readdirSync(captured).length : 0), { timeout: 30_000 })
+    .poll(() => (existsSync(captured) ? readdirSync(captured).length : 0))
     .toBeGreaterThan(0)
   const file = join(captured, readdirSync(captured)[0])
   return JSON.parse(readFileSync(file, 'utf8'))
@@ -77,17 +77,16 @@ async function startAndCapture(handle: AppHandle): Promise<unknown> {
 /** 3. Ends it, and its terminal with it. 4. Home offers to bring it back, and does. */
 async function endAndResume(page: Page): Promise<void> {
   await type(page, '/exit')
-  await expect.poll(() => rows(page), { timeout: 30_000 }).not.toContain('? for shortcuts')
+  await expect.poll(() => rows(page)).not.toContain('? for shortcuts')
   await type(page, 'exit')
 
   await openHome(page)
   const resume = page.getByRole('button', { name: /^Resume/ }).first()
-  await expect(resume).toBeVisible({ timeout: 30_000 })
+  await expect(resume).toBeVisible()
   await resume.click()
 }
 
 test('a real conversation is captured, ended, and brought back', async () => {
-  test.setTimeout(300_000)
   folder = e2eTempDir('resume-live-')
   const report: Record<string, unknown> = {
     claude: execSync('claude --version').toString().trim(),
@@ -102,13 +101,13 @@ test('a real conversation is captured, ended, and brought back', async () => {
   await endAndResume(page)
 
   // 5. One terminal for the conversation: the exited one is gone.
-  await expect(page.locator('.tab-bar__tab--session')).toHaveCount(1, { timeout: 30_000 })
+  await expect(page.locator('.tab-bar__tab--session')).toHaveCount(1)
 
   // 6. It remembers.
-  await expect.poll(() => rows(page), { timeout: 120_000 }).toMatch(/resume|Claude Code/i)
-  await expect.poll(() => rows(page), { timeout: 60_000 }).toContain('? for shortcuts')
+  await expect.poll(() => rows(page)).toMatch(/resume|Claude Code/i)
+  await expect.poll(() => rows(page)).toContain('? for shortcuts')
   await type(page, 'what number did I ask you to remember? reply with digits only')
-  await expect.poll(() => rows(page), { timeout: 120_000 }).toContain('4242')
+  await expect.poll(() => rows(page)).toContain('4242')
   report.resumedAnswered = true
 
   copyFileSync(SETTINGS, join(REPORT_DIR, 'settings-after.json'))

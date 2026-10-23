@@ -34,7 +34,6 @@ let handle: AppHandle
 let repo: string
 
 test.beforeAll(async () => {
-  test.setTimeout(180_000)
   repo = makeFixtureRepo('foundry-floor-repo-')
   // A running order with a real run graph, so the Factory view has a hall to draw.
   writeHallRecords(repo)
@@ -49,26 +48,24 @@ test.afterAll(async () => {
 })
 
 /** The Forge is in Factory view, and List is not pressed. */
-async function expectFactoryPressed(timeout: number): Promise<void> {
-  await expect.poll(() => pressedByLabel(handle, 'Factory view'), { timeout }).toBe('true')
-  expect(await pressedByLabel(handle, 'List view')).toBe('false')
+async function expectFactoryPressed(): Promise<void> {
+  await expect.poll(() => pressedByLabel(handle, 'Factory view')).toBe('true')
+  await expect.poll(() => pressedByLabel(handle, 'List view')).toBe('false')
 }
 
 /** The Forge is in List view, and Factory is not pressed. */
-async function expectListPressed(timeout: number): Promise<void> {
-  await expect.poll(() => pressedByLabel(handle, 'List view'), { timeout }).toBe('true')
-  expect(await pressedByLabel(handle, 'Factory view')).toBe('false')
+async function expectListPressed(): Promise<void> {
+  await expect.poll(() => pressedByLabel(handle, 'List view')).toBe('true')
+  await expect.poll(() => pressedByLabel(handle, 'Factory view')).toBe('false')
 }
 
 /** From the default, List, to Factory: and the factory surface draws something. */
 async function switchToFactory(): Promise<void> {
   await openForge(handle)
-  await expectListPressed(15_000)
-  expect(await clickByName(handle, 'button', 'Factory view')).toBe(true)
-  await expectFactoryPressed(10_000)
-  await expect
-    .poll(async () => (await bodyText(handle)).length, { timeout: 10_000 })
-    .toBeGreaterThan(0)
+  await expectListPressed()
+  await expect.poll(() => clickByName(handle, 'button', 'Factory view')).toBe(true)
+  await expectFactoryPressed()
+  await expect.poll(async () => (await bodyText(handle)).length).toBeGreaterThan(0)
   await captureFoundry(handle, 'foundry-factory-view.png')
 }
 
@@ -81,13 +78,13 @@ async function storedView(): Promise<string> {
 }
 
 async function toggleFromQuickActions(): Promise<void> {
-  expect(await storedView()).toBe('factory')
+  await expect.poll(() => storedView()).toBe('factory')
   await runQuickActionFromPanel(handle.page, 'Toggle factory view')
   await expect.poll(storedView).toBe('list')
-  await expectListPressed(15_000)
+  await expectListPressed()
   await runQuickActionFromPanel(handle.page, 'Toggle factory view')
   await expect.poll(storedView).toBe('factory')
-  await expectFactoryPressed(15_000)
+  await expectFactoryPressed()
 }
 
 /** Writes a watched draft and a shipped order, and restarts on the same profile. */
@@ -101,11 +98,11 @@ async function seedAndRestart(): Promise<string> {
 }
 
 async function backToList(): Promise<void> {
-  expect(await clickByName(handle, 'button', 'All halls')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'All halls')).toBe(true)
   await openForge(handle)
-  expect(await clickByName(handle, 'button', 'List view')).toBe(true)
-  await expectListPressed(10_000)
-  await expect.poll(() => bodyText(handle), { timeout: 10_000 }).toContain('New order')
+  await expect.poll(() => clickByName(handle, 'button', 'List view')).toBe(true)
+  await expectListPressed()
+  await expect.poll(() => bodyText(handle)).toContain('New order')
 }
 
 async function openOrderRow(id: string, listShot?: string): Promise<string> {
@@ -235,8 +232,8 @@ async function ciOnTheFloor(id: string): Promise<void> {
   expect(list).toContain('#7')
   expect(list).toContain('Fix 1 of 2')
 
-  await expect.poll(ciBand, { timeout: 15_000 }).toContain('Fix 1 of 2')
-  expect(await ciBand()).toContain('Test')
+  await expect.poll(ciBand).toContain('Fix 1 of 2')
+  await expect.poll(() => ciBand()).toContain('Test')
 
   await captureFoundry(handle, 'floor-ci.png')
 }
@@ -286,7 +283,7 @@ async function expectStatusWall(): Promise<void> {
     return wall ? wall.innerText : ''
   })()`
     )
-  await expect.poll(wall, { timeout: 15_000 }).toContain('First-pass yield')
+  await expect.poll(wall).toContain('First-pass yield')
   await captureFoundry(handle, 'site-status-wall.png')
 }
 
@@ -343,34 +340,32 @@ function artifactLinks(): Promise<{ count: number; insideButton: boolean }> {
 
 /** The factory site's card links the artifact beside the hall, and the hall's HUD offers it. */
 async function researchArtifactInTheFactory(): Promise<void> {
-  await expect.poll(async () => (await artifactLinks()).count, { timeout: 15_000 }).toBe(1)
+  await expect.poll(async () => (await artifactLinks()).count).toBe(1)
   expect((await artifactLinks()).insideButton).toBe(false)
   await captureFoundry(handle, 'foundry-factory-research-card.png')
-  await expect
-    .poll(() => clickContaining(handle, 'button', RESEARCH_TITLE), { timeout: 15_000 })
-    .toBe(true)
+  await expect.poll(() => clickContaining(handle, 'button', RESEARCH_TITLE)).toBe(true)
   // The hall loads after the click: wait for its HUD, not for the card's link still on screen.
-  await expect.poll(() => bodyText(handle), { timeout: 20_000 }).toContain('Open artifact')
+  await expect.poll(() => bodyText(handle)).toContain('Open artifact')
   expect((await artifactLinks()).count).toBe(1)
   await captureFoundry(handle, 'foundry-factory-research-hall.png')
-  expect(await clickByName(handle, 'button', 'All halls')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'All halls')).toBe(true)
 }
 
 /** The order list's row links the artifact too. */
 async function researchArtifactOnTheList(): Promise<void> {
-  await expect.poll(async () => (await artifactLinks()).count, { timeout: 15_000 }).toBe(1)
+  await expect.poll(async () => (await artifactLinks()).count).toBe(1)
   await captureFoundry(handle, 'foundry-list-research-row.png')
 }
 
 async function ledgerFactoryNumbers(): Promise<void> {
-  expect(await clickByName(handle, 'button', 'Ledger')).toBe(true)
-  await expect.poll(() => clickByName(handle, 'button', 'Factory'), { timeout: 15_000 }).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'Ledger')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'Factory')).toBe(true)
 
-  await expect.poll(async () => (await metricTiles()).Shipped, { timeout: 15_000 }).toBe('1')
+  await expect.poll(async () => (await metricTiles()).Shipped).toBe('1')
   const finalTiles = await metricTiles()
   expect(finalTiles['First-pass yield']).toBe('100%')
   expect(finalTiles['Median lead time']).toBe('30 min')
-  expect(await bodyText(handle)).toContain('a shipped order to measure')
+  await expect.poll(() => bodyText(handle)).toContain('a shipped order to measure')
 
   await captureFoundry(handle, 'ledger-factory.png')
 }
@@ -637,33 +632,29 @@ const ORPHAN_MONITOR = `(function () {
 /** From the Factory view's site, the hall's card and then the hall itself. */
 async function openHall(): Promise<void> {
   await openForge(handle)
-  expect(await clickByName(handle, 'button', 'Factory view')).toBe(true)
-  await expect.poll(() => pressedByLabel(handle, 'Factory view'), { timeout: 10_000 }).toBe('true')
+  await expect.poll(() => clickByName(handle, 'button', 'Factory view')).toBe(true)
+  await expect.poll(() => pressedByLabel(handle, 'Factory view')).toBe('true')
 
   // The hall's card carries a still picture of its floor, drawn from the run graph.
   await expect
-    .poll(
-      () =>
-        inFoundry<boolean>(
-          handle,
-          `!!document.querySelector('[role="img"][aria-label="Factory floor for Add retry backoff to the sync job"] canvas')`
-        ),
-      { timeout: 20_000 }
+    .poll(() =>
+      inFoundry<boolean>(
+        handle,
+        `!!document.querySelector('[role="img"][aria-label="Factory floor for Add retry backoff to the sync job"] canvas')`
+      )
     )
     .toBe(true)
   await captureFoundry(handle, 'foundry-factory-site-cards.png')
 
   await expect
-    .poll(() => clickContaining(handle, 'button', 'Add retry backoff to the sync job'), {
-      timeout: 20_000,
-    })
+    .poll(() => clickContaining(handle, 'button', 'Add retry backoff to the sync job'))
     .toBe(true)
 }
 
 /** One station button per run-graph node — the honesty rule: every node gets a
  * place in the hall whether or not anything is really running it. */
 async function expectEveryStation(): Promise<void> {
-  await expect.poll(() => stationCount(handle), { timeout: 15_000 }).toBe(8)
+  await expect.poll(() => stationCount(handle)).toBe(8)
   for (const label of EXPECTED_STATIONS) {
     await expect.poll(() => hasStation(handle, label), `no station "${label}"`).toBe(true)
   }
@@ -673,37 +664,31 @@ async function expectEveryStation(): Promise<void> {
 /** A station opens as a monitor: its heading and its transcript are there by
  * role. `build:lane1` is orphaned, so its tube says the line is dead. */
 async function expectOrphanMonitor(): Promise<void> {
-  expect(await clickByName(handle, 'button', 'builder, builder, no agent')).toBe(true)
-  await expect
-    .poll(() => inFoundry<boolean>(handle, ORPHAN_MONITOR), { timeout: 15_000 })
-    .toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'builder, builder, no agent')).toBe(true)
+  await expect.poll(() => inFoundry<boolean>(handle, ORPHAN_MONITOR)).toBe(true)
   // The power-on takes 0.42s: wait for the tube to finish opening before the picture.
   await expect
-    .poll(
-      () =>
-        inFoundry<boolean>(
-          handle,
-          `document.querySelector('section[aria-labelledby] > div').getAnimations().length === 0`
-        ),
-      { timeout: 10_000 }
+    .poll(() =>
+      inFoundry<boolean>(
+        handle,
+        `document.querySelector('section[aria-labelledby] > div').getAnimations().length === 0`
+      )
     )
     .toBe(true)
   await captureFoundry(handle, 'foundry-station-monitor.png')
-  expect(await clickByName(handle, 'button', 'Close monitor')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'Close monitor')).toBe(true)
   await expect
-    .poll(() => inFoundry<boolean>(handle, `!document.querySelector('[role="log"]')`), {
-      timeout: 10_000,
-    })
+    .poll(() => inFoundry<boolean>(handle, `!document.querySelector('[role="log"]')`))
     .toBe(true)
 }
 
 /** The recording plays back in the same hall. */
 async function expectReplay(): Promise<void> {
-  expect(await clickByName(handle, 'button', 'Replay')).toBe(true)
-  await expect.poll(() => bodyText(handle), { timeout: 10_000 }).toContain('Back to live')
+  await expect.poll(() => clickByName(handle, 'button', 'Replay')).toBe(true)
+  await expect.poll(() => bodyText(handle)).toContain('Back to live')
   await captureFoundry(handle, 'foundry-factory-replay.png')
-  expect(await clickByName(handle, 'button', 'Back to live')).toBe(true)
-  await expect.poll(() => bodyText(handle), { timeout: 10_000 }).not.toContain('Back to live')
+  await expect.poll(() => clickByName(handle, 'button', 'Back to live')).toBe(true)
+  await expect.poll(() => bodyText(handle)).not.toContain('Back to live')
 }
 
 /** The hall, its stations, a dead station's monitor and the replay. */
@@ -722,7 +707,6 @@ async function hallShowsTheRunGraph(): Promise<void> {
 }
 
 test('what runs recorded is shown in the factory hall, on the Floor and in the Ledger, and the Factory view survives a restart', async () => {
-  test.setTimeout(180_000)
   const step = test.step
   await step('the Forge opens in List view and switches to Factory view', switchToFactory)
   await step(
@@ -730,7 +714,7 @@ test('what runs recorded is shown in the factory hall, on the Floor and in the L
     toggleFromQuickActions
   )
   const watched = await step('records written by hand are read after a restart', seedAndRestart)
-  await step('Factory view survives a restart', () => expectFactoryPressed(15_000))
+  await step('Factory view survives a restart', () => expectFactoryPressed())
   await step('the factory site’s status wall reads the recorded numbers', expectStatusWall)
   await step(
     'a research order’s Claude artifact is linked on its hall card and in its hall',

@@ -8,6 +8,7 @@ import { UpdateWorkspaceInputSchema } from '../../../../src/shared/schemas/works
 import { workspaceFixture } from '../../../support/renderer-stores'
 import { installElectronApi } from '../../../support/electron-api'
 import { pressOutside } from '../../../support/modal'
+import { eventually } from '../../../support/eventually'
 
 const mockOpenDirectory = vi.fn<ElectronAPI['dialog']['openDirectory']>()
 /** The main process's answer to an update: the workspace as written. */
@@ -61,7 +62,7 @@ describe('EditWorkspaceDialog — saves the new name to the workspace', () => {
     render(<EditWorkspaceDialog workspace={ws} onClose={onClose} />)
     fireEvent.change(screen.getByDisplayValue('My Work'), { target: { value: 'New Name' } })
     fireEvent.click(screen.getByText('Save'))
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(useWorkspaceStore.getState().workspaces).toEqual([
         expect.objectContaining({ id: WS_ID, name: 'New Name', folderPath: '/home/work' }),
       ])
@@ -76,7 +77,7 @@ describe('EditWorkspaceDialog — saves the new name to the workspace', () => {
   it('calls openDirectory when Browse is clicked and updates folder path', async () => {
     render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Browse'))
-    await vi.waitFor(() => expect(screen.getByDisplayValue('/new/path')).toBeTruthy())
+    await eventually(() => expect(screen.getByDisplayValue('/new/path')).toBeTruthy())
     expect(mockOpenDirectory).toHaveBeenCalled()
   })
 })
@@ -149,7 +150,7 @@ describe('EditWorkspaceDialog — closes after successful save', () => {
     const onClose = vi.fn()
     render(<EditWorkspaceDialog workspace={ws} onClose={onClose} />)
     fireEvent.click(screen.getByText('Save'))
-    await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
+    await eventually(() => expect(onClose).toHaveBeenCalled())
   })
 
   it('does not call updateWorkspace when submitted with an empty name', async () => {

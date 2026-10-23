@@ -138,7 +138,7 @@ function answeredAndStaleQuestionsTests() {
         pendingAsks: 0,
         waiting: [],
       })
-      expect(counts.forge, status).toBe(0)
+      expect(counts.forge).toBe(0)
     }
   })
 }

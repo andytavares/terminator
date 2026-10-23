@@ -35,6 +35,7 @@ import type { WorkOrder } from '../../src/order/schema.js'
 import type { LadderStep } from '../../src/verify/ladder.js'
 import type { ExecutorDeps } from '../../src/line/executor.js'
 import { ledgerActions, orderLedger } from '../helpers/order-ledger.js'
+import { eventually } from '../../../../tests/support/eventually'
 
 let root: string
 let repo: string
@@ -43,6 +44,20 @@ let runner: ReturnType<typeof fakeRunner>
 let order: WorkOrder
 let recipe: Recipe
 let graph: RunGraph
+/** The host's shell calls still running: the executor measures a started run's diff in the
+ * background, and a test that ends before git does leaves a process behind. */
+const shellCalls = new Set<Promise<unknown>>()
+
+function trackShellCalls(api: FoundryHost['api']): void {
+  const exec = api.shell.exec.bind(api.shell)
+  api.shell.exec = ((options: Parameters<typeof exec>[0]) => {
+    const call = exec(options)
+    shellCalls.add(call)
+    const forget = () => shellCalls.delete(call)
+    call.then(forget, forget)
+    return call
+  }) as typeof exec
+}
 
 function agreed(repoPath: string): WorkOrder {
   const base = draftOrder({
@@ -69,6 +84,7 @@ beforeEach(async () => {
   root = path.join(parent, 'records')
   repo = await seededRepository(parent)
   host = fakeHost(() => root)
+  trackShellCalls(host.api)
   runner = fakeRunner()
   runtime.supervisedRunner = runner as never
   runtime.supervision = createSupervision({
@@ -84,7 +100,9 @@ beforeEach(async () => {
   graph = buildRunGraph(order, recipe)
 })
 
-afterEach(() => {
+afterEach(async () => {
+  // A measurement runs several git commands one after the other.
+  while (shellCalls.size > 0) await Promise.allSettled([...shellCalls])
   runtime.supervisedRunner = null
   runtime.supervision = null
   strandedAgents.clear()
@@ -172,7 +190,7 @@ function launchingTests() {
     expect(await running).toEqual({ sessionId: 'builder-1', exitCode: 0, transcriptFrom: 0 })
     expect(runner.stop).toHaveBeenCalledWith('builder-1')
     // The lane's conversation is offered to the next node of the same role, never another.
-    await vi.waitFor(() => expect(deps.sessionFor(1, 'builder')).toBe('builder-1'))
+    await eventually(() => expect(deps.sessionFor(1, 'builder')).toBe('builder-1'))
     expect(deps.sessionFor(1, 'verifier')).toBeUndefined()
     expect(runtime.supervision?.runs.get('builder-1')?.worktreePath).toBe(input.worktreePath)
   })
@@ -180,8 +198,11 @@ function launchingTests() {
   it('launches a fast role on the small model', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const { started } = agentStarts('scribe-1')
-    void deps.run(runInput({ role: 'scribe', modelTier: 'fast' }))
-    expect((await started).model).toBe('haiku')
+    const running = deps.run(runInput({ role: 'scribe', modelTier: 'fast' }))
+    const input = await started
+    expect(input.model).toBe('haiku')
+    input.onTurnEnd(1)
+    await running
   })
 }
 
@@ -189,15 +210,23 @@ function foldersItMayReachTests() {
   it('lets the agent reach its outputs folder, so it can publish what it wrote there', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const { started } = agentStarts('author-1')
-    void deps.run(runInput({ outputsDir: '/orders/WO-1/outputs', skillsMount: '/mnt/skills' }))
-    expect((await started).addDirs).toEqual(['/mnt/skills', '/orders/WO-1/outputs'])
+    const running = deps.run(
+      runInput({ outputsDir: '/orders/WO-1/outputs', skillsMount: '/mnt/skills' })
+    )
+    const input = await started
+    expect(input.addDirs).toEqual(['/mnt/skills', '/orders/WO-1/outputs'])
+    input.onTurnEnd(1)
+    await running
   })
 
   it('adds no folder to a node with no skills and no outputs', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const { started } = agentStarts('builder-2')
-    void deps.run(runInput())
-    expect((await started).addDirs).toBeUndefined()
+    const running = deps.run(runInput())
+    const input = await started
+    expect(input.addDirs).toBeUndefined()
+    input.onTurnEnd(1)
+    await running
   })
 }
 
@@ -207,7 +236,7 @@ function failingAndNeverStartingTests() {
     const { started } = agentStarts('builder-2')
     const running = deps.run(runInput())
     const input = await started
-    await vi.waitFor(() => expect(runtime.supervision?.runs.get('builder-2')).not.toBeNull())
+    await eventually(() => expect(runtime.supervision?.runs.get('builder-2')).not.toBeNull())
     input.onEnd(3)
     expect((await running).exitCode).toBe(3)
     expect(runtime.supervision?.snapshot().history[0]).toMatchObject({
@@ -234,7 +263,7 @@ function askingAboutAToolTests() {
   it('that asks about a tool is held for the operator and said so in the feed', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const { started } = agentStarts('builder-3')
-    void deps.run(runInput())
+    const running = deps.run(runInput())
     const input = await started
     strandedAgents.set('builder-3', { orderId: 'WO-1', sessionId: 'builder-3', at: 0 })
     input.onPending({
@@ -254,6 +283,8 @@ function askingAboutAToolTests() {
     input.onResolved('req-1', 'handback')
     expect(pendingPermissions.sessionFor('req-1')).toBeNull()
     expect(strandedAgents.get('builder-3')).toMatchObject({ orderId: 'WO-1' })
+    input.onTurnEnd(1)
+    await running
   })
 }
 
@@ -261,7 +292,7 @@ function refusedToolsTests() {
   it('that is refused a tool says so in the feed', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const { started } = agentStarts('verifier-1')
-    void deps.run(runInput({ role: 'verifier', readOnly: true }))
+    const running = deps.run(runInput({ role: 'verifier', readOnly: true }))
     const input = await started
     expect(
       input.autoDecide('Write', { file_path: path.join(input.worktreePath, 'src/a.ts') })
@@ -270,6 +301,8 @@ function refusedToolsTests() {
     expect(runtime.supervision?.feed.list().map((entry) => entry.summary)).toContain(
       'refused Write: a verifier does not edit'
     )
+    input.onTurnEnd(1)
+    await running
   })
 }
 
@@ -647,7 +680,7 @@ function executorDepsVerdictsTests() {
     } as never)
     deps.onEvent({ type: 'wave', nodes: [] } as never)
     await deps.record('run.note', 'WO-1', 'a line')
-    await vi.waitFor(async () =>
+    await eventually(async () =>
       expect((await ledgerActions(root)).sort()).toEqual(['run.note', 'verify.verdict'])
     )
     const entries = await createOrderStore(root).entries('WO-1')

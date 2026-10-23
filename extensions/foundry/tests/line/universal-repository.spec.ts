@@ -5,17 +5,15 @@ import * as path from 'node:path'
 
 import { fakeHost, gitAt, temporaryDirectory, execSucceeded } from '../helpers/foundry-host.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
-import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import { agentsAnswer, agreedLineOrder, checks, repositoryWithRemote } from '../helpers/line-run.js'
 import { ledgerActions } from '../helpers/order-ledger.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { createGateStore } from '../../src/gates/store.js'
 import { orderStoreAt } from '../../src/state/live-index.js'
-import { settleProofs } from '../../src/line/baseline.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-
-vi.setConfig({ testTimeout: 45_000 })
+import { eventually } from '../../../../tests/support/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
@@ -33,11 +31,13 @@ beforeAll(async () => {
   await activateFoundry(host)
 })
 
-// Each order starts its base-branch proof, which writes into the spec's folder until it ends.
-afterEach(settleProofs)
+// Each test's proofs and runs end before the next test, or the spec's folder, goes.
+afterEach(settleFoundryWork)
 
-afterAll(() => {
-  deactivate()
+// Each order starts its base-branch proof, which writes into the spec's folder until it ends.
+
+afterAll(async () => {
+  await deactivate()
   vi.unstubAllEnvs()
 })
 
@@ -122,7 +122,7 @@ async function createOrder(): Promise<WorkOrder> {
 
 /** The environment is proven on the base branch in the background; its runs are not the order's. */
 async function untilBaseProven(command: string): Promise<void> {
-  await vi.waitFor(() =>
+  await eventually(() =>
     expect(finished.some((run) => run.command === command && run.where.endsWith('@baseline'))).toBe(
       true
     )
@@ -160,9 +160,7 @@ describe('a repository with a script and no manifest', () => {
     const order = await createOrder()
     await untilBaseProven('./glyph test')
     await runAgreed(order)
-    await vi.waitFor(async () => expect(await statusOf(order.id)).toBe('shipped'), {
-      timeout: 20_000,
-    })
+    await eventually(async () => expect(await statusOf(order.id)).toBe('shipped'))
     expect(runsInLanes('./glyph test').map((run) => run.exitCode)).toContain(0)
   })
 })
@@ -175,9 +173,7 @@ describe('a script that fails in the final check', () => {
     await untilBaseProven('./glyph test')
     glyphExits(0, 1)
     await runAgreed(order)
-    await vi.waitFor(async () => expect(await gateRules()).toContain('verify.repeat-fail'), {
-      timeout: 20_000,
-    })
+    await eventually(async () => expect(await gateRules()).toContain('verify.repeat-fail'))
     expect(await statusOf(order.id)).not.toBe('shipped')
     expect(runsInLanes('./glyph test').at(-1)?.exitCode).toBe(1)
   })
@@ -188,10 +184,9 @@ describe('a repository with only a Makefile', () => {
     await commitToMain({ Makefile: 'test:\n\t@echo the suite passed\n' })
     const order = await createOrder()
     expect(order.context.toolchain.test).toMatchObject({ command: 'make test', source: 'hint' })
+    await untilBaseProven('make test')
     await runAgreed(order)
-    await vi.waitFor(async () => expect(await statusOf(order.id)).toBe('shipped'), {
-      timeout: 20_000,
-    })
+    await eventually(async () => expect(await statusOf(order.id)).toBe('shipped'))
     expect(runsInLanes('make test').map((run) => run.exitCode)).toContain(0)
   })
 })
@@ -203,9 +198,7 @@ describe('a repository with nothing to read', () => {
       Object.values(order.context.toolchain).map(() => null)
     )
     await runAgreed(order)
-    await vi.waitFor(async () => expect(await gateRules()).toContain('ready-for-review'), {
-      timeout: 20_000,
-    })
+    await eventually(async () => expect(await gateRules()).toContain('ready-for-review'))
     expect(finished).toEqual([])
     expect(await ledgerActions(dataDir)).not.toContain('step.passed')
   })

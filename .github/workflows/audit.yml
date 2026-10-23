@@ -1,0 +1,55 @@
+name: Audit
+
+# A new advisory is news about a dependency, not about this change, so it never fails a pull
+# request (ADR 123). It is looked for here, daily, and kept as one open issue.
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  audit:
+    name: Security audit
+    runs-on: macos-26
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      # Every dependency, shipped or tooling, must carry no high or critical advisory
+      # (Constitution IV). The output goes to a file so the issue can carry it.
+      - name: Audit
+        id: audit
+        run: npm audit --audit-level=high 2>&1 | tee audit.txt; test "${PIPESTATUS[0]}" -eq 0
+        shell: bash
+        continue-on-error: true
+
+      - name: Open or update the audit issue
+        if: steps.audit.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: 'Security audit: high or critical advisory in the dependencies'
+          FENCE: '```'
+        run: |
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          printf 'Found by the daily audit (%s).\n\n%s\n%s\n%s\n' "$run_url" "$FENCE" "$(cat audit.txt)" "$FENCE" > body.md
+          number=$(gh issue list --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --body-file body.md
+          else
+            gh issue create --title "$TITLE" --body-file body.md
+          fi
+
+      - name: Verdict
+        if: steps.audit.outcome == 'failure'
+        run: exit 1

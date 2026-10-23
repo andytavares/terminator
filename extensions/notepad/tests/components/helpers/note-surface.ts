@@ -23,11 +23,6 @@ export function storeSettings(values: Record<string, unknown>): void {
   vi.mocked(window.electronAPI.extension.getSettingsValues).mockResolvedValue({ values })
 }
 
-/** Resolves after `ms` of real time. */
-export function elapse(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
 export function listItem(id: string, title: string, tags: string[] = []): NoteListItem {
   return {
     id,

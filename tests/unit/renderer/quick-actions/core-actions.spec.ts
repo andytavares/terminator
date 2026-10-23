@@ -119,9 +119,9 @@ describe('buildCoreActions — linking issues to a session vs a branch', () => {
     )
   })
 
-  it('runs onLinkIssue, not onLinkIssueBranch', () => {
+  it('runs onLinkIssue, not onLinkIssueBranch', async () => {
     const deps = makeDeps()
-    buildCoreActions(deps)
+    await buildCoreActions(deps)
       .find((a) => a.id === 'core.link-issue')!
       .run()
     expect(deps.onLinkIssue).toHaveBeenCalledOnce()
@@ -137,9 +137,9 @@ describe('buildCoreActions — linking issues to a session vs a branch', () => {
 })
 
 describe('buildCoreActions — linking issues to a session vs a branch — runs onLinkIssueBranch for the branch action', () => {
-  it('runs onLinkIssueBranch for the branch action', () => {
+  it('runs onLinkIssueBranch for the branch action', async () => {
     const deps = makeDeps()
-    buildCoreActions(deps)
+    await buildCoreActions(deps)
       .find((a) => a.id === 'core.link-issue-branch')!
       .run()
     expect(deps.onLinkIssueBranch).toHaveBeenCalledOnce()
@@ -147,12 +147,12 @@ describe('buildCoreActions — linking issues to a session vs a branch — runs 
 })
 
 describe('buildCoreActions — runs the matching dep callback', () => {
-  it('runs the matching dep callback', () => {
+  it('runs the matching dep callback', async () => {
     const deps = makeDeps()
     const actions = buildCoreActions(deps)
-    actions.find((a) => a.id === 'core.clear')!.run()
+    await actions.find((a) => a.id === 'core.clear')!.run()
     expect(deps.onClear).toHaveBeenCalled()
-    actions.find((a) => a.id === 'core.split-vertical')!.run()
+    await actions.find((a) => a.id === 'core.split-vertical')!.run()
     expect(deps.onSplit).toHaveBeenCalledWith('vertical')
   })
 
@@ -232,9 +232,9 @@ const HANDLED_BY: [string, keyof CoreActionDeps, unknown[]][] = [
 ]
 
 describe('buildCoreActions — every action runs its own handler', () => {
-  it.each(HANDLED_BY)('%s runs %s', (id, handler, args) => {
+  it.each(HANDLED_BY)('%s runs %s', async (id, handler, args) => {
     const deps = makeDeps()
-    buildCoreActions(deps)
+    await buildCoreActions(deps)
       .find((a) => a.id === id)!
       .run()
     expect(deps[handler]).toHaveBeenCalledWith(...args)

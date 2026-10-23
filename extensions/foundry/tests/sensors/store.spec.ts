@@ -110,7 +110,7 @@ function gettingAndEmptyStateTests() {
     fs.mkdirSync(path.dirname(file), { recursive: true })
     for (const content of ['[]', 'null', 'not json']) {
       fs.writeFileSync(file, content)
-      expect(await createSignalStore(root).sensorState(), content).toEqual({})
+      expect(await createSignalStore(root).sensorState()).toEqual({})
     }
   })
 

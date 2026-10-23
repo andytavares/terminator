@@ -7,6 +7,7 @@ import { seedStore } from '../../../support/renderer-stores'
 import { installElectronApi } from '../../../support/electron-api'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 import type { WorkspaceSettings } from '../../../../src/shared/types'
+import { eventually } from '../../../support/eventually'
 
 // Workspace Settings lists every extension setting declared `workspaceScoped`,
 // shows the value that applies in this workspace, saves an edit as this
@@ -103,9 +104,8 @@ describe('WorkspaceExtensionSettings', () => {
 
     fireEvent.click(await signOffSwitch())
 
-    await waitFor(
-      () => expect(updateWorkspaceSetting).toHaveBeenCalledWith(WORKSPACE_ID, SIGN_OFF, false),
-      { timeout: 2000 }
+    await eventually(() =>
+      expect(updateWorkspaceSetting).toHaveBeenCalledWith(WORKSPACE_ID, SIGN_OFF, false)
     )
     expect(await screen.findByText('Use global default')).toBeTruthy()
   })

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { makeTempDir } from '../../support/temp-dir'
+import { eventually } from '../../support/eventually'
 
 let userData: string
 
@@ -34,8 +35,7 @@ function write(terminal: string, report: Record<string, unknown>): void {
   )
 }
 
-const seen = (count: number) =>
-  vi.waitFor(() => expect(changes).toHaveLength(count), { timeout: 4000, interval: 20 })
+const seen = (count: number) => eventually(() => expect(changes).toHaveLength(count))
 
 describe('the ask watcher', () => {
   it('raises an ask from a notification, and lifts it on stop', async () => {

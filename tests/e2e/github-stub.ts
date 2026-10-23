@@ -78,12 +78,14 @@ function stubContext(options: GithubStubOptions): StubContext {
 /** Answers each forwarded gh call, and records it in `calls`. */
 function ghServer(context: StubContext, calls: GhCall[]): Server {
   return createServer((request, response) => {
-    void readRequestBody(request).then((raw) => {
-      const call = JSON.parse(raw) as GhCall
-      calls.push(call)
-      response.setHeader('content-type', 'application/json')
-      response.end(JSON.stringify(handleGhCall(context, call)))
-    })
+    readRequestBody(request)
+      .then((raw) => {
+        const call = JSON.parse(raw) as GhCall
+        calls.push(call)
+        response.setHeader('content-type', 'application/json')
+        response.end(JSON.stringify(handleGhCall(context, call)))
+      })
+      .catch((error: Error) => response.destroy(error))
   })
 }
 

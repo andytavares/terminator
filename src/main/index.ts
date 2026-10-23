@@ -2,7 +2,8 @@ import './claim-profile.js'
 import { onChannel } from './ipc/channel-registrar.js'
 import { registerAppInfoHandlers, registerDialogHandlers } from './ipc/app.ipc.js'
 import { app, BrowserWindow, dialog, Menu, shell, session, protocol } from 'electron'
-import { enterBackgroundMode, revealWindow, windowOptions } from './background-mode.js'
+import { enterBackgroundMode, revealWindow, newWindow } from './background-mode.js'
+import { announceWindowReadiness, exposeReadinessToTests } from './e2e-readiness.js'
 import { join } from 'path'
 import {
   registerWorkspaceHandlers,
@@ -166,19 +167,18 @@ function handleWindowClose(win: BrowserWindow): void {
 }
 
 function createWindow(): void {
-  const win = new BrowserWindow(
-    windowOptions({
-      width: 1280,
-      height: 800,
-      webPreferences: {
-        contextIsolation: true,
-        nodeIntegration: false,
-        preload: join(__dirname, '../preload/index.js'),
-        webviewTag: true,
-      },
-    })
-  )
+  const win = newWindow({
+    width: 1280,
+    height: 800,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: join(__dirname, '../preload/index.js'),
+      webviewTag: true,
+    },
+  })
   mainWindow = win
+  announceWindowReadiness(win)
   loadRenderer(win)
   relayPushes(win)
   openLinksInBrowser(win)
@@ -493,6 +493,7 @@ function startExtensions(
 }
 
 enterBackgroundMode()
+exposeReadinessToTests()
 
 app.whenReady().then(async () => {
   logger.info('App ready', { version: app.getVersion() })
@@ -548,10 +549,10 @@ app.on('before-quit', async (event) => {
   event.preventDefault()
   isQuitting = true
   await extensionHost.unloadAll()
-  extensionHostProcess.stopHost()
+  await extensionHostProcess.stopHost()
   // After the extensions, which start most of them: a git or gh command still
   // running, and whatever it started, would outlive the app.
-  stopRunningCommands()
+  await stopRunningCommands()
   await ptyManager.killAll()
   closeAppDb()
   // Last, so what the steps above logged reaches the file before the process ends.

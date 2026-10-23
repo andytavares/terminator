@@ -17,8 +17,20 @@ import {
 } from '../git/git-service.js'
 import { excludeBranches } from '../git/branch-exclude.js'
 import { branchExcludePatternsFor } from '../git/branch-exclude-settings.js'
+import { logger } from '../logger.js'
 
 const PathSchema = z.object({ path: z.string().min(1) })
+
+/** `work`'s answer; when git cannot give one, its own words go to the log before the caller
+ * shows "could not read the repository", so a failure that does not repeat can still be read. */
+async function loggedWhenUnanswered<T>(channel: string, path: string, work: () => Promise<T>) {
+  try {
+    return await work()
+  } catch (error) {
+    logger.warn(`git could not answer ${channel} for ${path}: ${String(error)}`)
+    throw error
+  }
+}
 
 const PathAndBranchSchema = z.object({ path: z.string().min(1), branch: z.string().min(1) })
 
@@ -27,11 +39,11 @@ const repositoryChannels: ChannelSpec[] = [
     channel: 'git:is-repo',
     schema: PathSchema,
     invalid: { isRepo: false },
-    run: async ({ path }) => {
-      const isRepo = await isGitRepo(path)
-      if (!isRepo) return { isRepo: false }
-      return { isRepo: true, root: await getGitRoot(path) }
-    },
+    run: ({ path }) =>
+      loggedWhenUnanswered('git:is-repo', path, async () => {
+        if (!(await isGitRepo(path))) return { isRepo: false }
+        return { isRepo: true, root: await getGitRoot(path) }
+      }),
     onError: (e) => ({ error: String(e) }),
   }),
   defineChannel({
@@ -48,7 +60,10 @@ const branchChannels: ChannelSpec[] = [
     channel: 'git:current-branch',
     schema: PathSchema,
     invalid: { error: 'INVALID_PATH' },
-    run: async ({ path }) => ({ branch: await getCurrentBranch(path) }),
+    run: ({ path }) =>
+      loggedWhenUnanswered('git:current-branch', path, async () => ({
+        branch: await getCurrentBranch(path),
+      })),
     onError: (e) => ({ error: String(e) }),
   }),
   defineChannel({

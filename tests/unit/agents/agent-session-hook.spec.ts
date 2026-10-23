@@ -7,8 +7,11 @@ import { makeTempDir } from '../../support/temp-dir'
 let userData: string
 let home: string
 
+// Electron's home on macOS is the account's, whatever HOME says: a sealed run's HOME never reached
+// it, and e2e and smoke runs rewrote the developer's own ~/.claude/settings.json.
+const ACCOUNT_HOME = '/Users/account-home-never-written'
 vi.mock('electron', () => ({
-  app: { getPath: (name: string) => (name === 'home' ? home : userData) },
+  app: { getPath: (name: string) => (name === 'home' ? ACCOUNT_HOME : userData) },
 }))
 
 async function load() {
@@ -27,6 +30,7 @@ const PAYLOAD = {
 beforeEach(() => {
   userData = makeTempDir('agent-hook-ud-')
   home = makeTempDir('agent-hook-home-')
+  vi.stubEnv('HOME', home)
 })
 
 // The script is run for real: what matters is what it writes and what it prints,
@@ -298,5 +302,12 @@ describe('installing the hook — a missing script', () => {
     // Exactly as a shell would run it from the settings file.
     // execFileSync throws on a non-zero exit.
     expect(execFileSync('/bin/sh', ['-c', command], { encoding: 'utf8' })).toBe('')
+  })
+})
+
+describe('the settings file the hooks go in', () => {
+  it("is under HOME, so a sealed run's hooks land in its own home", async () => {
+    const { userSettingsPath } = await load()
+    expect(userSettingsPath()).toBe(path.join(home, '.claude', 'settings.json'))
   })
 })

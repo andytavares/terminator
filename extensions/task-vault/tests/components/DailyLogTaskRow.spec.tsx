@@ -10,8 +10,6 @@ vi.mock('../../src/components/DateTimePicker', () => import('./helpers/input-stu
 import { notify } from '../../src/utils/notify'
 import { useVaultNavStore } from '../../src/stores/vault-nav.store'
 
-vi.setConfig({ testTimeout: 30_000 })
-
 let bridge: ReturnType<typeof installVaultBridge>
 
 beforeEach(() => {
@@ -48,7 +46,7 @@ function selectTests() {
     const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
     fireEvent.click(screen.getByText('Write'))
     expect(props.onSelectTask).not.toHaveBeenCalled()
-    act(() => vi.advanceTimersByTime(220))
+    act(() => void vi.advanceTimersByTime(220))
     expect(props.onSelectTask).toHaveBeenCalledWith('t1')
   })
 
@@ -71,7 +69,7 @@ function selectTestsPart2() {
     const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
     fireEvent.click(screen.getByText('Write'))
     cleanup()
-    act(() => vi.advanceTimersByTime(500))
+    act(() => void vi.advanceTimersByTime(500))
     expect(props.onSelectTask).not.toHaveBeenCalled()
   })
 }

@@ -8,6 +8,7 @@ import {
   type FrameReply,
   type FrameRequest,
 } from '../../shared/frame-wire.js'
+import { announce } from '../e2e-readiness.js'
 import { onChannel } from '../ipc/channel-registrar.js'
 import { makeGoneTracker, type ViewCaller } from '../ipc/invoke-table.js'
 import type { ExtensionSurface } from './extension-exit.js'
@@ -66,6 +67,7 @@ export class FrameBridge {
       this.emitFrameEvent(frame, 'workspace:changed', this.lastWorkspaceChanged)
     }
     replaced?.port.close()
+    announce('ready', `${surface.extensionId}:${surface.viewParam}`)
   }
 
   broadcast(channel: string, data: unknown): void {

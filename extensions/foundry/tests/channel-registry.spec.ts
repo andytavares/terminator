@@ -145,7 +145,7 @@ describe('a question nobody is there to answer', () => {
 // and explains nothing.
 describe('a stall, where the order is read', () => {
   it('goes on the order ledger and not only the console feed', () => {
-    expect(src).toContain('void recordStall(featureDir, firing)')
+    expect(src).toContain('inBackground(recordStall(featureDir, firing))')
     const fn = src.slice(src.indexOf('async function recordStall'))
     const body = fn.slice(0, fn.indexOf('\n}'))
     expect(body).toContain("action: 'run.stalled'")

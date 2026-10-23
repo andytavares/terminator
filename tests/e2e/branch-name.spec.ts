@@ -98,7 +98,7 @@ async function firstCardIsTheCheckedOutBranch(): Promise<void> {
 
 async function changeStatisticsArrive(): Promise<void> {
   const stats = projectGroup(handle.page, 'main').locator('.branch-row__stats')
-  await expect(stats).toBeVisible({ timeout: 10000 })
+  await expect(stats).toBeVisible()
   await expect(stats).toContainText('+')
 }
 
@@ -158,7 +158,7 @@ async function setExcludePatterns(patterns: string[]): Promise<void> {
 /** Settings → Branch Exclude Patterns, through the real settings store and handler: the
  * setting once existed with nothing reading it, which a mocked unit test could not notice. */
 async function excludedBranchesLeaveThePicker(): Promise<void> {
-  expect(await listedBranches()).toEqual(expect.arrayContaining(['feat/x', ...EXCLUDED]))
+  await expect.poll(() => listedBranches()).toEqual(expect.arrayContaining(['feat/x', ...EXCLUDED]))
   await setExcludePatterns(['gh-readonly-queue/*', 'trunk-merge/*'])
   const listed = await listedBranches()
   expect(listed).toContain('feat/x')
@@ -172,14 +172,14 @@ async function worktreeCreationCloses(): Promise<void> {
   await page.getByRole('button', { name: 'Worktree' }).click()
   await page.getByPlaceholder('feature/my-feature').fill('feature/busy-state')
   await page.click('.tmui-dialog__actions .tmui-button--primary')
-  await expect(dialogTitle()).toHaveCount(0, { timeout: 30_000 })
+  await expect(dialogTitle()).toHaveCount(0)
   await expect(branchName(/^feature\/busy-state$/).first()).toBeVisible()
 }
 
 async function cardFollowsOutsideCheckout(): Promise<void> {
   git(repo, 'checkout', '-b', 'feature/renamed-by-git')
   // Polled by the app, so allow more than one interval.
-  await expect(branchName('feature/renamed-by-git').first()).toBeVisible({ timeout: 20000 })
+  await expect(branchName('feature/renamed-by-git').first()).toBeVisible()
   await expect(branchName(/^main$/)).toHaveCount(0)
 }
 
@@ -268,7 +268,6 @@ async function branchesChangeAndGo(): Promise<void> {
 }
 
 test("a repository's branches are shown, added, followed and removed from the sidebar", async () => {
-  test.setTimeout(120_000)
   await theRepositoryIsShown()
   await branchesAreAdded()
   await branchesChangeAndGo()

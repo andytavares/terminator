@@ -25,6 +25,7 @@ import { dispatchChannel } from '@terminator/extension-sdk'
 import { registerReviewAgentHandlers, type ReviewAgentDeps } from '../../src/ipc/review-agent.ipc'
 import { bindWorkspaceRoots } from '../../src/ipc/repo-root'
 import type { AgentRun } from '../../src/schemas/review-agent.schema'
+import { eventually } from '../../../../tests/support/eventually'
 
 type RunReview = NonNullable<ReviewAgentDeps['runReview']>
 type RunSummary = NonNullable<ReviewAgentDeps['runSummary']>
@@ -142,7 +143,7 @@ describe('review-agent IPC', () => {
     resolveDone(makeDoneRun({ id: result.run.id }))
 
     // The run finishes in the background and stores itself before it broadcasts.
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(broadcast).toHaveBeenCalledWith(
         'review-agent:event',
         expect.objectContaining({ run: expect.objectContaining({ status: 'done' }) })
@@ -179,18 +180,18 @@ describe('review-agent IPC — uses the model override when given, else the sett
     const { handlers, settings } = captureAgentHandlers({ ensureWorktree, runReview })
 
     await handlers['review-agent:start'](startPayload())
-    await vi.waitFor(() => expect(runReview).toHaveBeenCalledTimes(1))
+    await eventually(() => expect(runReview).toHaveBeenCalledTimes(1))
     expect(runReview.mock.calls[0][0].model).toBe('sonnet')
 
     settings['terminator.git-integration.review.agentModel'] = 'opus'
     await handlers['review-agent:start'](startPayload({ prNumber: 2, headSHA: 'sha2' }))
-    await vi.waitFor(() => expect(runReview).toHaveBeenCalledTimes(2))
+    await eventually(() => expect(runReview).toHaveBeenCalledTimes(2))
     expect(runReview.mock.calls[1][0].model).toBe('opus')
 
     await handlers['review-agent:start'](
       startPayload({ prNumber: 3, headSHA: 'sha3', model: 'sonnet' })
     )
-    await vi.waitFor(() => expect(runReview).toHaveBeenCalledTimes(3))
+    await eventually(() => expect(runReview).toHaveBeenCalledTimes(3))
     expect(runReview.mock.calls[2][0].model).toBe('sonnet')
   })
 })
@@ -210,7 +211,7 @@ describe('review-agent IPC — passes no effort for the Default choice or an uns
     for (const [i, value] of (['default', '', 'high'] as const).entries()) {
       settings['terminator.git-integration.review.agentEffort'] = value
       await start(i + 1)
-      await vi.waitFor(() => expect(runReview).toHaveBeenCalledTimes(i + 1))
+      await eventually(() => expect(runReview).toHaveBeenCalledTimes(i + 1))
     }
 
     expect(runReview.mock.calls.map((c) => c[0].effort)).toEqual([undefined, undefined, 'high'])
@@ -228,10 +229,10 @@ describe('review-agent IPC — stops a run after the configured timeout', () => 
     const { handlers, settings } = captureAgentHandlers({ ensureWorktree, runReview })
 
     await handlers['review-agent:start'](startPayload())
-    await vi.waitFor(() => expect(runReview).toHaveBeenCalledTimes(1))
+    await eventually(() => expect(runReview).toHaveBeenCalledTimes(1))
     settings['terminator.git-integration.review.agentTimeoutMinutes'] = 12
     await handlers['review-agent:start'](startPayload({ prNumber: 2, headSHA: 'sha2' }))
-    await vi.waitFor(() => expect(runReview).toHaveBeenCalledTimes(2))
+    await eventually(() => expect(runReview).toHaveBeenCalledTimes(2))
 
     expect(runReview.mock.calls.map((c) => c[0].timeoutMs)).toEqual([5 * 60_000, 12 * 60_000])
   })
@@ -255,7 +256,7 @@ describe('review-agent IPC — review-agent:cancel cancels a live run', () => {
     const { handlers } = captureAgentHandlers({ ensureWorktree, runReview })
 
     const started = (await handlers['review-agent:start'](startPayload())) as { run: AgentRun }
-    await vi.waitFor(() => expect(runReview).toHaveBeenCalled())
+    await eventually(() => expect(runReview).toHaveBeenCalled())
 
     const result = await handlers['review-agent:cancel']({ runId: started.run.id })
     expect(result).toEqual({ ok: true })
@@ -268,7 +269,7 @@ describe('review-agent IPC — review-agent:cancel cancels a live run', () => {
     const ensureWorktree = vi.fn(async () => '/wt')
     const { handlers, registration } = captureAgentHandlers({ ensureWorktree, runReview })
     await handlers['review-agent:start'](startPayload())
-    await vi.waitFor(() => expect(runReview).toHaveBeenCalled())
+    await eventually(() => expect(runReview).toHaveBeenCalled())
 
     registration.dispose()
 
@@ -398,14 +399,18 @@ describe('review-agent IPC — review-agent:summarize', () => {
 describe('review-agent IPC — review-agent:summarize ends with the extension', () => {
   it('disposing the handlers kills a summary still running', async () => {
     const cancel = vi.fn()
-    const runSummary = vi.fn<RunSummary>(() => ({ done: new Promise(() => {}), cancel }))
+    let end: (result: { error: string }) => void = () => undefined
+    const done = new Promise<{ error: string }>((resolve) => (end = resolve))
+    const runSummary = vi.fn<RunSummary>(() => ({ done, cancel }))
     const { handlers, registration } = captureAgentHandlers({ runSummary })
-    void handlers['review-agent:summarize'](summarizePayload())
-    await vi.waitFor(() => expect(runSummary).toHaveBeenCalled())
+    const summarizing = handlers['review-agent:summarize'](summarizePayload())
+    await eventually(() => expect(runSummary).toHaveBeenCalled())
 
     registration.dispose()
 
     expect(cancel).toHaveBeenCalledTimes(1)
+    end({ error: 'cancelled' })
+    await summarizing
   })
 
   it('forgets a finished summary, so disposing cancels nothing', async () => {

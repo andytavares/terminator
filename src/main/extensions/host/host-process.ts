@@ -10,8 +10,13 @@ import type { ExtensionSettingsSnapshot } from '../setting-scope.js'
 export interface SpawnedHost {
   link: MessageLink
   onExit(listener: (code: number) => void): void
-  kill(): void
+  /** Asks the host to stop, or with SIGKILL ends it outright. */
+  kill(signal?: 'SIGKILL'): void
 }
+
+/** How long the host has to exit after it is asked to stop before it is killed: one that hangs
+ * would otherwise hold up quitting for as long as it likes. */
+const KILL_AFTER_MS = 2000
 
 export interface HostProcessOptions {
   spawn: (snapshot: HostSnapshot) => SpawnedHost
@@ -68,9 +73,15 @@ export class ExtensionHostProcess {
     this.running?.endpoint.notify('workspaces.changed', workspaces)
   }
 
-  stopHost(): void {
+  /** Settles once the host process has exited. */
+  async stopHost(): Promise<void> {
     this.stopping = true
-    this.running?.host.kill()
+    const host = this.running?.host
+    if (!host) return
+    const exited = new Promise<void>((resolve) => host.onExit(() => resolve()))
+    const kill = setTimeout(() => host.kill('SIGKILL'), KILL_AFTER_MS)
+    host.kill()
+    await exited.finally(() => clearTimeout(kill))
   }
 
   private forgetBackend(extensionId: string): void {
@@ -158,7 +169,11 @@ export function spawnUtilityHost(entryPath: string): (snapshot: HostSnapshot) =>
     return {
       link: messagePortLink(port1),
       onExit: (listener) => child.on('exit', listener),
-      kill: () => child.kill(),
+      kill: (signal) => {
+        // UtilityProcess.kill() only asks, with SIGTERM.
+        if (signal === 'SIGKILL' && child.pid !== undefined) process.kill(child.pid, signal)
+        else child.kill()
+      },
     }
   }
 }

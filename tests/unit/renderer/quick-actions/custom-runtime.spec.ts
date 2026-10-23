@@ -73,14 +73,14 @@ describe('buildCustomQuickActions', () => {
 })
 
 describe('buildCustomQuickActions — re-plans at run time and refuses when state changed since the panel opened', () => {
-  it('re-plans at run time and refuses when state changed since the panel opened', () => {
+  it('re-plans at run time and refuses when state changed since the panel opened', async () => {
     const deps = makeDeps()
     const env = makeEnv({ focused: { sessionId: 's1', isAgent: true, agentState: 'idle' } })
     const actions = buildCustomQuickActions([promptAction({ target: 'agent' })], env, deps)
 
     // Agent became 'working' after the panel opened, before Enter was pressed.
     env.focused = { sessionId: 's1', isAgent: true, agentState: 'working' }
-    void actions[0].run()
+    await actions[0].run()
 
     expect(deps.notify).toHaveBeenCalledWith('Claude is mid-turn')
     expect(deps.input).not.toHaveBeenCalled()

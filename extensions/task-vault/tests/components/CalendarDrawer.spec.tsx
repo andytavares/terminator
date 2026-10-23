@@ -202,7 +202,6 @@ function calendarDrawerRefreshingTests() {
 
     await act(async () => {
       bridgeHandlers.get('task-vault:push:index-updated')?.({})
-      await Promise.resolve()
     })
 
     await waitFor(() => expect(screen.getByText('Reopened task')).toBeTruthy())

@@ -141,6 +141,7 @@ type OwnIpc = ReturnType<typeof createIpcRegistrar>
 const disposables: Disposable[] = []
 let _api: ExtensionAPI | null = null
 let _schedulerStarted = false
+let _stopScheduler: (() => Promise<void>) | null = null
 let _pendingCapture = false
 let _pendingCaptureTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -149,7 +150,7 @@ function maybeStartScheduler(db: ExtensionDB): void {
   try {
     const scheduler = startTaskScheduler(_api, db)
     _schedulerStarted = true
-    disposables.push({ dispose: scheduler.dispose })
+    _stopScheduler = scheduler.dispose
     setSchedulerTick(scheduler.tick)
   } catch {
     // best-effort
@@ -412,4 +413,6 @@ export async function deactivate(): Promise<void> {
     d.dispose()
   }
   disposables.length = 0
+  await _stopScheduler?.()
+  _stopScheduler = null
 }

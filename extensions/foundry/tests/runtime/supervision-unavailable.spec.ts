@@ -12,6 +12,7 @@ import { createOrderStore } from '../../src/order/store.js'
 import { orderStoreAt } from '../../src/state/live-index.js'
 
 import { readyDraft } from '../helpers/forge-turns.js'
+import { eventually } from '../../../../tests/support/eventually'
 vi.mock('../../src/runtime/control-server.js', () => ({
   createControlServer: async () => {
     throw new Error('EADDRINUSE')
@@ -29,11 +30,11 @@ beforeAll(async () => {
   repo = await seededRepository(parent)
   host = fakeHost(() => dataDir)
   activate(host.api)
-  await vi.waitFor(() => expect(host.showToast).toHaveBeenCalled())
+  await eventually(() => expect(host.showToast).toHaveBeenCalled())
 })
 
 afterAll(async () => {
-  deactivate()
+  await deactivate()
   vi.unstubAllEnvs()
 })
 
@@ -74,7 +75,7 @@ function supervisionUnavailableRefusalsTests() {
     await orderStoreAt(dataDir).save(readyDraft(repo))
     await host.call('foundry:order.hold', { id: 'WO-1', held: true })
     await host.call('foundry:order.hold', { id: 'WO-1', held: false })
-    await vi.waitFor(async () => {
+    await eventually(async () => {
       const entries = await createOrderStore(dataDir).entries('WO-1')
       expect(entries.find((entry) => entry.action === 'red-team.refused')?.reason).toBe(
         'the supervision runtime is not running'

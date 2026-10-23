@@ -273,7 +273,6 @@ function writeLeftOrders(): void {
 }
 
 test.beforeAll(async () => {
-  test.setTimeout(180_000)
   repo = e2eTempDir('foundry-resume-repo-')
   commitFixture()
   // Written before the application exists. This is what the last session left.
@@ -294,9 +293,7 @@ async function noticedOnOpening(): Promise<void> {
   // the application opens, which is the whole claim: this is found in one poll
   // rather than by coming back hours later and noticing nothing had moved.
   await expect
-    .poll(async () => ((await foundry('foundry:attention')) as { inbox: number }).inbox, {
-      timeout: 30_000,
-    })
+    .poll(async () => ((await foundry('foundry:attention')) as { inbox: number }).inbox)
     .toBe(2)
 
   // Two things wait on you: the interrupted run's gate, and the run that
@@ -336,14 +333,11 @@ async function inboxRendersTheMove(): Promise<void> {
   // Polled rather than read once: the inbox refetches on a timer, and the gate
   // is raised by the same poll the chrome makes.
   await expect
-    .poll(async () => await bodyText().catch((e) => `ERR:${(e as Error).message}`), {
-      timeout: 30_000,
-    })
+    .poll(async () => await bodyText().catch((e) => `ERR:${(e as Error).message}`))
     .toContain('Refresh the token on a 401')
 
-  const text = await bodyText()
-  expect(text, `the inbox rendered:\n${text}`).toContain('Pick it back up')
-  expect(text).toContain('Stop here')
+  await expect.poll(() => bodyText()).toContain('Pick it back up')
+  await expect.poll(() => bodyText()).toContain('Stop here')
 
   // The picture, because a structural assertion passes while the band renders
   // in the wrong place, off-screen, or unreadable.
@@ -361,12 +355,10 @@ async function inboxRendersTheMove(): Promise<void> {
 /** Waits for the order's row in the Forge list, then opens it. */
 async function openOrderRowInView(id: string, missing: string): Promise<void> {
   await expect
-    .poll(
-      () =>
-        inFoundry<string>(
-          `Array.from(document.querySelectorAll('.fdry-orders button')).map(b => b.textContent || '').join('|')`
-        ),
-      { timeout: 15_000 }
+    .poll(() =>
+      inFoundry<string>(
+        `Array.from(document.querySelectorAll('.fdry-orders button')).map(b => b.textContent || '').join('|')`
+      )
     )
     .toContain(id)
   expect(
@@ -410,21 +402,21 @@ async function floorCarriesTheMove(): Promise<void> {
   await openFoundry()
 
   // The Forge tab, then the running order — which opens on the Floor.
-  expect(await clickByName('Forge')).toBe(true)
+  await expect.poll(() => clickByName('Forge')).toBe(true)
   await openOrderRowInView(ORDER_ID, 'no row for the running order')
 
-  await expect.poll(() => bodyText(), { timeout: 15_000 }).toContain('Halted — your move')
-  const text = await bodyText()
   // `Halted — your move`, not `Nothing is running this`: an orphan always raises
   // `run.interrupted` (adopt.ts), and ADR-045 puts an unanswered gate first.
-  expect(text, `the Floor rendered:\n${text}`).toContain('Halted — your move')
+  await expect.poll(() => bodyText()).toContain('Halted — your move')
   // A gate is one line until it is opened; its reason is behind the chevron.
-  expect(await inFoundry<boolean>(SHOW_THE_REASON), 'no collapsed gate to open').toBe(true)
+  await expect
+    .poll(() => inFoundry<boolean>(SHOW_THE_REASON), { message: 'no collapsed gate to open' })
+    .toBe(true)
   // The interrupted gate's own words, so this proves the resume band rendered
   // rather than any halt at any gate.
-  await expect.poll(() => bodyText(), { timeout: 5_000 }).toContain('Nothing is moving this run')
-  expect(text).toContain('builder · U-1 refresh the token on a 401')
-  expect(text).toContain('Pick it back up')
+  await expect.poll(() => bodyText()).toContain('Nothing is moving this run')
+  await expect.poll(() => bodyText()).toContain('builder · U-1 refresh the token on a 401')
+  await expect.poll(() => bodyText()).toContain('Pick it back up')
 
   writeFileSync(
     join(process.cwd(), 'test-results', 'foundry-interrupted-floor.png'),
@@ -437,19 +429,19 @@ async function unshippedRunSaysSo(): Promise<void> {
 
   // The interrupted order is still open from the step before: "All orders" is
   // the way back to the list, and the list refetches on its own 4s timer.
-  expect(await clickByName('Forge')).toBe(true)
+  await expect.poll(() => clickByName('Forge')).toBe(true)
   await clickByName('All orders')
   await openOrderRowInView(UNSHIPPED_ID, 'no row for the unshipped order')
 
-  await expect.poll(() => bodyText(), { timeout: 15_000 }).toContain('Finished, but not shipped')
-  const text = await bodyText()
-  expect(text, `the Floor rendered:\n${text}`).toContain('Finished, but not shipped')
-  expect(text).toContain('Opening the pull request for fixture failed: exit code 1')
-  expect(text).not.toContain('Between steps')
+  await expect.poll(() => bodyText()).toContain('Finished, but not shipped')
+  await expect
+    .poll(() => bodyText())
+    .toContain('Opening the pull request for fixture failed: exit code 1')
+  await expect.poll(() => bodyText()).not.toContain('Between steps')
 
   // The standing text also shows in the order's list row, so it can be on
   // screen before the Floor renders its move: wait for the button itself.
-  await expect.poll(() => inFoundry<boolean>(HAS_TRY_AGAIN), { timeout: 15_000 }).toBe(true)
+  await expect.poll(() => inFoundry<boolean>(HAS_TRY_AGAIN)).toBe(true)
 }
 
 async function answeringRequeuesTheStep(): Promise<void> {
@@ -465,10 +457,8 @@ async function answeringRequeuesTheStep(): Promise<void> {
   // Reclaimed and written down. The executor then starts it again — which is
   // asynchronous and cuts a worktree, so what is asserted here is the reclaim
   // itself: the state the scheduler can act on, and the attempt given back.
-  await expect
-    .poll(() => graphOnDisk().nodes[0].attempts, { timeout: 20_000 })
-    .toBeLessThanOrEqual(1)
-  expect(['waiting', 'running']).toContain(graphOnDisk().nodes[0].state)
+  await expect.poll(() => graphOnDisk().nodes[0].attempts).toBeLessThanOrEqual(1)
+  await expect.poll(() => graphOnDisk().nodes[0].state).toMatch(/^(waiting|running)$/)
 }
 
 async function stoppingStopsTheRun(): Promise<void> {
@@ -493,7 +483,6 @@ async function stoppingStopsTheRun(): Promise<void> {
 }
 
 test('a run that died with the app is noticed on opening, shown with its move, resumed and stopped', async () => {
-  test.setTimeout(180_000)
   const step = test.step
   await step('the run is noticed on opening, without anybody going to look', noticedOnOpening)
   await step(

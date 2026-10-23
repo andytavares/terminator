@@ -262,7 +262,7 @@ function noteListTagFilterDropdownClosingTests() {
     vi.useFakeTimers()
     render(<NoteList />)
     fireEvent.click(screen.getByText('Tags'))
-    act(() => vi.runOnlyPendingTimers())
+    act(() => void vi.runOnlyPendingTimers())
     fireEvent.mouseDown(document.querySelector('.notepad-tag-filter__dropdown')!)
     expect(document.querySelector('.notepad-tag-filter__dropdown')).not.toBeNull()
     fireEvent.mouseDown(document.body)

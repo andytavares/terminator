@@ -30,14 +30,11 @@ let handle: AppHandle
 let repo: string
 
 test.beforeAll(async () => {
-  test.setTimeout(180_000)
   repo = makeFixtureRepo('foundry-intake-repo-')
   handle = await launchApp()
   await createWorkspace(handle.page, 'Foundry Intake', repo)
   await projectGroup(handle.page, 'main').click()
-  await expect(handle.page.getByRole('textbox', { name: 'Terminal input' }).first()).toBeVisible({
-    timeout: 15_000,
-  })
+  await expect(handle.page.getByRole('textbox', { name: 'Terminal input' }).first()).toBeVisible()
 })
 
 test.afterAll(async () => {
@@ -56,12 +53,8 @@ function focusedInFoundry(): Promise<string> {
 
 async function newWorkOrderFromQuickActions(): Promise<void> {
   await runQuickActionFromPanel(handle.page, 'New work order…')
-  await expect(handle.page.locator('[data-extension-panel="terminator.foundry"]')).toHaveCount(1, {
-    timeout: 30_000,
-  })
-  await expect
-    .poll(focusedInFoundry, { timeout: 15_000 })
-    .toBe('Describe what you want built or fixed…')
+  await expect(handle.page.locator('[data-extension-panel="terminator.foundry"]')).toHaveCount(1)
+  await expect.poll(focusedInFoundry).toBe('Describe what you want built or fixed…')
 }
 
 async function extensionAnswers(): Promise<void> {
@@ -99,7 +92,7 @@ async function chromeCountsWhatIsWaiting(): Promise<void> {
 
 async function everySurfaceRenders(): Promise<void> {
   // The Forge is home: it is what is on screen before anything is clicked.
-  await expect.poll(() => bodyText(handle), { timeout: 15_000 }).toContain('New order')
+  await expect.poll(() => bodyText(handle)).toContain('New order')
   expect(
     await inFoundry<string | null>(
       handle,
@@ -111,8 +104,10 @@ async function everySurfaceRenders(): Promise<void> {
     ['Ledger', 'What do I keep rejecting?'],
     ['Forge', 'New order'],
   ] as const) {
-    expect(await clickByName(handle, 'button', tab), `no control named "${tab}"`).toBe(true)
-    await expect.poll(() => bodyText(handle), { timeout: 15_000 }).toContain(expected)
+    await expect
+      .poll(() => clickByName(handle, 'button', tab), { message: `no control named "${tab}"` })
+      .toBe(true)
+    await expect.poll(() => bodyText(handle)).toContain(expected)
   }
   await settingsRendersAndGoesBack()
 }
@@ -120,11 +115,9 @@ async function everySurfaceRenders(): Promise<void> {
 async function settingsRendersAndGoesBack(): Promise<void> {
   // The settings control draws only an icon, so it is addressed by its label.
   // `innerText` reflects `text-transform`, so a phrase is matched, not the heading.
-  expect(await clickByName(handle, 'button', 'Settings')).toBe(true)
-  await expect
-    .poll(() => bodyText(handle), { timeout: 15_000 })
-    .toContain('Use my Claude Code default')
-  expect(await clickByName(handle, 'button', 'Back')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'Settings')).toBe(true)
+  await expect.poll(() => bodyText(handle)).toContain('Use my Claude Code default')
+  await expect.poll(() => clickByName(handle, 'button', 'Back')).toBe(true)
 }
 
 async function ideaBecomesAnOrder(): Promise<void> {
@@ -149,9 +142,8 @@ async function orderFitsTheView(): Promise<void> {
   // bottom while the order beside them left two thirds of the width empty.
   await expect.poll(() => clickByName(handle, 'button', 'Forge')).toBe(true)
   await expect
-    .poll(
-      () => inFoundry<number>(handle, `document.querySelectorAll('.fdry-orders button').length`),
-      { timeout: 15_000 }
+    .poll(() =>
+      inFoundry<number>(handle, `document.querySelectorAll('.fdry-orders button').length`)
     )
     .toBeGreaterThan(0)
   const size = await inFoundry<{ scroll: number; view: number }>(handle, PAGE_HEIGHT)
@@ -211,8 +203,8 @@ async function noTextAtTheDefaultSize(): Promise<void> {
     ['Ledger', 'What do I keep rejecting?'],
     ['Forge', 'New order'],
   ] as const) {
-    expect(await clickByName(handle, 'button', surface)).toBe(true)
-    await expect.poll(() => bodyText(handle), { timeout: 15_000 }).toContain(shows)
+    await expect.poll(() => clickByName(handle, 'button', surface)).toBe(true)
+    await expect.poll(() => bodyText(handle)).toContain(shows)
     for (const item of await inFoundry<string[]>(handle, OVERSIZED_TEXT)) {
       found.push(`${surface}: ${item}`)
     }
@@ -221,7 +213,7 @@ async function noTextAtTheDefaultSize(): Promise<void> {
 }
 
 async function nothingThrew(): Promise<void> {
-  expect(await inFoundry<string[]>(handle, 'window.__thrown || []')).toEqual([])
+  await expect.poll(() => inFoundry<string[]>(handle, 'window.__thrown || []')).toEqual([])
 }
 
 async function repositoryReadFirst(): Promise<void> {
@@ -304,7 +296,7 @@ async function repositoryUntouched(): Promise<void> {
 async function expectReadOnlyLaunch(): Promise<void> {
   // What the launch wrote, not the terminal's scrollback, which a talkative
   // agent scrolls out of view.
-  await expect.poll(() => hasAgentLaunchScript(handle), { timeout: 60_000 }).toBe(true)
+  await expect.poll(() => hasAgentLaunchScript(handle)).toBe(true)
   const launched = agentLaunchScript(handle)
   expect(launched).toContain('claude --session-id')
   expect(launched).not.toContain('bypassPermissions')
@@ -342,7 +334,7 @@ function orderProject(order: ConvergedOrder) {
 }
 
 async function architectLaunchesReadOnly(order: ConvergedOrder): Promise<void> {
-  await expect(orderProject(order)).toHaveCount(1, { timeout: 60_000 })
+  await expect(orderProject(order)).toHaveCount(1)
   const intakeProjects = handle.page.locator('.branch-row__name').filter({ hasText: 'intake' })
   await expect(intakeProjects).toHaveCount(0)
   await orderProject(order).click()
@@ -358,7 +350,7 @@ async function deleteRemovesTheProject(order: ConvergedOrder): Promise<void> {
     removed?: string[]
   }
   expect(deleted.removed).toContain(`the project ${order.branch}`)
-  await expect(orderProject(order)).toHaveCount(0, { timeout: 30_000 })
+  await expect(orderProject(order)).toHaveCount(0)
 }
 
 /** Opens the Forge from Quick Actions, and checks every surface renders and reads right. */
@@ -399,7 +391,6 @@ async function orderIsCheckedAndRecorded(): Promise<void> {
 }
 
 test('an idea becomes an order that is refused until complete, and its architect launches read-only and goes when the order is deleted', async () => {
-  test.setTimeout(240_000)
   await forgeOpensAndRenders()
   await orderIsCheckedAndRecorded()
   const order = await test.step('a seeded draft is handed to intake', convergeADraft)

@@ -66,7 +66,9 @@ async function dragCardToLane(): Promise<void> {
   await card.dragTo(boardLane('In Progress'))
 
   await expect(boardLane('In Progress').locator('.tv-kanban__card')).toHaveText([/Design the logo/])
-  expect(await storedTask(vault, 'Design the logo')).toMatchObject({ status: 'in-progress' })
+  await expect
+    .poll(() => storedTask(vault, 'Design the logo'))
+    .toMatchObject({ status: 'in-progress' })
 }
 
 /** Grouping the board by project draws a swimlane per project and is remembered. */

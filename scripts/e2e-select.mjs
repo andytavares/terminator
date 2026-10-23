@@ -140,7 +140,7 @@ function globToRegExp(glob) {
   return new RegExp('^' + out + '$')
 }
 
-function matchesAny(value, globs) {
+export function matchesAny(value, globs) {
   return globs.some((g) => globToRegExp(g).test(value))
 }
 

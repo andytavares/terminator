@@ -51,7 +51,7 @@ describe('DateTimePicker — open / close', () => {
     const { container } = render(<DateTimePicker mode="date" value="" onChange={vi.fn()} />)
     act(() => clickTrigger(container))
     expect(screen.getByText('June 2026')).toBeTruthy()
-    act(() => fireEvent.keyDown(document, { key: 'Escape' }))
+    act(() => void fireEvent.keyDown(document, { key: 'Escape' }))
     expect(screen.queryByText('June 2026')).toBeNull()
   })
 })
@@ -123,7 +123,7 @@ function dateTimePickerDateModeShortcutsTests() {
     const onChange = vi.fn()
     const { container } = render(<DateTimePicker mode="date" value="" onChange={onChange} />)
     act(() => clickTrigger(container))
-    act(() => fireEvent.click(screen.getByText('Today')))
+    act(() => void fireEvent.click(screen.getByText('Today')))
     expect(onChange).toHaveBeenCalledWith('2026-06-13')
   })
 
@@ -131,7 +131,7 @@ function dateTimePickerDateModeShortcutsTests() {
     const onChange = vi.fn()
     const { container } = render(<DateTimePicker mode="date" value="" onChange={onChange} />)
     act(() => clickTrigger(container))
-    act(() => fireEvent.click(screen.getByText('Tomorrow')))
+    act(() => void fireEvent.click(screen.getByText('Tomorrow')))
     expect(onChange).toHaveBeenCalledWith('2026-06-14')
   })
 }
@@ -146,7 +146,7 @@ function dateTimePickerDateModeCalendarNavigationTests() {
     const { container } = render(<DateTimePicker mode="date" value="" onChange={vi.fn()} />)
     act(() => clickTrigger(container))
     expect(screen.getByText('June 2026')).toBeTruthy()
-    act(() => fireEvent.click(screen.getByRole('button', { name: 'Previous month' })))
+    act(() => void fireEvent.click(screen.getByRole('button', { name: 'Previous month' })))
     expect(screen.getByText('May 2026')).toBeTruthy()
   })
 }
@@ -170,7 +170,7 @@ function dateTimePickerDateModeCalendarDaysTests() {
     act(() => clickTrigger(container))
     const dayButtons = container.querySelectorAll('.dtp__cal-day:not(.dtp__cal-day--other)')
     const day20 = Array.from(dayButtons).find((b) => b.textContent === '20') as HTMLElement
-    act(() => fireEvent.click(day20))
+    act(() => void fireEvent.click(day20))
     expect(onChange).toHaveBeenCalledWith('2026-06-20')
   })
 }
@@ -182,7 +182,7 @@ function dateTimePickerDateModeClearingLimitsTests() {
       <DateTimePicker mode="date" value="2026-06-13" onChange={onChange} />
     )
     act(() => clickTrigger(container))
-    act(() => fireEvent.click(screen.getByText('Clear')))
+    act(() => void fireEvent.click(screen.getByText('Clear')))
     expect(onChange).toHaveBeenCalledWith('')
   })
 
@@ -244,7 +244,7 @@ function dateTimePickerTimeMode12hAMSlotsHalvesTests() {
     const pmBtn = Array.from(container.querySelectorAll('.dtp__ampm-btn')).find(
       (b) => b.textContent === 'PM'
     ) as HTMLElement
-    act(() => fireEvent.click(pmBtn))
+    act(() => void fireEvent.click(pmBtn))
     const slots = container.querySelectorAll('.dtp__time-slot')
     // First PM slot is 12:00 (noon)
     expect(slots[0]?.textContent).toBe('12:00')
@@ -261,12 +261,12 @@ function dateTimePickerTimeMode12hAMSlotsChoosingTests() {
     const pmBtn = Array.from(container.querySelectorAll('.dtp__ampm-btn')).find(
       (b) => b.textContent === 'PM'
     ) as HTMLElement
-    act(() => fireEvent.click(pmBtn))
+    act(() => void fireEvent.click(pmBtn))
     // Find 5:00 slot (17:00 in 24h)
     const slot = Array.from(container.querySelectorAll('.dtp__time-slot')).find(
       (b) => b.textContent === '5:00'
     ) as HTMLElement
-    act(() => fireEvent.click(slot))
+    act(() => void fireEvent.click(slot))
     expect(onChange).toHaveBeenCalledWith('17:00')
   })
 }
@@ -276,7 +276,7 @@ function dateTimePickerTimeMode12hAMSelectionTests() {
     const onChange = vi.fn()
     const { container } = render(<DateTimePicker mode="time" value="" onChange={onChange} />)
     act(() => clickTrigger(container))
-    act(() => fireEvent.click(screen.getByText('End of day')))
+    act(() => void fireEvent.click(screen.getByText('End of day')))
     expect(onChange).toHaveBeenCalledWith('17:00')
   })
 
@@ -326,7 +326,7 @@ function dateTimePickerDatetimeModeUpdatesTests() {
     act(() => clickTrigger(container))
     const dayButtons = container.querySelectorAll('.dtp__cal-day:not(.dtp__cal-day--other)')
     const day20 = Array.from(dayButtons).find((b) => b.textContent === '20') as HTMLElement
-    act(() => fireEvent.click(day20))
+    act(() => void fireEvent.click(day20))
     expect(onChange).toHaveBeenCalledWith('2026-06-20T14:00')
   })
 
@@ -340,7 +340,7 @@ function dateTimePickerDatetimeModeUpdatesTests() {
     const slot = Array.from(container.querySelectorAll('.dtp__time-slot')).find(
       (b) => b.textContent === '4:00'
     ) as HTMLElement
-    act(() => fireEvent.click(slot))
+    act(() => void fireEvent.click(slot))
     expect(onChange).toHaveBeenCalledWith('2026-06-13T16:00')
   })
 }

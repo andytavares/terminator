@@ -16,6 +16,7 @@ import {
   quickActionsPanel,
   readTerminalRowsIn,
   runQuickActionFromPanel,
+  acceptingDialog,
 } from './helpers'
 import { answerFolderPicker } from './main-stubs'
 
@@ -146,7 +147,7 @@ async function toggleAndReload(page: Page, extensionName: string): Promise<void>
     .getByRole('button', { name: /^(Disable|Enable)$/ })
     .click()
   await reloaded
-  await expect(page.locator('.unified-sidebar')).toBeVisible({ timeout: 15000 })
+  await expect(page.locator('.unified-sidebar')).toBeVisible()
 }
 
 async function expectNotepadStatus(page: Page, status: string): Promise<void> {
@@ -163,16 +164,15 @@ async function bundledToggleTakesItAwayAndBack(): Promise<void> {
   await expect(notesButton).toHaveCount(0)
   await expectNotepadStatus(page, 'disabled')
   await toggleAndReload(page, 'Notepad')
-  await expect(notesButton).toBeVisible({ timeout: 15000 })
+  await expect(notesButton).toBeVisible()
   await expectNotepadStatus(page, 'enabled')
   await closeSettingsPanel(page)
 }
 
 async function uninstallRemovesItAcrossRestart(): Promise<void> {
   const { page } = handle
-  page.once('dialog', (dialog) => void dialog.accept())
   await openSettingsSection(page, 'Extensions')
-  await probeRow().getByRole('button', { name: 'Uninstall' }).click()
+  await acceptingDialog(page, () => probeRow().getByRole('button', { name: 'Uninstall' }).click())
   await expect(probeRow()).toHaveCount(0)
   await relaunch()
   await openSettingsSection(handle.page, 'Extensions')
@@ -226,7 +226,7 @@ function scrollbarGeometry(selector: string): Promise<Geometry> {
  * zero-width scrollbar means OS overlay scrollbars, which let glyphs render underneath. */
 async function expectTextClearOfScrollbar(container: string): Promise<void> {
   await expect
-    .poll(async () => (await scrollbarGeometry(container)).scrollbarPx, { timeout: 15000 })
+    .poll(async () => (await scrollbarGeometry(container)).scrollbarPx)
     .toBe(SCROLLBAR_WIDTH_PX)
   const g = await scrollbarGeometry(container)
   expect(g.screenRight).toBeLessThanOrEqual(g.viewportContentRight)
@@ -277,12 +277,11 @@ const RULER_COMMAND =
 /** WebGL draws to a canvas, so the ruler's last column is read as ink in the pixels. */
 async function expectRulerInkInLastColumn(page: Page): Promise<void> {
   await page.keyboard.type('clear\n')
-  await expect.poll(lastColumnInk, { timeout: 15000 }).toBe(0)
+  await expect.poll(lastColumnInk).toBe(0)
   await page.keyboard.type(RULER_COMMAND)
   await expect
     .poll(lastColumnInk, {
       message: 'the last column of the full-width ruler line was not drawn',
-      timeout: 30000,
     })
     .toBeGreaterThan(0)
 }
@@ -295,7 +294,7 @@ async function measureRulerRow(
   const screen = page.locator(PANE_SCREEN)
   const rulerRow = async () =>
     (await readTerminalRowsIn(screen)).findIndex((row) => /^#+$/.test(row) && row.length >= 40)
-  await expect.poll(rulerRow, { timeout: 30000 }).toBeGreaterThanOrEqual(0)
+  await expect.poll(rulerRow).toBeGreaterThanOrEqual(0)
   // The DOM renderer draws the screen's rows in order, one div each; its clip box is the
   // thing under test, so this measures the DOM on purpose.
   return screen.evaluate(
@@ -330,7 +329,7 @@ async function lastColumnGlyphNotClipped(): Promise<void> {
 
 async function splitPaneTextClearOfScrollbar(): Promise<void> {
   await handle.page.keyboard.press('Meta+d')
-  await expect(handle.page.locator('.leaf-pane').first()).toBeVisible({ timeout: 15000 })
+  await expect(handle.page.locator('.leaf-pane').first()).toBeVisible()
   await expectTextClearOfScrollbar('.leaf-pane__container')
 }
 
@@ -363,7 +362,7 @@ const RIGHT_EDGE_STEPS: Steps = [
 ]
 
 async function terminalRightEdgeIsClean(): Promise<void> {
-  await expect(handle.page.locator('.terminal-pane').first()).toBeVisible({ timeout: 15000 })
+  await expect(handle.page.locator('.terminal-pane').first()).toBeVisible()
   for (const [title, body] of RIGHT_EDGE_STEPS) await test.step(title, body)
 }
 
@@ -392,6 +391,5 @@ const LIFECYCLE_STEPS: Steps = [
 ]
 
 test('an extension is installed from a folder, used, reloaded and removed, across restarts', async () => {
-  test.setTimeout(300_000)
   for (const [title, body] of LIFECYCLE_STEPS) await test.step(title, body)
 })

@@ -178,13 +178,13 @@ export async function startJiraStub(issues: StubIssue[]): Promise<JiraStub> {
   const server = createServer(
     { key: readFileSync(keyPath), cert: readFileSync(certPath) },
     (request, response) => {
-      void (async () => {
+      ;(async () => {
         const url = new URL(request.url ?? '/', `https://${site}`)
         const method = request.method ?? 'GET'
         requests.push(`${method} ${url.pathname}${url.search}`)
         const answer = routeJira(state, { method, url, body: await readJsonBody(request) })
         sendJson(response, answer.status, answer.body)
-      })()
+      })().catch((error: Error) => response.destroy(error))
     }
   )
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))

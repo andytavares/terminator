@@ -75,10 +75,14 @@ function removeOwnConfig(): void {
   rmSync(ownConfigPath(), { force: true })
 }
 
+/** How long ngrok has to exit after SIGTERM before it gets SIGKILL. */
+const KILL_AFTER_MS = 2000
+
 export class NgrokManager {
   private process: ChildProcess | null = null
   private onCrashCallback: (() => void) | null = null
   private stopped = false
+  private exited: Promise<void> = Promise.resolve()
 
   static isInstalled(): boolean {
     try {
@@ -98,7 +102,8 @@ export class NgrokManager {
     const apiPort = await freePort()
     const args = ['http', String(port), ...agentConfigArgs(apiPort)]
     if (authToken) args.push('--authtoken', authToken)
-    this.process = spawn('ngrok', args, { detached: false, env: EXTENDED_ENV })
+    const child = spawn('ngrok', args, { detached: false, env: EXTENDED_ENV })
+    this.process = child
 
     const outputLines: string[] = []
     this.process.stdout?.on('data', (chunk: Buffer) => {
@@ -115,6 +120,11 @@ export class NgrokManager {
         this.onCrashCallback()
       }
     })
+    // 'error' too: a process that never started never exits.
+    this.exited = new Promise<void>((resolve) => {
+      child.on('exit', () => resolve())
+      child.on('error', () => resolve())
+    })
 
     return this.pollForUrl(port, apiPort).catch((err: Error) => {
       const detail = outputLines.slice(-5).join(' | ')
@@ -122,7 +132,16 @@ export class NgrokManager {
     })
   }
 
-  stop(): void {
+  /** Settles once the ngrok process has exited; one that ignores SIGTERM for KILL_AFTER_MS is
+   * killed, so stopping never waits on it for ever. */
+  async stop(): Promise<void> {
+    const child = this.process
+    this.terminate()
+    const kill = child ? setTimeout(() => child.kill('SIGKILL'), KILL_AFTER_MS) : undefined
+    await this.exited.finally(() => clearTimeout(kill))
+  }
+
+  private terminate(): void {
     this.stopped = true
     if (this.process) {
       this.onCrashCallback = null // clear before kill so exit event does not trigger crash handler
@@ -153,7 +172,7 @@ export class NgrokManager {
         // not ready yet
       }
     }
-    this.stop()
+    this.terminate()
     throw new Error('ngrok tunnel URL not available after polling')
   }
 }

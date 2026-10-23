@@ -1,15 +1,16 @@
 import { HOME_MEASURES } from '@terminator/extension-sdk'
-import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 import { fakeHost } from '../helpers/foundry-host.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
-import { activateFoundry } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import { startFoundryHomePublisher } from '../../src/home/publish.js'
 import { createDeciding, createStandingSources } from '../../src/ipc/standing.js'
 import { gateStoreAt, orderStoreAt } from '../../src/state/live-index.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import { runningOrder } from '../helpers/order-parts.js'
+import { eventually } from '../../../../tests/support/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
@@ -17,22 +18,19 @@ vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervis
 let dataDir = ''
 let host: FoundryHost
 
-beforeAll(async () => {
-  dataDir = makeTempDir('fdry-home-start-')
+beforeEach(async () => {
+  dataDir = makeTempDir('fdry-home-')
   host = fakeHost(() => dataDir)
   host.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
   await activateFoundry(host)
   // Activation publishes the starting state once; wait it out so no spec counts it.
-  await vi.waitFor(() => expect(host.homePublish).toHaveBeenCalledTimes(1))
-})
-
-beforeEach(() => {
-  dataDir = makeTempDir('fdry-home-')
+  await eventually(() => expect(host.homePublish).toHaveBeenCalledTimes(1))
   host.homePublish.mockClear()
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
 })
 
-afterEach(() => {
+afterEach(async () => {
+  await deactivate()
   vi.useRealTimers()
 })
 
@@ -68,7 +66,7 @@ describe('publishing to Home when a record changes', () => {
     await vi.advanceTimersByTimeAsync(499)
     expect(host.homePublish).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(1)
-    await vi.waitFor(() => expect(host.homePublish).toHaveBeenCalledTimes(1))
+    await eventually(() => expect(host.homePublish).toHaveBeenCalledTimes(1))
     const feed = lastFeed()
     expect(feed.asks).toMatchObject([{ id: `gate:${gateId}`, title: 'Foundry needs a decision' }])
     expect(feed.facets).toMatchObject([{ stage: 'building', whoseMove: 'you' }])
@@ -87,8 +85,9 @@ describe('publishing to Home when a record changes', () => {
       evidence: [],
     })
     await vi.advanceTimersByTimeAsync(500)
-    await vi.waitFor(() => expect(host.homePublish).toHaveBeenCalledTimes(1))
+    await eventually(() => expect(host.homePublish).toHaveBeenCalledTimes(1))
     await vi.advanceTimersByTimeAsync(2000)
+    await deactivate()
     expect(host.homePublish).toHaveBeenCalledTimes(1)
   })
 })
@@ -112,7 +111,7 @@ describe('a document order on Home', () => {
       evidence: [],
     })
     await vi.advanceTimersByTimeAsync(500)
-    await vi.waitFor(() => expect(host.homePublish).toHaveBeenCalledTimes(1))
+    await eventually(() => expect(host.homePublish).toHaveBeenCalledTimes(1))
     expect(lastFeed().facets).toMatchObject([
       { stage: 'shipped', links: [{ label: 'Open artifact', url }] },
     ])

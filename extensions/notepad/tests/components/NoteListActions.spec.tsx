@@ -4,8 +4,6 @@ import { render, screen, cleanup, fireEvent, createEvent } from '@testing-librar
 import { installNotepadBridge, listItem, eventually } from './helpers/note-surface'
 import type { DiagramListItem, Folder, NoteListItem } from '../../src/db/types'
 
-vi.setConfig({ testTimeout: 30_000 })
-
 const bridge = installNotepadBridge()
 
 import { NoteList } from '../../src/components/NoteList'

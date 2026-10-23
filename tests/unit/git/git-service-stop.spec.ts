@@ -29,7 +29,7 @@ describe('git-service on quit', () => {
       () => 'rejected'
     )
     const grandchild = await recordedPid(pidFile)
-    stopRunningCommands()
+    await stopRunningCommands()
 
     expect(await fetch).toBe('rejected')
     await expectProcessGone(grandchild)

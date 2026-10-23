@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { notepadSettingsFrom } from '../../src/notepad-settings'
 import { useNotepadSettings, useNotepadSettingsStore } from '../../src/stores/settings.store'
+import { eventually } from '../../../../tests/support/eventually'
 
 const getSettingsValues = vi.fn()
 const changeListeners = new Set<() => void>()
@@ -24,16 +25,16 @@ describe('useNotepadSettings', () => {
   it('loads the stored settings when the view mounts', async () => {
     getSettingsValues.mockResolvedValue({ values: { 'terminator.notepad.editorFontSize': 20 } })
     renderHook(() => useNotepadSettings())
-    await vi.waitFor(() => expect(useNotepadSettingsStore.getState().editorFontSize).toBe(20))
+    await eventually(() => expect(useNotepadSettingsStore.getState().editorFontSize).toBe(20))
   })
 
   it('reads them again when a setting changes in Settings', async () => {
     getSettingsValues.mockResolvedValue({ values: {} })
     renderHook(() => useNotepadSettings())
-    await vi.waitFor(() => expect(getSettingsValues).toHaveBeenCalled())
+    await eventually(() => expect(getSettingsValues).toHaveBeenCalled())
     getSettingsValues.mockResolvedValue({ values: { 'terminator.notepad.autosaveMs': 3000 } })
     act(() => changeListeners.forEach((listener) => listener()))
-    await vi.waitFor(() => expect(useNotepadSettingsStore.getState().autosaveMs).toBe(3000))
+    await eventually(() => expect(useNotepadSettingsStore.getState().autosaveMs).toBe(3000))
   })
 
   it('stops listening when the view goes away', () => {

@@ -68,7 +68,7 @@ async function addWorktreeBranch(page: Page, name: string): Promise<void> {
   await page.getByPlaceholder('feature/my-feature').fill(name)
   await page.click('.tmui-dialog__actions .tmui-button--primary')
   await projectGroup(page, name).click()
-  await page.getByRole('textbox', { name: 'Terminal input' }).first().waitFor({ timeout: 15_000 })
+  await page.getByRole('textbox', { name: 'Terminal input' }).first().waitFor()
 }
 
 /** Two branches: main has an agent asking and a test run going; the other has a short job. */
@@ -85,8 +85,7 @@ async function settleOnDesk(page: Page): Promise<void> {
   await openHome(page)
   await page.getByRole('button', { name: 'Skip today' }).click()
   await expect(page.getByRole('region', { name: 'Your move' })).toContainText(
-    'Do you want to create BoardScreen.tsx?',
-    { timeout: 20_000 }
+    'Do you want to create BoardScreen.tsx?'
   )
   await expect(
     page.getByRole('region', { name: 'In flight' }).locator('[data-thread-key]')
@@ -94,7 +93,6 @@ async function settleOnDesk(page: Page): Promise<void> {
 }
 
 test('capture the Desk and Insights', async () => {
-  test.setTimeout(180_000)
   handle = await launchApp(profileWithoutWeeklyReview(), {}, { hideSidebarOnHome: true })
   const { page } = handle
   await page.setViewportSize({ width: 1440, height: 900 })

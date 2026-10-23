@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test'
-import type { AppHandle } from './helpers'
+import { acceptingDialog, type AppHandle } from './helpers'
 import { invokeChannel, openFromAppBand, type ExtensionView } from './extension-page'
 import { expectCentredInWindow } from './modal-centre'
 
@@ -20,7 +20,7 @@ const NOTEPAD_URL = 'terminator.notepad/dist/index.html?view=main'
 /** Opens Notepad from the app band and waits for it to render. */
 export async function openNotepad(handle: AppHandle): Promise<ExtensionView> {
   const notepad = await openFromAppBand(handle, 'Notes', NOTEPAD_URL)
-  await expect(notepad.locator('.notepad-view')).toBeVisible({ timeout: 20_000 })
+  await expect(notepad.locator('.notepad-view')).toBeVisible()
   return notepad
 }
 
@@ -81,9 +81,7 @@ export async function typeInEditor(notepad: ExtensionView, text: string): Promis
 
 /** Waits for the open note to report that what was typed is saved. */
 export async function waitForSave(notepad: ExtensionView): Promise<void> {
-  await expect(notepad.locator('.notepad-view__save-status')).toHaveText('Saved', {
-    timeout: 10_000,
-  })
+  await expect(notepad.locator('.notepad-view__save-status')).toHaveText('Saved')
 }
 
 /** Picks `item` from the context menu of the list row titled `title`. */
@@ -99,7 +97,6 @@ export async function deleteForGood(
   title: string
 ): Promise<void> {
   // The confirm dialog is the host page's, not the frame's, so it is answered there.
-  handle.page.once('dialog', (dialog) => void dialog.accept())
-  await rowMenu(notepad, title, 'Delete')
+  await acceptingDialog(handle.page, () => rowMenu(notepad, title, 'Delete'))
   await expect(noteRow(notepad, title)).toHaveCount(0)
 }

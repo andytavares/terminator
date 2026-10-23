@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { logReviewAction } from '../../src/utils/review-log'
+import { eventually } from '../../../../tests/support/eventually'
 
 const mockInvoke = vi.fn()
 
@@ -69,7 +70,7 @@ function logReviewActionOutsideReviewsFailuresTests() {
       })
     ).not.toThrow()
 
-    await vi.waitFor(() => expect(consoleError).toHaveBeenCalled())
+    await eventually(() => expect(consoleError).toHaveBeenCalled())
     consoleError.mockRestore()
   })
 }

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync, readdirSync, existsSync } from 'fs'
 import { createServer, type AddressInfo, type Server } from 'net'
 import { hashPassword } from '../../src/server/password-hash'
+import { isPending, unfinishedWork } from '../../../../tests/support/pending'
 
 const PASSWORD = 'correct-password'
 
@@ -188,8 +189,8 @@ describe('RemoteServer start/stop lifecycle', () => {
 })
 
 describe('RemoteServer disconnectAllClients', () => {
-  it('disconnectAllClients() calls subscriberManager.destroyAll', () => {
-    remoteServer.disconnectAllClients()
+  it('disconnectAllClients() calls subscriberManager.destroyAll', async () => {
+    await remoteServer.disconnectAllClients()
     expect(mockSubscriberManager.destroyAll).toHaveBeenCalled()
   })
 
@@ -204,8 +205,17 @@ describe('RemoteServer disconnectAllClients', () => {
     expect(createRes.statusCode).toBe(201)
     const { sessionId } = JSON.parse(createRes.body) as { sessionId: string }
 
-    remoteServer.disconnectAllClients()
-    await vi.waitFor(() => expect(mockPtyManager.kill).toHaveBeenCalledWith(sessionId))
+    // The pty manager has not listed its sessions yet: a disconnect that does not wait kills none.
+    const listing = unfinishedWork()
+    mockPtyManager.listSessions.mockImplementationOnce(async () => {
+      await listing.done
+      return [...ptySessions.values()]
+    })
+    const disconnected = remoteServer.disconnectAllClients()
+    expect(await isPending(disconnected)).toBe(true)
+    listing.finish()
+    await disconnected
+    expect(mockPtyManager.kill).toHaveBeenCalledWith(sessionId)
   })
 })
 
@@ -274,7 +284,7 @@ describe('RemoteServer /app/* static asset session gate', () => {
 describe('RemoteServer /app/* session gate after sessions end', () => {
   it('disconnectAllClients() clears app sessions, blocking subsequent asset requests', async () => {
     const token = await surfaceSessionCookie('app')
-    remoteServer.disconnectAllClients()
+    await remoteServer.disconnectAllClients()
     const assetResp = await getWithCookie('/app/assets/main.js', token)
     expect(assetResp.statusCode).toBe(403)
   })
@@ -322,7 +332,7 @@ describe('RemoteServer login sessions', () => {
 
   it('ends every login session when clients are disconnected (password change)', async () => {
     const cookie = await loginCookie()
-    remoteServer.disconnectAllClients()
+    await remoteServer.disconnectAllClients()
     const res = await injectWorkspaces({ cookie })
     expect(res.statusCode).toBe(401)
   })

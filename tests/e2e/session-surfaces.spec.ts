@@ -34,18 +34,6 @@ async function runInTab(page: Page, index: number, command: string): Promise<voi
   await runInVisibleTerminal(page, command)
 }
 
-/** Samples `read` every 250ms, `times` times, and returns the distinct results seen. */
-async function sampleDistinct(read: () => Promise<string>, times: number): Promise<Set<string>> {
-  const seen = new Set<string>()
-  for (let i = 0; i < times; i++) {
-    seen.add(await read())
-    // Stability over time is what is asserted, so the interval is the point.
-    // eslint-disable-next-line no-restricted-syntax
-    if (i < times - 1) await new Promise((done) => setTimeout(done, 250))
-  }
-  return seen
-}
-
 const inFlight = (page: Page) => page.getByRole('region', { name: 'In flight' })
 
 function sidebarTerminalRow(page: Page, title: string) {
@@ -61,19 +49,37 @@ async function showSidebarTerminals(page: Page): Promise<void> {
   await expect(page.locator('.terminal-row').first()).toBeVisible()
 }
 
-/** The wall's tiles, by the order each is drawn in. */
-function wallOrder(page: Page): Promise<string> {
-  return page.evaluate(() =>
+/** Run in the page: records the wall's order on every change to it, and counts the changes
+ * output makes inside the tiles' previews. */
+function recordWallOrders(): void {
+  const orderNow = () =>
     [...document.querySelectorAll('.wall-tile')].map((el) => getComputedStyle(el).order).join('|')
-  )
+  const seen = { orders: new Set([orderNow()]), outputs: 0 }
+  Object.assign(window, { __wallSeen: seen })
+  new MutationObserver((records) => {
+    seen.orders.add(orderNow())
+    if (records.some((r) => (r.target as Element).closest?.('.wall-tile__preview') ?? false)) {
+      seen.outputs += 1
+    }
+  }).observe(document.body, { subtree: true, childList: true, attributes: true })
 }
+
+type WallSeen = { orders: Set<string>; outputs: number }
+const wallSeen = (page: Page) =>
+  page.evaluate(() => {
+    const seen = (window as unknown as { __wallSeen: WallSeen }).__wallSeen
+    return { orders: seen.orders.size, outputs: seen.outputs }
+  })
 
 async function outputNeverReorders(page: Page): Promise<void> {
   // Two of the three terminals never stop producing output.
   await runInTab(page, 0, 'while true; do echo tick; sleep 0.4; done')
   await runInTab(page, 1, 'while true; do echo tick; sleep 0.4; done')
   await openOverview(page)
-  expect((await sampleDistinct(() => wallOrder(page), 40)).size).toBe(1)
+  await page.evaluate(recordWallOrders)
+  // Output has redrawn the previews many times over: each change was a chance to reorder.
+  await expect.poll(async () => (await wallSeen(page)).outputs).toBeGreaterThanOrEqual(20)
+  expect((await wallSeen(page)).orders).toBe(1)
 }
 
 /** Run in the page: links Terminal 1's record to ENG-123 through the preload API. */
@@ -193,7 +199,6 @@ test.describe('session surfaces', () => {
   test.afterAll(() => closeApp(handle))
 
   test('three sessions are watched, linked and opened from every surface that names them', async () => {
-    test.setTimeout(120_000)
     const { page } = handle
     await createWorkspace(page, 'Surfaces', e2eTempDir('surfaces-'))
     await addAndSelectProject(page, 'Surfaces', 'ticket')

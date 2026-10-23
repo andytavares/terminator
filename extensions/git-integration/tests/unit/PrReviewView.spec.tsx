@@ -151,7 +151,7 @@ async function renderView(
 // than one test's 5 s; load it once here so every test times only its own work.
 beforeAll(async () => {
   await import('../../src/components/pr-review/PrReviewView')
-}, 60_000)
+})
 
 describe('PrReviewView', () => {
   it('renders the diff pane when chapter and file are available', async () => {

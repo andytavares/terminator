@@ -171,34 +171,34 @@ describe('registerQuickActionCommands (continued) — pull — toasts an error w
 
 describe('registerQuickActionCommands (continued)', () => {
   describe('commit', () => {
-    it('brings the project tab forward and asks the view to focus the commit message', () => {
+    it('brings the project tab forward and asks the view to focus the commit message', async () => {
       const { api, registrations, showSelf, broadcast } = buildMockApi()
       registerQuickActionCommands(api as never)
 
       const commit = registrations.find((r) => r.command.id === 'commit')!
-      commit.handler(ctx('/repo'))
+      await commit.handler(ctx('/repo'))
 
       expect(showSelf).toHaveBeenCalledWith('project')
       expect(broadcast).toHaveBeenCalledWith('git:focus-commit-message', { repoRoot: '/repo' })
     })
 
-    it('raises the window and puts the keyboard in its own view, as Task Vault does', () => {
+    it('raises the window and puts the keyboard in its own view, as Task Vault does', async () => {
       const { api, registrations, raise, focusSelf } = buildMockApi()
       registerQuickActionCommands(api as never)
 
       const commit = registrations.find((r) => r.command.id === 'commit')!
-      commit.handler(ctx('/repo'))
+      await commit.handler(ctx('/repo'))
 
       expect(raise).toHaveBeenCalledTimes(1)
       expect(focusSelf).toHaveBeenCalledWith('project')
     })
 
-    it('does nothing when ctx.repoRoot is null', () => {
+    it('does nothing when ctx.repoRoot is null', async () => {
       const { api, registrations, showSelf, broadcast } = buildMockApi()
       registerQuickActionCommands(api as never)
 
       const commit = registrations.find((r) => r.command.id === 'commit')!
-      commit.handler(ctx(null))
+      await commit.handler(ctx(null))
 
       expect(showSelf).not.toHaveBeenCalled()
       expect(broadcast).not.toHaveBeenCalled()
@@ -208,23 +208,23 @@ describe('registerQuickActionCommands (continued)', () => {
 
 describe('registerQuickActionCommands (continued)', () => {
   describe('create-pr', () => {
-    it('brings the project tab forward and asks the view to open the PR dialog', () => {
+    it('brings the project tab forward and asks the view to open the PR dialog', async () => {
       const { api, registrations, showSelf, broadcast } = buildMockApi()
       registerQuickActionCommands(api as never)
 
       const createPr = registrations.find((r) => r.command.id === 'create-pr')!
-      createPr.handler(ctx('/repo'))
+      await createPr.handler(ctx('/repo'))
 
       expect(showSelf).toHaveBeenCalledWith('project')
       expect(broadcast).toHaveBeenCalledWith('git:open-pr-dialog', { repoRoot: '/repo' })
     })
 
-    it('does nothing when ctx.repoRoot is null', () => {
+    it('does nothing when ctx.repoRoot is null', async () => {
       const { api, registrations, showSelf, broadcast } = buildMockApi()
       registerQuickActionCommands(api as never)
 
       const createPr = registrations.find((r) => r.command.id === 'create-pr')!
-      createPr.handler(ctx(null))
+      await createPr.handler(ctx(null))
 
       expect(showSelf).not.toHaveBeenCalled()
       expect(broadcast).not.toHaveBeenCalled()
@@ -239,19 +239,19 @@ describe('registerQuickActionCommands (continued)', () => {
     it.each([
       ['commit', 'commit'],
       ['create-pr', 'pull-request'],
-    ] as const)('%s leaves a %s request the view collects once', (id, kind) => {
+    ] as const)('%s leaves a %s request the view collects once', async (id, kind) => {
       const { api, registrations } = buildMockApi()
       registerQuickActionCommands(api as never)
-      registrations.find((r) => r.command.id === id)!.handler(ctx('/repo'))
+      await registrations.find((r) => r.command.id === id)!.handler(ctx('/repo'))
       expect(consumePendingViewRequest()).toEqual({ kind, repoRoot: '/repo' })
       expect(consumePendingViewRequest()).toBeNull()
     })
 
-    it('lapses after five seconds, so a view opened later is not surprised', () => {
+    it('lapses after five seconds, so a view opened later is not surprised', async () => {
       vi.useFakeTimers()
       const { api, registrations } = buildMockApi()
       registerQuickActionCommands(api as never)
-      registrations.find((r) => r.command.id === 'commit')!.handler(ctx('/repo'))
+      await registrations.find((r) => r.command.id === 'commit')!.handler(ctx('/repo'))
       vi.advanceTimersByTime(5000)
       expect(consumePendingViewRequest()).toBeNull()
       vi.useRealTimers()

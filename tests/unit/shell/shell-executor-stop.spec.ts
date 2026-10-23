@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { execShell } from '../../../src/main/shell/shell-executor'
 import { stopRunningCommands } from '../../../src/main/shell/command-runner'
 import { makeTempDir } from '../../support/temp-dir'
-import { PROCESS_WAIT_MS, expectProcessGone, recordedPid } from '../../support/processes'
+import { expectProcessGone, isProcessAlive, recordedPid } from '../../support/processes'
 
 // A git or gh command running at quit ends with the app, with what it started (macOS's git
 // shim started an xcodebuild that outlived it, run 38382115775). The stand-in gh records a sleep's pid.
@@ -30,42 +30,71 @@ afterEach(() => {
  * starts on a busy machine. A timeout under that kills a slow start before it writes the pid. */
 const COMMAND_TIMEOUT_MS = 4000
 
-/** The command's timeout, then time to stop what it started. */
-const TIMEOUT_TEST_LIMIT_MS = COMMAND_TIMEOUT_MS + PROCESS_WAIT_MS
-
 describe('stopRunningCommands', () => {
   it('ends a running command and every process it started', async () => {
     const run = execShell({ command: 'gh', args: [], cwd: scratch, timeoutMs: 60_000 })
     const grandchild = await recordedPid(pidFile)
 
-    stopRunningCommands()
+    await stopRunningCommands()
 
+    expect(isProcessAlive(grandchild)).toBe(false)
     expect((await run).exitCode).not.toBe(0)
-    await expectProcessGone(grandchild)
+  })
+
+  it('kills a command that ignores the request to stop, so quitting never hangs on it', async () => {
+    writeFileSync(
+      join(scratch, 'gh'),
+      `#!/bin/sh\ntrap '' TERM\nsleep 30 &\necho $! > "${pidFile}"\nwait\n`
+    )
+    const run = execShell({ command: 'gh', args: [], cwd: scratch, timeoutMs: 60_000 })
+    const grandchild = await recordedPid(pidFile)
+
+    await stopRunningCommands()
+
+    expect(isProcessAlive(grandchild)).toBe(false)
+    expect((await run).exitCode).not.toBe(0)
   })
 
   it('leaves nothing to stop once a command has finished', async () => {
     writeFileSync(join(scratch, 'gh'), '#!/bin/sh\necho done\n')
     expect((await execShell({ command: 'gh', args: [], cwd: scratch })).stdout).toBe('done\n')
-    expect(() => stopRunningCommands()).not.toThrow()
+    await expect(stopRunningCommands()).resolves.toBeUndefined()
+  })
+})
+
+describe('stopRunningCommands and a helper a command detached', () => {
+  it('settles once the command has exited, even while a helper it detached holds its output open', async () => {
+    const helperPid = join(scratch, 'helper.pid')
+    const detach = `perl -e 'use POSIX; setsid(); open(F, ">", "${helperPid}"); print F $$; close F; exec "sleep", "30"'`
+    writeFileSync(
+      join(scratch, 'gh'),
+      `#!/bin/sh\n${detach} &\nsleep 30 &\necho $! > "${pidFile}"\nwait\n`
+    )
+    const run = execShell({ command: 'gh', args: [], cwd: scratch, timeoutMs: 60_000 })
+    const grandchild = await recordedPid(pidFile)
+    const helper = await recordedPid(helperPid)
+    try {
+      await stopRunningCommands()
+      expect(isProcessAlive(grandchild)).toBe(false)
+    } finally {
+      // Out of the group's reach by design; it holds the output open until it goes.
+      process.kill(helper, 'SIGKILL')
+      await run
+    }
   })
 })
 
 describe('execShell timeout', () => {
-  it(
-    'ends what the command started, not only the command',
-    async () => {
-      const run = execShell({
-        command: 'gh',
-        args: [],
-        cwd: scratch,
-        timeoutMs: COMMAND_TIMEOUT_MS,
-      })
-      const grandchild = await recordedPid(pidFile)
+  it('ends what the command started, not only the command', async () => {
+    const run = execShell({
+      command: 'gh',
+      args: [],
+      cwd: scratch,
+      timeoutMs: COMMAND_TIMEOUT_MS,
+    })
+    const grandchild = await recordedPid(pidFile)
 
-      expect(await run).toMatchObject({ timedOut: true, exitCode: 124 })
-      await expectProcessGone(grandchild)
-    },
-    TIMEOUT_TEST_LIMIT_MS
-  )
+    expect(await run).toMatchObject({ timedOut: true, exitCode: 124 })
+    await expectProcessGone(grandchild)
+  })
 })

@@ -11,11 +11,11 @@
  */
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
-import { activateFoundry } from '../helpers/foundry-activation.js'
+import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import { writeBaseline } from '../../src/line/baseline.js'
 import { provenBaseline } from '../helpers/environment.js'
@@ -26,6 +26,7 @@ import type { WorkOrder } from '../../src/order/schema.js'
 import type { Gate } from '../../src/gates/rules.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 import { ledgerFileText } from '../helpers/order-ledger.js'
+import { eventually } from '../../../../tests/support/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
@@ -75,6 +76,13 @@ beforeAll(async () => {
   host = fakeHost(() => dataDir)
   host.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
   await activateFoundry(host)
+})
+
+// Each test's proofs, runs and open agent turns end before the next test, or the spec's folder, goes.
+afterEach(settleFoundryWork)
+
+afterAll(async () => {
+  await deactivate()
 })
 
 beforeEach(() => {
@@ -233,15 +241,12 @@ describe('after the architect amends an answered defect', () => {
  * still writing as the file ends recreates the folder cleanup removed, and CI fails the leak. */
 async function untilRunSettles(): Promise<void> {
   const timeline = path.join(dataDir, 'orders', 'WO-1', 'run-timeline.jsonl')
-  await vi.waitFor(
-    () => {
-      const last = fs.readFileSync(timeline, 'utf8').trim().split('\n').at(-1) ?? ''
-      for (const session of ['builder-session', 'verifier-session', 'scribe-session']) {
-        expect(last).toContain(`"sessionId":"${session}"`)
-      }
-    },
-    { timeout: 5000 }
-  )
+  await eventually(() => {
+    const last = fs.readFileSync(timeline, 'utf8').trim().split('\n').at(-1) ?? ''
+    for (const session of ['builder-session', 'verifier-session', 'scribe-session']) {
+      expect(last).toContain(`"sessionId":"${session}"`)
+    }
+  })
 }
 
 function agreeingAgainTests() {
@@ -249,9 +254,7 @@ function agreeingAgainTests() {
     await seed(true)
     await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
 
-    await vi.waitFor(() => expect(ledgerFileText(dataDir)).toContain('"action":"run.started"'), {
-      timeout: 5000,
-    })
+    await eventually(() => expect(ledgerFileText(dataDir)).toContain('"action":"run.started"'))
     const lines = ledgerFileText(dataDir)
       .trim()
       .split('\n')
@@ -268,20 +271,15 @@ function theInboxTests() {
     await seed(false)
     await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
 
-    await vi.waitFor(() => expect(ledgerFileText(dataDir)).toContain('order.redrafted'), {
-      timeout: 5000,
+    await eventually(() => expect(ledgerFileText(dataDir)).toContain('order.redrafted'))
+    await eventually(async () => {
+      const inbox = (await host.call('foundry:inbox.list')) as {
+        waiting: { orderId: string; headline: string }[]
+      }
+      expect(inbox.waiting).toEqual([
+        expect.objectContaining({ orderId: 'WO-1', headline: 'Ready to hand off' }),
+      ])
     })
-    await vi.waitFor(
-      async () => {
-        const inbox = (await host.call('foundry:inbox.list')) as {
-          waiting: { orderId: string; headline: string }[]
-        }
-        expect(inbox.waiting).toEqual([
-          expect.objectContaining({ orderId: 'WO-1', headline: 'Ready to hand off' }),
-        ])
-      },
-      { timeout: 5000 }
-    )
     expect(((await host.call('foundry:attention')) as { inbox: number }).inbox).toBe(1)
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('draft')
     expect(ledgerFileText(dataDir)).not.toContain('run.started')
@@ -297,9 +295,8 @@ function theOrderBeforeTests() {
   it('never puts the order from before the amendment back', async () => {
     await seed(true)
     await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
-    await vi.waitFor(
-      () => expect(ledgerFileText(dataDir)).toMatch(/"action":"run\.(started|refused)"/),
-      { timeout: 2000 }
+    await eventually(() =>
+      expect(ledgerFileText(dataDir)).toMatch(/"action":"run\.(started|refused)"/)
     )
     await untilRunSettles()
 

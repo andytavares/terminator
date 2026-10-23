@@ -42,14 +42,14 @@ function theTableTests() {
   it('has a 15-bit glyph for every letter, digit, hyphen, full stop and space', () => {
     const expected = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-. ']
     expect(Object.keys(GLYPHS).sort()).toEqual([...expected].sort())
-    for (const [ch, bits] of Object.entries(GLYPHS)) {
-      expect(bits, ch).toMatch(/^[01]{15}$/)
+    for (const bits of Object.values(GLYPHS)) {
+      expect(bits).toMatch(/^[01]{15}$/)
     }
   })
 
   it('gives every visible glyph at least one lit cell and the space none', () => {
     for (const [ch, bits] of Object.entries(GLYPHS)) {
-      expect(bits.includes('1'), ch).toBe(ch !== ' ')
+      expect(bits.includes('1')).toBe(ch !== ' ')
     }
   })
 }
@@ -99,7 +99,7 @@ function missingCharactersAndDigitsTests() {
     for (const bad of ['A', '', '12', '-']) {
       const paint = createRecordingPaint()
       drawDigit(paint, [0, 0], { digit: bad, color: '#abc' })
-      expect(paint.calls, bad).toHaveLength(0)
+      expect(paint.calls).toHaveLength(0)
     }
   })
 }
@@ -118,7 +118,7 @@ function shippedIdsTests() {
           if (name === undefined) continue
           names++
           const shown = signText(node({ id: step.id, stepId: name, role: null }), 99)
-          for (const ch of shown) expect(GLYPHS[ch], `${file}: ${name} -> ${shown}`).toBeDefined()
+          for (const ch of shown) expect(GLYPHS[ch]).toBeDefined()
         }
       }
     }

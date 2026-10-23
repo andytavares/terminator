@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ELECTRON_API_MANIFEST, type ChannelSpec } from '../../../src/shared/electron-api/manifest'
 import { methodAt } from '../../../src/shared/electron-api/__tests__/method-at'
 import { methodPathsOf } from '../../support/electron-api'
+import { eventually } from '../../support/eventually'
 
 class MockWebSocket {
   static instances: MockWebSocket[] = []
@@ -38,7 +39,7 @@ async function loadShim(): Promise<{ api: API; ws: MockWebSocket }> {
   global.fetch = mockFetch
   await import('../../../src/renderer-remote/electron-api-shim')
   // connectBridge is async (fetch, then WebSocket creation)
-  await vi.waitFor(() => expect(MockWebSocket.instances).toHaveLength(1))
+  await eventually(() => expect(MockWebSocket.instances).toHaveLength(1))
   const ws = MockWebSocket.instances[0]
   ws.onopen?.()
   return { api: window.electronAPI, ws }
@@ -83,7 +84,9 @@ describe('electron-api-shim bootstrap', () => {
       expect.objectContaining({ method: 'POST' })
     )
   })
+})
 
+describe('electron-api-shim before the socket opens', () => {
   it('queues messages before ws is open and flushes on open', async () => {
     vi.resetModules()
     MockWebSocket.instances = []
@@ -93,13 +96,16 @@ describe('electron-api-shim bootstrap', () => {
     })
     global.fetch = mockFetch
     await import('../../../src/renderer-remote/electron-api-shim')
-    await vi.waitFor(() => expect(MockWebSocket.instances).toHaveLength(1))
+    await eventually(() => expect(MockWebSocket.instances).toHaveLength(1))
     const ws = MockWebSocket.instances[0]
     const api = window.electronAPI
-    void api.workspace.list()
+    const pending = api.workspace.list() as Promise<unknown>
     expect(ws.sentMessages.length).toBe(0)
     ws.onopen?.()
     expect(ws.sentMessages.length).toBeGreaterThan(0)
+    const id = (JSON.parse(ws.sentMessages[0]) as { id: string }).id
+    ws.onmessage?.({ data: JSON.stringify({ type: 'result', id, result: ['ws1'] }) })
+    await expect(pending).resolves.toEqual(['ws1'])
   })
 })
 
@@ -130,7 +136,7 @@ describe('electron-api-shim connection edge cases', () => {
       writable: true,
     })
     await import('../../../src/renderer-remote/electron-api-shim')
-    await vi.waitFor(() => expect(replace).toHaveBeenCalledWith('/'))
+    await eventually(() => expect(replace).toHaveBeenCalledWith('/'))
     // No WebSocket should be created — the shim returned early after redirect
     expect(MockWebSocket.instances).toHaveLength(0)
   })
@@ -338,15 +344,21 @@ describe('electron-api-shim: what reaches a handler, and the local stand-ins —
     expect(ws.sentMessages).toEqual([])
     expect(handler).not.toHaveBeenCalled()
   })
+})
+
+describe('electron-api-shim extensionBridge.invoke', () => {
   it('extensionBridge.invoke calls invoke with channel', async () => {
     const { api, ws } = await loadShim()
-    void api.extensionBridge.invoke('custom:channel', { data: 1 })
-    expect(JSON.parse(ws.sentMessages[0])).toEqual({
+    const pending = api.extensionBridge.invoke('custom:channel', { data: 1 }) as Promise<unknown>
+    const sent = JSON.parse(ws.sentMessages[0]) as { id: string }
+    expect(sent).toEqual({
       type: 'invoke',
       id: expect.any(String),
       channel: 'custom:channel',
       args: [{ data: 1 }],
     })
+    ws.onmessage?.({ data: JSON.stringify({ type: 'result', id: sent.id, result: null }) })
+    await expect(pending).resolves.toBeNull()
   })
 })
 

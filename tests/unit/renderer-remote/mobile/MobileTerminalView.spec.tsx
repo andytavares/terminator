@@ -87,9 +87,9 @@ const WsMockCtor = Object.assign(
   }),
   { OPEN: 1 }
 )
-vi.stubGlobal('WebSocket', WsMockCtor)
 
 beforeEach(() => {
+  vi.stubGlobal('WebSocket', WsMockCtor)
   capturedMessageHandler = null
   capturedOnDataHandler = null
   mockTermBuffer.baseY = 76 // default: at bottom (76 + 24 >= 100)

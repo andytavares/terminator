@@ -72,7 +72,7 @@ async function displayMenuOffersEveryGroupingAndSort(): Promise<void> {
   const sidebar = page.locator('.unified-sidebar')
   const width = await sidebar.evaluate((element: HTMLElement) => element.style.width)
   await sidebar.evaluate((element: HTMLElement) => (element.style.width = '200px'))
-  expect(await page.evaluate(menuPastSidebar)).toEqual({ overhangs: true, onTop: true })
+  await expect.poll(() => page.evaluate(menuPastSidebar)).toEqual({ overhangs: true, onTop: true })
   await sidebar.evaluate((element: HTMLElement, before) => (element.style.width = before), width)
   await page.keyboard.press('Escape')
   await page.locator('.unified-sidebar__list').click({ position: { x: 5, y: 5 } })
@@ -116,14 +116,14 @@ async function sidebarSaysBranchNeverProject(): Promise<void> {
 
 async function manualIsStoredOrder(): Promise<void> {
   await pickSort('Manual')
-  expect(await repoOrder()).toEqual(['Zulu', 'Alpha'])
-  expect(await branchOrder()).toEqual(['z-branch', 'a-branch', 'a-only'])
+  await expect.poll(() => repoOrder()).toEqual(['Zulu', 'Alpha'])
+  await expect.poll(() => branchOrder()).toEqual(['z-branch', 'a-branch', 'a-only'])
 }
 
 async function nameSortReachesRepoHeaders(): Promise<void> {
   await pickSort('Name')
-  expect(await repoOrder()).toEqual(['Alpha', 'Zulu'])
-  expect(await branchOrder()).toEqual(['a-only', 'a-branch', 'z-branch'])
+  await expect.poll(() => repoOrder()).toEqual(['Alpha', 'Zulu'])
+  await expect.poll(() => branchOrder()).toEqual(['a-only', 'a-branch', 'z-branch'])
 }
 
 async function draggedRepoOrderSurvivesReload(): Promise<void> {
@@ -149,7 +149,7 @@ async function draggedBranchOrderSurvivesReload(): Promise<void> {
   await expect(page.locator('.branch-row__name').first()).toHaveText('a-branch')
   await page.reload()
   await expect(page.locator('.branch-row__name').first()).toHaveText('a-branch')
-  expect(await branchOrder()).toEqual(['a-branch', 'z-branch', 'a-only'])
+  await expect.poll(() => branchOrder()).toEqual(['a-branch', 'z-branch', 'a-only'])
 }
 
 async function theSidebarIsLaidOut(): Promise<void> {
@@ -185,7 +185,6 @@ async function theSidebarIsSortedAndReordered(): Promise<void> {
 }
 
 test('the sidebar is sorted, filtered and reordered by hand, and keeps the order', async () => {
-  test.setTimeout(90_000)
   await reposAndBranchesOutOfAlphabeticalOrder()
   await theSidebarIsLaidOut()
   await theSidebarIsSortedAndReordered()

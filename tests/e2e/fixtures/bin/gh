@@ -2,18 +2,10 @@
 // Stand-in for the gh CLI, beside the `claude` stub. When a spec has started a
 // stub GitHub (tests/e2e/github-stub.ts), the app's XDG_CONFIG_HOME, the folder
 // gh itself reads its config from, holds gh/e2e-stub-url: every call is sent
-// there and answered as gh would answer it. Otherwise this is the real gh, the
-// next one on PATH, so specs that start no stub run exactly as before.
-import { spawnSync } from 'node:child_process'
-import { accessSync, constants, readFileSync, realpathSync } from 'node:fs'
-import { delimiter, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-
-// The package is an ES module, so this extensionless script is one too.
-// PATH can name this folder as fixtures/zdotdir/../bin (fixtures/zdotdir/.zprofile)
-// or through a symlink, so a candidate is compared by its real path: one that
-// was this script ran itself until fork failed (macOS run 38380127678).
-const ownPath = realpathSync(fileURLToPath(import.meta.url))
+// there and answered as gh would answer it. Otherwise it fails closed: it never
+// reaches the real gh, whose answers are the developer's own (ADR 123).
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 function stubUrl() {
   const configHome = process.env.XDG_CONFIG_HOME
@@ -23,22 +15,6 @@ function stubUrl() {
   } catch {
     return null
   }
-}
-
-function isOtherGh(candidate) {
-  try {
-    accessSync(candidate, constants.X_OK)
-    return realpathSync(candidate) !== ownPath
-  } catch {
-    return false
-  }
-}
-
-function realGh() {
-  for (const directory of (process.env.PATH || '').split(delimiter)) {
-    if (directory && isOtherGh(join(directory, 'gh'))) return join(directory, 'gh')
-  }
-  return null
 }
 
 function readStdin() {
@@ -70,11 +46,6 @@ if (url) {
     process.exitCode = 1
   })
 } else {
-  const gh = realGh()
-  if (!gh) {
-    process.stderr.write('gh: command not found\n')
-    process.exit(127)
-  }
-  const result = spawnSync(gh, process.argv.slice(2), { stdio: 'inherit' })
-  process.exit(result.status ?? 1)
+  process.stderr.write(`no stub answers gh ${process.argv.slice(2).join(' ')}\n`)
+  process.exitCode = 1
 }

@@ -251,7 +251,6 @@ async function captureSettings(): Promise<void> {
 }
 
 test('capture the Foundry surfaces', async () => {
-  test.setTimeout(180_000)
   repo = e2eTempDir('foundry-shot-')
   commitRepo()
   seedAcceptedCheck()

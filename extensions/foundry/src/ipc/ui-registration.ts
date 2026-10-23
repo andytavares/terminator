@@ -6,6 +6,7 @@ import { ViewPayload } from './payloads.js'
 import type { ForgeChannels } from './forge-channels.js'
 
 import { disposables, reg } from './register.js'
+import { inBackground } from '../background.js'
 
 // Auto-expires so a late manual visit to the Forge doesn't surprise the
 // operator with an intake that opened itself for no reason they can see.
@@ -55,7 +56,7 @@ export function registerCommands(api: ExtensionAPI, forge: Pick<ForgeChannels, '
       (_context, args?: unknown) => {
         const ticket = ticketOf(args)
         if (ticket === null) openNewOrder(api)
-        else void orderFromTicket(api, forge, ticket)
+        else inBackground(orderFromTicket(api, forge, ticket))
       }
     )
   )

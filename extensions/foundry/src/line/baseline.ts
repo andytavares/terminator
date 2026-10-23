@@ -402,7 +402,7 @@ export function isProving(orderId: string): boolean {
   return inFlight.has(orderId)
 }
 
-/** Every proof running now, settled; a spec waits for it before its folder goes. @internal */
+/** Settles once every proof running now has; deactivation, and a spec before its folder goes. */
 export async function settleProofs(): Promise<void> {
   await Promise.allSettled([...inFlight.values()])
 }

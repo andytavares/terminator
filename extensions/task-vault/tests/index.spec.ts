@@ -279,7 +279,7 @@ function taskVaultActivateQuickActionsWithoutShortcutTests() {
     const [, handler] = commandsRegister.mock.calls.find(
       ([command]) => command.id === 'task-vault:capture-to-inbox'
     )!
-    handler({ projectId: null, sessionId: null, repoRoot: null })
+    await handler({ projectId: null, sessionId: null, repoRoot: null })
 
     const channels = vi.mocked(api.window.broadcast).mock.calls.map((c) => c[0])
     expect(channels).toContain('extension:activate-global-tab')

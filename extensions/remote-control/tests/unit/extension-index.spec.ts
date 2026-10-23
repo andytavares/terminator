@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest'
 import { dispatchChannel, type ChannelSpec, type RegisterChannel } from '@terminator/extension-sdk'
 import { hashPassword, verifyPassword } from '../../src/server/password-hash'
+import { eventually } from '../../../../tests/support/eventually'
 
 // Hoisted mocks must be declared before module imports
 const mockCreateRemoteServer = vi.hoisted(() => vi.fn())
@@ -47,6 +48,7 @@ function makeApi() {
       isRemoteAccessible: vi.fn().mockResolvedValue(false),
     },
     window: { broadcast: mockBroadcast },
+    log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     paths: { app: '/app', globalStorage: '/user-data/extensions/terminator.remote-control' },
     pty: {},
     workspace: { list: vi.fn(() => []), listProjects: vi.fn(() => []) },
@@ -188,7 +190,7 @@ function deactivateTests() {
       [`${EXT}.port`]: 7681,
     })
     await channelHandler('remote:toggle')({ enabled: true })
-    await vi.waitFor(() => expect(mockNgrokStart).toHaveBeenCalled())
+    await eventually(() => expect(mockNgrokStart).toHaveBeenCalled())
 
     const { deactivate } = await import('../../src/index.ts')
     await deactivate()
@@ -208,7 +210,7 @@ function startSettingsTests() {
     })
 
     await channelHandler('remote:toggle')({ enabled: true })
-    await vi.waitFor(() => expect(mockNgrokStart).toHaveBeenCalled())
+    await eventually(() => expect(mockNgrokStart).toHaveBeenCalled())
     await queueDrained()
 
     const [{ deps }] = mockCreateRemoteServer.mock.calls[0] as [
@@ -281,14 +283,14 @@ function tunnelReconnectTests() {
     // Start the server so remoteServer is set
     await toggleHandler({ enabled: true })
     // The start opens the tunnel last, so its crash handler marks the start as done.
-    await vi.waitFor(() => expect(mockNgrokSetOnCrash).toHaveBeenCalled())
+    await eventually(() => expect(mockNgrokSetOnCrash).toHaveBeenCalled())
 
     mockNgrokSetOnCrash.mockClear()
     mockBroadcast.mockClear()
 
     await registeredHandler('remote:tunnel-reconnect')()
 
-    await vi.waitFor(() => expect(mockNgrokSetOnCrash).toHaveBeenCalled())
+    await eventually(() => expect(mockNgrokSetOnCrash).toHaveBeenCalled())
     expect(mockBroadcast).toHaveBeenCalledWith(
       'remote:status',
       expect.objectContaining({ publicUrl: 'https://example.ngrok.app' })
@@ -304,6 +306,7 @@ function credentialHandlingTests() {
   })
 
   describe('storing a password', passwordStorageTests)
+  describe('changing the password while devices are connected', passwordRotationTests)
   describe('reading settings and refusing to start', passwordGateTests)
   describe('migrating a plaintext password', plaintextMigrationTests)
   describe('an unconvertible bcrypt hash', bcryptHashTests)
@@ -356,9 +359,8 @@ function plaintextMigrationTests() {
       [`${EXT}.passwordHash`]: BCRYPT,
     })
     // Activation queues the migration, which hashes with bcrypt: wait for it, however long.
-    await vi.waitFor(
-      () => expect(JSON.stringify([...values.values()])).not.toContain('earlier-version-password'),
-      { timeout: 15_000 }
+    await eventually(() =>
+      expect(JSON.stringify([...values.values()])).not.toContain('earlier-version-password')
     )
     expect(
       await verifyPassword('earlier-version-password', values.get(`${EXT}.passwordHash`) as string)
@@ -372,12 +374,33 @@ function bcryptHashTests() {
       [`${EXT}.enabled`]: true,
       [`${EXT}.passwordHash`]: BCRYPT,
     })
-    await vi.waitFor(() => expect(values.get(`${EXT}.enabled`)).toBe(false), { timeout: 15_000 })
+    await eventually(() => expect(values.get(`${EXT}.enabled`)).toBe(false))
     expect(mockCreateRemoteServer).not.toHaveBeenCalled()
     expect(mockBroadcast).toHaveBeenCalledWith('remote:status', {
       enabled: false,
       error: 'PASSWORD_REQUIRED',
       message: expect.stringContaining('Set a new password'),
     })
+  })
+}
+
+function passwordRotationTests() {
+  it('reports the new password saved when closing the remote terminals fails', async () => {
+    currentHash = await hashPassword('the-old-one')
+    const serverHandle = makeServerHandle()
+    serverHandle.disconnectAllClients.mockRejectedValue(new Error('could not list the sessions'))
+    const toggleHandler = await setupAndGetToggleHandler(serverHandle)
+    await toggleHandler({ enabled: true })
+    await eventually(() => expect(serverHandle.start).toHaveBeenCalled())
+    await serverHandle.start.mock.results[0].value
+
+    const result = await registeredHandler('remote:update-password')({ password: 'the-new-one' })
+
+    expect(result).toEqual({ ok: true })
+    expect(mockBroadcast).toHaveBeenLastCalledWith(
+      'remote:status',
+      expect.objectContaining({ enabled: true })
+    )
+    await queueDrained()
   })
 }

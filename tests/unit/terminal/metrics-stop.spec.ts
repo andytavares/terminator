@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { queryProcessMetrics } from '../../../src/main/ipc/metrics.ipc'
 import { stopRunningCommands } from '../../../src/main/shell/command-runner'
 import { makeTempDir } from '../../support/temp-dir'
-import { expectProcessGone, recordedPid } from '../../support/processes'
+import { isProcessAlive, recordedPid } from '../../support/processes'
 
 // The metrics view samples its terminals with `ps` every two seconds, so one
 // can be running as the app quits; it ends with the app, with anything it
@@ -30,9 +30,9 @@ describe('queryProcessMetrics while the app quits', () => {
     const sampling = queryProcessMetrics([process.pid])
     const grandchild = await recordedPid(pidFile)
 
-    stopRunningCommands()
+    await stopRunningCommands()
 
+    expect(isProcessAlive(grandchild)).toBe(false)
     expect(await sampling).toEqual([])
-    await expectProcessGone(grandchild)
   })
 })

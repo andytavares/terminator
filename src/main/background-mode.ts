@@ -1,4 +1,4 @@
-import { app, type BrowserWindowConstructorOptions } from 'electron'
+import { app, BrowserWindow, type BrowserWindowConstructorOptions } from 'electron'
 
 // Set by the e2e harness, so a test run never takes the screen, the Dock or the keyboard from
 // whoever is using the machine. Windows stay hidden but keep drawing, which is what lets a test
@@ -10,15 +10,25 @@ export function runsInBackground(): boolean {
 }
 
 /** A window's options; in the background it is created hidden and never stops drawing. */
-export function windowOptions(
-  options: BrowserWindowConstructorOptions
-): BrowserWindowConstructorOptions {
+function windowOptions(options: BrowserWindowConstructorOptions): BrowserWindowConstructorOptions {
   if (!RUNS_IN_BACKGROUND) return options
   return {
     ...options,
     show: false,
+    // macOS clamps a window to the screen's work area: on a runner's smaller screen the same
+    // test would lay out a narrower window than on a laptop.
+    enableLargerThanScreen: true,
     webPreferences: { ...options.webPreferences, backgroundThrottling: false },
   }
+}
+
+/** A new window. In the background it is sized again once made: macOS creates a window no
+ * larger than the screen, and only a later resize may exceed it. */
+export function newWindow(options: BrowserWindowConstructorOptions): BrowserWindow {
+  const win = new BrowserWindow(windowOptions(options))
+  const { width, height } = options
+  if (RUNS_IN_BACKGROUND && width !== undefined && height !== undefined) win.setSize(width, height)
+  return win
 }
 
 /** Shows and focuses a window, unless the app runs in the background. */

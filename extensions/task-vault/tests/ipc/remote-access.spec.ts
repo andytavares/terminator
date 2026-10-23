@@ -48,7 +48,7 @@ describe('task-vault remote access', () => {
       'task-vault:links:create',
       'task-vault:review:start',
     ]) {
-      expect(channels.get(channel), channel).toBe(true)
+      expect(channels.get(channel)).toBe(true)
     }
   })
 })

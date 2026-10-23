@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { Inbox, SIGNAL_POLL_MS } from '../../src/components/Inbox.js'
@@ -12,7 +12,7 @@ import { timesInvoked } from '../helpers/bridge-calls.js'
 // ignored — because an interruption they cannot attribute is one they learn to
 // click through without reading.
 
-let invoke: ReturnType<typeof vi.fn>
+let invoke: Mock<(channel: string, payload?: unknown) => Promise<unknown>>
 let bus = createChangeBus()
 const openExternal = vi.fn(async () => ({ ok: true as const }))
 

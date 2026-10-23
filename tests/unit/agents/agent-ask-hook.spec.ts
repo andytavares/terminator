@@ -7,8 +7,11 @@ import { makeTempDir } from '../../support/temp-dir'
 let userData: string
 let home: string
 
+// Electron's home on macOS is the account's, whatever HOME says: a sealed run's HOME never reached
+// it, and e2e and smoke runs rewrote the developer's own ~/.claude/settings.json.
+const ACCOUNT_HOME = '/Users/account-home-never-written'
 vi.mock('electron', () => ({
-  app: { getPath: (name: string) => (name === 'home' ? home : userData) },
+  app: { getPath: (name: string) => (name === 'home' ? ACCOUNT_HOME : userData) },
 }))
 
 async function load() {
@@ -19,6 +22,7 @@ async function load() {
 beforeEach(() => {
   userData = makeTempDir('ask-hook-ud-')
   home = makeTempDir('ask-hook-home-')
+  vi.stubEnv('HOME', home)
 })
 
 const NOTIFICATION = {

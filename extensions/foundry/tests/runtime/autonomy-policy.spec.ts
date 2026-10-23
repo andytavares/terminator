@@ -80,7 +80,7 @@ describe('a destructive action (FR-050)', () => {
 function destructiveCommandsTests() {
   it.each(DESTRUCTIVE)('asks about `%s` at every setting', (command) => {
     for (const autonomy of ['escorted', 'standard', 'lights-out'] as Autonomy[]) {
-      expect(decide('Bash', bash(command), autonomy), `${command} at ${autonomy}`).toBeNull()
+      expect(decide('Bash', bash(command), autonomy)).toBeNull()
     }
   })
 
@@ -101,8 +101,8 @@ function autonomyPolicyParsingTests() {
 
   it('takes the ordinary git a unit actually runs', () => {
     for (const command of ['git status', 'git diff', 'git add -A', 'git commit -m x', 'git log']) {
-      expect(isDestructive('Bash', bash(command)), command).toBe(false)
-      expect(decide('Bash', bash(command))?.allow, command).toBe(true)
+      expect(isDestructive('Bash', bash(command))).toBe(false)
+      expect(decide('Bash', bash(command))?.allow).toBe(true)
     }
   })
 
@@ -364,7 +364,7 @@ function everywhereElseTests() {
   it('still asks about everywhere else outside the checkout', () => {
     expect(writesOutside('Write', { file_path: '/etc/hosts' }, WT)).toBe(true)
     expect(writesOutside('Write', { file_path: '/work/other/src/a.ts' }, WT)).toBe(true)
-    expect(writesOutside('Write', { file_path: path.join(os.homedir(), '.zshrc') }, WT)).toBe(true)
+    expect(writesOutside('Write', { file_path: '/Users/operator/.zshrc' }, WT)).toBe(true)
   })
 
   it('does not make a destructive command ordinary just because it is in temp', () => {

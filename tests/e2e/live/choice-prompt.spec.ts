@@ -42,7 +42,6 @@ async function waitForChoice(page: Page): Promise<string[]> {
   try {
     await expect
       .poll(async () => hasNumberedChoice((rows = await readTerminalRows(page))), {
-        timeout: 90_000,
         intervals: [500],
       })
       .toBe(true)
@@ -67,7 +66,7 @@ async function askForAFile(page: Page): Promise<void> {
  * Needs you with the prompt's options as buttons. Records the buttons offered. */
 async function answerFromTheWall(page: Page, outcome: Record<string, unknown>): Promise<void> {
   await page.getByRole('button', { name: 'Overview' }).click()
-  await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible()
   const choices = page.getByRole('group', { name: /Do you want to create a\.txt\?/ })
   await expect(choices).toBeVisible()
   outcome.buttons = await choices
@@ -77,7 +76,6 @@ async function answerFromTheWall(page: Page, outcome: Record<string, unknown>): 
 }
 
 test('a live Claude Code prompt is pinned on the wall and answered from its buttons', async () => {
-  test.setTimeout(240_000)
   repo = e2eTempDir('choice-live-')
   handle = await launchApp()
   const { page } = handle
@@ -94,8 +92,8 @@ test('a live Claude Code prompt is pinned on the wall and answered from its butt
 
   await answerFromTheWall(page, outcome)
   const answered = 1
-  await expect(page.getByRole('heading', { name: 'Needs you' })).toBeHidden({ timeout: 15_000 })
-  await expect.poll(() => existsSync(join(repo, 'a.txt')), { timeout: 90_000 }).toBe(true)
+  await expect(page.getByRole('heading', { name: 'Needs you' })).toBeHidden()
+  await expect.poll(() => existsSync(join(repo, 'a.txt'))).toBe(true)
   outcome.answered = answered
   writeFileSync(join(REPORT_DIR, 'outcome.json'), JSON.stringify(outcome, null, 2))
 })

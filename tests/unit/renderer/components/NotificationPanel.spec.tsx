@@ -17,6 +17,7 @@ installElectronApi({
 
 import { NotificationPanel } from '../../../../src/renderer/components/NotificationPanel'
 import { installElectronApi } from '../../../support/electron-api'
+import { eventually } from '../../../support/eventually'
 
 function makeNotif(overrides: Partial<Notification> = {}): Notification {
   return {
@@ -297,7 +298,7 @@ describe('acting on a notification settles it', () => {
     useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
     render(<NotificationPanel />)
     fireEvent.click(screen.getByText('Approve'))
-    await vi.waitFor(() => expect(useNotificationStore.getState().notifications).toHaveLength(0))
+    await eventually(() => expect(useNotificationStore.getState().notifications).toHaveLength(0))
   })
 
   it('does not ask main to forget an id it has already forgotten', async () => {
@@ -305,7 +306,7 @@ describe('acting on a notification settles it', () => {
     useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
     render(<NotificationPanel />)
     fireEvent.click(screen.getByText('Approve'))
-    await vi.waitFor(() => expect(useNotificationStore.getState().notifications).toHaveLength(0))
+    await eventually(() => expect(useNotificationStore.getState().notifications).toHaveLength(0))
     expect(mockDismiss).not.toHaveBeenCalled()
   })
 
@@ -317,6 +318,6 @@ describe('acting on a notification settles it', () => {
     useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
     render(<NotificationPanel />)
     fireEvent.click(screen.getByText('Approve'))
-    await vi.waitFor(() => expect(useNotificationStore.getState().notifications).toHaveLength(0))
+    await eventually(() => expect(useNotificationStore.getState().notifications).toHaveLength(0))
   })
 })

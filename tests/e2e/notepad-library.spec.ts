@@ -27,8 +27,6 @@ import { expectCentredInWindow } from './modal-centre'
 let handle: AppHandle
 let notepad: ExtensionView
 
-test.describe.configure({ mode: 'serial' })
-
 test.beforeAll(async () => {
   handle = await launchApp()
   notepad = await openNotepad(handle)
@@ -105,7 +103,7 @@ const canvas = () => notepad.locator('.diagram-view__canvas')
 async function diagramOpensOnCanvas(): Promise<void> {
   await createItem(notepad, 'Diagram', 'Architecture')
   await expect(notepad.locator('.diagram-view__title-btn')).toContainText('Architecture')
-  await expect(canvas().locator('canvas').first()).toBeVisible({ timeout: 20_000 })
+  await expect(canvas().locator('canvas').first()).toBeVisible()
   diagramId = (await diagrams()).find((d) => d.title === 'Architecture')!.id
 }
 
@@ -127,7 +125,7 @@ async function rectangleIsSaved(): Promise<void> {
   await notepad.mouse.move(box.x + box.width / 2 + 80, box.y + box.height / 2 + 50, { steps: 8 })
   await notepad.mouse.up()
 
-  await expect.poll(sceneElementTypes, { timeout: 10_000 }).toEqual(['rectangle'])
+  await expect.poll(sceneElementTypes).toEqual(['rectangle'])
 }
 
 async function diagramIsRenamed(): Promise<void> {
@@ -176,9 +174,7 @@ async function canvasCommentDeleted(): Promise<void> {
 async function diagramPopsOut(): Promise<void> {
   await noteRow(notepad, 'System architecture').dblclick()
   const window = await popoutPage(handle, 'view=diagram')
-  await expect(window.locator('.diagram-view__title-btn')).toContainText('System architecture', {
-    timeout: 20_000,
-  })
+  await expect(window.locator('.diagram-view__title-btn')).toContainText('System architecture')
   await expect(window.locator('.diagram-view__canvas canvas').first()).toBeVisible()
   await window.close()
 }
@@ -194,7 +190,7 @@ async function diagramRetired(): Promise<void> {
 
   await rowMenu(notepad, 'System architecture', 'Archive')
   await deleteForGood(handle, notepad, 'System architecture')
-  expect(await diagrams()).toEqual([])
+  await expect.poll(() => diagrams()).toEqual([])
 }
 
 // ── Notes are found and moved in and out ────────────────────────────────────
@@ -439,6 +435,6 @@ async function reinitialiseKeepsNotes(): Promise<void> {
       )
     )
     .toContain('Re-initialise database: Done')
-  expect(await storedNotes(notepad)).toHaveLength(4)
+  await expect.poll(() => storedNotes(notepad)).toHaveLength(4)
   await page.keyboard.press('Escape')
 }

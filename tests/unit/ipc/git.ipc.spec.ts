@@ -22,6 +22,9 @@ const gitService = vi.hoisted(() => ({
 }))
 vi.mock('../../../src/main/git/git-service.js', () => gitService)
 
+const log = vi.hoisted(() => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() }))
+vi.mock('../../../src/main/logger.js', () => ({ logger: log }))
+
 vi.mock('electron-store', async () =>
   (await import('../../support/stores')).inMemoryElectronStore()
 )
@@ -81,6 +84,15 @@ describe('git:is-repo', () => {
       error: 'Error: git rev-parse timed out',
     })
   })
+
+  // The dialog says only "Could not read the git repository"; the log is where git's own words go.
+  it("writes git's own error and the folder to the log when git could not answer", async () => {
+    gitService.isGitRepo.mockRejectedValue(new Error('fatal: not a git repository'))
+    await handler('git:is-repo')({}, { path: '/x' })
+    expect(log.warn).toHaveBeenCalledWith(
+      'git could not answer git:is-repo for /x: Error: fatal: not a git repository'
+    )
+  })
 })
 
 describe('git:current-branch', () => {
@@ -96,6 +108,14 @@ describe('git:current-branch', () => {
     await expect(handler('git:current-branch')({}, { path: '/r' })).resolves.toEqual({
       error: 'Error: detached',
     })
+  })
+
+  it("writes git's own error and the folder to the log", async () => {
+    gitService.getCurrentBranch.mockRejectedValue(new Error('detached'))
+    await handler('git:current-branch')({}, { path: '/r' })
+    expect(log.warn).toHaveBeenCalledWith(
+      'git could not answer git:current-branch for /r: Error: detached'
+    )
   })
 })
 

@@ -65,7 +65,6 @@ async function foundry(channel: string, payload: unknown = {}): Promise<unknown>
 test.skip(REMOTE === '', 'set LIVE_REMOTE to run this')
 
 test.beforeAll(async () => {
-  test.setTimeout(300_000)
   repo = e2eTempDir('foundry-live-rework-')
   execFileSync('git', ['clone', REMOTE, repo])
   git('config', 'user.email', 'live@example.com')
@@ -162,7 +161,7 @@ async function observeUntilOverOrDeadline(): Promise<Observed> {
     return reason !== null
   }
   await expect
-    .poll(over, { timeout: 55 * 60_000, intervals: [10_000] })
+    .poll(over, { intervals: [10_000] })
     .toBe(true)
     .catch(() => console.log('[deadline] the run did not finish'))
   return last
@@ -211,7 +210,6 @@ function expectNobodyAsked(): void {
 }
 
 test('a lint failure goes back to the builder and the run still ships', async () => {
-  test.setTimeout(3_600_000)
   writeOrder()
   await startLiveRun(foundry, ORDER)
   const last = await observeUntilOverOrDeadline()

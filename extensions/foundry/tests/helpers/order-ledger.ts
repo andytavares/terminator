@@ -1,7 +1,7 @@
 /** Reading an order's ledger the way the store reads it, for specs that wait on or assert it. */
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { vi } from 'vitest'
+import { eventually } from '../../../../tests/support/eventually'
 import { createOrderStore } from '../../src/order/store.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
 
@@ -27,14 +27,11 @@ export function untilLedgerHas(
   action: string,
   reason?: string
 ): Promise<LedgerEntry> {
-  return vi.waitFor(
-    async () => {
-      const found = (await orderLedger(dataDir)).find(
-        (entry) => entry.action === action && (reason === undefined || entry.reason === reason)
-      )
-      if (found === undefined) throw new Error(`no ${action} yet`)
-      return found
-    },
-    { timeout: 10_000, interval: 50 }
-  )
+  return eventually(async () => {
+    const found = (await orderLedger(dataDir)).find(
+      (entry) => entry.action === action && (reason === undefined || entry.reason === reason)
+    )
+    if (found === undefined) throw new Error(`no ${action} yet`)
+    return found
+  })
 }

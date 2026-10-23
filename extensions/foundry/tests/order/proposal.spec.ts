@@ -59,7 +59,7 @@ function proposalRefusingTests() {
 
   it('refuses an id, a source or a provenance', () => {
     for (const field of ['id', 'source', 'provenance', 'context', 'redTeam']) {
-      expect(() => parseProposal({ [field]: {} }), field).toThrow(ProposalRejected)
+      expect(() => parseProposal({ [field]: {} })).toThrow(ProposalRejected)
     }
   })
 
@@ -245,7 +245,7 @@ function theMeasuredHalfTests() {
     // An agent that could rewrite the toolchain could tell the ladder a
     // command exists that does not.
     for (const field of ['repos', 'toolchain', 'houseDocs']) {
-      expect(() => parseProposal({ findings: { [field]: [] } }), field).toThrow(ProposalRejected)
+      expect(() => parseProposal({ findings: { [field]: [] } })).toThrow(ProposalRejected)
     }
   })
 

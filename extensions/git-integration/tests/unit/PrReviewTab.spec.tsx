@@ -378,8 +378,8 @@ describe('PrReviewTab (continued) — after an approval — returns the docked p
 
 describe('PrReviewTab — reads the v2 session key before falling back to the legacy key', () => {
   it('reads the v2 session key before falling back to the legacy key', async () => {
-    ;(githubModule.githubAPI.sessionGet as ReturnType<typeof vi.fn>).mockImplementation(
-      async (key: string) => (key === '/repo:::1' ? { session: null } : { session: null })
+    vi.mocked(githubModule.githubAPI.sessionGet).mockImplementation(async (key: string) =>
+      key === '/repo:::1' ? { session: null } : { session: null }
     )
     await openPrAtHead('headA')
     expect(githubModule.githubAPI.sessionGet).toHaveBeenCalledWith('/repo:::1')

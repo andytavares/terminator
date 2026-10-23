@@ -68,10 +68,12 @@ async function fetchPublished(ids) {
 
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'))
 
-function baseLockfile(branch) {
-  execFileSync('git', ['fetch', '--no-tags', '--depth=1', 'origin', branch], { stdio: 'ignore' })
+/** The base branch's lockfile as last fetched. It fetches nothing: CI checks out every branch
+ * and ci:local fetches main first; a --depth=1 fetch here made the shared repository shallow. */
+export function baseLockfile(branch, cwd = process.cwd()) {
   return JSON.parse(
-    execFileSync('git', ['show', 'FETCH_HEAD:package-lock.json'], {
+    execFileSync('git', ['show', `origin/${branch}:package-lock.json`], {
+      cwd,
       encoding: 'utf8',
       maxBuffer: 1 << 28,
     })

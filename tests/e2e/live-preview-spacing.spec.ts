@@ -49,7 +49,6 @@ async function sessionOnAnotherBranch(page: Page): Promise<void> {
 }
 
 test('the Overview wall draws a tile with no gaps between letters', async () => {
-  test.setTimeout(90_000)
   const handle: AppHandle = await launchApp()
   try {
     await sessionOnAnotherBranch(handle.page)

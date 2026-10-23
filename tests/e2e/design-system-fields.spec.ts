@@ -126,5 +126,5 @@ async function markdownListIndent(): Promise<number> {
 }
 
 test("core's reset leaves Markdown its list indent, so bullets sit inside the pane", async () => {
-  expect(await markdownListIndent()).toBe(20)
+  await expect.poll(() => markdownListIndent()).toBe(20)
 })

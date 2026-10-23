@@ -264,7 +264,7 @@ function parseParsingTests() {
   // break a role file that still carries it.
   it('ignores a key the schema no longer has, rather than refusing the file', () => {
     const r = parseRole(`${ROLE}outputSchema: verdict\n`, 'verifier.yaml')
-    expect(r.ok, r.ok ? '' : r.reason).toBe(true)
+    expect(r.ok).toBe(true)
   })
 
   it('defaults allowResume to false, so resuming is opt-in rather than inherited', () => {
@@ -473,7 +473,7 @@ steps:
 function upstreamStepsTests() {
   it('accepts onFail on a valid run step reworking an upstream agent step', () => {
     const r = parseRecipe(ONFAIL, 'onfail.yaml')
-    expect(r.ok, r.ok ? '' : r.reason).toBe(true)
+    expect(r.ok).toBe(true)
   })
 
   it('rejects onFail reworking a downstream step', () => {
@@ -530,7 +530,7 @@ describe('effort on a recipe and on a step', () => {
 function effortTests() {
   it('parses a recipe-level effort', () => {
     const r = parseRecipe(EFFORT, 'direct.yaml')
-    expect(r.ok, r.ok ? '' : r.reason).toBe(true)
+    expect(r.ok).toBe(true)
     if (r.ok) expect(r.value.effort).toBe('xhigh')
   })
 
@@ -565,7 +565,7 @@ describe('ci rounds', () => {
 function declaringAndRoundsTests() {
   it('accepts a recipe that declares ci alongside a ready-for-review gate', () => {
     const r = parseRecipe(`ci:\n  rounds: 2\n${RECIPE}`, 'bugfix.yaml')
-    expect(r.ok, r.ok ? '' : r.reason).toBe(true)
+    expect(r.ok).toBe(true)
     if (r.ok) expect(r.value.ci).toEqual({ rounds: 2 })
   })
 

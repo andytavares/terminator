@@ -205,7 +205,7 @@ describe('shutdown', () => {
   })
 })
 
-function ask(toolName: string, input: unknown) {
+async function ask(toolName: string, input: unknown) {
   const events: PendingPermission[] = []
   const bridge = createPermissionBridge({
     sessionId: 's1',
@@ -213,8 +213,11 @@ function ask(toolName: string, input: unknown) {
     onPending: (p) => events.push(p),
     onResolved: () => {},
   })
-  void bridge.canUseTool(toolName, input)
-  return events[0] as { summary: string; detail?: string | null }
+  const pending = bridge.canUseTool(toolName, input)
+  const asked = events[0] as { summary: string; detail?: string | null }
+  bridge.rejectAll('asked only to read what the operator is told')
+  await pending
+  return asked
 }
 
 // FR-007. Deciding requires seeing the ask. "AskUserQuestion request" is the
@@ -243,15 +246,15 @@ function questionsOn(events: PendingPermission[]) {
 }
 
 function permissionBridgeQuestionsTests() {
-  it('leads with the question itself', () => {
-    const event = ask('AskUserQuestion', {
+  it('leads with the question itself', async () => {
+    const event = await ask('AskUserQuestion', {
       questions: [{ question: 'Which database should the worker write to?', options: [] }],
     })
     expect(event.summary).toBe('Which database should the worker write to?')
   })
 
-  it('carries the options, which are most of what you need to answer', () => {
-    const event = ask('AskUserQuestion', {
+  it('carries the options, which are most of what you need to answer', async () => {
+    const event = await ask('AskUserQuestion', {
       questions: [
         {
           question: 'Which database?',
@@ -263,8 +266,8 @@ function permissionBridgeQuestionsTests() {
     expect(event.detail).toContain('SQLite')
   })
 
-  it('carries every question when more than one is asked', () => {
-    const event = ask('AskUserQuestion', {
+  it('carries every question when more than one is asked', async () => {
+    const event = await ask('AskUserQuestion', {
       questions: [{ question: 'First?' }, { question: 'Second?' }],
     })
     expect(event.detail).toContain('First?')
@@ -273,70 +276,73 @@ function permissionBridgeQuestionsTests() {
 }
 
 function shellRequestsTests() {
-  it('still leads with the command for a shell request', () => {
-    const event = ask('Bash', { command: 'redis-cli -h prod-cache-01 FLUSHALL' })
+  it('still leads with the command for a shell request', async () => {
+    const event = await ask('Bash', { command: 'redis-cli -h prod-cache-01 FLUSHALL' })
     expect(event.summary).toBe('redis-cli -h prod-cache-01 FLUSHALL')
   })
 
-  it('carries the command itself, not only the agent’s description of it', () => {
+  it('carries the command itself, not only the agent’s description of it', async () => {
     // Approving on a description alone is taking the agent's word for what the
     // command does.
-    const event = ask('Bash', { command: 'rm -rf build', description: 'Clean the build output' })
+    const event = await ask('Bash', {
+      command: 'rm -rf build',
+      description: 'Clean the build output',
+    })
     expect(event.detail).toContain('command: rm -rf build')
     expect(event.detail).toContain('description: Clean the build output')
   })
 
-  it('shows a command in full, however long the title elides it to', () => {
+  it('shows a command in full, however long the title elides it to', async () => {
     const command = `cd ${'/very-long-path'.repeat(40)} && npm run build`
-    const event = ask('Bash', { command })
+    const event = await ask('Bash', { command })
     expect(event.detail).toContain(command)
   })
 }
 
 function unknownToolsAndBoundsTests() {
-  it('shows the input of a tool it does not recognise, rather than only its name', () => {
+  it('shows the input of a tool it does not recognise, rather than only its name', async () => {
     // An unfamiliar tool is exactly when you most need to see what it wants.
-    const event = ask('SomeNewTool', { target: 'production', mode: 'destructive' })
+    const event = await ask('SomeNewTool', { target: 'production', mode: 'destructive' })
     expect(event.detail).toContain('target: production')
     expect(event.detail).toContain('mode: destructive')
   })
 
-  it('bounds a value that would never end, and says it did', () => {
-    const event = ask('SomeNewTool', { blob: 'x'.repeat(50_000) })
+  it('bounds a value that would never end, and says it did', async () => {
+    const event = await ask('SomeNewTool', { blob: 'x'.repeat(50_000) })
     expect(event.detail?.length ?? 0).toBeLessThan(5_000)
     expect(event.detail).toContain('truncated')
   })
 
-  it('bounds how many fields it shows', () => {
+  it('bounds how many fields it shows', async () => {
     const input = Object.fromEntries(
       Array.from({ length: 60 }, (_, index) => [`field${index}`, String(index)])
     )
-    const event = ask('SomeNewTool', input)
+    const event = await ask('SomeNewTool', input)
     expect((event.detail ?? '').split('\n')).toHaveLength(24)
   })
 }
 
 function multiLineValuesAndNonObjectsTests() {
-  it('puts a multi-line value on its own line so a script stays readable', () => {
-    const event = ask('Write', { file_path: '/a.sh', content: 'set -e\nrm -rf build\n' })
+  it('puts a multi-line value on its own line so a script stays readable', async () => {
+    const event = await ask('Write', { file_path: '/a.sh', content: 'set -e\nrm -rf build\n' })
     expect(event.detail).toContain('content:\nset -e\nrm -rf build')
   })
 
-  it('has no detail to show when the input is not an object', () => {
-    const event = ask('SomeNewTool', 'just a string')
+  it('has no detail to show when the input is not an object', async () => {
+    const event = await ask('SomeNewTool', 'just a string')
     expect(event.summary).toBe('SomeNewTool request')
     expect(event.detail).toBeNull()
   })
 }
 
 function emptyQuestionsTests() {
-  it('ignores an empty question list rather than claiming a question was asked', () => {
-    const event = ask('AskUserQuestion', { questions: [] })
+  it('ignores an empty question list rather than claiming a question was asked', async () => {
+    const event = await ask('AskUserQuestion', { questions: [] })
     expect(event.summary).toBe('AskUserQuestion request')
   })
 
-  it('falls back to the tool name when the questions carry no text', () => {
-    const event = ask('AskUserQuestion', { questions: [{ options: [] }] })
+  it('falls back to the tool name when the questions carry no text', async () => {
+    const event = await ask('AskUserQuestion', { questions: [{ options: [] }] })
     expect(event.summary).toBe('AskUserQuestion request')
   })
 }
@@ -393,9 +399,9 @@ function answersTests() {
 }
 
 function publishedQuestionsTests() {
-  it('publishes each question with its own options, so an answer can name it', () => {
+  it('publishes each question with its own options, so an answer can name it', async () => {
     const { bridge, events } = bridgeFor()
-    void bridge.canUseTool('AskUserQuestion', {
+    const pending = bridge.canUseTool('AskUserQuestion', {
       questions: [
         { question: 'Which scope?', options: [{ label: 'App-wide' }, { label: 'Terminal' }] },
       ],
@@ -403,12 +409,14 @@ function publishedQuestionsTests() {
     expect(questionsOn(events)).toEqual([
       { question: 'Which scope?', options: ['App-wide', 'Terminal'] },
     ])
+    bridge.rejectAll('test ended')
+    await pending
   })
 
-  it('keeps two questions apart rather than piling their options together', () => {
+  it('keeps two questions apart rather than piling their options together', async () => {
     // Flattened, clicking "Yes" would not say which question it answered.
     const { bridge, events } = bridgeFor()
-    void bridge.canUseTool('AskUserQuestion', {
+    const pending = bridge.canUseTool('AskUserQuestion', {
       questions: [
         { question: 'A?', options: [{ label: 'Yes' }] },
         { question: 'B?', options: [{ label: 'Yes' }, { label: 'No' }] },
@@ -418,20 +426,26 @@ function publishedQuestionsTests() {
       { question: 'A?', options: ['Yes'] },
       { question: 'B?', options: ['Yes', 'No'] },
     ])
+    bridge.rejectAll('test ended')
+    await pending
   })
 }
 
 function plainYesOrNoTests() {
-  it('offers no questions for a request that is a plain yes or no', () => {
+  it('offers no questions for a request that is a plain yes or no', async () => {
     const { bridge, events } = bridgeFor()
-    void bridge.canUseTool('Bash', { command: 'ls' })
+    const pending = bridge.canUseTool('Bash', { command: 'ls' })
     expect(questionsOn(events)).toBeUndefined()
+    bridge.rejectAll('test ended')
+    await pending
   })
 
-  it('keeps a question that offers no options', () => {
+  it('keeps a question that offers no options', async () => {
     const { bridge, events } = bridgeFor()
-    void bridge.canUseTool('AskUserQuestion', { questions: [{ question: 'Why?' }] })
+    const pending = bridge.canUseTool('AskUserQuestion', { questions: [{ question: 'Why?' }] })
     expect(questionsOn(events)).toEqual([{ question: 'Why?', options: [] }])
+    bridge.rejectAll('test ended')
+    await pending
   })
 }
 

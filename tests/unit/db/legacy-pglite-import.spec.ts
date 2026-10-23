@@ -104,9 +104,6 @@ describe('legacyImportPending', () => {
   })
 })
 
-// Each case starts a Postgres in WebAssembly twice (fixture, then import).
-vi.setConfig({ testTimeout: 60_000 })
-
 const IMPORTED_NOTES = [
   {
     id: 'n1',

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { makeTempDir } from '../../support/temp-dir'
-import { nextLoopTurn, openWatches } from '../../support/watches'
+import { openWatches } from '../../support/watches'
 import { fakeWebContentsView } from '../../support/fake-web-contents'
 
 type Handler = (event: unknown, payload?: unknown) => unknown
@@ -36,16 +36,21 @@ const startWatch = (view: View, projectRoot: string) =>
   invoke('fs:watch-start', view, { projectRoot })
 
 /** Looks less often than a burst takes to settle, or each look's write would keep it open. */
-const LOOKS = { interval: 250, timeout: 10_000 }
+const LOOK_INTERVAL_MS = 250
 
 /** Writes the file again on each look: macOS arms a watch a moment after `fs.watch` returns, and a
  * change made before that has no event. Resolves once `view` has been told about `root`. */
 async function changeUntilTold(root: string, view: View): Promise<void> {
-  await vi.waitFor(() => {
-    const told = view.received.some((event) => event.projectRoot === root)
-    if (!told) fs.writeFileSync(path.join(root, 'a.ts'), String(Math.random()))
-    expect(told).toBe(true)
-  }, LOOKS)
+  await expect
+    .poll(
+      () => {
+        const told = view.received.some((event) => event.projectRoot === root)
+        if (!told) fs.writeFileSync(path.join(root, 'a.ts'), String(Math.random()))
+        return told
+      },
+      { interval: LOOK_INTERVAL_MS }
+    )
+    .toBe(true)
 }
 
 const views: View[] = []
@@ -123,35 +128,33 @@ describe('fs:watch-stop', () => {
   })
 
   it('closes a watch no view is left on', async () => {
-    await nextLoopTurn()
     const before = openWatches()
     const view = openView()
     await startWatch(view, projectRoot)
     expect(openWatches()).toBeGreaterThan(before)
     await invoke('fs:watch-stop', view)
-    await nextLoopTurn()
-    expect(openWatches()).toBe(before)
+    await expect.poll(() => openWatches()).toBe(before)
   })
 })
 
 describe('a view that goes away', () => {
-  async function watchesLeftAfter(leave: (view: View) => void): Promise<number> {
-    await nextLoopTurn()
+  /** Every watch the view opened is closed once `leave` has run. */
+  async function expectNoWatchesLeftAfter(leave: (view: View) => void): Promise<void> {
     const before = openWatches()
     const view = openView()
     await startWatch(view, projectRoot)
+    expect(openWatches()).toBeGreaterThan(before)
     leave(view)
-    await nextLoopTurn()
-    return openWatches() - before
+    await expect.poll(() => openWatches()).toBe(before)
   }
 
   it('gives up its watches when it is destroyed', async () => {
-    expect(await watchesLeftAfter((view) => view.destroy())).toBe(0)
+    await expectNoWatchesLeftAfter((view) => view.destroy())
   })
 
   it('gives up its watches when it loads another page, as a reload does', async () => {
     const reload = { isMainFrame: true, isSameDocument: false }
-    expect(await watchesLeftAfter((view) => view.navigate(reload))).toBe(0)
+    await expectNoWatchesLeftAfter((view) => view.navigate(reload))
   })
 })
 

@@ -1,5 +1,6 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
+import { randomUUID } from 'node:crypto'
 
 // The one editor for a SessionStart hook this application owns in a Claude
 // settings file. Merge, never replace: every other key and every other entry
@@ -34,12 +35,16 @@ export async function readClaudeSettings(file: string): Promise<ClaudeSettingsFi
   }
 }
 
+/** Writes the whole file, then renames it into place: another process writing the same file
+ * (a second Terminator, Claude Code) leaves one whole copy, never a short one over a long one. */
 export async function writeClaudeSettings(
   file: string,
   settings: ClaudeSettingsFile
 ): Promise<void> {
   await fs.mkdir(path.dirname(file), { recursive: true })
-  await fs.writeFile(file, `${JSON.stringify(settings, null, 2)}\n`, 'utf8')
+  const draft = `${file}.${process.pid}.${randomUUID()}.tmp`
+  await fs.writeFile(draft, `${JSON.stringify(settings, null, 2)}\n`, 'utf8')
+  await fs.rename(draft, file)
 }
 
 /** Every `event` entry `marker` identifies goes, then one comes back with `command`. The

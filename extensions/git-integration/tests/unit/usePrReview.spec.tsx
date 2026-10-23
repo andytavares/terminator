@@ -1162,6 +1162,25 @@ const setActive = (pr: typeof validActivePr | null) =>
     setIssueComments: mockSetIssueComments,
   })
 
+/** Mounts a hook that calls the loader it gets whenever the loader changes, and reports when every
+ * call has finished. */
+function renderLoaderOnEveryChange(useLoader: () => () => Promise<unknown>) {
+  const loads: Promise<unknown>[] = []
+  const { rerender } = renderHook(() => {
+    const load = useLoader()
+    useEffect(() => {
+      loads.push(load())
+    }, [load])
+  })
+  return {
+    rerender,
+    settled: () =>
+      act(async () => {
+        await Promise.all(loads)
+      }),
+  }
+}
+
 describe('comment loaders — stable across activePr patches', () => {
   it('keeps the inline loader identity when activePr is patched for the same PR', () => {
     setActive(validActivePr)
@@ -1186,20 +1205,11 @@ describe('comment loaders — stable across activePr patches — does not fetch 
   it('does not fetch inline comments again when activePr is patched', async () => {
     mockPrInlineComments.mockResolvedValue({ comments: [] })
     setActive(validActivePr)
-    const { rerender } = renderHook(() => {
-      const load = useLoadInlineComments('/repo')
-      useEffect(() => {
-        void load()
-      }, [load])
-    })
-    await act(async () => {
-      await Promise.resolve()
-    })
+    const { rerender, settled } = renderLoaderOnEveryChange(() => useLoadInlineComments('/repo'))
+    await settled()
     setActive({ ...validActivePr, title: 'patched complexity' })
     rerender()
-    await act(async () => {
-      await Promise.resolve()
-    })
+    await settled()
     expect(mockPrInlineComments).toHaveBeenCalledTimes(1)
   })
 })
@@ -1208,20 +1218,11 @@ describe('comment loaders — stable across activePr patches — does not fetch 
   it('does not fetch issue comments again when activePr is patched', async () => {
     mockPrIssueCommentsAPI.mockResolvedValue({ comments: [] })
     setActive(validActivePr)
-    const { rerender } = renderHook(() => {
-      const load = useLoadIssueComments('/repo')
-      useEffect(() => {
-        void load()
-      }, [load])
-    })
-    await act(async () => {
-      await Promise.resolve()
-    })
+    const { rerender, settled } = renderLoaderOnEveryChange(() => useLoadIssueComments('/repo'))
+    await settled()
     setActive({ ...validActivePr, title: 'patched complexity' })
     rerender()
-    await act(async () => {
-      await Promise.resolve()
-    })
+    await settled()
     expect(mockPrIssueCommentsAPI).toHaveBeenCalledTimes(1)
   })
 })

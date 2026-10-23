@@ -229,11 +229,23 @@ async function runTick(api: ExtensionAPI, db: ExtensionDB, state: SchedulerState
   }
 }
 
+/** `run` as a tick that is remembered while it is in flight. */
+function trackTicks(run: () => Promise<void>) {
+  const inFlight = new Set<Promise<void>>()
+  const tickAsync = (): Promise<void> => {
+    const ticking = run().finally(() => inFlight.delete(ticking))
+    inFlight.add(ticking)
+    return ticking
+  }
+  return { tickAsync, inFlight }
+}
+
 export function startTaskScheduler(
   api: ExtensionAPI,
   db: ExtensionDB
 ): {
-  dispose: () => void
+  /** Stops the interval; settles once the ticks in flight have finished. */
+  dispose: () => Promise<void>
   tick: () => void
   tickAsync: () => Promise<void>
   startupPromise: Promise<void>
@@ -246,12 +258,16 @@ export function startTaskScheduler(
     lastDay: today(),
     isStartup: true,
   }
-  const tickAsync = (): Promise<void> => runTick(api, db, state)
+  const { tickAsync, inFlight } = trackTicks(() => runTick(api, db, state))
   const tick = (): void => {
     tickAsync().catch(() => {})
   }
   const startupPromise = tickAsync().catch(() => {})
   state.isStartup = false
   const intervalId = setInterval(tick, 15_000)
-  return { dispose: () => clearInterval(intervalId), tick, tickAsync, startupPromise }
+  const dispose = async (): Promise<void> => {
+    clearInterval(intervalId)
+    await Promise.all(inFlight)
+  }
+  return { dispose, tick, tickAsync, startupPromise }
 }

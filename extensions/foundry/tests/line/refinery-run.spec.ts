@@ -3,7 +3,7 @@
  * the order queued behind it on the same files is rebased and checked again —
  * or, when it no longer rebases, put in front of the operator.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
@@ -17,10 +17,7 @@ import { writeObservedFiles } from '../../src/line/observed-files.js'
 import { checkoutPath } from '../../src/line/worktree.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 import { ledgerActions } from '../helpers/order-ledger.js'
-
-// These cases drive real git and give each step up to 20 s (the vi.waitFor
-// calls below); the 5 s default case timeout cut them off first on a busy machine.
-vi.setConfig({ testTimeout: 45_000 })
+import { eventually } from '../../../../tests/support/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
@@ -33,19 +30,8 @@ let repo = ''
 let host: FoundryHost
 const merged = new Set<string>()
 
-beforeAll(async () => {
-  const parent = temporaryDirectory('fdry-refinery')
-  vi.stubEnv('HOME', path.join(parent, 'home'))
-  host = fakeHost(() => dataDir)
-  // Only the minute ticks are held; every agent and git call runs on real time.
-  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
-  await activateFoundry(host)
-})
-
-afterAll(async () => {
-  deactivate()
-  vi.useRealTimers()
-  vi.unstubAllEnvs()
+afterEach(async () => {
+  await deactivate()
 })
 
 /** GitHub: one draft per order's branch, green checks, and merged once `merged` says so. */
@@ -72,10 +58,7 @@ async function shipBoth(): Promise<void> {
   await store.save(agreedLineOrder(repo, { id: 'WO-2', agreedAt: '2026-10-12T10:02:00.000Z' }))
   for (const id of ['WO-1', 'WO-2']) {
     await host.call('foundry:run.start', { id, recipe: 'direct' })
-    await vi.waitFor(async () => expect((await store.load(id))?.status).toBe('shipped'), {
-      timeout: 20_000,
-      interval: 100,
-    })
+    await eventually(async () => expect((await store.load(id))?.status).toBe('shipped'))
   }
   // Both orders touched the same file, as the queue reads it.
   await writeObservedFiles(dataDir, 'WO-1', ['shared.css'])
@@ -88,14 +71,21 @@ async function mergeFirst(): Promise<void> {
   merged.add(pullOf('WO-1'))
 }
 
+// Each test activates Foundry afresh: the fake clock only lasts one test (tests/setup.ts), and the
+// interval the minute ticks run on is made at activation.
 beforeEach(async () => {
   const parent = temporaryDirectory('fdry-refinery-order')
+  vi.stubEnv('HOME', path.join(parent, 'home'))
+  host = fakeHost(() => dataDir)
+  // Only the minute ticks are held; every agent and git call runs on real time.
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
   dataDir = path.join(parent, 'records')
   repo = await repositoryWithRemote(parent)
   merged.clear()
   theRunner.runCommand.mockReset().mockResolvedValue(0)
   agentsAnswer(theRunner, parent)
   githubWithADraftPerOrder()
+  await activateFoundry(host)
 })
 
 describe('a minute after an order merged', () => {
@@ -111,16 +101,12 @@ function rebasingTests() {
     host.gh.mockClear()
 
     await vi.advanceTimersByTimeAsync(60_000)
-    await vi.waitFor(
-      async () => expect(await ledgerActions(dataDir, 'WO-2')).toContain('refinery.rebased'),
-      {
-        timeout: 20_000,
-        interval: 100,
-      }
+    await eventually(async () =>
+      expect(await ledgerActions(dataDir, 'WO-2')).toContain('refinery.rebased')
     )
     expect(await ledgerActions(dataDir, 'WO-1')).toContain('refinery.merged')
     // The rebased branch is the one on the remote, and CI was asked about it again.
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(host.gh).toHaveBeenCalledWith(
         expect.objectContaining({ args: expect.arrayContaining(['checks', pullOf('WO-2')]) })
       )
@@ -146,12 +132,8 @@ function aFailedRebaseTests() {
     await mergeFirst()
 
     await vi.advanceTimersByTimeAsync(60_000)
-    await vi.waitFor(
-      async () => expect(await ledgerActions(dataDir, 'WO-2')).toContain('refinery.conflict'),
-      {
-        timeout: 20_000,
-        interval: 100,
-      }
+    await eventually(async () =>
+      expect(await ledgerActions(dataDir, 'WO-2')).toContain('refinery.conflict')
     )
     const gates = await createGateStore(dataDir).list()
     expect(gates.find((gate) => gate.rule === 'refinery.conflict')).toMatchObject({
@@ -174,15 +156,12 @@ function theMergedIssueTests() {
         })
       )
       await host.call('foundry:run.start', { id: 'WO-1', recipe: 'direct' })
-      await vi.waitFor(async () => expect((await store.load('WO-1'))?.status).toBe('shipped'), {
-        timeout: 20_000,
-        interval: 100,
-      })
+      await eventually(async () => expect((await store.load('WO-1'))?.status).toBe('shipped'))
       vi.mocked(host.issues.transition).mockClear()
       await mergeFirst()
 
       await vi.advanceTimersByTimeAsync(60_000)
-      await vi.waitFor(() =>
+      await eventually(() =>
         expect(host.issues.transition).toHaveBeenCalledWith('linear', 'ENG-1', 'done', undefined)
       )
     } finally {

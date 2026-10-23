@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fakeHost } from '../helpers/foundry-host.js'
 import { startFoundryHomePublisher } from '../../src/home/publish.js'
 import { readLiveStandings } from '../../src/ipc/standing.js'
+import { eventually } from '../../../../tests/support/eventually'
 
 vi.mock('../../src/ipc/standing.js', () => ({ readLiveStandings: vi.fn() }))
 const feedCounter = vi.hoisted(() => ({ built: 0 }))
@@ -58,9 +59,9 @@ describe('publishing to Home while a read is slow', () => {
     await vi.advanceTimersByTimeAsync(2000)
     expect(rootsRead).toEqual(['/records/first'])
     finishRead(0)
-    await vi.waitFor(() => expect(rootsRead).toEqual(['/records/first', '/records/second']))
+    await eventually(() => expect(rootsRead).toEqual(['/records/first', '/records/second']))
     finishRead(1)
-    await vi.waitFor(() => expect(host.homePublish).toHaveBeenCalledTimes(2))
+    await eventually(() => expect(host.homePublish).toHaveBeenCalledTimes(2))
     expect(publishedInOrder(host)).toEqual([1, 2])
   })
 })

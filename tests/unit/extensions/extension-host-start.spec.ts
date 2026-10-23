@@ -231,17 +231,20 @@ describe('ExtensionHost.start — disabled extensions and whenActivated', () => 
   })
 
   it('whenActivated waits for that extension only, not for a slower one', async () => {
+    let finishSlow = () => {}
     const { host, backendHost } = await newExtensionHost({
-      'com.slow': () => new Promise(() => {}),
+      'com.slow': () => new Promise<void>((resolve) => (finishSlow = resolve)),
     })
 
-    void host.startAll({
+    const started = host.startAll({
       bundledDirectory: writeBundle({ 'com.quick': [], 'com.slow': [] }),
       beforeActivation: ready,
     })
     await host.whenActivated('com.quick')
 
     expect(backendHost.activated.map((record) => record.id)).toEqual(['com.quick'])
+    finishSlow()
+    await started
   })
 })
 
@@ -253,7 +256,6 @@ describe('ExtensionHost.start — afterActivation', () => {
         events.push('first')
       },
       'com.second': async () => {
-        await Promise.resolve()
         events.push('second')
       },
     })
@@ -261,7 +263,7 @@ describe('ExtensionHost.start — afterActivation', () => {
       events.push('after')
     }
 
-    void host.startAll({
+    const started = host.startAll({
       bundledDirectory: writeBundle({ 'com.first': [], 'com.second': [] }),
       beforeActivation: ready,
       afterActivation: recordAfterActivation,
@@ -269,6 +271,7 @@ describe('ExtensionHost.start — afterActivation', () => {
     await host.whenActivated('com.first')
 
     expect(events).toEqual(['first', 'second', 'after'])
+    await started
   })
 
   it('whenActivated resolves at once for an unknown extension', async () => {
@@ -286,7 +289,6 @@ describe('ExtensionHost.start with extensionDependencies (ADR 094)', () => {
         events.push('consumer')
       },
       'com.z-provider': async () => {
-        await Promise.resolve()
         events.push('provider')
       },
     })

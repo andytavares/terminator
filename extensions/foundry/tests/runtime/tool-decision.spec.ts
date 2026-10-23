@@ -116,7 +116,7 @@ function operatorToolsTests() {
 function neverAbstainingTests() {
   it('never abstains, whatever it decides', () => {
     for (const command of ['git status', 'rm -rf x', 'npm test', 'find . -delete']) {
-      expect(reviewing({ input: { command } }), command).not.toBeNull()
+      expect(reviewing({ input: { command } })).not.toBeNull()
     }
   })
 }
@@ -153,7 +153,7 @@ function toolClassesAndOrdinaryWorkTests() {
     // These went to an operator at every setting, so no run finished
     // unattended and builders sat while the graph said `running`.
     for (const command of ['pwd && git status', 'npm test 2>&1 | tail -20', 'cd "$(pwd)" && ls']) {
-      expect(policyAnswer(decideTool(request({ input: { command } })))?.allow, command).toBe(true)
+      expect(policyAnswer(decideTool(request({ input: { command } })))?.allow).toBe(true)
     }
   })
 }
@@ -311,14 +311,11 @@ function asStrictAsTheWaitTests() {
       { tool: 'Bash', input: { command: 'npm test > /work/other/out.log' } },
     ]
     for (const call of held) {
-      expect(
-        decideTool(request({ ...call, autonomy: 'standard' })),
-        JSON.stringify(call)
-      ).toBeNull()
+      expect(decideTool(request({ ...call, autonomy: 'standard' }))).toBeNull()
       const unattendedDecision = policyAnswer(
         decideTool(request({ ...call, autonomy: 'lights-out' }))
       )
-      expect(unattendedDecision?.allow, JSON.stringify(call)).toBe(false)
+      expect(unattendedDecision?.allow).toBe(false)
     }
   })
 }
@@ -336,15 +333,14 @@ function scratchFilesAndSomebodyThereTests() {
           request({ input: { command: `npm test > ${join(tmpdir(), 'out.log')}` }, autonomy })
         )
       )
-      expect(decision?.allow, autonomy).toBe(true)
+      expect(decision?.allow).toBe(true)
     }
   })
 
   it('still asks when somebody is there to be asked', () => {
     for (const autonomy of ['standard', 'escorted'] as const) {
       expect(
-        decideTool(request({ tool: 'Edit', input: { file_path: '/etc/hosts' }, autonomy })),
-        autonomy
+        decideTool(request({ tool: 'Edit', input: { file_path: '/etc/hosts' }, autonomy }))
       ).toBeNull()
     }
   })

@@ -5,7 +5,7 @@
 
 import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
+import { tmpdir, userInfo } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -58,9 +58,10 @@ export function startupProblems(output, extensionIds) {
 }
 
 /** The main log file: on macOS app.getPath('logs') is ~/Library/Logs/<app name>
- * (https://www.electronjs.org/docs/latest/api/app#appsetapplogspathpath). */
+ * (https://www.electronjs.org/docs/latest/api/app#appsetapplogspathpath), under the account's
+ * home: Electron does not read HOME, so the app's own HOME does not move it. */
 export function mainLogPath({ appName }) {
-  return join(homedir(), 'Library', 'Logs', appName, 'terminator.log')
+  return join(userInfo().homedir, 'Library', 'Logs', appName, 'terminator.log')
 }
 
 /** The command that starts the app for `mode`: electron-vite, or a packaged executable.
@@ -81,17 +82,18 @@ function sizeOf(path) {
   return existsSync(path) ? readFileSync(path).length : 0
 }
 
-/** The app's environment: logging on, and in the background (src/main/background-mode.ts), so a
- * smoke run neither shows a window nor takes focus from whoever is using the machine. */
-export function launchEnvironment(env) {
-  return { ...env, ELECTRON_ENABLE_LOGGING: '1', TERMINATOR_RUN_IN_BACKGROUND: '1' }
+/** The app's environment: logging on, in the background (src/main/background-mode.ts), so a
+ * smoke run neither shows a window nor takes focus, and in a fresh `home`: the app writes hooks
+ * into ~/.claude/settings.json, which must be neither the developer's nor different from CI's. */
+export function launchEnvironment(env, home) {
+  return { ...env, HOME: home, ELECTRON_ENABLE_LOGGING: '1', TERMINATOR_RUN_IN_BACKGROUND: '1' }
 }
 
-function launch([command, args]) {
+function launch([command, args], home) {
   const child = spawn(command, args, {
     cwd: REPO_ROOT,
     detached: true,
-    env: launchEnvironment(process.env),
+    env: launchEnvironment(process.env, home),
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   const run = { child, output: '', exitCode: undefined }
@@ -167,10 +169,11 @@ async function main([mode, executable]) {
     throw new Error('usage: smoke-start.mjs dev | preview | exec <executable>')
   }
   const userDataDirectory = mkdtempSync(join(tmpdir(), 'terminator-smoke-'))
+  const home = mkdtempSync(join(tmpdir(), 'terminator-smoke-home-'))
   const logPath = mainLogPath({ appName: appName() })
   const logOffset = sizeOf(logPath)
   const extensionIds = bundledExtensionIds(join(REPO_ROOT, 'extensions'))
-  const run = launch(startCommand({ mode, userDataDirectory, executable }))
+  const run = launch(startCommand({ mode, userDataDirectory, executable }), home)
   const outputSoFar = () => `${readFrom(logPath, logOffset)}\n${run.output}`
 
   await awaitStartup(run, outputSoFar, extensionIds)

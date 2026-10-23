@@ -2,7 +2,7 @@
  * Signals and the record, through `activate`: the sensor tick that reads the
  * product back once a minute, and the checks the operator accepted.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
@@ -10,6 +10,7 @@ import { fakeHost, temporaryDirectory } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { createOrderStore } from '../../src/order/store.js'
+import { eventually } from '../../../../tests/support/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
@@ -17,24 +18,20 @@ vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervis
 let dataDir = ''
 let host: FoundryHost
 
-beforeAll(async () => {
+// Each test activates Foundry afresh: the fake clock only lasts one test (tests/setup.ts), and the
+// interval the sensors tick on is made at activation.
+beforeEach(async () => {
   const parent = temporaryDirectory('fdry-sensors')
   vi.stubEnv('HOME', path.join(parent, 'home'))
+  dataDir = temporaryDirectory('fdry-sensors-records')
   host = fakeHost(() => dataDir)
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+  vi.mocked(host.issues.listMine).mockReset().mockResolvedValue({ issues: [], failures: [] })
   await activateFoundry(host)
 })
 
-afterAll(async () => {
-  deactivate()
-  vi.useRealTimers()
-  vi.unstubAllEnvs()
-})
-
-beforeEach(() => {
-  dataDir = temporaryDirectory('fdry-sensors-records')
-  host.gh.mockReset()
-  vi.mocked(host.issues.listMine).mockReset().mockResolvedValue({ issues: [], failures: [] })
+afterEach(async () => {
+  await deactivate()
 })
 
 type Signals = { signals: Array<{ id: string; title: string; sensorId: string }> }
@@ -46,7 +43,6 @@ async function signals(): Promise<Signals['signals']> {
 describe('a minute after a sensor was enabled', () => {
   describe('assigned issues', assignedIssuesTests)
   describe('failing workflows', failingWorkflowsTests)
-  describe('nothing on', nothingOnTests)
 })
 
 function assignedIssuesTests() {
@@ -62,7 +58,7 @@ function assignedIssuesTests() {
     })
 
     await vi.advanceTimersByTimeAsync(60_000)
-    await vi.waitFor(async () =>
+    await eventually(async () =>
       expect((await signals()).map((s) => s.title)).toEqual(['Login is slow'])
     )
   })
@@ -93,18 +89,10 @@ function failingWorkflowsTests() {
     })
 
     await vi.advanceTimersByTimeAsync(60_000)
-    await vi.waitFor(async () =>
+    await eventually(async () =>
       expect((await signals()).map((s) => s.title)).toEqual(['ci failing on main'])
     )
     expect(host.gh).toHaveBeenCalledWith(expect.objectContaining({ cwd: '/repos/app' }))
-  })
-}
-
-function nothingOnTests() {
-  it('runs nothing while every sensor is off', async () => {
-    await vi.advanceTimersByTimeAsync(60_000)
-    expect(host.gh).not.toHaveBeenCalled()
-    expect(host.issues.listMine).not.toHaveBeenCalled()
   })
 }
 

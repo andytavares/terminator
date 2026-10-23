@@ -1,17 +1,16 @@
 #!/usr/bin/env node
-// The E2E job of .github/workflows/ci.yml, run here step for step (selection, five shards at
-// CI=1, burn-in of changed specs). `npm run ci:local:e2e` runs all of it; `-- 3` runs only shard 3.
+// The E2E job of .github/workflows/ci.yml, run here step for step (selection, its shards at
+// CI=1, each spec once). `npm run ci:local:e2e` runs all of it; `-- 3` runs only shard 3.
 
 import { execFileSync, spawnSync } from 'node:child_process'
 import { cpus, loadavg } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { computeChanged, listSpecs, select } from './e2e-select.mjs'
+import { listSpecs } from './e2e-select.mjs'
+import { e2eShardCount, readWorkflow } from './ci-plan.mjs'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const BASE = 'origin/main'
-const SHARDS = 5
-const BURN_IN_REPEATS = 2
+const SHARDS = e2eShardCount(readWorkflow(join(REPO_ROOT, '.github/workflows/ci.yml')))
 const NEEDS_CHROMIUM = [
   'remote-control.spec.ts',
   'git-integration-contrast.spec.ts',
@@ -39,24 +38,43 @@ export async function waitForQuiet({ readLoad, cores, pause, limitMs }) {
   }
 }
 
+/** The `count` busiest processes in `ps -Ao pcpu,comm -r` output, as `<cpu>%  <command>`. */
+export function busiestProcesses(psOutput, count) {
+  return psOutput
+    .split('\n')
+    .slice(1)
+    .map((line) => line.trim().match(/^([\d.]+)\s+(.+)$/))
+    .filter((match) => match !== null)
+    .map(([, cpu, command]) => ({ cpu: Number(cpu), command }))
+    .sort((a, b) => b.cpu - a.cpu)
+    .slice(0, count)
+    .map(({ cpu, command }) => `${cpu.toFixed(1)}%  ${command}`)
+}
+
+const readProcesses = () => execFileSync('ps', ['-Ao', 'pcpu,comm', '-r'], { encoding: 'utf8' })
+
 async function requireQuietMachine() {
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
   const machine = { readLoad: () => loadavg()[0], cores: cpus().length, pause }
   if (await waitForQuiet({ ...machine, limitMs: QUIET_WAIT_MS })) return
   console.error(
-    `Load average is ${loadavg()[0].toFixed(1)} on ${cpus().length} cores after ${QUIET_WAIT_MS / 1000}s. Quiet the machine and run again.`
+    `Load average is ${loadavg()[0].toFixed(1)} on ${cpus().length} cores after ${QUIET_WAIT_MS / 1000}s. Quiet the machine and run again. Busiest now:`
   )
+  for (const line of busiestProcesses(readProcesses(), 8)) console.error(`  ${line}`)
   process.exit(2)
 }
 
+/** The e2e specs a selection runs: every spec when it says all, else the ones it names. */
+export function e2eSpecsOf(selection, allSpecs) {
+  return selection.e2eMode === 'all' ? allSpecs : selection.e2e
+}
+
 function selection() {
-  const changed = computeChanged(BASE)
-  const chosen = select({ changed, specs: listSpecs(), isMainPush: false })
-  const specs = chosen.mode === 'all' ? listSpecs() : chosen.specs
-  const changedSpecs = changed
-    .filter((path) => /^tests\/e2e\/[^/]+\.spec\.ts$/.test(path))
-    .map((path) => path.replace('tests/e2e/', ''))
-  return { specs, changedSpecs }
+  const output = execFileSync('node', ['scripts/test-select.mjs'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  })
+  return JSON.parse(output)
 }
 
 /** The Playwright arguments `scripts/e2e-shard.mjs` gives one shard. */
@@ -69,10 +87,10 @@ function argumentsOfShard(shard, specs) {
   return output.split(/\s+/).filter(Boolean)
 }
 
-function playwright(args, extra = []) {
+function playwright(args) {
   const needsChromium = NEEDS_CHROMIUM.some((spec) => args.some((arg) => arg.endsWith(spec)))
   if (needsChromium && !run('npx', ['playwright', 'install', 'chromium'])) return false
-  return run('npx', ['playwright', 'test', ...args, ...extra, '--reporter=dot'], { CI: '1' })
+  return run('npx', ['playwright', 'test', ...args, '--reporter=dot'], { CI: '1' })
 }
 
 function runShards(only, specs) {
@@ -87,24 +105,16 @@ function runShards(only, specs) {
   return failed
 }
 
-function burnIn(changedSpecs) {
-  if (changedSpecs.length === 0) return true
-  console.log(`\n== burn-in of ${changedSpecs.length} changed spec(s), ${BURN_IN_REPEATS} repeats`)
-  const files = changedSpecs.map((spec) => `tests/e2e/${spec}`)
-  return playwright(files, [`--repeat-each=${BURN_IN_REPEATS}`])
-}
-
 async function main() {
   const only = process.argv[2] ? Number(process.argv[2]) : null
   await requireQuietMachine()
   if (!run('npm', ['run', 'build'])) process.exit(1)
-  const { specs, changedSpecs } = selection()
-  console.log(`${specs.length} spec(s) selected against ${BASE}`)
+  const chosen = selection()
+  const specs = e2eSpecsOf(chosen, listSpecs())
+  console.log(`${specs.length} spec(s) selected: ${chosen.reason}`)
   const failed = runShards(only, specs)
-  const burnInPassed = only !== null || burnIn(changedSpecs)
   if (failed.length > 0) console.error(`\nShards failed: ${failed.join(', ')}`)
-  if (!burnInPassed) console.error('\nThe burn-in of the changed specs failed.')
-  process.exit(failed.length === 0 && burnInPassed ? 0 : 1)
+  process.exit(failed.length === 0 ? 0 : 1)
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main()

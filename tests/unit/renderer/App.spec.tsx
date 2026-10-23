@@ -366,9 +366,9 @@ function openPalette(): void {
 }
 
 /** Runs a Quick Actions entry by id, as a click on its row does. */
-function runAction(id: string): void {
-  act(() => {
-    void paletteAction(id)?.run()
+async function runAction(id: string): Promise<void> {
+  await act(async () => {
+    await paletteAction(id)?.run()
   })
 }
 
@@ -665,7 +665,7 @@ describe('App — does not close open panels when workspace changes', () => {
   it('command core.open-settings action opens SettingsPanel', async () => {
     render(<App />)
     openPalette()
-    runAction('core.open-settings')
+    await runAction('core.open-settings')
     await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeTruthy())
   })
 
@@ -674,7 +674,7 @@ describe('App — does not close open panels when workspace changes', () => {
     render(<App />)
     leaveHome()
     openPalette()
-    runAction('core.toggle-sidebar')
+    await runAction('core.toggle-sidebar')
     await waitFor(() =>
       expect(screen.getByTestId('unified-sidebar').className).toContain('unified-sidebar--hidden')
     )
@@ -685,23 +685,23 @@ describe('App — command core.toggle-log action opens LogWindow', () => {
   it('command core.toggle-log action opens LogWindow', async () => {
     render(<App />)
     openPalette()
-    runAction('core.toggle-log')
+    await runAction('core.toggle-log')
     await waitFor(() => expect(screen.getByTestId('log-window')).toBeTruthy())
   })
 
-  it('command core.switch-workspace-{id} action switches to that workspace', () => {
+  it('command core.switch-workspace-{id} action switches to that workspace', async () => {
     setupApp({ activeWorkspaceId: 'ws-2', workspaces: [WS1, WS2] })
     render(<App />)
     openPalette()
-    runAction('core.switch-workspace-ws-1')
+    await runAction('core.switch-workspace-ws-1')
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('ws-1')
   })
 
-  it('command core.split-vertical action splits the active project', () => {
+  it('command core.split-vertical action splits the active project', async () => {
     setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1', workspaces: [WS1] })
     render(<App />)
     openPalette()
-    runAction('core.split-vertical')
+    await runAction('core.split-vertical')
     expect(splitSession).toHaveBeenCalledWith('proj-1', 'vertical', {
       cwd: '/a',
       scrollbackLimit: 10000,
@@ -710,11 +710,11 @@ describe('App — command core.toggle-log action opens LogWindow', () => {
 })
 
 describe('App — command core.toggle-log action opens LogWindow — command core.split-horizontal action splits the active project', () => {
-  it('command core.split-horizontal action splits the active project', () => {
+  it('command core.split-horizontal action splits the active project', async () => {
     setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1', workspaces: [WS1] })
     render(<App />)
     openPalette()
-    runAction('core.split-horizontal')
+    await runAction('core.split-horizontal')
     expect(splitSession).toHaveBeenCalledWith('proj-1', 'horizontal', {
       cwd: '/a',
       scrollbackLimit: 10000,
@@ -794,10 +794,10 @@ describe('App — menu:close-tab (onMenuCloseTab) — closes the scratch session
 })
 
 describe('App — command core.toggle-overview action opens Overview', () => {
-  it('command core.toggle-overview action opens Overview', () => {
+  it('command core.toggle-overview action opens Overview', async () => {
     render(<App />)
     openPalette()
-    runAction('core.toggle-overview')
+    await runAction('core.toggle-overview')
     expect(registry().activeGlobalTabId).toBe('core.overview')
   })
 
@@ -1128,11 +1128,11 @@ describe('App — command palette sessions and note editing (US6)', () => {
 })
 
 describe('App — command palette sessions and note editing (US6) — activates both the project and the session when one is chosen', () => {
-  it('activates both the project and the session when one is chosen', () => {
+  it('activates both the project and the session when one is chosen', async () => {
     setupApp({ sessions: [paletteSession], projectsByWorkspaceId: projects })
     render(<App />)
     openPalette()
-    runAction('session:s1')
+    await runAction('session:s1')
     expect(useWorkspaceStore.getState().activeProjectId).toBe('proj-1')
     expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('s1')
   })
@@ -1230,24 +1230,24 @@ describe('App — Quick Actions integration (feature 057) — core actions', () 
     const shown = (projectId: string) =>
       useSessionStore.getState().getActiveSessionForProject(projectId)
 
-    runAction('core.cycle-recent-next')
+    await runAction('core.cycle-recent-next')
     expect(shown('proj-2')).toBe('s2')
 
-    runAction('core.next-waiting')
+    await runAction('core.next-waiting')
     expect(shown('proj-2')).toBe('s2')
 
-    runAction('session:s1')
+    await runAction('session:s1')
     expect(useWorkspaceStore.getState()).toMatchObject({
       activeWorkspaceId: 'ws-1',
       activeProjectId: 'proj-1',
     })
-    runAction('core.prev-tab')
+    await runAction('core.prev-tab')
     expect(shown('proj-1')).toBe('s3')
 
-    runAction('core.close-tab')
+    await runAction('core.close-tab')
     await waitFor(() => expect(useSessionStore.getState().sessions.has('s3')).toBe(false))
 
-    runAction('core.cycle-workspace-next')
+    await runAction('core.cycle-workspace-next')
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('ws-2')
   })
 })
@@ -1263,11 +1263,11 @@ describe('App — Quick Actions integration (feature 057) — "Link issue" opens
     showTab('proj-1', 's1')
     render(<App />)
     openPalette()
-    runAction('core.link-issue')
+    await runAction('core.link-issue')
     expect(screen.getByTestId('session-link-dialog').textContent).toContain('s1')
   })
 
-  it('"Link issue to branch" opens the branch dialog rather than the session one', () => {
+  it('"Link issue to branch" opens the branch dialog rather than the session one', async () => {
     facts.sessionFacts = [{ sessionId: 's1', workItem: null }]
     setupApp({
       activeProjectId: 'proj-1',
@@ -1277,7 +1277,7 @@ describe('App — Quick Actions integration (feature 057) — "Link issue" opens
     showTab('proj-1', 's1')
     render(<App />)
     openPalette()
-    runAction('core.link-issue-branch')
+    await runAction('core.link-issue-branch')
     expect(useIntegrationsStore.getState().linkDialogProjectId).toBe('proj-1')
     expect(screen.queryByTestId('session-link-dialog')).toBeNull()
   })
@@ -1538,7 +1538,7 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
 })
 
 describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — leaves everything as it was for core actions with no project, no sessions and no workspaces', () => {
-  it('leaves everything as it was for core actions with no project, no sessions and no workspaces', () => {
+  it('leaves everything as it was for core actions with no project, no sessions and no workspaces', async () => {
     render(<App />)
     openPalette()
     for (const id of [
@@ -1552,7 +1552,7 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
       'core.copy-issue-key',
       'core.open-issue',
     ]) {
-      runAction(id)
+      await runAction(id)
     }
     expect(splitSession).not.toHaveBeenCalled()
     expect(main.sent.input).not.toHaveBeenCalled()

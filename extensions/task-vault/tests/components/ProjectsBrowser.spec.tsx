@@ -6,8 +6,6 @@ import { invalidateSmartInputCache } from '../../src/components/SmartTaskInput'
 import { useVaultNavStore } from '../../src/stores/vault-nav.store'
 import { ProjectsBrowser } from '../../src/components/ProjectsBrowser'
 
-vi.setConfig({ testTimeout: 30_000 })
-
 let bridge: ReturnType<typeof installVaultBridge>
 const listSessions = vi.fn()
 

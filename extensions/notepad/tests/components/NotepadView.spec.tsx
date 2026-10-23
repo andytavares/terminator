@@ -9,7 +9,6 @@ import {
   eventually,
   typeAtEnd,
   storeSettings,
-  elapse,
 } from './helpers/note-surface'
 
 vi.mock('../../src/components/NoteList', () => ({
@@ -18,8 +17,6 @@ vi.mock('../../src/components/NoteList', () => ({
 vi.mock('../../src/components/DiagramView', () => ({
   DiagramView: ({ diagramId }: { diagramId: string }) => <div>diagram {diagramId}</div>,
 }))
-
-vi.setConfig({ testTimeout: 30_000 })
 
 const bridge = installNotepadBridge()
 
@@ -97,7 +94,7 @@ describe('NotepadView opening a note', () => {
     useNotesStore.setState({ notes: [listItem('n1', 'Plan')], selectedNoteId: 'n1' })
     render(<NotepadView />)
     await eventually(() => expect(bridge.calls('terminator.notepad:notes.get')).toHaveLength(1))
-    await act(() => elapse(50))
+    await act(async () => undefined)
     expect(document.querySelector('.cm-editor')).toBeNull()
 
     await act(async () => answerBody({ data: { body: BODY } }))
@@ -114,10 +111,8 @@ describe('NotepadView re-anchoring comments on load', () => {
     const byId = new Map(useCommentsStore.getState().comments.map((c) => [c.id, c]))
     expect(byId.get('c1')).toMatchObject({ startOffset: 7, endOffset: 12, status: 'open' })
     expect(byId.get('c2')?.status).toBe('orphaned')
-    await eventually(
-      () =>
-        expect(bridge.calls('terminator.notepad:comments.markOrphaned')).toEqual([{ id: 'c2' }]),
-      8000
+    await eventually(() =>
+      expect(bridge.calls('terminator.notepad:comments.markOrphaned')).toEqual([{ id: 'c2' }])
     )
     expect(bridge.calls('terminator.notepad:comments.updateAnchor')).toEqual([
       { id: 'c1', startOffset: 7, endOffset: 12 },
@@ -184,15 +179,20 @@ describe('NotepadView changes from another surface', () => {
 
 describe('NotepadView with Notepad settings changed', () => {
   beforeEach(() => useNotepadSettingsStore.setState(notepadSettingsFrom({})))
-  afterEach(() => storeSettings({}))
+  afterEach(() => {
+    vi.useRealTimers()
+    storeSettings({})
+  })
 
   it('waits the configured autosave delay before saving an edit', async () => {
     storeSettings({ 'terminator.notepad.autosaveMs': 2000 })
     await openNote()
     await eventually(() => expect(useNotepadSettingsStore.getState().autosaveMs).toBe(2000))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     act(() => typeAtEnd('!'))
-    await elapse(1200)
+    await vi.advanceTimersByTimeAsync(1200)
     expect(bridge.calls('terminator.notepad:notes.autosave')).toEqual([])
+    await vi.advanceTimersByTimeAsync(800)
     await eventually(() =>
       expect(bridge.calls('terminator.notepad:notes.autosave')).toHaveLength(1)
     )

@@ -42,7 +42,8 @@ export interface RemoteServerHandle {
   start(): Promise<void>
   stop(): Promise<void>
   isListening(): boolean
-  disconnectAllClients(): void
+  /** Settles once the remote terminals are killed. */
+  disconnectAllClients(): Promise<void>
   /** Who is connected, and a subscription to changes, for the view. */
   devices: ConnectedDeviceRegistry
   inject: FastifyInstance['inject']
@@ -395,11 +396,12 @@ class RemoteServer {
     this.listening = false
   }
 
-  private disconnectAllClients(): void {
+  private async disconnectAllClients(): Promise<void> {
     forEachSessionStore(this.parts.sessions, (store) => store.revokeAll())
     // Kill all remote PTYs — password rotation invalidates existing sessions
-    void this.connections.terminalCleanup.cleanup()
+    const terminalsKilled = this.connections.terminalCleanup.cleanup()
     this.connections.bridgeCleanup.disconnectAll()
     this.parts.subscriberManager.destroyAll()
+    await terminalsKilled
   }
 }

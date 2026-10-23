@@ -55,7 +55,6 @@ async function foundry(channel: string, payload: unknown = {}): Promise<unknown>
 test.skip(REMOTE === '', 'set LIVE_REMOTE to run this')
 
 test.beforeAll(async () => {
-  test.setTimeout(300_000)
   repo = e2eTempDir('foundry-live-refinery-')
   execFileSync('git', ['clone', REMOTE, repo])
   git('config', 'user.email', 'live@example.com')
@@ -146,7 +145,7 @@ async function runToDraft(id: string): Promise<string> {
     return ['ship.ready_asked', 'ship.refused', 'ship.ci_halted'].some((e) => ledger.includes(e))
   }
   await expect
-    .poll(shippingEnded, { timeout: 25 * 60_000, intervals: [10_000] })
+    .poll(shippingEnded, { intervals: [10_000] })
     .toBe(true)
     .catch(() => console.log(`[deadline] ${id} neither drafted nor stopped`))
   const pulls = JSON.parse(
@@ -197,7 +196,7 @@ async function restackOutcome(): Promise<string> {
     return ledger.includes('refinery.conflict') ? 'conflict' : ''
   }
   await expect
-    .poll(outcomeSoFar, { timeout: 15 * 60_000, intervals: [15_000] })
+    .poll(outcomeSoFar, { intervals: [15_000] })
     .not.toBe('')
     .catch(() => console.log('[deadline] the second order was neither rebased nor in conflict'))
   return outcomeSoFar()
@@ -212,7 +211,6 @@ function expectRestackedOnMain(): void {
 }
 
 test('a merge restacks the order queued behind it', async () => {
-  test.setTimeout(3_600_000)
   writeTwoOrders()
   const firstUrl = await runToDraft(FIRST)
   await runToDraft(SECOND)

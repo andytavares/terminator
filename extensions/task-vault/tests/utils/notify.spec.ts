@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { eventually } from '../../../../tests/support/eventually'
 
 // Mock the toast store before importing notify
 vi.mock('../../src/stores/extension-toast.store', () => ({
@@ -63,9 +64,12 @@ function notifyLocalToastsTests() {
     const onClick = vi.fn()
     notify('info', 'Archived: test', { key: 'taskArchived', onClick })
     await mockCreate.mock.results[0].value
-    await Promise.resolve()
-    toastPushed(pushed('Archived: test'))
-    expect(mockAddToast).toHaveBeenCalledWith('info', 'Archived: test', { onClick: undefined })
+    await eventually(() => {
+      toastPushed(pushed('Archived: test'))
+      expect(mockAddToast).toHaveBeenLastCalledWith('info', 'Archived: test', {
+        onClick: undefined,
+      })
+    })
   })
 
   it('does not throw when called without options', () => {

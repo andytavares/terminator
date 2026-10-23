@@ -145,14 +145,13 @@ function scoutedConvergeWaitingTests() {
     const startArchitect = vi.fn().mockResolvedValue({ ok: true, sessionId: 'a' })
     await convergeMaybeScouted({ startScout, startArchitect }, order({ id: 'WO-w' }), 'draft')
 
-    let settled: string | null = null
-    const waiting = waitForScout('WO-w').then((r) => (settled = r))
-    await Promise.resolve()
-    expect(settled).toBeNull()
+    const waiting = waitForScout('WO-w')
+    await expect(Promise.race([waiting, Promise.resolve('still waiting')])).resolves.toBe(
+      'still waiting'
+    )
 
     finish()
-    await waiting
-    expect(settled).toBe('finished')
+    await expect(waiting).resolves.toBe('finished')
     await expect(waitForScout('WO-w')).resolves.toBe('none')
   })
 }

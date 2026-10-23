@@ -19,6 +19,7 @@ import { makeVerdict, SelfVerificationError } from '../../src/verify/verdict.js'
 import { decide, raiseGate } from '../../src/gates/rules.js'
 import type { Gate } from '../../src/gates/rules.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { eventually } from '../../../../tests/support/eventually'
 
 // The executor is where the scheduler, the roles and a session finally meet.
 // Each of those was testable alone and none of them did anything on its own,
@@ -229,7 +230,7 @@ async function agentBudgetTest(): Promise<void> {
   })
   const executing = execute(planOf(o), deps(run))
   for (const _wave of [1, 2]) {
-    await vi.waitFor(() => expect(held).toHaveLength(2))
+    await eventually(() => expect(held).toHaveLength(2))
     held.splice(0).forEach((release) => release())
   }
   await executing
@@ -277,7 +278,7 @@ function aChangeOfRoleTests() {
     })
     expect(run.mock.calls.length).toBeGreaterThan(0)
     for (const call of run.mock.calls) {
-      expect(call[0].resumeSessionId, call[0].node.id).toBeUndefined()
+      expect(call[0].resumeSessionId).toBeUndefined()
     }
   })
 
@@ -2406,8 +2407,8 @@ function theMomentTheAgentExistsTests() {
       },
     })
 
-    // Let the started callback and its persist land before the turn ends.
-    await new Promise((resolve) => setImmediate(resolve))
+    // The persist of the started callback lands while the agent is still held.
+    await eventually(() => expect(seen).toContain('sess-build:U-1'))
     released()
     await running
 

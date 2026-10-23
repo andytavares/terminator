@@ -111,7 +111,7 @@ async function workspaceShellOpensNewTerminals(): Promise<void> {
   await page.keyboard.press('ControlOrMeta+t')
   await page.keyboard.type('echo "shell:$0"\n')
   await expect
-    .poll(async () => (await readTerminalRows(page)).join('\n'), { timeout: 15_000 })
+    .poll(async () => (await readTerminalRows(page)).join('\n'))
     .toContain('shell:/bin/bash')
 }
 
@@ -200,7 +200,6 @@ async function aPromptSurvivesARestart(): Promise<void> {
 }
 
 test('settings change the theme, a workspace, an extension and the terminal, and survive a restart', async () => {
-  test.setTimeout(120_000)
   await theLookChanges()
   await extensionsAndWorkspacesChange()
   await aPromptSurvivesARestart()

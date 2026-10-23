@@ -9,6 +9,7 @@ import type { PendingPermission } from '../../src/runtime/permission-bridge.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 import { partialFake } from '../../../../tests/support/fakes'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
+import { eventually } from '../../../../tests/support/eventually'
 
 // This replaces spawning `claude --print --permission-mode bypassPermissions`
 // as a hidden child process — a run nobody could see, approving every tool call
@@ -72,9 +73,6 @@ function runnerCoreApi() {
     },
   } as never
 }
-
-/** Lets the runner's awaits on the core (addProject, openTerminal) finish. */
-const coreCallsSettled = () => new Promise((resolve) => setImmediate(resolve))
 
 function runner(now: () => number = () => 1_000) {
   return createSupervisedRunner({
@@ -295,9 +293,11 @@ function reachingTheOperatorTests() {
     const call = held()
     const r = runner()
     const run = await r.start({ ...start, onPending: call.onPending })
-    void ask(run?.sessionId ?? '')
+    const pending = ask(run?.sessionId ?? '')
     await call.arrived
     expect(call.seen[0]).toMatchObject({ toolName: 'Bash', summary: 'rm -rf /' })
+    r.resolve(run?.sessionId ?? '', call.seen[0].requestId, { allow: false })
+    await pending
   })
 
   it('waits, rather than proceeding while nobody has answered', async () => {
@@ -305,10 +305,10 @@ function reachingTheOperatorTests() {
     const r = runner()
     const run = await r.start({ ...start, onPending: call.onPending })
     const pending = ask(run?.sessionId ?? '')
-    let settled = false
-    void pending.then(() => (settled = true)).catch(() => {})
     await call.arrived
-    expect(settled).toBe(false)
+    await expect(Promise.race([pending, Promise.resolve('unanswered')])).resolves.toBe('unanswered')
+    r.resolve(run?.sessionId ?? '', call.seen[0].requestId, { allow: false })
+    await pending
   })
 }
 
@@ -452,6 +452,16 @@ function disposingTests() {
     await call.arrived
     r.dispose()
     expect(await pending).toMatchObject({ permissionDecision: 'deny' })
+  })
+
+  // A run waiting for a turn to end waited for ever once the runner was gone: deactivating the
+  // extension left the run with no end and no record of why.
+  it('ends each running session, with no exit code, so nothing waits on it for ever', async () => {
+    const ends: Array<number | null> = []
+    const r = runner()
+    await r.start({ ...start, onEnd: (code) => ends.push(code) })
+    r.dispose()
+    expect(ends).toEqual([null])
   })
 }
 
@@ -950,14 +960,14 @@ describe('running one command in a terminal, with no agent', () => {
 
 function openingTheTabTests() {
   it("links the order's ticket to the project a command opens, too", async () => {
-    void runner().runCommand({ ...command, issue: { tracker: 'linear', key: 'TAV-15' } })
-    await coreCallsSettled()
+    exitWith({ exitCode: 0 })
+    await runner().runCommand({ ...command, issue: { tracker: 'linear', key: 'TAV-15' } })
     expect(created[0]).toMatchObject({ issue: { tracker: 'linear', key: 'TAV-15' } })
   })
 
   it('opens a plain terminal tab in the worktree project', async () => {
-    void runner().runCommand(command)
-    await coreCallsSettled()
+    exitWith({ exitCode: 0 })
+    await runner().runCommand(command)
     expect(created[0]).toMatchObject({ worktreePath: '/wt/feat-thing', gitBranch: 'feat/thing' })
     expect(ran[0]).toMatchObject({
       projectId: 'project-1',
@@ -970,8 +980,8 @@ function openingTheTabTests() {
   // Typed into an interactive shell, the verdict was that shell's exit, and closing the tab
   // read as exit 0 (extensions/foundry/CLAUDE.md, "Verification commands").
   it("runs the command's script as the terminal's process, typing nothing", async () => {
-    void runner().runCommand(command)
-    await coreCallsSettled()
+    exitWith({ exitCode: 0 })
+    await runner().runCommand(command)
     expect(written).toEqual([])
     const shell = process.env.SHELL ?? '/bin/sh'
     expect(ran[0].file).toBe(shell)
@@ -1024,7 +1034,8 @@ async function scriptFor(
   logPath?: string,
   env?: Record<string, string>
 ): Promise<string> {
-  void runner().runCommand({
+  exitWith({ exitCode: 0 })
+  await runner().runCommand({
     worktreePath: '/wt/feat-thing',
     workspaceId: 'ws-1',
     branch: 'feat/thing',
@@ -1033,7 +1044,6 @@ async function scriptFor(
     logPath,
     env,
   })
-  await coreCallsSettled()
   return scriptOf(ran[ran.length - 1])
 }
 
@@ -1231,15 +1241,13 @@ function runCheck(commandLine: string, logPath?: string): Promise<number | null>
 
 async function checkOrTimeOut(commandLine: string, logPath?: string): Promise<number | null> {
   const result: { ended: boolean; exitCode: number | null } = { ended: false, exitCode: null }
-  void runCheck(commandLine, logPath).then((exitCode) =>
+  const check = runCheck(commandLine, logPath).then((exitCode) =>
     Object.assign(result, { ended: true, exitCode })
   )
-  await vi.waitFor(
-    () => {
-      if (!result.ended) throw new Error(`the check never ended; it printed:\n${printed}`)
-    },
-    { timeout: 4_000, interval: 20 }
-  )
+  await eventually(() => {
+    if (!result.ended) throw new Error(`the check never ended; it printed:\n${printed}`)
+  })
+  await check
   return result.exitCode
 }
 
