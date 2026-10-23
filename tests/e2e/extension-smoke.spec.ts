@@ -109,12 +109,12 @@ async function recordErrors(part: string): Promise<void> {
   )
 }
 
-/** Clicks the control that opens the disclosure, and waits for the screen to change. */
 /** The surfaces with a disclosure open it; the others have nothing behind one. */
 async function openDisclosureIfAny(surface: Surface): Promise<void> {
   if (surface.expand) await openDisclosure(surface)
 }
 
+/** Clicks the control that opens the disclosure, and waits for the screen to change. */
 async function openDisclosure({ label, part, expand }: Surface): Promise<void> {
   const before = await inView<number>(part, 'document.body.innerText.length')
   const opened = await inView<boolean>(

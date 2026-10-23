@@ -139,7 +139,7 @@ describe('watching the architect at work', () => {
     fireEvent.click(
       await within(await header()).findByRole('button', { name: 'Watch the architect' })
     )
-    expect(await screen.findByText('that conversation no longer has a terminal')).toBeTruthy()
+    await screen.findByText('that conversation no longer has a terminal')
   })
 })
 
@@ -217,7 +217,7 @@ describe('a hand-off compile turns down', () => {
       compile: compileOrder(shown),
       environment: PROVEN_ENVIRONMENT,
     })
-    expect(await screen.findByRole('button', { name: /^Hand off with/ })).toBeTruthy()
+    await screen.findByRole('button', { name: /^Hand off with/ })
     expect(payloadsSentOn(invoke, 'foundry:run.start')).toEqual([])
     expect(onStarted).not.toHaveBeenCalled()
   })

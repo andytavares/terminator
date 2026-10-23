@@ -66,7 +66,7 @@ describe('MobileApp', () => {
     mockListTerminals.mockResolvedValue([])
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
     render(<MobileApp />)
-    expect(await screen.findByText('open terminal')).toBeTruthy()
+    await screen.findByText('open terminal')
   })
 
   it('switches to MobileTerminalView when onSelectTerminal is called', async () => {
@@ -74,7 +74,6 @@ describe('MobileApp', () => {
     mockListTerminals.mockResolvedValue([])
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
     render(<MobileApp />)
-    await screen.findByText('open terminal')
     fireEvent.click(await screen.findByText('open terminal'))
     expect(screen.getByText('terminal:s1')).toBeTruthy()
   })
@@ -84,7 +83,6 @@ describe('MobileApp', () => {
     mockListTerminals.mockResolvedValue([])
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
     render(<MobileApp />)
-    await screen.findByText('open terminal')
     fireEvent.click(await screen.findByText('open terminal'))
     expect(screen.getByText('terminal:s1')).toBeTruthy()
     fireEvent.click(screen.getByText('back'))

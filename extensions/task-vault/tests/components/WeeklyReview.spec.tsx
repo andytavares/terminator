@@ -121,7 +121,7 @@ function weeklyReviewStepTrailTests() {
   // are was never shown. Now the steps are named and position is stated once.
   it('names all six steps and states position once', async () => {
     render(<WeeklyReview />)
-    expect(await screen.findByText('1 of 6')).toBeTruthy()
+    await screen.findByText('1 of 6')
     for (const name of ['Get clear', 'Inbox', 'Projects', 'Stale', 'Someday', 'Reflect']) {
       expect(screen.getByText(name)).toBeTruthy()
     }
@@ -129,7 +129,7 @@ function weeklyReviewStepTrailTests() {
 
   it('marks which step you are on', async () => {
     render(<WeeklyReview />)
-    expect(await screen.findByText('1 of 6')).toBeTruthy()
+    await screen.findByText('1 of 6')
     expect(screen.getByText('Get clear').getAttribute('aria-current')).toBe('step')
   })
 }

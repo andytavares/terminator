@@ -160,7 +160,7 @@ const budgetGate = () =>
 function theRuleAndTheEvidenceTests() {
   it('names the rule, the reason and what happens if it is ignored', async () => {
     mount({ gates: [gate()] })
-    expect(await screen.findByText(ruleInWords('risk.p0'))).toBeTruthy()
+    await screen.findByText(ruleInWords('risk.p0'))
     expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
     // The reason is a click away rather than printed on every row.
     expect(screen.queryByText(/session\.ts/)).toBeNull()
@@ -324,14 +324,12 @@ function aPromotionNoteTests() {
 describe('a decision the handler refused', () => {
   it('says why, rather than redrawing as though nothing happened', async () => {
     mount({ gates: [gate()], decide: { error: 'Gate G-1 was already decided (approve).' } })
-    await screen.findByRole('button', { name: /Approve/ })
     fireEvent.click(await screen.findByRole('button', { name: /Approve/ }))
-    expect(await screen.findByText(/already decided/)).toBeTruthy()
+    await screen.findByText(/already decided/)
   })
 
   it('says nothing when the decision was taken', async () => {
     mount({ gates: [gate()] })
-    await screen.findByRole('button', { name: /Approve/ })
     fireEvent.click(await screen.findByRole('button', { name: /Approve/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', expect.anything())
@@ -359,7 +357,7 @@ describe('every gate rule can be rendered', () => {
       silenced: [],
       summary: { waiting: 1, orders: 1, automatic: 0, building: 0, converging: 0 },
     })
-    expect(await screen.findByText(ruleInWords(rule))).toBeTruthy()
+    await screen.findByText(ruleInWords(rule))
     // The stripe as well as the icon: a missing tone is a silent `undefined`
     // in the class list rather than a throw, so it needs its own assertion.
     expect(document.querySelector('.fdry-gate')?.className).toMatch(/\bis-(p0|warn|info|ok)\b/)
@@ -381,7 +379,7 @@ describe('ci.red', () => {
       silenced: [],
       summary: { waiting: 1, orders: 1, automatic: 0, building: 0, converging: 0 },
     })
-    expect(await screen.findByText(ruleInWords('ci.red'))).toBeTruthy()
+    await screen.findByText(ruleInWords('ci.red'))
     expect(screen.getByText(/PR #200 has been red/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Another round' })).toBeTruthy()
     expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()
@@ -403,7 +401,7 @@ describe('refinery.conflict', () => {
       silenced: [],
       summary: { waiting: 1, orders: 1, automatic: 0, building: 0, converging: 0 },
     })
-    expect(await screen.findByText(ruleInWords('refinery.conflict'))).toBeTruthy()
+    await screen.findByText(ruleInWords('refinery.conflict'))
     expect(screen.getByText(/no longer rebases onto main/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Take it over' })).toBeTruthy()
     expect(screen.getByText(/If nobody answers: Hold/)).toBeTruthy()

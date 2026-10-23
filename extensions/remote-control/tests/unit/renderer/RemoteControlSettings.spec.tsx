@@ -43,13 +43,13 @@ function settingsPasswordStateTests() {
   it('says whether a password is set without showing it', async () => {
     answerInvokes(true)
     render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
-    expect(await screen.findByText(/A password is set/)).toBeTruthy()
+    await screen.findByText(/A password is set/)
   })
 
   it('says none is set, so Remote Control cannot start yet', async () => {
     answerInvokes(false)
     render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
-    expect(await screen.findByText(/No password is set/)).toBeTruthy()
+    await screen.findByText(/No password is set/)
   })
 }
 

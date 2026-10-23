@@ -247,7 +247,10 @@ export default defineConfig([
       'vitest/no-focused-tests': 'error',
       'vitest/no-done-callback': 'error',
       // A test asserts, in its body or in a helper named for it (ADR 124's test audit).
-      'vitest/expect-expect': ['error', { assertFunctionNames: ['expect', 'expect*', 'assert*'] }],
+      'vitest/expect-expect': [
+        'error',
+        { assertFunctionNames: ['expect', 'expect*', 'assert*', 'screen.find*', 'within.find*'] },
+      ],
       'vitest/no-conditional-expect': 'error',
       'vitest/no-standalone-expect': 'error',
     },

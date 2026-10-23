@@ -424,7 +424,7 @@ describe('CreateProjectDialog — worktree mode choosing an existing branch, the
     await eventually(() => screen.getByText('develop'))
     fireEvent.click(screen.getByText('develop'))
     fireEvent.click(screen.getAllByText('+ New branch…')[0])
-    expect(await screen.findByPlaceholderText('feature/my-feature')).toBeTruthy()
+    await screen.findByPlaceholderText('feature/my-feature')
   })
 })
 
@@ -923,7 +923,7 @@ describe('CreateProjectDialog — a refused branch in a repo', () => {
   ])('says the repo has that branch already (%s)', async (_, submit) => {
     mockCreateProject.mockResolvedValue({ error: 'DUPLICATE_NAME' })
     await submit()
-    expect(await screen.findByText('This repo already has that branch')).toBeTruthy()
+    await screen.findByText('This repo already has that branch')
   })
 
   it.each([
@@ -932,7 +932,7 @@ describe('CreateProjectDialog — a refused branch in a repo', () => {
   ])('says it could not create the branch otherwise (%s)', async (_, submit) => {
     mockCreateProject.mockResolvedValue({ error: 'DB_ERROR' })
     await submit()
-    expect(await screen.findByText('Could not create the branch')).toBeTruthy()
+    await screen.findByText('Could not create the branch')
   })
 })
 

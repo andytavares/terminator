@@ -94,8 +94,7 @@ function readingTheWorkflowTests() {
 }
 
 function movingTheIssueTests() {
-  it('implements both reading the workflow and moving an issue', () => {
-    expect(provider.states).toBeDefined()
+  it('implements moving an issue', () => {
     expect(provider.transition).toBeDefined()
   })
 

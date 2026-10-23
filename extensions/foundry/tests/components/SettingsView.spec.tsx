@@ -89,7 +89,7 @@ describe('the sensors panel', () => {
 function settingsViewEnablingTests() {
   it('shows one row per sensor, with its description and rung', async () => {
     mount()
-    expect(await screen.findByText('CI flake watch')).toBeTruthy()
+    await screen.findByText('CI flake watch')
     expect(screen.getByText('your Foundry data folder')).toBeTruthy()
   })
 

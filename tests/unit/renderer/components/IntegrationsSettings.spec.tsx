@@ -62,7 +62,7 @@ describe('IntegrationsSettings — rendering', () => {
       connection({ connected: true, account: { name: 'Andrew', email: 'a@b.co' } }),
       JIRA_DISCONNECTED,
     ])
-    expect(await screen.findByText(/Connected as a@b.co/)).toBeTruthy()
+    await screen.findByText(/Connected as a@b.co/)
   })
 
   it('shows the Jira site alongside the account', async () => {
@@ -76,7 +76,7 @@ describe('IntegrationsSettings — rendering', () => {
         mine: { kind: 'query', jql: 'x' },
       }),
     ])
-    expect(await screen.findByText('tav.atlassian.net', { exact: false })).toBeTruthy()
+    await screen.findByText('tav.atlassian.net', { exact: false })
   })
 })
 
@@ -90,7 +90,7 @@ describe('IntegrationsSettings — rendering — says a working credential has s
       }),
       JIRA_DISCONNECTED,
     ])
-    expect(await screen.findByText(/Credential rejected/)).toBeTruthy()
+    await screen.findByText(/Credential rejected/)
   })
 
   it('offers the connect form only while disconnected', async () => {
@@ -177,7 +177,7 @@ describe('IntegrationsSettings — connecting — clears the rejection as soon a
 
     fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'bad' } })
     fireEvent.click(screen.getByText('Connect Linear'))
-    expect(await screen.findByRole('alert')).toBeTruthy()
+    await screen.findByRole('alert')
 
     fireEvent.change(await screen.findByLabelText('API key'), { target: { value: 'better' } })
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
@@ -297,7 +297,7 @@ describe('IntegrationsSettings — connected actions — re-checks the connectio
       ],
     })
     fireEvent.click(await screen.findByText('Test'))
-    expect(await screen.findByText(/Credential rejected/)).toBeTruthy()
+    await screen.findByText(/Credential rejected/)
   })
 })
 

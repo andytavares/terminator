@@ -120,7 +120,7 @@ function fetchingTests() {
     )
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1))
     rerender(<HallThumbnail orderId="WO-1" title="Build the thing" refreshKey="running" />)
-    expect(await screen.findByRole('img')).toBeTruthy()
+    await screen.findByRole('img')
     expect(invoke).toHaveBeenCalledTimes(1)
   })
 

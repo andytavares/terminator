@@ -75,7 +75,7 @@ function remoteViewTests() {
 function remoteViewBandTests() {
   it('says it is off, and offers one control to turn it on', async () => {
     render(<RemoteControlView />)
-    expect(await screen.findByText('Off')).toBeTruthy()
+    await screen.findByText('Off')
     expect(screen.getByRole('button', { name: 'Turn on' })).toBeTruthy()
   })
 

@@ -65,7 +65,6 @@ describe('PrDialog', () => {
   it('calls onClose when close button clicked', async () => {
     const onClose = vi.fn()
     render(<PrDialog {...defaultProps} onClose={onClose} />)
-    await screen.findByLabelText('Close')
     fireEvent.click(await screen.findByLabelText('Close'))
     expect(onClose).toHaveBeenCalled()
   })
@@ -191,7 +190,7 @@ describe('PrDialog — creation errors', () => {
     render(<PrDialog {...defaultProps} />)
     await screen.findByRole('dialog')
     fireEvent.click(await screen.findByText('Create PR'))
-    expect(await screen.findByText('gh error')).toBeTruthy()
+    await screen.findByText('gh error')
   })
 
   it('shows error when no commits ahead of base', async () => {
@@ -199,7 +198,7 @@ describe('PrDialog — creation errors', () => {
     render(<PrDialog {...defaultProps} />)
     await screen.findByRole('dialog')
     fireEvent.click(await screen.findByText('Create PR'))
-    expect(await screen.findByText(/No commits ahead/)).toBeTruthy()
+    await screen.findByText(/No commits ahead/)
   })
 
   it('shows error when push fails', async () => {
@@ -210,6 +209,6 @@ describe('PrDialog — creation errors', () => {
     render(<PrDialog {...defaultProps} />)
     await screen.findByRole('dialog')
     fireEvent.click(await screen.findByText('Create PR'))
-    expect(await screen.findByText('push failed')).toBeTruthy()
+    await screen.findByText('push failed')
   })
 })

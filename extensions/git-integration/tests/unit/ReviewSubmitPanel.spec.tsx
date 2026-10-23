@@ -82,7 +82,7 @@ describe('ReviewSubmitPanel — calls onClose when Cancel is clicked', () => {
     fireEvent.click(screen.getByText('Approve').closest('label')!)
     const submitBtn = screen.getByRole('button', { name: 'Submit approval' })
     fireEvent.click(submitBtn)
-    expect(await screen.findByText('Review submitted successfully.')).toBeTruthy()
+    await screen.findByText('Review submitted successfully.')
   })
 
   it('hands back to the caller once an approval lands', async () => {
@@ -116,7 +116,6 @@ describe('ReviewSubmitPanel — stays on the success screen after a comment revi
     fireEvent.click(screen.getByText('Approve').closest('label')!)
     const submitBtn = screen.getByRole('button', { name: 'Submit approval' })
     fireEvent.click(submitBtn)
-    await screen.findByText('Close')
     fireEvent.click(await screen.findByText('Close'))
     expect(onClose).toHaveBeenCalled()
   })

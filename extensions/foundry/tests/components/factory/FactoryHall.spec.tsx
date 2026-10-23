@@ -304,7 +304,6 @@ function movesWithoutAGateTests() {
 function monitorsTests() {
   it('opens a station’s monitor and attaches to it', async () => {
     mount()
-    await screen.findByRole('button', { name: /Build the thing/ })
     fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
     await screen.findByRole('button', { name: /ATTACH/ })
     expect(document.querySelector('.fdry-hall-inspector')).toBeNull()
@@ -586,11 +585,9 @@ function theSiteAndFailuresTests() {
       },
     })
     render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
-    await screen.findByRole('button', { name: /Build the thing/ })
     fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
-    await screen.findByRole('button', { name: /ATTACH/ })
     fireEvent.click(await screen.findByRole('button', { name: /ATTACH/ }))
-    expect(await screen.findByText('gone')).toBeTruthy()
+    await screen.findByText('gone')
   })
 }
 

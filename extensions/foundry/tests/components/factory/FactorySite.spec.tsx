@@ -105,7 +105,7 @@ describe('FactorySite', () => {
 function theCardsTests() {
   it('says there is nothing yet', async () => {
     mount([])
-    expect(await screen.findByText(/no orders yet/i)).toBeTruthy()
+    await screen.findByText(/no orders yet/i)
   })
 
   it('lists a card per order, newest first', async () => {
@@ -269,7 +269,7 @@ function theRefineryTrackTests() {
         },
       },
     ])
-    expect(await screen.findByLabelText('Refinery')).toBeTruthy()
+    await screen.findByLabelText('Refinery')
     const track = screen.getByLabelText('Refinery').querySelector('.fdry-refinery-track')
     expect(track?.textContent).toBe('First2 shared filesSecond')
   })

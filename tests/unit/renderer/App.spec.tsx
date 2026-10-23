@@ -484,7 +484,7 @@ describe('App — shows Welcome to Terminator EmptyState when no welcome seen', 
     render(<App />)
     expect(screen.queryByTestId('settings-panel')).toBeNull()
     act(() => main.events.openSettings.deliver())
-    expect(await screen.findByTestId('settings-panel')).toBeTruthy()
+    await screen.findByTestId('settings-panel')
   })
 })
 
@@ -492,7 +492,6 @@ describe('App — closes SettingsPanel when onClose is called', () => {
   it('closes SettingsPanel when onClose is called', async () => {
     render(<App />)
     act(() => main.events.openSettings.deliver())
-    await screen.findByText('Close Settings')
     fireEvent.click(await screen.findByText('Close Settings'))
     await waitFor(() => expect(screen.queryByTestId('settings-panel')).toBeNull())
   })
@@ -533,14 +532,14 @@ describe('App — records the welcome as seen once a project is opened', () => {
   it('opens SettingsPanel via onOpenSettings keyboard shortcut callback', async () => {
     render(<App />)
     act(() => shortcuts.callbacks.onOpenSettings?.())
-    expect(await screen.findByTestId('settings-panel')).toBeTruthy()
+    await screen.findByTestId('settings-panel')
   })
 
   it('opens LogWindow via onToggleLog keyboard shortcut callback', async () => {
     render(<App />)
     expect(screen.queryByTestId('log-window')).toBeNull()
     act(() => shortcuts.callbacks.onToggleLog?.())
-    expect(await screen.findByTestId('log-window')).toBeTruthy()
+    await screen.findByTestId('log-window')
   })
 })
 
@@ -548,7 +547,6 @@ describe('App — closes LogWindow when its onClose is called', () => {
   it('closes LogWindow when its onClose is called', async () => {
     render(<App />)
     act(() => shortcuts.callbacks.onToggleLog?.())
-    await screen.findByText('Close Log')
     fireEvent.click(await screen.findByText('Close Log'))
     await waitFor(() => expect(screen.queryByTestId('log-window')).toBeNull())
   })
@@ -557,13 +555,12 @@ describe('App — closes LogWindow when its onClose is called', () => {
     render(<App />)
     expect(screen.queryByTestId('quick-actions')).toBeNull()
     openPalette()
-    expect(await screen.findByTestId('quick-actions')).toBeTruthy()
+    await screen.findByTestId('quick-actions')
   })
 
   it('closes CommandPalette when its onClose is called', async () => {
     render(<App />)
     openPalette()
-    await screen.findByText('Close Palette')
     fireEvent.click(await screen.findByText('Close Palette'))
     await waitFor(() => expect(screen.queryByTestId('quick-actions')).toBeNull())
   })
@@ -666,7 +663,7 @@ describe('App — does not close open panels when workspace changes', () => {
     render(<App />)
     openPalette()
     await runAction('core.open-settings')
-    expect(await screen.findByTestId('settings-panel')).toBeTruthy()
+    await screen.findByTestId('settings-panel')
   })
 
   it('command core.toggle-sidebar action adds hidden class to UnifiedSidebar', async () => {
@@ -686,7 +683,7 @@ describe('App — command core.toggle-log action opens LogWindow', () => {
     render(<App />)
     openPalette()
     await runAction('core.toggle-log')
-    expect(await screen.findByTestId('log-window')).toBeTruthy()
+    await screen.findByTestId('log-window')
   })
 
   it('command core.switch-workspace-{id} action switches to that workspace', async () => {
@@ -737,7 +734,7 @@ describe('App — onSelectGlobalTab toggles activeGlobalTab off when same id cli
     render(<App />)
     leaveHome()
     fireEvent.click(screen.getByRole('button', { name: /Open Settings/ }))
-    expect(await screen.findByTestId('settings-panel')).toBeTruthy()
+    await screen.findByTestId('settings-panel')
   })
 })
 
@@ -1035,7 +1032,7 @@ describe('App — handleNewTab — shows NameTerminalDialog when promptForName i
     render(<App />)
     leaveHome()
     act(() => shortcuts.callbacks.onNewTab?.())
-    expect(await screen.findByTestId('name-terminal-dialog')).toBeTruthy()
+    await screen.findByTestId('name-terminal-dialog')
     expect(screen.getByTestId('name-terminal-default').textContent).toBe('Terminal 3')
   })
 })
@@ -1158,7 +1155,7 @@ describe('App — Quick Actions integration (feature 057)', () => {
     render(<App />)
     expect(screen.queryByTestId('quick-actions')).toBeNull()
     act(() => main.events.quickActionsOpen.deliver())
-    expect(await screen.findByTestId('quick-actions')).toBeTruthy()
+    await screen.findByTestId('quick-actions')
   })
 
   it('pressing Cmd+P again while open bumps the searchSignal prop', async () => {
@@ -1194,7 +1191,7 @@ describe('App — Quick Actions integration (feature 057) — shows a "Next time
     render(<App />)
     expect(screen.queryByTestId('quick-actions')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Quick actions (⌘P)' }))
-    expect(await screen.findByTestId('quick-actions')).toBeTruthy()
+    await screen.findByTestId('quick-actions')
   })
 })
 

@@ -170,6 +170,6 @@ describe('CommentComposer (reply) — shows error when reply submission returns 
     render(<CommentComposer {...replyProps} />)
     fireEvent.change(screen.getByPlaceholderText(/Leave a comment/), { target: { value: 'Hi' } })
     fireEvent.click(screen.getByText('Reply'))
-    expect(await screen.findByText(/FORBIDDEN/)).toBeTruthy()
+    await screen.findByText(/FORBIDDEN/)
   })
 })

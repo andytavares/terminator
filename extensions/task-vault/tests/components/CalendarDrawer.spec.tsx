@@ -204,7 +204,7 @@ function calendarDrawerRefreshingTests() {
       bridgeHandlers.get('task-vault:push:index-updated')?.({})
     })
 
-    expect(await screen.findByText('Reopened task')).toBeTruthy()
+    await screen.findByText('Reopened task')
     expect(screen.queryByText('Updated task')).toBeNull()
 
     // Also verify today's date is still selected (selected-date not reset)

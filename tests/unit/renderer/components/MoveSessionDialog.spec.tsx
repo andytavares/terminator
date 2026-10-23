@@ -225,7 +225,7 @@ describe('MoveSessionDialog — submits new project form on Enter key', () => {
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
     fireEvent.click(screen.getByText('+ New branch in Alpha'))
     fireEvent.click(screen.getByText('Create & move'))
-    expect(await screen.findByText('Name is required')).toBeTruthy()
+    await screen.findByText('Name is required')
     fireEvent.change(await screen.findByPlaceholderText('My branch'), { target: { value: 'x' } })
     expect(screen.queryByText('Name is required')).toBeNull()
   })

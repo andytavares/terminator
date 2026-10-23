@@ -270,7 +270,7 @@ describe('IssueDrawer — agent context (FR-023) — says plainly when nothing i
   it('survives a preview that fails', async () => {
     api.contextPreview.mockResolvedValue({ error: 'failed', message: 'nope' })
     setup()
-    expect(await screen.findByText('TAV-42')).toBeTruthy()
+    await screen.findByText('TAV-42')
   })
 
   it('toggles injection for the project', async () => {

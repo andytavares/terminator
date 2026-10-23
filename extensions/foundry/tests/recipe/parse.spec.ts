@@ -236,8 +236,7 @@ describe('parseRole', () => {
 function parseParsingTests() {
   it('parses a well-formed role', () => {
     const r = parseRole(ROLE, 'verifier.yaml')
-    expect(r.ok && r.value.allowResume).toBe(false)
-    expect(r.ok && r.value.writes).toEqual([])
+    expect(r).toMatchObject({ ok: true, value: { allowResume: false, writes: [] } })
   })
 
   // Unknown keys are stripped rather than refused, which is what lets a role

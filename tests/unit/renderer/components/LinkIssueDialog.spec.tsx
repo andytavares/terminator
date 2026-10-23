@@ -54,7 +54,7 @@ describe('LinkIssueDialog — opening', () => {
       failures: [],
     })
     open()
-    expect(await screen.findByText('Jira')).toBeTruthy()
+    await screen.findByText('Jira')
     expect(screen.getByText('Linear')).toBeTruthy()
   })
 

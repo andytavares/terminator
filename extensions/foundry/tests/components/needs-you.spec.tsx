@@ -91,7 +91,6 @@ window.HTMLElement.prototype.scrollIntoView = vi.fn()
 beforeEach(() => vi.clearAllMocks())
 
 async function openPlan(): Promise<void> {
-  await screen.findByRole('button', { name: /^Plan/ })
   fireEvent.click(await screen.findByRole('button', { name: /^Plan/ }))
 }
 
@@ -128,7 +127,6 @@ describe('the Forge puts its open questions on the Plan step', () => {
 // the operator.
 
 async function openRedTeam(): Promise<void> {
-  await screen.findByRole('button', { name: /^Red team/ })
   fireEvent.click(await screen.findByRole('button', { name: /^Red team/ }))
 }
 
@@ -256,7 +254,7 @@ function mountFloor(pending: unknown[]) {
 describe('the Floor puts a held tool call above the run graph', () => {
   it('renders the ask in the band', async () => {
     const { container } = mountFloor([ASK])
-    expect(await screen.findByText('Waiting on you — 1')).toBeTruthy()
+    await screen.findByText('Waiting on you — 1')
     expect(container.querySelector('.fdry-needs-you')).not.toBeNull()
   })
 
@@ -315,7 +313,7 @@ describe('the tab strip says how much is waiting', () => {
 
   it('says what the number means, rather than reading out a bare digit', async () => {
     mountApp({ inbox: 3, forge: 0 })
-    expect(await screen.findByRole('button', { name: 'Forge, 3 waiting on you' })).toBeTruthy()
+    await screen.findByRole('button', { name: 'Forge, 3 waiting on you' })
   })
 
   it('shows no badge at all when nothing is waiting', async () => {

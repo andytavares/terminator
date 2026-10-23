@@ -549,7 +549,7 @@ describe('ReviewDiffPane — shows loading diff message while fetching', () => {
   it('shows error when diff fetch fails', async () => {
     mockPrFileDiff.mockResolvedValue({ error: 'RATE_LIMITED' })
     await renderPane()
-    expect(await screen.findByText(/Failed to load diff/)).toBeTruthy()
+    await screen.findByText(/Failed to load diff/)
   })
 })
 
@@ -716,7 +716,7 @@ describe('ReviewDiffPane — shows the float bar under a selection, with Comment
 
     expect(screen.queryByTestId('composer')).toBeNull()
     fireEvent.click(screen.getByText('Comment'))
-    expect(await screen.findByTestId('composer')).toBeTruthy()
+    await screen.findByTestId('composer')
 
     fireEvent.click(await screen.findByText('Cancel'))
     await waitFor(() => expect(screen.queryByTestId('composer')).toBeNull())
@@ -748,7 +748,7 @@ describe('ReviewDiffPane — renders inline comment threads on matching lines', 
     storeThreads([threadOnLineOne('thread-1')])
     mockPrFileDiff.mockResolvedValue({ diff: oneLineDiff() })
     await renderPane()
-    expect(await screen.findByTestId('thread')).toBeTruthy()
+    await screen.findByTestId('thread')
   })
 })
 
@@ -832,13 +832,13 @@ describe('ReviewDiffPane — agent notes (R5)', () => {
 
   it('renders the agent note text after the finding line when agent notes are on', async () => {
     await renderWithRun()
-    expect(await screen.findByText(/calls computeRiskScore again/)).toBeTruthy()
+    await screen.findByText(/calls computeRiskScore again/)
     expect(screen.getByText(/Agent note ·/)).toBeTruthy()
   })
 
   it('shows an agent pip instead of the note when agent notes are off', async () => {
     await renderWithRun(false)
-    expect(await screen.findByText('x')).toBeTruthy()
+    await screen.findByText('x')
     expect(screen.queryByText(/Agent note ·/)).toBeNull()
     expect(screen.getByText('1')).toBeTruthy()
   })
@@ -851,7 +851,7 @@ describe('ReviewDiffPane — moved code (S4)', () => {
     mockPrFileDiff.mockResolvedValue({ diff })
     await renderPane({ file: { ...mockFile, path }, pr: prWithMove(path, 41) })
     const row = 'UnionFind · 28 lines, unchanged, from github/pr-review-service.ts:360'
-    expect(await screen.findByText(wholeText(row))).toBeTruthy()
+    await screen.findByText(wholeText(row))
     expect(screen.getByText('Moved')).toBeTruthy()
   })
 })
@@ -863,7 +863,7 @@ describe('ReviewDiffPane — moved code (S4) — collapses a moved-away (removed
     mockPrFileDiff.mockResolvedValue({ diff })
     await renderPane({ file: { ...mockFile, path }, pr: prWithMove('review/reading-order.ts', 41) })
     const row = 'UnionFind · 28 lines, unchanged, moved to review/reading-order.ts:41'
-    expect(await screen.findByText(wholeText(row))).toBeTruthy()
+    await screen.findByText(wholeText(row))
     expect(screen.getByText('Moved')).toBeTruthy()
   })
 })
@@ -944,7 +944,7 @@ describe('ReviewDiffPane — private notes side (S2)', () => {
       ],
     })
     await renderPane()
-    expect(await screen.findByText('left side note')).toBeTruthy()
+    await screen.findByText('left side note')
   })
 })
 
@@ -967,7 +967,7 @@ describe('ReviewDiffPane — pending drafts (S5)', () => {
       ],
     })
     const { container } = await renderPane()
-    expect(await screen.findByText(/sent when you submit your review/)).toBeTruthy()
+    await screen.findByText(/sent when you submit your review/)
     const code = container.querySelector('.rs-thread-bd code')
     expect(code?.textContent).toBe('fetch(filter)')
   })
@@ -1118,14 +1118,14 @@ describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS) — composer ke
     await renderTwoHunks()
     expect(screen.queryByTestId('composer')).toBeNull()
     window.dispatchEvent(new CustomEvent('review:comment'))
-    expect(await screen.findByTestId('composer')).toBeTruthy()
+    await screen.findByTestId('composer')
   })
 
   it('note opens the note composer on the selection', async () => {
     selectLineOne()
     await renderTwoHunks()
     window.dispatchEvent(new CustomEvent('review:note'))
-    expect(await screen.findByPlaceholderText('Private note…')).toBeTruthy()
+    await screen.findByPlaceholderText('Private note…')
   })
 })
 
@@ -1206,7 +1206,7 @@ describe('ReviewDiffPane — since-my-review diff (S1)', () => {
         toSha: 'abc',
       })
     )
-    expect(await screen.findByText(/Showing 9f0c76eb/)).toBeTruthy()
+    await screen.findByText(/Showing 9f0c76eb/)
     expect(mockPrFileDiff).not.toHaveBeenCalled()
   })
 })
@@ -1401,7 +1401,7 @@ describe('ReviewDiffPane expandable context — hides Comment but keeps the othe
     const row = container.querySelector('tr[data-new-line="13"]')!
     fireEvent.mouseDown(row.querySelector('.diff-gutter-btn')!)
     fireEvent.mouseUp(window)
-    expect(await screen.findByRole('button', { name: /Ask agent/ })).toBeTruthy()
+    await screen.findByRole('button', { name: /Ask agent/ })
     expect(screen.queryByRole('button', { name: /Comment/ })).toBeNull()
     expect(screen.getByRole('button', { name: /Add note/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Explain' })).toBeTruthy()
@@ -1418,7 +1418,7 @@ describe('ReviewDiffPane expandable context — hides Comment but keeps the othe
     const row = container.querySelector('tr[data-new-line="11"]')!
     fireEvent.mouseDown(row.querySelector('.diff-gutter-btn')!)
     fireEvent.mouseUp(window)
-    expect(await screen.findByRole('button', { name: /Comment/ })).toBeTruthy()
+    await screen.findByRole('button', { name: /Comment/ })
   })
 })
 
@@ -1457,7 +1457,7 @@ describe('ReviewDiffPane expandable context — resets expansions when another f
     const other = { ...mockFile, path: 'src/bar.ts' }
     mockPrFileDiff.mockResolvedValue({ diff: { ...twoHunkDiff, path: 'src/bar.ts' } })
     rerender(<ReviewDiffPane {...defaultProps} file={other} />)
-    expect(await screen.findByTitle('src/bar.ts')).toBeTruthy()
+    await screen.findByTitle('src/bar.ts')
     await waitFor(() => expect(container.querySelectorAll('.diff-gap-row').length).toBe(3))
     expect(expandedRows(container).length).toBe(0)
   })

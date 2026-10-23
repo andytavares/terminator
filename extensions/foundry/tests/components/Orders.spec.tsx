@@ -63,7 +63,7 @@ describe('the orders list', () => {
 function standingsTests() {
   it('says where each order stands, in the standing own words', async () => {
     mount([row({ standing: standing({ label: '2 to answer', turn: 'you' }) })])
-    expect(await screen.findByText('2 to answer')).toBeTruthy()
+    await screen.findByText('2 to answer')
   })
 
   it('marks the rows whose move is yours, and only those', async () => {
@@ -71,7 +71,7 @@ function standingsTests() {
       row({ id: 'WO-1', standing: standing({ turn: 'you', label: 'halted' }) }),
       row({ id: 'WO-2', title: 'Second', standing: standing({ turn: 'foundry' }) }),
     ])
-    expect(await screen.findByText('halted')).toBeTruthy()
+    await screen.findByText('halted')
     expect(container.querySelectorAll('.fdry-order-state.is-waiting')).toHaveLength(1)
   })
 
@@ -87,7 +87,7 @@ function standingsTests() {
         standing: standing({ kind: 'halted', turn: 'you', label: 'halted' }),
       }),
     ])
-    expect(await screen.findByText('halted')).toBeTruthy()
+    await screen.findByText('halted')
     expect(screen.queryByText('ready to hand off')).toBeNull()
   })
 }
@@ -97,7 +97,7 @@ function olderRowsAndRefetchingTests() {
   it('survives a row from an older shape that carries no standing', async () => {
     const { standing: _omitted, ...older } = row({ failures: 0 })
     mount([older])
-    expect(await screen.findByText('Refuse an expired refresh token')).toBeTruthy()
+    await screen.findByText('Refuse an expired refresh token')
   })
 
   it('refetches when Foundry says a gate changed, so an answer given elsewhere lands here', async () => {
@@ -272,12 +272,12 @@ describe('opening an order that has a run', () => {
       },
     })
     render(<Orders repoRoot="/repos/app" openOrderId="WO-1" />)
-    expect(await screen.findByRole('button', { name: 'All orders' })).toBeTruthy()
+    await screen.findByRole('button', { name: 'All orders' })
   }
 
   it.each(['running', 'shipped'])('opens a %s order on the Floor', async (status) => {
     await opened(status)
-    expect(await screen.findByText('Loading the run…')).toBeTruthy()
+    await screen.findByText('Loading the run…')
   })
 
   it('opens a draft in the Forge, not the Floor', async () => {

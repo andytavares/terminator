@@ -35,7 +35,7 @@ describe('AboutDialog', () => {
 
   it('renders version info rows', async () => {
     render(<AboutDialog onClose={vi.fn()} />)
-    expect(await screen.findByText('30.0.0')).toBeTruthy()
+    await screen.findByText('30.0.0')
     expect(screen.getByText('20.0.0')).toBeTruthy()
     expect(screen.getByText('124.0.0')).toBeTruthy()
     expect(screen.getByText('darwin')).toBeTruthy()
@@ -44,7 +44,7 @@ describe('AboutDialog', () => {
   it('calls onClose when Close button is clicked', async () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
-    expect(await screen.findByText('Close')).toBeTruthy()
+    await screen.findByText('Close')
     fireEvent.click(await screen.findByText('Close'))
     expect(onClose).toHaveBeenCalled()
   })
@@ -52,7 +52,7 @@ describe('AboutDialog', () => {
   it('calls onClose when overlay is clicked', async () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
-    expect(await screen.findByRole('dialog')).toBeTruthy()
+    await screen.findByRole('dialog')
     pressOutside(screen.getByRole('dialog'))
     expect(onClose).toHaveBeenCalled()
   })
@@ -62,7 +62,7 @@ describe('AboutDialog — does not call onClose when dialog body is clicked', ()
   it('does not call onClose when dialog body is clicked', async () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
-    expect(await screen.findByRole('dialog')).toBeTruthy()
+    await screen.findByRole('dialog')
     fireEvent.click(await screen.findByRole('dialog'))
     expect(onClose).not.toHaveBeenCalled()
   })
@@ -70,7 +70,7 @@ describe('AboutDialog — does not call onClose when dialog body is clicked', ()
   it('calls onClose when Escape is pressed', async () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
-    expect(await screen.findByRole('dialog')).toBeTruthy()
+    await screen.findByRole('dialog')
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).toHaveBeenCalled()
   })
@@ -97,19 +97,19 @@ describe('AboutDialog — keeps the placeholders when the app info cannot be rea
   it('shows DB error with message when health returns ok:false', async () => {
     mockDbHealth.mockResolvedValue({ ok: false, message: 'disk full' })
     render(<AboutDialog onClose={vi.fn()} />)
-    expect(await screen.findByText('Error — disk full')).toBeTruthy()
+    await screen.findByText('Error — disk full')
   })
 
   it('shows DB error with "unknown" when health returns ok:false without message', async () => {
     mockDbHealth.mockResolvedValue({ ok: false })
     render(<AboutDialog onClose={vi.fn()} />)
-    expect(await screen.findByText('Error — unknown')).toBeTruthy()
+    await screen.findByText('Error — unknown')
   })
 
   it('shows IPC error when db.health rejects', async () => {
     mockDbHealth.mockRejectedValue(new Error('IPC failed'))
     render(<AboutDialog onClose={vi.fn()} />)
-    expect(await screen.findByText('Error — IPC error')).toBeTruthy()
+    await screen.findByText('Error — IPC error')
   })
 })
 

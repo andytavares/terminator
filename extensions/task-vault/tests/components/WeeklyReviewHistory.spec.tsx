@@ -142,7 +142,7 @@ function weeklyReviewHistoryTests() {
 function weeklyReviewHistoryListingTests() {
   it('lists past reviews with their action count', async () => {
     render(<WeeklyReviewHistory />)
-    expect(await screen.findByText('2 actions')).toBeTruthy()
+    await screen.findByText('2 actions')
   })
 
   it('singularises a one-action review', async () => {
@@ -152,13 +152,13 @@ function weeklyReviewHistoryListingTests() {
       return Promise.resolve({})
     })
     render(<WeeklyReviewHistory />)
-    expect(await screen.findByText('1 action')).toBeTruthy()
+    await screen.findByText('1 action')
   })
 
   it('explains the empty state', async () => {
     mockInvoke.mockResolvedValue({ reviews: [] })
     render(<WeeklyReviewHistory />)
-    expect(await screen.findByText(/No reviews recorded yet/i)).toBeTruthy()
+    await screen.findByText(/No reviews recorded yet/i)
   })
 }
 
@@ -172,7 +172,7 @@ function weeklyReviewHistoryStatusTests() {
       return Promise.resolve({})
     })
     render(<WeeklyReviewHistory />)
-    expect(await screen.findByText('in progress')).toBeTruthy()
+    await screen.findByText('in progress')
   })
 }
 
@@ -188,7 +188,7 @@ function weeklyReviewHistoryExpandingOpeningTests() {
 
     fireEvent.click(await screen.findByText('2 actions'))
 
-    expect(await screen.findByText('Write the spec')).toBeTruthy()
+    await screen.findByText('Write the spec')
     expect(screen.getByText('Promoted to today')).toBeTruthy()
     expect(screen.getByText('Project status')).toBeTruthy()
     expect(screen.getByText('Website rebuild')).toBeTruthy()
@@ -197,10 +197,9 @@ function weeklyReviewHistoryExpandingOpeningTests() {
 
   it('shows the reflection alongside the actions', async () => {
     render(<WeeklyReviewHistory />)
-    await screen.findByText('2 actions')
     fireEvent.click(await screen.findByText('2 actions'))
 
-    expect(await screen.findByText('Reflection')).toBeTruthy()
+    await screen.findByText('Reflection')
     expect(screen.getByText('shipping small')).toBeTruthy()
   })
 }
@@ -228,10 +227,9 @@ function weeklyReviewHistoryEmptyDetailTests() {
       return Promise.resolve({})
     })
     render(<WeeklyReviewHistory />)
-    await screen.findByText('0 actions')
     fireEvent.click(await screen.findByText('0 actions'))
 
-    expect(await screen.findByText(/Nothing was recorded/i)).toBeTruthy()
+    await screen.findByText(/Nothing was recorded/i)
   })
 }
 

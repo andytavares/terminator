@@ -284,7 +284,7 @@ describe('ReviewDashboard — reloads when a review is submitted elsewhere', () 
       )
     )
     listeners['reviews:changed']()
-    expect(await screen.findByText('Nothing needs you')).toBeTruthy()
+    await screen.findByText('Nothing needs you')
   })
 })
 

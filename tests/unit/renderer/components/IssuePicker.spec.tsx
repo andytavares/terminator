@@ -45,7 +45,7 @@ describe('IssuePicker — choosing', () => {
   it('lists assigned issues on focus, with no typing', async () => {
     open()
     fireEvent.focus(screen.getByPlaceholderText(/Search/))
-    expect(await screen.findByText('TAV-42')).toBeTruthy()
+    await screen.findByText('TAV-42')
     expect(searchIssues).not.toHaveBeenCalled()
   })
 
@@ -56,7 +56,7 @@ describe('IssuePicker — choosing', () => {
     })
     open()
     fireEvent.focus(screen.getByPlaceholderText(/Search/))
-    expect(await screen.findByText('Jira')).toBeTruthy()
+    await screen.findByText('Jira')
     expect(screen.getByText('Linear')).toBeTruthy()
   })
 })
@@ -125,7 +125,7 @@ async function openList() {
   await act(async () => {
     fireEvent.focus(screen.getByPlaceholderText('Search, or type an issue key'))
   })
-  expect(await screen.findByText('TAV-42')).toBeTruthy()
+  await screen.findByText('TAV-42')
   return view
 }
 
@@ -173,7 +173,7 @@ describe('IssuePicker — dismissing the list — stays open when the pointer go
     await act(async () => {
       fireEvent.focus(screen.getByPlaceholderText('Search, or type an issue key'))
     })
-    expect(await screen.findByText('TAV-42')).toBeTruthy()
+    await screen.findByText('TAV-42')
   })
 })
 

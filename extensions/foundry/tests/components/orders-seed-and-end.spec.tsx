@@ -75,7 +75,7 @@ function pickingTests() {
 
   it('opens the order already made from that ticket rather than failing', async () => {
     await pickTicket({ 'foundry:order.create': () => ({ existing: { id: 'WO-3' } }) })
-    expect(await screen.findByRole('button', { name: 'All orders' })).toBeTruthy()
+    await screen.findByRole('button', { name: 'All orders' })
   })
 
   it('says why and stays on the list when the order cannot be made', async () => {
@@ -118,7 +118,7 @@ function nothingToPickTests() {
       'foundry:issues.mine': () => ({ error: 'Linear is unreachable' }),
     })
     fireEvent.click(screen.getByRole('radio', { name: 'Ticket' }))
-    expect(await screen.findByText('Linear is unreachable')).toBeTruthy()
+    await screen.findByText('Linear is unreachable')
   })
 
   it('says when no ticket matched', async () => {
@@ -127,7 +127,7 @@ function nothingToPickTests() {
       'foundry:issues.mine': () => ({ connected: mine.connected, issues: [] }),
     })
     fireEvent.click(screen.getByRole('radio', { name: 'Ticket' }))
-    expect(await screen.findByText('No tickets matched. Try a different search.')).toBeTruthy()
+    await screen.findByText('No tickets matched. Try a different search.')
   })
 
   it('says how to connect a tracker when none is', async () => {
@@ -136,7 +136,7 @@ function nothingToPickTests() {
       'foundry:issues.mine': () => ({ connected: [], issues: [] }),
     })
     fireEvent.click(screen.getByRole('radio', { name: 'Ticket' }))
-    expect(await screen.findByText(/No tracker is connected/)).toBeTruthy()
+    await screen.findByText(/No tracker is connected/)
   })
 }
 

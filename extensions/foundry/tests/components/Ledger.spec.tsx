@@ -145,7 +145,7 @@ describe('reading the record', () => {
 function whoDecidedTests() {
   it('shows who decided, what, about what and why', async () => {
     mount()
-    expect(await screen.findByText('G-1')).toBeTruthy()
+    await screen.findByText('G-1')
     const [first] = rowText()
     expect(first).toContain('operator')
     expect(first).toContain('gate.decided')
@@ -216,7 +216,7 @@ function countsAndEmptyTests() {
 
   it('says so when nothing has been recorded', async () => {
     mount({ entries: [], total: 0, actors: [], actions: [], orders: [] })
-    expect(await screen.findByText('Nothing recorded yet.')).toBeTruthy()
+    await screen.findByText('Nothing recorded yet.')
   })
 }
 
@@ -251,7 +251,7 @@ function ledgerAskingTests() {
     mount({ proposals: [PROPOSAL] })
     await screen.findByText('G-1')
     fireEvent.click(await screen.findByRole('button', { name: /keep rejecting/ }))
-    expect(await screen.findByText('Proposed rules')).toBeTruthy()
+    await screen.findByText('Proposed rules')
   })
 }
 
@@ -271,7 +271,7 @@ function citationsAndThresholdTests() {
     mount({ proposals: [] })
     await screen.findByText('G-1')
     fireEvent.click(await screen.findByRole('button', { name: /keep rejecting/ }))
-    expect(await screen.findByText(/three times/)).toBeTruthy()
+    await screen.findByText(/three times/)
   })
 }
 
@@ -317,7 +317,7 @@ function decliningAndRefusalsTests() {
     await screen.findByText('Proposed rules')
 
     fireEvent.click(await screen.findByRole('button', { name: /Accept/ }))
-    expect(await screen.findByText(/no longer supports/)).toBeTruthy()
+    await screen.findByText(/no longer supports/)
     // Still listed, because it was not decided.
     expect(screen.getByText(PROPOSAL.asserts)).toBeTruthy()
   })
@@ -334,7 +334,7 @@ describe('removing an accepted check (FR-081)', () => {
 function inForceTests() {
   it('shows the checks the operator accepted, with what each asserts', async () => {
     mount({ inForce: IN_FORCE })
-    expect(await screen.findByText('Checks you accepted')).toBeTruthy()
+    await screen.findByText('Checks you accepted')
     expect(screen.getByText('no unit hardcodes a timeout')).toBeTruthy()
   })
 
@@ -355,14 +355,14 @@ function removingTests() {
     mount({ inForce: IN_FORCE })
     await screen.findByText('Checks you accepted')
     fireEvent.click(await screen.findByRole('button', { name: /Remove this check/ }))
-    expect(await screen.findByText(/no longer in force/)).toBeTruthy()
+    await screen.findByText(/no longer in force/)
   })
 
   it('reports a refusal rather than claiming the check was removed', async () => {
     mount({ inForce: IN_FORCE, remove: { error: 'docs-in-pr is not yours to remove.' } })
     await screen.findByText('Checks you accepted')
     fireEvent.click(await screen.findByRole('button', { name: /Remove this check/ }))
-    expect(await screen.findByText(/not yours to remove/)).toBeTruthy()
+    await screen.findByText(/not yours to remove/)
     expect(screen.queryByText(/no longer in force/)).toBeNull()
   })
 }
@@ -375,7 +375,7 @@ function whatWasTurnedDownTests() {
         declined: [{ id: 'curator-hardcodes-the-timeout', reason: 'it fired on everything' }],
       },
     })
-    expect(await screen.findByText('Checks you accepted')).toBeTruthy()
+    await screen.findByText('Checks you accepted')
     expect(screen.getByText(/it fired on everything/)).toBeTruthy()
   })
 }
@@ -395,7 +395,7 @@ function declinedChecksTests() {
         ],
       },
     })
-    expect(await screen.findByText('Checks you accepted')).toBeTruthy()
+    await screen.findByText('Checks you accepted')
     expect(screen.getByText(/The sync timeout is read from settings\./)).toBeTruthy()
     expect(screen.getByText(/Skips the lint step/)).toBeTruthy()
     expect(document.body.textContent).not.toContain('curator-')
@@ -413,7 +413,7 @@ function anEmptyPanelTests() {
 describe('the skills in force', () => {
   it('lists a skill available across the rungs, with the rung it came from', async () => {
     mount({ inForce: { rules: [], declined: [], skills: [{ id: 'ci-fix', rung: 'built-in' }] } })
-    expect(await screen.findByText('Skills in force')).toBeTruthy()
+    await screen.findByText('Skills in force')
     expect(screen.getByText(/ci-fix/)).toBeTruthy()
     expect(screen.getByText(/built into Foundry/)).toBeTruthy()
   })
