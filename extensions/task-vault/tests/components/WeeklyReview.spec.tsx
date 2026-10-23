@@ -148,7 +148,7 @@ function weeklyReviewProjectsListingTests() {
     const nextStepBtn = screen.getByRole('button', { name: 'Next step' })
     fireEvent.click(nextStepBtn) // → step 2
     await screen.findByText('2 of 6')
-    fireEvent.click(screen.getByRole('button', { name: 'Next step' })) // → step 3
+    fireEvent.click(await screen.findByRole('button', { name: 'Next step' })) // → step 3
     await screen.findByText('3 of 6')
 
     expect(screen.getByText('Alpha Project')).toBeTruthy()
@@ -164,7 +164,7 @@ function weeklyReviewProjectsArchivingTests() {
     // Navigate to step 3
     fireEvent.click(screen.getByRole('button', { name: 'Next step' }))
     await screen.findByText('2 of 6')
-    fireEvent.click(screen.getByRole('button', { name: 'Next step' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Next step' }))
     await screen.findByText('3 of 6')
 
     const archiveBtn = screen.getAllByRole('button', { name: /archive/i })[0]
@@ -212,7 +212,7 @@ function weeklyReviewInboxRefreshTests() {
     answerWithCapturedItem()
     render(<WeeklyReview />)
     await screen.findByText('1 of 6')
-    fireEvent.click(screen.getByRole('button', { name: /next: inbox/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /next: inbox/i }))
 
     await screen.findByText('2 of 6')
 
@@ -241,7 +241,7 @@ function weeklyReviewReviewRecordTests() {
     render(<WeeklyReview />)
     await screen.findByText('1 of 6')
 
-    fireEvent.click(screen.getByRole('button', { name: 'History' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'History' }))
     await waitFor(() => {
       expect(screen.getByText('Past Reviews')).toBeTruthy()
     })

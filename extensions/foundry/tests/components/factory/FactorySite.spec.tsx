@@ -279,7 +279,7 @@ function factorySiteOpeningTests() {
   it('opens the order it is given', async () => {
     const { onOpen } = mount([{ id: 'WO-1', title: 'Only one', status: 'running' }])
     await screen.findByText('Only one')
-    fireEvent.click(screen.getByRole('button', { name: /Only one/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Only one/ }))
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 'WO-1', title: 'Only one' }))
   })
 }
@@ -303,7 +303,7 @@ describe('FactorySite status wall', () => {
   it('refetches with the chosen window when the toggle is switched', async () => {
     const { invoke } = mount([])
     await screen.findByText('Status wall')
-    fireEvent.click(screen.getByRole('radio', { name: 'All time' }))
+    fireEvent.click(await screen.findByRole('radio', { name: 'All time' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:factory.metrics', { window: 'all' })
     )
@@ -344,7 +344,7 @@ function factorySitePromotingTests() {
       ],
     })
     await screen.findByText('test-foo flakes on main')
-    fireEvent.click(screen.getByRole('button', { name: 'Promote' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Promote' }))
     const repoInput = screen.getByRole('textbox', { name: /repository/i }) as HTMLInputElement
     expect(repoInput.value).toBe('/repos/app')
     fireEvent.click(screen.getByRole('button', { name: 'Confirm promote' }))

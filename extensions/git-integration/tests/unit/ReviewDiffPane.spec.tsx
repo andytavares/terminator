@@ -718,7 +718,7 @@ describe('ReviewDiffPane — shows the float bar under a selection, with Comment
     fireEvent.click(screen.getByText('Comment'))
     expect(await screen.findByTestId('composer')).toBeTruthy()
 
-    fireEvent.click(screen.getByText('Cancel'))
+    fireEvent.click(await screen.findByText('Cancel'))
     await waitFor(() => expect(screen.queryByTestId('composer')).toBeNull())
   })
 })

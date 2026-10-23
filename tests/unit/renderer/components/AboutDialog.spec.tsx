@@ -45,7 +45,7 @@ describe('AboutDialog', () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
     expect(await screen.findByText('Close')).toBeTruthy()
-    fireEvent.click(screen.getByText('Close'))
+    fireEvent.click(await screen.findByText('Close'))
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -63,7 +63,7 @@ describe('AboutDialog — does not call onClose when dialog body is clicked', ()
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
     expect(await screen.findByRole('dialog')).toBeTruthy()
-    fireEvent.click(screen.getByRole('dialog'))
+    fireEvent.click(await screen.findByRole('dialog'))
     expect(onClose).not.toHaveBeenCalled()
   })
 

@@ -171,7 +171,7 @@ function filtersTests() {
   it('filters by order', async () => {
     mount()
     await screen.findByText('G-1')
-    fireEvent.change(screen.getByLabelText('Order'), { target: { value: 'WO-2' } })
+    fireEvent.change(await screen.findByLabelText('Order'), { target: { value: 'WO-2' } })
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith(
         'foundry:ledger.query',
@@ -185,7 +185,7 @@ function filteringByWhoAndWhatTests() {
   it('filters by who decided', async () => {
     mount()
     await screen.findByText('G-1')
-    fireEvent.change(screen.getByLabelText('Decided by'), { target: { value: 'operator' } })
+    fireEvent.change(await screen.findByLabelText('Decided by'), { target: { value: 'operator' } })
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith(
         'foundry:ledger.query',
@@ -197,7 +197,7 @@ function filteringByWhoAndWhatTests() {
   it('filters by action', async () => {
     mount()
     await screen.findByText('G-1')
-    fireEvent.change(screen.getByLabelText('Action'), { target: { value: 'gate.default' } })
+    fireEvent.change(await screen.findByLabelText('Action'), { target: { value: 'gate.default' } })
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith(
         'foundry:ledger.query',
@@ -250,7 +250,7 @@ function ledgerAskingTests() {
   it('asks only when the operator presses the button', async () => {
     mount({ proposals: [PROPOSAL] })
     await screen.findByText('G-1')
-    fireEvent.click(screen.getByRole('button', { name: /keep rejecting/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /keep rejecting/ }))
     expect(await screen.findByText('Proposed rules')).toBeTruthy()
   })
 }
@@ -259,7 +259,7 @@ function citationsAndThresholdTests() {
   it('shows the citations the proposal derives from', async () => {
     mount({ proposals: [PROPOSAL] })
     await screen.findByText('G-1')
-    fireEvent.click(screen.getByRole('button', { name: /keep rejecting/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /keep rejecting/ }))
     await screen.findByText('Proposed rules')
     expect(screen.getByText(/3 rejections/)).toBeTruthy()
     // The proposal's own words, and the entry it derives from.
@@ -270,7 +270,7 @@ function citationsAndThresholdTests() {
   it('explains the threshold rather than showing an empty box', async () => {
     mount({ proposals: [] })
     await screen.findByText('G-1')
-    fireEvent.click(screen.getByRole('button', { name: /keep rejecting/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /keep rejecting/ }))
     expect(await screen.findByText(/three times/)).toBeTruthy()
   })
 }
@@ -279,10 +279,10 @@ function ledgerAcceptingTests() {
   it('accepts one, and says what that means', async () => {
     mount({ proposals: [PROPOSAL] })
     await screen.findByText('G-1')
-    fireEvent.click(screen.getByRole('button', { name: /keep rejecting/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /keep rejecting/ }))
     await screen.findByText('Proposed rules')
 
-    fireEvent.click(screen.getByRole('button', { name: /Accept/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Accept/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:rules.decide', {
         proposalId: PROPOSAL.id,
@@ -297,10 +297,10 @@ function decliningAndRefusalsTests() {
   it('turns one down for good', async () => {
     mount({ proposals: [PROPOSAL] })
     await screen.findByText('G-1')
-    fireEvent.click(screen.getByRole('button', { name: /keep rejecting/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /keep rejecting/ }))
     await screen.findByText('Proposed rules')
 
-    fireEvent.click(screen.getByRole('button', { name: /Never propose this/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Never propose this/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:rules.decide', {
         proposalId: PROPOSAL.id,
@@ -313,10 +313,10 @@ function decliningAndRefusalsTests() {
   it('reports a refusal rather than claiming the rule was accepted', async () => {
     mount({ proposals: [PROPOSAL], decide: { error: 'The ledger no longer supports it.' } })
     await screen.findByText('G-1')
-    fireEvent.click(screen.getByRole('button', { name: /keep rejecting/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /keep rejecting/ }))
     await screen.findByText('Proposed rules')
 
-    fireEvent.click(screen.getByRole('button', { name: /Accept/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Accept/ }))
     expect(await screen.findByText(/no longer supports/)).toBeTruthy()
     // Still listed, because it was not decided.
     expect(screen.getByText(PROPOSAL.asserts)).toBeTruthy()
@@ -341,7 +341,7 @@ function inForceTests() {
   it('offers a way to take one back out', async () => {
     mount({ inForce: IN_FORCE })
     await screen.findByText('Checks you accepted')
-    fireEvent.click(screen.getByRole('button', { name: /Remove this check/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Remove this check/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:rules.remove', {
         ruleId: 'curator-hardcodes-the-timeout',
@@ -354,14 +354,14 @@ function removingTests() {
   it('says it is gone and will not come back', async () => {
     mount({ inForce: IN_FORCE })
     await screen.findByText('Checks you accepted')
-    fireEvent.click(screen.getByRole('button', { name: /Remove this check/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Remove this check/ }))
     expect(await screen.findByText(/no longer in force/)).toBeTruthy()
   })
 
   it('reports a refusal rather than claiming the check was removed', async () => {
     mount({ inForce: IN_FORCE, remove: { error: 'docs-in-pr is not yours to remove.' } })
     await screen.findByText('Checks you accepted')
-    fireEvent.click(screen.getByRole('button', { name: /Remove this check/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Remove this check/ }))
     expect(await screen.findByText(/not yours to remove/)).toBeTruthy()
     expect(screen.queryByText(/no longer in force/)).toBeNull()
   })
@@ -451,7 +451,7 @@ function ledgerSwitchingTests() {
   it('shows the 30-day tiles and a per-order row when switched to Factory', async () => {
     mount()
     await screen.findByText('G-1')
-    fireEvent.click(screen.getByRole('tab', { name: 'Factory' }))
+    fireEvent.click(await screen.findByRole('tab', { name: 'Factory' }))
     await screen.findByText('Ship the thing')
 
     expect(tileValue('Shipped')).toBe('1')
@@ -475,7 +475,7 @@ function nullNumbersTests() {
       },
     })
     await screen.findByText('G-1')
-    fireEvent.click(screen.getByRole('tab', { name: 'Factory' }))
+    fireEvent.click(await screen.findByRole('tab', { name: 'Factory' }))
     await screen.findByText('Ship the thing')
 
     expect(tileValue('Median lead time')).toBe('—')
@@ -489,9 +489,9 @@ function ledgerWindowsTests() {
   it('refetches with the chosen window', async () => {
     mount()
     await screen.findByText('G-1')
-    fireEvent.click(screen.getByRole('tab', { name: 'Factory' }))
+    fireEvent.click(await screen.findByRole('tab', { name: 'Factory' }))
     await screen.findByText('Ship the thing')
-    fireEvent.click(screen.getByRole('radio', { name: 'All time' }))
+    fireEvent.click(await screen.findByRole('radio', { name: 'All time' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:factory.metrics', { window: 'all' })
     )

@@ -117,7 +117,7 @@ describe('ReviewSubmitPanel — stays on the success screen after a comment revi
     const submitBtn = screen.getByRole('button', { name: 'Submit approval' })
     fireEvent.click(submitBtn)
     await screen.findByText('Close')
-    fireEvent.click(screen.getByText('Close'))
+    fireEvent.click(await screen.findByText('Close'))
     expect(onClose).toHaveBeenCalled()
   })
 })

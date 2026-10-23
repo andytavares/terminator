@@ -66,7 +66,7 @@ describe('PrDialog', () => {
     const onClose = vi.fn()
     render(<PrDialog {...defaultProps} onClose={onClose} />)
     await screen.findByLabelText('Close')
-    fireEvent.click(screen.getByLabelText('Close'))
+    fireEvent.click(await screen.findByLabelText('Close'))
     expect(onClose).toHaveBeenCalled()
   })
 })
@@ -165,7 +165,7 @@ describe('PrDialog — creating', () => {
 
     render(<PrDialog {...defaultProps} onCreated={onCreated} />)
     await screen.findByRole('dialog')
-    fireEvent.click(screen.getByText('Create PR'))
+    fireEvent.click(await screen.findByText('Create PR'))
     await waitFor(() => expect(onCreated).toHaveBeenCalled())
     const pr = onCreated.mock.calls[0][0] as PullRequest
     expect(pr.number).toBe(99)
@@ -190,7 +190,7 @@ describe('PrDialog — creation errors', () => {
 
     render(<PrDialog {...defaultProps} />)
     await screen.findByRole('dialog')
-    fireEvent.click(screen.getByText('Create PR'))
+    fireEvent.click(await screen.findByText('Create PR'))
     expect(await screen.findByText('gh error')).toBeTruthy()
   })
 
@@ -198,7 +198,7 @@ describe('PrDialog — creation errors', () => {
     mockShellExec.mockResolvedValue(execResult(0, '0', ''))
     render(<PrDialog {...defaultProps} />)
     await screen.findByRole('dialog')
-    fireEvent.click(screen.getByText('Create PR'))
+    fireEvent.click(await screen.findByText('Create PR'))
     expect(await screen.findByText(/No commits ahead/)).toBeTruthy()
   })
 
@@ -209,7 +209,7 @@ describe('PrDialog — creation errors', () => {
 
     render(<PrDialog {...defaultProps} />)
     await screen.findByRole('dialog')
-    fireEvent.click(screen.getByText('Create PR'))
+    fireEvent.click(await screen.findByText('Create PR'))
     expect(await screen.findByText('push failed')).toBeTruthy()
   })
 })

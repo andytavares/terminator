@@ -155,7 +155,7 @@ describe('LinkIssueDialog — linking', () => {
     const onClose = vi.fn()
     open({ onClose })
     fireEvent.click(await screen.findByText('TAV-42'))
-    fireEvent.click(screen.getByText('Link TAV-42'))
+    fireEvent.click(await screen.findByText('Link TAV-42'))
 
     await waitFor(() =>
       expect(linkIssue).toHaveBeenCalledWith(P, { tracker: 'linear', key: 'TAV-42' })
@@ -170,7 +170,7 @@ describe('LinkIssueDialog — linking — reports a failure and stays open rathe
     linkIssue.mockResolvedValue(false)
     open({ onClose })
     fireEvent.click(await screen.findByText('TAV-42'))
-    fireEvent.click(screen.getByText('Link TAV-42'))
+    fireEvent.click(await screen.findByText('Link TAV-42'))
 
     await waitFor(() =>
       expect(screen.getByRole('alert').textContent).toContain('Nothing was changed')
@@ -229,7 +229,7 @@ describe('LinkIssueDialog — dismissal', () => {
     // Let the initial load settle first, or its state update lands after the
     // test and React warns about an unwrapped update.
     await screen.findByText('TAV-42')
-    fireEvent.click(screen.getByText('Cancel'))
+    fireEvent.click(await screen.findByText('Cancel'))
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -238,7 +238,7 @@ describe('LinkIssueDialog — dismissal', () => {
     open({ onClose })
     await screen.findByText('TAV-42')
 
-    fireEvent.mouseDown(screen.getByRole('dialog'))
+    fireEvent.mouseDown(await screen.findByRole('dialog'))
     expect(onClose).not.toHaveBeenCalled()
 
     pressOutside(screen.getByRole('dialog'))

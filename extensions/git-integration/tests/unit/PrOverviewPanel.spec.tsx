@@ -405,7 +405,7 @@ describe('PrOverviewPanel — clamping the description', () => {
     renderPanel()
     fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
     await screen.findByText('A summary.')
-    fireEvent.click(screen.getByRole('button', { name: 'Show full description' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Show full description' }))
     expect(screen.getByRole('button', { name: 'Show less' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Show full description' })).toBeNull()
   }

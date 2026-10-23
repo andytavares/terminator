@@ -603,7 +603,7 @@ function askingTheArchitectTests() {
   it('asks the architect for one', async () => {
     mountStates({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
     await screen.findByRole('button', { name: /Draft the plan/ })
-    fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Draft the plan/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:order.converge', { id: 'WO-1' })
     )
@@ -613,7 +613,7 @@ function askingTheArchitectTests() {
     mountStates({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
     await screen.findByLabelText(/Tell the architect/)
 
-    fireEvent.change(screen.getByLabelText(/Tell the architect/), {
+    fireEvent.change(await screen.findByLabelText(/Tell the architect/), {
       target: { value: 'the second unit is not needed' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
@@ -645,7 +645,7 @@ function forgeRefusalsTests() {
     render(<Forge orderId="WO-1" />)
 
     await screen.findByRole('button', { name: /Draft the plan/ })
-    fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Draft the plan/ }))
     expect(await screen.findByText('the proposal reached for a status')).toBeTruthy()
   })
 }
@@ -905,7 +905,7 @@ function sendingAFixTests() {
     withFinding()
     await openForgeStep('Red team')
     await screen.findByText('the outcome restates the problem')
-    fireEvent.click(screen.getByRole('radio', { name: /^Fix it my way/ }))
+    fireEvent.click(await screen.findByRole('radio', { name: /^Fix it my way/ }))
     const how = screen.getByLabelText(/How should "the outcome restates the problem" be fixed/)
     fireEvent.change(how, { target: { value: 'state what will be observably different' } })
     expect(invoke).not.toHaveBeenCalledWith('foundry:order.converge', expect.anything())
@@ -928,7 +928,7 @@ function theFixBoxAndClearingTests() {
     withFinding()
     await openForgeStep('Red team')
     await screen.findByText('the outcome restates the problem')
-    fireEvent.click(screen.getByRole('radio', { name: /^Fix it my way/ }))
+    fireEvent.click(await screen.findByRole('radio', { name: /^Fix it my way/ }))
     const finding = screen.getByText(/the outcome restates the problem/).closest('.fdry-fnd')
     expect(finding?.querySelector('textarea')).toBeTruthy()
   })
@@ -940,7 +940,7 @@ function theFixBoxAndClearingTests() {
     withFinding()
     await openForgeStep('Red team')
     await screen.findByText('the outcome restates the problem')
-    fireEvent.click(screen.getByRole('radio', { name: /^Ask the architect/ }))
+    fireEvent.click(await screen.findByRole('radio', { name: /^Ask the architect/ }))
     expect(invoke).not.toHaveBeenCalledWith('foundry:order.converge', expect.anything())
 
     fireEvent.click(screen.getByRole('button', { name: /Send \d decision/ }))
@@ -970,8 +970,8 @@ function whileTheArchitectWorksTests() {
     })
     await openForgeStep('Red team')
     await screen.findByText('the outcome restates the problem')
-    fireEvent.click(screen.getByRole('radio', { name: /^Ask the architect/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Send \d decision/ }))
+    fireEvent.click(await screen.findByRole('radio', { name: /^Ask the architect/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Send \d decision/ }))
     await waitFor(() => expect(converges()).toBe(1))
 
     expect(screen.getByRole('radio', { name: /^Ask the architect/ })).toBeTruthy()
@@ -989,7 +989,7 @@ function forgeAcceptingTests() {
     withFinding()
     await openForgeStep('Red team')
     await screen.findByText('the outcome restates the problem')
-    fireEvent.click(screen.getByRole('radio', { name: /^Accept it/ }))
+    fireEvent.click(await screen.findByRole('radio', { name: /^Accept it/ }))
     const box = await screen.findByLabelText(/Why "the outcome restates the problem" is accepted/)
 
     // Nothing is sent until there is one — a shrug is not a decision.
@@ -1095,8 +1095,8 @@ function clearingAChoiceTests() {
       openQuestions: [{ ...TWO_QUESTIONS[0], multiple: true }],
     })
     await screen.findByText('which token?')
-    fireEvent.click(screen.getByRole('checkbox', { name: /^a/ }))
-    fireEvent.click(screen.getByRole('checkbox', { name: /^a/ }))
+    fireEvent.click(await screen.findByRole('checkbox', { name: /^a/ }))
+    fireEvent.click(await screen.findByRole('checkbox', { name: /^a/ }))
     expect(screen.getByText(/0 of 1 decided/)).toBeTruthy()
   })
 }
@@ -1106,8 +1106,8 @@ function oneConvergeCallTests() {
     withQuestions()
     await screen.findByText('which token?')
 
-    fireEvent.click(screen.getByRole('radio', { name: 'b' }))
-    fireEvent.click(screen.getByRole('radio', { name: 'client' }))
+    fireEvent.click(await screen.findByRole('radio', { name: 'b' }))
+    fireEvent.click(await screen.findByRole('radio', { name: 'client' }))
     expect(screen.getByText(/2 of 2 decided/)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: /^Send( \d)? decisions?$/ }))
@@ -1459,7 +1459,9 @@ function forgeTheReasonTests() {
   it('carries the reason back to the architect', async () => {
     refused()
     await screen.findByText(/plan was refused/i)
-    fireEvent.click(screen.getByRole('button', { name: /Tell the architect what was wrong/ }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Tell the architect what was wrong/ })
+    )
 
     await waitFor(() => {
       const call = invoke.mock.calls.find((c) => c[0] === 'foundry:order.converge')
@@ -1475,7 +1477,7 @@ function forgeStartingOverTests() {
   it('can also start the turn over, carrying nothing', async () => {
     refused()
     await screen.findByText(/plan was refused/i)
-    fireEvent.click(screen.getByRole('button', { name: /Start the turn over/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Start the turn over/ }))
 
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:order.converge', { id: 'WO-1' })
@@ -1520,7 +1522,7 @@ describe('attaching to the architect', () => {
       { provenance: { forgeSession: 'sess-architect', decisions: [], amendments: [] } }
     )
     expect(await screen.findByRole('button', { name: /Attach/ })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /Attach/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Attach/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 'sess-architect' })
     )
@@ -1536,7 +1538,7 @@ describe('attaching to the architect', () => {
     terminalReply = { ok: false }
     mountStates({}, { provenance: { forgeSession: 'sess-gone', decisions: [], amendments: [] } })
     await screen.findByRole('button', { name: /Attach/ })
-    fireEvent.click(screen.getByRole('button', { name: /Attach/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Attach/ }))
     expect(await screen.findByText(/no longer has a terminal/)).toBeTruthy()
   })
 })
@@ -1744,7 +1746,7 @@ function proofAndTheEscapeTests() {
   it('offers to ask the architect for proof', async () => {
     mountBlocked()
     await screen.findByRole('button', { name: 'Ask for proof' })
-    fireEvent.click(screen.getByRole('button', { name: 'Ask for proof' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Ask for proof' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith(
         'foundry:order.converge',
@@ -1768,7 +1770,7 @@ function acceptingAsUnverifiableTests() {
   it('accepts a criterion as unverifiable, with a reason', async () => {
     mountBlocked()
     await screen.findByRole('button', { name: 'Nothing here can prove this' })
-    fireEvent.click(screen.getByRole('button', { name: 'Nothing here can prove this' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Nothing here can prove this' }))
 
     const box = screen.getByLabelText('Why AC-1 cannot be proven')
     fireEvent.change(box, { target: { value: 'there is no display in this environment' } })
@@ -1788,7 +1790,7 @@ function acceptingAsUnverifiableTests() {
   it('will not accept one on a blank reason — a shrug is not a decision', async () => {
     mountBlocked()
     await screen.findByRole('button', { name: 'Nothing here can prove this' })
-    fireEvent.click(screen.getByRole('button', { name: 'Nothing here can prove this' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Nothing here can prove this' }))
     const accept = screen.getByRole('button', { name: 'Accept it' })
     expect(isUnavailable(accept)).toBe(true)
     expect(reasonFor(accept)).toBe('Say why it stands. The reason travels with the order.')
@@ -1976,7 +1978,7 @@ function movingBetweenStepsTests() {
   it('goes forward to the next step and back again', async () => {
     mountStates({})
     await screen.findByRole('heading', { name: 'What is being asked' })
-    fireEvent.click(screen.getByRole('button', { name: 'Next: Plan' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Next: Plan' }))
     expect(screen.getByRole('heading', { name: 'The plan and how it is proven' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.getByRole('heading', { name: 'What is being asked' })).toBeTruthy()

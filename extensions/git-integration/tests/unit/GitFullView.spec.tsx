@@ -345,7 +345,7 @@ describe('GitFullView — commits with --no-verify when Commit without hooks is 
     })
     fireEvent.click(screen.getByText('Commit'))
     await screen.findByText('Commit without hooks')
-    fireEvent.click(screen.getByText('Commit without hooks'))
+    fireEvent.click(await screen.findByText('Commit without hooks'))
     await waitFor(() =>
       expect(mockGitCommit).toHaveBeenCalledWith({
         repoRoot: '/repo',

@@ -92,7 +92,7 @@ function settingsPasswordGenerateTests() {
     answerInvokes(true, { password: 'generated-abc123' })
     render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     await screen.findByPlaceholderText('New password')
-    fireEvent.click(screen.getByRole('button', { name: 'Generate new' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate new' }))
     expect(await screen.findByText('generated-abc123')).toBeTruthy()
     expect(screen.getByText(/will not be shown again/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))

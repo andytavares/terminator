@@ -75,7 +75,7 @@ describe('MobileApp', () => {
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
     render(<MobileApp />)
     await screen.findByText('open terminal')
-    fireEvent.click(screen.getByText('open terminal'))
+    fireEvent.click(await screen.findByText('open terminal'))
     expect(screen.getByText('terminal:s1')).toBeTruthy()
   })
 
@@ -85,7 +85,7 @@ describe('MobileApp', () => {
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
     render(<MobileApp />)
     await screen.findByText('open terminal')
-    fireEvent.click(screen.getByText('open terminal'))
+    fireEvent.click(await screen.findByText('open terminal'))
     expect(screen.getByText('terminal:s1')).toBeTruthy()
     fireEvent.click(screen.getByText('back'))
     expect(screen.getByText('open terminal')).toBeTruthy()

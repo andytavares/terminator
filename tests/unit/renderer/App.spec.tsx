@@ -493,7 +493,7 @@ describe('App — closes SettingsPanel when onClose is called', () => {
     render(<App />)
     act(() => main.events.openSettings.deliver())
     await screen.findByText('Close Settings')
-    fireEvent.click(screen.getByText('Close Settings'))
+    fireEvent.click(await screen.findByText('Close Settings'))
     await waitFor(() => expect(screen.queryByTestId('settings-panel')).toBeNull())
   })
 
@@ -549,7 +549,7 @@ describe('App — closes LogWindow when its onClose is called', () => {
     render(<App />)
     act(() => shortcuts.callbacks.onToggleLog?.())
     await screen.findByText('Close Log')
-    fireEvent.click(screen.getByText('Close Log'))
+    fireEvent.click(await screen.findByText('Close Log'))
     await waitFor(() => expect(screen.queryByTestId('log-window')).toBeNull())
   })
 
@@ -564,7 +564,7 @@ describe('App — closes LogWindow when its onClose is called', () => {
     render(<App />)
     openPalette()
     await screen.findByText('Close Palette')
-    fireEvent.click(screen.getByText('Close Palette'))
+    fireEvent.click(await screen.findByText('Close Palette'))
     await waitFor(() => expect(screen.queryByTestId('quick-actions')).toBeNull())
   })
 
@@ -806,7 +806,7 @@ describe('App — command core.toggle-overview action opens Overview', () => {
     expect(screen.queryByTestId('about-dialog')).toBeNull()
     act(() => main.events.openAbout.deliver())
     await screen.findByTestId('about-dialog')
-    fireEvent.click(screen.getByText('Close About'))
+    fireEvent.click(await screen.findByText('Close About'))
     await waitFor(() => expect(screen.queryByTestId('about-dialog')).toBeNull())
   })
 
@@ -1051,7 +1051,7 @@ describe('App — handleNewTab — NameTerminalDialog onConfirm opens the named 
     render(<App />)
     act(() => shortcuts.callbacks.onNewTab?.())
     await screen.findByTestId('name-terminal-dialog')
-    fireEvent.click(screen.getByText('Confirm'))
+    fireEvent.click(await screen.findByText('Confirm'))
     await waitFor(() => expect(screen.queryByTestId('name-terminal-dialog')).toBeNull())
     expect(createSession).toHaveBeenCalledWith({
       projectId: 'proj-1',
@@ -1074,7 +1074,7 @@ describe('App — handleNewTab — NameTerminalDialog onCancel closes dialog wit
     render(<App />)
     act(() => shortcuts.callbacks.onNewTab?.())
     await screen.findByTestId('name-terminal-dialog')
-    fireEvent.click(screen.getByText('Cancel Dialog'))
+    fireEvent.click(await screen.findByText('Cancel Dialog'))
     await waitFor(() => expect(screen.queryByTestId('name-terminal-dialog')).toBeNull())
     expect(createSession).not.toHaveBeenCalled()
   })

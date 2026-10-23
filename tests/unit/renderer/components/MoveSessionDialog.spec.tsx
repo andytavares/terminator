@@ -226,7 +226,7 @@ describe('MoveSessionDialog — submits new project form on Enter key', () => {
     fireEvent.click(screen.getByText('+ New branch in Alpha'))
     fireEvent.click(screen.getByText('Create & move'))
     expect(await screen.findByText('Name is required')).toBeTruthy()
-    fireEvent.change(screen.getByPlaceholderText('My branch'), { target: { value: 'x' } })
+    fireEvent.change(await screen.findByPlaceholderText('My branch'), { target: { value: 'x' } })
     expect(screen.queryByText('Name is required')).toBeNull()
   })
 })

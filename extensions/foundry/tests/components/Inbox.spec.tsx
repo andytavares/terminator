@@ -194,7 +194,7 @@ function inboxLinksTests() {
       ],
     })
     fireEvent.click(await screen.findByRole('link', { name: '#233' }))
-    fireEvent.click(screen.getByRole('link', { name: 'TAV-15' }))
+    fireEvent.click(await screen.findByRole('link', { name: 'TAV-15' }))
     expect(openExternal).toHaveBeenCalledWith(pullUrl)
     expect(openExternal).toHaveBeenCalledWith(ticketUrl)
   })
@@ -219,7 +219,7 @@ function inboxDecidingTests() {
   it('sends the decision, and asks again afterwards', async () => {
     mount({ gates: [gate()] })
     await screen.findByText(ruleInWords('risk.p0'))
-    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
         gateId: 'G-1',
@@ -245,7 +245,7 @@ function inboxTheNewLimitTests() {
   it('asks for the new limit, then sends it with the decision', async () => {
     mount({ gates: [budgetGate()] })
     await screen.findByText(ruleInWords('budget.exceeded'))
-    fireEvent.click(screen.getByRole('button', { name: 'Raise the budget' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Raise the budget' }))
     expect(invoke).not.toHaveBeenCalledWith('foundry:inbox.decide', expect.anything())
     expect(screen.getByText('At least 46.')).toBeTruthy()
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Minutes' }), {
@@ -266,7 +266,7 @@ function noRecordedBudgetTests() {
   it('decides straight away for a gate that never recorded its budget', async () => {
     mount({ gates: [gate({ rule: 'budget.exceeded' })] })
     await screen.findByText(ruleInWords('budget.exceeded'))
-    fireEvent.click(screen.getByRole('button', { name: 'Raise the budget' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Raise the budget' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
         gateId: 'G-1',
@@ -296,8 +296,8 @@ function aPromotionNoteTests() {
   it('keeps a promotion note up after the last signal goes', async () => {
     mount({ signals: [signal()] })
     await screen.findByText('test-foo flakes on main')
-    fireEvent.click(screen.getByRole('button', { name: 'Promote' }))
-    fireEvent.change(screen.getByRole('textbox', { name: /repository/i }), {
+    fireEvent.click(await screen.findByRole('button', { name: 'Promote' }))
+    fireEvent.change(await screen.findByRole('textbox', { name: /repository/i }), {
       target: { value: '/repos/app' },
     })
     invoke.mockImplementation(async (channel: string) => {
@@ -325,14 +325,14 @@ describe('a decision the handler refused', () => {
   it('says why, rather than redrawing as though nothing happened', async () => {
     mount({ gates: [gate()], decide: { error: 'Gate G-1 was already decided (approve).' } })
     await screen.findByRole('button', { name: /Approve/ })
-    fireEvent.click(screen.getByRole('button', { name: /Approve/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Approve/ }))
     expect(await screen.findByText(/already decided/)).toBeTruthy()
   })
 
   it('says nothing when the decision was taken', async () => {
     mount({ gates: [gate()] })
     await screen.findByRole('button', { name: /Approve/ })
-    fireEvent.click(screen.getByRole('button', { name: /Approve/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Approve/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', expect.anything())
     )
@@ -528,7 +528,7 @@ function inboxPromotingTests() {
       ],
     })
     await screen.findByText('test-foo flakes on main')
-    fireEvent.click(screen.getByRole('button', { name: 'Promote' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Promote' }))
     const repoInput = screen.getByRole('textbox', { name: /repository/i }) as HTMLInputElement
     expect(repoInput.value).toBe('/repos/app')
     fireEvent.click(screen.getByRole('button', { name: 'Confirm promote' }))
@@ -546,8 +546,8 @@ function changingTheRepositoryTests() {
   it('lets the repository be changed before promoting', async () => {
     mount({ signals: [highSignal()] })
     await screen.findByText('test-foo flakes on main')
-    fireEvent.click(screen.getByRole('button', { name: 'Promote' }))
-    fireEvent.change(screen.getByRole('textbox', { name: /repository/i }), {
+    fireEvent.click(await screen.findByRole('button', { name: 'Promote' }))
+    fireEvent.change(await screen.findByRole('textbox', { name: /repository/i }), {
       target: { value: '/repos/other' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Confirm promote' }))
@@ -564,7 +564,7 @@ function dismissingAndTheBadgeTests() {
   it('dismisses a signal and removes it from the list', async () => {
     mount({ signals: [highSignal()] })
     await screen.findByText('test-foo flakes on main')
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Dismiss' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:signals.dismiss', { id: 'SIG-1' })
     )

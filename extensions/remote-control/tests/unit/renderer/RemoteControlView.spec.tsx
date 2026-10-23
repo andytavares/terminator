@@ -233,7 +233,7 @@ function remoteViewControlTests() {
   it('turns on through the bridge', async () => {
     render(<RemoteControlView />)
     await screen.findByText('Off')
-    fireEvent.click(screen.getByRole('button', { name: 'Turn on' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Turn on' }))
     expect(invoke).toHaveBeenCalledWith('remote:toggle', { enabled: true })
   })
 }

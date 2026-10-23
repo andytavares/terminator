@@ -121,9 +121,9 @@ function listShowsEachAreaListsArchivedAreasTests() {
   it('lists archived areas with a delete button, and an empty state', async () => {
     render(<AreasView />)
     await screen.findByText('Work')
-    fireEvent.click(screen.getByRole('button', { name: 'Archived' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Archived' }))
     expect(await screen.findByText('Old')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Delete area permanently' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete area permanently' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:delete-area')).toEqual([{ areaFilePath: 'Old' }])
     )
@@ -157,7 +157,7 @@ function listShowsAnErrorTests() {
     render(<AreasView />)
     fireEvent.keyDown(await screen.findByText('Work'), { key: 'Enter' })
     expect(await screen.findByText('Plan sprint')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Areas' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Areas' }))
     expect(await screen.findByText('Home')).toBeTruthy()
   })
 }
@@ -191,8 +191,8 @@ function createCancelsCreatingWithTests() {
   it('cancels creating with the button or Escape', async () => {
     render(<AreasView />)
     fireEvent.click(await screen.findByRole('button', { name: '+ New area' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-    fireEvent.click(screen.getByRole('button', { name: '+ New area' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+    fireEvent.click(await screen.findByRole('button', { name: '+ New area' }))
     fireEvent.keyDown(screen.getByPlaceholderText(/Area name/), { key: 'Escape' })
     expect(screen.queryByPlaceholderText(/Area name/)).toBeNull()
   })

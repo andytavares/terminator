@@ -179,7 +179,7 @@ describe('IntegrationsSettings — connecting — clears the rejection as soon a
     fireEvent.click(screen.getByText('Connect Linear'))
     expect(await screen.findByRole('alert')).toBeTruthy()
 
-    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'better' } })
+    fireEvent.change(await screen.findByLabelText('API key'), { target: { value: 'better' } })
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
   })
 

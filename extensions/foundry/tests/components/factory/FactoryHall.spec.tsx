@@ -305,7 +305,7 @@ function monitorsTests() {
   it('opens a station’s monitor and attaches to it', async () => {
     mount()
     await screen.findByRole('button', { name: /Build the thing/ })
-    fireEvent.click(screen.getByRole('button', { name: /Build the thing/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
     await screen.findByRole('button', { name: /ATTACH/ })
     expect(document.querySelector('.fdry-hall-inspector')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /ATTACH/ }))
@@ -542,7 +542,7 @@ function playbackTests() {
     try {
       fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
       await screen.findByRole('button', { name: 'Pause' })
-      fireEvent.click(screen.getByRole('button', { name: '4x' }))
+      fireEvent.click(await screen.findByRole('button', { name: '4x' }))
       expect(screen.getByRole('button', { name: '4x' }).getAttribute('aria-pressed')).toBe('true')
       // 3 s of recording at 4x is 750 ms of replay, in steps of 100 ms
       await act(() => vi.advanceTimersByTimeAsync(700))
@@ -567,7 +567,7 @@ function theSiteAndFailuresTests() {
   it('goes back to the site', async () => {
     const { onBack } = mount()
     await screen.findByRole('button', { name: /Build the thing/ })
-    fireEvent.click(screen.getByRole('button', { name: 'All halls' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'All halls' }))
     expect(onBack).toHaveBeenCalled()
   })
 
@@ -587,9 +587,9 @@ function theSiteAndFailuresTests() {
     })
     render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
     await screen.findByRole('button', { name: /Build the thing/ })
-    fireEvent.click(screen.getByRole('button', { name: /Build the thing/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
     await screen.findByRole('button', { name: /ATTACH/ })
-    fireEvent.click(screen.getByRole('button', { name: /ATTACH/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /ATTACH/ }))
     await screen.findByText('gone')
   })
 }

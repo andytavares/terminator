@@ -92,7 +92,7 @@ beforeEach(() => vi.clearAllMocks())
 
 async function openPlan(): Promise<void> {
   await screen.findByRole('button', { name: /^Plan/ })
-  fireEvent.click(screen.getByRole('button', { name: /^Plan/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /^Plan/ }))
 }
 
 describe('the Forge puts its open questions on the Plan step', () => {
@@ -129,7 +129,7 @@ describe('the Forge puts its open questions on the Plan step', () => {
 
 async function openRedTeam(): Promise<void> {
   await screen.findByRole('button', { name: /^Red team/ })
-  fireEvent.click(screen.getByRole('button', { name: /^Red team/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /^Red team/ }))
 }
 
 function mountForgeWithOrder(over: Partial<WorkOrder>) {

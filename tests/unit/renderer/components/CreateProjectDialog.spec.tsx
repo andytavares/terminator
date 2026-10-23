@@ -623,7 +623,7 @@ describe('CreateProjectDialog — from an issue — honours an edit made after p
     fireEvent.focus(screen.getByPlaceholderText(/Search, or type an issue key/))
     fireEvent.click(await screen.findByText('TAV-42'))
 
-    fireEvent.click(screen.getByTitle('Choose a different issue'))
+    fireEvent.click(await screen.findByTitle('Choose a different issue'))
     expect(screen.getByPlaceholderText(/Search, or type an issue key/)).toBeTruthy()
   })
 
@@ -632,7 +632,7 @@ describe('CreateProjectDialog — from an issue — honours an edit made after p
     fireEvent.focus(screen.getByPlaceholderText(/Search, or type an issue key/))
     fireEvent.click(await screen.findByText('TAV-42'))
 
-    fireEvent.click(screen.getByText('Create'))
+    fireEvent.click(await screen.findByText('Create'))
     await eventually(() => expect(mockCreateProject).toHaveBeenCalled())
     await eventually(() =>
       expect(linkIssue).toHaveBeenCalledWith('p-new', { tracker: 'linear', key: 'TAV-42' })
@@ -703,7 +703,7 @@ describe('CreateProjectDialog — from an issue — while it is working', () => 
     fireEvent.click(screen.getByText('Create'))
     await screen.findByRole('button', { name: 'Creating…' })
 
-    fireEvent.click(screen.getByText('Cancel'))
+    fireEvent.click(await screen.findByText('Cancel'))
     pressOutside(screen.getByRole('dialog'))
     expect(onClose).not.toHaveBeenCalled()
     gate.finish()

@@ -96,7 +96,7 @@ function settingsViewEnablingTests() {
   it('refuses to enable a sensor with no repository, and shows why', async () => {
     mount()
     await screen.findByText('CI flake watch')
-    fireEvent.click(screen.getByRole('checkbox', { name: /Enable CI flake watch/i }))
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Enable CI flake watch/i }))
     expect(
       await screen.findByText('A sensor needs a repository before it can be enabled.')
     ).toBeTruthy()
@@ -107,9 +107,12 @@ function enablingWithARepositoryTests() {
   it('enables once a repository is given', async () => {
     mount()
     await screen.findByText('CI flake watch')
-    fireEvent.change(screen.getByRole('textbox', { name: /Repository for CI flake watch/i }), {
-      target: { value: '/repos/app' },
-    })
+    fireEvent.change(
+      await screen.findByRole('textbox', { name: /Repository for CI flake watch/i }),
+      {
+        target: { value: '/repos/app' },
+      }
+    )
     fireEvent.click(screen.getByRole('checkbox', { name: /Enable CI flake watch/i }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:sensors.set', {
@@ -153,7 +156,7 @@ function runningNowTests() {
   it('runs a sensor now and shows what it recorded', async () => {
     mount({ runNow: { recorded: 3, problem: null } })
     await screen.findByText('CI flake watch')
-    fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Run now' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:sensors.run-now', { id: 'ci-flake' })
     )
@@ -163,7 +166,7 @@ function runningNowTests() {
   it('runs a sensor now and shows the problem it hit', async () => {
     mount({ runNow: { recorded: 0, problem: 'could not reach the repository' } })
     await screen.findByText('CI flake watch')
-    fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Run now' }))
     expect(await screen.findByText(/could not reach the repository/)).toBeTruthy()
   })
 }

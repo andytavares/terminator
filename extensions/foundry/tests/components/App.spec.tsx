@@ -178,9 +178,9 @@ async function openWorkingHall() {
   render(<App />)
   fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
   await screen.findByRole('button', { name: 'Factory view' })
-  fireEvent.click(screen.getByRole('button', { name: 'Factory view' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Factory view' }))
   await screen.findByText('Working order')
-  fireEvent.click(screen.getByRole('button', { name: /Working order/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /Working order/ }))
 }
 
 describe('App', () => {
@@ -242,7 +242,7 @@ function whatIsWaitingTests() {
     inboxWaiting = [waitingRow]
     render(<App />)
     await screen.findByRole('region', { name: 'Waiting on you' })
-    fireEvent.click(screen.getByRole('button', { name: 'Ledger' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Ledger' }))
     await screen.findByText('Nothing recorded yet.')
     expect(screen.queryByRole('region', { name: 'Waiting on you' })).toBeNull()
   })
@@ -263,7 +263,7 @@ function appSettingsTests() {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
     expect(await screen.findByRole('button', { name: /back/i })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /back/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /back/i }))
     expect(await screen.findByText(/no orders yet/i)).toBeTruthy()
   })
 
@@ -299,7 +299,7 @@ function leavingSettingsTests() {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
     await screen.findByRole('button', { name: /back/i })
-    fireEvent.click(screen.getByRole('button', { name: 'Ledger' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Ledger' }))
     await waitFor(() => expect(screen.queryByRole('button', { name: /back/i })).toBeNull())
     expect(screen.getByRole('button', { name: 'Ledger' }).getAttribute('aria-pressed')).toBe('true')
   })
@@ -415,7 +415,7 @@ describe('the Ledger surface', () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Ledger' }))
     await screen.findByText('Nothing recorded yet.')
-    fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Forge' }))
     expect(await screen.findByText(/no orders yet/i)).toBeTruthy()
   })
 })
@@ -509,7 +509,7 @@ function appSwitchingTests() {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
     await screen.findByRole('button', { name: 'Factory view' })
-    fireEvent.click(screen.getByRole('button', { name: 'Factory view' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Factory view' }))
     await waitFor(() =>
       expect(mockBridgeInvoke).toHaveBeenCalledWith('foundry:ui.set-view', { view: 'factory' })
     )
@@ -608,9 +608,9 @@ function aShapingOrderTests() {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
     await screen.findByRole('button', { name: 'Factory view' })
-    fireEvent.click(screen.getByRole('button', { name: 'Factory view' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Factory view' }))
     await screen.findByText('Still shaping')
-    fireEvent.click(screen.getByRole('button', { name: /Still shaping/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Still shaping/ }))
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'List view' }).getAttribute('aria-pressed')).toBe(
         'true'
@@ -625,9 +625,9 @@ function flippingBackTests() {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
     await screen.findByRole('button', { name: 'Factory view' })
-    fireEvent.click(screen.getByRole('button', { name: 'Factory view' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Factory view' }))
     await screen.findByText(/no orders yet/i)
-    fireEvent.click(screen.getByRole('button', { name: 'List view' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'List view' }))
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'List view' }).getAttribute('aria-pressed')).toBe(
         'true'
@@ -666,7 +666,7 @@ function aHallBandWithoutAGateTests() {
     })
     await openWorkingHall()
     await screen.findByText('Nothing is running this')
-    fireEvent.click(screen.getByRole('button', { name: 'Open in List view' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Open in List view' }))
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'List view' }).getAttribute('aria-pressed')).toBe(
         'true'
