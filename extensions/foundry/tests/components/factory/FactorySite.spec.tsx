@@ -105,7 +105,7 @@ describe('FactorySite', () => {
 function theCardsTests() {
   it('says there is nothing yet', async () => {
     mount([])
-    await waitFor(() => expect(screen.getByText(/no orders yet/i)).toBeTruthy())
+    await screen.findByText(/no orders yet/i)
   })
 
   it('lists a card per order, newest first', async () => {
@@ -113,7 +113,7 @@ function theCardsTests() {
       { id: 'WO-1', title: 'Older', status: 'running', createdAt: '2026-10-01T00:00:00.000Z' },
       { id: 'WO-2', title: 'Newer', status: 'running', createdAt: '2026-10-07T00:00:00.000Z' },
     ])
-    await waitFor(() => screen.getByText('Older'))
+    await screen.findByText('Older')
     const cards = Array.from(document.querySelectorAll('.fdry-hall-card'))
     expect(cards.map((c) => c.textContent)).toEqual([
       expect.stringContaining('Newer'),
@@ -156,7 +156,7 @@ const SHIPPED_AROUND_BUILDING = [
 function completedOrdersTests() {
   it('puts finished orders in their own section, marked done, newest first', async () => {
     mount(SHIPPED_AROUND_BUILDING)
-    await waitFor(() => screen.getByText('Building'))
+    await screen.findByText('Building')
 
     const active = screen.getByRole('region', { name: 'Active' })
     const completed = screen.getByRole('region', { name: 'Completed' })
@@ -175,7 +175,7 @@ function completedOrdersTests() {
 function noCompletedSectionTests() {
   it('shows no Completed section until an order finishes', async () => {
     mount([{ id: 'WO-1', title: 'Building', status: 'running' }])
-    await waitFor(() => screen.getByText('Building'))
+    await screen.findByText('Building')
     expect(screen.queryByRole('region', { name: 'Completed' })).toBeNull()
   })
 }
@@ -201,7 +201,7 @@ function waitingShippedOrdersTests() {
         },
       },
     ])
-    await waitFor(() => screen.getByText('Awaiting review'))
+    await screen.findByText('Awaiting review')
     expect(screen.getByRole('region', { name: 'Active' }).textContent).toContain('Awaiting review')
     expect(screen.queryByRole('region', { name: 'Completed' })).toBeNull()
   })
@@ -226,7 +226,7 @@ function beaconsTests() {
         },
       },
     ])
-    await waitFor(() => screen.getByText('Halted'))
+    await screen.findByText('Halted')
     expect(
       screen.getByRole('button', { name: /Halted/ }).querySelector('.fdry-hall-card-beacon')
     ).not.toBeNull()
@@ -238,13 +238,13 @@ function factorySiteCiTests() {
     mount([
       { id: 'WO-1', title: 'Shipping', status: 'running', ci: { status: 'red', round: 2, max: 3 } },
     ])
-    await waitFor(() => screen.getByText('Shipping'))
+    await screen.findByText('Shipping')
     expect(screen.getByText('CI · Failed after 3 fixes')).toBeTruthy()
   })
 
   it('says nothing about CI for an order that has not shipped one', async () => {
     mount([{ id: 'WO-1', title: 'Fresh', status: 'running', ci: null }])
-    await waitFor(() => screen.getByText('Fresh'))
+    await screen.findByText('Fresh')
     expect(screen.queryByText(/CI \d/)).toBeNull()
   })
 }
@@ -252,7 +252,7 @@ function factorySiteCiTests() {
 function theRefineryTrackTests() {
   it('shows no refinery track when nothing is queued behind anything', async () => {
     mount([{ id: 'WO-1', title: 'Only one', status: 'running' }])
-    await waitFor(() => screen.getByText('Only one'))
+    await screen.findByText('Only one')
     expect(screen.queryByLabelText('Refinery')).toBeNull()
   })
 
@@ -269,7 +269,7 @@ function theRefineryTrackTests() {
         },
       },
     ])
-    await waitFor(() => expect(screen.getByLabelText('Refinery')).toBeTruthy())
+    await screen.findByLabelText('Refinery')
     const track = screen.getByLabelText('Refinery').querySelector('.fdry-refinery-track')
     expect(track?.textContent).toBe('First2 shared filesSecond')
   })
@@ -278,8 +278,8 @@ function theRefineryTrackTests() {
 function factorySiteOpeningTests() {
   it('opens the order it is given', async () => {
     const { onOpen } = mount([{ id: 'WO-1', title: 'Only one', status: 'running' }])
-    await waitFor(() => screen.getByText('Only one'))
-    fireEvent.click(screen.getByRole('button', { name: /Only one/ }))
+    await screen.findByText('Only one')
+    fireEvent.click(await screen.findByRole('button', { name: /Only one/ }))
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 'WO-1', title: 'Only one' }))
   })
 }
@@ -287,7 +287,7 @@ function factorySiteOpeningTests() {
 describe('FactorySite status wall', () => {
   it('shows the 30-day numbers as tiles', async () => {
     mount([])
-    await waitFor(() => screen.getByText('Status wall'))
+    await screen.findByText('Status wall')
     expect(screen.getByText('Shipped').previousSibling?.textContent).toBe('3')
     expect(screen.getByText('Median lead time').previousSibling?.textContent).toBe('1 h 20 min')
     expect(screen.getByText('First-pass yield').previousSibling?.textContent).toBe('50%')
@@ -295,15 +295,15 @@ describe('FactorySite status wall', () => {
 
   it('renders a null number as —, never 0', async () => {
     mount([], { ...METRICS, medianLeadTimeMs: null, firstPassYield: null })
-    await waitFor(() => screen.getByText('Status wall'))
+    await screen.findByText('Status wall')
     expect(screen.getByText('Median lead time').previousSibling?.textContent).toBe('—')
     expect(screen.getByText('First-pass yield').previousSibling?.textContent).toBe('—')
   })
 
   it('refetches with the chosen window when the toggle is switched', async () => {
     const { invoke } = mount([])
-    await waitFor(() => screen.getByText('Status wall'))
-    fireEvent.click(screen.getByRole('radio', { name: 'All time' }))
+    await screen.findByText('Status wall')
+    fireEvent.click(await screen.findByRole('radio', { name: 'All time' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:factory.metrics', { window: 'all' })
     )
@@ -318,13 +318,13 @@ describe('the Dock', () => {
 function factorySiteCratesTests() {
   it('shows nothing when there are no open signals', async () => {
     mount([])
-    await waitFor(() => screen.getByText(/no orders yet/i))
+    await screen.findByText(/no orders yet/i)
     expect(screen.queryByLabelText('Dock')).toBeNull()
   })
 
   it('shows a crate per open signal, with its title, count and severity', async () => {
     mount([], METRICS, { signals: [dockSignal()] })
-    await waitFor(() => screen.getByText('test-foo flakes on main'))
+    await screen.findByText('test-foo flakes on main')
     expect(screen.getByText(/×4/)).toBeTruthy()
     expect(screen.getByText(/high/)).toBeTruthy()
   })
@@ -343,8 +343,8 @@ function factorySitePromotingTests() {
         },
       ],
     })
-    await waitFor(() => screen.getByText('test-foo flakes on main'))
-    fireEvent.click(screen.getByRole('button', { name: 'Promote' }))
+    await screen.findByText('test-foo flakes on main')
+    fireEvent.click(await screen.findByRole('button', { name: 'Promote' }))
     const repoInput = screen.getByRole('textbox', { name: /repository/i }) as HTMLInputElement
     expect(repoInput.value).toBe('/repos/app')
     fireEvent.click(screen.getByRole('button', { name: 'Confirm promote' }))

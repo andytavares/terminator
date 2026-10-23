@@ -216,8 +216,7 @@ function exhaustedRoundsTests() {
       state: h.state,
     })
     expect(h.sendBack).toHaveBeenCalledTimes(2)
-    expect(outcome.kind).toBe('red')
-    if (outcome.kind === 'red') expect(outcome.rounds).toBe(2)
+    expect(outcome).toMatchObject({ kind: 'red', rounds: 2 })
     expect(h.record.mock.calls.at(-1)?.[0]).toBe('ci.exhausted')
   })
 }

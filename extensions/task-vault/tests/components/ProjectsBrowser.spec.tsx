@@ -114,7 +114,7 @@ function listArchivesAProjectTests() {
     bridge.responses['task-vault:projects:list'] = { projects: [] }
     await act(async () => bridge.push('task-vault:push:index-updated', {}))
     expect(await screen.findByText('No projects found.')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Active' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Active' }))
     expect(await screen.findByText('No active projects.')).toBeTruthy()
   })
 }
@@ -161,7 +161,7 @@ function createPicksAnExistingPicksAnExistingTests() {
     const area = screen.getByPlaceholderText('e.g. work')
     fireEvent.focus(area)
     fireEvent.mouseEnter(await screen.findByText('Work', { selector: 'li' }))
-    fireEvent.mouseDown(screen.getByText('Work', { selector: 'li' }))
+    fireEvent.mouseDown(await screen.findByText('Work', { selector: 'li' }))
     expect((area as HTMLInputElement).value).toBe('Work')
     fireEvent.change(screen.getByPlaceholderText('Project name'), { target: { value: 'Launch' } })
     fireEvent.keyDown(screen.getByPlaceholderText('Project name'), { key: 'Enter' })
@@ -278,7 +278,7 @@ function areaGoesToAGoesToATests() {
     expect(useVaultNavStore.getState().selectedAreaName).toBe('Work')
     fireEvent.click(within(projectCardNamed('Launch')).getByRole('button', { name: 'Change area' }))
     fireEvent.change(await screen.findByDisplayValue('Work'), { target: { value: 'Ops' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save area' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Save area' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:projects:update-area')).toEqual([
         { projectFilePath: 'Launch', area: 'Ops' },

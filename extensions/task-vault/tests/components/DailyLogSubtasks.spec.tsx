@@ -177,7 +177,7 @@ function linkTestsPart2() {
     renderDailyLog(task('t1', 'Write'))
     fireEvent.click(buttonNamed('Link to terminal session'))
     await screen.findByRole('option', { name: 'Work › App › zsh' })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'sess-aaaaaaaa1' } })
+    fireEvent.change(await screen.findByRole('combobox'), { target: { value: 'sess-aaaaaaaa1' } })
     await eventually(() =>
       expect(vi.mocked(notify)).toHaveBeenCalledWith(
         'error',

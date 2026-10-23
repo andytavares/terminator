@@ -195,8 +195,7 @@ function unreadableIssuesTests() {
       { kind: 'tracker', tracker: 'linear', key: 'TAV-99', repoPaths: [repo] },
       deps({ readIssue: vi.fn(async () => null) })
     )
-    expect('error' in r).toBe(true)
-    if ('error' in r) expect(r.error).toContain('TAV-99')
+    expect(r).toMatchObject({ error: expect.stringContaining('TAV-99') })
   })
 }
 
@@ -306,8 +305,7 @@ function anUnreadableSignalTests() {
       { kind: 'signal', signalId: 'sig-missing', repoPaths: [repo] },
       deps({ readSignal: vi.fn(async () => null) })
     )
-    expect('error' in r).toBe(true)
-    if ('error' in r) expect(r.error).toContain('sig-missing')
+    expect(r).toMatchObject({ error: expect.stringContaining('sig-missing') })
   })
 }
 

@@ -7,7 +7,10 @@ import { emitProjectDelete } from '../../../src/main/extensions/workspace-events
 // working in a checkout that is being removed.
 
 let stop: (() => void) | null = null
-afterEach(() => stop?.())
+afterEach(() => {
+  stop?.()
+  stop = null
+})
 
 function sessions() {
   return [

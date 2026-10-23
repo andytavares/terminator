@@ -1,8 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mergeSensed, ranked, dismiss, promote } from '../../src/sensors/cluster.js'
 import type { Signal, SensedItem } from '../../src/sensors/types.js'
 
 let idCounter = 0
+beforeEach(() => {
+  idCounter = 0
+})
 function newId(): string {
   idCounter += 1
   return `sig-${idCounter}`

@@ -28,6 +28,14 @@ let scratch: string
 let repo: string
 let execHandler: (event: unknown, payload: unknown) => Promise<unknown>
 
+function registeredHandler(
+  channel: string
+): (event: unknown, payload: unknown) => Promise<unknown> {
+  const call = vi.mocked(ipcMain.handle).mock.calls.find(([name]) => name === channel)
+  if (!call) throw new Error(`no handler registered for ${channel}`)
+  return call[1] as (event: unknown, payload: unknown) => Promise<unknown>
+}
+
 function useFakeGitOnPath(): void {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -40,8 +48,7 @@ function useFakeGitOnPath(): void {
     mkdirSync(repo)
 
     registerShellHandlers()
-    const calls = vi.mocked(ipcMain.handle).mock.calls
-    execHandler = calls.find(([channel]) => channel === 'shell:exec')![1] as typeof execHandler
+    execHandler = registeredHandler('shell:exec')
   })
 
   afterEach(() => {
@@ -113,10 +120,7 @@ describe('shell:open-external IPC handler', () => {
 
     registerShellHandlers()
 
-    const calls = vi.mocked(ipcMain.handle).mock.calls
-    const call = calls.find(([channel]) => channel === 'shell:open-external')
-    expect(call).toBeDefined()
-    handler = call![1] as typeof handler
+    handler = registeredHandler('shell:open-external')
   })
 
   it('returns ok:true when openExternal succeeds', async () => {
@@ -141,10 +145,7 @@ describe('shell:open-path IPC handler', () => {
 
     registerShellHandlers()
 
-    const calls = vi.mocked(ipcMain.handle).mock.calls
-    const call = calls.find(([channel]) => channel === 'shell:open-path')
-    expect(call).toBeDefined()
-    handler = call![1] as typeof handler
+    handler = registeredHandler('shell:open-path')
   })
 
   it('returns ok:true when openPath succeeds', async () => {
@@ -175,10 +176,7 @@ describe('shell:open-path IPC handler — home directory', () => {
 
     registerShellHandlers()
 
-    const calls = vi.mocked(ipcMain.handle).mock.calls
-    const call = calls.find(([channel]) => channel === 'shell:open-path')
-    expect(call).toBeDefined()
-    handler = call![1] as typeof handler
+    handler = registeredHandler('shell:open-path')
   })
 
   it('expands bare ~ to the home directory', async () => {

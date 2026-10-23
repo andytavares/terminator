@@ -103,16 +103,17 @@ function aRootThatCannotBeWrittenTests() {
     const wall = path.join(tmp, 'wall')
     fs.writeFileSync(wall, '')
     const r = await ensureWritable(path.join(wall, 'foundry'))
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toContain(path.join(wall, 'foundry'))
+    expect(r).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining(path.join(wall, 'foundry')),
+    })
   })
 
   it('reports a root that exists but is a file, rather than trying to write into it', async () => {
     const file = path.join(tmp, 'not-a-dir')
     fs.writeFileSync(file, 'x')
     const r = await ensureWritable(file)
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/not a directory/i)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/not a directory/i) })
   })
 }
 

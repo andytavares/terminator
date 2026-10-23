@@ -97,7 +97,7 @@ function dayTests() {
   it('says a day has no tasks, including when loading it fails', async () => {
     render(<CalendarDrawer />)
     expect(await screen.findByText('No tasks')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '2026-01-11 · nothing' }))
+    fireEvent.click(await screen.findByRole('button', { name: '2026-01-11 · nothing' }))
     expect(await screen.findByText('No tasks')).toBeTruthy()
   })
 }

@@ -105,25 +105,20 @@ describe('resolveRecipe', () => {
   it('parses and reports which rung it came from', () => {
     put(builtIn, 'recipes/direct', recipe('direct'))
     const r = resolveRecipe('direct', sources())
-    expect(r.ok).toBe(true)
-    if (r.ok) {
-      expect(r.resolved.value.id).toBe('direct')
-      expect(r.resolved.rung).toBe('built-in')
-    }
+    expect(r.ok && r.resolved.value.id).toBe('direct')
+    expect(r.ok && r.resolved.rung).toBe('built-in')
   })
 
   it('reports a malformed override by path rather than falling through to the built-in', () => {
     put(builtIn, 'recipes/direct', recipe('direct'))
     put(dataRoot, 'recipes/direct', 'id: [unclosed\n')
     const r = resolveRecipe('direct', sources())
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toContain('direct.yaml')
+    expect(r).toMatchObject({ ok: false, reason: expect.stringContaining('direct.yaml') })
   })
 
   it('reports a name nobody defines', () => {
     const r = resolveRecipe('nowhere', sources())
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toContain('nowhere')
+    expect(r).toMatchObject({ ok: false, reason: expect.stringContaining('nowhere') })
   })
 })
 

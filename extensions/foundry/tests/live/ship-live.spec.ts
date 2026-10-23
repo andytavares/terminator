@@ -219,7 +219,7 @@ async function viewOnGitHub(url: string): Promise<PullView> {
   return JSON.parse(view.stdout) as PullView
 }
 
-async function opensADraftGitHubCanShowBack(): Promise<void> {
+async function expectDraftOpenedAndShownBack(): Promise<void> {
   const raised: Gate[] = []
   const result = await shipOrder(liveOrder(), verifiedShipment(), liveShipDeps(raised))
 
@@ -246,7 +246,7 @@ async function opensADraftGitHubCanShowBack(): Promise<void> {
   console.log(`live pull request: ${pull.url}`)
 }
 
-async function marksTheDraftReady(): Promise<void> {
+async function expectDraftMarkedReady(): Promise<void> {
   // The last `gh` path with no live cover. `markReady` is what the
   // "mark it ready?" decision runs, and it is the only thing in the whole
   // feature that stops being a draft.
@@ -284,7 +284,7 @@ async function marksTheDraftReady(): Promise<void> {
   await exec({ command: 'gh', args: ['pr', 'ready', pull.url, '--undo'], cwd: LIVE })
 }
 
-async function recordsTheDraftInTheOrdersLedger(): Promise<void> {
+async function expectDraftRecordedInOrdersLedger(): Promise<void> {
   // `ship.draft_opened`'s subject is the pull request URL; filing by subject once put it in
   // `orders/https:/github.com/…/ledger.jsonl`, not here (docs/ARCHITECTURE.md, "The ledger").
   const ledger = path.join(dataRoot, 'orders', liveOrder().id, 'ledger.jsonl')
@@ -306,13 +306,13 @@ describe.skipIf(LIVE === '')('shipping, for real', () => {
   afterAll(removeTheLiveRecords)
   beforeAll(commitTheChangeInAWorktree)
 
-  it(
-    'pushes the branch and opens a draft pull request GitHub can show back',
-    opensADraftGitHubCanShowBack
-  )
-  it('turns the draft into a review request when the operator says so', marksTheDraftReady)
-  it(
-    "records the draft in the order's own ledger, and nowhere else",
-    recordsTheDraftInTheOrdersLedger
-  )
+  it('pushes the branch and opens a draft pull request GitHub can show back', async () => {
+    await expectDraftOpenedAndShownBack()
+  })
+  it('turns the draft into a review request when the operator says so', async () => {
+    await expectDraftMarkedReady()
+  })
+  it("records the draft in the order's own ledger, and nowhere else", async () => {
+    await expectDraftRecordedInOrdersLedger()
+  })
 })

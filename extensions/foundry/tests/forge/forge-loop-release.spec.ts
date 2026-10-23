@@ -143,6 +143,10 @@ describe('a round that asks to see the fix, finishing while held', () => {
     await setOrderHeld(false)
     await untilLedgerHas(dataDir, 'converge.started', 'red team round 1 fix')
     await untilToastShown(host, READY)
+    expect(await firstTurnAfterRelease()).toEqual({
+      action: 'converge.started',
+      reason: 'red team round 1 fix',
+    })
   })
 })
 

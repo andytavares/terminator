@@ -168,13 +168,14 @@ function connect(sessionId: string, ticket?: string): Promise<WebSocket> {
   })
 }
 
-function connectExpectClose(sessionId: string, ticket?: string): Promise<void> {
-  return new Promise((resolve) => {
-    const qs = ticket ? `?ticket=${ticket}` : ''
-    const ws = new WebSocket(`${baseUrl}/ws/terminals/${sessionId}${qs}`)
+async function expectConnectionClosed(sessionId: string, ticket?: string): Promise<void> {
+  const qs = ticket ? `?ticket=${ticket}` : ''
+  const ws = new WebSocket(`${baseUrl}/ws/terminals/${sessionId}${qs}`)
+  await new Promise<void>((resolve) => {
     ws.on('close', () => resolve())
     ws.on('error', () => resolve())
   })
+  expect(ws.readyState).not.toBe(WebSocket.OPEN)
 }
 
 function closed(ws: WebSocket): Promise<void> {
@@ -383,19 +384,19 @@ function terminalSocketTests() {
 function terminalSocketAdmissionTests() {
   it('closes the connection when no ticket is provided', async () => {
     const sessionId = await createSession()
-    await connectExpectClose(sessionId)
+    await expectConnectionClosed(sessionId)
   })
 
   it('closes the connection for an invalid ticket', async () => {
     const sessionId = await createSession()
-    await connectExpectClose(sessionId, 'badticket')
+    await expectConnectionClosed(sessionId, 'badticket')
   })
 
   it('closes the connection when the ticket is valid but the session is gone', async () => {
     const sessionId = await createSession()
     const ticket = await ticketFor(sessionId)
     ptyManager.emitExit(sessionId)
-    await connectExpectClose(sessionId, ticket)
+    await expectConnectionClosed(sessionId, ticket)
   })
 }
 

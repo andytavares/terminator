@@ -28,19 +28,15 @@ describe('parseSensor', () => {
 function schemaParsingTests() {
   it('parses a well-formed sensor', () => {
     const r = parseSensor(SENSOR, 'ci-main-red.yaml')
-    expect(r.ok).toBe(true)
-    if (r.ok) {
-      expect(r.value.id).toBe('ci-main-red')
-      expect(r.value.severity).toBe('high')
-      expect(r.value.every).toBe('30m')
-      expect(r.value.source).toEqual({ kind: 'github-runs', branch: null, limit: 20 })
-    }
+    expect(r.ok && r.value.id).toBe('ci-main-red')
+    expect(r.ok && r.value.severity).toBe('high')
+    expect(r.ok && r.value.every).toBe('30m')
+    expect(r.ok && r.value.source).toEqual({ kind: 'github-runs', branch: null, limit: 20 })
   })
 
   it('requires the id to match the filename', () => {
     const r = parseSensor(SENSOR, 'other-name.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/other-name/)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/other-name/) })
   })
 }
 
@@ -64,8 +60,7 @@ function schemaRefusalsTests() {
 function schemaMalformedAndNewerTests() {
   it('reports malformed YAML by path instead of throwing', () => {
     const r = parseSensor('id: [unclosed\n', 'broken.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toContain('broken.yaml')
+    expect(r).toMatchObject({ ok: false, reason: expect.stringContaining('broken.yaml') })
   })
 
   it('refuses a schema version newer than it knows', () => {
@@ -92,7 +87,7 @@ source:
 `
     const r = parseSensor(tracker, 'tracker-query.yaml')
     expect(r.ok).toBe(true)
-    if (r.ok) expect(r.value.source).toEqual({ kind: 'tracker', query: null, limit: 25 })
+    expect(r.ok && r.value.source).toEqual({ kind: 'tracker', query: null, limit: 25 })
   })
 }
 

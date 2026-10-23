@@ -221,18 +221,21 @@ function registerDiagramsIpcHandlersRegistrationTests() {
     vi.mocked(ipcMain.handle).mockClear()
     registerDiagramsIpcHandlers(mockApi, db)
     const calls = vi.mocked(ipcMain.handle).mock.calls as [string, (...a: unknown[]) => unknown][]
-    const getHandler = (ch: string) => calls.find(([c]) => c === ch)?.[1]
-    await getHandler('terminator.notepad:diagrams.create')?.(null, { title: 'T' })
-    await getHandler('terminator.notepad:diagrams.list')?.(null, {})
-    await getHandler('terminator.notepad:diagrams.get')?.(null, { id: 'noop' })
-    await getHandler('terminator.notepad:diagrams.autosave')?.(null, {
-      id: 'noop',
-      title: 'X',
-      sceneJson: '{}',
-    })
-    await getHandler('terminator.notepad:diagrams.archive')?.(null, { id: 'noop' })
-    await getHandler('terminator.notepad:diagrams.restore')?.(null, { id: 'noop' })
-    await getHandler('terminator.notepad:diagrams.hardDelete')?.(null, { id: 'noop' })
+    const getHandler = (ch: string) => calls.find(([c]) => c === ch)![1]
+    const call = (name: string, payload: unknown) =>
+      getHandler(`terminator.notepad:diagrams.${name}`)(null, payload)
+    const created = (await call('create', { title: 'T' })) as { data: { id: string } }
+    const { id } = created.data
+
+    expect(await call('list', {})).toHaveProperty('data.0.id', id)
+    expect(await call('get', { id })).toHaveProperty('data.title', 'T')
+    expect(await call('autosave', { id, title: 'X', sceneJson: '{}' })).toHaveProperty(
+      'data.updatedAt'
+    )
+    expect(await call('archive', { id })).toHaveProperty('data.archivedAt')
+    expect(await call('restore', { id })).toHaveProperty('data.ok', true)
+    expect(await call('hardDelete', { id })).toHaveProperty('data.ok', true)
+    expect(await call('get', { id })).toHaveProperty('error', 'DIAGRAM_NOT_FOUND')
   })
 }
 

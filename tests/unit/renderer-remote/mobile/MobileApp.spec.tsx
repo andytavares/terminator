@@ -66,7 +66,7 @@ describe('MobileApp', () => {
     mockListTerminals.mockResolvedValue([])
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
     render(<MobileApp />)
-    await waitFor(() => expect(screen.getByText('open terminal')).toBeTruthy())
+    await screen.findByText('open terminal')
   })
 
   it('switches to MobileTerminalView when onSelectTerminal is called', async () => {
@@ -74,8 +74,7 @@ describe('MobileApp', () => {
     mockListTerminals.mockResolvedValue([])
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
     render(<MobileApp />)
-    await waitFor(() => screen.getByText('open terminal'))
-    fireEvent.click(screen.getByText('open terminal'))
+    fireEvent.click(await screen.findByText('open terminal'))
     expect(screen.getByText('terminal:s1')).toBeTruthy()
   })
 
@@ -84,8 +83,7 @@ describe('MobileApp', () => {
     mockListTerminals.mockResolvedValue([])
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
     render(<MobileApp />)
-    await waitFor(() => screen.getByText('open terminal'))
-    fireEvent.click(screen.getByText('open terminal'))
+    fireEvent.click(await screen.findByText('open terminal'))
     expect(screen.getByText('terminal:s1')).toBeTruthy()
     fireEvent.click(screen.getByText('back'))
     expect(screen.getByText('open terminal')).toBeTruthy()
@@ -110,7 +108,7 @@ describe('MobileApp — calls listWorkspaces and listTerminals on mount', () => 
     mockAssignTerminalWorkspace.mockResolvedValue(undefined)
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
     render(<MobileApp />)
-    await waitFor(() => screen.getByText('assign workspace'))
+    await screen.findByText('assign workspace')
     await act(async () => {
       fireEvent.click(screen.getByText('assign workspace'))
     })
@@ -129,7 +127,7 @@ describe('MobileApp — onCreateTerminal calls createTerminal and navigates to t
     mockListTerminals.mockResolvedValue([])
     const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
     render(<MobileApp />)
-    await waitFor(() => screen.getByText('new terminal'))
+    await screen.findByText('new terminal')
     await act(async () => {
       fireEvent.click(screen.getByText('new terminal'))
     })

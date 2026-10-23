@@ -82,7 +82,7 @@ describe('ReviewSubmitPanel — calls onClose when Cancel is clicked', () => {
     fireEvent.click(screen.getByText('Approve').closest('label')!)
     const submitBtn = screen.getByRole('button', { name: 'Submit approval' })
     fireEvent.click(submitBtn)
-    await waitFor(() => expect(screen.getByText('Review submitted successfully.')).toBeTruthy())
+    await screen.findByText('Review submitted successfully.')
   })
 
   it('hands back to the caller once an approval lands', async () => {
@@ -105,7 +105,7 @@ describe('ReviewSubmitPanel — stays on the success screen after a comment revi
       target: { value: 'looks fine' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Submit comment' }))
-    await waitFor(() => screen.getByText('Review submitted successfully.'))
+    await screen.findByText('Review submitted successfully.')
     expect(onApproved).not.toHaveBeenCalled()
   })
 
@@ -116,8 +116,7 @@ describe('ReviewSubmitPanel — stays on the success screen after a comment revi
     fireEvent.click(screen.getByText('Approve').closest('label')!)
     const submitBtn = screen.getByRole('button', { name: 'Submit approval' })
     fireEvent.click(submitBtn)
-    await waitFor(() => screen.getByText('Close'))
-    fireEvent.click(screen.getByText('Close'))
+    fireEvent.click(await screen.findByText('Close'))
     expect(onClose).toHaveBeenCalled()
   })
 })
@@ -129,7 +128,7 @@ describe('ReviewSubmitPanel — shows error when submission fails', () => {
     fireEvent.click(screen.getByText('Approve').closest('label')!)
     const submitBtn = screen.getByRole('button', { name: 'Submit approval' })
     fireEvent.click(submitBtn)
-    await waitFor(() => screen.getByText(/API error/))
+    await screen.findByText(/API error/)
     expect(screen.getByText(/API error/)).toBeTruthy()
   })
 
@@ -139,7 +138,7 @@ describe('ReviewSubmitPanel — shows error when submission fails', () => {
     fireEvent.click(screen.getByText('Approve').closest('label')!)
     const submitBtn = screen.getByRole('button', { name: 'Submit approval' })
     fireEvent.click(submitBtn)
-    await waitFor(() => screen.getByText(/UNAUTHORIZED/))
+    await screen.findByText(/UNAUTHORIZED/)
     expect(screen.getByText(/UNAUTHORIZED/)).toBeTruthy()
   })
 })
@@ -150,7 +149,7 @@ describe('ReviewSubmitPanel — shows validation error when submitting COMMENT w
     // COMMENT is the default event
     const submitBtn = screen.getByRole('button', { name: 'Submit comment' })
     fireEvent.click(submitBtn)
-    await waitFor(() => screen.getByText(/A comment body is required/))
+    await screen.findByText(/A comment body is required/)
     expect(mockPrReviewSubmit).not.toHaveBeenCalled()
   })
 

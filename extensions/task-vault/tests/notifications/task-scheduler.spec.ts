@@ -653,11 +653,13 @@ function startTaskSchedulerBlockedTasksCustomDatesSkipsNotificationWhenTests() {
 
     const api = makeApi('09:00')
 
+    const createNotification = vi.spyOn(api.notifications, 'createNotification')
     mock.mockQuery.mockRejectedValueOnce(new Error('DB not ready'))
 
     const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise // should not throw
+    await scheduler.startupPromise
     await scheduler.dispose()
+    expect(createNotification).not.toHaveBeenCalled()
   })
 }
 

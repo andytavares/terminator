@@ -30,7 +30,8 @@ import {
   reorderItems,
   NOTES_CHANGED_CHANNEL,
 } from '../../../src/ipc/notes.ipc'
-import type { ExtensionDB } from '@terminator/extension-sdk'
+import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
+import { partialFake } from '../../../../../tests/support/fakes'
 
 let db: ExtensionDB
 
@@ -384,26 +385,37 @@ function iPCHandlerStructureNotesChannelsTests() {
   })
 }
 
+/** The ipc-backed API plus the window surface the notes handlers broadcast through. */
+const apiWithBroadcast = () =>
+  partialFake<ExtensionAPI>({
+    ipc: mockApi.ipc,
+    window: partialFake<ExtensionAPI['window']>({ broadcast: vi.fn() }),
+  })
+
 function iPCHandlerStructureNotesWrappersTests() {
   it('registerNotesIpcHandlers wrappers route to underlying handlers', async () => {
     vi.mocked(ipcMain.handle).mockClear()
-    registerNotesIpcHandlers(mockApi, db)
+    registerNotesIpcHandlers(apiWithBroadcast(), db)
     const calls = vi.mocked(ipcMain.handle).mock.calls as [string, (...a: unknown[]) => unknown][]
-    const getHandler = (ch: string) => calls.find(([c]) => c === ch)?.[1]
-    // Invoke wrappers to cover the anonymous arrow functions
-    await getHandler('terminator.notepad:notes.create')?.(null, { title: 'T', body: 'B', tags: [] })
-    await getHandler('terminator.notepad:notes.list')?.(null, {})
-    await getHandler('terminator.notepad:notes.archive')?.(null, { id: 'noop' })
-    await getHandler('terminator.notepad:notes.reorder')?.(null, { items: [] })
-    await getHandler('terminator.notepad:notes.get')?.(null, { id: 'noop' })
-    await getHandler('terminator.notepad:notes.autosave')?.(null, {
-      id: 'x',
-      title: '',
-      body: '',
-      tags: [],
-    })
-    await getHandler('terminator.notepad:notes.restore')?.(null, { id: 'noop' })
-    await getHandler('terminator.notepad:notes.hardDelete')?.(null, { id: 'noop' })
+    const getHandler = (ch: string) => calls.find(([c]) => c === ch)![1]
+    const call = (name: string, payload: unknown) =>
+      getHandler(`terminator.notepad:notes.${name}`)(null, payload)
+    const created = (await call('create', { title: 'T', body: 'B', tags: [] })) as {
+      data: { id: string }
+    }
+    const { id } = created.data
+
+    expect(await call('list', {})).toHaveProperty('data.0.id', id)
+    expect(await call('get', { id })).toHaveProperty('data.body', 'B')
+    expect(await call('autosave', { id, title: 'T2', body: 'B2', tags: [] })).toHaveProperty(
+      'data.title',
+      'T2'
+    )
+    expect(await call('reorder', { items: [{ id, type: 'note' }] })).toHaveProperty('data.ok', true)
+    expect(await call('archive', { id })).toHaveProperty('data.archivedAt')
+    expect(await call('restore', { id })).toHaveProperty('data.ok', true)
+    expect(await call('hardDelete', { id })).toHaveProperty('data.ok', true)
+    expect(await call('get', { id })).toHaveProperty('error', 'NOTE_NOT_FOUND')
   })
 }
 
@@ -411,11 +423,24 @@ function iPCHandlerStructureTagsWrappersTests() {
   it('registerTagsIpcHandlers wrappers route to underlying handlers', async () => {
     vi.mocked(ipcMain.handle).mockClear()
     registerTagsIpcHandlers(mockApi, db)
+    registerNotesIpcHandlers(apiWithBroadcast(), db)
     const calls = vi.mocked(ipcMain.handle).mock.calls as [string, (...a: unknown[]) => unknown][]
-    const getHandler = (ch: string) => calls.find(([c]) => c === ch)?.[1]
-    await getHandler('terminator.notepad:tags.list')?.(null, {})
-    await getHandler('terminator.notepad:tags.rename')?.(null, { id: 'noop', name: 'x' })
-    await getHandler('terminator.notepad:tags.delete')?.(null, { id: 'noop' })
+    const getHandler = (ch: string) => calls.find(([c]) => c === ch)![1]
+    const call = (channel: string, payload: unknown) => getHandler(channel)(null, payload)
+    await call('terminator.notepad:notes.create', { title: 'T', body: 'B', tags: ['work'] })
+    const listed = (await call('terminator.notepad:tags.list', {})) as {
+      data: { id: string; name: string }[]
+    }
+    const { id } = listed.data[0]
+
+    expect(listed.data.map((t) => t.name)).toEqual(['work'])
+    expect(await call('terminator.notepad:tags.rename', { id, name: 'play' })).toHaveProperty(
+      'data.ok',
+      true
+    )
+    expect(await call('terminator.notepad:tags.list', {})).toHaveProperty('data.0.name', 'play')
+    expect(await call('terminator.notepad:tags.delete', { id })).toHaveProperty('data.ok', true)
+    expect(await call('terminator.notepad:tags.list', {})).toHaveProperty('data', [])
   })
 }
 

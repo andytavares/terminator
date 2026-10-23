@@ -587,9 +587,8 @@ function propsWallFixturesTests() {
     bakeHall(baseMap(), paint)
     const body = paint.calls.filter((c) => c.op === 'fillRect' && c.style === '#8a2f2a')
     expect(body.length).toBeGreaterThan(0)
-    for (const c of body) {
-      if (c.op === 'fillRect') expect(c.y + c.h).toBeLessThanOrEqual(3 * TILE_PX)
-    }
+    const bottoms = body.flatMap((c) => (c.op === 'fillRect' ? [c.y + c.h] : []))
+    for (const bottom of bottoms) expect(bottom).toBeLessThanOrEqual(3 * TILE_PX)
   })
 
   it('keeps every partition rect between its side walls, so the glazing does not overhang them', () => {

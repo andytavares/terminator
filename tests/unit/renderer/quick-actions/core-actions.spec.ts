@@ -178,18 +178,24 @@ describe('buildCoreActions — runs the matching dep callback', () => {
 describe('CORE_SHORTCUTS', () => {
   const actions = buildCoreActions(makeDeps())
 
+  const SWITCH_WORKSPACE = 'core.switch-workspace'
+  const ordinaryEntries = CORE_SHORTCUTS.filter((entry) => entry.actionId !== SWITCH_WORKSPACE)
+
   it('has a matching action with the same shortcut display for every entry', () => {
-    for (const entry of CORE_SHORTCUTS) {
-      if (entry.actionId === 'core.switch-workspace') {
-        const matches = actions.filter((a) => a.id.startsWith('core.switch-workspace-'))
-        expect(matches.length).toBeGreaterThan(0)
-        for (const m of matches) expect(m.shortcut).toMatch(/^⌘[1-9]$/)
-        continue
-      }
-      const action = actions.find((a) => a.id === entry.actionId)
-      expect(action, `no action for CORE_SHORTCUTS entry "${entry.actionId}"`).toBeDefined()
-      expect(action!.shortcut).toBe(entry.display)
-    }
+    const shown = ordinaryEntries.map((entry) => ({
+      actionId: entry.actionId,
+      display: actions.find((a) => a.id === entry.actionId)?.shortcut,
+    }))
+    expect(shown).toEqual(
+      ordinaryEntries.map((entry) => ({ actionId: entry.actionId, display: entry.display }))
+    )
+  })
+
+  it('shows ⌘1 to ⌘9 on each switch-workspace action', () => {
+    expect(CORE_SHORTCUTS.map((entry) => entry.actionId)).toContain(SWITCH_WORKSPACE)
+    const matches = actions.filter((a) => a.id.startsWith(`${SWITCH_WORKSPACE}-`))
+    expect(matches.length).toBeGreaterThan(0)
+    expect(matches.filter((a) => !/^⌘[1-9]$/.test(a.shortcut ?? ''))).toEqual([])
   })
 
   it('matches the KeyboardEvent shape it documents', () => {

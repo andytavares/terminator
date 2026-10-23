@@ -48,7 +48,7 @@ const defaultProps = {
 describe('PrDialog', () => {
   it('renders the dialog with title input pre-filled from branch', async () => {
     render(<PrDialog {...defaultProps} />)
-    await waitFor(() => screen.getByRole('dialog'))
+    await screen.findByRole('dialog')
     const input = screen.getByPlaceholderText('Pull request title') as HTMLInputElement
     // feature/ prefix isn't stripped (only feat/fix/chore/docs/refactor), dashes become spaces
     expect(input.value).toBe('feature/my feature')
@@ -57,7 +57,7 @@ describe('PrDialog', () => {
   it('calls onClose when overlay is clicked', async () => {
     const onClose = vi.fn()
     render(<PrDialog {...defaultProps} onClose={onClose} />)
-    await waitFor(() => screen.getByRole('dialog'))
+    await screen.findByRole('dialog')
     pressOutside(screen.getByRole('dialog'))
     expect(onClose).toHaveBeenCalled()
   })
@@ -65,8 +65,7 @@ describe('PrDialog', () => {
   it('calls onClose when close button clicked', async () => {
     const onClose = vi.fn()
     render(<PrDialog {...defaultProps} onClose={onClose} />)
-    await waitFor(() => screen.getByLabelText('Close'))
-    fireEvent.click(screen.getByLabelText('Close'))
+    fireEvent.click(await screen.findByLabelText('Close'))
     expect(onClose).toHaveBeenCalled()
   })
 })
@@ -84,14 +83,14 @@ describe('PrDialog — notices', () => {
       body: '',
     }
     render(<PrDialog {...defaultProps} existingPr={existingPr} />)
-    await waitFor(() => screen.getByRole('dialog'))
+    await screen.findByRole('dialog')
     expect(screen.getByText(/A PR already exists/)).toBeTruthy()
     expect(screen.getByText(/#42: Old PR/)).toBeTruthy()
   })
 
   it('shows default branch warning when branch is main', async () => {
     render(<PrDialog {...defaultProps} branch="main" />)
-    await waitFor(() => screen.getByRole('dialog'))
+    await screen.findByRole('dialog')
     expect(screen.getByText(/creating a PR from the default branch/)).toBeTruthy()
   })
 })
@@ -99,7 +98,7 @@ describe('PrDialog — notices', () => {
 describe('PrDialog — title, modes and draft', () => {
   it('disables Create PR button when title is empty', async () => {
     render(<PrDialog {...defaultProps} />)
-    await waitFor(() => screen.getByRole('dialog'))
+    await screen.findByRole('dialog')
     const input = screen.getByPlaceholderText('Pull request title') as HTMLInputElement
     fireEvent.change(input, { target: { value: '' } })
     const btn = screen.getByText('Create PR').closest('button') as HTMLButtonElement
@@ -108,7 +107,7 @@ describe('PrDialog — title, modes and draft', () => {
 
   it('switches between write and preview modes', async () => {
     render(<PrDialog {...defaultProps} />)
-    await waitFor(() => screen.getByRole('dialog'))
+    await screen.findByRole('dialog')
     expect(screen.getByPlaceholderText(/Describe your changes/)).toBeTruthy()
     fireEvent.click(screen.getByText('Preview'))
     expect(screen.queryByPlaceholderText(/Describe your changes/)).toBeNull()
@@ -118,7 +117,7 @@ describe('PrDialog — title, modes and draft', () => {
 
   it('toggles draft checkbox', async () => {
     render(<PrDialog {...defaultProps} />)
-    await waitFor(() => screen.getByRole('dialog'))
+    await screen.findByRole('dialog')
     const checkbox = screen.getByRole('checkbox') as HTMLInputElement
     expect(checkbox.checked).toBe(false)
     fireEvent.click(checkbox)
@@ -137,7 +136,7 @@ describe('PrDialog — branches and template', () => {
       ],
     })
     render(<PrDialog {...defaultProps} />)
-    await waitFor(() => screen.getByRole('dialog'))
+    await screen.findByRole('dialog')
     await waitFor(() => {
       const select = screen.getByRole('listbox') as HTMLSelectElement
       expect(select.value).toBe('main')
@@ -147,7 +146,7 @@ describe('PrDialog — branches and template', () => {
   it('loads PR template from filesystem', async () => {
     mockReadFile.mockResolvedValue({ content: '## Summary\n' })
     render(<PrDialog {...defaultProps} />)
-    await waitFor(() => screen.getByRole('dialog'))
+    await screen.findByRole('dialog')
     await waitFor(() => {
       const textarea = screen.getByPlaceholderText(/Describe your changes/) as HTMLTextAreaElement
       expect(textarea.value).toBe('## Summary\n')
@@ -164,8 +163,8 @@ describe('PrDialog — creating', () => {
     mockInvoke.mockResolvedValueOnce({ number: 99, url: 'https://github.com/foo/bar/pull/99' })
 
     render(<PrDialog {...defaultProps} onCreated={onCreated} />)
-    await waitFor(() => screen.getByRole('dialog'))
-    fireEvent.click(screen.getByText('Create PR'))
+    await screen.findByRole('dialog')
+    fireEvent.click(await screen.findByText('Create PR'))
     await waitFor(() => expect(onCreated).toHaveBeenCalled())
     const pr = onCreated.mock.calls[0][0] as PullRequest
     expect(pr.number).toBe(99)
@@ -189,17 +188,17 @@ describe('PrDialog — creation errors', () => {
     mockInvoke.mockResolvedValueOnce({ error: 'gh error' })
 
     render(<PrDialog {...defaultProps} />)
-    await waitFor(() => screen.getByRole('dialog'))
-    fireEvent.click(screen.getByText('Create PR'))
-    await waitFor(() => expect(screen.getByText('gh error')).toBeTruthy())
+    await screen.findByRole('dialog')
+    fireEvent.click(await screen.findByText('Create PR'))
+    await screen.findByText('gh error')
   })
 
   it('shows error when no commits ahead of base', async () => {
     mockShellExec.mockResolvedValue(execResult(0, '0', ''))
     render(<PrDialog {...defaultProps} />)
-    await waitFor(() => screen.getByRole('dialog'))
-    fireEvent.click(screen.getByText('Create PR'))
-    await waitFor(() => expect(screen.getByText(/No commits ahead/)).toBeTruthy())
+    await screen.findByRole('dialog')
+    fireEvent.click(await screen.findByText('Create PR'))
+    await screen.findByText(/No commits ahead/)
   })
 
   it('shows error when push fails', async () => {
@@ -208,8 +207,8 @@ describe('PrDialog — creation errors', () => {
       .mockResolvedValueOnce(execResult(1, '', 'push failed'))
 
     render(<PrDialog {...defaultProps} />)
-    await waitFor(() => screen.getByRole('dialog'))
-    fireEvent.click(screen.getByText('Create PR'))
-    await waitFor(() => expect(screen.getByText('push failed')).toBeTruthy())
+    await screen.findByRole('dialog')
+    fireEvent.click(await screen.findByText('Create PR'))
+    await screen.findByText('push failed')
   })
 })

@@ -543,8 +543,9 @@ describe('useLoadPrDetail — does not crash on exception', () => {
   it('does not crash on exception', async () => {
     mockPrReviewDetail.mockRejectedValue(new Error('network fail'))
     const { result } = renderHook(() => useLoadPrDetail('/repo'))
-    await load(result.current, 1, vi.fn())
-    // should not throw
+    const onSuccess = vi.fn()
+    await load(result.current, 1, onSuccess)
+    expect(onSuccess).not.toHaveBeenCalled()
   })
 })
 

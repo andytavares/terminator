@@ -214,12 +214,10 @@ test('a lint failure goes back to the builder and the run still ships', async ()
   await startLiveRun(foundry, ORDER)
   const last = await observeUntilOverOrDeadline()
 
-  const ledger = existsSync(ledgerFile()) ? readFileSync(ledgerFile(), 'utf8') : ''
+  const ledger = ledgerText()
 
   console.log(`ledger:\n${ledger}`)
-  if (existsSync(gatesFile())) {
-    console.log(`gates: ${readFileSync(gatesFile(), 'utf8')}`)
-  }
+  logGates()
 
   expectOneRework(last, ledger)
   expectSkillsMounted(last, ledger)
@@ -227,3 +225,13 @@ test('a lint failure goes back to the builder and the run still ships', async ()
   expect(ledger).toContain('ship.draft_opened')
   expectOneDraftPullRequest(repo, join(liveOrderDir(repo, ORDER), 'worktrees', 'live'))
 })
+
+/** The run's gates, when it raised any, for reading a failed live run. */
+function logGates(): void {
+  if (existsSync(gatesFile())) console.log(`gates: ${readFileSync(gatesFile(), 'utf8')}`)
+}
+
+/** The order's ledger, empty when the run wrote none. */
+function ledgerText(): string {
+  return existsSync(ledgerFile()) ? readFileSync(ledgerFile(), 'utf8') : ''
+}

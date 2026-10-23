@@ -224,5 +224,10 @@ test('a merge restacks the order queued behind it', async () => {
   console.log(`first ledger:\n${ledgerOf(FIRST)}\nsecond ledger:\n${ledgerOf(SECOND)}`)
   expect(ledgerOf(FIRST)).toContain('refinery.merged')
   expect(['rebased', 'conflict']).toContain(outcome)
-  if (outcome === 'rebased') expectRestackedOnMain()
+  expectRestackedWhenRebased(outcome)
 })
+
+/** A live restack either rebases or stops at a conflict; only a rebase leaves the branch on main. */
+function expectRestackedWhenRebased(outcome: string): void {
+  if (outcome === 'rebased') expectRestackedOnMain()
+}
