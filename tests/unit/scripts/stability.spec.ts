@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   burnIn,
   changedSpecs,
+  e2eBurnInCommands,
   freshSeeds,
   stabilityArguments,
 } from '../../../scripts/stability.mjs'
@@ -122,5 +123,31 @@ describe('burning in nothing', () => {
     })
     expect(ran).toBe(0)
     expect(result).toEqual({ code: 0, message: 'stability: no spec added or edited' })
+  })
+})
+
+describe('burning in e2e specs', () => {
+  it('installs Chromium first when a spec drives the browser', () => {
+    expect(e2eBurnInCommands(['tests/e2e/remote-control.spec.ts'], 5)).toEqual([
+      ['npx', ['playwright', 'install', 'chromium']],
+      ['npx', ['playwright', 'test', 'tests/e2e/remote-control.spec.ts', '--repeat-each=5']],
+    ])
+  })
+
+  it('runs only Playwright when no spec needs Chromium', () => {
+    expect(e2eBurnInCommands(['tests/e2e/settings.spec.ts'], 5)).toEqual([
+      ['npx', ['playwright', 'test', 'tests/e2e/settings.spec.ts', '--repeat-each=5']],
+    ])
+  })
+})
+
+describe('which unit specs the default Vitest run holds', () => {
+  it('burns in a .spec.js unit spec, and leaves out the ones the default Vitest run excludes', () => {
+    const more = [
+      'tests/integration/remote/server.spec.js',
+      'tests/unit/main/startup.perf.spec.ts',
+      'extensions/git-integration/tests/live/pull-requests.spec.ts',
+    ].join('\n')
+    expect(changedSpecs(more, { e2e: false })).toEqual(['tests/integration/remote/server.spec.js'])
   })
 })

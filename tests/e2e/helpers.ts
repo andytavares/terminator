@@ -248,7 +248,12 @@ export async function launchApp(
     drawBeforePointerActions(page)
     return { app, page, userDataDir, launchId: marker.launchId }
   } catch (error) {
-    throw await launchFailure(app, output, `${String(error)} (${steps.describe()})`)
+    const message = error instanceof Error ? error.message : String(error)
+    throw await launchFailure(
+      app,
+      output,
+      new Error(`${message} (${steps.describe()})`, { cause: error })
+    )
   }
 }
 

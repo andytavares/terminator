@@ -396,6 +396,48 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  # The quarantined e2e tests, run once the E2E shards end. Not required (ADR 124).
+  quarantine-e2e:
+    name: Quarantine (E2E)
+    needs: e2e
+    if: ${{ !cancelled() }}
+    runs-on: macos-26
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Quarantined e2e tests
+        env:
+          PLAYWRIGHT_JUNIT_OUTPUT_NAME: junit/quarantine-e2e.xml
+        run: |
+          if [ "$(jq '[.[] | select(.kind == "e2e")] | length' tests/quarantine.json)" = 0 ]; then
+            echo "Nothing quarantined in e2e."
+            exit 0
+          fi
+          npm run build
+          node node_modules/electron/install.js
+          codesign --force --deep --sign - node_modules/electron/dist/Electron.app
+          npx playwright test --grep @quarantine --reporter=dot,junit
+        timeout-minutes: 7
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5
+        with:
+          report_type: test_results
+          files: junit/quarantine-e2e.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
   # The required "Test" check. Same OS as the shards, because the blobs carry
   # their absolute source paths and coverage is remapped against them. Green when
   # every shard passed or when the diff needed no unit spec at all.

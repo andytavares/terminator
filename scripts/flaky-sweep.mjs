@@ -13,13 +13,15 @@ import { pathToFileURL } from 'node:url'
 
 const FAILED = new Set(['failed', 'timedOut', 'interrupted'])
 const PASSED = new Set(['passed'])
+// GitHub refuses a longer issue title.
+const MAX_TITLE = 256
 
 /** Playwright suites hold the file as their first title; the rest, then the spec title, name a test. */
 function playwrightResults(suite, titles, results) {
   for (const spec of suite.specs ?? []) {
     for (const test of spec.tests) {
       for (const { status } of test.results) {
-        results.push({ test: `${spec.file} > ${[...titles, spec.title].join(' > ')}`, status })
+        results.push({ file: spec.file, name: [...titles, spec.title].join(' > '), status })
       }
     }
   }
@@ -49,7 +51,10 @@ export function resultsOf(report, root = process.cwd()) {
   // the config file's directory, since the sweep's reports come from runners with other paths.
   const config = report.config ?? {}
   const testDir = config.rootDir ? relative(dirname(config.configFile ?? root), config.rootDir) : ''
-  return results.map(({ test, status }) => ({ test: join(testDir, test), status }))
+  return results.map(({ file, name, status }) => ({
+    test: `${join(testDir, file)} > ${name}`,
+    status,
+  }))
 }
 
 /** flaky: passed at least once and failed at least once. broken: failed every time it ran. */
@@ -82,36 +87,40 @@ export function renderTable({ flaky, broken }) {
 /** Title and body of the issue that tracks one flaky test. */
 export function issueFor({ test, passed, failed }, runUrl) {
   return {
-    title: `Flaky: ${test}`,
+    title: `Flaky: ${test}`.slice(0, MAX_TITLE),
     body: `Found by the nightly flaky sweep (${runUrl}).\n\n${test}\n\nPassed in ${passed} run(s) and failed in ${failed} on one commit.\n`,
   }
 }
 
+/** The number of the open issue titled exactly `title`; a search also returns longer titles. */
+export function matchingIssue(open, title) {
+  return open.find((issue) => issue.title === title)?.number
+}
+
 function openOrUpdateIssue({ title, body }) {
-  const number = execFileSync(
-    'gh',
-    [
-      'issue',
-      'list',
-      '--state',
-      'open',
-      '--search',
-      `"${title}" in:title`,
-      '--json',
-      'number',
-      '--jq',
-      '.[0].number',
-    ],
-    { encoding: 'utf8' }
-  ).trim()
+  const search = ['issue', 'list', '--state', 'open', '--search', `"${title}" in:title`]
+  const open = JSON.parse(
+    execFileSync('gh', [...search, '--json', 'number,title'], { encoding: 'utf8' })
+  )
+  const number = matchingIssue(open, title)
   const args = number
-    ? ['issue', 'edit', number, '--body', body]
+    ? ['issue', 'edit', String(number), '--body', body]
     : ['issue', 'create', '--title', title, '--body', body]
   execFileSync('gh', args, { stdio: 'inherit' })
 }
 
 function runUrlOf(env) {
   return `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}`
+}
+
+/** One issue that GitHub refuses does not keep the others from being filed. */
+function reportIssue(issue) {
+  try {
+    openOrUpdateIssue(issue)
+  } catch (error) {
+    process.exitCode = 1
+    console.error(`flaky-sweep: could not file "${issue.title}": ${error.message}`)
+  }
 }
 
 function main(argv) {
@@ -125,7 +134,7 @@ function main(argv) {
   const classified = classify(reports)
   console.log(renderTable(classified))
   if (argv.includes('--open-issues')) {
-    for (const entry of classified.flaky) openOrUpdateIssue(issueFor(entry, runUrlOf(process.env)))
+    for (const entry of classified.flaky) reportIssue(issueFor(entry, runUrlOf(process.env)))
   }
 }
 

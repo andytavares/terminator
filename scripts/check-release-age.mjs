@@ -174,10 +174,18 @@ function baseAuditReport(branch) {
 
 async function main(branch) {
   const all = addedVersions(readJson('package-lock.json'), baseLockfile(branch))
-  const exempt = exemptByAdvisory(all, baseAuditReport(branch), auditReport(process.cwd()))
-  const ids = all.filter((id) => !exempt.has(id))
   const exceptions = readJson('.release-age-exceptions.json')
-  const young = tooYoung({ published: await fetchPublished(ids), exceptions, now: Date.now() })
+  const tooNew = tooYoung({ published: await fetchPublished(all), exceptions, now: Date.now() })
+  // The two audits ask the registry; only a version under the cooldown needs them.
+  const exempt =
+    tooNew.length === 0
+      ? new Map()
+      : exemptByAdvisory(
+          tooNew.map(({ id }) => id),
+          baseAuditReport(branch),
+          auditReport(process.cwd())
+        )
+  const young = tooNew.filter(({ id }) => !exempt.has(id))
   console.log(
     `check-release-age: ${all.length} versions added since ${branch}, ${young.length} under ${COOLDOWN_DAYS} days old`
   )

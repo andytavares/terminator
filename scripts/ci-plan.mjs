@@ -13,6 +13,7 @@ export const SKIPPED_JOBS = {
   'e2e-result': 'it only reads the results of the jobs above',
   'e2e-report': 'it only merges the e2e reports into one HTML page',
   quarantine: 'it runs the quarantined tests, which never gate (ADR 124)',
+  'quarantine-e2e': 'it runs the quarantined e2e tests, which never gate (ADR 124)',
 }
 
 const TEST_ALL_LABEL =

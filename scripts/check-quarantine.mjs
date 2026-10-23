@@ -57,7 +57,9 @@ function countProblems({ entries }) {
     .map((entry) => problem(entry, `more than ${MAX_ENTRIES} tests are quarantined`))
 }
 
-function changeProblems({ entries, onBase, changedFiles }) {
+/** `quarantinedOnBase`: the tests the base branch's tests/quarantine.json lists. The change that
+ * quarantines a test edits its spec to add the tag; only a later change may not keep it. */
+function changeProblems({ entries, onBase, changedFiles, quarantinedOnBase = [] }) {
   return entries.flatMap((entry) => {
     const file = specFile(entry.test)
     if (!onBase(file, titleInFile(entry.test)))
@@ -67,7 +69,7 @@ function changeProblems({ entries, onBase, changedFiles }) {
           'not on the base branch, and a new test cannot start in quarantine, it must pass the stability gate'
         ),
       ]
-    if (changedFiles.includes(file))
+    if (changedFiles.includes(file) && quarantinedOnBase.includes(entry.test))
       return [problem(entry, `this change edits ${file} and leaves the test in quarantine`)]
     return []
   })
@@ -110,10 +112,17 @@ function unitTagged() {
   return listed.map((test) => `${relative(process.cwd(), test.file)}${SEPARATOR}${test.name}`)
 }
 
+/** Every suite below a file's own carries `file` too, so only the top level is skipped. */
 function* playwrightTitles(suite, path) {
   for (const spec of suite.specs ?? []) yield [...path, spec.title].join(SEPARATOR)
-  for (const child of suite.suites ?? [])
-    yield* playwrightTitles(child, child.file === undefined ? [...path, child.title] : path)
+  for (const child of suite.suites ?? []) yield* playwrightTitles(child, [...path, child.title])
+}
+
+/** Each test in a Playwright JSON report, named as scripts/flaky-sweep.mjs names it. */
+export function playwrightTests(report, root) {
+  return report.suites.flatMap((fileSuite) => [
+    ...playwrightTitles(fileSuite, [relative(root, `${report.config.rootDir}/${fileSuite.file}`)]),
+  ])
 }
 
 /** Playwright exits 1 with "No tests found" when nothing matches, and still writes its report. */
@@ -129,11 +138,7 @@ function e2eTagged() {
       // No tagged e2e test: the report lists none.
     }
   })
-  return report.suites.flatMap((fileSuite) => [
-    ...playwrightTitles(fileSuite, [
-      `${relative(process.cwd(), `${report.config.rootDir}/${fileSuite.file}`)}`,
-    ]),
-  ])
+  return playwrightTests(report, process.cwd())
 }
 
 /** Whether `file` on the base branch, as last fetched, holds `title`'s last segment. */
@@ -154,6 +159,16 @@ function changedFilesSince(branch) {
     .filter(Boolean)
 }
 
+function quarantinedOnBase(branch) {
+  try {
+    return JSON.parse(run('git', ['show', `origin/${branch}:tests/quarantine.json`])).map(
+      (entry) => entry.test
+    )
+  } catch {
+    return []
+  }
+}
+
 function main(branch) {
   const entries = JSON.parse(readFileSync('tests/quarantine.json', 'utf8'))
   const tagged = [...unitTagged(), ...e2eTagged()]
@@ -167,6 +182,7 @@ function main(branch) {
     today: new Date().toISOString().slice(0, 10),
     onBase: onBaseBranch(branch),
     changedFiles: changedFilesSince(branch),
+    quarantinedOnBase: quarantinedOnBase(branch),
   })
   for (const message of problems) console.error(`  ${message}`)
   return problems.length === 0 ? 0 : 1

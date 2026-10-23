@@ -8,11 +8,14 @@ import { execFileSync, spawn } from 'node:child_process'
 import { randomInt } from 'node:crypto'
 import { availableParallelism } from 'node:os'
 import { pathToFileURL } from 'node:url'
+import { needsChromium } from './ci-e2e-local.mjs'
 import { startLoad } from './under-load.mjs'
 
 const UNIT_RUNS = 30
 const E2E_RUNS = 5
-const SPEC_FILE = /\.spec\.tsx?$/
+const SPEC_FILE = /\.spec\.(tsx?|js)$/
+// What vitest.config.ts leaves out of the default run: `vitest run <file>` finds no test there.
+const NOT_IN_DEFAULT_RUN = [/\.perf\.spec\.ts$/, /^extensions\/[^/]+\/tests\/live\//]
 
 /** `--runs N`, `--e2e`, `--list` (print the specs, run nothing), then the specs named. */
 export function stabilityArguments(argv) {
@@ -32,6 +35,7 @@ export function changedSpecs(diffOutput, { e2e }) {
   return diffOutput
     .split('\n')
     .filter((file) => SPEC_FILE.test(file) && file.startsWith('tests/e2e/') === e2e)
+    .filter((file) => !NOT_IN_DEFAULT_RUN.some((excluded) => excluded.test(file)))
 }
 
 /** `count` seeds, none repeated. */
@@ -81,9 +85,19 @@ async function runUnitBurnIn({ specs, runs }) {
   }
 }
 
+/** The commands an e2e burn-in runs, in order: Chromium's install when a spec needs it. */
+export function e2eBurnInCommands(specs, runs) {
+  const test = ['npx', ['playwright', 'test', ...specs, `--repeat-each=${runs}`]]
+  return needsChromium(specs) ? [['npx', ['playwright', 'install', 'chromium']], test] : [test]
+}
+
 async function runE2eBurnIn({ specs, runs }) {
   if (specs.length === 0) return burnIn({ specs, runs, run: () => 0, seeds: [] })
-  const code = await exitCodeOf('npx', ['playwright', 'test', ...specs, `--repeat-each=${runs}`])
+  let code = 0
+  for (const [command, args] of e2eBurnInCommands(specs, runs)) {
+    code = await exitCodeOf(command, args)
+    if (code !== 0) break
+  }
   return { code, message: `stability: playwright exited ${code} for ${specs.length} specs` }
 }
 

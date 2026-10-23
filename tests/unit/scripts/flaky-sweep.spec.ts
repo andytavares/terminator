@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { classify, issueFor, renderTable } from '../../../scripts/flaky-sweep.mjs'
+import {
+  classify,
+  issueFor,
+  matchingIssue,
+  renderTable,
+  resultsOf,
+} from '../../../scripts/flaky-sweep.mjs'
 
 const fixtures = join(__dirname, '../../fixtures/flaky-sweep')
 const load = (name: string) => JSON.parse(readFileSync(join(fixtures, name), 'utf8'))
@@ -76,5 +82,54 @@ describe('issueFor', () => {
     expect(title).toBe('Flaky: tests/e2e/settings.spec.ts > Settings > saves a theme')
     expect(body).toContain('https://github.com/o/r/actions/runs/9')
     expect(body).toContain('Passed in 2 run(s) and failed in 1')
+  })
+})
+
+describe('issueFor limits', () => {
+  it('keeps the title within the 256 characters GitHub allows', () => {
+    const { title } = issueFor(
+      { test: `tests/a.spec.ts > ${'x'.repeat(300)}`, passed: 1, failed: 1 },
+      ''
+    )
+    expect(title).toHaveLength(256)
+  })
+})
+
+describe('matchingIssue', () => {
+  it('takes the open issue whose title is exactly the test, not one that only starts with it', () => {
+    const open = [
+      { number: 7, title: 'Flaky: tests/a.spec.ts > saves a theme twice' },
+      { number: 8, title: 'Flaky: tests/a.spec.ts > saves a theme' },
+    ]
+    expect(matchingIssue(open, 'Flaky: tests/a.spec.ts > saves a theme')).toBe(8)
+  })
+
+  it('finds none when no title is exactly the test', () => {
+    const open = [{ number: 7, title: 'Flaky: tests/a.spec.ts > saves a theme twice' }]
+    expect(matchingIssue(open, 'Flaky: tests/a.spec.ts > saves a theme')).toBeUndefined()
+  })
+})
+
+describe('resultsOf', () => {
+  it('keeps a Playwright title that holds a path as written', () => {
+    const report = {
+      config: { configFile: '/repo/playwright.config.ts', rootDir: '/repo/tests/e2e' },
+      suites: [
+        {
+          title: 'a.spec.ts',
+          file: 'a.spec.ts',
+          specs: [
+            {
+              title: 'opens //tmp/../x',
+              file: 'a.spec.ts',
+              tests: [{ results: [{ status: 'passed' }] }],
+            },
+          ],
+        },
+      ],
+    }
+    expect(resultsOf(report, '/repo')).toEqual([
+      { test: 'tests/e2e/a.spec.ts > opens //tmp/../x', status: 'passed' },
+    ])
   })
 })

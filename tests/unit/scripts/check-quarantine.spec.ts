@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { quarantineProblems } from '../../../scripts/check-quarantine.mjs'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { playwrightTests, quarantineProblems } from '../../../scripts/check-quarantine.mjs'
+import { resultsOf } from '../../../scripts/flaky-sweep.mjs'
 
 const FOUNDRY_SPEC = 'extensions/foundry/tests/components/App.spec.tsx'
 const FOUNDRY_TEST = `${FOUNDRY_SPEC} > the Factory view toggle > a shaping order > sends a shaping order back to the list, open`
@@ -19,6 +22,7 @@ const check = (overrides: Record<string, unknown> = {}) =>
     today: '2026-10-23',
     onBase,
     changedFiles: [],
+    quarantinedOnBase: [FOUNDRY_TEST],
     ...overrides,
   })
 
@@ -107,5 +111,24 @@ describe('quarantineProblems base and change rules', () => {
     expect(check({ changedFiles: [FOUNDRY_SPEC, 'README.md'] })).toEqual([
       `${FOUNDRY_TEST} (issue 301): this change edits ${FOUNDRY_SPEC} and leaves the test in quarantine; ${MOVES}`,
     ])
+  })
+})
+
+describe('playwrightTests', () => {
+  const report = JSON.parse(
+    readFileSync(join(__dirname, '../../fixtures/flaky-sweep/playwright-run-1.json'), 'utf8')
+  )
+
+  it('names an e2e test with its describe titles, as the sweep names its issue', () => {
+    const root = '/Users/runner/work/terminator/terminator'
+    const named = playwrightTests(report, root)
+    expect(named).toContain('tests/e2e/settings.spec.ts > Settings > saves a theme')
+    expect(named).toEqual(resultsOf(report, root).map((each: { test: string }) => each.test))
+  })
+})
+
+describe('quarantineProblems on the change that quarantines', () => {
+  it('lets the change that quarantines a test edit its spec file to add the tag', () => {
+    expect(check({ changedFiles: [FOUNDRY_SPEC], quarantinedOnBase: [] })).toEqual([])
   })
 })

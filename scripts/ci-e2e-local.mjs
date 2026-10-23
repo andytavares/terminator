@@ -87,9 +87,12 @@ function argumentsOfShard(shard, specs) {
   return output.split(/\s+/).filter(Boolean)
 }
 
+/** Whether any of `specs` drives a plain Chromium, which Playwright must install first. */
+export const needsChromium = (specs) =>
+  NEEDS_CHROMIUM.some((spec) => specs.some((arg) => arg.endsWith(spec)))
+
 function playwright(args) {
-  const needsChromium = NEEDS_CHROMIUM.some((spec) => args.some((arg) => arg.endsWith(spec)))
-  if (needsChromium && !run('npx', ['playwright', 'install', 'chromium'])) return false
+  if (needsChromium(args) && !run('npx', ['playwright', 'install', 'chromium'])) return false
   return run(
     'npx',
     ['playwright', 'test', ...args, '--grep-invert', '@quarantine', '--reporter=dot'],

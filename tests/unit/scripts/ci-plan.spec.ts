@@ -18,6 +18,9 @@ const stepOf = (job: string, name: string) =>
 const stepsOf = (id: string) => (workflow.jobs[id].steps ?? []) as Array<Record<string, unknown>>
 const workflowText = readFileSync(resolve(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8')
 
+/** The jobs that run the app or draw as a Mac does, in ci.yml's order. */
+const MAC_JOBS = ['story-screenshots', 'e2e-stability', 'quarantine-e2e', 'start', 'e2e']
+
 /** The jobs ci:local runs, in ci.yml's order. */
 const PLANNED_JOBS = [
   'lint',
@@ -139,7 +142,7 @@ describe('the deterministic workflow (ADR 123)', () => {
     const macJobs = Object.entries(workflow.jobs)
       .filter(([, job]) => job['runs-on'] === 'macos-26')
       .map(([id]) => id)
-    expect(macJobs).toEqual(['story-screenshots', 'e2e-stability', 'start', 'e2e'])
+    expect(macJobs).toEqual(MAC_JOBS)
     const runners = Object.values(workflow.jobs).map((job) => job['runs-on'])
     expect(new Set(runners)).toEqual(new Set(['macos-26', 'ubuntu-24.04-arm']))
     expect(workflowText).not.toMatch(/apt-get/)
