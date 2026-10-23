@@ -16,10 +16,11 @@ function useMountedTerminal(
 ): void {
   useLayoutEffect(() => {
     const instance = useSessionStore.getState().getTerminalInstance(sessionId)
-    if (!instance || !containerRef.current) return
-    instance.mount(containerRef.current)
+    const container = containerRef.current
+    if (!instance || !container) return
+    instance.mount(container)
     return () => {
-      instance.unmount()
+      instance.unmount(container)
     }
   }, [containerRef, sessionId])
 }

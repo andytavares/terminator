@@ -30,6 +30,7 @@ export interface CoreActionDeps {
 
   onNewTab(): void
   onSplit(direction: 'vertical' | 'horizontal'): void
+  onBreakOut(): void
   onClosePane(): void
   onClear(): void
   onNewScratch(): void
@@ -102,6 +103,15 @@ const TERMINAL_ACTIONS: CoreActionSpec[] = [
     shortcut: '⌘⇧D',
     requires: 'terminal',
     run: (d) => d.onSplit('horizontal'),
+  },
+  {
+    id: 'core.break-out',
+    label: 'Move to its own window',
+    group: 'terminal',
+    mnemonic: 'o',
+    shortcut: '⌘⇧O',
+    requires: 'terminal',
+    run: (d) => d.onBreakOut(),
   },
   {
     id: 'core.close-tab',

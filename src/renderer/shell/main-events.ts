@@ -13,6 +13,7 @@ import { recordDirectUse } from '../quick-actions/usage'
 import { findSurface, type SurfaceRegistration } from '../quick-actions/surface-actions'
 import { adoptTerminalSession } from '../terminal/session-controller'
 import { revealSession } from '../terminal/navigate-to-session'
+import { dockBack, toggleBreakout } from '../terminal/breakout'
 
 // What the main process tells the window: menu accelerators, notifications,
 // and what extensions ask the shell to do.
@@ -45,10 +46,13 @@ type MenuEvents = typeof window.electronAPI.extensionEvents
 type Unsubscribe = (() => void) | undefined
 
 /** Wraps a menu action so it also counts as a direct use of that shortcut. */
-function countedShortcut(actionId: string, run: () => void): () => void {
-  return () => {
+function countedShortcut<Args extends unknown[]>(
+  actionId: string,
+  run: (...args: Args) => void
+): (...args: Args) => void {
+  return (...args) => {
     recordDirectShortcut(actionId)
-    run()
+    run(...args)
   }
 }
 
@@ -58,7 +62,21 @@ function subscribeShellMenu(events: MenuEvents | undefined, handlers: MenuHandle
     events?.onMenuOpenSettings?.(countedShortcut('core.open-settings', handlers.openSettings)),
     events?.onMenuOpenAbout?.(handlers.openAbout),
     events?.onMenuToggleSidebar?.(countedShortcut('core.toggle-sidebar', handlers.toggleSidebar)),
-    events?.onMenuCloseTab?.(closeActiveTab),
+    events?.onMenuCloseTab?.(closeTabOf),
+  ]
+}
+
+/** Closes the terminal of the breakout window the accelerator was pressed in, else the active tab. */
+function closeTabOf(sessionId: string | null): void {
+  if (sessionId) void useSessionStore.getState().closeSession(sessionId)
+  else closeActiveTab()
+}
+
+/** What happens in a terminal's own window: its accelerator, and the user closing it. */
+function subscribeBreakout(events: MenuEvents | undefined): Unsubscribe[] {
+  return [
+    events?.onMenuToggleBreakout?.(countedShortcut('core.break-out', toggleBreakout)),
+    window.electronAPI.breakout?.onClosed(dockBack),
   ]
 }
 
@@ -83,6 +101,7 @@ export function useMenuEvents(handlers: MenuHandlers): void {
     const unsubscribers = [
       ...subscribeShellMenu(events, { openSettings, openAbout, toggleSidebar }),
       ...subscribeSurfaceMenu(events),
+      ...subscribeBreakout(events),
     ]
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe?.())
   }, [openSettings, openAbout, toggleSidebar])

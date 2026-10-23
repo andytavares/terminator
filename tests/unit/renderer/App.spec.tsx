@@ -6,6 +6,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../src/renderer/stores/workspace.store'
 import { useSettingsStore } from '../../../src/renderer/stores/settings.store'
 import { useSessionStore } from '../../../src/renderer/stores/session.store'
+import { isBrokenOut, useBreakoutStore } from '../../../src/renderer/stores/breakout.store'
 import { useToastStore } from '../../../src/renderer/stores/toast.store'
 import { useExtensionCommandsStore } from '../../../src/renderer/stores/extension-commands.store'
 import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
@@ -145,6 +146,7 @@ const tabBar = vi.hoisted(() => ({
   onScratchDeactivate: undefined as (() => void) | undefined,
 }))
 vi.mock('../../../src/renderer/components/terminal/TabBar', () => ({
+  TabStateIcon: () => null,
   TabBar: ({
     editNoteSessionId,
     onScratchDeactivate,
@@ -208,6 +210,8 @@ function mainEvents() {
     openHome: pushedEvent<[]>(),
     toggleSidebar: pushedEvent<[]>(),
     closeTab: pushedEvent<[string | null]>(),
+    toggleBreakout: pushedEvent<[string | null]>(),
+    breakoutClosed: pushedEvent<[string]>(),
     togglePanel: pushedEvent<[string]>(),
     selectProjectTab: pushedEvent<[string]>(),
     bridge: bridgeEvents(),
@@ -258,10 +262,12 @@ function extensionParts(events: MainEvents, sent: MainSent) {
       onMenuOpenHome: events.openHome.addListener,
       onMenuToggleSidebar: events.toggleSidebar.addListener,
       onMenuCloseTab: events.closeTab.addListener,
+      onMenuToggleBreakout: events.toggleBreakout.addListener,
       onTogglePanel: events.togglePanel.addListener,
       onSelectProjectTab: events.selectProjectTab.addListener,
       notifyPanelState: sent.notifyPanelState,
     },
+    breakout: { onClosed: events.breakoutClosed.addListener },
     extensionBridge: { on: events.bridge.on, invoke: async () => ({}) },
     extension: {
       getCommands: sent.getCommands,
@@ -788,6 +794,67 @@ describe('App — menu:close-tab (onMenuCloseTab) — closes the scratch session
     act(() => main.events.closeTab.deliver(null))
     await act(async () => {})
     expect(has('ses-1')).toBe(true)
+  })
+})
+
+const childWindow = () =>
+  partialFake<Window>({
+    document: document.implementation.createHTMLDocument('breakout'),
+    closed: false,
+    focus: vi.fn(),
+    close: vi.fn(),
+  })
+const twoTabs = () => {
+  setupApp({
+    activeProjectId: 'proj-1',
+    activeWorkspaceId: 'ws-1',
+    sessions: [tab('ses-active', 'proj-1'), tab('ses-other', 'proj-1')],
+  })
+  showTab('proj-1', 'ses-active')
+}
+
+describe('App — breakout windows', () => {
+  beforeEach(() => {
+    useBreakoutStore.setState(useBreakoutStore.getInitialState(), true)
+    vi.spyOn(window, 'open').mockImplementation(() => childWindow())
+  })
+
+  it('moves the focused terminal into its own window on the toggle accelerator', () => {
+    twoTabs()
+    render(<App />)
+    act(() => main.events.toggleBreakout.deliver(null))
+    expect(isBrokenOut('ses-active')).toBe(true)
+  })
+
+  it('docks the terminal of the window the accelerator was pressed in', () => {
+    twoTabs()
+    render(<App />)
+    act(() => main.events.toggleBreakout.deliver(null))
+    act(() => main.events.toggleBreakout.deliver('ses-active'))
+    expect(isBrokenOut('ses-active')).toBe(false)
+  })
+})
+
+describe('App — breakout windows — ending', () => {
+  beforeEach(() => {
+    useBreakoutStore.setState(useBreakoutStore.getInitialState(), true)
+    vi.spyOn(window, 'open').mockImplementation(() => childWindow())
+  })
+
+  it('docks a terminal whose window the user closed', () => {
+    twoTabs()
+    render(<App />)
+    act(() => main.events.toggleBreakout.deliver(null))
+    act(() => main.events.breakoutClosed.deliver('ses-active'))
+    expect(isBrokenOut('ses-active')).toBe(false)
+  })
+
+  it('closes the terminal of the focused window, not the tab showing, on close tab', async () => {
+    twoTabs()
+    render(<App />)
+    act(() => main.events.closeTab.deliver('ses-other'))
+    await waitFor(() => expect(has('ses-other')).toBe(false))
+    expect(has('ses-active')).toBe(true)
   })
 })
 

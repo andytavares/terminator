@@ -296,7 +296,7 @@ function SessionTab(props: SessionTabProps): JSX.Element {
   )
 }
 
-function TabStateIcon({ session }: { session: TerminalSession }): JSX.Element {
+export function TabStateIcon({ session }: { session: TerminalSession }): JSX.Element {
   const state = agentStateOf(session)
   const status = statusPresentationForState(state)
   const Icon = STATUS_ICON[status.icon]

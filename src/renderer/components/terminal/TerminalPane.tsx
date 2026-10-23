@@ -1,5 +1,6 @@
 import { useShallow } from 'zustand/react/shallow'
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
+import { useBreakoutStore } from '../../stores/breakout.store'
 import { useSessionStore } from '../../stores/session.store'
 import { useModalStore } from '../../stores/modal.store'
 import { Button } from '@terminator/extension-ui'
@@ -38,6 +39,11 @@ function usePaneState(projectId: string) {
   }
 }
 
+/** Whether the tab is drawn by its own window, so this pane must leave the terminal to it. */
+function useIsBrokenOut(sessionId: string | null): boolean {
+  return useBreakoutStore((s) => sessionId !== null && s.windows.has(sessionId))
+}
+
 /** A tab that opened clears the open error; the tab on screen has its bells seen. */
 function useShownTabSeen(
   projectId: string,
@@ -59,7 +65,7 @@ function swapTerminal(
   nextId: string | null,
   container: HTMLDivElement | null
 ): void {
-  if (prevId) instanceOf(prevId)?.unmount()
+  if (prevId) instanceOf(prevId)?.unmount(container ?? undefined)
   if (nextId && container) instanceOf(nextId)?.mount(container)
 }
 
@@ -76,7 +82,8 @@ function useSinglePaneMount(
       // LeafPane handles mounting in split mode. Reset ref so when the split
       // collapses, the surviving terminal gets remounted correctly. A tab that
       // showed alone and is no pane of this split goes off screen.
-      if (prevId && !leafIds(layout).includes(prevId)) instanceOf(prevId)?.unmount()
+      if (prevId && !leafIds(layout).includes(prevId))
+        instanceOf(prevId)?.unmount(containerRef.current ?? undefined)
       prevSessionIdRef.current = null
       return
     }
@@ -87,12 +94,13 @@ function useSinglePaneMount(
 
   // Cleanup on unmount — useLayoutEffect so snapshot capture precedes browser layout.
   useLayoutEffect(() => {
+    const container = containerRef.current ?? undefined
     return () => {
       const currentId = prevSessionIdRef.current
       prevSessionIdRef.current = null
-      if (currentId) instanceOf(currentId)?.unmount()
+      if (currentId) instanceOf(currentId)?.unmount(container)
     }
-  }, [])
+  }, [containerRef])
 }
 
 type PaneState = ReturnType<typeof usePaneState>
@@ -142,7 +150,8 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
   const pane = usePaneState(projectId)
   const { activeSessionId, layout } = pane
   useShownTabSeen(projectId, pane)
-  useSinglePaneMount(containerRef, activeSessionId, layout)
+  const shownSessionId = useIsBrokenOut(activeSessionId) ? null : activeSessionId
+  useSinglePaneMount(containerRef, shownSessionId, layout)
   useFocusRequests(projectId, pane)
   const refocusActive = useRefocusActive(activeSessionId)
   const handleRatioChange = useCallback(

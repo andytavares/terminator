@@ -398,6 +398,26 @@ function containerInOtherWindow(view: Window | null): HTMLElement {
   return container
 }
 
+describe('TerminalInstance — unmount(from) — after the terminal moved to another container', () => {
+  it('leaves the element in the newer container when the older one unmounts late', () => {
+    const instance = new TerminalInstance('ses-1', 1000)
+    const mainContainer = document.createElement('div')
+    const breakoutContainer = containerInOtherWindow(null)
+    instance.mount(mainContainer)
+    instance.mount(breakoutContainer)
+    instance.unmount(mainContainer)
+    expect(breakoutContainer.contains(instance.element)).toBe(true)
+  })
+
+  it('removes the element from the container it is still in', () => {
+    const instance = new TerminalInstance('ses-1', 1000)
+    const container = document.createElement('div')
+    instance.mount(container)
+    instance.unmount(container)
+    expect(container.contains(instance.element)).toBe(false)
+  })
+})
+
 describe('TerminalInstance — mount() — into a container of another window', () => {
   it('opens the terminal again, with WebGL off first, when the document differs', () => {
     webglAddons.length = 0

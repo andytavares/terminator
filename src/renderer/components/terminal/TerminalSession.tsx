@@ -339,8 +339,10 @@ export class TerminalInstance {
     this.element.parentElement?.removeChild(this.element)
   }
 
-  // Remove from DOM without destroying the xterm instance.
-  unmount(): void {
+  // Remove from DOM without destroying the xterm instance. A caller that names the container it
+  // mounted into leaves the terminal alone once it lives in another one (a breakout window).
+  unmount(from?: HTMLElement): void {
+    if (from && this.element.parentElement !== from) return
     this.disableWebgl()
     this.resizeObserver?.disconnect()
     this.resizeObserver = null

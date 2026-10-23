@@ -51,7 +51,7 @@ beforeEach(() => {
 
 // A menu accelerator has no renderer keydown (e.g. Cmd+Shift+H, Cmd+B), so this
 // guard only covers entries the hook itself handles.
-const MENU_ONLY = new Set(['core.open-home', 'core.toggle-sidebar'])
+const MENU_ONLY = new Set(['core.open-home', 'core.toggle-sidebar', 'core.break-out'])
 const HOOK_HANDLED = new Set(
   CORE_SHORTCUTS.map((s) => s.actionId).filter((id) => !MENU_ONLY.has(id))
 )
