@@ -1,7 +1,7 @@
 // A diagnostic for a hung e2e launch (ADR 123): which readiness step never answered.
 
 export const LAUNCH_STEPS = ['firstWindow', 'size', 'drawn', 'focused', 'sidebar'] as const
-export type LaunchStep = (typeof LAUNCH_STEPS)[number]
+type LaunchStep = (typeof LAUNCH_STEPS)[number]
 
 export interface LaunchSteps {
   /** Records that `step` has settled. */
