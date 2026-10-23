@@ -129,7 +129,7 @@ export class TerminalInstance {
   private resizeObserver: ResizeObserver | null = null
   private linkPointer: LinkPointer | null = null
   private themeObserver: MutationObserver | null = null
-  private opened = false
+  private openedIn: Document | null = null
   private sessionId: string
   private busyTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -218,10 +218,13 @@ export class TerminalInstance {
 
   // Call once after the element is in a visible, sized container.
   mount(container: HTMLElement): void {
+    const { ownerDocument } = container
+    // A GPU context belongs to the window it was made in; xterm adopts the new window on a repeat open().
+    if (this.openedIn && this.openedIn !== ownerDocument) this.disableWebgl()
     container.appendChild(this.element)
-    if (!this.opened) {
+    if (this.openedIn !== ownerDocument) {
       this.terminal.open(this.element)
-      this.opened = true
+      this.openedIn = ownerDocument
     }
     this.enableWebgl()
     if (!this.webglAddon) this.measureGlyphsWhereVisible()
@@ -239,11 +242,16 @@ export class TerminalInstance {
     // (which forces xterm to re-sync the DOM viewport) and then pin to the bottom.
     // While a tab is visible xterm follows output natively and honours the user
     // scrolling up; we only re-establish "following" when the tab reappears.
-    requestAnimationFrame(() => {
+    // The container's window, not the main one: a hidden main window throttles its frames and observers.
+    const view = ownerDocument.defaultView
+    const scheduleFrame = view?.requestAnimationFrame.bind(view) ?? requestAnimationFrame
+    const ObserverOfWindow = view?.ResizeObserver ?? ResizeObserver
+    scheduleFrame(() => {
       this.terminal.scrollLines(-1)
       this.terminal.scrollToBottom()
     })
-    this.resizeObserver = new ResizeObserver(() => this.fitAddon.fit())
+    this.resizeObserver?.disconnect()
+    this.resizeObserver = new ObserverOfWindow(() => this.fitAddon.fit())
     this.resizeObserver.observe(container)
   }
 
@@ -266,7 +274,7 @@ export class TerminalInstance {
   }
 
   mountPreview(container: HTMLElement): (() => void) | null {
-    if (!this.opened) return null
+    if (!this.openedIn) return null
     const { cols, rows } = this.terminal
     if (!cols || !rows) return null
 
