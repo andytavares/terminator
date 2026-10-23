@@ -1,0 +1,19 @@
+extensions/foundry/tests/components/App.spec.tsx
+  s_0565505ad6a275::t_dbb399ffa1b644 182,611
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ed0bc6ee0fb563f00d4eac9b25e0dee7b9f3e912",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
