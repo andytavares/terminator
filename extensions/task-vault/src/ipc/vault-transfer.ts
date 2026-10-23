@@ -34,8 +34,8 @@ const ImportJsonRequestSchema = z.object({
   tasks: z
     .array(z.custom<ImportedTask>((task) => typeof task === 'object' && task !== null))
     .optional(),
-  projects: z.array(z.record(z.unknown())).optional(),
-  areas: z.array(z.record(z.unknown())).optional(),
+  projects: z.array(z.record(z.string(), z.unknown())).optional(),
+  areas: z.array(z.record(z.string(), z.unknown())).optional(),
 })
 
 type Row = Record<string, unknown>
