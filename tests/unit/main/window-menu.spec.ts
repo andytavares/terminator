@@ -1,9 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
 import { buildWindowMenu } from '../../../src/main/window-menu'
 
-function items() {
+const BREAKOUT_SESSION = '3f2c1a9e-5b7d-4e8a-9c01-2d4f6a8b0c1e'
+
+function items(focusedBreakoutSession: string | null = null) {
   const send = vi.fn()
-  const menu = buildWindowMenu(send)
+  const menu = buildWindowMenu(send, focusedBreakoutSession)
   const submenu = menu.submenu as Electron.MenuItemConstructorOptions[]
   return { menu, submenu, send }
 }
@@ -34,6 +36,32 @@ describe('buildWindowMenu', () => {
     const close = submenu.find((i) => i.label === 'Close Tab')!
     expect(close.accelerator).toBe('CmdOrCtrl+W')
     ;(close.click as () => void)()
-    expect(send).toHaveBeenCalledWith('menu:close-tab')
+    expect(send).toHaveBeenCalledWith('menu:close-tab', { sessionId: null })
+  })
+})
+
+describe('buildWindowMenu in a breakout window', () => {
+  it('closes the focused breakout terminal on Cmd+W, naming its session', () => {
+    const { submenu, send } = items(BREAKOUT_SESSION)
+    const close = submenu.find((i) => i.label === 'Close Terminal')!
+    expect(submenu.find((i) => i.label === 'Close Tab')).toBeUndefined()
+    ;(close.click as () => void)()
+    expect(send).toHaveBeenCalledWith('menu:close-tab', { sessionId: BREAKOUT_SESSION })
+  })
+
+  it('moves the terminal to its own window on Cmd+Shift+O from the main window', () => {
+    const { submenu, send } = items()
+    const toggle = submenu.find((i) => i.label === 'Move Terminal to Its Own Window')!
+    expect(toggle.accelerator).toBe('CmdOrCtrl+Shift+O')
+    ;(toggle.click as () => void)()
+    expect(send).toHaveBeenCalledWith('menu:toggle-breakout', { sessionId: null })
+  })
+
+  it('returns the focused breakout terminal to the main window', () => {
+    const { submenu, send } = items(BREAKOUT_SESSION)
+    const toggle = submenu.find((i) => i.label === 'Return Terminal to Main Window')!
+    expect(toggle.accelerator).toBe('CmdOrCtrl+Shift+O')
+    ;(toggle.click as () => void)()
+    expect(send).toHaveBeenCalledWith('menu:toggle-breakout', { sessionId: BREAKOUT_SESSION })
   })
 })

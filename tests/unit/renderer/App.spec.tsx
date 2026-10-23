@@ -207,7 +207,7 @@ function mainEvents() {
     openAbout: pushedEvent<[]>(),
     openHome: pushedEvent<[]>(),
     toggleSidebar: pushedEvent<[]>(),
-    closeTab: pushedEvent<[]>(),
+    closeTab: pushedEvent<[string | null]>(),
     togglePanel: pushedEvent<[string]>(),
     selectProjectTab: pushedEvent<[string]>(),
     bridge: bridgeEvents(),
@@ -752,7 +752,7 @@ describe('App — menu:close-tab (onMenuCloseTab)', () => {
     })
     showTab('proj-1', 'ses-active')
     render(<App />)
-    act(() => main.events.closeTab.deliver())
+    act(() => main.events.closeTab.deliver(null))
     await waitFor(() => expect(has('ses-active')).toBe(false))
     expect(has('ses-other')).toBe(true)
   })
@@ -761,7 +761,7 @@ describe('App — menu:close-tab (onMenuCloseTab)', () => {
     setupApp({ sessions: [tab('ses-active', 'proj-1')] })
     showTab('proj-1', 'ses-active')
     render(<App />)
-    act(() => main.events.closeTab.deliver())
+    act(() => main.events.closeTab.deliver(null))
     await act(async () => {})
     expect(has('ses-active')).toBe(true)
   })
@@ -774,7 +774,7 @@ describe('App — menu:close-tab (onMenuCloseTab) — closes the scratch session
     render(<App />)
     act(() => shortcuts.callbacks.onNewScratch?.())
     await waitFor(() => expect(useWorkspaceStore.getState().scratchActive).toBe(true))
-    act(() => main.events.closeTab.deliver())
+    act(() => main.events.closeTab.deliver(null))
     await waitFor(() => expect(has('ses-scratch')).toBe(false))
   })
 
@@ -785,7 +785,7 @@ describe('App — menu:close-tab (onMenuCloseTab) — closes the scratch session
       sessions: [tab('ses-1', 'proj-1')],
     })
     render(<App />)
-    act(() => main.events.closeTab.deliver())
+    act(() => main.events.closeTab.deliver(null))
     await act(async () => {})
     expect(has('ses-1')).toBe(true)
   })
@@ -1515,7 +1515,7 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
     act(() => main.events.openSettings.deliver())
     await waitFor(() => expect(directUse()).toContain('core.open-settings'))
 
-    act(() => main.events.closeTab.deliver())
+    act(() => main.events.closeTab.deliver(null))
     await waitFor(() => expect(directUse()).toContain('core.close-tab'))
   })
 })
