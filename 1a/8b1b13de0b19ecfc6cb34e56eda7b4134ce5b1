@@ -1,0 +1,44 @@
+.github/workflows/ci.yml
+  s_0565505ad6a275::t_dd719d8b36266b 609
+  s_0565505ad6a275::t_bf9b3bd9369aa6 308-332,334-335,338,340-363,365
+  s_0565505ad6a275::t_5bf1b868acdf79 18-23,57-63,275-280,282-283,587,601-608
+  s_0565505ad6a275::t_778ff58863b6cd 260,366-397,598
+  s_0565505ad6a275::t_80c0732efd324b 333,336-337,339,364
+  s_0565505ad6a275::t_3c1b2865831274 261,281
+  s_0565505ad6a275::t_31420c1bda0929 64,284,398
+scripts/ci-plan.mjs
+  s_0565505ad6a275::t_778ff58863b6cd 15
+package.json
+  s_0565505ad6a275::t_156566ec5ec10a 38-39
+.github/workflows/stability-sweep.yml
+  s_0565505ad6a275::t_895e2a71fed031 1-156
+tests/unit/scripts/ci-plan.spec.ts
+  s_0565505ad6a275::t_80c0732efd324b 142,149,151,154,170-171,173
+  s_0565505ad6a275::t_d4782097a5f505 21-36,39,167,169
+scripts/ci-e2e-local.mjs
+  s_0565505ad6a275::t_778ff58863b6cd 93-99
+.github/dependabot.yml
+  s_0565505ad6a275::t_79af8e14ccac6e 1,6-7,12-26
+scripts/stability.mjs
+  s_0565505ad6a275::t_05ae808b32b51d 4,17,21,24,26-27,95
+tests/unit/scripts/stability.spec.ts
+  s_0565505ad6a275::t_05ae808b32b51d 40-41
+  s_0565505ad6a275::t_acaf08178db25a 48,52-58
+  s_0565505ad6a275::t_aed60ead7e2290 59-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1a8b1b13de0b19ecfc6cb34e56eda7b4134ce5b1",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
