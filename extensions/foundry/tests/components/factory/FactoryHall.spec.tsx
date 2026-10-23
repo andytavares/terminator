@@ -590,7 +590,7 @@ function theSiteAndFailuresTests() {
     fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
     await screen.findByRole('button', { name: /ATTACH/ })
     fireEvent.click(await screen.findByRole('button', { name: /ATTACH/ }))
-    await screen.findByText('gone')
+    expect(await screen.findByText('gone')).toBeTruthy()
   })
 }
 
@@ -815,11 +815,10 @@ function gateCardsTests() {
     const card = document.querySelector('.fdry-card--gate') as HTMLElement
     const top = Number.parseFloat(card.style.top)
     const room = card.style.getPropertyValue('--fdry-card-room')
-    if (card.classList.contains('is-below')) {
-      expect(room).toBe(`calc(${100 - top}% - 26px)`)
-    } else {
-      expect(room).toBe(`calc(${top}% - 50px)`)
-    }
+    const expectedRoom = card.classList.contains('is-below')
+      ? `calc(${100 - top}% - 26px)`
+      : `calc(${top}% - 50px)`
+    expect(room).toBe(expectedRoom)
   })
 }
 

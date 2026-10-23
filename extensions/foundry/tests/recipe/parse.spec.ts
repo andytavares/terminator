@@ -45,23 +45,18 @@ describe('parseRecipe', () => {
 function wellFormedTests() {
   it('parses a well-formed recipe', () => {
     const r = parseRecipe(RECIPE, 'bugfix.yaml')
-    expect(r.ok).toBe(true)
-    if (r.ok) {
-      expect(r.value.id).toBe('bugfix')
-      expect(r.value.steps.map((s) => s.kind)).toEqual(['agent', 'fanout', 'gate'])
-    }
+    expect(r.ok && r.value.id).toBe('bugfix')
+    expect(r.ok && r.value.steps.map((s) => s.kind)).toEqual(['agent', 'fanout', 'gate'])
   })
 
   it('requires the id to match the filename, so a name resolves to what it says', () => {
     const r = parseRecipe(RECIPE, 'direct.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/direct/)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/direct/) })
   })
 
   it('reports malformed YAML by path instead of throwing', () => {
     const r = parseRecipe('id: [unclosed\n', 'broken.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toContain('broken.yaml')
+    expect(r).toMatchObject({ ok: false, reason: expect.stringContaining('broken.yaml') })
   })
 }
 
@@ -71,8 +66,7 @@ function versionsAndKindsTests() {
       RECIPE.replace(`schemaVersion: ${RECIPE_SCHEMA_VERSION}`, 'schemaVersion: 99'),
       'bugfix.yaml'
     )
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/99/)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/99/) })
   })
 
   it('rejects a seventh step kind — the language is deliberately six', () => {
@@ -90,14 +84,12 @@ function versionsAndKindsTests() {
 function idsAndOrderTests() {
   it('rejects duplicate step ids', () => {
     const r = parseRecipe(RECIPE.replace('id: fix', 'id: reproduce'), 'bugfix.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/reproduce/)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/reproduce/) })
   })
 
   it('rejects an `after` naming a step that does not exist', () => {
     const r = parseRecipe(RECIPE.replace('after: [reproduce]', 'after: [nonesuch]'), 'bugfix.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/nonesuch/)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/nonesuch/) })
   })
 
   it('rejects a cycle in the step graph', () => {
@@ -106,8 +98,7 @@ function idsAndOrderTests() {
       '  - id: reproduce\n    kind: agent\n    role: builder\n    after: [fix]\n'
     )
     const r = parseRecipe(cyclic, 'bugfix.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/cycle/i)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/cycle/i) })
   })
 }
 
@@ -131,8 +122,7 @@ function gatesAndRequirementsTests() {
 function emptyRecipesTests() {
   it('rejects YAML that is not a mapping at all', () => {
     const r = parseRecipe('- just\n- a list\n', 'bugfix.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/not a mapping/)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/not a mapping/) })
   })
 
   it('rejects a recipe with no steps — a shape of work with no steps is not one', () => {
@@ -149,14 +139,12 @@ function missingFieldsTests() {
     ['run', 'a command', { from: 'kind: agent\n    role: builder', to: 'kind: run' }],
   ])('rejects a %s step with no %s', (_kind, _need, { from, to }) => {
     const r = parseRecipe(RECIPE.replace(from, to), 'bugfix.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/reproduce/)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/reproduce/) })
   })
 
   it('rejects a fanout with nothing to fan out over', () => {
     const r = parseRecipe(RECIPE.replace('    over: plan.units[role=builder]\n', ''), 'bugfix.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/fix/)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/fix/) })
   })
 
   it('rejects a gate with no rule', () => {
@@ -222,11 +210,8 @@ function skillsTests() {
       ),
       'bugfix.yaml'
     )
-    expect(r.ok).toBe(false)
-    if (!r.ok) {
-      expect(r.reason).toMatch(/reproduce/)
-      expect(r.reason).toMatch(/Not Valid!/)
-    }
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/reproduce/) })
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/Not Valid!/) })
   })
 }
 
@@ -251,11 +236,8 @@ describe('parseRole', () => {
 function parseParsingTests() {
   it('parses a well-formed role', () => {
     const r = parseRole(ROLE, 'verifier.yaml')
-    expect(r.ok).toBe(true)
-    if (r.ok) {
-      expect(r.value.allowResume).toBe(false)
-      expect(r.value.writes).toEqual([])
-    }
+    expect(r.ok && r.value.allowResume).toBe(false)
+    expect(r.ok && r.value.writes).toEqual([])
   })
 
   // Unknown keys are stripped rather than refused, which is what lets a role
@@ -284,14 +266,12 @@ function requiredFieldsTests() {
 
   it('requires the id to match the filename', () => {
     const r = parseRole(ROLE, 'builder.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/verifier/)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/verifier/) })
   })
 
   it('reports malformed YAML by path', () => {
     const r = parseRole('id: [unclosed\n', 'verifier.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toContain('verifier.yaml')
+    expect(r).toMatchObject({ ok: false, reason: expect.stringContaining('verifier.yaml') })
   })
 }
 
@@ -328,11 +308,8 @@ function roleSkillsTests() {
 
   it('refuses a skill id that could not be a directory name, and names the role', () => {
     const r = parseRole(`${ROLE}skills: [Not Valid!]\n`, 'verifier.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) {
-      expect(r.reason).toMatch(/verifier/)
-      expect(r.reason).toMatch(/Not Valid!/)
-    }
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/verifier/) })
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/Not Valid!/) })
   })
 }
 
@@ -384,7 +361,7 @@ function rungsAndScopesTests() {
   it('parses a well-formed rule', () => {
     const r = parseRule(RULE, 'exit-code-not-count.yaml')
     expect(r.ok).toBe(true)
-    if (r.ok) expect(r.value.scope).toBe('universal')
+    expect(r.ok && r.value.scope).toBe('universal')
   })
 
   it('rejects a rung outside L0 to L6', () => {
@@ -412,16 +389,17 @@ function originsAndIdsTests() {
 
   it('requires the id to match the filename', () => {
     const r = parseRule(RULE, 'something-else.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/exit-code-not-count/)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/exit-code-not-count/) })
   })
 }
 
 function parseMalformedAndNewerTests() {
   it('reports malformed YAML by path', () => {
     const r = parseRule('scope: [unclosed\n', 'exit-code-not-count.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toContain('exit-code-not-count.yaml')
+    expect(r).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('exit-code-not-count.yaml'),
+    })
   })
 
   it('refuses a schema version newer than it knows', () => {
@@ -478,20 +456,17 @@ function upstreamStepsTests() {
 
   it('rejects onFail reworking a downstream step', () => {
     const r = parseRecipe(ONFAIL.replace('rework: build', 'rework: ship'), 'onfail.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/verify/)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/verify/) })
   })
 
   it('rejects onFail reworking a step that is not upstream at all', () => {
     const r = parseRecipe(ONFAIL.replace('rework: build', 'rework: sibling'), 'onfail.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/verify/)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/verify/) })
   })
 
   it('rejects onFail reworking a gate — only an agent or fanout can redo work', () => {
     const r = parseRecipe(ONFAIL.replace('rework: build', 'rework: gatecheck'), 'onfail.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/verify/)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/verify/) })
   })
 }
 
@@ -514,8 +489,7 @@ function maxAndKindsTests() {
       ),
       'onfail.yaml'
     )
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/build/)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/build/) })
   })
 }
 
@@ -531,26 +505,23 @@ function effortTests() {
   it('parses a recipe-level effort', () => {
     const r = parseRecipe(EFFORT, 'direct.yaml')
     expect(r.ok).toBe(true)
-    if (r.ok) expect(r.value.effort).toBe('xhigh')
+    expect(r.ok && r.value.effort).toBe('xhigh')
   })
 
   it('parses a step-level effort', () => {
     const r = parseRecipe(EFFORT, 'direct.yaml')
-    if (r.ok) expect(r.value.steps.find((s) => s.id === 'document')?.effort).toBe('medium')
+    expect(r.ok && r.value.steps.find((s) => s.id === 'document')?.effort).toBe('medium')
   })
 
   it('leaves effort undefined where nothing declared one', () => {
     const r = parseRecipe(RECIPE, 'bugfix.yaml')
-    if (r.ok) {
-      expect(r.value.effort).toBeUndefined()
-      expect(r.value.steps.every((s) => s.effort === undefined)).toBe(true)
-    }
+    expect(r.ok && r.value.effort).toBeUndefined()
+    expect(r.ok && r.value.steps.every((s) => s.effort === undefined)).toBe(true)
   })
 
   it('refuses an effort the runtime does not have, by file', () => {
     const r = parseRecipe(EFFORT.replace('effort: xhigh', 'effort: extreme'), 'direct.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/^direct\.yaml: /)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/^direct\.yaml: /) })
   })
 }
 
@@ -566,12 +537,12 @@ function declaringAndRoundsTests() {
   it('accepts a recipe that declares ci alongside a ready-for-review gate', () => {
     const r = parseRecipe(`ci:\n  rounds: 2\n${RECIPE}`, 'bugfix.yaml')
     expect(r.ok).toBe(true)
-    if (r.ok) expect(r.value.ci).toEqual({ rounds: 2 })
+    expect(r.ok && r.value.ci).toEqual({ rounds: 2 })
   })
 
   it('leaves ci undefined where nothing declared it', () => {
     const r = parseRecipe(RECIPE, 'bugfix.yaml')
-    if (r.ok) expect(r.value.ci).toBeUndefined()
+    expect(r.ok && r.value.ci).toBeUndefined()
   })
 
   it('rejects a rounds of 0', () => {
@@ -598,7 +569,6 @@ steps:
     role: builder
 `
     const r = parseRecipe(noGate, 'bugfix.yaml')
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/ready-for-review/)
+    expect(r).toMatchObject({ ok: false, reason: expect.stringMatching(/ready-for-review/) })
   })
 }

@@ -96,7 +96,7 @@ describe('a held call on its card', () => {
     })
     const card = await screen.findByRole('group', { name: 'Wants to run Bash' })
     fireEvent.click(within(card).getByRole('button', { name: 'Allow' }))
-    await within(card).findByText('That request is no longer waiting.')
+    expect(await within(card).findByText('That request is no longer waiting.')).toBeTruthy()
   })
 })
 
@@ -105,7 +105,7 @@ describe('a parked agent with no terminal left', () => {
     mountHall(hallView({ stranded: ['s-1'] }), { 'foundry:run-terminal': () => ({ ok: false }) })
     const card = await screen.findByRole('group', { name: 'Waiting at its terminal' })
     fireEvent.click(within(card).getByRole('button', { name: 'Go to terminal' }))
-    await within(card).findByText('That agent is no longer in a terminal.')
+    expect(await within(card).findByText('That agent is no longer in a terminal.')).toBeTruthy()
   })
 })
 
@@ -113,7 +113,7 @@ describe('what an open monitor says of its station', () => {
   it('says no agent for a station nothing is running', async () => {
     mountHall(hallView({ orphaned: ['N-1'] }))
     fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
-    await screen.findByRole('img', { name: 'No agent' })
+    expect(await screen.findByRole('img', { name: 'No agent' })).toBeTruthy()
   })
 
   it('says a failed station failed, with the run’s own headline', async () => {

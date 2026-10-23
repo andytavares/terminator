@@ -361,7 +361,7 @@ function aWorkspaceChangeTests() {
 }
 
 /** The counts read once, then a read that fails after the next change. */
-async function keepsTheLastCountWhenAReadFails(): Promise<void> {
+async function expectLastCountKeptWhenAReadFails(): Promise<void> {
   let reads = 0
   mockBridgeInvoke.mockImplementation(async (channel: string, payload?: unknown) => {
     if (channel !== 'foundry:attention') return channel in replies ? replies[channel](payload) : {}
@@ -393,7 +393,9 @@ describe('the counts on the chrome', () => {
     await waitFor(() => expect(timesInvoked(mockBridgeInvoke, 'foundry:attention')).toBe(2))
   })
 
-  it('leave the last count up when a later read fails', keepsTheLastCountWhenAReadFails)
+  it('leave the last count up when a later read fails', async () => {
+    await expectLastCountKeptWhenAReadFails()
+  })
 
   it('are read again when the workspace switches, which writes nothing to say so', async () => {
     render(<App />)
@@ -533,7 +535,7 @@ function appSwitchingTests() {
 }
 
 /** A view changed to List elsewhere while this one showed the factory. */
-async function followsABroadcastBackToTheList(): Promise<void> {
+async function expectBroadcastFollowedBackToTheList(): Promise<void> {
   currentView = 'factory'
   render(<App />)
   await waitFor(() =>
@@ -574,7 +576,9 @@ function unreadableViewTests() {
     expect(screen.getByRole('button', { name: 'Forge' }).getAttribute('aria-pressed')).toBe('true')
   })
 
-  it('follows a view change broadcast back to the list', followsABroadcastBackToTheList)
+  it('follows a view change broadcast back to the list', async () => {
+    await expectBroadcastFollowedBackToTheList()
+  })
 }
 
 function leavingAHallTests() {

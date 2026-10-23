@@ -449,7 +449,7 @@ describe('a rework', () => {
 function theReworkChipTests() {
   it('shows a chip counting how many times a node has been sent back', async () => {
     mount(reply({ graph: { orderId: 'WO-1', recipe: 'standard', nodes: REWORKED_NODES } }))
-    await screen.findByText(/Sent back 2×/)
+    expect(await screen.findByText(/Sent back 2×/)).toBeTruthy()
   })
 
   it('does not show the chip for a node with no reworks', async () => {

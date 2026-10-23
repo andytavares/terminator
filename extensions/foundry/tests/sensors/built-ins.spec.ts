@@ -24,21 +24,19 @@ describe('built-in sensors', () => {
 
   it('parses ci-main-red as a github-runs sensor on the base branch', () => {
     const parsed = parseSensor(readSensorFile('ci-main-red.yaml'), 'ci-main-red.yaml')
-    expect(parsed.ok).toBe(true)
-    if (parsed.ok) {
-      expect(parsed.value.source).toEqual({ kind: 'github-runs', branch: null, limit: 20 })
-      expect(parsed.value.severity).toBe('high')
-      expect(parsed.value.every).toBe('30m')
-    }
+    expect(parsed.ok && parsed.value.source).toEqual({
+      kind: 'github-runs',
+      branch: null,
+      limit: 20,
+    })
+    expect(parsed.ok && parsed.value.severity).toBe('high')
+    expect(parsed.ok && parsed.value.every).toBe('30m')
   })
 
   it("parses tracker-query as a tracker sensor over the operator's own issues", () => {
     const parsed = parseSensor(readSensorFile('tracker-query.yaml'), 'tracker-query.yaml')
-    expect(parsed.ok).toBe(true)
-    if (parsed.ok) {
-      expect(parsed.value.source).toEqual({ kind: 'tracker', query: null, limit: 25 })
-      expect(parsed.value.severity).toBe('medium')
-      expect(parsed.value.every).toBe('60m')
-    }
+    expect(parsed.ok && parsed.value.source).toEqual({ kind: 'tracker', query: null, limit: 25 })
+    expect(parsed.ok && parsed.value.severity).toBe('medium')
+    expect(parsed.ok && parsed.value.every).toBe('60m')
   })
 })

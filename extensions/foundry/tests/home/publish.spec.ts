@@ -18,13 +18,17 @@ vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervis
 let dataDir = ''
 let host: FoundryHost
 
+async function startingStatePublished(): Promise<void> {
+  await eventually(() => expect(host.homePublish).toHaveBeenCalledTimes(1))
+}
+
 beforeEach(async () => {
   dataDir = makeTempDir('fdry-home-')
   host = fakeHost(() => dataDir)
   host.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
   await activateFoundry(host)
   // Activation publishes the starting state once; wait it out so no spec counts it.
-  await eventually(() => expect(host.homePublish).toHaveBeenCalledTimes(1))
+  await startingStatePublished()
   host.homePublish.mockClear()
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
 })

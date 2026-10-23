@@ -139,7 +139,7 @@ describe('watching the architect at work', () => {
     fireEvent.click(
       await within(await header()).findByRole('button', { name: 'Watch the architect' })
     )
-    await screen.findByText('that conversation no longer has a terminal')
+    expect(await screen.findByText('that conversation no longer has a terminal')).toBeTruthy()
   })
 })
 
@@ -306,7 +306,9 @@ function provenRowTests() {
     })
     await openForgeStep('Hand off')
     fireEvent.click(await within(rows()).findByRole('button', { name: 'Check again' }))
-    await screen.findByText('Only a draft order can check its base branch again.')
+    expect(
+      await screen.findByText('Only a draft order can check its base branch again.')
+    ).toBeTruthy()
   })
 
   it('offers neither once the base branch is proven', async () => {

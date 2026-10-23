@@ -33,9 +33,8 @@ let original: string | null = null
 
 describe.skipIf(!RUNNABLE)('the Linear provider, against the real API', () => {
   beforeAll(async () => {
-    expect(provider.states, 'the Linear provider must implement states').toBeDefined()
-    expect(provider.transition, 'the Linear provider must implement transition').toBeDefined()
-    states = await provider.states!(cred, ISSUE)
+    if (provider.states === undefined) throw new Error('the Linear provider must implement states')
+    states = await provider.states(cred, ISSUE)
     const issue = await provider.get(cred, ISSUE)
     original = issue?.state.name ?? null
   })
@@ -67,7 +66,7 @@ function readingTheWorkflowTests() {
     // workspace calls it, it must be one that comes before the review state.
     const reviewAt = states.findIndex((state) => state.intent === 'in_review')
     const startedAt = states.findIndex((state) => state.intent === 'started')
-    if (reviewAt !== -1) expect(startedAt).toBeLessThan(reviewAt)
+    expect(reviewAt === -1 || startedAt < reviewAt).toBe(true)
   })
 
   it('resolves "in_review" only where the workflow has somewhere later to go', () => {
@@ -76,9 +75,9 @@ function readingTheWorkflowTests() {
     // as `started`, which is the failure "one started state wearing two hats"
     // would produce.
     expect(review.length).toBeLessThanOrEqual(1)
-    if (review.length === 1) {
-      expect(review[0].id).not.toBe(states.find((s) => s.intent === 'started')?.id)
-    }
+    expect(review.map((state) => state.id)).not.toContain(
+      states.find((state) => state.intent === 'started')?.id
+    )
   })
 
   it('resolves "done" to exactly one state', () => {
@@ -95,6 +94,11 @@ function readingTheWorkflowTests() {
 }
 
 function movingTheIssueTests() {
+  it('implements both reading the workflow and moving an issue', () => {
+    expect(provider.states).toBeDefined()
+    expect(provider.transition).toBeDefined()
+  })
+
   it('actually moves the issue, and Linear reports the new state', async () => {
     const target = states.find((state) => state.intent === 'started')
     expect(target, 'this workflow has no started state to move to').toBeDefined()

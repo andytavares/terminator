@@ -1761,7 +1761,7 @@ function proofAndTheEscapeTests() {
     fireEvent.click(screen.getByRole('button', { name: /Or mark one unprovable/ }))
     // The heading it lands on is the one the acceptance list sits under, on the
     // step that list is on.
-    await waitFor(() => expect(document.getElementById('fdry-acceptance')).not.toBeNull())
+    await screen.findByRole('heading', { name: 'Acceptance criteria' })
     expect(document.activeElement?.id).toBe('fdry-acceptance')
   })
 }
@@ -2241,7 +2241,7 @@ describe('holding and releasing the red-team loop from the strip', () => {
   describe('order.hold', orderHoldTests)
 })
 
-function auditUnavailableControls(): void {
+function expectUnavailableControlsHold(): void {
   const nodes = Array.from(document.querySelectorAll('[aria-disabled="true"]'))
   expect(nodes.length).toBeGreaterThan(0)
   for (const node of nodes) {
@@ -2300,7 +2300,7 @@ function forgeARunningTurnTests() {
       expect(screen.getAllByText(/architect is working/).length).toBeGreaterThan(0)
     )
     await openForgeStep('Hand off')
-    auditUnavailableControls()
+    expectUnavailableControlsHold()
   })
 }
 
@@ -2319,7 +2319,7 @@ function aRefusedTurnTests() {
     installForgeBridge()
     render(<Forge orderId="WO-1" />)
     await screen.findByText(/plan was refused/i)
-    auditUnavailableControls()
+    expectUnavailableControlsHold()
   })
 }
 
@@ -2337,7 +2337,7 @@ function aFindingNeedingADecisionTests() {
     await openForgeStep('Red team')
     await screen.findByText('blocking one')
     // Nothing is decided yet, so Send is unavailable — the case under audit.
-    auditUnavailableControls()
+    expectUnavailableControlsHold()
   })
 }
 
@@ -2346,7 +2346,7 @@ function theShapeStepTests() {
     mountForStart()
     await openForgeStep('Shape')
     await screen.findByText('Speckit')
-    auditUnavailableControls()
+    expectUnavailableControlsHold()
   })
 
   it('holds on a handed-off order whose shape is fixed', async () => {
@@ -2355,6 +2355,6 @@ function theShapeStepTests() {
     fireEvent.click(handOffButton())
     await waitFor(() => expect(screen.getAllByText(/Handed off/).length).toBeGreaterThan(0))
     await openForgeStep('Shape')
-    auditUnavailableControls()
+    expectUnavailableControlsHold()
   })
 }
