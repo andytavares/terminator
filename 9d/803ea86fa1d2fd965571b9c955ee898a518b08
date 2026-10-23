@@ -1,0 +1,30 @@
+src/renderer/components/terminal/TabBar.tsx
+  s_0565505ad6a275::t_23d76d07c03375 16
+src/shared/schemas/session-records.schema.ts
+  s_0565505ad6a275::t_23d76d07c03375 3
+eslint.config.mjs
+  s_0565505ad6a275::t_67ecc1e869e1b1 293-310
+  s_0565505ad6a275::t_cb29d79d5a5c71 292
+src/shared/session-description.ts
+  s_0565505ad6a275::t_23d76d07c03375 1-2
+src/main/sessions/session-record-store.ts
+  s_0565505ad6a275::t_23d76d07c03375 11
+src/renderer/components/session/WorkItemCell.tsx
+  s_0565505ad6a275::t_23d76d07c03375 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9d803ea86fa1d2fd965571b9c955ee898a518b08",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
