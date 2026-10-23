@@ -5,6 +5,7 @@
 
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
+import { packageName } from './check-release-age.mjs'
 
 export const SINGLE_COPIES = [
   '@codemirror/state',
@@ -14,8 +15,6 @@ export const SINGLE_COPIES = [
   'react',
   'react-dom',
 ]
-
-const packageName = (key) => key.slice(key.lastIndexOf('node_modules/') + 'node_modules/'.length)
 
 /** Each of `names` installed more than once, with the path and version of every copy. */
 export function duplicateCopies(lock, names) {
