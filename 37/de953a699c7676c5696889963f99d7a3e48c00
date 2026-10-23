@@ -1,0 +1,26 @@
+tests/e2e/live/rework-live.spec.ts
+  s_0565505ad6a275::t_e79c8f0bbeed2e 217,232-236
+  s_0565505ad6a275::t_11ca5a7ba61fb2 220,228-231,237
+tests/e2e/helpers.ts
+  s_0565505ad6a275::t_11ca5a7ba61fb2 487-488
+tests/e2e/extension-smoke.spec.ts
+  s_0565505ad6a275::t_11ca5a7ba61fb2 113-117,316
+tests/e2e/live/refinery-live.spec.ts
+  s_0565505ad6a275::t_11ca5a7ba61fb2 227,229-233
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "37de953a699c7676c5696889963f99d7a3e48c00",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
