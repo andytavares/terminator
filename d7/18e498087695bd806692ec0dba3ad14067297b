@@ -1,0 +1,22 @@
+scripts/check-single-copies.mjs
+  s_0565505ad6a275::t_3d7605503da60c 1-2,5-45
+  s_0565505ad6a275::t_5ab8cd301bdada 3-4
+tests/unit/scripts/check-single-copies.spec.ts
+  s_0565505ad6a275::t_f5edff71e67eef 1-83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d718e498087695bd806692ec0dba3ad14067297b",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
