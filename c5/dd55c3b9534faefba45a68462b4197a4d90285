@@ -1,0 +1,24 @@
+src/renderer/components/terminal/TerminalSession.tsx
+  s_bcb87751443cd2::t_278f4c0ebb28c4 132,221-223,225,227,245-249,253-254,277
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_bcb87751443cd2::t_d26a5531e77206 392-402,404-429,433-434,438,444-463
+  s_bcb87751443cd2::t_532681c0e974bb 403
+  s_bcb87751443cd2::t_137f807e7f0a8e 430-432
+  s_bcb87751443cd2::t_ad583983f955e4 435-437,439-443
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c5dd55c3b9534faefba45a68462b4197a4d90285",
+  "prompts": {},
+  "sessions": {
+    "s_bcb87751443cd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b568ee83-ad51-4a54-9901-52cfcfa5b37f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
