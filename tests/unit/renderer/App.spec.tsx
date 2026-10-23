@@ -442,10 +442,11 @@ describe('App — loads the workspaces and settings from main on mount', () => {
     expect(settings()).toEqual(mainSettings.getGlobalSettings())
   })
 
-  it("shows the project's terminal once the operator leaves Home", () => {
+  it("shows the project's terminal once the operator leaves Home", async () => {
     setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
     render(<App />)
-    expect(screen.getByTestId('home-screen')).toBeTruthy()
+    // Home is lazy: it draws once its module has loaded, whatever ran before this test.
+    await screen.findByTestId('home-screen')
     leaveHome()
     expect(screen.getByTestId('terminal-pane').textContent).toBe('proj-1')
   })
@@ -940,10 +941,10 @@ describe('App — Home', () => {
     ])
   })
 
-  it('opens on Home at launch', () => {
+  it('opens on Home at launch', async () => {
     render(<App />)
     expect(registry().activeGlobalTabId).toBe('core.home')
-    expect(screen.getByTestId('home-screen')).toBeTruthy()
+    await screen.findByTestId('home-screen')
   })
 })
 
