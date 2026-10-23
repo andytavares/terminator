@@ -1,0 +1,47 @@
+tests/unit/main/breakout.ipc.spec.ts
+  s_bcb87751443cd2::t_4f8246dada4094 20,30-33
+  s_bcb87751443cd2::t_0121cd966b3aa6 1-19,21-29,34-52
+tests/unit/main/breakout-windows.spec.ts
+  s_bcb87751443cd2::t_10ca3f3b801fcd 48-50
+  s_bcb87751443cd2::t_4f8246dada4094 1,68-70,72,75-76,78,80,87,94,99-105
+  s_bcb87751443cd2::t_0121cd966b3aa6 2-47,51-67,71,73-74,77,79,81-86,88-93,95-98,106-107
+src/shared/electron-api/__tests__/manifest.spec.ts
+  s_bcb87751443cd2::t_59a0eb295d5980 150-152
+src/main/ipc/breakout.ipc.ts
+  s_bcb87751443cd2::t_59a0eb295d5980 1-29
+tests/unit/renderer/App.spec.tsx
+  s_bcb87751443cd2::t_104d03c703f73e 210
+  s_bcb87751443cd2::t_dcf35da944824d 755,764,777,788,1518
+src/main/background-mode.ts
+  s_bcb87751443cd2::t_0121cd966b3aa6 13-15
+tests/unit/main/window-menu.spec.ts
+  s_bcb87751443cd2::t_0121cd966b3aa6 4-6,8,39-40,44-65
+  s_bcb87751443cd2::t_10ca3f3b801fcd 41-43
+src/main/index.ts
+  s_bcb87751443cd2::t_59a0eb295d5980 61-62,142-145,189,286-289,314-315,523
+src/shared/electron-api/manifest.ts
+  s_bcb87751443cd2::t_0121cd966b3aa6 901-903
+  s_bcb87751443cd2::t_59a0eb295d5980 900,904-911,970-985
+  s_bcb87751443cd2::t_ba0bf5469d6a2e 986
+src/main/breakout-windows.ts
+  s_bcb87751443cd2::t_59a0eb295d5980 1-64
+src/main/window-menu.ts
+  s_bcb87751443cd2::t_59a0eb295d5980 30
+  s_bcb87751443cd2::t_10ca3f3b801fcd 5-27,29,44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "161b0f8be6a3f4e1923fa43af6a644ca3a8b30d9",
+  "prompts": {},
+  "sessions": {
+    "s_bcb87751443cd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b568ee83-ad51-4a54-9901-52cfcfa5b37f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
