@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Link, Pencil } from 'lucide-react'
 import type { WorkItem } from '../../sidebar/work-item'
 import type { Issue } from '../../../shared/types/index'
-import { DESCRIPTION_MAX_LENGTH } from '../../../shared/schemas/session-records.schema'
+import { DESCRIPTION_MAX_LENGTH } from '../../../shared/session-description'
 import './WorkItemCell.css'
 
 interface Props {

@@ -57,7 +57,7 @@ export type ProfilePaths = z.infer<typeof PathsSchema>
 const ProofSchema = z.object({
   commit: z.string(),
   /** By command: the exit code it ended with on that commit, or null when it did not exit. */
-  exitCodes: z.record(z.number().nullable()),
+  exitCodes: z.record(z.string(), z.number().nullable()),
   /** When the proof ran, ISO 8601. */
   at: z.string().optional(),
 })
@@ -68,10 +68,10 @@ export const ProfileSchema = z.object({
   repository: z.string().default(''),
   prepare: nullableEntry,
   share: z.array(z.string()).default([]),
-  checks: ChecksSchema.default({}),
+  checks: ChecksSchema.prefault({}),
   additional: z.array(AdditionalCheckSchema).default([]),
   pictures: nullableEntry,
-  paths: PathsSchema.default({}),
+  paths: PathsSchema.prefault({}),
   proof: ProofSchema.nullable().default(null),
 })
 export type Profile = z.infer<typeof ProfileSchema>

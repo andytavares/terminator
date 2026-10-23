@@ -30,10 +30,10 @@
     "@terminator/extension-ui": "1.0.0",
     "js-yaml": "4.3.2",
     "lucide-react": "1.21.0",
-    "mermaid": "11.16.1",
+    "mermaid": "12.2.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "zod": "3.23.8",
+    "zod": "4.6.6",
     "zustand": "4.5.5"
   }
 }

@@ -212,6 +212,27 @@ describe('extension IPC handlers — extension settings values', () => {
     expect(await update({}, { key: 'com.test.token', value: 'abc123' })).toEqual({ ok: true })
     expect(await values({})).toEqual({ values: { 'com.test.token': 'abc123' } })
   })
+
+  // The remote bridge sends JSON, which drops a key whose value is undefined.
+  it('takes a payload with no value', async () => {
+    const update = captureHandle('extension:update-setting')
+
+    expect(await update({}, { key: 'com.test.token' })).toEqual({ ok: true })
+  })
+})
+
+describe('extension IPC handlers — extension:run-command', () => {
+  useExtensionHandlers()
+
+  it('runs a command called with no arguments', async () => {
+    const handler = vi.fn()
+    globalRegistry.commandHandlers.set('com.test.refresh', handler)
+    const run = captureHandle('extension:run-command')
+
+    expect(await run({}, { key: 'com.test.refresh' })).toEqual({ ok: true })
+    expect(handler).toHaveBeenCalledOnce()
+    globalRegistry.commandHandlers.delete('com.test.refresh')
+  })
 })
 
 // Workspace Settings sets a `workspaceScoped` setting for one workspace; the
