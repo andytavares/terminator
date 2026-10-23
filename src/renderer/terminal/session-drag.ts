@@ -2,7 +2,8 @@ import type React from 'react'
 import { breakOut } from './breakout'
 
 /** Carried by a drag of a terminal's tab, and never as plain text: a terminal must not paste
- * its own id when dropped on another one. */
+ * its own id when dropped on another one.
+ * @internal */
 export const SESSION_DRAG_TYPE = 'application/x-terminator-session'
 
 interface Pointer {
@@ -13,10 +14,6 @@ interface Pointer {
 
 // The breakout windows share this JS context, so a drag started in any of them is known here.
 let draggedSessionId: string | null = null
-
-export function startSessionDrag(sessionId: string): void {
-  draggedSessionId = sessionId
-}
 
 export function draggedSession(): string | null {
   return draggedSessionId
@@ -29,14 +26,15 @@ export function endSessionDrag(): void {
 /** Marks the drag as carrying this terminal. */
 export function beginSessionDrag(e: React.DragEvent, sessionId: string): void {
   e.dataTransfer.setData(SESSION_DRAG_TYPE, sessionId)
-  startSessionDrag(sessionId)
+  draggedSessionId = sessionId
 }
 
 export function isSessionDrag(e: React.DragEvent): boolean {
   return e.dataTransfer.types.includes(SESSION_DRAG_TYPE)
 }
 
-/** A drag that nothing accepted, ending over no Terminator window, asks for a window of its own. */
+/** A drag that nothing accepted, ending over no Terminator window, asks for a window of its own.
+ * @internal */
 export function shouldBreakOut({
   dropEffect,
   pointer,

@@ -32,8 +32,10 @@ function usePaneState(projectId: string) {
       terminalInstances: s.terminalInstances,
     }))
   )
+  const activeSessionId = store.getActiveSessionForProject(projectId)
   return {
-    activeSessionId: store.getActiveSessionForProject(projectId),
+    activeSessionId,
+    shownSessionId: useIsBrokenOut(activeSessionId) ? null : activeSessionId,
     hasSessions: store.getSessionsForProject(projectId).length > 0,
     layout: store.getPaneLayout(projectId),
     focusRequest: store.focusRequest,
@@ -152,8 +154,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
   const pane = usePaneState(projectId)
   const { activeSessionId, layout } = pane
   useShownTabSeen(projectId, pane)
-  const shownSessionId = useIsBrokenOut(activeSessionId) ? null : activeSessionId
-  useSinglePaneMount(containerRef, shownSessionId, layout)
+  useSinglePaneMount(containerRef, pane.shownSessionId, layout)
   useFocusRequests(projectId, pane)
   const refocusActive = useRefocusActive(activeSessionId)
   const handleRatioChange = useCallback(

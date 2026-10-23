@@ -17,9 +17,8 @@ const stopFollowing = new Map<string, () => void>()
 
 function terminalSize(sessionId: string): { width: number; height: number } {
   const element = useSessionStore.getState().getTerminalInstance(sessionId)?.element
-  const width = element?.offsetWidth ?? 0
-  const height = element?.offsetHeight ?? 0
-  return width > 0 && height > 0 ? { width, height } : FALLBACK_SIZE
+  if (!element || element.offsetWidth === 0 || element.offsetHeight === 0) return FALLBACK_SIZE
+  return { width: element.offsetWidth, height: element.offsetHeight }
 }
 
 function windowFeatures(sessionId: string, at?: { x: number; y: number }): string {
@@ -91,6 +90,7 @@ export function breakOut(sessionId: string, at?: { x: number; y: number }): void
   if (!child) return reportBlockedWindow(sessionId)
   releaseFromMainPane(session.projectId, sessionId)
   child.document.title = session.tabTitle
+  child.document.body.style.margin = '0'
   stopFollowing.set(sessionId, followMainDocument(child))
   useBreakoutStore.getState().add(sessionId, child)
 }

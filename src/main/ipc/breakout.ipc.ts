@@ -3,7 +3,7 @@ import { defineChannel } from '@terminator/extension-sdk'
 import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { runsInBackground } from '../background-mode.js'
 
-function isInside(point: { x: number; y: number }, bounds: Electron.Rectangle): boolean {
+function containsPoint(point: { x: number; y: number }, bounds: Electron.Rectangle): boolean {
   return (
     point.x >= bounds.x &&
     point.x < bounds.x + bounds.width &&
@@ -26,7 +26,7 @@ export function registerBreakoutHandlers(): void {
       run: () => {
         const point = screen.getCursorScreenPoint()
         const outside = !BrowserWindow.getAllWindows().some(
-          (win) => canBeUnderPointer(win) && isInside(point, win.getBounds())
+          (win) => canBeUnderPointer(win) && containsPoint(point, win.getBounds())
         )
         return { outside, x: point.x, y: point.y }
       },

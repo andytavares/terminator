@@ -6,10 +6,11 @@ import { useBreakoutStore } from '../../../../src/renderer/stores/breakout.store
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import {
+  beginSessionDrag,
   draggedSession,
   endSessionDrag,
-  startSessionDrag,
 } from '../../../../src/renderer/terminal/session-drag'
+import { partialFake } from '../../../support/fakes'
 import { SCRATCH_PROJECT_ID } from '../../../../src/shared/types/index'
 import {
   projectFixture,
@@ -20,6 +21,13 @@ import {
 
 const dockBack = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/terminal/breakout', () => ({ dockBack }))
+
+/** Starts a drag of the session's tab, as a dragstart on it does. */
+const startSessionDrag = (sessionId: string) =>
+  beginSessionDrag(
+    partialFake<React.DragEvent>({ dataTransfer: partialFake<DataTransfer>({ setData: vi.fn() }) }),
+    sessionId
+  )
 
 function fire(type: 'dragenter' | 'dragover' | 'dragleave' | 'drop'): Event {
   const event = new Event(type, { bubbles: true, cancelable: true })

@@ -9,7 +9,6 @@ import {
   finishSessionDrag,
   isSessionDrag,
   shouldBreakOut,
-  startSessionDrag,
 } from '../../../../src/renderer/terminal/session-drag'
 import { partialFake } from '../../../support/fakes'
 import { installElectronApi } from '../../../support/electron-api'
@@ -31,16 +30,6 @@ describe('shouldBreakOut', () => {
     ['move', inside, false],
   ] as const)('dropEffect %s with the pointer %o gives %s', (dropEffect, pointer, expected) => {
     expect(shouldBreakOut({ dropEffect, pointer })).toBe(expected)
-  })
-})
-
-describe('the dragged session', () => {
-  it('is remembered from the start of a drag until its end', () => {
-    expect(draggedSession()).toBeNull()
-    startSessionDrag('s1')
-    expect(draggedSession()).toBe('s1')
-    endSessionDrag()
-    expect(draggedSession()).toBeNull()
   })
 })
 
@@ -66,6 +55,13 @@ describe('isSessionDrag', () => {
   })
 })
 
+/** Starts a drag of the session's tab, as a dragstart on it does. */
+const startDragOf = (sessionId: string) =>
+  beginSessionDrag(
+    partialFake<React.DragEvent>({ dataTransfer: partialFake<DataTransfer>({ setData: vi.fn() }) }),
+    sessionId
+  )
+
 describe('finishSessionDrag', () => {
   const pointerOutside = vi.fn()
   beforeEach(() => {
@@ -75,7 +71,7 @@ describe('finishSessionDrag', () => {
 
   it('moves the terminal to a window at the pointer when it was dropped on nothing', async () => {
     pointerOutside.mockResolvedValue(outside)
-    startSessionDrag('s1')
+    startDragOf('s1')
     await finishSessionDrag('s1', 'none')
     expect(breakOut).toHaveBeenCalledWith('s1', { x: 640, y: 120 })
     expect(draggedSession()).toBeNull()

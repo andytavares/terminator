@@ -37,8 +37,6 @@ import {
 import { MainArea } from './shell/MainArea'
 import { useSidebarVisibility } from './shell/useSidebarVisibility'
 import { ShellOverlays } from './shell/ShellOverlays'
-import { BreakoutWindows } from './components/terminal/BreakoutWindowView'
-import { BreakoutDropZone } from './components/terminal/BreakoutDropZone'
 
 export function App(): JSX.Element {
   const { windows, palette, launch, note, scratchActive, quickActions } = useShellParts()
@@ -62,8 +60,6 @@ export function App(): JSX.Element {
             editNoteSessionId={note.editNoteSessionId}
           />
           <ShellOverlays {...windows} {...launch} quickActions={quickActions} />
-          <BreakoutWindows />
-          <BreakoutDropZone />
         </div>
         {showMetricsBar && <GlobalMetricsBar />}
       </div>

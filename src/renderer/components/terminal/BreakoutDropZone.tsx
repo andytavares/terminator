@@ -4,7 +4,7 @@ import { isBrokenOut } from '../../stores/breakout.store'
 import { useSessionStore } from '../../stores/session.store'
 import { dockBack } from '../../terminal/breakout'
 import { draggedSession, endSessionDrag } from '../../terminal/session-drag'
-import { usePlaceOf } from './BreakoutWindowView'
+import { usePlaceOf } from './place-of'
 import './BreakoutDropZone.css'
 
 /** The terminal being dragged, when it is one that lives in its own window. */
@@ -16,7 +16,7 @@ function draggedBreakoutSession(): string | null {
 type Listeners = [string, (e: Event) => void][]
 
 function dragListeners(setSessionId: (sessionId: string | null) => void): Listeners {
-  const hide = (): void => setSessionId(null)
+  const hideOverlay = (): void => setSessionId(null)
   return [
     ['dragenter', () => setSessionId(draggedBreakoutSession())],
     [
@@ -28,7 +28,7 @@ function dragListeners(setSessionId: (sessionId: string | null) => void): Listen
     [
       'dragleave',
       (e) => {
-        if (!(e as DragEvent).relatedTarget) hide()
+        if (!(e as DragEvent).relatedTarget) hideOverlay()
       },
     ],
     [
@@ -40,10 +40,10 @@ function dragListeners(setSessionId: (sessionId: string | null) => void): Listen
         // Docking unmounts the dragged tab, so its own dragend never fires to clear the drag.
         endSessionDrag()
         dockBack(dropped)
-        hide()
+        hideOverlay()
       },
     ],
-    ['dragend', hide],
+    ['dragend', hideOverlay],
   ]
 }
 
