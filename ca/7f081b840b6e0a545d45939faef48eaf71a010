@@ -1,0 +1,44 @@
+scripts/ci-e2e-local.mjs
+  s_0565505ad6a275::t_e53c0e6ce52fe2 90-93,95
+scripts/ci-plan.mjs
+  s_0565505ad6a275::t_01f0aac0470020 16
+scripts/stability.mjs
+  s_0565505ad6a275::t_e53c0e6ce52fe2 11,16-18,38,88-93,96-100
+tests/unit/scripts/check-quarantine.spec.ts
+  s_0565505ad6a275::t_e53c0e6ce52fe2 2-5,25,116-134
+scripts/check-release-age.mjs
+  s_0565505ad6a275::t_e53c0e6ce52fe2 178-188
+tests/e2e/helpers.ts
+  s_0565505ad6a275::t_f1949b673ab1a3 251-256
+.gitignore
+  s_0565505ad6a275::t_e53c0e6ce52fe2 33-36
+.github/workflows/ci.yml
+  s_0565505ad6a275::t_01f0aac0470020 399-440
+tests/unit/scripts/stability.spec.ts
+  s_0565505ad6a275::t_e53c0e6ce52fe2 5,128-153
+tests/unit/scripts/ci-plan.spec.ts
+  s_0565505ad6a275::t_1bf581871b97f6 21-23,145
+scripts/flaky-sweep.mjs
+  s_0565505ad6a275::t_01f0aac0470020 116-125,137
+  s_0565505ad6a275::t_e53c0e6ce52fe2 16-17,24,54-57,90,95-99,101-105,107
+scripts/check-quarantine.mjs
+  s_0565505ad6a275::t_e53c0e6ce52fe2 60-62,72,115,118-125,141,162-171,185
+tests/unit/scripts/flaky-sweep.spec.ts
+  s_0565505ad6a275::t_e53c0e6ce52fe2 4-10,87-135
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ca7f081b840b6e0a545d45939faef48eaf71a010",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
