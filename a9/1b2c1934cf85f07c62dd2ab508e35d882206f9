@@ -1,0 +1,89 @@
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_bcb87751443cd2::t_c1a4424b89c5da 401-420
+src/renderer/components/terminal/TerminalPane.tsx
+  s_bcb87751443cd2::t_505b4a5aec92e4 3,42-46,85-86,153-154
+  s_bcb87751443cd2::t_06a4a44cff2213 68,97,101,103
+src/renderer/terminal/breakout.ts
+  s_bcb87751443cd2::t_e4ec81fbd87928 105
+  s_bcb87751443cd2::t_642a0421917d3e 1-84,90-104,106-132
+  s_bcb87751443cd2::t_94bb814e706c1c 85-89
+src/renderer/components/terminal/BreakoutWindowView.css
+  s_bcb87751443cd2::t_c14b6571f105d5 1-69
+src/renderer/shell/main-events.ts
+  s_bcb87751443cd2::t_d77be9db0bcc93 49-53,55
+  s_bcb87751443cd2::t_ca05aefb4d90bf 16,78
+  s_bcb87751443cd2::t_c7b31eb368f0c6 65-77,79,104
+tests/unit/renderer/components/TerminalPane.spec.tsx
+  s_bcb87751443cd2::t_84653f611e258b 7,266-280
+  s_bcb87751443cd2::t_faca4702470a2a 281-283
+src/renderer/components/terminal/BreakoutWindowView.tsx
+  s_bcb87751443cd2::t_c7b31eb368f0c6 8,44-72,80
+  s_bcb87751443cd2::t_c14b6571f105d5 1-7,9-43,73-79,81-96
+tests/unit/renderer/terminal/navigate-to-session.spec.ts
+  s_bcb87751443cd2::t_b4c4c44af0f4be 2,5-6,89-99
+  s_bcb87751443cd2::t_4d87052a76bba9 100-101
+tests/unit/renderer/stores/breakout.store.spec.ts
+  s_bcb87751443cd2::t_4c88b2bee6dd1a 1-31
+tests/unit/renderer/quick-actions/core-actions.spec.ts
+  s_bcb87751443cd2::t_792e0911547089 29,216,269-270,274,276-279
+  s_bcb87751443cd2::t_1bd13e26067906 271-273,275,280-285
+  s_bcb87751443cd2::t_d6a4ec3f60e133 286
+src/renderer/components/terminal/LeafPane.tsx
+  s_bcb87751443cd2::t_06a4a44cff2213 19-21,23
+tests/unit/renderer/components/BreakoutWindowView.spec.tsx
+  s_bcb87751443cd2::t_c14b6571f105d5 1-2,4-33,37-56,63,65,67-82
+  s_bcb87751443cd2::t_a4108bb55b6c51 64,66
+  s_bcb87751443cd2::t_98001d3003907c 3,57-62
+  s_bcb87751443cd2::t_94bb814e706c1c 34-36
+tests/unit/renderer/terminal/breakout.spec.ts
+  s_bcb87751443cd2::t_456e8082fe2459 161,163,279,281
+  s_bcb87751443cd2::t_a4108bb55b6c51 3,88,90,116,118,159,170-172,174,176-178,181,183,201,203,248,250
+  s_bcb87751443cd2::t_94bb814e706c1c 4,40-45,142-143,146-148,195-199,233-235
+  s_bcb87751443cd2::t_e4ec81fbd87928 109
+  s_bcb87751443cd2::t_86494b13418874 255-273
+  s_bcb87751443cd2::t_3e0cf35fe4b85e 1-2,5-39,46-87,89,91-108,110-115,117,119-141,144-145,149-158,160,162,164-169,173,175,179-180,182,184-194,200,202,204-232,236-247,249,251-254,274-278,280,282-300
+tests/unit/renderer/quick-actions/shortcut-conflict-guard.spec.tsx
+  s_bcb87751443cd2::t_792e0911547089 54
+src/renderer/components/terminal/TerminalSession.tsx
+  s_bcb87751443cd2::t_06a4a44cff2213 342-345
+src/renderer/quick-actions/use-core-quick-actions.ts
+  s_bcb87751443cd2::t_94bb814e706c1c 128-135
+  s_bcb87751443cd2::t_ca05aefb4d90bf 22
+  s_bcb87751443cd2::t_ac61b8ef290fb0 140
+src/renderer/components/terminal/TabBar.tsx
+  s_bcb87751443cd2::t_e7797fdf2e3bbb 299
+tests/unit/renderer/App.spec.tsx
+  s_bcb87751443cd2::t_d77be9db0bcc93 213-214,265,270
+  s_bcb87751443cd2::t_a4108bb55b6c51 800-814,816,835-841,859
+  s_bcb87751443cd2::t_94bb814e706c1c 9,815,817-834,842-858
+  s_bcb87751443cd2::t_1bd13e26067906 149
+  s_bcb87751443cd2::t_8b613641a63467 860
+src/renderer/stores/breakout.store.ts
+  s_bcb87751443cd2::t_4c88b2bee6dd1a 1-24
+src/renderer/terminal/navigate-to-session.ts
+  s_bcb87751443cd2::t_b4c4c44af0f4be 2,20-21
+tests/support/quick-actions.ts
+  s_bcb87751443cd2::t_792e0911547089 90-93
+  s_bcb87751443cd2::t_539f68c47b0730 89
+src/renderer/quick-actions/core-actions.ts
+  s_bcb87751443cd2::t_ac61b8ef290fb0 33,107-114
+  s_bcb87751443cd2::t_b5881304ca57f3 115
+src/renderer/App.tsx
+  s_bcb87751443cd2::t_94bb814e706c1c 40,64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a91b2c1934cf85f07c62dd2ab508e35d882206f9",
+  "prompts": {},
+  "sessions": {
+    "s_bcb87751443cd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b568ee83-ad51-4a54-9901-52cfcfa5b37f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
