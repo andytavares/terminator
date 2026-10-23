@@ -1,4 +1,19 @@
 <!--
+SYNC IMPACT REPORT (4.0.0)
+==========================
+Version change: 3.0.0 → 4.0.0 (MAJOR: Principle XIV's "One run" redefined)
+
+Modified principles:
+  - XIV: "One run" becomes "One run decides": the first run is still the verdict and nothing
+    retries a failure, but the stability gate and the nightly sweep repeat tests to find
+    flaky ones. A new rule allows a short, capped, visible quarantine. ADR 124.
+
+Added sections: none
+Removed sections: none
+Templates requiring updates: none
+Follow-up TODOs: none
+-->
+<!--
 SYNC IMPACT REPORT (3.0.0)
 ==========================
 Version change: 2.0.1 → 3.0.0 (MAJOR: Principle VI's coverage gate redefined; Principle XIV added)
@@ -307,10 +322,19 @@ code has no value; it is a defect. ADR 123 records the reasoning.
   failure reproduces with `TEST_SEED=<seed>`. A test that fails in some order MUST be
   rewritten to be independent; pinning the order (`sequence.shuffle: false`, `.sequential`,
   a fixed seed) is forbidden.
-- **One run.** The suite runs once. Retries, reruns, repeats, burn-in, quarantine and
-  skipping a failing test are forbidden, in CI, locally, and in Foundry's final check. A
-  failing test is fixed at its cause, or deleted together with the behavior it claimed to
-  cover.
+- **One run decides.** A check's verdict is its first run. A failing test is never
+  retried or rerun into a pass, in CI, locally, or in Foundry's final check; it is fixed at
+  its cause, or deleted together with the behavior it claimed to cover. Repeats exist only
+  to find flaky tests, never to pass one: the stability gate runs every spec a change adds
+  or edits many times, shuffled and under load, and any failure fails the check; the
+  nightly sweep runs the whole suite several times on one commit of `main` and opens an
+  issue for every test that disagrees with itself. ADR 124.
+- **Quarantine is short, small and visible.** A test the sweep found flaky on `main` may
+  be quarantined: tagged `quarantine` (Vitest) or `@quarantine` (Playwright) and listed in
+  `tests/quarantine.json` with its issue and an expiry at most 7 days away. It still runs,
+  in a job that does not gate. At most 5 tests are quarantined at once, a test added or
+  edited by a change cannot be, and an expired entry fails Lint until the test is fixed or
+  deleted. Skipping a test (`skip`, `fixme`, `todo`) is still forbidden.
 - **Signals, never time.** A test waits only on a signal from the code under test: an
   awaited promise, an event, a locator assertion, or `eventually()`
   (`tests/support/eventually.ts`). It never sleeps and never waits a tick. Work a test
@@ -363,4 +387,4 @@ This constitution supersedes all other practices, conventions, and ad-hoc guidan
 - The constitution version and amendment history are the authoritative record of governance
   decisions affecting this project.
 
-**Version**: 3.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-10-22
+**Version**: 4.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-10-23
