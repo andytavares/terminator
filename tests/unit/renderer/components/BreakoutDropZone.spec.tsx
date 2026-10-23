@@ -5,7 +5,11 @@ import { BreakoutDropZone } from '../../../../src/renderer/components/terminal/B
 import { useBreakoutStore } from '../../../../src/renderer/stores/breakout.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
-import { endSessionDrag, startSessionDrag } from '../../../../src/renderer/terminal/session-drag'
+import {
+  draggedSession,
+  endSessionDrag,
+  startSessionDrag,
+} from '../../../../src/renderer/terminal/session-drag'
 import { SCRATCH_PROJECT_ID } from '../../../../src/shared/types/index'
 import {
   projectFixture,
@@ -108,6 +112,15 @@ describe('BreakoutDropZone — dropping', () => {
     fire('drop')
     expect(dockBack).toHaveBeenCalledWith('s1')
     expect(screen.queryByRole('region')).toBeNull()
+  })
+})
+
+describe('BreakoutDropZone — after a drop', () => {
+  it('ends the drag on a drop, since the docked tab is gone before its dragend', () => {
+    render(<BreakoutDropZone />)
+    startSessionDrag('s1')
+    fire('drop')
+    expect(draggedSession()).toBeNull()
   })
 
   it('docks nothing on a drop that carries no breakout terminal', () => {

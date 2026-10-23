@@ -202,7 +202,8 @@ function extensionViewMenuItems(): Electron.MenuItemConstructorOptions[] {
         label: item.label,
         accelerator: item.accelerator,
         type: item.type,
-        checked: false,
+        // A rebuild (every window focus) keeps the ticks of panels already open.
+        checked: Menu.getApplicationMenu()?.getMenuItemById(item.id)?.checked ?? false,
         click: item.onClick,
       }) as Electron.MenuItemConstructorOptions
   )

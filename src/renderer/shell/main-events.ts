@@ -3,6 +3,7 @@ import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
 import { useExtensionRegistry } from '../extensions/registry'
 import { useWorkspaceStore } from '../stores/workspace.store'
 import { useSessionStore } from '../stores/session.store'
+import { isBrokenOut } from '../stores/breakout.store'
 import { useSettingsStore } from '../stores/settings.store'
 import { useLogStore } from '../stores/log.store'
 import { useNotificationStore } from '../stores/notification.store'
@@ -39,7 +40,10 @@ function closeActiveTab(): void {
   const { scratchActive, activeProjectId } = useWorkspaceStore.getState()
   const projectId = scratchActive ? SCRATCH_PROJECT_ID : activeProjectId
   const sessionId = useSessionStore.getState().projectViews.get(projectId ?? '')?.activeSessionId
-  if (projectId && sessionId) void useSessionStore.getState().closeSession(sessionId)
+  // A tab in its own window is not on the main window's screen, so ⌘W there must not close it.
+  if (projectId && sessionId && !isBrokenOut(sessionId)) {
+    void useSessionStore.getState().closeSession(sessionId)
+  }
 }
 
 type MenuEvents = typeof window.electronAPI.extensionEvents

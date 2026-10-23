@@ -3,7 +3,7 @@ import { AppWindow } from 'lucide-react'
 import { isBrokenOut } from '../../stores/breakout.store'
 import { useSessionStore } from '../../stores/session.store'
 import { dockBack } from '../../terminal/breakout'
-import { draggedSession } from '../../terminal/session-drag'
+import { draggedSession, endSessionDrag } from '../../terminal/session-drag'
 import { usePlaceOf } from './BreakoutWindowView'
 import './BreakoutDropZone.css'
 
@@ -37,6 +37,8 @@ function dragListeners(setSessionId: (sessionId: string | null) => void): Listen
         const dropped = draggedBreakoutSession()
         if (dropped === null) return
         e.preventDefault()
+        // Docking unmounts the dragged tab, so its own dragend never fires to clear the drag.
+        endSessionDrag()
         dockBack(dropped)
         hide()
       },

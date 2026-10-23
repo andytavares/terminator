@@ -56,7 +56,13 @@ export function watchBreakoutWindows(
     if (!sessionId) return
     sessionByWindow.set(child, sessionId)
     applyLinkHandling(child)
+    // Its page runs in the main window's renderer, so it cannot outlive that window.
+    const closeChild = (): void => {
+      if (!child.isDestroyed()) child.close()
+    }
+    mainWindow.once('closed', closeChild)
     child.on('closed', () => {
+      if (!mainWindow.isDestroyed()) mainWindow.removeListener('closed', closeChild)
       sessionByWindow.delete(child)
       sendToWindow(mainWindow, 'breakout:closed', { sessionId })
     })

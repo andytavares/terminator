@@ -804,6 +804,23 @@ const childWindow = () =>
     focus: vi.fn(),
     close: vi.fn(),
   })
+describe('App — menu:close-tab (onMenuCloseTab) — a tab in its own window', () => {
+  it('closes nothing from the main window when the active tab is in its own window', async () => {
+    setupApp({
+      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-1',
+      sessions: [tab('ses-active', 'proj-1')],
+    })
+    showTab('proj-1', 'ses-active')
+    useBreakoutStore.getState().add('ses-active', childWindow())
+    render(<App />)
+    act(() => main.events.closeTab.deliver(null))
+    await act(async () => {})
+    expect(has('ses-active')).toBe(true)
+    useBreakoutStore.setState(useBreakoutStore.getInitialState(), true)
+  })
+})
+
 const twoTabs = () => {
   setupApp({
     activeProjectId: 'proj-1',

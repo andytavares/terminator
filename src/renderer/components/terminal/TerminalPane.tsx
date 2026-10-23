@@ -94,14 +94,15 @@ function useSinglePaneMount(
   }, [containerRef, activeSessionId, layout])
 
   // Cleanup on unmount — useLayoutEffect so snapshot capture precedes browser layout.
+  // The pane only ever holds a session it shows itself (a broken-out one is never prevSessionId),
+  // and its container is remounted on a split collapse, so this unmounts unconditionally.
   useLayoutEffect(() => {
-    const container = containerRef.current ?? undefined
     return () => {
       const currentId = prevSessionIdRef.current
       prevSessionIdRef.current = null
-      if (currentId) instanceOf(currentId)?.unmount(container)
+      if (currentId) instanceOf(currentId)?.unmount()
     }
-  }, [containerRef])
+  }, [])
 }
 
 type PaneState = ReturnType<typeof usePaneState>

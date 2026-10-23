@@ -1,8 +1,7 @@
-import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
 import { breakoutFrameName } from '../../shared/breakout'
 import { isBrokenOut, useBreakoutStore } from '../stores/breakout.store'
 import { useSessionStore } from '../stores/session.store'
-import { useWorkspaceStore } from '../stores/workspace.store'
+import { focusedTerminalSessionId } from '../lib/focus-terminal'
 import { dispatchNotification } from '../lib/notifications'
 import { revealSession } from './navigate-to-session'
 
@@ -64,7 +63,9 @@ function followMainDocument(child: Window): () => void {
 function releaseFromMainPane(projectId: string, sessionId: string): void {
   const store = useSessionStore.getState()
   store.closeSplitLeaf(projectId, sessionId)
-  const next = store.getSessionsForProject(projectId).find((s) => s.id !== sessionId)
+  const next = store
+    .getSessionsForProject(projectId)
+    .find((s) => s.id !== sessionId && !isBrokenOut(s.id))
   if (next) store.setActiveSessionForProject(projectId, next.id)
 }
 
@@ -115,18 +116,9 @@ function dropWindowsOfEndedSessions(): void {
 
 useSessionStore.subscribe(dropWindowsOfEndedSessions)
 
-/** The terminal the keyboard is in: the focused pane, else the tab showing, of what is on screen. */
-function focusedSessionId(): string | null {
-  const { scratchActive, activeProjectId } = useWorkspaceStore.getState()
-  const projectId = scratchActive ? SCRATCH_PROJECT_ID : activeProjectId
-  if (!projectId) return null
-  const store = useSessionStore.getState()
-  return store.getFocusedSession(projectId) ?? store.getActiveSessionForProject(projectId)
-}
-
 /** Docks the given session, or with none moves the focused terminal into its own window. */
 export function toggleBreakout(sessionId: string | null): void {
   if (sessionId !== null) return dockBack(sessionId)
-  const focused = focusedSessionId()
+  const focused = focusedTerminalSessionId()
   if (focused) breakOut(focused)
 }

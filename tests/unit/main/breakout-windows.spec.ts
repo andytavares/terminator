@@ -60,14 +60,17 @@ describe('breakoutWindowOpen for anything else', () => {
 
 function fakeMain() {
   const webContents = Object.assign(new EventEmitter(), { send: vi.fn(), isDestroyed: () => false })
-  return { webContents, isDestroyed: () => false } as never as Electron.BrowserWindow & {
+  return Object.assign(new EventEmitter(), {
+    webContents,
+    isDestroyed: () => false,
+  }) as never as Electron.BrowserWindow & {
     webContents: EventEmitter & { send: ReturnType<typeof vi.fn> }
   }
 }
 
 function watched() {
   const main = fakeMain()
-  const child = new EventEmitter()
+  const child = Object.assign(new EventEmitter(), { close: vi.fn(), isDestroyed: () => false })
   const applyLinkHandling = vi.fn()
   watchBreakoutWindows(main, applyLinkHandling)
   const created = (frameName: string) =>
@@ -96,6 +99,23 @@ describe('watchBreakoutWindows', () => {
     child.emit('closed')
     expect(main.webContents.send).toHaveBeenCalledWith('breakout:closed', { sessionId: SESSION })
     expect(sessionOfWindow(child as never)).toBeNull()
+  })
+})
+
+describe('watchBreakoutWindows when the main window closes', () => {
+  it('closes a breakout window when the main window it runs in closes', () => {
+    const { main, child, created } = watched()
+    created(breakoutFrameName(SESSION))
+    main.emit('closed')
+    expect(child.close).toHaveBeenCalledOnce()
+  })
+
+  it('stops watching the main window once the breakout window has closed', () => {
+    const { main, child, created } = watched()
+    created(breakoutFrameName(SESSION))
+    child.emit('closed')
+    main.emit('closed')
+    expect(child.close).not.toHaveBeenCalled()
   })
 })
 

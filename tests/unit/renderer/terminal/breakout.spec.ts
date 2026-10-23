@@ -106,6 +106,13 @@ describe('breakOut — what stays in the main window', () => {
     expect(sessionState().getActiveSessionForProject('p1')).toBe('s2')
   })
 
+  it('skips a tab already in its own window when choosing the next tab', () => {
+    seedSessions('p1', ['s1', 's2', 's3'])
+    useBreakoutStore.getState().add('s2', fakeChildWindow() as never)
+    breakOut('s1')
+    expect(sessionState().getActiveSessionForProject('p1')).toBe('s3')
+  })
+
   it('unsplits the pane it takes out of the main pane', () => {
     seedSessions('p1', ['s1', 's2'])
     const closeSplitLeaf = vi.fn()
