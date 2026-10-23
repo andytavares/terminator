@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { useSessionStore } from '../../stores/session.store'
 import './LeafPane.css'
 import { droppedPaths } from './dropped-paths'
+import { isSessionDrag } from '../../terminal/session-drag'
 
 interface Props {
   sessionId: string
@@ -61,6 +62,7 @@ function usePaneHandlers({ sessionId, projectId }: Props) {
   )
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>): void {
+    if (isSessionDrag(e)) return
     e.preventDefault()
     const instance = useSessionStore.getState().getTerminalInstance(sessionId)
     if (!instance) return

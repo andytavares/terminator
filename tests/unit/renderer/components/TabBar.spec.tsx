@@ -1,9 +1,13 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
+import { useBreakoutStore } from '../../../../src/renderer/stores/breakout.store'
+import { SESSION_DRAG_TYPE, draggedSession } from '../../../../src/renderer/terminal/session-drag'
+import { installElectronApi } from '../../../support/electron-api'
+import { eventually } from '../../../support/eventually'
 import { TabBar } from '../../../../src/renderer/components/terminal/TabBar'
 import { projectFixture, seedStore, workspaceFixture } from '../../../support/renderer-stores'
 
@@ -52,6 +56,9 @@ vi.mock('../../../../src/renderer/components/sidebar/MoveSessionDialog', () => (
   ),
 }))
 
+const breakOut = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/terminal/breakout', () => ({ breakOut }))
+
 const mockCloseSession = vi.fn()
 const mockSetActive = vi.fn()
 const mockRequestFocus = vi.fn()
@@ -61,6 +68,11 @@ const mockGetBell = vi.fn()
 const mockOnNewTab = vi.fn()
 const mockRenameSession = vi.fn()
 const mockReorderSessions = vi.fn()
+
+/** The data transfer a browser always puts on a drag event; jsdom has none. */
+function tabDrag(parts: { setData?: Mock; dropEffect?: string } = {}) {
+  return { dataTransfer: { setData: vi.fn(), types: [], dropEffect: 'move', ...parts } }
+}
 
 function renderTabBar(overrides: Partial<React.ComponentProps<typeof TabBar>> = {}) {
   return render(
@@ -78,6 +90,10 @@ function renderTabBar(overrides: Partial<React.ComponentProps<typeof TabBar>> = 
 beforeEach(() => {
   vi.clearAllMocks()
   seedStore(useSessionRecordsStore, records)
+  seedStore(useBreakoutStore, { windows: new Map() })
+  installElectronApi({
+    breakout: { pointerOutside: vi.fn().mockResolvedValue({ outside: false, x: 0, y: 0 }) },
+  })
   seedStore(useSessionStore, {
     getSessionsForProject: mockGetSessions,
     closeSession: mockCloseSession,
@@ -307,7 +323,7 @@ describe('TabBar — tab reordering', () => {
     mockGetActive.mockReturnValue('ses-1')
     renderTabBar()
     const tabs = document.querySelectorAll('.tab-bar__tab--session')
-    fireEvent.dragStart(tabs[0])
+    fireEvent.dragStart(tabs[0], tabDrag())
     fireEvent.dragOver(tabs[1], { preventDefault: () => {} })
     fireEvent.drop(tabs[1])
     expect(mockReorderSessions).toHaveBeenCalledWith('proj-1', ['ses-2', 'ses-1'])
@@ -320,7 +336,7 @@ describe('TabBar — tab reordering', () => {
     ])
     renderTabBar()
     const tabs = document.querySelectorAll('.tab-bar__tab--session')
-    fireEvent.dragStart(tabs[0])
+    fireEvent.dragStart(tabs[0], tabDrag())
     fireEvent.drop(tabs[0])
     expect(mockReorderSessions).not.toHaveBeenCalled()
   })
@@ -796,7 +812,7 @@ describe('TabBar — the drop target', () => {
 
   it('marks the tab a drag is over, and unmarks it when the drag leaves', () => {
     const tabs = twoTabs()
-    fireEvent.dragStart(tabs[0])
+    fireEvent.dragStart(tabs[0], tabDrag())
     fireEvent.dragOver(tabs[1])
     expect(tabs[1].classList.contains('tab-bar__tab--dnd-over')).toBe(true)
     fireEvent.dragLeave(tabs[1])
@@ -805,11 +821,77 @@ describe('TabBar — the drop target', () => {
 
   it('unmarks it, and moves nothing, when the drag is abandoned', () => {
     const tabs = twoTabs()
-    fireEvent.dragStart(tabs[0])
+    fireEvent.dragStart(tabs[0], tabDrag())
     fireEvent.dragOver(tabs[1])
-    fireEvent.dragEnd(tabs[0])
+    fireEvent.dragEnd(tabs[0], tabDrag())
     expect(tabs[1].classList.contains('tab-bar__tab--dnd-over')).toBe(false)
     fireEvent.drop(tabs[1])
     expect(mockReorderSessions).not.toHaveBeenCalled()
+  })
+})
+
+const threeTabs = [
+  { id: 'ses-1', tabTitle: 'Tab 1', type: 'human', agentState: 'idle' },
+  { id: 'ses-2', tabTitle: 'Tab 2', type: 'human', agentState: 'idle' },
+  { id: 'ses-3', tabTitle: 'Tab 3', type: 'human', agentState: 'idle' },
+]
+
+function tabTitles(): string[] {
+  return [...document.querySelectorAll('.tab-bar__tab--session .tab-bar__title')].map(
+    (title) => title.textContent ?? ''
+  )
+}
+
+describe('TabBar — a terminal in its own window', () => {
+  beforeEach(() => mockGetSessions.mockReturnValue(threeTabs))
+
+  it('draws no tab for it and keeps the order of the others', () => {
+    seedStore(useBreakoutStore, { windows: new Map([['ses-2', window]]) })
+    renderTabBar()
+    expect(tabTitles()).toEqual(['Tab 1', 'Tab 3'])
+  })
+
+  it('draws the tab back in its slot once it is docked', () => {
+    seedStore(useBreakoutStore, { windows: new Map([['ses-2', window]]) })
+    renderTabBar()
+    act(() => useBreakoutStore.setState({ windows: new Map() }))
+    expect(tabTitles()).toEqual(['Tab 1', 'Tab 2', 'Tab 3'])
+  })
+
+  it('keeps its slot in the saved order when the visible tabs are reordered', () => {
+    seedStore(useBreakoutStore, { windows: new Map([['ses-2', window]]) })
+    renderTabBar()
+    const tabs = document.querySelectorAll('.tab-bar__tab--session')
+    fireEvent.dragStart(tabs[0], tabDrag())
+    fireEvent.drop(tabs[1])
+    expect(mockReorderSessions).toHaveBeenCalledWith('proj-1', ['ses-3', 'ses-2', 'ses-1'])
+  })
+})
+
+describe('TabBar — dragging a tab out', () => {
+  beforeEach(() => mockGetSessions.mockReturnValue(threeTabs))
+
+  it('carries the session under its own type and never as plain text', () => {
+    const setData = vi.fn()
+    renderTabBar()
+    fireEvent.dragStart(
+      document.querySelectorAll('.tab-bar__tab--session')[1],
+      tabDrag({ setData })
+    )
+    expect(setData).toHaveBeenCalledWith(SESSION_DRAG_TYPE, 'ses-2')
+    expect(setData).not.toHaveBeenCalledWith('text/plain', expect.anything())
+    expect(draggedSession()).toBe('ses-2')
+  })
+
+  it('opens its own window at the pointer when dropped over no Terminator window', async () => {
+    installElectronApi({
+      breakout: { pointerOutside: vi.fn().mockResolvedValue({ outside: true, x: 900, y: 40 }) },
+    })
+    renderTabBar()
+    const tab = document.querySelectorAll('.tab-bar__tab--session')[0]
+    fireEvent.dragStart(tab, tabDrag())
+    fireEvent.dragEnd(tab, tabDrag({ dropEffect: 'none' }))
+    await eventually(() => expect(breakOut).toHaveBeenCalledWith('ses-1', { x: 900, y: 40 }))
+    expect(draggedSession()).toBeNull()
   })
 })

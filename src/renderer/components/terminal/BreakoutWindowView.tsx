@@ -7,15 +7,16 @@ import { useWorkspaceStore } from '../../stores/workspace.store'
 import { branchLabel } from '../../sidebar/branch-display'
 import { SCRATCH_PROJECT_ID, type TerminalSession } from '../../../shared/types/index'
 import { TabStateIcon } from './TabBar'
+import { beginSessionDrag, endSessionDrag } from '../../terminal/session-drag'
 import './BreakoutWindowView.css'
 
-interface Place {
+export interface Place {
   label: string
   color?: string
 }
 
 /** The workspace and branch a terminal belongs to, as the header names them. */
-function usePlaceOf(projectId: string): Place | null {
+export function usePlaceOf(projectId: string): Place | null {
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const projectsByWorkspaceId = useWorkspaceStore((s) => s.projectsByWorkspaceId)
   if (projectId === SCRATCH_PROJECT_ID) return { label: 'Scratch' }
@@ -41,21 +42,30 @@ function useMountedTerminal(sessionId: string, containerRef: React.RefObject<HTM
   }, [sessionId, containerRef])
 }
 
+function BreakoutTab({ session }: { session: TerminalSession }): JSX.Element {
+  return (
+    <div
+      role="tab"
+      aria-selected="true"
+      aria-label={`${session.tabTitle}, in its own window`}
+      className="breakout-window__tab"
+      draggable
+      onDragStart={(e) => beginSessionDrag(e, session.id)}
+      onDragEnd={endSessionDrag}
+    >
+      <GripVertical className="breakout-window__grip" aria-hidden="true" />
+      <TabStateIcon session={session} />
+      <span className="breakout-window__title">{session.tabTitle}</span>
+    </div>
+  )
+}
+
 function BreakoutHeader({ session }: { session: TerminalSession }): JSX.Element {
   const place = usePlaceOf(session.projectId)
   return (
     <div className="breakout-window__header">
       <div role="tablist" className="breakout-window__tabs">
-        <div
-          role="tab"
-          aria-selected="true"
-          aria-label={`${session.tabTitle}, in its own window`}
-          className="breakout-window__tab"
-        >
-          <GripVertical className="breakout-window__grip" aria-hidden="true" />
-          <TabStateIcon session={session} />
-          <span className="breakout-window__title">{session.tabTitle}</span>
-        </div>
+        <BreakoutTab session={session} />
       </div>
       {place && (
         <span

@@ -11,6 +11,7 @@ import { LeafPane } from './LeafPane'
 import { leafIds } from '../../utils/pane-tree'
 import './TerminalPane.css'
 import { droppedPaths } from './dropped-paths'
+import { isSessionDrag } from '../../terminal/session-drag'
 
 interface Props {
   projectId: string
@@ -213,6 +214,7 @@ function SingleTerminal({ containerRef, activeSessionId, refocusActive }: Single
   }
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>): void {
+    if (isSessionDrag(e)) return
     e.preventDefault()
     const instance = activeSessionId ? instanceOf(activeSessionId) : undefined
     if (!instance) return

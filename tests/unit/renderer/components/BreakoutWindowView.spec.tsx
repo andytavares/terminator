@@ -5,6 +5,7 @@ import { BreakoutWindows } from '../../../../src/renderer/components/terminal/Br
 import { useBreakoutStore } from '../../../../src/renderer/stores/breakout.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
+import { SESSION_DRAG_TYPE, draggedSession } from '../../../../src/renderer/terminal/session-drag'
 import type { TerminalInstance } from '../../../../src/renderer/components/terminal/TerminalSession'
 import { partialFake } from '../../../support/fakes'
 import {
@@ -19,6 +20,13 @@ const unmount = vi.fn()
 
 function fakeChildWindow(): Window {
   return partialFake<Window>({ document: document.implementation.createHTMLDocument('child') })
+}
+
+/** The child document has no window of its own, so testing-library cannot fire into it. */
+function dispatchDrag(target: Element, type: string, dataTransfer: object): void {
+  act(() => {
+    target.dispatchEvent(Object.assign(new Event(type, { bubbles: true }), { dataTransfer }))
+  })
 }
 
 beforeEach(() => {
@@ -78,5 +86,22 @@ describe('BreakoutWindows — leaving', () => {
     render(<BreakoutWindows />)
     act(() => useBreakoutStore.getState().add('missing', child))
     expect(mount).not.toHaveBeenCalled()
+  })
+})
+
+describe('BreakoutWindows — dragging the tab back', () => {
+  it('carries the session under its own type while dragged, and lets go at the end', () => {
+    const child = fakeChildWindow()
+    const setData = vi.fn()
+    render(<BreakoutWindows />)
+    act(() => useBreakoutStore.getState().add('s1', child))
+    const tab = child.document.querySelector('[role="tab"]')!
+    expect(tab.getAttribute('draggable')).toBe('true')
+    dispatchDrag(tab, 'dragstart', { setData, types: [] })
+    expect(setData).toHaveBeenCalledWith(SESSION_DRAG_TYPE, 's1')
+    expect(setData).not.toHaveBeenCalledWith('text/plain', expect.anything())
+    expect(draggedSession()).toBe('s1')
+    dispatchDrag(tab, 'dragend', {})
+    expect(draggedSession()).toBeNull()
   })
 })

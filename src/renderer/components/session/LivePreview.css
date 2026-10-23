@@ -7,3 +7,39 @@
   -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
   mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
 }
+
+.live-preview-window {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: var(--tm-bg-base);
+  color: var(--tm-text-secondary);
+  font-family: var(--tm-font-ui);
+  font-size: 11.5px;
+}
+
+.live-preview-window__line {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tm-text-primary);
+}
+
+.live-preview-window__note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-preview-window__note svg {
+  width: 13px;
+  height: 13px;
+}

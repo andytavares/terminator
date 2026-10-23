@@ -1,4 +1,5 @@
 import React from 'react'
+import { SESSION_DRAG_TYPE } from '../../../../src/renderer/terminal/session-drag'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, render, screen, fireEvent } from '@testing-library/react'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
@@ -149,6 +150,27 @@ describe('TerminalPane — pastes dropped file paths into the active terminal se
     const file = fileAt('/Users/me/report.pdf')
     fireEvent.drop(pane, { dataTransfer: { files: [file], types: ['Files'] } })
     expect(mockPaste).toHaveBeenCalledWith('/Users/me/report.pdf')
+  })
+})
+
+describe('TerminalPane — a dropped terminal tab', () => {
+  it('ignores a dropped terminal tab', () => {
+    const mockPaste = vi.fn()
+    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
+    mockGetActive.mockReturnValue('ses-1')
+    mockGetInstance.mockReturnValue({
+      terminal: { paste: mockPaste, focus: vi.fn(), scrollToBottom: vi.fn() },
+      mount: vi.fn(),
+      unmount: vi.fn(),
+    })
+    const { container } = render(<TerminalPane projectId="proj-1" />)
+    fireEvent.drop(container.querySelector('.terminal-pane')!, {
+      dataTransfer: {
+        files: [fileAt('/Users/me/report.pdf')],
+        types: [SESSION_DRAG_TYPE, 'Files'],
+      },
+    })
+    expect(mockPaste).not.toHaveBeenCalled()
   })
 })
 
