@@ -669,6 +669,16 @@ jobs:
           path: test-results/
           retention-days: 14
 
+      # The app logs git's own words when it cannot answer (git.ipc.ts); Electron writes the log
+      # under the runner's real home, not the sealed one, so it is kept here or not at all.
+      - name: Upload app log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-log-${{ matrix.shard }}
+          path: ~/Library/Logs/@andytavares/terminator/
+          retention-days: 14
+
   # The one E2E check branch protection requires: green when every shard
   # passed or when the diff needed no E2E at all.
   e2e-result:
