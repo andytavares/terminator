@@ -37,6 +37,14 @@ const NODE_INCLUDE = [
 export default defineConfig({
   test: {
     globals: true,
+    // A flaky test found on main carries this tag while tests/quarantine.json holds its issue and
+    // expiry; required jobs run with --tagsFilter='!quarantine' (scripts/check-quarantine.mjs).
+    tags: [
+      {
+        name: 'quarantine',
+        description: 'Flaky on main; listed in tests/quarantine.json with its issue and expiry',
+      },
+    ],
     globalSetup: ['tests/global-setup.ts'],
     setupFiles: ['tests/setup.ts'],
     // Vitest turns every stylesheet into an empty string, `?raw` imports included.
