@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// node scripts/stability.mjs [--runs N] [--e2e] [--list] [spec ...]: runs each spec a change adds or
-// edits (since origin/<base>, as fetched) many times, shuffled, under load, and fails on the first
-// failure, so a flaky test is caught on the PR that writes it (ADR 124).
+// node scripts/stability.mjs [--runs N] [--part K/N] [--e2e] [--list] [--github-output] [spec ...]:
+// runs each spec a change adds or edits (since origin/<base>, as fetched) many times, shuffled,
+// under load, and fails on the first failure, so a flaky test is caught on the PR that writes it
+// (ADR 124). --github-output sizes CI's Stability shards instead of running anything.
 
 import { execFileSync, spawn } from 'node:child_process'
 import { randomInt } from 'node:crypto'
@@ -16,18 +17,60 @@ const E2E_RUNS = 5
 const SPEC_FILE = /\.spec\.(tsx?|js)$/
 // What vitest.config.ts leaves out of the default run: `vitest run <file>` finds no test there.
 const NOT_IN_DEFAULT_RUN = [/\.perf\.spec\.ts$/, /^extensions\/[^/]+\/tests\/live\//]
+// One unit run on CI's ubuntu-24.04-arm under load: 96 specs took 81-86 s (run 39976627567).
+const SECONDS_PER_SPEC = 0.9
+const SECONDS_PER_RUN = 5
+// The step stops at 7 minutes; a shard plans for 5, so a slow run still finishes.
+const SHARD_SECONDS = 300
+const FLAGS = ['--e2e', '--list', '--github-output']
+const VALUED = ['--runs', '--part']
 
-/** `--runs N`, `--e2e`, `--list` (print the specs, run nothing), then the specs named. */
+/** `--runs N`, `--part K/N` (the Kth of N slices of the specs), `--e2e`, `--list` (print the specs,
+ * run nothing), `--github-output` (print CI's shards, run nothing), then the specs named. */
 export function stabilityArguments(argv) {
   const specs = []
-  let runs
-  const flags = new Set(['--e2e', '--list'].filter((flag) => argv.includes(flag)))
+  const values = {}
   for (let at = 0; at < argv.length; at++) {
-    if (argv[at] === '--runs') runs = Number(argv[++at])
-    else if (!flags.has(argv[at])) specs.push(argv[at])
+    if (VALUED.includes(argv[at])) values[argv[at]] = argv[++at]
+    else if (!FLAGS.includes(argv[at])) specs.push(argv[at])
   }
-  const e2e = flags.has('--e2e')
-  return { runs: runs ?? (e2e ? E2E_RUNS : UNIT_RUNS), e2e, list: flags.has('--list'), specs }
+  const e2e = argv.includes('--e2e')
+  const runs =
+    values['--runs'] === undefined ? (e2e ? E2E_RUNS : UNIT_RUNS) : Number(values['--runs'])
+  const part = values['--part'] ?? '1/1'
+  return {
+    runs,
+    part,
+    e2e,
+    list: argv.includes('--list'),
+    githubOutput: argv.includes('--github-output'),
+    specs,
+  }
+}
+
+/** CI's Stability shards: each runs `runs` passes over one `part` of the specs inside
+ * SHARD_SECONDS, and together they run every spec `runs` times in all. */
+export function stabilityShards(specCount, runs) {
+  const parts = Math.max(1, Math.ceil((specCount * SECONDS_PER_SPEC) / SHARD_SECONDS))
+  const passSeconds = SECONDS_PER_RUN + (specCount * SECONDS_PER_SPEC) / parts
+  const runsPerShard = Math.max(1, Math.floor(SHARD_SECONDS / passSeconds))
+  const shards = []
+  for (let done = 0; done < runs; done += runsPerShard) {
+    for (let part = 1; part <= parts; part++) {
+      shards.push({
+        shard: shards.length + 1,
+        runs: Math.min(runsPerShard, runs - done),
+        part: `${part}/${parts}`,
+      })
+    }
+  }
+  return shards
+}
+
+/** Vitest's arguments for one pass over `part` of the specs. */
+export function unitBurnInArguments(specs, part) {
+  const args = ['vitest', 'run', ...specs]
+  return part === '1/1' ? args : [...args, `--shard=${part}`]
 }
 
 /** The spec files in a `git diff --name-only` listing: end-to-end ones or unit ones. */
@@ -72,14 +115,14 @@ const commandExitCode = (command, args, env) =>
     child.on('close', (status) => resolve(status ?? 1))
   })
 
-async function runUnitBurnIn({ specs, runs }) {
+async function runUnitBurnIn({ specs, runs, part }) {
   const load = startLoad(availableParallelism())
   try {
     return await burnIn({
       specs,
       seeds: freshSeeds(runs),
       run: (seed) =>
-        commandExitCode('npx', ['vitest', 'run', ...specs], { TEST_SEED: String(seed) }),
+        commandExitCode('npx', unitBurnInArguments(specs, part), { TEST_SEED: String(seed) }),
     })
   } finally {
     await load.stop()
@@ -108,6 +151,9 @@ async function main() {
     ? options.specs
     : changedSpecs(diffAgainstBase(process.env), options)
   if (options.list) return specs.forEach((spec) => console.log(spec))
+  if (options.githubOutput) {
+    return console.log(`shards=${JSON.stringify(stabilityShards(specs.length, options.runs))}`)
+  }
   const burn = options.e2e ? runE2eBurnIn : runUnitBurnIn
   const { code, message } = await burn({ ...options, specs })
   ;(code === 0 ? console.log : console.error)(message)
