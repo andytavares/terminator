@@ -1,10 +1,7 @@
 #!/usr/bin/env node
-// node scripts/flaky-sweep.mjs <dir> [--open-issues]: reads every *.json in <dir>, each one run (or
-// shard) of the suite on one commit, written by Vitest (`--reporter=json --outputFile=<file>`) or
-// Playwright (`PLAYWRIGHT_JSON_OUTPUT_NAME=<file> npx playwright test --reporter=json`).
-// Prints a markdown table of tests that disagree with themselves (flaky) and tests that never pass
-// (broken). Exits 0 always: the nightly sweep reports, it does not gate.
-// --open-issues opens or updates one `Flaky: <test>` GitHub issue per flaky test, as audit.yml does.
+// node scripts/flaky-sweep.mjs <dir> [--open-issues]: reads Vitest and Playwright JSON reports of one
+// commit, prints the tests that both passed and failed (flaky) or never passed (broken), and with
+// --open-issues keeps one `Flaky: <test>` issue each. The sweep reports; it never gates (ADR 124).
 
 import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
@@ -79,13 +76,14 @@ function section(title, rows) {
 }
 
 /** The markdown report of a classification. */
-export function renderTable({ flaky, broken }) {
+export function sweepTable({ flaky, broken }) {
   if (flaky.length === 0 && broken.length === 0) return 'No flaky or broken tests.\n'
   return [...section('Flaky', flaky), ...section('Broken', broken)].join('\n')
 }
 
 /** Title and body of the issue that tracks one flaky test. */
-export function issueFor({ test, passed, failed }, runUrl) {
+export function issueFor(entry, runUrl) {
+  const { test, passed, failed } = entry
   return {
     title: `Flaky: ${test}`.slice(0, MAX_TITLE),
     body: `Found by the nightly flaky sweep (${runUrl}).\n\n${test}\n\nPassed in ${passed} run(s) and failed in ${failed} on one commit.\n`,
@@ -132,7 +130,7 @@ function main(argv) {
   const files = readdirSync(dir).filter((name) => name.endsWith('.json'))
   const reports = files.map((name) => JSON.parse(readFileSync(join(dir, name), 'utf8')))
   const classified = classify(reports)
-  console.log(renderTable(classified))
+  console.log(sweepTable(classified))
   if (argv.includes('--open-issues')) {
     for (const entry of classified.flaky) reportIssue(issueFor(entry, runUrlOf(process.env)))
   }

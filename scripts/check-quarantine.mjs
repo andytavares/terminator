@@ -1,11 +1,7 @@
 #!/usr/bin/env node
-// node scripts/check-quarantine.mjs: exits 1 if the quarantine breaks a rule. A flaky test found on
-// main may carry the `quarantine` tag (Vitest) or `@quarantine` (Playwright) and be listed in
-// tests/quarantine.json with its issue and an expiry at most 7 days out. Required jobs skip the
-// tag; a non-required job runs it. This check, in Lint, forces the fix or the deletion in time.
-// Tagged tests come from `vitest list --tagsFilter=quarantine --json=<file>` (it honours the filter) and
-// `playwright test --list --grep @quarantine` (lists only, no Electron launch).
-// The base branch is GITHUB_BASE_REF in a pull request, main anywhere else; nothing is fetched.
+// node scripts/check-quarantine.mjs: exits 1 when tests/quarantine.json and the `quarantine` tags
+// break a rule of ADR 124 (unlisted, expired, over 7 days, over 5, new to the change, edited), so a
+// quarantined test is fixed or deleted in time. Reads origin/<base> as fetched; fetches nothing.
 
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
@@ -23,7 +19,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const specFile = (test) => test.split(SEPARATOR)[0]
 const titleInFile = (test) => test.split(SEPARATOR).slice(1).join(SEPARATOR)
 const daysBetween = (from, to) => (Date.parse(to) - Date.parse(from)) / DAY_MS
-const problem = ({ test, issue }, text) =>
+const quarantineProblem = ({ test, issue }, text) =>
   `${test}${issue === undefined ? '' : ` (issue ${issue})`}: ${text}; ${MOVES}`
 
 function listingProblems({ entries, tagged }) {
@@ -32,12 +28,12 @@ function listingProblems({ entries, tagged }) {
     ...tagged
       .filter((test) => !listed.has(test))
       .map((test) =>
-        problem({ test }, 'tagged quarantine but not listed in tests/quarantine.json')
+        quarantineProblem({ test }, 'tagged quarantine but not listed in tests/quarantine.json')
       ),
     ...entries
       .filter((entry) => !tagged.includes(entry.test))
       .map((entry) =>
-        problem(entry, 'listed in tests/quarantine.json but no test carries the tag')
+        quarantineProblem(entry, 'listed in tests/quarantine.json but no test carries the tag')
       ),
   ]
 }
@@ -45,8 +41,10 @@ function listingProblems({ entries, tagged }) {
 function datingProblems({ entries, today }) {
   return entries.flatMap((entry) => {
     if (daysBetween(entry.quarantined, entry.expires) > MAX_DAYS)
-      return [problem(entry, `expires more than ${MAX_DAYS} days after it was quarantined`)]
-    if (today > entry.expires) return [problem(entry, `expired on ${entry.expires}`)]
+      return [
+        quarantineProblem(entry, `expires more than ${MAX_DAYS} days after it was quarantined`),
+      ]
+    if (today > entry.expires) return [quarantineProblem(entry, `expired on ${entry.expires}`)]
     return []
   })
 }
@@ -54,7 +52,7 @@ function datingProblems({ entries, today }) {
 function countProblems({ entries }) {
   return entries
     .slice(MAX_ENTRIES)
-    .map((entry) => problem(entry, `more than ${MAX_ENTRIES} tests are quarantined`))
+    .map((entry) => quarantineProblem(entry, `more than ${MAX_ENTRIES} tests are quarantined`))
 }
 
 /** `quarantinedOnBase`: the tests the base branch's tests/quarantine.json lists. The change that
@@ -64,13 +62,15 @@ function changeProblems({ entries, onBase, changedFiles, quarantinedOnBase = [] 
     const file = specFile(entry.test)
     if (!onBase(file, titleInFile(entry.test)))
       return [
-        problem(
+        quarantineProblem(
           entry,
           'not on the base branch, and a new test cannot start in quarantine, it must pass the stability gate'
         ),
       ]
     if (changedFiles.includes(file) && quarantinedOnBase.includes(entry.test))
-      return [problem(entry, `this change edits ${file} and leaves the test in quarantine`)]
+      return [
+        quarantineProblem(entry, `this change edits ${file} and leaves the test in quarantine`),
+      ]
     return []
   })
 }

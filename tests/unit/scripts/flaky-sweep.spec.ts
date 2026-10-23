@@ -5,7 +5,7 @@ import {
   classify,
   issueFor,
   matchingIssue,
-  renderTable,
+  sweepTable,
   resultsOf,
 } from '../../../scripts/flaky-sweep.mjs'
 
@@ -61,15 +61,15 @@ describe('classify across reporters', () => {
   })
 })
 
-describe('renderTable', () => {
+describe('sweepTable', () => {
   it('lists each flaky and broken test with its passes and failures', () => {
-    const table = renderTable(classify(vitestRuns))
+    const table = sweepTable(classify(vitestRuns))
     expect(table).toContain(`| ${FLAKY_VITEST} | 1 | 1 |`)
     expect(table).toContain('always fails | 0 | 2 |')
   })
 
   it('says so when nothing disagrees', () => {
-    expect(renderTable({ flaky: [], broken: [] })).toBe('No flaky or broken tests.\n')
+    expect(sweepTable({ flaky: [], broken: [] })).toBe('No flaky or broken tests.\n')
   })
 })
 

@@ -77,7 +77,6 @@ describe('burning specs in', () => {
     const seeds = [11, 22, 33, 44]
     const result = await burnIn({
       specs,
-      runs: 4,
       seeds,
       run: async (seed: number) => {
         seen.push(seed)
@@ -94,7 +93,6 @@ describe('burning in a failing spec', () => {
     const seen: number[] = []
     const result = await burnIn({
       specs,
-      runs: 5,
       seeds: [11, 22, 33, 44, 55],
       run: async (seed: number) => {
         seen.push(seed)
@@ -114,7 +112,6 @@ describe('burning in nothing', () => {
     let ran = 0
     const result = await burnIn({
       specs: [],
-      runs: 30,
       seeds: [1],
       run: async () => {
         ran += 1

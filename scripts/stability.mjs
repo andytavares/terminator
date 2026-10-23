@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-// Burn-in gate: runs every spec a change adds or edits many times, shuffled, under CPU load, and
-// fails on the first failure, so a flaky test is caught on the PR that writes it (Constitution XIV).
-// `node scripts/stability.mjs [--runs N] [--e2e] [--list] [spec ...]`; with no specs it takes the
-// *.spec.ts(x) files added or edited since origin/$GITHUB_BASE_REF (main), as last fetched.
+// node scripts/stability.mjs [--runs N] [--e2e] [--list] [spec ...]: runs each spec a change adds or
+// edits (since origin/<base>, as fetched) many times, shuffled, under load, and fails on the first
+// failure, so a flaky test is caught on the PR that writes it (ADR 124).
 
 import { execFileSync, spawn } from 'node:child_process'
 import { randomInt } from 'node:crypto'
 import { availableParallelism } from 'node:os'
 import { pathToFileURL } from 'node:url'
 import { needsChromium } from './ci-e2e-local.mjs'
+import { baseBranch } from './check-release-age.mjs'
 import { startLoad } from './under-load.mjs'
 
 const UNIT_RUNS = 30
@@ -46,8 +46,9 @@ export function freshSeeds(count) {
 }
 
 /** Runs `run(seed)` once per seed; stops at the first non-zero code. */
-export async function burnIn({ specs, runs, run, seeds }) {
+export async function burnIn({ specs, run, seeds }) {
   if (specs.length === 0) return { code: 0, message: 'stability: no spec added or edited' }
+  const runs = seeds.length
   for (let index = 0; index < runs; index++) {
     if ((await run(seeds[index])) !== 0) {
       const failed = `failed on run ${index + 1} of ${runs} with TEST_SEED=${seeds[index]}`
@@ -59,13 +60,13 @@ export async function burnIn({ specs, runs, run, seeds }) {
 
 /** Reads origin/<base> as fetched; fetches nothing. */
 function diffAgainstBase(env) {
-  const base = env.GITHUB_BASE_REF || 'main'
+  const base = baseBranch(env)
   return execFileSync('git', ['diff', '--name-only', '--diff-filter=AM', `origin/${base}...HEAD`], {
     encoding: 'utf8',
   })
 }
 
-const exitCodeOf = (command, args, env) =>
+const commandExitCode = (command, args, env) =>
   new Promise((resolve) => {
     const child = spawn(command, args, { stdio: 'inherit', env: { ...process.env, ...env } })
     child.on('close', (status) => resolve(status ?? 1))
@@ -76,9 +77,9 @@ async function runUnitBurnIn({ specs, runs }) {
   try {
     return await burnIn({
       specs,
-      runs,
       seeds: freshSeeds(runs),
-      run: (seed) => exitCodeOf('npx', ['vitest', 'run', ...specs], { TEST_SEED: String(seed) }),
+      run: (seed) =>
+        commandExitCode('npx', ['vitest', 'run', ...specs], { TEST_SEED: String(seed) }),
     })
   } finally {
     await load.stop()
@@ -92,10 +93,10 @@ export function e2eBurnInCommands(specs, runs) {
 }
 
 async function runE2eBurnIn({ specs, runs }) {
-  if (specs.length === 0) return burnIn({ specs, runs, run: () => 0, seeds: [] })
+  if (specs.length === 0) return burnIn({ specs, run: () => 0, seeds: [] })
   let code = 0
   for (const [command, args] of e2eBurnInCommands(specs, runs)) {
-    code = await exitCodeOf(command, args)
+    code = await commandExitCode(command, args)
     if (code !== 0) break
   }
   return { code, message: `stability: playwright exited ${code} for ${specs.length} specs` }
