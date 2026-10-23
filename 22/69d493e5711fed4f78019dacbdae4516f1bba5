@@ -1,0 +1,44 @@
+extensions/git-integration/tests/unit/CommentComposer.spec.tsx
+  s_0565505ad6a275::t_83e2bb91c6ae26 173
+extensions/remote-control/tests/unit/bridge.route.spec.ts
+  s_0565505ad6a275::t_e3f95aa179660a 17-19,26-27,29,95,148,153,158,166,289,321-322,349,355,364-365
+extensions/task-vault/tests/components/WeeklyReview.spec.tsx
+  s_0565505ad6a275::t_df18b32c038b4b 257-259,262-268
+extensions/remote-control/tests/unit/terminal.routes.spec.ts
+  s_0565505ad6a275::t_e3f95aa179660a 171-174,178,387,392,399
+extensions/git-integration/tests/unit/risk-score.spec.ts
+  s_0565505ad6a275::t_0e9e468bbc12d6 98-99,108-109,150-151
+extensions/notepad/tests/unit/ipc/notes.ipc.spec.ts
+  s_0565505ad6a275::t_6c3031be2fa165 33-34,388-394,398,426
+  s_0565505ad6a275::t_3f6a355d8edb9d 400-418,428-443
+extensions/git-integration/tests/unit/FileDiffView.spec.tsx
+  s_0565505ad6a275::t_83e2bb91c6ae26 158,161-164,166-167,176-190,192
+extensions/git-integration/tests/unit/usePrReview.spec.tsx
+  s_0565505ad6a275::t_0e9e468bbc12d6 546-548
+extensions/task-vault/tests/notifications/task-scheduler.spec.ts
+  s_0565505ad6a275::t_df18b32c038b4b 656,660,662
+extensions/git-integration/tests/unit/ReviewDashboard.spec.tsx
+  s_0565505ad6a275::t_0e9e468bbc12d6 287
+extensions/notepad/tests/unit/ipc/diagrams.ipc.spec.ts
+  s_0565505ad6a275::t_8826e2fe5f1dbe 224-238
+extensions/git-integration/tests/unit/channel-schemas.spec.ts
+  s_0565505ad6a275::t_9e178a5a2b3c59 94,99
+extensions/git-integration/tests/unit/PrOverviewPanel.spec.tsx
+  s_0565505ad6a275::t_f96ba39446e09b 398,404
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2269d493e5711fed4f78019dacbdae4516f1bba5",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
