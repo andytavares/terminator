@@ -1,0 +1,24 @@
+tests/e2e/helpers.ts
+  s_0565505ad6a275::t_d64b5389731c07 117,120,128,130-131,134,244,246,251
+  s_0565505ad6a275::t_9ec853d83a6a56 16
+tests/unit/support/launch-steps.spec.ts
+  s_0565505ad6a275::t_ce4728b6045e36 1-30
+tests/support/launch-steps.ts
+  s_0565505ad6a275::t_ce4728b6045e36 1-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d82671baf310be93e6f1339ec349301c2b5ce9cb",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
