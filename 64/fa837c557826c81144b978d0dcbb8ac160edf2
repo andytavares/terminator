@@ -1,0 +1,52 @@
+extensions/git-integration/package.json
+  s_0565505ad6a275::t_6b66a835bdb9b3 25
+src/main/ipc/extension.ipc.ts
+  s_0565505ad6a275::t_d5d0ecc201059b 48,61,84
+extensions/foundry/src/order/schema.ts
+  s_0565505ad6a275::t_da8ad9b7dc4099 88,103
+extensions/foundry/src/recipe/parse.ts
+  s_0565505ad6a275::t_da8ad9b7dc4099 324
+tests/integration/ipc/extension.ipc.spec.ts
+  s_0565505ad6a275::t_d713724f2e8a3e 215-235
+extensions/foundry/src/profile/schema.ts
+  s_0565505ad6a275::t_da8ad9b7dc4099 60,71,74
+extensions/foundry/tests/forge/refused-turn.spec.ts
+  s_0565505ad6a275::t_cff51ddd87b411 147-149
+  s_0565505ad6a275::t_1a8c62d08ff0e0 179
+extensions/task-vault/src/ipc/vault-transfer.ts
+  s_0565505ad6a275::t_da8ad9b7dc4099 37-38
+extensions/foundry/package.json
+  s_0565505ad6a275::t_6b66a835bdb9b3 16
+packages/extension-sdk/src/index.ts
+  s_0565505ad6a275::t_da8ad9b7dc4099 31
+extensions/foundry/src/line/rung-output.ts
+  s_0565505ad6a275::t_da8ad9b7dc4099 335-336
+extensions/notepad/package.json
+  s_0565505ad6a275::t_f79cfcdfdc08b2 36
+extensions/remote-control/package.json
+  s_0565505ad6a275::t_8b3327499c3798 20
+extensions/task-vault/package.json
+  s_0565505ad6a275::t_2701589aae8642 15
+package-lock.json
+  s_0565505ad6a275::t_fbad9dcf88cb18 27,81,106,132,140,152,158,173,16817-16819,16873
+package.json
+  s_0565505ad6a275::t_e7468ddadce807 78
+packages/extension-sdk/package.json
+  s_0565505ad6a275::t_cfa052d634b043 41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "64fa837c557826c81144b978d0dcbb8ac160edf2",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
