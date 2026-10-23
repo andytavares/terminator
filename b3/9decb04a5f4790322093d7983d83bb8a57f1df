@@ -1,0 +1,112 @@
+extensions/foundry/tests/components/Orders.spec.tsx
+  s_0565505ad6a275::t_3c15a7444d3bd3 126,134,137,197,216,252,254
+  s_0565505ad6a275::t_d4fdb5b2ed4995 66,74,90,100,233,275,280
+tests/unit/renderer/components/IssuePicker.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 59,128,176
+extensions/git-integration/tests/unit/ReviewDiffPane.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 552,719,751,835,841,854,866,947,970,1121,1128,1209,1404,1421,1460
+tests/unit/renderer/components/LinkIssueDialog.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 57
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_0565505ad6a275::t_3c15a7444d3bd3 143,151,210,217,230,252,275,297,307,309,380,569,589,591,593,732,761
+  s_0565505ad6a275::t_d4fdb5b2ed4995 203-205,706-708
+tests/unit/extensions/PrDialog.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 194,202,213
+  s_0565505ad6a275::t_3c15a7444d3bd3 51,60,68,87,94,102,111,121,140,150,167,192,200,211
+extensions/foundry/tests/components/Ledger.spec.tsx
+  s_0565505ad6a275::t_3c15a7444d3bd3 158,166,173,187,199,213,245,252,261,263,272,281,283,299,301,315,317,343,356,363,408,423,447,453,455,477,479,491,493,514
+  s_0565505ad6a275::t_d4fdb5b2ed4995 148,219,254,274,320,337,358,365,378,398,416
+tests/unit/renderer-remote/App.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 36,44,52,62,105
+extensions/git-integration/tests/unit/MergeFlowView.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 140
+extensions/foundry/tests/components/SettingsView.spec.tsx
+  s_0565505ad6a275::t_3c15a7444d3bd3 98,109,145,155,165
+  s_0565505ad6a275::t_d4fdb5b2ed4995 92,100-102
+extensions/task-vault/tests/components/CalendarDrawer.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 207
+  s_0565505ad6a275::t_3c15a7444d3bd3 159,173,183,198
+tests/unit/renderer/components/MoveSessionDialog.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 228
+tests/unit/renderer-remote/mobile/MobileApp.spec.tsx
+  s_0565505ad6a275::t_3c15a7444d3bd3 77,87,113,132
+  s_0565505ad6a275::t_d4fdb5b2ed4995 69
+extensions/git-integration/tests/unit/GitFullView.spec.tsx
+  s_0565505ad6a275::t_3c15a7444d3bd3 134,347
+  s_0565505ad6a275::t_d4fdb5b2ed4995 207-209,230,326,374,388-390,414,423,455,466
+extensions/task-vault/tests/components/WeeklyReviewHistory.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 145,155,161,175,191,203,234
+  s_0565505ad6a275::t_3c15a7444d3bd3 187,200,211,214,231,247,274,293
+extensions/remote-control/tests/unit/renderer/RemoteControlSettings.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 46,52
+extensions/foundry/tests/components/Inbox.spec.tsx
+  s_0565505ad6a275::t_3c15a7444d3bd3 125,175,206,212,221,234,247,268,298,327,334,453,467,490,512,530,548,566,576
+  s_0565505ad6a275::t_d4fdb5b2ed4995 163,329,362,384,406
+extensions/git-integration/tests/unit/ReviewSubmitPanel.spec.tsx
+  s_0565505ad6a275::t_3c15a7444d3bd3 108,119,132,142,153
+  s_0565505ad6a275::t_d4fdb5b2ed4995 85
+extensions/foundry/tests/components/forge-moves.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 220
+extensions/foundry/tests/components/App.spec.tsx
+  s_0565505ad6a275::t_3c15a7444d3bd3 180,182,213,246,276,301,355,417,432,449,491,498,511,525,610,612,627,629,653,668
+  s_0565505ad6a275::t_d4fdb5b2ed4995 201,265,267,337,359,411,419,516,592
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 416,595,649,675,685,1451,1522,1540,1741,1811-1813,1867,1893,1901,1957-1959,2053-2055,2066,2142
+  s_0565505ad6a275::t_3c15a7444d3bd3 281,287,313,319,605,614,647,789,814,876,887,907,930,942,972,991,1060,1084,1097,1107,1132,1159,1193,1461,1477,1531,1538,1561,1746,1770,1790,1842,1849,1967,1978,1987,1996,2011,2021,2029,2196,2319,2336,2346
+extensions/task-vault/tests/components/WeeklyReview.spec.tsx
+  s_0565505ad6a275::t_3c15a7444d3bd3 145,150,152,162,166,168,214,217,242,255
+  s_0565505ad6a275::t_d4fdb5b2ed4995 124,132
+extensions/task-vault/tests/components/KanbanBoard.spec.tsx
+  s_0565505ad6a275::t_3c15a7444d3bd3 169
+tests/unit/renderer/components/IssueDrawer.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 273
+extensions/notepad/tests/components/ExportDialog.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 192
+tests/unit/renderer/App.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 487,536,543,560,669,689,740,1038,1161,1197
+  s_0565505ad6a275::t_3c15a7444d3bd3 495,551,566,808,1053,1076,1167
+extensions/remote-control/tests/unit/renderer/RemoteControlView.spec.tsx
+  s_0565505ad6a275::t_95730fadccd8aa 3
+  s_0565505ad6a275::t_d4fdb5b2ed4995 78
+  s_0565505ad6a275::t_3c15a7444d3bd3 84,91,102,115,126,135,146,160,169,188,195,204,214,222,235,249,262,275
+tests/unit/renderer/components/AboutDialog.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 38,47,55,65,73,100,106,112
+  s_0565505ad6a275::t_95730fadccd8aa 3
+  s_0565505ad6a275::t_3c15a7444d3bd3 120
+extensions/foundry/tests/components/factory/HallThumbnail.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 99-101,108-110,123
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 153,166,222,497,520,566,654,712,732,767,782,825,913,929-933,950,980,999,1006,1040,1130,1260,1319,1331,1351,1376,1389,1471,1484,1506,1516,1524,1534,1553,1568
+  s_0565505ad6a275::t_3c15a7444d3bd3 174,180,230,237,245,251,259,265,296,303,310,319,330,336,342,349,357,365,372,408,416,424,439,452,465,527,535,547,564,571,583,612,620,641,652,661,663,681,683,692,694,708,710,717,739,750,759,773,789,841,851,860,871,887,893,899,997,1004,1061,1069,1076,1097,1105,1115,1128,1149,1168,1176,1595,1606,1614,1640,1647,1707,1781,1807,1819,1834,1855,1866,1876
+extensions/foundry/tests/components/needs-you.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 259,318
+  s_0565505ad6a275::t_3c15a7444d3bd3 94,102,110,119,131,178,201,265,323,329
+tests/unit/renderer/components/IntegrationsSettings.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 65,79,93,180,300
+extensions/foundry/tests/components/factory/FactorySite.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 108,272
+  s_0565505ad6a275::t_3c15a7444d3bd3 116,159,178,204,229,241,247,255,281,290,298,305,321,327,346
+extensions/git-integration/tests/unit/ReviewDashboard.spec.tsx
+  s_0565505ad6a275::t_d4fdb5b2ed4995 300
+tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_0565505ad6a275::t_3c15a7444d3bd3 273,295,335,361,381,405,429,451,477,503,528,552,589,848,864,884,905
+  s_0565505ad6a275::t_d4fdb5b2ed4995 147,160,243,260,266,297,574,609,631,658,671,836,924
+extensions/git-integration/tests/unit/CommentComposer.spec.tsx
+  s_0565505ad6a275::t_3c15a7444d3bd3 173
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b39decb04a5f4790322093d7983d83bb8a57f1df",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
