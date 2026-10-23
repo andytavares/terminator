@@ -85,7 +85,7 @@ const EnvironmentSchema = z.object({
   prepare: z.string().nullable().default(null),
   share: z.array(z.string()).default([]),
   pictures: z.string().nullable().default(null),
-  paths: PathsSchema.default({}),
+  paths: PathsSchema.prefault({}),
   additional: z
     .array(
       z.object({
@@ -100,7 +100,7 @@ const EnvironmentSchema = z.object({
 const ContextSchema = z.object({
   repos: z.array(RepoRefSchema).min(1),
   toolchain: ToolchainSchema,
-  environment: EnvironmentSchema.default({}),
+  environment: EnvironmentSchema.prefault({}),
   entryPoints: z.array(z.string()).default([]),
   priorArt: z.array(z.string()).default([]),
   conventions: z.array(z.string()).default([]),

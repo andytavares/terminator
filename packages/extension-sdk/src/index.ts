@@ -28,7 +28,7 @@ export const noPayload = z.union([z.undefined(), z.object({})])
 /** Declares one channel so `run` gets its own schema's payload type. The registry holds channels
  * of every schema, so the returned spec takes the payload `dispatchChannel` parsed with it. */
 export function defineChannel<S extends z.ZodType>(spec: ChannelSpec<S>): ChannelSpec {
-  return { ...spec, run: (args) => spec.run(args) }
+  return { ...spec, run: (args) => spec.run(args as z.infer<S>) }
 }
 
 /** Answers one invoke of `spec`: parses the payload, returns the declared invalid response when

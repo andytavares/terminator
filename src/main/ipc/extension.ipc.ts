@@ -45,7 +45,7 @@ const settingsChannels: ChannelSpec[] = [
   }),
   defineChannel({
     channel: 'extension:update-setting',
-    schema: z.object({ key: z.string().min(1), value: z.unknown() }),
+    schema: z.object({ key: z.string().min(1), value: z.unknown().optional() }),
     invalid,
     run: ({ key, value }) => {
       setExtensionSetting(key, value)
@@ -58,7 +58,7 @@ const settingsChannels: ChannelSpec[] = [
     schema: z.object({
       workspaceId: z.string().min(1),
       key: z.string().min(1),
-      value: z.unknown(),
+      value: z.unknown().optional(),
     }),
     invalid,
     run: ({ workspaceId, key, value }) => {
@@ -81,7 +81,7 @@ const commandChannels: ChannelSpec[] = [
     channel: 'extension:run-command',
     schema: z.object({
       key: z.string().min(1),
-      args: z.unknown(),
+      args: z.unknown().optional(),
       ctx: CommandContextSchema.optional(),
     }),
     invalid,
