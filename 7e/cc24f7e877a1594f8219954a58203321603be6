@@ -1,0 +1,34 @@
+tests/unit/scripts/stability.spec.ts
+  s_0565505ad6a275::t_ba58c3a68b2847 8-9,43-44,48,57,153-168,170-175,177-178,180,182-192,194-205
+  s_0565505ad6a275::t_94c37e3784a5a3 169,176,193
+  s_0565505ad6a275::t_0f2692b0fe69f5 179,181,206
+scripts/stability.mjs
+  s_0565505ad6a275::t_25aa45cdbb1fbb 2-5,20-26,28-29,32,34-35,37-59,65-73,118,125,154-156
+  s_0565505ad6a275::t_94c37e3784a5a3 60-64
+docs/adr/124-flaky-tests-are-caught-before-merge-and-quarantined-with-an-expiry.md
+  s_0565505ad6a275::t_1b48e59c1f1f8b 17
+.github/workflows/ci.yml
+  s_0565505ad6a275::t_3b92a7e3380df4 309-337,340-343,358-359,362-375
+  s_0565505ad6a275::t_81aaa901daf3db 376
+tests/unit/scripts/ci-plan.spec.ts
+  s_0565505ad6a275::t_f90f5cb4957274 33,176,182-203
+  s_0565505ad6a275::t_618f551070a8bd 204-205
+scripts/ci-plan.mjs
+  s_0565505ad6a275::t_3b92a7e3380df4 15-16,31-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7ecc24f7e877a1594f8219954a58203321603be6",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
