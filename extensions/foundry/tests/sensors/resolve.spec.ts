@@ -40,16 +40,14 @@ describe('resolveSensor', () => {
   it('finds a built-in sensor when nothing else defines the id', () => {
     put(builtIn, 'direct', sensor('direct'))
     const result = resolveSensor('direct', sources())
-    expect(result.ok).toBe(true)
-    if (result.ok) expect(result.resolved.rung).toBe('built-in')
+    expect(result.ok && result.resolved.rung).toBe('built-in')
   })
 
   it('lets the data root override a built-in sensor of the same id', () => {
     put(builtIn, 'direct', sensor('direct'))
     put(dataRoot, 'direct', sensor('direct'))
     const result = resolveSensor('direct', sources())
-    expect(result.ok).toBe(true)
-    if (result.ok) expect(result.resolved.rung).toBe('data-root')
+    expect(result.ok && result.resolved.rung).toBe('data-root')
   })
 })
 

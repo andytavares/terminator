@@ -138,7 +138,7 @@ function inboxProcessorFinishingTests() {
     bridge.responses['task-vault:vault:process-inbox-item'] = { error: 'STALE_ID' }
     fireEvent.click(screen.getByRole('button', { name: 'Trash it' }))
     await screen.findByText('2 of 2')
-    fireEvent.click(screen.getByRole('button', { name: 'Incubate — Backlog' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Incubate — Backlog' }))
     await eventually(() => expect(onDone).toHaveBeenCalled())
   })
 

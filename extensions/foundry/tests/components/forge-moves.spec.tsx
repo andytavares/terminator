@@ -217,7 +217,7 @@ describe('a hand-off compile turns down', () => {
       compile: compileOrder(shown),
       environment: PROVEN_ENVIRONMENT,
     })
-    await waitFor(() => expect(screen.getByRole('button', { name: /^Hand off with/ })).toBeTruthy())
+    await screen.findByRole('button', { name: /^Hand off with/ })
     expect(payloadsSentOn(invoke, 'foundry:run.start')).toEqual([])
     expect(onStarted).not.toHaveBeenCalled()
   })
@@ -306,7 +306,9 @@ function provenRowTests() {
     })
     await openForgeStep('Hand off')
     fireEvent.click(await within(rows()).findByRole('button', { name: 'Check again' }))
-    await screen.findByText('Only a draft order can check its base branch again.')
+    expect(
+      await screen.findByText('Only a draft order can check its base branch again.')
+    ).toBeTruthy()
   })
 
   it('offers neither once the base branch is proven', async () => {

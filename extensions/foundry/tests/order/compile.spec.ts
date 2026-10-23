@@ -394,22 +394,16 @@ function theFailureDetailTests() {
 describe('agreeOrder', () => {
   it('moves a complete order to agreed and stamps when', () => {
     const r = agreeOrder(complete(), '2026-09-06T11:00:00.000Z')
-    expect(r.ok).toBe(true)
-    if (r.ok) {
-      expect(r.order.status).toBe('agreed')
-      expect(r.order.agreedAt).toBe('2026-09-06T11:00:00.000Z')
-    }
+    expect(r.ok && r.order.status).toBe('agreed')
+    expect(r.ok && r.order.agreedAt).toBe('2026-09-06T11:00:00.000Z')
   })
 
   it('leaves an incomplete order exactly as it was', () => {
     const before = complete({ acceptance: [] })
     const r = agreeOrder(before, '2026-09-06T11:00:00.000Z')
-    expect(r.ok).toBe(false)
-    if (!r.ok) {
-      expect(r.result.failures.length).toBeGreaterThan(0)
-      expect(before.status).toBe('draft')
-      expect(before.agreedAt).toBeNull()
-    }
+    expect(!r.ok && r.result.failures.length).toBeGreaterThan(0)
+    expect(before.status).toBe('draft')
+    expect(before.agreedAt).toBeNull()
   })
 
   it('refuses to agree an order that is not a draft', () => {

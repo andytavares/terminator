@@ -283,7 +283,7 @@ function eventSocket(readyState: WebSocket['readyState']): WebSocket {
 }
 
 /** The server closes the socket with `code`; the hook says `status` and stays there. */
-async function closedOnPurpose(code: number, status: string): Promise<void> {
+async function expectStaysAfterServerClosesOnPurpose(code: number, status: string): Promise<void> {
   const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
   const ws = eventSocket(1)
   const { result } = renderHook(() => useReconnect(mockOpenWs, ws))
@@ -307,5 +307,7 @@ describe('useReconnect — a socket the server closes on purpose', () => {
   it.each([
     [4003, 'full'],
     [4004, 'removed'],
-  ])('says why on close code %i, and does not come back by itself', closedOnPurpose)
+  ])('says why on close code %i, and does not come back by itself', async (code, status) => {
+    await expectStaysAfterServerClosesOnPurpose(code, status)
+  })
 })

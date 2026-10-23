@@ -494,6 +494,8 @@ export async function runQuickActionFromPanel(page: Page, label: string): Promis
   const panel = quickActionsPanel(page)
   await expect(panel.locator(':focus')).toHaveCount(1)
   await page.keyboard.press('/')
+  // The search box mounts on `/` and takes focus in an effect; a key typed before then is lost.
+  await expect(panel.getByLabel('Search quick actions')).toBeFocused()
   await page.keyboard.type(label)
   const row = panel
     .locator('.qa-row')

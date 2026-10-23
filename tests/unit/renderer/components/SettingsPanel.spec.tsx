@@ -144,7 +144,7 @@ describe('ExtensionsSection', () => {
   it('shows empty message when no extensions', async () => {
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => expect(screen.getByText('No extensions installed.')).toBeTruthy())
+    await screen.findByText('No extensions installed.')
   })
 
   it('renders installed extensions list', async () => {
@@ -157,7 +157,7 @@ describe('ExtensionsSection', () => {
     api.extension.list.mockResolvedValue({ extensions: [ext] })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => expect(screen.getByText('Test Extension')).toBeTruthy())
+    await screen.findByText('Test Extension')
     expect(screen.getByText('v1.0.0')).toBeTruthy()
     expect(screen.getByText('enabled')).toBeTruthy()
   })
@@ -240,7 +240,7 @@ describe('ExtensionsSection — stops listening for list changes when it closes'
     api.extension.list.mockResolvedValue({ extensions: [ext] })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => expect(screen.getByText('Disable')).toBeTruthy())
+    await screen.findByText('Disable')
   })
 })
 
@@ -257,21 +257,20 @@ describe('ExtensionsSection — shows Enable button for disabled extensions', ()
     api.extension.list.mockResolvedValue({ extensions: [ext] })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => expect(screen.getByText('Enable')).toBeTruthy())
+    await screen.findByText('Enable')
   })
 
   it('shows Install from Directory button', async () => {
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => expect(screen.getByText('Install from Directory')).toBeTruthy())
+    await screen.findByText('Install from Directory')
   })
 
   it('calls openDirectory when install button is clicked', async () => {
     api.dialog.openDirectory.mockResolvedValue({ cancelled: true })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => screen.getByText('Install from Directory'))
-    fireEvent.click(screen.getByText('Install from Directory'))
+    fireEvent.click(await screen.findByText('Install from Directory'))
     await waitFor(() => expect(api.dialog.openDirectory).toHaveBeenCalled())
   })
 })
@@ -292,9 +291,8 @@ describe('ExtensionsSection — installs extension and shows it in list', () => 
     api.extension.install.mockResolvedValue({ extension: newExt })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => screen.getByText('Install from Directory'))
-    fireEvent.click(screen.getByText('Install from Directory'))
-    await waitFor(() => expect(screen.getByText('New Ext')).toBeTruthy())
+    fireEvent.click(await screen.findByText('Install from Directory'))
+    await screen.findByText('New Ext')
   })
 })
 
@@ -332,8 +330,7 @@ describe('ExtensionsSection — shows toast on install error', () => {
     })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => screen.getByText('Install from Directory'))
-    fireEvent.click(screen.getByText('Install from Directory'))
+    fireEvent.click(await screen.findByText('Install from Directory'))
     await waitFor(() =>
       expect(mockDispatchNotification).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'error' })
@@ -358,8 +355,7 @@ describe('ExtensionsSection — toggles extension enable/disable', () => {
     })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => screen.getByText('Disable'))
-    fireEvent.click(screen.getByText('Disable'))
+    fireEvent.click(await screen.findByText('Disable'))
     await waitFor(() => expect(api.extension.toggle).toHaveBeenCalledWith('com.test', false))
   })
 })
@@ -378,8 +374,7 @@ describe('ExtensionsSection — reloads extension and shows toast', () => {
     api.extension.reload.mockResolvedValue({ extension: { ...ext, version: '1.0.1' } })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => screen.getByText('Reload'))
-    fireEvent.click(screen.getByText('Reload'))
+    fireEvent.click(await screen.findByText('Reload'))
     await waitFor(() =>
       expect(mockDispatchNotification).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'info' })
@@ -402,8 +397,7 @@ describe('ExtensionsSection — shows toast when reload fails', () => {
     api.extension.reload.mockResolvedValue({ error: 'RELOAD_FAILED' })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => screen.getByText('Reload'))
-    fireEvent.click(screen.getByText('Reload'))
+    fireEvent.click(await screen.findByText('Reload'))
     await waitFor(() =>
       expect(mockDispatchNotification).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'error' })
@@ -426,8 +420,7 @@ describe('ExtensionsSection — uninstalls extension when confirm is accepted', 
     vi.stubGlobal('confirm', vi.fn().mockReturnValue(true))
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => screen.getByText('Uninstall'))
-    fireEvent.click(screen.getByText('Uninstall'))
+    fireEvent.click(await screen.findByText('Uninstall'))
     await waitFor(() => expect(api.extension.uninstall).toHaveBeenCalledWith('com.test'))
     vi.unstubAllGlobals()
   })
@@ -448,8 +441,7 @@ describe('ExtensionsSection — does not uninstall when confirm is declined', ()
     vi.stubGlobal('confirm', declined)
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => screen.getByText('Uninstall'))
-    fireEvent.click(screen.getByText('Uninstall'))
+    fireEvent.click(await screen.findByText('Uninstall'))
     // The handler asks before its first await, so the refusal has already been acted on.
     expect(declined).toHaveBeenCalledTimes(1)
     expect(api.extension.uninstall).not.toHaveBeenCalled()
@@ -474,8 +466,7 @@ describe('ExtensionsSection — upgrades extension via Browse + install', () => 
     api.extension.install.mockResolvedValue({ extension: upgraded })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => screen.getByText('Upgrade'))
-    fireEvent.click(screen.getByText('Upgrade'))
+    fireEvent.click(await screen.findByText('Upgrade'))
     await waitFor(() =>
       expect(mockDispatchNotification).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'info' })
@@ -500,8 +491,7 @@ describe('ExtensionsSection — shows error toast when upgrade install step fail
     api.extension.install.mockResolvedValue({ error: 'INVALID_MANIFEST' })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => screen.getByText('Upgrade'))
-    fireEvent.click(screen.getByText('Upgrade'))
+    fireEvent.click(await screen.findByText('Upgrade'))
     await waitFor(() =>
       expect(mockDispatchNotification).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'error' })
@@ -525,8 +515,7 @@ describe('ExtensionsSection — shows error toast when upgrade uninstall step fa
     api.extension.uninstall.mockResolvedValue({ error: 'UNINSTALL_FAILED' })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => screen.getByText('Upgrade'))
-    fireEvent.click(screen.getByText('Upgrade'))
+    fireEvent.click(await screen.findByText('Upgrade'))
     await waitFor(() =>
       expect(mockDispatchNotification).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'error' })
@@ -549,8 +538,7 @@ describe('ExtensionsSection — skips upgrade when directory dialog is cancelled
     api.dialog.openDirectory.mockResolvedValue({ cancelled: true })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => screen.getByText('Upgrade'))
-    fireEvent.click(screen.getByText('Upgrade'))
+    fireEvent.click(await screen.findByText('Upgrade'))
     await waitFor(() => expect(api.dialog.openDirectory).toHaveBeenCalledTimes(1))
     await act(async () => {
       await api.dialog.openDirectory.mock.results[0].value
@@ -571,7 +559,7 @@ describe('ExtensionsSection — renders ExtensionSettingRow for extension with s
         default: 'hello',
       },
     })
-    await waitFor(() => expect(screen.getByText('My Setting')).toBeTruthy())
+    await screen.findByText('My Setting')
   })
 })
 
@@ -586,8 +574,7 @@ describe('ExtensionsSection — ExtensionSettingRow calls updateSetting after de
         default: 'hello',
       },
     })
-    await waitFor(() => screen.getByDisplayValue('hello'))
-    fireEvent.change(screen.getByDisplayValue('hello'), { target: { value: 'world' } })
+    fireEvent.change(await screen.findByDisplayValue('hello'), { target: { value: 'world' } })
     // Wait for debounce timer (400ms) to fire
     await eventually(() =>
       expect(api.extension.updateSetting).toHaveBeenCalledWith('com.test.myKey', 'world')
@@ -606,7 +593,7 @@ describe('ExtensionsSection — ExtensionSettingRow renders boolean select', () 
         default: true,
       },
     })
-    await waitFor(() => expect(screen.getByText('Enable Feature')).toBeTruthy())
+    await screen.findByText('Enable Feature')
     // The boolean setting renders as a toggle switch (role="switch")
     expect(screen.getByRole('switch', { name: 'Enable Feature' })).toBeTruthy()
   })
@@ -628,7 +615,7 @@ describe('ExtensionsSection — groups per-notification-kind boolean settings in
     })
 
     // One row for the notification kind, not three separate switch rows
-    await waitFor(() => expect(screen.getByText('Task completed')).toBeTruthy())
+    await screen.findByText('Task completed')
     expect(screen.queryByRole('switch')).toBeNull()
 
     const checkboxes = screen.getAllByRole('checkbox')
@@ -655,7 +642,7 @@ describe('ExtensionsSection — ExtensionSettingRow renders enum select', () => 
         default: 'auto',
       },
     })
-    await waitFor(() => expect(screen.getByText('Mode')).toBeTruthy())
+    await screen.findByText('Mode')
     // Enum options are capitalized in the segmented control
     expect(screen.getByText('Fast')).toBeTruthy()
     expect(screen.getByText('Slow')).toBeTruthy()
@@ -668,8 +655,8 @@ describe('ExtensionsSection — toggleSettingsExpand collapses panel when clicke
 
   it('toggleSettingsExpand collapses panel when clicked again', async () => {
     await openSettingsOf({ 'com.test.key': { type: 'string', label: 'Key', default: 'val' } })
-    await waitFor(() => expect(screen.getByText('Key')).toBeTruthy())
-    fireEvent.click(screen.getByTitle('Configure'))
+    await screen.findByText('Key')
+    fireEvent.click(await screen.findByTitle('Configure'))
     await waitFor(() => expect(screen.queryByText('Key')).toBeNull())
   })
 })
@@ -833,7 +820,7 @@ describe('ExtensionsSection — shows schema description when present', () => {
       {},
       'This extension does stuff'
     )
-    await waitFor(() => expect(screen.getByText('This extension does stuff')).toBeTruthy())
+    await screen.findByText('This extension does stuff')
   })
 })
 
@@ -845,8 +832,7 @@ describe('ExtensionsSection — renders folder-type setting with Choose button a
     await openSettingsOf({
       'com.test.folder': { type: 'folder', label: 'Export Path', default: '' },
     })
-    await waitFor(() => screen.getByText('Choose…'))
-    fireEvent.click(screen.getByText('Choose…'))
+    fireEvent.click(await screen.findByText('Choose…'))
     // Wait for the debounce timer (400ms) to fire so saveTimer is cleared before unmount
     await eventually(() =>
       expect(api.extension.updateSetting).toHaveBeenCalledWith('com.test.folder', '/my/path')
@@ -861,7 +847,7 @@ describe('ExtensionsSection — renders number-type setting as number input', ()
     await openSettingsOf({
       'com.test.num': { type: 'number', label: 'Count', default: 5, min: 1, max: 100 },
     })
-    await waitFor(() => screen.getByText('Count'))
+    await screen.findByText('Count')
     const input = screen.getByDisplayValue('5') as HTMLInputElement
     expect(input.type).toBe('number')
   })
@@ -881,8 +867,7 @@ describe('ExtensionsSection — toggle with error response calls toggle API', ()
     api.extension.toggle.mockResolvedValue({ error: 'TOGGLE_FAILED' })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => screen.getByText('Disable'))
-    fireEvent.click(screen.getByText('Disable'))
+    fireEvent.click(await screen.findByText('Disable'))
     await waitFor(() => expect(api.extension.toggle).toHaveBeenCalledWith('com.test', false))
   })
 })
@@ -902,8 +887,7 @@ describe('ExtensionsSection — uninstall with error response shows error toast'
     vi.stubGlobal('confirm', vi.fn().mockReturnValue(true))
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
-    await waitFor(() => screen.getByText('Uninstall'))
-    fireEvent.click(screen.getByText('Uninstall'))
+    fireEvent.click(await screen.findByText('Uninstall'))
     await waitFor(() =>
       expect(mockDispatchNotification).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'error' })
@@ -921,7 +905,7 @@ describe('ExtensionsSection — folder-type setting shows Not set placeholder wh
     await openSettingsOf({
       'com.test.folder': { type: 'folder', label: 'Export Path', default: '' },
     })
-    await waitFor(() => expect(screen.getByText('Not set')).toBeTruthy())
+    await screen.findByText('Not set')
   })
 })
 
@@ -948,7 +932,7 @@ async function openSettingsOf(
   return view
 }
 
-const savedSetting = (key: string, value: unknown) =>
+const expectSettingSaved = (key: string, value: unknown) =>
   eventually(() => expect(api.extension.updateSetting).toHaveBeenCalledWith(key, value))
 
 describe('ExtensionsSection — editing each kind of setting', () => {
@@ -957,7 +941,7 @@ describe('ExtensionsSection — editing each kind of setting', () => {
   it('saves a switched boolean as a boolean', async () => {
     await openSettingsOf({ 'com.test.on': { type: 'boolean', label: 'On', default: true } })
     fireEvent.click(screen.getByRole('switch', { name: 'On' }))
-    await savedSetting('com.test.on', false)
+    await expectSettingSaved('com.test.on', false)
   })
 
   it('saves the option picked from an enum', async () => {
@@ -965,7 +949,7 @@ describe('ExtensionsSection — editing each kind of setting', () => {
       'com.test.mode': { type: 'enum', label: 'Mode', default: 'fast', options: ['fast', 'safe'] },
     })
     fireEvent.click(screen.getByText('Safe'))
-    await savedSetting('com.test.mode', 'safe')
+    await expectSettingSaved('com.test.mode', 'safe')
   })
 
   it('masks a secret setting', async () => {
@@ -979,7 +963,7 @@ describe('ExtensionsSection — editing each kind of setting', () => {
     await openSettingsOf({ 'com.test.n': { type: 'number', label: 'N', default: 1 } })
     fireEvent.change(screen.getByDisplayValue('1'), { target: { value: '2' } })
     fireEvent.change(screen.getByDisplayValue('2'), { target: { value: '3' } })
-    await savedSetting('com.test.n', 3)
+    await expectSettingSaved('com.test.n', 3)
     expect(api.extension.updateSetting).toHaveBeenCalledTimes(1)
   })
 })
@@ -1001,7 +985,7 @@ describe('ExtensionsSection — a list setting', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Paths' }), {
       target: { value: 'src/auth/**\n\n  docs/** ' },
     })
-    await savedSetting('com.test.paths', ['src/auth/**', 'docs/**'])
+    await expectSettingSaved('com.test.paths', ['src/auth/**', 'docs/**'])
   })
 })
 

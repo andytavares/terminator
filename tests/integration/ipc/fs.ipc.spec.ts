@@ -40,7 +40,7 @@ const LOOK_INTERVAL_MS = 250
 
 /** Writes the file again on each look: macOS arms a watch a moment after `fs.watch` returns, and a
  * change made before that has no event. Resolves once `view` has been told about `root`. */
-async function changeUntilTold(root: string, view: View): Promise<void> {
+async function expectToBeToldOfChange(root: string, view: View): Promise<void> {
   await expect
     .poll(
       () => {
@@ -75,10 +75,10 @@ describe('fs:watch-start', () => {
   it('tells the view that asked which file changed in its root', async () => {
     const view = openView()
     expect(await startWatch(view, projectRoot)).toEqual({ ok: true })
-    await changeUntilTold(projectRoot, view)
+    await expectToBeToldOfChange(projectRoot, view)
     // A new watch can also report the making of its own directory, so the file is changed alone.
     view.received.length = 0
-    await changeUntilTold(projectRoot, view)
+    await expectToBeToldOfChange(projectRoot, view)
     expect(view.received.map((event) => event.filename)).toContain('a.ts')
   })
 
@@ -86,8 +86,8 @@ describe('fs:watch-start', () => {
     const [first, second] = [openView(), openView()]
     await startWatch(first, projectRoot)
     await startWatch(second, otherRoot)
-    await changeUntilTold(projectRoot, first)
-    await changeUntilTold(otherRoot, second)
+    await expectToBeToldOfChange(projectRoot, first)
+    await expectToBeToldOfChange(otherRoot, second)
     expect(new Set(first.received.map((event) => event.projectRoot))).toEqual(
       new Set([projectRoot])
     )
@@ -100,16 +100,16 @@ describe('fs:watch-start — shared roots and several roots', () => {
     const [first, second] = [openView(), openView()]
     await startWatch(first, projectRoot)
     await startWatch(second, projectRoot)
-    await changeUntilTold(projectRoot, first)
-    await changeUntilTold(projectRoot, second)
+    await expectToBeToldOfChange(projectRoot, first)
+    await expectToBeToldOfChange(projectRoot, second)
   })
 
   it('lets one view watch several roots', async () => {
     const view = openView()
     await startWatch(view, projectRoot)
     await startWatch(view, otherRoot)
-    await changeUntilTold(projectRoot, view)
-    await changeUntilTold(otherRoot, view)
+    await expectToBeToldOfChange(projectRoot, view)
+    await expectToBeToldOfChange(otherRoot, view)
   })
 
   it('rejects a payload without a root', async () => {
@@ -123,7 +123,7 @@ describe('fs:watch-stop', () => {
     await startWatch(stopping, projectRoot)
     await startWatch(staying, projectRoot)
     expect(await invoke('fs:watch-stop', stopping)).toEqual({ ok: true })
-    await changeUntilTold(projectRoot, staying)
+    await expectToBeToldOfChange(projectRoot, staying)
     expect(stopping.received).toEqual([])
   })
 
@@ -164,7 +164,7 @@ describe('a view that stays', () => {
     await startWatch(view, projectRoot)
     view.navigate({ isMainFrame: true, isSameDocument: false })
     await startWatch(view, projectRoot)
-    await changeUntilTold(projectRoot, view)
+    await expectToBeToldOfChange(projectRoot, view)
   })
 
   it.each([
@@ -174,7 +174,7 @@ describe('a view that stays', () => {
     const view = openView()
     await startWatch(view, projectRoot)
     view.navigate(navigation)
-    await changeUntilTold(projectRoot, view)
+    await expectToBeToldOfChange(projectRoot, view)
   })
 })
 

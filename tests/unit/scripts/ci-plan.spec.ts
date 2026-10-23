@@ -30,7 +30,7 @@ const PLANNED_JOBS = [
   'story-screenshots',
   'unit',
   'perf',
-  'stability',
+  'stability-shard',
   'e2e-stability',
   'test',
   'build',
@@ -173,9 +173,33 @@ describe('the stability jobs (ADR 124)', () => {
   // ADR 124: repeats only find flaky tests, in the stability jobs; nothing retries a failure.
   it('repeats specs only in the stability jobs, retries nothing, and reports every shard', () => {
     expect(workflowText).not.toMatch(/Burn in|repeat-each|--retries/)
-    expect(stepsOf('stability').map((step) => step.run)).toContain('node scripts/stability.mjs')
+    expect(workflow.jobs['stability-shard'].strategy?.['fail-fast']).toBe(false)
     expect(workflow.jobs.unit.strategy?.['fail-fast']).toBe(false)
     expect(workflow.jobs.e2e.strategy?.['fail-fast']).toBe(false)
+  })
+})
+
+describe('the Stability shards (ADR 124)', () => {
+  it('sizes the shards from the change, and each runs its share', () => {
+    expect(stepsOf('stability-plan').map((step) => step.run)).toContain(
+      'node scripts/stability.mjs --github-output >> "$GITHUB_OUTPUT"'
+    )
+    expect(workflow.jobs['stability-shard'].strategy?.matrix).toEqual({
+      include: '${{ fromJSON(needs.stability-plan.outputs.shards) }}',
+    })
+  })
+
+  it('runs all 30 passes in one step locally, as one shard stands for them all', () => {
+    expect(stepOf('stability-shard', 'Changed specs, this shard')?.script).toBe(
+      'node scripts/stability.mjs'
+    )
+  })
+
+  it('has one Stability verdict, red unless the plan and every shard passed', () => {
+    const verdict = workflow.jobs.stability
+    expect(verdict.name).toBe('Stability')
+    expect(verdict.needs).toEqual(['stability-plan', 'stability-shard'])
+    expect(verdict.if).toBe('always()')
   })
 })
 

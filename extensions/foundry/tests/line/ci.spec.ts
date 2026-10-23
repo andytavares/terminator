@@ -91,10 +91,10 @@ function noChecksYetTests() {
       pollMs: 10,
       appearWithinMs: 10,
     })
-    expect(verdict.kind).toBe('not_measured')
-    if (verdict.kind === 'not_measured') {
-      expect(verdict.reason).toMatch(/no checks/i)
-    }
+    expect(verdict).toMatchObject({
+      kind: 'not_measured',
+      reason: expect.stringMatching(/no checks/i),
+    })
   })
 }
 
@@ -152,10 +152,7 @@ function cancelAndUnreadableOutputTests() {
   it('unparseable output with non-zero exit is not_measured with stderr as reason', async () => {
     const exec = queuedExec([fail('gh: some other failure')])
     const verdict = await watchChecks(pull, exec, { sleep: noopSleep() })
-    expect(verdict.kind).toBe('not_measured')
-    if (verdict.kind === 'not_measured') {
-      expect(verdict.reason).toBe('gh: some other failure')
-    }
+    expect(verdict).toMatchObject({ kind: 'not_measured', reason: 'gh: some other failure' })
   })
 }
 
@@ -204,10 +201,10 @@ function timingOutAndPollingTests() {
     const exec = queuedExec(results)
     const sleep = vi.fn(noopSleep())
     const verdict = await watchChecks(pull, exec, { sleep, pollMs: 1000, timeoutMs: 3000 })
-    expect(verdict.kind).toBe('not_measured')
-    if (verdict.kind === 'not_measured') {
-      expect(verdict.reason).toMatch(/still pending/i)
-    }
+    expect(verdict).toMatchObject({
+      kind: 'not_measured',
+      reason: expect.stringMatching(/still pending/i),
+    })
     expect(sleep).toHaveBeenCalledTimes(3)
   })
 

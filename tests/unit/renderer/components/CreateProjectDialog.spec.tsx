@@ -397,8 +397,8 @@ describe('CreateProjectDialog — branch mode selecting a branch via dropdown fi
   })
 })
 
-describe('CreateProjectDialog — worktree mode selecting existing branch then new branch fires onNewBranch', () => {
-  it('worktree mode selecting existing branch then new branch fires onNewBranch', async () => {
+describe('CreateProjectDialog — worktree mode choosing an existing branch, then + New branch, shows the new branch name field', () => {
+  it('worktree mode choosing an existing branch, then + New branch, shows the new branch name field', async () => {
     gitApi.isRepo.mockResolvedValue({ isRepo: true, root: '/repo' })
     gitApi.listBranches.mockResolvedValue({
       branches: [
@@ -424,7 +424,7 @@ describe('CreateProjectDialog — worktree mode selecting existing branch then n
     await eventually(() => screen.getByText('develop'))
     fireEvent.click(screen.getByText('develop'))
     fireEvent.click(screen.getAllByText('+ New branch…')[0])
-    await eventually(() => screen.getByPlaceholderText('feature/my-feature'))
+    await screen.findByPlaceholderText('feature/my-feature')
   })
 })
 
@@ -623,7 +623,7 @@ describe('CreateProjectDialog — from an issue — honours an edit made after p
     fireEvent.focus(screen.getByPlaceholderText(/Search, or type an issue key/))
     fireEvent.click(await screen.findByText('TAV-42'))
 
-    fireEvent.click(screen.getByTitle('Choose a different issue'))
+    fireEvent.click(await screen.findByTitle('Choose a different issue'))
     expect(screen.getByPlaceholderText(/Search, or type an issue key/)).toBeTruthy()
   })
 
@@ -632,7 +632,7 @@ describe('CreateProjectDialog — from an issue — honours an edit made after p
     fireEvent.focus(screen.getByPlaceholderText(/Search, or type an issue key/))
     fireEvent.click(await screen.findByText('TAV-42'))
 
-    fireEvent.click(screen.getByText('Create'))
+    fireEvent.click(await screen.findByText('Create'))
     await eventually(() => expect(mockCreateProject).toHaveBeenCalled())
     await eventually(() =>
       expect(linkIssue).toHaveBeenCalledWith('p-new', { tracker: 'linear', key: 'TAV-42' })
@@ -703,7 +703,7 @@ describe('CreateProjectDialog — from an issue — while it is working', () => 
     fireEvent.click(screen.getByText('Create'))
     await screen.findByRole('button', { name: 'Creating…' })
 
-    fireEvent.click(screen.getByText('Cancel'))
+    fireEvent.click(await screen.findByText('Cancel'))
     pressOutside(screen.getByRole('dialog'))
     expect(onClose).not.toHaveBeenCalled()
     gate.finish()
@@ -815,7 +815,9 @@ describe('CreateProjectDialog branch names and fetching — fetches and relists 
     git().fetch.mockResolvedValue({ error: 'Could not resolve host: github.com' })
     await openWorktreeMode()
     fireEvent.click(screen.getByRole('button', { name: 'Fetch branches' }))
-    await eventually(() => screen.getByText('Could not fetch: Could not resolve host: github.com'))
+    expect(
+      await screen.findByText('Could not fetch: Could not resolve host: github.com')
+    ).toBeTruthy()
   })
 })
 

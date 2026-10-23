@@ -43,13 +43,13 @@ function settingsPasswordStateTests() {
   it('says whether a password is set without showing it', async () => {
     answerInvokes(true)
     render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
-    await waitFor(() => expect(screen.getByText(/A password is set/)).toBeTruthy())
+    await screen.findByText(/A password is set/)
   })
 
   it('says none is set, so Remote Control cannot start yet', async () => {
     answerInvokes(false)
     render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
-    await waitFor(() => expect(screen.getByText(/No password is set/)).toBeTruthy())
+    await screen.findByText(/No password is set/)
   })
 }
 
@@ -92,7 +92,7 @@ function settingsPasswordGenerateTests() {
     answerInvokes(true, { password: 'generated-abc123' })
     render(<RemoteControlSettings onViewersSaved={vi.fn()} />)
     await screen.findByPlaceholderText('New password')
-    fireEvent.click(screen.getByRole('button', { name: 'Generate new' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate new' }))
     expect(await screen.findByText('generated-abc123')).toBeTruthy()
     expect(screen.getByText(/will not be shown again/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))

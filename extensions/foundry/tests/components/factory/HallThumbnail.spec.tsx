@@ -96,20 +96,18 @@ function thePictureTests() {
     const invoke = vi.fn(async () => ({ graph: GRAPH }))
     mockBridge(invoke)
     render(<HallThumbnail orderId="WO-1" title="Build the thing" refreshKey="running" />)
-    await waitFor(() =>
-      expect(screen.getByRole('img', { name: 'Factory floor for Build the thing' })).toBeTruthy()
-    )
+    expect(
+      await screen.findByRole('img', { name: 'Factory floor for Build the thing' })
+    ).toBeTruthy()
   })
 
   it('shows a plain placeholder for a draft with no run yet, never an empty box', async () => {
     const invoke = vi.fn(async () => ({}))
     mockBridge(invoke)
     render(<HallThumbnail orderId="WO-2" title="Not yet started" refreshKey="draft" />)
-    await waitFor(() =>
-      expect(
-        screen.getByText('Not started yet — the floor appears when the work starts.')
-      ).toBeTruthy()
-    )
+    expect(
+      await screen.findByText('Not started yet — the floor appears when the work starts.')
+    ).toBeTruthy()
   })
 }
 
@@ -122,7 +120,7 @@ function fetchingTests() {
     )
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1))
     rerender(<HallThumbnail orderId="WO-1" title="Build the thing" refreshKey="running" />)
-    await waitFor(() => expect(screen.getByRole('img')).toBeTruthy())
+    await screen.findByRole('img')
     expect(invoke).toHaveBeenCalledTimes(1)
   })
 

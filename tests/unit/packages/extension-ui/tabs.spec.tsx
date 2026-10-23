@@ -206,10 +206,12 @@ describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel', () => {
 
   it('points aria-controls only at a panel that is in the document', () => {
     render(<PartsHarness />)
-    for (const element of screen.getAllByRole('tab')) {
-      const controls = element.getAttribute('aria-controls')
-      if (controls) expect(document.getElementById(controls)).not.toBeNull()
-    }
+    const controlled = screen
+      .getAllByRole('tab')
+      .map((element) => element.getAttribute('aria-controls'))
+      .filter((id): id is string => id !== null)
+    expect(controlled.length).toBeGreaterThan(0)
+    expect(controlled.filter((id) => document.getElementById(id) === null)).toEqual([])
     expect(tabNamed('My PRs').hasAttribute('aria-controls')).toBe(false)
   })
 })

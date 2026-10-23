@@ -1576,7 +1576,7 @@ describe('UnifiedSidebar — the issue drawer', () => {
     renderSidebar()
     fireEvent.click(screen.getByRole('button', { name: 'Open TAV-14' }))
     expect((await screen.findByTestId('issue-drawer')).textContent).toBe('mainclose-drawer')
-    fireEvent.click(screen.getByText('close-drawer'))
+    fireEvent.click(await screen.findByText('close-drawer'))
     expect(screen.queryByTestId('issue-drawer')).toBeNull()
   })
 

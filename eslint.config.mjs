@@ -246,6 +246,13 @@ export default defineConfig([
       'vitest/require-awaited-expect-poll': 'error',
       'vitest/no-focused-tests': 'error',
       'vitest/no-done-callback': 'error',
+      // A test asserts, in its body or in a helper named for it (ADR 124's test audit).
+      'vitest/expect-expect': [
+        'error',
+        { assertFunctionNames: ['expect', 'expect*', 'assert*', 'screen.find*', 'within.find*'] },
+      ],
+      'vitest/no-conditional-expect': 'error',
+      'vitest/no-standalone-expect': 'error',
     },
   },
   {
@@ -255,6 +262,8 @@ export default defineConfig([
       'testing-library/await-async-utils': 'error',
       'testing-library/await-async-events': 'error',
       'testing-library/no-wait-for-side-effects': 'error',
+      // Wait for the element the test acts on, not for something else first (the #292 flake).
+      'testing-library/prefer-find-by': 'error',
     },
   },
   {
@@ -269,6 +278,9 @@ export default defineConfig([
       'playwright/no-force-option': 'error',
       'playwright/no-element-handle': 'error',
       'playwright/no-useless-await': 'error',
+      // Skipping is forbidden (Constitution XIV); a skip that depends on the machine is allowed.
+      'playwright/no-skipped-test': ['error', { allowConditional: true }],
+      'playwright/no-conditional-in-test': 'error',
     },
   },
   {

@@ -131,7 +131,7 @@ async function renderView(
 async function renderWithPrDialogOpen() {
   await renderView()
   fireEvent.click(screen.getByText('Open PR'))
-  await waitFor(() => screen.getByTestId('pr-dialog'))
+  await screen.findByTestId('pr-dialog')
 }
 
 // The first import compiles the component tree, which on a loaded machine takes longer
@@ -204,11 +204,9 @@ describe('GitFullView — shows commit error message when commit returns error',
       target: { value: 'fix: something' },
     })
     fireEvent.click(screen.getByText('Commit'))
-    await waitFor(() =>
-      expect(
-        screen.getByText('Nothing staged to commit. Stage at least one file first.')
-      ).toBeTruthy()
-    )
+    expect(
+      await screen.findByText('Nothing staged to commit. Stage at least one file first.')
+    ).toBeTruthy()
   })
 })
 
@@ -229,7 +227,7 @@ describe('GitFullView — calls commit and push when Commit & Push is clicked', 
   it('opens PR dialog when Open PR is clicked', async () => {
     await renderView()
     fireEvent.click(screen.getByText('Open PR'))
-    await waitFor(() => expect(screen.getByTestId('pr-dialog')).toBeTruthy())
+    await screen.findByTestId('pr-dialog')
   })
 })
 
@@ -325,7 +323,7 @@ describe('GitFullView — shows hook output when commit fails due to hook failur
       target: { value: 'fix: something' },
     })
     fireEvent.click(screen.getByText('Commit'))
-    await waitFor(() => expect(screen.getByText('Pre-commit hooks failed.')).toBeTruthy())
+    await screen.findByText('Pre-commit hooks failed.')
     expect(screen.getByText('Hook output')).toBeTruthy()
     expect(screen.getByText('Commit without hooks')).toBeTruthy()
   })
@@ -346,8 +344,7 @@ describe('GitFullView — commits with --no-verify when Commit without hooks is 
       target: { value: 'fix: skip hooks' },
     })
     fireEvent.click(screen.getByText('Commit'))
-    await waitFor(() => screen.getByText('Commit without hooks'))
-    fireEvent.click(screen.getByText('Commit without hooks'))
+    fireEvent.click(await screen.findByText('Commit without hooks'))
     await waitFor(() =>
       expect(mockGitCommit).toHaveBeenCalledWith({
         repoRoot: '/repo',
@@ -373,7 +370,7 @@ describe('GitFullView — shows running hooks status text while committing', () 
       target: { value: 'wip' },
     })
     fireEvent.click(screen.getByText('Commit'))
-    await waitFor(() => expect(screen.getByText(/Running pre-commit hooks/)).toBeTruthy())
+    await screen.findByText(/Running pre-commit hooks/)
     resolve!({ commitHash: 'abc' })
   })
 })
@@ -387,9 +384,9 @@ describe('GitFullView — shows push error when push fails after commit & push',
       target: { value: 'feat: add x' },
     })
     fireEvent.click(screen.getByText('Commit & Push'))
-    await waitFor(() =>
-      expect(screen.getByText('Committed but push rejected — pull changes first.')).toBeTruthy()
-    )
+    expect(
+      await screen.findByText('Committed but push rejected — pull changes first.')
+    ).toBeTruthy()
   })
 
   it('focuses the commit message box on git:focus-commit-message for this repo', async () => {
@@ -413,7 +410,7 @@ describe('GitFullView — ignores git:focus-commit-message for a different repo'
     await renderView('/repo')
     expect(screen.queryByTestId('pr-dialog')).toBeNull()
     channelHandlers.get('git:open-pr-dialog')?.({ repoRoot: '/repo' })
-    await waitFor(() => expect(screen.getByTestId('pr-dialog')).toBeTruthy())
+    await screen.findByTestId('pr-dialog')
   })
 
   it('shows the pull request the branch already has when git:open-pr-dialog opens it', async () => {
@@ -422,7 +419,7 @@ describe('GitFullView — ignores git:focus-commit-message for a different repo'
     })
     await renderView('/repo')
     channelHandlers.get('git:open-pr-dialog')?.({ repoRoot: '/repo' })
-    await waitFor(() => expect(screen.getByText('existing PR #7')).toBeTruthy())
+    await screen.findByText('existing PR #7')
     expect(mockGitPrStatus).toHaveBeenCalledWith({ repoRoot: '/repo' })
   })
 
@@ -454,7 +451,7 @@ describe('GitFullView — a Commit… or Create PR… run before the view existe
   it('opens the PR dialog for a pending Create PR… on this repo', async () => {
     leavePendingRequest({ kind: 'pull-request', repoRoot: '/repo' })
     await renderView('/repo')
-    await waitFor(() => expect(screen.getByTestId('pr-dialog')).toBeTruthy())
+    await screen.findByTestId('pr-dialog')
   })
 })
 
@@ -465,7 +462,7 @@ describe('GitFullView — a pending Create PR… and the pull request a branch h
     })
     leavePendingRequest({ kind: 'pull-request', repoRoot: '/repo' })
     await renderView('/repo')
-    await waitFor(() => expect(screen.getByText('existing PR #9')).toBeTruthy())
+    await screen.findByText('existing PR #9')
   })
 
   it("leaves another repository's pending request alone", async () => {
