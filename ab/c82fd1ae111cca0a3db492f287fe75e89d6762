@@ -1,0 +1,85 @@
+src/renderer/components/terminal/TabBar.tsx
+  s_bcb87751443cd2::t_03c2ad3b12ef5e 5-6,221-230,233-235,237
+  s_bcb87751443cd2::t_de95fcbee9e9ea 278-282,285
+  s_bcb87751443cd2::t_f922e2d2d177cf 283-284,286-298,309
+tests/unit/renderer/components/LeafPane.spec.tsx
+  s_bcb87751443cd2::t_1dfc1a54069ccb 130-137
+  s_bcb87751443cd2::t_f6171ba224f67a 2
+  s_bcb87751443cd2::t_de95fcbee9e9ea 129
+  s_bcb87751443cd2::t_bf5de90ff0c0e9 138-140
+src/renderer/components/terminal/TerminalPane.tsx
+  s_bcb87751443cd2::t_f6171ba224f67a 14,217
+src/renderer/components/terminal/LeafPane.tsx
+  s_bcb87751443cd2::t_f6171ba224f67a 6,65
+tests/unit/renderer/components/LivePreview.spec.tsx
+  s_bcb87751443cd2::t_1fc5d3338cfd48 3,8-9,12-14,22,59-81
+  s_bcb87751443cd2::t_de95fcbee9e9ea 24-26
+  s_bcb87751443cd2::t_98f4a817aadc05 82
+src/renderer/terminal/session-drag.ts
+  s_bcb87751443cd2::t_56a1a3f023536e 1-55
+src/renderer/components/session/LivePreview.css
+  s_bcb87751443cd2::t_b7e4b1ddcae22e 10-45
+src/renderer/components/terminal/BreakoutDropZone.tsx
+  s_bcb87751443cd2::t_5a3f447591aace 55-56
+  s_bcb87751443cd2::t_de95fcbee9e9ea 16-47,53
+  s_bcb87751443cd2::t_b8de8ea56beed8 1-15,48-52,54,57-86
+src/renderer/components/sidebar/TerminalRow.tsx
+  s_bcb87751443cd2::t_8a42a2c0826e07 2-3,108-123,128
+tests/unit/renderer/components/BreakoutWindowView.spec.tsx
+  s_bcb87751443cd2::t_5a3f447591aace 8
+  s_bcb87751443cd2::t_9c80715df7ed02 91-99,101-103,105
+  s_bcb87751443cd2::t_b6f442a1f71984 25-31,100,104,106
+  s_bcb87751443cd2::t_f1b3b492e51d93 107
+src/renderer/components/terminal/BreakoutDropZone.css
+  s_bcb87751443cd2::t_b8de8ea56beed8 1-33
+src/renderer/components/terminal/BreakoutWindowView.tsx
+  s_bcb87751443cd2::t_de95fcbee9e9ea 45-62,68
+  s_bcb87751443cd2::t_9c80715df7ed02 10
+  s_bcb87751443cd2::t_b8de8ea56beed8 13,19
+tests/unit/renderer/terminal/session-drag.spec.ts
+  s_bcb87751443cd2::t_c9130dcefe774f 1,15,73
+  s_bcb87751443cd2::t_d4ade403f9ed53 2-14,16-72,74-89
+src/renderer/components/sidebar/TerminalRow.css
+  s_bcb87751443cd2::t_8a42a2c0826e07 119-129
+tests/unit/renderer/components/TabBar.spec.tsx
+  s_bcb87751443cd2::t_a9e427ffb5123d 3,7-10,59-61,93,832-848,850-854,856,858-861,863-864,866-876,881-891,894-897
+  s_bcb87751443cd2::t_abb3f7da80dba3 849,855,857,862
+  s_bcb87751443cd2::t_9c66b25d30847d 2,72-76,94-96,326,339,815,824,826,865,877-880,892-893
+tests/unit/renderer/components/BreakoutDropZone.spec.tsx
+  s_bcb87751443cd2::t_b8de8ea56beed8 1-8,10-44,46-84,86,88-118
+  s_bcb87751443cd2::t_de95fcbee9e9ea 85,87
+  s_bcb87751443cd2::t_e5550ac9aaa7d3 9,45
+src/renderer/App.tsx
+  s_bcb87751443cd2::t_e5550ac9aaa7d3 41,66
+tests/unit/renderer/components/TerminalRow.spec.tsx
+  s_bcb87751443cd2::t_55e4293102f1a7 5-6,161-172,174
+  s_bcb87751443cd2::t_8a42a2c0826e07 173
+  s_bcb87751443cd2::t_b0faeae852ee7e 2,30-31
+  s_bcb87751443cd2::t_f9d9c4160bebcf 175
+src/renderer/components/session/LivePreview.tsx
+  s_bcb87751443cd2::t_b7e4b1ddcae22e 32
+  s_bcb87751443cd2::t_cbc300faef66e3 2-4,6,14-31,34-41,49
+  s_bcb87751443cd2::t_52e3d8280472d2 33
+tests/unit/renderer/components/TerminalPane.spec.tsx
+  s_bcb87751443cd2::t_5a3f447591aace 168-171
+  s_bcb87751443cd2::t_de95fcbee9e9ea 156
+  s_bcb87751443cd2::t_f6171ba224f67a 2
+  s_bcb87751443cd2::t_1dfc1a54069ccb 157-167,172-173
+  s_bcb87751443cd2::t_a247cceeb0e298 174-176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "abc82fd1ae111cca0a3db492f287fe75e89d6762",
+  "prompts": {},
+  "sessions": {
+    "s_bcb87751443cd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b568ee83-ad51-4a54-9901-52cfcfa5b37f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
