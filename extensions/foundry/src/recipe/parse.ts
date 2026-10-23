@@ -321,7 +321,7 @@ export function parseRole(text: string, file: string): ParseResult<Role> {
 }
 
 /** A schema for a file named by its `id`. */
-type NamedSchema = z.ZodType<{ id: string }, z.ZodTypeDef, unknown>
+type NamedSchema = z.ZodType<{ id: string }, unknown>
 
 /** A role or rule file: YAML at a known version, valid for `schema`, named by its id. */
 function parseNamedFile<S extends NamedSchema>(

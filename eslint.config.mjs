@@ -290,6 +290,25 @@ export default defineConfig([
     },
   },
   {
+    files: ['src/renderer/**/*.{ts,tsx}'],
+    ignores: ['**/*.spec.ts', '**/*.spec.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['zod', '**/shared/schemas/*'],
+              allowTypeImports: true,
+              message:
+                'The renderer ships without zod: a value from a schema module bundles all of zod into the renderer chunk. Import the type, or keep the value in a module without zod.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['src/renderer/components/**/*.tsx'],
     rules: {
       'no-restricted-syntax': [

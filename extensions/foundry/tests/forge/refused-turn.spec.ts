@@ -144,7 +144,9 @@ function refusedTurnRefusingTests() {
     const refusal = lastIntake(await store.entries('WO-0909-6db'))
     expect(refusal.kind).toBe('refused')
     expect(refusal.kind === 'refused' && refusal.reason).toContain('evidence')
-    expect(refusal.kind === 'refused' && refusal.reason).toContain('Invalid enum value')
+    expect(refusal.kind === 'refused' && refusal.reason).toContain(
+      'Invalid option: expected one of "exit_code"'
+    )
   })
 
   // The reason it was invisible. A refusal has nothing to save, so the
@@ -174,7 +176,7 @@ function theSurfaceTests() {
       intake: { kind: string; reason: string }
     }
     expect(polled.intake.kind).toBe('refused')
-    expect(polled.intake.reason).toContain('Invalid enum value')
+    expect(polled.intake.reason).toContain('Invalid option: expected one of "exit_code"')
 
     // And what the order list shows. It said "Foundry is still shaping this".
     const listed = (await c.list()) as {

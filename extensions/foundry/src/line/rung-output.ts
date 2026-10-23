@@ -332,7 +332,8 @@ export function parseRungOutput(value: unknown, writes: readonly Collectable[]):
         .join('; ')
     )
   }
-  return parsed.data as RungOutput
+  // The shape is built from `writes`, so its parsed type is only known here.
+  return parsed.data as unknown as RungOutput
 }
 
 /** @internal */
