@@ -7,7 +7,7 @@
     "build:renderer": "vite build --config vite.renderer.config.ts"
   },
   "dependencies": {
-    "@codemirror/commands": "6.10.3",
+    "@codemirror/commands": "6.11.1",
     "@codemirror/lang-cpp": "6.0.3",
     "@codemirror/lang-css": "6.3.1",
     "@codemirror/lang-html": "6.4.11",
