@@ -35,6 +35,8 @@
     "lint:unused:production": "knip --production",
     "lint:duplicates": "jscpd",
     "lint:release-age": "node scripts/check-release-age.mjs",
+    "lint:single-copies": "node scripts/check-single-copies.mjs",
+    "lint:quarantine": "node scripts/check-quarantine.mjs",
     "lint:workflows": "node scripts/workflow-lint.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json && tsc --noEmit -p tsconfig.shared.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p packages/extension-ui && tsc --noEmit -p packages/extension-ui/tsconfig.test.json && tsc --noEmit -p packages/extension-sdk && npm run typecheck:extensions",
     "format": "prettier --write .",

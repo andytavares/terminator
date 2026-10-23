@@ -1,0 +1,156 @@
+name: Stability sweep
+
+# The whole suite, several times on one commit of main, each run with its own seed. A test that
+# passes in one run and fails in another is flaky; it gets one open issue (ADR 124). The sweep
+# reports and never gates, so its test steps carry on past a failure.
+
+on:
+  schedule:
+    - cron: '41 5 * * *'
+  workflow_dispatch:
+    inputs:
+      unit_runs:
+        description: Whole unit-suite runs
+        default: '5'
+      e2e_runs:
+        description: Whole e2e-suite runs
+        default: '2'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 2
+    outputs:
+      unit_runs: ${{ steps.runs.outputs.unit_runs }}
+      e2e_runs: ${{ steps.runs.outputs.e2e_runs }}
+
+    steps:
+      - name: Runs
+        id: runs
+        env:
+          UNIT_RUNS: ${{ inputs.unit_runs || '5' }}
+          E2E_RUNS: ${{ inputs.e2e_runs || '2' }}
+        run: |
+          echo "unit_runs=$(seq -s, 1 "$UNIT_RUNS" | sed 's/.*/[&]/')" >> "$GITHUB_OUTPUT"
+          echo "e2e_runs=$(seq -s, 1 "$E2E_RUNS" | sed 's/.*/[&]/')" >> "$GITHUB_OUTPUT"
+
+  unit:
+    name: Unit (run ${{ matrix.run }}, ${{ matrix.shard }}/4)
+    needs: plan
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        run: ${{ fromJSON(needs.plan.outputs.unit_runs) }}
+        shard: [1, 2, 3, 4]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        continue-on-error: true
+        run: |
+          npx vitest run --shard=${{ matrix.shard }}/4 --reporter=dot \
+            --reporter=json --outputFile.json=sweep/unit-${{ matrix.run }}-${{ matrix.shard }}.json
+        timeout-minutes: 6
+
+      - name: Upload results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sweep-unit-${{ matrix.run }}-${{ matrix.shard }}
+          path: sweep/
+          retention-days: 7
+
+  e2e:
+    name: E2E (run ${{ matrix.run }}, ${{ matrix.shard }}/3)
+    needs: plan
+    runs-on: macos-26
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        run: ${{ fromJSON(needs.plan.outputs.e2e_runs) }}
+        shard: [1, 2, 3]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # The same code-signature workaround as ci.yml's E2E job.
+      - name: Re-sign Electron
+        run: |
+          node node_modules/electron/install.js
+          codesign --force --deep --sign - node_modules/electron/dist/Electron.app
+
+      - name: Test
+        continue-on-error: true
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: sweep/e2e-${{ matrix.run }}-${{ matrix.shard }}.json
+        run: |
+          read -r -a shard <<< "$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 3)"
+          npx playwright install chromium
+          npx playwright test "${shard[@]}" --reporter=json,dot
+        timeout-minutes: 8
+
+      - name: Upload results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sweep-e2e-${{ matrix.run }}-${{ matrix.shard }}
+          path: sweep/
+          retention-days: 7
+
+  report:
+    name: Report
+    needs: [unit, e2e]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 4
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sweep-*
+          path: sweep
+          merge-multiple: true
+
+      - name: Flaky and broken tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/flaky-sweep.mjs sweep --open-issues | tee -a "$GITHUB_STEP_SUMMARY"

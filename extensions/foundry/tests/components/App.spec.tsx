@@ -179,8 +179,7 @@ async function openWorkingHall() {
   fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
   await waitFor(() => screen.getByRole('button', { name: 'Factory view' }))
   fireEvent.click(screen.getByRole('button', { name: 'Factory view' }))
-  await waitFor(() => screen.getByText('Working order'))
-  fireEvent.click(screen.getByRole('button', { name: /Working order/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /Working order/ }))
 }
 
 describe('App', () => {
@@ -609,8 +608,7 @@ function aShapingOrderTests() {
     fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
     await waitFor(() => screen.getByRole('button', { name: 'Factory view' }))
     fireEvent.click(screen.getByRole('button', { name: 'Factory view' }))
-    await waitFor(() => screen.getByText('Still shaping'))
-    fireEvent.click(screen.getByRole('button', { name: /Still shaping/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Still shaping/ }))
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'List view' }).getAttribute('aria-pressed')).toBe(
         'true'

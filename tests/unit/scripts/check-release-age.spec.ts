@@ -7,6 +7,8 @@ import {
   addedVersions,
   baseBranch,
   baseLockfile,
+  exemptByAdvisory,
+  fixedAdvisories,
   lockedVersions,
   tooYoung,
 } from '../../../scripts/check-release-age.mjs'
@@ -90,6 +92,45 @@ describe('tooYoung', () => {
     expect(tooYoung({ published: { 'zod@4.6.7': null }, exceptions: {}, now: NOW })).toEqual([
       { id: 'zod@4.6.7', publishedAt: null },
     ])
+  })
+})
+
+const advisory = (name: string, id: string) => ({
+  name,
+  url: `https://github.com/advisories/${id}`,
+})
+// The shape of `npm audit --json` on main: fastify and katex vulnerable, mermaid only through katex.
+const baseAudit = {
+  vulnerabilities: {
+    fastify: { via: [advisory('fastify', 'GHSA-389g-gv7q-r4x8')], effects: [] },
+    katex: { via: [advisory('katex', 'GHSA-238p-pmpm-9mq7')], effects: ['mermaid'] },
+    mermaid: { via: ['katex'], effects: [] },
+  },
+}
+const fixedHead = { vulnerabilities: {} }
+const added = ['fastify@5.12.6', 'mermaid@12.2.0', 'chevrotain@13.2.0']
+
+describe('versions that fix a reported advisory', () => {
+  it('exempts the fixed package and what it affects, and no other added version', () => {
+    expect(fixedAdvisories(baseAudit, fixedHead)).toEqual([
+      'https://github.com/advisories/GHSA-389g-gv7q-r4x8',
+      'https://github.com/advisories/GHSA-238p-pmpm-9mq7',
+    ])
+    expect(exemptByAdvisory(added, baseAudit, fixedHead)).toEqual(
+      new Map([
+        ['fastify@5.12.6', ['GHSA-389g-gv7q-r4x8']],
+        ['mermaid@12.2.0', ['GHSA-238p-pmpm-9mq7']],
+      ])
+    )
+  })
+
+  it('exempts nothing for an advisory the head still carries', () => {
+    expect(exemptByAdvisory(added, baseAudit, baseAudit)).toEqual(new Map())
+  })
+
+  it('exempts nothing when either report is not an audit', () => {
+    expect(exemptByAdvisory(added, null, fixedHead)).toEqual(new Map())
+    expect(exemptByAdvisory(added, baseAudit, null)).toEqual(new Map())
   })
 })
 
