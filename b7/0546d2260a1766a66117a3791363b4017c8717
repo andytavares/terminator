@@ -1,0 +1,88 @@
+extensions/foundry/tests/ipc/interrupted-run-ipc.spec.ts
+  s_0565505ad6a275::t_720904a4f5fb20 134-137,141
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_0565505ad6a275::t_8232583f24f092 818-821
+  s_0565505ad6a275::t_7d5a0d8bd4c31e 593
+extensions/foundry/tests/components/factory/hall-moves.spec.tsx
+  s_0565505ad6a275::t_7d5a0d8bd4c31e 99,108,116
+extensions/foundry/tests/components/orders-seed-and-end.spec.tsx
+  s_0565505ad6a275::t_a31acf09462732 78,121,130,139
+extensions/foundry/tests/components/forge-moves.spec.tsx
+  s_0565505ad6a275::t_bb9795abd93bfd 142,309-311
+extensions/foundry/tests/home/publish.spec.ts
+  s_0565505ad6a275::t_720904a4f5fb20 21-24,31
+extensions/foundry/tests/recipe/resolve.spec.ts
+  s_0565505ad6a275::t_d0fcc2b77535fe 116,121
+  s_0565505ad6a275::t_7ed4f7385d7309 108-109
+extensions/foundry/tests/factory/art/props.spec.ts
+  s_0565505ad6a275::t_f6a103e5c6e26a 590-591
+extensions/foundry/tests/line/ci.spec.ts
+  s_0565505ad6a275::t_f6a103e5c6e26a 155,204-207
+  s_0565505ad6a275::t_bb9795abd93bfd 94-97
+extensions/foundry/tests/line/ship-tail.spec.ts
+  s_0565505ad6a275::t_f6a103e5c6e26a 219
+extensions/foundry/tests/factory/sim.spec.ts
+  s_0565505ad6a275::t_f6a103e5c6e26a 453,842-844
+extensions/foundry/tests/recipe/parse.spec.ts
+  s_0565505ad6a275::t_7ed4f7385d7309 48-49,213-214,239-240,311-312,399-402,518-519
+  s_0565505ad6a275::t_072c05f24fb9f5 54,59,69,87,92,101,125,142,147,269,274,392,459,464,469,492,524,572
+  s_0565505ad6a275::t_bdbbe7cb837a36 364,508,513,540,545
+extensions/foundry/tests/forge/intake-source.spec.ts
+  s_0565505ad6a275::t_f6a103e5c6e26a 198,308
+extensions/foundry/tests/sensors/schema.spec.ts
+  s_0565505ad6a275::t_7ed4f7385d7309 31-34
+  s_0565505ad6a275::t_d0fcc2b77535fe 39,63
+  s_0565505ad6a275::t_bdbbe7cb837a36 90
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_0565505ad6a275::t_2df2397d3b9b19 452
+extensions/foundry/tests/components/App.spec.tsx
+  s_0565505ad6a275::t_2df2397d3b9b19 364,396-398,538,579-581
+extensions/foundry/tests/factory/layout.spec.ts
+  s_0565505ad6a275::t_f6a103e5c6e26a 224
+extensions/foundry/tests/data-root.spec.ts
+  s_0565505ad6a275::t_7ed4f7385d7309 106-109
+  s_0565505ad6a275::t_072c05f24fb9f5 116
+extensions/foundry/tests/line/run-graph.spec.ts
+  s_0565505ad6a275::t_f6a103e5c6e26a 363
+extensions/foundry/tests/live/linear-transition-live.spec.ts
+  s_0565505ad6a275::t_3ffef6a3041773 36-37,69,78-80,97-100
+  s_0565505ad6a275::t_c07481076f013a 101
+extensions/foundry/tests/forge/forge-loop-release.spec.ts
+  s_0565505ad6a275::t_36eebf5cc7309b 146-149
+extensions/foundry/tests/order/compile.spec.ts
+  s_0565505ad6a275::t_f6a103e5c6e26a 397-398,404-406
+extensions/foundry/tests/factory/art/monitor.spec.ts
+  s_0565505ad6a275::t_f6a103e5c6e26a 92,96,99
+extensions/foundry/tests/runtime/supervision-unavailable.spec.ts
+  s_0565505ad6a275::t_720904a4f5fb20 26-29,37
+extensions/foundry/tests/live/ship-live.spec.ts
+  s_0565505ad6a275::t_bb9795abd93bfd 309,315
+  s_0565505ad6a275::t_e865c349917db6 222,249,287,310-314,316-317
+extensions/foundry/tests/sensors/built-ins.spec.ts
+  s_0565505ad6a275::t_7ed4f7385d7309 27-33,38-40
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_0565505ad6a275::t_2df2397d3b9b19 1764
+  s_0565505ad6a275::t_1f26592ca03862 2244,2303,2322,2340,2349,2358
+extensions/foundry/tests/sensors/cluster.spec.ts
+  s_0565505ad6a275::t_0eee1e41123478 1,6-8
+extensions/foundry/tests/recipe/built-ins.spec.ts
+  s_0565505ad6a275::t_227c8eec81a801 77-78,82-85,456,459-461
+extensions/foundry/tests/sensors/resolve.spec.ts
+  s_0565505ad6a275::t_9a949fe344bf31 43,50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b70546d2260a1766a66117a3791363b4017c8717",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
