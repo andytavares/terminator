@@ -1,0 +1,27 @@
+scripts/flaky-sweep.mjs
+  s_0565505ad6a275::t_1f18221bb99d6f 2-4,79,85-86,133
+scripts/stability.mjs
+  s_0565505ad6a275::t_1f18221bb99d6f 2-4,11,49,51,63,69,96,99
+  s_0565505ad6a275::t_00e4961f7850e0 81-82
+scripts/check-quarantine.mjs
+  s_0565505ad6a275::t_00e4961f7850e0 44-46,71-73
+  s_0565505ad6a275::t_1f18221bb99d6f 2-4,22,31,36,47,55,65
+tests/unit/scripts/flaky-sweep.spec.ts
+  s_0565505ad6a275::t_1f18221bb99d6f 8,64,66,72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "da854682b2a9db15b08fbd04788288a18b0c0c23",
+  "prompts": {},
+  "sessions": {
+    "s_0565505ad6a275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be06ab7b-a072-4cef-b1b3-4cecebae77ed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
