@@ -60,6 +60,13 @@ import type {
   SetLinkInputSchema,
   TransferInputSchema,
 } from '../schemas/session-records.schema'
+import type {
+  TaskArchiveInputSchema,
+  TaskCreateInputSchema,
+  TaskLaneInputSchema,
+  TaskUpdateInputSchema,
+  Task,
+} from '../schemas/tasks.schema'
 import type { HomeFeedActionInputSchema, MergedHomeFeed } from '../schemas/home-feed.schema'
 import type { AgentAsk } from '../agent-sessions/ask'
 import type { AttentionInterval, AttentionMeasures } from '../home/attention-measures'
@@ -139,6 +146,7 @@ function extensionIdEvent<const Path extends string>(path: Path, channel: string
 type Failure = { error: string }
 type DetailedFailure = { error: string; message?: string }
 type SessionRecordResult<Data> = Promise<{ data: Data } | { error: string; message: string }>
+type TaskResult = Promise<{ data: Task } | { error: string; message: string }>
 type CommandContext = {
   projectId: string | null
   sessionId: string | null
@@ -1160,6 +1168,57 @@ export const ELECTRON_API_MANIFEST = [
           handler: (payload: { sessionId: string; record: SessionRecordListing | null }) => void
         ) => Unsubscribe
       >(),
+  }),
+
+  // ── tasks (lanes across repositories, grouped as one piece of work) ───────
+  method({
+    path: 'tasks.list',
+    kind: 'invoke',
+    channel: 'task:list',
+    signature: signature<() => Promise<{ data: Task[] }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'tasks.create',
+    kind: 'invoke',
+    channel: 'task:create',
+    signature: signature<(input: z.input<typeof TaskCreateInputSchema>) => TaskResult>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'tasks.update',
+    kind: 'invoke',
+    channel: 'task:update',
+    signature: signature<(input: z.input<typeof TaskUpdateInputSchema>) => TaskResult>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'tasks.addLane',
+    kind: 'invoke',
+    channel: 'task:add-lane',
+    signature: signature<(input: z.input<typeof TaskLaneInputSchema>) => TaskResult>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'tasks.removeLane',
+    kind: 'invoke',
+    channel: 'task:remove-lane',
+    signature: signature<(input: z.input<typeof TaskLaneInputSchema>) => TaskResult>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'tasks.archive',
+    kind: 'invoke',
+    channel: 'task:archive',
+    signature: signature<(input: z.input<typeof TaskArchiveInputSchema>) => TaskResult>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'tasks.onChanged',
+    kind: 'event',
+    channel: 'task:changed',
+    signature: signature<(handler: (tasks: Task[]) => void) => Unsubscribe>(),
+    remote: 'omit',
   }),
 
   // ── agent usage and work-thread summaries (core only) ─────────────────────

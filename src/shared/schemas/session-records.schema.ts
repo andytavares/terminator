@@ -13,7 +13,7 @@ const SessionSnapshotSchema = z.object({
   startedAt: z.string(),
 })
 
-const WorkItemRefSchema = z.object({
+export const WorkItemRefSchema = z.object({
   tracker: TrackerIdSchema,
   key: z.string().min(1),
 })

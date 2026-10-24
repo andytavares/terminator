@@ -80,6 +80,7 @@ import { registerNotificationHandlers } from '../../../src/main/ipc/notification
 import { registerSessionRecordsHandlers } from '../../../src/main/ipc/session-records.ipc.js'
 import { registerSettingsHandlers } from '../../../src/main/ipc/settings.ipc.js'
 import { registerShellHandlers } from '../../../src/main/ipc/shell.ipc.js'
+import { registerTaskHandlers } from '../../../src/main/ipc/task.ipc.js'
 import { registerTerminalHandlers } from '../../../src/main/ipc/terminal.ipc.js'
 import { registerWorkspaceHandlers } from '../../../src/main/ipc/workspace.ipc.js'
 import type { ExtensionHost } from '../../../src/main/extensions/extension-host.js'
@@ -103,6 +104,7 @@ function registerEveryCoreHandler(): void {
   registerSessionRecordsHandlers(noWindow)
   registerSettingsHandlers()
   registerShellHandlers()
+  registerTaskHandlers(noWindow)
   registerTerminalHandlers(partialFake<PtyManager>({}), noWindow, partialFake<OutputRelay>({}))
   registerWorkspaceHandlers()
 }
