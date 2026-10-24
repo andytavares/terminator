@@ -15,8 +15,8 @@ export function PlanStrip({ now }: { now: number }): JSX.Element | null {
   return (
     <div className="plan-strip">
       <span>
-        <b>Plan today</b> · {carried} {plural(carried, 'task')} carried over · pick up to{' '}
-        {FOCUS_LIMIT} to focus on
+        <b>Plan today</b> · {carried > 0 && `${carried} ${plural(carried, 'task')} carried over · `}
+        pick up to {FOCUS_LIMIT} to focus on
       </span>
       <span className="plan-strip__actions">
         <Button size="sm" onClick={() => usePlanSheet.getState().show()}>

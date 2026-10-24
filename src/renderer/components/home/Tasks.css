@@ -127,8 +127,9 @@
 }
 .task-row__lanes {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
-  overflow: hidden;
+  min-width: 0;
 }
 .task-lane {
   display: inline-flex;

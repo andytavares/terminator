@@ -86,3 +86,43 @@
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
 }
+
+.tasks-body > .task-list {
+  margin: 16px 18px 0;
+}
+
+.plan__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.plan__pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--tm-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tm-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.plan__pick:hover {
+  background: var(--tm-overlay-subtle);
+}
+.plan__pick svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  color: var(--tm-text-faint);
+}
+.plan__pick[aria-pressed='true'] svg {
+  color: var(--tm-warning);
+  fill: currentColor;
+}

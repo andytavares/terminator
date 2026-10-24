@@ -102,7 +102,13 @@ function PlanBand({ now }: { now: number }): JSX.Element {
   )
 }
 
-function ColumnTitle({ icon, children }: { icon: JSX.Element; children: string }): JSX.Element {
+export function ColumnTitle({
+  icon,
+  children,
+}: {
+  icon: JSX.Element
+  children: string
+}): JSX.Element {
   return (
     <h3 className="plan__title">
       {icon}

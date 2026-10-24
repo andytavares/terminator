@@ -4,7 +4,8 @@ import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useFocusStore } from '../../home/focus-store'
 import { FOCUS_LIMIT } from '../../home/focus'
 import { runningSentence } from '../../home/plan-the-day'
-import { CarriedOverColumn, FocusColumn } from './PlanTheDay'
+import { CarriedOverColumn } from './PlanTheDay'
+import { PlanTaskFocus } from './PlanTaskFocus'
 import { TicketsColumn } from './TicketsColumn'
 import { usePlan } from './usePlan'
 import { usePlanSheet } from './plan-sheet'
@@ -25,7 +26,7 @@ function PlanSheetBody({ now }: { now: number }): JSX.Element {
           <CarriedOverColumn rows={plan.carried} full={plan.today.length >= FOCUS_LIMIT} />
         )}
         {hasTracker && <TicketsColumn />}
-        <FocusColumn today={plan.today} reviewMinutes={plan.reviewMinutes} />
+        <PlanTaskFocus threads={threads} />
       </div>
       {running && <p className="plan-sheet__line">{running}</p>}
       {!hasTracker && (

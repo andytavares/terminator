@@ -27,6 +27,7 @@ function input(patch: Partial<WorkThreadInput>): WorkThreadInput {
       ['p1', '/repos/terminator'],
       ['p2', '/repos/other'],
     ]),
+    repos: new Map(),
     now: NOW,
     ...patch,
   }
@@ -439,6 +440,15 @@ describe('tasks: implicit and empty lanes', () => {
       ['limits-ui', 'quiet'],
       ['limits-docs', 'quiet'],
     ])
+  })
+})
+
+describe('tasks: lane names', () => {
+  it('names a lane with nothing running by its repo, not by its folder', () => {
+    const repos = new Map([['/repos/web', { name: 'web-console', color: '#3b82f6' }]])
+    const stored = task({ lanes: [{ repoRoot: '/repos/web', branch: 'limits' }] })
+    const [thread] = buildWorkThreads(input({ tasks: [stored], repos }))
+    expect(thread.lanes[0]).toMatchObject({ repoName: 'web-console', repoColor: '#3b82f6' })
   })
 })
 

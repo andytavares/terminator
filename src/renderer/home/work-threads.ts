@@ -65,6 +65,8 @@ export interface WorkThreadInput {
   changeStats: ReadonlyMap<string, ChangeStats>
   /** The repo's root folder by project id; a session's branch is only unique within it. */
   repoRoots: ReadonlyMap<string, string>
+  /** Each repo's name and colour by its root folder, for a lane with no session to say them. */
+  repos: ReadonlyMap<string, { name: string; color: string | null }>
   now: number
 }
 
@@ -244,11 +246,16 @@ function isClosedDraft(draft: Draft): boolean {
   )
 }
 
-function repoLaneOf(lane: LaneDraft): WorkThreadLane {
+function repoLaneOf(lane: LaneDraft, input: WorkThreadInput): WorkThreadLane {
+  const repo = input.repos.get(lane.repoRoot)
   return {
     repoRoot: lane.repoRoot,
-    repoName: lane.sessions[0]?.workspaceName ?? lane.repoRoot.split('/').pop() ?? lane.repoRoot,
-    repoColor: lane.sessions[0]?.workspaceColor ?? null,
+    repoName:
+      lane.sessions[0]?.workspaceName ??
+      repo?.name ??
+      lane.repoRoot.split('/').pop() ??
+      lane.repoRoot,
+    repoColor: lane.sessions[0]?.workspaceColor ?? repo?.color ?? null,
     branch: lane.branch,
     state: laneStateOf(lane),
   }
@@ -268,7 +275,7 @@ function identityOf(draft: Draft, lanes: readonly LaneDraft[], input: WorkThread
     title: titleOf(draft, issue),
     ...ticketKeyOf(draft),
     taskId: draft.task?.id ?? null,
-    lanes: lanes.map(repoLaneOf),
+    lanes: lanes.map((lane) => repoLaneOf(lane, input)),
     changes: input.changeStats.get(lead?.projectId ?? '') ?? null,
   }
 }

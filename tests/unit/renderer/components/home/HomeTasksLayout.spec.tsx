@@ -65,6 +65,8 @@ const thread = (key: string, taskState: string, sessionState = 'idle') => ({
   key,
   title: key,
   state: taskState,
+  focus: false,
+  taskId: null,
   archived: false,
   facets: [],
   lanes: [],
@@ -217,9 +219,8 @@ describe('Home — Needs you, the reasons and the calm line', () => {
 describe('Home — the plan', () => {
   it('shows the plan strip, and Skip today takes it away', () => {
     render(<HomeScreen />)
-    expect(document.body.textContent).toContain(
-      'Plan today · 0 tasks carried over · pick up to 3 to focus on'
-    )
+    expect(document.body.textContent).toContain('Plan today · pick up to 3 to focus on')
+    expect(document.body.textContent).not.toContain('0 tasks carried over')
     fireEvent.click(screen.getByRole('button', { name: 'Skip today' }))
     expect(document.body.textContent).not.toContain('pick up to 3 to focus on')
   })
@@ -241,6 +242,36 @@ describe('Home — the plan sheet', () => {
     render(<HomeScreen />)
     fireEvent.click(screen.getByRole('button', { name: /^Plan/ }))
     expect(await screen.findByRole('dialog', { name: 'Plan today' })).toBeTruthy()
+  })
+})
+
+describe('Home — the plan sheet picks tasks', () => {
+  it("lists open tasks to star and shows the starred ones as today's focus", async () => {
+    state.threads = [
+      { ...thread('Rate limits across services', 'running', 'working'), focus: true },
+      thread('Billing page copy', 'quiet'),
+      thread('Shipped already', 'done'),
+    ]
+    render(<HomeScreen />)
+    fireEvent.keyDown(home(), { key: 'p' })
+    const sheet = await screen.findByRole('dialog', { name: 'Plan today' })
+    const open = within(sheet).getByRole('list', { name: 'Open tasks' })
+    expect(
+      within(open)
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-pressed'))
+    ).toEqual(['true', 'false'])
+    const focus = within(sheet).getByRole('list', { name: "Today's focus" })
+    expect(
+      within(focus)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent)
+    ).toEqual([
+      '1Rate limits across services',
+      '2pick one more, or leave it empty',
+      '3pick one more, or leave it empty',
+    ])
+    expect(within(sheet).queryByText('Press Add on any item')).toBeNull()
   })
 })
 

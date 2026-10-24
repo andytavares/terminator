@@ -22,6 +22,7 @@ function threadsOnDesk() {
     issues: [],
     tasks: [],
     changeStats: new Map(),
+    repos: new Map(),
     repoRoots: new Map([['p1', '/r']]),
     now: NOW,
   })

@@ -39,6 +39,7 @@ export function usePlan(now: number): Plan {
         focusTotal: yesterday.length,
         focusDone: finished.length,
         waiting: {
+          questions: asks.filter((a) => a.kind === 'answer').length,
           agents: asks.filter((a) => a.kind === 'finished').length,
           reviews: asks.filter((a) => a.kind === 'review').length,
         },

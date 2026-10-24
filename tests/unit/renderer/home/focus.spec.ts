@@ -24,6 +24,7 @@ function threadsOf(facets: ReturnType<typeof facet>[]) {
     issues: [],
     tasks: [],
     changeStats: new Map(),
+    repos: new Map(),
     repoRoots: new Map(),
     now: NOW,
   })

@@ -36,18 +36,51 @@ describe('yesterdayKey', () => {
 
 describe('planSentence', () => {
   it('counts yesterday focus and what waits on the operator', () => {
-    expect(planSentence({ focusTotal: 3, focusDone: 2, waiting: { agents: 2, reviews: 1 } })).toBe(
+    expect(
+      planSentence({
+        focusTotal: 3,
+        focusDone: 2,
+        waiting: { questions: 0, agents: 2, reviews: 1 },
+      })
+    ).toBe(
       'Yesterday you finished 2 of 3 focus items. Waiting on you: 2 agents finished and 1 review.'
     )
   })
 
   it('leaves out yesterday when nothing was picked, and says when nothing waits', () => {
-    expect(planSentence({ focusTotal: 0, focusDone: 0, waiting: { agents: 0, reviews: 0 } })).toBe(
-      'Nothing is waiting on you.'
-    )
-    expect(planSentence({ focusTotal: 1, focusDone: 1, waiting: { agents: 0, reviews: 0 } })).toBe(
-      'Yesterday you finished 1 of 1 focus item. Nothing is waiting on you.'
-    )
+    expect(
+      planSentence({
+        focusTotal: 0,
+        focusDone: 0,
+        waiting: { questions: 0, agents: 0, reviews: 0 },
+      })
+    ).toBe('Nothing is waiting on you.')
+    expect(
+      planSentence({
+        focusTotal: 1,
+        focusDone: 1,
+        waiting: { questions: 0, agents: 0, reviews: 0 },
+      })
+    ).toBe('Yesterday you finished 1 of 1 focus item. Nothing is waiting on you.')
+  })
+})
+
+describe('planSentence — questions', () => {
+  it('counts an agent asking as waiting on you, and names only what is there', () => {
+    expect(
+      planSentence({
+        focusTotal: 0,
+        focusDone: 0,
+        waiting: { questions: 1, agents: 0, reviews: 0 },
+      })
+    ).toBe('Waiting on you: 1 question.')
+    expect(
+      planSentence({
+        focusTotal: 0,
+        focusDone: 0,
+        waiting: { questions: 2, agents: 1, reviews: 1 },
+      })
+    ).toBe('Waiting on you: 2 questions, 1 agent finished and 1 review.')
   })
 })
 
