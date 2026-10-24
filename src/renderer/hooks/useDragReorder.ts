@@ -27,7 +27,7 @@ function useCurrentItems<T>(items: T[]): React.MutableRefObject<T[]> {
 }
 
 /** `items` with the one at `from` moved to `to`. */
-function moved<T>(items: T[], from: number, to: number): T[] {
+export function moved<T>(items: T[], from: number, to: number): T[] {
   const reordered = [...items]
   const [item] = reordered.splice(from, 1)
   reordered.splice(to, 0, item)

@@ -1,5 +1,4 @@
 import React from 'react'
-import { SESSION_DRAG_TYPE } from '../../../../src/renderer/terminal/session-drag'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, fireEvent } from '@testing-library/react'
 
@@ -123,18 +122,6 @@ describe('LeafPane — clears the unseen bells on mousedown', () => {
       dataTransfer: { files: [file], types: ['Files'] },
     })
     expect(instance.terminal.paste).toHaveBeenCalledWith('/Users/me/report.pdf')
-  })
-})
-
-describe('LeafPane — a dropped terminal tab', () => {
-  it('ignores a dropped terminal tab', () => {
-    const instance = makeInstance()
-    withInstance(instance)
-    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    fireEvent.drop(container.querySelector('.leaf-pane')!, {
-      dataTransfer: { files: [new File([], 'report.pdf')], types: [SESSION_DRAG_TYPE, 'Files'] },
-    })
-    expect(instance.terminal.paste).not.toHaveBeenCalled()
   })
 })
 

@@ -5,11 +5,20 @@ import { useBreakoutStore } from '../../stores/breakout.store'
 import { useSessionStore } from '../../stores/session.store'
 import type { TerminalSession } from '../../../shared/types/index'
 import { TabStateIcon } from './TabBar'
-import { beginSessionDrag, endSessionDrag } from '../../terminal/session-drag'
+import { beginTabDrag, windowContains, type ScreenPoint } from '../../terminal/tab-drag'
+import { dockBack } from '../../terminal/breakout'
 import { useMountedTerminal } from './use-mounted-terminal'
 import { usePlaceOf } from './place-of'
 import { BreakoutDropZone } from './BreakoutDropZone'
 import './BreakoutWindowView.css'
+
+/** Let go over the main window, the terminal goes back among its tabs. `window` is the main
+ * window: this code runs in its renderer even while drawing into the terminal's own window. */
+function dockIfOverMainWindow(sessionId: string) {
+  return (point: ScreenPoint): void => {
+    if (windowContains(window, point)) dockBack(sessionId)
+  }
+}
 
 function BreakoutTab({ session }: { session: TerminalSession }): JSX.Element {
   return (
@@ -18,9 +27,7 @@ function BreakoutTab({ session }: { session: TerminalSession }): JSX.Element {
       aria-selected="true"
       aria-label={`${session.tabTitle}, in its own window`}
       className="breakout-window__tab"
-      draggable
-      onDragStart={(e) => beginSessionDrag(e, session.id)}
-      onDragEnd={endSessionDrag}
+      onPointerDown={(e) => beginTabDrag(e, session.id, dockIfOverMainWindow(session.id))}
     >
       <GripVertical className="breakout-window__grip" aria-hidden="true" />
       <TabStateIcon session={session} />
@@ -62,7 +69,6 @@ function BreakoutWindowView({ sessionId }: { sessionId: string }): JSX.Element |
   )
 }
 
-/** Draws every terminal that lives in its own window into that window. */
 /** Each terminal's own window, and the drop on the main window that brings one back. */
 export function BreakoutWindows(): JSX.Element {
   const windows = useBreakoutStore((s) => s.windows)

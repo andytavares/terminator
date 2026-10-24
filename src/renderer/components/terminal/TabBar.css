@@ -179,6 +179,14 @@
 }
 
 /* ── Drag-over indicator on session tabs ─────────────────────── */
+.tab-bar__tab--session {
+  user-select: none;
+}
+
+.tab-bar__tab--dragging {
+  opacity: 0.5;
+}
+
 .tab-bar__tab--dnd-over {
   border-left: 2px solid var(--ws-color, var(--tm-accent));
 }

@@ -59,7 +59,6 @@ import { flushLogs, logger } from './logger.js'
 import { sendToWindow } from './safe-send.js'
 import { buildWindowMenu } from './window-menu.js'
 import { breakoutWindowOpen, sessionOfWindow, watchBreakoutWindows } from './breakout-windows.js'
-import { registerBreakoutHandlers } from './ipc/breakout.ipc.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
 import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
@@ -521,7 +520,6 @@ app.whenReady().then(async () => {
   const terminalRelay = registerSessionHandlers()
   startIntegrationsAndRecords()
   registerToolHandlers()
-  registerBreakoutHandlers()
   extensionHost.setDeps(extensionDeps(terminalRelay, userData))
 
   // The extension host's synchronous getters read these; main pushes every change.
