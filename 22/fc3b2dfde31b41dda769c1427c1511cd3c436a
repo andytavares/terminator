@@ -1,0 +1,128 @@
+tests/unit/renderer/sidebar/wall-order.spec.ts
+  s_bcb87751443cd2::t_45dd8dcbe1424b 93-97
+  s_bcb87751443cd2::t_2c38d3e42a577f 147-197
+  s_bcb87751443cd2::t_5cbcf15f250372 198
+src/renderer/components/sidebar/SidebarList.tsx
+  s_bcb87751443cd2::t_a95203f2261ad0 30-31,193
+  s_bcb87751443cd2::t_2d4dc5438a3e76 234
+tests/unit/renderer/components/TaskSwitcher.spec.tsx
+  s_bcb87751443cd2::t_0c86b920666c38 28,56-58,97,99,121-123
+  s_bcb87751443cd2::t_1d730be6e084c2 23-24
+  s_bcb87751443cd2::t_e1b6595a8de6f2 29-35
+  s_bcb87751443cd2::t_527046f87c59dd 1-22,25-27,36-55,59-64,67-96,98,100-120,124-136
+  s_bcb87751443cd2::t_2d4dc5438a3e76 65-66
+tests/unit/renderer/sidebar/views.spec.ts
+  s_bcb87751443cd2::t_c520ee82c9dd37 299-306
+src/main/window-menu.ts
+  s_bcb87751443cd2::t_1d730be6e084c2 44-48
+src/renderer/sidebar/task-groups.ts
+  s_bcb87751443cd2::t_df238abb104225 1-61
+  s_bcb87751443cd2::t_1c1b63aa0d17fa 62-82,85-96,99-105
+  s_bcb87751443cd2::t_2d4dc5438a3e76 83-84,97-98
+src/renderer/components/sidebar/BranchRow.tsx
+  s_bcb87751443cd2::t_78502a94c642bb 175-188
+  s_bcb87751443cd2::t_a95203f2261ad0 52-53,156,167,169-171
+  s_bcb87751443cd2::t_6e121e7db2bc4f 173-174
+src/renderer/components/terminal/LaneSwitcher.css
+  s_bcb87751443cd2::t_75e5d29968e89f 1-51
+src/renderer/sidebar/wall-prefs.ts
+  s_bcb87751443cd2::t_df238abb104225 5,33
+src/renderer/components/sidebar/TaskSections.tsx
+  s_bcb87751443cd2::t_a95203f2261ad0 1-29,35-36,39-40,47-49,53,55-66
+  s_bcb87751443cd2::t_61b9bd066cee70 30-34,37-38,41-46,50-52,54
+src/renderer/components/overview/OverviewScreen.css
+  s_bcb87751443cd2::t_d7d4451b80cf51 97-109
+src/renderer/sidebar/wall-order.ts
+  s_bcb87751443cd2::t_92dc520e95f190 16-17,20-35,48-69,89-96,100-101
+  s_bcb87751443cd2::t_61b9bd066cee70 104-105,130
+  s_bcb87751443cd2::t_5152e46d609fa0 36,38,70-88,97-99,102-103,106-108,118-122,128,132,147
+  s_bcb87751443cd2::t_e1b6595a8de6f2 131
+src/renderer/components/overview/OverviewScreen.tsx
+  s_bcb87751443cd2::t_60e6cb98941238 5,15,39,277-306,309-310,319-321
+src/renderer/components/task-switcher/TaskSwitcher.tsx
+  s_bcb87751443cd2::t_de7bf30238dd3d 1-40,43-60,90,103-159
+  s_bcb87751443cd2::t_2d4dc5438a3e76 98,102
+  s_bcb87751443cd2::t_cf867c2430697f 41-42,61-67,87-89,91-96,99-101
+  s_bcb87751443cd2::t_84d19c7680ccdd 68-86,97
+tests/unit/renderer/components/OverviewScreen.spec.tsx
+  s_bcb87751443cd2::t_9e8b3a6bfccbf7 7,17-19
+  s_bcb87751443cd2::t_16dbabc0bab81a 339-357
+  s_bcb87751443cd2::t_1fcc0f319fa8db 62-63,359
+  s_bcb87751443cd2::t_a519b18c42e6c8 61,64,358
+src/renderer/components/terminal/LaneSwitcher.tsx
+  s_bcb87751443cd2::t_2d4dc5438a3e76 48-50
+  s_bcb87751443cd2::t_1c1b63aa0d17fa 1-47,51-55
+src/shared/electron-api/__tests__/manifest.spec.ts
+  s_bcb87751443cd2::t_9c59b594f4c17d 151
+src/renderer/components/task-switcher/TaskSwitcher.css
+  s_bcb87751443cd2::t_de7bf30238dd3d 1-84
+src/renderer/components/sidebar/DisplayMenu.tsx
+  s_bcb87751443cd2::t_df238abb104225 14
+tests/unit/renderer/components/TabBarTasks.spec.tsx
+  s_bcb87751443cd2::t_1fcc0f319fa8db 112-114
+  s_bcb87751443cd2::t_2d4dc5438a3e76 23-34
+  s_bcb87751443cd2::t_55c25e9a7cd954 135
+  s_bcb87751443cd2::t_6d71f303e9512e 56-60
+  s_bcb87751443cd2::t_cadb8f06a558ed 1-22,35-55,61-111,115-134,136-154
+tests/unit/renderer/components/UnifiedSidebarTasks.spec.tsx
+  s_bcb87751443cd2::t_1fcc0f319fa8db 123-125
+  s_bcb87751443cd2::t_cadb8f06a558ed 1-34,43-122,126-148
+  s_bcb87751443cd2::t_2d4dc5438a3e76 35-42
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_bcb87751443cd2::t_a95203f2261ad0 22,86-90
+src/renderer/quick-actions/use-core-quick-actions.ts
+  s_bcb87751443cd2::t_de7bf30238dd3d 14
+  s_bcb87751443cd2::t_1d730be6e084c2 250
+src/renderer/components/task-switcher/task-switcher.store.ts
+  s_bcb87751443cd2::t_de7bf30238dd3d 1-12
+tests/unit/renderer/sidebar/task-groups.spec.ts
+  s_bcb87751443cd2::t_2d4dc5438a3e76 73,91-93
+  s_bcb87751443cd2::t_9c59b594f4c17d 1-72,74,78-90,94-111
+  s_bcb87751443cd2::t_1fcc0f319fa8db 75-77
+tests/unit/renderer/sidebar/wall-prefs.spec.ts
+  s_bcb87751443cd2::t_1fcc0f319fa8db 23-29
+src/renderer/sidebar/view-model.ts
+  s_bcb87751443cd2::t_df238abb104225 15
+src/renderer/quick-actions/core-actions.ts
+  s_bcb87751443cd2::t_73f922669f90f1 291
+  s_bcb87751443cd2::t_1d730be6e084c2 53,287-290,292-293
+  s_bcb87751443cd2::t_3a879e3269df4c 294
+src/renderer/shell/main-events.ts
+  s_bcb87751443cd2::t_1d730be6e084c2 17,98-99
+  s_bcb87751443cd2::t_13d78d2a45b317 100
+src/shared/electron-api/manifest.ts
+  s_bcb87751443cd2::t_1d730be6e084c2 898-904
+  s_bcb87751443cd2::t_8e4aa880924f80 897
+src/renderer/components/sidebar/UnifiedSidebar.css
+  s_bcb87751443cd2::t_a95203f2261ad0 167-175
+src/renderer/components/sidebar/branch-actions.ts
+  s_bcb87751443cd2::t_2d4dc5438a3e76 61-64
+src/renderer/components/terminal/TabBar.tsx
+  s_bcb87751443cd2::t_75e5d29968e89f 17-19,175,481,498-507,512,551
+src/renderer/sidebar/views.ts
+  s_bcb87751443cd2::t_df238abb104225 60
+src/renderer/shell/ShellOverlays.tsx
+  s_bcb87751443cd2::t_de7bf30238dd3d 11,79
+src/renderer/terminal/reveal-branch.ts
+  s_bcb87751443cd2::t_1c1b63aa0d17fa 1-33
+tests/unit/main/window-menu.spec.ts
+  s_bcb87751443cd2::t_9c59b594f4c17d 68-77
+tests/unit/renderer/quick-actions/core-actions.spec.ts
+  s_bcb87751443cd2::t_9c59b594f4c17d 47,235
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "22fc3b2dfde31b41dda769c1427c1511cd3c436a",
+  "prompts": {},
+  "sessions": {
+    "s_bcb87751443cd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b568ee83-ad51-4a54-9901-52cfcfa5b37f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
