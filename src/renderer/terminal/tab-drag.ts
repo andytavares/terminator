@@ -87,7 +87,8 @@ type DragListeners = {
 }
 
 /** Listens to the pointer from the press until its release, Escape or a pointercancel. */
-function followPress({ tab, sessionId, start }: Press, onDrop: OnDrop): void {
+function followPress(press: Press, onDrop: OnDrop): void {
+  const { tab, sessionId, start } = press
   const doc = tab.ownerDocument
   let dragging = false
   const listeners: DragListeners = {
