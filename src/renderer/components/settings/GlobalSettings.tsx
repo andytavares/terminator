@@ -4,6 +4,7 @@ import type {
   GlobalSettings as GlobalSettingsValue,
   NotificationTarget,
 } from '../../../shared/types/index'
+import type { HomeLayout } from '../../../shared/schemas/settings.schema'
 import { parsePatterns, PATTERNS_PLACEHOLDER } from './patterns'
 import { QuickActionsSettings } from './QuickActionsSettings'
 import '@terminator/extension-ui/settings-fields.css'
@@ -164,6 +165,7 @@ function InterfaceFields({ settings }: { settings: Settings }): JSX.Element {
         </span>
       </div>
       <HideSidebarOnHomeField hide={settings.ui?.hideSidebarOnHome ?? true} />
+      <HomeLayoutField layout={settings.ui?.homeLayout ?? 'tasks'} />
       <StaleAfterField staleAfterMs={settings.sidebar.staleAfterMs} />
     </>
   )
@@ -184,6 +186,29 @@ function HideSidebarOnHomeField({ hide }: { hide: boolean }): JSX.Element {
         {HIDE_SIDEBAR_LABEL}
       </label>
       <span className="settings-section__hint">Press ⌘B to show it</span>
+    </div>
+  )
+}
+
+function HomeLayoutField({ layout }: { layout: HomeLayout }): JSX.Element {
+  const updateHomeLayout = useSettingsStore((s) => s.updateHomeLayout)
+  return (
+    <div className="settings-section__field">
+      <label className="settings-section__label" htmlFor="home-layout">
+        Home layout
+      </label>
+      <select
+        id="home-layout"
+        className="settings-section__input"
+        value={layout}
+        onChange={(e) => void updateHomeLayout(e.target.value as HomeLayout)}
+      >
+        <option value="classic">Classic</option>
+        <option value="tasks">Tasks</option>
+      </select>
+      <span className="settings-section__hint">
+        Tasks shows what needs you, then your tasks. Classic keeps the Desk as it was.
+      </span>
     </div>
   )
 }

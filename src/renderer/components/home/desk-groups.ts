@@ -1,7 +1,8 @@
 import type { DeskCount } from './desk-filter'
+import type { TaskState } from '../../home/task-state'
 import { focusFirst, groupThreads, type WorkThread } from '../../home/work-threads'
 
-export type DeskGroupBy = 'move' | 'repo'
+export type DeskGroupBy = 'move' | 'repo' | 'none'
 
 export interface DeskGroup {
   id: string
@@ -18,6 +19,7 @@ export interface DeskGroup {
 export const DESK_GROUP_OPTIONS: ReadonlyArray<readonly [DeskGroupBy, string]> = [
   ['move', 'state'],
   ['repo', 'repo'],
+  ['none', 'none'],
 ]
 
 const NO_REPO_LABEL = 'Scratch terminals'
@@ -49,10 +51,33 @@ function byRepo(threads: readonly WorkThread[]): DeskGroup[] {
     }))
 }
 
-/** The Desk's lists, grouped by state or by repo; archived threads are left out. */
+function inOneGroup(threads: readonly WorkThread[]): DeskGroup[] {
+  const all = [...threads].sort(focusFirst)
+  return all.length === 0
+    ? []
+    : [{ id: 'all', label: 'All', tone: 'muted', collapsible: false, threads: all }]
+}
+
+const GROUPERS: Record<DeskGroupBy, (threads: readonly WorkThread[]) => DeskGroup[]> = {
+  move: byState,
+  repo: byRepo,
+  none: inOneGroup,
+}
+
+/** The Desk's lists, grouped by state, by repo or not at all; archived threads are left out. */
 export function deskGroups(threads: readonly WorkThread[], groupBy: DeskGroupBy): DeskGroup[] {
-  const shown = threads.filter((t) => !t.archived)
-  return groupBy === 'move' ? byState(shown) : byRepo(shown)
+  return GROUPERS[groupBy](threads.filter((t) => !t.archived))
+}
+
+/** The states whose tasks need no attention, so the Tasks list folds them to one line. */
+const FOLDED_STATES: readonly string[] = ['quiet', 'done']
+
+/** The Tasks list's groups: those of the Desk, with Quiet and Done folded when grouped by state. */
+export function taskGroups(threads: readonly WorkThread[], groupBy: DeskGroupBy): DeskGroup[] {
+  return deskGroups(threads, groupBy).map((group) => ({
+    ...group,
+    collapsible: groupBy === 'move' && FOLDED_STATES.includes(group.id),
+  }))
 }
 
 /** The keys of the rows on screen, top to bottom; a collapsed group shows none. */
@@ -65,6 +90,8 @@ export function visibleThreadKeys(groups: readonly DeskGroup[], expandedIds: rea
 export interface DeskFilterValue {
   text: string
   count: DeskCount | null
+  /** The state pressed on the Tasks layout's pulse line. */
+  taskState?: TaskState | null
 }
 
 const failingFilter = (t: WorkThread): boolean => t.prChip?.tone === 'bad'
@@ -86,6 +113,9 @@ function matchesText(thread: WorkThread, text: string): boolean {
 /** The threads the Desk's search box and the summary counts leave showing. */
 export function filterThreads(threads: readonly WorkThread[], filter: DeskFilterValue) {
   return threads.filter(
-    (t) => matchesText(t, filter.text) && (!filter.count || COUNT_MATCHES[filter.count](t))
+    (t) =>
+      matchesText(t, filter.text) &&
+      (!filter.count || COUNT_MATCHES[filter.count](t)) &&
+      (!filter.taskState || t.state === filter.taskState)
   )
 }

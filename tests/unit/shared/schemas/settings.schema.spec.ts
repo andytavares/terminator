@@ -23,3 +23,25 @@ describe('GlobalSettingsSchema — ui.hideSidebarOnHome', () => {
     expect(parsed.ui.hideSidebarOnHome).toBe(false)
   })
 })
+
+describe('GlobalSettingsSchema — ui.homeLayout', () => {
+  it('is Tasks when the settings have never set it', () => {
+    expect(
+      GlobalSettingsSchema.parse({ ...base, ui: { hasSeenWelcome: true } }).ui.homeLayout
+    ).toBe('tasks')
+  })
+
+  it('is Tasks in the shipped defaults', () => {
+    expect(defaultGlobalSettings('/bin/zsh').ui.homeLayout).toBe('tasks')
+  })
+
+  it('keeps Classic and rejects a layout that does not exist', () => {
+    const ui = { hasSeenWelcome: true }
+    expect(
+      GlobalSettingsSchema.parse({ ...base, ui: { ...ui, homeLayout: 'classic' } }).ui.homeLayout
+    ).toBe('classic')
+    expect(
+      GlobalSettingsSchema.safeParse({ ...base, ui: { ...ui, homeLayout: 'board' } }).success
+    ).toBe(false)
+  })
+})

@@ -148,6 +148,12 @@ describe('In flight rows — grouping', () => {
     expect(screen.queryByText(/Running · /)).toBeNull()
   })
 
+  it('names the grouping chosen on the Tasks layout, including none', () => {
+    useDeskSelection.setState({ groupBy: 'none' })
+    render(<InFlight />)
+    expect(screen.getByRole('button', { name: 'Group: none' })).toBeTruthy()
+  })
+
   it('marks the selected row', () => {
     useDeskSelection.getState().select('linear:TAV-31')
     render(<InFlight />)
@@ -172,7 +178,7 @@ describe('the work-thread drawer', () => {
     expect(drawer.getByText('AGENTS AND TERMINALS · 1')).toBeTruthy()
     expect(drawer.getByText('PULL REQUEST #275')).toBeTruthy()
     expect(drawer.getByText('End-to-end tests')).toBeTruthy()
-    expect(await drawer.findByText(/\+412 −88/)).toBeTruthy()
+    expect((await drawer.findAllByText(/\+412 −88/)).length).toBeGreaterThan(0)
     expect(await drawer.findByText(/1\.2M tokens · \$3\.10/)).toBeTruthy()
     expect(drawer.getByText('Keep the existing risk chip.')).toBeTruthy()
   })

@@ -1,6 +1,7 @@
 import { plural } from '@terminator/extension-sdk/plain'
 import type { HomeAsk, HomeFocusCandidate } from '../../shared/schemas/home-feed.schema'
 import { localDateKey, type FocusItem } from './focus'
+import type { WorkThread } from './work-threads'
 
 // What the morning band says, as functions of the data it is given.
 
@@ -79,3 +80,12 @@ const FULL_BAR_MINUTES = 60
 
 export const reviewLoadShare = (minutes: number): number =>
   Math.min(100, Math.round((minutes / FULL_BAR_MINUTES) * 100))
+
+/** "Already running: 5 agents across 3 tasks."; null when no agent is working. */
+export function runningSentence(threads: readonly WorkThread[]): string | null {
+  const working = threads.map((t) => t.sessions.filter((s) => s.state === 'working').length)
+  const agents = working.reduce((sum, count) => sum + count, 0)
+  if (agents === 0) return null
+  const tasks = working.filter((count) => count > 0).length
+  return `Already running: ${agents} ${plural(agents, 'agent')} across ${tasks} ${plural(tasks, 'task')}.`
+}

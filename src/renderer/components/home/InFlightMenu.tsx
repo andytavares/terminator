@@ -5,6 +5,7 @@ import { ContextMenu, closeAllContextMenus, type ContextMenuItem } from '../Cont
 import { afterClosing } from '../sidebar/row-events'
 import { useDismissedThreads } from './dismissed-threads'
 import { leadSessionOf, toggleArchived } from './thread-actions'
+import { toggleDone } from './task-actions'
 import { SESSION_ACTIONS } from '../session/session-actions'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { ConfirmDialog } from '../ConfirmDialog'
@@ -40,12 +41,17 @@ type Run = (fn: () => void) => () => void
 /** Session actions: open the terminal, rename the title, or link a ticket. */
 function sessionItems(thread: WorkThread, run: Run, actions: ItemActions): ContextMenuItem[] {
   const lead = leadSessionOf(thread)
-  if (!lead) return []
-  const items: ContextMenuItem[] = [
-    { label: 'Open terminal', onSelect: run(() => SESSION_ACTIONS.onOpen(lead.sessionId)) },
-    { label: 'Rename…', onSelect: run(actions.onStartRename) },
-  ]
-  if (thread.ticketKey === undefined) {
+  const items: ContextMenuItem[] = []
+  if (lead) {
+    items.push({
+      label: 'Open terminal',
+      onSelect: run(() => SESSION_ACTIONS.onOpen(lead.sessionId)),
+    })
+  }
+  if (lead || thread.taskId !== null) {
+    items.push({ label: 'Rename…', onSelect: run(actions.onStartRename) })
+  }
+  if (lead && thread.ticketKey === undefined) {
     items.push({ label: 'Link ticket…', onSelect: run(actions.onLink) })
   }
   return items
@@ -65,7 +71,18 @@ function dismissWithUndo(thread: WorkThread): void {
 
 /** Archive or Restore, and Dismiss: what every row offers. */
 function rowItems(thread: WorkThread, run: Run): ContextMenuItem[] {
+  const done: ContextMenuItem[] =
+    thread.taskId === null
+      ? []
+      : [
+          {
+            label: thread.doneAt === null ? 'Mark done' : 'Undo done',
+            separatorBefore: true,
+            onSelect: run(() => void toggleDone(thread)),
+          },
+        ]
   return [
+    ...done,
     {
       label: thread.archived ? 'Restore' : 'Archive',
       separatorBefore: true,

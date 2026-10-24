@@ -168,13 +168,17 @@ function collectDrafts(input: WorkThreadInput): Draft[] {
   return [...drafts.values()]
 }
 
-function nowLineOf(draft: Draft): string {
-  const asking = draft.sessions.find((s) => s.state === 'awaiting-input')
+/** What the sessions are doing: the question one is asking, else what one is printing; empty when neither. */
+export function sessionLineOf(sessions: readonly SessionFacts[]): string {
+  const asking = sessions.find((s) => s.state === 'awaiting-input')
   if (asking) {
     return `Asking: ${asking.choicePrompt?.question ?? asking.askMessage ?? asking.latestLine}`
   }
-  const working = draft.sessions.find((s) => s.state === 'working' && s.latestLine !== '')
-  return working?.latestLine ?? mainFacet(draft)?.line ?? ''
+  return sessions.find((s) => s.state === 'working' && s.latestLine !== '')?.latestLine ?? ''
+}
+
+function nowLineOf(draft: Draft): string {
+  return sessionLineOf(draft.sessions) || (mainFacet(draft)?.line ?? '')
 }
 
 function mainFacet(draft: Draft): ThreadFacet | undefined {

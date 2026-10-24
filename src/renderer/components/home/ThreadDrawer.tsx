@@ -7,12 +7,7 @@ import { useNow } from '../session/useNow'
 import { useDeskSelection } from './desk-selection'
 import { useWorkThreads } from './useWorkThreads'
 import { pullRequestOf, stateCaption } from './thread-format'
-import {
-  leadSessionOf,
-  openLinkExternally,
-  startAgentOnBranch,
-  toggleArchived,
-} from './thread-actions'
+import { leadSessionOf, openLinkExternally, startAgentOnBranch } from './thread-actions'
 import {
   AgentsSection,
   PullRequestSection,
@@ -20,6 +15,8 @@ import {
   TerminalSection,
   TimelineSection,
 } from './ThreadDrawerSections'
+import { StateGlyph } from './StateGlyph'
+import { LanesSection, TaskActions, taskCountsOf, taskSummaryOf } from './ThreadDrawerLanes'
 import type { WorkThread } from '../../home/work-threads'
 import './ThreadDrawer.css'
 
@@ -50,14 +47,6 @@ function LinkButtons({ thread }: { thread: WorkThread }): JSX.Element {
   )
 }
 
-function ArchiveButton({ thread }: { thread: WorkThread }): JSX.Element {
-  return (
-    <Button size="sm" variant="ghost" onClick={() => toggleArchived(thread)}>
-      {thread.archived ? 'Restore' : 'Archive'}
-    </Button>
-  )
-}
-
 function DrawerActions({ thread }: { thread: WorkThread }): JSX.Element {
   const lead = leadSessionOf(thread)
   return (
@@ -74,7 +63,6 @@ function DrawerActions({ thread }: { thread: WorkThread }): JSX.Element {
         New agent on this branch
       </Button>
       <LinkButtons thread={thread} />
-      <ArchiveButton thread={thread} />
     </div>
   )
 }
@@ -97,9 +85,12 @@ function ThreadDrawerHeader({ thread }: { thread: WorkThread }): JSX.Element {
         </span>
       </div>
       <h4>
+        <StateGlyph state={thread.state} inferred={thread.inferred} />{' '}
         {thread.ticketKey && <span className="desk-dr-h__key">{thread.ticketKey}</span>}{' '}
         {thread.title}
       </h4>
+      {thread.lanes.length > 0 && <p className="task-summary">{taskSummaryOf(thread)}</p>}
+      <p className="task-summary task-summary--counts">{taskCountsOf(thread)}</p>
       <DrawerActions thread={thread} />
     </div>
   )
@@ -132,11 +123,13 @@ export function ThreadDrawer(): JSX.Element | null {
       <ThreadDrawerHeader thread={thread} />
       <div className="desk-pipe">{stateCaption(thread, now)}</div>
       <div className="desk-dr-b">
+        <LanesSection thread={thread} />
         <TerminalSection thread={thread} />
         <SummarySection thread={thread} />
         <AgentsSection thread={thread} now={now} />
         <PullRequestSection thread={thread} />
         <TimelineSection thread={thread} now={now} />
+        <TaskActions thread={thread} />
       </div>
     </Drawer>
   )

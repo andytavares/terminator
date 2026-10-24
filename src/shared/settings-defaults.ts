@@ -8,7 +8,7 @@ export function defaultGlobalSettings(defaultShell: string): GlobalSettings {
     appearance: { theme: 'dark' },
     terminal: { scrollbackLimit: 10000, defaultShell, promptForName: false },
     git: { worktreeBaseDir: '', branchExcludePatterns: [] },
-    ui: { hasSeenWelcome: false, editor: '', hideSidebarOnHome: true },
+    ui: { hasSeenWelcome: false, editor: '', hideSidebarOnHome: true, homeLayout: 'tasks' },
     sidebar: { staleAfterMs: 2 * 60 * 60 * 1000 },
     notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },
     quickActions: { pins: [], usage: [], directUse: [], custom: [] },

@@ -1,26 +1,11 @@
-import React, { useEffect, useMemo } from 'react'
+import React, { useEffect } from 'react'
 import { Check, ChevronDown, ChevronRight, Clock, Sun } from 'lucide-react'
 import { Button, Checkbox, Kbd } from '@terminator/extension-ui'
-import { useHomeFeedStore } from '../../stores/home-feed.store'
 import { useFocusStore } from '../../home/focus-store'
-import {
-  FOCUS_LIMIT,
-  carriedOver,
-  focusDone as isFocusDone,
-  localDateKey,
-  type FocusItem,
-} from '../../home/focus'
-import {
-  carriedOverRows,
-  estimatedReviewMinutes,
-  planSentence,
-  reviewLoadShare,
-  yesterdayKey,
-  type PlanRow,
-} from '../../home/plan-the-day'
+import { FOCUS_LIMIT, localDateKey, type FocusItem } from '../../home/focus'
+import { reviewLoadShare, type PlanRow } from '../../home/plan-the-day'
 import { useNow } from '../session/useNow'
-import { useDeskModel } from './useDeskModel'
-import { useWorkThreads } from './useWorkThreads'
+import { usePlan } from './usePlan'
 import { TicketsColumn } from './TicketsColumn'
 import './PlanTheDay.css'
 
@@ -31,39 +16,6 @@ export function PlanTheDay(): JSX.Element | null {
   const now = useNow()
   const dismissedOn = useFocusStore((s) => s.planDismissedOn)
   return dismissedOn === localDateKey(now) ? null : <PlanBand now={now} />
-}
-
-interface Plan {
-  sentence: string
-  carried: PlanRow[]
-  today: FocusItem[]
-  reviewMinutes: number
-}
-
-function usePlan(now: number): Plan {
-  const { asks } = useDeskModel()
-  const { allThreads } = useWorkThreads()
-  const candidates = useHomeFeedStore((s) => s.focus)
-  const days = useFocusStore((s) => s.days)
-  return useMemo(() => {
-    const today = days[localDateKey(now)] ?? []
-    const yesterday = days[yesterdayKey(now)] ?? []
-    const finished = yesterday.filter((item) => isFocusDone(item, allThreads, candidates))
-    const left = carriedOver(yesterday).filter((item) => !finished.includes(item))
-    return {
-      sentence: planSentence({
-        focusTotal: yesterday.length,
-        focusDone: finished.length,
-        waiting: {
-          agents: asks.filter((a) => a.kind === 'finished').length,
-          reviews: asks.filter((a) => a.kind === 'review').length,
-        },
-      }),
-      carried: carriedOverRows(left, candidates, today),
-      today,
-      reviewMinutes: estimatedReviewMinutes(asks),
-    }
-  }, [asks, candidates, days, now, allThreads])
 }
 
 function useStartTheDayShortcut(start: () => void): void {
@@ -179,7 +131,7 @@ function AddButton({ item, disabled }: AddProps): JSX.Element {
   )
 }
 
-function CarriedOverColumn({ rows, full }: { rows: PlanRow[]; full: boolean }): JSX.Element {
+export function CarriedOverColumn({ rows, full }: { rows: PlanRow[]; full: boolean }): JSX.Element {
   return (
     <div className="plan__column">
       <ColumnTitle icon={<Clock aria-hidden="true" />}>CARRIED OVER</ColumnTitle>
@@ -198,7 +150,7 @@ function CarriedOverColumn({ rows, full }: { rows: PlanRow[]; full: boolean }): 
   )
 }
 
-function FocusColumn(props: { today: FocusItem[]; reviewMinutes: number }): JSX.Element {
+export function FocusColumn(props: { today: FocusItem[]; reviewMinutes: number }): JSX.Element {
   const removeFocus = useFocusStore((s) => s.removeFocus)
   const slots = Array.from({ length: FOCUS_LIMIT }, (_, index) => props.today[index])
   return (

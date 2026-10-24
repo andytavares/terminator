@@ -4,8 +4,7 @@ import { Chip, StatusDot } from '@terminator/extension-ui'
 import { compactAge, stateCaption } from './thread-format'
 import { useDeskSelection } from './desk-selection'
 import { InFlightMenu, useWorkMenu, type WorkMenuState } from './InFlightMenu'
-import { SESSION_ACTIONS } from '../session/session-actions'
-import { leadSessionOf } from './thread-actions'
+import { renameThread } from './task-actions'
 import type { WorkThread } from '../../home/work-threads'
 
 interface InFlightRowProps {
@@ -29,7 +28,7 @@ interface WorkCellProps {
   onCancelRename: () => void
 }
 
-function RenameField({
+export function RenameField({
   thread,
   onRename,
   onCancelRename,
@@ -113,12 +112,6 @@ function PullRequestCell({ thread }: { thread: WorkThread }): JSX.Element {
   )
 }
 
-/** Saves the typed rename as the lead session's description — the title's last candidate. */
-function saveRename(thread: WorkThread, text: string): void {
-  const lead = leadSessionOf(thread)
-  if (lead) SESSION_ACTIONS.onSaveDescription(lead, text)
-}
-
 /** The row's rename mode: on, off without saving, and off saving the typed text. */
 function useTitleRename(thread: WorkThread) {
   const [renaming, setRenaming] = React.useState(false)
@@ -128,7 +121,7 @@ function useTitleRename(thread: WorkThread) {
     cancelTitleRename: () => setRenaming(false),
     finishTitleRename: (text: string) => {
       setRenaming(false)
-      saveRename(thread, text)
+      renameThread(thread, text)
     },
   }
 }

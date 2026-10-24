@@ -7,7 +7,7 @@ import type { HomeViewName } from './home-view'
 
 export type DeskKeyCommand =
   | { kind: 'move'; step: 1 | -1 }
-  | { kind: 'open' | 'reply' | 'done' | 'snooze' | 'terminal' | 'escape' | 'go-to' }
+  | { kind: 'open' | 'reply' | 'done' | 'snooze' | 'terminal' | 'escape' | 'go-to' | 'plan' }
   | { kind: 'choose'; number: number }
   | { kind: 'view'; view: HomeViewName }
 
@@ -21,6 +21,7 @@ const LETTER_COMMANDS: Record<string, DeskKeyCommand> = {
   h: { kind: 'snooze' },
   t: { kind: 'terminal' },
   g: { kind: 'go-to' },
+  p: { kind: 'plan' },
   Enter: { kind: 'open' },
   Escape: { kind: 'escape' },
 }

@@ -7,6 +7,9 @@ import { QuietDesk } from './QuietDesk'
 import { InFlight } from './InFlight'
 import { TodayRail } from './TodayRail'
 import { useHomeView } from './home-view'
+import { useHomeLayout } from './home-layout'
+import { TasksBody } from './TasksBody'
+import { usePlanSheet } from './plan-sheet'
 import { useDeskModel, type DeskState } from './useDeskModel'
 import { useDeskController, type DeskController } from './use-desk-controller'
 import { useDeskKeys } from './use-desk-keys'
@@ -42,7 +45,7 @@ export function HomeScreen(_props: HomeScreenProps = {}): JSX.Element {
     <section className="desk" aria-label="Home" tabIndex={-1} ref={rootRef} onKeyDown={onKeyDown}>
       <DeskHeader ref={searchRef} now={desk.now} />
       <Suspense fallback={null}>
-        {view === 'insights' ? <Insights /> : <DeskBody desk={desk} controller={controller} />}
+        {view === 'insights' ? <Insights /> : <Body desk={desk} controller={controller} />}
       </Suspense>
     </section>
   )
@@ -55,6 +58,8 @@ function useRootKeys(
 ) {
   const onDeskKey = useDeskKeys(controller.onCommand)
   return (event: React.KeyboardEvent): void => {
+    // The Plan sheet is modal: its keys are its own, and the Desk behind it must not re-render mid-press.
+    if (usePlanSheet.getState().open) return
     if (event.metaKey && event.key === 'k') {
       event.preventDefault()
       event.stopPropagation()
@@ -63,6 +68,10 @@ function useRootKeys(
     }
     onDeskKey(event)
   }
+}
+
+function Body(props: DeskBodyProps): JSX.Element {
+  return useHomeLayout() === 'tasks' ? <TasksBody {...props} /> : <DeskBody {...props} />
 }
 
 type ShownDesk = DeskState & { searching: boolean }

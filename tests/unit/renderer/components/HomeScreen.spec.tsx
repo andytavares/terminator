@@ -56,6 +56,8 @@ import { useFocusStore } from '../../../../src/renderer/home/focus-store'
 import { localDateKey } from '../../../../src/renderer/home/focus'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
+import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
+import { defaultGlobalSettings } from '../../../../src/shared/settings-defaults'
 
 const NOW = Date.now()
 
@@ -113,6 +115,11 @@ beforeEach(() => {
   useDismissalsStore.setState({ entries: {} })
   useStartWorkStore.setState({ open: false })
   useFocusStore.setState({ days: {} })
+  // These specs cover the Classic Desk; the Tasks layout has its own spec.
+  const defaults = defaultGlobalSettings('/bin/zsh')
+  useSettingsStore.setState({
+    globalSettings: { ...defaults, ui: { ...defaults.ui, homeLayout: 'classic' } },
+  })
   useSessionStore.setState({
     getTerminalInstance: () =>
       ({ readVisibleRows: () => ['Do you want to run it?', '❯ 1. Yes', '', ''] }) as never,

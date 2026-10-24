@@ -21,6 +21,9 @@ import { workKeyOfThread } from '../../../../src/renderer/components/home/focus-
 import { summaryInputOf } from '../../../../src/renderer/components/home/useThreadSummary'
 import { usageLabel } from '../../../../src/renderer/components/home/useSessionUsage'
 import { FACTS, NOW, REPO_ROOT, seedDesk } from '../home/desk-world'
+import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
+import { defaultGlobalSettings } from '../../../../src/shared/settings-defaults'
+import type { HomeLayout } from '../../../../src/shared/schemas/settings.schema'
 import type { WorkThread } from '../../../../src/renderer/home/work-threads'
 
 const world = vi.hoisted(() => ({ facts: [] as unknown[] }))
@@ -74,8 +77,14 @@ describe('useWorkThreads', () => {
   })
 })
 
+function useHomeLayoutSetting(homeLayout: HomeLayout): void {
+  const defaults = defaultGlobalSettings('/bin/zsh')
+  useSettingsStore.setState({ globalSettings: { ...defaults, ui: { ...defaults.ui, homeLayout } } })
+}
+
 describe('useOrderedThreadKeys', () => {
   it('lists the rows as drawn: by state, with archived work left out', () => {
+    useHomeLayoutSetting('classic')
     const { result } = renderHook(() => useOrderedThreadKeys())
     expect(result.current).toEqual([
       'linear:TAV-31',
@@ -98,6 +107,16 @@ describe('useOrderedThreadKeys', () => {
       selectedThreadKey: 'k',
       openThreadKey: null,
     })
+  })
+})
+
+describe('useOrderedThreadKeys — Tasks layout', () => {
+  it('skips the rows of a folded Quiet group in the Tasks layout, until it is shown', () => {
+    useHomeLayoutSetting('tasks')
+    const { result } = renderHook(() => useOrderedThreadKeys())
+    expect(result.current).not.toContain('session:scratch')
+    act(() => useDeskSelection.getState().toggleGroup('quiet'))
+    expect(result.current).toContain('session:scratch')
   })
 })
 

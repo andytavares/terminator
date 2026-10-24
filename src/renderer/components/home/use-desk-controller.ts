@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDeskSelection, useOrderedThreadKeys } from './desk-selection'
 import { useHomeView } from './home-view'
+import { usePlanSheet } from './plan-sheet'
 import { openAsk, replyToSession, runAskAction } from './desk-actions'
 import type { DeskKeyCommand } from './use-desk-keys'
 import type { DeskState } from './useDeskModel'
@@ -166,6 +167,7 @@ export function useDeskController(desk: DeskState): DeskController {
       return moveSelection(command.step, { ...move, resetCursor: () => setCursor(() => NO_CURSOR) })
     }
     if (command.kind === 'view') return showView(command.view)
+    if (command.kind === 'plan') return usePlanSheet.getState().show()
     if (command.kind === 'open' && threadKey !== null)
       return useDeskSelection.getState().openThread(threadKey)
     if (command.kind === 'escape') return closeInnermost(cursor, handlers)
