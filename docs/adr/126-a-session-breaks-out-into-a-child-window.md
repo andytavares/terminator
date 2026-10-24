@@ -30,3 +30,11 @@ This is the only option where "process, scrollback and agent state carry over un
 - Closing a breakout window docks its session at its original branch and tab position. It never kills the process.
 - `Cmd+W` in a breakout window closes that session, not the main window's active tab.
 - `Shift+Cmd+O` toggles: it moves the focused session out, and in a breakout window moves it back.
+
+## Amendment, 2026-10-24: a tab drag follows the pointer, not HTML drag and drop
+
+The first version dragged tabs with HTML drag and drop and, at `dragend`, asked main where the cursor was. On macOS an unaccepted drop slides back to its start before `dragend` fires, and the cursor read at that point is wherever the hand has moved since. A tab released outside the window counted as dropped inside, and nothing opened.
+
+A tab drag now captures the pointer (`src/renderer/terminal/tab-drag.ts`). The release reports at once, with its own screen position, even outside the window. Every Terminator window belongs to this renderer, so whether that point is over one is a rectangle test here, and the main-process check is gone. Escape cancels a drag. The same drag reorders tabs and docks a breakout window's tab over the main window.
+
+Moving a terminal between windows also exposed an xterm 6.0.0 bug: a frame requested in a window that then closes never runs, and a pending frame blocks every later refresh, so the terminal stopped drawing. `patches/@xterm+xterm+6.0.0.patch` (patch-package) requests the frame again in the new window. Re-check it on every xterm upgrade; the bug is still in 6.1.0-beta.315.

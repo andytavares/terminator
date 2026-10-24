@@ -5,12 +5,7 @@ import { BreakoutDropZone } from '../../../../src/renderer/components/terminal/B
 import { useBreakoutStore } from '../../../../src/renderer/stores/breakout.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
-import {
-  beginSessionDrag,
-  draggedSession,
-  endSessionDrag,
-} from '../../../../src/renderer/terminal/session-drag'
-import { partialFake } from '../../../support/fakes'
+import { useTabDragStore } from '../../../../src/renderer/terminal/tab-drag'
 import { SCRATCH_PROJECT_ID } from '../../../../src/shared/types/index'
 import {
   projectFixture,
@@ -19,22 +14,9 @@ import {
   workspaceFixture,
 } from '../../../support/renderer-stores'
 
-const dockBack = vi.hoisted(() => vi.fn())
-vi.mock('../../../../src/renderer/terminal/breakout', () => ({ dockBack }))
-
-/** Starts a drag of the session's tab, as a dragstart on it does. */
-const startSessionDrag = (sessionId: string) =>
-  beginSessionDrag(
-    partialFake<React.DragEvent>({ dataTransfer: partialFake<DataTransfer>({ setData: vi.fn() }) }),
-    sessionId
-  )
-
-function fire(type: 'dragenter' | 'dragover' | 'dragleave' | 'drop'): Event {
-  const event = new Event(type, { bubbles: true, cancelable: true })
-  act(() => {
-    document.dispatchEvent(event)
-  })
-  return event
+/** A tab of this session being dragged, over the main window or not. */
+function dragging(sessionId: string, overMainWindow = true): void {
+  act(() => useTabDragStore.setState({ sessionId, overSessionId: null, overMainWindow }))
 }
 
 beforeEach(() => {
@@ -61,79 +43,45 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  endSessionDrag()
+  useTabDragStore.setState({ sessionId: null, overSessionId: null, overMainWindow: false })
   cleanup()
 })
 
 describe('BreakoutDropZone', () => {
   it('is not drawn when nothing is being dragged', () => {
     render(<BreakoutDropZone />)
-    fire('dragenter')
     expect(screen.queryByRole('region')).toBeNull()
   })
 
   it('is not drawn for a tab whose terminal is not in its own window', () => {
     render(<BreakoutDropZone />)
-    startSessionDrag('s3')
-    fire('dragenter')
+    dragging('s3')
     expect(screen.queryByRole('region')).toBeNull()
   })
 
-  it('names the terminal, its workspace and its branch while one is dragged in', () => {
+  it('names the terminal, its workspace and its branch while one is dragged over the window', () => {
     render(<BreakoutDropZone />)
-    startSessionDrag('s1')
-    fire('dragenter')
+    dragging('s1')
     const region = screen.getByRole('region', { name: 'Return Terminal 2 to its tabs' })
     expect(region.textContent).toContain('Drop to return Terminal 2')
     expect(region.textContent).toContain('to Terminator · feat/breakout')
   })
+})
 
+describe('BreakoutDropZone — the prompt', () => {
   it('names Scratch for a scratch terminal', () => {
     render(<BreakoutDropZone />)
-    startSessionDrag('s2')
-    fire('dragenter')
+    dragging('s2')
     expect(screen.getByRole('region').textContent).toContain('to Scratch')
   })
-})
 
-describe('BreakoutDropZone — dropping', () => {
-  it('allows the drop only while it is showing', () => {
+  it('goes away when the drag leaves the window, and when it ends', () => {
     render(<BreakoutDropZone />)
-    expect(fire('dragover').defaultPrevented).toBe(false)
-    startSessionDrag('s1')
-    fire('dragenter')
-    expect(fire('dragover').defaultPrevented).toBe(true)
-  })
-
-  it('goes away when the drag leaves the window', () => {
-    render(<BreakoutDropZone />)
-    startSessionDrag('s1')
-    fire('dragenter')
-    fire('dragleave')
+    dragging('s1')
+    dragging('s1', false)
     expect(screen.queryByRole('region')).toBeNull()
-  })
-
-  it('docks the terminal on a drop and goes away', () => {
-    render(<BreakoutDropZone />)
-    startSessionDrag('s1')
-    fire('dragenter')
-    fire('drop')
-    expect(dockBack).toHaveBeenCalledWith('s1')
+    dragging('s1')
+    act(() => useTabDragStore.setState({ sessionId: null, overMainWindow: false }))
     expect(screen.queryByRole('region')).toBeNull()
-  })
-})
-
-describe('BreakoutDropZone — after a drop', () => {
-  it('ends the drag on a drop, since the docked tab is gone before its dragend', () => {
-    render(<BreakoutDropZone />)
-    startSessionDrag('s1')
-    fire('drop')
-    expect(draggedSession()).toBeNull()
-  })
-
-  it('docks nothing on a drop that carries no breakout terminal', () => {
-    render(<BreakoutDropZone />)
-    fire('drop')
-    expect(dockBack).not.toHaveBeenCalled()
   })
 })
