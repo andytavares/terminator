@@ -11,6 +11,7 @@ import { StartWorkHost } from '../components/home/StartWorkHost'
 // app before a lazily loaded panel mounted, and be lost.
 import { QuickActionsHost, type QuickActionsHostProps } from '../components/QuickActionsHost'
 import type { PendingTab } from './terminal-launch'
+import { BreakoutWindows } from '../components/terminal/BreakoutWindowView'
 
 // Opened on demand, so it is its own chunk rather than part of the first
 // script (https://react.dev/reference/react/lazy).
@@ -62,6 +63,7 @@ export function ShellOverlays(state: ShellOverlayState): JSX.Element {
       <HomeBadge />
       <ToastContainer />
       <ExtensionOverlays />
+      <BreakoutWindows />
     </>
   )
 }

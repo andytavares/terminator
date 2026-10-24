@@ -1,9 +1,11 @@
 import React from 'react'
+import { SESSION_DRAG_TYPE } from '../../../../src/renderer/terminal/session-drag'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, render, screen, fireEvent } from '@testing-library/react'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useTerminalOpenErrorStore } from '../../../../src/renderer/stores/terminal-open-error.store'
 import { TerminalPane } from '../../../../src/renderer/components/terminal/TerminalPane'
+import { useBreakoutStore } from '../../../../src/renderer/stores/breakout.store'
 import { useModalStore } from '../../../../src/renderer/stores/modal.store'
 import { seedStore } from '../../../support/renderer-stores'
 import type { PaneNode } from '../../../../src/shared/types/index'
@@ -151,6 +153,27 @@ describe('TerminalPane — pastes dropped file paths into the active terminal se
   })
 })
 
+describe('TerminalPane — a dropped terminal tab', () => {
+  it('ignores a dropped terminal tab', () => {
+    const mockPaste = vi.fn()
+    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
+    mockGetActive.mockReturnValue('ses-1')
+    mockGetInstance.mockReturnValue({
+      terminal: { paste: mockPaste, focus: vi.fn(), scrollToBottom: vi.fn() },
+      mount: vi.fn(),
+      unmount: vi.fn(),
+    })
+    const { container } = render(<TerminalPane projectId="proj-1" />)
+    fireEvent.drop(container.querySelector('.terminal-pane')!, {
+      dataTransfer: {
+        files: [fileAt('/Users/me/report.pdf')],
+        types: [SESSION_DRAG_TYPE, 'Files'],
+      },
+    })
+    expect(mockPaste).not.toHaveBeenCalled()
+  })
+})
+
 describe('TerminalPane — quotes paths with spaces when dropping files', () => {
   it('quotes paths with spaces when dropping files', () => {
     const mockPaste = vi.fn()
@@ -259,6 +282,24 @@ describe('TerminalPane — unmounts previous session instance when active sessio
     rerender(<TerminalPane projectId="proj-1" />)
     expect(unmountFirst).toHaveBeenCalled()
     expect(unmountSecond).not.toHaveBeenCalled()
+  })
+})
+
+describe('TerminalPane — the active tab lives in its own window', () => {
+  const sole = [{ id: 'ses-1', tabTitle: 'T', type: 'human' }]
+
+  afterEach(() => useBreakoutStore.setState(useBreakoutStore.getInitialState(), true))
+
+  it('keeps the terminal out of the pane while the window has it, and takes it back on dock', () => {
+    const mockMount = vi.fn()
+    mockGetSessions.mockReturnValue(sole)
+    mockGetActive.mockReturnValue('ses-1')
+    mockGetInstance.mockReturnValue({ ...instanceFocusing(vi.fn()), mount: mockMount })
+    useBreakoutStore.getState().add('ses-1', {} as Window)
+    render(<TerminalPane projectId="proj-1" />)
+    expect(mockMount).not.toHaveBeenCalled()
+    act(() => useBreakoutStore.getState().remove('ses-1'))
+    expect(mockMount).toHaveBeenCalledTimes(1)
   })
 })
 

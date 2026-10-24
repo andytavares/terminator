@@ -2,6 +2,8 @@ import { useShallow } from 'zustand/react/shallow'
 import React, { useState } from 'react'
 import { Play, Circle, Pause, CircleX } from 'lucide-react'
 import { useSessionStore } from '../../stores/session.store'
+import { useBreakoutStore } from '../../stores/breakout.store'
+import { beginSessionDrag, finishSessionDrag } from '../../terminal/session-drag'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { AlertBadge } from '../AlertBadge'
 import { MoveSessionDialog } from '../sidebar/MoveSessionDialog'
@@ -216,15 +218,23 @@ interface SessionTabsProps {
   onNewTab: () => void
 }
 
-/** The branch's terminals, in their order, which a drag rearranges. */
+/** The saved order after the drawn tabs were rearranged: every tab that is not drawn keeps the
+ * place it had. */
+function orderKeepingHidden(all: TerminalSession[], reorderedDrawn: TerminalSession[]): string[] {
+  const drawnIds = new Set(reorderedDrawn.map((s) => s.id))
+  const remaining = [...reorderedDrawn]
+  return all.map((s) => (drawnIds.has(s.id) ? remaining.shift()! : s).id)
+}
+
+/** The branch's terminals, in their order, which a drag rearranges. One in its own window has no
+ * tab here, and gets its place back when it docks. */
 function SessionTabs(props: SessionTabsProps): JSX.Element {
   const { projectId } = props
-  const { sessions } = props.tabs
+  const windows = useBreakoutStore((s) => s.windows)
+  const all = props.tabs.sessions
+  const sessions = all.filter((s) => !windows.has(s.id))
   const { dragOverIndex, getItemProps } = useDragReorder(sessions, (reordered) =>
-    useSessionStore.getState().reorderSessions(
-      projectId,
-      reordered.map((s) => s.id)
-    )
+    useSessionStore.getState().reorderSessions(projectId, orderKeepingHidden(all, reordered))
   )
   return (
     <div
@@ -265,6 +275,27 @@ interface SessionTabProps extends SessionTabsProps {
   isDragOver: boolean
 }
 
+type SessionDragProps = Omit<DragItemProps, 'onDragStart' | 'onDragEnd'> & {
+  onDragStart: (e: React.DragEvent) => void
+  onDragEnd: (e: React.DragEvent) => void
+}
+
+/** The reorder handlers, plus carrying the session out of the window: a drop on nothing opens it
+ * in a window of its own. */
+function withSessionDrag(dragProps: DragItemProps, sessionId: string): SessionDragProps {
+  return {
+    ...dragProps,
+    onDragStart: (e) => {
+      dragProps.onDragStart()
+      beginSessionDrag(e, sessionId)
+    },
+    onDragEnd: (e) => {
+      dragProps.onDragEnd()
+      void finishSessionDrag(sessionId, e.dataTransfer.dropEffect)
+    },
+  }
+}
+
 function SessionTab(props: SessionTabProps): JSX.Element {
   const { projectId, session, editing, dragProps, isDragOver } = props
   const isActive = session.id === props.tabs.activeId
@@ -275,7 +306,7 @@ function SessionTab(props: SessionTabProps): JSX.Element {
   }
   return (
     <div
-      {...dragProps}
+      {...withSessionDrag(dragProps, session.id)}
       className={`tab-bar__tab tab-bar__tab--session${isActive ? ' tab-bar__tab--active' : ''}${isDragOver ? ' tab-bar__tab--dnd-over' : ''}`}
       onClick={showSession}
       onContextMenu={(e) => props.onContextMenu(e, session.id)}
@@ -296,7 +327,7 @@ function SessionTab(props: SessionTabProps): JSX.Element {
   )
 }
 
-function TabStateIcon({ session }: { session: TerminalSession }): JSX.Element {
+export function TabStateIcon({ session }: { session: TerminalSession }): JSX.Element {
   const state = agentStateOf(session)
   const status = statusPresentationForState(state)
   const Icon = STATUS_ICON[status.icon]

@@ -124,6 +124,15 @@ Terminal sessions are powered by **xterm.js** backed by **node-pty** in the main
 
 URLs and absolute file paths in terminal output are **underlined on hover**. `Cmd+click` a URL to open it in your system browser; `Cmd+click` a file path (e.g. `/Users/foo/bar.ts` or `~/project/file.go`) to open it with the default application. Line:col suffixes like `file.go:42:5` are stripped before opening.
 
+### Moving a terminal to its own window
+
+Any terminal can live in a window of its own, for a second screen or to keep an agent in view while you work on another branch. The process, scrollback and agent state carry over; nothing restarts.
+
+- **Move it out:** press `Cmd+Shift+O`, choose **Window → Move Terminal to Its Own Window**, run **Move to its own window** from Quick Actions (`Cmd+P`), or drag its tab and release it outside every Terminator window.
+- **Bring it back:** drag its tab from the window's header onto the main window, press `Cmd+Shift+O` in that window, or close the window. Closing never ends the session.
+
+The terminal always returns to the branch it came from, at its old tab position, even if you have since moved to another branch. `Cmd+W` in a terminal's own window closes that session.
+
 ### Useful shortcuts
 
 | Action                                                        | Shortcut      |
@@ -565,6 +574,7 @@ Click the **bell icon** in the sidebar header to open the notification center pa
 | Close focused pane / active tab      | `Cmd+W`                  |
 | Split pane vertically                | `Cmd+D`                  |
 | Split pane horizontally              | `Cmd+Shift+D`            |
+| Move terminal to its own window      | `Cmd+Shift+O`            |
 | Cycle tabs left/right                | `Cmd+Left` / `Cmd+Right` |
 | Clear terminal                       | `Cmd+K`                  |
 | Quick actions                        | `Cmd+P`                  |

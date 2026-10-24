@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { X } from 'lucide-react'
+import { AppWindow, X } from 'lucide-react'
+import { useBreakoutStore } from '../../stores/breakout.store'
 import { StateChip } from '../session/StateChip'
 import type { BranchTerminal } from '../../sidebar/branch-rows'
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
@@ -104,13 +105,27 @@ interface ContentProps {
   onClose: () => void
 }
 
+/** The terminal's state, or a window icon when it lives in a window of its own. */
+function TerminalGutter({ terminal }: { terminal: BranchTerminal }): JSX.Element {
+  const isBrokenOut = useBreakoutStore((s) => s.windows.has(terminal.sessionId))
+  return (
+    <span className="terminal-row__gutter">
+      {isBrokenOut ? (
+        <span className="terminal-row__window" title="In its own window">
+          <AppWindow aria-hidden="true" />
+        </span>
+      ) : (
+        <StateChip state={terminal.state} compact />
+      )}
+    </span>
+  )
+}
+
 /** State chip, name, own link key, unseen bells, and the close button. */
 function TerminalRowContent({ terminal, linkKey, onClose }: ContentProps): JSX.Element {
   return (
     <>
-      <span className="terminal-row__gutter">
-        <StateChip state={terminal.state} compact />
-      </span>
+      <TerminalGutter terminal={terminal} />
       <span className="terminal-row__name" title={terminal.title}>
         {terminal.title}
       </span>

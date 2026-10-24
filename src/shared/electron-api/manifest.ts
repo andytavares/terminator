@@ -897,8 +897,18 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extensionEvents.onMenuCloseTab',
     kind: 'event',
     channel: 'menu:close-tab',
-    signature: signature<(handler: () => void) => Unsubscribe>(),
-    toHandlerArgs: () => [],
+    signature: signature<(handler: (sessionId: string | null) => void) => Unsubscribe>(),
+    toHandlerArgs: (args) => [
+      (args[0] as { sessionId?: string | null } | undefined)?.sessionId ?? null,
+    ],
+  }),
+  method({
+    path: 'extensionEvents.onMenuToggleBreakout',
+    kind: 'event',
+    channel: 'menu:toggle-breakout',
+    signature: signature<(handler: (sessionId: string | null) => void) => Unsubscribe>(),
+    toHandlerArgs: (args) => [(args[0] as { sessionId: string | null }).sessionId],
+    remote: 'omit',
   }),
   method({
     path: 'extensionEvents.onMenuOpenAbout',
@@ -955,6 +965,23 @@ export const ELECTRON_API_MANIFEST = [
     channel: 'app:get-info',
     signature: signature<() => Promise<AppInfo>>(),
     extensionView: 'shared',
+  }),
+
+  // ── breakout ──────────────────────────────────────────────────────────────
+  method({
+    path: 'breakout.pointerOutside',
+    kind: 'invoke',
+    channel: 'breakout:pointer-outside',
+    signature: signature<() => Promise<{ outside: boolean; x: number; y: number }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'breakout.onClosed',
+    kind: 'event',
+    channel: 'breakout:closed',
+    signature: signature<(handler: (sessionId: string) => void) => Unsubscribe>(),
+    toHandlerArgs: (args) => [(args[0] as { sessionId: string }).sessionId],
+    remote: 'omit',
   }),
 
   // ── extensionBridge ───────────────────────────────────────────────────────

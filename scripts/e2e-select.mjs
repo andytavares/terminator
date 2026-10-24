@@ -110,6 +110,7 @@ export const CORE_SPECS = [
   'session-surfaces.spec.ts',
   'settings.spec.ts',
   'sidebar-sorting.spec.ts',
+  'terminal-breakout.spec.ts',
 ]
 
 const SPEC_FILE_RE = /^tests\/e2e\/([^/]+\.spec\.ts)$/

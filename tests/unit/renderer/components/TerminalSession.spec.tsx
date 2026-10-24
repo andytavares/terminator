@@ -389,6 +389,98 @@ describe('TerminalInstance — mount()', () => {
   })
 })
 
+/** A container in another document, as a window.open() child window would hold. */
+function containerInOtherWindow(view: Window | null): HTMLElement {
+  const otherDocument = document.implementation.createHTMLDocument('breakout')
+  Object.defineProperty(otherDocument, 'defaultView', { value: view })
+  const container = otherDocument.createElement('div')
+  otherDocument.body.appendChild(container)
+  return container
+}
+
+describe('TerminalInstance — unmount(from) — after the terminal moved to another container', () => {
+  it('leaves the element in the newer container when the older one unmounts late', () => {
+    const instance = new TerminalInstance('ses-1', 1000)
+    const mainContainer = document.createElement('div')
+    const breakoutContainer = containerInOtherWindow(null)
+    instance.mount(mainContainer)
+    instance.mount(breakoutContainer)
+    instance.unmount(mainContainer)
+    expect(breakoutContainer.contains(instance.element)).toBe(true)
+  })
+
+  it('removes the element from the container it is still in', () => {
+    const instance = new TerminalInstance('ses-1', 1000)
+    const container = document.createElement('div')
+    instance.mount(container)
+    instance.unmount(container)
+    expect(container.contains(instance.element)).toBe(false)
+  })
+})
+
+describe('TerminalInstance — mount() — into a container of another window', () => {
+  it('opens the terminal again, with WebGL off first, when the document differs', () => {
+    webglAddons.length = 0
+    const instance = new TerminalInstance('ses-1', 1000)
+    instance.mount(document.createElement('div'))
+    const open = vi.mocked(instance.terminal.open)
+    const other = containerInOtherWindow(null)
+    instance.mount(other)
+    expect(other.contains(instance.element)).toBe(true)
+    expect(open).toHaveBeenCalledTimes(2)
+    expect(open).toHaveBeenLastCalledWith(instance.element)
+    expect(webglAddons[0]?.dispose).toHaveBeenCalled()
+  })
+
+  it('opens only once when remounted into the same other document', () => {
+    const instance = new TerminalInstance('ses-1', 1000)
+    const other = containerInOtherWindow(null)
+    instance.mount(other)
+    instance.unmount()
+    instance.mount(other)
+    expect(instance.terminal.open).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens again when it returns to the main document', () => {
+    const instance = new TerminalInstance('ses-1', 1000)
+    instance.mount(containerInOtherWindow(null))
+    instance.mount(document.createElement('div'))
+    expect(instance.terminal.open).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('TerminalInstance — mount() — in the window of its container', () => {
+  it('observes and schedules the scroll pin with the container window, not the main one', () => {
+    const observe = vi.fn()
+    const childResizeObserver = vi.fn(function () {
+      return { observe, disconnect: vi.fn() }
+    })
+    const childFrame = vi.fn()
+    const view = partialFake<Window & typeof globalThis>({
+      ResizeObserver: childResizeObserver as unknown as typeof ResizeObserver,
+      requestAnimationFrame: childFrame,
+    })
+    const container = containerInOtherWindow(view)
+    const instance = new TerminalInstance('ses-1', 1000)
+    instance.mount(container)
+    expect(childResizeObserver).toHaveBeenCalledTimes(1)
+    expect(observe).toHaveBeenCalledWith(container)
+    expect(mockResizeObserver).not.toHaveBeenCalled()
+    expect(childFrame).toHaveBeenCalledTimes(1)
+  })
+
+  it('disconnects the previous observer when mounted again without unmount', () => {
+    const disconnect = vi.fn()
+    mockResizeObserver.mockImplementation(function () {
+      return { observe: vi.fn(), disconnect }
+    })
+    const instance = new TerminalInstance('ses-1', 1000)
+    instance.mount(document.createElement('div'))
+    instance.mount(document.createElement('div'))
+    expect(disconnect).toHaveBeenCalledTimes(1)
+  })
+})
+
 function mounted(sessionId: string): TerminalInstance {
   const instance = new TerminalInstance(sessionId, 1000)
   instance.mount(document.createElement('div'))

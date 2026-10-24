@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { revealSession } from '../../../../src/renderer/terminal/navigate-to-session'
 import { SCRATCH_PROJECT_ID } from '../../../../src/shared/types/index'
+import { useBreakoutStore } from '../../../../src/renderer/stores/breakout.store'
+import { partialFake } from '../../../support/fakes'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
@@ -82,5 +84,18 @@ describe('revealSession — does nothing for a session that has gone', () => {
     const first = sessionState().focusRequest
     revealSession('s1')
     expect(sessionState().focusRequest).toEqual({ sessionId: 's1', nonce: first!.nonce + 1 })
+  })
+})
+
+describe('revealSession — a terminal in its own window', () => {
+  it('focuses that window and leaves the main window where it is', () => {
+    seedSessions(terminalSessionOf({ id: 's1', projectId: 'p1' }))
+    const focus = vi.fn()
+    useBreakoutStore.getState().add('s1', partialFake<Window>({ focus }))
+    revealSession('s1')
+    expect(focus).toHaveBeenCalled()
+    expect(registryState().activeGlobalTabId).toBe('core.home')
+    expect(workspaceState().activeProjectId).not.toBe('p1')
+    useBreakoutStore.getState().remove('s1')
   })
 })

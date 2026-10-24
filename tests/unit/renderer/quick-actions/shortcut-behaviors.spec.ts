@@ -11,6 +11,7 @@ import {
   type ClosePaneDeps,
 } from '../../../../src/renderer/quick-actions/shortcut-behaviors'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
+import { useBreakoutStore } from '../../../../src/renderer/stores/breakout.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import type { TerminalSession } from '../../../../src/shared/types/index'
@@ -245,6 +246,16 @@ describe('closeFocusedPane', () => {
     const d = deps()
     closeFocusedPane('p1', d)
     closeFocusedPane(null, d)
+    expect(d.closeSession).not.toHaveBeenCalled()
+  })
+})
+
+describe('closeFocusedPane — a tab in its own window', () => {
+  it('closes nothing when the active tab is in its own window', () => {
+    useBreakoutStore.getState().add('s1', {} as Window)
+    const d = deps({ getActiveSessionForProject: () => 's1' })
+    closeFocusedPane('p1', d)
+    useBreakoutStore.getState().remove('s1')
     expect(d.closeSession).not.toHaveBeenCalled()
   })
 })

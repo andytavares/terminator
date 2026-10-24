@@ -1,0 +1,69 @@
+.breakout-window {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--tm-bg-base);
+  color: var(--tm-text-primary);
+}
+
+.breakout-window__header {
+  flex: 0 0 auto;
+  height: 26px;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--tm-bg-surface);
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.breakout-window__tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 0 12px 0 6px;
+  background: var(--tm-bg-base);
+  color: var(--tm-text-primary);
+  border-right: 1px solid var(--tm-border);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.breakout-window__grip {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  color: var(--tm-text-secondary);
+}
+
+.breakout-window__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.breakout-window__place {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding-right: 10px;
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.breakout-window__swatch {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--ws-color, transparent);
+  flex: 0 0 auto;
+}
+
+.breakout-window__terminal {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+}

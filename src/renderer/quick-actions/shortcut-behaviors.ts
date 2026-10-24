@@ -4,6 +4,7 @@ import type { TerminalPlace } from '../terminal/session-controller'
 import { useExtensionRegistry } from '../extensions/registry'
 import { dispatchNotification } from '../lib/notifications'
 import { agentStateOf } from '../sidebar/agent-state'
+import { isBrokenOut } from '../stores/breakout.store'
 
 /** Leaves whatever global/workspace/project tab is showing, the way every
  * "go to session" path must (see navigate-to-session.ts's revealSession). */
@@ -205,6 +206,6 @@ export function closeFocusedPane(effectiveProjectId: string | null, deps: CloseP
     )
   } else {
     const activeId = getActiveSessionForProject(effectiveProjectId)
-    if (activeId) void closeSession(activeId)
+    if (activeId && !isBrokenOut(activeId)) void closeSession(activeId)
   }
 }

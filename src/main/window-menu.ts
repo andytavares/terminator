@@ -2,8 +2,32 @@
  * The Window menu. Its `window` role makes macOS list every open window in it,
  * pop-outs included, and Cmd+` is left unbound so the OS can cycle through them.
  */
+type Send = (channel: string, payload?: unknown) => void
+
+/** Close and move-between-windows act on the focused breakout's terminal, or on the main window's. */
+function closeAndMoveItems(
+  send: Send,
+  focusedBreakoutSession: string | null
+): Electron.MenuItemConstructorOptions[] {
+  return [
+    {
+      label: focusedBreakoutSession ? 'Close Terminal' : 'Close Tab',
+      accelerator: 'CmdOrCtrl+W',
+      click: () => send('menu:close-tab', { sessionId: focusedBreakoutSession }),
+    },
+    {
+      label: focusedBreakoutSession
+        ? 'Return Terminal to Main Window'
+        : 'Move Terminal to Its Own Window',
+      accelerator: 'CmdOrCtrl+Shift+O',
+      click: () => send('menu:toggle-breakout', { sessionId: focusedBreakoutSession }),
+    },
+  ]
+}
+
 export function buildWindowMenu(
-  send: (channel: string) => void
+  send: Send,
+  focusedBreakoutSession: string | null
 ): Electron.MenuItemConstructorOptions {
   return {
     label: 'Window',
@@ -17,11 +41,7 @@ export function buildWindowMenu(
         accelerator: 'CmdOrCtrl+Shift+H',
         click: () => send('menu:open-home'),
       },
-      {
-        label: 'Close Tab',
-        accelerator: 'CmdOrCtrl+W',
-        click: () => send('menu:close-tab'),
-      },
+      ...closeAndMoveItems(send, focusedBreakoutSession),
       { type: 'separator' },
       { role: 'front' },
     ],

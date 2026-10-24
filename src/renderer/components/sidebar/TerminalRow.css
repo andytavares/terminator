@@ -116,3 +116,14 @@
   opacity: 1;
   color: var(--tm-text-primary);
 }
+
+.terminal-row__window {
+  display: grid;
+  place-items: center;
+  color: var(--tm-text-secondary);
+}
+
+.terminal-row__window svg {
+  width: 12px;
+  height: 12px;
+}
