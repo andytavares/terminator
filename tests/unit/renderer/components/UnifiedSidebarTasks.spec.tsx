@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useTaskStore } from '../../../../src/renderer/stores/task.store'
@@ -144,5 +144,22 @@ describe('UnifiedSidebar — Add to task…', () => {
     fireEvent.contextMenu(container.querySelectorAll('.branch-row')[0])
     fireEvent.click(screen.getByText('Add to task…'))
     expect(openAddToTask).toHaveBeenCalledWith({ repoRoot: '/b', branch: 'main' })
+  })
+})
+
+describe('UnifiedSidebar — grouped by task — the task’s state', () => {
+  const header = () => screen.getByText('Login rework').closest('.repo-header') as HTMLElement
+
+  it('draws the task’s state glyph on its header', () => {
+    renderSidebar()
+    groupByTask()
+    expect(within(header()).getByRole('img', { name: 'Quiet' })).toBeTruthy()
+  })
+
+  it('says Done once the task is marked done', () => {
+    useTaskStore.setState({ tasks: [{ ...loginTask, doneAt: '2026-10-20T00:00:00.000Z' }] })
+    renderSidebar()
+    groupByTask()
+    expect(within(header()).getByRole('img', { name: 'Done' })).toBeTruthy()
   })
 })
