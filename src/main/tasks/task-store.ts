@@ -20,7 +20,7 @@ const FILE_NAME = 'tasks.json'
 
 type TaskChangeHandler = (tasks: Task[]) => void
 
-export class TaskError extends Error {
+class TaskError extends Error {
   constructor(
     readonly code: 'NOT_FOUND',
     message: string
