@@ -1,0 +1,28 @@
+tests/unit/agents/ask-watcher.spec.ts
+  s_bcb87751443cd2::t_8935609435985b 34-37,39,41,139-146
+  s_bcb87751443cd2::t_05413f58d986e3 147-150
+tests/unit/agents/agent-ask-hook.spec.ts
+  s_bcb87751443cd2::t_8935609435985b 54-59,64,76,84-95,99,110
+src/main/agents/agent-ask-hook.ts
+  s_bcb87751443cd2::t_0732f6e3969338 9,46
+src/main/agents/ask-watcher.ts
+  s_bcb87751443cd2::t_0732f6e3969338 15-16,86-87
+docs/ARCHITECTURE.md
+  s_bcb87751443cd2::t_b9a5ed523e45e1 504
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0d6be9ff8b64017ea65cf8213608a6ad7b04c9ab",
+  "prompts": {},
+  "sessions": {
+    "s_bcb87751443cd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b568ee83-ad51-4a54-9901-52cfcfa5b37f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
