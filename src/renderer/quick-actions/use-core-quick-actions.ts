@@ -11,6 +11,7 @@ import { revealSession } from '../terminal/navigate-to-session'
 import { qualifiedBranchLabel } from '../sidebar/branch-display'
 import { agentStateOf } from '../sidebar/agent-state'
 import { useStartWorkStore } from '../components/home/start-work'
+import { useTaskSwitcher } from '../components/task-switcher/task-switcher.store'
 import { useDeskSelection } from '../components/home/desk-selection'
 import { useSessionRecordsStore } from '../stores/session-records.store'
 import { buildCoreActions, type CoreSessionSummary } from './core-actions'
@@ -246,6 +247,7 @@ function coreActionDeps(c: CoreContext, paletteSessions: CoreSessionSummary[]): 
     ...issueHandlers(c),
     ...shellHandlers(c.shell),
     onStartWork: () => useStartWorkStore.getState().openLauncher(),
+    onTaskSwitcher: () => useTaskSwitcher.getState().show(),
   }
 }
 

@@ -8,6 +8,7 @@ import { ToastContainer } from '../components/ToastContainer'
 import { HomeBadge, SessionLinkHost } from '../components/AppShellParts'
 import { StartWorkHost } from '../components/home/StartWorkHost'
 import { AddToTaskDialog } from '../components/tasks/AddToTaskDialog'
+import { TaskSwitcher } from '../components/task-switcher/TaskSwitcher'
 // Not lazy: the keys typed straight after ⌘P ("n n", "/") would reach the
 // app before a lazily loaded panel mounted, and be lost.
 import { QuickActionsHost, type QuickActionsHostProps } from '../components/QuickActionsHost'
@@ -75,6 +76,7 @@ function WorkDialogs(): JSX.Element {
     <>
       <StartWorkHost />
       <AddToTaskDialog />
+      <TaskSwitcher />
     </>
   )
 }

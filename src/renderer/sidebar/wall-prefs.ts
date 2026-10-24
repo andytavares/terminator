@@ -2,7 +2,7 @@
 // localStorage — the one side effect here, isolated to load/save.
 
 export type TileSize = 's' | 'm' | 'l'
-export type WallThenBy = 'state' | 'workspace-project' | 'recent'
+export type WallThenBy = 'state' | 'workspace-project' | 'recent' | 'task'
 
 export interface WallPrefs {
   size: TileSize
@@ -30,7 +30,7 @@ export function loadWallPrefs(): WallPrefs {
   return {
     size: ['s', 'm', 'l'].includes(p.size as string) ? (p.size as TileSize) : d.size,
     pinNeeds: typeof p.pinNeeds === 'boolean' ? p.pinNeeds : d.pinNeeds,
-    thenBy: ['state', 'workspace-project', 'recent'].includes(p.thenBy as string)
+    thenBy: ['state', 'workspace-project', 'recent', 'task'].includes(p.thenBy as string)
       ? (p.thenBy as WallThenBy)
       : d.thenBy,
   }

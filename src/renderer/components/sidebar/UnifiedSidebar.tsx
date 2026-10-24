@@ -19,6 +19,7 @@ import { DisplayMenu } from './DisplayMenu'
 import { useBranchActions } from './branch-actions'
 import { IssueDialogs, SidebarDialogs, useSidebarDialog } from './SidebarDialogs'
 import { RepoGroupList, useSidebarCollapse, type RowContext } from './SidebarList'
+import { TaskGroupList } from './TaskSections'
 import { ScratchSection } from './ScratchSection'
 import { useSidebarData, useSidebarRows, type SidebarData } from './useSidebarRows'
 import { useSidebarViews, type SidebarViews } from './useSidebarViews'
@@ -82,7 +83,11 @@ function SidebarListBody({ props, rows, ctx, searchQuery }: ListBodyProps): JSX.
   const { groups, scratch } = rows
   return (
     <div className="unified-sidebar__list">
-      <RepoGroupList groups={groups} ctx={ctx} />
+      {ctx.groupBy === 'task' ? (
+        <TaskGroupList groups={groups} ctx={ctx} />
+      ) : (
+        <RepoGroupList groups={groups} ctx={ctx} />
+      )}
       {(scratch.length > 0 || groups.length > 0) && (
         <ScratchSection
           scratch={scratch}

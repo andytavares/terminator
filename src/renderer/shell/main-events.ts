@@ -14,6 +14,7 @@ import { recordDirectUse } from '../quick-actions/usage'
 import { findSurface, type SurfaceRegistration } from '../quick-actions/surface-actions'
 import { adoptTerminalSession } from '../terminal/session-controller'
 import { revealSession } from '../terminal/navigate-to-session'
+import { useTaskSwitcher } from '../components/task-switcher/task-switcher.store'
 import { dockBack, toggleBreakout } from '../terminal/breakout'
 
 // What the main process tells the window: menu accelerators, notifications,
@@ -93,6 +94,9 @@ function subscribeSurfaceMenu(events: MenuEvents | undefined): Unsubscribe[] {
     // Home is a Window-menu accelerator (Cmd+Shift+H), not a renderer keydown.
     events?.onMenuOpenHome?.(
       countedShortcut('core.open-home', () => registry().setActiveGlobalTab('core.home'))
+    ),
+    events?.onMenuOpenTaskSwitcher?.(
+      countedShortcut('core.switch-task', () => useTaskSwitcher.getState().show())
     ),
   ]
 }

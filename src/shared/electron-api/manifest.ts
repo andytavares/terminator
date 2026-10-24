@@ -895,6 +895,14 @@ export const ELECTRON_API_MANIFEST = [
     toHandlerArgs: () => [],
   }),
   method({
+    path: 'extensionEvents.onMenuOpenTaskSwitcher',
+    kind: 'event',
+    channel: 'menu:open-task-switcher',
+    signature: signature<(handler: () => void) => Unsubscribe>(),
+    toHandlerArgs: () => [],
+    remote: 'omit',
+  }),
+  method({
     path: 'extensionEvents.onMenuToggleSidebar',
     kind: 'event',
     channel: 'menu:toggle-sidebar',

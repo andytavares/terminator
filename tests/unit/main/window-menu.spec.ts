@@ -65,3 +65,13 @@ describe('buildWindowMenu in a breakout window', () => {
     expect(send).toHaveBeenCalledWith('menu:toggle-breakout', { sessionId: BREAKOUT_SESSION })
   })
 })
+
+describe('buildWindowMenu — the task switcher', () => {
+  it('opens the task switcher on Cmd+J', () => {
+    const { submenu, send } = items()
+    const switcher = submenu.find((i) => i.label === 'Switch Task…')!
+    expect(switcher.accelerator).toBe('CmdOrCtrl+J')
+    ;(switcher.click as () => void)()
+    expect(send).toHaveBeenCalledWith('menu:open-task-switcher')
+  })
+})

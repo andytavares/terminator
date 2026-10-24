@@ -90,7 +90,11 @@ describe('placeWall — orders the rest by workspace and project when asked', ()
   })
 
   it('places nothing for no sessions', () => {
-    expect(placeWall([], DEFAULT_WALL_PREFS)).toEqual({ placements: [], needsCount: 0 })
+    expect(placeWall([], DEFAULT_WALL_PREFS)).toEqual({
+      placements: [],
+      needsCount: 0,
+      taskBands: [],
+    })
   })
 })
 
@@ -138,5 +142,57 @@ describe("placeWall — thenBy 'recent' orders by when a session was last opened
   it('orders most recently opened first, with never-attended sessions last', () => {
     const wall = placeWall(opened, { ...DEFAULT_WALL_PREFS, thenBy: 'recent' })
     expect(inOrder(wall)).toEqual(['newer', 'older', 'never'])
+  })
+})
+
+const BY_TASK = { ...DEFAULT_WALL_PREFS, thenBy: 'task' as const }
+const LOGIN = { id: 'task-login', title: 'Login rework' }
+const BILLING = { id: 'task-billing', title: 'Billing' }
+
+const taskFacts: SessionFacts[] = [
+  fact({ sessionId: 'a', state: 'working', startedAt: T1, workspaceName: 'api' }),
+  fact({ sessionId: 'b', state: 'idle', startedAt: T2, workspaceName: 'web' }),
+  fact({ sessionId: 'c', state: 'working', startedAt: T3, workspaceName: 'api' }),
+  fact({ sessionId: 'd', state: 'idle', startedAt: T4, workspaceName: 'api' }),
+  fact({ sessionId: 'e', state: 'idle', startedAt: T5, workspaceName: 'web' }),
+]
+const taskOfSession = new Map([
+  ['a', LOGIN],
+  ['b', BILLING],
+  ['c', LOGIN],
+  ['d', LOGIN],
+])
+
+describe('placeWall — then by task', () => {
+  it('puts each task’s tiles together, tasks in title order, tiles in no task last', () => {
+    const wall = placeWall(taskFacts, BY_TASK, taskOfSession)
+    expect(inOrder(wall)).toEqual(['b', 'a', 'c', 'd', 'e'])
+  })
+
+  it('counts each band’s repos and terminals', () => {
+    const { taskBands } = placeWall(taskFacts, BY_TASK, taskOfSession)
+    expect(taskBands.map((b) => [b.title, b.repoCount, b.terminalCount])).toEqual([
+      ['Billing', 1, 1],
+      ['Login rework', 1, 3],
+      ['Not in a task', 1, 1],
+    ])
+  })
+
+  it('gives every band a heading slot before its first tile', () => {
+    const wall = placeWall(taskFacts, BY_TASK, taskOfSession)
+    const firstTile = (id: string) => wall.placements.find((p) => p.sessionId === id)!.order
+    const [billing, login, loose] = wall.taskBands
+    expect(billing.order).toBe(firstTile('b') - 1)
+    expect(login.order).toBe(firstTile('a') - 1)
+    expect(loose.order).toBe(firstTile('e') - 1)
+  })
+
+  it('draws no bands for any other arrangement', () => {
+    expect(placeWall(taskFacts, DEFAULT_WALL_PREFS, taskOfSession).taskBands).toEqual([])
+  })
+
+  it('draws no “Not in a task” band when every tile is in a task', () => {
+    const { taskBands } = placeWall(taskFacts.slice(0, 4), BY_TASK, taskOfSession)
+    expect(taskBands.map((b) => b.title)).toEqual(['Billing', 'Login rework'])
   })
 })

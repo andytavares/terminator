@@ -41,6 +41,11 @@ export function buildWindowMenu(
         accelerator: 'CmdOrCtrl+Shift+H',
         click: () => send('menu:open-home'),
       },
+      {
+        label: 'Switch Task…',
+        accelerator: 'CmdOrCtrl+J',
+        click: () => send('menu:open-task-switcher'),
+      },
       ...closeAndMoveItems(send, focusedBreakoutSession),
       { type: 'separator' },
       { role: 'front' },

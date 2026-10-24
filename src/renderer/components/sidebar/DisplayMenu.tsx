@@ -11,6 +11,7 @@ import './SidebarMenu.css'
  */
 const GROUPS: Array<[GroupKey, string]> = [
   ['workspace', 'Workspace'],
+  ['task', 'Task'],
   ['none', 'None'],
 ]
 

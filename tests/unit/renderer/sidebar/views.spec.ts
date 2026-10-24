@@ -296,4 +296,12 @@ describe('a preference naming a retired option (VW-1) — falls back when the st
     )
     expect(loadViews().find((v) => v.id === 'everything')!.groupBy).toBe('none')
   })
+
+  it('remembers grouping by task across a reload', () => {
+    localStorage.setItem(
+      VIEWS_STORAGE_KEY,
+      JSON.stringify({ custom: [], overrides: { everything: { groupBy: 'task' } } })
+    )
+    expect(loadViews().find((v) => v.id === 'everything')!.groupBy).toBe('task')
+  })
 })

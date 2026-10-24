@@ -57,7 +57,7 @@ export const BUILT_IN_VIEWS: SessionView[] = [
 const BUILT_IN_IDS = new Set(BUILT_IN_VIEWS.map((v) => v.id))
 
 /** The keys that still mean something now the list is of branches. */
-const VALID_GROUP_KEYS = new Set<string>(['workspace', 'none'])
+const VALID_GROUP_KEYS = new Set<string>(['workspace', 'task', 'none'])
 const VALID_SORT_KEYS = new Set<string>(['recent', 'oldest', 'name', 'status', 'manual'])
 
 function isSessionView(value: unknown): value is SessionView {
