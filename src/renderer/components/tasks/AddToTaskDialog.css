@@ -69,5 +69,5 @@
 
 .add-to-task__error {
   padding: 8px 14px;
-  color: var(--tm-danger-text, var(--tm-text-primary));
+  color: var(--tm-danger);
 }
