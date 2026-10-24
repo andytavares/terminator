@@ -1,6 +1,13 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { askChangeOf, parseAskReport, type AgentAsk } from '../../shared/agent-sessions/ask.js'
+import {
+  askChangeOf,
+  isFocusReport,
+  parseAskReport,
+  turnChangeOf,
+  type AgentAsk,
+} from '../../shared/agent-sessions/ask.js'
+import { setTurn } from './agent-turns.js'
 import { asksDirectory } from './agent-ask-hook.js'
 import { probeUntilArmed } from './agent-session-watcher.js'
 import { makeLogger } from '../logger.js'
@@ -33,12 +40,9 @@ export function clearAsk(sessionId: string): void {
   if (asks.delete(sessionId)) announce(sessionId, null)
 }
 
-// xterm reports focus gaining and losing as these, with no one typing.
-const FOCUS_REPORTS: readonly string[] = ['\x1b[I', '\x1b[O']
-
 /** Input to the terminal answers the ask, unless it is only the terminal reporting its focus. */
 export function clearAskOnInput(sessionId: string, data: string): void {
-  if (!FOCUS_REPORTS.includes(data)) clearAsk(sessionId)
+  if (!isFocusReport(data)) clearAsk(sessionId)
 }
 
 function applyAskReport(file: string): void {
@@ -51,6 +55,8 @@ function applyAskReport(file: string): void {
   try {
     const report = parseAskReport(JSON.parse(fs.readFileSync(claimed, 'utf8')))
     if (report === null) return
+    const inTurn = turnChangeOf(report)
+    if (inTurn !== null) setTurn(report.terminal, inTurn)
     const change = askChangeOf(report)
     if (change.kind === 'set') {
       asks.set(report.terminal, change.ask)

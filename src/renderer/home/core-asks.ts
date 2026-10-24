@@ -10,6 +10,8 @@ export interface DeskAsk extends Sourced<HomeAsk> {
   choices?: ChoiceOption[]
   /** Which repo and which work the ask is about, e.g. "terminator · TAV-31 Rate limit". */
   where?: string
+  /** True when core guessed the session is asking (a bell, a choice on screen) rather than being told. */
+  inferred?: boolean
 }
 
 /** The command the Desk runs to bring a session forward; core handles it, no extension does. */
@@ -57,6 +59,7 @@ function answerAsk(facts: SessionFacts, titles: IssueTitles): DeskAsk {
     detail: facts.choicePrompt?.question ?? facts.askMessage ?? facts.latestLine,
     actions: [...picks, { id: 'reply', label: 'Reply', primary: picks.length === 0 }],
     ...(choices.length > 0 ? { choices } : {}),
+    ...(facts.askInferred ? { inferred: true } : {}),
   }
 }
 

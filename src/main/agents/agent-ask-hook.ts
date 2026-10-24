@@ -4,13 +4,14 @@ import { shellQuote } from '@terminator/extension-sdk/node'
 import { putHook } from '../integrations/claude-settings.js'
 import { reportDirectory, userSettingsPath, type CaptureHookOptions } from './agent-session-hook.js'
 
-// Claude Code runs Notification hooks when it needs an answer and Stop hooks when a turn ends
-// (payloads: https://code.claude.com/docs/en/hooks). One script writes both to asks/<terminal>.json.
+// Claude Code runs Notification hooks when it needs an answer, UserPromptSubmit hooks when a turn
+// starts and Stop hooks when it ends (payloads: https://code.claude.com/docs/en/hooks). One script
+// writes all three to asks/<terminal>.json.
 
 const SCRIPT_NAME = 'agent-ask-hook.cjs'
 const ASKS_DIR_NAME = 'asks'
 
-/** The script the agent runs on Notification and Stop; silent on error like CAPTURE_SCRIPT.
+/** The script the agent runs on Notification, UserPromptSubmit and Stop; silent on error like CAPTURE_SCRIPT.
  * @internal */
 export const ASK_SCRIPT = `// Written by Terminator. Do not edit: it is overwritten on every start.
 const fs = require('fs')
@@ -29,7 +30,7 @@ process.stdin.on('end', () => {
     if (!terminal || !reportDir) return
     const payload = JSON.parse(raw)
     if (!payload || typeof payload !== 'object') return
-    const events = { Notification: 'notification', Stop: 'stop' }
+    const events = { Notification: 'notification', Stop: 'stop', UserPromptSubmit: 'prompt' }
     const event = events[payload.hook_event_name]
     if (!event) return
 
@@ -78,10 +79,11 @@ function askCommand(options: CaptureHookOptions): string {
   return `[ -n "$TERMINATOR_SESSION_ID" ] && test -f ${shellQuote(options.scriptPath)} && ${run} || true`
 }
 
-/** Registers the Notification and Stop entries in the operator's Claude settings, ours alone. */
+/** Registers the Notification, UserPromptSubmit and Stop entries in the operator's Claude settings, ours alone. */
 export async function installAskHooks(options: CaptureHookOptions): Promise<void> {
   const command = askCommand(options)
   const ours = { marker: SCRIPT_NAME, command }
   await putHook(userSettingsPath(), 'Notification', ours)
+  await putHook(userSettingsPath(), 'UserPromptSubmit', ours)
   await putHook(userSettingsPath(), 'Stop', ours)
 }

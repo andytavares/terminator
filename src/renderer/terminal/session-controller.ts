@@ -3,6 +3,7 @@ import { useWorkspaceStore } from '../stores/workspace.store'
 import { TerminalInstance } from '../components/terminal/TerminalSession'
 import { dispatchNotification } from '../lib/notifications'
 import { latestLineOf } from '../sidebar/screen'
+import { isFocusReport } from '../../shared/agent-sessions/ask'
 import { parseChoicePrompt, samePrompt } from '../sidebar/choice-prompt'
 import type { PaneSplitDirection } from '../../shared/types/index'
 
@@ -84,6 +85,10 @@ function onBusy(sessionId: string, instance: TerminalInstance): void {
   }
 }
 
+function onInput(sessionId: string, data: string): void {
+  if (!isFocusReport(data)) useSessionStore.getState().clearInferredAsk(sessionId)
+}
+
 function onIdle(sessionId: string, instance: TerminalInstance): void {
   // Unthrottled: idle is the end of a burst, and its timestamp is the one
   // that decides how stale the session looks from here on.
@@ -110,6 +115,7 @@ function buildInstance(sessionId: string, scrollbackLimit: number): TerminalInst
   const instance: TerminalInstance = new TerminalInstance(sessionId, scrollbackLimit, {
     onBell: () => handleBell(sessionId),
     onBusy: () => onBusy(sessionId, instance),
+    onInput: (data) => onInput(sessionId, data),
     onIdle: () => onIdle(sessionId, instance),
     onDispose: () => forgetTerminal(sessionId),
   })

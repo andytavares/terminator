@@ -205,6 +205,16 @@ describe('TerminalInstance', () => {
   })
 })
 
+describe('TerminalInstance — reports keystrokes to its hook', () => {
+  it('tells its onInput hook what was typed', () => {
+    const onInput = vi.fn()
+    new TerminalInstance('ses-input', 1000, { onInput })
+    const instance = vi.mocked(Terminal).mock.results[0].value
+    instance.onData.mock.calls[0][0]('ls\r')
+    expect(onInput).toHaveBeenCalledWith('ls\r')
+  })
+})
+
 describe('TerminalInstance — forwards keystrokes to the PTY via onData', () => {
   it('forwards keystrokes to the PTY via onData', () => {
     new TerminalInstance('ses-data', 1000)

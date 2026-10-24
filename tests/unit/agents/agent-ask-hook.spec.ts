@@ -75,6 +75,17 @@ describe('the ask script, executed', () => {
   })
 })
 
+describe('the ask script, executed — a prompt', () => {
+  it('writes a UserPromptSubmit as a prompt', async () => {
+    const { asks } = await run({ hook_event_name: 'UserPromptSubmit', prompt: 'do it' })
+    expect(JSON.parse(fs.readFileSync(path.join(asks, 's1.json'), 'utf8'))).toMatchObject({
+      terminal: 's1',
+      event: 'prompt',
+      message: '',
+    })
+  })
+})
+
 describe('the ask script, executed — input it cannot use', () => {
   it.each([
     ['garbage', 'not json at all', { TERMINATOR_SESSION_ID: 's1' }],
@@ -102,7 +113,7 @@ describe('the ask script, executed — input it cannot use', () => {
 })
 
 describe('installing the ask hooks', () => {
-  it('adds a Notification and a Stop entry and keeps the operator’s own', async () => {
+  it('adds a Notification, a UserPromptSubmit and a Stop entry and keeps the operator’s own', async () => {
     const settings = path.join(home, '.claude', 'settings.json')
     fs.mkdirSync(path.dirname(settings), { recursive: true })
     fs.writeFileSync(
@@ -115,6 +126,8 @@ describe('installing the ask hooks', () => {
     await mod.installAskHooks({ execPath: process.execPath, scriptPath })
     const hooks = JSON.parse(fs.readFileSync(settings, 'utf8')).hooks
     expect(hooks.Notification).toHaveLength(1)
+    expect(hooks.UserPromptSubmit).toHaveLength(1)
+    expect(hooks.UserPromptSubmit[0].hooks[0].command).toContain('agent-ask-hook.cjs')
     expect(hooks.Stop).toHaveLength(2)
     expect(JSON.stringify(hooks.Stop)).toContain('mine.sh')
     expect(hooks.Notification[0].hooks[0].command).toContain('agent-ask-hook.cjs')

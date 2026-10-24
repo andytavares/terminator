@@ -10,6 +10,7 @@ vi.mock('electron', () => ({ app: { getPath: () => userData } }))
 
 type Change = [string, { message: string; since: string } | null]
 let changes: Change[]
+let turns: Array<[string, boolean]>
 let stop: (() => void) | undefined
 let asksDir: string
 
@@ -17,11 +18,14 @@ async function load() {
   vi.resetModules()
   const mod = await import('../../../src/main/agents/ask-watcher')
   mod.onAskChange((id, ask) => changes.push([id, ask]))
-  return mod
+  const agentTurns = await import('../../../src/main/agents/agent-turns')
+  agentTurns.onTurnChange((id, inTurn) => turns.push([id, inTurn]))
+  return { ...mod, ...agentTurns }
 }
 
 beforeEach(() => {
   changes = []
+  turns = []
   userData = makeTempDir('ask-watch-')
   asksDir = path.join(userData, 'agent-sessions', 'asks')
 })
@@ -93,5 +97,37 @@ describe('the ask watcher — answers and leftovers', () => {
     await seen(1)
     expect(changes.map((c) => c[0])).toEqual(['s1'])
     expect(fs.readdirSync(asksDir)).toEqual([])
+  })
+})
+
+describe('the ask watcher — turns', () => {
+  it('puts a turn on at a prompt and off at a stop, and a notification leaves it alone', async () => {
+    const mod = await load()
+    stop = mod.startAskWatcher()
+    write('s1', { event: 'prompt' })
+    await eventually(() => expect(turns).toEqual([['s1', true]]))
+    write('s1', { event: 'notification', message: 'Allow?' })
+    await seen(1)
+    expect(turns).toEqual([['s1', true]])
+    expect(mod.currentTurns()).toEqual([{ sessionId: 's1', inTurn: true }])
+    write('s1', { event: 'stop' })
+    await eventually(() =>
+      expect(turns).toEqual([
+        ['s1', true],
+        ['s1', false],
+      ])
+    )
+    expect(mod.currentTurns()).toEqual([{ sessionId: 's1', inTurn: false }])
+  })
+
+  it('lifts the ask at a prompt: the operator just answered', async () => {
+    const mod = await load()
+    stop = mod.startAskWatcher()
+    write('s1', { event: 'notification', message: 'Allow?' })
+    await seen(1)
+    write('s1', { event: 'prompt' })
+    await seen(2)
+    expect(changes[1]).toEqual(['s1', null])
+    expect(mod.currentAsks()).toEqual([])
   })
 })

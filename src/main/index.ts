@@ -25,6 +25,7 @@ import { startAgentSessionWatcher } from './agents/agent-session-watcher.js'
 import { makeSnapshotFor } from './sessions/session-snapshot.js'
 import { registerSessionRecordsHandlers } from './ipc/session-records.ipc.js'
 import { registerAgentAskHandlers } from './ipc/agent-ask.ipc.js'
+import { registerAgentTurnHandlers } from './ipc/agent-turn.ipc.js'
 import { registerAttentionHandlers } from './ipc/attention.ipc.js'
 import { loadAttentionLog } from './home/attention-log.js'
 import { startAskWatcher } from './agents/ask-watcher.js'
@@ -382,6 +383,7 @@ function registerSessionHandlers(): OutputRelay {
   registerIntegrationsHandlers(() => mainWindow)
   registerSessionRecordsHandlers(() => mainWindow)
   registerAgentAskHandlers(() => mainWindow)
+  registerAgentTurnHandlers(() => mainWindow)
   registerAttentionHandlers()
   registerAgentUsageHandlers()
   registerThreadSummaryHandler()
@@ -415,7 +417,7 @@ function startIntegrationsAndRecords(): void {
     .catch((error) =>
       logger.error('could not install the agent session hook', { error: String(error) })
     )
-  // The Notification and Stop hooks tell core an agent is waiting on an answer (ask-watcher).
+  // The Notification, UserPromptSubmit and Stop hooks tell core an agent is asking or mid-turn.
   // Installed after the session hook finishes: both edit the one settings file.
   startAskWatcherAndHooks(sessionHookInstalled)
   void loadAttentionLog().catch((error) =>

@@ -126,3 +126,15 @@ describe('finishedFacts', () => {
     expect(finishedFacts({ files: 0, added: 0, removed: 0 })).toEqual([])
   })
 })
+
+describe('coreAsksFrom: told or guessed', () => {
+  it('marks an answer inferred when a bell or a screen choice raised it, not when the agent did', () => {
+    const [guessed] = coreAsksFrom(
+      [fact({ state: 'awaiting-input', askInferred: true, askSignal: 'bell' })],
+      titles
+    )
+    const [told] = coreAsksFrom([fact({ state: 'awaiting-input', askMessage: 'Allow?' })], titles)
+    expect(guessed.inferred).toBe(true)
+    expect(told.inferred).toBeUndefined()
+  })
+})

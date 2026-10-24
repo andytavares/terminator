@@ -1207,6 +1207,25 @@ export const ELECTRON_API_MANIFEST = [
     remote: 'omit',
   }),
 
+  // ── agent turns (Claude Code's UserPromptSubmit and Stop hooks say the agent is mid-turn) ──
+  method({
+    path: 'agentTurn.list',
+    kind: 'invoke',
+    channel: 'agent-turn:list',
+    signature: signature<() => Promise<{ data: Array<{ sessionId: string; inTurn: boolean }> }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agentTurn.onChanged',
+    kind: 'event',
+    channel: 'agent-turn:changed',
+    signature:
+      signature<
+        (handler: (payload: { sessionId: string; inTurn: boolean }) => void) => Unsubscribe
+      >(),
+    remote: 'omit',
+  }),
+
   // ── attention log (when sessions worked and when they waited on you) ──────
   method({
     path: 'attention.record',

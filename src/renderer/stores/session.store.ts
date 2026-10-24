@@ -200,12 +200,14 @@ interface SessionState {
   handleProcessExit: (sessionId: string, exitCode: number | null) => void
   incrementBellCount: (sessionId: string) => void
   clearBellCount: (sessionId: string) => void
+  clearInferredAsk: (sessionId: string) => void
   getBellCountForSession: (sessionId: string) => number
   getBellCountForProject: (projectId: string) => number
   setSessionBusy: (sessionId: string) => void
   setSessionIdle: (sessionId: string) => void
   /** What the agent says it is waiting on, or null once it is answered. */
   setAgentAsk: (sessionId: string, ask: AgentAsk | null) => void
+  setAgentTurn: (sessionId: string, inTurn: boolean) => void
   /** What a session's screen showed when its output last settled. */
   setSessionScreen: (
     sessionId: string,
@@ -585,6 +587,26 @@ function agentAskSlice(set: SetSessions): Slice<'setAgentAsk'> {
   }
 }
 
+/** Typing answers whatever the bell or the on-screen choice seemed to ask. */
+function inferredAskSlice(set: SetSessions): Slice<'clearInferredAsk'> {
+  return {
+    clearInferredAsk: (sessionId) =>
+      set((s) => {
+        const session = s.sessions.get(sessionId)
+        if (!session?.bellCount && session?.choicePrompt === undefined) return s
+        return patchSession(s, sessionId, { bellCount: undefined, choicePrompt: undefined }) ?? s
+      }),
+  }
+}
+
+/** Whether a session's agent is mid-turn, as its hooks report. */
+function agentTurnSlice(set: SetSessions): Slice<'setAgentTurn'> {
+  return {
+    setAgentTurn: (sessionId, inTurn) =>
+      set((s) => patchSession(s, sessionId, { agentTurn: inTurn }) ?? s),
+  }
+}
+
 /** Reads over the sessions and their views. */
 function querySlice(
   get: GetSessions
@@ -659,6 +681,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   ...terminalSlice(set),
   ...signalSlice(set),
   ...agentAskSlice(set),
+  ...agentTurnSlice(set),
+  ...inferredAskSlice(set),
   ...querySlice(get),
   ...splitSlice(set, get),
 }))

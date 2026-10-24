@@ -373,3 +373,23 @@ describe('buildSessionFacts — leaves Closed once its record has moved to the s
     expect(facts[0]).toMatchObject({ sessionId: 's2', isClosed: false, description: 'why' })
   })
 })
+
+describe('buildSessionFacts — told or guessed', () => {
+  const build = (patch: Partial<typeof session>) =>
+    buildSessionFacts({ ...empty, sessions: [{ ...session, ...patch }] })[0]
+
+  it('says which signal inferred an ask, and nothing when the agent asked', () => {
+    expect(build({ bellCount: 1 })).toMatchObject({ askInferred: true, askSignal: 'bell' })
+    const choicePrompt = { question: 'Proceed?', options: [{ number: 1, label: 'Yes' }] }
+    expect(build({ choicePrompt })).toMatchObject({ askInferred: true, askSignal: 'choice' })
+    const agentAsk = { message: 'Allow?', since: '2026-10-18T10:00:00.000Z' }
+    expect(build({ agentAsk, bellCount: 1 })).toMatchObject({ askInferred: false, askSignal: null })
+  })
+
+  it('says what running comes from: the agent’s turn, output, or nothing', () => {
+    expect(build({ agentTurn: true }).runningFrom).toBe('agent-turn')
+    expect(build({ busy: true }).runningFrom).toBe('output')
+    expect(build({ agentTurn: false, busy: true }).runningFrom).toBeNull()
+    expect(build({}).runningFrom).toBeNull()
+  })
+})
