@@ -5,6 +5,7 @@ import { sessionsOfLane } from './lane-details'
 import { startWork } from './start-work'
 import type { WorkThread } from '../../home/work-threads'
 import type { TaskCreateInput } from '../../../shared/schemas/tasks.schema'
+import { TASK_TITLE_MAX_LENGTH } from '../../../shared/task-title'
 import type { Workspace } from '../../../shared/types/index'
 
 const TICKET_KEY = /^(linear|jira):(.+)$/
@@ -31,9 +32,11 @@ async function ensureTask(thread: WorkThread): Promise<string | null> {
   if (thread.taskId !== null) return thread.taskId
   if (thread.lanes.length === 0) return null
   const lanes = thread.lanes.map(({ repoRoot, branch }) => ({ repoRoot, branch }))
-  const created = await useTaskStore
-    .getState()
-    .create({ title: thread.title, lanes, ticket: ticketOf(thread) })
+  const created = await useTaskStore.getState().create({
+    title: thread.title.slice(0, TASK_TITLE_MAX_LENGTH),
+    lanes,
+    ticket: ticketOf(thread),
+  })
   return created ? storedTaskOf(thread) : null
 }
 

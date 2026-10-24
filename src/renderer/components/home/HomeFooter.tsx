@@ -7,7 +7,7 @@ import { useWeekMeasures, type WeekMeasures } from './useWeekMeasures'
 import { ArchivedTasks } from './ArchivedTasks'
 
 /** "This week: 4 shipped · agents waited a median of 5 min on you"; null when neither is known. */
-export function weekSentence(shipped: number | null, week: WeekMeasures | null): string | null {
+function weekSentence(shipped: number | null, week: WeekMeasures | null): string | null {
   const parts = [
     ...(shipped === null ? [] : [`${shipped} shipped`]),
     ...(week && week.waits > 0

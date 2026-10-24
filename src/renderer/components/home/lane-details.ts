@@ -4,18 +4,13 @@ import type { SessionFacts } from '../../sidebar/session-facts'
 
 export type ThreadLane = WorkThread['lanes'][number]
 
-const folderName = (path: string): string => path.split('/').pop() ?? path
-
-/** The sessions on one lane: the same branch in the same repo, which a session names by its workspace. */
+/** The sessions on one lane, as the join placed them by repo and branch. */
 export function sessionsOfLane(thread: WorkThread, lane: ThreadLane): SessionFacts[] {
-  return thread.sessions.filter(
-    (s) =>
-      s.branch === lane.branch && (s.workspaceName ?? folderName(lane.repoRoot)) === lane.repoName
-  )
+  return thread.sessions.filter((s) => lane.sessionIds.includes(s.sessionId))
 }
 
 /** The facets published for one lane's repo and branch. */
-export function facetsOfLane(thread: WorkThread, lane: ThreadLane): ThreadFacet[] {
+function facetsOfLane(thread: WorkThread, lane: ThreadLane): ThreadFacet[] {
   return thread.facets.filter(
     (f) =>
       'repoRoot' in f.workKey &&

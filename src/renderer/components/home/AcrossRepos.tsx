@@ -6,6 +6,7 @@ import { RunAsChoices } from './RunAsChoices'
 import { branchSlug, startAcrossRepos, type AcrossResult, type RepoMessages } from './across-repos'
 import { useRepoGit, useMyTickets } from './start-work-model'
 import { useRunAsOptions, type RunAs } from './start-work'
+import { TASK_TITLE_MAX_LENGTH } from '../../../shared/task-title'
 import type { IssueSummary, Workspace } from '../../../shared/types/index'
 import './AcrossRepos.css'
 
@@ -39,6 +40,8 @@ function describeResult(result: AcrossResult, chosenCount: number) {
   for (const workspace of result.started) notes.set(workspace.id, 'Started')
   if (result.problems.size > 0)
     return { notes, summary: 'Nothing was started. Fix the repos named below, or untick them.' }
+  if (result.started.length === 0)
+    return { notes, summary: 'No lane was started. The repos below say why.' }
   const made = `${result.started.length} of ${chosenCount} ${plural(chosenCount, 'lane')} started`
   if (result.started.length > 0 && !result.recorded)
     return { notes, summary: `${made}, but the task could not be saved.` }
@@ -103,6 +106,7 @@ function TaskFields({ fields }: { fields: Fields }): JSX.Element {
         <input
           autoFocus
           aria-label="Task title"
+          maxLength={TASK_TITLE_MAX_LENGTH}
           value={fields.title}
           onChange={(e) => fields.setTitle(e.target.value)}
         />
@@ -140,7 +144,8 @@ function TicketField({ fields }: { fields: Fields }): JSX.Element {
   const pick = (key: string): void => {
     const issue = issues.find((i) => i.key === key) ?? null
     fields.setTicket(issue)
-    if (issue !== null && fields.title.trim() === '') fields.setTitle(issue.title)
+    if (issue !== null && fields.title.trim() === '')
+      fields.setTitle(issue.title.slice(0, TASK_TITLE_MAX_LENGTH))
   }
   return (
     <label>

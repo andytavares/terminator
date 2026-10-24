@@ -420,6 +420,21 @@ describe('tasks', () => {
   })
 })
 
+describe('tasks: a stored ticket', () => {
+  it("keeps the ticket's facets and its unbranched sessions in the task that stores the ticket", () => {
+    const stored = task({ lanes: [lanes[0]], ticket: { tracker: 'linear', key: 'TAV-31' } })
+    const onBranch = working({ sessionId: 'a', projectId: 'p1', branch: 'limits' })
+    const ticketOnly = working({ sessionId: 'b', projectId: null, workItem: ticket('TAV-31') })
+    const ticketFacet = facet({ workKey: { tracker: 'linear', key: 'TAV-31' }, kind: 'order' })
+    const threads = buildWorkThreads(
+      input({ facts: [onBranch, ticketOnly], facets: [ticketFacet], tasks: [stored], repoRoots })
+    )
+    expect(threads.map((t) => t.key)).toEqual([`task:${stored.id}`])
+    expect(threads[0].sessions.map((s) => s.sessionId).sort()).toEqual(['a', 'b'])
+    expect(threads[0].facets).toHaveLength(1)
+  })
+})
+
 describe('tasks: implicit and empty lanes', () => {
   it('makes one implicit thread with two lanes of a ticket across two repos', () => {
     const facts = threeRepos()
@@ -440,6 +455,27 @@ describe('tasks: implicit and empty lanes', () => {
       ['limits-ui', 'quiet'],
       ['limits-docs', 'quiet'],
     ])
+  })
+})
+
+describe('tasks: sessions on a lane', () => {
+  it('names the sessions on each lane by repo, even when two repos share a workspace name', () => {
+    const sameName = [
+      { repoRoot: '/repos/api', branch: 'limits' },
+      { repoRoot: '/repos/web', branch: 'limits' },
+    ]
+    const facts = sameName.map((lane, i) =>
+      working({
+        workspaceName: 'Backend',
+        sessionId: `s${i}`,
+        projectId: `p${i + 1}`,
+        branch: 'limits',
+      })
+    )
+    const [thread] = buildWorkThreads(
+      input({ facts, tasks: [task({ lanes: sameName })], repoRoots })
+    )
+    expect(thread.lanes.map((l) => l.sessionIds)).toEqual([['s0'], ['s1']])
   })
 })
 

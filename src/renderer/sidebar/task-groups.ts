@@ -59,8 +59,12 @@ export function groupByTask(
 }
 
 /** One lane of the task the visible branch is in, with the branch it opens. */
-export interface SwitchLane {
+interface SwitchLane {
   repoName: string
+  /** The repo's name, with the branch beside it when another lane of the task is in that repo. */
+  label: string
+  /** Unique within the task: its repo folder and branch. */
+  key: string
   /** The branch to select; null when this lane's branch is not in the sidebar. */
   projectId: string | null
 }
@@ -80,7 +84,22 @@ function switchLaneOf(
   const workspace = workspaces.find((w) => w.folderPath === lane.repoRoot)
   const project =
     workspace && projects.get(workspace.id)?.find((p) => branchLabel(p) === lane.branch)
-  return { repoName: workspace?.name ?? lane.repoRoot, projectId: project?.id ?? null }
+  const repoName = workspace?.name ?? lane.repoRoot
+  return {
+    repoName,
+    label: repoName,
+    key: `${lane.repoRoot}#${lane.branch}`,
+    projectId: project?.id ?? null,
+  }
+}
+
+function withBranchWhereRepoRepeats(lanes: SwitchLane[], task: Task): SwitchLane[] {
+  const repoCount = (root: string) => task.lanes.filter((l) => l.repoRoot === root).length
+  return lanes.map((lane, i) =>
+    repoCount(task.lanes[i].repoRoot) > 1
+      ? { ...lane, label: `${lane.repoName} · ${task.lanes[i].branch}` }
+      : lane
+  )
 }
 
 // The lanes to switch between when the visible branch is in a live task with two or more;
@@ -91,7 +110,10 @@ export function laneSwitchOf(
   repos: { workspaces: readonly Workspace[]; projects: ReadonlyMap<string, Project[]> }
 ): LaneSwitch | null {
   const lanes = (task: Task) =>
-    task.lanes.map((l) => switchLaneOf(l, repos.workspaces, repos.projects))
+    withBranchWhereRepoRepeats(
+      task.lanes.map((l) => switchLaneOf(l, repos.workspaces, repos.projects)),
+      task
+    )
   for (const task of tasks.filter((t) => t.archivedAt === null && t.lanes.length >= 2)) {
     const switchLanes = lanes(task)
     const current = switchLanes.findIndex((l) => l.projectId === visibleProjectId)

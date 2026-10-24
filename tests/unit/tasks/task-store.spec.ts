@@ -174,3 +174,46 @@ describe('task store loading', () => {
     expect(store.listTasks()).toEqual([])
   })
 })
+
+describe('task store startup', () => {
+  const stored = {
+    id: '6f1c2a4e-1b7d-4c1e-9a55-0d3f6b2c8e11',
+    title: 'Rate limits',
+    lanes: [api],
+    ticket: null,
+    focus: false,
+    doneAt: null,
+    createdAt: '2026-10-01T00:00:00.000Z',
+    archivedAt: null,
+  }
+
+  it('tells a window that listed before the file was read what it holds', async () => {
+    fs.writeFileSync(FILE(), JSON.stringify([stored]))
+    const store = await load()
+    const seen: string[][] = []
+    store.onTaskChange((tasks) => seen.push(tasks.map((t) => t.title)))
+    await store.loadTasks()
+    expect(seen).toEqual([['Rate limits']])
+  })
+
+  it('keeps a task created while the file is still being read', async () => {
+    fs.writeFileSync(FILE(), JSON.stringify([stored]))
+    const store = await load()
+    const loading = store.loadTasks()
+    const created = await store.createTask({ title: 'Billing', lanes: [web] })
+    await loading
+    expect(store.listTasks().map((t) => t.id)).toEqual([stored.id, created.id])
+  })
+})
+
+describe('task store write failures', () => {
+  it('keeps memory as it was when the write fails, so a refused change is not saved later', async () => {
+    const store = await load()
+    await store.createTask({ title: 'Billing', lanes: [api] })
+    const docs = await store.createTask({ title: 'Docs', lanes: [web] })
+    const before = store.listTasks()
+    userData = path.join(FILE(), 'not-a-folder')
+    await expect(store.addLane(docs.id, api)).rejects.toThrow()
+    expect(store.listTasks()).toEqual(before)
+  })
+})

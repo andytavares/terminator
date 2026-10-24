@@ -189,3 +189,20 @@ describe('Start work, Across repos — a repo fails midway', () => {
     expect(screen.getByRole('alert').textContent).toMatch(/2 of 3 lanes started/)
   })
 })
+
+describe('Start work, Across repos — every repo fails', () => {
+  it('says nothing was started or recorded, and keeps the dialog open to try again', async () => {
+    launched.createFromDraft.mockResolvedValue({
+      field: 'form',
+      message: 'Worktree error: raw git',
+    })
+    const onClose = await openAcrossRepos()
+    fireEvent.click(startButton(/Start 3 lanes/))
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toMatch(/No lane was started/)
+    expect(alert.textContent).not.toMatch(/recorded/)
+    expect(useTaskStore.getState().tasks).toEqual([])
+    expect(startButton(/Start 3 lanes/)).toBeTruthy()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+})

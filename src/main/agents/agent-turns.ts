@@ -21,3 +21,14 @@ export function setTurn(sessionId: string, inTurn: boolean): void {
   turns.set(sessionId, inTurn)
   for (const listener of listeners) listener(sessionId, inTurn)
 }
+
+/** Ends a turn in progress; a terminal not in one is left alone, so a shell's Esc changes nothing. */
+export function endTurn(sessionId: string): void {
+  if (turns.get(sessionId) === true) setTurn(sessionId, false)
+}
+
+/** The terminal is gone: forget its turn, and tell listeners it is no longer in one. */
+export function clearTurn(sessionId: string): void {
+  if (!turns.delete(sessionId)) return
+  for (const listener of listeners) listener(sessionId, false)
+}

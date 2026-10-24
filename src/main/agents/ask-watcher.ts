@@ -7,7 +7,7 @@ import {
   turnChangeOf,
   type AgentAsk,
 } from '../../shared/agent-sessions/ask.js'
-import { setTurn } from './agent-turns.js'
+import { endTurn, setTurn } from './agent-turns.js'
 import { asksDirectory } from './agent-ask-hook.js'
 import { probeUntilArmed } from './agent-session-watcher.js'
 import { makeLogger } from '../logger.js'
@@ -40,9 +40,15 @@ export function clearAsk(sessionId: string): void {
   if (asks.delete(sessionId)) announce(sessionId, null)
 }
 
-/** Input to the terminal answers the ask, unless it is only the terminal reporting its focus. */
-export function clearAskOnInput(sessionId: string, data: string): void {
-  if (!isFocusReport(data)) clearAsk(sessionId)
+// Claude Code's interrupt keys. An interrupted turn sends no Stop hook
+// (https://code.claude.com/docs/en/hooks#stop), so the key itself ends it.
+const INTERRUPT_KEYS: readonly string[] = ['\x1b', '\x03']
+
+/** Input answers the ask (unless it is only a focus report); Esc or Ctrl+C also ends the turn. */
+export function noteTerminalInput(sessionId: string, data: string): void {
+  if (isFocusReport(data)) return
+  clearAsk(sessionId)
+  if (INTERRUPT_KEYS.includes(data)) endTurn(sessionId)
 }
 
 function applyAskReport(file: string): void {

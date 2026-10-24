@@ -196,3 +196,20 @@ describe('placeWall — then by task', () => {
     expect(taskBands.map((b) => b.title)).toEqual(['Billing', 'Login rework'])
   })
 })
+
+describe('placeWall — then by task, same titles', () => {
+  it('keeps two tasks with the same title in one band each, never interleaved', () => {
+    const otherLogin = { id: 'task-login-2', title: 'Login rework' }
+    const sameTitle = new Map([
+      ['a', LOGIN],
+      ['b', otherLogin],
+      ['c', LOGIN],
+      ['d', otherLogin],
+    ])
+    const { taskBands } = placeWall(taskFacts.slice(0, 4), BY_TASK, sameTitle)
+    expect(taskBands.map((b) => [b.title, b.terminalCount])).toEqual([
+      ['Login rework', 2],
+      ['Login rework', 2],
+    ])
+  })
+})

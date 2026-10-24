@@ -21,7 +21,8 @@ export function taskKeyOf(id: string): string {
   return `task:${id}`
 }
 
-/** The task holding each lane; a live task wins over an archived one, which still holds its sessions. */
+/** The task holding each lane and each stored ticket ("linear:TAV-31"); a live task wins over an
+ *  archived one, which still holds its sessions. */
 export function taskKeysByLane(tasks: readonly Task[]): Map<string, string> {
   const byLane = new Map<string, string>()
   const archivedFirst = [...tasks].sort(
@@ -30,6 +31,7 @@ export function taskKeysByLane(tasks: readonly Task[]): Map<string, string> {
   for (const task of archivedFirst) {
     for (const lane of task.lanes)
       byLane.set(laneKeyOf(lane.repoRoot, lane.branch), taskKeyOf(task.id))
+    if (task.ticket) byLane.set(`${task.ticket.tracker}:${task.ticket.key}`, taskKeyOf(task.id))
   }
   return byLane
 }

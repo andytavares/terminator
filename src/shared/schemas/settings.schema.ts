@@ -28,7 +28,7 @@ const QuickActionsSettingsSchema = z
   .default({ pins: [], usage: [], directUse: [], custom: [] })
 
 /** Classic is the Desk as it was; Tasks is the queue above the task list. */
-export const HomeLayoutSchema = z.enum(['classic', 'tasks'])
+const HomeLayoutSchema = z.enum(['classic', 'tasks'])
 export type HomeLayout = z.infer<typeof HomeLayoutSchema>
 
 export const GlobalSettingsSchema = z.object({

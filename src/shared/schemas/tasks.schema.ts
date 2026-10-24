@@ -1,12 +1,13 @@
 import { z } from 'zod'
 import { WorkItemRefSchema } from './session-records.schema.js'
+import { TASK_TITLE_MAX_LENGTH } from '../task-title.js'
 
 const TaskLaneSchema = z.object({
   repoRoot: z.string().min(1),
   branch: z.string().min(1),
 })
 
-const TitleSchema = z.string().min(1).max(120)
+const TitleSchema = z.string().min(1).max(TASK_TITLE_MAX_LENGTH)
 
 export const TaskSchema = z.object({
   id: z.string().uuid(),

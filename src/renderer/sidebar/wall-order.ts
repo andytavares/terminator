@@ -58,12 +58,13 @@ function bandOf(title: string, order: number, tiles: readonly SessionFacts[]): W
 
 /** Tasks by title, tiles in no task last, each in the order it was started. */
 function byTask(tasks: ReadonlyMap<string, WallTask>) {
-  const titleOf = (f: SessionFacts) => tasks.get(f.sessionId)?.title ?? null
+  const taskOf = (f: SessionFacts) => tasks.get(f.sessionId) ?? null
   return (a: SessionFacts, b: SessionFacts): number => {
-    const [titleA, titleB] = [titleOf(a), titleOf(b)]
-    if (titleA === titleB) return byStarted(a, b)
-    if (titleA === null || titleB === null) return titleA === null ? 1 : -1
-    return titleA.localeCompare(titleB) || byStarted(a, b)
+    const [taskA, taskB] = [taskOf(a), taskOf(b)]
+    if (taskA?.id === taskB?.id) return byStarted(a, b)
+    if (taskA === null || taskB === null) return taskA === null ? 1 : -1
+    // Two tasks can share a title; the id keeps each one's tiles in one run.
+    return taskA.title.localeCompare(taskB.title) || taskA.id.localeCompare(taskB.id)
   }
 }
 

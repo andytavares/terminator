@@ -152,3 +152,23 @@ describe('TabBar — Add to task…', () => {
     expect(openAddToTask).toHaveBeenCalledWith({ repoRoot: '/b', branch: 'login' })
   })
 })
+
+describe('TabBar — lane switcher — one repo, two branches', () => {
+  it('names the branch on each lane when two lanes share a repo', () => {
+    const apiBilling = projectFixture({
+      id: 'p-api-billing',
+      workspaceId: 'ws-1',
+      name: 'billing',
+      gitBranch: 'billing',
+    })
+    useWorkspaceStore.setState({
+      projectsByWorkspaceId: new Map([['ws-1', [apiLogin, apiBilling]]]),
+    })
+    useTaskStore.setState({
+      tasks: [taskOf([TWO_LANES[0], { repoRoot: '/b', branch: 'billing' }])],
+    })
+    renderTabBar()
+    expect(screen.getByRole('button', { name: 'Backend · login' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Backend · billing' })).toBeTruthy()
+  })
+})

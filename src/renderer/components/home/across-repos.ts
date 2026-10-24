@@ -56,7 +56,7 @@ async function problemWith(workspace: Workspace, branch: string): Promise<string
 }
 
 /** Every repo that cannot take the branch, checked before anything starts. */
-export async function checkRepos(workspaces: Workspace[], branch: string): Promise<RepoMessages> {
+async function checkRepos(workspaces: Workspace[], branch: string): Promise<RepoMessages> {
   const found = await Promise.all(workspaces.map((w) => problemWith(w, branch)))
   const problems: RepoMessages = new Map()
   workspaces.forEach((workspace, i) => {

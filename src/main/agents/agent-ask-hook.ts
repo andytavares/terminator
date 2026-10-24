@@ -30,7 +30,7 @@ process.stdin.on('end', () => {
     if (!terminal || !reportDir) return
     const payload = JSON.parse(raw)
     if (!payload || typeof payload !== 'object') return
-    const events = { Notification: 'notification', Stop: 'stop', UserPromptSubmit: 'prompt' }
+    const events = { Notification: 'notification', Stop: 'stop', StopFailure: 'stop', UserPromptSubmit: 'prompt' }
     const event = events[payload.hook_event_name]
     if (!event) return
 
@@ -79,11 +79,12 @@ function askCommand(options: CaptureHookOptions): string {
   return `[ -n "$TERMINATOR_SESSION_ID" ] && test -f ${shellQuote(options.scriptPath)} && ${run} || true`
 }
 
-/** Registers the Notification, UserPromptSubmit and Stop entries in the operator's Claude settings, ours alone. */
+/** Registers the Notification, UserPromptSubmit, Stop and StopFailure entries in the operator's Claude settings, ours alone. */
 export async function installAskHooks(options: CaptureHookOptions): Promise<void> {
   const command = askCommand(options)
   const ours = { marker: SCRIPT_NAME, command }
   await putHook(userSettingsPath(), 'Notification', ours)
   await putHook(userSettingsPath(), 'UserPromptSubmit', ours)
   await putHook(userSettingsPath(), 'Stop', ours)
+  await putHook(userSettingsPath(), 'StopFailure', ours)
 }

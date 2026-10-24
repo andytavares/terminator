@@ -86,6 +86,16 @@ describe('the ask script, executed — a prompt', () => {
   })
 })
 
+describe('the ask script, executed — a failed turn', () => {
+  it('writes a StopFailure as a stop: the turn ended on an API error', async () => {
+    const { asks } = await run({ hook_event_name: 'StopFailure', error: 'rate_limit' })
+    expect(JSON.parse(fs.readFileSync(path.join(asks, 's1.json'), 'utf8'))).toMatchObject({
+      terminal: 's1',
+      event: 'stop',
+    })
+  })
+})
+
 describe('the ask script, executed — input it cannot use', () => {
   it.each([
     ['garbage', 'not json at all', { TERMINATOR_SESSION_ID: 's1' }],
@@ -128,6 +138,7 @@ describe('installing the ask hooks', () => {
     expect(hooks.Notification).toHaveLength(1)
     expect(hooks.UserPromptSubmit).toHaveLength(1)
     expect(hooks.UserPromptSubmit[0].hooks[0].command).toContain('agent-ask-hook.cjs')
+    expect(hooks.StopFailure).toHaveLength(1)
     expect(hooks.Stop).toHaveLength(2)
     expect(JSON.stringify(hooks.Stop)).toContain('mine.sh')
     expect(hooks.Notification[0].hooks[0].command).toContain('agent-ask-hook.cjs')

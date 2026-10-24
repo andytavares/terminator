@@ -25,6 +25,8 @@ interface WorkThreadLane {
   repoColor: string | null
   branch: string
   state: TaskState
+  /** The sessions running on this repo and branch. */
+  sessionIds: string[]
 }
 
 export interface WorkThread {
@@ -124,14 +126,19 @@ function keyOfSession(f: SessionFacts, input: WorkThreadInput, joins: Joins) {
   const lane = root && f.branch ? laneKeyOf(root, f.branch) : null
   const task = lane ? joins.taskKeys.get(lane) : undefined
   if (task) return task
-  if (f.workItem) return workKeyId(f.workItem.ref)
-  if (lane) return joins.tickets.get(lane) ?? lane
+  if (f.workItem) return joinedKey(workKeyId(f.workItem.ref), joins)
+  if (lane) return joinedKey(lane, joins)
   return `session:${f.sessionId}`
 }
 
+/** A lane or ticket key resolved through its branch's ticket and the task holding either. */
+function joinedKey(own: string, joins: Joins): string {
+  const ticket = joins.tickets.get(own) ?? own
+  return joins.taskKeys.get(own) ?? joins.taskKeys.get(ticket) ?? ticket
+}
+
 function keyOfFacet(facet: ThreadFacet, joins: Joins): string {
-  const own = workKeyId(facet.workKey)
-  return joins.taskKeys.get(own) ?? joins.tickets.get(own) ?? own
+  return joinedKey(workKeyId(facet.workKey), joins)
 }
 
 function draftFor(drafts: Map<string, Draft>, key: string): Draft {
@@ -263,6 +270,7 @@ function repoLaneOf(lane: LaneDraft, input: WorkThreadInput): WorkThreadLane {
     ...repoLabelOf(lane, input),
     branch: lane.branch,
     state: laneStateOf(lane),
+    sessionIds: lane.sessions.map((session) => session.sessionId),
   }
 }
 

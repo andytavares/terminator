@@ -37,14 +37,14 @@ export function LaneSwitcher({ projectId }: { projectId: string }): JSX.Element 
       <span className="lane-switcher__title">{switcher.title}</span>
       {switcher.lanes.map((lane, i) => (
         <button
-          key={lane.repoName}
+          key={lane.key}
           type="button"
           className={`lane-switcher__lane${i === switcher.current ? ' lane-switcher__lane--on' : ''}`}
           aria-pressed={i === switcher.current}
           disabled={lane.projectId === null}
           onClick={() => lane.projectId !== null && revealBranch(lane.projectId)}
         >
-          {lane.repoName}
+          {lane.label}
           {lane.projectId !== null && asking.has(lane.projectId) && (
             <StateGlyph state="needs-you" />
           )}

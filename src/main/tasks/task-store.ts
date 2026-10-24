@@ -31,6 +31,8 @@ export class TaskError extends Error {
 
 const tasks = new Map<string, Task>()
 const handlers = new Set<TaskChangeHandler>()
+/** Writes wait for the startup read, so one made before it lands is not wiped by it. */
+let loaded: Promise<void> = Promise.resolve()
 
 const filePath = (): string => path.join(app.getPath('userData'), FILE_NAME)
 
@@ -38,13 +40,25 @@ export function listTasks(): Task[] {
   return [...tasks.values()]
 }
 
-async function commit(): Promise<void> {
-  await writeJsonAtomic(filePath(), listTasks())
+function announce(): void {
   const snapshot = listTasks()
   for (const handler of handlers) handler(snapshot)
 }
 
-function find(id: string): Task {
+/** Saves the tasks; when the write fails, memory goes back to `before` so disk and memory agree. */
+async function commit(before: ReadonlyMap<string, Task>): Promise<void> {
+  try {
+    await writeJsonAtomic(filePath(), listTasks())
+  } catch (error) {
+    tasks.clear()
+    for (const [id, task] of before) tasks.set(id, task)
+    throw error
+  }
+  announce()
+}
+
+async function find(id: string): Promise<Task> {
+  await loaded
   const task = tasks.get(id)
   if (task === undefined) throw new TaskError('NOT_FOUND', `No task ${id}`)
   return task
@@ -60,13 +74,20 @@ async function readStoredEntries(): Promise<unknown[]> {
   }
 }
 
-/** Read what was stored, dropping entries that are not tasks. Called once at startup. */
-export async function loadTasks(): Promise<void> {
-  tasks.clear()
+async function readTasks(): Promise<void> {
   for (const entry of await readStoredEntries()) {
     const parsed = TaskSchema.safeParse(entry)
     if (parsed.success) tasks.set(parsed.data.id, parsed.data)
   }
+  // A window may have listed before the read finished; it learns what was stored.
+  announce()
+}
+
+/** Read what was stored, dropping entries that are not tasks. Called once at startup. */
+export function loadTasks(): Promise<void> {
+  tasks.clear()
+  loaded = readTasks()
+  return loaded
 }
 
 function withoutLane(task: Task, lane: TaskLane): Task {
@@ -86,6 +107,8 @@ function withLane(task: Task, lane: TaskLane): Task {
 }
 
 export async function createTask(input: TaskCreateInput): Promise<Task> {
+  await loaded
+  const before = new Map(tasks)
   const id = randomUUID()
   let task: Task = {
     id,
@@ -102,7 +125,7 @@ export async function createTask(input: TaskCreateInput): Promise<Task> {
     task = withLane(task, lane)
   }
   tasks.set(id, task)
-  await commit()
+  await commit(before)
   return task
 }
 
@@ -112,7 +135,7 @@ function doneAtFor(task: Task, done: boolean | undefined): string | null {
 }
 
 export async function updateTask(input: TaskUpdateInput): Promise<Task> {
-  const task = find(input.id)
+  const task = await find(input.id)
   const updated: Task = {
     ...task,
     title: input.title ?? task.title,
@@ -120,34 +143,38 @@ export async function updateTask(input: TaskUpdateInput): Promise<Task> {
     ticket: input.ticket === undefined ? task.ticket : input.ticket,
     doneAt: doneAtFor(task, input.done),
   }
+  const before = new Map(tasks)
   tasks.set(task.id, updated)
-  await commit()
+  await commit(before)
   return updated
 }
 
 export async function addLane(id: string, lane: TaskLane): Promise<Task> {
-  const task = find(id)
+  const task = await find(id)
+  const before = new Map(tasks)
   claimLane(id, lane)
   const updated = withLane(task, lane)
   tasks.set(id, updated)
-  await commit()
+  await commit(before)
   return updated
 }
 
 export async function removeLane(id: string, lane: TaskLane): Promise<Task> {
-  const updated = withoutLane(find(id), lane)
+  const updated = withoutLane(await find(id), lane)
+  const before = new Map(tasks)
   tasks.set(id, updated)
-  await commit()
+  await commit(before)
   return updated
 }
 
 export async function archiveTask(id: string, archived: boolean): Promise<Task> {
   const updated: Task = {
-    ...find(id),
+    ...(await find(id)),
     archivedAt: archived ? new Date().toISOString() : null,
   }
+  const before = new Map(tasks)
   tasks.set(id, updated)
-  await commit()
+  await commit(before)
   return updated
 }
 

@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useTaskStore } from '../../stores/task.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import type { Task, TaskLane } from '../../../shared/schemas/tasks.schema'
+import { TASK_TITLE_MAX_LENGTH } from '../../../shared/task-title'
 import { sameLane } from '../../../shared/task-lanes'
 import type { Project, Workspace } from '../../../shared/types/index'
 
@@ -62,5 +63,8 @@ export async function addLanesToTask(taskId: string, lanes: readonly TaskLane[])
 
 /** A new task named after the branch of its first lane. */
 export function createTaskFrom(lanes: readonly TaskLane[]): Promise<boolean> {
-  return useTaskStore.getState().create({ title: lanes[0].branch, lanes: [...lanes] })
+  return useTaskStore.getState().create({
+    title: lanes[0].branch.slice(0, TASK_TITLE_MAX_LENGTH),
+    lanes: [...lanes],
+  })
 }
