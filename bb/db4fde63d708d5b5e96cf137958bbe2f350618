@@ -1,0 +1,49 @@
+src/main/tasks/task-store.ts
+  s_bcb87751443cd2::t_ce44b33c21cc1c 1-161
+tests/unit/ipc/task.ipc.spec.ts
+  s_bcb87751443cd2::t_a9e1d7cb9e762f 23,41,50-78,94
+  s_bcb87751443cd2::t_31ed4682631851 1-22,24-40,42-49,79-93
+src/main/index.ts
+  s_bcb87751443cd2::t_f64b10665aeb5b 29-30,389,410
+src/renderer/shell/bootstrap.ts
+  s_bcb87751443cd2::t_f64b10665aeb5b 7
+  s_bcb87751443cd2::t_a9e1d7cb9e762f 26-34,50
+src/main/ipc/task.ipc.ts
+  s_bcb87751443cd2::t_43cc6f3988cf78 1-81
+tests/unit/renderer/stores/task.store.spec.ts
+  s_bcb87751443cd2::t_d4f34549681be1 87-89
+  s_bcb87751443cd2::t_a9e1d7cb9e762f 24,38,44,59-76,103
+  s_bcb87751443cd2::t_0faee19ab9f90d 1-23,25-37,39-43,45-58,77-86,90-102
+tests/unit/ipc/core-channel-schemas.spec.ts
+  s_bcb87751443cd2::t_e3347412a15a07 83,107
+src/renderer/stores/task.store.ts
+  s_bcb87751443cd2::t_f64b10665aeb5b 1-66
+src/shared/schemas/session-records.schema.ts
+  s_bcb87751443cd2::t_ce44b33c21cc1c 16
+src/shared/schemas/tasks.schema.ts
+  s_bcb87751443cd2::t_43cc6f3988cf78 1-49
+src/shared/electron-api/manifest.ts
+  s_bcb87751443cd2::t_f64b10665aeb5b 63-69,149,1173-1222
+  s_bcb87751443cd2::t_539de4910f667a 1223
+tests/unit/tasks/task-store.spec.ts
+  s_bcb87751443cd2::t_a9e1d7cb9e762f 46-75,113-137
+  s_bcb87751443cd2::t_b8b035bf2d045d 23,95-97,147-149,176
+  s_bcb87751443cd2::t_d4f34549681be1 156-161
+  s_bcb87751443cd2::t_a817c572b698f2 1-22,24-45,76-94,98-112,138-146,150-155,162-175
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bbdb4fde63d708d5b5e96cf137958bbe2f350618",
+  "prompts": {},
+  "sessions": {
+    "s_bcb87751443cd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b568ee83-ad51-4a54-9901-52cfcfa5b37f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
