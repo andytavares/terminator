@@ -3,9 +3,8 @@ import { Ellipsis } from 'lucide-react'
 import { IconButton } from '@terminator/extension-ui'
 import { ContextMenu, closeAllContextMenus, type ContextMenuItem } from '../ContextMenu'
 import { afterClosing } from '../sidebar/row-events'
-import { useParkedThreads } from './parked-threads'
 import { useDismissedThreads } from './dismissed-threads'
-import { leadSessionOf } from './thread-actions'
+import { leadSessionOf, toggleArchived } from './thread-actions'
 import { SESSION_ACTIONS } from '../session/session-actions'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { ConfirmDialog } from '../ConfirmDialog'
@@ -26,12 +25,6 @@ interface ItemActions {
   onStartRename: () => void
   onLink: () => void
   onRemoveWorktree: () => void
-}
-
-function toggleParked(thread: WorkThread): void {
-  const store = useParkedThreads.getState()
-  if (thread.parked) store.unpark(thread.key)
-  else store.park(thread.key)
 }
 
 /** True when the lead session's project is a git worktree the workspace store can delete. */
@@ -70,13 +63,13 @@ function dismissWithUndo(thread: WorkThread): void {
   })
 }
 
-/** Park or Unpark, and Dismiss: what every row offers. */
+/** Archive or Restore, and Dismiss: what every row offers. */
 function rowItems(thread: WorkThread, run: Run): ContextMenuItem[] {
   return [
     {
-      label: thread.parked ? 'Unpark' : 'Park',
+      label: thread.archived ? 'Restore' : 'Archive',
       separatorBefore: true,
-      onSelect: run(() => toggleParked(thread)),
+      onSelect: run(() => toggleArchived(thread)),
     },
     {
       label: 'Dismiss',

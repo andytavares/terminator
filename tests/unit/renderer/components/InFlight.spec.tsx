@@ -5,6 +5,7 @@ import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { InFlight } from '../../../../src/renderer/components/home/InFlight'
 import { useDeskSelection } from '../../../../src/renderer/components/home/desk-selection'
+import { useTaskStore } from '../../../../src/renderer/stores/task.store'
 import { useParkedThreads } from '../../../../src/renderer/components/home/parked-threads'
 import { useDismissedThreads } from '../../../../src/renderer/components/home/dismissed-threads'
 import { useToastStore } from '../../../../src/renderer/stores/toast.store'
@@ -12,7 +13,8 @@ import { ToastContainer } from '../../../../src/renderer/components/ToastContain
 import { useHomeFeedStore } from '../../../../src/renderer/stores/home-feed.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { installElectronApi } from '../../../support/electron-api'
-import { FACTS, seedDesk, sendToAgentAsk } from '../home/desk-world'
+import { FACTS, REPO_ROOT, seedDesk, sendToAgentAsk } from '../home/desk-world'
+import { task } from '../home/fixtures'
 
 const spies = vi.hoisted(() => ({
   open: vi.fn(),
@@ -84,6 +86,7 @@ function resetDesk(): void {
   useDeskSelection.setState({ selectedThreadKey: null, openThreadKey: null, groupBy: 'move' })
   useDeskSelection.setState({ expandedGroupIds: [] })
   useParkedThreads.setState({ keys: [] })
+  useTaskStore.setState({ tasks: [] })
   useDismissedThreads.setState({ dismissed: {} })
 }
 
@@ -103,17 +106,19 @@ beforeEach(() => {
 const inFlightRowNamed = (title: string) => screen.getByRole('button', { name: title })
 
 describe('In flight rows', () => {
-  it('counts the work and groups it by whose move it is', () => {
+  it('counts the work and groups it by state', () => {
     render(<InFlight />)
     expect(screen.getByText('4 work items')).toBeTruthy()
-    expect(screen.getByText('Agents working · 2')).toBeTruthy()
+    expect(screen.getByText('Needs you · 1')).toBeTruthy()
+    expect(screen.getByText('Running · 1')).toBeTruthy()
     expect(screen.getByText('Waiting on others · 1')).toBeTruthy()
+    expect(screen.getByText('Quiet · 1')).toBeTruthy()
   })
 
-  it('shows the stage caption, branch, what is happening now and the pull request chip', () => {
+  it('shows the state, branch, what is happening now and the pull request chip', () => {
     render(<InFlight />)
     const asking = within(inFlightRowNamed('Reproduce staging 429s before release'))
-    expect(asking.getByText('Building · your move')).toBeTruthy()
+    expect(asking.getByText('Needs you')).toBeTruthy()
     expect(asking.getByText('TAV-31')).toBeTruthy()
     expect(asking.getByText('1 asking')).toBeTruthy()
     expect(asking.getByText('no pull request')).toBeTruthy()
@@ -121,30 +126,26 @@ describe('In flight rows', () => {
     expect(building.getByText('#275 checks failing')).toBeTruthy()
     expect(building.getByText('Writing ReviewHeader tests')).toBeTruthy()
     expect(building.getByText('tav-20')).toBeTruthy()
+    expect(building.getByText('Running')).toBeTruthy()
     const waiting = within(inFlightRowNamed('Make all text in the app scale with settings'))
-    expect(waiting.getByText('In review · 1 day')).toBeTruthy()
+    expect(waiting.getByText('Waiting on others · 1 day')).toBeTruthy()
     expect(waiting.getByText('1 d')).toBeTruthy()
   })
 })
 
-describe('In flight rows — Parked and grouping', () => {
-  it('keeps Parked collapsed until its heading is pressed', () => {
+describe('In flight rows — grouping', () => {
+  it('lists a scratch terminal under Quiet, not hidden away', () => {
     render(<InFlight />)
-    expect(screen.queryByRole('button', { name: 'Scratch shell' })).toBeNull()
-    const heading = screen.getByRole('button', {
-      name: /Parked · 1 · scratch terminals and work untouched for 2 days/,
-    })
-    expect(heading.getAttribute('aria-expanded')).toBe('false')
-    fireEvent.click(heading)
     expect(screen.getByRole('button', { name: 'Scratch shell' })).toBeTruthy()
+    expect(screen.queryByText(/Parked/)).toBeNull()
   })
 
   it('groups by repo from the Group menu', () => {
     render(<InFlight />)
-    fireEvent.click(screen.getByRole('button', { name: 'Group: whose move' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Group: state' }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'repo' }))
     expect(screen.getByText('terminator · 3')).toBeTruthy()
-    expect(screen.queryByText(/Agents working/)).toBeNull()
+    expect(screen.queryByText(/Running · /)).toBeNull()
   })
 
   it('marks the selected row', () => {
@@ -164,10 +165,10 @@ const openBuilding = () => {
 }
 
 describe('the work-thread drawer', () => {
-  it('opens from a click with the title, stage, agents and pull request checks', async () => {
+  it('opens from a click with the title, state, agents and pull request checks', async () => {
     const drawer = within(await openBuilding())
     expect(drawer.getByRole('heading', { level: 4 }).textContent).toContain('TAV-20')
-    expect(drawer.getByRole('list', { name: 'Stage' })).toBeTruthy()
+    expect(drawer.getByText('Running')).toBeTruthy()
     expect(drawer.getByText('AGENTS AND TERMINALS · 1')).toBeTruthy()
     expect(drawer.getByText('PULL REQUEST #275')).toBeTruthy()
     expect(drawer.getByText('End-to-end tests')).toBeTruthy()
@@ -235,7 +236,7 @@ describe('the work-thread drawer — checks', () => {
 })
 
 describe('the work-thread drawer — actions', () => {
-  it('opens the terminal, the pull request and the ticket, and parks the work', async () => {
+  it('opens the terminal, the pull request and the ticket, and archives the work', async () => {
     const drawer = within(await openBuilding())
     fireEvent.click(drawer.getByRole('button', { name: 'Open terminal' }))
     expect(spies.open).toHaveBeenCalledWith('building')
@@ -243,9 +244,9 @@ describe('the work-thread drawer — actions', () => {
     expect(openExternal).toHaveBeenCalledWith('https://github.com/o/r/pull/275')
     fireEvent.click(drawer.getByRole('button', { name: 'Open in Linear' }))
     expect(openExternal).toHaveBeenCalledWith('https://linear.app/t/issue/TAV-20')
-    fireEvent.click(drawer.getByRole('button', { name: 'Park' }))
+    fireEvent.click(drawer.getByRole('button', { name: 'Archive' }))
     expect(useParkedThreads.getState().keys).toEqual(['linear:TAV-20'])
-    expect(drawer.getByRole('button', { name: 'Unpark' })).toBeTruthy()
+    expect(drawer.getByRole('button', { name: 'Restore' })).toBeTruthy()
   })
 
   it("starts a Claude agent on the thread's branch", async () => {
@@ -287,7 +288,7 @@ describe('filtering from the Desk header', () => {
 
   it.each([
     ['your-move', 1],
-    ['agents', 2],
+    ['agents', 1],
     ['others', 1],
     ['failing', 1],
   ])('shows only the %s threads', (count, rows) => {
@@ -305,10 +306,7 @@ const rightClickRow = (title: string) => {
   return row
 }
 
-const openScratchRow = () => {
-  fireEvent.click(screen.getByRole('button', { name: /Parked · 1/ }))
-  return rightClickRow('Scratch shell')
-}
+const openScratchRow = () => rightClickRow('Scratch shell')
 
 const contextMenuItemNames = () =>
   within(document.body)
@@ -321,7 +319,7 @@ const openMenuItem = (name: string) => within(document.body).getByRole('button',
 const TICKETED_MENU = [
   'Open terminal',
   'Rename…',
-  'Park',
+  'Archive',
   'Dismiss',
   'Close sessions',
   'Remove worktree…',
@@ -330,7 +328,7 @@ const SCRATCH_MENU = [
   'Open terminal',
   'Rename…',
   'Link ticket…',
-  'Unpark',
+  'Archive',
   'Dismiss',
   'Close sessions',
 ]
@@ -352,7 +350,7 @@ describe('the row menu — which items', () => {
     render(<InFlight />)
     const row = inFlightRowNamed('Make all text in the app scale with settings')
     fireEvent.click(within(row).getByRole('button', { name: 'Work actions' }))
-    expect(contextMenuItemNames()).toEqual(['Park', 'Dismiss'])
+    expect(contextMenuItemNames()).toEqual(['Archive', 'Dismiss'])
     expect(
       screen.queryByRole('dialog', { name: 'Make all text in the app scale with settings' })
     ).toBeNull()
@@ -413,16 +411,26 @@ const parkViaMenu = (title: string, item: string): void => {
   fireEvent.click(openMenuItem(item))
 }
 
-describe('the row menu — Park and Dismiss', () => {
-  it('Park moves the thread under Parked and the menu then offers Unpark', () => {
+describe('the row menu — Archive and Dismiss', () => {
+  it('Archive takes work with no stored task out of the lists', () => {
     render(<InFlight />)
-    parkViaMenu('Reproduce staging 429s before release', 'Park')
+    parkViaMenu('Reproduce staging 429s before release', 'Archive')
     expect(useParkedThreads.getState().keys).toEqual(['linear:TAV-31'])
     expect(
       screen.queryByRole('button', { name: 'Reproduce staging 429s before release' })
     ).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /Parked · / }))
-    parkViaMenu('Reproduce staging 429s before release', 'Unpark')
+  })
+
+  it('Archive on a stored task archives it through the task store', () => {
+    const archive = vi.fn().mockResolvedValue(true)
+    const stored = task({
+      title: 'Rate limits',
+      lanes: [{ repoRoot: REPO_ROOT, branch: 'tav-31' }],
+    })
+    useTaskStore.setState({ tasks: [stored], archive })
+    render(<InFlight />)
+    parkViaMenu('Rate limits', 'Archive')
+    expect(archive).toHaveBeenCalledWith(stored.id, true)
     expect(useParkedThreads.getState().keys).toEqual([])
   })
 

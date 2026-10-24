@@ -7,7 +7,7 @@ import {
   type WorkThreadInput,
 } from '../../../../src/renderer/home/work-threads'
 import { fact } from '../sidebar/fixtures/facts'
-import { facet } from './fixtures'
+import { facet, task } from './fixtures'
 import { ticket } from './desk-world'
 import type { IssueSummary } from '../../../../src/shared/types/index'
 import type { SessionFacts } from '../../../../src/renderer/sidebar/session-facts'
@@ -22,6 +22,7 @@ function input(patch: Partial<WorkThreadInput>): WorkThreadInput {
     facets: [],
     issues: [],
     changeStats: new Map(),
+    tasks: [],
     repoRoots: new Map([
       ['p1', '/repos/terminator'],
       ['p2', '/repos/other'],
@@ -84,8 +85,7 @@ describe('joining: facets without a session', () => {
     const [thread] = buildWorkThreads(input({ facets: [facet()] }))
     expect(thread).toMatchObject({
       key: '/repos/terminator#tav-31',
-      branch: 'tav-31',
-      repoName: 'terminator',
+      lanes: [{ repoRoot: '/repos/terminator', branch: 'tav-31', repoName: 'terminator' }],
     })
     expect(thread.ticketKey).toBeUndefined()
   })
@@ -129,16 +129,13 @@ describe('joining: sessions that have ended', () => {
       input({ facts: [ended({ sessionId: 'old' }), working({ sessionId: 'live' })] })
     )
     expect(thread.sessions.map((s) => s.sessionId)).toEqual(['live', 'old'])
-    expect(thread.branch).toBe('tav-31')
+    expect(thread.lanes.map((l) => l.branch)).toEqual(['tav-31'])
   })
 
-  it('keeps a thread whose only sessions have ended, in In flight until 48 hours pass', () => {
-    const [recent] = buildWorkThreads(input({ facts: [ended()] }))
-    expect(recent).toMatchObject({ whoseMove: 'others', parked: false, closed: false })
-    const [stale] = buildWorkThreads(
-      input({ facts: [ended({ lastActivityAt: hoursBeforeNow(49) })] })
-    )
-    expect(stale.parked).toBe(true)
+  it('keeps a thread whose only sessions have ended, quiet and never parked by a timer', () => {
+    const stale = ended({ lastActivityAt: hoursBeforeNow(49) })
+    const [thread] = buildWorkThreads(input({ facts: [stale] }))
+    expect(thread).toMatchObject({ state: 'quiet', archived: false, closed: false })
   })
 
   it('drops the thread once its pull request has merged', () => {
@@ -153,40 +150,32 @@ describe('joining: sessions that have ended', () => {
   })
 })
 
-describe('thread fields', () => {
-  it('takes the furthest facet stage, and building when only a session exists', () => {
-    const two = buildWorkThreads(
-      input({
-        facts: [working()],
-        facets: [facet({ stage: 'in-review' }), facet({ kind: 'task', stage: 'building' })],
-      })
-    )
-    expect(two[0].stage).toBe('in-review')
-    expect(buildWorkThreads(input({ facts: [working()] }))[0].stage).toBe('building')
+describe('thread fields: state', () => {
+  const stateFor = (facts: WorkThreadInput['facts'], facets: WorkThreadInput['facets'] = []) =>
+    buildWorkThreads(input({ facts, facets }))[0].state
+
+  it('says the most urgent state: needs-you, then running, then waiting', () => {
+    const asking = working({ sessionId: 'b', state: 'awaiting-input' })
+    expect(stateFor([working(), asking])).toBe('needs-you')
+    expect(stateFor([working()], [facet({ whoseMove: 'you' })])).toBe('needs-you')
+    expect(stateFor([working()], [facet({ whoseMove: 'others' })])).toBe('running')
+    expect(stateFor([working({ state: 'idle' })], [facet({ whoseMove: 'others' })])).toBe('waiting')
   })
 
-  it('leaves a Foundry order that is shaping at shaping', () => {
-    const order = facet({ kind: 'order', stage: 'shaping' })
-    expect(buildWorkThreads(input({ facts: [working()], facets: [order] }))[0].stage).toBe(
-      'shaping'
-    )
+  it('is quiet, never waiting, for an idle branch with no pull request', () => {
+    expect(stateFor([fact({ state: 'idle', branch: 'tav-31' })])).toBe('quiet')
   })
-})
 
-describe('thread fields: who moves next', () => {
-  it('says whose move it is: you beats agents beats others', () => {
-    const whoseMoveFor = (
-      facts: WorkThreadInput['facts'],
-      facets: WorkThreadInput['facets'] = []
-    ) => buildWorkThreads(input({ facts, facets }))[0].whoseMove
-    expect(whoseMoveFor([working(), working({ sessionId: 'b', state: 'awaiting-input' })])).toBe(
-      'you'
-    )
-    expect(whoseMoveFor([working()], [facet({ whoseMove: 'you' })])).toBe('you')
-    expect(whoseMoveFor([working()], [facet({ whoseMove: 'others' })])).toBe('agents')
+  it('marks the thread inferred when the ask comes from a bell alone', () => {
+    const bell = working({ state: 'awaiting-input', askInferred: true, askSignal: 'bell' })
+    const [thread] = buildWorkThreads(input({ facts: [bell] }))
+    expect(thread).toMatchObject({ state: 'needs-you', inferred: true })
+  })
+
+  it('does not read a facet stage', () => {
     expect(
-      whoseMoveFor([fact({ state: 'idle', lastActivityAt: hoursBeforeNow(1) })], [facet()])
-    ).toBe('others')
+      stateFor([fact({ state: 'idle' })], [facet({ stage: 'shipped', whoseMove: 'agents' })])
+    ).toBe('quiet')
   })
 })
 
@@ -217,7 +206,7 @@ describe('thread fields: what is happening', () => {
   })
 })
 
-describe('thread fields: title, parking and changes', () => {
+describe('thread fields: title and changes', () => {
   it('titles by issue, then facet, then description, then branch', () => {
     const title = (patch: Partial<WorkThreadInput>) => buildWorkThreads(input(patch))[0].title
     const linked = working({ workItem: ticket('TAV-31'), description: 'My notes' })
@@ -227,17 +216,15 @@ describe('thread fields: title, parking and changes', () => {
     expect(title({ facets: [facet({ title: 'Add limits' })] })).toBe('Add limits')
   })
 
-  it('parks a scratch session and anything untouched for 48 hours', () => {
+  it('keeps a scratch session quiet and not archived, however long it sat', () => {
     const scratch = fact({ projectId: null, branch: null, lastActivityAt: hoursBeforeNow(1) })
-    expect(buildWorkThreads(input({ facts: [scratch] }))[0].parked).toBe(true)
-    expect(
-      buildWorkThreads(input({ facts: [working({ lastActivityAt: hoursBeforeNow(47) })] }))[0]
-        .parked
-    ).toBe(false)
-    expect(
-      buildWorkThreads(input({ facts: [working({ lastActivityAt: hoursBeforeNow(49) })] }))[0]
-        .parked
-    ).toBe(true)
+    expect(buildWorkThreads(input({ facts: [scratch] }))[0]).toMatchObject({
+      state: 'quiet',
+      archived: false,
+      lanes: [],
+    })
+    const old = working({ lastActivityAt: hoursBeforeNow(200) })
+    expect(buildWorkThreads(input({ facts: [old] }))[0].archived).toBe(false)
   })
 
   it('carries the uncommitted change stats of its project', () => {
@@ -283,7 +270,7 @@ describe('latestResumableThread', () => {
         ],
       })
     )
-    expect(latestResumableThread(threads)?.branch).toBe('b')
+    expect(latestResumableThread(threads)?.lanes[0].branch).toBe('b')
   })
 
   it('finds nothing when no ended conversation can be resumed', () => {
@@ -294,34 +281,73 @@ describe('latestResumableThread', () => {
   })
 })
 
+const firstBranch = (t: { lanes: { branch: string | null }[] }) => t.lanes[0].branch
+
 describe('groupThreads', () => {
-  it('groups, puts your move first in Agents working, and omits empty groups', () => {
+  const sessions = () => [
+    working({ sessionId: 'a', branch: 'a' }),
+    working({ sessionId: 'b', branch: 'b', state: 'awaiting-input' }),
+    fact({ sessionId: 'd', branch: 'd', state: 'idle' }),
+  ]
+
+  it('groups by state in focus order and omits empty groups', () => {
+    const groups = groupThreads(buildWorkThreads(input({ facts: sessions() })))
+    expect(groups.map((g) => [g.id, g.label])).toEqual([
+      ['needs-you', 'Needs you'],
+      ['running', 'Running'],
+      ['quiet', 'Quiet'],
+    ])
+  })
+
+  it('never emits a waiting group for an idle branch', () => {
+    const idle = fact({ branch: 'd', state: 'idle', lastActivityAt: hoursBeforeNow(1) })
+    const groups = groupThreads(buildWorkThreads(input({ facts: [idle] })))
+    expect(groups.map((g) => g.id)).toEqual(['quiet'])
+  })
+})
+
+describe('groupThreads: waiting and done', () => {
+  it('emits waiting for an open pull request with someone else, and done for a marked task', () => {
+    const stored = task({
+      doneAt: '2026-10-18T11:00:00.000Z',
+      lanes: [{ repoRoot: '/r', branch: 'x' }],
+    })
+    const threads = buildWorkThreads(
+      input({
+        facts: [working({ state: 'idle' })],
+        facets: [facet({ whoseMove: 'others' })],
+        tasks: [stored],
+      })
+    )
+    expect(groupThreads(threads).map((g) => [g.id, g.label])).toEqual([
+      ['waiting', 'Waiting on others'],
+      ['done', 'Done'],
+    ])
+  })
+})
+
+describe('groupThreads: archived and order', () => {
+  it('leaves archived threads out', () => {
+    const archived = task({ archivedAt: '2026-10-18T11:00:00.000Z' })
+    const threads = buildWorkThreads(input({ tasks: [archived] }))
+    expect(threads).toHaveLength(1)
+    expect(groupThreads(threads)).toEqual([])
+  })
+
+  it('puts the focused task first in its group, then the newest', () => {
+    const focused = task({ focus: true, lanes: [{ repoRoot: '/repos/terminator', branch: 'a' }] })
     const threads = buildWorkThreads(
       input({
         facts: [
-          working({ sessionId: 'a', branch: 'a', lastActivityAt: hoursBeforeNow(1) }),
-          working({
-            sessionId: 'b',
-            branch: 'b',
-            state: 'awaiting-input',
-            lastActivityAt: hoursBeforeNow(3),
-          }),
-          working({ sessionId: 'c', branch: 'c', lastActivityAt: hoursBeforeNow(60) }),
-          fact({ sessionId: 'd', branch: 'd', state: 'idle', lastActivityAt: hoursBeforeNow(1) }),
+          fact({ sessionId: 'a', branch: 'a', startedAt: '2026-10-18T08:00:00.000Z' }),
+          fact({ sessionId: 'b', branch: 'b', startedAt: '2026-10-18T09:00:00.000Z' }),
+          fact({ sessionId: 'c', branch: 'c', startedAt: '2026-10-18T10:00:00.000Z' }),
         ],
+        tasks: [focused],
       })
     )
-    const groups = groupThreads(threads)
-    expect(groups.map((g) => [g.id, g.label])).toEqual([
-      ['agents', 'Agents working'],
-      ['others', 'Waiting on others'],
-      ['parked', 'Parked'],
-    ])
-    expect(groups[0].threads.map((t) => t.branch)).toEqual(['b', 'a'])
-    expect(groupThreads(threads.filter((t) => !t.parked)).map((g) => g.id)).toEqual([
-      'agents',
-      'others',
-    ])
+    const [quiet] = groupThreads(threads)
+    expect(quiet.threads.map((t) => t.taskId ?? firstBranch(t))).toEqual([focused.id, 'c', 'b'])
   })
 })
 
@@ -342,11 +368,101 @@ describe('groupThreads: order', () => {
       }),
     ]
     const order = (activity: { a: number; b: number }) =>
-      groupThreads(buildWorkThreads(input({ facts: facts(activity) })))[0].threads.map(
-        (t) => t.branch
-      )
+      groupThreads(buildWorkThreads(input({ facts: facts(activity) })))[0].threads.map(firstBranch)
     expect(order({ a: 5, b: 1 })).toEqual(['b', 'a'])
     expect(order({ a: 1, b: 5 })).toEqual(['b', 'a'])
+  })
+})
+
+const repoRoots = new Map([
+  ['p1', '/repos/api'],
+  ['p2', '/repos/web'],
+  ['p3', '/repos/docs'],
+])
+const lanes = [
+  { repoRoot: '/repos/api', branch: 'limits' },
+  { repoRoot: '/repos/web', branch: 'limits-ui' },
+  { repoRoot: '/repos/docs', branch: 'limits-docs' },
+]
+const threeRepos = () =>
+  lanes.map((lane, i) =>
+    working({
+      workspaceName: null,
+      sessionId: `s${i}`,
+      projectId: `p${i + 1}`,
+      branch: lane.branch,
+    })
+  )
+
+describe('tasks', () => {
+  it('joins the three lanes of a stored task into one thread with three lanes', () => {
+    const stored = task({ lanes })
+    const threads = buildWorkThreads(input({ facts: threeRepos(), tasks: [stored], repoRoots }))
+    expect(threads).toHaveLength(1)
+    expect(threads[0]).toMatchObject({
+      key: `task:${stored.id}`,
+      taskId: stored.id,
+      title: 'Rate limits',
+    })
+    expect(threads[0].lanes.map((l) => [l.repoName, l.branch, l.state])).toEqual([
+      ['api', 'limits', 'running'],
+      ['web', 'limits-ui', 'running'],
+      ['docs', 'limits-docs', 'running'],
+    ])
+  })
+
+  it("lets a lane's task beat the session's ticket link", () => {
+    const stored = task({ lanes: [lanes[0]] })
+    const linked = working({ projectId: 'p1', branch: 'limits', workItem: ticket('TAV-31') })
+    const [thread] = buildWorkThreads(input({ facts: [linked], tasks: [stored], repoRoots }))
+    expect(thread.key).toBe(`task:${stored.id}`)
+  })
+})
+
+describe('tasks: implicit and empty lanes', () => {
+  it('makes one implicit thread with two lanes of a ticket across two repos', () => {
+    const facts = threeRepos()
+      .slice(0, 2)
+      .map((f) => ({ ...f, workItem: ticket('TAV-31') }))
+    const threads = buildWorkThreads(input({ facts, repoRoots }))
+    expect(threads).toHaveLength(1)
+    expect(threads[0]).toMatchObject({ key: 'linear:TAV-31', taskId: null })
+    expect(threads[0].lanes.map((l) => l.repoName)).toEqual(['api', 'web'])
+  })
+
+  it('still shows a stored lane with nothing running on it', () => {
+    const [thread] = buildWorkThreads(
+      input({ facts: [threeRepos()[0]], tasks: [task({ lanes })], repoRoots })
+    )
+    expect(thread.lanes.map((l) => [l.branch, l.state])).toEqual([
+      ['limits', 'running'],
+      ['limits-ui', 'quiet'],
+      ['limits-docs', 'quiet'],
+    ])
+  })
+})
+
+describe('tasks: archived and done', () => {
+  it('holds the sessions of an archived task so they do not show as loose threads', () => {
+    const archived = task({ lanes, archivedAt: '2026-10-18T11:00:00.000Z' })
+    const threads = buildWorkThreads(input({ facts: threeRepos(), tasks: [archived], repoRoots }))
+    expect(threads).toHaveLength(1)
+    expect(threads[0]).toMatchObject({ archived: true, taskId: archived.id })
+  })
+
+  it('carries focus and doneAt from the stored task', () => {
+    const stored = task({ lanes, focus: true, doneAt: '2026-10-18T11:00:00.000Z' })
+    const [thread] = buildWorkThreads(input({ facts: threeRepos(), tasks: [stored], repoRoots }))
+    expect(thread).toMatchObject({ focus: true, doneAt: stored.doneAt, state: 'done' })
+  })
+})
+
+describe('tasks: facets', () => {
+  const stored = task({ lanes: [{ repoRoot: '/repos/terminator', branch: 'tav-31' }] })
+
+  it('joins a pull request facet on a stored lane to its task', () => {
+    const [thread] = buildWorkThreads(input({ facets: [facet()], tasks: [stored] }))
+    expect(thread).toMatchObject({ key: `task:${stored.id}`, state: 'waiting' })
   })
 })
 

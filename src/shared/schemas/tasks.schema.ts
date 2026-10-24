@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { WorkItemRefSchema } from './session-records.schema.js'
 
-export const TaskLaneSchema = z.object({
+const TaskLaneSchema = z.object({
   repoRoot: z.string().min(1),
   branch: z.string().min(1),
 })

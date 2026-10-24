@@ -54,11 +54,13 @@ describe('useWorkThreads', () => {
     expect(thread.facets[0].workKey).toEqual({ repoRoot: REPO_ROOT, branch: 'tav-20' })
   })
 
-  it('lists a thread the operator parked under Parked', () => {
+  it('marks a thread the operator parked by hand archived and leaves it out of the groups', () => {
     act(() => useParkedThreads.getState().park('linear:TAV-20'))
     const { result } = renderHook(() => useWorkThreads())
-    const parked = result.current.groups.find((g) => g.id === 'parked')
-    expect(parked?.threads.map((t) => t.key)).toContain('linear:TAV-20')
+    expect(result.current.threads.find((t) => t.key === 'linear:TAV-20')?.archived).toBe(true)
+    expect(result.current.groups.flatMap((g) => g.threads.map((t) => t.key))).not.toContain(
+      'linear:TAV-20'
+    )
   })
 
   it('keeps the parked set across a reload', () => {
@@ -73,12 +75,15 @@ describe('useWorkThreads', () => {
 })
 
 describe('useOrderedThreadKeys', () => {
-  it('lists the rows as drawn: Parked only once opened', () => {
+  it('lists the rows as drawn: by state, with archived work left out', () => {
     const { result } = renderHook(() => useOrderedThreadKeys())
-    expect(result.current).toEqual(['linear:TAV-31', 'linear:TAV-20', `${REPO_ROOT}#tav-14`])
-    act(() => useDeskSelection.getState().toggleGroup('parked'))
-    expect(result.current).toHaveLength(4)
-    act(() => useDeskSelection.getState().toggleGroup('parked'))
+    expect(result.current).toEqual([
+      'linear:TAV-31',
+      'linear:TAV-20',
+      `${REPO_ROOT}#tav-14`,
+      'session:scratch',
+    ])
+    act(() => useParkedThreads.getState().park('session:scratch'))
     expect(result.current).toHaveLength(3)
   })
 

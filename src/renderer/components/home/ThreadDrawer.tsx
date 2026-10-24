@@ -1,14 +1,18 @@
 import React, { useEffect } from 'react'
 import { GitBranch } from 'lucide-react'
-import { Button, Drawer, Kbd, StageBar } from '@terminator/extension-ui'
+import { Button, Drawer, Kbd } from '@terminator/extension-ui'
 import { SESSION_ACTIONS } from '../session/session-actions'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useNow } from '../session/useNow'
 import { useDeskSelection } from './desk-selection'
-import { useParkedThreads } from './parked-threads'
 import { useWorkThreads } from './useWorkThreads'
-import { pullRequestOf } from './thread-format'
-import { leadSessionOf, openLinkExternally, startAgentOnBranch } from './thread-actions'
+import { pullRequestOf, stateCaption } from './thread-format'
+import {
+  leadSessionOf,
+  openLinkExternally,
+  startAgentOnBranch,
+  toggleArchived,
+} from './thread-actions'
 import {
   AgentsSection,
   PullRequestSection,
@@ -46,12 +50,10 @@ function LinkButtons({ thread }: { thread: WorkThread }): JSX.Element {
   )
 }
 
-function ParkButton({ threadKey }: { threadKey: string }): JSX.Element {
-  const parked = useParkedThreads((s) => s.keys.includes(threadKey))
-  const { park, unpark } = useParkedThreads.getState()
+function ArchiveButton({ thread }: { thread: WorkThread }): JSX.Element {
   return (
-    <Button size="sm" variant="ghost" onClick={() => (parked ? unpark : park)(threadKey)}>
-      {parked ? 'Unpark' : 'Park'}
+    <Button size="sm" variant="ghost" onClick={() => toggleArchived(thread)}>
+      {thread.archived ? 'Restore' : 'Archive'}
     </Button>
   )
 }
@@ -72,7 +74,7 @@ function DrawerActions({ thread }: { thread: WorkThread }): JSX.Element {
         New agent on this branch
       </Button>
       <LinkButtons thread={thread} />
-      <ParkButton threadKey={thread.key} />
+      <ArchiveButton thread={thread} />
     </div>
   )
 }
@@ -81,13 +83,13 @@ function ThreadDrawerHeader({ thread }: { thread: WorkThread }): JSX.Element {
   return (
     <div className="desk-dr-h">
       <div className="desk-dr-h__top">
-        <span className="desk-sw" style={{ background: thread.repoColor ?? undefined }} />
-        {thread.repoName}
-        {thread.branch && (
+        <span className="desk-sw" style={{ background: thread.lanes[0]?.repoColor ?? undefined }} />
+        {thread.lanes[0]?.repoName}
+        {thread.lanes[0] && (
           <>
             <span>·</span>
             <GitBranch aria-hidden="true" />
-            <span className="desk-dr-h__branch">{thread.branch}</span>
+            <span className="desk-dr-h__branch">{thread.lanes[0].branch}</span>
           </>
         )}
         <span className="desk-dr-h__esc">
@@ -128,9 +130,7 @@ export function ThreadDrawer(): JSX.Element | null {
   return (
     <Drawer label={thread.title} onDismiss={closeThread}>
       <ThreadDrawerHeader thread={thread} />
-      <div className="desk-pipe">
-        <StageBar stage={thread.stage} yourMove={thread.whoseMove === 'you'} size="large" />
-      </div>
+      <div className="desk-pipe">{stateCaption(thread, now)}</div>
       <div className="desk-dr-b">
         <TerminalSection thread={thread} />
         <SummarySection thread={thread} />

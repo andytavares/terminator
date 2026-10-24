@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useHomeFeedStore } from '../../stores/home-feed.store'
+import { useTaskStore } from '../../stores/task.store'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useChangeStatsStore } from '../../stores/change-stats.store'
 import { useSessionFacts } from '../session/useSessionFacts'
@@ -74,10 +75,10 @@ function useChangeStats(projectIds: readonly string[]): Map<string, ChangeStats>
 }
 
 function parkedByHand(threads: WorkThread[], keys: readonly string[]): WorkThread[] {
-  return threads.map((t) => (keys.includes(t.key) ? { ...t, parked: true } : t))
+  return threads.map((t) => (keys.includes(t.key) ? { ...t, archived: true } : t))
 }
 
-/** The threads worth showing: parked ones marked so, dismissed ones left out. */
+/** The threads worth showing: those parked by hand marked archived, dismissed ones left out. */
 function shownThreads(
   input: WorkThreadInput,
   parkedKeys: readonly string[],
@@ -92,6 +93,7 @@ function shownThreads(
 export function useWorkThreads(): WorkThreads {
   const facts = useSessionFacts()
   const facets = useHomeFeedStore((s) => s.facets)
+  const tasks = useTaskStore((s) => s.tasks)
   const parkedKeys = useParkedThreads((s) => s.keys)
   const dismissed = useDismissedThreads((s) => s.dismissed)
   const now = useNow(MINUTE_MS)
@@ -104,7 +106,7 @@ export function useWorkThreads(): WorkThreads {
   const changeStats = useChangeStats(projectIds)
 
   const result = useMemo(() => {
-    const input: WorkThreadInput = { facts, facets, issues, changeStats, repoRoots, now }
+    const input: WorkThreadInput = { facts, facets, tasks, issues, changeStats, repoRoots, now }
     // `allThreads` keeps dismissed threads so a Focus item's done check still sees the work.
     const threads = shownThreads(input, parkedKeys, dismissed)
     return {
@@ -112,7 +114,7 @@ export function useWorkThreads(): WorkThreads {
       groups: groupThreads(threads),
       allThreads: parkedByHand(allWorkThreads(input), parkedKeys),
     }
-  }, [facts, facets, issues, changeStats, repoRoots, now, parkedKeys, dismissed])
+  }, [facts, facets, tasks, issues, changeStats, repoRoots, now, parkedKeys, dismissed])
   useEffect(() => {
     const live = new Set(result.allThreads.map((t) => t.key))
     useParkedThreads.getState().forgetGone(live, Date.now())

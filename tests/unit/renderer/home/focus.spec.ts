@@ -6,7 +6,7 @@ import {
   localDateKey,
   type FocusItem,
 } from '../../../../src/renderer/home/focus'
-import { buildWorkThreads } from '../../../../src/renderer/home/work-threads'
+import { allWorkThreads } from '../../../../src/renderer/home/work-threads'
 import { facet } from './fixtures'
 
 const NOW = Date.parse('2026-10-18T12:00:00.000Z')
@@ -16,13 +16,13 @@ const focusItem = (patch: Partial<FocusItem> = {}): FocusItem => ({
   doneByHand: false,
   ...patch,
 })
-const shipped = facet({ stage: 'shipped', closedAt: 'x', updatedAt: '2026-10-18T10:00:00.000Z' })
 
 function threadsOf(facets: ReturnType<typeof facet>[]) {
-  return buildWorkThreads({
+  return allWorkThreads({
     facts: [],
     facets,
     issues: [],
+    tasks: [],
     changeStats: new Map(),
     repoRoots: new Map(),
     now: NOW,
@@ -43,10 +43,9 @@ describe('focusDone', () => {
   })
   it('is done when the thread it points at has shipped', () => {
     const key = { repoRoot: '/repos/terminator', branch: 'tav-31' }
-    const open = threadsOf([facet({ stage: 'shipped' })])
+    const open = threadsOf([facet({ closedAt: 'x', whoseMove: 'agents' })])
     expect(focusDone(focusItem({ workKey: key }), open, [])).toBe(true)
     expect(focusDone(focusItem({ workKey: { ...key, branch: 'other' } }), open, [])).toBe(false)
-    expect(shipped.closedAt).not.toBeNull()
   })
   it('is not done with no evidence', () => {
     expect(focusDone(focusItem(), threadsOf([facet()]), [])).toBe(false)

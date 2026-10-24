@@ -1,5 +1,5 @@
 import type { DeskCount } from './desk-filter'
-import { groupThreads, yourMoveFirst, type WorkThread } from '../../home/work-threads'
+import { focusFirst, groupThreads, type WorkThread } from '../../home/work-threads'
 
 export type DeskGroupBy = 'move' | 'repo'
 
@@ -16,20 +16,18 @@ export interface DeskGroup {
 }
 
 export const DESK_GROUP_OPTIONS: ReadonlyArray<readonly [DeskGroupBy, string]> = [
-  ['move', 'whose move'],
+  ['move', 'state'],
   ['repo', 'repo'],
 ]
 
-const PARKED_NOTE = 'scratch terminals and work untouched for 2 days'
 const NO_REPO_LABEL = 'Scratch terminals'
 
-function byWhoseMove(threads: readonly WorkThread[]): DeskGroup[] {
+function byState(threads: readonly WorkThread[]): DeskGroup[] {
   return groupThreads(threads).map((group) => ({
     id: group.id,
     label: group.label,
-    tone: group.id === 'agents' ? 'working' : 'muted',
-    collapsible: group.id === 'parked',
-    ...(group.id === 'parked' ? { note: PARKED_NOTE } : {}),
+    tone: group.id === 'running' ? 'working' : 'muted',
+    collapsible: false,
     threads: group.threads,
   }))
 }
@@ -37,7 +35,7 @@ function byWhoseMove(threads: readonly WorkThread[]): DeskGroup[] {
 function byRepo(threads: readonly WorkThread[]): DeskGroup[] {
   const repos = new Map<string, WorkThread[]>()
   for (const thread of threads) {
-    const repo = thread.repoName ?? NO_REPO_LABEL
+    const repo = thread.lanes[0]?.repoName ?? NO_REPO_LABEL
     repos.set(repo, [...(repos.get(repo) ?? []), thread])
   }
   return [...repos.entries()]
@@ -47,13 +45,14 @@ function byRepo(threads: readonly WorkThread[]): DeskGroup[] {
       label: repo,
       tone: 'muted' as const,
       collapsible: false,
-      threads: inRepo.sort(yourMoveFirst),
+      threads: inRepo.sort(focusFirst),
     }))
 }
 
-/** The Desk's lists, grouped by whose move it is or by repo. */
+/** The Desk's lists, grouped by state or by repo; archived threads are left out. */
 export function deskGroups(threads: readonly WorkThread[], groupBy: DeskGroupBy): DeskGroup[] {
-  return groupBy === 'move' ? byWhoseMove(threads) : byRepo(threads)
+  const shown = threads.filter((t) => !t.archived)
+  return groupBy === 'move' ? byState(shown) : byRepo(shown)
 }
 
 /** The keys of the rows on screen, top to bottom; a collapsed group shows none. */
@@ -68,19 +67,19 @@ export interface DeskFilterValue {
   count: DeskCount | null
 }
 
-const agentsGroupFilter = (t: WorkThread): boolean => !t.parked && t.whoseMove !== 'others'
 const failingFilter = (t: WorkThread): boolean => t.prChip?.tone === 'bad'
 
 const COUNT_MATCHES: Record<DeskCount, (thread: WorkThread) => boolean> = {
-  'your-move': (t) => t.whoseMove === 'you',
-  agents: agentsGroupFilter,
-  others: (t) => !t.parked && t.whoseMove === 'others',
+  'your-move': (t) => t.state === 'needs-you',
+  agents: (t) => t.state === 'running',
+  others: (t) => t.state === 'waiting',
   failing: failingFilter,
 }
 
 function matchesText(thread: WorkThread, text: string): boolean {
   const needle = text.trim().toLowerCase()
-  const haystack = [thread.title, thread.ticketKey, thread.branch, thread.repoName, thread.nowLine]
+  const lanes = thread.lanes.flatMap((lane) => [lane.branch, lane.repoName])
+  const haystack = [thread.title, thread.ticketKey, thread.nowLine, ...lanes]
   return needle === '' || haystack.some((part) => part?.toLowerCase().includes(needle))
 }
 

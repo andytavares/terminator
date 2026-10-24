@@ -27,8 +27,7 @@ export function focusDone(
   if (item.doneByHand) return true
   const id = item.workKey ? workKeyId(item.workKey) : null
   const shipped = threads.some(
-    (t) =>
-      t.stage === 'shipped' && (t.key === id || t.facets.some((f) => workKeyId(f.workKey) === id))
+    (t) => t.state === 'done' && (t.key === id || t.facets.some((f) => workKeyId(f.workKey) === id))
   )
   return shipped || candidates.some((c) => c.id === item.id && c.done)
 }
