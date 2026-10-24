@@ -3,7 +3,7 @@ import { StateGlyph } from './StateGlyph'
 import { TaskRow } from './TaskRow'
 import { DeskGroupMenu } from './DeskGroupMenu'
 import { useNow } from '../session/useNow'
-import { useDeskSelection } from './desk-selection'
+import { useDeskSelection, useShownRows } from './desk-selection'
 import { useWorkThreads } from './useWorkThreads'
 import { useDeskFilter } from './desk-filter'
 import { filterThreads, taskGroups, type DeskGroup } from './desk-groups'
@@ -39,13 +39,11 @@ function GroupHeading({ group }: { group: DeskGroup }): JSX.Element {
   )
 }
 
-function GroupRows({ group, now }: { group: DeskGroup; now: number }): JSX.Element | null {
-  const selectedKey = useDeskSelection((s) => s.selectedThreadKey)
-  const expanded = useDeskSelection((s) => s.expandedGroupIds.includes(group.id))
-  if (group.collapsible && !expanded) return null
+function GroupRows({ group, now }: { group: DeskGroup; now: number }): JSX.Element {
+  const { selectedKey, threads } = useShownRows(group)
   return (
     <>
-      {group.threads.map((thread) => (
+      {threads.map((thread) => (
         <TaskRow key={thread.key} thread={thread} now={now} selected={thread.key === selectedKey} />
       ))}
     </>

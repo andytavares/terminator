@@ -79,6 +79,15 @@ function asDispatched(spec: InvokeRow, event: IpcMainInvokeEvent): ChannelSpec {
   return { ...spec, run: (args) => spec.run(args as never, callerOfEvent(event)) }
 }
 
+/** A store's thrown error as a channel's failure: its `code` when it has one, else 'failed'. */
+export function failureOf(error: unknown): { error: string; message: string } {
+  const code = (error as { code?: unknown }).code
+  return {
+    error: typeof code === 'string' ? code : 'failed',
+    message: error instanceof Error ? error.message : String(error),
+  }
+}
+
 export function registerInvokeTable(specs: ReadonlyArray<InvokeRow>): void {
   for (const spec of specs) {
     handleChannel(spec.channel, (event, payload) =>

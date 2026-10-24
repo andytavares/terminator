@@ -1,6 +1,6 @@
 import type { BrowserWindow } from 'electron'
 import { defineChannel, validationError, type ChannelSpec } from '@terminator/extension-sdk'
-import { registerInvokeTable, noPayload } from './invoke-table.js'
+import { failureOf, registerInvokeTable, noPayload } from './invoke-table.js'
 import { sendToWindow } from '../safe-send.js'
 import * as fs from 'node:fs'
 import {
@@ -24,14 +24,6 @@ import type { SessionRecord, SessionRecordListing } from '../../shared/types/ind
 
 // Core-only. Not part of the Extension API: a session's description is the
 // operator's note to themself, and no extension has a reason to read it.
-
-function fail(error: unknown): { error: string; message: string } {
-  const code = (error as { code?: unknown }).code
-  return {
-    error: typeof code === 'string' ? code : 'failed',
-    message: error instanceof Error ? error.message : String(error),
-  }
-}
 
 /**
  * Whether the conversation can be brought back on this machine right now.
@@ -75,7 +67,7 @@ const recordWriteChannels: ChannelSpec[] = [
     run: async ({ session, description }) => ({
       data: listing(await setDescription(session, description)),
     }),
-    onError: fail,
+    onError: failureOf,
   }),
   defineChannel({
     channel: 'session-records:set-link',
@@ -89,14 +81,14 @@ const recordWriteChannels: ChannelSpec[] = [
       await syncSessionContext(session.sessionId, getIssueService())
       return { data: listing(record) }
     },
-    onError: fail,
+    onError: failureOf,
   }),
   defineChannel({
     channel: 'session-records:forget',
     schema: ForgetInputSchema,
     invalid: validationError,
     run: async ({ sessionId }) => ({ data: await forget(sessionId) }),
-    onError: fail,
+    onError: failureOf,
   }),
   defineChannel({
     channel: 'session-records:transfer',
@@ -105,7 +97,7 @@ const recordWriteChannels: ChannelSpec[] = [
     run: async ({ fromSessionId, session }) => ({
       data: listing(await transfer(fromSessionId, session)),
     }),
-    onError: fail,
+    onError: failureOf,
   }),
 ]
 

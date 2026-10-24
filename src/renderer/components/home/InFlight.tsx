@@ -4,7 +4,7 @@ import { StatusDot } from '@terminator/extension-ui'
 import { DeskGroupMenu } from './DeskGroupMenu'
 import { useNow } from '../session/useNow'
 import { InFlightRow } from './InFlightRow'
-import { useDeskSelection } from './desk-selection'
+import { useDeskSelection, useShownRows } from './desk-selection'
 import { useWorkThreads } from './useWorkThreads'
 import { deskGroups, filterThreads, type DeskGroup } from './desk-groups'
 import { useDeskFilter } from './desk-filter'
@@ -40,13 +40,11 @@ function GroupHeading({ group }: { group: DeskGroup }): JSX.Element {
   )
 }
 
-function GroupRows({ group, now }: { group: DeskGroup; now: number }): JSX.Element | null {
-  const selectedKey = useDeskSelection((s) => s.selectedThreadKey)
-  const expanded = useDeskSelection((s) => s.expandedGroupIds.includes(group.id))
-  if (group.collapsible && !expanded) return null
+function GroupRows({ group, now }: { group: DeskGroup; now: number }): JSX.Element {
+  const { selectedKey, threads } = useShownRows(group)
   return (
     <>
-      {group.threads.map((thread) => (
+      {threads.map((thread) => (
         <InFlightRow
           key={thread.key}
           thread={thread}

@@ -1,6 +1,6 @@
 import type { BrowserWindow } from 'electron'
 import { defineChannel, validationError, type ChannelSpec } from '@terminator/extension-sdk'
-import { registerInvokeTable, noPayload } from './invoke-table.js'
+import { failureOf, registerInvokeTable, noPayload } from './invoke-table.js'
 import { sendToWindow } from '../safe-send.js'
 import {
   TaskArchiveInputSchema,
@@ -20,14 +20,6 @@ import {
 
 // Core-only. Tasks are the operator's own grouping; no extension reads them.
 
-function fail(error: unknown): { error: string; message: string } {
-  const code = (error as { code?: unknown }).code
-  return {
-    error: typeof code === 'string' ? code : 'failed',
-    message: error instanceof Error ? error.message : String(error),
-  }
-}
-
 const taskChannels: ChannelSpec[] = [
   defineChannel({
     channel: 'task:list',
@@ -40,35 +32,35 @@ const taskChannels: ChannelSpec[] = [
     schema: TaskCreateInputSchema,
     invalid: validationError,
     run: async (input) => ({ data: await createTask(input) }),
-    onError: fail,
+    onError: failureOf,
   }),
   defineChannel({
     channel: 'task:update',
     schema: TaskUpdateInputSchema,
     invalid: validationError,
     run: async (input) => ({ data: await updateTask(input) }),
-    onError: fail,
+    onError: failureOf,
   }),
   defineChannel({
     channel: 'task:add-lane',
     schema: TaskLaneInputSchema,
     invalid: validationError,
     run: async ({ id, lane }) => ({ data: await addLane(id, lane) }),
-    onError: fail,
+    onError: failureOf,
   }),
   defineChannel({
     channel: 'task:remove-lane',
     schema: TaskLaneInputSchema,
     invalid: validationError,
     run: async ({ id, lane }) => ({ data: await removeLane(id, lane) }),
-    onError: fail,
+    onError: failureOf,
   }),
   defineChannel({
     channel: 'task:archive',
     schema: TaskArchiveInputSchema,
     invalid: validationError,
     run: async ({ id, archived }) => ({ data: await archiveTask(id, archived) }),
-    onError: fail,
+    onError: failureOf,
   }),
 ]
 

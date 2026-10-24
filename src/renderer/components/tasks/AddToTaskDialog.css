@@ -1,14 +1,6 @@
 /* The Add to task picker, drawn as in the approved Home design (7.6). */
 .add-to-task {
   width: 460px;
-  max-width: 100%;
-  background: var(--tm-bg-elevated);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: 12px;
-  box-shadow: 0 30px 70px rgb(0 0 0 / 55%);
-  overflow: hidden;
-  color: var(--tm-text-primary);
-  font-size: 12px;
 }
 
 .add-to-task__filter {

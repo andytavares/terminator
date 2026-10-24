@@ -1,12 +1,13 @@
 import { create } from 'zustand'
 import { useEffect } from 'react'
 import { useWorkThreads } from './useWorkThreads'
-import { latestResumableThread } from '../../home/work-threads'
+import { latestResumableThread, type WorkThread } from '../../home/work-threads'
 import {
   deskGroups,
   filterThreads,
   taskGroups,
   visibleThreadKeys,
+  type DeskGroup,
   type DeskGroupBy,
 } from './desk-groups'
 import { useHomeLayout } from './home-layout'
@@ -72,4 +73,14 @@ export function useOpenRequestedResume(): void {
     useDeskSelection.setState({ resumeRequested: false })
     useDeskSelection.getState().openThread(target.key)
   }, [requested, threads])
+}
+
+/** The selected row's key, and a group's threads when they show: none while it is folded. */
+export function useShownRows(group: DeskGroup): {
+  selectedKey: string | null
+  threads: WorkThread[]
+} {
+  const selectedKey = useDeskSelection((s) => s.selectedThreadKey)
+  const expanded = useDeskSelection((s) => s.expandedGroupIds.includes(group.id))
+  return { selectedKey, threads: group.collapsible && !expanded ? [] : group.threads }
 }

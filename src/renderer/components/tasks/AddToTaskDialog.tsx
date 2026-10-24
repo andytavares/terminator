@@ -13,6 +13,7 @@ import {
   useLaneCards,
 } from './add-to-task-model'
 import type { Task, TaskLane } from '../../../shared/schemas/tasks.schema'
+import '../home/StartWork.css'
 import './AddToTaskDialog.css'
 
 const REFUSED = 'The task could not be changed. Try again.'
