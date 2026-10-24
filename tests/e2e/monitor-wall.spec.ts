@@ -35,7 +35,7 @@ async function overviewIconNamedOnFocus(page: Page): Promise<void> {
   // user did last, so the test says so rather than relying on nothing having been clicked.
   // Home still mounting can take focus as it settles, which hides the tooltip (CI, twice); the
   // step is about keyboard focus, so it starts once Home has drawn, and says if focus moved.
-  await expect(page.getByRole('region', { name: 'In flight' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Tasks' })).toBeVisible()
   await page.keyboard.press('Shift')
   const overview = page.getByRole('button', { name: 'Overview' })
   await overview.focus()

@@ -226,9 +226,10 @@ async function offeredAfterRestart(page: Page): Promise<void> {
   // The conversation whose transcript is gone is listed as work too, with nothing to resume.
   await page.keyboard.press('Escape')
   await expect(drawer).toBeHidden()
-  await expect(
-    page.getByRole('region', { name: 'In flight' }).getByRole('button', { name: 'the other one' })
-  ).toBeVisible()
+  // Sessions the restart left without an agent are Quiet, which the Tasks list folds to one line.
+  const tasks = page.getByRole('region', { name: 'Tasks' })
+  await tasks.getByRole('button', { name: 'Show Quiet' }).click()
+  await expect(tasks.getByRole('button', { name: 'the other one' })).toBeVisible()
   await openResumeDrawer(page)
   await expect(drawer.getByRole('button', { name: 'Resume' })).toHaveCount(1)
 }

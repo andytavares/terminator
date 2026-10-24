@@ -1,12 +1,12 @@
 import { test, expect, type Page } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   launchApp,
   closeApp,
   createWorkspace,
   e2eTempDir,
+  profileWithoutWeeklyReview,
   runQuickActionFromPanel,
 } from '../helpers'
 import type { AppHandle } from '../helpers'
@@ -28,15 +28,6 @@ test.afterAll(async () => closeApp(handle))
 const QUESTION =
   "clear; printf ' Do you want to create BoardScreen.tsx?\\n \\342\\235\\257 1. Yes\\n   2. Yes, and allow edits this session\\n   3. No\\n'"
 const BUSY = 'while true; do echo "$(date +%T) 14 passed, 2 failed"; sleep 0.4; done'
-
-/** Task Vault offers its weekly review on one weekday; move it off today so the band holds only the question. */
-function profileWithoutWeeklyReview(): string {
-  const profile = e2eTempDir('profile-')
-  const otherDay = String((new Date().getDay() + 3) % 7)
-  const values = { 'terminator.task-vault.weeklyReviewDay': otherDay }
-  writeFileSync(join(profile, 'extension-settings.json'), JSON.stringify({ values }))
-  return profile
-}
 
 /** A repository with one commit, so each branch the app makes reports its own name. */
 function gitFolder(): string {

@@ -1,12 +1,11 @@
 import { test, expect, type Page } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import {
   launchApp,
   closeApp,
   createWorkspace,
   e2eTempDir,
+  profileWithoutWeeklyReview,
   projectGroup,
   workspaceRow,
 } from './helpers'
@@ -28,16 +27,6 @@ const QUESTION_TEXT = 'Do you want to create RateLimitBanner.tsx?'
 const QUESTION =
   `clear; printf ' ${QUESTION_TEXT}\\n \\342\\235\\257 1. Yes\\n ` +
   "  2. Yes, and allow edits this session\\n   3. No\\n'"
-
-/** Task Vault asks for its weekly review on one weekday; move it off today so the queue holds only
- * what the test puts there. */
-function profileWithoutWeeklyReview(): string {
-  const profile = e2eTempDir('profile-')
-  const otherDay = String((new Date().getDay() + 3) % 7)
-  const values = { 'terminator.task-vault.weeklyReviewDay': otherDay }
-  writeFileSync(join(profile, 'extension-settings.json'), JSON.stringify({ values }))
-  return profile
-}
 
 /** An empty gh config keeps the developer's own pull requests out of the queue. */
 const NO_GITHUB = () => ({ XDG_CONFIG_HOME: e2eTempDir('no-gh-'), GH_TOKEN: '', GITHUB_TOKEN: '' })
