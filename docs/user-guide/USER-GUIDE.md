@@ -540,7 +540,7 @@ On the first view of Home each day, a one-line **Plan today** strip sits under t
 
 - **Carried over** lists focus items you picked yesterday and did not finish, and your open Task Vault tasks for today.
 - **Tickets** lists your tickets, when an issue tracker is connected. Without one, the sheet ends with a note to connect Linear in **Settings → Integrations**.
-- **Open tasks** lists your open tasks. Press one to star it. **Today's focus** has three slots; a starred task fills the next free one, and the star shows on the task's row on Home and in `Cmd+J`.
+- **Open tasks** lists your open tasks. Press one to star it. **Today's focus** has three slots; a starred task fills the next free one, and the star shows on the task's row on Home and in `Cmd+J`. A task that has been quiet for three days or more says so, for example "quiet 4 days", with an **Archive** button. Nothing is archived unless you press it.
 
 A line under the columns says how many agents are already running across how many tasks. **Start the day** or **Skip today** closes the sheet and hides the strip until tomorrow. In the Classic layout the same plan opens above the Desk.
 

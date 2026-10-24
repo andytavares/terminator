@@ -26,7 +26,7 @@ function PlanSheetBody({ now }: { now: number }): JSX.Element {
           <CarriedOverColumn rows={plan.carried} full={plan.today.length >= FOCUS_LIMIT} />
         )}
         {hasTracker && <TicketsColumn />}
-        <PlanTaskFocus threads={threads} />
+        <PlanTaskFocus threads={threads} now={now} />
       </div>
       {running && <p className="plan-sheet__line">{running}</p>}
       {!hasTracker && (

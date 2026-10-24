@@ -275,6 +275,22 @@ describe('Home — the plan sheet picks tasks', () => {
   })
 })
 
+describe('Home — the plan sheet offers to archive', () => {
+  it('offers to archive a task quiet for three days or more, and only that one', async () => {
+    const DAY = 24 * 60 * 60_000
+    state.threads = [
+      { ...thread('Rate-limit docs', 'quiet'), lastActivity: NOW - 3 * DAY - 1 },
+      { ...thread('Billing page copy', 'quiet'), lastActivity: NOW - DAY },
+    ]
+    render(<HomeScreen />)
+    fireEvent.keyDown(home(), { key: 'p' })
+    const sheet = await screen.findByRole('dialog', { name: 'Plan today' })
+    expect(within(sheet).getByText('quiet 3 days')).toBeTruthy()
+    expect(within(sheet).getAllByRole('button', { name: /^Archive/ })).toHaveLength(1)
+    expect(within(sheet).getByRole('button', { name: 'Archive Rate-limit docs' })).toBeTruthy()
+  })
+})
+
 describe('Home — the plan sheet and trackers', () => {
   it('leaves out the tickets column when no tracker is connected', async () => {
     render(<HomeScreen />)
