@@ -7,15 +7,13 @@ import {
   closeApp,
   createWorkspace,
   e2eTempDir,
-  projectGroup,
   runQuickActionFromPanel,
-  workspaceRow,
 } from '../helpers'
 import type { AppHandle } from '../helpers'
 import { openHome, runInVisibleTerminal } from '../session-views'
 
-// Retakes the user-guide screenshots of the Desk and Insights, with terminals on two branches
-// and one agent asking a numbered question. Writes into docs/, so it is run deliberately:
+// Retakes the user-guide screenshots of Home (the Tasks layout, and a task's drawer) and Insights,
+// with one task across three repos and one lane asking a numbered question. Writes into docs/, so it is run deliberately:
 //
 //   npm run build
 //   E2E_TOOLS=1 npx playwright test tests/e2e/tools/capture-session-home-screenshots.spec.ts
@@ -59,50 +57,70 @@ function gitFolder(): string {
   return folder
 }
 
-/** A second branch of the repository, in a worktree of its own, selected. */
-async function addWorktreeBranch(page: Page, name: string): Promise<void> {
-  await workspaceRow(page, 'terminator').hover()
-  await workspaceRow(page, 'terminator')
-    .locator('.repo-header__action[aria-label="New branch in terminator"]')
-    .click()
-  await page.getByPlaceholder('feature/my-feature').fill(name)
-  await page.click('.tmui-dialog__actions .tmui-button--primary')
-  await projectGroup(page, name).click()
-  await page.getByRole('textbox', { name: 'Terminal input' }).first().waitFor()
-}
+const TITLE = 'Rate limits across services'
+const BRANCH = 'rate-limits'
+const REPOS = ['terminator', 'api-gateway', 'web-console']
 
-/** Two branches: main has an agent asking and a test run going; the other has a short job. */
-async function startWork(page: Page): Promise<void> {
-  await projectGroup(page, 'main').click()
-  await runInVisibleTerminal(page, QUESTION)
-  await page.getByRole('button', { name: 'New terminal' }).click()
-  await runInVisibleTerminal(page, BUSY)
-  await addWorktreeBranch(page, 'rate-limits')
-  await runInVisibleTerminal(page, 'echo moving kitty keybinds to ghostty')
-}
-
-async function settleOnDesk(page: Page): Promise<void> {
+/** One task across three repos, with Terminal only so no agent is needed. */
+async function startTaskAcrossRepos(page: Page): Promise<void> {
   await openHome(page)
-  await page.getByRole('button', { name: 'Skip today' }).click()
-  await expect(page.getByRole('region', { name: 'Your move' })).toContainText(
+  await page.getByRole('button', { name: /^Start work/ }).click()
+  const launcher = page.getByRole('dialog', { name: 'Start work' })
+  await launcher.getByRole('tab', { name: 'Across repos' }).click()
+  await launcher.getByRole('textbox', { name: 'Task title' }).fill(TITLE)
+  await launcher.getByRole('textbox', { name: 'Branch in every repo' }).fill(BRANCH)
+  await launcher.getByRole('radio', { name: 'Terminal only' }).click()
+  await launcher.getByRole('button', { name: 'Start 3 lanes' }).click()
+  await expect(launcher).toBeHidden()
+}
+
+/** Shows the lane of `repo` and waits until its terminal is the one on screen. */
+async function showLane(page: Page, repo: string): Promise<void> {
+  const lanes = page.getByRole('group', { name: `Lanes of ${TITLE}` })
+  await expect(async () => {
+    await lanes.getByRole('button', { name: repo }).click()
+    await expect(page.locator('.tab-bar__scope')).toHaveText(`${repo} · ${BRANCH}`)
+  }).toPass()
+}
+
+/** api-gateway asks a numbered question and terminator runs a test loop. */
+async function startWork(page: Page): Promise<void> {
+  await startTaskAcrossRepos(page)
+  await showLane(page, 'api-gateway')
+  await runInVisibleTerminal(page, QUESTION)
+  await showLane(page, 'terminator')
+  await runInVisibleTerminal(page, BUSY)
+}
+
+async function settleOnHome(page: Page): Promise<void> {
+  await openHome(page)
+  await expect(page.getByRole('region', { name: 'Needs you' })).toContainText(
     'Do you want to create BoardScreen.tsx?'
   )
-  await expect(
-    page.getByRole('region', { name: 'In flight' }).locator('[data-thread-key]')
-  ).toHaveCount(2)
+  const row = page
+    .getByRole('region', { name: 'Tasks' })
+    .getByRole('button', { name: TITLE, exact: true })
+  for (const repo of REPOS) await expect(row).toContainText(repo)
 }
 
-test('capture the Desk and Insights', async () => {
+test('capture Home and Insights', async () => {
   handle = await launchApp(profileWithoutWeeklyReview(), {}, { hideSidebarOnHome: true })
   const { page } = handle
   await page.setViewportSize({ width: 1440, height: 900 })
   await runQuickActionFromPanel(page, 'Toggle sidebar')
-  await createWorkspace(page, 'terminator', gitFolder())
+  for (const repo of REPOS) await createWorkspace(page, repo, gitFolder())
   await startWork(page)
-  await settleOnDesk(page)
-  await page.getByRole('status').getByRole('button', { name: 'Dismiss' }).click()
+  await settleOnHome(page)
   await expect(page.getByRole('status')).toHaveCount(0)
-  await page.screenshot({ path: join(DOCS, '11a-home-desk.png') })
+  await page.screenshot({ path: join(DOCS, '11a-home-tasks.png') })
+
+  await page
+    .getByRole('region', { name: 'Tasks' })
+    .getByRole('button', { name: TITLE, exact: true })
+    .click()
+  await expect(page.getByRole('dialog', { name: TITLE })).toBeVisible()
+  await page.screenshot({ path: join(DOCS, '11c-home-task-drawer.png') })
+  await page.keyboard.press('Escape')
 
   await page.getByRole('radio', { name: 'Insights' }).click()
   await expect(page.getByText('How long do agents wait on me?')).toBeVisible()
