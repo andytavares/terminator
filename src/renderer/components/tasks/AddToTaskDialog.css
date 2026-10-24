@@ -1,0 +1,81 @@
+/* The Add to task picker, drawn as in the approved Home design (7.6). */
+.add-to-task {
+  width: 460px;
+  max-width: 100%;
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 12px;
+  box-shadow: 0 30px 70px rgb(0 0 0 / 55%);
+  overflow: hidden;
+  color: var(--tm-text-primary);
+  font-size: 12px;
+}
+
+.add-to-task__filter {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--tm-border);
+  outline: 0;
+  background: transparent;
+  color: var(--tm-text-primary);
+  caret-color: var(--tm-accent-text);
+  font: inherit;
+  font-size: 15px;
+}
+
+.add-to-task__group {
+  margin: 0;
+  padding: 10px 14px 4px;
+  color: var(--tm-text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.add-to-task__choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  box-sizing: border-box;
+  width: calc(100% - 12px);
+  margin: 0 6px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tm-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.add-to-task__choice:hover:not(:disabled) {
+  background: var(--tm-accent-dim);
+}
+
+.add-to-task__choice:disabled {
+  color: var(--tm-text-muted);
+  cursor: default;
+}
+
+.add-to-task__note {
+  color: var(--tm-text-muted);
+  font-size: 11px;
+}
+
+.add-to-task__suggestion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--tm-border);
+  color: var(--tm-text-secondary);
+}
+
+.add-to-task__error {
+  padding: 8px 14px;
+  color: var(--tm-danger-text, var(--tm-text-primary));
+}

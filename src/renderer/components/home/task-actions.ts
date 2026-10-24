@@ -2,8 +2,10 @@ import { useTaskStore } from '../../stores/task.store'
 import { SESSION_ACTIONS } from '../session/session-actions'
 import { leadSessionOf } from './thread-actions'
 import { sessionsOfLane } from './lane-details'
+import { startWork } from './start-work'
 import type { WorkThread } from '../../home/work-threads'
 import type { TaskCreateInput } from '../../../shared/schemas/tasks.schema'
+import type { Workspace } from '../../../shared/types/index'
 
 const TICKET_KEY = /^(linear|jira):(.+)$/
 
@@ -66,4 +68,19 @@ export function openAllLanes(thread: WorkThread): void {
     const lead = leadSessionOf({ ...thread, sessions: sessionsOfLane(thread, lane) })
     if (lead) SESSION_ACTIONS.onOpen(lead.sessionId)
   }
+}
+
+/** Makes a worktree on the task's branch in another repo, opens a terminal there and adds the lane.
+ *  Null when it worked; otherwise what to tell the person. */
+export async function addRepoToTask(
+  taskId: string,
+  branch: string,
+  workspace: Workspace
+): Promise<string | null> {
+  const message = await startWork({ kind: 'branch', branch, workspace, runAs: 'terminal' })
+  if (message !== null) return message
+  const added = await useTaskStore
+    .getState()
+    .addLane(taskId, { repoRoot: workspace.folderPath, branch })
+  return added ? null : `${workspace.name} started, but the task could not be changed.`
 }

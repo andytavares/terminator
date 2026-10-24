@@ -7,6 +7,7 @@ import { LogWindow } from '../components/LogWindow'
 import { ToastContainer } from '../components/ToastContainer'
 import { HomeBadge, SessionLinkHost } from '../components/AppShellParts'
 import { StartWorkHost } from '../components/home/StartWorkHost'
+import { AddToTaskDialog } from '../components/tasks/AddToTaskDialog'
 // Not lazy: the keys typed straight after ⌘P ("n n", "/") would reach the
 // app before a lazily loaded panel mounted, and be lost.
 import { QuickActionsHost, type QuickActionsHostProps } from '../components/QuickActionsHost'
@@ -59,11 +60,21 @@ export function ShellOverlays(state: ShellOverlayState): JSX.Element {
         <SessionLinkHost sessionId={state.linkSessionId} onClose={state.closeLink} />
       )}
       {state.quickActions && <QuickActionsHost {...state.quickActions} />}
-      <StartWorkHost />
+      <WorkDialogs />
       <HomeBadge />
       <ToastContainer />
       <ExtensionOverlays />
       <BreakoutWindows />
+    </>
+  )
+}
+
+/** The dialogs that start work or add a branch to a task, closed until something opens them. */
+function WorkDialogs(): JSX.Element {
+  return (
+    <>
+      <StartWorkHost />
+      <AddToTaskDialog />
     </>
   )
 }

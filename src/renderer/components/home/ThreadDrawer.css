@@ -190,3 +190,17 @@
   color: var(--tm-text-muted);
   font-size: 11.5px;
 }
+
+.task-add-lane {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.task-add-lane__choices {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: 6px;
+}

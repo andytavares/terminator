@@ -6,6 +6,7 @@ import { afterClosing } from '../sidebar/row-events'
 import { useDismissedThreads } from './dismissed-threads'
 import { leadSessionOf, toggleArchived } from './thread-actions'
 import { toggleDone } from './task-actions'
+import { openAddToTask } from '../tasks/add-to-task'
 import { SESSION_ACTIONS } from '../session/session-actions'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { ConfirmDialog } from '../ConfirmDialog'
@@ -38,7 +39,7 @@ function isWorktreeThread(thread: WorkThread): boolean {
 
 type Run = (fn: () => void) => () => void
 
-/** Session actions: open the terminal, rename the title, or link a ticket. */
+/** Session actions: open the terminal, rename the title, link a ticket, or add the branch to a task. */
 function sessionItems(thread: WorkThread, run: Run, actions: ItemActions): ContextMenuItem[] {
   const lead = leadSessionOf(thread)
   const items: ContextMenuItem[] = []
@@ -53,6 +54,10 @@ function sessionItems(thread: WorkThread, run: Run, actions: ItemActions): Conte
   }
   if (lead && thread.ticketKey === undefined) {
     items.push({ label: 'Link ticket…', onSelect: run(actions.onLink) })
+  }
+  if (thread.lanes.length === 1) {
+    const [{ repoRoot, branch }] = thread.lanes
+    items.push({ label: 'Add to task…', onSelect: run(() => openAddToTask({ repoRoot, branch })) })
   }
   return items
 }

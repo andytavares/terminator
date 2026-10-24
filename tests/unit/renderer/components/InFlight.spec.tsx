@@ -8,6 +8,7 @@ import { useDeskSelection } from '../../../../src/renderer/components/home/desk-
 import { useTaskStore } from '../../../../src/renderer/stores/task.store'
 import { useParkedThreads } from '../../../../src/renderer/components/home/parked-threads'
 import { useDismissedThreads } from '../../../../src/renderer/components/home/dismissed-threads'
+import { useAddToTaskStore } from '../../../../src/renderer/components/tasks/add-to-task'
 import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import { ToastContainer } from '../../../../src/renderer/components/ToastContainer'
 import { useHomeFeedStore } from '../../../../src/renderer/stores/home-feed.store'
@@ -325,6 +326,7 @@ const openMenuItem = (name: string) => within(document.body).getByRole('button',
 const TICKETED_MENU = [
   'Open terminal',
   'Rename…',
+  'Add to task…',
   'Archive',
   'Dismiss',
   'Close sessions',
@@ -356,7 +358,7 @@ describe('the row menu — which items', () => {
     render(<InFlight />)
     const row = inFlightRowNamed('Make all text in the app scale with settings')
     fireEvent.click(within(row).getByRole('button', { name: 'Work actions' }))
-    expect(contextMenuItemNames()).toEqual(['Archive', 'Dismiss'])
+    expect(contextMenuItemNames()).toEqual(['Add to task…', 'Archive', 'Dismiss'])
     expect(
       screen.queryByRole('dialog', { name: 'Make all text in the app scale with settings' })
     ).toBeNull()
@@ -371,6 +373,16 @@ const openRenameField = (title: string, text: string, key: string): HTMLElement 
   fireEvent.keyDown(field, { key })
   return field
 }
+
+describe('the row menu — Add to task', () => {
+  it('opens the picker for the one branch the row is on', () => {
+    useAddToTaskStore.setState({ lane: null })
+    render(<InFlight />)
+    rightClickRow('PR overview shows status before story')
+    fireEvent.click(openMenuItem('Add to task…'))
+    expect(useAddToTaskStore.getState().lane).toEqual({ repoRoot: REPO_ROOT, branch: 'tav-20' })
+  })
+})
 
 describe('the row menu — Open terminal and Close sessions', () => {
   it('Open terminal reveals the thread’s lead session', () => {

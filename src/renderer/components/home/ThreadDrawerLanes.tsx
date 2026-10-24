@@ -5,6 +5,7 @@ import { SESSION_ACTIONS } from '../session/session-actions'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { useChangeStatsStore } from '../../stores/change-stats.store'
 import { StateGlyph } from './StateGlyph'
+import { AddLaneControls } from './ThreadDrawerAddLane'
 import { leadSessionOf, toggleArchived } from './thread-actions'
 import { openAllLanes, renameThread, toggleDone } from './task-actions'
 import { laneNowLineOf, pullRequestLineOf, sessionsOfLane, type ThreadLane } from './lane-details'
@@ -106,6 +107,7 @@ export function LanesSection({ thread }: { thread: WorkThread }): JSX.Element | 
           <LaneRow key={`${lane.repoRoot}#${lane.branch}`} thread={thread} lane={lane} />
         ))}
       </ul>
+      <AddLaneControls thread={thread} />
     </section>
   )
 }
