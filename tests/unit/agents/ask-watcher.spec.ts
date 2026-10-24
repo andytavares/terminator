@@ -31,10 +31,14 @@ beforeEach(() => {
 })
 afterEach(() => stop?.())
 
-function write(terminal: string, report: Record<string, unknown>): void {
+let written = 0
+
+// Named as the hook names them: the time it wrote, then a tie-breaker.
+function write(terminal: string, report: Record<string, unknown>, name?: string): void {
   fs.mkdirSync(asksDir, { recursive: true })
+  written += 1
   fs.writeFileSync(
-    path.join(asksDir, `${terminal}.json`),
+    path.join(asksDir, name ?? `${String(1_000_000 + written)}-${terminal}.json`),
     JSON.stringify({ terminal, at: '2026-10-18T10:00:00.000Z', message: '', ...report })
   )
 }
@@ -128,6 +132,18 @@ describe('the ask watcher — turns', () => {
     write('s1', { event: 'prompt' })
     await seen(2)
     expect(changes[1]).toEqual(['s1', null])
+    expect(mod.currentAsks()).toEqual([])
+  })
+})
+
+describe('the ask watcher — events in a row', () => {
+  it('applies the events it finds together oldest first, whatever order they were listed in', async () => {
+    const mod = await load()
+    stop = mod.startAskWatcher()
+    write('s1', { event: 'stop' }, '1761300000002-41.json')
+    write('s1', { event: 'notification', message: 'Allow?' }, '1761300000001-40.json')
+    await seen(2)
+    expect(changes.map((c) => c[1] && c[1].message)).toEqual(['Allow?', null])
     expect(mod.currentAsks()).toEqual([])
   })
 })

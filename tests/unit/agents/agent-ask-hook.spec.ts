@@ -51,11 +51,17 @@ async function run(
   return { out, asks, files: fs.existsSync(asks) ? fs.readdirSync(asks) : [] }
 }
 
+function onlyReport(asks: string): Record<string, unknown> {
+  const names = fs.readdirSync(asks)
+  expect(names).toHaveLength(1)
+  return JSON.parse(fs.readFileSync(path.join(asks, names[0]), 'utf8'))
+}
+
 describe('the ask script, executed', () => {
   it('writes a notification under the terminal it ran in, and says nothing', async () => {
     const { out, asks } = await run(NOTIFICATION)
     expect(out).toBe('')
-    const written = JSON.parse(fs.readFileSync(path.join(asks, 's1.json'), 'utf8'))
+    const written = onlyReport(asks)
     expect(written).toMatchObject({
       terminal: 's1',
       event: 'notification',
@@ -67,7 +73,7 @@ describe('the ask script, executed', () => {
 
   it('writes a stop with no message and no type', async () => {
     const { asks } = await run({ hook_event_name: 'Stop', session_id: 'abc' })
-    expect(JSON.parse(fs.readFileSync(path.join(asks, 's1.json'), 'utf8'))).toMatchObject({
+    expect(onlyReport(asks)).toMatchObject({
       event: 'stop',
       message: '',
       notificationType: null,
@@ -75,10 +81,22 @@ describe('the ask script, executed', () => {
   })
 })
 
+describe('the ask script, executed — events in a row', () => {
+  it('keeps every event: a stop written before the notification is read does not replace it', async () => {
+    await run(NOTIFICATION)
+    const { asks, files } = await run({ hook_event_name: 'Stop', session_id: 'abc' })
+    expect(files).toHaveLength(2)
+    const events = files
+      .sort()
+      .map((name) => JSON.parse(fs.readFileSync(path.join(asks, name), 'utf8')).event)
+    expect(events).toEqual(['notification', 'stop'])
+  })
+})
+
 describe('the ask script, executed — a prompt', () => {
   it('writes a UserPromptSubmit as a prompt', async () => {
     const { asks } = await run({ hook_event_name: 'UserPromptSubmit', prompt: 'do it' })
-    expect(JSON.parse(fs.readFileSync(path.join(asks, 's1.json'), 'utf8'))).toMatchObject({
+    expect(onlyReport(asks)).toMatchObject({
       terminal: 's1',
       event: 'prompt',
       message: '',
@@ -89,7 +107,7 @@ describe('the ask script, executed — a prompt', () => {
 describe('the ask script, executed — a failed turn', () => {
   it('writes a StopFailure as a stop: the turn ended on an API error', async () => {
     const { asks } = await run({ hook_event_name: 'StopFailure', error: 'rate_limit' })
-    expect(JSON.parse(fs.readFileSync(path.join(asks, 's1.json'), 'utf8'))).toMatchObject({
+    expect(onlyReport(asks)).toMatchObject({
       terminal: 's1',
       event: 'stop',
     })

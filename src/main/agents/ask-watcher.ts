@@ -12,7 +12,8 @@ import { asksDirectory } from './agent-ask-hook.js'
 import { probeUntilArmed } from './agent-session-watcher.js'
 import { makeLogger } from '../logger.js'
 
-// One file per terminal, claimed by rename before it is read (as agent-session-watcher does).
+// One file per hook event, named by the time it was written and claimed by rename before it is
+// read (as agent-session-watcher does). Oldest first, so a stop after a notification wins.
 // The ask lives in main because both the hook and the keystrokes arrive here.
 
 export type AskListener = (sessionId: string, ask: AgentAsk | null) => void
@@ -82,7 +83,8 @@ function applyDirectory(directory: string): void {
   } catch {
     return
   }
-  for (const name of names) if (name.endsWith('.json')) applyAskReport(path.join(directory, name))
+  const reports = names.filter((name) => name.endsWith('.json')).sort()
+  for (const name of reports) applyAskReport(path.join(directory, name))
 }
 
 /** Watches for asks (`fs.watch`, ADR-005) and returns the way to stop. Any event re-reads the
