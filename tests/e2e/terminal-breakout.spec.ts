@@ -45,6 +45,16 @@ async function echoInto(page: Page, marker: string): Promise<void> {
   await expect.poll(() => rowsOf(page)).toContain(`\n${marker}`)
 }
 
+/** The rows hold the output whether or not xterm draws it, so this compares pixels: a terminal
+ * that stopped drawing looks the same before and after the echo. */
+async function echoDrawnInto(page: Page, marker: string): Promise<void> {
+  const before = await visibleTerminalScreen(page).screenshot()
+  await echoInto(page, marker)
+  await expect
+    .poll(async () => (await visibleTerminalScreen(page).screenshot()).equals(before))
+    .toBe(false)
+}
+
 /** Clicks the Window menu's item in the main process; a native accelerator cannot be pressed
  * from a background-mode run. */
 function clickWindowMenuItem(label: string): Promise<void> {
@@ -56,11 +66,11 @@ function clickWindowMenuItem(label: string): Promise<void> {
   }, label)
 }
 
-async function threeTerminalsSecondSelected(): Promise<string[]> {
+async function threeTerminalsSecondSelected(workspace: string): Promise<string[]> {
   const { page } = handle
   const folder = e2eTempDir('terminator-e2e-breakout-')
-  await createWorkspace(page, 'WS-Breakout', folder)
-  await addAndSelectProject(page, 'WS-Breakout', 'breakout-branch')
+  await createWorkspace(page, workspace, folder)
+  await addAndSelectProject(page, workspace, 'breakout-branch')
   await expect(sessionTabs()).toHaveCount(1)
   for (const opened of [2, 3]) {
     await page.keyboard.press('ControlOrMeta+t')
@@ -77,7 +87,7 @@ async function threeTerminalsSecondSelected(): Promise<string[]> {
 test('a terminal moves to its own window with its scrollback and docks back where it was', async () => {
   const { page, app } = handle
   const titles = await test.step('three terminals, the second holds a marker', () =>
-    threeTerminalsSecondSelected())
+    threeTerminalsSecondSelected('WS-Breakout'))
 
   const breakout = await test.step('the menu moves it to its own window', async () => {
     const opened = app.waitForEvent('window')
@@ -106,4 +116,24 @@ test('a terminal moves to its own window with its scrollback and docks back wher
     await expect(sessionTabs().nth(1)).toHaveClass(/tab-bar__tab--active/)
     await expect.poll(() => rowsOf(page)).toMatch(/breakout-marker-1[\s\S]*breakout-marker-2/)
   })
+})
+
+test('a terminal still draws after moving out, back and out again', async () => {
+  await test.step('three terminals, the second holds a marker', () =>
+    threeTerminalsSecondSelected('WS-Redraw'))
+
+  for (const round of [1, 2]) {
+    const breakout = await test.step(`round ${round}: the menu moves it out`, async () => {
+      const opened = handle.app.waitForEvent('window')
+      await clickWindowMenuItem('Move Terminal to Its Own Window')
+      return opened
+    })
+    await test.step(`round ${round}: it draws new output in its window`, () =>
+      echoDrawnInto(breakout, `redraw-out-${round}`))
+    await test.step(`round ${round}: closing the window brings it back, still drawing`, async () => {
+      await breakout.close()
+      await expect(sessionTabs().nth(1)).toHaveClass(/tab-bar__tab--active/)
+      await echoDrawnInto(handle.page, `redraw-back-${round}`)
+    })
+  }
 })
