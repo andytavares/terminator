@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useTaskStore } from '../../stores/task.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import type { Task, TaskLane } from '../../../shared/schemas/tasks.schema'
+import { sameLane } from '../../../shared/task-lanes'
 import type { Project, Workspace } from '../../../shared/types/index'
 
 // What the Add to task picker and the task drawer decide, apart from how it is drawn.
@@ -11,9 +12,6 @@ export interface LaneCard {
   lane: TaskLane
   repoName: string
 }
-
-export const sameLane = (a: TaskLane, b: TaskLane): boolean =>
-  a.repoRoot === b.repoRoot && a.branch === b.branch
 
 export const holdsLane = (task: Task, lane: TaskLane): boolean =>
   task.lanes.some((held) => sameLane(held, lane))

@@ -45,10 +45,8 @@ function withoutTaskBranches(repos: readonly RepoGroup[], taken: Set<string>): R
     .filter((repo) => repo.branches.length > 0)
 }
 
-/**
- * Each live task with the branches it holds, and the repos with the branches no task holds.
- * An archived task is not drawn, so its branches stay under their repos.
- */
+// Each live task with its branches, then the repos with the branches no task holds.
+// An archived task is not drawn, so its branches stay under their repos.
 export function groupByTask(
   repos: readonly RepoGroup[],
   tasks: readonly Task[]
@@ -85,10 +83,8 @@ function switchLaneOf(
   return { repoName: workspace?.name ?? lane.repoRoot, projectId: project?.id ?? null }
 }
 
-/**
- * The lanes to switch between when the visible branch is in a live task with two or more;
- * null for a branch in no task or in a task of one lane, where there is nothing to switch to.
- */
+// The lanes to switch between when the visible branch is in a live task with two or more;
+// null when there is nothing to switch to.
 export function laneSwitchOf(
   visibleProjectId: string,
   tasks: readonly Task[],

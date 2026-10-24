@@ -1,6 +1,14 @@
 import type { SessionFacts } from '../../../../../src/renderer/sidebar/session-facts'
 
-const TOLD = { askInferred: false, askSignal: null, runningFrom: null } as const
+/** What the screen and the hooks say: nothing asked, nothing guessed, nothing running. */
+const SIGNALS = {
+  latestLine: '',
+  choicePrompt: null,
+  askMessage: null,
+  askInferred: false,
+  askSignal: null,
+  runningFrom: null,
+} as const
 
 /** A session's facts with every field present, for the pure layer's specs to vary one at a time. */
 export function fact(patch: Partial<SessionFacts> = {}): SessionFacts {
@@ -23,10 +31,7 @@ export function fact(patch: Partial<SessionFacts> = {}): SessionFacts {
     lastAttendedAt: null,
     startedAt: '2026-09-15T10:00:00.000Z',
     closedAt: null,
-    latestLine: '',
-    choicePrompt: null,
-    askMessage: null,
-    ...TOLD,
+    ...SIGNALS,
     agent: null,
     resumable: false,
     snapshot: snapshotOf(sessionId),

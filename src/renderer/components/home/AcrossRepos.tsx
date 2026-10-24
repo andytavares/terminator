@@ -69,12 +69,16 @@ function useAcrossRun(fields: Fields, onClose: () => void) {
 
 type Run = ReturnType<typeof useAcrossRun>
 
+/** A title, a branch and at least one repo: enough to start. */
+const isReady = (fields: Fields): boolean =>
+  fields.title.trim() !== '' && fields.branch !== '' && fields.chosen.length > 0
+
 /** Start work's Across repos tab: one title and branch, a checkbox per repo, one task. */
 export function AcrossRepos({ onClose }: { onClose: () => void }): JSX.Element {
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const fields = useAcrossFields(workspaces)
   const run = useAcrossRun(fields, onClose)
-  const ready = fields.title.trim() !== '' && fields.branch !== '' && fields.chosen.length > 0
+  const ready = isReady(fields)
   const onKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey)) return
     e.preventDefault()
@@ -86,7 +90,7 @@ export function AcrossRepos({ onClose }: { onClose: () => void }): JSX.Element {
         <TaskFields fields={fields} />
         <RepoChoices workspaces={workspaces} fields={fields} notes={run.notes} />
       </div>
-      <Footer {...{ fields, run, ready, onClose }} />
+      <Footer {...{ fields, run, onClose }} />
     </div>
   )
 }
@@ -173,8 +177,7 @@ function RepoChoices({ workspaces, fields, notes }: RepoChoicesProps): JSX.Eleme
           <RepoRow
             key={workspace.id}
             workspace={workspace}
-            ticked={fields.chosen.includes(workspace)}
-            onToggle={() => fields.toggle(workspace.id)}
+            fields={fields}
             note={notes.get(workspace.id)}
           />
         ))}
@@ -187,16 +190,19 @@ function RepoChoices({ workspaces, fields, notes }: RepoChoicesProps): JSX.Eleme
 
 interface RepoRowProps {
   workspace: Workspace
-  ticked: boolean
-  onToggle: () => void
+  fields: Fields
   note: string | undefined
 }
 
-function RepoRow({ workspace, ticked, onToggle, note }: RepoRowProps): JSX.Element {
+function RepoRow({ workspace, fields, note }: RepoRowProps): JSX.Element {
   const { base } = useRepoGit(workspace)
   return (
     <li aria-label={workspace.name} className="across-repos__repo">
-      <Checkbox checked={ticked} label={workspace.name} onChange={onToggle} />
+      <Checkbox
+        checked={fields.chosen.includes(workspace)}
+        label={workspace.name}
+        onChange={() => fields.toggle(workspace.id)}
+      />
       <span>{workspace.name}</span>
       <small>{base === null ? '' : `from ${base}`}</small>
       {note !== undefined && <span className="across-repos__note">{note}</span>}
@@ -207,12 +213,12 @@ function RepoRow({ workspace, ticked, onToggle, note }: RepoRowProps): JSX.Eleme
 interface FooterProps {
   fields: Fields
   run: Run
-  ready: boolean
   onClose: () => void
 }
 
-function Footer({ fields, run, ready, onClose }: FooterProps): JSX.Element {
+function Footer({ fields, run, onClose }: FooterProps): JSX.Element {
   const count = fields.chosen.length
+  const ready = isReady(fields)
   return (
     <div className="start-work__footer">
       {run.summary !== '' && (

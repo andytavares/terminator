@@ -34,10 +34,8 @@ export function taskKeysByLane(tasks: readonly Task[]): Map<string, string> {
   return byLane
 }
 
-/**
- * A lane per repo and branch the members touch, the stored ones first even when empty.
- * What sits on no branch (a scratch terminal, a ticket-keyed facet) comes back as `loose`.
- */
+// A lane per repo and branch the members touch, stored ones first even when empty. What sits
+// on no branch (a scratch terminal, a ticket-keyed facet) comes back as `loose`.
 export function groupIntoLanes(
   members: { sessions: readonly SessionFacts[]; facets: readonly ThreadFacet[] },
   stored: readonly TaskLane[],

@@ -7,7 +7,7 @@ import type { WorkThread } from '../../home/work-threads'
 
 const EMPTY_SLOT = 'pick one more, or leave it empty'
 
-const isOpen = (thread: WorkThread): boolean => !thread.archived && thread.state !== 'done'
+const isOpenTask = (thread: WorkThread): boolean => !thread.archived && thread.state !== 'done'
 
 /** Every open task with its star; pressing one stars the task on Home and in ⌘J. */
 function OpenTasks({ threads }: { threads: readonly WorkThread[] }): JSX.Element {
@@ -59,7 +59,7 @@ function TodaysFocus({ starred }: { starred: readonly WorkThread[] }): JSX.Eleme
 
 /** The Tasks layout's focus: stars on tasks, not a separate list of items. */
 export function PlanTaskFocus({ threads }: { threads: readonly WorkThread[] }): JSX.Element {
-  const open = threads.filter(isOpen)
+  const open = threads.filter(isOpenTask)
   return (
     <>
       <OpenTasks threads={open} />

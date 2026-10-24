@@ -49,17 +49,15 @@ function FocusStar({ thread }: { thread: WorkThread }): JSX.Element | null {
 
 interface TitleProps {
   thread: WorkThread
-  renaming: boolean
-  finishRename: (text: string) => void
-  cancelRename: () => void
+  rename: CellsProps['rename']
 }
 
-function TaskTitle({ thread, renaming, finishRename, cancelRename }: TitleProps): JSX.Element {
+function TaskTitle({ thread, rename }: TitleProps): JSX.Element {
   return (
     <div className="task-row__title">
       <FocusStar thread={thread} />
-      {renaming ? (
-        <RenameField thread={thread} onRename={finishRename} onCancelRename={cancelRename} />
+      {rename.renaming ? (
+        <RenameField thread={thread} onRename={rename.finish} onCancelRename={rename.cancel} />
       ) : (
         <span className="task-row__name">{thread.title}</span>
       )}
@@ -77,20 +75,21 @@ interface CellsProps {
     finish: (text: string) => void
     cancel: () => void
   }
+  /** The row's context menu, which the row itself opens on a right click. */
   workMenu: WorkMenuState
 }
 
+type CellsInput = Pick<CellsProps, 'thread' | 'now'> & {
+  controls: Pick<CellsProps, 'rename' | 'workMenu'>
+}
+
 /** The row's cells: state, title, repos, what is happening now, last activity, and the menu. */
-function TaskRowCells({ thread, now, rename, workMenu }: CellsProps): JSX.Element {
+function TaskRowCells({ thread, now, controls }: CellsInput): JSX.Element {
+  const { rename, workMenu } = controls
   return (
     <>
       <StateGlyph state={thread.state} inferred={thread.inferred} />
-      <TaskTitle
-        thread={thread}
-        renaming={rename.renaming}
-        finishRename={rename.finish}
-        cancelRename={rename.cancel}
-      />
+      <TaskTitle thread={thread} rename={rename} />
       <div className="task-row__lanes">
         {thread.lanes.map((lane) => (
           <LaneChip key={`${lane.repoRoot}#${lane.branch}`} lane={lane} taskState={thread.state} />
@@ -136,7 +135,7 @@ export function TaskRow({ thread, now, selected }: TaskRowProps): JSX.Element {
         if (event.key === 'Enter' && event.target === event.currentTarget) openThread(thread.key)
       }}
     >
-      <TaskRowCells thread={thread} now={now} rename={rename} workMenu={workMenu} />
+      <TaskRowCells thread={thread} now={now} controls={{ rename, workMenu }} />
     </div>
   )
 }

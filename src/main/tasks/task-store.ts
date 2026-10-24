@@ -10,6 +10,7 @@ import {
   type TaskLane,
   type TaskUpdateInput,
 } from '../../shared/schemas/tasks.schema.js'
+import { sameLane } from '../../shared/task-lanes.js'
 
 // The operator's pieces of work: each groups lanes (a branch in a repository)
 // across repositories. Held in memory for synchronous readers and mirrored to
@@ -32,9 +33,6 @@ const tasks = new Map<string, Task>()
 const handlers = new Set<TaskChangeHandler>()
 
 const filePath = (): string => path.join(app.getPath('userData'), FILE_NAME)
-
-const sameLane = (a: TaskLane, b: TaskLane): boolean =>
-  a.repoRoot === b.repoRoot && a.branch === b.branch
 
 export function listTasks(): Task[] {
   return [...tasks.values()]

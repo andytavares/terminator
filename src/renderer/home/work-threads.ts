@@ -246,16 +246,21 @@ function isClosedDraft(draft: Draft): boolean {
   )
 }
 
-function repoLaneOf(lane: LaneDraft, input: WorkThreadInput): WorkThreadLane {
+/** The repo's name and colour: from a session on the lane, else the workspace at its root. */
+function repoLabelOf(lane: LaneDraft, input: WorkThreadInput) {
+  const session = lane.sessions[0]
+  if (session?.workspaceName) {
+    return { repoName: session.workspaceName, repoColor: session.workspaceColor }
+  }
   const repo = input.repos.get(lane.repoRoot)
+  if (repo) return { repoName: repo.name, repoColor: repo.color }
+  return { repoName: lane.repoRoot.split('/').pop() || lane.repoRoot, repoColor: null }
+}
+
+function repoLaneOf(lane: LaneDraft, input: WorkThreadInput): WorkThreadLane {
   return {
     repoRoot: lane.repoRoot,
-    repoName:
-      lane.sessions[0]?.workspaceName ??
-      repo?.name ??
-      lane.repoRoot.split('/').pop() ??
-      lane.repoRoot,
-    repoColor: lane.sessions[0]?.workspaceColor ?? repo?.color ?? null,
+    ...repoLabelOf(lane, input),
     branch: lane.branch,
     state: laneStateOf(lane),
   }

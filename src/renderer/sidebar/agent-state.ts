@@ -8,18 +8,9 @@ interface AgentStateSource {
   derive(session: TerminalSession): AgentState
 }
 
-/**
- * Derives state from the signals core owns: PTY exit, the question and the
- * turn that Claude Code's own hooks report (`agentAsk`, `agentTurn`, installed
- * by core beside its SessionStart hook), and, where no hook speaks, guesses:
- * the terminal bell, a numbered choice read off the screen, and byte flow.
- *
- * Order: exited; a reported ask; a bell or on-screen choice (a guess, flagged
- * by `inferredAsk`); a reported turn in progress is working; a terminal that
- * has reported hooks but is between turns is idle even while bytes flow
- * (redraws, a spinner); otherwise byte flow decides. A shell-launched agent
- * that is not Claude Code emits no hook at all, so it stays on the guesses.
- */
+// Facts first: PTY exit, then the ask and the turn Claude Code's hooks report (`agentAsk`,
+// `agentTurn`). Then guesses: a bell or on-screen choice (flagged by `inferredAskSignal`).
+// A hooked agent between turns is idle however its terminal prints; otherwise byte flow decides.
 export class BellAndBusySource implements AgentStateSource {
   derive(session: TerminalSession): AgentState {
     if (session.status === 'closed') return 'exited'

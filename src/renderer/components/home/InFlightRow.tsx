@@ -51,8 +51,8 @@ export function RenameField({
 /** Where the work happens: the order's repo, the branch, or "Scratch terminal". */
 function threadPlaceOf(thread: WorkThread): string {
   const [lane] = thread.lanes
-  if (isOrder(thread)) return lane?.repoName ?? ''
-  return lane?.branch ?? lane?.repoName ?? 'Scratch terminal'
+  if (lane === undefined) return isOrder(thread) ? '' : 'Scratch terminal'
+  return isOrder(thread) ? lane.repoName : lane.branch
 }
 
 /** Where the work happens, with the last thing it said; empty when neither is known. */
