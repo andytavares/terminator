@@ -1,0 +1,87 @@
+tests/unit/ipc/agent-turn.ipc.spec.ts
+  s_bcb87751443cd2::t_d4f34549681be1 1-33
+src/main/agents/agent-ask-hook.ts
+  s_bcb87751443cd2::t_059cd574e815a1 7-9,14,33,82,87
+src/renderer/shell/agent-attention.ts
+  s_bcb87751443cd2::t_0b1c02b250331c 102,111-115
+  s_bcb87751443cd2::t_18bbf1afcb9d56 116-117
+tests/unit/agents/agent-ask-hook.spec.ts
+  s_bcb87751443cd2::t_9a022bd5ae92ec 78-88,116,129-130
+src/renderer/components/terminal/TerminalSession.tsx
+  s_bcb87751443cd2::t_2053feeb2de750 119,170
+src/renderer/terminal/session-controller.ts
+  s_bcb87751443cd2::t_2053feeb2de750 88-91,118
+  s_bcb87751443cd2::t_8b20f322c3ad5e 6
+tests/unit/renderer/sidebar/agent-state.spec.ts
+  s_bcb87751443cd2::t_d4f34549681be1 2,70-102
+tests/unit/shared/agent-sessions/ask.spec.ts
+  s_bcb87751443cd2::t_d4f34549681be1 2-7,25-28,65-86
+src/main/agents/ask-watcher.ts
+  s_bcb87751443cd2::t_2053feeb2de750 5,45
+  s_bcb87751443cd2::t_059cd574e815a1 3-4,6-10,58-59
+tests/unit/renderer/home/core-asks.spec.ts
+  s_bcb87751443cd2::t_9a022bd5ae92ec 129-140
+tests/unit/renderer/sidebar/session-facts.spec.ts
+  s_bcb87751443cd2::t_9a022bd5ae92ec 376-395
+src/shared/electron-api/manifest.ts
+  s_bcb87751443cd2::t_0b1c02b250331c 1210-1214,1216-1228
+  s_bcb87751443cd2::t_d4f34549681be1 1215
+src/shared/agent-sessions/ask.ts
+  s_bcb87751443cd2::t_059cd574e815a1 1,5,34,45,51-55
+  s_bcb87751443cd2::t_2053feeb2de750 56-64
+tests/unit/agents/ask-watcher.spec.ts
+  s_bcb87751443cd2::t_9a022bd5ae92ec 114-119
+  s_bcb87751443cd2::t_d4f34549681be1 13,21-23,28,102-113,120-132
+  s_bcb87751443cd2::t_8dada8fcc14cdb 133
+tests/unit/renderer/home/desk-order.spec.ts
+  s_bcb87751443cd2::t_9a022bd5ae92ec 140-146
+  s_bcb87751443cd2::t_d4f34549681be1 122-139,147-148
+src/main/index.ts
+  s_bcb87751443cd2::t_5881b84810e27c 420
+  s_bcb87751443cd2::t_0b1c02b250331c 28,386
+tests/unit/renderer/stores/session.store.spec.ts
+  s_bcb87751443cd2::t_297698d0ce426e 405-428
+src/shared/types/index.ts
+  s_bcb87751443cd2::t_0b1c02b250331c 104-105
+src/main/agents/agent-turns.ts
+  s_bcb87751443cd2::t_059cd574e815a1 1-23
+tests/unit/renderer/terminal/session-controller.spec.ts
+  s_bcb87751443cd2::t_9a022bd5ae92ec 17,30,683-700
+  s_bcb87751443cd2::t_191930ea9de05e 185-189
+  s_bcb87751443cd2::t_36f8f44924d86d 701-702
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_bcb87751443cd2::t_297698d0ce426e 208-217
+tests/unit/renderer/sidebar/fixtures/facts.ts
+  s_bcb87751443cd2::t_297698d0ce426e 3-4,29
+src/renderer/stores/session.store.ts
+  s_bcb87751443cd2::t_2053feeb2de750 203
+  s_bcb87751443cd2::t_0b1c02b250331c 210,599-600,602-609,684
+  s_bcb87751443cd2::t_c891aa9df01976 590-598,685
+  s_bcb87751443cd2::t_f4964e22c7edc3 601
+src/main/ipc/agent-turn.ipc.ts
+  s_bcb87751443cd2::t_059cd574e815a1 1-23
+src/renderer/home/core-asks.ts
+  s_bcb87751443cd2::t_09172080ac9555 13-14,62
+src/renderer/home/desk-order.ts
+  s_bcb87751443cd2::t_be99a47a255a8d 35-38,49
+src/renderer/sidebar/agent-state.ts
+  s_bcb87751443cd2::t_8e51b487aaf095 12-15,17-21,26-31,35-41
+src/renderer/sidebar/session-facts.ts
+  s_bcb87751443cd2::t_08acc5d581b208 2,46-51,111-115,118-119,121-124,186-188
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "65c823335c700327ca6f9a36bd5aec0433615935",
+  "prompts": {},
+  "sessions": {
+    "s_bcb87751443cd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b568ee83-ad51-4a54-9901-52cfcfa5b37f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
