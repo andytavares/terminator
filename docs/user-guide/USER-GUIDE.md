@@ -473,7 +473,7 @@ A ticket linked to several branches joins them as a task without anything stored
 
 #### Switching tasks
 
-- **Lane switcher.** When the terminal on screen belongs to a task with two or more lanes, the tab bar shows the task's name and a button per repo. One press moves to that repo's branch. A lane that is asking carries the needs-you mark, even when the terminal on screen is another lane's.
+- **Lane switcher.** When the terminal on screen belongs to a task with two or more lanes, the tab bar shows the task's name and a button per repo. One press moves to that repo's branch, and so does `Ctrl+1`–`Ctrl+9` (**Window → Switch Lane**) by its place in the row. A lane that is asking carries the needs-you mark, even when the terminal on screen is another lane's.
 - **`Cmd+J`** (**Window → Switch Task…**) opens a switcher over any screen. Tasks are in the same order and with the same shapes as Home. `Enter` opens the task's most recent lane, and `Cmd+Enter` opens its drawer.
 - **Sidebar.** **Display → Group → Task** lists each task with its lanes beneath, and the branches in no task under **Not in a task**. **Workspace** remains the default, and the choice is remembered.
 
@@ -508,6 +508,7 @@ Choose how to run it — as a **Claude agent**, **Terminal only**, or a **Foundr
 | `G` then `I` | Switch to Insights; `G` then `D` returns to Today | Home                    |
 | `Cmd+K`      | Search                                            | Home                    |
 | `Cmd+J`      | Switch task                                       | Everywhere              |
+| `Ctrl+1`–`9` | Switch to that lane of the task on screen         | Everywhere              |
 | `Cmd+N`      | Start work                                        | Everywhere              |
 | `Cmd+P`      | Quick actions                                     | Everywhere              |
 | `Cmd+B`      | Show or hide the branch tree                      | Home                    |
@@ -626,6 +627,7 @@ Click the **bell icon** in the sidebar header to open the notification center pa
 | Toggle Overview screen               | `Cmd+Shift+E`            |
 | Open Home                            | `Cmd+~`                  |
 | Switch task                          | `Cmd+J`                  |
+| Switch to lane 1–9 of the task       | `Ctrl+1` – `Ctrl+9`      |
 | Plan today (on Home)                 | `P`                      |
 | Start work (on Home)                 | `Cmd+N`                  |
 | Search Home                          | `Cmd+K` (on Home)        |

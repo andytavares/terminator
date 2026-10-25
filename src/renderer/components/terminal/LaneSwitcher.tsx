@@ -41,6 +41,7 @@ export function LaneSwitcher({ projectId }: { projectId: string }): JSX.Element 
           type="button"
           className={`lane-switcher__lane${i === switcher.current ? ' lane-switcher__lane--on' : ''}`}
           aria-pressed={i === switcher.current}
+          title={i < 9 ? `⌃${i + 1}` : undefined}
           disabled={lane.projectId === null}
           onClick={() => lane.projectId !== null && revealBranch(lane.projectId)}
         >

@@ -16,6 +16,7 @@ import { adoptTerminalSession } from '../terminal/session-controller'
 import { revealSession } from '../terminal/navigate-to-session'
 import { useTaskSwitcher } from '../components/task-switcher/task-switcher.store'
 import { dockBack, toggleBreakout } from '../terminal/breakout'
+import { switchLane } from '../terminal/switch-lane'
 
 // What the main process tells the window: menu accelerators, notifications,
 // and what extensions ask the shell to do.
@@ -95,9 +96,16 @@ function subscribeSurfaceMenu(events: MenuEvents | undefined): Unsubscribe[] {
     events?.onMenuOpenHome?.(
       countedShortcut('core.open-home', () => registry().setActiveGlobalTab('core.home'))
     ),
+  ]
+}
+
+/** The accelerators that move between tasks and between the lanes of one. */
+function subscribeTaskMenu(events: MenuEvents | undefined): Unsubscribe[] {
+  return [
     events?.onMenuOpenTaskSwitcher?.(
       countedShortcut('core.switch-task', () => useTaskSwitcher.getState().show())
     ),
+    events?.onMenuSwitchLane?.(switchLane),
   ]
 }
 
@@ -109,6 +117,7 @@ export function useMenuEvents(handlers: MenuHandlers): void {
     const unsubscribers = [
       ...subscribeShellMenu(events, { openSettings, openAbout, toggleSidebar }),
       ...subscribeSurfaceMenu(events),
+      ...subscribeTaskMenu(events),
       ...subscribeBreakout(events),
     ]
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe?.())

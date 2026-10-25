@@ -40,6 +40,20 @@ describe('buildWindowMenu', () => {
   })
 })
 
+describe('buildWindowMenu — lanes', () => {
+  it('switches to lane 1–9 of the visible task on Ctrl+1–9', () => {
+    const { submenu, send } = items()
+    const lanes = submenu.find((i) => i.label === 'Switch Lane')!
+    const entries = lanes.submenu as Electron.MenuItemConstructorOptions[]
+    expect(entries.map((i) => i.accelerator)).toEqual(
+      [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `Control+${n}`)
+    )
+    expect(entries[2].label).toBe('Lane 3')
+    ;(entries[2].click as () => void)()
+    expect(send).toHaveBeenCalledWith('menu:switch-lane', { lane: 2 })
+  })
+})
+
 describe('buildWindowMenu in a breakout window', () => {
   it('closes the focused breakout terminal on Cmd+W, naming its session', () => {
     const { submenu, send } = items(BREAKOUT_SESSION)

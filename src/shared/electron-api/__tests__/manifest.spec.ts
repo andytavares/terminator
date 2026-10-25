@@ -149,6 +149,7 @@ const INTERNAL_ONLY_CHANNELS = [
   'menu:set-panel-checked',
   'menu:toggle-breakout',
   'menu:open-task-switcher',
+  'menu:switch-lane',
   'breakout:pointer-outside',
   'breakout:closed',
   'workspace:project-added',

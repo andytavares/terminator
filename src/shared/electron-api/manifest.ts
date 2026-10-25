@@ -903,6 +903,14 @@ export const ELECTRON_API_MANIFEST = [
     remote: 'omit',
   }),
   method({
+    path: 'extensionEvents.onMenuSwitchLane',
+    kind: 'event',
+    channel: 'menu:switch-lane',
+    signature: signature<(handler: (lane: number) => void) => Unsubscribe>(),
+    toHandlerArgs: (args) => [(args[0] as { lane: number }).lane],
+    remote: 'omit',
+  }),
+  method({
     path: 'extensionEvents.onMenuToggleSidebar',
     kind: 'event',
     channel: 'menu:toggle-sidebar',
