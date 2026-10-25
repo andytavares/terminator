@@ -229,9 +229,14 @@ function titleOf(draft: Draft, issue: IssueSummary | undefined): string {
   return candidates.find((c) => c) ?? draft.key
 }
 
+/** When a stored task was made; a task with no session or facet yet is dated by it. */
+const createdAtOf = (draft: Draft): number[] =>
+  draft.task ? [Date.parse(draft.task.createdAt)] : []
+
 function lastActivityOf(draft: Draft): number {
   return Math.max(
     0,
+    ...createdAtOf(draft),
     ...draft.sessions.map((s) => s.lastActivityAt),
     ...draft.facets.map((f) => Date.parse(f.updatedAt))
   )
@@ -242,7 +247,7 @@ function startedAtOf(draft: Draft): number {
     ...draft.sessions.map((s) => Date.parse(s.startedAt)),
     ...draft.facets.map((f) => Date.parse(f.openedAt ?? f.updatedAt)),
   ]
-  return Math.min(...times)
+  return Math.min(...(times.length > 0 ? times : createdAtOf(draft)))
 }
 
 function isClosedDraft(draft: Draft): boolean {

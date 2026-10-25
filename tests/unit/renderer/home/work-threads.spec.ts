@@ -530,3 +530,12 @@ describe('thread links', () => {
     expect(buildWorkThreads(input({ facets: [facet()] }))[0].links).toEqual([])
   })
 })
+
+describe('buildWorkThreads: a stored task with nothing running', () => {
+  it('dates the task from when it was made, not from sessions it does not have', () => {
+    const quiet = task({ createdAt: '2026-10-17T09:00:00.000Z' })
+    const [thread] = buildWorkThreads(input({ tasks: [quiet] }))
+    expect(thread.startedAt).toBe(Date.parse('2026-10-17T09:00:00.000Z'))
+    expect(thread.lastActivity).toBe(Date.parse('2026-10-17T09:00:00.000Z'))
+  })
+})
