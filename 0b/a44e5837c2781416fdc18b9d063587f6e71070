@@ -1,0 +1,33 @@
+scripts/ci-plan.mjs
+  s_bcb87751443cd2::t_9b95be84e9f154 17-19
+.github/workflows/ci.yml
+  s_bcb87751443cd2::t_b0a15fbf17fd44 377-408,412-416,431,440,443-455
+  s_bcb87751443cd2::t_ae60926560b5b8 456
+tests/unit/scripts/stability.spec.ts
+  s_bcb87751443cd2::t_e0f49a715394ea 245-248
+  s_bcb87751443cd2::t_f60d096262f87c 6,208,216,218-231,233,235-244,250-251
+  s_bcb87751443cd2::t_2056ce3edee089 209-215,217,232,234
+  s_bcb87751443cd2::t_551fa8103bf381 249
+scripts/stability.mjs
+  s_bcb87751443cd2::t_e0f49a715394ea 8-9,27-30,57-63,77-104,168-170,174,177,191-194
+tests/unit/scripts/ci-plan.spec.ts
+  s_bcb87751443cd2::t_82abde38313268 22,34
+docs/adr/124-flaky-tests-are-caught-before-merge-and-quarantined-with-an-expiry.md
+  s_bcb87751443cd2::t_ffe2589b015900 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0ba44e5837c2781416fdc18b9d063587f6e71070",
+  "prompts": {},
+  "sessions": {
+    "s_bcb87751443cd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b568ee83-ad51-4a54-9901-52cfcfa5b37f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
