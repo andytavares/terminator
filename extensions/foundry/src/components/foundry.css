@@ -2775,16 +2775,6 @@
   min-width: 160px;
 }
 
-.fdry-hall-slot {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.fdry-hall-slot > .fdry-hall-card {
-  flex: 1;
-}
-
 .fdry-doc-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2794,21 +2784,49 @@
 
 .fdry-hall-card {
   position: relative;
+  /* A grid item, so its title cannot push it wider than its column. */
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 12px 14px;
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-md);
   background: var(--tm-bg-elevated);
   color: var(--tm-text-primary);
+}
+
+.fdry-hall-card:has(.fdry-hall-card-open:hover) {
+  background: var(--tm-bg-card-hover);
+}
+
+.fdry-hall-card-open {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   text-align: left;
   cursor: pointer;
 }
 
-.fdry-hall-card:hover {
-  background: var(--tm-bg-card-hover);
+/* A path or a long title wraps inside the card, at most three lines. */
+.fdry-hall-card-title {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow-wrap: anywhere;
+}
+
+.fdry-hall-card-links {
+  padding: 0 14px 12px;
 }
 
 /* A finished order: tinted the colour every other surface gives "done", so it
@@ -2818,7 +2836,7 @@
   background: color-mix(in srgb, var(--tm-success) 8%, var(--tm-bg-elevated));
 }
 
-.fdry-hall-card.is-done:hover {
+.fdry-hall-card.is-done:has(.fdry-hall-card-open:hover) {
   background: color-mix(in srgb, var(--tm-success) 14%, var(--tm-bg-elevated));
 }
 
