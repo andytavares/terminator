@@ -1,0 +1,21 @@
+src/renderer/home/work-threads.ts
+  s_bcb87751443cd2::t_8eafc2f84e8647 232-235,239,250
+tests/unit/renderer/home/work-threads.spec.ts
+  s_bcb87751443cd2::t_0f439b7dd1d715 533-541
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bad94181f5739244627b3baff6e0fd85412b6f9b",
+  "prompts": {},
+  "sessions": {
+    "s_bcb87751443cd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b568ee83-ad51-4a54-9901-52cfcfa5b37f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
