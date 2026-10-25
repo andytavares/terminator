@@ -25,8 +25,11 @@ const PASSED_THROUGH = [
   'TERM',
 ]
 
+/** The time zone of every test process and every app a test launches, so both read one "today". */
+export const TEST_TIME_ZONE = 'UTC'
+
 const FIXED = {
-  TZ: 'UTC',
+  TZ: TEST_TIME_ZONE,
   LANG: 'en_US.UTF-8',
   LC_ALL: 'en_US.UTF-8',
   CI: '1',
