@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { buildWindowMenu } from '../../../src/main/window-menu'
+import { buildWindowMenu, laneAccelerator } from '../../../src/main/window-menu'
 
 const BREAKOUT_SESSION = '3f2c1a9e-5b7d-4e8a-9c01-2d4f6a8b0c1e'
 
@@ -46,11 +46,23 @@ describe('buildWindowMenu — lanes', () => {
     const lanes = submenu.find((i) => i.label === 'Switch Lane')!
     const entries = lanes.submenu as Electron.MenuItemConstructorOptions[]
     expect(entries.map((i) => i.accelerator)).toEqual(
-      [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `Control+${n}`)
+      [0, 1, 2, 3, 4, 5, 6, 7, 8].map((lane) => laneAccelerator(lane, process.platform))
     )
     expect(entries[2].label).toBe('Lane 3')
     ;(entries[2].click as () => void)()
     expect(send).toHaveBeenCalledWith('menu:switch-lane', { lane: 2 })
+  })
+})
+
+describe('laneAccelerator', () => {
+  it('is Ctrl+n on a Mac, where Cmd+n switches workspaces', () => {
+    expect(laneAccelerator(0, 'darwin')).toBe('Control+1')
+    expect(laneAccelerator(8, 'darwin')).toBe('Control+9')
+  })
+
+  it('is Alt+n where Ctrl is the command key and Ctrl+n switches workspaces', () => {
+    expect(laneAccelerator(1, 'linux')).toBe('Alt+2')
+    expect(laneAccelerator(1, 'win32')).toBe('Alt+2')
   })
 })
 

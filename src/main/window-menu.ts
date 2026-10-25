@@ -25,17 +25,21 @@ function closeAndMoveItems(
   ]
 }
 
-// Ctrl, not Cmd: Cmd+1–9 belong to tabs elsewhere, and a menu accelerator fires even while the
-// terminal has focus (xterm swallows renderer keydowns).
 const LANE_COUNT = 9
 
-/** Ctrl+1–9 show that lane of the task the visible branch is in. */
+/** The key for lane `lane` (from 0). The workspace keys own CmdOrCtrl+1–9, so a Mac takes Ctrl
+ * and elsewhere, where Ctrl is that key, Alt. A menu accelerator fires while xterm has focus. */
+export function laneAccelerator(lane: number, platform: NodeJS.Platform): string {
+  return `${platform === 'darwin' ? 'Control' : 'Alt'}+${lane + 1}`
+}
+
+/** Ctrl+1–9 (Alt+1–9 off a Mac) show that lane of the task the visible branch is in. */
 function switchLaneMenu(send: Send): Electron.MenuItemConstructorOptions {
   return {
     label: 'Switch Lane',
     submenu: Array.from({ length: LANE_COUNT }, (_, lane) => ({
       label: `Lane ${lane + 1}`,
-      accelerator: `Control+${lane + 1}`,
+      accelerator: laneAccelerator(lane, process.platform),
       click: () => send('menu:switch-lane', { lane }),
     })),
   }

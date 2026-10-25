@@ -55,6 +55,8 @@ function withTabs(projectId: string, ids: string[], active: string): void {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // The app ships for macOS: Cmd is the command key. A test of another platform says so.
+  vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
   createSession.mockResolvedValue('session-id')
   splitSession.mockResolvedValue(undefined)
   resetStore(useSessionStore)
@@ -108,6 +110,24 @@ describe('useKeyboardShortcuts', () => {
     renderHook(() => useKeyboardShortcuts())
     pressKey('9', { metaKey: true })
     expect(workspaceState().activeWorkspaceId).toBe('ws-1')
+  })
+})
+
+describe('useKeyboardShortcuts — Ctrl+1–9 are the lane keys on a Mac', () => {
+  it('leaves Ctrl+2 alone on a Mac: it switches lanes there, not workspaces', () => {
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('2', { ctrlKey: true })
+    expect(workspaceState().activeWorkspaceId).toBe('ws-1')
+    pressKey('2', { metaKey: true })
+    expect(workspaceState().activeWorkspaceId).toBe('ws-2')
+  })
+
+  it('switches workspace on Ctrl+2 where Ctrl is the command key', () => {
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('Linux x86_64')
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('2', { ctrlKey: true })
+    expect(workspaceState().activeWorkspaceId).toBe('ws-2')
   })
 })
 

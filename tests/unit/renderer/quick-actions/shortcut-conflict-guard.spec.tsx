@@ -20,6 +20,8 @@ vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
 const workspace1 = workspaceFixture({ id: 'ws-1', name: 'WS 1', folderPath: '/ws1', color: '#fff' })
 
 beforeEach(() => {
+  // The app ships for macOS: Cmd is the command key.
+  vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
   vi.clearAllMocks()
   // The real stores, with only the actions that reach the main process replaced.
   useWorkspaceStore.setState({
