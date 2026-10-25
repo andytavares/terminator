@@ -85,8 +85,34 @@ async function insightsAnswersItsQuestions(page: Page): Promise<void> {
   for (const question of INSIGHTS_QUESTIONS) {
     await expect(page.getByText(question)).toBeVisible()
   }
+  await insightsScrollsInAShortWindow(page)
   await page.getByRole('radio', { name: 'Today' }).click()
   await expect(tasks(page)).toBeVisible()
+}
+
+/** Insights is taller than a short window, so the wheel must move it; a clipped page never moves. */
+async function insightsScrollsInAShortWindow(page: Page): Promise<void> {
+  const before = await handle.app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].getSize()
+  )
+  await handle.app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].setSize(1100, 500)
+  )
+  try {
+    const firstQuestion = page.getByText(INSIGHTS_QUESTIONS[0])
+    const topBefore = (await firstQuestion.boundingBox())?.y ?? 0
+    // A bare mouse move: hover() scrolls the element into view itself, even where a person cannot.
+    await page.mouse.move(400, topBefore + 40)
+    await page.mouse.wheel(0, 2000)
+    await expect
+      .poll(async () => (await firstQuestion.boundingBox())?.y ?? 0)
+      .toBeLessThan(topBefore)
+  } finally {
+    await handle.app.evaluate(
+      ({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0].setSize(size[0], size[1]),
+      before
+    )
+  }
 }
 
 async function workRowOpensItsDrawer(page: Page): Promise<void> {
