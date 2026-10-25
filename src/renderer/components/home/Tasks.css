@@ -138,6 +138,8 @@
 }
 .task-lane {
   display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
   align-items: center;
   gap: 5px;
   height: 20px;
@@ -150,7 +152,15 @@
   font-size: 11px;
   white-space: nowrap;
 }
+/* A long branch name is cut, not pushed into the next column; the chip's title holds it whole. */
+.task-lane__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .task-lane__colour {
+  flex: none;
   width: 7px;
   height: 7px;
   border-radius: 2px;

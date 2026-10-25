@@ -28,9 +28,9 @@ interface LaneChipProps {
 /** A repo the task touches: its colour and name, and the lane's own state when it differs. */
 function LaneChip({ lane, label, taskState }: LaneChipProps) {
   return (
-    <span className="task-lane">
+    <span className="task-lane" title={label}>
       <i className="task-lane__colour" style={{ background: lane.repoColor ?? undefined }} />
-      {label}
+      <span className="task-lane__name">{label}</span>
       {lane.state !== taskState && <StateGlyph state={lane.state} />}
     </span>
   )
