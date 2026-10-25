@@ -1,0 +1,55 @@
+docs/user-guide/USER-GUIDE.md
+  s_bcb87751443cd2::t_69908405410088 134
+src/renderer/components/terminal/BreakoutDropZone.tsx
+  s_bcb87751443cd2::t_69908405410088 1,3,5,9-13,37-38,40
+src/renderer/components/terminal/TabBar.css
+  s_bcb87751443cd2::t_69908405410088 182-189
+src/renderer/components/terminal/TabBar.tsx
+  s_bcb87751443cd2::t_69908405410088 6-12,27,238-254,261,266-268,291,294-298,302,311-313
+tests/unit/renderer/components/TabBar.spec.tsx
+  s_bcb87751443cd2::t_69908405410088 2,8,11,71-94,114,344,355,828,830,832-834,838,840-841,843,880,888,890-898,900-903,905-910,912,914-923
+tests/unit/renderer/terminal/tab-drag.spec.ts
+  s_bcb87751443cd2::t_69908405410088 1-232
+docs/ARCHITECTURE.md
+  s_bcb87751443cd2::t_69908405410088 66
+src/renderer/hooks/useDragReorder.ts
+  s_bcb87751443cd2::t_69908405410088 30
+src/renderer/components/terminal/BreakoutWindowView.css
+  s_bcb87751443cd2::t_69908405410088 22-23
+src/renderer/components/terminal/BreakoutWindowView.tsx
+  s_bcb87751443cd2::t_69908405410088 8-9,15-22,30
+patches/@xterm+xterm+6.0.0.patch
+  s_bcb87751443cd2::t_69908405410088 1-40
+package.json
+  s_bcb87751443cd2::t_69908405410088 51-52,96,106,113
+tests/e2e/terminal-breakout.spec.ts
+  s_bcb87751443cd2::t_69908405410088 1,48-57,69,72-73,90,120-199
+tests/unit/renderer/components/BreakoutDropZone.spec.tsx
+  s_bcb87751443cd2::t_69908405410088 8,17-19,46,58,62,64,69,71,74,78,80-81,83-84
+tests/unit/renderer/components/BreakoutWindowView.spec.tsx
+  s_bcb87751443cd2::t_69908405410088 8,25-27,29,31-39,43-52,114-124,128-129
+src/renderer/terminal/tab-drag.ts
+  s_bcb87751443cd2::t_69908405410088 1-132
+tests/e2e/timings.json
+  s_bcb87751443cd2::t_69908405410088 2-59
+docs/adr/126-a-session-breaks-out-into-a-child-window.md
+  s_bcb87751443cd2::t_69908405410088 33-40
+package-lock.json
+  s_bcb87751443cd2::t_2a08745c2c282a 10,45,55,62,139,1345-1347,5351-5357,6098-6110,6332-6350,6365-6381,7809-7811,8868-8880,8912-8921,9266-9268,9917-9926,9971-9977,10379-10398,10447-10456,10497-10506,12761-12787,13301-13392,14721-14738,14816-14825,15720-15732,15935-15937
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "15e2fce8702cd44c903cb21ca041a6ebd79a1065",
+  "prompts": {},
+  "sessions": {
+    "s_bcb87751443cd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b568ee83-ad51-4a54-9901-52cfcfa5b37f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
