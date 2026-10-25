@@ -62,6 +62,7 @@ import type {
 } from '../schemas/session-records.schema'
 import type {
   TaskArchiveInputSchema,
+  TaskMergeInputSchema,
   TaskCreateInputSchema,
   TaskLaneInputSchema,
   TaskUpdateInputSchema,
@@ -1227,6 +1228,13 @@ export const ELECTRON_API_MANIFEST = [
     kind: 'invoke',
     channel: 'task:archive',
     signature: signature<(input: z.input<typeof TaskArchiveInputSchema>) => TaskResult>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'tasks.merge',
+    kind: 'invoke',
+    channel: 'task:merge',
+    signature: signature<(input: z.input<typeof TaskMergeInputSchema>) => TaskResult>(),
     remote: 'omit',
   }),
   method({

@@ -75,6 +75,27 @@ describe('task channel validation', () => {
   })
 })
 
+describe('task channel merge', () => {
+  it('merges one task into another, leaving one', async () => {
+    const into = await invoke<{ data: Task }>('task:create', { title: 'Billing', lanes: [api] })
+    const from = await invoke<{ data: Task }>('task:create', { title: 'Web', lanes: [web] })
+    const merged = await invoke<{ data: Task }>('task:merge', {
+      from: from.data.id,
+      into: into.data.id,
+    })
+    expect(merged.data.lanes).toEqual([api, web])
+    expect((await invoke<{ data: Task[] }>('task:list')).data.map((t) => t.id)).toEqual([
+      into.data.id,
+    ])
+  })
+
+  it('answers SAME_TASK for a task merged into itself', async () => {
+    const { data } = await invoke<{ data: Task }>('task:create', { title: 'Billing', lanes: [api] })
+    const result = await invoke<{ error: string }>('task:merge', { from: data.id, into: data.id })
+    expect(result.error).toBe('SAME_TASK')
+  })
+})
+
 describe('task channel writes', () => {
   it('adds, removes and archives through their channels, announcing the full list', async () => {
     const { data } = await invoke<{ data: Task }>('task:create', { title: 'Billing', lanes: [api] })

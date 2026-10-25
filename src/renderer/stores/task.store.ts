@@ -19,6 +19,8 @@ interface TaskState {
   addLane: (id: string, lane: TaskLane) => Promise<boolean>
   removeLane: (id: string, lane: TaskLane) => Promise<boolean>
   archive: (id: string, archived: boolean) => Promise<boolean>
+  /** Moves every lane of `from` into `into`; `from` is gone afterwards. */
+  merge: (from: string, into: string) => Promise<boolean>
 }
 
 type WriteResult = { data: Task } | { error: string; message: string }
@@ -63,4 +65,9 @@ export const useTaskStore = create<TaskState>((set) => ({
   addLane: (id, lane) => write(set, api().addLane?.({ id, lane })),
   removeLane: (id, lane) => write(set, api().removeLane?.({ id, lane })),
   archive: (id, archived) => write(set, api().archive?.({ id, archived })),
+  merge: async (from, into) => {
+    const merged = await write(set, api().merge?.({ from, into }))
+    if (merged) set((state) => ({ tasks: state.tasks.filter((t) => t.id !== from) }))
+    return merged
+  },
 }))

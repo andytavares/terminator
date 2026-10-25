@@ -44,6 +44,11 @@ export const TaskArchiveInputSchema = z.object({
   archived: z.boolean(),
 })
 
+export const TaskMergeInputSchema = z.object({
+  from: z.string().min(1),
+  into: z.string().min(1),
+})
+
 export type Task = z.infer<typeof TaskSchema>
 export type TaskLane = z.infer<typeof TaskLaneSchema>
 export type TaskCreateInput = z.infer<typeof TaskCreateInputSchema>

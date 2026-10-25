@@ -6,6 +6,7 @@ import { InFlightMenu, useWorkMenu, type WorkMenuState } from './InFlightMenu'
 import { RenameField } from './InFlightRow'
 import { StateGlyph } from './StateGlyph'
 import { canStoreTask, renameThread, toggleFocus } from './task-actions'
+import { useMergeDrop } from './thread-drag'
 import type { ThreadLane } from './lane-details'
 import type { WorkThread } from '../../home/work-threads'
 import './InFlight.css'
@@ -116,19 +117,27 @@ function useTaskRename(thread: WorkThread): CellsProps['rename'] {
   }
 }
 
-/** One task on Home; pressing it, or Enter, opens its drawer. */
+function rowClass(selected: boolean, dropTarget: boolean): string {
+  return ['task-row', selected && 'task-row--selected', dropTarget && 'task-row--drop']
+    .filter(Boolean)
+    .join(' ')
+}
+
+/** One task on Home; pressing it, or Enter, opens its drawer. Drop another row on it to merge. */
 export function TaskRow({ thread, now, selected }: TaskRowProps): JSX.Element {
   const openThread = useDeskSelection((s) => s.openThread)
   const workMenu = useWorkMenu()
   const rename = useTaskRename(thread)
+  const drop = useMergeDrop(thread)
   return (
     <div
+      {...drop.props}
       role="button"
       tabIndex={0}
       aria-label={thread.title}
       aria-current={selected || undefined}
       data-thread-key={thread.key}
-      className={selected ? 'task-row task-row--selected' : 'task-row'}
+      className={rowClass(selected, drop.over)}
       onClick={() => openThread(thread.key)}
       onContextMenu={workMenu.openWorkMenu}
       onKeyDown={(event) => {

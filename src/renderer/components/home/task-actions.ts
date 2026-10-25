@@ -4,7 +4,7 @@ import { leadSessionOf } from './thread-actions'
 import { sessionsOfLane } from './lane-details'
 import { startWork } from './start-work'
 import type { WorkThread } from '../../home/work-threads'
-import type { TaskCreateInput } from '../../../shared/schemas/tasks.schema'
+import type { Task, TaskCreateInput, TaskLane } from '../../../shared/schemas/tasks.schema'
 import { TASK_TITLE_MAX_LENGTH } from '../../../shared/task-title'
 import type { Workspace } from '../../../shared/types/index'
 
@@ -53,6 +53,45 @@ export async function toggleFocus(thread: WorkThread): Promise<void> {
 export async function toggleDone(thread: WorkThread): Promise<void> {
   const id = await ensureTask(thread)
   if (id !== null) await useTaskStore.getState().update({ id, done: thread.doneAt === null })
+}
+
+/** Whether `dragged` can be dropped on `target`: two different rows, each on a branch. */
+export function canMergeThreads(dragged: WorkThread, target: WorkThread): boolean {
+  return dragged.key !== target.key && dragged.lanes.length > 0 && canStoreTask(target)
+}
+
+/** What a merge changed, so Undo can put it back. */
+export type MergeUndo =
+  | { kind: 'task'; task: Task }
+  | { kind: 'lanes'; into: string; lanes: TaskLane[] }
+
+/** Drops one Home row onto another: the target becomes (or stays) a stored task and takes
+ *  every lane of the dragged row; a dragged stored task is merged in and gone afterwards. */
+export async function mergeThreads(
+  dragged: WorkThread,
+  target: WorkThread
+): Promise<MergeUndo | null> {
+  if (!canMergeThreads(dragged, target)) return null
+  const into = await ensureTask(target)
+  if (into === null) return null
+  const store = useTaskStore.getState()
+  const draggedTask = store.tasks.find((t) => t.id === dragged.taskId)
+  if (draggedTask)
+    return (await store.merge(draggedTask.id, into)) ? { kind: 'task', task: draggedTask } : null
+  const lanes = dragged.lanes.map(({ repoRoot, branch }) => ({ repoRoot, branch }))
+  for (const lane of lanes) if (!(await store.addLane(into, lane))) return null
+  return { kind: 'lanes', into, lanes }
+}
+
+/** Puts a merge back: the dragged task again with its lanes, or the added branches out again. */
+export async function undoMerge(undo: MergeUndo): Promise<void> {
+  const store = useTaskStore.getState()
+  if (undo.kind === 'lanes') {
+    for (const lane of undo.lanes) await store.removeLane(undo.into, lane)
+    return
+  }
+  const { title, lanes, ticket } = undo.task
+  await store.create({ title, lanes, ticket })
 }
 
 /** Renames a stored task; other work is named by its lead session's description. */

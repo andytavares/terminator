@@ -6,6 +6,7 @@ import {
   TaskArchiveInputSchema,
   TaskCreateInputSchema,
   TaskLaneInputSchema,
+  TaskMergeInputSchema,
   TaskUpdateInputSchema,
 } from '../../shared/schemas/tasks.schema.js'
 import {
@@ -13,6 +14,7 @@ import {
   archiveTask,
   createTask,
   listTasks,
+  mergeTasks,
   onTaskChange,
   removeLane,
   updateTask,
@@ -60,6 +62,13 @@ const taskChannels: ChannelSpec[] = [
     schema: TaskArchiveInputSchema,
     invalid: validationError,
     run: async ({ id, archived }) => ({ data: await archiveTask(id, archived) }),
+    onError: failureOf,
+  }),
+  defineChannel({
+    channel: 'task:merge',
+    schema: TaskMergeInputSchema,
+    invalid: validationError,
+    run: async ({ from, into }) => ({ data: await mergeTasks(from, into) }),
     onError: failureOf,
   }),
 ]

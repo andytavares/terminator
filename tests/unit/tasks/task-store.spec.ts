@@ -134,6 +134,63 @@ describe('task store failures', () => {
   })
 })
 
+describe('task store merge', () => {
+  it('moves every lane of one task into another and drops the first, in one write', async () => {
+    const store = await load()
+    const into = await store.createTask({ title: 'Billing', lanes: [api] })
+    const from = await store.createTask({
+      title: 'Infra',
+      lanes: [web, infra],
+      ticket: { tracker: 'linear', key: 'NW-88' },
+    })
+    await store.updateTask({ id: from.id, focus: true })
+    const seen: number[] = []
+    store.onTaskChange((tasks) => seen.push(tasks.length))
+    const merged = await store.mergeTasks(from.id, into.id)
+    expect(merged).toMatchObject({
+      id: into.id,
+      title: 'Billing',
+      lanes: [api, web, infra],
+      focus: true,
+      ticket: { tracker: 'linear', key: 'NW-88' },
+    })
+    expect(store.listTasks()).toEqual([merged])
+    expect(seen).toEqual([1])
+    expect(JSON.parse(fs.readFileSync(FILE(), 'utf8'))).toEqual([merged])
+  })
+})
+
+describe('task store merge — what the receiver keeps', () => {
+  it('keeps the receiving task’s own ticket', async () => {
+    const store = await load()
+    const into = await store.createTask({
+      title: 'Billing',
+      lanes: [api],
+      ticket: { tracker: 'jira', key: 'BIL-1' },
+    })
+    const from = await store.createTask({
+      title: 'Infra',
+      lanes: [infra],
+      ticket: { tracker: 'linear', key: 'NW-88' },
+    })
+    expect((await store.mergeTasks(from.id, into.id)).ticket).toEqual({
+      tracker: 'jira',
+      key: 'BIL-1',
+    })
+  })
+})
+
+describe('task store merge — refusals', () => {
+  it('refuses to merge a task into itself or into one that does not exist', async () => {
+    const store = await load()
+    const task = await store.createTask({ title: 'Billing', lanes: [api] })
+    await expect(store.mergeTasks(task.id, task.id)).rejects.toMatchObject({ code: 'SAME_TASK' })
+    await expect(store.mergeTasks(task.id, 'nope')).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    await expect(store.mergeTasks('nope', task.id)).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    expect(store.listTasks()).toEqual([task])
+  })
+})
+
 describe('task store persistence', () => {
   it('writes the tasks to tasks.json and reads them back', async () => {
     const store = await load()

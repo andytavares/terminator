@@ -22,7 +22,7 @@ type TaskChangeHandler = (tasks: Task[]) => void
 
 class TaskError extends Error {
   constructor(
-    readonly code: 'NOT_FOUND',
+    readonly code: 'NOT_FOUND' | 'SAME_TASK',
     message: string
   ) {
     super(message)
@@ -176,6 +176,24 @@ export async function archiveTask(id: string, archived: boolean): Promise<Task> 
   tasks.set(id, updated)
   await commit(before)
   return updated
+}
+
+/** Moves every lane of `fromId` into `intoId` and drops `fromId`. The receiver keeps its title
+ * and its ticket if it has one; it is focused if either was. */
+export async function mergeTasks(fromId: string, intoId: string): Promise<Task> {
+  if (fromId === intoId) throw new TaskError('SAME_TASK', `Task ${fromId} cannot merge into itself`)
+  const from = await find(fromId)
+  const into = await find(intoId)
+  const merged: Task = {
+    ...from.lanes.reduce(withLane, into),
+    focus: into.focus || from.focus,
+    ticket: into.ticket ?? from.ticket,
+  }
+  const before = new Map(tasks)
+  tasks.delete(fromId)
+  tasks.set(intoId, merged)
+  await commit(before)
+  return merged
 }
 
 export function onTaskChange(handler: TaskChangeHandler): () => void {
