@@ -1,6 +1,7 @@
 import type { Project, Workspace } from '../../shared/types/index'
 import type { Task, TaskLane } from '../../shared/schemas/tasks.schema'
 import { branchLabel } from './branch-display'
+import { laneLabels } from './lane-labels'
 import type { BranchRow, RepoGroup } from './branch-rows'
 
 // The sidebar grouped by task: pure, like the rest of this directory. It takes the
@@ -94,12 +95,8 @@ function switchLaneOf(
 }
 
 function withBranchWhereRepoRepeats(lanes: SwitchLane[], task: Task): SwitchLane[] {
-  const repoCount = (root: string) => task.lanes.filter((l) => l.repoRoot === root).length
-  return lanes.map((lane, i) =>
-    repoCount(task.lanes[i].repoRoot) > 1
-      ? { ...lane, label: `${lane.repoName} · ${task.lanes[i].branch}` }
-      : lane
-  )
+  const labels = laneLabels(task.lanes.map((l, i) => ({ ...l, repoName: lanes[i].repoName })))
+  return lanes.map((lane, i) => ({ ...lane, label: labels[i] }))
 }
 
 // The lanes to switch between when the visible branch is in a live task with two or more;

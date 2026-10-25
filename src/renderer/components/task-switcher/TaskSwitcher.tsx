@@ -10,6 +10,7 @@ import { filterThreads } from '../home/desk-groups'
 import { useDeskSelection } from '../home/desk-selection'
 import { leadSessionOf } from '../home/thread-actions'
 import { StateGlyph } from '../home/StateGlyph'
+import { laneLabels } from '../../sidebar/lane-labels'
 import { useTaskSwitcher } from './task-switcher.store'
 import './TaskSwitcher.css'
 
@@ -151,9 +152,7 @@ function Choice({ thread, chosen, onChoose }: ChoiceProps): JSX.Element {
     >
       <StateGlyph state={thread.state} inferred={thread.inferred} />
       <span className="task-switcher__title">{thread.title}</span>
-      <span className="task-switcher__lanes">
-        {thread.lanes.map((lane) => lane.repoName).join(' · ')}
-      </span>
+      <span className="task-switcher__lanes">{laneLabels(thread.lanes).join(', ')}</span>
     </div>
   )
 }

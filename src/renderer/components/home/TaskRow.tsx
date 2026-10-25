@@ -7,6 +7,7 @@ import { RenameField } from './InFlightRow'
 import { StateGlyph } from './StateGlyph'
 import { canStoreTask, renameThread, toggleFocus } from './task-actions'
 import { useMergeDrop } from './thread-drag'
+import { laneLabels } from '../../sidebar/lane-labels'
 import type { ThreadLane } from './lane-details'
 import type { WorkThread } from '../../home/work-threads'
 import './InFlight.css'
@@ -18,12 +19,18 @@ interface TaskRowProps {
   selected: boolean
 }
 
+interface LaneChipProps {
+  lane: ThreadLane
+  label: string
+  taskState: WorkThread['state']
+}
+
 /** A repo the task touches: its colour and name, and the lane's own state when it differs. */
-function LaneChip({ lane, taskState }: { lane: ThreadLane; taskState: WorkThread['state'] }) {
+function LaneChip({ lane, label, taskState }: LaneChipProps) {
   return (
     <span className="task-lane">
       <i className="task-lane__colour" style={{ background: lane.repoColor ?? undefined }} />
-      {lane.repoName}
+      {label}
       {lane.state !== taskState && <StateGlyph state={lane.state} />}
     </span>
   )
@@ -87,13 +94,19 @@ type CellsInput = Pick<CellsProps, 'thread' | 'now'> & {
 /** The row's cells: state, title, repos, what is happening now, last activity, and the menu. */
 function TaskRowCells({ thread, now, controls }: CellsInput): JSX.Element {
   const { rename, workMenu } = controls
+  const labels = laneLabels(thread.lanes)
   return (
     <>
       <StateGlyph state={thread.state} inferred={thread.inferred} />
       <TaskTitle thread={thread} rename={rename} />
       <div className="task-row__lanes">
-        {thread.lanes.map((lane) => (
-          <LaneChip key={`${lane.repoRoot}#${lane.branch}`} lane={lane} taskState={thread.state} />
+        {thread.lanes.map((lane, i) => (
+          <LaneChip
+            key={`${lane.repoRoot}#${lane.branch}`}
+            lane={lane}
+            label={labels[i]}
+            taskState={thread.state}
+          />
         ))}
       </div>
       <div className="task-row__now">{thread.nowLine}</div>

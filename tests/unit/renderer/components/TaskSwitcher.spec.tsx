@@ -76,7 +76,7 @@ describe('TaskSwitcher — what it lists', () => {
     render(<TaskSwitcher />)
     const first = screen.getAllByRole('option')[0]
     expect(within(first).getByRole('img', { name: 'Needs you' })).toBeTruthy()
-    expect(within(first).getByText('api · web')).toBeTruthy()
+    expect(within(first).getByText('api, web')).toBeTruthy()
   })
 
   it('narrows the list as you type', () => {

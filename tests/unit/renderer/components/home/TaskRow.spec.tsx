@@ -87,3 +87,21 @@ describe('TaskRow — drop one row on another to merge', () => {
     expect(useToastStore.getState().toasts).toEqual([])
   })
 })
+
+describe('TaskRow — lane chips', () => {
+  it('names two lanes in one repo by their branches, so they read apart', async () => {
+    const usage = { repoRoot: '/code/web', branch: 'usage-page' }
+    const thread = rowThread('Rate limits', api, 'x')
+    const lane = (l: TaskLane, repoName: string) => ({
+      ...l,
+      repoName,
+      repoColor: null,
+      state: 'quiet' as const,
+      sessionIds: [],
+    })
+    thread.lanes = [lane(api, 'api'), lane(web, 'web'), lane(usage, 'web')]
+    render(<TaskRow thread={thread} now={Date.now()} selected={false} />)
+    const chips = Array.from(document.querySelectorAll('.task-lane')).map((c) => c.textContent)
+    expect(chips).toEqual(['api', 'web · rate-limits', 'web · usage-page'])
+  })
+})
