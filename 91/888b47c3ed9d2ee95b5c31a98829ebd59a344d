@@ -1,0 +1,34 @@
+tests/unit/renderer/components/home/TaskRow.spec.tsx
+  s_bcb87751443cd2::t_dea6eee31945a6 1-107
+src/renderer/components/task-switcher/TaskSwitcher.tsx
+  s_bcb87751443cd2::t_6dfa0fd7826977 155
+  s_bcb87751443cd2::t_d8a1f025f7898a 13
+tests/unit/renderer/sidebar/lane-labels.spec.ts
+  s_bcb87751443cd2::t_d8a1f025f7898a 1-20
+src/renderer/components/home/TaskRow.tsx
+  s_bcb87751443cd2::t_d8a1f025f7898a 10
+  s_bcb87751443cd2::t_6dfa0fd7826977 22-27,29,33,97,103-109
+src/renderer/sidebar/task-groups.ts
+  s_bcb87751443cd2::t_6dfa0fd7826977 98-99
+  s_bcb87751443cd2::t_d8a1f025f7898a 4
+tests/unit/renderer/components/TaskSwitcher.spec.tsx
+  s_bcb87751443cd2::t_5fcc4642f2c732 79
+src/renderer/sidebar/lane-labels.ts
+  s_bcb87751443cd2::t_b7908ce192676c 1-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "91888b47c3ed9d2ee95b5c31a98829ebd59a344d",
+  "prompts": {},
+  "sessions": {
+    "s_bcb87751443cd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b568ee83-ad51-4a54-9901-52cfcfa5b37f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
