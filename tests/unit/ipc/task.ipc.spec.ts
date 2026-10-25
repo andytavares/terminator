@@ -96,6 +96,16 @@ describe('task channel merge', () => {
   })
 })
 
+describe('task channel delete', () => {
+  it('deletes a task and answers NOT_FOUND the second time', async () => {
+    const { data } = await invoke<{ data: Task }>('task:create', { title: 'Billing', lanes: [api] })
+    await invoke('task:delete', { id: data.id })
+    expect((await invoke<{ data: Task[] }>('task:list')).data).toEqual([])
+    const again = await invoke<{ error: string }>('task:delete', { id: data.id })
+    expect(again.error).toBe('NOT_FOUND')
+  })
+})
+
 describe('task channel writes', () => {
   it('adds, removes and archives through their channels, announcing the full list', async () => {
     const { data } = await invoke<{ data: Task }>('task:create', { title: 'Billing', lanes: [api] })

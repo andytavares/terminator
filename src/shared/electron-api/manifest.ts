@@ -63,6 +63,7 @@ import type {
 import type {
   TaskArchiveInputSchema,
   TaskMergeInputSchema,
+  TaskIdInputSchema,
   TaskCreateInputSchema,
   TaskLaneInputSchema,
   TaskUpdateInputSchema,
@@ -1228,6 +1229,13 @@ export const ELECTRON_API_MANIFEST = [
     kind: 'invoke',
     channel: 'task:archive',
     signature: signature<(input: z.input<typeof TaskArchiveInputSchema>) => TaskResult>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'tasks.delete',
+    kind: 'invoke',
+    channel: 'task:delete',
+    signature: signature<(input: z.input<typeof TaskIdInputSchema>) => TaskResult>(),
     remote: 'omit',
   }),
   method({

@@ -100,6 +100,25 @@ describe('mergeThreads — onto a row that is only a branch', () => {
     await mergeThreads(threadOf('/code/web#rate-limits', [web]), threadOf('Login rework', [api]))
     expect(stored()).toEqual([{ title: 'Login rework', lanes: [api, web] }])
   })
+
+  it('leaves no task behind on Undo when the merge made the one it dropped on', async () => {
+    const undo = await mergeThreads(
+      threadOf('/code/web#rate-limits', [web]),
+      threadOf('Login rework', [api])
+    )
+    await undoMerge(undo!)
+    expect(stored()).toEqual([])
+  })
+
+  it('gives a dragged task back on Undo and leaves no task where a branch was dropped on', async () => {
+    const from = await main.createTask({ title: 'Web side', lanes: [web] })
+    const undo = await mergeThreads(
+      threadOf('task:web', [web], from.id),
+      threadOf('Login rework', [api])
+    )
+    await undoMerge(undo!)
+    expect(stored()).toEqual([{ title: 'Web side', lanes: [web] }])
+  })
 })
 
 describe('canMergeThreads', () => {

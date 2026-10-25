@@ -191,6 +191,18 @@ describe('task store merge — refusals', () => {
   })
 })
 
+describe('task store delete', () => {
+  it('deletes a task for good, on disk too, and refuses one that does not exist', async () => {
+    const store = await load()
+    const keep = await store.createTask({ title: 'Billing', lanes: [api] })
+    const gone = await store.createTask({ title: 'Infra', lanes: [infra] })
+    expect(await store.deleteTask(gone.id)).toEqual(gone)
+    expect(store.listTasks()).toEqual([keep])
+    expect(JSON.parse(fs.readFileSync(FILE(), 'utf8'))).toEqual([keep])
+    await expect(store.deleteTask(gone.id)).rejects.toMatchObject({ code: 'NOT_FOUND' })
+  })
+})
+
 describe('task store persistence', () => {
   it('writes the tasks to tasks.json and reads them back', async () => {
     const store = await load()

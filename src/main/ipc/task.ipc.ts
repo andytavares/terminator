@@ -5,6 +5,7 @@ import { sendToWindow } from '../safe-send.js'
 import {
   TaskArchiveInputSchema,
   TaskCreateInputSchema,
+  TaskIdInputSchema,
   TaskLaneInputSchema,
   TaskMergeInputSchema,
   TaskUpdateInputSchema,
@@ -13,6 +14,7 @@ import {
   addLane,
   archiveTask,
   createTask,
+  deleteTask,
   listTasks,
   mergeTasks,
   onTaskChange,
@@ -62,6 +64,13 @@ const taskChannels: ChannelSpec[] = [
     schema: TaskArchiveInputSchema,
     invalid: validationError,
     run: async ({ id, archived }) => ({ data: await archiveTask(id, archived) }),
+    onError: failureOf,
+  }),
+  defineChannel({
+    channel: 'task:delete',
+    schema: TaskIdInputSchema,
+    invalid: validationError,
+    run: async ({ id }) => ({ data: await deleteTask(id) }),
     onError: failureOf,
   }),
   defineChannel({

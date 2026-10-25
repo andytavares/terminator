@@ -196,6 +196,15 @@ export async function mergeTasks(fromId: string, intoId: string): Promise<Task> 
   return merged
 }
 
+/** Removes a task for good; its lanes belong to no task afterwards. Undo of a merge uses it. */
+export async function deleteTask(id: string): Promise<Task> {
+  const task = await find(id)
+  const before = new Map(tasks)
+  tasks.delete(id)
+  await commit(before)
+  return task
+}
+
 export function onTaskChange(handler: TaskChangeHandler): () => void {
   handlers.add(handler)
   return () => {

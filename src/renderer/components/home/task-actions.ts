@@ -61,9 +61,11 @@ export function canMergeThreads(dragged: WorkThread, target: WorkThread): boolea
 }
 
 /** What a merge changed, so Undo can put it back: both tasks as they were, or the added lanes. */
+/** What a merge changed, so Undo can put it back. `created` is the task the merge made of a
+ *  row that was only a branch; Undo deletes it. */
 export type MergeUndo =
-  | { kind: 'task'; task: Task; into: Task }
-  | { kind: 'lanes'; into: string; lanes: TaskLane[] }
+  | { kind: 'task'; task: Task; into: Task; created: boolean }
+  | { kind: 'lanes'; into: string; lanes: TaskLane[]; created: boolean }
 
 async function removeLanes(into: string, lanes: readonly TaskLane[]): Promise<void> {
   for (const lane of lanes) await useTaskStore.getState().removeLane(into, lane)
@@ -89,6 +91,7 @@ export async function mergeThreads(
   target: WorkThread
 ): Promise<MergeUndo | null> {
   if (!canMergeThreads(dragged, target)) return null
+  const created = target.taskId === null
   const into = await ensureTask(target)
   if (into === null) return null
   const store = useTaskStore.getState()
@@ -96,23 +99,29 @@ export async function mergeThreads(
   const intoTask = store.tasks.find((t) => t.id === into)
   if (draggedTask) {
     if (intoTask === undefined || !(await store.merge(draggedTask.id, into))) return null
-    return { kind: 'task', task: draggedTask, into: intoTask }
+    return { kind: 'task', task: draggedTask, into: intoTask, created }
   }
   const lanes = dragged.lanes.map(({ repoRoot, branch }) => ({ repoRoot, branch }))
-  return (await addLanes(into, lanes)) ? { kind: 'lanes', into, lanes } : null
+  return (await addLanes(into, lanes)) ? { kind: 'lanes', into, lanes, created } : null
 }
 
 /** Puts a merge back: the dragged task again with its lanes, star and done mark, and the task it
  *  was dropped on with its own star and ticket; or the added branches out again. */
 export async function undoMerge(undo: MergeUndo): Promise<void> {
   const store = useTaskStore.getState()
-  if (undo.kind === 'lanes') return removeLanes(undo.into, undo.lanes)
+  const into = undo.kind === 'lanes' ? undo.into : undo.into.id
+  if (undo.created) await store.remove(into)
+  if (undo.kind === 'lanes') {
+    if (!undo.created) await removeLanes(undo.into, undo.lanes)
+    return
+  }
   const { title, lanes, ticket, focus, doneAt } = undo.task
   if (!(await store.create({ title, lanes, ticket }))) return
   const restored = storedTaskOf(lanes)
   if (restored !== null && (focus || doneAt !== null))
     await store.update({ id: restored, focus, done: doneAt !== null })
-  await store.update({ id: undo.into.id, focus: undo.into.focus, ticket: undo.into.ticket })
+  if (!undo.created)
+    await store.update({ id: undo.into.id, focus: undo.into.focus, ticket: undo.into.ticket })
 }
 
 /** Renames a stored task; other work is named by its lead session's description. */
