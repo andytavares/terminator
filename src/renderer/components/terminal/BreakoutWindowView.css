@@ -19,6 +19,8 @@
 }
 
 .breakout-window__tab {
+  user-select: none;
+  cursor: grab;
   display: flex;
   align-items: center;
   gap: 7px;
