@@ -28,7 +28,8 @@ function closeAndMoveItems(
 const LANE_COUNT = 9
 
 /** The key for lane `lane` (from 0). The workspace keys own CmdOrCtrl+1–9, so a Mac takes Ctrl
- * and elsewhere, where Ctrl is that key, Alt. A menu accelerator fires while xterm has focus. */
+ * and elsewhere, where Ctrl is that key, Alt. A menu accelerator fires while xterm has focus.
+ * @internal */
 export function laneAccelerator(lane: number, platform: NodeJS.Platform): string {
   return `${platform === 'darwin' ? 'Control' : 'Alt'}+${lane + 1}`
 }
