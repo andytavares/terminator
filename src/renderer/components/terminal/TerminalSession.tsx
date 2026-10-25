@@ -116,6 +116,7 @@ function naturalSize(element: HTMLElement, rows: number) {
 export interface TerminalInstanceHooks {
   onBell?: () => void
   onBusy?: () => void
+  onInput?: (data: string) => void
   onIdle?: () => void
   onDispose?: () => void
 }
@@ -166,6 +167,7 @@ export class TerminalInstance {
   private wireToPty(sessionId: string): void {
     this.terminal.onData((data) => {
       window.electronAPI.terminal.input(sessionId, data)
+      this.hooks?.onInput?.(data)
     })
 
     this.terminal.onResize(({ cols, rows }) => {

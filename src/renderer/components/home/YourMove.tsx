@@ -15,7 +15,8 @@ import { untilLabel } from './desk-actions'
 import type { AskHandlers, DeskCursor } from './use-desk-controller'
 import type { DeskState } from './useDeskModel'
 import { ageLabel, isHot } from '../../home/desk-order'
-import type { DeskAsk } from '../../home/core-asks'
+import { ASK_SIGNAL_REASONS, type DeskAsk } from '../../home/core-asks'
+import { StateGlyph } from './StateGlyph'
 import type { HomeAsk, WorkKey } from '../../../shared/schemas/home-feed.schema'
 import './YourMove.css'
 
@@ -61,7 +62,7 @@ export function YourMove(props: YourMoveProps): JSX.Element | null {
   )
 }
 
-function KeyHints({ expanded }: { expanded: boolean }): JSX.Element {
+export function KeyHints({ expanded }: { expanded: boolean }): JSX.Element {
   if (expanded) {
     return (
       <span className="move__hint">
@@ -92,14 +93,16 @@ function MoveFooter({ snoozed, doneToday }: Pick<DeskState, 'snoozed' | 'doneTod
   )
 }
 
-interface AskRowProps {
+export interface AskRowProps {
   ask: DeskAsk
+  /** Draw a guessed ask with the inferred glyph and the reason it is a guess (Tasks layout). */
+  glyphs?: boolean
   now: number
   cursor: DeskCursor
   handlers: AskHandlers
 }
 
-function AskRow(props: AskRowProps): JSX.Element {
+export function AskRow(props: AskRowProps): JSX.Element {
   const { ask, now, cursor, handlers } = props
   const expanded = cursor.expandedId === ask.id
   // A click on a button inside the row is that button's, not the row's.
@@ -115,7 +118,7 @@ function AskRow(props: AskRowProps): JSX.Element {
         aria-current={cursor.selectedId === ask.id || undefined}
         onClick={onRowClick}
       >
-        <AskSummary ask={ask} />
+        <AskSummary ask={ask} glyphs={props.glyphs} />
         {!expanded && <AskRowActions ask={ask} handlers={handlers} />}
         <span className="mi__age" data-hot={isHot(ask, now) || undefined}>
           {ageLabel(ask.since, now)}
@@ -146,12 +149,13 @@ function AskExtras(props: AskRowProps): JSX.Element {
 }
 
 /** The kind's icon, where the ask comes from, and what it says. */
-function AskSummary({ ask }: { ask: DeskAsk }): JSX.Element {
+function AskSummary({ ask, glyphs }: { ask: DeskAsk; glyphs?: boolean }): JSX.Element {
   const Icon = KIND_ICONS[ask.kind]
+  const guessed = glyphs === true && ask.inferred === true
   return (
     <>
       <span className={`mi__icon mi__icon--${ask.kind}`}>
-        <Icon aria-hidden="true" />
+        {guessed ? <StateGlyph state="needs-you" inferred /> : <Icon aria-hidden="true" />}
       </span>
       <span className="mi__where">
         <b>{ask.title}</b>
@@ -159,6 +163,7 @@ function AskSummary({ ask }: { ask: DeskAsk }): JSX.Element {
       </span>
       <span className="mi__what">
         {ask.detail} {ask.facts.length > 0 && <em>{ask.facts.join(' · ')}</em>}
+        {guessed && ask.askSignal && <em> Inferred: {ASK_SIGNAL_REASONS[ask.askSignal]}</em>}
       </span>
     </>
   )

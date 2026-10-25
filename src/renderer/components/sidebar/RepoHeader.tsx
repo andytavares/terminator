@@ -31,6 +31,8 @@ export interface RepoHeaderProps {
    * branches below it.
    */
   pathLabel?: string
+  /** Drawn before the name in place of the colour swatch: a task header's state glyph. */
+  leading?: React.ReactNode
   /**
    * Drag-to-reorder for the repo list. It used to hang off the "new branch"
    * row that closed each repo's run; with that row gone the header is the only
@@ -84,13 +86,13 @@ export function RepoHeader(props: RepoHeaderProps): JSX.Element {
 
 /** Chevron, swatch, name, the collapsed waiting marker, hover actions, then the count. */
 function RepoHeaderContent(props: RepoHeaderProps): JSX.Element {
-  const { group, collapsed, pathLabel } = props
+  const { group, collapsed, pathLabel, leading } = props
   return (
     <>
       <span className="repo-header__chevron" aria-hidden="true">
         {collapsed ? <ChevronRight /> : <ChevronDown />}
       </span>
-      {group.color && <span className="repo-header__swatch" aria-hidden="true" />}
+      {leading ?? (group.color && <span className="repo-header__swatch" aria-hidden="true" />)}
       <span className="repo-header__name" title={pathLabel || group.folderPath || undefined}>
         {group.label}
       </span>

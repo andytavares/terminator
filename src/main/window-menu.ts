@@ -25,6 +25,27 @@ function closeAndMoveItems(
   ]
 }
 
+const LANE_COUNT = 9
+
+/** The key for lane `lane` (from 0). The workspace keys own CmdOrCtrl+1–9, so a Mac takes Ctrl
+ * and elsewhere, where Ctrl is that key, Alt. A menu accelerator fires while xterm has focus.
+ * @internal */
+export function laneAccelerator(lane: number, platform: NodeJS.Platform): string {
+  return `${platform === 'darwin' ? 'Control' : 'Alt'}+${lane + 1}`
+}
+
+/** Ctrl+1–9 (Alt+1–9 off a Mac) show that lane of the task the visible branch is in. */
+function switchLaneMenu(send: Send): Electron.MenuItemConstructorOptions {
+  return {
+    label: 'Switch Lane',
+    submenu: Array.from({ length: LANE_COUNT }, (_, lane) => ({
+      label: `Lane ${lane + 1}`,
+      accelerator: laneAccelerator(lane, process.platform),
+      click: () => send('menu:switch-lane', { lane }),
+    })),
+  }
+}
+
 export function buildWindowMenu(
   send: Send,
   focusedBreakoutSession: string | null
@@ -41,6 +62,12 @@ export function buildWindowMenu(
         accelerator: 'CmdOrCtrl+Shift+H',
         click: () => send('menu:open-home'),
       },
+      {
+        label: 'Switch Task…',
+        accelerator: 'CmdOrCtrl+J',
+        click: () => send('menu:open-task-switcher'),
+      },
+      switchLaneMenu(send),
       ...closeAndMoveItems(send, focusedBreakoutSession),
       { type: 'separator' },
       { role: 'front' },

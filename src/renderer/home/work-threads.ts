@@ -1,27 +1,50 @@
 import type { ThreadFacet, WorkKey } from '../../shared/schemas/home-feed.schema'
 import type { ChangeStats } from '../../shared/schemas/git.schema'
 import type { IssueSummary } from '../../shared/types/index'
+import type { Task } from '../../shared/schemas/tasks.schema'
 import type { SessionFacts } from '../sidebar/session-facts'
 import { planResume } from '../sidebar/resume'
+import { groupIntoLanes, laneKeyOf, taskKeyOf, taskKeysByLane, type LaneDraft } from './task-lanes'
+import {
+  STATE_LABELS,
+  TASK_STATES,
+  laneStateOf,
+  needsYouInferred,
+  taskStateOf,
+  type LaneFacts,
+  type TaskState,
+} from './task-state'
 
-type Stage = ThreadFacet['stage']
-type WhoseMove = ThreadFacet['whoseMove']
 type Tone = ThreadFacet['tone']
 type ThreadLink = NonNullable<ThreadFacet['links']>[number]
+
+/** One repo and branch a thread touches. */
+interface WorkThreadLane {
+  repoRoot: string
+  repoName: string
+  repoColor: string | null
+  branch: string
+  state: TaskState
+  /** The sessions running on this repo and branch. */
+  sessionIds: string[]
+}
 
 export interface WorkThread {
   key: string
   title: string
   ticketKey?: string
-  repoName: string | null
-  repoColor: string | null
-  branch: string | null
+  /** The stored task holding this thread, null for work that is one branch or one ticket. */
+  taskId: string | null
+  lanes: WorkThreadLane[]
   sessions: SessionFacts[]
   facets: ThreadFacet[]
   /** Where the thread's results are, from every facet, one per address. */
   links: ThreadLink[]
-  stage: Stage
-  whoseMove: WhoseMove
+  state: TaskState
+  /** The state is needs-you from a bell or a screen choice alone; draw it hollow. */
+  inferred: boolean
+  focus: boolean
+  doneAt: string | null
   nowLine: string
   agentsLabel: string
   prChip: { text: string; tone: Tone } | null
@@ -29,7 +52,8 @@ export interface WorkThread {
   lastActivity: number
   /** When the work began (epoch ms); it orders a list, because output never moves it. */
   startedAt: number
-  parked: boolean
+  /** Archived with its task, or parked by hand; it is left out of the lists. */
+  archived: boolean
   /** Every facet is closed and no session is open: the work is over. */
   closed: boolean
 }
@@ -37,39 +61,36 @@ export interface WorkThread {
 export interface WorkThreadInput {
   facts: readonly SessionFacts[]
   facets: readonly ThreadFacet[]
+  tasks: readonly Task[]
   issues: readonly IssueSummary[]
   /** Uncommitted change stats by project id. */
   changeStats: ReadonlyMap<string, ChangeStats>
   /** The repo's root folder by project id; a session's branch is only unique within it. */
   repoRoots: ReadonlyMap<string, string>
+  /** Each repo's name and colour by its root folder, for a lane with no session to say them. */
+  repos: ReadonlyMap<string, { name: string; color: string | null }>
   now: number
 }
 
 export interface ThreadGroup {
-  id: 'agents' | 'others' | 'parked'
+  id: TaskState
   label: string
   threads: WorkThread[]
 }
 
-const STAGES: readonly Stage[] = ['shaping', 'building', 'in-review', 'merging', 'shipped']
 /** Ticket keys read "<tracker>:<key>"; a repo key starts with a path. */
 const TICKET_KEY = /^(linear|jira):/
-const PARKED_AFTER_MS = 48 * 60 * 60 * 1000
 
 /** One string per piece of work, so sessions, facets and issues can be joined on it. */
 export function workKeyId(key: WorkKey): string {
-  return 'tracker' in key ? `${key.tracker}:${key.key}` : `${key.repoRoot}#${key.branch}`
+  return 'tracker' in key ? `${key.tracker}:${key.key}` : laneKeyOf(key.repoRoot, key.branch)
 }
 
 interface Draft {
   key: string
-  repoRoot: string | null
+  task: Task | null
   sessions: SessionFacts[]
   facets: ThreadFacet[]
-}
-
-function repoKey(repoRoot: string, branch: string): string {
-  return workKeyId({ repoRoot, branch })
 }
 
 /** A closed session has no live project, so its record's snapshot says where it ran. */
@@ -88,27 +109,40 @@ function branchTickets(input: WorkThreadInput): Map<string, string> {
     const projectId = projectIdOf(f)
     const root = projectId ? input.repoRoots.get(projectId) : undefined
     if (f.workItem && root && f.branch) {
-      byBranch.set(repoKey(root, f.branch), workKeyId(f.workItem.ref))
+      byBranch.set(laneKeyOf(root, f.branch), workKeyId(f.workItem.ref))
     }
   }
   return byBranch
 }
 
-function keyOfSession(f: SessionFacts, input: WorkThreadInput, tickets: Map<string, string>) {
-  const projectId = projectIdOf(f)
-  const root = projectId ? input.repoRoots.get(projectId) : undefined
-  if (f.workItem) return workKeyId(f.workItem.ref)
-  if (root && f.branch) return tickets.get(repoKey(root, f.branch)) ?? repoKey(root, f.branch)
+/** What a lane or a ticket joins to: the task holding the lane first, then the ticket. */
+interface Joins {
+  taskKeys: Map<string, string>
+  tickets: Map<string, string>
+}
+
+function keyOfSession(f: SessionFacts, input: WorkThreadInput, joins: Joins) {
+  const root = repoRootOf(f, input)
+  const lane = root && f.branch ? laneKeyOf(root, f.branch) : null
+  const task = lane ? joins.taskKeys.get(lane) : undefined
+  if (task) return task
+  if (f.workItem) return joinedKey(workKeyId(f.workItem.ref), joins)
+  if (lane) return joinedKey(lane, joins)
   return `session:${f.sessionId}`
 }
 
-function keyOfFacet(facet: ThreadFacet, tickets: Map<string, string>): string {
-  const own = workKeyId(facet.workKey)
-  return tickets.get(own) ?? own
+/** A lane or ticket key resolved through its branch's ticket and the task holding either. */
+function joinedKey(own: string, joins: Joins): string {
+  const ticket = joins.tickets.get(own) ?? own
+  return joins.taskKeys.get(own) ?? joins.taskKeys.get(ticket) ?? ticket
+}
+
+function keyOfFacet(facet: ThreadFacet, joins: Joins): string {
+  return joinedKey(workKeyId(facet.workKey), joins)
 }
 
 function draftFor(drafts: Map<string, Draft>, key: string): Draft {
-  const found = drafts.get(key) ?? { key, repoRoot: null, sessions: [], facets: [] }
+  const found = drafts.get(key) ?? { key, task: null, sessions: [], facets: [] }
   drafts.set(key, found)
   return found
 }
@@ -116,16 +150,6 @@ function draftFor(drafts: Map<string, Draft>, key: string): Draft {
 function repoRootOf(f: SessionFacts, input: WorkThreadInput): string | null {
   const projectId = projectIdOf(f)
   return projectId ? (input.repoRoots.get(projectId) ?? null) : null
-}
-
-function attachSessionToDraft(draft: Draft, f: SessionFacts, repoRoot: string | null) {
-  draft.sessions.push(f)
-  draft.repoRoot ??= repoRoot
-}
-
-function attachFacetToDraft(draft: Draft, facet: ThreadFacet) {
-  draft.facets.push(facet)
-  if ('repoRoot' in facet.workKey) draft.repoRoot ??= facet.workKey.repoRoot
 }
 
 /**
@@ -141,45 +165,29 @@ function sessionsToShow(facts: readonly SessionFacts[]): SessionFacts[] {
 }
 
 function collectDrafts(input: WorkThreadInput): Draft[] {
-  const tickets = branchTickets(input)
+  const joins = { taskKeys: taskKeysByLane(input.tasks), tickets: branchTickets(input) }
   const drafts = new Map<string, Draft>()
-  for (const f of sessionsToShow(input.facts)) {
-    attachSessionToDraft(draftFor(drafts, keyOfSession(f, input, tickets)), f, repoRootOf(f, input))
+  for (const task of input.tasks) {
+    drafts.set(taskKeyOf(task.id), { key: taskKeyOf(task.id), task, sessions: [], facets: [] })
   }
-  for (const facet of input.facets)
-    attachFacetToDraft(draftFor(drafts, keyOfFacet(facet, tickets)), facet)
+  for (const f of sessionsToShow(input.facts)) {
+    draftFor(drafts, keyOfSession(f, input, joins)).sessions.push(f)
+  }
+  for (const facet of input.facets) draftFor(drafts, keyOfFacet(facet, joins)).facets.push(facet)
   return [...drafts.values()]
 }
 
-function furthestStage(draft: Draft): Stage {
-  const shaping = draft.facets.some((f) => f.kind === 'order' && f.stage === 'shaping')
-  const furthest = draft.facets.reduce<Stage>(
-    (best, f) => (STAGES.indexOf(f.stage) > STAGES.indexOf(best) ? f.stage : best),
-    'shaping'
-  )
-  if (shaping || furthest !== 'shaping') return furthest
-  return 'building'
-}
-
-function whoseMoveOf(draft: Draft): WhoseMove {
-  const { sessions, facets } = draft
-  if (
-    sessions.some((s) => s.state === 'awaiting-input') ||
-    facets.some((f) => f.whoseMove === 'you')
-  ) {
-    return 'you'
-  }
-  if (sessions.some((s) => s.state === 'working')) return 'agents'
-  return 'others'
-}
-
-function nowLineOf(draft: Draft): string {
-  const asking = draft.sessions.find((s) => s.state === 'awaiting-input')
+/** What the sessions are doing: the question one is asking, else what one is printing; empty when neither. */
+export function sessionLineOf(sessions: readonly SessionFacts[]): string {
+  const asking = sessions.find((s) => s.state === 'awaiting-input')
   if (asking) {
     return `Asking: ${asking.choicePrompt?.question ?? asking.askMessage ?? asking.latestLine}`
   }
-  const working = draft.sessions.find((s) => s.state === 'working' && s.latestLine !== '')
-  return working?.latestLine ?? mainFacet(draft)?.line ?? ''
+  return sessions.find((s) => s.state === 'working' && s.latestLine !== '')?.latestLine ?? ''
+}
+
+function nowLineOf(draft: Draft): string {
+  return sessionLineOf(draft.sessions) || (mainFacet(draft)?.line ?? '')
 }
 
 function mainFacet(draft: Draft): ThreadFacet | undefined {
@@ -210,6 +218,7 @@ function firstLine(text: string | null | undefined): string | undefined {
 function titleOf(draft: Draft, issue: IssueSummary | undefined): string {
   const { sessions, facets } = draft
   const candidates = [
+    draft.task?.title,
     issue?.title,
     facets.find((f) => f.title)?.title,
     firstLine(sessions.find((s) => s.description)?.description),
@@ -220,12 +229,16 @@ function titleOf(draft: Draft, issue: IssueSummary | undefined): string {
   return candidates.find((c) => c) ?? draft.key
 }
 
+/** When a stored task was made; a task with no session or facet yet is dated by it. */
+const createdAtOf = (draft: Draft): number[] =>
+  draft.task ? [Date.parse(draft.task.createdAt)] : []
+
 function lastActivityOf(draft: Draft): number {
-  return Math.max(
-    0,
+  const times = [
     ...draft.sessions.map((s) => s.lastActivityAt),
-    ...draft.facets.map((f) => Date.parse(f.updatedAt))
-  )
+    ...draft.facets.map((f) => Date.parse(f.updatedAt)),
+  ]
+  return Math.max(0, ...(times.length > 0 ? times : createdAtOf(draft)))
 }
 
 function startedAtOf(draft: Draft): number {
@@ -233,12 +246,7 @@ function startedAtOf(draft: Draft): number {
     ...draft.sessions.map((s) => Date.parse(s.startedAt)),
     ...draft.facets.map((f) => Date.parse(f.openedAt ?? f.updatedAt)),
   ]
-  return Math.min(...times)
-}
-
-function isParked(draft: Draft, lastActivity: number, now: number): boolean {
-  const scratch = draft.facets.length === 0 && draft.sessions.every((s) => projectIdOf(s) === null)
-  return scratch || now - lastActivity > PARKED_AFTER_MS
+  return Math.min(...(times.length > 0 ? times : createdAtOf(draft)))
 }
 
 function isClosedDraft(draft: Draft): boolean {
@@ -249,39 +257,61 @@ function isClosedDraft(draft: Draft): boolean {
   )
 }
 
-function repoNameOf(draft: Draft): string | null {
-  const root = draft.repoRoot?.split('/').pop()
-  return draft.sessions[0]?.workspaceName ?? root ?? null
+/** The repo's name and colour: from a session on the lane, else the workspace at its root. */
+function repoLabelOf(lane: LaneDraft, input: WorkThreadInput) {
+  const session = lane.sessions[0]
+  if (session?.workspaceName) {
+    return { repoName: session.workspaceName, repoColor: session.workspaceColor }
+  }
+  const repo = input.repos.get(lane.repoRoot)
+  if (repo) return { repoName: repo.name, repoColor: repo.color }
+  return { repoName: lane.repoRoot.split('/').pop() || lane.repoRoot, repoColor: null }
 }
 
-/** Where the work is: its title, repo and branch. */
-function identityOf(draft: Draft, input: WorkThreadInput) {
+function repoLaneOf(lane: LaneDraft, input: WorkThreadInput): WorkThreadLane {
+  return {
+    repoRoot: lane.repoRoot,
+    ...repoLabelOf(lane, input),
+    branch: lane.branch,
+    state: laneStateOf(lane),
+    sessionIds: lane.sessions.map((session) => session.sessionId),
+  }
+}
+
+function ticketKeyOf(draft: Draft): { ticketKey: string } | Record<string, never> {
+  if (TICKET_KEY.test(draft.key)) return { ticketKey: draft.key.replace(TICKET_KEY, '') }
+  return draft.task?.ticket ? { ticketKey: draft.task.ticket.key } : {}
+}
+
+/** Where the work is: its title, ticket, repos and branches. */
+function identityOf(draft: Draft, lanes: readonly LaneDraft[], input: WorkThreadInput) {
   const issue = input.issues.find((i) => workKeyId(i) === draft.key)
   const lead = draft.sessions[0]
   return {
     key: draft.key,
     title: titleOf(draft, issue),
-    ...(TICKET_KEY.test(draft.key) ? { ticketKey: draft.key.replace(TICKET_KEY, '') } : {}),
-    repoName: repoNameOf(draft),
-    repoColor: lead?.workspaceColor ?? null,
-    branch: lead?.branch ?? workBranch(draft),
+    ...ticketKeyOf(draft),
+    taskId: draft.task?.id ?? null,
+    lanes: lanes.map((lane) => repoLaneOf(lane, input)),
     changes: input.changeStats.get(lead?.projectId ?? '') ?? null,
   }
 }
 
-/** What is happening on it and whose move it is. */
-function statusOf(draft: Draft, now: number) {
+/** What is happening on it and what state it is in. */
+function statusOf(draft: Draft, laneFacts: readonly LaneFacts[]) {
   const pr = draft.facets.find((f) => f.kind === 'pull-request')
-  const lastActivity = lastActivityOf(draft)
+  const doneAt = draft.task?.doneAt ?? null
   return {
-    stage: furthestStage(draft),
-    whoseMove: whoseMoveOf(draft),
+    state: taskStateOf(laneFacts, doneAt),
+    inferred: needsYouInferred(laneFacts),
+    focus: draft.task?.focus ?? false,
+    doneAt,
     nowLine: nowLineOf(draft),
     agentsLabel: agentsLabelOf(draft.sessions),
     prChip: pr ? { text: pr.line, tone: pr.tone } : null,
-    lastActivity,
+    lastActivity: lastActivityOf(draft),
     startedAt: startedAtOf(draft),
-    parked: isParked(draft, lastActivity, now),
+    archived: draft.task?.archivedAt != null,
     closed: isClosedDraft(draft),
   }
 }
@@ -295,18 +325,17 @@ function linksOf(facets: readonly ThreadFacet[]): ThreadLink[] {
 }
 
 function toThread(draft: Draft, input: WorkThreadInput): WorkThread {
+  const { lanes, loose } = groupIntoLanes(draft, draft.task?.lanes ?? [], (s) =>
+    repoRootOf(s, input)
+  )
+  const hasLoose = loose.sessions.length + loose.facets.length > 0
   return {
-    ...identityOf(draft, input),
-    ...statusOf(draft, input.now),
+    ...identityOf(draft, lanes, input),
+    ...statusOf(draft, hasLoose ? [...lanes, loose] : lanes),
     sessions: draft.sessions,
     facets: draft.facets,
     links: linksOf(draft.facets),
   }
-}
-
-function workBranch(draft: Draft): string | null {
-  const key = draft.facets.map((f) => f.workKey).find((k) => 'branch' in k)
-  return key && 'branch' in key ? key.branch : null
 }
 
 /** Every thread, including finished ones; a Focus item reads a shipped thread from here. */
@@ -326,36 +355,22 @@ export function latestResumableThread(threads: readonly WorkThread[]): WorkThrea
 
 /** The threads worth showing: work with an open session or a facet still open. */
 export function buildWorkThreads(input: WorkThreadInput): WorkThread[] {
-  return allWorkThreads(input).filter((t) => !t.closed)
+  return allWorkThreads(input).filter((t) => !t.closed || t.taskId !== null)
 }
 
-const GROUP_LABELS: Record<ThreadGroup['id'], string> = {
-  agents: 'Agents working',
-  others: 'Waiting on others',
-  parked: 'Parked',
-}
-
-function threadGroupOf(thread: WorkThread): ThreadGroup['id'] {
-  if (thread.parked) return 'parked'
-  return thread.whoseMove === 'others' ? 'others' : 'agents'
-}
-
-/** Your move first, then newest work first; a row never moves because its terminal printed. */
-export function yourMoveFirst(a: WorkThread, b: WorkThread): number {
+/** The focused task first, then newest work first; a row never moves because its terminal printed. */
+export function focusFirst(a: WorkThread, b: WorkThread): number {
   return (
-    Number(b.whoseMove === 'you') - Number(a.whoseMove === 'you') ||
-    b.startedAt - a.startedAt ||
-    a.key.localeCompare(b.key)
+    Number(b.focus) - Number(a.focus) || b.startedAt - a.startedAt || a.key.localeCompare(b.key)
   )
 }
 
-/** The Desk's three lists; threads waiting on you sit at the top of "Agents working". */
+/** The lists Home shows, one per state in focus order; archived threads are left out. */
 export function groupThreads(threads: readonly WorkThread[]): ThreadGroup[] {
-  return (Object.keys(GROUP_LABELS) as ThreadGroup['id'][])
-    .map((id) => ({
-      id,
-      label: GROUP_LABELS[id],
-      threads: threads.filter((t) => threadGroupOf(t) === id).sort(yourMoveFirst),
-    }))
-    .filter((group) => group.threads.length > 0)
+  const shown = threads.filter((t) => !t.archived)
+  return TASK_STATES.map((id) => ({
+    id,
+    label: STATE_LABELS[id],
+    threads: shown.filter((t) => t.state === id).sort(focusFirst),
+  })).filter((group) => group.threads.length > 0)
 }

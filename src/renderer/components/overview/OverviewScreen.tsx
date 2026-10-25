@@ -2,6 +2,7 @@ import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { WallTile } from './WallTile'
+import { useWorkThreads } from '../home/useWorkThreads'
 import { useIssueTitles, useSessionFacts } from '../session/useSessionFacts'
 import { useMetricsStore } from '../../stores/metrics.store'
 import { useExtensionRegistry } from '../../extensions/registry'
@@ -11,7 +12,7 @@ import { answersFor } from '../session/answers'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { useNow } from '../session/useNow'
 import { matchesFilter } from '../../sidebar/session-filter'
-import { placeWall } from '../../sidebar/wall-order'
+import { placeWall, type WallTask, type WallTaskBand } from '../../sidebar/wall-order'
 import {
   loadWallPrefs,
   saveWallPrefs,
@@ -35,6 +36,7 @@ const THEN_BY: Array<{ value: WallThenBy; label: string }> = [
   { value: 'state', label: 'State' },
   { value: 'workspace-project', label: 'Repo and branch' },
   { value: 'recent', label: 'Recently opened' },
+  { value: 'task', label: 'Task' },
 ]
 
 /**
@@ -272,9 +274,40 @@ interface WallGridProps {
   onLink: (facts: SessionFacts) => void
 }
 
+/** The stored task each open session's branch belongs to, by session id. */
+function useWallTasks(): Map<string, WallTask> {
+  const { threads } = useWorkThreads()
+  return useMemo(
+    () =>
+      new Map(
+        threads
+          .filter((t) => t.taskId !== null && !t.archived)
+          .flatMap((t) => t.sessions.map((s) => [s.sessionId, { id: t.taskId!, title: t.title }]))
+      ),
+    [threads]
+  )
+}
+
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`
+}
+
+/** A task's name over its tiles, with how many repos and terminals they span. */
+function TaskBandHeading({ band }: { band: WallTaskBand }): JSX.Element {
+  return (
+    <h3 className="wall__band wall__band--task" style={{ order: band.order }}>
+      {band.title}
+      <span className="wall__band-meta">
+        {plural(band.repoCount, 'repo')} · {plural(band.terminalCount, 'terminal')}
+      </span>
+    </h3>
+  )
+}
+
 /** The band headings and every tile, as siblings in one grid. */
 function WallGrid({ shown, prefs, processes, onLink }: WallGridProps): JSX.Element {
-  const wall = useMemo(() => placeWall(shown, prefs), [shown, prefs])
+  const tasks = useWallTasks()
+  const wall = useMemo(() => placeWall(shown, prefs, tasks), [shown, prefs, tasks])
   const factsById = new Map(shown.map((f) => [f.sessionId, f]))
   const now = useNow()
   return (
@@ -283,6 +316,9 @@ function WallGrid({ shown, prefs, processes, onLink }: WallGridProps): JSX.Eleme
         needsCount={wall.needsCount}
         hasRest={wall.placements.length > wall.needsCount}
       />
+      {wall.taskBands.map((band) => (
+        <TaskBandHeading key={band.order} band={band} />
+      ))}
       {wall.placements.map((placement) => (
         <WallTile
           key={placement.sessionId}

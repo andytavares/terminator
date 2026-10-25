@@ -27,6 +27,8 @@ import { openFolderInEditor, type BranchActions } from './branch-actions'
 import type { SidebarDialog } from './SidebarDialogs'
 import type { SidebarData } from './useSidebarRows'
 import type { IssueMenuActions } from './issue-menu-items'
+import { openAddToTask } from '../tasks/add-to-task'
+import { laneOf } from '../../sidebar/task-groups'
 import { RepoHeader } from './RepoHeader'
 import { BranchRow } from './BranchRow'
 import { TerminalRow } from './TerminalRow'
@@ -188,7 +190,7 @@ interface BranchEntryProps {
 }
 
 /** A branch's row and, once expanded, the terminals under it. */
-function BranchEntry({ row, workspace, drag, ctx }: BranchEntryProps): JSX.Element {
+export function BranchEntry({ row, workspace, drag, ctx }: BranchEntryProps): JSX.Element {
   const { projectId } = row
   const expanded = ctx.collapse.terminalsExpanded(projectId)
   return (
@@ -229,6 +231,7 @@ function useBranchRowProps(row: BranchRowData, workspace: Workspace | undefined,
     changeStats: useChangeStatsStore((s) => s.statsFor(projectId)?.stats),
     editorName: ctx.editorName,
     issueActions: issueActionsFor(projectId, issueKey),
+    onAddToTask: project && workspace ? () => openAddToTask(laneOf(project, workspace)) : undefined,
     ...branchRowActions(row, project?.gitBranch === undefined && project !== undefined, ctx),
   }
 }

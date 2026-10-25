@@ -51,26 +51,74 @@ async function run(
   return { out, asks, files: fs.existsSync(asks) ? fs.readdirSync(asks) : [] }
 }
 
+function onlyReport(asks: string): Record<string, string | null> {
+  const names = fs.readdirSync(asks)
+  expect(names).toHaveLength(1)
+  return JSON.parse(fs.readFileSync(path.join(asks, names[0]), 'utf8'))
+}
+
 describe('the ask script, executed', () => {
   it('writes a notification under the terminal it ran in, and says nothing', async () => {
     const { out, asks } = await run(NOTIFICATION)
     expect(out).toBe('')
-    const written = JSON.parse(fs.readFileSync(path.join(asks, 's1.json'), 'utf8'))
+    const written = onlyReport(asks)
     expect(written).toMatchObject({
       terminal: 's1',
       event: 'notification',
       message: 'Claude needs your permission to use Bash',
       notificationType: 'permission_prompt',
     })
-    expect(Date.parse(written.at)).not.toBeNaN()
+    expect(Date.parse(written.at ?? '')).not.toBeNaN()
   })
 
   it('writes a stop with no message and no type', async () => {
     const { asks } = await run({ hook_event_name: 'Stop', session_id: 'abc' })
-    expect(JSON.parse(fs.readFileSync(path.join(asks, 's1.json'), 'utf8'))).toMatchObject({
+    expect(onlyReport(asks)).toMatchObject({
       event: 'stop',
       message: '',
       notificationType: null,
+    })
+  })
+})
+
+describe('the ask script, executed — events in a row', () => {
+  it('keeps every event: a stop written before the notification is read does not replace it', async () => {
+    await run(NOTIFICATION)
+    const { asks, files } = await run({ hook_event_name: 'Stop', session_id: 'abc' })
+    expect(files).toHaveLength(2)
+    const events = files
+      .sort()
+      .map((name) => JSON.parse(fs.readFileSync(path.join(asks, name), 'utf8')).event)
+    expect(events).toEqual(['notification', 'stop'])
+  })
+})
+
+describe('the ask script, executed — file names', () => {
+  // Two hooks of one turn can land in the same millisecond, and pids say nothing about order:
+  // the name carries the time to the microsecond, fixed width, so names sort by time.
+  it('names the event by its time to the microsecond, then the process', async () => {
+    const { files } = await run(NOTIFICATION)
+    expect(files[0]).toMatch(/^\d{13}\.\d{3}-\d+\.json$/)
+  })
+})
+
+describe('the ask script, executed — a prompt', () => {
+  it('writes a UserPromptSubmit as a prompt', async () => {
+    const { asks } = await run({ hook_event_name: 'UserPromptSubmit', prompt: 'do it' })
+    expect(onlyReport(asks)).toMatchObject({
+      terminal: 's1',
+      event: 'prompt',
+      message: '',
+    })
+  })
+})
+
+describe('the ask script, executed — a failed turn', () => {
+  it('writes a StopFailure as a stop: the turn ended on an API error', async () => {
+    const { asks } = await run({ hook_event_name: 'StopFailure', error: 'rate_limit' })
+    expect(onlyReport(asks)).toMatchObject({
+      terminal: 's1',
+      event: 'stop',
     })
   })
 })
@@ -102,7 +150,7 @@ describe('the ask script, executed — input it cannot use', () => {
 })
 
 describe('installing the ask hooks', () => {
-  it('adds a Notification and a Stop entry and keeps the operator’s own', async () => {
+  it('adds a Notification, a UserPromptSubmit and a Stop entry and keeps the operator’s own', async () => {
     const settings = path.join(home, '.claude', 'settings.json')
     fs.mkdirSync(path.dirname(settings), { recursive: true })
     fs.writeFileSync(
@@ -115,6 +163,9 @@ describe('installing the ask hooks', () => {
     await mod.installAskHooks({ execPath: process.execPath, scriptPath })
     const hooks = JSON.parse(fs.readFileSync(settings, 'utf8')).hooks
     expect(hooks.Notification).toHaveLength(1)
+    expect(hooks.UserPromptSubmit).toHaveLength(1)
+    expect(hooks.UserPromptSubmit[0].hooks[0].command).toContain('agent-ask-hook.cjs')
+    expect(hooks.StopFailure).toHaveLength(1)
     expect(hooks.Stop).toHaveLength(2)
     expect(JSON.stringify(hooks.Stop)).toContain('mine.sh')
     expect(hooks.Notification[0].hooks[0].command).toContain('agent-ask-hook.cjs')

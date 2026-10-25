@@ -102,6 +102,7 @@ export const CORE_SPECS = [
   'design-system-fields.spec.ts',
   'desk.spec.ts',
   'extension-lifecycle.spec.ts',
+  'home-tasks.spec.ts',
   'issue-trackers.spec.ts',
   'live-preview-spacing.spec.ts',
   'monitor-wall.spec.ts',

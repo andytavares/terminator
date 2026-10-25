@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vite
 import { clearAsk } from '../../../src/main/agents/ask-watcher'
 import { OutputRelay, type RendererSend } from '../../../src/main/terminal/output-relay'
 import { OUTPUT_FLUSH_INTERVAL_MS } from '../../../src/main/terminal/output-batcher'
+import { currentTurns, setTurn } from '../../../src/main/agents/agent-turns'
 import { HIGH_WATERMARK_CHARS, LOW_WATERMARK_CHARS } from '../../../src/main/terminal/flow-control'
 
 vi.mock('../../../src/main/agents/ask-watcher', () => ({ clearAsk: vi.fn() }))
@@ -43,6 +44,12 @@ describe('OutputRelay', () => {
   it('withdraws the exited session’s pending ask', () => {
     ptyManager.pushExit(0)
     expect(clearAsk).toHaveBeenCalledWith('s1')
+  })
+
+  it('forgets the exited session’s turn, so a dead agent never reads as running', () => {
+    setTurn('s1', true)
+    ptyManager.pushExit(0)
+    expect(currentTurns()).not.toContainEqual(expect.objectContaining({ sessionId: 's1' }))
   })
 
   it('sends the chunks of one frame as one message', () => {

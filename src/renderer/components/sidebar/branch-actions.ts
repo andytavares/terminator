@@ -58,7 +58,10 @@ function startTerminal(project: Project, createSession: CreateSession): void {
 
 /** The terminal a branch opens on (FR-047): one waiting on you (why you clicked), else the one you
  * last had open here, else the most recently active. With none, the caller offers to start one. */
-function terminalToFocus(sessionList: TerminalSession[], projectId: string): string | undefined {
+export function terminalToFocus(
+  sessionList: TerminalSession[],
+  projectId: string
+): string | undefined {
   const own = sessionList.filter((s) => s.projectId === projectId)
   if (own.length === 0) return undefined
   const waiting = own.find((s) => s.agentState === 'awaiting-input')

@@ -50,6 +50,7 @@ export interface CoreActionDeps {
   onCopyIssueKey(): void
   onOpenIssue(): void
   onHome(): void
+  onTaskSwitcher(): void
   onStartWork(): void
   onOverview(): void
   onToggleSidebar(): void
@@ -282,6 +283,14 @@ const TOP_ACTIONS: CoreActionSpec[] = [
     mnemonic: 'h',
     shortcut: '⌘⇧H',
     run: (d) => d.onHome(),
+  },
+  {
+    id: 'core.switch-task',
+    label: 'Switch task',
+    group: 'top',
+    mnemonic: 'j',
+    shortcut: '⌘J',
+    run: (d) => d.onTaskSwitcher(),
   },
   {
     id: 'core.toggle-overview',

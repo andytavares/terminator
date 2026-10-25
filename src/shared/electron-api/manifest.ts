@@ -60,6 +60,15 @@ import type {
   SetLinkInputSchema,
   TransferInputSchema,
 } from '../schemas/session-records.schema'
+import type {
+  TaskArchiveInputSchema,
+  TaskMergeInputSchema,
+  TaskIdInputSchema,
+  TaskCreateInputSchema,
+  TaskLaneInputSchema,
+  TaskUpdateInputSchema,
+  Task,
+} from '../schemas/tasks.schema'
 import type { HomeFeedActionInputSchema, MergedHomeFeed } from '../schemas/home-feed.schema'
 import type { AgentAsk } from '../agent-sessions/ask'
 import type { AttentionInterval, AttentionMeasures } from '../home/attention-measures'
@@ -139,6 +148,7 @@ function extensionIdEvent<const Path extends string>(path: Path, channel: string
 type Failure = { error: string }
 type DetailedFailure = { error: string; message?: string }
 type SessionRecordResult<Data> = Promise<{ data: Data } | { error: string; message: string }>
+type TaskResult = Promise<{ data: Task } | { error: string; message: string }>
 type CommandContext = {
   projectId: string | null
   sessionId: string | null
@@ -887,6 +897,22 @@ export const ELECTRON_API_MANIFEST = [
     toHandlerArgs: () => [],
   }),
   method({
+    path: 'extensionEvents.onMenuOpenTaskSwitcher',
+    kind: 'event',
+    channel: 'menu:open-task-switcher',
+    signature: signature<(handler: () => void) => Unsubscribe>(),
+    toHandlerArgs: () => [],
+    remote: 'omit',
+  }),
+  method({
+    path: 'extensionEvents.onMenuSwitchLane',
+    kind: 'event',
+    channel: 'menu:switch-lane',
+    signature: signature<(handler: (lane: number) => void) => Unsubscribe>(),
+    toHandlerArgs: (args) => [(args[0] as { lane: number }).lane],
+    remote: 'omit',
+  }),
+  method({
     path: 'extensionEvents.onMenuToggleSidebar',
     kind: 'event',
     channel: 'menu:toggle-sidebar',
@@ -1155,6 +1181,71 @@ export const ELECTRON_API_MANIFEST = [
       >(),
   }),
 
+  // ── tasks (lanes across repositories, grouped as one piece of work) ───────
+  method({
+    path: 'tasks.list',
+    kind: 'invoke',
+    channel: 'task:list',
+    signature: signature<() => Promise<{ data: Task[] }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'tasks.create',
+    kind: 'invoke',
+    channel: 'task:create',
+    signature: signature<(input: z.input<typeof TaskCreateInputSchema>) => TaskResult>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'tasks.update',
+    kind: 'invoke',
+    channel: 'task:update',
+    signature: signature<(input: z.input<typeof TaskUpdateInputSchema>) => TaskResult>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'tasks.addLane',
+    kind: 'invoke',
+    channel: 'task:add-lane',
+    signature: signature<(input: z.input<typeof TaskLaneInputSchema>) => TaskResult>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'tasks.removeLane',
+    kind: 'invoke',
+    channel: 'task:remove-lane',
+    signature: signature<(input: z.input<typeof TaskLaneInputSchema>) => TaskResult>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'tasks.archive',
+    kind: 'invoke',
+    channel: 'task:archive',
+    signature: signature<(input: z.input<typeof TaskArchiveInputSchema>) => TaskResult>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'tasks.delete',
+    kind: 'invoke',
+    channel: 'task:delete',
+    signature: signature<(input: z.input<typeof TaskIdInputSchema>) => TaskResult>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'tasks.merge',
+    kind: 'invoke',
+    channel: 'task:merge',
+    signature: signature<(input: z.input<typeof TaskMergeInputSchema>) => TaskResult>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'tasks.onChanged',
+    kind: 'event',
+    channel: 'task:changed',
+    signature: signature<(handler: (tasks: Task[]) => void) => Unsubscribe>(),
+    remote: 'omit',
+  }),
+
   // ── agent usage and work-thread summaries (core only) ─────────────────────
   method({
     path: 'agentUsage.get',
@@ -1196,6 +1287,25 @@ export const ELECTRON_API_MANIFEST = [
     signature:
       signature<
         (handler: (payload: { sessionId: string; ask: AgentAsk | null }) => void) => Unsubscribe
+      >(),
+    remote: 'omit',
+  }),
+
+  // ── agent turns (Claude Code's UserPromptSubmit and Stop hooks say the agent is mid-turn) ──
+  method({
+    path: 'agentTurn.list',
+    kind: 'invoke',
+    channel: 'agent-turn:list',
+    signature: signature<() => Promise<{ data: Array<{ sessionId: string; inTurn: boolean }> }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agentTurn.onChanged',
+    kind: 'event',
+    channel: 'agent-turn:changed',
+    signature:
+      signature<
+        (handler: (payload: { sessionId: string; inTurn: boolean }) => void) => Unsubscribe
       >(),
     remote: 'omit',
   }),

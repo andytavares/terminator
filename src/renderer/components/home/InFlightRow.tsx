@@ -1,11 +1,10 @@
 import React from 'react'
 import { CircleCheck, CircleX, Factory, GitBranch } from 'lucide-react'
-import { Chip, StageBar, StatusDot } from '@terminator/extension-ui'
-import { compactAge, stageCaption } from './thread-format'
+import { Chip, StatusDot } from '@terminator/extension-ui'
+import { compactAge, stateCaption } from './thread-format'
 import { useDeskSelection } from './desk-selection'
 import { InFlightMenu, useWorkMenu, type WorkMenuState } from './InFlightMenu'
-import { SESSION_ACTIONS } from '../session/session-actions'
-import { leadSessionOf } from './thread-actions'
+import { renameThread } from './task-actions'
 import type { WorkThread } from '../../home/work-threads'
 
 interface InFlightRowProps {
@@ -19,7 +18,7 @@ const isOrder = (thread: WorkThread): boolean => thread.facets.some((f) => f.kin
 /** The mono label before the title: the ticket key, "Order", or the repo. */
 function keyLabelOf(thread: WorkThread): string {
   if (thread.ticketKey) return thread.ticketKey
-  return isOrder(thread) ? 'Order' : (thread.repoName ?? '')
+  return isOrder(thread) ? 'Order' : (thread.lanes[0]?.repoName ?? '')
 }
 
 interface WorkCellProps {
@@ -29,7 +28,7 @@ interface WorkCellProps {
   onCancelRename: () => void
 }
 
-function RenameField({
+export function RenameField({
   thread,
   onRename,
   onCancelRename,
@@ -51,8 +50,9 @@ function RenameField({
 
 /** Where the work happens: the order's repo, the branch, or "Scratch terminal". */
 function threadPlaceOf(thread: WorkThread): string {
-  if (isOrder(thread)) return thread.repoName ?? ''
-  return thread.branch ?? thread.repoName ?? 'Scratch terminal'
+  const [lane] = thread.lanes
+  if (lane === undefined) return isOrder(thread) ? '' : 'Scratch terminal'
+  return isOrder(thread) ? lane.repoName : lane.branch
 }
 
 /** Where the work happens, with the last thing it said; empty when neither is known. */
@@ -65,7 +65,7 @@ function WorkCell({ thread, renaming, onRename, onCancelRename }: WorkCellProps)
   return (
     <div className="desk-tr__work">
       <b>
-        <span className="desk-sw" style={{ background: thread.repoColor ?? undefined }} />
+        <span className="desk-sw" style={{ background: thread.lanes[0]?.repoColor ?? undefined }} />
         <span className="desk-tr__key">{keyLabelOf(thread)}</span>
         {renaming ? (
           <RenameField thread={thread} onRename={onRename} onCancelRename={onCancelRename} />
@@ -112,12 +112,6 @@ function PullRequestCell({ thread }: { thread: WorkThread }): JSX.Element {
   )
 }
 
-/** Saves the typed rename as the lead session's description — the title's last candidate. */
-function saveRename(thread: WorkThread, text: string): void {
-  const lead = leadSessionOf(thread)
-  if (lead) SESSION_ACTIONS.onSaveDescription(lead, text)
-}
-
 /** The row's rename mode: on, off without saving, and off saving the typed text. */
 function useTitleRename(thread: WorkThread) {
   const [renaming, setRenaming] = React.useState(false)
@@ -127,7 +121,7 @@ function useTitleRename(thread: WorkThread) {
     cancelTitleRename: () => setRenaming(false),
     finishTitleRename: (text: string) => {
       setRenaming(false)
-      saveRename(thread, text)
+      renameThread(thread, text)
     },
   }
 }
@@ -139,7 +133,7 @@ interface RowCellsProps {
   workMenu: WorkMenuState
 }
 
-/** The row's cells and its menu: work, stage, agents, pull request, age. */
+/** The row's cells and its menu: work, state, agents, pull request, age. */
 function RowCells({ thread, now, rename, workMenu }: RowCellsProps): JSX.Element {
   return (
     <>
@@ -149,11 +143,7 @@ function RowCells({ thread, now, rename, workMenu }: RowCellsProps): JSX.Element
         onRename={rename.finishTitleRename}
         onCancelRename={rename.cancelTitleRename}
       />
-      <StageBar
-        stage={thread.stage}
-        yourMove={thread.whoseMove === 'you'}
-        caption={stageCaption(thread, now)}
-      />
+      <div className="desk-tr__state">{stateCaption(thread, now)}</div>
       <AgentsCell thread={thread} />
       <div>
         <PullRequestCell thread={thread} />

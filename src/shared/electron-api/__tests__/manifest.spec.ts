@@ -148,6 +148,8 @@ const INTERNAL_ONLY_CHANNELS = [
   'db:health',
   'menu:set-panel-checked',
   'menu:toggle-breakout',
+  'menu:open-task-switcher',
+  'menu:switch-lane',
   'breakout:closed',
   'workspace:project-added',
   'workspace:project-removed',

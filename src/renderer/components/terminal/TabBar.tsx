@@ -20,6 +20,8 @@ import { agentStateOf } from '../../sidebar/agent-state'
 import './TabBar.css'
 import { useSessionFacts } from '../session/useSessionFacts'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
+import { LaneSwitcher } from './LaneSwitcher'
+import { laneOfBranch, openAddToTask } from '../tasks/add-to-task'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { DESCRIPTION_MAX_LENGTH } from '../../../shared/session-description'
 import { moved } from '../../hooks/useDragReorder'
@@ -175,6 +177,7 @@ export function TabBar(props: Props): JSX.Element {
       className="tab-bar-stack"
       style={wsColor ? { ['--ws-color' as string]: wsColor } : undefined}
     >
+      <LaneSwitcher projectId={projectId} />
       <PrimaryTabs {...props} />
       {props.activeProjectTabId === null && (
         <SessionTabs
@@ -474,6 +477,7 @@ function TabCtxMenu({ menus, editing, factsById, sessions }: TabMenusProps): JSX
     ),
     onNote: then(() => editing.note.start(sessionId, facts?.description ?? '')),
     onMove: then(() => menus.setMoveDialogSessionId(sessionId)),
+    onAddToTask: then(() => addBranchToTask(sessions.find((s) => s.id === sessionId))),
     onLinkIssue: then(() => menus.setLinkSessionId(sessionId)),
     onRemoveLink: then(
       () => facts && void useSessionRecordsStore.getState().setLink(facts.snapshot, null)
@@ -490,10 +494,17 @@ function TabCtxMenu({ menus, editing, factsById, sessions }: TabMenusProps): JSX
   )
 }
 
+/** Opens the Add to task picker for the branch a tab's terminal is on. */
+function addBranchToTask(session: TerminalSession | undefined): void {
+  const lane = laneOfBranch(session?.projectId)
+  if (lane) openAddToTask(lane)
+}
+
 interface TabMenuActions {
   onRename: () => void
   onNote: () => void
   onMove: () => void
+  onAddToTask: () => void
   onLinkIssue: () => void
   onRemoveLink: () => void
   onCloseTab: () => void
@@ -532,6 +543,7 @@ function SessionTabCtxMenu({
       />
       <div className="ctx-menu__separator" />
       <MenuItem label="Move to branch…" onSelect={actions.onMove} />
+      <MenuItem label="Add to task…" onSelect={actions.onAddToTask} />
       <div className="ctx-menu__separator" />
       <IssueItems ownLinkKey={ownLinkKey} actions={actions} />
       <div className="ctx-menu__separator" />

@@ -1,6 +1,7 @@
 import { plural } from '@terminator/extension-sdk/plain'
 import type { HomeAsk, HomeFocusCandidate } from '../../shared/schemas/home-feed.schema'
 import { localDateKey, type FocusItem } from './focus'
+import type { WorkThread } from './work-threads'
 
 // What the morning band says, as functions of the data it is given.
 
@@ -15,21 +16,33 @@ export interface PlanFacts {
   /** Yesterday's focus items, and how many of them got done. */
   focusTotal: number
   focusDone: number
-  /** The agents finished and the reviews waiting on the operator right now. */
-  waiting: { agents: number; reviews: number }
+  /** The questions, finished agents and reviews waiting on the operator right now. */
+  waiting: { questions: number; agents: number; reviews: number }
+}
+
+/** "1 question, 2 agents finished and 1 review", naming only what is there. */
+function waitingParts({ questions, agents, reviews }: PlanFacts['waiting']): string[] {
+  return [
+    questions > 0 ? `${questions} ${plural(questions, 'question')}` : '',
+    agents > 0 ? `${agents} ${plural(agents, 'agent')} finished` : '',
+    reviews > 0 ? `${reviews} ${plural(reviews, 'review')}` : '',
+  ].filter(Boolean)
+}
+
+function joinedWithAnd(parts: readonly string[]): string {
+  if (parts.length < 2) return parts.join('')
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
 }
 
 /** "Yesterday you finished 2 of 3 focus items. Waiting on you: 2 agents finished and 1 review." */
 export function planSentence({ focusTotal, focusDone, waiting }: PlanFacts): string {
-  const { agents, reviews } = waiting
+  const parts = waitingParts(waiting)
   const yesterday =
     focusTotal === 0
       ? ''
       : `Yesterday you finished ${focusDone} of ${focusTotal} ${plural(focusTotal, 'focus item')}. `
   const waitingText =
-    agents + reviews === 0
-      ? 'Nothing is waiting on you.'
-      : `Waiting on you: ${agents} ${plural(agents, 'agent')} finished and ${reviews} ${plural(reviews, 'review')}.`
+    parts.length === 0 ? 'Nothing is waiting on you.' : `Waiting on you: ${joinedWithAnd(parts)}.`
   return yesterday + waitingText
 }
 
@@ -79,3 +92,12 @@ const FULL_BAR_MINUTES = 60
 
 export const reviewLoadShare = (minutes: number): number =>
   Math.min(100, Math.round((minutes / FULL_BAR_MINUTES) * 100))
+
+/** "Already running: 5 agents across 3 tasks."; null when no agent is working. */
+export function runningSentence(threads: readonly WorkThread[]): string | null {
+  const working = threads.map((t) => t.sessions.filter((s) => s.state === 'working').length)
+  const agents = working.reduce((sum, count) => sum + count, 0)
+  if (agents === 0) return null
+  const tasks = working.filter((count) => count > 0).length
+  return `Already running: ${agents} ${plural(agents, 'agent')} across ${tasks} ${plural(tasks, 'task')}.`
+}

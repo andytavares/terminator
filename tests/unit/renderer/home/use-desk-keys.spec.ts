@@ -20,6 +20,7 @@ describe('deskKeyCommand', () => {
     ['h', { kind: 'snooze' }],
     ['t', { kind: 'terminal' }],
     ['Escape', { kind: 'escape' }],
+    ['p', { kind: 'plan' }],
   ])('reads %s', (pressed, command) => {
     expect(deskKeyCommand(key(pressed), false)).toEqual(command)
   })

@@ -26,12 +26,19 @@ const globalSettings: GlobalSettingsValue = {
     scrollbackLimit: 5000,
     defaultShell: '/bin/zsh',
   },
-  ui: { hasSeenWelcome: false, editor: '', showMetricsBar: false, hideSidebarOnHome: true },
+  ui: {
+    hasSeenWelcome: false,
+    editor: '',
+    showMetricsBar: false,
+    hideSidebarOnHome: true,
+    homeLayout: 'tasks',
+  },
   sidebar: { staleAfterMs: 7_200_000 },
 }
 
 const mockUpdateQuickActions = vi.fn()
 const mockUpdateHideSidebarOnHome = vi.fn()
+const mockUpdateHomeLayout = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -43,6 +50,7 @@ beforeEach(() => {
     updateWorktreeBaseDir: mockUpdateWorktreeBaseDir,
     updateShowMetricsBar: mockUpdateShowMetrics,
     updateHideSidebarOnHome: mockUpdateHideSidebarOnHome,
+    updateHomeLayout: mockUpdateHomeLayout,
     updateBranchExcludePatterns: mockUpdateBranchExclude,
     updatePromptForName: mockUpdatePromptForName,
     updateNotificationDefaultTargets: mockUpdateNotificationDefaultTargets,
@@ -52,6 +60,21 @@ beforeEach(() => {
   })
   installElectronApi({
     settings: { updateGlobal: mockUpdateGlobal },
+  })
+})
+
+describe('GlobalSettings — Home layout', () => {
+  it('offers Classic and Tasks, shows the saved one, and saves a change', () => {
+    render(<GlobalSettings />)
+    const layout = screen.getByRole('combobox', { name: 'Home layout' }) as HTMLSelectElement
+    expect(
+      within(layout)
+        .getAllByRole('option')
+        .map((o) => o.textContent)
+    ).toEqual(['Classic', 'Tasks'])
+    expect(layout.value).toBe('tasks')
+    fireEvent.change(layout, { target: { value: 'classic' } })
+    expect(mockUpdateHomeLayout).toHaveBeenCalledWith('classic')
   })
 })
 

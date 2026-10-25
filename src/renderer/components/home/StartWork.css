@@ -1,7 +1,7 @@
-/* The Start work launcher, drawn as in the approved Home design. The shell centres the dialog
-   (ADR 110); this is the panel inside it. */
-.start-work {
-  width: 820px;
+/* The Start work launcher and the Add to task picker, drawn as in the approved Home design. The
+   shell centres the dialog (ADR 110); this is the panel inside it. */
+.start-work,
+.add-to-task {
   max-width: 100%;
   background: var(--tm-bg-elevated);
   border: 1px solid var(--tm-border-strong);
@@ -10,6 +10,9 @@
   overflow: hidden;
   color: var(--tm-text-primary);
   font-size: 12px;
+}
+.start-work {
+  width: 820px;
 }
 
 .start-work__input {

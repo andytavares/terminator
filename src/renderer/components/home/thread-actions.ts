@@ -4,6 +4,8 @@ import { startSessionInBranch } from '../../terminal/start-session'
 import { agentCommand, PROMPT_TOO_LONG } from './start-work'
 import { runFeedAction } from './desk-actions'
 import { useToastStore } from '../../stores/toast.store'
+import { useTaskStore } from '../../stores/task.store'
+import { useParkedThreads } from './parked-threads'
 import { workKeyId, type WorkThread } from '../../home/work-threads'
 import type { SessionFacts } from '../../sidebar/session-facts'
 
@@ -12,6 +14,17 @@ export function leadSessionOf(thread: WorkThread): SessionFacts | undefined {
   return thread.sessions
     .filter((s) => !s.isClosed)
     .sort((a, b) => b.lastActivityAt - a.lastActivityAt)[0]
+}
+
+/** Archives or restores a thread: a stored task through the task store, other work by hand. */
+export function toggleArchived(thread: WorkThread): void {
+  if (thread.taskId !== null) {
+    void useTaskStore.getState().archive(thread.taskId, !thread.archived)
+    return
+  }
+  const parked = useParkedThreads.getState()
+  if (thread.archived) parked.unpark(thread.key)
+  else parked.park(thread.key)
 }
 
 export function openLinkExternally(url: string): void {

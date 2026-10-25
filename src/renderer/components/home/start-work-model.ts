@@ -12,7 +12,7 @@ import type { IssueSummary, Workspace } from '../../../shared/types/index'
 
 // What the Start work launcher shows: the lists on its left and the facts on its right.
 
-export type LauncherTab = 'tickets' | 'prompt' | 'branch' | 'scratch'
+export type LauncherTab = 'tickets' | 'prompt' | 'branch' | 'across' | 'scratch'
 
 export type LauncherRow =
   | { kind: 'ticket'; issue: IssueSummary }

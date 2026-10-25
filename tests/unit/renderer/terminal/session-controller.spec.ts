@@ -14,6 +14,7 @@ let capturedCtorArgs: Array<{
   hooks?: {
     onBell?: () => void
     onBusy?: () => void
+    onInput?: (data: string) => void
     onIdle?: () => void
     onDispose?: () => void
   }
@@ -26,6 +27,7 @@ vi.mock('../../../../src/renderer/components/terminal/TerminalSession', () => ({
       hooks?: {
         onBell?: () => void
         onBusy?: () => void
+        onInput?: (data: string) => void
         onIdle?: () => void
         onDispose?: () => void
       }
@@ -180,7 +182,11 @@ describe('createTerminalSession — stores the instance before activating the se
     const { sessionId, scrollbackLimit, hooks } = capturedCtorArgs[0]
     expect(sessionId).toBe('session-123')
     expect(scrollbackLimit).toBe(7777)
-    expect(Object.keys(hooks ?? {}).sort()).toEqual(['onBell', 'onBusy', 'onDispose', 'onIdle'])
+    expect(
+      Object.keys(hooks ?? {})
+        .sort()
+        .join()
+    ).toBe('onBell,onBusy,onDispose,onIdle,onInput')
   })
 })
 
@@ -672,5 +678,25 @@ describe('answerChoice (054)', () => {
     useSessionStore.setState({ terminalInstances: new Map() })
     expect(answerChoice('s1', 1)).toBe(false)
     expect(terminalApi.input).not.toHaveBeenCalled()
+  })
+})
+
+describe('createTerminalSession — typing answers a guessed ask', () => {
+  it('clears the bell and the screen choice on a keystroke, but not on a focus report', async () => {
+    await createTerminalSession(terminalRequest())
+    const { hooks } = capturedCtorArgs[0]
+    const choicePrompt = { question: 'Go?', options: [{ number: 1, label: 'Yes' }] }
+    const raise = () =>
+      useSessionStore.setState({
+        sessions: new Map([
+          ['session-123', { ...sessionOf('session-123')!, bellCount: 1, choicePrompt }],
+        ]),
+      })
+    raise()
+    hooks!.onInput!('\x1b[I')
+    expect(sessionOf('session-123')!.bellCount).toBe(1)
+    hooks!.onInput!('y')
+    expect(sessionOf('session-123')!.bellCount).toBeUndefined()
+    expect(sessionOf('session-123')!.choicePrompt).toBeUndefined()
   })
 })

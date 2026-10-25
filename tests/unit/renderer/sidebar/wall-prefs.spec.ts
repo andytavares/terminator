@@ -20,6 +20,13 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+describe('loadWallPrefs — ordering by task', () => {
+  it('reads back ordering by task', () => {
+    saveWallPrefs({ size: 'm', pinNeeds: true, thenBy: 'task' })
+    expect(loadWallPrefs().thenBy).toBe('task')
+  })
+})
+
 describe('loadWallPrefs', () => {
   it('defaults to medium tiles, pinned needs, then by state', () => {
     expect(loadWallPrefs()).toEqual({ size: 'm', pinNeeds: true, thenBy: 'state' })

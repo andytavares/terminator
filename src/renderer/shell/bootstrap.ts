@@ -4,6 +4,7 @@ import { useWorkspaceStore } from '../stores/workspace.store'
 import { useSettingsStore } from '../stores/settings.store'
 import { useSessionStore } from '../stores/session.store'
 import { useSessionRecordsStore } from '../stores/session-records.store'
+import { useTaskStore } from '../stores/task.store'
 import { useExtensionCommandsStore } from '../stores/extension-commands.store'
 import { useHomeFeedStore } from '../stores/home-feed.store'
 import { useMetricsStore } from '../stores/metrics.store'
@@ -22,6 +23,15 @@ function useHomeFeed(): void {
   }, [])
 }
 
+/** Tasks, read once and then kept current by main's task:changed. */
+function useTasks(): void {
+  useEffect(() => {
+    const tasks = useTaskStore.getState()
+    void tasks.load()
+    return tasks.subscribe()
+  }, [])
+}
+
 /** Workspaces, settings, session records and extension commands, read from main. */
 export function useInitialLoad(): void {
   useEffect(() => {
@@ -37,6 +47,7 @@ export function useInitialLoad(): void {
     return records.subscribe()
   }, [])
 
+  useTasks()
   useHomeFeed()
 
   // Read before the first ⌘P, so the keys typed straight after it find them,

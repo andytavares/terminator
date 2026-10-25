@@ -4,7 +4,7 @@ import { render, screen, fireEvent, within, act } from '@testing-library/react'
 import { fact } from '../sidebar/fixtures/facts'
 import type { SessionFacts } from '../../../../src/renderer/sidebar/session-facts'
 
-const state = vi.hoisted(() => ({ facts: [] as SessionFacts[] }))
+const state = vi.hoisted(() => ({ facts: [] as SessionFacts[], threads: [] as unknown[] }))
 const navigate = vi.hoisted(() => vi.fn())
 const startScratch = vi.hoisted(() => vi.fn())
 const closeFromFacts = vi.hoisted(() => vi.fn())
@@ -13,6 +13,9 @@ vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
   useSessionFacts: () => state.facts,
   useIssue: () => undefined,
   useIssueTitles: () => new Map(),
+}))
+vi.mock('../../../../src/renderer/components/home/useWorkThreads', () => ({
+  useWorkThreads: () => ({ threads: state.threads, groups: [], allThreads: state.threads }),
 }))
 vi.mock('../../../../src/renderer/components/session/LivePreview', () => ({
   LivePreview: ({ sessionId }: { sessionId: string }) => (
@@ -54,6 +57,10 @@ const metricsApi = {
   getProcesses: vi.fn(),
 }
 let records: SeededStore<typeof useSessionRecordsStore>
+
+beforeEach(() => {
+  state.threads = []
+})
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -327,5 +334,26 @@ describe('OverviewScreen — starting and resuming from the wall — resumes a s
     render(<OverviewScreen />)
     fireEvent.click(screen.getByRole('button', { name: 'Resume claude' }))
     expect(resumeSession).toHaveBeenCalledWith(stopped)
+  })
+})
+
+describe('OverviewScreen — ordered by task', () => {
+  it('bands the tiles under their task', () => {
+    state.threads = [
+      {
+        taskId: 'task-1',
+        archived: false,
+        title: 'Login rework',
+        sessions: state.facts.filter((f) => f.sessionId === 'c'),
+      },
+    ]
+    render(<OverviewScreen />)
+    fireEvent.change(screen.getByRole('combobox', { name: 'Then by' }), {
+      target: { value: 'task' },
+    })
+    const band = screen.getByRole('heading', { name: /Login rework/ })
+    expect(band.textContent).toContain('1 repo · 1 terminal')
+    expect(screen.getByRole('heading', { name: /Not in a task/ })).toBeTruthy()
+    expect(Number(band.style.order)).toBeLessThan(Number(overviewTileOf('zsh').style.order))
   })
 })

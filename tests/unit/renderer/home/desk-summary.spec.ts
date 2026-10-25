@@ -20,7 +20,9 @@ function threadsOnDesk() {
       facet({ workKey: { repoRoot: '/r', branch: 'z' }, tone: 'good' }),
     ],
     issues: [],
+    tasks: [],
     changeStats: new Map(),
+    repos: new Map(),
     repoRoots: new Map([['p1', '/r']]),
     now: NOW,
   })

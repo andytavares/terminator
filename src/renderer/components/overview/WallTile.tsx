@@ -7,10 +7,14 @@ import { WorkItemCell } from '../session/WorkItemCell'
 import { ResumeButton } from '../session/ResumeButton'
 import { CloseSessionButton } from '../session/CloseSessionButton'
 import { useIssue } from '../session/useSessionFacts'
+import { ContextMenu } from '../ContextMenu'
+import { afterClosing, useRowMenu } from '../sidebar/row-events'
+import { laneOfBranch, openAddToTask } from '../tasks/add-to-task'
 import { formatRelativeTime } from '../../sidebar/relative-time'
 import type { SessionActions, SessionFacts } from '../../sidebar/session-facts'
 import type { WallPlacement } from '../../sidebar/wall-order'
 import type { ProcessMetrics } from '../../../shared/types/index'
+import type { TaskLane } from '../../../shared/schemas/tasks.schema'
 import './WallTile.css'
 
 interface Props extends SessionActions {
@@ -45,6 +49,7 @@ function locationOf(facts: SessionFacts): string {
 export function WallTile(props: Props): JSX.Element {
   const { facts, placement, onOpen } = props
   const location = locationOf(facts)
+  const { menu, lane, openTileMenu, closeMenu } = useTileMenu(facts.projectId)
   return (
     <article
       className={`wall-tile${facts.state === 'awaiting-input' ? ' wall-tile--needs' : ''}`}
@@ -57,6 +62,7 @@ export function WallTile(props: Props): JSX.Element {
         ...(facts.workspaceColor ? { ['--rail' as string]: facts.workspaceColor } : {}),
       }}
       onClick={() => onOpen(facts.sessionId)}
+      onContextMenu={openTileMenu}
       onKeyDown={(e) => {
         if (e.key === 'Enter' && e.target === e.currentTarget) onOpen(facts.sessionId)
       }}
@@ -64,8 +70,34 @@ export function WallTile(props: Props): JSX.Element {
       <TileCap {...props} location={location} />
       <LivePreview sessionId={facts.sessionId} className="wall-tile__preview" />
       <TileFoot {...props} />
+      {menu && lane && <TileMenu at={menu} lane={lane} onClose={closeMenu} />}
     </article>
   )
+}
+
+/** The tile's menu, opened only on a branch. The branch is looked up on a right click, not on
+ *  every render: a tile redraws with each metrics tick. */
+function useTileMenu(projectId: string | null) {
+  const { menu, openMenu, closeMenu } = useRowMenu()
+  const openTileMenu = (event: React.MouseEvent): void => {
+    if (laneOfBranch(projectId)) openMenu(event)
+  }
+  return { menu, lane: menu ? laneOfBranch(projectId) : null, openTileMenu, closeMenu }
+}
+
+interface TileMenuProps {
+  at: { x: number; y: number }
+  lane: TaskLane
+  onClose: () => void
+}
+
+/** The tile's right-click menu: Add to task… for the branch its terminal is on. */
+function TileMenu({ at, lane, onClose }: TileMenuProps): JSX.Element {
+  const addToTask = {
+    label: 'Add to task…',
+    onSelect: afterClosing(onClose, () => openAddToTask(lane)),
+  }
+  return <ContextMenu x={at.x} y={at.y} onDismiss={onClose} items={[addToTask]} />
 }
 
 /** State, where the session lives, its name and age, then Open and Close. */

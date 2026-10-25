@@ -1,0 +1,151 @@
+/* Home's Tasks layout: pulse line, plan strip, footer, and the plan sheet's body. */
+
+.pulse {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 14px 18px 0;
+}
+.pulse__count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--tm-control-height);
+  padding: 0 10px;
+  border: 1px solid var(--tm-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tm-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+.pulse__count b {
+  color: var(--tm-text-primary);
+  font-weight: 600;
+}
+.pulse__count:hover {
+  background: var(--tm-overlay-subtle);
+}
+.pulse__count[aria-pressed='true'] {
+  border-color: var(--tm-accent);
+  background: var(--tm-accent-dim);
+}
+.pulse__glyph {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+}
+
+.plan-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 18px 0;
+  padding: 7px 12px;
+  border: 1px solid var(--tm-border);
+  border-radius: 8px;
+  color: var(--tm-text-secondary);
+}
+.plan-strip b {
+  color: var(--tm-text-primary);
+  font-weight: 600;
+}
+.plan-strip__actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.tasks-body > .quiet,
+.tasks-body > .move {
+  margin-top: 12px;
+}
+
+.home-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 16px 18px;
+  color: var(--tm-text-secondary);
+  font-size: 11.5px;
+}
+.home-foot__spacer {
+  flex: 1;
+}
+
+.plan-sheet__line {
+  margin: 0 0 12px;
+  color: var(--tm-text-secondary);
+}
+.plan-sheet__line--faint {
+  margin: 12px 0 0;
+  color: var(--tm-text-faint);
+}
+.plan-sheet__body {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+}
+
+.tasks-body > .task-list {
+  margin: 16px 18px 0;
+}
+
+.plan__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.plan__pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--tm-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tm-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.plan__pick:hover {
+  background: var(--tm-overlay-subtle);
+}
+.plan__pick svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  color: var(--tm-text-faint);
+}
+.plan__pick[aria-pressed='true'] svg {
+  color: var(--tm-warning);
+  fill: currentColor;
+}
+
+.plan__list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.plan__offer {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  color: var(--tm-text-faint);
+  font-size: 11.5px;
+}
+.plan__archive {
+  padding: 2px 6px;
+  border: 1px solid var(--tm-border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--tm-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}

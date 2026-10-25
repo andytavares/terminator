@@ -101,6 +101,8 @@ export interface TerminalSession {
   choicePrompt?: ChoicePrompt
   /** What the agent said it is waiting on, from its Notification hook (renderer-side view state). */
   agentAsk?: AgentAsk
+  /** Whether the agent is mid-turn, from its UserPromptSubmit and Stop hooks; undefined until this terminal reports one (renderer-side view state). */
+  agentTurn?: boolean
 }
 
 /** One option in a numbered-choice prompt, numbered as on screen. */

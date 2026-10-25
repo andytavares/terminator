@@ -21,7 +21,7 @@ const threadHit = (t: WorkThread): SearchHit => ({
   kind: 'thread',
   key: t.key,
   label: t.title,
-  detail: [t.ticketKey, t.repoName].filter(Boolean).join(' · '),
+  detail: [t.ticketKey, t.lanes[0]?.repoName].filter(Boolean).join(' · '),
 })
 
 const sessionHit = (f: SessionFacts): SearchHit => ({
@@ -38,7 +38,9 @@ export function searchWork(input: SearchInput): SearchHit[] {
   const threadTickets = new Set(threads.map((t) => t.ticketKey))
   return [
     ...threads
-      .filter((t) => matchesText([t.title, t.ticketKey, t.repoName, t.branch], text))
+      .filter((t) =>
+        matchesText([t.title, t.ticketKey, ...t.lanes.flatMap((l) => [l.repoName, l.branch])], text)
+      )
       .map(threadHit),
     ...facts
       .filter((f) => !f.isClosed && matchesText([f.name, f.branch, f.description], text))

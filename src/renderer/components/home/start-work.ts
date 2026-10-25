@@ -143,7 +143,8 @@ const ticketPrompt = (issue: IssueSummary): string =>
 export type WorkRequest = { workspace: Workspace; runAs: RunAs } & (
   | { kind: 'ticket'; issue: IssueSummary }
   | { kind: 'prompt'; text: string }
-  | { kind: 'branch'; branch: string }
+  /** `prompt` is what the agent is first told on this branch; none starts it with nothing. */
+  | { kind: 'branch'; branch: string; prompt?: string }
 )
 
 type Outcome = string | null
@@ -199,6 +200,7 @@ const projectFor = (request: WorkRequest): Promise<string | Error> | string | Er
 
 function promptOf(request: WorkRequest): string | null {
   if (request.kind === 'ticket') return ticketPrompt(request.issue)
+  if (request.kind === 'branch') return request.prompt ?? null
   return request.kind === 'prompt' ? request.text : null
 }
 
