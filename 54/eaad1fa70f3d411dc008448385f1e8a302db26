@@ -1,0 +1,20 @@
+tests/unit/agents/agent-ask-hook.spec.ts
+  s_bcb87751443cd2::t_ba1f6f3c690857 54
+  s_bcb87751443cd2::t_2209df18dd29e7 71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "54eaad1fa70f3d411dc008448385f1e8a302db26",
+  "prompts": {},
+  "sessions": {
+    "s_bcb87751443cd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b568ee83-ad51-4a54-9901-52cfcfa5b37f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
