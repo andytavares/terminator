@@ -1,0 +1,29 @@
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_bcb87751443cd2::t_b81defeaed33a2 58-59
+  s_bcb87751443cd2::t_be396da762490f 116-133
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_bcb87751443cd2::t_d336166a256e30 109-112,116
+src/main/window-menu.ts
+  s_bcb87751443cd2::t_d336166a256e30 30-36,42
+tests/unit/renderer/quick-actions/shortcut-conflict-guard.spec.tsx
+  s_bcb87751443cd2::t_a9dc5b50ada8e6 23-24
+tests/unit/main/window-menu.spec.ts
+  s_bcb87751443cd2::t_be396da762490f 2,49,57-66
+  s_bcb87751443cd2::t_7514cb96e8fe74 67-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d89afa6548653369d4e6b9e7f6b501bb22909fbe",
+  "prompts": {},
+  "sessions": {
+    "s_bcb87751443cd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b568ee83-ad51-4a54-9901-52cfcfa5b37f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
