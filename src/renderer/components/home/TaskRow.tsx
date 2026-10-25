@@ -130,7 +130,7 @@ function useTaskRename(thread: WorkThread): CellsProps['rename'] {
   }
 }
 
-function rowClass(selected: boolean, dropTarget: boolean): string {
+function taskRowClass(selected: boolean, dropTarget: boolean): string {
   return ['task-row', selected && 'task-row--selected', dropTarget && 'task-row--drop']
     .filter(Boolean)
     .join(' ')
@@ -141,7 +141,7 @@ export function TaskRow({ thread, now, selected }: TaskRowProps): JSX.Element {
   const openThread = useDeskSelection((s) => s.openThread)
   const workMenu = useWorkMenu()
   const rename = useTaskRename(thread)
-  const drop = useMergeDrop(thread)
+  const drop = useMergeDrop(thread, rename.renaming)
   return (
     <div
       {...drop.props}
@@ -150,7 +150,7 @@ export function TaskRow({ thread, now, selected }: TaskRowProps): JSX.Element {
       aria-label={thread.title}
       aria-current={selected || undefined}
       data-thread-key={thread.key}
-      className={rowClass(selected, drop.over)}
+      className={taskRowClass(selected, drop.over)}
       onClick={() => openThread(thread.key)}
       onContextMenu={workMenu.openWorkMenu}
       onKeyDown={(event) => {

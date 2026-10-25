@@ -234,12 +234,11 @@ const createdAtOf = (draft: Draft): number[] =>
   draft.task ? [Date.parse(draft.task.createdAt)] : []
 
 function lastActivityOf(draft: Draft): number {
-  return Math.max(
-    0,
-    ...createdAtOf(draft),
+  const times = [
     ...draft.sessions.map((s) => s.lastActivityAt),
-    ...draft.facets.map((f) => Date.parse(f.updatedAt))
-  )
+    ...draft.facets.map((f) => Date.parse(f.updatedAt)),
+  ]
+  return Math.max(0, ...(times.length > 0 ? times : createdAtOf(draft)))
 }
 
 function startedAtOf(draft: Draft): number {

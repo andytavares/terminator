@@ -55,7 +55,29 @@ describe('mergeThreads — Undo', () => {
       { title: 'Web side', lanes: [web] },
     ])
   })
+})
 
+describe('mergeThreads — Undo keeps what each task was', () => {
+  it('puts back the dragged task’s star and the receiver’s own star and ticket on Undo', async () => {
+    const into = await main.createTask({ title: 'Rate limits', lanes: [api] })
+    const from = await main.createTask({
+      title: 'Web side',
+      lanes: [web],
+      ticket: { tracker: 'linear', key: 'TAV-9' },
+    })
+    await main.updateTask({ id: from.id, focus: true })
+    const undo = await mergeThreads(
+      threadOf('task:web', [web], from.id),
+      threadOf('task:rate', [api], into.id)
+    )
+    await undoMerge(undo!)
+    const byTitle = (title: string) => main.listTasks().find((t) => t.title === title)
+    expect(byTitle('Web side')).toMatchObject({ focus: true, ticket: { key: 'TAV-9' } })
+    expect(byTitle('Rate limits')).toMatchObject({ focus: false, ticket: null })
+  })
+})
+
+describe('mergeThreads — Undo of added branches', () => {
   it('takes added branches back out on Undo', async () => {
     const into = await main.createTask({ title: 'Rate limits', lanes: [api] })
     const undo = await mergeThreads(

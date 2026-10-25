@@ -539,3 +539,16 @@ describe('buildWorkThreads: a stored task with nothing running', () => {
     expect(thread.lastActivity).toBe(Date.parse('2026-10-17T09:00:00.000Z'))
   })
 })
+
+describe('buildWorkThreads: a stored task over work already under way', () => {
+  it('keeps the last activity of its sessions, not the moment the task was made', () => {
+    const later = task({
+      createdAt: new Date(hoursBeforeNow(1)).toISOString(),
+      lanes: [{ repoRoot: '/repos/terminator', branch: 'tav-31' }],
+    })
+    const idle = working({ state: 'idle', lastActivityAt: hoursBeforeNow(30) })
+    const [thread] = buildWorkThreads(input({ facts: [idle], tasks: [later] }))
+    expect(thread.taskId).toBe(later.id)
+    expect(thread.lastActivity).toBe(hoursBeforeNow(30))
+  })
+})

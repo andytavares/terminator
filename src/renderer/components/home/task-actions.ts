@@ -16,9 +16,9 @@ function ticketOf(thread: WorkThread): TaskCreateInput['ticket'] {
   return tracker ? { tracker: tracker as 'linear' | 'jira', key } : null
 }
 
-/** The stored task holding this thread's first lane; a write returns no id, so it is looked up. */
-function storedTaskOf(thread: WorkThread): string | null {
-  const [first] = thread.lanes
+/** The stored task holding the first of these lanes; a write returns no id, so it is looked up. */
+function storedTaskOf(lanes: readonly TaskLane[]): string | null {
+  const [first] = lanes
   const found = useTaskStore
     .getState()
     .tasks.find((t) =>
@@ -37,7 +37,7 @@ async function ensureTask(thread: WorkThread): Promise<string | null> {
     lanes,
     ticket: ticketOf(thread),
   })
-  return created ? storedTaskOf(thread) : null
+  return created ? storedTaskOf(thread.lanes) : null
 }
 
 /** Whether a star can be pressed: only work on a branch can be stored as a task. */
@@ -60,10 +60,27 @@ export function canMergeThreads(dragged: WorkThread, target: WorkThread): boolea
   return dragged.key !== target.key && dragged.lanes.length > 0 && canStoreTask(target)
 }
 
-/** What a merge changed, so Undo can put it back. */
+/** What a merge changed, so Undo can put it back: both tasks as they were, or the added lanes. */
 export type MergeUndo =
-  | { kind: 'task'; task: Task }
+  | { kind: 'task'; task: Task; into: Task }
   | { kind: 'lanes'; into: string; lanes: TaskLane[] }
+
+async function removeLanes(into: string, lanes: readonly TaskLane[]): Promise<void> {
+  for (const lane of lanes) await useTaskStore.getState().removeLane(into, lane)
+}
+
+/** Adds each lane to `into`; when one is refused, the ones already added are taken out again. */
+async function addLanes(into: string, lanes: readonly TaskLane[]): Promise<boolean> {
+  const added: TaskLane[] = []
+  for (const lane of lanes) {
+    if (!(await useTaskStore.getState().addLane(into, lane))) {
+      await removeLanes(into, added)
+      return false
+    }
+    added.push(lane)
+  }
+  return true
+}
 
 /** Drops one Home row onto another: the target becomes (or stays) a stored task and takes
  *  every lane of the dragged row; a dragged stored task is merged in and gone afterwards. */
@@ -76,22 +93,26 @@ export async function mergeThreads(
   if (into === null) return null
   const store = useTaskStore.getState()
   const draggedTask = store.tasks.find((t) => t.id === dragged.taskId)
-  if (draggedTask)
-    return (await store.merge(draggedTask.id, into)) ? { kind: 'task', task: draggedTask } : null
+  const intoTask = store.tasks.find((t) => t.id === into)
+  if (draggedTask) {
+    if (intoTask === undefined || !(await store.merge(draggedTask.id, into))) return null
+    return { kind: 'task', task: draggedTask, into: intoTask }
+  }
   const lanes = dragged.lanes.map(({ repoRoot, branch }) => ({ repoRoot, branch }))
-  for (const lane of lanes) if (!(await store.addLane(into, lane))) return null
-  return { kind: 'lanes', into, lanes }
+  return (await addLanes(into, lanes)) ? { kind: 'lanes', into, lanes } : null
 }
 
-/** Puts a merge back: the dragged task again with its lanes, or the added branches out again. */
+/** Puts a merge back: the dragged task again with its lanes, star and done mark, and the task it
+ *  was dropped on with its own star and ticket; or the added branches out again. */
 export async function undoMerge(undo: MergeUndo): Promise<void> {
   const store = useTaskStore.getState()
-  if (undo.kind === 'lanes') {
-    for (const lane of undo.lanes) await store.removeLane(undo.into, lane)
-    return
-  }
-  const { title, lanes, ticket } = undo.task
-  await store.create({ title, lanes, ticket })
+  if (undo.kind === 'lanes') return removeLanes(undo.into, undo.lanes)
+  const { title, lanes, ticket, focus, doneAt } = undo.task
+  if (!(await store.create({ title, lanes, ticket }))) return
+  const restored = storedTaskOf(lanes)
+  if (restored !== null && (focus || doneAt !== null))
+    await store.update({ id: restored, focus, done: doneAt !== null })
+  await store.update({ id: undo.into.id, focus: undo.into.focus, ticket: undo.into.ticket })
 }
 
 /** Renames a stored task; other work is named by its lead session's description. */

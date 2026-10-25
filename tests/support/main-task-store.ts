@@ -24,6 +24,7 @@ export async function wireMainTaskStore(): Promise<Main> {
       ...window.electronAPI,
       tasks: {
         create: (input: never) => answer(() => main.createTask(input)),
+        update: (input: never) => answer(() => main.updateTask(input)),
         addLane: ({ id, lane }: LaneInput) => answer(() => main.addLane(id, lane)),
         removeLane: ({ id, lane }: LaneInput) => answer(() => main.removeLane(id, lane)),
         merge: ({ from, into }: { from: string; into: string }) =>

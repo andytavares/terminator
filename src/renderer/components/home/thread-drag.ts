@@ -44,11 +44,13 @@ export interface MergeDrop {
   props: React.HTMLAttributes<HTMLElement> & { draggable: boolean }
 }
 
-/** The drag handlers for one row: it can be picked up, and another row can be dropped on it. */
-export function useMergeDrop(thread: WorkThread): MergeDrop {
+/** The drag handlers for one row: it can be picked up unless it is being renamed, and another
+ *  row can be dropped on it. */
+export function useMergeDrop(thread: WorkThread, renaming: boolean): MergeDrop {
   const [over, setOver] = useState(false)
   const props: MergeDrop['props'] = {
-    draggable: thread.lanes.length > 0,
+    // A draggable row would take a drag in its rename field, so text could not be selected.
+    draggable: thread.lanes.length > 0 && !renaming,
     onDragStart: (event) => {
       event.dataTransfer.setData(THREAD_TYPE, thread.key)
       event.dataTransfer.effectAllowed = 'move'
@@ -60,7 +62,10 @@ export function useMergeDrop(thread: WorkThread): MergeDrop {
       event.preventDefault()
       setOver(true)
     },
-    onDragLeave: () => setOver(false),
+    onDragLeave: (event) => {
+      // Moving onto one of the row's own chips leaves the row too; only leaving it counts.
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(false)
+    },
     onDrop: (event) => {
       event.preventDefault()
       setOver(false)

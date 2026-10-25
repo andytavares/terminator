@@ -23,6 +23,12 @@ function useAskingBranches(): Set<string> {
   )
 }
 
+/** The Window → Switch Lane key for lane `i` (from 0): Ctrl on a Mac, Alt elsewhere. */
+function laneKeyHint(i: number): string | undefined {
+  if (i >= 9) return undefined
+  return `${navigator.platform.startsWith('Mac') ? '⌃' : 'Alt+'}${i + 1}`
+}
+
 /** The task's name and a button per repo it spans, when the visible branch is in such a task. */
 export function LaneSwitcher({ projectId }: { projectId: string }): JSX.Element | null {
   const tasks = useTaskStore((s) => s.tasks)
@@ -41,7 +47,7 @@ export function LaneSwitcher({ projectId }: { projectId: string }): JSX.Element 
           type="button"
           className={`lane-switcher__lane${i === switcher.current ? ' lane-switcher__lane--on' : ''}`}
           aria-pressed={i === switcher.current}
-          title={i < 9 ? `⌃${i + 1}` : undefined}
+          title={laneKeyHint(i)}
           disabled={lane.projectId === null}
           onClick={() => lane.projectId !== null && revealBranch(lane.projectId)}
         >

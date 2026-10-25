@@ -49,8 +49,7 @@ function locationOf(facts: SessionFacts): string {
 export function WallTile(props: Props): JSX.Element {
   const { facts, placement, onOpen } = props
   const location = locationOf(facts)
-  const { menu, openMenu, closeMenu } = useRowMenu()
-  const lane = laneOfBranch(facts.projectId)
+  const { menu, lane, openTileMenu, closeMenu } = useTileMenu(facts.projectId)
   return (
     <article
       className={`wall-tile${facts.state === 'awaiting-input' ? ' wall-tile--needs' : ''}`}
@@ -63,7 +62,7 @@ export function WallTile(props: Props): JSX.Element {
         ...(facts.workspaceColor ? { ['--rail' as string]: facts.workspaceColor } : {}),
       }}
       onClick={() => onOpen(facts.sessionId)}
-      onContextMenu={lane ? openMenu : undefined}
+      onContextMenu={openTileMenu}
       onKeyDown={(e) => {
         if (e.key === 'Enter' && e.target === e.currentTarget) onOpen(facts.sessionId)
       }}
@@ -74,6 +73,16 @@ export function WallTile(props: Props): JSX.Element {
       {menu && lane && <TileMenu at={menu} lane={lane} onClose={closeMenu} />}
     </article>
   )
+}
+
+/** The tile's menu, opened only on a branch. The branch is looked up on a right click, not on
+ *  every render: a tile redraws with each metrics tick. */
+function useTileMenu(projectId: string | null) {
+  const { menu, openMenu, closeMenu } = useRowMenu()
+  const openTileMenu = (event: React.MouseEvent): void => {
+    if (laneOfBranch(projectId)) openMenu(event)
+  }
+  return { menu, lane: menu ? laneOfBranch(projectId) : null, openTileMenu, closeMenu }
 }
 
 interface TileMenuProps {

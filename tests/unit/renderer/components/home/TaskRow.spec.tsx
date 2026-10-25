@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { makeTempDir } from '../../../../support/temp-dir'
 import { wireMainTaskStore } from '../../../../support/main-task-store'
 import { TaskRow } from '../../../../../src/renderer/components/home/TaskRow'
@@ -85,6 +85,24 @@ describe('TaskRow — drop one row on another to merge', () => {
     fireEvent.dragEnd(webSide)
     expect(main.listTasks()).toHaveLength(2)
     expect(useToastStore.getState().toasts).toEqual([])
+  })
+})
+
+describe('TaskRow — drag feedback', () => {
+  it('stays marked as the drop target while the pointer moves onto one of its own chips', async () => {
+    const { rate, webSide } = await twoRows()
+    fireEvent.dragStart(webSide, { dataTransfer: dataTransfer() })
+    fireEvent.dragOver(rate, { dataTransfer: dataTransfer() })
+    const chip = rate.querySelector('.task-lane') as HTMLElement
+    // jsdom has no DragEvent, so the leave is a mouse event of that type, which carries relatedTarget.
+    const leaveTo = (to: Element) =>
+      act(() => {
+        rate.dispatchEvent(new MouseEvent('dragleave', { bubbles: true, relatedTarget: to }))
+      })
+    leaveTo(chip)
+    expect(rate.className).toContain('task-row--drop')
+    leaveTo(document.body)
+    expect(rate.className).not.toContain('task-row--drop')
   })
 })
 
