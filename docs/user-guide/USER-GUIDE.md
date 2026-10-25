@@ -131,7 +131,7 @@ URLs and absolute file paths in terminal output are **underlined on hover**. `Cm
 
 Any terminal can live in a window of its own, for a second screen or to keep an agent in view while you work on another branch. The process, scrollback and agent state carry over; nothing restarts.
 
-- **Move it out:** press `Cmd+Shift+O`, choose **Window → Move Terminal to Its Own Window**, run **Move to its own window** from Quick Actions (`Cmd+P`), or drag its tab and release it outside every Terminator window.
+- **Move it out:** press `Cmd+Shift+O`, choose **Window → Move Terminal to Its Own Window**, run **Move to its own window** from Quick Actions (`Cmd+P`), or drag its tab and release it outside every Terminator window. The window opens the moment you let go; `Escape` cancels the drag.
 - **Bring it back:** drag its tab from the window's header onto the main window, press `Cmd+Shift+O` in that window, or close the window. Closing never ends the session.
 
 The terminal always returns to the branch it came from, at its old tab position, even if you have since moved to another branch. `Cmd+W` in a terminal's own window closes that session.

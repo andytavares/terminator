@@ -995,13 +995,6 @@ export const ELECTRON_API_MANIFEST = [
 
   // ── breakout ──────────────────────────────────────────────────────────────
   method({
-    path: 'breakout.pointerOutside',
-    kind: 'invoke',
-    channel: 'breakout:pointer-outside',
-    signature: signature<() => Promise<{ outside: boolean; x: number; y: number }>>(),
-    remote: 'omit',
-  }),
-  method({
     path: 'breakout.onClosed',
     kind: 'event',
     channel: 'breakout:closed',

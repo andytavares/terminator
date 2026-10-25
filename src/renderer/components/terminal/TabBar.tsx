@@ -3,7 +3,13 @@ import React, { useState } from 'react'
 import { Play, Circle, Pause, CircleX } from 'lucide-react'
 import { useSessionStore } from '../../stores/session.store'
 import { useBreakoutStore } from '../../stores/breakout.store'
-import { beginSessionDrag, finishSessionDrag } from '../../terminal/session-drag'
+import { breakOut } from '../../terminal/breakout'
+import {
+  beginTabDrag,
+  isOverTerminatorWindow,
+  useTabDragStore,
+  type ScreenPoint,
+} from '../../terminal/tab-drag'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { AlertBadge } from '../AlertBadge'
 import { MoveSessionDialog } from '../sidebar/MoveSessionDialog'
@@ -18,7 +24,7 @@ import { LaneSwitcher } from './LaneSwitcher'
 import { laneOfBranch, openAddToTask } from '../tasks/add-to-task'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { DESCRIPTION_MAX_LENGTH } from '../../../shared/session-description'
-import { useDragReorder, type DragItemProps } from '../../hooks/useDragReorder'
+import { moved } from '../../hooks/useDragReorder'
 import type { SessionFacts } from '../../sidebar/session-facts'
 import type { TerminalSession } from '../../../shared/types/index'
 
@@ -229,29 +235,37 @@ function orderKeepingHidden(all: TerminalSession[], reorderedDrawn: TerminalSess
   return all.map((s) => (drawnIds.has(s.id) ? remaining.shift()! : s).id)
 }
 
+/** A tab let go over another tab takes its place; let go over no Terminator window, it opens in
+ * a window of its own there. */
+function dropSessionTab(projectId: string, all: TerminalSession[], drawn: TerminalSession[]) {
+  return (sessionId: string) =>
+    (point: ScreenPoint, overSessionId: string | null): void => {
+      if (overSessionId === null) {
+        if (!isOverTerminatorWindow(point)) breakOut(sessionId, point)
+        return
+      }
+      const from = drawn.findIndex((s) => s.id === sessionId)
+      const to = drawn.findIndex((s) => s.id === overSessionId)
+      if (from === -1 || to === -1 || from === to) return
+      const order = orderKeepingHidden(all, moved(drawn, from, to))
+      useSessionStore.getState().reorderSessions(projectId, order)
+    }
+}
+
 /** The branch's terminals, in their order, which a drag rearranges. One in its own window has no
  * tab here, and gets its place back when it docks. */
 function SessionTabs(props: SessionTabsProps): JSX.Element {
-  const { projectId } = props
   const windows = useBreakoutStore((s) => s.windows)
   const all = props.tabs.sessions
   const sessions = all.filter((s) => !windows.has(s.id))
-  const { dragOverIndex, getItemProps } = useDragReorder(sessions, (reordered) =>
-    useSessionStore.getState().reorderSessions(projectId, orderKeepingHidden(all, reordered))
-  )
+  const dropOf = dropSessionTab(props.projectId, all, sessions)
   return (
     <div
       className={`tab-bar tab-bar--sessions${sessions.length > SCROLL_AFTER ? ' tab-bar--scrollable' : ''}`}
     >
-      <ScopeLabel projectId={projectId} />
-      {sessions.map((session, index) => (
-        <SessionTab
-          key={session.id}
-          {...props}
-          session={session}
-          dragProps={getItemProps(index)}
-          isDragOver={dragOverIndex === index}
-        />
+      <ScopeLabel projectId={props.projectId} />
+      {sessions.map((session) => (
+        <SessionTab key={session.id} {...props} session={session} onDrop={dropOf(session.id)} />
       ))}
       <button className="tab-bar__new-tab" onClick={props.onNewTab} title="New tab (⌘T)">
         +
@@ -274,33 +288,18 @@ function ScopeLabel({ projectId }: { projectId: string }): JSX.Element | null {
 
 interface SessionTabProps extends SessionTabsProps {
   session: TerminalSession
-  dragProps: DragItemProps
-  isDragOver: boolean
+  onDrop: (point: ScreenPoint, overSessionId: string | null) => void
 }
 
-type SessionDragProps = Omit<DragItemProps, 'onDragStart' | 'onDragEnd'> & {
-  onDragStart: (e: React.DragEvent) => void
-  onDragEnd: (e: React.DragEvent) => void
-}
-
-/** The reorder handlers, plus carrying the session out of the window: a drop on nothing opens it
- * in a window of its own. */
-function withSessionDrag(dragProps: DragItemProps, sessionId: string): SessionDragProps {
-  return {
-    ...dragProps,
-    onDragStart: (e) => {
-      dragProps.onDragStart()
-      beginSessionDrag(e, sessionId)
-    },
-    onDragEnd: (e) => {
-      dragProps.onDragEnd()
-      void finishSessionDrag(sessionId, e.dataTransfer.dropEffect)
-    },
-  }
+/** The tab's class: active, being dragged, or the one a dragged tab would land on. */
+function useSessionTabClass(sessionId: string, isActive: boolean): string {
+  const dragged = useTabDragStore((s) => s.sessionId === sessionId)
+  const landing = useTabDragStore((s) => s.overSessionId === sessionId && s.sessionId !== sessionId)
+  return `tab-bar__tab tab-bar__tab--session${isActive ? ' tab-bar__tab--active' : ''}${dragged ? ' tab-bar__tab--dragging' : ''}${landing ? ' tab-bar__tab--dnd-over' : ''}`
 }
 
 function SessionTab(props: SessionTabProps): JSX.Element {
-  const { projectId, session, editing, dragProps, isDragOver } = props
+  const { projectId, session, editing } = props
   const isActive = session.id === props.tabs.activeId
   const isRenaming = editing.rename.id === session.id
   const showSession = (): void => {
@@ -309,8 +308,9 @@ function SessionTab(props: SessionTabProps): JSX.Element {
   }
   return (
     <div
-      {...withSessionDrag(dragProps, session.id)}
-      className={`tab-bar__tab tab-bar__tab--session${isActive ? ' tab-bar__tab--active' : ''}${isDragOver ? ' tab-bar__tab--dnd-over' : ''}`}
+      data-session-tab={session.id}
+      onPointerDown={(e) => !isRenaming && beginTabDrag(e, session.id, props.onDrop)}
+      className={useSessionTabClass(session.id, isActive)}
       onClick={showSession}
       onContextMenu={(e) => props.onContextMenu(e, session.id)}
       onDoubleClick={(e) => {
