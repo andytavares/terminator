@@ -84,7 +84,18 @@
 .plan-sheet__body {
   grid-template-columns: none;
   grid-auto-flow: column;
-  grid-auto-columns: 1fr;
+  grid-auto-columns: minmax(0, 1fr);
+}
+/* The outer columns line up with the dialog's own edges. */
+.plan-sheet__body > .plan__column:first-child {
+  padding-left: 0;
+}
+.plan-sheet__body > .plan__column:last-child {
+  padding-right: 0;
+}
+/* A column's sticky title is painted the dialog's colour, not the Desk band's. */
+.plan-sheet__body .plan__title {
+  background: var(--tm-bg-elevated);
 }
 
 .tasks-body > .task-list {

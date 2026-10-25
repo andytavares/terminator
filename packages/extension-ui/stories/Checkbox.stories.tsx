@@ -18,7 +18,16 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-export const Ticked: Story = {}
+export const Ticked: Story = {
+  play: async ({ canvasElement }) => {
+    const box = within(canvasElement).getByRole('checkbox', { name: 'Tests pass' })
+    const outer = box.getBoundingClientRect()
+    const tick = box.querySelector('svg')!.getBoundingClientRect()
+    // The tick sits inside the box; an unsized icon spills out of it.
+    await expect(tick.width).toBeLessThanOrEqual(outer.width)
+    await expect(tick.height).toBeLessThanOrEqual(outer.height)
+  },
+}
 export const TickedLight = inLight(Ticked)
 
 export const Empty: Story = { args: { checked: false } }

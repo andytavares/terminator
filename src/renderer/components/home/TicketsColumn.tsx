@@ -92,12 +92,14 @@ function TicketRow({ issue, disabled, onOpen }: TicketRowProps): JSX.Element {
       onKeyDown={(e) => e.key === 'Enter' && !fromButton(e) && open()}
     >
       <span className="plan__ticket-key">{issue.key}</span>
-      <span className="plan__ticket-title">{issue.title}</span>
-      <span
-        className="plan__ticket-assignee"
-        data-unassigned={issue.assignee === null ? '' : undefined}
-      >
-        {issue.assignee?.name ?? 'Unassigned'}
+      <span className="plan__ticket-text">
+        <span className="plan__ticket-title">{issue.title}</span>
+        <span
+          className="plan__ticket-assignee"
+          data-unassigned={issue.assignee === null ? '' : undefined}
+        >
+          {issue.assignee?.name ?? 'Unassigned'}
+        </span>
       </span>
       <TicketAddButton issue={issue} disabled={disabled} />
     </div>
