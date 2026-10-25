@@ -1,0 +1,24 @@
+src/renderer/components/home/Insights.css
+  s_a3d27b825d77a4::t_97e9ea1bbcee5f 4-7,9
+tests/e2e/desk.spec.ts
+  s_a3d27b825d77a4::t_97e9ea1bbcee5f 98-100,107-109
+  s_a3d27b825d77a4::t_e91d41a645b5dd 88,93-97,101-103,106,110-115
+  s_a3d27b825d77a4::t_49fe4fc135dada 104-105
+  s_a3d27b825d77a4::t_49449735606007 116-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a40d35a5471cabe97ee1f49aff3b6afe0e3bdba6",
+  "prompts": {},
+  "sessions": {
+    "s_a3d27b825d77a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8c980b30-a836-4b43-94d8-92ca6c992155",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
