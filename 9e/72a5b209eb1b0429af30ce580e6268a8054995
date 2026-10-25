@@ -1,0 +1,19 @@
+tests/e2e/timings.json
+  s_bcb87751443cd2::t_3cc8c522a91f4b 2-5,7-50,52-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9e72a5b209eb1b0429af30ce580e6268a8054995",
+  "prompts": {},
+  "sessions": {
+    "s_bcb87751443cd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b568ee83-ad51-4a54-9901-52cfcfa5b37f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
