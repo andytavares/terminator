@@ -6,7 +6,7 @@ import { reportDirectory, userSettingsPath, type CaptureHookOptions } from './ag
 
 // Claude Code runs Notification hooks when it needs an answer, UserPromptSubmit hooks when a turn
 // starts and Stop hooks when it ends (payloads: https://code.claude.com/docs/en/hooks). One script
-// writes each event to its own asks/<time>-<pid>.json, so two events in a row are both seen.
+// writes each event to its own asks/<microseconds>-<pid>.json, so two events in a row are both seen.
 
 const SCRIPT_NAME = 'agent-ask-hook.cjs'
 const ASKS_DIR_NAME = 'asks'
@@ -43,7 +43,10 @@ process.stdin.on('end', () => {
       notificationType: typeof payload.notification_type === 'string' ? payload.notification_type : null,
       at: new Date().toISOString(),
     }
-    const target = path.join(directory, Date.now() + '-' + process.pid + '.json')
+    // Microseconds since the epoch, fixed width: the watcher applies files in name order, and
+    // two hooks of one turn can land in the same millisecond.
+    const at = (performance.timeOrigin + performance.now()).toFixed(3)
+    const target = path.join(directory, at + '-' + process.pid + '.json')
     fs.writeFileSync(target + '.tmp', JSON.stringify(report), 'utf8')
     fs.renameSync(target + '.tmp', target)
   } catch {

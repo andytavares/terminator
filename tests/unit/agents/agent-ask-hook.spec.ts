@@ -93,6 +93,15 @@ describe('the ask script, executed — events in a row', () => {
   })
 })
 
+describe('the ask script, executed — file names', () => {
+  // Two hooks of one turn can land in the same millisecond, and pids say nothing about order:
+  // the name carries the time to the microsecond, fixed width, so names sort by time.
+  it('names the event by its time to the microsecond, then the process', async () => {
+    const { files } = await run(NOTIFICATION)
+    expect(files[0]).toMatch(/^\d{13}\.\d{3}-\d+\.json$/)
+  })
+})
+
 describe('the ask script, executed — a prompt', () => {
   it('writes a UserPromptSubmit as a prompt', async () => {
     const { asks } = await run({ hook_event_name: 'UserPromptSubmit', prompt: 'do it' })
