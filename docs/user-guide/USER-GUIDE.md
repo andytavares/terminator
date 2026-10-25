@@ -467,7 +467,7 @@ The drawer holds:
 A branch that is in no task is still a task of one lane, so you do not have to make one. To join work, either:
 
 - **Start work → Across repos** (`Cmd+N`, then the **Across repos** tab). Enter a title such as "Rate limits across services"; the branch name follows it (`rate-limits-across-services`) until you type your own. Tick the repos, choose how to run it (**Claude agent**, **Terminal only**, or **Foundry**), optionally add a ticket and a first prompt for each agent, and press **Start 3 lanes**. Terminator makes a worktree on that branch in each repo, opens a terminal in each and records one task. If a branch name is taken in a repo, that repo says so and nothing starts until you fix or untick it.
-- **Add to task…** on work already under way. It is on a branch row in the sidebar, on a terminal's tab, and on a Home row's menu. The picker lists open tasks, and **+ New task from api-gateway/rate-limits**. If other repos have a branch of the same name, it offers to add them too; they join only when you confirm.
+- **Add to task…** on work already under way. It is on a branch row in the sidebar, on a terminal's tab, on an Overview tile (right-click it), and on a Home row's menu. The picker lists open tasks, and **+ New task from api-gateway/rate-limits**. If other repos have a branch of the same name, it offers to add them too; they join only when you confirm.
 
 A ticket linked to several branches joins them as a task without anything stored, and becomes a stored task the first time you rename it, star it or add a lane.
 

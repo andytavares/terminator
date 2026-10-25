@@ -13,7 +13,10 @@ import {
 } from '../../../support/renderer-stores'
 
 const openAddToTask = vi.hoisted(() => vi.fn())
-vi.mock('../../../../src/renderer/components/tasks/add-to-task', () => ({ openAddToTask }))
+vi.mock('../../../../src/renderer/components/tasks/add-to-task', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  openAddToTask,
+}))
 vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
   useSessionFacts: () => [],
 }))

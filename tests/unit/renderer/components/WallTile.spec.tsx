@@ -13,6 +13,9 @@ vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
 
 import { WallTile } from '../../../../src/renderer/components/overview/WallTile'
 import { fact } from '../sidebar/fixtures/facts'
+import { useAddToTaskStore } from '../../../../src/renderer/components/tasks/add-to-task'
+import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
+import { projectFixture, workspaceFixture } from '../../../support/renderer-stores'
 
 const NOW = Date.parse('2026-09-15T12:00:00.000Z')
 
@@ -236,5 +239,41 @@ describe('WallTile — what does not open it', () => {
   it('draws no edge colour for a session with no workspace colour', () => {
     render(<WallTile {...props} facts={{ ...facts, workspaceColor: null }} />)
     expect(screen.getByRole('article').style.getPropertyValue('--rail')).toBe('')
+  })
+})
+
+function seedNorthwind(): void {
+  useAddToTaskStore.getState().close()
+  useWorkspaceStore.setState({
+    ...useWorkspaceStore.getInitialState(),
+    workspaces: [workspaceFixture({ id: 'ws-nw', name: 'Northwind', folderPath: '/nw' })],
+    projectsByWorkspaceId: new Map([
+      [
+        'ws-nw',
+        [projectFixture({ id: 'p-nw', workspaceId: 'ws-nw', gitBranch: 'nw-88-rate-limits' })],
+      ],
+    ]),
+  })
+}
+
+describe('WallTile — Add to task…', () => {
+  beforeEach(seedNorthwind)
+
+  it('opens the picker for the tile’s repo and branch from its menu, without opening the tile', () => {
+    render(<WallTile {...props} facts={{ ...facts, projectId: 'p-nw' }} />)
+    fireEvent.contextMenu(screen.getByRole('article'))
+    fireEvent.click(screen.getByText('Add to task…'))
+    expect(useAddToTaskStore.getState().lane).toEqual({
+      repoRoot: '/nw',
+      branch: 'nw-88-rate-limits',
+    })
+    expect(props.onOpen).not.toHaveBeenCalled()
+    expect(screen.queryByText('Add to task…')).toBeNull()
+  })
+
+  it('has no menu for a terminal on no branch', () => {
+    render(<WallTile {...props} facts={{ ...facts, projectId: null }} />)
+    fireEvent.contextMenu(screen.getByRole('article'))
+    expect(screen.queryByText('Add to task…')).toBeNull()
   })
 })

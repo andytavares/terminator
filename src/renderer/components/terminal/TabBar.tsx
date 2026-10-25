@@ -15,8 +15,7 @@ import './TabBar.css'
 import { useSessionFacts } from '../session/useSessionFacts'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { LaneSwitcher } from './LaneSwitcher'
-import { openAddToTask } from '../tasks/add-to-task'
-import { laneOf } from '../../sidebar/task-groups'
+import { laneOfBranch, openAddToTask } from '../tasks/add-to-task'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { DESCRIPTION_MAX_LENGTH } from '../../../shared/session-description'
 import { useDragReorder, type DragItemProps } from '../../hooks/useDragReorder'
@@ -497,12 +496,8 @@ function TabCtxMenu({ menus, editing, factsById, sessions }: TabMenusProps): JSX
 
 /** Opens the Add to task picker for the branch a tab's terminal is on. */
 function addBranchToTask(session: TerminalSession | undefined): void {
-  const workspaces = useWorkspaceStore.getState()
-  const project = [...workspaces.projectsByWorkspaceId.values()]
-    .flat()
-    .find((p) => p.id === session?.projectId)
-  const workspace = workspaces.workspaces.find((w) => w.id === project?.workspaceId)
-  if (project && workspace) openAddToTask(laneOf(project, workspace))
+  const lane = laneOfBranch(session?.projectId)
+  if (lane) openAddToTask(lane)
 }
 
 interface TabMenuActions {
