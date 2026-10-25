@@ -1,0 +1,24 @@
+src/renderer/components/home/TasksBody.css
+  s_a3d27b825d77a4::t_4782c4d9b11614 87-98
+src/renderer/components/home/PlanTheDay.css
+  s_a3d27b825d77a4::t_3d466d3d70005c 80
+  s_a3d27b825d77a4::t_4782c4d9b11614 96-97,208,211,235-239,248-250
+src/renderer/components/home/TicketsColumn.tsx
+  s_a3d27b825d77a4::t_4782c4d9b11614 95-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "38b6ad6a7b247daaf4b580196944a71eb6524cb6",
+  "prompts": {},
+  "sessions": {
+    "s_a3d27b825d77a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8c980b30-a836-4b43-94d8-92ca6c992155",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
