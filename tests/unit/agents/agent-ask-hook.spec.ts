@@ -51,7 +51,7 @@ async function run(
   return { out, asks, files: fs.existsSync(asks) ? fs.readdirSync(asks) : [] }
 }
 
-function onlyReport(asks: string): Record<string, unknown> {
+function onlyReport(asks: string): Record<string, string | null> {
   const names = fs.readdirSync(asks)
   expect(names).toHaveLength(1)
   return JSON.parse(fs.readFileSync(path.join(asks, names[0]), 'utf8'))
@@ -68,7 +68,7 @@ describe('the ask script, executed', () => {
       message: 'Claude needs your permission to use Bash',
       notificationType: 'permission_prompt',
     })
-    expect(Date.parse(written.at)).not.toBeNaN()
+    expect(Date.parse(written.at ?? '')).not.toBeNaN()
   })
 
   it('writes a stop with no message and no type', async () => {
