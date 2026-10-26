@@ -1,4 +1,5 @@
 import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
+import type { BranchTerminal } from './branch-rows'
 
 /** What decides the main area's content (`src/renderer/shell/MainArea.tsx`). */
 export interface MainAreaFacts {
@@ -48,4 +49,12 @@ export function repoStandsForShown(
   branchProjectIds: readonly string[]
 ): boolean {
   return collapsed && shown !== null && branchProjectIds.includes(shown.projectId)
+}
+
+/** Every terminal and pane a branch lists under it once expanded. */
+export function listedSessionIds(terminals: readonly BranchTerminal[]): string[] {
+  return terminals.flatMap((terminal) => [
+    terminal.sessionId,
+    ...terminal.panes.map((pane) => pane.sessionId),
+  ])
 }

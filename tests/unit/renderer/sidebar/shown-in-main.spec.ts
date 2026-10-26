@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
   branchStandsForShown,
+  listedSessionIds,
   repoStandsForShown,
   shownInMain,
   type MainAreaFacts,
 } from '../../../../src/renderer/sidebar/shown-in-main'
 import { SCRATCH_PROJECT_ID } from '../../../../src/shared/types/index'
+import type { BranchTerminal } from '../../../../src/renderer/sidebar/branch-rows'
 
 const lastShown: Record<string, string> = {
   'terminator-main': 'terminal-1',
@@ -94,5 +96,17 @@ describe('repoStandsForShown', () => {
   it('never marks a repo without the shown branch', () => {
     expect(repoStandsForShown(shown, true, ['terminator-main'])).toBe(false)
     expect(repoStandsForShown(null, true, ['quicknote-main'])).toBe(false)
+  })
+})
+
+/** Only the ids matter to listedSessionIds. */
+function terminal(sessionId: string, panes: string[] = []): BranchTerminal {
+  return { sessionId, panes: panes.map((pane) => terminal(pane)) } as BranchTerminal
+}
+
+describe('listedSessionIds', () => {
+  it('lists each terminal, then the panes split off it', () => {
+    const terminals = [terminal('quicknote-1', ['quicknote-2']), terminal('quicknote-3')]
+    expect(listedSessionIds(terminals)).toEqual(['quicknote-1', 'quicknote-2', 'quicknote-3'])
   })
 })

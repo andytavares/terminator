@@ -32,7 +32,11 @@ import { RepoHeader } from './RepoHeader'
 import { BranchRow } from './BranchRow'
 import { TerminalRow } from './TerminalRow'
 import { useShownInMain } from './useShownInMain'
-import { branchStandsForShown, repoStandsForShown } from '../../sidebar/shown-in-main'
+import {
+  branchStandsForShown,
+  listedSessionIds,
+  repoStandsForShown,
+} from '../../sidebar/shown-in-main'
 
 /** Which repos and branch terminal lists are folded away, remembered across launches. */
 export function useSidebarCollapse() {
@@ -215,14 +219,6 @@ export function BranchEntry({ row, workspace, drag, ctx }: BranchEntryProps): JS
       {expanded && <TerminalEntries projectId={projectId} terminals={row.terminals} ctx={ctx} />}
     </>
   )
-}
-
-/** Every terminal and pane a branch lists under it once expanded. */
-function listedSessionIds(terminals: BranchTerminal[]): string[] {
-  return terminals.flatMap((terminal) => [
-    terminal.sessionId,
-    ...terminal.panes.map((pane) => pane.sessionId),
-  ])
 }
 
 /** What a branch row shows (its key and change counts) and what it does. */
