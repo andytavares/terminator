@@ -8,7 +8,10 @@ export interface ResumePlan {
   projectId: string
   /** The folder the conversation ran in. */
   cwd: string
-  command: string
+  transport: AgentConversation['transport']
+  agentId: string
+  /** The line to type in a terminal; none for an agent tab. */
+  command: string | null
   conversationId: string
 }
 
@@ -21,11 +24,9 @@ export interface ResumePlan {
  */
 const ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 
-/** How an agent is asked to carry a conversation on, or nothing when it cannot be. */
-function resumeCommand(agent: AgentConversation | null): string | null {
-  if (agent === null || !ID.test(agent.sessionId)) return null
-  if (agent.provider !== 'claude') return null
-  return `claude --resume ${agent.sessionId}`
+/** Whether the conversation can be carried on: an agent tab takes the id as data, a terminal as text. */
+function canResume(agent: AgentConversation): boolean {
+  return agent.transport === 'acp' || (agent.agentId === 'claude' && ID.test(agent.sessionId))
 }
 
 /**
@@ -39,8 +40,7 @@ function resumeCommand(agent: AgentConversation | null): string | null {
 export function planResume(facts: SessionFacts): ResumePlan | null {
   if (!facts.isClosed && facts.state !== 'exited') return null
   if (!facts.resumable) return null
-  const command = resumeCommand(facts.agent)
-  if (command === null || facts.agent === null) return null
+  if (facts.agent === null || !canResume(facts.agent)) return null
   const projectId = facts.snapshot.projectId
   if (projectId === '') return null
 
@@ -48,7 +48,9 @@ export function planResume(facts: SessionFacts): ResumePlan | null {
     fromSessionId: facts.sessionId,
     projectId,
     cwd: facts.agent.cwd,
-    command,
+    transport: facts.agent.transport,
+    agentId: facts.agent.agentId,
+    command: facts.agent.transport === 'tui' ? `claude --resume ${facts.agent.sessionId}` : null,
     conversationId: facts.agent.sessionId,
   }
 }

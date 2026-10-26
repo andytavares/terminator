@@ -1,5 +1,22 @@
 # Changelog — @terminator/extension-sdk
 
+## 5.2.0
+
+### Added
+
+- `api.agents`: agents the app runs over the Agent Client Protocol (ACP).
+- `api.agents.list()`: the agents that can start, `claude` and the ones in the `agents` setting.
+- `api.agents.start(input)`: starts a session, as a tab of a project when `tab` is set; null when
+  the agent did not start.
+- `api.agents.prompt(sessionId, text)`: sends a prompt; resolves when the turn ends.
+- `api.agents.cancel(sessionId)`: cancels the running turn.
+- `api.agents.setConfig(sessionId, configId, value)`: sets a session option such as the model.
+- `api.agents.close(sessionId)`: ends the agent process and closes its tab.
+- `api.agents.onUpdate`, `onPermission`, `onEnd`: listen to a session's updates, asks and exit.
+- `api.agents.answer(sessionId, requestId, optionId)`: answers a tool-call ask.
+- `api.agents.runOnce(input)`: one prompt in a throwaway session, with every ask rejected.
+- `api.agents.models(agentId?)`: the `model` option of an agent's sessions.
+
 ## 5.1.0
 
 ### Added

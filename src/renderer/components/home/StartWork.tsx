@@ -4,6 +4,7 @@ import { Button, Chip, Kbd, ModalShell } from '@terminator/extension-ui'
 import { WorkspacePicker } from './WorkspacePicker'
 import { AcrossRepos } from './AcrossRepos'
 import { RunAsChoices } from './RunAsChoices'
+import { agentLabel, useAgentChoices } from './agent-choices'
 import { startScratchSession } from '../../terminal/start-session'
 import {
   branchOf,
@@ -42,13 +43,15 @@ function useLauncherFields() {
   const [tab, setTab] = useState<LauncherTab>('tickets')
   const [query, setQuery] = useState(prefill)
   const [runAs, setRunAs] = useState<RunAs>('agent')
+  const [agentId, setAgentId] = useState<string | null>(null)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [pickedRepoId, setPickedRepoId] = useState<string | null>(null)
   const [picking, setPicking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   return {
-    ...{ tab, query, runAs, selectedIndex, pickedRepoId, picking, error },
-    ...{ setTab, setQuery, setRunAs, setSelectedIndex, setPickedRepoId, setPicking, setError },
+    ...{ tab, query, runAs, agentId, selectedIndex, pickedRepoId, picking, error },
+    ...{ setTab, setQuery, setRunAs, setAgentId, setSelectedIndex, setPickedRepoId },
+    ...{ setPicking, setError },
   }
 }
 
@@ -80,9 +83,10 @@ function useLauncherData(fields: Fields) {
 function useLauncher(onClose: () => void) {
   const fields = useLauncherFields()
   const data = useLauncherData(fields)
-  const { tab, query, runAs, picking, error } = fields
-  const runAsOptions = useRunAsOptions()
-  const view = { tab, query, runAs, picking, error, runAsOptions, ...data }
+  const { tab, query, runAs, agentId, picking, error } = fields
+  const choices = useAgentChoices()
+  const runAsOptions = useRunAsOptions(agentLabel(choices, agentId))
+  const view = { tab, query, runAs, agentId, choices, picking, error, runAsOptions, ...data }
   const actions = launcherActions({ fields, view, onClose })
   return { view, actions, selectedIndex: data.index }
 }
@@ -93,6 +97,7 @@ interface ActionsInput {
     tab: LauncherTab
     query: string
     runAs: RunAs
+    agentId: string | null
     selected?: LauncherRow
     repo: Workspace | null
   }
@@ -111,6 +116,7 @@ function launcherActions({ fields, view, onClose }: ActionsInput) {
       fresh()
     },
     setRunAs: fields.setRunAs,
+    setAgentId: fields.setAgentId,
     select: fields.setSelectedIndex,
     pickRepo: (id: string) => {
       fields.setPickedRepoId(id)
@@ -131,14 +137,13 @@ interface SubmitInput {
 }
 
 function requestFor(view: ActionsInput['view'], repo: Workspace): WorkRequest | null {
-  const { selected, runAs, tab, query } = view
+  const { selected, runAs, agentId, tab, query } = view
+  const common = { workspace: repo, runAs, ...(agentId === null ? {} : { agentId }) }
   if (tab === 'prompt' || selected?.kind === 'prompt') {
-    return query.trim() === '' ? null : { kind: 'prompt', text: query, workspace: repo, runAs }
+    return query.trim() === '' ? null : { kind: 'prompt', text: query, ...common }
   }
-  if (selected?.kind === 'ticket')
-    return { kind: 'ticket', issue: selected.issue, workspace: repo, runAs }
-  if (selected?.kind === 'branch')
-    return { kind: 'branch', branch: selected.name, workspace: repo, runAs }
+  if (selected?.kind === 'ticket') return { kind: 'ticket', issue: selected.issue, ...common }
+  if (selected?.kind === 'branch') return { kind: 'branch', branch: selected.name, ...common }
   return null
 }
 
@@ -370,8 +375,29 @@ function RunAsPanel({ view, actions }: Launcher): JSX.Element {
     <div className="start-work__side">
       <div className="start-work__label">Run it as</div>
       <RunAsChoices options={view.runAsOptions} runAs={view.runAs} onPick={actions.setRunAs} />
+      <AgentPicker view={view} actions={actions} />
       <Summary {...{ view, actions }} />
     </div>
+  )
+}
+
+function AgentPicker({ view, actions }: PartProps): JSX.Element | null {
+  const { agents, defaultId } = view.choices
+  if (agents.length < 2 || view.runAs !== 'agent') return null
+  return (
+    <label className="start-work__agent">
+      Agent
+      <select
+        value={view.agentId ?? defaultId}
+        onChange={(e) => actions.setAgentId(e.target.value)}
+      >
+        {agents.map((agent) => (
+          <option key={agent.id} value={agent.id}>
+            {agent.label}
+          </option>
+        ))}
+      </select>
+    </label>
   )
 }
 

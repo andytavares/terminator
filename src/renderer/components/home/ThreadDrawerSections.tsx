@@ -29,7 +29,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function terminalName(lead: SessionFacts): string {
-  if (lead.agent) return lead.agent.provider
+  if (lead.agent) return lead.agent.agentId
   return lead.shell?.split('/').pop() ?? 'terminal'
 }
 

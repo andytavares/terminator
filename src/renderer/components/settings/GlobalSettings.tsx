@@ -6,6 +6,7 @@ import type {
 } from '../../../shared/types/index'
 import type { HomeLayout } from '../../../shared/schemas/settings.schema'
 import { parsePatterns, PATTERNS_PLACEHOLDER } from './patterns'
+import { AgentsSettings } from './AgentsSettings'
 import { QuickActionsSettings } from './QuickActionsSettings'
 import '@terminator/extension-ui/settings-fields.css'
 import './SettingsPanel.css'
@@ -59,6 +60,7 @@ export function GlobalSettings(): JSX.Element {
         <OverridesField settings={settings} />
       </div>
       <QuickActionsSettings scope="global" />
+      <AgentsSettings />
     </>
   )
 }

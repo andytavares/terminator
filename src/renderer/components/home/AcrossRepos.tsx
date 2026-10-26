@@ -6,6 +6,7 @@ import { RunAsChoices } from './RunAsChoices'
 import { branchSlug, startAcrossRepos, type AcrossResult, type RepoMessages } from './across-repos'
 import { useRepoGit, useMyTickets } from './start-work-model'
 import { useRunAsOptions, type RunAs } from './start-work'
+import { agentLabel, useAgentChoices } from './agent-choices'
 import { TASK_TITLE_MAX_LENGTH } from '../../../shared/task-title'
 import type { IssueSummary, Workspace } from '../../../shared/types/index'
 import './AcrossRepos.css'
@@ -173,7 +174,7 @@ interface RepoChoicesProps {
 }
 
 function RepoChoices({ workspaces, fields, notes }: RepoChoicesProps): JSX.Element {
-  const options = useRunAsOptions()
+  const options = useRunAsOptions(agentLabel(useAgentChoices(), null))
   return (
     <div className="across-repos__repos">
       <div className="start-work__label">Repos</div>

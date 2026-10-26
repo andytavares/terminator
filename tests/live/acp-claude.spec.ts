@@ -29,6 +29,7 @@ function serviceFor(): AgentService {
     scratchDirectory: makeTempDir('acp-live-scratch-'),
     scrollbackLimit: () => 1000,
     broadcast: () => undefined,
+    recordTab: () => undefined,
     now: Date.now,
   })
 }

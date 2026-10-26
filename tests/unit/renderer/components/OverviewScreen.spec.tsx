@@ -322,7 +322,8 @@ describe('OverviewScreen — starting and resuming from the wall — resumes a s
       name: 'claude',
       state: 'exited',
       agent: {
-        provider: 'claude',
+        agentId: 'claude',
+        transport: 'tui',
         sessionId: 'conv-1',
         transcriptPath: '/t/c.jsonl',
         cwd: '/code/repo',

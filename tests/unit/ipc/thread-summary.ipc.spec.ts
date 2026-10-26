@@ -26,9 +26,16 @@ vi.mock('../../../src/main/shell/login-shell-path', () => ({ loginShellPathReady
 vi.mock('../../../src/main/sessions/session-record-store', () => ({ listRecords: () => records }))
 
 const TRANSCRIPT = path.resolve(__dirname, '../../fixtures/transcripts/sample-transcript.jsonl')
-const recordOf = (sessionId: string, transcriptPath: string) => ({
+const recordOf = (sessionId: string, transcriptPath: string | null) => ({
   sessionId,
-  agent: { provider: 'claude', sessionId: 'c1', transcriptPath, cwd: '/', capturedAt: '' },
+  agent: {
+    agentId: 'claude',
+    transport: transcriptPath === null ? 'acp' : 'tui',
+    sessionId: 'c1',
+    transcriptPath,
+    cwd: '/',
+    capturedAt: '',
+  },
 })
 
 async function summarizeWith(
@@ -98,16 +105,18 @@ describe('home:thread-summary', () => {
   })
 
   it('keeps the given texts without a record, a transcript or a readable file', async () => {
-    records.push(recordOf('s3', '/no/such/transcript.jsonl'))
+    records.push(recordOf('s3', '/no/such/transcript.jsonl'), recordOf('s4', null))
     const sessions = await summarizeWith([
       { lastAssistantTexts: ['no id'] },
       { sessionId: 's2', lastAssistantTexts: ['no record'] },
       { sessionId: 's3', lastAssistantTexts: ['unreadable'] },
+      { sessionId: 's4', lastAssistantTexts: ['agent tab, no transcript'] },
     ])
     expect(sessions.map((s) => [s.firstUserPrompt, s.lastAssistantTexts])).toEqual([
       ['given', ['no id']],
       ['given', ['no record']],
       ['given', ['unreadable']],
+      ['given', ['agent tab, no transcript']],
     ])
   })
 })

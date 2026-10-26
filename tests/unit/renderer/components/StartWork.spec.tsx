@@ -19,11 +19,13 @@ import type {
 
 const launched = vi.hoisted(() => ({
   inBranch: vi.fn(),
+  agentInBranch: vi.fn(),
   scratch: vi.fn(),
   createFromDraft: vi.fn(),
 }))
 vi.mock('../../../../src/renderer/terminal/start-session', () => ({
   startSessionInBranch: launched.inBranch,
+  startAgentInBranch: launched.agentInBranch,
   startScratchSession: launched.scratch,
 }))
 vi.mock('../../../../src/renderer/components/sidebar/create-project', async (importOriginal) => ({
@@ -111,6 +113,7 @@ const git = {
   listWorktrees: vi.fn<ElectronAPI['git']['listWorktrees']>(),
 }
 const executeCommand = vi.fn<ElectronAPI['extension']['executeCommand']>()
+const agentsList = vi.fn<ElectronAPI['agents']['list']>()
 
 function seedStartWorkStores(): void {
   useWorkspaceStore.setState({
@@ -139,8 +142,10 @@ beforeEach(() => {
     branches: [{ name: 'main', isCurrent: true, isRemote: false }],
   })
   git.listWorktrees.mockResolvedValue({ worktrees: [] })
+  agentsList.mockResolvedValue({ data: [{ id: 'claude', label: 'Claude Code' }] })
   installElectronApi({
     git,
+    agents: { list: agentsList },
     extension: {
       executeCommand,
       getCommands: vi.fn(async () => ({ commands: [] })),
@@ -148,6 +153,7 @@ beforeEach(() => {
     },
   })
   launched.inBranch.mockResolvedValue('s-new')
+  launched.agentInBranch.mockResolvedValue('s-new')
   launched.createFromDraft.mockResolvedValue('p-new')
   seedStartWorkStores()
 })
@@ -207,16 +213,16 @@ describe('StartWork — opening and closing', () => {
 describe('StartWork — run it as', () => {
   const checked = () => screen.getByRole('radio', { checked: true }).getAttribute('aria-label')
 
-  it('offers only Claude agent and Terminal only when no extension adds an option', async () => {
+  it('offers the agent tab, Claude in a terminal and Terminal only when no extension adds one', async () => {
     await open()
     expect(screen.getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
-      'Claude agent',
+      'Claude Code in an agent tab',
+      'Claude in a terminal',
       'Terminal only',
     ])
     expect(document.body.textContent).not.toMatch(/Foundry/)
-    fireEvent.keyDown(searchBox(), { key: 'Tab' })
-    fireEvent.keyDown(searchBox(), { key: 'Tab' })
-    expect(checked()).toBe('Claude agent')
+    for (let step = 0; step < 3; step++) fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    expect(checked()).toBe('Claude Code in an agent tab')
   })
 })
 
@@ -227,15 +233,15 @@ describe('StartWork — run it as, with an extension option', () => {
     registerFoundryOption()
     await open()
     expect(screen.getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
-      'Claude agent',
+      'Claude Code in an agent tab',
+      'Claude in a terminal',
       'Terminal only',
       'Foundry order',
     ])
-    fireEvent.keyDown(searchBox(), { key: 'Tab' })
-    fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    for (let step = 0; step < 3; step++) fireEvent.keyDown(searchBox(), { key: 'Tab' })
     expect(checked()).toBe('Foundry order')
     fireEvent.keyDown(searchBox(), { key: 'Tab' })
-    expect(checked()).toBe('Claude agent')
+    expect(checked()).toBe('Claude Code in an agent tab')
   })
 
   it('summarises the branch and worktree of the selected ticket', async () => {
@@ -264,10 +270,13 @@ describe('StartWork — Enter on a ticket', () => {
         }),
       })
     )
-    expect(launched.inBranch).toHaveBeenCalledWith(
-      'p-new',
-      expect.stringMatching(/^claude 'Work on TAV-33: Retry rate-limited GitHub searches/)
-    )
+    expect(launched.agentInBranch).toHaveBeenCalledWith({
+      projectId: 'p-new',
+      title: 'TAV-33',
+      prompt: expect.stringMatching(/^Work on TAV-33: Retry rate-limited GitHub searches/),
+      agentId: undefined,
+    })
+    expect(launched.inBranch).not.toHaveBeenCalled()
     expect(setLink).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 's-new' }), {
       tracker: 'linear',
       key: 'TAV-33',
@@ -307,6 +316,7 @@ describe('StartWork — starting dismissed work', () => {
 describe('StartWork — Enter on a ticket, run another way', () => {
   it('starts a plain terminal for Terminal only', async () => {
     await open()
+    fireEvent.keyDown(searchBox(), { key: 'Tab' })
     fireEvent.keyDown(searchBox(), { key: 'Tab' })
     fireEvent.keyDown(searchBox(), { key: 'Enter' })
     await waitFor(() => expect(launched.inBranch).toHaveBeenCalledWith('p-new', undefined))
@@ -351,8 +361,7 @@ describe('StartWork — an extension option', () => {
     registerFoundryOption()
     useExtensionCommandsRegistered()
     const onClose = await open()
-    fireEvent.keyDown(searchBox(), { key: 'Tab' })
-    fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    for (let step = 0; step < 3; step++) fireEvent.keyDown(searchBox(), { key: 'Tab' })
     fireEvent.keyDown(searchBox(), { key: 'Enter' })
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(executeCommand).toHaveBeenCalledWith(
@@ -373,8 +382,7 @@ describe('StartWork — an extension option whose command is not running', () =>
   it('says so in plain words and starts nothing', async () => {
     registerFoundryOption()
     const onClose = await open()
-    fireEvent.keyDown(searchBox(), { key: 'Tab' })
-    fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    for (let step = 0; step < 3; step++) fireEvent.keyDown(searchBox(), { key: 'Tab' })
     fireEvent.keyDown(searchBox(), { key: 'Enter' })
     expect((await screen.findByRole('alert')).textContent).toBe(
       'Foundry order is not turned on, so it cannot take this.'
@@ -387,6 +395,7 @@ describe('StartWork — an extension option whose command is not running', () =>
 function useExtensionCommandsRegistered(): void {
   installElectronApi({
     git,
+    agents: { list: agentsList },
     extension: {
       executeCommand,
       getCommands: vi.fn(async () => ({
@@ -405,24 +414,81 @@ function useExtensionCommandsRegistered(): void {
 }
 
 describe('StartWork — other tabs', () => {
-  it('Prompt tab starts a Claude agent with the typed prompt and links nothing', async () => {
+  it('Prompt tab starts an agent tab with the typed prompt and links nothing', async () => {
     const onClose = await open()
     goToTab('Prompt')
     fireEvent.change(searchBox(), { target: { value: "fix the dev's build" } })
     fireEvent.keyDown(searchBox(), { key: 'Enter' })
     await waitFor(() => expect(onClose).toHaveBeenCalled())
-    expect(launched.inBranch).toHaveBeenCalledWith('p-main', `claude 'fix the dev'\\''s build'`)
+    expect(launched.agentInBranch).toHaveBeenCalledWith({
+      projectId: 'p-main',
+      title: 'Agent',
+      prompt: "fix the dev's build",
+      agentId: undefined,
+    })
     expect(launched.createFromDraft).not.toHaveBeenCalled()
     expect(setLink).not.toHaveBeenCalled()
   })
 
-  it('Prompt tab refuses a prompt too long to type into a terminal line', async () => {
-    await open()
+  it('Prompt tab sends an agent tab a prompt of any length', async () => {
+    const onClose = await open()
     goToTab('Prompt')
     fireEvent.change(searchBox(), { target: { value: 'x'.repeat(1200) } })
     fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(launched.agentInBranch).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'x'.repeat(1200) })
+    )
+  })
+})
+
+describe('StartWork — other tabs, Claude in a terminal', () => {
+  it('Prompt tab types the command for Claude in a terminal', async () => {
+    const onClose = await open()
+    goToTab('Prompt')
+    fireEvent.change(searchBox(), { target: { value: "fix the dev's build" } })
+    fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(launched.inBranch).toHaveBeenCalledWith('p-main', `claude 'fix the dev'\\''s build'`)
+  })
+
+  it('Prompt tab refuses a prompt too long to type for Claude in a terminal', async () => {
+    await open()
+    goToTab('Prompt')
+    fireEvent.change(searchBox(), { target: { value: 'x'.repeat(1200) } })
+    fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
     expect((await screen.findByRole('alert')).textContent).toMatch(/too long/i)
     expect(launched.inBranch).not.toHaveBeenCalled()
+  })
+})
+
+describe('StartWork — other tabs, the agent picker', () => {
+  it('passes the agent chosen in the picker to the agent tab', async () => {
+    agentsList.mockResolvedValue({
+      data: [
+        { id: 'claude', label: 'Claude Code' },
+        { id: 'opencode', label: 'OpenCode' },
+      ],
+    })
+    const onClose = await open()
+    goToTab('Prompt')
+    fireEvent.change(searchBox(), { target: { value: 'fix it' } })
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Agent' }), {
+      target: { value: 'opencode' },
+    })
+    expect(screen.getByRole('radio', { name: 'OpenCode in an agent tab' })).toBeTruthy()
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(launched.agentInBranch).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: 'opencode', prompt: 'fix it' })
+    )
+  })
+
+  it('shows no picker when only one agent exists', async () => {
+    await open()
+    expect(screen.queryByRole('combobox', { name: 'Agent' })).toBeNull()
   })
 })
 
@@ -435,7 +501,9 @@ describe('StartWork — scratch and branch tabs', () => {
     expect(onClose).toHaveBeenCalled()
     expect(launched.inBranch).not.toHaveBeenCalled()
   })
+})
 
+describe('StartWork — branch tab', () => {
   it('Branch tab lists the repo worktrees and starts a session on the chosen one', async () => {
     git.listWorktrees.mockResolvedValue({
       worktrees: [{ path: '/repo/.worktrees/dev', branch: 'dev', isMain: false, head: 'abc' }],
@@ -453,7 +521,9 @@ describe('StartWork — scratch and branch tabs', () => {
     await screen.findByRole('option', { name: /dev/ })
     fireEvent.keyDown(searchBox(), { key: 'Enter' })
     await waitFor(() => expect(onClose).toHaveBeenCalled())
-    expect(launched.inBranch).toHaveBeenCalledWith('p-dev', expect.stringMatching(/^claude$/))
+    expect(launched.agentInBranch).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: 'p-dev', prompt: null })
+    )
   })
 })
 

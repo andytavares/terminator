@@ -100,7 +100,12 @@ describe('the agent session watcher', () => {
     await folded()
     expect(recorded[0]).toMatchObject({
       ...snapshot('sess-1'),
-      agent: { provider: 'claude', sessionId: 'conv-1', capturedAt: '2026-09-15T18:00:00.000Z' },
+      agent: {
+        agentId: 'claude',
+        transport: 'tui',
+        sessionId: 'conv-1',
+        capturedAt: '2026-09-15T18:00:00.000Z',
+      },
     })
   })
 

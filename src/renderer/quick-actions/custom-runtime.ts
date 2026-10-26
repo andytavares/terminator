@@ -4,12 +4,13 @@ import type { QuickAction } from './types'
 
 export interface CustomRuntimeDeps {
   input(sessionId: string, data: string): void
+  prompt(sessionId: string, text: string): void
   openTab(projectId: string): Promise<string>
   notify(message: string): void
 }
 
 function describe(a: CustomAction): string {
-  if (a.kind === 'prompt') return 'prompt · Claude'
+  if (a.kind === 'prompt') return 'prompt · agent'
   return a.target === 'new-tab' ? 'shell · new tab' : 'shell · focused'
 }
 
@@ -23,6 +24,11 @@ async function runAction(
   const plan = planCustomAction(a, env)
   if (!plan.ok) {
     deps.notify(plan.reason)
+    return
+  }
+
+  if (plan.kind === 'agent-prompt') {
+    deps.prompt(plan.sessionId, plan.text)
     return
   }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import type { ExtensionAPI, SessionInfo } from '@terminator/extension-sdk'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
 import { partialFake } from '../../../../tests/support/fakes'
 import { bindShell } from '../../src/shell/run-git'
 import { createHomeActionHandler, worktreeOfBranch } from '../../src/home/actions'
@@ -29,16 +29,6 @@ describe('worktreeOfBranch', () => {
   it('finds nothing for a branch no worktree holds', () => {
     expect(worktreeOfBranch(PORCELAIN, 'feat/other')).toBeUndefined()
   })
-})
-
-const agentTerminal = (overrides: Partial<SessionInfo>): SessionInfo => ({
-  sessionId: 's1',
-  cwd: '/work/widgets-login',
-  type: 'agent',
-  origin: 'app',
-  createdAt: '2026-10-18T09:00:00Z',
-  pid: 1,
-  ...overrides,
 })
 
 /** git answers the worktree list, gh answers nothing; the shell is bound for runGit too. */
@@ -79,18 +69,25 @@ const PULL_REQUESTS = [
   }),
 ]
 
-function setupActions(sessions: SessionInfo[] = []) {
+const MESSAGE =
+  'Checks are failing on https://github.com/acme/widgets/pull/275. Find the failing checks, fix them and push.'
+
+function setupActions() {
   const exec = fakeGitShell()
-  const pty = {
-    listSessions: async () => sessions,
-    write: vi.fn(),
-    openTerminal: vi.fn(async () => 'new-session'),
+  const ends: Array<() => void> = []
+  const agents = {
+    start: vi.fn(async () => ({ sessionId: 'new-agent', agentId: 'claude', configOptions: [] })),
+    prompt: vi.fn(async () => ({ stopReason: 'end_turn' })),
+    onEnd: vi.fn((_sessionId: string, listener: () => void) => {
+      ends.push(listener)
+      return () => undefined
+    }),
   }
   const openAuxiliary = vi.fn()
   const warn = vi.fn()
   const api = partialFake<ExtensionAPI>({
     shell: partialFake<ExtensionAPI['shell']>({ exec: exec as never }),
-    pty: partialFake<ExtensionAPI['pty']>(pty),
+    agents: partialFake<ExtensionAPI['agents']>(agents),
     workspace: repoWorkspace,
     window: partialFake<ExtensionAPI['window']>({ openAuxiliary }),
     log: { debug: vi.fn(), info: vi.fn(), warn, error: vi.fn() },
@@ -100,7 +97,7 @@ function setupActions(sessions: SessionInfo[] = []) {
     storage: '/storage',
     pullRequests: () => PULL_REQUESTS,
   })
-  return { handle, exec, write: pty.write, openTerminal: pty.openTerminal, openAuxiliary, warn }
+  return { handle, exec, agents, endAgent: () => ends.forEach((end) => end()), openAuxiliary, warn }
 }
 
 describe('start-review', () => {
@@ -144,48 +141,46 @@ describe('open-log on a pull request whose checks were read', () => {
 })
 
 describe('send-to-agent', () => {
-  it('types the message into the agent terminal already on the branch', async () => {
-    const { handle, write, openTerminal } = setupActions([
-      agentTerminal({ sessionId: 'elsewhere', cwd: '/work/other' }),
-      agentTerminal({ sessionId: 'on-branch' }),
-    ])
+  it('starts an agent tab in the branch worktree and prompts it', async () => {
+    const { handle, agents } = setupActions()
     await handle('fix:acme/widgets#275', 'send-to-agent')
-    expect(openTerminal).not.toHaveBeenCalled()
-    expect(write).toHaveBeenCalledWith(
-      'on-branch',
-      'Checks are failing on https://github.com/acme/widgets/pull/275. Find the failing checks, fix them and push.\r'
-    )
+    expect(agents.start).toHaveBeenCalledWith({
+      cwd: '/work/widgets-login',
+      tab: { projectId: 'p1', title: 'Fix checks #275' },
+    })
+    expect(agents.prompt).toHaveBeenCalledWith('new-agent', MESSAGE)
   })
 
-  it('never types into a person terminal', async () => {
-    const { handle, write, openTerminal } = setupActions([agentTerminal({ type: 'human' })])
+  it('prompts the agent tab it started before, instead of starting another', async () => {
+    const { handle, agents } = setupActions()
     await handle('fix:acme/widgets#275', 'send-to-agent')
-    expect(write).not.toHaveBeenCalledWith('s1', expect.anything())
-    expect(openTerminal).toHaveBeenCalled()
+    await handle('fix:acme/widgets#275', 'send-to-agent')
+    expect(agents.start).toHaveBeenCalledTimes(1)
+    expect(agents.prompt).toHaveBeenCalledTimes(2)
   })
 })
 
-describe('send-to-agent without an agent terminal', () => {
-  it('starts claude in the branch worktree when no agent terminal is there', async () => {
-    const { handle, write, openTerminal } = setupActions([])
+describe('send-to-agent — failures', () => {
+  it('starts a new agent tab once the earlier one has ended', async () => {
+    const { handle, agents, endAgent } = setupActions()
     await handle('fix:acme/widgets#275', 'send-to-agent')
-    expect(openTerminal).toHaveBeenCalledWith({
-      projectId: 'p1',
-      cwd: '/work/widgets-login',
-      tabTitle: 'Fix checks #275',
-      type: 'agent',
-    })
-    expect(write).toHaveBeenCalledWith(
-      'new-session',
-      "claude 'Checks are failing on https://github.com/acme/widgets/pull/275. Find the failing checks, fix them and push.'\r"
-    )
+    endAgent()
+    await handle('fix:acme/widgets#275', 'send-to-agent')
+    expect(agents.start).toHaveBeenCalledTimes(2)
+  })
+
+  it('does nothing, and says so, when the agent does not start', async () => {
+    const { handle, agents, warn } = setupActions()
+    agents.start.mockResolvedValueOnce(null as never)
+    await handle('fix:acme/widgets#275', 'send-to-agent')
+    expect(agents.prompt).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('did not start'))
   })
 
   it('does nothing, and says so, when the branch is checked out nowhere', async () => {
-    const { handle, write, openTerminal, warn } = setupActions()
+    const { handle, agents, warn } = setupActions()
     await handle('fix:acme/widgets#40', 'send-to-agent')
-    expect(write).not.toHaveBeenCalled()
-    expect(openTerminal).not.toHaveBeenCalled()
+    expect(agents.start).not.toHaveBeenCalled()
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('fix/cache'))
   })
 })

@@ -7,7 +7,7 @@ type Props = { scope: 'global' } | { scope: 'workspace'; workspaceId: string }
 
 const KIND_OPTIONS: Array<{ value: CustomActionKind; label: string }> = [
   { value: 'shell', label: 'Shell command' },
-  { value: 'prompt', label: 'Claude prompt' },
+  { value: 'prompt', label: 'Agent prompt' },
 ]
 
 const TARGET_OPTIONS: Record<
@@ -18,13 +18,13 @@ const TARGET_OPTIONS: Record<
     { value: 'focused', label: 'Focused terminal' },
     { value: 'new-tab', label: 'New tab on branch' },
   ],
-  prompt: [{ value: 'agent', label: 'Focused Claude session' }],
+  prompt: [{ value: 'agent', label: 'Focused agent session' }],
 }
 
 const VARIABLES = ['cwd', 'branch', 'worktree', 'repo', 'issue', 'selection']
 
 function targetLabel(a: CustomAction): string {
-  if (a.kind === 'prompt') return 'Focused Claude session'
+  if (a.kind === 'prompt') return 'Focused agent session'
   return a.target === 'new-tab' ? 'New tab on branch' : 'Focused terminal'
 }
 

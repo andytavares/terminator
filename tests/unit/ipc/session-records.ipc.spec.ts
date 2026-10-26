@@ -51,7 +51,8 @@ const NW_88: Issue = {
 }
 
 const conversation = (transcriptPath: string) => ({
-  provider: 'claude' as const,
+  agentId: 'claude',
+  transport: 'tui' as const,
   sessionId: 'conv-1',
   transcriptPath,
   cwd: '/code/repo',
@@ -266,6 +267,16 @@ describe('whether a conversation can still be resumed', () => {
     await records.setAgent(SNAP, conversation(transcript))
     fs.rmSync(transcript)
     expect((await list())[0].resumable).toBe(false)
+  })
+
+  it('is resumable for an agent tab conversation that has no transcript', async () => {
+    await records.setAgent(SNAP, {
+      ...conversation(transcript),
+      agentId: 'opencode',
+      transport: 'acp',
+      transcriptPath: null,
+    })
+    expect((await list())[0].resumable).toBe(true)
   })
 
   // The transcript belongs to the agent: it can go at any moment, including

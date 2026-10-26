@@ -6,7 +6,8 @@ import { fact } from '../sidebar/fixtures/facts'
 import type { AgentConversation } from '../../../../src/shared/types/index'
 
 const conversation: AgentConversation = {
-  provider: 'claude',
+  agentId: 'claude',
+  transport: 'tui',
   sessionId: 'b610a882',
   transcriptPath: '/t/b610a882.jsonl',
   cwd: '/code/repo',

@@ -167,6 +167,7 @@ export interface Extension {
 
 export type {
   ActionUsage,
+  AgentsSettings,
   CustomAction,
   CustomActionKind,
   CustomActionTarget,
@@ -263,20 +264,18 @@ export interface SessionSnapshot {
   startedAt: string
 }
 
-/** Agents whose conversations can be brought back by id. */
-export type AgentProvider = 'claude'
-
 /**
  * One agent conversation, as the agent itself reported it.
  *
- * `sessionId` is the agent's own identifier and survives resuming; the
- * transcript is the agent's file, and its existence is what makes the
- * conversation resumable on this machine.
+ * `sessionId` is the agent's own identifier and survives resuming. `transport`
+ * says how it was run: `tui` is the `claude` program in a terminal, `acp` an
+ * agent tab. A transcript is the agent's file; an agent without one has none.
  */
 export interface AgentConversation {
-  provider: AgentProvider
+  agentId: string
+  transport: 'tui' | 'acp'
   sessionId: string
-  transcriptPath: string
+  transcriptPath: string | null
   cwd: string
   capturedAt: string
 }

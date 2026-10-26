@@ -691,6 +691,18 @@ describe('answerChoice (054)', () => {
   })
 })
 
+describe('answerChoice — an agent tab', () => {
+  setUpAnswerChoice054()
+
+  it('never reads or answers the screen of an agent tab', () => {
+    useSessionStore.setState((s) => ({
+      sessions: new Map(s.sessions).set('s1', { ...sessionOf('s1')!, surface: 'agent' }),
+    }))
+    expect(answerChoice('s1', 1)).toBe(false)
+    expect(terminalApi.input).not.toHaveBeenCalled()
+  })
+})
+
 describe('createTerminalSession — typing answers a guessed ask', () => {
   it('clears the bell and the screen choice on a keystroke, but not on a focus report', async () => {
     await createTerminalSession(terminalRequest())

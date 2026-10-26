@@ -24,7 +24,8 @@ function conversationOf(
   report: NonNullable<ReturnType<typeof parseHookReport>>
 ): AgentConversation {
   return {
-    provider: report.provider,
+    agentId: report.provider,
+    transport: 'tui',
     sessionId: report.sessionId,
     transcriptPath: report.transcriptPath,
     cwd: report.cwd,

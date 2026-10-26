@@ -21,11 +21,10 @@ type SummarySession = ThreadSummaryInput['sessions'][number]
 /** The session with its opening prompt and last words read from its transcript, when it has one. */
 async function withTranscript(session: SummarySession): Promise<SummarySession> {
   const record = listRecords().find((r) => r.sessionId === session.sessionId)
-  if (session.sessionId === undefined || !record?.agent) return session
+  const transcriptPath = record?.agent?.transcriptPath ?? null
+  if (session.sessionId === undefined || transcriptPath === null) return session
   try {
-    const { firstUserPrompt, lastAssistantTexts } = await readTranscriptUsage(
-      record.agent.transcriptPath
-    )
+    const { firstUserPrompt, lastAssistantTexts } = await readTranscriptUsage(transcriptPath)
     return { ...session, firstUserPrompt, lastAssistantTexts }
   } catch {
     return session

@@ -4,6 +4,7 @@ import { getGlobalSettings } from '../../storage/settings-store.js'
 import { createAgentLog } from './agent-log.js'
 import { agentMeta, createConnector } from './agent-connection.js'
 import { listAgents } from './agent-registry.js'
+import { recordAgentTab } from './record-agent-tab.js'
 import { createAgentService, type AgentService } from './agent-service.js'
 
 let service: AgentService | undefined
@@ -22,6 +23,7 @@ export function startAgentService(
     scratchDirectory: join(userData, 'agent-scratch'),
     scrollbackLimit: () => getGlobalSettings().terminal.scrollbackLimit,
     broadcast,
+    recordTab: (session) => recordAgentTab(session, () => new Date().toISOString()),
     now: Date.now,
   })
   return service

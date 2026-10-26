@@ -4,7 +4,8 @@ import { fact } from './fixtures/facts'
 import type { AgentConversation } from '../../../../src/shared/types/index'
 
 const conversation: AgentConversation = {
-  provider: 'claude',
+  agentId: 'claude',
+  transport: 'tui',
   sessionId: 'b610a882-41f3-4833-a6a3-dc3a33aea060',
   transcriptPath: '/t/b610a882.jsonl',
   cwd: '/code/northwind-api',
@@ -37,11 +38,15 @@ describe('planResume', () => {
       fromSessionId: 's1',
       projectId: 'p1',
       cwd: '/code/northwind-api',
+      transport: 'tui',
+      agentId: 'claude',
       command: 'claude --resume b610a882-41f3-4833-a6a3-dc3a33aea060',
       conversationId: conversation.sessionId,
     })
   })
+})
 
+describe('planResume — which sessions', () => {
   it('plans one for a closed session too', () => {
     expect(
       planResume(exited({ isClosed: true, closedAt: '2026-09-15T19:00:00.000Z' }))
@@ -62,6 +67,33 @@ describe('planResume', () => {
 
   it('has no plan when the conversation can no longer be resumed', () => {
     expect(planResume(exited({ resumable: false }))).toBeNull()
+  })
+})
+
+describe('planResume — a conversation run in an agent tab', () => {
+  const tab: AgentConversation = {
+    agentId: 'opencode',
+    transport: 'acp',
+    sessionId: 'acp-session-1',
+    transcriptPath: null,
+    cwd: '/code/northwind-api',
+    capturedAt: '2026-09-15T18:00:00.000Z',
+  }
+
+  it('plans an agent tab resume with no typed command', () => {
+    expect(planResume(exited({ agent: tab }))).toEqual({
+      fromSessionId: 's1',
+      projectId: 'p1',
+      cwd: '/code/northwind-api',
+      transport: 'acp',
+      agentId: 'opencode',
+      command: null,
+      conversationId: 'acp-session-1',
+    })
+  })
+
+  it('plans a terminal resume for a terminal conversation', () => {
+    expect(planResume(exited())).toMatchObject({ transport: 'tui', agentId: 'claude' })
   })
 })
 

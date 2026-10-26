@@ -68,7 +68,8 @@ const OPEN_SESSION = {
 describe('ThreadDrawer terminal section', () => {
   it("shows the lead agent session's live terminal and opens it on click", () => {
     const agent = {
-      provider: 'claude',
+      agentId: 'claude',
+      transport: 'tui',
       sessionId: 'agent-1',
       transcriptPath: '/t.jsonl',
       cwd: '/repos/terminator',

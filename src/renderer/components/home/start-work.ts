@@ -6,7 +6,7 @@ import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry, type StartWorkOptionRegistration } from '../../extensions/registry'
 import { useExtensionCommandsStore } from '../../stores/extension-commands.store'
-import { startSessionInBranch } from '../../terminal/start-session'
+import { startAgentInBranch, startSessionInBranch } from '../../terminal/start-session'
 import { singleQuoted } from '../../terminal/typed-input'
 import { MAX_TYPED_LINE_BYTES } from '../../quick-actions/custom-actions'
 import { openSnapshot } from '../../sidebar/session-facts'
@@ -31,7 +31,7 @@ export const useStartWorkStore = create<{
   closeLauncher: () => set({ open: false, prefill: '' }),
 }))
 
-/** 'agent', 'terminal', or the key of an extension's start-work option. */
+/** 'agent', 'claude-terminal', 'terminal', or the key of an extension's start-work option. */
 export type RunAs = string
 
 export interface RunAsOption {
@@ -40,28 +40,33 @@ export interface RunAsOption {
   hint: string
 }
 
-const BUILT_IN_RUN_AS: RunAsOption[] = [
+const builtInRunAs = (agentName: string): RunAsOption[] => [
   {
     value: 'agent',
-    label: 'Claude agent',
-    hint: 'Ticket injected as context. You answer its questions on the Desk.',
+    label: `${agentName} in an agent tab`,
+    hint: 'The ticket is its first prompt. Its questions show in the tab and on the Desk.',
+  },
+  {
+    value: 'claude-terminal',
+    label: 'Claude in a terminal',
+    hint: 'The claude program in a shell, as before.',
   },
   { value: 'terminal', label: 'Terminal only', hint: 'A shell in the new worktree.' },
 ]
 
-/** Claude agent and Terminal only, then every option an extension declared. */
-export function useRunAsOptions(): RunAsOption[] {
+/** The agent tab, Claude in a terminal and Terminal only, then every option an extension declared. */
+export function useRunAsOptions(agentName: string): RunAsOption[] {
   const registered = useExtensionRegistry((s) => s.startWorkOptions)
   return useMemo(
     () => [
-      ...BUILT_IN_RUN_AS,
+      ...builtInRunAs(agentName),
       ...[...registered.values()].map((o) => ({
         value: o.key,
         label: o.label,
         hint: o.description,
       })),
     ],
-    [registered]
+    [registered, agentName]
   )
 }
 
@@ -140,7 +145,7 @@ export function agentCommand(prompt: string | null): string | null {
 const ticketPrompt = (issue: IssueSummary): string =>
   `Work on ${issue.key}: ${issue.title} (${issue.url})`
 
-export type WorkRequest = { workspace: Workspace; runAs: RunAs } & (
+export type WorkRequest = { workspace: Workspace; runAs: RunAs; agentId?: string } & (
   | { kind: 'ticket'; issue: IssueSummary }
   | { kind: 'prompt'; text: string }
   /** `prompt` is what the agent is first told on this branch; none starts it with nothing. */
@@ -204,9 +209,9 @@ function promptOf(request: WorkRequest): string | null {
   return request.kind === 'prompt' ? request.text : null
 }
 
-/** The line to type in the new terminal: nothing for a plain shell. */
+/** The line to type in the new terminal: nothing for a plain shell or an agent tab. */
 function commandFor(request: WorkRequest): string | undefined | Error {
-  if (request.runAs !== 'agent') return undefined
+  if (request.runAs !== 'claude-terminal') return undefined
   const command = agentCommand(promptOf(request))
   return command ?? new Error(PROMPT_TOO_LONG)
 }
@@ -265,8 +270,19 @@ export async function startWork(request: WorkRequest): Promise<Outcome> {
   if (command instanceof Error) return command.message
   const projectId = await projectFor(request)
   if (projectId instanceof Error) return projectId.message
-  const sessionId = await startSessionInBranch(projectId, command)
-  if (sessionId === null) return 'The terminal could not be opened.'
+  const sessionId =
+    request.runAs === 'agent'
+      ? await startAgentInBranch({
+          projectId,
+          title: request.kind === 'ticket' ? request.issue.key : 'Agent',
+          prompt: promptOf(request),
+          agentId: request.agentId,
+        })
+      : await startSessionInBranch(projectId, command)
+  if (sessionId === null)
+    return request.runAs === 'agent'
+      ? 'The agent could not be started.'
+      : 'The terminal could not be opened.'
   if (request.kind === 'ticket') await linkTicket(sessionId, request.issue)
   restoreStarted(request)
   return null

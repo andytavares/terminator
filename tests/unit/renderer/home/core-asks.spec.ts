@@ -4,7 +4,8 @@ import { fact } from '../sidebar/fixtures/facts'
 
 const titles = new Map([['linear:TAV-31', 'Rate limit']])
 const agent = {
-  provider: 'claude',
+  agentId: 'claude',
+  transport: 'tui',
   sessionId: 'c1',
   transcriptPath: '/t',
   cwd: '/r',

@@ -10,6 +10,7 @@ import {
   type RendererCommand,
 } from '../quick-actions/extension-actions'
 import { CORE_GROUPS } from '../quick-actions/groups'
+import { promptAgentTab } from '../terminal/agent-tab'
 import { buildCustomQuickActions } from '../quick-actions/custom-runtime'
 import type { CustomRunEnv } from '../quick-actions/custom-actions'
 import { rankFirstScreen } from '../quick-actions/rank'
@@ -130,6 +131,7 @@ function useCustomEnv(target: QuickActionTarget): CustomRunEnv {
         ? {
             sessionId: focusedSession.id,
             isAgent: focusedSession.type === 'agent',
+            isAgentTab: focusedSession.surface === 'agent',
             agentState: agentStateOf(focusedSession),
           }
         : null,
@@ -166,6 +168,7 @@ function useCustomQuickActions(target: QuickActionTarget): QuickAction[] {
     () =>
       buildCustomQuickActions([...(globalCustom ?? []), ...(workspaceCustom ?? [])], env, {
         input: (sessionId, data) => window.electronAPI.terminal.input(sessionId, data),
+        prompt: promptAgentTab,
         openTab: (tabProjectId) => openProjectTab(tabProjectId, activeWorkspaceId, createSession),
         notify: (message) => useToastStore.getState().addToast({ type: 'error', message }),
       }),

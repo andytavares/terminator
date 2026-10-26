@@ -233,7 +233,8 @@ export function answerChoice(sessionId: string, number: number): boolean {
   const store = useSessionStore.getState()
   const session = store.sessions.get(sessionId)
   const instance = store.getTerminalInstance(sessionId)
-  if (session === undefined || instance === undefined) return false
+  // An agent tab asks through the protocol; there is no screen to read.
+  if (session === undefined || instance === undefined || session.surface === 'agent') return false
   const onScreen = parseChoicePrompt(instance.readVisibleRows())
   const offered = onScreen?.options.some((o) => o.number === number) === true
   if (!samePrompt(session.choicePrompt ?? null, onScreen) || !offered) {

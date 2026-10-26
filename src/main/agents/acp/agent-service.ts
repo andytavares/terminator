@@ -72,6 +72,13 @@ export interface AgentServiceDeps {
   scratchDirectory: string
   scrollbackLimit(): number
   broadcast(channel: string, payload: unknown): void
+  /** A session opened a tab: keep its conversation on the session record. */
+  recordTab(session: {
+    sessionId: string
+    agentId: string
+    cwd: string
+    tab: { projectId: string; title: string }
+  }): void
   now(): number
 }
 
@@ -327,7 +334,15 @@ class AcpAgentService implements AgentService {
   async start(input: StartAgentInput): Promise<AgentStarted | null> {
     try {
       const session = await this.open(input, false)
-      if (input.tab) this.showTab(session, input.tab)
+      if (input.tab) {
+        this.showTab(session, input.tab)
+        this.deps.recordTab({
+          sessionId: session.id,
+          agentId: session.agentId,
+          cwd: input.cwd,
+          tab: input.tab,
+        })
+      }
       return {
         sessionId: session.id,
         agentId: session.agentId,

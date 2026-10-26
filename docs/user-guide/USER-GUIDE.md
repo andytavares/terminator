@@ -245,6 +245,7 @@ Open Settings with **`Cmd+,`** or via **View → Open Settings**.
 | ------------------ | ----------------------------------------------------------------------------- |
 | **Interface**      | Theme (dark/light), show CPU/Memory/Network bar, hide the branch tree on Home |
 | **Terminal**       | Default shell, scrollback limit                                               |
+| **Agents**         | Default agent and your own ACP agents — see below                             |
 | **Integrations**   | Connect Linear and Jira — see below                                           |
 | **Extensions**     | Enable/disable individual extensions                                          |
 | **Remote Control** | Enable local server, port, ngrok tunnel, session password                     |
@@ -466,7 +467,7 @@ The drawer holds:
 
 A branch that is in no task is still a task of one lane, so you do not have to make one. To join work, either:
 
-- **Start work → Across repos** (`Cmd+N`, then the **Across repos** tab). Enter a title such as "Rate limits across services"; the branch name follows it (`rate-limits-across-services`) until you type your own. Tick the repos, choose how to run it (**Claude agent**, **Terminal only**, or **Foundry**), optionally add a ticket and a first prompt for each agent, and press **Start 3 lanes**. Terminator makes a worktree on that branch in each repo, opens a terminal in each and records one task. If a branch name is taken in a repo, that repo says so and nothing starts until you fix or untick it.
+- **Start work → Across repos** (`Cmd+N`, then the **Across repos** tab). Enter a title such as "Rate limits across services"; the branch name follows it (`rate-limits-across-services`) until you type your own. Tick the repos, choose how to run it (**an agent in an agent tab**, **Claude in a terminal**, **Terminal only**, or **Foundry**), optionally add a ticket and a first prompt for each agent, and press **Start 3 lanes**. Terminator makes a worktree on that branch in each repo, opens a terminal in each and records one task. If a branch name is taken in a repo, that repo says so and nothing starts until you fix or untick it.
 - **Add to task…** on work already under way. It is on a branch row in the sidebar, on a terminal's tab, on an Overview tile (right-click it), and on a Home row's menu. The picker lists open tasks, and **+ New task from api-gateway/rate-limits**. If other repos have a branch of the same name, it offers to add them too; they join only when you confirm.
 
 - **Drag one Home row onto another** to merge them. The row you drop on keeps its name and takes every lane of the row you dragged; a dragged task is gone afterwards. A toast says what moved, with **Undo**. A row with no branch cannot be merged.
@@ -489,7 +490,7 @@ A ticket linked to several branches joins them as a task without anything stored
 - **Across repos** starts one task in several repos (see above).
 - **Scratch terminal** opens a terminal that belongs to no branch.
 
-Choose how to run it — as a **Claude agent**, **Terminal only**, or a **Foundry** order — with `Tab`. The **Workspace** button at the right of the tabs shows where the work will run and why that workspace was suggested; press it or `Cmd+R` to pick another, type to filter, and `Enter` to choose. `Enter` starts it, and Terminator opens what it started so you land in it.
+Choose how to run it — as an **agent in an agent tab** (the default agent, with a picker when you have more than one), **Claude in a terminal**, **Terminal only**, or a **Foundry** order — with `Tab`. In an agent tab the ticket is the agent's first prompt and has no length limit; its questions show in the tab and on Home. **Claude in a terminal** types `claude '<prompt>'` into a shell and refuses a prompt over 1024 bytes. The **Workspace** button at the right of the tabs shows where the work will run and why that workspace was suggested; press it or `Cmd+R` to pick another, type to filter, and `Enter` to choose. `Enter` starts it, and Terminator opens what it started so you land in it.
 
 #### Search
 
@@ -573,17 +574,21 @@ Tile size (**S**, **M**, **L**), **Pin sessions that need you** and **Then by** 
 
 "Waiting on you" is worked out from what the terminal does: a bell, or a numbered choice left on screen when output stops. An agent that waits without either reads as idle.
 
+### Agents
+
+Terminator starts agents over the Agent Client Protocol (ACP) and shows each as an **agent tab**. Claude Code is built in. **Settings → Agents** sets the **Default agent** and lists your own. Any agent that speaks ACP works: choose **Add agent**, give it an id, a label and the command line that starts it, for example `opencode acp`. Everywhere you start an agent (Start work, a thread's **New agent on this branch**, Send to agent), the agent tab is the default and **Claude in a terminal** stays available.
+
 ### Picking a Claude Code conversation back up
 
-When a Claude Code session ends — you typed `/exit`, the terminal closed, or you quit Terminator — the conversation itself is still on disk. A **Resume** button appears on that session wherever it is shown: its work thread's drawer on Home, and its Overview tile. Press it and Terminator opens a terminal on the same branch, in the same folder, running `claude --resume` for that conversation. The new terminal takes over the old one's description and ticket link, and the exited tab closes, so there is one terminal per conversation.
+When a Claude Code session ends — you typed `/exit`, the terminal closed, or you quit Terminator — the conversation itself is still on disk. A **Resume** button appears on that session wherever it is shown: its work thread's drawer on Home, and its Overview tile. Press it and Terminator opens it on the same branch, in the same folder: a terminal running `claude --resume` for a conversation that ran in a terminal, an agent tab for one that ran in an agent tab. The new terminal takes over the old one's description and ticket link, and the exited tab closes, so there is one terminal per conversation.
 
 After a restart, conversations from the last run wait with their Resume button. Nothing is resumed for you: a restart never starts agents on its own, so you choose which threads to pick up. A thread whose sessions have all ended stays in the task list until its pull request merges or closes, or you archive it, or its records are dropped after 30 days. **Resume a conversation…** in Quick actions (`Cmd+P`) opens the drawer of the thread holding the most recent one.
 
 Resume appears only where it can work:
 
-- Only for **Claude Code** sessions. A plain shell has nothing to resume, and no button.
+- Only for agent sessions: Claude Code in a terminal, or any agent in an agent tab. A plain shell has nothing to resume, and no button.
 - Only once the conversation has been seen. Terminator learns it from Claude Code itself, so it appears a second or two after the agent starts — including a `claude` you typed yourself.
-- If the conversation's transcript has been deleted, or the record came from another machine, the session says **Conversation no longer available** in place of the button.
+- If the conversation's transcript has been deleted (agent tabs of agents that keep no transcript always offer Resume), or the record came from another machine, the session says **Conversation no longer available** in place of the button.
 
 **How Terminator learns the conversation.** On first launch it adds one `SessionStart` entry to your own `~/.claude/settings.json`. The entry runs a small script that records which conversation is running in which Terminator terminal, and writes nothing else. To turn the feature off, open that file and delete the entry under `hooks.SessionStart` whose command mentions `agent-session-hook.cjs`, then restart Claude Code sessions. Terminator will add it again the next time it starts, so remove it after quitting Terminator if you want it to stay gone. Nothing else in the file is touched, and a settings file Terminator cannot parse is never overwritten.
 

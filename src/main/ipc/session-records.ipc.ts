@@ -35,7 +35,9 @@ import type { SessionRecord, SessionRecordListing } from '../../shared/types/ind
  */
 function listing(record: SessionRecord | null): SessionRecordListing | null {
   if (record === null) return null
-  const resumable = record.agent !== null && fs.existsSync(record.agent.transcriptPath)
+  const transcript = record.agent?.transcriptPath
+  // An agent with no transcript of its own cannot be checked, so it is offered.
+  const resumable = record.agent != null && (transcript == null || fs.existsSync(transcript))
   return { ...record, resumable }
 }
 

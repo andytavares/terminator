@@ -51,7 +51,7 @@ vi.mock('../../../../src/renderer/components/session/SessionLinkDialog', () => (
   SessionLinkDialog: linkStub.FakeLinkDialog,
 }))
 vi.mock('../../../../src/renderer/terminal/start-session', () => ({
-  startSessionInBranch: spies.startInBranch,
+  startAgentInBranch: spies.startInBranch,
 }))
 
 const deskFilter = vi.hoisted(() => ({ text: '', count: null as string | null }))
@@ -256,10 +256,12 @@ describe('the work-thread drawer — actions', () => {
     expect(drawer.getByRole('button', { name: 'Restore' })).toBeTruthy()
   })
 
-  it("starts a Claude agent on the thread's branch", async () => {
+  it("starts an agent tab on the thread's branch", async () => {
     const drawer = within(await openBuilding())
     fireEvent.click(drawer.getByRole('button', { name: 'New agent on this branch' }))
-    expect(spies.startInBranch).toHaveBeenCalledWith('p20', expect.stringContaining('claude'))
+    expect(spies.startInBranch).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: 'p20', prompt: expect.stringContaining('Work on') })
+    )
   })
 
   it('opens a session from its row', async () => {

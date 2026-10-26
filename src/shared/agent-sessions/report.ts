@@ -1,10 +1,8 @@
-import type { AgentProvider } from '../types/index.js'
-
 /** What the capture hook writes for one terminal, once its agent has reported a conversation. */
 export interface HookReport {
   /** The terminal the agent is running in — this application's own session id. */
   terminal: string
-  provider: AgentProvider
+  provider: 'claude'
   sessionId: string
   transcriptPath: string
   cwd: string
@@ -34,7 +32,7 @@ export function parseHookReport(value: unknown): HookReport | null {
 
   return {
     ...where,
-    provider: provider as AgentProvider,
+    provider: 'claude',
     source: text(raw.source) ?? 'unknown',
     at: text(raw.at) ?? new Date().toISOString(),
   }

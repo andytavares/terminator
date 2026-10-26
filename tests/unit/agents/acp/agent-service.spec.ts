@@ -21,6 +21,8 @@ const OPTIONS = [
   { optionId: 'reject', name: 'Reject', kind: 'reject_once' as const },
 ]
 
+const recordTab = vi.fn()
+
 function serviceWith(connect: AgentServiceDeps['connect'], broadcast = vi.fn()) {
   return createAgentService({
     connect,
@@ -31,6 +33,7 @@ function serviceWith(connect: AgentServiceDeps['connect'], broadcast = vi.fn()) 
     scratchDirectory: makeTempDir('agent-scratch-'),
     scrollbackLimit: () => 5000,
     broadcast,
+    recordTab,
     now: () => 0,
   })
 }
@@ -120,6 +123,25 @@ describe('start with a resume or a tab', () => {
       scrollbackLimit: 5000,
       surface: 'agent',
     })
+  })
+})
+
+describe('start — recording a tab', () => {
+  it('records the conversation of a session that has a tab', async () => {
+    const tab = { projectId: 'p1', title: 'Fix' }
+    await started({ cwd: '/work', tab })
+    expect(recordTab).toHaveBeenCalledWith({
+      sessionId: SESSION_ID,
+      agentId: 'claude',
+      cwd: '/work',
+      tab,
+    })
+  })
+
+  it('records nothing for a session without a tab', async () => {
+    recordTab.mockClear()
+    await started({ cwd: '/work' })
+    expect(recordTab).not.toHaveBeenCalled()
   })
 
   it('returns null when the agent cannot start', async () => {
