@@ -312,6 +312,8 @@ export interface RunAgentOnceInput extends Omit<StartAgentInput, 'resume' | 'tab
   prompt: string
   /** Default 5 minutes. On expiry the session is cancelled and closed. */
   timeoutMs?: number
+  /** Called once the session exists, so the caller can `cancel` it. Since 5.2.0. */
+  onStarted?: (sessionId: string) => void
 }
 
 export type RunAgentOnceResult =

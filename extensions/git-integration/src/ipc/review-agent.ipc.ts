@@ -26,7 +26,7 @@ export interface ReviewAgentDeps {
   broadcast: (channel: string, data: unknown) => void
   /** The core's `api.agents`: reviews and summaries ask through `runOnce`, a run's conversation
    *  opens through `start`. */
-  agents: Pick<AgentsAPI, 'runOnce' | 'start'>
+  agents: Pick<AgentsAPI, 'runOnce' | 'start' | 'cancel'>
   /** The workspace project that holds the repo's checkout, or undefined. */
   projectIdFor: (repoRoot: string) => string | undefined
   /** The extension's own globalStorage folder, where a summary's agent runs: `repoRoot` can be a
@@ -180,7 +180,10 @@ async function finishAgentRun(ctx: AgentContext, slot: RunSlot, finished: AgentR
 
 /** `runOnce` bound to the service, which keeps state a bare method reference would lose. */
 function agentDepsOf(ctx: AgentContext): RunAgentReviewDeps {
-  return { runOnce: (input) => ctx.deps.agents.runOnce(input) }
+  return {
+    runOnce: (input) => ctx.deps.agents.runOnce(input),
+    cancelSession: (sessionId) => ctx.deps.agents.cancel(sessionId),
+  }
 }
 
 /** Runs the agent in the PR head's worktree; any failure ends the run as failed. */

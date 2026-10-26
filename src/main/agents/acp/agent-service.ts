@@ -37,6 +37,7 @@ import type { AgentLog } from './agent-log.js'
 
 const logger = makeLogger('agent-service')
 const DEFAULT_TIMEOUT_MS = 300_000
+const DEFAULT_START_TIMEOUT_MS = 60_000
 
 /** The calls the service makes on an agent: a `ClientSideConnection` has them all. */
 export interface AgentCalls {
@@ -80,6 +81,8 @@ export interface AgentServiceDeps {
     tab: { projectId: string; title: string }
   }): void
   now(): number
+  /** How long an agent may take to open a session before it is killed. Default 60 s. */
+  startTimeoutMs?: number
 }
 
 export interface AgentService extends AgentsAPI {
@@ -176,6 +179,15 @@ function newSession(fields: Pick<Session, 'id' | 'agentId' | 'link' | 'unattende
     permissionListeners: new Set(),
     endListeners: new Set(),
   }
+}
+
+/** `work`, or a rejection once `ms` pass without it settling. */
+function withinTime<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const expiry = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`no answer within ${ms} ms`)), ms)
+  })
+  return Promise.race([work, expiry]).finally(() => clearTimeout(timer))
 }
 
 /** Starts collecting the session's reply text; the returned function reads what came so far. */
@@ -307,7 +319,8 @@ class AcpAgentService implements AgentService {
     const session = newSession({ id: input.resume ?? '', agentId, link, unattended })
     link.onExit((exitCode) => this.finish(session, exitCode))
     try {
-      session.configOptions = await this.begin(session, input)
+      const limit = this.deps.startTimeoutMs ?? DEFAULT_START_TIMEOUT_MS
+      session.configOptions = await withinTime(this.begin(session, input), limit)
       if (input.mode !== undefined) await this.applyMode(session, input.mode)
       return session
     } catch (error) {
@@ -416,7 +429,7 @@ class AcpAgentService implements AgentService {
   }
 
   async runOnce(input: RunAgentOnceInput): Promise<RunAgentOnceResult> {
-    const { prompt, timeoutMs = DEFAULT_TIMEOUT_MS, ...startInput } = input
+    const { prompt, timeoutMs = DEFAULT_TIMEOUT_MS, onStarted, ...startInput } = input
     let session: Session
     try {
       session = await this.open(startInput, true)
@@ -425,6 +438,7 @@ class AcpAgentService implements AgentService {
       return { error: 'AGENT_UNAVAILABLE', message: UNAVAILABLE_MESSAGE }
     }
     const reply = collectReply(session)
+    onStarted?.(session.id)
     let timedOut = false
     const timer = setTimeout(() => {
       timedOut = true

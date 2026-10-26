@@ -277,6 +277,8 @@ export interface RunAgentReviewInput extends DiffTarget {
 export interface RunAgentReviewDeps {
   /** The core's `api.agents.runOnce`. */
   runOnce: AgentsAPI['runOnce']
+  /** The core's `api.agents.cancel`: what stops a session a cancelled run started. */
+  cancelSession?: AgentsAPI['cancel']
   exec?: ExecFn
 }
 
@@ -300,16 +302,19 @@ type AgentExit =
   | { kind: 'failed'; error: string }
   | { kind: 'cancelled' }
 
-/** Lets `cancel()` reach a run already under way: `runOnce` has no cancel, so a cancel wins a
- *  race against its answer, and the session ends at its own timeout. */
+/** Lets `cancel()` reach a run already under way: a cancel wins the race against the answer,
+ *  and stops the agent's session as soon as the run knows its id. */
 interface RunControl {
   cancelled: boolean
   whenCancelled: Promise<AgentExit>
   cancel: () => void
+  /** The run's session exists. */
+  started: (sessionId: string) => void
 }
 
-function newRunControl(): RunControl {
+function newRunControl(stopSession: (sessionId: string) => void = () => {}): RunControl {
   let settle: () => void = () => {}
+  let sessionId: string | null = null
   const whenCancelled = new Promise<AgentExit>((resolve) => {
     settle = () => resolve({ kind: 'cancelled' })
   })
@@ -318,7 +323,12 @@ function newRunControl(): RunControl {
     whenCancelled,
     cancel: () => {
       control.cancelled = true
+      if (sessionId !== null) stopSession(sessionId)
       settle()
+    },
+    started: (id) => {
+      sessionId = id
+      if (control.cancelled) stopSession(id)
     },
   }
   return control
@@ -434,6 +444,7 @@ async function askAgent(
     mode: 'default',
     agentMeta: { claudeCode: { options } },
     timeoutMs: call.timeoutMs,
+    onStarted: control.started,
   }).then(toAgentExit, (e): AgentExit => ({ kind: 'failed', error: String(e) }))
   return Promise.race([reply, control.whenCancelled])
 }
@@ -487,7 +498,7 @@ export function runAgentReview(
 ): RunAgentReviewResult {
   const runId = randomUUID()
   const run: RunContext = { input, runId, startedAt: new Date().toISOString(), activity: [] }
-  const control = newRunControl()
+  const control = newRunControl(deps.cancelSession)
   return { runId, done: executeAgentRun(run, deps, control), cancel: control.cancel }
 }
 
@@ -576,7 +587,7 @@ function summaryFromExit(exit: AgentExit): SummaryResult {
 
 /** Summarizes a PR's description or discussion with the review agent, read-only. */
 export function runSummary(input: RunSummaryInput, deps: RunAgentReviewDeps): RunSummaryResult {
-  const control = newRunControl()
+  const control = newRunControl(deps.cancelSession)
   const { cwd, model, effort, timeoutMs } = input
   const prompt = withJsonReplyRule(buildSummaryPrompt(input), summaryJsonSchema())
   return {

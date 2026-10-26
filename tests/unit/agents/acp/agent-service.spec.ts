@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { AgentPermissionAsk, AgentUpdate, StartAgentInput } from '@terminator/extension-sdk'
 import {
   createAgentService,
+  type AgentLink,
   type AgentServiceDeps,
 } from '../../../../src/main/agents/acp/agent-service'
+import { partialFake } from '../../../support/fakes'
 import { createAgentLog } from '../../../../src/main/agents/acp/agent-log'
 import { makeTempDir } from '../../../support/temp-dir'
 import { fakeConnector, SESSION_ID, type FakeAgent } from './fake-agent'
@@ -25,6 +27,7 @@ const recordTab = vi.fn()
 
 function serviceWith(connect: AgentServiceDeps['connect'], broadcast = vi.fn()) {
   return createAgentService({
+    startTimeoutMs: 50,
     connect,
     listAgents: () => [{ id: 'claude', label: 'Claude Code' }],
     defaultAgentId: () => 'claude',
@@ -332,6 +335,37 @@ describe('runOnce', () => {
     }
     expect(await run).toMatchObject({ error: 'TIMEOUT' })
     expect(agent.killed).toBe(true)
+  })
+})
+
+describe('runOnce cancelled by its caller', () => {
+  it('names the session once it exists, so a cancel reaches the agent', async () => {
+    const { service, firstAgent } = setup()
+    const onStarted = vi.fn((sessionId: string) => service.cancel(sessionId))
+    const run = service.runOnce({ cwd: '/w', prompt: 'slow', onStarted })
+    const agent = await firstAgent
+    agent.onPrompt = async () => {
+      await agent.cancelled
+      return { stopReason: 'cancelled' }
+    }
+    expect(await run).toMatchObject({ stopReason: 'cancelled', sessionId: SESSION_ID })
+    expect(onStarted).toHaveBeenCalledWith(SESSION_ID)
+    expect(agent.killed).toBe(true)
+  })
+})
+
+describe('an agent that never answers', () => {
+  it('is killed and reported unavailable once the start time runs out', async () => {
+    const link = {
+      agent: partialFake<AgentLink['agent']>({ initialize: () => new Promise(() => undefined) }),
+      onExit: () => undefined,
+      kill: vi.fn(),
+    }
+    const service = serviceWith(async () => link)
+    expect(await service.runOnce({ cwd: '/w', prompt: 'x' })).toMatchObject({
+      error: 'AGENT_UNAVAILABLE',
+    })
+    expect(link.kill).toHaveBeenCalled()
   })
 })
 

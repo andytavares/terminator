@@ -329,7 +329,41 @@ describe('runAgentReview — cancelling', () => {
     cancel()
     expect((await done).status).toBe('cancelled')
   })
+})
 
+describe('runAgentReview — cancelling the agent session', () => {
+  it('cancel() stops the agent session the run started', async () => {
+    const exec = vi.fn(async () => ({ stdout: 'diff' }))
+    const cancelSession = vi.fn()
+    const runOnce = vi.fn<RunOnce>(async (input) => {
+      input.onStarted?.('acp-7')
+      return NEVER_REPLIES
+    })
+    const { done, cancel } = runAgentReview(baseInput, { exec, runOnce, cancelSession })
+    await eventually(() => expect(runOnce).toHaveBeenCalled())
+    cancel()
+    expect((await done).status).toBe('cancelled')
+    expect(cancelSession).toHaveBeenCalledWith('acp-7')
+  })
+
+  it('stops a session that starts after the cancel', async () => {
+    const exec = vi.fn(async () => ({ stdout: 'diff' }))
+    const cancelSession = vi.fn()
+    let started: (sessionId: string) => void = () => {}
+    const runOnce = vi.fn<RunOnce>(async (input) => {
+      started = (sessionId) => input.onStarted?.(sessionId)
+      return NEVER_REPLIES
+    })
+    const { done, cancel } = runAgentReview(baseInput, { exec, runOnce, cancelSession })
+    await eventually(() => expect(runOnce).toHaveBeenCalled())
+    cancel()
+    started('acp-8')
+    expect((await done).status).toBe('cancelled')
+    expect(cancelSession).toHaveBeenCalledWith('acp-8')
+  })
+})
+
+describe('runAgentReview — cancelling before the agent', () => {
   it('does not ask the agent when cancelled while the diff is computed', async () => {
     let diffPrinted: (out: { stdout: string }) => void = () => {}
     const exec = vi.fn((_cmd: 'git', args: string[]) =>
