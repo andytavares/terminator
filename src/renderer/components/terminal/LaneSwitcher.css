@@ -1,0 +1,51 @@
+.lane-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: var(--tm-bg-base);
+  border-bottom: 1px solid var(--tm-border);
+  font-size: 12px;
+  overflow-x: auto;
+}
+
+.lane-switcher__title {
+  font-weight: 600;
+  color: var(--tm-text-primary);
+  margin-right: 6px;
+  white-space: nowrap;
+}
+
+.lane-switcher__lane {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  background: none;
+  color: var(--tm-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.lane-switcher__lane:hover:not(:disabled) {
+  background: var(--tm-bg-card-hover);
+}
+
+.lane-switcher__lane--on {
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-card-hover);
+}
+
+.lane-switcher__lane:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.lane-switcher .state-glyph {
+  width: 12px;
+  height: 12px;
+}

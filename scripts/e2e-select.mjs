@@ -102,6 +102,7 @@ export const CORE_SPECS = [
   'design-system-fields.spec.ts',
   'desk.spec.ts',
   'extension-lifecycle.spec.ts',
+  'home-tasks.spec.ts',
   'issue-trackers.spec.ts',
   'live-preview-spacing.spec.ts',
   'monitor-wall.spec.ts',
@@ -110,6 +111,7 @@ export const CORE_SPECS = [
   'session-surfaces.spec.ts',
   'settings.spec.ts',
   'sidebar-sorting.spec.ts',
+  'terminal-breakout.spec.ts',
 ]
 
 const SPEC_FILE_RE = /^tests\/e2e\/([^/]+\.spec\.ts)$/

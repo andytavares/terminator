@@ -1,5 +1,11 @@
 import { defineConfig } from '@playwright/test'
 import { e2eWorkerCount } from './tests/e2e/worker-count'
+import { TEST_TIME_ZONE } from './scripts/test-env.mjs'
+
+// The app runs in the sealed time zone; a spec that works out "today" must use the same one, or
+// between the two zones' midnights (8 pm to midnight in New York) they name different days.
+// Workers inherit it from here.
+process.env.TZ = TEST_TIME_ZONE
 
 // Specs that use what a machine has one of (the clipboard, remote-control port 17683, the
 // keychain) run one at a time in their own project; two at once read each other's clipboard.

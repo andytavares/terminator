@@ -1,27 +1,13 @@
-import React, { useRef, useLayoutEffect, useCallback } from 'react'
+import React, { useRef, useCallback } from 'react'
 import { X } from 'lucide-react'
 import { useSessionStore } from '../../stores/session.store'
 import './LeafPane.css'
 import { droppedPaths } from './dropped-paths'
+import { useMountedTerminal } from './use-mounted-terminal'
 
 interface Props {
   sessionId: string
   projectId: string
-}
-
-/** Puts the session's xterm in the container while the pane is mounted. */
-function useMountedTerminal(
-  containerRef: React.RefObject<HTMLDivElement>,
-  sessionId: string
-): void {
-  useLayoutEffect(() => {
-    const instance = useSessionStore.getState().getTerminalInstance(sessionId)
-    if (!instance || !containerRef.current) return
-    instance.mount(containerRef.current)
-    return () => {
-      instance.unmount()
-    }
-  }, [containerRef, sessionId])
 }
 
 function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {

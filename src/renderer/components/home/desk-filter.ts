@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { DeskAsk } from '../../home/core-asks'
+import type { TaskState } from '../../home/task-state'
 
 export type DeskCount = 'your-move' | 'agents' | 'others' | 'failing'
 
@@ -7,15 +8,20 @@ export type DeskCount = 'your-move' | 'agents' | 'others' | 'failing'
 export const useDeskFilter = create<{
   text: string
   count: DeskCount | null
+  /** The task state pressed on the Tasks layout's pulse line. */
+  taskState: TaskState | null
   setText: (text: string) => void
   setCount: (count: DeskCount | null) => void
+  setTaskState: (state: TaskState | null) => void
   clear: () => void
 }>((set) => ({
   text: '',
   count: null,
+  taskState: null,
   setText: (text) => set({ text }),
   setCount: (count) => set({ count }),
-  clear: () => set({ text: '', count: null }),
+  setTaskState: (taskState) => set({ taskState }),
+  clear: () => set({ text: '', count: null, taskState: null }),
 }))
 
 /** Whether every word of `text` appears somewhere in `fields`, case aside. */

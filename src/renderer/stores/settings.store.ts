@@ -8,6 +8,7 @@ import type {
   WorkspaceSettings,
 } from '../../shared/types/index'
 import { defaultGlobalSettings } from '../../shared/settings-defaults'
+import type { HomeLayout } from '../../shared/schemas/settings.schema'
 
 interface SettingsState {
   globalSettings: GlobalSettings | null
@@ -31,6 +32,7 @@ interface SettingsState {
   markWelcomeSeen: () => Promise<void>
   updateShowMetricsBar: (show: boolean) => Promise<void>
   updateHideSidebarOnHome: (hide: boolean) => Promise<void>
+  updateHomeLayout: (layout: HomeLayout) => Promise<void>
   updatePromptForName: (enabled: boolean) => Promise<void>
   updateNotificationDefaultTargets: (targets: NotificationTarget[]) => Promise<void>
   updateNotificationOverride: (key: string, targets: NotificationTarget[]) => Promise<void>
@@ -174,6 +176,7 @@ function preferenceSlice(
   | 'markWelcomeSeen'
   | 'updateShowMetricsBar'
   | 'updateHideSidebarOnHome'
+  | 'updateHomeLayout'
   | 'updateNotificationDefaultTargets'
   | 'updateNotificationOverride'
   | 'updateQuickActions'
@@ -182,6 +185,7 @@ function preferenceSlice(
     markWelcomeSeen: () => saveGlobal(set, { ui: { hasSeenWelcome: true } }),
     updateShowMetricsBar: (show) => saveGlobal(set, { ui: { showMetricsBar: show } }),
     updateHideSidebarOnHome: (hide) => saveGlobal(set, { ui: { hideSidebarOnHome: hide } }),
+    updateHomeLayout: (layout) => saveGlobal(set, { ui: { homeLayout: layout } }),
     updateNotificationDefaultTargets: (targets) =>
       saveGlobal(set, { notifications: { defaultTargets: targets } }),
     updateNotificationOverride: (key, targets) =>

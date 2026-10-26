@@ -1,6 +1,6 @@
-import { WORK_STAGES } from '@terminator/extension-ui'
 import { plural } from '@terminator/extension-sdk/plain'
 import type { WorkThread } from '../../home/work-threads'
+import { STATE_LABELS } from '../../home/task-state'
 
 const MINUTE_MS = 60_000
 const HOUR_MS = 60 * MINUTE_MS
@@ -14,7 +14,7 @@ export function compactAge(elapsedMs: number): string {
   return `${Math.floor(elapsedMs / DAY_MS)} d`
 }
 
-/** "20 minutes", "3 hours" or "1 day": how long a stage has waited, in words.
+/** "20 minutes", "3 hours" or "1 day": how long a thread has waited, in words.
  * @internal */
 export function ageInWords(elapsedMs: number): string {
   const [count, unit]: [number, string] =
@@ -26,12 +26,11 @@ export function ageInWords(elapsedMs: number): string {
   return `${count} ${plural(count, unit)}`
 }
 
-/** The line under the stage bar: "Building · your move", "In review · 1 day". */
-export function stageCaption(thread: WorkThread, now: number): string {
-  const name = WORK_STAGES.find((entry) => entry.stage === thread.stage)?.name ?? ''
-  if (thread.whoseMove === 'you') return `${name} · your move`
-  if (thread.stage === 'in-review') return `${name} · ${ageInWords(now - thread.lastActivity)}`
-  return name
+/** The state in words: "Running", "Waiting on others · 1 day". */
+export function stateCaption(thread: WorkThread, now: number): string {
+  const label = STATE_LABELS[thread.state]
+  if (thread.state === 'waiting') return `${label} · ${ageInWords(now - thread.lastActivity)}`
+  return label
 }
 
 export interface PullRequestSummary {

@@ -56,6 +56,8 @@ import { useFocusStore } from '../../../../src/renderer/home/focus-store'
 import { localDateKey } from '../../../../src/renderer/home/focus'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
+import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
+import { defaultGlobalSettings } from '../../../../src/shared/settings-defaults'
 
 const NOW = Date.now()
 
@@ -113,6 +115,11 @@ beforeEach(() => {
   useDismissalsStore.setState({ entries: {} })
   useStartWorkStore.setState({ open: false })
   useFocusStore.setState({ days: {} })
+  // These specs cover the Classic Desk; the Tasks layout has its own spec.
+  const defaults = defaultGlobalSettings('/bin/zsh')
+  useSettingsStore.setState({
+    globalSettings: { ...defaults, ui: { ...defaults.ui, homeLayout: 'classic' } },
+  })
   useSessionStore.setState({
     getTerminalInstance: () =>
       ({ readVisibleRows: () => ['Do you want to run it?', '❯ 1. Yes', '', ''] }) as never,
@@ -295,6 +302,13 @@ describe('HomeScreen — keys', () => {
   })
 })
 
+const bareThread = {
+  sessions: [],
+  facets: [],
+  archived: false,
+  state: 'running',
+  lanes: [],
+}
 describe('HomeScreen — the summary line', () => {
   it('shows each count that is not zero and leaves out the rest', () => {
     useHomeFeedStore.setState({ asks: [homeFeedAsk({ id: 'r1' }), homeFeedAsk({ id: 'r2' })] })
@@ -307,16 +321,13 @@ describe('HomeScreen — the summary line', () => {
 
   it('counts agents working and failing checks, singular and plural', () => {
     const working = {
+      ...bareThread,
       sessions: [{ state: 'working' }],
-      facets: [],
-      parked: false,
-      whoseMove: 'agents',
     }
     const failing = {
-      sessions: [],
+      ...bareThread,
       facets: [{ kind: 'pull-request', tone: 'bad' }],
-      parked: false,
-      whoseMove: 'others',
+      state: 'waiting',
     }
     state.threads = [working, failing]
     render(<HomeScreen />)
@@ -383,14 +394,6 @@ describe('HomeBadge', () => {
   })
 })
 
-const bareThread = {
-  sessions: [],
-  facets: [],
-  parked: false,
-  whoseMove: 'agents',
-  repoName: null,
-  branch: null,
-}
 const type = (text: string) =>
   fireEvent.change(screen.getByRole('searchbox', { name: 'Search work' }), {
     target: { value: text },
@@ -419,8 +422,7 @@ describe('HomeScreen — search results', () => {
         key: 't1',
         title: 'Rate limit',
         ticketKey: 'TAV-31',
-        repoName: 'cli',
-        branch: 'rl',
+        lanes: [{ repoName: 'cli', branch: 'rl' }],
       },
     ]
     state.facts = [fact({ sessionId: 's9', name: 'rate shell', branch: 'rl' })]

@@ -13,7 +13,7 @@ import {
 import { openHome, runInVisibleTerminal } from './session-views'
 import { expectCentredInWindow } from './modal-centre'
 
-// Home against the running app: it is the launch view, a terminal is listed under In flight by
+// Home against the running app: it is the launch view, a terminal is listed under Tasks by
 // the work it serves, and what the operator writes about a session names that work. Addressed by
 // role and name (contracts/ui-surfaces.md).
 
@@ -28,7 +28,7 @@ test.beforeAll(async () => {
 
 test.afterAll(() => closeApp(handle))
 
-const inFlight = (page: Page) => page.getByRole('region', { name: 'In flight' })
+const tasks = (page: Page) => page.getByRole('region', { name: 'Tasks' })
 const sessionTab = (page: Page) => page.locator('.tab-bar__tab--session').first()
 
 /** Clicks a control in a dialog or menu that has just opened over the Contributions frame: the
@@ -42,15 +42,15 @@ async function clickOnceDrawn(control: Locator): Promise<void> {
 async function opensOnHomeWithNothingOpen(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
   await expect(page.getByText('Nothing needs you.')).toBeVisible()
-  await expect(inFlight(page).getByText('0 work items')).toBeVisible()
+  await expect(tasks(page).getByText('Tasks · 0')).toBeVisible()
 }
 
 async function listsTerminalUnderItsWork(page: Page): Promise<void> {
   await createWorkspace(page, 'Repo One', e2eTempDir('home-'))
   await addAndSelectProject(page, 'Repo One', BRANCH)
   await openHome(page)
-  await expect(inFlight(page).getByText('1 work item')).toBeVisible()
-  await expect(inFlight(page).getByRole('button', { name: BRANCH })).toBeVisible()
+  await expect(tasks(page).getByText('Tasks · 1')).toBeVisible()
+  await expect(tasks(page).getByRole('button', { name: BRANCH })).toBeVisible()
 }
 
 async function tabMenuItem(page: Page, name: string): Promise<void> {
@@ -65,7 +65,7 @@ async function descriptionNamesTheWork(page: Page): Promise<void> {
   await box.fill(DESCRIPTION)
   await box.press('Enter')
   await openHome(page)
-  await expect(inFlight(page).getByRole('button', { name: DESCRIPTION })).toBeVisible()
+  await expect(tasks(page).getByRole('button', { name: DESCRIPTION })).toBeVisible()
 }
 
 async function openLinkDialog(page: Page): Promise<Locator> {
@@ -93,7 +93,7 @@ async function linkDialogClosesOnEscape(page: Page): Promise<void> {
 
 async function groupMenuOpensInsideTheWindow(page: Page): Promise<void> {
   await openHome(page)
-  await inFlight(page)
+  await tasks(page)
     .getByRole('button', { name: /^Group:/ })
     .click()
   const menu = page.getByRole('menu', { name: 'Group by' })
@@ -105,12 +105,12 @@ async function groupMenuOpensInsideTheWindow(page: Page): Promise<void> {
   expect(box.y + box.height).toBeLessThanOrEqual(view.height)
   await menu.getByRole('menuitemradio', { name: 'repo' }).click()
   await expect(menu).toBeHidden()
-  await expect(inFlight(page).getByRole('button', { name: 'Group: repo' })).toBeVisible()
+  await expect(tasks(page).getByRole('button', { name: 'Group: repo' })).toBeVisible()
 }
 
-/** The names of In flight's rows, top to bottom. */
-function inFlightOrder(page: Page): Promise<(string | null)[]> {
-  return inFlight(page)
+/** The names of the Tasks rows, top to bottom. */
+function tasksOrder(page: Page): Promise<(string | null)[]> {
+  return tasks(page)
     .locator('[data-thread-key]')
     .evaluateAll((rows) => rows.map((row) => row.getAttribute('aria-label')))
 }
@@ -125,13 +125,13 @@ async function outputLeavesInFlightOrder(page: Page): Promise<void> {
     .poll(async () => (await readTerminalRows(page)).some((row) => row.includes('printed-42')))
     .toBe(true)
   await openHome(page)
-  await expect.poll(() => inFlightOrder(page)).toEqual(['feature-b', DESCRIPTION])
+  await expect.poll(() => tasksOrder(page)).toEqual(['feature-b', DESCRIPTION])
 }
 
 test('a session is kept on Home under the work it serves, and what is written about it names that work', async () => {
   const { page } = handle
   await test.step('the app opens on Home with nothing open', () => opensOnHomeWithNothingOpen(page))
-  await test.step('Home lists a terminal under In flight, as the branch it runs on', () =>
+  await test.step('Home lists a terminal under Tasks, as the branch it runs on', () =>
     listsTerminalUnderItsWork(page))
   await test.step('describing a session from its tab names the work on Home', () =>
     descriptionNamesTheWork(page))
@@ -140,6 +140,6 @@ test('a session is kept on Home under the work it serves, and what is written ab
   await test.step('the link dialog closes on Escape', () => linkDialogClosesOnEscape(page))
   await test.step("Home's group menu opens inside the window", () =>
     groupMenuOpensInsideTheWindow(page))
-  await test.step('output in a session leaves In flight in the order it had', () =>
+  await test.step('output in a session leaves Tasks in the order it had', () =>
     outputLeavesInFlightOrder(page))
 })

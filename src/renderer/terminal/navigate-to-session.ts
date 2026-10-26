@@ -1,4 +1,5 @@
 import { useSessionStore } from '../stores/session.store'
+import { useBreakoutStore } from '../stores/breakout.store'
 import { useWorkspaceStore } from '../stores/workspace.store'
 import { useExtensionRegistry } from '../extensions/registry'
 import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
@@ -16,6 +17,8 @@ import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
 export function revealSession(sessionId: string): void {
   const session = useSessionStore.getState().sessions.get(sessionId)
   if (session === undefined) return
+  const breakoutWindow = useBreakoutStore.getState().windows.get(sessionId)
+  if (breakoutWindow) return breakoutWindow.focus()
 
   const registry = useExtensionRegistry.getState()
   registry.setActiveGlobalTab(null)

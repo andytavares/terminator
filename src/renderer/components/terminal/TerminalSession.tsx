@@ -116,6 +116,7 @@ function naturalSize(element: HTMLElement, rows: number) {
 export interface TerminalInstanceHooks {
   onBell?: () => void
   onBusy?: () => void
+  onInput?: (data: string) => void
   onIdle?: () => void
   onDispose?: () => void
 }
@@ -129,7 +130,7 @@ export class TerminalInstance {
   private resizeObserver: ResizeObserver | null = null
   private linkPointer: LinkPointer | null = null
   private themeObserver: MutationObserver | null = null
-  private opened = false
+  private openedIn: Document | null = null
   private sessionId: string
   private busyTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -166,6 +167,7 @@ export class TerminalInstance {
   private wireToPty(sessionId: string): void {
     this.terminal.onData((data) => {
       window.electronAPI.terminal.input(sessionId, data)
+      this.hooks?.onInput?.(data)
     })
 
     this.terminal.onResize(({ cols, rows }) => {
@@ -218,10 +220,13 @@ export class TerminalInstance {
 
   // Call once after the element is in a visible, sized container.
   mount(container: HTMLElement): void {
+    const { ownerDocument } = container
+    // A GPU context belongs to the window it was made in; xterm adopts the new window on a repeat open().
+    if (this.openedIn && this.openedIn !== ownerDocument) this.disableWebgl()
     container.appendChild(this.element)
-    if (!this.opened) {
+    if (this.openedIn !== ownerDocument) {
       this.terminal.open(this.element)
-      this.opened = true
+      this.openedIn = ownerDocument
     }
     this.enableWebgl()
     if (!this.webglAddon) this.measureGlyphsWhereVisible()
@@ -239,11 +244,16 @@ export class TerminalInstance {
     // (which forces xterm to re-sync the DOM viewport) and then pin to the bottom.
     // While a tab is visible xterm follows output natively and honours the user
     // scrolling up; we only re-establish "following" when the tab reappears.
-    requestAnimationFrame(() => {
+    // The container's window, not the main one: a hidden main window throttles its frames and observers.
+    const view = ownerDocument.defaultView
+    const scheduleFrame = view?.requestAnimationFrame.bind(view) ?? requestAnimationFrame
+    const ObserverOfWindow = view?.ResizeObserver ?? ResizeObserver
+    scheduleFrame(() => {
       this.terminal.scrollLines(-1)
       this.terminal.scrollToBottom()
     })
-    this.resizeObserver = new ResizeObserver(() => this.fitAddon.fit())
+    this.resizeObserver?.disconnect()
+    this.resizeObserver = new ObserverOfWindow(() => this.fitAddon.fit())
     this.resizeObserver.observe(container)
   }
 
@@ -266,7 +276,7 @@ export class TerminalInstance {
   }
 
   mountPreview(container: HTMLElement): (() => void) | null {
-    if (!this.opened) return null
+    if (!this.openedIn) return null
     const { cols, rows } = this.terminal
     if (!cols || !rows) return null
 
@@ -331,8 +341,10 @@ export class TerminalInstance {
     this.element.parentElement?.removeChild(this.element)
   }
 
-  // Remove from DOM without destroying the xterm instance.
-  unmount(): void {
+  // Remove from DOM without destroying the xterm instance. A caller that names the container it
+  // mounted into leaves the terminal alone once it lives in another one (a breakout window).
+  unmount(from?: HTMLElement): void {
+    if (from && this.element.parentElement !== from) return
     this.disableWebgl()
     this.resizeObserver?.disconnect()
     this.resizeObserver = null

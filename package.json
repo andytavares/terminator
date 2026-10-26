@@ -1,6 +1,6 @@
 {
   "name": "@andytavares/terminator",
-  "version": "0.1.160",
+  "version": "0.1.163",
   "description": "Extension-first AI-focused terminal emulator",
   "main": "out/main/index.js",
   "type": "module",
@@ -48,7 +48,8 @@
     "storybook": "npm run storybook -w @terminator/extension-ui",
     "build-storybook": "npm run build-storybook -w @terminator/extension-ui",
     "test:stories": "npm run test:stories -w @terminator/extension-ui",
-    "test:visual": "npm run test:visual -w @terminator/extension-ui"
+    "test:visual": "npm run test:visual -w @terminator/extension-ui",
+    "postinstall": "patch-package"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -92,7 +93,7 @@
     "@vitejs/plugin-react": "5.2.0",
     "@vitest/coverage-v8": "5.0.3",
     "@vitest/eslint-plugin": "1.6.27",
-    "electron": "44.7.0",
+    "electron": "44.9.3",
     "electron-builder": "26.15.3",
     "electron-vite": "5.0.0",
     "esbuild": "0.25.12",
@@ -102,13 +103,14 @@
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-testing-library": "7.16.2",
     "globals": "17.13.0",
-    "happy-dom": "20.14.5",
+    "happy-dom": "21.0.4",
     "husky": "9.1.7",
     "js-yaml": "4.3.2",
     "jscpd": "5.4.1",
     "jsdom": "29.1.1",
     "knip": "6.39.0",
     "lint-staged": "17.0.8",
+    "patch-package": "8.0.1",
     "playwright": "1.61.0",
     "prettier": "3.3.3",
     "syncpack": "15.3.3",

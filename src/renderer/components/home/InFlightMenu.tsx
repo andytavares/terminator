@@ -3,9 +3,10 @@ import { Ellipsis } from 'lucide-react'
 import { IconButton } from '@terminator/extension-ui'
 import { ContextMenu, closeAllContextMenus, type ContextMenuItem } from '../ContextMenu'
 import { afterClosing } from '../sidebar/row-events'
-import { useParkedThreads } from './parked-threads'
 import { useDismissedThreads } from './dismissed-threads'
-import { leadSessionOf } from './thread-actions'
+import { leadSessionOf, toggleArchived } from './thread-actions'
+import { toggleDone } from './task-actions'
+import { openAddToTask } from '../tasks/add-to-task'
 import { SESSION_ACTIONS } from '../session/session-actions'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { ConfirmDialog } from '../ConfirmDialog'
@@ -28,12 +29,6 @@ interface ItemActions {
   onRemoveWorktree: () => void
 }
 
-function toggleParked(thread: WorkThread): void {
-  const store = useParkedThreads.getState()
-  if (thread.parked) store.unpark(thread.key)
-  else store.park(thread.key)
-}
-
 /** True when the lead session's project is a git worktree the workspace store can delete. */
 function isWorktreeThread(thread: WorkThread): boolean {
   const lead = leadSessionOf(thread)
@@ -44,16 +39,25 @@ function isWorktreeThread(thread: WorkThread): boolean {
 
 type Run = (fn: () => void) => () => void
 
-/** Session actions: open the terminal, rename the title, or link a ticket. */
+/** Session actions: open the terminal, rename the title, link a ticket, or add the branch to a task. */
 function sessionItems(thread: WorkThread, run: Run, actions: ItemActions): ContextMenuItem[] {
   const lead = leadSessionOf(thread)
-  if (!lead) return []
-  const items: ContextMenuItem[] = [
-    { label: 'Open terminal', onSelect: run(() => SESSION_ACTIONS.onOpen(lead.sessionId)) },
-    { label: 'Rename…', onSelect: run(actions.onStartRename) },
-  ]
-  if (thread.ticketKey === undefined) {
+  const items: ContextMenuItem[] = []
+  if (lead) {
+    items.push({
+      label: 'Open terminal',
+      onSelect: run(() => SESSION_ACTIONS.onOpen(lead.sessionId)),
+    })
+  }
+  if (lead || thread.taskId !== null) {
+    items.push({ label: 'Rename…', onSelect: run(actions.onStartRename) })
+  }
+  if (lead && thread.ticketKey === undefined) {
     items.push({ label: 'Link ticket…', onSelect: run(actions.onLink) })
+  }
+  if (thread.lanes.length === 1) {
+    const [{ repoRoot, branch }] = thread.lanes
+    items.push({ label: 'Add to task…', onSelect: run(() => openAddToTask({ repoRoot, branch })) })
   }
   return items
 }
@@ -70,13 +74,24 @@ function dismissWithUndo(thread: WorkThread): void {
   })
 }
 
-/** Park or Unpark, and Dismiss: what every row offers. */
+/** Archive or Restore, and Dismiss: what every row offers. */
 function rowItems(thread: WorkThread, run: Run): ContextMenuItem[] {
+  const done: ContextMenuItem[] =
+    thread.taskId === null
+      ? []
+      : [
+          {
+            label: thread.doneAt === null ? 'Mark done' : 'Undo done',
+            separatorBefore: true,
+            onSelect: run(() => void toggleDone(thread)),
+          },
+        ]
   return [
+    ...done,
     {
-      label: thread.parked ? 'Unpark' : 'Park',
+      label: thread.archived ? 'Restore' : 'Archive',
       separatorBefore: true,
-      onSelect: run(() => toggleParked(thread)),
+      onSelect: run(() => toggleArchived(thread)),
     },
     {
       label: 'Dismiss',

@@ -402,6 +402,30 @@ describe('useSessionStore — handleProcessExit', () => {
   })
 })
 
+describe('useSessionStore — what the agent and the operator signal', () => {
+  setUpUseSessionStore()
+
+  it('clearInferredAsk drops the bell and the screen choice, and is a no-op without either', () => {
+    const choicePrompt = { question: 'Go?', options: [{ number: 1, label: 'Yes' }] }
+    useSessionStore.setState({
+      sessions: new Map([['sess-1', makeSession({ bellCount: 2, choicePrompt })]]),
+    })
+    useSessionStore.getState().clearInferredAsk('sess-1')
+    const cleared = useSessionStore.getState().sessions.get('sess-1')!
+    expect(cleared.bellCount).toBeUndefined()
+    expect(cleared.choicePrompt).toBeUndefined()
+    const before = useSessionStore.getState().sessions
+    useSessionStore.getState().clearInferredAsk('sess-1')
+    expect(useSessionStore.getState().sessions).toBe(before)
+  })
+
+  it('setAgentTurn records whether the agent is mid-turn', () => {
+    useSessionStore.setState({ sessions: new Map([['sess-1', makeSession()]]) })
+    useSessionStore.getState().setAgentTurn('sess-1', true)
+    expect(useSessionStore.getState().sessions.get('sess-1')!.agentTurn).toBe(true)
+  })
+})
+
 describe('useSessionStore — bell counts', () => {
   setUpUseSessionStore()
 

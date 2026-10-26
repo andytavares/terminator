@@ -1,8 +1,16 @@
 import { create } from 'zustand'
 import { useEffect } from 'react'
 import { useWorkThreads } from './useWorkThreads'
-import { latestResumableThread } from '../../home/work-threads'
-import { deskGroups, filterThreads, visibleThreadKeys, type DeskGroupBy } from './desk-groups'
+import { latestResumableThread, type WorkThread } from '../../home/work-threads'
+import {
+  deskGroups,
+  filterThreads,
+  taskGroups,
+  visibleThreadKeys,
+  type DeskGroup,
+  type DeskGroupBy,
+} from './desk-groups'
+import { useHomeLayout } from './home-layout'
 import { useDeskFilter } from './desk-filter'
 
 interface DeskSelectionState {
@@ -42,14 +50,15 @@ export const useDeskSelection = create<DeskSelectionState>((set) => ({
     })),
 }))
 
-/** The keys of the rows on the Desk, top to bottom, as drawn: a collapsed Parked group has none. */
+/** The keys of the rows on Home, top to bottom, as drawn: a folded group has none. */
 export function useOrderedThreadKeys(): string[] {
   const { threads } = useWorkThreads()
-  const { text, count } = useDeskFilter()
+  const { text, count, taskState } = useDeskFilter()
   const groupBy = useDeskSelection((s) => s.groupBy)
   const expandedGroupIds = useDeskSelection((s) => s.expandedGroupIds)
+  const grouped = useHomeLayout() === 'tasks' ? taskGroups : deskGroups
   return visibleThreadKeys(
-    deskGroups(filterThreads(threads, { text, count }), groupBy),
+    grouped(filterThreads(threads, { text, count, taskState }), groupBy),
     expandedGroupIds
   )
 }
@@ -64,4 +73,14 @@ export function useOpenRequestedResume(): void {
     useDeskSelection.setState({ resumeRequested: false })
     useDeskSelection.getState().openThread(target.key)
   }, [requested, threads])
+}
+
+/** The selected row's key, and a group's threads when they show: none while it is folded. */
+export function useShownRows(group: DeskGroup): {
+  selectedKey: string | null
+  threads: WorkThread[]
+} {
+  const selectedKey = useDeskSelection((s) => s.selectedThreadKey)
+  const expanded = useDeskSelection((s) => s.expandedGroupIds.includes(group.id))
+  return { selectedKey, threads: group.collapsible && !expanded ? [] : group.threads }
 }

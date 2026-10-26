@@ -49,6 +49,8 @@ export interface BranchRowProps {
   onRemove?: () => void
   /** Opens this branch's working copy in the user's editor. */
   onOpenInEditor?: () => void
+  /** Puts this branch in a task. */
+  onAddToTask?: () => void
   /** Names the editor in the menu — "Open in Cursor" beats "Open in editor". */
   editorName?: string
   issueActions?: IssueMenuActions
@@ -151,7 +153,7 @@ function branchMenuItems(
   closeMenu: () => void,
   startRename: () => void
 ): ContextMenuItem[] {
-  const { onRename, onOpenInEditor, editorName, issueActions, repoActions = [], onRemove } = props
+  const { onRename, onOpenInEditor, onAddToTask, editorName, issueActions } = props
   // Only a branch with no branch to be named by can be renamed: everything
   // else is named by its branch and renaming it would be a lie (ADR-034).
   const items: ContextMenuItem[] = onRename ? [{ label: 'Rename', onSelect: startRename }] : []
@@ -162,14 +164,28 @@ function branchMenuItems(
       onSelect: afterClosing(closeMenu, onOpenInEditor),
     })
   }
-  if (issueActions) items.push(...issueMenuItems(issueActions, closeMenu))
-  repoActions.forEach((action, i) =>
+  if (onAddToTask) {
     items.push({
-      label: action.label,
-      separatorBefore: i === 0,
-      onSelect: afterClosing(closeMenu, action.onSelect),
+      label: 'Add to task…',
+      separatorBefore: true,
+      onSelect: afterClosing(closeMenu, onAddToTask),
     })
-  )
+  }
+  if (issueActions) items.push(...issueMenuItems(issueActions, closeMenu))
+  items.push(...repoAndRemoveItems(props, closeMenu))
+  return items
+}
+
+/** The repo's extension actions, then Remove branch. */
+function repoAndRemoveItems(
+  { repoActions = [], onRemove }: BranchRowProps,
+  closeMenu: () => void
+): ContextMenuItem[] {
+  const items: ContextMenuItem[] = repoActions.map((action, i) => ({
+    label: action.label,
+    separatorBefore: i === 0,
+    onSelect: afterClosing(closeMenu, action.onSelect),
+  }))
   if (onRemove) {
     items.push({ label: 'Remove branch', danger: true, separatorBefore: true, onSelect: onRemove })
   }

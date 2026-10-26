@@ -154,3 +154,53 @@
   color: var(--tm-text-primary);
   font-weight: 500;
 }
+
+.task-summary {
+  margin: 6px 0 0;
+  color: var(--tm-text-muted);
+  font-size: 12px;
+}
+.task-summary--counts {
+  color: var(--tm-text-secondary);
+}
+.desk-dr-h h4 .state-glyph {
+  vertical-align: -2px;
+}
+.task-lane-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.task-lane-row {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 7px 0;
+  border-top: 1px solid var(--tm-border);
+}
+.task-lane-row:first-child {
+  border-top: 0;
+}
+.task-lane-row__name {
+  font-family: var(--tm-font-mono);
+  font-size: 12px;
+}
+.task-lane-row__details {
+  color: var(--tm-text-muted);
+  font-size: 11.5px;
+}
+
+.task-add-lane {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.task-add-lane__choices {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: 6px;
+}

@@ -97,6 +97,7 @@ describe('FactorySite', () => {
   describe('no Completed section', noCompletedSectionTests)
   describe('waiting shipped orders', waitingShippedOrdersTests)
   describe('beacons', beaconsTests)
+  describe("a finished order's document", documentLinkTests)
   describe('CI', factorySiteCiTests)
   describe('the refinery track', theRefineryTrackTests)
   describe('opening', factorySiteOpeningTests)
@@ -169,6 +170,26 @@ function completedOrdersTests() {
     ])
     expect(finished.every((c) => c.classList.contains('is-done'))).toBe(true)
     expect(active.querySelector('.fdry-hall-card.is-done')).toBeNull()
+  })
+}
+
+function documentLinkTests() {
+  it("keeps a finished order's document link inside its card, beside the card's open button", async () => {
+    mount([
+      {
+        id: 'WO-1',
+        title: 'Overview redesign',
+        status: 'shipped',
+        standing: doneStanding('Finished · document ready'),
+        document: { kind: 'file', url: null, path: '/orders/WO-1/outputs/redesign.md' },
+        createdAt: '2026-10-01T00:00:00.000Z',
+      },
+    ] as FactoryOrderRow[])
+    const link = await screen.findByRole('link', { name: 'redesign.md' })
+
+    const card = link.closest('.fdry-hall-card')
+    expect(card?.classList.contains('is-done')).toBe(true)
+    expect(card?.contains(screen.getByRole('button', { name: /Overview redesign/ }))).toBe(true)
   })
 }
 

@@ -32,7 +32,10 @@ export function isHidden(ask: HomeAsk, dismissals: Dismissals, now: number): boo
   return entry.until > now && entry.signature === askSignature(ask)
 }
 
-/** Asks in the order the operator should meet them: by kind, then oldest first. */
+/** Whether core guessed the ask rather than being told it; only a Desk ask carries the flag. */
+const isInferred = (ask: HomeAsk): boolean => 'inferred' in ask && ask.inferred === true
+
+/** Asks in the order the operator should meet them: by kind, then told before guessed, then oldest first. */
 export function orderAsks<A extends HomeAsk>(
   asks: readonly A[],
   dismissals: Dismissals,
@@ -43,6 +46,7 @@ export function orderAsks<A extends HomeAsk>(
     .sort(
       (a, b) =>
         KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) ||
+        Number(isInferred(a)) - Number(isInferred(b)) ||
         Date.parse(a.since) - Date.parse(b.since)
     )
 }

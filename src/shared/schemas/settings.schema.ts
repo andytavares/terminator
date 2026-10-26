@@ -27,6 +27,10 @@ const QuickActionsSettingsSchema = z
   })
   .default({ pins: [], usage: [], directUse: [], custom: [] })
 
+/** Classic is the Desk as it was; Tasks is the queue above the task list. */
+const HomeLayoutSchema = z.enum(['classic', 'tasks'])
+export type HomeLayout = z.infer<typeof HomeLayoutSchema>
+
 export const GlobalSettingsSchema = z.object({
   appearance: z.object({
     theme: ThemeSchema,
@@ -46,6 +50,7 @@ export const GlobalSettingsSchema = z.object({
       showMetricsBar: z.boolean().optional(),
       /** Home lists all work itself, so the project tree stays out of its way; ⌘B shows it. */
       hideSidebarOnHome: z.boolean().default(true),
+      homeLayout: HomeLayoutSchema.default('tasks'),
       /**
        * Which editor "Open in editor" launches, by id. Empty means detect —
        * the common case, and why this is not a required choice buried in
@@ -53,7 +58,12 @@ export const GlobalSettingsSchema = z.object({
        */
       editor: z.string().default(''),
     })
-    .default({ hasSeenWelcome: false, editor: '', hideSidebarOnHome: true }),
+    .default({
+      hasSeenWelcome: false,
+      editor: '',
+      hideSidebarOnHome: true,
+      homeLayout: 'tasks',
+    }),
   // Bounded 1 minute to 30 days so "zero" or "a year" is a validation failure
   // rather than a view that shows everything or nothing.
   sidebar: z

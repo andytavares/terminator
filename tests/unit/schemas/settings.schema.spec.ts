@@ -116,7 +116,12 @@ describe('GlobalSettingsSchema — shell, ui and extensions', () => {
   it('applies default value for ui field when omitted', () => {
     const { ui: _ui, ...withoutUi } = validGlobal
     const result = GlobalSettingsSchema.parse(withoutUi)
-    expect(result.ui).toEqual({ hasSeenWelcome: false, editor: '', hideSidebarOnHome: true })
+    expect(result.ui).toEqual({
+      hasSeenWelcome: false,
+      editor: '',
+      hideSidebarOnHome: true,
+      homeLayout: 'tasks',
+    })
   })
 })
 

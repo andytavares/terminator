@@ -25,6 +25,9 @@ import { startAgentSessionWatcher } from './agents/agent-session-watcher.js'
 import { makeSnapshotFor } from './sessions/session-snapshot.js'
 import { registerSessionRecordsHandlers } from './ipc/session-records.ipc.js'
 import { registerAgentAskHandlers } from './ipc/agent-ask.ipc.js'
+import { registerAgentTurnHandlers } from './ipc/agent-turn.ipc.js'
+import { registerTaskHandlers } from './ipc/task.ipc.js'
+import { loadTasks } from './tasks/task-store.js'
 import { registerAttentionHandlers } from './ipc/attention.ipc.js'
 import { loadAttentionLog } from './home/attention-log.js'
 import { startAskWatcher } from './agents/ask-watcher.js'
@@ -58,6 +61,7 @@ import { routeExtensionExitRequest, type ExtensionSurface } from './extensions/e
 import { flushLogs, logger } from './logger.js'
 import { sendToWindow } from './safe-send.js'
 import { buildWindowMenu } from './window-menu.js'
+import { breakoutWindowOpen, sessionOfWindow, watchBreakoutWindows } from './breakout-windows.js'
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
 import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
@@ -137,8 +141,10 @@ function openExternally(url: string): void {
 /** Redirect external http(s) link clicks and window.open() calls to the system browser. Non-http
  * URLs (e.g. same-origin navigations) are denied without opening externally. */
 function openLinksInBrowser(win: BrowserWindow): void {
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    openExternally(url)
+  win.webContents.setWindowOpenHandler((details) => {
+    const breakout = breakoutWindowOpen(details)
+    if (breakout) return breakout
+    openExternally(details.url)
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', (event, url) => {
@@ -182,6 +188,7 @@ function createWindow(): void {
   loadRenderer(win)
   relayPushes(win)
   openLinksInBrowser(win)
+  watchBreakoutWindows(win, openLinksInBrowser)
   handleWindowClose(win)
 }
 
@@ -197,7 +204,8 @@ function extensionViewMenuItems(): Electron.MenuItemConstructorOptions[] {
         label: item.label,
         accelerator: item.accelerator,
         type: item.type,
-        checked: false,
+        // A rebuild (every window focus) keeps the ticks of panels already open.
+        checked: Menu.getApplicationMenu()?.getMenuItemById(item.id)?.checked ?? false,
         click: item.onClick,
       }) as Electron.MenuItemConstructorOptions
   )
@@ -278,7 +286,10 @@ function setupMenu(): void {
       label: 'View',
       submenu: buildViewSubmenu(),
     },
-    buildWindowMenu((channel) => mainWindow?.webContents.send(channel)),
+    buildWindowMenu(
+      (channel, payload) => mainWindow?.webContents.send(channel, payload),
+      sessionOfWindow(BrowserWindow.getFocusedWindow())
+    ),
     helpMenu(),
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
@@ -302,6 +313,8 @@ function registerAppHandlers(): void {
 
   registerAppInfoHandlers()
 }
+
+app.on('browser-window-focus', setupMenu)
 
 app.on('second-instance', () => {
   if (!mainWindow) return
@@ -371,6 +384,8 @@ function registerSessionHandlers(): OutputRelay {
   registerIntegrationsHandlers(() => mainWindow)
   registerSessionRecordsHandlers(() => mainWindow)
   registerAgentAskHandlers(() => mainWindow)
+  registerAgentTurnHandlers(() => mainWindow)
+  registerTaskHandlers(() => mainWindow)
   registerAttentionHandlers()
   registerAgentUsageHandlers()
   registerThreadSummaryHandler()
@@ -391,6 +406,7 @@ function startIntegrationsAndRecords(): void {
   closeSessionsOfDeletedProjects({ pty: ptyManager, markClosed })
   // Nothing can be open at startup: sessions die with the app, so whatever the
   // last run left open is closed at its last update before anyone reads it.
+  void loadTasks().catch((error) => logger.error('could not load tasks', { error: String(error) }))
   void loadRecords()
     .then(sweepOpenRecords)
     .then(() => startAgentSessionWatcher({ snapshotFor: makeSnapshotFor(ptyManager) }))
@@ -404,7 +420,7 @@ function startIntegrationsAndRecords(): void {
     .catch((error) =>
       logger.error('could not install the agent session hook', { error: String(error) })
     )
-  // The Notification and Stop hooks tell core an agent is waiting on an answer (ask-watcher).
+  // The Notification, UserPromptSubmit and Stop hooks tell core an agent is asking or mid-turn.
   // Installed after the session hook finishes: both edit the one settings file.
   startAskWatcherAndHooks(sessionHookInstalled)
   void loadAttentionLog().catch((error) =>

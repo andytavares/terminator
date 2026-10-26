@@ -1,7 +1,12 @@
 /* Insights, drawn as in the approved Home design (.ins, .mcard, .kpi, .lr). MetricCard and
    Sparkline bring their own styles from @terminator/extension-ui. */
 .ins {
+  /* Fills the Desk under its header and scrolls on its own; taller than a short window. */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: grid;
+  align-content: start;
   gap: 16px;
   padding: 16px 18px 20px;
 }

@@ -1,11 +1,14 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
+import { useBreakoutStore } from '../../../../src/renderer/stores/breakout.store'
+import { useTabDragStore } from '../../../../src/renderer/terminal/tab-drag'
 import { TabBar } from '../../../../src/renderer/components/terminal/TabBar'
 import { projectFixture, seedStore, workspaceFixture } from '../../../support/renderer-stores'
+import { partialFake } from '../../../support/fakes'
 
 const records = {
   setDescription: vi.fn().mockResolvedValue(true),
@@ -52,6 +55,9 @@ vi.mock('../../../../src/renderer/components/sidebar/MoveSessionDialog', () => (
   ),
 }))
 
+const breakOut = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/terminal/breakout', () => ({ breakOut }))
+
 const mockCloseSession = vi.fn()
 const mockSetActive = vi.fn()
 const mockRequestFocus = vi.fn()
@@ -61,6 +67,32 @@ const mockGetBell = vi.fn()
 const mockOnNewTab = vi.fn()
 const mockRenameSession = vi.fn()
 const mockReorderSessions = vi.fn()
+
+/** Inside jsdom's window, which sits at 0,0 and is 1024x768. */
+const IN_WINDOW = { x: 300, y: 20 }
+const OUTSIDE_WINDOW = { x: 1500, y: 40 }
+
+function pointerAt(type: string, at: { x: number; y: number }): void {
+  act(() => {
+    document.dispatchEvent(
+      new PointerEvent(type, { bubbles: true, pointerId: 1, screenX: at.x, screenY: at.y })
+    )
+  })
+}
+
+/** Presses on the tab and moves the pointer far enough to make it a drag, over `over`. */
+function startTabDrag(tab: Element, over: Element | null = null): void {
+  document.elementFromPoint = () => over
+  HTMLElement.prototype.setPointerCapture = vi.fn()
+  fireEvent.pointerDown(tab, { button: 0, pointerId: 1, screenX: 290, screenY: 20 })
+  pointerAt('pointermove', IN_WINDOW)
+}
+
+/** A whole drag of `tab`, let go at `to` over `over`. */
+function dragTab(tab: Element, over: Element | null, to = IN_WINDOW): void {
+  startTabDrag(tab, over)
+  pointerAt('pointerup', to)
+}
 
 function renderTabBar(overrides: Partial<React.ComponentProps<typeof TabBar>> = {}) {
   return render(
@@ -78,6 +110,8 @@ function renderTabBar(overrides: Partial<React.ComponentProps<typeof TabBar>> = 
 beforeEach(() => {
   vi.clearAllMocks()
   seedStore(useSessionRecordsStore, records)
+  seedStore(useBreakoutStore, { windows: new Map() })
+  useTabDragStore.setState({ sessionId: null, overSessionId: null, overMainWindow: false })
   seedStore(useSessionStore, {
     getSessionsForProject: mockGetSessions,
     closeSession: mockCloseSession,
@@ -307,9 +341,7 @@ describe('TabBar — tab reordering', () => {
     mockGetActive.mockReturnValue('ses-1')
     renderTabBar()
     const tabs = document.querySelectorAll('.tab-bar__tab--session')
-    fireEvent.dragStart(tabs[0])
-    fireEvent.dragOver(tabs[1], { preventDefault: () => {} })
-    fireEvent.drop(tabs[1])
+    dragTab(tabs[0], tabs[1])
     expect(mockReorderSessions).toHaveBeenCalledWith('proj-1', ['ses-2', 'ses-1'])
   })
 
@@ -320,8 +352,7 @@ describe('TabBar — tab reordering', () => {
     ])
     renderTabBar()
     const tabs = document.querySelectorAll('.tab-bar__tab--session')
-    fireEvent.dragStart(tabs[0])
-    fireEvent.drop(tabs[0])
+    dragTab(tabs[0], tabs[0])
     expect(mockReorderSessions).not.toHaveBeenCalled()
   })
 })
@@ -794,22 +825,101 @@ describe('TabBar — the drop target', () => {
     return document.querySelectorAll('.tab-bar__tab--session')
   }
 
-  it('marks the tab a drag is over, and unmarks it when the drag leaves', () => {
+  it('marks the tab a drag is over, and unmarks it when the pointer moves off it', () => {
     const tabs = twoTabs()
-    fireEvent.dragStart(tabs[0])
-    fireEvent.dragOver(tabs[1])
+    startTabDrag(tabs[0], tabs[1])
     expect(tabs[1].classList.contains('tab-bar__tab--dnd-over')).toBe(true)
-    fireEvent.dragLeave(tabs[1])
+    expect(tabs[0].classList.contains('tab-bar__tab--dragging')).toBe(true)
+    document.elementFromPoint = () => null
+    pointerAt('pointermove', { x: 600, y: 300 })
     expect(tabs[1].classList.contains('tab-bar__tab--dnd-over')).toBe(false)
   })
 
-  it('unmarks it, and moves nothing, when the drag is abandoned', () => {
+  it('unmarks it, and moves nothing, when Escape cancels the drag', () => {
     const tabs = twoTabs()
-    fireEvent.dragStart(tabs[0])
-    fireEvent.dragOver(tabs[1])
-    fireEvent.dragEnd(tabs[0])
+    startTabDrag(tabs[0], tabs[1])
+    fireEvent.keyDown(document, { key: 'Escape' })
     expect(tabs[1].classList.contains('tab-bar__tab--dnd-over')).toBe(false)
-    fireEvent.drop(tabs[1])
+    pointerAt('pointerup', IN_WINDOW)
     expect(mockReorderSessions).not.toHaveBeenCalled()
+  })
+})
+
+const threeTabs = [
+  { id: 'ses-1', tabTitle: 'Tab 1', type: 'human', agentState: 'idle' },
+  { id: 'ses-2', tabTitle: 'Tab 2', type: 'human', agentState: 'idle' },
+  { id: 'ses-3', tabTitle: 'Tab 3', type: 'human', agentState: 'idle' },
+]
+
+function tabTitles(): string[] {
+  return [...document.querySelectorAll('.tab-bar__tab--session .tab-bar__title')].map(
+    (title) => title.textContent ?? ''
+  )
+}
+
+describe('TabBar — a terminal in its own window', () => {
+  beforeEach(() => mockGetSessions.mockReturnValue(threeTabs))
+
+  it('draws no tab for it and keeps the order of the others', () => {
+    seedStore(useBreakoutStore, { windows: new Map([['ses-2', window]]) })
+    renderTabBar()
+    expect(tabTitles()).toEqual(['Tab 1', 'Tab 3'])
+  })
+
+  it('draws the tab back in its slot once it is docked', () => {
+    seedStore(useBreakoutStore, { windows: new Map([['ses-2', window]]) })
+    renderTabBar()
+    act(() => useBreakoutStore.setState({ windows: new Map() }))
+    expect(tabTitles()).toEqual(['Tab 1', 'Tab 2', 'Tab 3'])
+  })
+
+  it('keeps its slot in the saved order when the visible tabs are reordered', () => {
+    seedStore(useBreakoutStore, { windows: new Map([['ses-2', window]]) })
+    renderTabBar()
+    const tabs = document.querySelectorAll('.tab-bar__tab--session')
+    dragTab(tabs[0], tabs[1])
+    expect(mockReorderSessions).toHaveBeenCalledWith('proj-1', ['ses-3', 'ses-2', 'ses-1'])
+  })
+})
+
+describe('TabBar — dragging a tab out', () => {
+  beforeEach(() => mockGetSessions.mockReturnValue(threeTabs))
+
+  it('opens its own window where it is let go, the moment it is let go outside every window', () => {
+    renderTabBar()
+    dragTab(document.querySelectorAll('.tab-bar__tab--session')[0], null, OUTSIDE_WINDOW)
+    expect(breakOut).toHaveBeenCalledWith('ses-1', OUTSIDE_WINDOW)
+  })
+
+  it('stays put when let go inside the window but not on a tab', () => {
+    renderTabBar()
+    dragTab(document.querySelectorAll('.tab-bar__tab--session')[0], null, { x: 600, y: 500 })
+    expect(breakOut).not.toHaveBeenCalled()
+    expect(mockReorderSessions).not.toHaveBeenCalled()
+  })
+})
+
+describe('TabBar — a tab let go somewhere it does not leave from', () => {
+  beforeEach(() => mockGetSessions.mockReturnValue(threeTabs))
+
+  it('stays put when let go over a terminal that is already in its own window', () => {
+    const own = partialFake<Window>({
+      screenX: 1400,
+      screenY: 0,
+      outerWidth: 600,
+      outerHeight: 400,
+    })
+    seedStore(useBreakoutStore, { windows: new Map([['ses-3', own]]) })
+    renderTabBar()
+    dragTab(document.querySelectorAll('.tab-bar__tab--session')[0], null, OUTSIDE_WINDOW)
+    expect(breakOut).not.toHaveBeenCalled()
+  })
+
+  it('is not a click on the tab: the dragged tab is not selected', () => {
+    renderTabBar()
+    const tab = document.querySelectorAll('.tab-bar__tab--session')[1]
+    dragTab(tab, null, OUTSIDE_WINDOW)
+    fireEvent.click(tab)
+    expect(mockSetActive).not.toHaveBeenCalled()
   })
 })

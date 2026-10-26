@@ -34,7 +34,7 @@ async function runInTab(page: Page, index: number, command: string): Promise<voi
   await runInVisibleTerminal(page, command)
 }
 
-const inFlight = (page: Page) => page.getByRole('region', { name: 'In flight' })
+const tasks = (page: Page) => page.getByRole('region', { name: 'Tasks' })
 
 function sidebarTerminalRow(page: Page, title: string) {
   return page
@@ -117,8 +117,8 @@ async function linkFromHome(page: Page): Promise<void> {
   await box.press('Enter')
   await page.evaluate(linkTerminalOneToEng123)
   await openHome(page)
-  await expect(inFlight(page).getByRole('button', { name: /Wiring up the link/ })).toBeVisible()
-  await expect(inFlight(page).getByText('ENG-123')).toBeVisible()
+  await expect(tasks(page).getByRole('button', { name: /Wiring up the link/ })).toBeVisible()
+  await expect(tasks(page).getByText('ENG-123')).toBeVisible()
 }
 
 async function linkShowsOnSidebarAndTab(page: Page): Promise<void> {
@@ -141,7 +141,7 @@ async function linkShowsOnSidebarAndTab(page: Page): Promise<void> {
 /** 1. Enter on a work row, then the drawer's Open terminal. 2. The "Open <name>" button on a wall tile. */
 async function openFromHomeAndWall(page: Page): Promise<void> {
   await openHome(page)
-  const row = inFlight(page).getByRole('button', { name: /Wiring up the link/ })
+  const row = tasks(page).getByRole('button', { name: /Wiring up the link/ })
   await row.focus()
   await page.keyboard.press('Enter')
   await page

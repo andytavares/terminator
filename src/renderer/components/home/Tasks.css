@@ -1,0 +1,213 @@
+/* Home's task list: state glyphs, group headings and one row per task (approved Home design, section 7.2). */
+.state-glyph {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.state-glyph--needs-you {
+  color: var(--tm-warning);
+}
+.state-glyph--running {
+  color: var(--tm-accent-text);
+}
+.state-glyph--waiting {
+  color: var(--tm-text-secondary);
+}
+.state-glyph--quiet {
+  color: var(--tm-text-faint);
+}
+.state-glyph--done {
+  color: var(--tm-success);
+}
+
+.task-list__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.task-list__head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.task-list__head .desk-group-menu {
+  margin-left: auto;
+}
+
+.task-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--tm-border);
+  background: var(--tm-bg-base);
+  color: var(--tm-text-muted);
+}
+.task-group h3 {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.task-group .state-glyph {
+  width: 12px;
+  height: 12px;
+}
+.task-group__toggle {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--tm-text-faint);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.task-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 300px minmax(0, 1.1fr) 52px;
+  gap: 12px;
+  align-items: center;
+  padding: 9px 14px;
+  border-top: 1px solid var(--tm-border);
+  cursor: pointer;
+}
+.task-row:hover,
+.task-row--selected {
+  background: var(--tm-bg-card-hover);
+}
+.task-row--selected {
+  box-shadow: inset 2px 0 0 var(--tm-accent);
+}
+/* Another row is held over this one: dropping merges it in. */
+.task-row--drop {
+  background: var(--tm-bg-card-hover);
+  box-shadow: inset 0 0 0 1px var(--tm-accent);
+}
+.task-row:hover .desk-tr__menu,
+.task-row:focus-within .desk-tr__menu {
+  opacity: 1;
+}
+.task-row .desk-tr__menu {
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+}
+.task-row__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 600;
+}
+.task-row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-row__ticket {
+  color: var(--tm-text-muted);
+  font-family: var(--tm-font-mono);
+  font-size: 11px;
+  font-weight: 400;
+}
+.task-row__star {
+  display: inline-flex;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tm-text-faint);
+  cursor: pointer;
+}
+.task-row__star[aria-pressed='true'] {
+  color: var(--tm-warning);
+}
+.task-row__star svg {
+  width: 12px;
+  height: 12px;
+}
+.task-row__lanes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+.task-lane {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid var(--tm-border);
+  border-radius: 5px;
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  font-family: var(--tm-font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+/* A long branch name is cut, not pushed into the next column; the chip's title holds it whole. */
+.task-lane__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-lane__colour {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+}
+.task-lane .state-glyph {
+  width: 11px;
+  height: 11px;
+}
+.task-row__now {
+  overflow: hidden;
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-row__last {
+  color: var(--tm-text-faint);
+  font-size: 11.5px;
+  text-align: right;
+}
+
+.archived-tasks {
+  position: relative;
+  display: inline-block;
+}
+.archived-tasks__panel {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  min-width: 280px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.archived-tasks__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.archived-tasks__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+.archived-tasks__empty {
+  margin: 0;
+  color: var(--tm-text-muted);
+  font-size: 12px;
+}

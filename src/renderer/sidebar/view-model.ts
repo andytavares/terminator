@@ -12,7 +12,7 @@ import type { AgentState, TerminalSession } from '../../shared/types/index'
  * a branch became the listed item, and `status` became redundant when every row
  * started carrying its own state glyph (FR-038).
  */
-export type GroupKey = 'workspace' | 'none'
+export type GroupKey = 'workspace' | 'task' | 'none'
 export type SortKey = 'recent' | 'oldest' | 'name' | 'status' | 'manual'
 
 interface SessionFilters {

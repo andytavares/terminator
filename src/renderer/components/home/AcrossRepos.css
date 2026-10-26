@@ -1,0 +1,63 @@
+/* Start work → Across repos, drawn as in the approved Home design (7.5). */
+.across-repos__body {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  min-height: 330px;
+}
+
+.across-repos__fields,
+.across-repos__repos {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 14px;
+}
+
+.across-repos__fields {
+  border-right: 1px solid var(--tm-border);
+}
+
+.across-repos__fields label {
+  display: grid;
+  gap: 4px;
+  color: var(--tm-text-secondary);
+  font-size: 11.5px;
+}
+
+.across-repos__fields input,
+.across-repos__fields select,
+.across-repos__fields textarea {
+  padding: 6px 8px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 6px;
+  background: var(--tm-bg-card);
+  color: var(--tm-text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.across-repos__list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.across-repos__repo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.across-repos__repo small {
+  color: var(--tm-text-muted);
+}
+
+.across-repos__note {
+  flex-basis: 100%;
+  padding-left: 24px;
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+}

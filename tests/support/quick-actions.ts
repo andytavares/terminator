@@ -87,6 +87,11 @@ export const CORE_SHORTCUTS: ShortcutSpec[] = [
     firedBy: (e) => meta(e) && e.shiftKey && e.key.toLowerCase() === 'd',
   },
   {
+    actionId: 'core.break-out',
+    display: '⌘⇧O',
+    firedBy: (e) => meta(e) && e.shiftKey && e.key.toLowerCase() === 'o',
+  },
+  {
     actionId: 'core.close-tab',
     display: '⌘W',
     firedBy: (e) => meta(e) && e.key.toLowerCase() === 'w',

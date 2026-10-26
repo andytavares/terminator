@@ -230,3 +230,8 @@
 button.tmui-checkbox {
   cursor: pointer;
 }
+/* The tick fits the box; lucide draws at 24px unless told otherwise. */
+.tmui-checkbox svg {
+  width: 10px;
+  height: 10px;
+}

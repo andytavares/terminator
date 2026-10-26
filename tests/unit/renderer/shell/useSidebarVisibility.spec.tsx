@@ -25,7 +25,7 @@ const setHideOnHome = (hideSidebarOnHome: boolean) =>
     useSettingsStore.setState({
       globalSettings: {
         ...defaultGlobalSettings('/bin/zsh'),
-        ui: { hasSeenWelcome: true, editor: '', hideSidebarOnHome },
+        ui: { hasSeenWelcome: true, editor: '', hideSidebarOnHome, homeLayout: 'tasks' },
       },
     })
   )

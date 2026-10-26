@@ -1,8 +1,8 @@
-/** What the ask hook writes for one terminal: a Notification or a Stop from its agent. */
+/** What the ask hook writes for one terminal: a Notification, a Stop or a UserPromptSubmit from its agent. */
 export interface AskReport {
   /** The terminal the agent is running in — this application's own session id. */
   terminal: string
-  event: 'notification' | 'stop'
+  event: 'notification' | 'stop' | 'prompt'
   message: string
   notificationType: string | null
   at: string
@@ -31,7 +31,7 @@ export function parseAskReport(value: unknown): AskReport | null {
   const raw = value as Record<string, unknown>
   const terminal = text(raw.terminal)
   if (terminal === null) return null
-  if (raw.event !== 'notification' && raw.event !== 'stop') return null
+  if (raw.event !== 'notification' && raw.event !== 'stop' && raw.event !== 'prompt') return null
   return {
     terminal,
     event: raw.event,
@@ -42,9 +42,23 @@ export function parseAskReport(value: unknown): AskReport | null {
 }
 
 export function askChangeOf(report: AskReport): AskChange {
-  if (report.event === 'stop') return { kind: 'clear' }
+  if (report.event === 'stop' || report.event === 'prompt') return { kind: 'clear' }
   const type = report.notificationType
   if (type !== null && ANSWERED_TYPES.includes(type)) return { kind: 'clear' }
   if (type !== null && NOT_AN_ASK.includes(type)) return { kind: 'ignore' }
   return { kind: 'set', ask: { message: report.message, since: report.at } }
+}
+
+/** Whether the agent is in a turn after this report: a prompt starts one, a stop ends it, a notification leaves it as it is. */
+export function turnChangeOf(report: AskReport): boolean | null {
+  if (report.event === 'prompt') return true
+  return report.event === 'stop' ? false : null
+}
+
+// xterm reports focus gaining and losing as these, with no one typing.
+const FOCUS_REPORTS: readonly string[] = ['\x1b[I', '\x1b[O']
+
+/** Whether input is only the terminal reporting its focus, which answers nothing. */
+export function isFocusReport(data: string): boolean {
+  return FOCUS_REPORTS.includes(data)
 }

@@ -5,11 +5,14 @@ import { DeskSearch } from './DeskSearch'
 import { useStartWorkStore } from './start-work'
 import { useHomeView, type HomeViewName } from './home-view'
 import { InsightsBar } from './InsightsBar'
+import { useHomeLayout } from './home-layout'
+import type { HomeLayout } from '../../../shared/schemas/settings.schema'
 
-const VIEWS = [
-  { value: 'desk', label: 'Desk' },
-  { value: 'insights', label: 'Insights' },
-] as const
+const viewsFor = (layout: HomeLayout) =>
+  [
+    { value: 'desk', label: layout === 'tasks' ? 'Today' : 'Desk' },
+    { value: 'insights', label: 'Insights' },
+  ] as const
 
 /** "Saturday 18 October". */
 function deskDate(now: number): string {
@@ -41,6 +44,7 @@ export const DeskHeader = forwardRef<HTMLInputElement, { now: number }>(function
   { now },
   searchRef
 ) {
+  const layout = useHomeLayout()
   const view = useHomeView((s) => s.view)
   const show = useHomeView((s) => s.show)
   return (
@@ -49,7 +53,7 @@ export const DeskHeader = forwardRef<HTMLInputElement, { now: number }>(function
       <span className="hd__date">{deskDate(now)}</span>
       <SegmentedControl<HomeViewName>
         label="View"
-        options={VIEWS}
+        options={viewsFor(layout)}
         value={view}
         onChange={show}
         size="sm"

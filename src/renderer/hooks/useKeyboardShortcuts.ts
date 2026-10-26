@@ -106,10 +106,14 @@ const APP_KEYS: CoreKey[] = [
   },
 ]
 
+// The command key itself: Cmd on a Mac, where Ctrl+1–9 switch the lanes of a task.
+const commandKeyHeld = (e: KeyboardEvent): boolean =>
+  navigator.platform.startsWith('Mac') ? e.metaKey : e.ctrlKey
+
 const WORKSPACE_KEYS: CoreKey[] = [
   // Cmd+1–9: switch to nth workspace, expand it, collapse all others
   {
-    test: (e, at) => at.isMeta && e.key >= '1' && e.key <= '9',
+    test: (e) => commandKeyHeld(e) && e.key >= '1' && e.key <= '9',
     run: (c, e) => {
       const workspaces = useWorkspaceStore.getState()
       const index = parseInt(e.key, 10) - 1

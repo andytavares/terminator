@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import { Bot, GitBranch, Plus } from 'lucide-react'
 import { Button, Chip, Kbd, ModalShell } from '@terminator/extension-ui'
 import { WorkspacePicker } from './WorkspacePicker'
+import { AcrossRepos } from './AcrossRepos'
+import { RunAsChoices } from './RunAsChoices'
 import { startScratchSession } from '../../terminal/start-session'
 import {
   branchOf,
@@ -30,6 +32,7 @@ const TABS: Array<{ id: LauncherTab; label: string }> = [
   { id: 'tickets', label: 'My tickets' },
   { id: 'prompt', label: 'Prompt' },
   { id: 'branch', label: 'Branch' },
+  { id: 'across', label: 'Across repos' },
   { id: 'scratch', label: 'Scratch terminal' },
 ]
 
@@ -159,19 +162,28 @@ export function StartWork({ onClose }: { onClose: () => void }): JSX.Element {
   return (
     <ModalShell label="Start work" placement="top" onDismiss={actions.dismiss}>
       <div className="start-work" onKeyDown={(e) => handleKey(e, launcher)}>
-        <SearchRow {...{ view, actions }} />
+        {view.tab !== 'across' && <SearchRow {...{ view, actions }} />}
         <TabRow {...{ view, actions }} />
-        <div className="start-work__body">
-          <ChoiceList {...launcher} />
-          <RunAsPanel {...launcher} />
-        </div>
-        <Footer {...launcher} />
+        {view.tab === 'across' ? <AcrossRepos onClose={onClose} /> : <LauncherBody {...launcher} />}
       </div>
     </ModalShell>
   )
 }
 
+function LauncherBody(launcher: Launcher): JSX.Element {
+  return (
+    <>
+      <div className="start-work__body">
+        <ChoiceList {...launcher} />
+        <RunAsPanel {...launcher} />
+      </div>
+      <Footer {...launcher} />
+    </>
+  )
+}
+
 function handleKey(e: React.KeyboardEvent, { view, actions, selectedIndex }: Launcher): void {
+  if (view.tab === 'across') return
   const moves: Record<string, () => void> = {
     ArrowDown: () => actions.select(Math.min(selectedIndex + 1, view.rows.length - 1)),
     ArrowUp: () => actions.select(Math.max(selectedIndex - 1, 0)),
@@ -191,6 +203,7 @@ const PLACEHOLDERS: Record<LauncherTab, string> = {
   tickets: 'Search tickets, or type a prompt',
   prompt: 'Describe the task',
   branch: 'Search branches',
+  across: 'Not used on this tab',
   scratch: 'Nothing to type for a scratch terminal',
 }
 
@@ -227,7 +240,7 @@ function TabRow({ view, actions }: PartProps): JSX.Element {
           {tab.label}
         </button>
       ))}
-      {view.tab !== 'scratch' && (
+      {view.tab !== 'scratch' && view.tab !== 'across' && (
         <WorkspacePicker
           current={view.repo}
           reason={view.repoReason}
@@ -356,24 +369,7 @@ function RunAsPanel({ view, actions }: Launcher): JSX.Element {
   return (
     <div className="start-work__side">
       <div className="start-work__label">Run it as</div>
-      <div role="radiogroup" aria-label="Run it as" className="start-work__options">
-        {view.runAsOptions.map((option) => (
-          <div
-            key={option.value}
-            role="radio"
-            aria-checked={view.runAs === option.value}
-            aria-label={option.label}
-            className="start-work__option"
-            onClick={() => actions.setRunAs(option.value)}
-          >
-            <span className="start-work__radio" aria-hidden="true" />
-            <span>
-              {option.label}
-              <small>{option.hint}</small>
-            </span>
-          </div>
-        ))}
-      </div>
+      <RunAsChoices options={view.runAsOptions} runAs={view.runAs} onPick={actions.setRunAs} />
       <Summary {...{ view, actions }} />
     </div>
   )

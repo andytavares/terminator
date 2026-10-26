@@ -1,5 +1,5 @@
 import { resolveWorkItem, type WorkItem } from './work-item'
-import { BellAndBusySource } from './agent-state'
+import { BellAndBusySource, inferredAskSignal } from './agent-state'
 import type {
   AgentConversation,
   AgentState,
@@ -43,6 +43,12 @@ export interface SessionFacts {
   choicePrompt: ChoicePrompt | null
   /** What the agent said it is waiting on, from its Notification hook. */
   askMessage: string | null
+  /** True when the session reads as waiting on you from a bell or a screen choice, not from its agent's own word. */
+  askInferred: boolean
+  /** Which guess inferred the ask, null when none did. */
+  askSignal: 'bell' | 'choice' | null
+  /** What says the session is working: the agent's own turn, byte flow (a guess), or null when it is not running. */
+  runningFrom: 'agent-turn' | 'output' | null
   /** The agent conversation that ran in this session, when one was reported. */
   agent: AgentConversation | null
   /** Whether that conversation can be brought back on this machine right now. */
@@ -102,10 +108,20 @@ export function openSnapshot(
   }
 }
 
+function runningFrom(session: TerminalSession, state: AgentState): SessionFacts['runningFrom'] {
+  if (state !== 'working') return null
+  return session.agentTurn === true ? 'agent-turn' : 'output'
+}
+
 /** What the running terminal itself says: when it was last used and what it last printed. */
 function liveFacts(session: TerminalSession) {
+  const state = stateSource.derive(session)
+  const askSignal = inferredAskSignal(session)
   return {
-    state: stateSource.derive(session),
+    state,
+    askSignal,
+    askInferred: askSignal !== null,
+    runningFrom: runningFrom(session, state),
     lastActivityAt: session.lastActivityAt,
     lastAttendedAt: session.lastAttendedAt ?? null,
     latestLine: session.latestLine ?? '',
@@ -167,6 +183,9 @@ const CLOSED = {
   latestLine: '',
   choicePrompt: null,
   askMessage: null,
+  askInferred: false,
+  askSignal: null,
+  runningFrom: null,
 } as const
 
 function closedFacts(record: SessionRecordListing & { closedAt: string }): SessionFacts {

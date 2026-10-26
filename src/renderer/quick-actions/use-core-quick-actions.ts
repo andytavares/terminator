@@ -11,6 +11,7 @@ import { revealSession } from '../terminal/navigate-to-session'
 import { qualifiedBranchLabel } from '../sidebar/branch-display'
 import { agentStateOf } from '../sidebar/agent-state'
 import { useStartWorkStore } from '../components/home/start-work'
+import { useTaskSwitcher } from '../components/task-switcher/task-switcher.store'
 import { useDeskSelection } from '../components/home/desk-selection'
 import { useSessionRecordsStore } from '../stores/session-records.store'
 import { buildCoreActions, type CoreSessionSummary } from './core-actions'
@@ -19,6 +20,7 @@ import type { CoreActionDeps } from './core-actions'
 import type { PaneSplitDirection, TerminalSession, Workspace } from '../../shared/types/index'
 import type { QuickAction } from './types'
 import { cycleTab } from './shortcut-behaviors'
+import { toggleBreakout } from '../terminal/breakout'
 
 /** What the app shell does on behalf of an action: its own dialogs, panes and toggles. */
 export interface ShellCommands {
@@ -124,11 +126,19 @@ function closePane(projectId: string | null): void {
 function terminalHandlers(
   c: CoreContext
 ): Handlers<
-  'onNewTab' | 'onSplit' | 'onClosePane' | 'onClear' | 'onNewScratch' | 'onEditNote' | 'onCycleTab'
+  | 'onNewTab'
+  | 'onSplit'
+  | 'onBreakOut'
+  | 'onClosePane'
+  | 'onClear'
+  | 'onNewScratch'
+  | 'onEditNote'
+  | 'onCycleTab'
 > {
   return {
     onNewTab: c.shell.onNewTab,
     onSplit: (direction) => splitFocused(c, direction),
+    onBreakOut: () => toggleBreakout(null),
     onClosePane: () => closePane(c.projectId),
     onClear: () => {
       if (c.focusedSessionId) window.electronAPI.terminal.input(c.focusedSessionId, '\x0c')
@@ -237,6 +247,7 @@ function coreActionDeps(c: CoreContext, paletteSessions: CoreSessionSummary[]): 
     ...issueHandlers(c),
     ...shellHandlers(c.shell),
     onStartWork: () => useStartWorkStore.getState().openLauncher(),
+    onTaskSwitcher: () => useTaskSwitcher.getState().show(),
   }
 }
 

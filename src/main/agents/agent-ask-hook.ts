@@ -4,13 +4,14 @@ import { shellQuote } from '@terminator/extension-sdk/node'
 import { putHook } from '../integrations/claude-settings.js'
 import { reportDirectory, userSettingsPath, type CaptureHookOptions } from './agent-session-hook.js'
 
-// Claude Code runs Notification hooks when it needs an answer and Stop hooks when a turn ends
-// (payloads: https://code.claude.com/docs/en/hooks). One script writes both to asks/<terminal>.json.
+// Claude Code runs Notification hooks when it needs an answer, UserPromptSubmit hooks when a turn
+// starts and Stop hooks when it ends (payloads: https://code.claude.com/docs/en/hooks). One script
+// writes each event to its own asks/<microseconds>-<pid>.json, so two events in a row are both seen.
 
 const SCRIPT_NAME = 'agent-ask-hook.cjs'
 const ASKS_DIR_NAME = 'asks'
 
-/** The script the agent runs on Notification and Stop; silent on error like CAPTURE_SCRIPT.
+/** The script the agent runs on Notification, UserPromptSubmit and Stop; silent on error like CAPTURE_SCRIPT.
  * @internal */
 export const ASK_SCRIPT = `// Written by Terminator. Do not edit: it is overwritten on every start.
 const fs = require('fs')
@@ -29,7 +30,7 @@ process.stdin.on('end', () => {
     if (!terminal || !reportDir) return
     const payload = JSON.parse(raw)
     if (!payload || typeof payload !== 'object') return
-    const events = { Notification: 'notification', Stop: 'stop' }
+    const events = { Notification: 'notification', Stop: 'stop', StopFailure: 'stop', UserPromptSubmit: 'prompt' }
     const event = events[payload.hook_event_name]
     if (!event) return
 
@@ -42,7 +43,10 @@ process.stdin.on('end', () => {
       notificationType: typeof payload.notification_type === 'string' ? payload.notification_type : null,
       at: new Date().toISOString(),
     }
-    const target = path.join(directory, terminal + '.json')
+    // Microseconds since the epoch, fixed width: the watcher applies files in name order, and
+    // two hooks of one turn can land in the same millisecond.
+    const at = (performance.timeOrigin + performance.now()).toFixed(3)
+    const target = path.join(directory, at + '-' + process.pid + '.json')
     fs.writeFileSync(target + '.tmp', JSON.stringify(report), 'utf8')
     fs.renameSync(target + '.tmp', target)
   } catch {
@@ -78,10 +82,12 @@ function askCommand(options: CaptureHookOptions): string {
   return `[ -n "$TERMINATOR_SESSION_ID" ] && test -f ${shellQuote(options.scriptPath)} && ${run} || true`
 }
 
-/** Registers the Notification and Stop entries in the operator's Claude settings, ours alone. */
+/** Registers the Notification, UserPromptSubmit, Stop and StopFailure entries in the operator's Claude settings, ours alone. */
 export async function installAskHooks(options: CaptureHookOptions): Promise<void> {
   const command = askCommand(options)
   const ours = { marker: SCRIPT_NAME, command }
   await putHook(userSettingsPath(), 'Notification', ours)
+  await putHook(userSettingsPath(), 'UserPromptSubmit', ours)
   await putHook(userSettingsPath(), 'Stop', ours)
+  await putHook(userSettingsPath(), 'StopFailure', ours)
 }

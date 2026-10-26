@@ -1,12 +1,12 @@
 import React, { Suspense, lazy } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { StatusDot } from '@terminator/extension-ui'
-import { DropdownMenu, RadioChoices } from '../sidebar/menu'
+import { DeskGroupMenu } from './DeskGroupMenu'
 import { useNow } from '../session/useNow'
 import { InFlightRow } from './InFlightRow'
-import { useDeskSelection } from './desk-selection'
+import { useDeskSelection, useShownRows } from './desk-selection'
 import { useWorkThreads } from './useWorkThreads'
-import { DESK_GROUP_OPTIONS, deskGroups, filterThreads, type DeskGroup } from './desk-groups'
+import { deskGroups, filterThreads, type DeskGroup } from './desk-groups'
 import { useDeskFilter } from './desk-filter'
 import '../sidebar/SidebarMenu.css'
 
@@ -14,31 +14,6 @@ const ThreadDrawer = lazy(() => import('./ThreadDrawer').then((m) => ({ default:
 import './InFlight.css'
 
 const MINUTE_MS = 60_000
-
-function GroupMenu(): JSX.Element {
-  const groupBy = useDeskSelection((s) => s.groupBy)
-  const setGroupBy = useDeskSelection((s) => s.setGroupBy)
-  const current = DESK_GROUP_OPTIONS.find(([value]) => value === groupBy)?.[1]
-  return (
-    <DropdownMenu
-      label={`Group: ${current}`}
-      icon={<ChevronDown aria-hidden="true" />}
-      panelLabel="Group by"
-      variant="desk-group-menu"
-    >
-      {(close) => (
-        <RadioChoices
-          choices={DESK_GROUP_OPTIONS}
-          current={groupBy}
-          onPick={(value) => {
-            setGroupBy(value)
-            close()
-          }}
-        />
-      )}
-    </DropdownMenu>
-  )
-}
 
 function GroupHeading({ group }: { group: DeskGroup }): JSX.Element {
   const expanded = useDeskSelection((s) => s.expandedGroupIds.includes(group.id))
@@ -65,13 +40,11 @@ function GroupHeading({ group }: { group: DeskGroup }): JSX.Element {
   )
 }
 
-function GroupRows({ group, now }: { group: DeskGroup; now: number }): JSX.Element | null {
-  const selectedKey = useDeskSelection((s) => s.selectedThreadKey)
-  const expanded = useDeskSelection((s) => s.expandedGroupIds.includes(group.id))
-  if (group.collapsible && !expanded) return null
+function GroupRows({ group, now }: { group: DeskGroup; now: number }): JSX.Element {
+  const { selectedKey, threads } = useShownRows(group)
   return (
     <>
-      {group.threads.map((thread) => (
+      {threads.map((thread) => (
         <InFlightRow
           key={thread.key}
           thread={thread}
@@ -91,7 +64,7 @@ function InFlightHeader({ count }: { count: number }): JSX.Element {
         {count} work {count === 1 ? 'item' : 'items'}
       </span>
       <span className="desk-sec-h__right">
-        <GroupMenu />
+        <DeskGroupMenu />
       </span>
     </div>
   )

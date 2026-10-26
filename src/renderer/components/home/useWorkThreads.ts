@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useHomeFeedStore } from '../../stores/home-feed.store'
+import { useTaskStore } from '../../stores/task.store'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useChangeStatsStore } from '../../stores/change-stats.store'
 import { useSessionFacts } from '../session/useSessionFacts'
@@ -43,6 +44,15 @@ function useRepoRoots(): Map<string, string> {
   }, [workspaces, projectsByWorkspaceId])
 }
 
+/** Each repo's name and colour by its folder, so a lane with nothing open still says which repo. */
+function useRepos(): Map<string, { name: string; color: string | null }> {
+  const workspaces = useWorkspaceStore((s) => s.workspaces)
+  return useMemo(
+    () => new Map(workspaces.map((w) => [w.folderPath, { name: w.name, color: w.color }])),
+    [workspaces]
+  )
+}
+
 function useIssues(): Issue[] {
   const issuesByKey = useIntegrationsStore((s) => s.issuesByKey)
   const linked = useIntegrationsStore((s) => s.issues)
@@ -74,10 +84,10 @@ function useChangeStats(projectIds: readonly string[]): Map<string, ChangeStats>
 }
 
 function parkedByHand(threads: WorkThread[], keys: readonly string[]): WorkThread[] {
-  return threads.map((t) => (keys.includes(t.key) ? { ...t, parked: true } : t))
+  return threads.map((t) => (keys.includes(t.key) ? { ...t, archived: true } : t))
 }
 
-/** The threads worth showing: parked ones marked so, dismissed ones left out. */
+/** The threads worth showing: those parked by hand marked archived, dismissed ones left out. */
 function shownThreads(
   input: WorkThreadInput,
   parkedKeys: readonly string[],
@@ -88,23 +98,32 @@ function shownThreads(
   )
 }
 
-/** Home's work threads, joined from sessions, extension facets and tickets; the clock ticks each minute. */
-export function useWorkThreads(): WorkThreads {
+/** Everything the threads are joined from; the clock ticks each minute. */
+function useThreadInput(): WorkThreadInput {
   const facts = useSessionFacts()
   const facets = useHomeFeedStore((s) => s.facets)
-  const parkedKeys = useParkedThreads((s) => s.keys)
-  const dismissed = useDismissedThreads((s) => s.dismissed)
+  const tasks = useTaskStore((s) => s.tasks)
   const now = useNow(MINUTE_MS)
   const repoRoots = useRepoRoots()
+  const repos = useRepos()
   const issues = useIssues()
   const projectIds = useMemo(
     () => [...new Set(facts.flatMap((f) => (f.isClosed || !f.projectId ? [] : [f.projectId])))],
     [facts]
   )
   const changeStats = useChangeStats(projectIds)
+  return useMemo(
+    () => ({ facts, facets, tasks, issues, changeStats, repoRoots, repos, now }),
+    [facts, facets, tasks, issues, changeStats, repoRoots, repos, now]
+  )
+}
 
+/** Home's work threads, joined from sessions, extension facets, tasks and tickets. */
+export function useWorkThreads(): WorkThreads {
+  const input = useThreadInput()
+  const parkedKeys = useParkedThreads((s) => s.keys)
+  const dismissed = useDismissedThreads((s) => s.dismissed)
   const result = useMemo(() => {
-    const input: WorkThreadInput = { facts, facets, issues, changeStats, repoRoots, now }
     // `allThreads` keeps dismissed threads so a Focus item's done check still sees the work.
     const threads = shownThreads(input, parkedKeys, dismissed)
     return {
@@ -112,7 +131,7 @@ export function useWorkThreads(): WorkThreads {
       groups: groupThreads(threads),
       allThreads: parkedByHand(allWorkThreads(input), parkedKeys),
     }
-  }, [facts, facets, issues, changeStats, repoRoots, now, parkedKeys, dismissed])
+  }, [input, parkedKeys, dismissed])
   useEffect(() => {
     const live = new Set(result.allThreads.map((t) => t.key))
     useParkedThreads.getState().forgetGone(live, Date.now())

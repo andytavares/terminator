@@ -99,13 +99,20 @@ export function trackStateChanges(send: (report: StateReport) => void): () => vo
   }
 }
 
-/** Mirrors agent asks onto sessions, and reports session state changes to the attention log. */
+/** Mirrors agent asks and turns onto sessions, and reports session state changes to the attention log. */
 export function useAgentAttention(): void {
   useEffect(() => {
     const api = window.electronAPI?.agentAsk
     const setAsk = useSessionStore.getState().setAgentAsk
     void api?.list?.().then(({ data }) => data.forEach((a) => setAsk(a.sessionId, a.ask)))
     return api?.onChanged?.(({ sessionId, ask }) => setAsk(sessionId, ask))
+  }, [])
+
+  useEffect(() => {
+    const api = window.electronAPI?.agentTurn
+    const setTurn = useSessionStore.getState().setAgentTurn
+    void api?.list?.().then(({ data }) => data.forEach((t) => setTurn(t.sessionId, t.inTurn)))
+    return api?.onChanged?.(({ sessionId, inTurn }) => setTurn(sessionId, inTurn))
   }, [])
 
   useEffect(() => {

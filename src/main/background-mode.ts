@@ -10,7 +10,9 @@ export function runsInBackground(): boolean {
 }
 
 /** A window's options; in the background it is created hidden and never stops drawing. */
-function windowOptions(options: BrowserWindowConstructorOptions): BrowserWindowConstructorOptions {
+export function windowOptions(
+  options: BrowserWindowConstructorOptions
+): BrowserWindowConstructorOptions {
   if (!RUNS_IN_BACKGROUND) return options
   return {
     ...options,

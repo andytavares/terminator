@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { BellAndBusySource } from '../../../../src/renderer/sidebar/agent-state'
+import { BellAndBusySource, inferredAskSignal } from '../../../../src/renderer/sidebar/agent-state'
 import type { TerminalSession } from '../../../../src/shared/types/index'
 
 const base: TerminalSession = {
@@ -65,5 +65,38 @@ describe('BellAndBusySource — a visible choice prompt (054)', () => {
 
   it('still reads a closed session as exited', () => {
     expect(derive({ choicePrompt: prompt, status: 'closed' })).toBe('exited')
+  })
+})
+
+describe('BellAndBusySource — the agent’s own turn', () => {
+  it('reads a hooked agent in a turn that prints nothing as working', () => {
+    expect(derive({ agentTurn: true, busy: false })).toBe('working')
+  })
+
+  it('reads a hooked agent between turns as idle even while bytes flow', () => {
+    expect(derive({ agentTurn: false, busy: true })).toBe('idle')
+  })
+
+  it('reads a terminal that never reported a hook by its bytes', () => {
+    expect(derive({ busy: true })).toBe('working')
+    expect(derive({ busy: false })).toBe('idle')
+  })
+
+  it('still reads a reported ask, a bell or a choice as waiting, whatever the turn', () => {
+    const ask = { message: 'Allow Bash?', since: '2026-10-18T10:00:00.000Z' }
+    expect(derive({ agentTurn: true, agentAsk: ask })).toBe('awaiting-input')
+    expect(derive({ agentTurn: true, bellCount: 1 })).toBe('awaiting-input')
+    expect(derive({ agentTurn: false, status: 'closed' })).toBe('exited')
+  })
+})
+
+describe('inferredAskSignal', () => {
+  it('names the guess behind an ask, the bell first, and nothing when the agent asked', () => {
+    const prompt = { question: 'Create a.txt?', options: [{ number: 1, label: 'Yes' }] }
+    expect(inferredAskSignal({ ...base, bellCount: 1, choicePrompt: prompt })).toBe('bell')
+    expect(inferredAskSignal({ ...base, choicePrompt: prompt })).toBe('choice')
+    expect(inferredAskSignal(base)).toBeNull()
+    const agentAsk = { message: 'Allow?', since: '2026-10-18T10:00:00.000Z' }
+    expect(inferredAskSignal({ ...base, bellCount: 1, agentAsk })).toBeNull()
   })
 })

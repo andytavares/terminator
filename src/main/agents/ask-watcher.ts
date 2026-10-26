@@ -1,11 +1,19 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { askChangeOf, parseAskReport, type AgentAsk } from '../../shared/agent-sessions/ask.js'
+import {
+  askChangeOf,
+  isFocusReport,
+  parseAskReport,
+  turnChangeOf,
+  type AgentAsk,
+} from '../../shared/agent-sessions/ask.js'
+import { endTurn, setTurn } from './agent-turns.js'
 import { asksDirectory } from './agent-ask-hook.js'
 import { probeUntilArmed } from './agent-session-watcher.js'
 import { makeLogger } from '../logger.js'
 
-// One file per terminal, claimed by rename before it is read (as agent-session-watcher does).
+// One file per hook event, named by the time it was written and claimed by rename before it is
+// read (as agent-session-watcher does). Oldest first, so a stop after a notification wins.
 // The ask lives in main because both the hook and the keystrokes arrive here.
 
 export type AskListener = (sessionId: string, ask: AgentAsk | null) => void
@@ -33,12 +41,15 @@ export function clearAsk(sessionId: string): void {
   if (asks.delete(sessionId)) announce(sessionId, null)
 }
 
-// xterm reports focus gaining and losing as these, with no one typing.
-const FOCUS_REPORTS: readonly string[] = ['\x1b[I', '\x1b[O']
+// Claude Code's interrupt keys. An interrupted turn sends no Stop hook
+// (https://code.claude.com/docs/en/hooks#stop), so the key itself ends it.
+const INTERRUPT_KEYS: readonly string[] = ['\x1b', '\x03']
 
-/** Input to the terminal answers the ask, unless it is only the terminal reporting its focus. */
-export function clearAskOnInput(sessionId: string, data: string): void {
-  if (!FOCUS_REPORTS.includes(data)) clearAsk(sessionId)
+/** Input answers the ask (unless it is only a focus report); Esc or Ctrl+C also ends the turn. */
+export function noteTerminalInput(sessionId: string, data: string): void {
+  if (isFocusReport(data)) return
+  clearAsk(sessionId)
+  if (INTERRUPT_KEYS.includes(data)) endTurn(sessionId)
 }
 
 function applyAskReport(file: string): void {
@@ -51,6 +62,8 @@ function applyAskReport(file: string): void {
   try {
     const report = parseAskReport(JSON.parse(fs.readFileSync(claimed, 'utf8')))
     if (report === null) return
+    const inTurn = turnChangeOf(report)
+    if (inTurn !== null) setTurn(report.terminal, inTurn)
     const change = askChangeOf(report)
     if (change.kind === 'set') {
       asks.set(report.terminal, change.ask)
@@ -70,7 +83,8 @@ function applyDirectory(directory: string): void {
   } catch {
     return
   }
-  for (const name of names) if (name.endsWith('.json')) applyAskReport(path.join(directory, name))
+  const reports = names.filter((name) => name.endsWith('.json')).sort()
+  for (const name of reports) applyAskReport(path.join(directory, name))
 }
 
 /** Watches for asks (`fs.watch`, ADR-005) and returns the way to stop. Any event re-reads the

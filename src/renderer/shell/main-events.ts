@@ -3,6 +3,7 @@ import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
 import { useExtensionRegistry } from '../extensions/registry'
 import { useWorkspaceStore } from '../stores/workspace.store'
 import { useSessionStore } from '../stores/session.store'
+import { isBrokenOut } from '../stores/breakout.store'
 import { useSettingsStore } from '../stores/settings.store'
 import { useLogStore } from '../stores/log.store'
 import { useNotificationStore } from '../stores/notification.store'
@@ -13,6 +14,9 @@ import { recordDirectUse } from '../quick-actions/usage'
 import { findSurface, type SurfaceRegistration } from '../quick-actions/surface-actions'
 import { adoptTerminalSession } from '../terminal/session-controller'
 import { revealSession } from '../terminal/navigate-to-session'
+import { useTaskSwitcher } from '../components/task-switcher/task-switcher.store'
+import { dockBack, toggleBreakout } from '../terminal/breakout'
+import { switchLane } from '../terminal/switch-lane'
 
 // What the main process tells the window: menu accelerators, notifications,
 // and what extensions ask the shell to do.
@@ -38,17 +42,23 @@ function closeActiveTab(): void {
   const { scratchActive, activeProjectId } = useWorkspaceStore.getState()
   const projectId = scratchActive ? SCRATCH_PROJECT_ID : activeProjectId
   const sessionId = useSessionStore.getState().projectViews.get(projectId ?? '')?.activeSessionId
-  if (projectId && sessionId) void useSessionStore.getState().closeSession(sessionId)
+  // A tab in its own window is not on the main window's screen, so ⌘W there must not close it.
+  if (projectId && sessionId && !isBrokenOut(sessionId)) {
+    void useSessionStore.getState().closeSession(sessionId)
+  }
 }
 
 type MenuEvents = typeof window.electronAPI.extensionEvents
 type Unsubscribe = (() => void) | undefined
 
 /** Wraps a menu action so it also counts as a direct use of that shortcut. */
-function countedShortcut(actionId: string, run: () => void): () => void {
-  return () => {
+function countedShortcut<Args extends unknown[]>(
+  actionId: string,
+  run: (...args: Args) => void
+): (...args: Args) => void {
+  return (...args) => {
     recordDirectShortcut(actionId)
-    run()
+    run(...args)
   }
 }
 
@@ -58,7 +68,21 @@ function subscribeShellMenu(events: MenuEvents | undefined, handlers: MenuHandle
     events?.onMenuOpenSettings?.(countedShortcut('core.open-settings', handlers.openSettings)),
     events?.onMenuOpenAbout?.(handlers.openAbout),
     events?.onMenuToggleSidebar?.(countedShortcut('core.toggle-sidebar', handlers.toggleSidebar)),
-    events?.onMenuCloseTab?.(closeActiveTab),
+    events?.onMenuCloseTab?.(closeTabOf),
+  ]
+}
+
+/** Closes the terminal of the breakout window the accelerator was pressed in, else the active tab. */
+function closeTabOf(sessionId: string | null): void {
+  if (sessionId) void useSessionStore.getState().closeSession(sessionId)
+  else closeActiveTab()
+}
+
+/** What happens in a terminal's own window: its accelerator, and the user closing it. */
+function subscribeBreakout(events: MenuEvents | undefined): Unsubscribe[] {
+  return [
+    events?.onMenuToggleBreakout?.(countedShortcut('core.break-out', toggleBreakout)),
+    window.electronAPI.breakout?.onClosed(dockBack),
   ]
 }
 
@@ -75,6 +99,16 @@ function subscribeSurfaceMenu(events: MenuEvents | undefined): Unsubscribe[] {
   ]
 }
 
+/** The accelerators that move between tasks and between the lanes of one. */
+function subscribeTaskMenu(events: MenuEvents | undefined): Unsubscribe[] {
+  return [
+    events?.onMenuOpenTaskSwitcher?.(
+      countedShortcut('core.switch-task', () => useTaskSwitcher.getState().show())
+    ),
+    events?.onMenuSwitchLane?.(switchLane),
+  ]
+}
+
 /** Subscribes to every menu accelerator main sends; a window without them (the remote) has none. */
 export function useMenuEvents(handlers: MenuHandlers): void {
   const { openSettings, openAbout, toggleSidebar } = handlers
@@ -83,6 +117,8 @@ export function useMenuEvents(handlers: MenuHandlers): void {
     const unsubscribers = [
       ...subscribeShellMenu(events, { openSettings, openAbout, toggleSidebar }),
       ...subscribeSurfaceMenu(events),
+      ...subscribeTaskMenu(events),
+      ...subscribeBreakout(events),
     ]
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe?.())
   }, [openSettings, openAbout, toggleSidebar])

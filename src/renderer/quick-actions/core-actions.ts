@@ -30,6 +30,7 @@ export interface CoreActionDeps {
 
   onNewTab(): void
   onSplit(direction: 'vertical' | 'horizontal'): void
+  onBreakOut(): void
   onClosePane(): void
   onClear(): void
   onNewScratch(): void
@@ -49,6 +50,7 @@ export interface CoreActionDeps {
   onCopyIssueKey(): void
   onOpenIssue(): void
   onHome(): void
+  onTaskSwitcher(): void
   onStartWork(): void
   onOverview(): void
   onToggleSidebar(): void
@@ -102,6 +104,15 @@ const TERMINAL_ACTIONS: CoreActionSpec[] = [
     shortcut: '⌘⇧D',
     requires: 'terminal',
     run: (d) => d.onSplit('horizontal'),
+  },
+  {
+    id: 'core.break-out',
+    label: 'Move to its own window',
+    group: 'terminal',
+    mnemonic: 'o',
+    shortcut: '⌘⇧O',
+    requires: 'terminal',
+    run: (d) => d.onBreakOut(),
   },
   {
     id: 'core.close-tab',
@@ -272,6 +283,14 @@ const TOP_ACTIONS: CoreActionSpec[] = [
     mnemonic: 'h',
     shortcut: '⌘⇧H',
     run: (d) => d.onHome(),
+  },
+  {
+    id: 'core.switch-task',
+    label: 'Switch task',
+    group: 'top',
+    mnemonic: 'j',
+    shortcut: '⌘J',
+    run: (d) => d.onTaskSwitcher(),
   },
   {
     id: 'core.toggle-overview',

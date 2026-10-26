@@ -179,13 +179,14 @@ function refreshKeyOf(row: FactoryOrderRow): string {
   return `${row.status}:${row.standing?.kind ?? ''}:${row.ci?.status ?? ''}:${row.ci?.round ?? ''}`
 }
 
-// A link cannot sit inside the card's button, so the document's link is its sibling.
+// A link cannot sit inside the card's button, so the card is a box holding both:
+// the button opens the order, and the document's link sits below it.
 function HallCard({ row, onOpen }: { readonly row: FactoryOrderRow } & Pick<GridProps, 'onOpen'>) {
   return (
-    <div className="fdry-hall-slot">
+    <div className={isCompleted(row) ? 'fdry-hall-card is-done' : 'fdry-hall-card'}>
       <HallCardButton row={row} onOpen={onOpen} />
       {row.document ? (
-        <span className="fdry-order-links fdry-hall-slot-links">
+        <span className="fdry-order-links fdry-hall-card-links">
           <DocumentChip document={row.document} />
         </span>
       ) : null}
@@ -198,16 +199,12 @@ function HallCardButton({
   onOpen,
 }: { readonly row: FactoryOrderRow } & Pick<GridProps, 'onOpen'>) {
   return (
-    <button
-      type="button"
-      className={isCompleted(row) ? 'fdry-hall-card is-done' : 'fdry-hall-card'}
-      onClick={() => onOpen(row)}
-    >
+    <button type="button" className="fdry-hall-card-open" onClick={() => onOpen(row)}>
       {row.standing?.turn === 'you' ? (
         <span className="fdry-hall-card-beacon" aria-hidden="true" />
       ) : null}
       <HallThumbnail orderId={row.id} title={row.title} refreshKey={refreshKeyOf(row)} />
-      <b>{row.title}</b>
+      <b className="fdry-hall-card-title">{row.title}</b>
       {row.standing === undefined ? null : (
         <span className="fdry-hall-card-state">{row.standing.label}</span>
       )}

@@ -26,6 +26,7 @@ function coreActionHandlers() {
   return {
     onNewTab: vi.fn(),
     onSplit: vi.fn(),
+    onBreakOut: vi.fn(),
     onClosePane: vi.fn(),
     onClear: vi.fn(),
     onNewScratch: vi.fn(),
@@ -43,6 +44,7 @@ function coreActionHandlers() {
     onCopyIssueKey: vi.fn(),
     onOpenIssue: vi.fn(),
     onHome: vi.fn(),
+    onTaskSwitcher: vi.fn(),
     onStartWork: vi.fn(),
     onOverview: vi.fn(),
     onToggleSidebar: vi.fn(),
@@ -212,6 +214,7 @@ describe('CORE_SHORTCUTS', () => {
 const HANDLED_BY: [string, keyof CoreActionDeps, unknown[]][] = [
   ['core.new-tab', 'onNewTab', []],
   ['core.split-horizontal', 'onSplit', ['horizontal']],
+  ['core.break-out', 'onBreakOut', []],
   ['core.close-tab', 'onClosePane', []],
   ['core.new-scratch', 'onNewScratch', []],
   ['core.edit-note', 'onEditNote', []],
@@ -229,6 +232,7 @@ const HANDLED_BY: [string, keyof CoreActionDeps, unknown[]][] = [
   ['core.copy-issue-key', 'onCopyIssueKey', []],
   ['core.open-issue', 'onOpenIssue', []],
   ['core.open-home', 'onHome', []],
+  ['core.switch-task', 'onTaskSwitcher', []],
   ['core.start-work', 'onStartWork', []],
   ['core.toggle-overview', 'onOverview', []],
   ['core.next-waiting-top', 'onNextWaiting', []],
@@ -262,5 +266,23 @@ describe('buildCoreActions — issue labels name the linked issue', () => {
     expect(actionLabelOf(actions, 'core.view-issue')).toBe('View linked issue')
     expect(actionLabelOf(actions, 'core.copy-issue-key')).toBe('Copy issue key')
     expect(actionLabelOf(actions, 'core.open-issue')).toBe('Open issue in tracker')
+  })
+})
+
+describe('buildCoreActions — Move to its own window', () => {
+  const find = (overrides: Partial<CoreActionDeps>) =>
+    buildCoreActions(makeDeps(overrides)).find((a) => a.id === 'core.break-out')
+
+  it('is a terminal action listed with ⌘⇧O', () => {
+    expect(find({})).toMatchObject({
+      label: 'Move to its own window',
+      group: 'terminal',
+      shortcut: '⌘⇧O',
+    })
+  })
+
+  it('is unavailable without a focused terminal and available with one', () => {
+    expect(find({ hasTerminalFocused: false })?.disabledReason).toBeDefined()
+    expect(find({ hasTerminalFocused: true })?.disabledReason).toBeUndefined()
   })
 })

@@ -1,7 +1,9 @@
 import React from 'react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { TerminalRow } from '../../../../src/renderer/components/sidebar/TerminalRow'
+import { useBreakoutStore } from '../../../../src/renderer/stores/breakout.store'
+import { resetStore } from '../../../support/renderer-stores'
 import type { BranchTerminal } from '../../../../src/renderer/sidebar/branch-rows'
 
 const terminal = (patch: Partial<BranchTerminal> = {}): BranchTerminal => ({
@@ -24,6 +26,8 @@ const renderRow = (patch: Partial<BranchTerminal> = {}, props: Record<string, un
       {...props}
     />
   )
+
+beforeEach(() => resetStore(useBreakoutStore))
 
 describe('TerminalRow', () => {
   it('names the terminal', () => {
@@ -152,5 +156,20 @@ describe('TerminalRow — work item — dismissing the menu', () => {
     fireEvent.click(document.body)
     expect(container.querySelector('.ctx-menu')).toBeNull()
     expect(onLinkIssue).not.toHaveBeenCalled()
+  })
+})
+
+describe('TerminalRow — a terminal in its own window', () => {
+  it('shows a window icon titled for it in place of the state chip', () => {
+    resetStore(useBreakoutStore, { windows: new Map([['ses-1', window]]) })
+    const { container } = renderRow()
+    expect(screen.getByTitle('In its own window')).toBeTruthy()
+    expect(container.querySelector('.terminal-row__gutter .state-chip')).toBeNull()
+  })
+
+  it('keeps the state chip for a terminal that is not', () => {
+    const { container } = renderRow()
+    expect(screen.queryByTitle('In its own window')).toBeNull()
+    expect(container.querySelector('.terminal-row__gutter .state-chip')).not.toBeNull()
   })
 })

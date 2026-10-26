@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { askChangeOf, parseAskReport } from '../../../../src/shared/agent-sessions/ask'
+import {
+  askChangeOf,
+  isFocusReport,
+  parseAskReport,
+  turnChangeOf,
+} from '../../../../src/shared/agent-sessions/ask'
 
 const report = (over: Record<string, unknown> = {}) =>
   parseAskReport({
@@ -16,6 +21,10 @@ describe('parseAskReport', () => {
     'rejects %j',
     (value) => expect(parseAskReport(value)).toBeNull()
   )
+
+  it('accepts a prompt, which a UserPromptSubmit hook writes', () => {
+    expect(report({ event: 'prompt', notificationType: undefined }).event).toBe('prompt')
+  })
 
   it('keeps a notification without a type', () => {
     expect(report({ notificationType: undefined }).notificationType).toBeNull()
@@ -51,5 +60,27 @@ describe('askChangeOf', () => {
       kind: 'clear',
     })
     expect(askChangeOf(report({ notificationType: 'elicitation_response' })).kind).toBe('clear')
+  })
+})
+
+describe('a prompt', () => {
+  it('lifts the ask: the operator just answered', () => {
+    expect(askChangeOf(report({ event: 'prompt' }))).toEqual({ kind: 'clear' })
+  })
+})
+
+describe('turnChangeOf', () => {
+  it('starts a turn on a prompt, ends it on a stop, and leaves it on a notification', () => {
+    expect(turnChangeOf(report({ event: 'prompt' }))).toBe(true)
+    expect(turnChangeOf(report({ event: 'stop' }))).toBe(false)
+    expect(turnChangeOf(report())).toBeNull()
+  })
+})
+
+describe('isFocusReport', () => {
+  it('is true for the terminal reporting focus in or out, false for a keystroke', () => {
+    expect(isFocusReport('\x1b[I')).toBe(true)
+    expect(isFocusReport('\x1b[O')).toBe(true)
+    expect(isFocusReport('y')).toBe(false)
   })
 })

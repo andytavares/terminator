@@ -119,3 +119,30 @@ describe('isHot', () => {
     expect(isHot(ask({ id: 'a', kind: 'finished', ageMinutes: 30 }), NOW)).toBe(false)
   })
 })
+
+describe('orderAsks — told before guessed', () => {
+  it('puts a reported answer before an older inferred one, and still oldest first within each', () => {
+    const answer = (id: string, ageMinutes: number, inferred: boolean) => ({
+      ...ask({ id, kind: 'answer', ageMinutes }),
+      ...(inferred ? { inferred: true } : {}),
+    })
+    const ordered = orderAsks(
+      [
+        answer('guess-old', 40, true),
+        answer('told-new', 1, false),
+        answer('guess-new', 2, true),
+        answer('told-old', 10, false),
+        ask({ id: 'fix', kind: 'fix', ageMinutes: 90 }),
+      ],
+      {},
+      NOW
+    )
+    expect(ordered.map((a) => a.id)).toEqual([
+      'told-old',
+      'told-new',
+      'guess-old',
+      'guess-new',
+      'fix',
+    ])
+  })
+})
