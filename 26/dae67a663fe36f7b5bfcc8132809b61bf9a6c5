@@ -1,0 +1,27 @@
+src/renderer/components/ContextMenu.tsx
+  s_4442da545bd38a::t_721bbd0c43a999 34,50,52
+packages/extension-ui/src/Popover.tsx
+  s_4442da545bd38a::t_77bb7b7fa7b27b 59-61
+tests/unit/renderer/components/ContextMenu.spec.tsx
+  s_4442da545bd38a::t_7ed1df8e3a69a8 125-137,142
+  s_4442da545bd38a::t_0d766f01859c3b 124,138-141,159-160
+  s_4442da545bd38a::t_61efd285fe364f 2,19-24,122-123,143-158,161-179
+src/renderer/components/sidebar/useShownInMain.ts
+  s_4442da545bd38a::t_77bb7b7fa7b27b 18-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "26dae67a663fe36f7b5bfcc8132809b61bf9a6c5",
+  "prompts": {},
+  "sessions": {
+    "s_4442da545bd38a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d287f4c8-4059-43c7-8a40-e53bdb0bc217",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
