@@ -1,0 +1,19 @@
+src/renderer/components/home/StartWork.css
+  s_a80af929ba8425::t_dc2d191190fc0b 314
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d131058ddb83ac957911ff3984240a9ded046329",
+  "prompts": {},
+  "sessions": {
+    "s_a80af929ba8425": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4966b7a9-21f0-4823-b753-f496f1c5df05",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
