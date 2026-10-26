@@ -1,0 +1,47 @@
+tests/unit/renderer/sidebar/shown-in-main.spec.ts
+  s_4442da545bd38a::t_b3a15d9714bd91 8,13,47,65,69,74,78-79
+  s_4442da545bd38a::t_3f5cecfe198e50 50-53
+  s_4442da545bd38a::t_9b8a89d2d09a33 1-7,9-12,14-26,31-46,48-49,54-64,66-68,70-73,75-77,80-98
+  s_4442da545bd38a::t_e9d7257a0b06e1 27-30
+src/renderer/components/sidebar/RepoHeader.tsx
+  s_4442da545bd38a::t_ba9c7f08a4134d 59,66,73,90-91
+  s_4442da545bd38a::t_745ebceeb7c323 13-14
+  s_4442da545bd38a::t_e520b43253e1c8 92-93
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_4442da545bd38a::t_745ebceeb7c323 1473-1474,1482-1502
+src/renderer/App.tsx
+  s_4442da545bd38a::t_e9d7257a0b06e1 52
+  s_4442da545bd38a::t_745ebceeb7c323 38,276,279-280,287
+  s_4442da545bd38a::t_ba9c7f08a4134d 43,82
+src/renderer/components/sidebar/TerminalRow.css
+  s_4442da545bd38a::t_edc8cba1043e33 29,31
+src/renderer/components/sidebar/SidebarList.tsx
+  s_4442da545bd38a::t_745ebceeb7c323 34-35,116-117,122,200-201,206,220-228,307
+src/renderer/components/sidebar/RepoHeader.css
+  s_4442da545bd38a::t_edc8cba1043e33 39,41-44
+src/renderer/components/sidebar/TerminalRow.tsx
+  s_4442da545bd38a::t_5dc9eab33615a5 59
+src/renderer/sidebar/shown-in-main.ts
+  s_4442da545bd38a::t_3f5cecfe198e50 24-27
+  s_4442da545bd38a::t_690f2441b80d56 1-23,28-32,35-40,42-51
+  s_4442da545bd38a::t_b3a15d9714bd91 33-34,41
+src/renderer/components/sidebar/useShownInMain.ts
+  s_4442da545bd38a::t_a9bdc5be52fa54 19
+  s_4442da545bd38a::t_008a41177e8ab4 1-18,20-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "48da76ff240824fc008857110144302f626a113c",
+  "prompts": {},
+  "sessions": {
+    "s_4442da545bd38a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d287f4c8-4059-43c7-8a40-e53bdb0bc217",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
