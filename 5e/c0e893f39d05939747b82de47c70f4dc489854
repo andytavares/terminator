@@ -1,0 +1,32 @@
+tests/e2e/helpers.ts
+  s_a80af929ba8425::t_2fe5ddf995e6a4 244-249,251-253,260
+  s_a80af929ba8425::t_2f9fe7dbbc3cce 239-243
+tests/e2e/foundry-intake.spec.ts
+  s_a80af929ba8425::t_2f9fe7dbbc3cce 3-4,18
+  s_a80af929ba8425::t_fbbd6e3d53079d 296-302,304
+tests/e2e/foundry-forge.spec.ts
+  s_a80af929ba8425::t_6b6943500e5801 156
+  s_a80af929ba8425::t_2f9fe7dbbc3cce 3-4,14
+  s_a80af929ba8425::t_fbbd6e3d53079d 138-139,141-142,144-146,150,153-155,157
+tests/e2e/fixtures/acp-stub-agent.mjs
+  s_a80af929ba8425::t_2fe5ddf995e6a4 4,6,29-33,47-60,65
+tests/e2e/foundry-harness.ts
+  s_a80af929ba8425::t_fbbd6e3d53079d 5-12,259-269,272-279,282-290,294-296,298-302,304-306
+  s_a80af929ba8425::t_eaf432ae1cee32 3,291-293,297,303
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5ec0e893f39d05939747b82de47c70f4dc489854",
+  "prompts": {},
+  "sessions": {
+    "s_a80af929ba8425": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4966b7a9-21f0-4823-b753-f496f1c5df05",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
