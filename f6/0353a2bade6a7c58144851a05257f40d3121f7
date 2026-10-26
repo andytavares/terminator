@@ -1,0 +1,27 @@
+tests/e2e/task-vault-links.spec.ts
+  s_4442da545bd38a::t_6b67480074bf19 73-74
+src/renderer/sidebar/shown-in-main.ts
+  s_4442da545bd38a::t_013fdee627d4ab 2,53-59
+  s_4442da545bd38a::t_a4eb1c6d03882e 60
+src/renderer/components/sidebar/SidebarList.tsx
+  s_4442da545bd38a::t_013fdee627d4ab 35-39
+tests/unit/renderer/sidebar/shown-in-main.spec.ts
+  s_4442da545bd38a::t_35793d1cb5475a 4,10,101-108
+  s_4442da545bd38a::t_7eeb43deae5918 109-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f60353a2bade6a7c58144851a05257f40d3121f7",
+  "prompts": {},
+  "sessions": {
+    "s_4442da545bd38a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d287f4c8-4059-43c7-8a40-e53bdb0bc217",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
