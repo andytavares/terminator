@@ -1,4 +1,6 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useLayoutEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import { keepOnScreen } from '@terminator/extension-ui'
 
 export interface ContextMenuItem {
   label: string
@@ -24,7 +26,12 @@ export function closeAllContextMenus(): void {
   window.dispatchEvent(new CustomEvent('close-context-menus'))
 }
 
+/** Drawn in the document body: an ancestor with containment (Home's `container-type: size`)
+ * would otherwise hold the fixed menu and clip it at its own edge. */
 export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps): JSX.Element {
+  const ref = useRef<HTMLDivElement>(null)
+  // Before paint, so a menu opened near an edge never flashes half off screen.
+  useLayoutEffect(() => keepOnScreen(ref.current), [x, y, items])
   useEffect(() => {
     const dismiss = (): void => onDismiss()
     window.addEventListener('click', dismiss)
@@ -35,8 +42,24 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps): JSX.E
     }
   }, [onDismiss])
 
+  return createPortal(
+    <div
+      ref={ref}
+      className="ctx-menu"
+      style={{ left: x, top: y }}
+      // The portal still bubbles through the React tree: the row behind must not act too.
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <MenuItems items={items} />
+    </div>,
+    document.body
+  )
+}
+
+function MenuItems({ items }: { items: ContextMenuItem[] }): JSX.Element {
   return (
-    <div className="ctx-menu" style={{ left: x, top: y }} onClick={(e) => e.stopPropagation()}>
+    <>
       {items.map((item) => (
         <React.Fragment key={item.label}>
           {item.separatorBefore && <div className="ctx-menu__separator" />}
@@ -48,6 +71,6 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps): JSX.E
           </button>
         </React.Fragment>
       ))}
-    </div>
+    </>
   )
 }

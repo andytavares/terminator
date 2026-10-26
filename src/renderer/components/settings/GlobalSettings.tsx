@@ -28,6 +28,7 @@ const CORE_NOTIFICATION_KEYS: Array<{ key: string; label: string }> = [
   { key: 'splitPaneFailed', label: 'Split pane failed' },
   { key: 'closeTerminalFailed', label: 'Close terminal failed' },
   { key: 'remoteTunnelDisconnected', label: 'Remote tunnel disconnected' },
+  { key: 'updateReady', label: 'Update ready to install' },
   { key: 'extensionInstalled', label: 'Extension installed' },
   { key: 'extensionInstallFailed', label: 'Extension install failed' },
   { key: 'extensionReloaded', label: 'Extension reloaded' },

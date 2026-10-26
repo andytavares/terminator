@@ -26,8 +26,9 @@
   padding-left: 61px;
 }
 
+/* Lighter than selected: a hovered row must never read as the session on screen. */
 .terminal-row:hover {
-  background: var(--tm-bg-card-hover);
+  background: var(--tm-bg-elevated);
 }
 
 .terminal-row--selected {

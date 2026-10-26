@@ -10,6 +10,8 @@ import './RepoHeader.css'
 export interface RepoHeaderProps {
   group: RepoGroup
   collapsed: boolean
+  /** Folded, and holds the branch the main area shows: the row that stands for it. */
+  selected?: boolean
   onToggleCollapse: () => void
   onAddBranch?: () => void
   onEdit?: () => void
@@ -54,20 +56,21 @@ export interface RepoHeaderProps {
  * revealing it never moves what was already on the row (FR-031).
  */
 export function RepoHeader(props: RepoHeaderProps): JSX.Element {
-  const { group, collapsed, onToggleCollapse, dragProps, dragOver = false } = props
+  const { group, collapsed, onToggleCollapse, dragProps } = props
   const { menu, openMenu, closeMenu } = useRowMenu()
 
   return (
     <>
       <div
         {...dragProps}
-        className={`repo-header${dragOver ? ' repo-header--dnd-over' : ''}`}
+        className={repoHeaderClass(props)}
         style={group.color ? { ['--ws-color' as string]: group.color } : undefined}
         onClick={onToggleCollapse}
         onContextMenu={repoMenuItems(props, closeMenu).length > 0 ? openMenu : undefined}
         role="button"
         tabIndex={0}
         aria-expanded={!collapsed}
+        aria-current={props.selected ? 'true' : undefined}
         onKeyDown={activateOnKey(onToggleCollapse)}
       >
         <RepoHeaderContent {...props} />
@@ -82,6 +85,10 @@ export function RepoHeader(props: RepoHeaderProps): JSX.Element {
       )}
     </>
   )
+}
+
+function repoHeaderClass({ selected, dragOver }: RepoHeaderProps): string {
+  return `repo-header${selected ? ' repo-header--selected' : ''}${dragOver ? ' repo-header--dnd-over' : ''}`
 }
 
 /** Chevron, swatch, name, the collapsed waiting marker, hover actions, then the count. */

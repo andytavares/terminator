@@ -127,6 +127,8 @@ Download the `.dmg` from the [latest release](https://github.com/andytavares/ter
 
 The app is signed and notarized, so it opens normally.
 
+After that, the app updates itself. It checks for a new release at launch and every four hours, downloads it, and installs it the next time you quit. Keep it in Applications: an app run from the DMG or from Downloads cannot update. **Terminator → Check for Updates…** checks at once and shows the result in a dialog.
+
 ## Available Scripts
 
 | Script                           | Description                                                                      |

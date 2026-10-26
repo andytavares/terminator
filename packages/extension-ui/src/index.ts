@@ -62,7 +62,7 @@ export type { TimeInput } from './relative-time'
 
 export { usePolling, everyWhileVisible } from './usePolling'
 
-export { Popover } from './Popover'
+export { Popover, keepOnScreen } from './Popover'
 export type { PopoverProps } from './Popover'
 
 export { ConfirmDialog } from './ConfirmDialog'

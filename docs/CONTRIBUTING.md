@@ -47,6 +47,8 @@ Starts the app on a fresh profile and passes when the main log says `App ready`,
 
 `asarUnpack` lists only `postgres.wasm` and `postgres.data` of `@electric-sql/pglite`, which the one-time import (`src/main/db/legacy-pglite-import.ts`, ADR 099) reads with `readFileSync`; Electron's asar fs interception redirects those reads to `app.asar.unpacked`. Unpacking all of the package breaks Electron's ESM dynamic import handler: from `app.asar.unpacked`, pglite's `import("./fs/nodefs.js")` fails to resolve through the asar virtual path, the NodeFS adapter never loads, and `pg_initdb` aborts. The entries go when PGlite is removed, one release after the import ships.
 
+The `zip` target and the `publish` section exist for self-update (ADR 128): each build writes `dist/latest-mac.yml`, and `release.yml` uploads it with the zip and the blockmaps. Installed apps find a release only through that file.
+
 #### Signing certificate
 
 `release.yml` signs with the Developer ID Application certificate in the `APPLE_CERTIFICATE` secret (a base64 `.p12`, password in `APPLE_CERTIFICATE_PASSWORD`). It must come from Apple's Developer ID G2 authority: the original authority expires on February 1, 2027, and the `Check the signature` step fails any build signed from it. G2 certificates last one year; the same step warns 30 days before expiry. To renew:

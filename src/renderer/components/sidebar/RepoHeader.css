@@ -36,7 +36,12 @@
   outline: none;
 }
 
+/* Lighter than selected: a hovered row must never read as the session on screen. */
 .repo-header:hover {
+  background: var(--tm-bg-elevated);
+}
+
+.repo-header--selected {
   background: var(--tm-bg-card-hover);
 }
 

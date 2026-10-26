@@ -54,8 +54,11 @@ export function Popover({ label, children, onDismiss, className }: PopoverProps)
 /** Keeps it on screen: anchored near the right or bottom edge, the panel would sit half outside
  * the view with no way to scroll to it. Measured after mount and nudged back, because the overflow
  * depends on the rendered width, which nothing knows in advance. */
-function keepOnScreen(el: HTMLElement | null): void {
+export function keepOnScreen(el: HTMLElement | null): void {
   if (!el) return
+  // Measure from the anchor: a nudge left from an earlier position would skew the box.
+  el.style.marginLeft = ''
+  el.style.marginTop = ''
   const margin = 8
   const box = el.getBoundingClientRect()
   const overflowRight = box.right - (window.innerWidth - margin)
