@@ -286,7 +286,9 @@ class AcpAgentService implements AgentService {
   private finish(session: Session, exitCode: number | null): void {
     if (session.ended) return
     session.ended = true
-    if (!this.sessions.delete(session.id)) return // It never got an id: its start failed or is failing.
+    // Not the registered one: its start failed, or a resume took its id over.
+    if (this.sessions.get(session.id) !== session) return
+    this.sessions.delete(session.id)
     this.cancelAsks(session)
     clearTurn(session.id)
     clearAsk(session.id)
@@ -305,6 +307,9 @@ class AcpAgentService implements AgentService {
       this.sessions.set(session.id, session)
       return toConfigOptions(created.configOptions)
     }
+    // One agent per conversation: resuming a running one takes it over.
+    const running = this.live(input.resume)
+    if (running) this.closeSession(running)
     session.id = input.resume
     session.replaying = true
     this.sessions.set(session.id, session)
@@ -382,7 +387,11 @@ class AcpAgentService implements AgentService {
 
   async prompt(sessionId: string, text: string): Promise<{ stopReason: string }> {
     const session = this.live(sessionId)
-    if (!session) return { stopReason: 'error' }
+    return session ? this.promptSession(session, text) : { stopReason: 'error' }
+  }
+
+  private async promptSession(session: Session, text: string): Promise<{ stopReason: string }> {
+    const sessionId = session.id
     setTurn(sessionId, true)
     try {
       const { stopReason } = await session.link.agent.prompt({
@@ -400,7 +409,12 @@ class AcpAgentService implements AgentService {
 
   cancel(sessionId: string): void {
     const session = this.live(sessionId)
-    if (!session) return
+    if (session) this.cancelSession(session)
+  }
+
+  private cancelSession(session: Session): void {
+    if (session.ended) return
+    const { id: sessionId } = session
     this.cancelAsks(session)
     session.link.agent.cancel({ sessionId }).catch((error) => {
       logger.error('agent cancel failed', { error: String(error) })
@@ -426,10 +440,16 @@ class AcpAgentService implements AgentService {
 
   async close(sessionId: string): Promise<void> {
     const session = this.live(sessionId)
-    if (!session) return
+    if (session) this.closeSession(session)
+  }
+
+  private closeSession(session: Session): void {
+    const registered = this.sessions.get(session.id) === session
     this.finish(session, null)
     session.link.kill()
-    if (session.hasTab) this.deps.broadcast('terminal:close-tab', { sessionId })
+    if (registered && session.hasTab) {
+      this.deps.broadcast('terminal:close-tab', { sessionId: session.id })
+    }
   }
 
   async answer(sessionId: string, requestId: string, optionId: string | null): Promise<boolean> {
@@ -454,13 +474,13 @@ class AcpAgentService implements AgentService {
     onStarted?.(session.id)
     try {
       // An agent that ignores the cancel is killed by the close below, not waited for.
-      const { stopReason } = await withinTime(this.prompt(session.id, prompt), timeoutMs)
+      const { stopReason } = await withinTime(this.promptSession(session, prompt), timeoutMs)
       return { text: reply(), stopReason, sessionId: session.id }
     } catch {
-      this.cancel(session.id)
+      this.cancelSession(session)
       return { error: 'TIMEOUT', message: timeoutMessage(timeoutMs) }
     } finally {
-      await this.close(session.id)
+      this.closeSession(session)
     }
   }
 
@@ -469,7 +489,7 @@ class AcpAgentService implements AgentService {
     try {
       const session = await this.open({ agentId, cwd: this.deps.scratchDirectory }, true)
       const option = session.configOptions.find((candidate) => candidate.id === 'model') ?? null
-      await this.close(session.id)
+      this.closeSession(session)
       return option
     } catch (error) {
       logger.error('agent models could not be read', { error: String(error) })

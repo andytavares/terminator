@@ -369,6 +369,22 @@ describe('an agent that never answers', () => {
   })
 })
 
+describe('resuming a session that still runs', () => {
+  it('takes it over: the old agent is closed, and its run cannot close the new one', async () => {
+    const { service, firstAgent, agents } = setup()
+    let started: (sessionId: string) => void = () => undefined
+    const running = new Promise<string>((resolve) => (started = resolve))
+    const run = service.runOnce({ cwd: '/w', prompt: 'slow', timeoutMs: 50, onStarted: started })
+    const old = await firstAgent
+    old.onPrompt = () => new Promise(() => undefined)
+    await service.start({ cwd: '/w', resume: await running })
+    expect(old.killed).toBe(true)
+    expect(await run).toMatchObject({ error: 'TIMEOUT' })
+    expect(agents[1].killed).toBe(false)
+    expect(await service.prompt(SESSION_ID, 'still there?')).toEqual({ stopReason: 'end_turn' })
+  })
+})
+
 describe('runOnce without an agent', () => {
   it('reports an agent that cannot start in plain words', async () => {
     const service = serviceWith(() => Promise.reject(new Error('spawn ENOENT')))
