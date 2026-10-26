@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import { accessSync, constants } from 'node:fs'
 import { delimiter, join } from 'node:path'
 import { Readable, Writable } from 'node:stream'
@@ -19,19 +19,26 @@ export function createConnector(settings: () => AgentsSettings): AgentServiceDep
       stdio: ['pipe', 'pipe', 'ignore'],
     })
     child.stdin.on('error', () => undefined) // The exit event reports a process that is gone.
+    const exited = exitOf(child)
     const stream = ndJsonStream(
       Writable.toWeb(child.stdin),
       Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>
     )
     return {
       agent: new ClientSideConnection(() => client, stream),
-      onExit(listener) {
-        child.once('exit', (exitCode) => listener(exitCode))
-        child.once('error', () => listener(null))
-      },
+      onExit: (listener) => void exited.then(listener),
       kill: () => void child.kill(),
     }
   }
+}
+
+/** The exit code, or null for a process that could not start. Listened to at once: a spawn
+ * error with no listener would throw in the main process. */
+function exitOf(child: ChildProcess): Promise<number | null> {
+  return new Promise((resolve) => {
+    child.once('exit', (exitCode) => resolve(exitCode))
+    child.once('error', () => resolve(null))
+  })
 }
 
 function claudeOnPath(): string | null {

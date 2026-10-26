@@ -385,3 +385,50 @@ function askedOutcome(agent: FakeAgent) {
     toolCall: { toolCallId: 't2', title: 'Run ls', kind: 'execute' },
   })
 }
+
+describe('an agent that ignores a cancel', () => {
+  it('still reports a time out and is killed', async () => {
+    const { service, firstAgent } = setup()
+    const run = service.runOnce({ cwd: '/w', prompt: 'stuck', timeoutMs: 1 })
+    const agent = await firstAgent
+    agent.onPrompt = () => new Promise(() => undefined)
+    expect(await run).toMatchObject({ error: 'TIMEOUT' })
+    expect(agent.killed).toBe(true)
+  })
+})
+
+describe('an agent that never answers the mode', () => {
+  it('is killed and reported not started once the start time runs out', async () => {
+    const link = {
+      agent: partialFake<AgentLink['agent']>({
+        initialize: async () => ({}),
+        newSession: async () => ({ sessionId: SESSION_ID }),
+        setSessionMode: () => new Promise(() => undefined),
+      }),
+      onExit: () => undefined,
+      kill: vi.fn(),
+    }
+    const service = serviceWith(async () => link)
+    expect(await service.start({ cwd: '/w', mode: 'default' })).toBeNull()
+    expect(link.kill).toHaveBeenCalled()
+  })
+})
+
+describe('an agent that exits before its session opens', () => {
+  it('is reported unavailable without waiting for the start time', async () => {
+    const link = {
+      agent: partialFake<AgentLink['agent']>({ initialize: () => new Promise(() => undefined) }),
+      onExit: (listener: (code: number | null) => void) => listener(127),
+      kill: vi.fn(),
+    }
+    const service = createAgentService({
+      ...partialFake<AgentServiceDeps>({}),
+      connect: async () => link,
+      defaultAgentId: () => 'claude',
+      startTimeoutMs: 60_000,
+    })
+    expect(await service.runOnce({ cwd: '/w', prompt: 'x' })).toMatchObject({
+      error: 'AGENT_UNAVAILABLE',
+    })
+  })
+})

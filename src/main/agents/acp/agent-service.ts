@@ -190,6 +190,13 @@ function withinTime<T>(work: Promise<T>, ms: number): Promise<T> {
   return Promise.race([work, expiry]).finally(() => clearTimeout(timer))
 }
 
+/** Rejects once the agent's process ends: an agent that dies while starting has no answer to wait for. */
+function whenExited(link: AgentLink): Promise<never> {
+  return new Promise<never>((_, reject) =>
+    link.onExit((exitCode) => reject(new Error(`the agent exited with ${exitCode}`)))
+  )
+}
+
 /** Starts collecting the session's reply text; the returned function reads what came so far. */
 function collectReply(session: Session): () => string {
   const chunks: string[] = []
@@ -306,6 +313,12 @@ class AcpAgentService implements AgentService {
     return toConfigOptions(loaded?.configOptions)
   }
 
+  /** The session, its options and its mode: all of it within the start time. */
+  private async openSession(session: Session, input: StartAgentInput): Promise<void> {
+    session.configOptions = await this.begin(session, input)
+    if (input.mode !== undefined) await this.applyMode(session, input.mode)
+  }
+
   private async applyMode(session: Session, mode: string): Promise<void> {
     await session.link.agent.setSessionMode({ sessionId: session.id, modeId: mode })
     session.configOptions = session.configOptions.map((option) =>
@@ -320,8 +333,8 @@ class AcpAgentService implements AgentService {
     link.onExit((exitCode) => this.finish(session, exitCode))
     try {
       const limit = this.deps.startTimeoutMs ?? DEFAULT_START_TIMEOUT_MS
-      session.configOptions = await withinTime(this.begin(session, input), limit)
-      if (input.mode !== undefined) await this.applyMode(session, input.mode)
+      const opening = Promise.race([this.openSession(session, input), whenExited(link)])
+      await withinTime(opening, limit)
       return session
     } catch (error) {
       session.ended = true
@@ -439,17 +452,14 @@ class AcpAgentService implements AgentService {
     }
     const reply = collectReply(session)
     onStarted?.(session.id)
-    let timedOut = false
-    const timer = setTimeout(() => {
-      timedOut = true
-      this.cancel(session.id)
-    }, timeoutMs)
     try {
-      const { stopReason } = await this.prompt(session.id, prompt)
-      if (timedOut) return { error: 'TIMEOUT', message: timeoutMessage(timeoutMs) }
+      // An agent that ignores the cancel is killed by the close below, not waited for.
+      const { stopReason } = await withinTime(this.prompt(session.id, prompt), timeoutMs)
       return { text: reply(), stopReason, sessionId: session.id }
+    } catch {
+      this.cancel(session.id)
+      return { error: 'TIMEOUT', message: timeoutMessage(timeoutMs) }
     } finally {
-      clearTimeout(timer)
       await this.close(session.id)
     }
   }

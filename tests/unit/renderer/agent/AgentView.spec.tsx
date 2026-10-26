@@ -81,6 +81,17 @@ describe('AgentView transcript', () => {
     expect(within(log).getByText('Earlier reply More')).toBeTruthy()
   })
 
+  it('draws an update that arrives before the history once', async () => {
+    let answer: (reply: { data: AgentUpdate[] }) => void = () => undefined
+    agents.history.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    render(<AgentView sessionId="agent-1" />)
+    const early = text('agent_message_chunk', 'Hello')
+    act(() => updates.deliver({ sessionId: 'agent-1', update: early }))
+    // Main logs an update before it broadcasts it, so the history read after it holds it.
+    await act(async () => answer({ data: [early] }))
+    expect(within(screen.getByRole('log')).getByText('Hello')).toBeTruthy()
+  })
+
   it('ignores another session’s update', async () => {
     await mountView()
     act(() => updates.deliver({ sessionId: 'other', update: text('agent_message_chunk', 'Stray') }))

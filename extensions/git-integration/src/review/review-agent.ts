@@ -296,6 +296,8 @@ interface RunContext {
   runId: string
   startedAt: string
   activity: string[]
+  /** The agent's session, once it has started; '' before. */
+  sessionId: string
 }
 
 /** How one agent call ended. */
@@ -354,7 +356,7 @@ function baseFields(run: RunContext) {
     repoRoot: input.repoRoot,
     prNumber: input.prNumber,
     headSHA: input.headSHA,
-    sessionId: '',
+    sessionId: run.sessionId,
     scope: input.scope,
     request: input.request,
     question: input.question ?? null,
@@ -501,8 +503,14 @@ export function runAgentReview(
   deps: RunAgentReviewDeps
 ): RunAgentReviewResult {
   const runId = randomUUID()
-  const run: RunContext = { input, runId, startedAt: new Date().toISOString(), activity: [] }
-  const control = newRunControl(deps)
+  const startedAt = new Date().toISOString()
+  const run: RunContext = { input, runId, startedAt, activity: [], sessionId: '' }
+  // A failed or cancelled run keeps its session, so its conversation can still be continued.
+  const onSession = (sessionId: string) => {
+    run.sessionId = sessionId
+    deps.onSession?.(sessionId)
+  }
+  const control = newRunControl({ ...deps, onSession })
   return { runId, done: executeAgentRun(run, deps, control), cancel: control.cancel }
 }
 

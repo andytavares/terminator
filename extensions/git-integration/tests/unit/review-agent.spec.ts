@@ -376,6 +376,31 @@ describe('runAgentReview — a running session', () => {
   })
 })
 
+describe('runAgentReview — a run that ends without findings', () => {
+  it('keeps the session id, so its conversation can still be continued', async () => {
+    const exec = vi.fn(async () => ({ stdout: 'diff' }))
+    const runOnce = vi.fn<RunOnce>(async (input) => {
+      input.onStarted?.('acp-10')
+      return replied('I found nothing to report.', 'acp-10')
+    })
+    const run = await runAgentReview(baseInput, { exec, runOnce }).done
+    expect(run.status).toBe('failed')
+    expect(run.sessionId).toBe('acp-10')
+  })
+
+  it('keeps the session id of a cancelled run', async () => {
+    const exec = vi.fn(async () => ({ stdout: 'diff' }))
+    const runOnce = vi.fn<RunOnce>(async (input) => {
+      input.onStarted?.('acp-11')
+      return NEVER_REPLIES
+    })
+    const { done, cancel } = runAgentReview(baseInput, { exec, runOnce })
+    await eventually(() => expect(runOnce).toHaveBeenCalled())
+    cancel()
+    expect((await done).sessionId).toBe('acp-11')
+  })
+})
+
 describe('runAgentReview — cancelling before the agent', () => {
   it('does not ask the agent when cancelled while the diff is computed', async () => {
     let diffPrinted: (out: { stdout: string }) => void = () => {}

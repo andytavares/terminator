@@ -8,6 +8,15 @@ export interface AgentLog {
   readHistory(sessionId: string): AgentUpdate[]
 }
 
+/** The update a line holds; none for an empty line or one half written when the app stopped. */
+function updateOf(line: string): AgentUpdate[] {
+  try {
+    return [(JSON.parse(line) as { update: AgentUpdate }).update]
+  } catch {
+    return []
+  }
+}
+
 /** One JSON line `{ at, update }` per update, in `<directory>/<sessionId>.jsonl`. */
 export function createAgentLog({
   directory,
@@ -30,10 +39,7 @@ export function createAgentLog({
       } catch {
         return []
       }
-      return text
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => (JSON.parse(line) as { update: AgentUpdate }).update)
+      return text.split('\n').flatMap(updateOf)
     },
   }
 }

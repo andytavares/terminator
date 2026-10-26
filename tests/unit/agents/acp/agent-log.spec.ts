@@ -1,3 +1,4 @@
+import { appendFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { createAgentLog } from '../../../../src/main/agents/acp/agent-log'
@@ -21,5 +22,13 @@ describe('agent log', () => {
   it('returns nothing for a session that was never logged', () => {
     const log = createAgentLog({ directory: makeTempDir('agent-log-'), now: () => 0 })
     expect(log.readHistory('missing')).toEqual([])
+  })
+
+  it('skips a line a crash left half written', () => {
+    const directory = makeTempDir('agent-log-')
+    const log = createAgentLog({ directory, now: () => 0 })
+    log.append('s1', { sessionUpdate: 'plan' })
+    appendFileSync(join(directory, 's1.jsonl'), '{"at":1,"upd')
+    expect(log.readHistory('s1')).toEqual([{ sessionUpdate: 'plan' }])
   })
 })
