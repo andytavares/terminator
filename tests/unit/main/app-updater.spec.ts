@@ -68,6 +68,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.unstubAllEnvs()
 })
 
 const notificationsWithTitle = (title: string) =>
@@ -172,5 +173,17 @@ describe('checkForUpdatesNow with an update found', () => {
     startAppUpdates(reveal)
     await checkForUpdatesNow()
     expect(notificationsWithTitle('Could not check for updates')).toHaveLength(1)
+  })
+})
+
+describe('a test run of the packaged app', () => {
+  it('never checks, so smoke and e2e runs of a packaged build stay off the network', async () => {
+    vi.stubEnv('TERMINATOR_RUN_IN_BACKGROUND', '1')
+    vi.resetModules()
+    const updates = await import('../../../src/main/app-updater')
+    updates.startAppUpdates(reveal)
+    await updates.checkForUpdatesNow()
+    await vi.advanceTimersByTimeAsync(5 * 60 * 60 * 1000)
+    expect(fake.checks).toBe(0)
   })
 })

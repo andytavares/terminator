@@ -1,11 +1,15 @@
 import { app } from 'electron'
 // Default import: electron-updater defines autoUpdater with a getter that ESM named imports miss.
 import electronUpdater from 'electron-updater'
+import { runsInBackground } from './background-mode'
 import { logger } from './logger'
 import { notificationManager } from './notifications/notification-manager'
 
 /** Releases come about once a day and the app stays open for days. */
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
+
+/** Dev runs are unpackaged; smoke and e2e runs of a packaged build run in the background. */
+const checksForUpdates = (): boolean => app.isPackaged && !runsInBackground()
 
 /** Each later check finds the cached download and emits `update-downloaded` again. */
 let announcedVersion: string | null = null
@@ -13,7 +17,7 @@ let announcedVersion: string | null = null
 /** Checks GitHub Releases at launch and every four hours; an update installs on quit (ADR 128).
  * A click on the notification runs `revealApp`, never a restart, which closes every terminal. */
 export function startAppUpdates(revealApp: () => void): void {
-  if (!app.isPackaged) return
+  if (!checksForUpdates()) return
   const { autoUpdater } = electronUpdater
   autoUpdater.logger = logger
   autoUpdater.on('error', (error) => logger.warn('update check failed', { error: String(error) }))
@@ -50,7 +54,7 @@ function announceUpdate(version: string, revealApp: () => void): void {
 
 /** The "Check for Updates…" menu item. An update found announces itself when its download ends. */
 export async function checkForUpdatesNow(): Promise<void> {
-  if (!app.isPackaged) return
+  if (!checksForUpdates()) return
   try {
     const result = await electronUpdater.autoUpdater.checkForUpdates()
     // A download that fails after the check found an update only emits 'error'.

@@ -10,7 +10,7 @@ Every release meant a manual download: open the GitHub release, download the DMG
 
 ## Decision
 
-1. **electron-updater with the GitHub provider.** `src/main/app-updater.ts` checks GitHub Releases at launch and every four hours in the packaged app, downloads a newer version, and hands the zip to Squirrel.Mac, Electron's own Mac updater. An unpackaged app (dev, e2e) never checks.
+1. **electron-updater with the GitHub provider.** `src/main/app-updater.ts` checks GitHub Releases at launch and every four hours in the packaged app, downloads a newer version, and hands the zip to Squirrel.Mac, Electron's own Mac updater. An unpackaged app (dev, e2e) never checks, and neither does a test run of a packaged build (`TERMINATOR_RUN_IN_BACKGROUND=1`, set by `scripts/smoke-start.mjs`).
 2. **Install on quit by default.** A restart closes every terminal and agent, so the app never restarts by itself. The `updateReady` notification offers "Restart now"; a click on the notification only brings the window forward, because `clickHandler()` would otherwise run the first action.
 3. **The release ships the feed.** `electron-builder.cjs` adds a `zip` target and a `publish` section, so each build writes `latest-mac.yml` and `app-update.yml`. `release.yml` uploads the zip, the blockmaps and `latest-mac.yml`, and fails when they are missing.
 4. **Terminator > Check for Updates…** checks on demand and says when no update exists (`updateNotFound`) or the check failed (`updateCheckFailed`).
