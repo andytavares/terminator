@@ -37,6 +37,40 @@ function reply() {
   return file && existsSync(file) ? readFileSync(file, 'utf8') : null
 }
 
+const sessionHandlers = {
+  newSession: async ({ cwd, _meta }) => {
+    const sessionId = randomUUID()
+    const inherited = Boolean(process.env.CLAUDE_CODE_BRIDGE_SESSION_ID)
+    record({ kind: 'session', sessionId, cwd, meta: _meta ?? null, inherited })
+    return { sessionId, configOptions: CONFIG_OPTIONS }
+  },
+  loadSession: async ({ sessionId, cwd, _meta }) => {
+    record({ kind: 'session', sessionId, cwd, meta: _meta ?? null, resumed: true })
+    return { configOptions: CONFIG_OPTIONS }
+  },
+  setSessionMode: async ({ sessionId, modeId }) => {
+    record({ kind: 'mode', sessionId, modeId })
+    return {}
+  },
+  setSessionConfigOption: async () => ({ configOptions: CONFIG_OPTIONS }),
+}
+
+/** Answers with the reply file when there is one; otherwise works until it is cancelled. */
+function prompter(connection) {
+  return async ({ sessionId, prompt }) => {
+    const asked = prompt.map((block) => block.text ?? '').join(' ')
+    record({ kind: 'prompt', sessionId, length: asked.length })
+    const text = reply() ?? `acp-stub: ${asked.slice(0, 200)}`
+    await connection.sessionUpdate({
+      sessionId,
+      update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } },
+    })
+    if (reply() !== null) return { stopReason: 'end_turn' }
+    await new Promise((resolve) => cancels.set(sessionId, resolve))
+    return { stopReason: 'cancelled' }
+  }
+}
+
 function agent(connection) {
   return {
     initialize: async () => ({
@@ -44,34 +78,9 @@ function agent(connection) {
       agentCapabilities: { loadSession: true },
     }),
     authenticate: async () => ({}),
-    newSession: async ({ cwd, _meta }) => {
-      const sessionId = randomUUID()
-      const inherited = Boolean(process.env.CLAUDE_CODE_BRIDGE_SESSION_ID)
-      record({ kind: 'session', sessionId, cwd, meta: _meta ?? null, inherited })
-      return { sessionId, configOptions: CONFIG_OPTIONS }
-    },
-    loadSession: async ({ sessionId, cwd, _meta }) => {
-      record({ kind: 'session', sessionId, cwd, meta: _meta ?? null, resumed: true })
-      return { configOptions: CONFIG_OPTIONS }
-    },
-    setSessionMode: async ({ sessionId, modeId }) => {
-      record({ kind: 'mode', sessionId, modeId })
-      return {}
-    },
-    setSessionConfigOption: async () => ({ configOptions: CONFIG_OPTIONS }),
+    ...sessionHandlers,
     cancel: async ({ sessionId }) => cancels.get(sessionId)?.(),
-    prompt: async ({ sessionId, prompt }) => {
-      const asked = prompt.map((block) => block.text ?? '').join(' ')
-      record({ kind: 'prompt', sessionId, length: asked.length })
-      const text = reply() ?? `acp-stub: ${asked.slice(0, 200)}`
-      await connection.sessionUpdate({
-        sessionId,
-        update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } },
-      })
-      if (reply() !== null) return { stopReason: 'end_turn' }
-      await new Promise((resolve) => cancels.set(sessionId, resolve))
-      return { stopReason: 'cancelled' }
-    },
+    prompt: prompter(connection),
   }
 }
 
