@@ -3,6 +3,7 @@
 **Status**: Accepted
 **Date**: 2026-07-29
 **Supersedes in part**: [ADR-007](007-agent-runner-subprocess.md) (the headless spawn remains only for self-review)
+**Amended by**: [ADR 130](130-agents-the-app-drives-run-over-acp.md) (the agent runs over ACP in an agent tab; the hook stays)
 
 ## Context
 
