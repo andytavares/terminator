@@ -21,11 +21,12 @@ vi.mock('electron-store', () => ({
   },
 }))
 
-import { dispatchChannel } from '@terminator/extension-sdk'
+import { dispatchChannel, type AgentsAPI } from '@terminator/extension-sdk'
 import { registerReviewAgentHandlers, type ReviewAgentDeps } from '../../src/ipc/review-agent.ipc'
 import { bindWorkspaceRoots } from '../../src/ipc/repo-root'
 import type { AgentRun } from '../../src/schemas/review-agent.schema'
 import { eventually } from '../../../../tests/support/eventually'
+import { partialFake } from '../../../../tests/support/fakes'
 
 type RunReview = NonNullable<ReviewAgentDeps['runReview']>
 type RunSummary = NonNullable<ReviewAgentDeps['runSummary']>
@@ -35,12 +36,19 @@ type Handler = (payload: unknown) => Promise<unknown>
 function captureAgentHandlers(deps: Partial<ReviewAgentDeps>) {
   const handlers: Record<string, Handler> = {}
   const broadcast = vi.fn()
-  const openTerminal = vi.fn()
+  const start = vi.fn<AgentsAPI['start']>(async () => ({
+    sessionId: 'tab-1',
+    agentId: 'claude',
+    configOptions: [],
+  }))
+  const runOnce = vi.fn<AgentsAPI['runOnce']>()
+  const agents = partialFake<ReviewAgentDeps['agents']>({ start, runOnce })
   const settings: Record<string, unknown> = {}
   const fullDeps: ReviewAgentDeps = {
     getSetting: <T>(key: string) => settings[key] as T | undefined,
     broadcast,
-    openTerminal,
+    agents,
+    projectIdFor: (repoRoot) => (repoRoot === '/repo' ? 'project-1' : undefined),
     storagePath: '/storage/git-integration',
     ...deps,
   }
@@ -48,7 +56,7 @@ function captureAgentHandlers(deps: Partial<ReviewAgentDeps>) {
   const registration = registerReviewAgentHandlers((spec) => {
     handlers[spec.channel] = (payload) => dispatchChannel(spec, payload)
   }, fullDeps)
-  return { handlers, broadcast, openTerminal, settings, registration }
+  return { handlers, broadcast, start, runOnce, settings, registration }
 }
 
 const scope = {
@@ -336,26 +344,78 @@ describe('review-agent IPC — review-agent:dismiss returns NOT_FOUND for an unk
   })
 })
 
-describe('review-agent IPC — review-agent:open-terminal opens claude --resume <sessionId> in the run worktree', () => {
-  it('review-agent:open-terminal opens `claude --resume <sessionId>` in the run worktree', async () => {
+describe('review-agent IPC — review-agent:open-terminal opens the run conversation in an agent tab', () => {
+  it('resumes the stored session in the run worktree, as a tab of the repo project', async () => {
     const ensureWorktree = vi.fn(async () => '/wt/pr-1-sha1')
-    const { handlers, openTerminal } = captureAgentHandlers({ ensureWorktree })
+    const { handlers, start } = captureAgentHandlers({ ensureWorktree })
     storeState.data['/repo:::1:::sha1'] = [makeDoneRun({ id: 'run-1', sessionId: 'sess-123' })]
 
     const result = await handlers['review-agent:open-terminal']({ runId: 'run-1' })
     expect(result).toEqual({ ok: true })
-    expect(openTerminal).toHaveBeenCalledWith({
-      repoRoot: '/repo',
+    expect(start).toHaveBeenCalledWith({
       cwd: '/wt/pr-1-sha1',
-      title: 'Review #1',
-      command: 'claude --resume sess-123',
+      resume: 'sess-123',
+      tab: { projectId: 'project-1', title: 'Review #1' },
     })
   })
 
-  it('review-agent:open-terminal returns NOT_FOUND for an unknown run', async () => {
-    const { handlers } = captureAgentHandlers({})
+  it('returns NOT_FOUND for an unknown run', async () => {
+    const { handlers, start } = captureAgentHandlers({})
     const result = await handlers['review-agent:open-terminal']({ runId: 'nope' })
     expect(result).toEqual({ error: 'NOT_FOUND' })
+    expect(start).not.toHaveBeenCalled()
+  })
+})
+
+describe('review-agent IPC — review-agent:open-terminal refuses a run it cannot open', () => {
+  it('returns NO_SESSION for a run that has no conversation yet', async () => {
+    const { handlers, start } = captureAgentHandlers({})
+    storeState.data['/repo:::1:::sha1'] = [makeDoneRun({ id: 'run-1', sessionId: '' })]
+    expect(await handlers['review-agent:open-terminal']({ runId: 'run-1' })).toEqual({
+      error: 'NO_SESSION',
+    })
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('returns NO_PROJECT when no project holds the repo', async () => {
+    const { handlers, start } = captureAgentHandlers({ ensureWorktree: async () => '/wt' })
+    storeState.data['/other:::1:::sha1'] = [
+      makeDoneRun({ id: 'run-2', repoRoot: '/other', sessionId: 'sess-9' }),
+    ]
+    expect(await handlers['review-agent:open-terminal']({ runId: 'run-2' })).toEqual({
+      error: 'NO_PROJECT',
+    })
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('returns AGENT_UNAVAILABLE when the agent does not start', async () => {
+    const { handlers, start } = captureAgentHandlers({ ensureWorktree: async () => '/wt' })
+    start.mockResolvedValueOnce(null)
+    storeState.data['/repo:::1:::sha1'] = [makeDoneRun({ id: 'run-1', sessionId: 'sess-123' })]
+    expect(await handlers['review-agent:open-terminal']({ runId: 'run-1' })).toEqual({
+      error: 'AGENT_UNAVAILABLE',
+    })
+  })
+})
+
+describe('review-agent IPC — runs ask the core agent service', () => {
+  it('hands the review run the service runOnce and starts it without a session id', async () => {
+    const runReview = vi.fn<RunReview>(() => ({
+      runId: 'x',
+      done: new Promise(() => {}),
+      cancel() {},
+    }))
+    const { handlers, runOnce } = captureAgentHandlers({
+      runReview,
+      ensureWorktree: async () => '/wt',
+    })
+    await handlers['review-agent:start'](startPayload())
+    await eventually(() => expect(runReview).toHaveBeenCalled())
+    const [input, deps] = runReview.mock.calls[0]
+    expect(input).not.toHaveProperty('sessionId')
+    expect(deps?.runOnce).toBeTypeOf('function')
+    await deps?.runOnce({ cwd: '/wt', prompt: 'p' })
+    expect(runOnce).toHaveBeenCalledWith({ cwd: '/wt', prompt: 'p' })
   })
 })
 

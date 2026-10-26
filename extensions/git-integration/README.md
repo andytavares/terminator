@@ -53,7 +53,7 @@ A **workspace** setting can also be set per workspace in Workspace Settings ("Us
 - **git** — must be on `$PATH`.
 - **gh CLI** (optional) — required for pull requests and reviews. [Install gh](https://cli.github.com/), then run `gh auth login`. The app runs it from your login shell's `PATH`; the "gh CLI path" setting is gone (SDK 2.1.0), because the core runs only the bare `gh` command.
 
-Every git and gh command goes through the core: git through `api.shell.exec` (`src/shell/run-git.ts`, bound in `activate`), gh through `api.github`. The extension starts no process of its own except the review agent's `claude`.
+Every git and gh command goes through the core: git through `api.shell.exec` (`src/shell/run-git.ts`, bound in `activate`), gh through `api.github`. The extension starts no process of its own: the review agent runs through the core's `api.agents` (ACP).
 
 ## How It Works
 

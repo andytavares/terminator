@@ -14,7 +14,7 @@ import { projectForCheckout } from './review/terminal-project.js'
 import { VALIDATION_ERROR, type RegisterFn } from './ipc/register.js'
 import { registerGithubHandlers, type GithubHandlerOptions } from './ipc/github.ipc.js'
 import { registerWorktreesHandlers } from './ipc/worktrees.ipc.js'
-import { registerReviewAgentHandlers, type OpenTerminalInput } from './ipc/review-agent.ipc.js'
+import { registerReviewAgentHandlers } from './ipc/review-agent.ipc.js'
 import { consumePendingViewRequest, registerQuickActionCommands } from './commands.js'
 import { createHomePublisher } from './home/publisher.js'
 import { remoteAccessFor } from './remote-access.js'
@@ -169,19 +169,6 @@ function bindRoots(api: ExtensionAPI, projectRoots: () => string[]): void {
   ])
 }
 
-/** Opens an agent terminal in the project the repo belongs to and types the command into it. */
-async function openReviewAgentTerminal(api: ExtensionAPI, input: OpenTerminalInput): Promise<void> {
-  const projectId = projectForCheckout(api.workspace, input.repoRoot)
-  if (!projectId) return
-  const sessionId = await api.pty.openTerminal({
-    projectId,
-    cwd: input.cwd,
-    tabTitle: input.title,
-    type: 'agent',
-  })
-  if (sessionId) api.pty.write(sessionId, `${input.command}\r`)
-}
-
 /** The workspace's project roots, and the extension's own folder, where a gh call that needs no checkout runs. */
 interface ChannelRoots {
   projectRoots: () => string[]
@@ -226,11 +213,12 @@ function registerChannels(api: ExtensionAPI, roots: ChannelRoots): void {
   registerWorktreesHandlers(registerFn, api)
   registerFn(pendingRequestChannel())
   registerGithub(api, registerFn, roots)
-  // Read-only review agent: headless `claude -p` in a detached PR-head worktree.
+  // Read-only review agent: over ACP (`api.agents`) in a detached PR-head worktree.
   const reviewAgent = registerReviewAgentHandlers(registerFn, {
     getSetting: (key) => api.settings.get(key),
     broadcast: (channel, data) => api.window.broadcast(channel, data),
-    openTerminal: (input) => openReviewAgentTerminal(api, input),
+    agents: api.agents,
+    projectIdFor: (repoRoot) => projectForCheckout(api.workspace, repoRoot),
     storagePath: roots.storage,
   })
   disposables.push(reviewAgent)

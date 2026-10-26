@@ -5,6 +5,8 @@ import { ThreadSummaryInputSchema } from '../../../src/shared/schemas/agent-usag
 type Handler = (event: unknown, payload?: unknown) => unknown
 const handlers = vi.hoisted(() => new Map<string, Handler>())
 const summarize = vi.hoisted(() => vi.fn())
+const runOnce = vi.hoisted(() => vi.fn())
+const summarizerDeps = vi.hoisted(() => [] as Array<{ runOnce: (input: object) => unknown }>)
 const records = vi.hoisted(() => [] as unknown[])
 
 vi.mock('electron', () => ({
@@ -12,9 +14,14 @@ vi.mock('electron', () => ({
 }))
 vi.mock('../../../src/main/logger', () => ({ logger: { error: vi.fn() } }))
 vi.mock('../../../src/main/home/thread-summary', () => ({
-  createThreadSummarizer: () => summarize,
+  createThreadSummarizer: (deps: { runOnce: (input: object) => unknown }) => {
+    summarizerDeps.push(deps)
+    return summarize
+  },
 }))
-vi.mock('../../../src/main/shell/command-runner', () => ({ runTextCommand: vi.fn() }))
+vi.mock('../../../src/main/agents/acp/agent-service-instance', () => ({
+  agentService: () => ({ runOnce }),
+}))
 vi.mock('../../../src/main/shell/login-shell-path', () => ({ loginShellPathReady: vi.fn() }))
 vi.mock('../../../src/main/sessions/session-record-store', () => ({ listRecords: () => records }))
 
@@ -62,6 +69,17 @@ describe('thread summary input', () => {
     const sessionsOf = (count: number) => ({ title: 't', sessions: Array(count).fill(session) })
     expect(ThreadSummaryInputSchema.safeParse(sessionsOf(20)).success).toBe(true)
     expect(ThreadSummaryInputSchema.safeParse(sessionsOf(21)).success).toBe(false)
+  })
+})
+
+describe('home:thread-summary agent', () => {
+  it('summarizes through the agent service', async () => {
+    vi.resetModules()
+    summarizerDeps.length = 0
+    await import('../../../src/main/ipc/thread-summary.ipc')
+    runOnce.mockResolvedValue({ text: 'ok', stopReason: 'end_turn', sessionId: 's' })
+    await expect(summarizerDeps[0].runOnce({ prompt: 'p' })).resolves.toMatchObject({ text: 'ok' })
+    expect(runOnce).toHaveBeenCalledWith({ prompt: 'p' })
   })
 })
 
