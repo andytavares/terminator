@@ -1,0 +1,28 @@
+tests/unit/main/app-updater.spec.ts
+  s_4442da545bd38a::t_fda4bcc6d8c5cf 164-174
+  s_4442da545bd38a::t_659be465a735bd 122-130,175
+  s_4442da545bd38a::t_b48d5d7b6cd9a3 176
+src/main/index.ts
+  s_4442da545bd38a::t_82ff2563602a9f 4,582-585
+  s_4442da545bd38a::t_600847895374c5 586-587
+src/main/app-updater.ts
+  s_4442da545bd38a::t_285013177fb09c 57-60
+  s_4442da545bd38a::t_dd7bee37963939 23-26
+  s_4442da545bd38a::t_82ff2563602a9f 10-12,33-34,56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "757546ae8845bdda66343438648eb47cccd6efc6",
+  "prompts": {},
+  "sessions": {
+    "s_4442da545bd38a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d287f4c8-4059-43c7-8a40-e53bdb0bc217",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
