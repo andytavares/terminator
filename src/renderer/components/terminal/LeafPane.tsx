@@ -4,6 +4,7 @@ import { useSessionStore } from '../../stores/session.store'
 import './LeafPane.css'
 import { droppedPaths } from './dropped-paths'
 import { useMountedTerminal } from './use-mounted-terminal'
+import { AgentView } from '../agent/AgentView'
 
 interface Props {
   sessionId: string
@@ -55,6 +56,19 @@ function usePaneHandlers({ sessionId, projectId }: Props) {
   return { handleMouseDown, handleClose, handleDrop }
 }
 
+/** An agent's transcript, or the terminal that useMountedTerminal fills. */
+function PaneBody({
+  sessionId,
+  containerRef,
+}: {
+  sessionId: string
+  containerRef: React.RefObject<HTMLDivElement>
+}): JSX.Element {
+  const isAgent = useSessionStore((s) => s.sessions.get(sessionId)?.surface === 'agent')
+  if (isAgent) return <AgentView sessionId={sessionId} />
+  return <div ref={containerRef} className="leaf-pane__container" />
+}
+
 export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const isFocused = useSessionStore((s) => s.getFocusedSession(projectId) === sessionId)
@@ -81,7 +95,7 @@ export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
           <X aria-hidden="true" />
         </button>
       </div>
-      <div ref={containerRef} className="leaf-pane__container" />
+      <PaneBody sessionId={sessionId} containerRef={containerRef} />
     </div>
   )
 }

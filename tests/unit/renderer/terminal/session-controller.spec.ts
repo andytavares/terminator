@@ -378,6 +378,16 @@ describe('adoptTerminalSession', () => {
   })
 })
 
+describe('adoptTerminalSession — an agent tab', () => {
+  it('stores an agent tab as one and builds no xterm for it', () => {
+    adoptTerminalSession({ ...adopted, surface: 'agent' })
+    expect(sessionOf('terminal-1')).toMatchObject({ surface: 'agent' })
+    expect(capturedCtorArgs).toEqual([])
+    expect(useSessionStore.getState().getTerminalInstance('terminal-1')).toBeUndefined()
+    expect(activeIn('proj-1')).toBe('terminal-1')
+  })
+})
+
 describe('adoptTerminalSession — does nothing for a session it already has, so a repeat is not a second tab', () => {
   it('does nothing for a session it already has, so a repeat is not a second tab', () => {
     storeSession('terminal-1', { tabTitle: 'feat/x', type: 'human' })

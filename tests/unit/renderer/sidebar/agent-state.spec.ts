@@ -100,3 +100,25 @@ describe('inferredAskSignal', () => {
     expect(inferredAskSignal({ ...base, bellCount: 1, agentAsk })).toBeNull()
   })
 })
+
+describe('BellAndBusySource — an agent tab', () => {
+  const agentTab: Partial<TerminalSession> = { surface: 'agent' }
+
+  it.each<[string, Partial<TerminalSession>, string]>([
+    ['exited when the agent has exited', { status: 'closed' }, 'exited'],
+    [
+      'awaiting-input from a raised ask',
+      { agentAsk: { message: 'Run it?', since: '2026-08-21T00:00:00.000Z' } },
+      'awaiting-input',
+    ],
+    ['working in a turn', { agentTurn: true }, 'working'],
+    ['idle between turns', { agentTurn: false }, 'idle'],
+  ])('is %s', (_label, patch, expected) => {
+    expect(derive({ ...agentTab, ...patch })).toBe(expected)
+  })
+
+  it('ignores the bell, byte flow and a screen choice, which an agent tab never has', () => {
+    const choicePrompt = { question: 'Proceed?', options: [{ number: 1, label: 'Yes' }] }
+    expect(derive({ ...agentTab, bellCount: 2, busy: true, choicePrompt })).toBe('idle')
+  })
+})

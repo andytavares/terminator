@@ -76,6 +76,8 @@ export interface TerminalSession {
   status: SessionStatus
   type: SessionType
   scrollbackLimit: number
+  /** What the tab draws: a terminal (absent) or an ACP agent's transcript, which has no PTY or xterm. */
+  surface?: 'terminal' | 'agent'
   createdAt: string
   closedAt?: string
   parentSessionId?: string

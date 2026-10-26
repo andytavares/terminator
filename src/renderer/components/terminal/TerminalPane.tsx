@@ -11,6 +11,7 @@ import { LeafPane } from './LeafPane'
 import { leafIds } from '../../utils/pane-tree'
 import './TerminalPane.css'
 import { droppedPaths } from './dropped-paths'
+import { AgentView } from '../agent/AgentView'
 
 interface Props {
   projectId: string
@@ -171,9 +172,10 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
     )
   }
   return (
-    <SingleTerminal
+    <SingleTab
       containerRef={containerRef}
       activeSessionId={activeSessionId}
+      shownSessionId={pane.shownSessionId}
       refocusActive={refocusActive}
     />
   )
@@ -207,7 +209,23 @@ interface SingleTerminalProps {
   refocusActive: () => void
 }
 
-/** One tab alone: a click focuses it, and files dropped on it paste their paths. */
+/** One tab alone: an agent's transcript, or a terminal. */
+function SingleTab({
+  shownSessionId,
+  ...terminal
+}: SingleTerminalProps & { shownSessionId: string | null }) {
+  const showsAgent = useSessionStore(
+    (s) => shownSessionId !== null && s.sessions.get(shownSessionId)?.surface === 'agent'
+  )
+  if (!showsAgent || !shownSessionId) return <SingleTerminal {...terminal} />
+  return (
+    <div className="terminal-pane">
+      <AgentView sessionId={shownSessionId} />
+    </div>
+  )
+}
+
+/** One terminal alone: a click focuses it, and files dropped on it paste their paths. */
 function SingleTerminal({ containerRef, activeSessionId, refocusActive }: SingleTerminalProps) {
   function handleMouseDown(e: React.MouseEvent): void {
     if (e.button !== 0) return
