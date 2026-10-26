@@ -168,12 +168,35 @@ async function askReviewAgent(): Promise<ExtensionView> {
 const panel = (view: Pick<ExtensionView, 'getByRole'>) =>
   view.getByRole('complementary', { name: 'Agent panel' })
 
-async function aRunningReviewContinuesInAnAgentTab(): Promise<void> {
-  const view = await askReviewAgent()
-  await panel(view).getByRole('button', { name: 'Run' }).click()
-  await expect(panel(view)).toContainText('Reviewing')
+/** Starts a review: Run, or the button an ended review offers, which leads back to Run. */
+async function startReview(view: ExtensionView): Promise<void> {
+  const offered = panel(view)
+    .getByRole('button', { name: /^(Run|Try again|Ask again)$/ })
+    .first()
+  const label = await offered.textContent()
+  await offered.click()
+  if (label?.trim() !== 'Run') await panel(view).getByRole('button', { name: 'Run' }).click()
+}
 
+async function runReview(view: ExtensionView): Promise<void> {
+  await startReview(view)
+  await expect(panel(view)).toContainText('Reviewing')
+}
+
+async function aRunningReviewIsCancelled(): Promise<void> {
+  const view = await askReviewAgent()
+  await runReview(view)
+  await panel(view).getByRole('button', { name: 'Cancel' }).click()
+  await expect(panel(view)).not.toContainText('Reviewing')
+}
+
+/** One agent per conversation: the tab takes the review over, and the review ends. */
+async function aRunningReviewMovesToAnAgentTab(): Promise<void> {
+  const view = await askReviewAgent()
+  await runReview(view)
   await panel(view).getByRole('button', { name: 'Continue in agent tab' }).click()
+  await expect(panel(view)).not.toContainText('Reviewing')
+
   await handle.page.locator('.branch-row').first().click()
   const tab = handle.page.locator('.tab-bar__tab').filter({ hasText: 'Review #1' })
   await expect(tab).toBeVisible()
@@ -181,22 +204,10 @@ async function aRunningReviewContinuesInAnAgentTab(): Promise<void> {
   await expect(handle.page.getByRole('log', { name: 'Agent transcript' })).toBeVisible()
 }
 
-async function aRunningReviewIsCancelled(): Promise<void> {
-  const view = await askReviewAgent()
-  await expect(panel(view)).toContainText('Reviewing')
-  await panel(view).getByRole('button', { name: 'Cancel' }).click()
-  await expect(panel(view)).not.toContainText('Reviewing')
-}
-
 async function aFinishedReviewListsItsFinding(): Promise<ExtensionView> {
   writeFileSync(join(replyDir, 'reply.json'), JSON.stringify(REPLY))
   const view = await askReviewAgent()
-  await panel(view)
-    .getByRole('button', { name: /^(Run|Try again|Ask again)$/ })
-    .click()
-  if (await panel(view).getByRole('button', { name: 'Run' }).isVisible()) {
-    await panel(view).getByRole('button', { name: 'Run' }).click()
-  }
+  await startReview(view)
   await expect(panel(view)).toContainText('1 findings')
   await expect(panel(view)).toContainText('subtract swaps its operands')
   return view
@@ -213,11 +224,11 @@ async function aDismissedFindingStaysDismissed(): Promise<void> {
   await expect(panel(view)).not.toContainText('subtract swaps its operands')
 }
 
-test('the review agent runs on a pull request, moves to a terminal, and its dismissed finding stays dismissed', async () => {
+test('the review agent runs on a pull request, moves to an agent tab, and its dismissed finding stays dismissed', async () => {
   await openAgentWorkspace()
   await runSteps([
-    ['a running review can be continued in an agent tab', aRunningReviewContinuesInAnAgentTab],
-    ['a running review can then be cancelled', aRunningReviewIsCancelled],
+    ['a running review can be cancelled', aRunningReviewIsCancelled],
+    ['a running review moves to an agent tab', aRunningReviewMovesToAnAgentTab],
     [
       'a finished review lists its finding, and a dismissed finding stays dismissed',
       aDismissedFindingStaysDismissed,
