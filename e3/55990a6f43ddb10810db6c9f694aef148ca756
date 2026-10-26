@@ -1,0 +1,24 @@
+scripts/ci-plan.mjs
+  s_4442da545bd38a::t_567b2bc795f8fa 46
+tests/unit/scripts/ci-plan.spec.ts
+  s_4442da545bd38a::t_c7dac3d6c3f8cb 162-166,168
+  s_4442da545bd38a::t_567b2bc795f8fa 2
+docs/adr/129-ci-jobs-have-no-time-limit.md
+  s_4442da545bd38a::t_2cc6e1d966a03a 1-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e355990a6f43ddb10810db6c9f694aef148ca756",
+  "prompts": {},
+  "sessions": {
+    "s_4442da545bd38a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d287f4c8-4059-43c7-8a40-e53bdb0bc217",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
