@@ -6,18 +6,8 @@
 # whatever spawned it kills it — a real launch never exits on its own either —
 # or until that spawner is gone.
 #
-# The review agent's headless run (`claude -p ... --json-schema ...`) answers
-# with the file E2E_CLAUDE_REVIEW_REPLY names, when a spec has written it, as
-# `--output-format json` prints a result; until then it idles like the rest.
-case " $* " in
-  *" -p "*"--json-schema"*)
-    if [ -n "$E2E_CLAUDE_REVIEW_REPLY" ] && [ -f "$E2E_CLAUDE_REVIEW_REPLY" ]; then
-      cat >/dev/null
-      cat "$E2E_CLAUDE_REVIEW_REPLY"
-      exit 0
-    fi
-    ;;
-esac
+# Agents the app starts itself run over ACP and go to fixtures/acp-stub-agent.mjs
+# instead; this one stands in for `claude` typed into a terminal.
 echo "claude-stub $*"
 # An app that is force-killed takes its extension host with it but not this
 # process, which init adopts: a plain `sleep 86400` outlived every such run.

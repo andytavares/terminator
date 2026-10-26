@@ -2,13 +2,7 @@ import { test, expect } from '@playwright/test'
 import { existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import {
-  closeApp,
-  launchApp,
-  readTerminalRowsIn,
-  visibleTerminalScreen,
-  type AppHandle,
-} from './helpers'
+import { closeApp, launchApp, type AppHandle } from './helpers'
 import { misalignedOn } from './control-alignment'
 import {
   git,
@@ -22,8 +16,8 @@ import { popoutPage, type ExtensionView } from './extension-page'
 import { startGithubStub, type GithubStub } from './github-stub'
 
 /** The Reviews dashboard and the review agent, against the stub GitHub. The dashboard runs
- * first, while no workspace has the repository, so it offers to clone it. The `claude` stub
- * (fixtures/bin/claude) idles until E2E_CLAUDE_REVIEW_REPLY holds what `claude -p` prints. */
+ * first, while no workspace has the repository, so it offers to clone it. The stub ACP agent
+ * (fixtures/acp-stub-agent.mjs) keeps a turn open until E2E_AGENT_REPLY holds its reply. */
 
 let handle: AppHandle
 let stub: GithubStub
@@ -33,23 +27,20 @@ let replyDir: string
 let cloneFolder: string
 
 const REPLY = {
-  type: 'result',
-  structured_output: {
-    summary: 'One real problem in subtract.',
-    findings: [
-      {
-        severity: 'must-fix',
-        path: 'src/math.ts',
-        startLine: 5,
-        endLine: 6,
-        side: 'RIGHT',
-        title: 'subtract swaps its operands',
-        body: 'It returns `b - a`.',
-        suggestedCode: null,
-      },
-    ],
-    walkthrough: [],
-  },
+  summary: 'One real problem in subtract.',
+  findings: [
+    {
+      severity: 'must-fix',
+      path: 'src/math.ts',
+      startLine: 5,
+      endLine: 6,
+      side: 'RIGHT',
+      title: 'subtract swaps its operands',
+      body: 'It returns `b - a`.',
+      suggestedCode: null,
+    },
+  ],
+  walkthrough: [],
 }
 
 test.beforeAll(async () => {
@@ -64,7 +55,7 @@ test.beforeAll(async () => {
   cloneFolder = mkdtempSync(join(tmpdir(), 'terminator-e2e-clones-'))
   handle = await launchApp(undefined, {
     ...stub.env,
-    E2E_CLAUDE_REVIEW_REPLY: join(replyDir, 'reply.json'),
+    E2E_AGENT_REPLY: join(replyDir, 'reply.json'),
   })
 })
 
@@ -177,21 +168,17 @@ async function askReviewAgent(): Promise<ExtensionView> {
 const panel = (view: Pick<ExtensionView, 'getByRole'>) =>
   view.getByRole('complementary', { name: 'Agent panel' })
 
-async function aRunningReviewContinuesInATerminal(): Promise<void> {
+async function aRunningReviewContinuesInAnAgentTab(): Promise<void> {
   const view = await askReviewAgent()
   await panel(view).getByRole('button', { name: 'Run' }).click()
   await expect(panel(view)).toContainText('Reviewing')
 
-  await panel(view).getByRole('button', { name: 'Continue in terminal' }).click()
+  await panel(view).getByRole('button', { name: 'Continue in agent tab' }).click()
   await handle.page.locator('.branch-row').first().click()
   const tab = handle.page.locator('.tab-bar__tab').filter({ hasText: 'Review #1' })
   await expect(tab).toBeVisible()
   await tab.click()
-  const screen = visibleTerminalScreen(handle.page)
-  await expect(screen).toBeVisible()
-  await expect
-    .poll(async () => (await readTerminalRowsIn(screen)).join('\n'))
-    .toContain('claude-stub --resume')
+  await expect(handle.page.getByRole('log', { name: 'Agent transcript' })).toBeVisible()
 }
 
 async function aRunningReviewIsCancelled(): Promise<void> {
@@ -229,7 +216,7 @@ async function aDismissedFindingStaysDismissed(): Promise<void> {
 test('the review agent runs on a pull request, moves to a terminal, and its dismissed finding stays dismissed', async () => {
   await openAgentWorkspace()
   await runSteps([
-    ['a running review can be continued in a terminal', aRunningReviewContinuesInATerminal],
+    ['a running review can be continued in an agent tab', aRunningReviewContinuesInAnAgentTab],
     ['a running review can then be cancelled', aRunningReviewIsCancelled],
     [
       'a finished review lists its finding, and a dismissed finding stays dismissed',

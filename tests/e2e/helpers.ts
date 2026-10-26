@@ -8,7 +8,8 @@ import {
 } from '@playwright/test'
 import { spawnSync, type ChildProcess } from 'node:child_process'
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { sealedAppEnvironment } from './e2e-environment'
 import { saveIpcTrace, startIpcTrace } from './ipc-trace'
 import { orOnHang } from '../support/hang-bound'
@@ -235,11 +236,21 @@ export interface LaunchOptions {
   hideSidebarOnHome?: boolean
 }
 
+/** The stand-in ACP agent, seeded as `claude` so no run starts the real Claude adapter. */
+const STUB_AGENT = {
+  id: 'claude',
+  label: 'Claude Code',
+  command: process.execPath,
+  args: [join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'acp-stub-agent.mjs')],
+}
+
 /** electron-store's file for the settings store (`name: 'settings'`); `global` is merged over the defaults. */
-function seedSidebarShownOnHome(userDataDir: string): void {
+function seedSettings(userDataDir: string, options: LaunchOptions): void {
   const file = join(userDataDir, 'settings.json')
   if (existsSync(file)) return
-  writeFileSync(file, JSON.stringify({ global: { ui: { hideSidebarOnHome: false } } }))
+  const agents = { default: 'claude', custom: [STUB_AGENT] }
+  const ui = options.hideSidebarOnHome === true ? {} : { ui: { hideSidebarOnHome: false } }
+  writeFileSync(file, JSON.stringify({ global: { ...ui, agents } }))
 }
 
 export async function launchApp(
@@ -247,7 +258,7 @@ export async function launchApp(
   env: Record<string, string> = {},
   options: LaunchOptions = {}
 ): Promise<AppHandle> {
-  if (options.hideSidebarOnHome !== true) seedSidebarShownOnHome(userDataDir)
+  seedSettings(userDataDir, options)
   const marker = launchMarker()
   const app = await startElectron(userDataDir, { ...env, ...marker.env })
   const output = keepOutput(app)
