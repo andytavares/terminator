@@ -44,6 +44,7 @@ const backend: BackendModule = {
       api.agents.onUpdate('s1', (update) => api.window.broadcast('demo:update', update))
       api.agents.onPermission('s1', (ask) => api.window.broadcast('demo:ask', ask))
       api.agents.onEnd('s1', (code) => api.window.broadcast('demo:end', code))
+      api.agents.onPermissionSettled('s1', (id) => api.window.broadcast('demo:settled', id))
     })
   },
 }
@@ -52,6 +53,7 @@ type Listeners = {
   update?: (update: AgentUpdate) => void
   ask?: (ask: AgentPermissionAsk) => void
   end?: (exitCode: number | null) => void
+  settled?: (requestId: string) => void
 }
 
 /** Main's agents: calls are spies, and the listeners an extension adds are kept for the test. */
@@ -68,6 +70,10 @@ function agentsInMain(listeners: Listeners) {
     onPermission: (_session: string, listener: (ask: AgentPermissionAsk) => void) => {
       listeners.ask = listener
       return () => void delete listeners.ask
+    },
+    onPermissionSettled: (_session: string, listener: (requestId: string) => void) => {
+      listeners.settled = listener
+      return () => void delete listeners.settled
     },
     onEnd: (_session: string, listener: (exitCode: number | null) => void) => {
       listeners.end = listener
@@ -139,15 +145,17 @@ describe('api.agents in the extension host — cancel and listeners', () => {
     const { broadcast, channels, listeners, process, record } = harness()
     await process.activate(record)
     await dispatchChannel(channels.get('demo:listen')!, {})
-    await eventually(() => expect(Object.keys(listeners)).toHaveLength(3))
+    await eventually(() => expect(Object.keys(listeners)).toHaveLength(4))
 
     listeners.update?.({ sessionUpdate: 'plan' })
     listeners.ask?.({ requestId: 'r1' } as AgentPermissionAsk)
     listeners.end?.(2)
+    listeners.settled?.('r1')
     await eventually(() => {
       expect(broadcast).toHaveBeenCalledWith('demo:update', { sessionUpdate: 'plan' })
       expect(broadcast).toHaveBeenCalledWith('demo:ask', { requestId: 'r1' })
       expect(broadcast).toHaveBeenCalledWith('demo:end', 2)
+      expect(broadcast).toHaveBeenCalledWith('demo:settled', 'r1')
     })
   })
 })

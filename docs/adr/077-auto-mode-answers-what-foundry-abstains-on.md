@@ -6,6 +6,8 @@
 
 Builds on ADR 049 (an accidental question costs five minutes).
 
+Amended by ADR 130: there is no hook any more. Auto mode is the permission mode of roles that may write anywhere in their checkout, and inside an ask an abstention is held for a person.
+
 ## Context
 
 Foundry launches every agent with `--permission-mode auto`, but auto mode never

@@ -298,6 +298,12 @@ export interface AgentPermissionAsk {
   kind: string | null
   /** The tool's input as the agent reported it, such as `{ command }` or `{ file_path }`. */
   rawInput: unknown
+  /** The ACP id of the tool call the ask is about. */
+  toolCallId: string
+  /** The `_meta` of that tool call as last reported in a `tool_call` or `tool_call_update`, so a
+   * client can read agent-specific facts (the Claude agent sends `{ claudeCode: { toolName } }`).
+   * Null when the agent sent none. */
+  toolCallMeta: Record<string, unknown> | null
   options: Array<{ optionId: string; name: string; kind: string }>
 }
 
@@ -337,6 +343,8 @@ export interface AgentsAPI {
   onPermission(sessionId: string, listener: (ask: AgentPermissionAsk) => void): () => void
   /** False when the ask was already answered or the session ended. Null cancels the ask. */
   answer(sessionId: string, requestId: string, optionId: string | null): Promise<boolean>
+  /** An ask was answered or cancelled, by this client or by the session's tab. */
+  onPermissionSettled(sessionId: string, listener: (requestId: string) => void): () => void
   /** The agent process exited; exit code null when a signal ended it. */
   onEnd(sessionId: string, listener: (exitCode: number | null) => void): () => void
   runOnce(input: RunAgentOnceInput): Promise<RunAgentOnceResult>

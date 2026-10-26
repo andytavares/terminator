@@ -904,7 +904,7 @@ if (exit?.exitCode === 0) api.pty.closeTerminalTab(exit.sessionId)
 
 ### `api.agents`
 
-Agents over the Agent Client Protocol (Since 5.2.0): `list`, `start`, `prompt`, `cancel`, `answer`, `setConfig`, `close`, `onUpdate`, `onPermission`, `onEnd`, `runOnce` and `models`. `start({ cwd, tab: { projectId, title } })` shows the session as an agent tab. Git integration's "Send to agent" starts one tab per folder, prompts it, and forgets it when it ends:
+Agents over the Agent Client Protocol (Since 5.2.0): `list`, `start`, `prompt`, `cancel`, `answer`, `setConfig`, `close`, `onUpdate`, `onPermission`, `onPermissionSettled`, `onEnd`, `runOnce` and `models`. `start({ cwd, tab: { projectId, title } })` shows the session as an agent tab. Git integration's "Send to agent" starts one tab per folder, prompts it, and forgets it when it ends:
 
 ```ts
 const started = await api.agents.start({ cwd: folder, tab: { projectId, title: tabTitle } })
@@ -913,6 +913,8 @@ if (started) {
   void api.agents.prompt(started.sessionId, message)
 }
 ```
+
+An ask (`onPermission`) carries `toolCallId` and `toolCallMeta`, the `_meta` of that tool call (the Claude agent sends `{ claudeCode: { toolName } }`). `answer` takes one of the ask's `options`; `onPermissionSettled(sessionId, listener)` tells you when an ask was answered anywhere, including the session's tab. Set `mode` in `start` (`default` asks for every write and state-changing command, `auto` lets the agent decide).
 
 ### `api.window`
 

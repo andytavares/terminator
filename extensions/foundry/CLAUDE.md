@@ -28,16 +28,22 @@ Knowledge of a toolchain is **data in `hints/*.yaml`**, one file per ecosystem, 
 
 ### 3. A question this policy asks by accident costs five minutes
 
-`runtime/tool-decision.ts` decides every tool call an agent makes. Anything it
-does not decide is **held for `DEFAULT_ASK_AFTER_MS` — five minutes** — before
-handing back to the agent tab, where, in an unattended run, nobody is sitting.
+`runtime/tool-decision.ts` decides every permission ask an agent raises over ACP.
+Anything it does not decide is **held for `DEFAULT_ASK_AFTER_MS` — five minutes** —
+before it is left open in the agent tab, where, in an unattended run, nobody is sitting.
 
 So reading a command correctly is a latency requirement here, not only a
 correctness one: a held call costs minutes where a decided one costs seconds.
 
-With `terminator.foundry.letAutoModeDecide` on (the default), an abstention at
-`standard` or `lights-out` goes to Claude Code's auto mode instead of the hold
-(ADR 077), destructive actions included. Only `escorted` still holds for a person.
+Each agent gets its permission mode per role (`runtime/permission-mode.ts`, ADR 130).
+With `terminator.foundry.letAutoModeDecide` on (the default), a role that may write
+anywhere in its checkout runs in Claude's `auto` mode at `standard` or `lights-out`,
+and Claude's classifier answers what this policy does not decide. Every other role
+runs in `default` mode, where each write and state-changing command is an ask this
+policy decides. Inside an ask there is no auto mode to defer to: what the policy
+leaves open is held for a person, or refused with the reason at `lights-out`
+(`unattendedRule`). A refusal reaches the agent as "rejected", without the reason;
+an operator's typed answer is sent after it as the agent's next prompt.
 
 When you change `shell-split.ts`, `autonomy-policy.ts` or `read-only-policy.ts`,
 the question is not only "does this let the wrong thing through". It is also

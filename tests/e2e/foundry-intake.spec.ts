@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { existsSync, rmSync } from 'node:fs'
-import { isAbsolute, join } from 'node:path'
+import { rmSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   launchApp,
   closeApp,
@@ -297,9 +297,8 @@ async function expectReadOnlyLaunch(): Promise<void> {
   await expect.poll(() => supervisedLaunch(handle)).not.toBeNull()
   const launched = supervisedLaunch(handle)!
   expect(launched.mode).not.toBe('bypassPermissions')
-  // The settings file with the hook that holds every tool call, at a path that exists.
-  expect(isAbsolute(launched.settings)).toBe(true)
-  expect(existsSync(launched.settings)).toBe(true)
+  // Read-only, so every write and state-changing command is an ask that Foundry's policy decides.
+  expect(launched.mode).toBe('default')
   // And it does not carry the parent Claude Code session in with it.
   expect(launched.inherited).toBe(false)
 }

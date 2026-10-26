@@ -109,8 +109,11 @@ interface Session {
   ended: boolean
   configOptions: AgentConfigOption[]
   asks: Map<string, OpenAsk>
+  /** The latest `_meta` each tool call reported, by tool call id. */
+  toolCallMeta: Map<string, Record<string, unknown>>
   updateListeners: Set<(update: AgentUpdate) => void>
   permissionListeners: Set<(ask: AgentPermissionAsk) => void>
+  settledListeners: Set<(requestId: string) => void>
   endListeners: Set<(exitCode: number | null) => void>
 }
 
@@ -173,8 +176,10 @@ function newSession(fields: Pick<Session, 'id' | 'agentId' | 'link' | 'unattende
     ended: false,
     configOptions: [],
     asks: new Map(),
+    toolCallMeta: new Map(),
     updateListeners: new Set(),
     permissionListeners: new Set(),
+    settledListeners: new Set(),
     endListeners: new Set(),
   }
 }
@@ -223,7 +228,14 @@ class AcpAgentService implements AgentService {
     return session && !session.ended ? session : undefined
   }
 
+  private rememberToolCallMeta(session: Session, update: AgentUpdate): void {
+    const { toolCallId, _meta } = update
+    if (typeof toolCallId === 'string' && _meta && typeof _meta === 'object')
+      session.toolCallMeta.set(toolCallId, _meta as Record<string, unknown>)
+  }
+
   private publishUpdate(session: Session, update: AgentUpdate): void {
+    this.rememberToolCallMeta(session, update)
     if (session.replaying) return
     try {
       // Nobody opens a one-shot session again, so its updates are not kept.
@@ -240,6 +252,7 @@ class AcpAgentService implements AgentService {
     if (!open) return false
     session.asks.delete(requestId)
     open.resolve({ outcome })
+    notify(session.settledListeners, requestId)
     this.deps.broadcast('agents:permission-settled', { sessionId: session.id, requestId })
     if (session.asks.size === 0) clearAsk(session.id)
     return true
@@ -255,6 +268,8 @@ class AcpAgentService implements AgentService {
     const ask: AgentPermissionAsk = {
       sessionId: session.id,
       requestId: randomUUID(),
+      toolCallId: toolCall.toolCallId,
+      toolCallMeta: session.toolCallMeta.get(toolCall.toolCallId) ?? null,
       title: toolCall.title ?? '',
       kind: toolCall.kind ?? null,
       rawInput: toolCall.rawInput,
@@ -289,6 +304,7 @@ class AcpAgentService implements AgentService {
     if (this.sessions.get(session.id) !== session) return
     this.sessions.delete(session.id)
     this.cancelAsks(session)
+    session.toolCallMeta.clear()
     clearTurn(session.id)
     clearAsk(session.id)
     notify(session.endListeners, exitCode)
@@ -516,6 +532,11 @@ class AcpAgentService implements AgentService {
   onPermission(sessionId: string, listener: (ask: AgentPermissionAsk) => void): () => void {
     const session = this.live(sessionId)
     return session ? disposer(session.permissionListeners, listener) : () => undefined
+  }
+
+  onPermissionSettled(sessionId: string, listener: (requestId: string) => void): () => void {
+    const session = this.live(sessionId)
+    return session ? disposer(session.settledListeners, listener) : () => undefined
   }
 
   onEnd(sessionId: string, listener: (exitCode: number | null) => void): () => void {

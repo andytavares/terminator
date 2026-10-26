@@ -167,6 +167,8 @@ function agentsFor(main: MainCalls): ExtensionAPI['agents'] {
     close: (sessionId) => main.ask('agents.close', sessionId),
     onUpdate: (sessionId, callback) => listenAcross('agents.onUpdate', sessionId, callback),
     onPermission: (sessionId, callback) => listenAcross('agents.onPermission', sessionId, callback),
+    onPermissionSettled: (sessionId, callback) =>
+      listenAcross('agents.onPermissionSettled', sessionId, callback),
     answer: (sessionId, requestId, optionId) =>
       main.ask('agents.answer', sessionId, requestId, optionId),
     onEnd: (sessionId, callback) => listenAcross('agents.onEnd', sessionId, callback),

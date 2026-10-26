@@ -193,6 +193,46 @@ describe('permission', () => {
   })
 })
 
+describe('permission ask fields', () => {
+  const meta = { claudeCode: { toolName: 'Write' } }
+
+  it('carries the tool call id and the _meta its tool_call reported', async () => {
+    const context = await started()
+    await context.agent.toClient.sessionUpdate({
+      sessionId: SESSION_ID,
+      update: { sessionUpdate: 'tool_call', toolCallId: 't1', title: 'Write', _meta: meta },
+    })
+    const { ask } = await askedOf(context)
+    expect(ask).toMatchObject({ toolCallId: 't1', toolCallMeta: meta })
+  })
+
+  it('has no _meta for a tool call that reported none', async () => {
+    const { ask } = await askedOf(await started())
+    expect(ask).toMatchObject({ toolCallId: 't1', toolCallMeta: null })
+  })
+})
+
+describe('permission settled', () => {
+  it('tells a listener when an ask is settled', async () => {
+    const context = await started()
+    const settled: string[] = []
+    context.service.onPermissionSettled(context.sessionId, (id) => settled.push(id))
+    const { ask } = await askedOf(context)
+    await context.service.answer(context.sessionId, ask.requestId, 'allow')
+    expect(settled).toEqual([ask.requestId])
+  })
+
+  it('stops telling a listener that was disposed', async () => {
+    const context = await started()
+    const settled: string[] = []
+    const dispose = context.service.onPermissionSettled(context.sessionId, (id) => settled.push(id))
+    dispose()
+    const { ask } = await askedOf(context)
+    await context.service.answer(context.sessionId, ask.requestId, 'allow')
+    expect(settled).toEqual([])
+  })
+})
+
 describe('permission answers', () => {
   it('is settled by the first answer only', async () => {
     const context = await started()

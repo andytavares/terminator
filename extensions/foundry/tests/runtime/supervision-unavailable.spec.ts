@@ -13,9 +13,9 @@ import { orderStoreAt } from '../../src/state/live-index.js'
 
 import { readyDraft } from '../helpers/forge-turns.js'
 import { eventually } from '../../../../tests/support/eventually'
-vi.mock('../../src/runtime/control-server.js', () => ({
-  createControlServer: async () => {
-    throw new Error('EADDRINUSE')
+vi.mock('../../src/runtime/supervised-runner.js', () => ({
+  createSupervisedRunner: () => {
+    throw new Error('the runner could not be created')
   },
 }))
 

@@ -7,8 +7,9 @@ The premise: you cap out at two to six concurrent agents because **review** is
 the bottleneck, and the failure nobody instruments is an agent that is stuck
 _without asking for help_. Everything below exists for one of those two facts.
 
-Architecture and the verified hook contract:
-[ADR-026](../../docs/adr/026-supervised-runs-in-a-terminal.md).
+Architecture: [ADR-026](../../docs/adr/026-supervised-runs-in-a-terminal.md), as
+[ADR-130](../../docs/adr/130-agents-the-app-drives-run-over-acp.md) amended it (agents run
+over ACP; there is no hook).
 
 ## The surfaces
 
@@ -222,7 +223,7 @@ left off the list is not "the agent can ask for it", it is "the agent cannot do
 it" — and one that is _on_ the list is allowed outright, not sent to the
 operator. It answered `null` on an allowed command for a while, which abstains,
 and an abstention is a held tool call: five minutes on the inbox before it
-falls back to the terminal. Six reads was half an hour of waiting, with the
+is left open in the agent tab. Six reads was half an hour of waiting, with the
 console showing an agent thinking. Four live runs in a row died on that, each on a different command, and the
 architect said so itself before giving up: _"Bash is restricted to single
 commands here. Working within that."_
@@ -299,11 +300,10 @@ problems of the old terminal launch are gone with it:
 
 ## What an agent is started with
 
-`startSupervisedRun` (`runtime/supervised-runner.ts`) mints a run id, writes the
-run's settings file (`<stateDir>/settings/<runId>.settings.json`, one
-`PreToolUse` hook keyed by that run id) and calls `api.agents.start` with the
-file, the model and effort when chosen, the skill folders, and the environment
-the skills read:
+`startSupervisedRun` (`runtime/supervised-runner.ts`) calls `api.agents.start` with
+the permission mode its caller chose, the model and effort when chosen, the skill
+folders, and the environment the skills read. It writes no settings file and
+installs no hook:
 
 | Variable                                | Why                                               |
 | --------------------------------------- | ------------------------------------------------- |
@@ -319,8 +319,12 @@ its length and its line breaks are no concern.
 
 The turn end is the end of a `prompt` (`end_turn`); the end of the run is
 `api.agents.onEnd`. A `cancelled` or `error` turn is not reported as a turn end.
-`mode` is `auto` when `letAutoModeDecide` is on, so a hook `defer` goes to Claude
-Code's auto mode, and `default` otherwise.
+`mode` is chosen per role by `modeFor` (`runtime/permission-mode.ts`): `auto` for a
+role that may write anywhere in its checkout, at `standard` or `lights-out`, with
+`letAutoModeDecide` on; `default` for every other role. A read-only role (red team,
+scout, review, the architect's rounds), a role limited to declared write paths
+(`docsOnly`, an output file or directory), `escorted`, or `letAutoModeDecide` off
+all get `default`.
 
 Checks (`runCommand`) still run in terminal tabs: a command is not an agent.
 
@@ -575,16 +579,19 @@ is not on offer is readable rather than inferred.
 
 ## Which model, and how many questions
 
-A run is launched with `--permission-mode auto` and, when one is chosen,
-`--model`.
+A run is started with a permission mode (`modeFor`) and, when one is chosen, a model.
 
-**The autonomy ladder still decides first.** A `PreToolUse` hook runs under every
-permission mode and its `allow`/`deny` is honoured before the mode is consulted
-at all, so the ladder's judgement is unchanged. What the mode picks up is only
-what the ladder _abstains_ on — and under `default` that was a prompt. A single
-phase routinely asked twenty-five times. Under `auto` the runtime's own
-classifier answers those instead, so the questions that reach you are the ones
-the ladder actually wanted a person for.
+**Foundry decides every ask it sees.** In `default` mode Claude raises an ACP
+permission ask for every write and every state-changing command (reads and plain
+`ls` do not ask). `runtime/supervised-runner.ts` subscribes to the session's asks,
+takes the tool name from the ask's `toolCallMeta` (`claudeCode.toolName`), and
+gives the call to the permission bridge, which runs the autonomy ladder. Allow
+picks the ask's `allow_once` option; deny picks `reject_once`. What the ladder
+abstains on is held for a person. In `auto` mode Foundry sees only what Claude's
+classifier asks about, and the ladder decides those the same way.
+
+**A refusal carries no reason.** ACP's reject option has no text, so the agent
+reads "rejected", not Foundry's reason. The reason stays in the console feed.
 
 ### An "ask" has no unattended resolution
 
@@ -592,10 +599,11 @@ This is worth knowing before turning `lights-out` on, because for a whole
 session it looked like Claude Code hanging at random.
 
 When the ladder abstains, the call is held and the operator is asked. If nobody
-answers within five minutes the bridge **hands the call back** — which means
-Claude Code raises its own ask in the agent tab instead. That is the right
+answers within five minutes the bridge **hands the call back**: it drops the call
+from Foundry's held list and leaves the ask open in the agent tab. That is the right
 answer when somebody is at the console. When nobody is, the agent waits at that
-prompt for ever, and only the wall-clock budget ends the run.
+ask for ever, and only the wall-clock budget ends the run. An ask the operator
+answers in the agent tab clears its held call in Foundry (`onPermissionSettled`).
 
 Measured on a live run:
 
@@ -757,8 +765,7 @@ waiting on it and sends you to the agent tab.
   survives is the **graph**, not the sessions — see "A run whose agents are
   gone" for how the two are reconciled when the application reopens.
 - **On disk**, under `runtime/` in Foundry's own `api.paths.globalStorage` — the feed
-  (`feed.jsonl`), mute rules, and the per-session
-  `--settings` files and hook script.
+  (`feed.jsonl`) and mute rules.
 - **In the browser** — when you last read the feed. That is a property of the
   person looking, not of the runs.
 

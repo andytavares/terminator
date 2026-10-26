@@ -15,7 +15,6 @@ import { activate, deactivate } from '../src/index.ts'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 
 vi.mock('../src/runtime/supervised-runner.js', () => import('./helpers/supervision-mocks.js'))
-vi.mock('../src/runtime/control-server.js', () => import('./helpers/supervision-mocks.js'))
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const contract = fs.readFileSync(

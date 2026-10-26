@@ -285,8 +285,8 @@ function calloutsParkedAgentsTests() {
         kind: 'stranded',
         id: 's-build',
         nodeId: 'build',
-        title: 'Waiting at its terminal',
-        detail: 'A question went unanswered in time. Answer it in the terminal.',
+        title: 'Waiting in its agent tab',
+        detail: 'A question went unanswered in time. Answer it in the agent tab.',
       },
     ])
     const both = interruptionsFor({

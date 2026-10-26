@@ -30,8 +30,8 @@ A spike drove the adapter (0.89.1, SDK 1.8.0) against claude 2.1.310 in a tempor
 1. **The core owns one ACP client** (`src/main/agents/acp/`), exposed to extensions as `api.agents` (Extension SDK 5.2.0) and to the renderer over `agents:*` channels.
 2. **An agent is a setting.** `claude` runs the bundled adapter with the user's own `claude` binary. Other ACP agents are added as commands in the `agents` setting.
 3. **An ACP session shows in a tab** (`surface: 'agent'`): its messages, tool calls and permission asks, and a prompt box. This keeps ADR 026's rule: no agent the operator cannot see or talk to.
-4. **Foundry keeps its PreToolUse hook for the Claude agent.** ACP's permission request cannot say "let the agent's own classifier decide", cannot rewrite input, and is not sent for reads. Foundry passes its settings file through `_meta.claudeCode.options.settings`, so its policy still sees every tool call. The terminal, the launch script and the keystroke control go away.
-5. **A held call has no terminal to go back to.** When the hook hands a call back, Claude Code asks over ACP, and the ask shows in the session's tab and in Foundry's pending list.
+4. **Foundry has no PreToolUse hook.** It sets the agent's permission mode per role: `auto` for a role that may write anywhere in its checkout (at `standard` or `lights-out`, with `letAutoModeDecide` on), `default` for every other role. In `default` mode Claude raises an ACP permission ask for every write and every state-changing command, so Foundry's policy decides each of them. The core gives each ask the `toolCallId` and the `_meta` of its tool call (Claude's `toolName` is there), and tells a client when an ask is settled (`onPermissionSettled`). The control server, the hook script, the settings file and the keystroke control are deleted.
+5. **A held ask stays in the agent's tab.** Foundry holds an ask it cannot decide for a person. After five minutes, or when the operator hands it back, Foundry drops it from its held list and leaves the ask open in the session's tab. An ask answered in the tab clears Foundry's held entry.
 6. **The `claude` TUI stays** as a choice for sessions a person starts.
 
 ## Alternatives considered
@@ -39,10 +39,13 @@ A spike drove the adapter (0.89.1, SDK 1.8.0) against claude 2.1.310 in a tempor
 - **Keep the terminal and hooks only.** Claude-only, and the side channels keep failing without an error.
 - **Drop the TUI and convert everything.** Too much new UI before any value; deferred.
 - **The Claude Agent SDK directly.** Claude-only.
-- **Answer every tool through ACP permission asks alone.** Reads never ask, and "defer to auto mode" cannot be expressed, so Foundry's ladder would see less than it does now.
+- **Keep the PreToolUse hook.** It saw every call, reads included, and could give a reason. It needed a settings file, a loopback server and a hook script for one agent, and it was the last side channel into Claude Code.
 
 ## Consequences
 
 - Foundry still reads Claude's transcript, because the adapter still writes it. Foundry stays Claude-only.
+- A refusal reaches the agent as "rejected", without Foundry's reason: an ACP reject option carries no text. The reason stays in Foundry's feed. An operator's typed answer is sent after the refusal as the agent's next prompt.
+- Inside an ask there is no auto mode to defer to, so the policy's old "leave it to auto mode" answer is gone: what it leaves open is asked, or refused with the reason at `lights-out`.
+- In `auto` mode Foundry sees only what Claude's classifier asks about, not every tool call. In `default` mode reads do not ask, so Foundry no longer sees them either.
 - The app ships the adapter but not its 241 MB Claude binary; `claude` must be installed, as before.
 - The adapter releases often (18 releases in 30 days). It is pinned and updated through the 14-day cooldown.

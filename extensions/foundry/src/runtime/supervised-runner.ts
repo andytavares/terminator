@@ -1,19 +1,18 @@
 import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import type { ExtensionAPI, StartAgentInput } from '@terminator/extension-sdk'
+import type { AgentPermissionAsk, ExtensionAPI, StartAgentInput } from '@terminator/extension-sdk'
 import { shellQuote } from '@terminator/extension-sdk/node'
-import { transcriptPathFor, writeRunSettings } from './claude-launch.js'
-import { installHookScript } from './hook-script.js'
-import type { ControlServer } from './control-server.js'
+import { transcriptPathFor } from './claude-launch.js'
 import {
   createPermissionBridge,
   type PendingPermission,
   type PermissionDecision,
   type PermissionOutcome,
+  type ToolVerdict,
 } from './permission-bridge.js'
+import type { PermissionMode } from './permission-mode.js'
 import { countTurns, transcriptSize } from './transcript-tailer.js'
-import { letAutoModeDecide } from '../state/settings.js'
 import type { WatchedRun } from './stall-watcher.js'
 
 /**
@@ -24,9 +23,9 @@ import type { WatchedRun } from './stall-watcher.js'
  */
 type StepLabel = string
 
-// A phase runs over ACP in an agent tab the operator can see and type in (ADR 130); every
-// tool call waits in the PreToolUse hook until somebody decides, and the runner watches the
-// transcript, the hooks and each prompt's end, not the process.
+// A phase runs over ACP in an agent tab the operator can see and type in (ADR 130). The
+// agent's permission mode is set per role; each permission ask waits for Foundry's policy or
+// a person, and the runner watches the transcript, the asks and each prompt's end.
 
 export interface SupervisedRun {
   /** The claude session id, which the agent chose. `resume` continues it. */
@@ -69,8 +68,13 @@ export interface StartSupervisedRunOptions {
    * Where this node's skills were mounted. Absent or empty mounts none.
    */
   addDirs?: string[]
+  /**
+   * The agent's permission mode, chosen per role by `modeFor`. `default` makes every write and
+   * state-changing command an ask, so `autoDecide` still sees it; `auto` leaves them to Claude.
+   */
+  mode: PermissionMode
   /** Decides without asking when the autonomy ladder allows it. */
-  autoDecide?: (toolName: string, input: unknown) => PermissionDecision | 'mode' | null
+  autoDecide?: (toolName: string, input: unknown) => PermissionDecision | null
   /** The ladder refused something without asking. Only refusals are reported. */
   onAutoDenied?: (toolName: string, reason: string) => void
   onPending: (pending: PendingPermission) => void
@@ -164,7 +168,7 @@ export interface SupervisedRunner {
    * changed nothing.
    */
   resolve(sessionId: string, requestId: string, decision: PermissionDecision): boolean
-  /** Gives one back to the agent tab, for answering where the agent is. */
+  /** Drops one from Foundry's held list; its ask stays open in the agent tab. */
   handBackToTerminal(sessionId: string, requestId: string): void
   /** Ends the current turn, leaving the session open so a redirect lands. */
   interrupt(sessionId: string): void
@@ -206,12 +210,13 @@ interface Running {
   startedAt: number
   /** True while a tool call is held: blocked on a person is not stuck. */
   isWaiting: boolean
+  /** Stops listening for the agent's asks. */
   release: () => void
   /**
-   * Whose callbacks the next hook or turn-end belongs to.
+   * Whose callbacks the next ask or turn-end belongs to.
    *
    * A one-field box rather than the callbacks themselves, and shared with the
-   * closures `start` installed on the bridge and the control server. The
+   * closures `start` installed on the bridge and the ask listeners. The
    * session outlives the phase, so `continueRun` has to redirect callbacks
    * those closures captured before this record existed — a permission raised
    * during `plan` must not be reported against `specify`.
@@ -221,30 +226,25 @@ interface Running {
 
 export interface SupervisedRunnerOptions {
   api: ExtensionAPI
-  control: ControlServer
-  /** Where per-session settings and the hook script are written. */
+  /** Where the scripts of the checks are written. */
   stateDir: string
   now?: () => number
 }
 
-/** What every part of one runner shares: the host, the control server, and the live runs. */
+/** What every part of one runner shares: the host and the live runs. */
 interface RunnerContext {
   readonly api: ExtensionAPI
-  readonly control: ControlServer
-  /** Where per-session settings and the hook script are written. */
+  /** Where the scripts of the checks are written. */
   readonly stateDir: string
   readonly now: () => number
-  readonly hookScriptPath: string
   readonly running: Map<string, Running>
 }
 
 function runnerContext(options: SupervisedRunnerOptions): RunnerContext {
   return {
     api: options.api,
-    control: options.control,
     stateDir: options.stateDir,
     now: options.now ?? Date.now,
-    hookScriptPath: installHookScript(options.stateDir),
     running: new Map<string, Running>(),
   }
 }
@@ -342,21 +342,16 @@ async function startSupervisedRun(
   const project = await addWorktreeProject(context.api, start)
   if (project === null) return null
 
-  // Ours: the hook and the control server are keyed by it, and the agent's own
-  // session id is not known until it has started.
-  const runId = randomUUID()
-  const started = await context.api.agents.start(
-    agentStartInput(context, start, { projectId: project.id, runId })
-  )
+  const started = await context.api.agents.start(agentStartInput(start, project.id))
   // No tab, no run. Said out loud rather than starting an agent nobody can see.
   if (started === null) return null
 
   const { sessionId } = started
-  // A box shared with the record, so `continueRun` can move a hook to another phase
+  // A box shared with the record, so `continueRun` can move an ask to another phase
   // without a new session; the closures exist before the record does.
   const phase: Running['phase'] = { current: { id: start.phase, ...start } }
   const bridge = permissionBridgeFor(context, sessionId, { phase, autoDecide: start.autoDecide })
-  const release = registerControl(context, runId, bridge)
+  const release = listenForAsks(context, sessionId, bridge)
   const run = trackRun(context, sessionId, {
     bridge,
     release,
@@ -367,7 +362,7 @@ async function startSupervisedRun(
     featureDir: start.featureDir,
   })
 
-  // Registered before the first prompt: a hook or turn end arriving before the
+  // Registered before the first prompt: an ask or turn end arriving before the
   // caller had added the run would hit an empty registry and be dropped.
   start.onRegistered?.({ ...run })
   promptSession(context, sessionId, start.prompt)
@@ -409,11 +404,10 @@ function permissionBridgeFor(
   })
 }
 
-/** The Claude options for one run: settings file, model, effort, skill folders and environment. */
-function claudeOptions(start: StartSupervisedRunOptions, settings: string): object {
+/** The Claude options for one run: model, effort, skill folders and environment. */
+function claudeOptions(start: StartSupervisedRunOptions): object {
   const featureSlug = path.basename(start.featureDir)
   return {
-    settings,
     // Empty means "follow the operator's own configuration", so it is left out.
     ...(start.model ? { model: start.model } : {}),
     ...(start.effort ? { effort: start.effort } : {}),
@@ -429,39 +423,60 @@ function claudeOptions(start: StartSupervisedRunOptions, settings: string): obje
 }
 
 /** What `api.agents.start` is given for one run. */
-function agentStartInput(
-  context: RunnerContext,
-  start: StartSupervisedRunOptions,
-  { projectId, runId }: { projectId: string; runId: string }
-): StartAgentInput {
-  const settings = writeRunSettings({
-    runId,
-    settingsDirectory: path.join(context.stateDir, 'settings'),
-    hookScriptPath: context.hookScriptPath,
-    controlUrl: context.control.url,
-    controlToken: context.control.token,
-  })
+function agentStartInput(start: StartSupervisedRunOptions, projectId: string): StartAgentInput {
   return {
-    // Claude, whatever the default agent is: the hook and the transcript are Claude Code's.
+    // Claude, whatever the default agent is: Foundry reads Claude Code's transcript.
     agentId: 'claude',
     cwd: start.worktreePath,
     resume: start.resumeSessionId,
-    // Auto mode answers what the ladder defers; `default` asks the operator.
-    mode: letAutoModeDecide(context.api) ? 'auto' : 'default',
+    mode: start.mode,
     tab: { projectId, title: start.title },
-    agentMeta: { claudeCode: { options: claudeOptions(start, settings) } },
+    agentMeta: { claudeCode: { options: claudeOptions(start) } },
   }
 }
 
-/** The session's hooks on the control server; returns what releases them. */
-function registerControl(
+/** The tool a permission ask is about, as Claude names it. */
+function toolNameOf(ask: AgentPermissionAsk): string {
+  const named = (ask.toolCallMeta?.claudeCode as { toolName?: unknown } | undefined)?.toolName
+  if (typeof named === 'string') return named
+  if (ask.kind === 'execute') return 'Bash'
+  return ask.kind === 'read' || ask.kind === 'search' ? 'Read' : 'Write'
+}
+
+/** The option that carries a verdict, or null (which cancels the ask) when the agent offers none. */
+function optionFor(ask: AgentPermissionAsk, verdict: 'allow' | 'deny'): string | null {
+  const kind = verdict === 'allow' ? 'allow_once' : 'reject_once'
+  return ask.options.find((option) => option.kind === kind)?.optionId ?? null
+}
+
+/** Decides one ask with the bridge and sends the verdict; an `ask` verdict leaves it open in the tab. */
+async function decideAsk(
   context: RunnerContext,
-  runId: string,
+  { bridge, ask }: { bridge: Running['bridge']; ask: AgentPermissionAsk }
+): Promise<void> {
+  const { api } = context
+  const verdict: ToolVerdict = await bridge.canUseTool(toolNameOf(ask), ask.rawInput, ask.requestId)
+  if (verdict.permissionDecision === 'ask') return
+  await api.agents.answer(ask.sessionId, ask.requestId, optionFor(ask, verdict.permissionDecision))
+  // A refusal carries no words over ACP, so the operator's reach the agent as its next prompt.
+  if (verdict.message !== undefined) sendToSession(context, ask.sessionId, verdict.message)
+}
+
+/** Listens for the session's asks and for the tab answering one; returns what stops both. */
+function listenForAsks(
+  context: RunnerContext,
+  sessionId: string,
   bridge: Running['bridge']
 ): () => void {
-  return context.control.register(runId, {
-    decide: (request) => bridge.canUseTool(request.toolName, request.input),
+  const { agents } = context.api
+  const stopAsks = agents.onPermission(sessionId, (ask) => {
+    decideAsk(context, { bridge, ask }).catch(() => undefined)
   })
+  const stopSettled = agents.onPermissionSettled(sessionId, (askId) => bridge.withdraw(askId))
+  return () => {
+    stopAsks()
+    stopSettled()
+  }
 }
 
 /** Sends a prompt; its end is a turn end, unless the turn was cut short or failed. */

@@ -4,12 +4,12 @@ import { join, dirname } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { spawn as ptySpawn } from 'node-pty'
 import { createSupervisedRunner } from '../../src/runtime/supervised-runner.js'
-import { createControlServer, type ControlServer } from '../../src/runtime/control-server.js'
 import { transcriptPathFor } from '../../src/runtime/claude-launch.js'
 import type { PendingPermission } from '../../src/runtime/permission-bridge.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 import { partialFake } from '../../../../tests/support/fakes'
 import type {
+  AgentPermissionAsk,
   AgentsAPI,
   AgentTurnEnd,
   ExtensionAPI,
@@ -17,12 +17,11 @@ import type {
 } from '@terminator/extension-sdk'
 import { eventually } from '../../../../tests/support/eventually'
 
-// The agent runs over ACP, in a tab of the card's worktree project, and every tool call goes
-// through a PreToolUse hook that holds it still until somebody decides. What is asserted
-// here is what the operator ends up with: a project, an agent tab, and a tool call that waits.
+// The agent runs over ACP, in a tab of the card's worktree project, and every permission ask
+// waits for Foundry's policy or a person. What is asserted here is what the operator ends up
+// with: a project, an agent tab, and a tool call that waits.
 
 let dir: string
-let control: ControlServer
 let created: Array<Record<string, unknown>>
 let projectId: string | null
 /** The tab a command opens in; null when none can be. */
@@ -40,6 +39,10 @@ let agentsClosed: string[]
 let endListeners: Array<(exitCode: number | null) => void>
 let detachedEnd: number
 let startsAs: { sessionId: string } | null
+let askListeners: Array<(ask: AgentPermissionAsk) => void>
+let settledListeners: Array<(requestId: string) => void>
+let detachedAsks: number
+let answers: Array<{ sessionId: string; requestId: string; optionId: string | null }>
 
 function exitWith(exit: { exitCode: number | null }): void {
   nextExit = exit
@@ -61,6 +64,18 @@ function fakeAgents(): AgentsAPI {
     prompt: (sessionId, text) =>
       new Promise<AgentTurnEnd>((end) => prompts.push({ sessionId, text, end })),
     cancel: (sessionId) => cancelled.push(sessionId),
+    onPermission: (_sessionId, listener) => {
+      askListeners.push(listener)
+      return () => void (detachedAsks += 1)
+    },
+    onPermissionSettled: (_sessionId, listener) => {
+      settledListeners.push(listener)
+      return () => undefined
+    },
+    answer: async (sessionId, requestId, optionId) => {
+      answers.push({ sessionId, requestId, optionId })
+      return true
+    },
     close: async (sessionId) => void agentsClosed.push(sessionId),
     onEnd: (_sessionId, listener) => {
       endListeners.push(listener)
@@ -95,7 +110,6 @@ function runnerCoreApi(): ExtensionAPI {
 function runner(now: () => number = () => 1_000) {
   return createSupervisedRunner({
     api: runnerCoreApi(),
-    control,
     stateDir: join(dir, 'state'),
     now,
   })
@@ -130,13 +144,13 @@ const start = {
   title: 'Builder',
   prompt: '/speckit-implement',
   phase: 'implement' as never,
+  mode: 'default' as const,
   onPending: () => {},
   onResolved: () => {},
 }
 
-beforeEach(async () => {
+beforeEach(() => {
   dir = makeTempDir('supervised-runner-')
-  control = await createControlServer()
   created = []
   projectId = 'project-1'
   terminalId = 'terminal-1'
@@ -150,35 +164,43 @@ beforeEach(async () => {
   endListeners = []
   detachedEnd = 0
   startsAs = { sessionId: 'acp-1' }
+  askListeners = []
+  settledListeners = []
+  detachedAsks = 0
+  answers = []
 })
 
-afterEach(async () => {
-  await control.close()
+afterEach(() => {
   rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
 })
 
-/** The options the runner handed Claude: settings file, model, env and the rest. */
+/** The options the runner handed Claude: model, env and the rest. */
 function claudeOptions(): Record<string, unknown> {
   const meta = agentStarts[0].agentMeta as { claudeCode: { options: Record<string, unknown> } }
   return meta.claudeCode.options
 }
 
-/** The id the hook script is given: the last quoted argument of the PreToolUse command. */
-function runIdOfHook(): string {
-  const settings = JSON.parse(readFileSync(claudeOptions().settings as string, 'utf8'))
-  const match = /'([^']+)'$/.exec(settings.hooks.PreToolUse[0].hooks[0].command)
-  if (match === null) throw new Error('no run id in the hook command')
-  return match[1]
+const ALLOW = { optionId: 'allow-once', name: 'Allow', kind: 'allow_once' }
+const REJECT = { optionId: 'reject-once', name: 'Reject', kind: 'reject_once' }
+
+/** A permission ask as the core raises it for a Bash command, unless `over` says otherwise. */
+function askOf(over: Partial<AgentPermissionAsk> = {}): AgentPermissionAsk {
+  return {
+    sessionId: 'acp-1',
+    requestId: 'acp-ask-1',
+    toolCallId: 'tool-1',
+    toolCallMeta: { claudeCode: { toolName: 'Bash' } },
+    title: 'rm -rf /',
+    kind: 'execute',
+    rawInput: { command: 'rm -rf /' },
+    options: [ALLOW, REJECT],
+    ...over,
+  }
 }
 
-function ask(runId: string): Promise<unknown> {
-  const pending = fetch(control.url, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ sessionId: runId, toolName: 'Bash', input: { command: 'rm -rf /' } }),
-  }).then((r) => r.json())
-  pending.catch(() => {})
-  return pending
+/** The agent asks; the runner's listener is the one the run registered. */
+function raise(ask: AgentPermissionAsk = askOf()): void {
+  for (const listener of askListeners) listener(ask)
 }
 
 /** Ends the turn that began with `text`, as the agent does when it stops responding. */
@@ -208,7 +230,11 @@ describe('the supervised runner over ACP', () => {
   describe('nothing started', nothingStartedTests)
   describe('a tool call the agent may not make on its own', toolCallTests)
   describe('the operator answers', answeringTests)
+  describe('the operator denies', plainDenyTests)
+  describe('no option for the verdict', missingOptionTests)
+  describe('the tab answers', tabAnswersTests)
   describe('the ladder answers', ladderTests)
+  describe('the end of a run with asks', endWithAsksTests)
   describe('turns', turnTests)
   describe('kinds of turn end', turnKindsTests)
   describe('the next phase', nextPhaseTests)
@@ -245,7 +271,7 @@ function startingARunTests() {
 }
 
 function claudeOptionsTests() {
-  it('gives Claude its settings, model, effort, skill folders and environment', async () => {
+  it('gives Claude its model, effort, skill folders and environment', async () => {
     await runner().start({
       ...start,
       model: 'opus',
@@ -264,7 +290,7 @@ function claudeOptionsTests() {
         CLAUDE_CODE_ARTIFACT_AUTO_OPEN: '0',
       },
     })
-    expect(existsSync(claudeOptions().settings as string)).toBe(true)
+    expect(claudeOptions().settings).toBeUndefined()
   })
 
   it('leaves the model and effort off when none was chosen, so the operator config wins', async () => {
@@ -275,10 +301,13 @@ function claudeOptionsTests() {
 }
 
 function modeAndResumeTests() {
-  it('asks for auto mode, which decides what the ladder defers', async () => {
-    await runner().start(start)
-    expect(agentStarts[0].mode).toBe('auto')
-  })
+  it.each(['auto', 'default'] as const)(
+    'starts the agent in the %s mode it was given',
+    async (mode) => {
+      await runner().start({ ...start, mode })
+      expect(agentStarts[0].mode).toBe(mode)
+    }
+  )
 
   it('resumes an existing conversation rather than starting a second one', async () => {
     await runner().start({ ...start, resumeSessionId: 'earlier' })
@@ -338,34 +367,104 @@ function toolCallTests() {
     const call = held()
     const r = runner()
     await r.start({ ...start, onPending: call.onPending })
-    const pending = ask(runIdOfHook())
+    raise()
     await call.arrived
     expect(call.seen[0]).toMatchObject({ toolName: 'Bash', summary: 'rm -rf /' })
+    expect(answers).toEqual([])
     expect(r.resolve('acp-1', call.seen[0].requestId, { allow: false })).toBe(true)
-    await pending
+  })
+
+  it('names the tool from the ask’s _meta, and from its kind when the agent sent none', async () => {
+    const call = held()
+    await runner().start({ ...start, onPending: call.onPending })
+    raise(askOf({ requestId: 'a', toolCallMeta: { claudeCode: { toolName: 'Edit' } } }))
+    raise(askOf({ requestId: 'b', toolCallMeta: null, kind: 'execute' }))
+    raise(askOf({ requestId: 'c', toolCallMeta: null, kind: 'read' }))
+    raise(askOf({ requestId: 'd', toolCallMeta: null, kind: 'edit' }))
+    expect(call.seen.map((pending) => pending.toolName)).toEqual(['Edit', 'Bash', 'Read', 'Write'])
   })
 }
 
 function answeringTests() {
-  it('waits while nobody has answered, then proceeds on allow', async () => {
+  it('waits while nobody has answered, then picks the allow option on allow', async () => {
     const call = held()
     const r = runner()
     await r.start({ ...start, onPending: call.onPending })
-    const pending = ask(runIdOfHook())
+    raise()
     await call.arrived
-    await expect(Promise.race([pending, Promise.resolve('unanswered')])).resolves.toBe('unanswered')
+    expect(answers).toEqual([])
     r.resolve('acp-1', call.seen[0].requestId, { allow: true })
-    expect(await pending).toMatchObject({ permissionDecision: 'allow' })
+    await eventually(() =>
+      expect(answers).toEqual([
+        { sessionId: 'acp-1', requestId: 'acp-ask-1', optionId: 'allow-once' },
+      ])
+    )
   })
 
-  it('carries a real answer back, since the reason is the only channel for words', async () => {
+  it('picks the reject option on a typed answer, and sends the words as the next prompt', async () => {
     const call = held()
     const r = runner()
     await r.start({ ...start, onPending: call.onPending })
-    const pending = ask(runIdOfHook())
+    raise()
     await call.arrived
     r.resolve('acp-1', call.seen[0].requestId, { allow: false, answer: 'use the staging host' })
-    expect(await pending).toEqual({ permissionDecision: 'deny', reason: 'use the staging host' })
+    await eventually(() => expect(answers.map((a) => a.optionId)).toEqual(['reject-once']))
+    await eventually(() => expect(prompts.at(-1)?.text).toBe('use the staging host'))
+  })
+}
+
+function plainDenyTests() {
+  it('sends no prompt for a plain deny', async () => {
+    const call = held()
+    const r = runner()
+    await r.start({ ...start, onPending: call.onPending })
+    raise()
+    await call.arrived
+    r.resolve('acp-1', call.seen[0].requestId, { allow: false })
+    await eventually(() => expect(answers.map((a) => a.optionId)).toEqual(['reject-once']))
+    expect(prompts.map((p) => p.text)).toEqual(['/speckit-implement'])
+  })
+}
+
+function missingOptionTests() {
+  it('cancels the ask when the agent offered no option for the verdict', async () => {
+    const call = held()
+    const r = runner()
+    await r.start({ ...start, onPending: call.onPending })
+    raise(askOf({ options: [ALLOW] }))
+    await call.arrived
+    r.resolve('acp-1', call.seen[0].requestId, { allow: false })
+    await eventually(() => expect(answers.map((a) => a.optionId)).toEqual([null]))
+  })
+}
+
+function tabAnswersTests() {
+  it('drops the held call when the operator answers in the agent tab', async () => {
+    const resolved: Array<[string, string]> = []
+    const call = held()
+    const r = runner()
+    await r.start({
+      ...start,
+      onPending: call.onPending,
+      onResolved: (id, decision) => resolved.push([id, decision]),
+    })
+    raise()
+    await call.arrived
+    for (const settled of settledListeners) settled('acp-ask-1')
+    expect(resolved).toEqual([[call.seen[0].requestId, 'answered']])
+    expect(r.resolve('acp-1', call.seen[0].requestId, { allow: true })).toBe(false)
+    expect(answers).toEqual([])
+  })
+
+  it('leaves the ask open in the tab when the call is handed back', async () => {
+    const call = held()
+    const r = runner()
+    await r.start({ ...start, onPending: call.onPending })
+    raise()
+    await call.arrived
+    r.handBackToTerminal('acp-1', call.seen[0].requestId)
+    expect(r.resolve('acp-1', call.seen[0].requestId, { allow: true })).toBe(false)
+    expect(answers).toEqual([])
   })
 }
 
@@ -377,26 +476,50 @@ function ladderTests() {
       autoDecide: () => ({ allow: true }),
       onPending: (p) => seen.push(p),
     })
-    expect(await ask(runIdOfHook())).toMatchObject({ permissionDecision: 'allow' })
+    raise()
+    await eventually(() => expect(answers.map((a) => a.optionId)).toEqual(['allow-once']))
     expect(seen).toEqual([])
   })
 
-  it('is not answered once the run has ended', async () => {
+  it('refuses with the reject option and says so when the ladder refuses', async () => {
+    const refused: string[] = []
+    await runner().start({
+      ...start,
+      autoDecide: () => ({ allow: false, reason: 'outside the checkout' }),
+      onAutoDenied: (tool, reason) => refused.push(`${tool}: ${reason}`),
+    })
+    raise()
+    await eventually(() => expect(answers.map((a) => a.optionId)).toEqual(['reject-once']))
+    expect(refused).toEqual(['Bash: outside the checkout'])
+  })
+}
+
+function endWithAsksTests() {
+  it('stops listening for asks once the run has ended', async () => {
     const r = runner()
     await r.start(start)
     r.dispose()
-    expect(await ask(runIdOfHook())).toMatchObject({ permissionDecision: 'ask' })
+    expect(detachedAsks).toBe(1)
+  })
+
+  it('rejects what was still held when the run ends', async () => {
+    const call = held()
+    const r = runner()
+    await r.start({ ...start, onPending: call.onPending })
+    raise()
+    await call.arrived
+    r.dispose()
+    await eventually(() => expect(answers.map((a) => a.optionId)).toEqual(['reject-once']))
   })
 
   it('counts as blocked on a person while held, and working again once answered', async () => {
     const call = held()
     const r = runner()
     await r.start({ ...start, onPending: call.onPending })
-    const pending = ask(runIdOfHook())
+    raise()
     await call.arrived
     expect(r.watchable()[0].isWaiting).toBe(true)
     r.resolve('acp-1', call.seen[0].requestId, { allow: true })
-    await pending
     expect(r.watchable()[0].isWaiting).toBe(false)
   })
 }
@@ -833,7 +956,6 @@ function realPtyApi(): ExtensionAPI {
 function runCheck(commandLine: string, logPath?: string): Promise<number | null> {
   return createSupervisedRunner({
     api: realPtyApi(),
-    control,
     stateDir: join(dir, 'state'),
     now: () => 1_000,
   }).runCommand({

@@ -1,40 +1,9 @@
-import { shellQuote } from '@terminator/extension-sdk/node'
-import { writeFileSync, mkdirSync } from 'fs'
-import { isAbsolute, join } from 'path'
+import { join } from 'path'
 import { homedir } from 'os'
 import { existsSync, realpathSync } from 'fs'
 
-// The settings that make an agent answerable from the console, and where its
-// transcript is. The agent itself is started over ACP (`api.agents`), which
-// chooses the session id; the hook is keyed by a run id minted here instead.
-
-/** What one run's settings file needs. */
-export interface RunSettingsOptions {
-  /** Names the file and is the hook script's session argument. */
-  runId: string
-  /** Written here, one file per run. */
-  settingsDirectory: string
-  hookScriptPath: string
-  controlUrl: string
-  controlToken: string
-  /**
-   * The program that runs the hook. Electron's own binary in `node` mode, so
-   * the hook does not depend on a node being installed or on whatever the
-   * login shell put on PATH.
-   */
-  nodePath?: string
-}
-
-/**
- * How long the runtime waits for a decision before giving up on the hook.
- *
- * Twelve hours, because the thing it is waiting for is a person, and a person
- * goes to lunch. Safe to set this high: when it does expire the runtime falls
- * back to its own ask in the agent tab rather than to a decision nobody made
- * — verified against claude 2.1.220, along with the fact that a timeout this
- * large is accepted at all.
- */
-const HOOK_TIMEOUT_SECONDS = 43_200
+// Where an agent's transcript is. The agent itself is started over ACP (`api.agents`),
+// which chooses the session id.
 
 /**
  * Where Claude Code keeps a session's transcript.
@@ -86,80 +55,4 @@ function realPath(target: string): string {
     // best answer available and is right wherever the two agree.
     return target
   }
-}
-
-/** What a hook command line carries: the script, how to reach the console, and whose session it is. */
-interface HookCommandOptions {
-  hookScriptPath: string
-  controlUrl: string
-  controlToken: string
-  sessionId: string
-  nodePath: string
-}
-
-/**
- * The settings handed to one run.
- *
- * A file per session rather than a shared one: two agents running at once each
- * need their own session id on their own hook command line, and a single file
- * would have them answering each other's permission requests. Nothing is
- * written into the repository — the operator's own `.claude/settings.json` is
- * never touched.
- * @internal
- */
-export function buildSettings(options: HookCommandOptions): unknown {
-  return {
-    hooks: {
-      PreToolUse: [
-        {
-          // Every tool, not a list of the dangerous ones: what counts as
-          // dangerous is the autonomy ladder's judgement, and it lives in the
-          // console where it can be changed without restarting an agent.
-          matcher: '*',
-          hooks: [
-            {
-              type: 'command',
-              command: toolHookCommand(options),
-              timeout: HOOK_TIMEOUT_SECONDS,
-            },
-          ],
-        },
-      ],
-    },
-  }
-}
-
-/** The hook script run against the console's URL, for one run. */
-function toolHookCommand(options: HookCommandOptions): string {
-  return [
-    // Electron refuses to be a node unless told; without this the hook script
-    // would launch a second copy of the application.
-    'ELECTRON_RUN_AS_NODE=1',
-    shellQuote(options.nodePath),
-    shellQuote(options.hookScriptPath),
-    shellQuote(options.controlUrl),
-    shellQuote(options.controlToken),
-    shellQuote(options.sessionId),
-  ].join(' ')
-}
-
-/** The run's settings, written to a file of its own; returns where. */
-export function writeRunSettings(options: RunSettingsOptions): string {
-  // Absolute, or the agent fails in a way that only shows up at runtime: a
-  // relative path is resolved against the card's worktree, where it never
-  // exists, and the whole run dies on "Settings file not found".
-  if (!isAbsolute(options.settingsDirectory)) {
-    throw new Error(`settingsDirectory must be absolute, got ${options.settingsDirectory}`)
-  }
-  mkdirSync(options.settingsDirectory, { recursive: true })
-  const settingsPath = join(options.settingsDirectory, `${options.runId}.settings.json`)
-  const settings = buildSettings({
-    hookScriptPath: options.hookScriptPath,
-    controlUrl: options.controlUrl,
-    controlToken: options.controlToken,
-    sessionId: options.runId,
-    nodePath: options.nodePath ?? process.execPath,
-  })
-  writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8')
-  return settingsPath
 }

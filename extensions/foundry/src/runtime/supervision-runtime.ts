@@ -2,7 +2,6 @@ import type { ExtensionAPI } from '@terminator/extension-sdk'
 import * as path from 'node:path'
 
 import { orderDir } from '../data-root.js'
-import { createControlServer } from './control-server.js'
 import { createSupervisedRunner, type SupervisedRunner } from './supervised-runner.js'
 import { createStallWatcher, type StallWatcher } from './stall-watcher.js'
 import { createSupervision, type Supervision } from './supervision.js'
@@ -68,15 +67,13 @@ function recordToolsInFlight(
   recordingsInFlight.add(recording)
 }
 
-// Brings up the control server, runner, supervision layer and stall detector, and
+// Brings up the runner, supervision layer and stall detector, and
 // returns the layer; null when it cannot start, so phases run unsupervised and
 // surfaces read empty rather than throw.
 export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Supervision | null> {
   try {
-    runtime.control = await createControlServer()
     runtime.supervisedRunner = createSupervisedRunner({
       api,
-      control: runtime.control,
       stateDir: runtimeStateDir(api.paths.globalStorage),
     })
     // A run that stops making progress without asking for anything is the
@@ -96,16 +93,16 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
     startPaletteRefresh(api)
     return runtime.supervision
   } catch (error) {
-    await runtimeUnavailable(api, error)
+    runtimeUnavailable(api, error)
     return null
   }
 }
 
 // Without the runtime, phases fall back to the headless spawn. Said out loud: it
 // decides whether tool calls are asked about or approved silently.
-async function runtimeUnavailable(api: ExtensionAPI, error: unknown): Promise<void> {
+function runtimeUnavailable(api: ExtensionAPI, error: unknown): void {
   api.log.error('supervised runtime unavailable — phases will run unsupervised', error)
-  await closeHalfStartedRuntime()
+  closeHalfStartedRuntime()
   api.notifications.showToast(
     'error',
     'Supervision could not start — phases will run unsupervised, approving their own tool calls',
@@ -113,18 +110,13 @@ async function runtimeUnavailable(api: ExtensionAPI, error: unknown): Promise<vo
   )
 }
 
-// Close what was opened. A failure after the control server bound left it
-// listening on a port nothing would ever answer on, and nothing would ever
-// close it either.
-async function closeHalfStartedRuntime(): Promise<void> {
-  const controlClosed = runtime.control?.close()
-  runtime.control = null
+// Close what was opened.
+function closeHalfStartedRuntime(): void {
   runtime.supervisedRunner?.dispose()
   runtime.supervisedRunner = null
   runtime.stallWatcher?.stop()
   runtime.stallWatcher = null
   runtime.supervision = null
-  await controlClosed
 }
 
 function watchForStalls(api: ExtensionAPI, runner: SupervisedRunner): StallWatcher {
@@ -194,8 +186,8 @@ function onStallFiring(api: ExtensionAPI, firing: StallFiring, featureDir: strin
   })
 }
 
-/** Everything `startSupervisionRuntime` brought up, taken down again; settles once the control
- * server has closed and the recordings in flight are written. */
+/** Everything `startSupervisionRuntime` brought up, taken down again; settles once the
+ * recordings in flight are written. */
 export async function stopSupervisionRuntime(): Promise<void> {
   runtime.supervision = null
   runtime.mutes = null
@@ -206,7 +198,5 @@ export async function stopSupervisionRuntime(): Promise<void> {
   stopPaletteRefresh()
   runtime.supervisedRunner?.dispose()
   runtime.supervisedRunner = null
-  const controlClosed = runtime.control?.close()
-  runtime.control = null
-  await Promise.all([controlClosed, ...recordingsInFlight])
+  await Promise.all(recordingsInFlight)
 }

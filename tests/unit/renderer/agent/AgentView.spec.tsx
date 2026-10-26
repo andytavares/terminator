@@ -11,6 +11,8 @@ import { terminalSessionOf } from '../../../support/renderer-stores'
 const ask: AgentPermissionAsk = {
   sessionId: 'agent-1',
   requestId: 'req-1',
+  toolCallId: 'tool-1',
+  toolCallMeta: null,
   title: 'Run tests',
   kind: 'execute',
   rawInput: { command: 'npm test' },

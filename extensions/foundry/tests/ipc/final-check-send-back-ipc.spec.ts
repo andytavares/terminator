@@ -26,7 +26,6 @@ import { theRunner } from '../helpers/supervision-mocks.js'
 
 /** Agents that start and never finish: the reopened nodes stay where they were put. */
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
-vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 let dataDir = ''
 let host: FoundryHost

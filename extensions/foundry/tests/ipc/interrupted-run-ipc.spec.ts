@@ -31,7 +31,6 @@ import { eventually } from '../../../../tests/support/eventually'
  * every agent's terminal was a child of the process that died with it.
  */
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
-vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 /** Read by the extension through `settings.get`; a fresh one per test. */
 let dataDir = ''

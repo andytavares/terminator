@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { isAbsolute, join } from 'node:path'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { launchApp, closeApp, createWorkspace, type AppHandle } from './helpers'
 import { misalignedOn } from './control-alignment'
 import { extensionPage } from './extension-page'
@@ -133,7 +133,7 @@ async function startForgeRun(id: string): Promise<void> {
   expect(started.graph?.nodes.length).toBeGreaterThan(0)
 }
 
-/** The agent's launch: supervised, with its settings and its whole brief, on its own. */
+/** The agent's launch: supervised, in the mode its role earns, with its whole brief, on its own. */
 async function expectSupervisedLaunch(): Promise<void> {
   await expect.poll(() => supervisedLaunch(handle)).not.toBeNull()
   const launched = supervisedLaunch(handle)!
@@ -141,9 +141,9 @@ async function expectSupervisedLaunch(): Promise<void> {
   // Never the thing this replaced: an invisible agent approving its own tool calls.
   expect(launched.mode).not.toBe('bypassPermissions')
 
-  // An absolute settings file that exists: the hook that holds every tool call is in it.
-  expect(isAbsolute(launched.settings)).toBe(true)
-  expect(existsSync(launched.settings)).toBe(true)
+  // The builder writes anywhere in its checkout, at the default autonomy with auto mode on:
+  // `modeFor` gives it auto mode, and Foundry decides what auto mode still asks about.
+  expect(launched.mode).toBe('auto')
 
   // And it does not carry the parent Claude Code session in with it, which is
   // how an agent ends up waiting on somebody else's bridge for ever.

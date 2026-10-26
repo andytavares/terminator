@@ -3,7 +3,7 @@
  *
  * Real files under a temporary records location and real `git`; `gh` and the
  * tracker answer from what a spec gives them, because both reach the network.
- * A spec mocks the supervised runner and the control server itself (`vi.mock`
+ * A spec mocks the supervised runner itself (`vi.mock`
  * is per file), with `supervision-mocks.ts`, and drives its `theRunner`.
  */
 import { execFile } from 'node:child_process'
@@ -38,17 +38,6 @@ export function fakeRunner() {
     ),
     watchable: vi.fn((): unknown[] => []),
     dispose: vi.fn(),
-  }
-}
-
-/** The control server's surface, never listening. */
-export function quietControlServer() {
-  return {
-    url: 'http://127.0.0.1:1/pretooluse',
-    eventUrl: 'http://127.0.0.1:1/event',
-    token: 'token',
-    register: () => () => undefined,
-    close: async () => undefined,
   }
 }
 

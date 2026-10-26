@@ -1,14 +1,19 @@
-import type { HookDecision } from './control-server.js'
-
 // A tool call the agent cannot make without a person, turned into console state
-// a surface can act on, and the operator's answer turned back into something
-// the runtime understands.
+// a surface can act on, and the operator's answer turned back into a verdict.
 //
-// The PreToolUse hook is the only thing that can hold a tool call still while
-// somebody decides; the Notification hook does not fire for permission prompts
-// at all (FR-010, research.md R1). What travels back is a hook decision rather
-// than the SDK's PermissionResult, which is the only part of this file that
-// ever cared how the agent was being run.
+// The agent asks over ACP (ADR 130) and the call stays asked until the verdict
+// is sent, so a held call is simply an ask nobody has answered yet.
+
+/**
+ * What the bridge settles a tool call with. `ask` means nobody decided here: the
+ * ask stays open in the agent's tab for whoever is watching it.
+ */
+export interface ToolVerdict {
+  permissionDecision: 'allow' | 'deny' | 'ask'
+  reason?: string
+  /** What the operator typed: it reaches the agent as its next prompt. */
+  message?: string
+}
 
 export interface PermissionDecision {
   allow: boolean
@@ -16,11 +21,10 @@ export interface PermissionDecision {
   /**
    * A real answer, for a request that is a question rather than a yes/no.
    *
-   * A hook decision has exactly two ways back to the agent: allow with an
-   * updated input, or deny with a reason. The reason is the only channel that
-   * carries words, so answering travels as a denial whose reason is the
-   * answer — the tool call does not proceed, and the agent reads what you
-   * said. Nothing is denied in the sense the operator would mean it.
+   * An ACP ask has two ways back to the agent: an allow option or a reject
+   * option, with no words. An answer travels as a rejection, so the tool call
+   * does not proceed; the words stay in the console's record. Nothing is
+   * denied in the sense the operator would mean it.
    */
   answer?: string
 }
@@ -63,10 +67,10 @@ export interface PermissionBridgeOptions {
   onResolved: (requestId: string, decision: PermissionOutcome) => void
   now: () => number
   /**
-   * The autonomy ladder. Null abstains and asks the operator; `mode` leaves
-   * the call to Claude Code's own permission mode.
+   * The autonomy ladder. Null abstains and asks the operator; so does `mode`,
+   * because inside an ask there is no auto mode left to defer to.
    */
-  autoDecide?: (toolName: string, input: unknown) => PermissionDecision | 'mode' | null
+  autoDecide?: (toolName: string, input: unknown) => PermissionDecision | null
   /**
    * The ladder refused something, without asking anybody.
    *
@@ -76,24 +80,25 @@ export interface PermissionBridgeOptions {
    */
   onAutoDenied?: (toolName: string, reason: string) => void
   /**
-   * How long to hold a tool call before handing the decision back to the
-   * terminal.
+   * How long to hold a tool call before leaving it to the agent's tab.
    *
-   * A request nobody answers must not block the agent indefinitely. When this
-   * elapses the bridge abstains — `ask` — and Claude Code raises its own prompt
-   * in the terminal the operator is already looking at, which they can answer
-   * there. That is a worse surface than the console but an available one, and
-   * it is the difference between a slow answer and a run that is stuck.
+   * When this elapses the bridge drops the call from its held list and settles
+   * it `ask`; the ask itself stays open in the agent's tab, where the operator
+   * can answer it. That is a worse surface than the console but an available
+   * one.
    */
   askAfterMs?: number
 }
 
 export interface PermissionBridge {
-  canUseTool(toolName: string, input: unknown): Promise<HookDecision>
+  /** `askId` names the ACP ask, so `withdraw` can find the call it raised. */
+  canUseTool(toolName: string, input: unknown, askId?: string): Promise<ToolVerdict>
   /** True when it was still waiting; false when there was nothing to answer. */
   resolve(requestId: string, decision: PermissionDecision): boolean
-  /** Hands one back to the terminal, as the timeout does. */
+  /** Leaves one to the agent's tab, as the timeout does. */
   handBackToTerminal(requestId: string): void
+  /** The ask was answered elsewhere (in the agent's tab): drop its held call. */
+  withdraw(askId: string): void
   /** Denies everything outstanding. An unresolved promise would hang the turn. */
   rejectAll(reason: string): void
 }
@@ -242,9 +247,8 @@ function renderInput(record: Record<string, unknown>): string | null {
 
 /** A held tool call: how to answer it, what it asked with, and its hand-back timer. */
 interface Outstanding {
-  readonly settle: (result: HookDecision) => void
-  /** An `allow` must return the input the agent asked with, not an empty one. */
-  readonly input: unknown
+  readonly settle: (result: ToolVerdict) => void
+  readonly askId: string | undefined
   readonly timer: ReturnType<typeof setTimeout>
 }
 
@@ -265,9 +269,10 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
     held: 0,
   }
   return {
-    canUseTool: (toolName, input) => canUseTool(state, toolName, input),
+    canUseTool: (toolName, input, askId) => canUseTool(state, { toolName, input, askId }),
     resolve: (requestId, decision) => resolveRequest(state, requestId, decision),
     handBackToTerminal: (requestId) => handBack(state, requestId),
+    withdraw: (askId) => withdrawAsk(state, askId),
     rejectAll: (reason) => rejectAll(state, reason),
   }
 }
@@ -281,13 +286,13 @@ function takeOutstanding(state: BridgeState, requestId: string): Outstanding | u
   return entry
 }
 
-// Gives the decision back to Claude Code, which prompts in the terminal: nothing is
-// approved for the operator, and nothing refused because they were away.
+// Leaves the decision to the agent's tab: nothing is approved for the operator, and
+// nothing refused because they were away.
 function handBack(state: BridgeState, requestId: string): void {
   const entry = takeOutstanding(state, requestId)
   if (entry === undefined) return
-  // Handed back, not denied: the runtime asks in the terminal instead. The
-  // feed said "denied" for a request nobody had refused.
+  // Handed back, not denied: the ask stays open in the tab. The feed said
+  // "denied" for a request nobody had refused.
   state.options.onResolved(requestId, 'handback')
   entry.settle({ permissionDecision: 'ask' })
 }
@@ -297,36 +302,39 @@ function answerOf(decision: PermissionDecision): string {
   return decision.answer?.trim() ?? ''
 }
 
-function toResult(decision: PermissionDecision, input: unknown): HookDecision {
+function toResult(decision: PermissionDecision): ToolVerdict {
   const answer = answerOf(decision)
-  if (answer !== '') return { permissionDecision: 'deny', reason: answer }
+  if (answer !== '') return { permissionDecision: 'deny', reason: answer, message: answer }
   return decision.allow
-    ? { permissionDecision: 'allow', updatedInput: input }
+    ? { permissionDecision: 'allow' }
     : {
         permissionDecision: 'deny',
         reason: decision.reason ?? 'Denied by the operator',
       }
 }
 
-function canUseTool(state: BridgeState, toolName: string, input: unknown): Promise<HookDecision> {
+function canUseTool(
+  state: BridgeState,
+  call: { toolName: string; input: unknown; askId: string | undefined }
+): Promise<ToolVerdict> {
+  const { toolName, input } = call
   const { options } = state
   const auto = options.autoDecide?.(toolName, input) ?? null
-  if (auto === 'mode') return Promise.resolve({ permissionDecision: 'defer' })
   if (auto !== null) {
     // Resolved by the autonomy ladder, with no prompt. A refusal is said out loud (an
     // allow would drown the feed): unseen, refusals made agents look like they went quiet.
     if (!auto.allow) options.onAutoDenied?.(toolName, auto.reason ?? 'no reason given')
-    return Promise.resolve(toResult(auto, input))
+    return Promise.resolve(toResult(auto))
   }
-  return holdForAnswer(state, toolName, input)
+  return holdForAnswer(state, call)
 }
 
 /** Raises the call for a person and holds it until answered or handed back. */
 function holdForAnswer(
   state: BridgeState,
-  toolName: string,
-  input: unknown
-): Promise<HookDecision> {
+  call: { toolName: string; input: unknown; askId: string | undefined }
+): Promise<ToolVerdict> {
+  const { toolName, input, askId } = call
   const { options } = state
   const { sessionId } = options
   const requestId = `${sessionId}-perm-${++state.held}`
@@ -340,11 +348,11 @@ function holdForAnswer(
     at: options.now(),
   })
 
-  return new Promise<HookDecision>((resolvePromise) => {
+  return new Promise<ToolVerdict>((resolvePromise) => {
     const timer = setTimeout(() => handBack(state, requestId), state.askAfterMs)
     // Never keep the process alive for a prompt nobody is watching.
     timer.unref?.()
-    state.outstanding.set(requestId, { settle: resolvePromise, input, timer })
+    state.outstanding.set(requestId, { settle: resolvePromise, askId, timer })
   })
 }
 
@@ -362,8 +370,18 @@ function resolveRequest(
   // carrying the words, so reporting it as `allow` — or as `deny` — both
   // misread what the operator did.
   state.options.onResolved(requestId, permissionOutcomeOf(decision))
-  entry.settle(toResult(decision, entry.input))
+  entry.settle(toResult(decision))
   return true
+}
+
+function withdrawAsk(state: BridgeState, askId: string): void {
+  for (const [requestId, entry] of state.outstanding) {
+    if (entry.askId !== askId) continue
+    takeOutstanding(state, requestId)
+    // Answered where the agent is; nothing is left to send.
+    state.options.onResolved(requestId, 'answered')
+    entry.settle({ permissionDecision: 'ask' })
+  }
 }
 
 function permissionOutcomeOf(decision: PermissionDecision): PermissionOutcome {

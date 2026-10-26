@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import {
   agentRecordFile,
   launchApp,
@@ -259,8 +259,6 @@ export async function openListedOrder(handle: AppHandle, id: string): Promise<vo
 /** What a supervised agent was started with, as the stand-in agent recorded it over ACP. */
 export interface SupervisedLaunch {
   cwd: string
-  /** The settings file Foundry passed, which carries its PreToolUse hook. */
-  settings: string
   /** The permission mode set after the session opened; null when none was. */
   mode: string | null
   /** Characters in the first prompt: the whole brief, not a typed line's first kilobyte. */
@@ -273,7 +271,6 @@ interface RecordEntry {
   kind: 'session' | 'mode' | 'prompt'
   sessionId: string
   cwd?: string
-  meta?: { claudeCode?: { options?: { settings?: string } } } | null
   inherited?: boolean
   modeId?: string
   length?: number
@@ -288,19 +285,20 @@ function recordEntries(handle: AppHandle): RecordEntry[] {
     .map((line) => JSON.parse(line) as RecordEntry)
 }
 
-const settingsOf = (entry: RecordEntry | undefined): string =>
-  entry?.meta?.claudeCode?.options?.settings ?? ''
+/** Where Foundry cuts a lane's checkout, which is where its supervised agents run. */
+const FOUNDRY_CHECKOUTS = `${sep}.foundry${sep}orders${sep}`
 
-/** The newest session started with Foundry's settings file, once its brief has been sent. */
+/** The newest session that ran in a Foundry checkout, once its brief has been sent. */
 export function supervisedLaunch(handle: AppHandle): SupervisedLaunch | null {
   const entries = recordEntries(handle)
-  const session = entries.filter((e) => e.kind === 'session' && settingsOf(e) !== '').at(-1)
+  const session = entries
+    .filter((e) => e.kind === 'session' && e.cwd?.includes(FOUNDRY_CHECKOUTS))
+    .at(-1)
   const ofSession = entries.filter((e) => e.sessionId === session?.sessionId)
   const brief = ofSession.find((e) => e.kind === 'prompt')
   if (!session || !brief) return null
   return {
     cwd: session.cwd ?? '',
-    settings: settingsOf(session),
     mode: ofSession.filter((e) => e.kind === 'mode').at(-1)?.modeId ?? null,
     briefLength: brief.length ?? 0,
     inherited: session.inherited === true,

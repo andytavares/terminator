@@ -225,8 +225,8 @@ function parkedOf(input: InterruptionInput): Interruption[] {
       kind: 'stranded',
       id: sessionId,
       nodeId: nodeOfSession(input.graph, sessionId),
-      title: 'Waiting at its terminal',
-      detail: 'A question went unanswered in time. Answer it in the terminal.',
+      title: 'Waiting in its agent tab',
+      detail: 'A question went unanswered in time. Answer it in the agent tab.',
     }))
 }
 

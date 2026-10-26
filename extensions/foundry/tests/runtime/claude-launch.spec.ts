@@ -1,35 +1,9 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { rmSync, readFileSync } from 'fs'
+import { describe, it, expect } from 'vitest'
 import { homedir } from 'os'
-import { join } from 'path'
-import {
-  writeRunSettings,
-  buildSettings,
-  transcriptPathFor,
-  resumableIn,
-} from '../../src/runtime/claude-launch.js'
+import { transcriptPathFor, resumableIn } from '../../src/runtime/claude-launch.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
-
-let directory: string
-
-beforeEach(() => {
-  directory = makeTempDir('claude-launch-')
-})
-
-afterEach(() => {
-  rmSync(directory, { recursive: true, force: true, maxRetries: 5 })
-})
-
-const options = () => ({
-  runId: '11111111-2222-3333-4444-555555555555',
-  settingsDirectory: join(directory, 'settings'),
-  hookScriptPath: '/opt/terminator/pretooluse-hook.mjs',
-  controlUrl: 'http://127.0.0.1:5051/pretooluse',
-  controlToken: 'abc123',
-  nodePath: '/opt/Terminator.app/Contents/MacOS/Terminator',
-})
 
 // A conversation is filed under the directory it ran in. One begun elsewhere —
 // an architect that ran on the repository root before ADR-061 — cannot be
@@ -62,20 +36,6 @@ describe('transcriptPathFor', () => {
   describe('encoding', encodingTests)
   describe('resolving the directory', resolvingTheDirectoryTests)
 })
-
-const settings = () =>
-  buildSettings({
-    hookScriptPath: '/opt/hook.mjs',
-    controlUrl: 'http://127.0.0.1:1/pretooluse',
-    controlToken: 'tok',
-    sessionId: 's1',
-    nodePath: '/opt/node',
-  }) as {
-    hooks: Record<
-      string,
-      Array<{ matcher: string; hooks: Array<{ command: string; timeout: number }> }>
-    >
-  }
 
 function encodingTests() {
   it('encodes the working copy the way the runtime does', () => {
@@ -126,67 +86,6 @@ function resolvingTheDirectoryTests() {
     )
   })
 }
-
-describe('buildSettings', () => {
-  describe('the PreToolUse hook', thePretooluseHookTests)
-
-  // Turn end and end come from the agent protocol now, not from hooks.
-  it('registers no lifecycle hooks', () => {
-    expect(Object.keys(settings().hooks)).toEqual(['PreToolUse'])
-  })
-})
-
-function thePretooluseHookTests() {
-  it('registers a PreToolUse hook, which is the only event that can hold a tool call still', () => {
-    expect(settings().hooks.PreToolUse).toHaveLength(1)
-  })
-
-  it('matches every tool rather than a list of the dangerous ones', () => {
-    expect(settings().hooks.PreToolUse[0].matcher).toBe('*')
-  })
-
-  it('runs Electron as a node, so the hook does not relaunch the application', () => {
-    expect(settings().hooks.PreToolUse[0].hooks[0].command).toContain('ELECTRON_RUN_AS_NODE=1')
-  })
-
-  it('passes the endpoint, the token and the session on the command line', () => {
-    const { command } = settings().hooks.PreToolUse[0].hooks[0]
-    expect(command).toContain(`'http://127.0.0.1:1/pretooluse'`)
-    expect(command).toContain(`'tok'`)
-    expect(command).toContain(`'s1'`)
-  })
-
-  it('waits hours rather than the default minute, because it is waiting for a person', () => {
-    expect(settings().hooks.PreToolUse[0].hooks[0].timeout).toBe(43_200)
-  })
-}
-
-describe('writeRunSettings', () => {
-  it('writes the settings file the agent is pointed at, named after the run', () => {
-    const file = writeRunSettings(options())
-    expect(file).toBe(
-      join(directory, 'settings', '11111111-2222-3333-4444-555555555555.settings.json')
-    )
-    expect(JSON.parse(readFileSync(file, 'utf8'))).toHaveProperty('hooks.PreToolUse')
-  })
-
-  it('gives each run its own file, so two agents cannot answer for each other', () => {
-    expect(writeRunSettings(options())).not.toBe(writeRunSettings({ ...options(), runId: 'other' }))
-  })
-
-  it('runs the hook with this application, when no other node is named', () => {
-    const { nodePath: _unused, ...rest } = options()
-    expect(readFileSync(writeRunSettings(rest), 'utf8')).toContain(process.execPath)
-  })
-
-  // `resolveWorktreeBaseDir('')` is `join('', '.worktrees')` — relative — and a relative
-  // settings path is resolved against the card's worktree, where it never exists.
-  it('is refused when the directory is relative, rather than failing inside the agent', () => {
-    expect(() =>
-      writeRunSettings({ ...options(), settingsDirectory: '.worktrees/.foundry-runtime/settings' })
-    ).toThrow(/must be absolute/)
-  })
-})
 
 describe('transcriptPathFor — what it falls back to', () => {
   it('looks under the current user home, when none is named', () => {

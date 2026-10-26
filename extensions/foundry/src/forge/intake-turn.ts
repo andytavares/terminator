@@ -23,6 +23,7 @@ import { announceLive, orderStoreAt } from '../state/live-index.js'
 import { intakeSessions, deletedOrders } from './intake-sessions.js'
 import { askModel, modelForTier } from '../state/settings.js'
 import { readOnlyAutoDecide } from '../runtime/agent-policy.js'
+import { READ_ONLY_MODE } from '../runtime/permission-mode.js'
 import { runtime } from '../runtime/runtime-state.js'
 import { notePending, noteResolved } from '../runtime/held-calls.js'
 import { shellExecOf } from '../host-calls.js'
@@ -197,7 +198,8 @@ function architectStartOptions(launch: ArchitectLaunch): StartSupervisedRunOptio
       { draft: modelForTier(api, plan.role.modelTier), ask: askModel(api) },
       turn.loop === true ? { loop: true } : undefined
     ),
-    // Read-only, enforced by the hook rather than by the prompt. The
+    mode: READ_ONLY_MODE,
+    // Read-only, enforced by the policy rather than by the prompt. The
     // architect proposes; it does not edit the repository it is reading.
     // Its one exception is the proposal itself, and only at that path.
     autoDecide: readOnlyAutoDecide(plan.proposalPath),
@@ -437,7 +439,8 @@ function roundStartOptions(launch: RoundLaunch): StartSupervisedRunOptions {
     prompt: input.prompt(role),
     phase: roleId,
     model: input.model ?? modelForTier(api, role.modelTier),
-    // Read-only, enforced by the hook rather than by the prompt, with the
+    mode: READ_ONLY_MODE,
+    // Read-only, enforced by the policy rather than by the prompt, with the
     // one exception being the rung's own output file.
     autoDecide: readOnlyAutoDecide(launch.outputPath),
     ...heldCallNotes(api, featureDir),

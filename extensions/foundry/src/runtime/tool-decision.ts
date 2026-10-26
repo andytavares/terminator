@@ -68,13 +68,6 @@ export interface ToolRequest {
    */
   readonly skillsMount: string | null
   /**
-   * Leave what this policy has no opinion on to Claude Code's auto mode,
-   * rather than holding it five minutes for a person — a destructive action
-   * included, exactly as in any other auto-mode session. Never at `escorted`,
-   * whose meaning is "ask me".
-   */
-  readonly letModeDecide: boolean
-  /**
    * The role writes documentation and nothing else (`writes` is exactly
    * `[docs]`). Its file edits are refused outside documentation paths.
    */
@@ -152,7 +145,7 @@ function shipsTheBranch(command: string): boolean {
 }
 
 /** What `decideTool` answers: a decision, auto mode's to take, or `null` to ask. */
-type ToolAnswer = PolicyDecision | 'mode' | null
+type ToolAnswer = PolicyDecision | null
 
 /** One of `decideTool`'s rules: its answer, or `undefined` to leave it to the next. */
 type ToolRule = (request: ToolRequest) => ToolAnswer | undefined
@@ -283,10 +276,6 @@ function autonomyRule(request: ToolRequest): PolicyDecision | undefined {
   return taken === null ? undefined : { allow: taken.allow, reason: taken.reason }
 }
 
-function modeRule(request: ToolRequest): 'mode' | undefined {
-  return request.letModeDecide && request.autonomy !== 'escorted' ? 'mode' : undefined
-}
-
 // At `lights-out` a question has nobody to answer, so it is refused, with why, rather
 // than held until the budget ends the run; elsewhere it is asked. Nothing becomes more
 // permissive: the agent is told, so it can do the work another way.
@@ -304,7 +293,6 @@ const TOOL_RULES: readonly ToolRule[] = [
   docsOnlyRule,
   publishDocumentRule,
   autonomyRule,
-  modeRule,
 ]
 
 // Decide, or hand to the operator: `null` means ask (held, then the inbox). Decisions

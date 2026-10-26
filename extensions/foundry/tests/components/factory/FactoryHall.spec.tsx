@@ -331,7 +331,7 @@ function cardSummariesAndPlatesTests() {
     fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
     await screen.findByRole('heading', { name: 'BUILD THE THING' })
     expect(screen.getByRole('img', { name: 'Needs you' })).toBeTruthy()
-    expect(screen.getByText(/^WAITING FOR YOU: WAITING AT ITS TERMINAL/i)).toBeTruthy()
+    expect(screen.getByText(/^WAITING FOR YOU: WAITING IN ITS AGENT TAB/i)).toBeTruthy()
   })
 
   it('leaves the station name to the floor: no plate over it, the full label on the button', async () => {
@@ -461,7 +461,7 @@ function factoryHallWaitingGatesTests() {
 function factoryHallParkedAgentsTests() {
   it('pins an agent parked at its terminal and takes you there', async () => {
     mount({ view: hallView({ stranded: ['s-1'] }) })
-    const card = await screen.findByRole('group', { name: 'Waiting at its terminal' })
+    const card = await screen.findByRole('group', { name: 'Waiting in its agent tab' })
     fireEvent.click(within(card).getByRole('button', { name: 'Go to agent tab' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 's-1' })

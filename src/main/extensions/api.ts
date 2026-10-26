@@ -873,6 +873,8 @@ function agentsApi(): ExtensionAPI['agents'] {
     close: (sessionId) => agentService().close(sessionId),
     onUpdate: (sessionId, listener) => agentService().onUpdate(sessionId, listener),
     onPermission: (sessionId, listener) => agentService().onPermission(sessionId, listener),
+    onPermissionSettled: (sessionId, listener) =>
+      agentService().onPermissionSettled(sessionId, listener),
     answer: (sessionId, requestId, optionId) =>
       agentService().answer(sessionId, requestId, optionId),
     onEnd: (sessionId, listener) => agentService().onEnd(sessionId, listener),
