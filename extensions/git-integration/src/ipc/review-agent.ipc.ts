@@ -55,6 +55,19 @@ interface AgentContext {
   runningByScope: Map<string, AgentRun>
   /** runId -> its cancel, for a run or summary this process started */
   liveRuns: Map<string, () => void>
+  /** runId -> its session id once its agent starts, or null when it ends without one */
+  runSessions: Map<string, SessionWait>
+}
+
+interface SessionWait {
+  session: Promise<string | null>
+  settle: (sessionId: string | null) => void
+}
+
+function sessionWait(): SessionWait {
+  let settle: SessionWait['settle'] = () => {}
+  const session = new Promise<string | null>((resolve) => (settle = resolve))
+  return { session, settle }
 }
 
 type StartInput = z.infer<typeof StartPayload>
@@ -174,6 +187,8 @@ function newRun(input: StartInput): AgentRun {
 async function finishAgentRun(ctx: AgentContext, slot: RunSlot, finished: AgentRun): Promise<void> {
   ctx.runningByScope.delete(slot.runningKey)
   ctx.liveRuns.delete(slot.run.id)
+  ctx.runSessions.get(slot.run.id)?.settle(null)
+  ctx.runSessions.delete(slot.run.id)
   await upsertRun(slot.head, finished)
   ctx.deps.broadcast('review-agent:event', { run: finished })
 }
@@ -184,27 +199,43 @@ function agentDepsOf(ctx: AgentContext, slot?: RunSlot): RunAgentReviewDeps {
     runOnce: (input) => ctx.deps.agents.runOnce(input),
     cancelSession: (sessionId) => ctx.deps.agents.cancel(sessionId),
     // A running review's conversation opens in an agent tab before it replies.
-    onSession: slot && ((sessionId) => void upsertRun(slot.head, { ...slot.run, sessionId })),
+    onSession:
+      slot &&
+      ((sessionId) => {
+        ctx.runSessions.get(slot.run.id)?.settle(sessionId)
+        void upsertRun(slot.head, { ...slot.run, sessionId })
+      }),
   }
 }
 
 /** Runs the agent in the PR head's worktree; any failure ends the run as failed. */
 async function runAgentToEnd(ctx: AgentContext, input: StartInput, slot: RunSlot) {
   const { run } = slot
+  // Cancellable from the moment the run exists, not only once its agent starts.
+  const gate = { cancelled: false, cancel: () => {} }
+  ctx.liveRuns.set(run.id, () => {
+    gate.cancelled = true
+    gate.cancel()
+  })
   try {
     const worktreePath = await ctx.ensureWorktree(input)
+    if (gate.cancelled) return await finishAgentRun(ctx, slot, cancelledBeforeStart(run))
     const { model, effort, timeoutMs } = runSettings(ctx.deps, input.model)
     const { model: _requested, ...review } = input
     const { cancel, done } = ctx.runReview(
       { ...review, question: input.question ?? null, worktreePath, model, effort, timeoutMs },
       agentDepsOf(ctx, slot)
     )
-    ctx.liveRuns.set(run.id, cancel)
+    gate.cancel = cancel
     await finishAgentRun(ctx, slot, await done)
   } catch (e) {
     const finishedAt = new Date().toISOString()
     await finishAgentRun(ctx, slot, { ...run, status: 'failed', finishedAt, error: String(e) })
   }
+}
+
+function cancelledBeforeStart(run: AgentRun): AgentRun {
+  return { ...run, status: 'cancelled', finishedAt: new Date().toISOString() }
 }
 
 /** Starts a run for the PR and scope, or answers the one already running for them. */
@@ -214,6 +245,7 @@ async function startAgentRun(ctx: AgentContext, input: StartInput): Promise<{ ru
   if (existing && existing.status === 'running') return { run: existing }
   const run = newRun(input)
   ctx.runningByScope.set(runningKey, run)
+  ctx.runSessions.set(run.id, sessionWait())
   await upsertRun(input, run)
   void runAgentToEnd(ctx, input, { run, runningKey, head: headOf(input) })
   return { run }
@@ -234,13 +266,17 @@ async function dismissFinding(input: PrHead & { runId: string; findingId: string
 async function openRunConversation(ctx: AgentContext, runId: string) {
   const found = await findStoredRun(runId)
   if (!found) return { error: 'NOT_FOUND' }
-  if (!found.run.sessionId) return { error: 'NO_SESSION' }
+  // A run whose agent is still starting has no session yet: wait for it.
+  const sessionId = found.run.sessionId || (await ctx.runSessions.get(runId)?.session)
+  if (!sessionId) return { error: 'NO_SESSION' }
   const projectId = ctx.deps.projectIdFor(found.repoRoot)
   if (!projectId) return { error: 'NO_PROJECT' }
   const cwd = await ctx.ensureWorktree(found)
+  // One agent per conversation: the tab takes the review over, so the running review ends.
+  ctx.liveRuns.get(runId)?.()
   const started = await ctx.deps.agents.start({
     cwd,
-    resume: found.run.sessionId,
+    resume: sessionId,
     tab: { projectId, title: `Review #${found.prNumber}` },
   })
   return started ? { ok: true } : { error: 'AGENT_UNAVAILABLE' }
@@ -340,6 +376,7 @@ export function registerReviewAgentHandlers(
     runSummary: deps.runSummary ?? runSummary,
     runningByScope: new Map(),
     liveRuns: new Map(),
+    runSessions: new Map(),
   }
   for (const spec of [...runChannels(ctx), ...storedRunChannels(deps)]) register(spec)
   return { dispose: () => ctx.liveRuns.forEach((cancel) => cancel()) }

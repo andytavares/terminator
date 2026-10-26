@@ -417,6 +417,55 @@ describe('review-agent IPC — a running review continues in an agent tab', () =
   })
 })
 
+describe('review-agent IPC — cancelling before the agent starts', () => {
+  it('ends the run as cancelled and never starts the agent', async () => {
+    let worktreeReady: (path: string) => void = () => {}
+    const ensureWorktree = vi.fn(() => new Promise<string>((resolve) => (worktreeReady = resolve)))
+    const runReview = vi.fn<RunReview>()
+    const { handlers, broadcast } = captureAgentHandlers({ runReview, ensureWorktree })
+    const { run } = (await handlers['review-agent:start'](startPayload())) as { run: AgentRun }
+    expect(await handlers['review-agent:cancel']({ runId: run.id })).toEqual({ ok: true })
+    worktreeReady('/wt/pr-1-sha1')
+    await eventually(() =>
+      expect(broadcast).toHaveBeenCalledWith('review-agent:event', {
+        run: expect.objectContaining({ id: run.id, status: 'cancelled' }),
+      })
+    )
+    expect(runReview).not.toHaveBeenCalled()
+  })
+})
+
+describe('review-agent IPC — continuing a review whose agent is still starting', () => {
+  it('waits for the session, then resumes it', async () => {
+    const runReview = vi.fn<RunReview>(() => ({
+      runId: 'x',
+      done: new Promise(() => {}),
+      cancel() {},
+    }))
+    const ensureWorktree = vi.fn(async () => '/wt/pr-1-sha1')
+    const { handlers, start } = captureAgentHandlers({ runReview, ensureWorktree })
+    const { run } = (await handlers['review-agent:start'](startPayload())) as { run: AgentRun }
+    await eventually(() => expect(runReview).toHaveBeenCalled())
+    const opened = handlers['review-agent:open-terminal']({ runId: run.id })
+    runReview.mock.calls[0][1]?.onSession?.('sess-late')
+    expect(await opened).toEqual({ ok: true })
+    expect(start).toHaveBeenCalledWith(expect.objectContaining({ resume: 'sess-late' }))
+  })
+
+  it('moves the review into the tab: the running review is cancelled first', async () => {
+    const cancel = vi.fn()
+    const runReview = vi.fn<RunReview>(() => ({ runId: 'x', done: new Promise(() => {}), cancel }))
+    const ensureWorktree = vi.fn(async () => '/wt/pr-1-sha1')
+    const { handlers, start } = captureAgentHandlers({ runReview, ensureWorktree })
+    const { run } = (await handlers['review-agent:start'](startPayload())) as { run: AgentRun }
+    await eventually(() => expect(runReview).toHaveBeenCalled())
+    runReview.mock.calls[0][1]?.onSession?.('sess-live')
+    expect(await handlers['review-agent:open-terminal']({ runId: run.id })).toEqual({ ok: true })
+    expect(cancel).toHaveBeenCalled()
+    expect(cancel.mock.invocationCallOrder[0]).toBeLessThan(start.mock.invocationCallOrder[0])
+  })
+})
+
 describe('review-agent IPC — runs ask the core agent service', () => {
   it('hands the review run the service runOnce and starts it without a session id', async () => {
     const runReview = vi.fn<RunReview>(() => ({
