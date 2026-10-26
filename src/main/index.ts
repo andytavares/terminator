@@ -3,6 +3,7 @@ import { onChannel } from './ipc/channel-registrar.js'
 import { registerAppInfoHandlers, registerDialogHandlers } from './ipc/app.ipc.js'
 import { app, BrowserWindow, dialog, Menu, shell, session, protocol } from 'electron'
 import { enterBackgroundMode, revealWindow, newWindow } from './background-mode.js'
+import { checkForUpdatesNow, startAppUpdates } from './app-updater.js'
 import { announceWindowReadiness, exposeReadinessToTests } from './e2e-readiness.js'
 import { join } from 'path'
 import {
@@ -244,6 +245,7 @@ function appNameMenu(): Electron.MenuItemConstructorOptions[] {
       label: app.getName(),
       submenu: [
         { label: `About ${app.getName()}`, click: openAbout },
+        { label: 'Check for Updates…', click: () => void checkForUpdatesNow() },
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },
@@ -538,6 +540,7 @@ app.whenReady().then(async () => {
   onWorkspacesChanged(() => extensionHostProcess.pushWorkspaces(workspacesOf(coreView.workspace)))
   setupMenu()
   createWindow()
+  startAppUpdates(() => mainWindow && revealWindow(mainWindow))
 
   app.on('activate', () => {
     if (mainWindow) {
