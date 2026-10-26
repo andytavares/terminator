@@ -609,8 +609,13 @@ function stopSupervisedRun(context: RunnerContext, sessionId: string, reason?: s
     reason !== undefined && reason.trim() !== ''
       ? agents.prompt(sessionId, reason.trim())
       : Promise.resolve(undefined)
-  // Closing ends the agent, whose exit is then reported by `onEnd`.
-  void said.then(() => agents.close(sessionId)).catch(() => undefined)
+  // A stop asked for is a clean end, as `/exit` was: report 0, then close.
+  void said
+    .then(() => {
+      context.running.get(sessionId)?.phase.current.onEnd?.(0)
+      end(context, sessionId, true)
+    })
+    .catch(() => undefined)
   return true
 }
 

@@ -570,6 +570,15 @@ function stoppingTests() {
     await eventually(() => expect(agentsClosed).toEqual(['acp-1']))
     expect(prompts.map((p) => p.text)).toEqual(['/speckit-implement'])
   })
+
+  it('reports a deliberate stop as a clean end, once', async () => {
+    const onEnd = vi.fn()
+    const r = runner()
+    await r.start({ ...start, onEnd })
+    r.stop('acp-1')
+    await eventually(() => expect(agentsClosed).toEqual(['acp-1']))
+    expect(onEnd.mock.calls).toEqual([[0]])
+  })
 }
 
 function missingSessionTests() {
