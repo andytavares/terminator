@@ -279,8 +279,6 @@ export interface RunAgentReviewDeps {
   runOnce: AgentsAPI['runOnce']
   /** The core's `api.agents.cancel`: what stops a session a cancelled run started. */
   cancelSession?: AgentsAPI['cancel']
-  /** The run's agent session exists, so its conversation can be opened while it runs. */
-  onSession?: (sessionId: string) => void
   exec?: ExecFn
 }
 
@@ -316,7 +314,12 @@ interface RunControl {
   started: (sessionId: string) => void
 }
 
-function newRunControl({ cancelSession, onSession }: RunAgentReviewDeps): RunControl {
+interface ControlDeps {
+  cancelSession?: AgentsAPI['cancel']
+  onSession?: (sessionId: string) => void
+}
+
+function newRunControl({ cancelSession, onSession }: ControlDeps): RunControl {
   const stopSession = (id: string) => cancelSession?.(id)
   let settle: () => void = () => {}
   let sessionId: string | null = null
@@ -506,11 +509,8 @@ export function runAgentReview(
   const startedAt = new Date().toISOString()
   const run: RunContext = { input, runId, startedAt, activity: [], sessionId: '' }
   // A failed or cancelled run keeps its session, so its conversation can still be continued.
-  const onSession = (sessionId: string) => {
-    run.sessionId = sessionId
-    deps.onSession?.(sessionId)
-  }
-  const control = newRunControl({ ...deps, onSession })
+  const onSession = (sessionId: string) => void (run.sessionId = sessionId)
+  const control = newRunControl({ cancelSession: deps.cancelSession, onSession })
   return { runId, done: executeAgentRun(run, deps, control), cancel: control.cancel }
 }
 

@@ -190,13 +190,10 @@ async function aRunningReviewIsCancelled(): Promise<void> {
   await expect(panel(view)).not.toContainText('Reviewing')
 }
 
-/** One agent per conversation: the tab takes the review over, and the review ends. */
-async function aRunningReviewMovesToAnAgentTab(): Promise<void> {
+/** A finished review's conversation continues in an agent tab of the repository's project. */
+async function aFinishedReviewContinuesInAnAgentTab(): Promise<void> {
   const view = await askReviewAgent()
-  await runReview(view)
-  await panel(view).getByRole('button', { name: 'Continue in agent tab' }).click()
-  await expect(panel(view)).not.toContainText('Reviewing')
-
+  await panel(view).getByRole('button', { name: 'Ask follow-up' }).click()
   await handle.page.locator('.branch-row').first().click()
   const tab = handle.page.locator('.tab-bar__tab').filter({ hasText: 'Review #1' })
   await expect(tab).toBeVisible()
@@ -224,14 +221,14 @@ async function aDismissedFindingStaysDismissed(): Promise<void> {
   await expect(panel(view)).not.toContainText('subtract swaps its operands')
 }
 
-test('the review agent runs on a pull request, moves to an agent tab, and its dismissed finding stays dismissed', async () => {
+test('the review agent runs on a pull request, keeps a dismissed finding dismissed, and continues in an agent tab', async () => {
   await openAgentWorkspace()
   await runSteps([
     ['a running review can be cancelled', aRunningReviewIsCancelled],
-    ['a running review moves to an agent tab', aRunningReviewMovesToAnAgentTab],
     [
       'a finished review lists its finding, and a dismissed finding stays dismissed',
       aDismissedFindingStaysDismissed,
     ],
+    ['a finished review continues in an agent tab', aFinishedReviewContinuesInAnAgentTab],
   ])
 })
