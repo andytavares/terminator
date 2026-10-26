@@ -1470,7 +1470,8 @@ describe('UnifiedSidebar — the terminals under a branch', () => {
     expect(onSelectProject).toHaveBeenCalled()
   })
 
-  it('marks the terminal the branch is showing', () => {
+  it('marks the terminal the main area is showing', () => {
+    useWorkspaceStore.setState({ activeProjectId: 'p1' })
     useSessionStore.getState().setActiveSessionForProject('p1', 's2')
     const { container } = renderSidebar()
     expandMain(container)
@@ -1478,6 +1479,27 @@ describe('UnifiedSidebar — the terminals under a branch', () => {
     expect(terminalRowNamed(container, 'api-shell').classList).not.toContain(
       'terminal-row--selected'
     )
+    expect(container.querySelectorAll('[aria-current="true"]')).toHaveLength(1)
+  })
+
+  it("does not mark a branch's last terminal while another branch is on screen", () => {
+    useWorkspaceStore.setState({ activeProjectId: 'p3' })
+    useSessionStore.getState().setActiveSessionForProject('p1', 's2')
+    const { container } = renderSidebar()
+    expandMain(container)
+    expect(container.querySelector('.terminal-row--selected')).toBeNull()
+    expect(container.querySelector('.branch-row--selected')?.textContent).toContain('Web')
+  })
+})
+
+describe('UnifiedSidebar — nothing is marked while Home covers the main area', () => {
+  it('marks no row', () => {
+    useWorkspaceStore.setState({ activeProjectId: 'p1' })
+    useSessionStore.getState().setActiveSessionForProject('p1', 's2')
+    useExtensionRegistry.getState().setActiveGlobalTab('core.home')
+    const { container } = renderSidebar()
+    expandMain(container)
+    expect(container.querySelectorAll('[aria-current="true"]')).toHaveLength(0)
   })
 })
 

@@ -20,7 +20,6 @@ import {
 } from '../../sidebar/collapse-state'
 import { useDragReorder, type DragItemProps } from '../../hooks/useDragReorder'
 import { useWorkspaceStore } from '../../stores/workspace.store'
-import { useSessionStore } from '../../stores/session.store'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useChangeStatsStore } from '../../stores/change-stats.store'
 import { openFolderInEditor, type BranchActions } from './branch-actions'
@@ -32,6 +31,12 @@ import { laneOf } from '../../sidebar/task-groups'
 import { RepoHeader } from './RepoHeader'
 import { BranchRow } from './BranchRow'
 import { TerminalRow } from './TerminalRow'
+import { useShownInMain } from './useShownInMain'
+import {
+  branchStandsForShown,
+  listedSessionIds,
+  repoStandsForShown,
+} from '../../sidebar/shown-in-main'
 
 /** Which repos and branch terminal lists are folded away, remembered across launches. */
 export function useSidebarCollapse() {
@@ -112,10 +117,13 @@ function RepoSection({ group, drag, ctx }: RepoSectionProps): JSX.Element {
   const workspace = ctx.data.workspaceById.get(group.workspaceId)
   const collapsed = ctx.collapse.isCollapsed(ctx.groupBy, group.workspaceId)
   const active = useWorkspaceStore((s) => s.activeWorkspaceId === group.workspaceId)
+  const branchIds = group.branches.map((branch) => branch.projectId)
+  const selected = repoStandsForShown(useShownInMain(), collapsed, branchIds)
   return (
     <>
       <RepoHeader
         group={group}
+        selected={selected}
         pathLabel={abbreviatePath(group.folderPath, ctx.homeDir)}
         dragProps={drag?.props}
         dragOver={drag?.over ?? false}
@@ -193,10 +201,13 @@ interface BranchEntryProps {
 export function BranchEntry({ row, workspace, drag, ctx }: BranchEntryProps): JSX.Element {
   const { projectId } = row
   const expanded = ctx.collapse.terminalsExpanded(projectId)
+  const listed = expanded ? listedSessionIds(row.terminals) : []
+  const selected = branchStandsForShown(useShownInMain(), projectId, listed)
   return (
     <>
       <BranchRow
         {...useBranchRowProps(row, workspace, ctx)}
+        selected={selected}
         dragProps={drag.props}
         dragOver={drag.over}
         expanded={expanded}
@@ -210,7 +221,7 @@ export function BranchEntry({ row, workspace, drag, ctx }: BranchEntryProps): JS
   )
 }
 
-/** What a branch row shows (its key, change counts, selection) and what it does. */
+/** What a branch row shows (its key and change counts) and what it does. */
 function useBranchRowProps(row: BranchRowData, workspace: Workspace | undefined, ctx: RowContext) {
   const { projectId } = row
   const project = ctx.data.projectById.get(projectId)
@@ -222,7 +233,6 @@ function useBranchRowProps(row: BranchRowData, workspace: Workspace | undefined,
   const issueKey = useIntegrationsStore((s) => s.linkFor(projectId)?.key ?? null)
   return {
     row,
-    selected: useWorkspaceStore((s) => s.activeProjectId === projectId),
     colour: workspace?.color,
     now: ctx.clock,
     issueKey,
@@ -290,7 +300,7 @@ interface TerminalEntriesProps {
 }
 
 function TerminalEntries({ projectId, terminals, ctx }: TerminalEntriesProps): JSX.Element {
-  const shown = useSessionStore((s) => s.projectViews.get(projectId)?.activeSessionId ?? null)
+  const shown = useShownInMain()?.sessionId ?? null
   const entry = (terminal: BranchTerminal, nested: boolean): JSX.Element => (
     <TerminalRow
       key={terminal.sessionId}

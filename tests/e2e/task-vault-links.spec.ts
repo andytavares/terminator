@@ -70,7 +70,8 @@ async function linkTaskToTerminal(): Promise<void> {
 
 /** Jumping from the task brings its terminal forward. */
 async function jumpToTerminal(): Promise<void> {
-  await expect(projectGroup(handle.page, 'beta')).toHaveClass(/branch-row--selected/)
+  // The vault covers the main area, so no branch is on screen and none is marked.
+  await expect(handle.page.locator('.branch-row--selected')).toHaveCount(0)
   await pressRowAction(
     dailyLogTaskRow(vault, 'Deploy the fix').getByRole('button', {
       name: 'Jump to linked terminal',
