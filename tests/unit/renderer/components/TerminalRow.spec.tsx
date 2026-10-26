@@ -143,7 +143,7 @@ describe('TerminalRow — work item — offers change and remove when the sessio
   it('draws no menu at all when nothing can link', () => {
     const { container } = renderRow()
     fireEvent.contextMenu(container.querySelector('.terminal-row')!)
-    expect(container.querySelector('.ctx-menu')).toBeNull()
+    expect(document.querySelector('.ctx-menu')).toBeNull()
   })
 })
 
@@ -152,9 +152,9 @@ describe('TerminalRow — work item — dismissing the menu', () => {
     const onLinkIssue = vi.fn()
     const { container } = renderRow({}, { onLinkIssue })
     fireEvent.contextMenu(container.querySelector('.terminal-row')!)
-    expect(container.querySelector('.ctx-menu')).toBeTruthy()
+    expect(document.querySelector('.ctx-menu')).toBeTruthy()
     fireEvent.click(document.body)
-    expect(container.querySelector('.ctx-menu')).toBeNull()
+    expect(document.querySelector('.ctx-menu')).toBeNull()
     expect(onLinkIssue).not.toHaveBeenCalled()
   })
 })
