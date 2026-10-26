@@ -28,7 +28,7 @@
     "@lezer/markdown": "1.8.0",
     "@terminator/extension-sdk": "5.1.0",
     "@terminator/extension-ui": "1.0.0",
-    "js-yaml": "4.3.2",
+    "js-yaml": "5.4.3",
     "lucide-react": "1.21.0",
     "mermaid": "12.2.0",
     "react": "18.3.1",
