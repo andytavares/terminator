@@ -279,6 +279,8 @@ export interface RunAgentReviewDeps {
   runOnce: AgentsAPI['runOnce']
   /** The core's `api.agents.cancel`: what stops a session a cancelled run started. */
   cancelSession?: AgentsAPI['cancel']
+  /** The run's agent session exists, so its conversation can be opened while it runs. */
+  onSession?: (sessionId: string) => void
   exec?: ExecFn
 }
 
@@ -312,7 +314,8 @@ interface RunControl {
   started: (sessionId: string) => void
 }
 
-function newRunControl(stopSession: (sessionId: string) => void = () => {}): RunControl {
+function newRunControl({ cancelSession, onSession }: RunAgentReviewDeps): RunControl {
+  const stopSession = (id: string) => cancelSession?.(id)
   let settle: () => void = () => {}
   let sessionId: string | null = null
   const whenCancelled = new Promise<AgentExit>((resolve) => {
@@ -328,6 +331,7 @@ function newRunControl(stopSession: (sessionId: string) => void = () => {}): Run
     },
     started: (id) => {
       sessionId = id
+      onSession?.(id)
       if (control.cancelled) stopSession(id)
     },
   }
@@ -498,7 +502,7 @@ export function runAgentReview(
 ): RunAgentReviewResult {
   const runId = randomUUID()
   const run: RunContext = { input, runId, startedAt: new Date().toISOString(), activity: [] }
-  const control = newRunControl(deps.cancelSession)
+  const control = newRunControl(deps)
   return { runId, done: executeAgentRun(run, deps, control), cancel: control.cancel }
 }
 
@@ -587,7 +591,7 @@ function summaryFromExit(exit: AgentExit): SummaryResult {
 
 /** Summarizes a PR's description or discussion with the review agent, read-only. */
 export function runSummary(input: RunSummaryInput, deps: RunAgentReviewDeps): RunSummaryResult {
-  const control = newRunControl(deps.cancelSession)
+  const control = newRunControl(deps)
   const { cwd, model, effort, timeoutMs } = input
   const prompt = withJsonReplyRule(buildSummaryPrompt(input), summaryJsonSchema())
   return {

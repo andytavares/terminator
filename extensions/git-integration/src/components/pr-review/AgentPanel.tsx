@@ -369,6 +369,9 @@ function RunningPhase({ run, label }: { run: AgentRun; label: string }) {
         <Button size="sm" onClick={() => void reviewAgentAPI.cancel(run.id)}>
           Cancel
         </Button>
+        <Button size="sm" onClick={() => void reviewAgentAPI.openTerminal(run.id)}>
+          Continue in agent tab
+        </Button>
       </div>
     </div>
   )

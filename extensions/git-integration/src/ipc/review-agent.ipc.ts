@@ -179,10 +179,12 @@ async function finishAgentRun(ctx: AgentContext, slot: RunSlot, finished: AgentR
 }
 
 /** `runOnce` bound to the service, which keeps state a bare method reference would lose. */
-function agentDepsOf(ctx: AgentContext): RunAgentReviewDeps {
+function agentDepsOf(ctx: AgentContext, slot?: RunSlot): RunAgentReviewDeps {
   return {
     runOnce: (input) => ctx.deps.agents.runOnce(input),
     cancelSession: (sessionId) => ctx.deps.agents.cancel(sessionId),
+    // A running review's conversation opens in an agent tab before it replies.
+    onSession: slot && ((sessionId) => void upsertRun(slot.head, { ...slot.run, sessionId })),
   }
 }
 
@@ -195,7 +197,7 @@ async function runAgentToEnd(ctx: AgentContext, input: StartInput, slot: RunSlot
     const { model: _requested, ...review } = input
     const { cancel, done } = ctx.runReview(
       { ...review, question: input.question ?? null, worktreePath, model, effort, timeoutMs },
-      agentDepsOf(ctx)
+      agentDepsOf(ctx, slot)
     )
     ctx.liveRuns.set(run.id, cancel)
     await finishAgentRun(ctx, slot, await done)

@@ -398,6 +398,25 @@ describe('review-agent IPC — review-agent:open-terminal refuses a run it canno
   })
 })
 
+describe('review-agent IPC — a running review continues in an agent tab', () => {
+  it('stores the session the run started, so open-terminal resumes it while it runs', async () => {
+    const runReview = vi.fn<RunReview>(() => ({
+      runId: 'x',
+      done: new Promise(() => {}),
+      cancel() {},
+    }))
+    const ensureWorktree = vi.fn(async () => '/wt/pr-1-sha1')
+    const { handlers, start } = captureAgentHandlers({ runReview, ensureWorktree })
+    const { run } = (await handlers['review-agent:start'](startPayload())) as { run: AgentRun }
+    await eventually(() => expect(runReview).toHaveBeenCalled())
+    runReview.mock.calls[0][1]?.onSession?.('sess-live')
+    await eventually(async () =>
+      expect(await handlers['review-agent:open-terminal']({ runId: run.id })).toEqual({ ok: true })
+    )
+    expect(start).toHaveBeenCalledWith(expect.objectContaining({ resume: 'sess-live' }))
+  })
+})
+
 describe('review-agent IPC — runs ask the core agent service', () => {
   it('hands the review run the service runOnce and starts it without a session id', async () => {
     const runReview = vi.fn<RunReview>(() => ({

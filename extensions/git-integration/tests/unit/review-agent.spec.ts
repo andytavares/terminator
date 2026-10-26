@@ -363,6 +363,19 @@ describe('runAgentReview — cancelling the agent session', () => {
   })
 })
 
+describe('runAgentReview — a running session', () => {
+  it('is named to the caller as soon as the agent starts', async () => {
+    const exec = vi.fn(async () => ({ stdout: 'diff' }))
+    const onSession = vi.fn()
+    const runOnce = vi.fn<RunOnce>(async (input) => {
+      input.onStarted?.('acp-9')
+      return NEVER_REPLIES
+    })
+    runAgentReview(baseInput, { exec, runOnce, onSession })
+    await eventually(() => expect(onSession).toHaveBeenCalledWith('acp-9'))
+  })
+})
+
 describe('runAgentReview — cancelling before the agent', () => {
   it('does not ask the agent when cancelled while the diff is computed', async () => {
     let diffPrinted: (out: { stdout: string }) => void = () => {}
