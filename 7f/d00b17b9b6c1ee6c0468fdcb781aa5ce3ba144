@@ -1,0 +1,25 @@
+docs/CONTRIBUTING.md
+  s_4442da545bd38a::t_1a40ade30d4e22 50-51
+README.md
+  s_4442da545bd38a::t_1a40ade30d4e22 130-131
+docs/adr/128-the-app-updates-itself-from-github-releases.md
+  s_4442da545bd38a::t_1a40ade30d4e22 1-28
+docs/ARCHITECTURE.md
+  s_4442da545bd38a::t_6959110436329a 92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7fd00b17b9b6c1ee6c0468fdcb781aa5ce3ba144",
+  "prompts": {},
+  "sessions": {
+    "s_4442da545bd38a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d287f4c8-4059-43c7-8a40-e53bdb0bc217",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
