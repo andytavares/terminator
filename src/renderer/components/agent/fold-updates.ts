@@ -1,8 +1,8 @@
 import type { AgentUpdate } from '@terminator/extension-sdk'
 
-export type MessageRole = 'agent' | 'thought' | 'user'
+type MessageRole = 'agent' | 'thought' | 'user'
 
-export type ToolOutput =
+type ToolOutput =
   | { kind: 'diff'; path: string; oldText: string; newText: string }
   | { kind: 'text'; text: string }
 
@@ -17,9 +17,9 @@ export type ToolEntry = {
   output: ToolOutput[]
 }
 
-export type TranscriptEntry = { kind: 'message'; role: MessageRole; text: string } | ToolEntry
+type TranscriptEntry = { kind: 'message'; role: MessageRole; text: string } | ToolEntry
 
-export interface PlanItem {
+interface PlanItem {
   content: string
   status: string
   priority: string
