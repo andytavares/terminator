@@ -56,6 +56,7 @@ export function TerminalRow(props: TerminalRowProps): JSX.Element {
       }`}
       role="button"
       tabIndex={0}
+      aria-current={selected ? 'true' : undefined}
       onClick={onSelect}
       onKeyDown={activateOnKey(onSelect)}
       onContextMenu={openMenu}

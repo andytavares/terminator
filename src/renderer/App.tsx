@@ -35,11 +35,12 @@ import {
   useSelectionEffects,
 } from './shell/bootstrap'
 import { MainArea } from './shell/MainArea'
+import { useShownInMain } from './components/sidebar/useShownInMain'
 import { useSidebarVisibility } from './shell/useSidebarVisibility'
 import { ShellOverlays } from './shell/ShellOverlays'
 
 export function App(): JSX.Element {
-  const { windows, palette, launch, note, scratchActive, quickActions } = useShellParts()
+  const { windows, palette, launch, note, quickActions } = useShellParts()
   const showMetricsBar = useMetricsBar()
   return (
     <ErrorBoundary>
@@ -48,11 +49,7 @@ export function App(): JSX.Element {
           {/* App-level destinations own the window's left edge, full height, so
               they stay put whether or not the sidebar is showing. */}
           <ShellBand onOpenQuickActions={palette.open} />
-          <ShellSidebar
-            visible={windows.sidebarVisible}
-            scratchActive={scratchActive}
-            onNewScratch={launch.newScratch}
-          />
+          <ShellSidebar visible={windows.sidebarVisible} onNewScratch={launch.newScratch} />
           <MainArea
             onNewTab={launch.newTab}
             onOpenQuickActions={palette.open}
@@ -82,7 +79,7 @@ function useShellParts() {
   const quickActions = palette.isOpen
     ? { ...palette.host, surfaces, activateSurface: showSurface, shell }
     : null
-  return { windows, palette, launch, note, scratchActive, quickActions }
+  return { windows, palette, launch, note, quickActions }
 }
 
 /** Whether the metrics bar is on, polling system metrics while it is. */
@@ -272,24 +269,22 @@ function ShellBand({ onOpenQuickActions }: { onOpenQuickActions: () => void }): 
 
 interface ShellSidebarProps {
   visible: boolean
-  scratchActive: boolean
   onNewScratch: () => void
 }
 
 /** The sidebar, wired to the registry's tabs and the scratch view. */
-function ShellSidebar({ visible, scratchActive, onNewScratch }: ShellSidebarProps): JSX.Element {
+function ShellSidebar({ visible, onNewScratch }: ShellSidebarProps): JSX.Element {
   const activeWorkspaceTabId = useExtensionRegistry((s) => s.activeWorkspaceTabId)
   // No `sessions` here: they change every second while a terminal prints.
-  const activeScratchSessionId = useSessionStore(
-    (s) => s.projectViews.get(SCRATCH_PROJECT_ID)?.activeSessionId ?? null
-  )
+  const shown = useShownInMain()
+  const activeScratchSessionId = shown?.projectId === SCRATCH_PROJECT_ID ? shown.sessionId : null
   return (
     <UnifiedSidebar
       activeWorkspaceTabId={activeWorkspaceTabId}
       onSelectWorkspaceTab={selectWorkspaceTab}
       onSelectProject={clearSurfaceTabs}
       onNewScratch={onNewScratch}
-      activeScratchSessionId={scratchActive ? activeScratchSessionId : null}
+      activeScratchSessionId={activeScratchSessionId}
       onSelectScratchSession={(sessionId) => revealSession(sessionId)}
       visible={visible}
     />
