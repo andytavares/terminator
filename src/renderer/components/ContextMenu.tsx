@@ -31,7 +31,7 @@ export function closeAllContextMenus(): void {
 export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps): JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
   // Before paint, so a menu opened near an edge never flashes half off screen.
-  useLayoutEffect(() => keepOnScreen(ref.current), [x, y])
+  useLayoutEffect(() => keepOnScreen(ref.current), [x, y, items])
   useEffect(() => {
     const dismiss = (): void => onDismiss()
     window.addEventListener('click', dismiss)
@@ -47,7 +47,9 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps): JSX.E
       ref={ref}
       className="ctx-menu"
       style={{ left: x, top: y }}
+      // The portal still bubbles through the React tree: the row behind must not act too.
       onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
     >
       <MenuItems items={items} />
     </div>,

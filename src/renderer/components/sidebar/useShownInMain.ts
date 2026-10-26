@@ -15,11 +15,15 @@ export function useShownInMain(): ShownInMain | null {
   const { scratchActive, activeProjectId } = useWorkspaceStore(
     useShallow((s) => ({ scratchActive: s.scratchActive, activeProjectId: s.activeProjectId }))
   )
-  const projectViews = useSessionStore((s) => s.projectViews)
-  return shownInMain({
-    ...tabs,
-    scratchActive,
-    activeProjectId,
-    activeSessionOf: (projectId) => projectViews.get(projectId)?.activeSessionId ?? null,
-  })
+  // Selects the result, not the map: every row calls this, and the map changes on any terminal.
+  return useSessionStore(
+    useShallow((s) =>
+      shownInMain({
+        ...tabs,
+        scratchActive,
+        activeProjectId,
+        activeSessionOf: (projectId) => s.projectViews.get(projectId)?.activeSessionId ?? null,
+      })
+    )
+  )
 }

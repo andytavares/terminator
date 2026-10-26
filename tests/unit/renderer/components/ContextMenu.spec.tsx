@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { ContextMenu, closeAllContextMenus } from '../../../../src/renderer/components/ContextMenu'
 
@@ -14,6 +14,12 @@ const items = [
 beforeEach(() => {
   vi.clearAllMocks()
   onDismiss = vi.fn()
+})
+
+// Here, not in a test body: a failed expect would otherwise leave the window size stubbed.
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 
 describe('ContextMenu', () => {
@@ -113,7 +119,63 @@ describe('ContextMenu — stays on screen', () => {
     const menu = document.querySelector('.ctx-menu') as HTMLElement
     expect(menu.style.marginLeft).toBe('-124px')
     expect(menu.style.marginTop).toBe('-100px')
-    vi.unstubAllGlobals()
-    vi.restoreAllMocks()
+  })
+})
+
+/** A 160×120 menu box whose top-left corner sits at `left`, `top`. */
+const menuBox = (left: number, top: number) => ({
+  left,
+  top,
+  right: left + 160,
+  bottom: top + 120,
+  width: 160,
+  height: 120,
+  x: left,
+  y: top,
+  toJSON: () => ({}),
+})
+
+describe('ContextMenu — moved while open', () => {
+  it('drops an earlier nudge once the new position fits', () => {
+    const measure = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue(menuBox(980, 740))
+    vi.stubGlobal('innerWidth', 1024)
+    vi.stubGlobal('innerHeight', 768)
+    const { rerender } = render(<ContextMenu x={980} y={740} items={items} onDismiss={onDismiss} />)
+    measure.mockReturnValue(menuBox(100, 100))
+    rerender(<ContextMenu x={100} y={100} items={items} onDismiss={onDismiss} />)
+    const menu = document.querySelector('.ctx-menu') as HTMLElement
+    expect(menu.style.marginLeft).toBe('')
+    expect(menu.style.marginTop).toBe('')
+  })
+})
+
+describe('ContextMenu — an item changed while open', () => {
+  it('measures again, so a wider label cannot run past the edge', () => {
+    const measure = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue(menuBox(800, 100))
+    vi.stubGlobal('innerWidth', 1024)
+    vi.stubGlobal('innerHeight', 768)
+    const { rerender } = render(<ContextMenu x={800} y={100} items={items} onDismiss={onDismiss} />)
+    measure.mockReturnValue({ ...menuBox(800, 100), right: 1100, width: 300 })
+    const longer = [...items, { label: 'Open AUTH-1234 in Linear', onSelect: vi.fn() }]
+    rerender(<ContextMenu x={800} y={100} items={longer} onDismiss={onDismiss} />)
+    const menu = document.querySelector('.ctx-menu') as HTMLElement
+    expect(menu.style.marginLeft).toBe('-84px')
+  })
+})
+
+describe('ContextMenu — keys stay in the menu', () => {
+  it('does not hand Enter on an item to the row that opened it', () => {
+    const rowKeyDown = vi.fn()
+    render(
+      <div onKeyDown={rowKeyDown}>
+        <ContextMenu x={0} y={0} items={items} onDismiss={onDismiss} />
+      </div>
+    )
+    fireEvent.keyDown(screen.getByText('Rename'), { key: 'Enter' })
+    expect(rowKeyDown).not.toHaveBeenCalled()
   })
 })

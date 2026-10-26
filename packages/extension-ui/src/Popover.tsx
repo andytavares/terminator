@@ -56,6 +56,9 @@ export function Popover({ label, children, onDismiss, className }: PopoverProps)
  * depends on the rendered width, which nothing knows in advance. */
 export function keepOnScreen(el: HTMLElement | null): void {
   if (!el) return
+  // Measure from the anchor: a nudge left from an earlier position would skew the box.
+  el.style.marginLeft = ''
+  el.style.marginTop = ''
   const margin = 8
   const box = el.getBoundingClientRect()
   const overflowRight = box.right - (window.innerWidth - margin)
