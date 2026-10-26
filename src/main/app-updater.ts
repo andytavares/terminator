@@ -7,6 +7,9 @@ import { notificationManager } from './notifications/notification-manager'
 /** Releases come about once a day and the app stays open for days. */
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
 
+/** Each later check finds the cached download and emits `update-downloaded` again. */
+let announcedVersion: string | null = null
+
 /** Checks GitHub Releases at launch and every four hours; an update installs on quit (ADR 128).
  * A click on the notification runs `revealApp`, never a restart, which closes every terminal. */
 export function startAppUpdates(revealApp: () => void): void {
@@ -17,13 +20,18 @@ export function startAppUpdates(revealApp: () => void): void {
   autoUpdater.on('update-downloaded', ({ version }) => announceUpdate(version, revealApp))
   const checkInBackground = (): void => {
     // The 'error' listener above logs it; a background check never interrupts anyone.
-    autoUpdater.checkForUpdates().catch(() => {})
+    autoUpdater
+      .checkForUpdates()
+      .then((result) => result?.downloadPromise)
+      .catch(() => {})
   }
   checkInBackground()
   setInterval(checkInBackground, CHECK_INTERVAL_MS).unref()
 }
 
 function announceUpdate(version: string, revealApp: () => void): void {
+  if (version === announcedVersion) return
+  announcedVersion = version
   notificationManager.create({
     key: 'updateReady',
     type: 'info',
@@ -45,7 +53,11 @@ export async function checkForUpdatesNow(): Promise<void> {
   if (!app.isPackaged) return
   try {
     const result = await electronUpdater.autoUpdater.checkForUpdates()
-    if (result?.isUpdateAvailable) return
+    // A download that fails after the check found an update only emits 'error'.
+    if (result?.isUpdateAvailable) {
+      await result.downloadPromise
+      return
+    }
     notificationManager.create({
       key: 'updateNotFound',
       type: 'info',

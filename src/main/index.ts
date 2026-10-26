@@ -1,7 +1,7 @@
 import './claim-profile.js'
 import { onChannel } from './ipc/channel-registrar.js'
 import { registerAppInfoHandlers, registerDialogHandlers } from './ipc/app.ipc.js'
-import { app, BrowserWindow, dialog, Menu, shell, session, protocol } from 'electron'
+import { app, autoUpdater, BrowserWindow, dialog, Menu, shell, session, protocol } from 'electron'
 import { enterBackgroundMode, revealWindow, newWindow } from './background-mode.js'
 import { checkForUpdatesNow, startAppUpdates } from './app-updater.js'
 import { announceWindowReadiness, exposeReadinessToTests } from './e2e-readiness.js'
@@ -577,6 +577,12 @@ app.on('before-quit', async (event) => {
   // Last, so what the steps above logged reaches the file before the process ends.
   await flushLogs()
   app.exit(0)
+})
+
+// quitAndInstall() closes the windows before before-quit fires; the close handler would hide them
+// instead and the update would never install.
+autoUpdater.on('before-quit-for-update', () => {
+  isQuitting = true
 })
 
 app.on('window-all-closed', () => {

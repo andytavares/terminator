@@ -119,6 +119,15 @@ describe('the Update ready notification', () => {
     notificationManager.triggerAction(ready.id, 'restart')
     expect(fake.installs).toBe(1)
   })
+
+  it('announces a version once, though every later check downloads it again', () => {
+    startAppUpdates(reveal)
+    fake.emit('update-downloaded', { version: '0.1.170' })
+    fake.emit('update-downloaded', { version: '0.1.170' })
+    expect(notificationsWithTitle('Update ready')).toHaveLength(1)
+    fake.emit('update-downloaded', { version: '0.1.171' })
+    expect(notificationsWithTitle('Update ready')).toHaveLength(2)
+  })
 })
 
 describe('checkForUpdatesNow', () => {
@@ -150,5 +159,18 @@ describe('checkForUpdatesNow', () => {
     await checkForUpdatesNow()
     expect(fake.checks).toBe(0)
     expect(notificationManager.list()).toEqual([])
+  })
+})
+
+describe('checkForUpdatesNow with an update found', () => {
+  it('reports a download that fails after the check found an update', async () => {
+    fake.nextCheck = () =>
+      Promise.resolve({
+        isUpdateAvailable: true,
+        downloadPromise: Promise.reject(new Error('sha512 checksum mismatch')),
+      })
+    startAppUpdates(reveal)
+    await checkForUpdatesNow()
+    expect(notificationsWithTitle('Could not check for updates')).toHaveLength(1)
   })
 })
