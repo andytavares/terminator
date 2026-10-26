@@ -1,0 +1,31 @@
+src/renderer/components/settings/GlobalSettings.tsx
+  s_4442da545bd38a::t_b5b69403c76043 31-33
+package.json
+  s_4442da545bd38a::t_ce55b22c133b66 75
+tests/unit/main/app-updater.spec.ts
+  s_4442da545bd38a::t_f62700cce25357 93-102
+  s_4442da545bd38a::t_08da4a6725d36d 1-92,103-154
+src/main/index.ts
+  s_4442da545bd38a::t_b5b69403c76043 6,248,543
+src/main/app-updater.ts
+  s_4442da545bd38a::t_c2ff2fb687b014 1-9,12-63
+  s_4442da545bd38a::t_f00de7a9ebb268 10-11
+package-lock.json
+  s_4442da545bd38a::t_25bad5b16f52e1 24,7917-7944,11609-11621,15663-15668
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "314678eb98b2225684513e0eaac10ca19fc00d65",
+  "prompts": {},
+  "sessions": {
+    "s_4442da545bd38a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d287f4c8-4059-43c7-8a40-e53bdb0bc217",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
