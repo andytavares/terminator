@@ -1,0 +1,45 @@
+src/renderer/components/agent/AgentView.tsx
+  s_a80af929ba8425::t_0c7390ead729c2 11,146-148
+src/main/agents/acp/agent-service.ts
+  s_a80af929ba8425::t_0c7390ead729c2 43,128
+  s_a80af929ba8425::t_debc83df909f09 55
+src/renderer/components/QuickActionsHost.tsx
+  s_a80af929ba8425::t_07d655d27aeca1 16
+  s_a80af929ba8425::t_5caf2617c9e6a6 121-130,141
+extensions/foundry/src/state/model-catalog.ts
+  s_a80af929ba8425::t_f4c63900f6395f 10-12
+src/renderer/components/terminal/TerminalPane.tsx
+  s_a80af929ba8425::t_5caf2617c9e6a6 155,157,174-175
+src/renderer/components/settings/AgentsSettings.tsx
+  s_a80af929ba8425::t_e0867db13af0de 4
+src/renderer/components/home/start-work.ts
+  s_a80af929ba8425::t_0c7390ead729c2 136
+  s_a80af929ba8425::t_debc83df909f09 138-139
+knip.jsonc
+  s_a80af929ba8425::t_0c7390ead729c2 29-30,43-49
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_a80af929ba8425::t_f4c63900f6395f 27-29
+src/main/agents/acp/record-agent-tab.ts
+  s_a80af929ba8425::t_debc83df909f09 25,31
+  s_a80af929ba8425::t_f4c63900f6395f 24
+src/shared/session-records/retention.ts
+  s_a80af929ba8425::t_96b4f09c5e3503 3
+src/renderer/components/settings/QuickActionsSettings.tsx
+  s_a80af929ba8425::t_e0867db13af0de 207
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "af00ad6ab1d41d23c6b93e7d93a0d1958951fd1b",
+  "prompts": {},
+  "sessions": {
+    "s_a80af929ba8425": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4966b7a9-21f0-4823-b753-f496f1c5df05",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
