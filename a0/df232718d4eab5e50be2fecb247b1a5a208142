@@ -1,0 +1,76 @@
+extensions/foundry/tests/components/forge-moves.spec.tsx
+  s_a80af929ba8425::t_53559300d80ecf 142
+extensions/foundry/tests/runtime/agent-policy.spec.ts
+  s_a80af929ba8425::t_52deb0afdf12c6 1,3
+extensions/foundry/src/renderer/attach-to-step.ts
+  s_a80af929ba8425::t_2626a176071490 16
+extensions/foundry/src/runtime/claude-launch.ts
+  s_a80af929ba8425::t_cdf7cb8236b84a 33
+  s_a80af929ba8425::t_3601e7fabf6590 7-9,11-15,122,132-133,140,147-150,155,160
+extensions/foundry/src/line/node-session.ts
+  s_a80af929ba8425::t_4b2515c1345285 13
+extensions/foundry/src/components/factory/FactoryHall.tsx
+  s_a80af929ba8425::t_2626a176071490 704,1144,1425
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_a80af929ba8425::t_28c90dde4c53de 1015
+  s_a80af929ba8425::t_53559300d80ecf 571,993,999-1000,1466,1872
+extensions/foundry/src/forge/intake-turn.ts
+  s_a80af929ba8425::t_52deb0afdf12c6 159
+  s_a80af929ba8425::t_4b2515c1345285 25
+extensions/foundry/src/state/model-catalog.ts
+  s_a80af929ba8425::t_65448aaff87c71 1-2,12-17,21,36,52,54-56,58,60-63,74-75,77-78
+extensions/foundry/tests/components/factory/StationMonitor.spec.tsx
+  s_a80af929ba8425::t_53559300d80ecf 164-165
+extensions/foundry/CLAUDE.md
+  s_a80af929ba8425::t_ac67bb206feb42 33
+extensions/foundry/tests/order/standing.spec.ts
+  s_a80af929ba8425::t_63837af360916d 247
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_a80af929ba8425::t_53559300d80ecf 465
+extensions/foundry/tests/components/factory/hall-moves.spec.tsx
+  s_a80af929ba8425::t_53559300d80ecf 107-108
+extensions/foundry/SUPERVISION.md
+  s_a80af929ba8425::t_03ef4d1e8c0be1 287-325
+  s_a80af929ba8425::t_ac67bb206feb42 64,79,110,331,596,602-608,626,657,750,848
+extensions/foundry/tests/state/model-catalog.spec.ts
+  s_a80af929ba8425::t_65448aaff87c71 2-3,6-13,17-19,22,26-29,32,34,36,38,40-42,46,53-55,58-59,62-68,70
+  s_a80af929ba8425::t_28c90dde4c53de 47-49
+extensions/foundry/src/components/Forge.tsx
+  s_a80af929ba8425::t_2626a176071490 296
+extensions/foundry/src/components/Floor.tsx
+  s_a80af929ba8425::t_2626a176071490 291,785,942,945
+extensions/foundry/tests/runtime/claude-launch.spec.ts
+  s_a80af929ba8425::t_fe28fed28b8860 8,26,75,132-136,164-168,170,173-174,179,182-187
+extensions/foundry/src/order/standing.ts
+  s_a80af929ba8425::t_28c90dde4c53de 357
+  s_a80af929ba8425::t_2626a176071490 330,358
+  s_a80af929ba8425::t_210d226557e1ec 356
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_a80af929ba8425::t_8be75ea75d2d98 140,567-568,571
+  s_a80af929ba8425::t_cdf7cb8236b84a 6,16,29-33,36,38,68,70,73,83,85-87,93,95-96,107,171,204-205
+  s_a80af929ba8425::t_52deb0afdf12c6 352-354,416-435,439,445-446,454
+  s_a80af929ba8425::t_2a7dc27bba19a6 4,332,337,344-347,349-351,355-358,363,368-371,374,377,436,438,440-442,448-453,455,461-462,464,469-478,480-499,503,507,509-513,517,522-524,538,582-585,597,601-602,605-611,622
+extensions/foundry/tests/runtime/supervised-runner.spec.ts
+  s_a80af929ba8425::t_a5fabda499bbdb 28-29,142
+  s_a80af929ba8425::t_721105a2e124cf 1,8,12-17,20-22,35-43,55-59,61-79,81-86,91-92,146-152,160-164,166-174,178,184-226,232,236,238,240,242,244,246-266,269-272,276-277,279,282-284,288-296,300-303,305-317,324-325,328-331,335-336,339-340,343,348-349,352-353,355-356,363-364,366-367,371,374,379,383,385-387,390,393-394,396-399,401,403-405,407-411,415-417,420-423,426-427,429-433,437-439,441-443,447,449-452,456-464,470,473-475,480-481,485-494,497-502,505-508,512-519,523-528,532-541,544-549,553-562,565-570,574-583,586-592
+extensions/foundry/src/ipc/model-registration.ts
+  s_a80af929ba8425::t_65448aaff87c71 25
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_a80af929ba8425::t_53559300d80ecf 1539
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a0df232718d4eab5e50be2fecb247b1a5a208142",
+  "prompts": {},
+  "sessions": {
+    "s_a80af929ba8425": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4966b7a9-21f0-4823-b753-f496f1c5df05",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
