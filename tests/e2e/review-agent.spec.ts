@@ -190,9 +190,9 @@ async function aRunningReviewIsCancelled(): Promise<void> {
   await expect(panel(view)).not.toContainText('Reviewing')
 }
 
-/** A finished review's conversation continues in an agent tab of the repository's project. */
-async function aFinishedReviewContinuesInAnAgentTab(): Promise<void> {
-  const view = await askReviewAgent()
+/** A finding's follow-up continues the review's conversation in an agent tab of the project. */
+async function aFindingsFollowUpContinuesInAnAgentTab(): Promise<void> {
+  const view = await aFinishedReviewListsItsFinding()
   await panel(view).getByRole('button', { name: 'Ask follow-up' }).click()
   await handle.page.locator('.branch-row').first().click()
   const tab = handle.page.locator('.tab-bar__tab').filter({ hasText: 'Review #1' })
@@ -226,9 +226,9 @@ test('the review agent runs on a pull request, keeps a dismissed finding dismiss
   await runSteps([
     ['a running review can be cancelled', aRunningReviewIsCancelled],
     [
-      'a finished review lists its finding, and a dismissed finding stays dismissed',
-      aDismissedFindingStaysDismissed,
+      'a finished review lists its finding, whose follow-up continues in an agent tab',
+      aFindingsFollowUpContinuesInAnAgentTab,
     ],
-    ['a finished review continues in an agent tab', aFinishedReviewContinuesInAnAgentTab],
+    ['a dismissed finding stays dismissed', aDismissedFindingStaysDismissed],
   ])
 })
