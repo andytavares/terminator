@@ -1,0 +1,26 @@
+tests/unit/main/app-updater.spec.ts
+  s_4442da545bd38a::t_10cb8430a1823a 71
+  s_4442da545bd38a::t_12b1b39c49494b 178-189
+src/main/app-updater.ts
+  s_4442da545bd38a::t_10cb8430a1823a 4,11-13,20,57
+docs/ARCHITECTURE.md
+  s_4442da545bd38a::t_040cce167cda53 92
+docs/adr/128-the-app-updates-itself-from-github-releases.md
+  s_4442da545bd38a::t_731e7e887f34bf 13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0f50f61a75cb4709c6327f114cadaa2de8f14d0e",
+  "prompts": {},
+  "sessions": {
+    "s_4442da545bd38a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d287f4c8-4059-43c7-8a40-e53bdb0bc217",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
