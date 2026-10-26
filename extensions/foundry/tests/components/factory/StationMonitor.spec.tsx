@@ -161,8 +161,8 @@ function ledAndAlertsTests() {
 
 function refusalsAndNoCarrierTests() {
   it('shows an attach refusal on the screen as an alert line', () => {
-    mount({ attachProblem: 'That agent is no longer in a terminal.' })
-    const problem = screen.getByText('That agent is no longer in a terminal.')
+    mount({ attachProblem: 'That agent is no longer in an agent tab.' })
+    const problem = screen.getByText('That agent is no longer in an agent tab.')
     expect(problem.className).toContain('fdry-crt__alert')
     expect(problem.className).toContain('fdry-problem')
   })

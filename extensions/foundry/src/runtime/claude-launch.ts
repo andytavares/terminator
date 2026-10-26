@@ -4,42 +4,18 @@ import { isAbsolute, join } from 'path'
 import { homedir } from 'os'
 import { existsSync, realpathSync } from 'fs'
 
-// What to type into the terminal to start an agent, and the settings that make
-// it answerable from the console.
-//
-// The session id is minted here rather than read back from the runtime. That
-// single decision removes the worst failure this feature has had: with the
-// runtime choosing, every event it reported arrived keyed to an id the console
-// had never registered, and the whole lot was silently discarded — a session
-// that sat `working` for half an hour with no turns, no tool activity and
-// nothing to show. Now the id is ours before the process exists, so the
-// transcript path is known up front and a hook callback needs no correlation.
+// The settings that make an agent answerable from the console, and where its
+// transcript is. The agent itself is started over ACP (`api.agents`), which
+// chooses the session id; the hook is keyed by a run id minted here instead.
 
-export interface LaunchSpec {
-  /** The claude session id, which is also ours. `--resume` takes this. */
-  readonly sessionId: string
-  /** Where the agent runs: the provisioned working copy. */
-  readonly cwd: string
-  /** Typed into the terminal. Newline is added by whoever sends it. */
-  readonly command: string
-  /** Written for us; the runtime reads it via --settings. */
-  readonly settingsPath: string
-  /** Where the runtime will write its durable record, derivable before it exists. */
-  readonly transcriptPath: string
-}
-
-export interface LaunchSpecOptions {
-  sessionId: string
-  cwd: string
-  /** Lane tasks and artefact paths, composed upstream (FR-039). */
-  prompt: string
-  /** Written here, one file per session. */
+/** What one run's settings file needs. */
+export interface RunSettingsOptions {
+  /** Names the file and is the hook script's session argument. */
+  runId: string
+  /** Written here, one file per run. */
   settingsDirectory: string
-  /** Continuing an existing conversation rather than starting one. */
-  resume?: boolean
   hookScriptPath: string
   controlUrl: string
-  controlEventUrl: string
   controlToken: string
   /**
    * The program that runs the hook. Electron's own binary in `node` mode, so
@@ -47,24 +23,6 @@ export interface LaunchSpecOptions {
    * login shell put on PATH.
    */
   nodePath?: string
-  /** Overridden only by tests; the real one is resolved from PATH. */
-  claudePath?: string
-  /**
-   * Which model to run, as `--model` takes it.
-   *
-   * An alias (`opus`, `sonnet`) resolves to the latest of that family, which is
-   * why the settings default is one: a pinned id is a thing that silently goes
-   * a generation stale. Absent, the runtime uses whatever the operator's own
-   * configuration says, which is the right answer when nobody has chosen.
-   */
-  model?: string
-  /** What `--effort` gets. Absent leaves the flag off, so the operator's configuration wins. */
-  effort?: string
-  /**
-   * Extra directories Claude Code loads skills from, one `--add-dir` per
-   * entry. Absent or empty adds none — most runs mount nothing.
-   */
-  addDirs?: string[]
 }
 
 /**
@@ -72,7 +30,7 @@ export interface LaunchSpecOptions {
  *
  * Twelve hours, because the thing it is waiting for is a person, and a person
  * goes to lunch. Safe to set this high: when it does expire the runtime falls
- * back to its own prompt in the terminal rather than to a decision nobody made
+ * back to its own ask in the agent tab rather than to a decision nobody made
  * — verified against claude 2.1.220, along with the fact that a timeout this
  * large is accepted at all.
  */
@@ -134,7 +92,6 @@ function realPath(target: string): string {
 interface HookCommandOptions {
   hookScriptPath: string
   controlUrl: string
-  controlEventUrl: string
   controlToken: string
   sessionId: string
   nodePath: string
@@ -152,9 +109,6 @@ interface HookCommandOptions {
  */
 export function buildSettings(options: HookCommandOptions): unknown {
   return {
-    // Nobody is watching an unattended run, so a browser tab opening on each
-    // published artifact would only pile up.
-    env: { CLAUDE_CODE_ARTIFACT_AUTO_OPEN: '0' },
     hooks: {
       PreToolUse: [
         {
@@ -165,121 +119,47 @@ export function buildSettings(options: HookCommandOptions): unknown {
           hooks: [
             {
               type: 'command',
-              command: toolHookCommand(options, options.controlUrl),
+              command: toolHookCommand(options),
               timeout: HOOK_TIMEOUT_SECONDS,
             },
           ],
         },
       ],
-      // The agent finished responding and is waiting for input. Without this a
-      // session that had finished would look identical to one that was stuck,
-      // and the stall detector would call it a stall eight minutes later.
-      Stop: [notifyHook(options, 'stop')],
-      SessionEnd: [notifyHook(options, 'session_end')],
     },
   }
 }
 
-/** The hook script run against one of the console's URLs, for one session. */
-function toolHookCommand(options: HookCommandOptions, url: string, kind?: string): string {
+/** The hook script run against the console's URL, for one run. */
+function toolHookCommand(options: HookCommandOptions): string {
   return [
     // Electron refuses to be a node unless told; without this the hook script
     // would launch a second copy of the application.
     'ELECTRON_RUN_AS_NODE=1',
     shellQuote(options.nodePath),
     shellQuote(options.hookScriptPath),
-    shellQuote(url),
+    shellQuote(options.controlUrl),
     shellQuote(options.controlToken),
     shellQuote(options.sessionId),
-    ...(kind === undefined ? [] : [shellQuote(kind)]),
   ].join(' ')
 }
 
-/** A lifecycle hook that tells the console `kind` happened. */
-function notifyHook(options: HookCommandOptions, kind: string): unknown {
-  return {
-    matcher: '*',
-    // Seconds, not hours: nothing is waiting on the answer, and a lifecycle
-    // hook that hangs would hold up the agent for no reason at all.
-    hooks: [
-      {
-        type: 'command',
-        command: toolHookCommand(options, options.controlEventUrl, kind),
-        timeout: 10,
-      },
-    ],
-  }
-}
-
-export function buildLaunchSpec(options: LaunchSpecOptions): LaunchSpec {
-  const settingsPath = writeSettings(options)
-  return {
-    sessionId: options.sessionId,
-    cwd: options.cwd,
-    command: claudeCommand(options, settingsPath),
-    settingsPath,
-    transcriptPath: transcriptPathFor(options.cwd, options.sessionId),
-  }
-}
-
 /** The run's settings, written to a file of its own; returns where. */
-function writeSettings(options: LaunchSpecOptions): string {
-  // Absolute, or the command is wrong in a way that only shows up at runtime:
-  // the runtime resolves `--settings` against the terminal's cwd, which is the
-  // card's worktree, and a relative path put it somewhere that never exists.
-  // The whole run then dies on "Settings file not found" with the card still
-  // reading WORKING.
+export function writeRunSettings(options: RunSettingsOptions): string {
+  // Absolute, or the agent fails in a way that only shows up at runtime: a
+  // relative path is resolved against the card's worktree, where it never
+  // exists, and the whole run dies on "Settings file not found".
   if (!isAbsolute(options.settingsDirectory)) {
     throw new Error(`settingsDirectory must be absolute, got ${options.settingsDirectory}`)
   }
   mkdirSync(options.settingsDirectory, { recursive: true })
-  const settingsPath = join(options.settingsDirectory, `${options.sessionId}.settings.json`)
+  const settingsPath = join(options.settingsDirectory, `${options.runId}.settings.json`)
   const settings = buildSettings({
     hookScriptPath: options.hookScriptPath,
     controlUrl: options.controlUrl,
-    controlEventUrl: options.controlEventUrl,
     controlToken: options.controlToken,
-    sessionId: options.sessionId,
+    sessionId: options.runId,
     nodePath: options.nodePath ?? process.execPath,
   })
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8')
   return settingsPath
-}
-
-/** `flag value`, or nothing when the value is absent or empty. */
-function optionalFlag(flag: string, value: string | undefined): string[] {
-  return value === undefined || value === '' ? [] : [flag, shellQuote(value)]
-}
-
-/** The command line that starts, or resumes, the agent. */
-function claudeCommand(options: LaunchSpecOptions, settingsPath: string): string {
-  return [
-    options.claudePath ?? 'claude',
-    // `--resume` for a conversation that already exists, `--session-id` only
-    // for one being created. The runtime refuses a `--session-id` it has seen
-    // — "Session ID … is already in use" — and it refuses it by exiting, while
-    // the shell around it lives on: no PTY exit fires, so the run sits
-    // registered as working with a dead agent until the stall detector
-    // eventually notices.
-    options.resume === true ? '--resume' : '--session-id',
-    options.sessionId,
-    '--settings',
-    shellQuote(settingsPath),
-    ...optionalFlag('--model', options.model),
-    ...optionalFlag('--effort', options.effort),
-    // One per mounted skill directory, so Claude Code loads
-    // `<dir>/.claude/skills/<name>/SKILL.md` from each of them.
-    ...(options.addDirs ?? []).flatMap((dir) => ['--add-dir', shellQuote(dir)]),
-    // The ladder still decides first: a PreToolUse hook runs under every
-    // permission mode, and its allow/deny is honoured before the mode is
-    // consulted at all. What the mode picks up is only what the ladder
-    // abstains on — and under `default` that was a prompt, which is the whole
-    // reason a run asked twenty-five times before finishing a phase. Under
-    // `auto` the runtime's own classifier answers those instead, so the
-    // ladder's judgement is unchanged and the questions are the ones it
-    // actually wanted a person for.
-    '--permission-mode',
-    'auto',
-    shellQuote(options.prompt),
-  ].join(' ')
 }

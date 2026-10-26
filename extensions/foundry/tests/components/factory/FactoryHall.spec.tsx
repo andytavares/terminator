@@ -462,7 +462,7 @@ function factoryHallParkedAgentsTests() {
   it('pins an agent parked at its terminal and takes you there', async () => {
     mount({ view: hallView({ stranded: ['s-1'] }) })
     const card = await screen.findByRole('group', { name: 'Waiting at its terminal' })
-    fireEvent.click(within(card).getByRole('button', { name: 'Go to terminal' }))
+    fireEvent.click(within(card).getByRole('button', { name: 'Go to agent tab' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 's-1' })
     )

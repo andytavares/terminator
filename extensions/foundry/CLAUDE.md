@@ -30,7 +30,7 @@ Knowledge of a toolchain is **data in `hints/*.yaml`**, one file per ecosystem, 
 
 `runtime/tool-decision.ts` decides every tool call an agent makes. Anything it
 does not decide is **held for `DEFAULT_ASK_AFTER_MS` — five minutes** — before
-handing back to a terminal that, in an unattended run, nobody is sitting at.
+handing back to the agent tab, where, in an unattended run, nobody is sitting.
 
 So reading a command correctly is a latency requirement here, not only a
 correctness one: a held call costs minutes where a decided one costs seconds.

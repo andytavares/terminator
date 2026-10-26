@@ -1536,7 +1536,7 @@ describe('attaching to the architect', () => {
     terminalReply = { ok: false }
     mountStates({}, { provenance: { forgeSession: 'sess-gone', decisions: [], amendments: [] } })
     fireEvent.click(await screen.findByRole('button', { name: /Attach/ }))
-    await screen.findByText(/no longer has a terminal/)
+    await screen.findByText(/no longer has an agent tab/)
   })
 })
 

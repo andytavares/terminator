@@ -139,7 +139,7 @@ describe('watching the architect at work', () => {
     fireEvent.click(
       await within(await header()).findByRole('button', { name: 'Watch the architect' })
     )
-    await screen.findByText('that conversation no longer has a terminal')
+    await screen.findByText('that conversation no longer has an agent tab')
   })
 })
 

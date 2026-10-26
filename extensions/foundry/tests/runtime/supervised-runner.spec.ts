@@ -1,36 +1,45 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { rmSync, readFileSync, mkdirSync, writeFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { spawn as ptySpawn } from 'node-pty'
 import { createSupervisedRunner } from '../../src/runtime/supervised-runner.js'
 import { createControlServer, type ControlServer } from '../../src/runtime/control-server.js'
+import { transcriptPathFor } from '../../src/runtime/claude-launch.js'
 import type { PendingPermission } from '../../src/runtime/permission-bridge.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 import { partialFake } from '../../../../tests/support/fakes'
-import type { ExtensionAPI } from '@terminator/extension-sdk'
+import type {
+  AgentsAPI,
+  AgentTurnEnd,
+  ExtensionAPI,
+  StartAgentInput,
+} from '@terminator/extension-sdk'
 import { eventually } from '../../../../tests/support/eventually'
 
-// This replaces spawning `claude --print --permission-mode bypassPermissions`
-// as a hidden child process — a run nobody could see, approving every tool call
-// on the operator's behalf. What is asserted here is what the operator ends up
-// with: a project, a terminal, a typed command, and a tool call that waits.
-
-const ESC = '\x1b'
+// The agent runs over ACP, in a tab of the card's worktree project, and every tool call goes
+// through a PreToolUse hook that holds it still until somebody decides. What is asserted
+// here is what the operator ends up with: a project, an agent tab, and a tool call that waits.
 
 let dir: string
 let control: ControlServer
 let created: Array<Record<string, unknown>>
-let opened: Array<Record<string, unknown>>
-let written: Array<{ terminal: string; data: string }>
-let terminalId: string | null
 let projectId: string | null
-let exitListener: ((exitCode: number | null) => void) | null
-let exitDetached: boolean
+/** The tab a command opens in; null when none can be. */
+let terminalId: string | null
 let closed: string[]
 let ran: Array<{ file: string; args: string[] } & Record<string, unknown>>
 /** How the next `runInTerminal` ends; never, unless a test says. */
 let nextExit: { exitCode: number | null } | null
+
+/** What the fake `api.agents` was asked, and the ways a test answers it. */
+let agentStarts: StartAgentInput[]
+let prompts: Array<{ sessionId: string; text: string; end: (turn: AgentTurnEnd) => void }>
+let cancelled: string[]
+let agentsClosed: string[]
+let endListeners: Array<(exitCode: number | null) => void>
+let detachedEnd: number
+let startsAs: { sessionId: string } | null
 
 function exitWith(exit: { exitCode: number | null }): void {
   nextExit = exit
@@ -43,35 +52,44 @@ function scriptOf(input: { args: string[] }): string {
   return match[1]
 }
 
-function runnerCoreApi() {
-  return {
-    workspace: {
-      addProject: async (input: Record<string, unknown>) => {
-        created.push(input)
+function fakeAgents(): AgentsAPI {
+  return partialFake<AgentsAPI>({
+    start: async (input) => {
+      agentStarts.push(input)
+      return startsAs === null ? null : { ...startsAs, agentId: 'claude', configOptions: [] }
+    },
+    prompt: (sessionId, text) =>
+      new Promise<AgentTurnEnd>((end) => prompts.push({ sessionId, text, end })),
+    cancel: (sessionId) => cancelled.push(sessionId),
+    close: async (sessionId) => void agentsClosed.push(sessionId),
+    onEnd: (_sessionId, listener) => {
+      endListeners.push(listener)
+      return () => {
+        detachedEnd += 1
+      }
+    },
+  })
+}
+
+function runnerCoreApi(): ExtensionAPI {
+  return partialFake<ExtensionAPI>({
+    workspace: partialFake<ExtensionAPI['workspace']>({
+      addProject: async (input) => {
+        created.push({ ...input })
         return projectId === null ? null : { id: projectId, workspaceId: 'ws-1', name: 'p' }
       },
-    },
-    pty: {
-      openTerminal: async (input: Record<string, unknown>) => {
-        opened.push(input)
-        return terminalId
-      },
-      write: (terminal: string, data: string) => written.push({ terminal, data }),
-      closeTerminalTab: (terminal: string) => closed.push(terminal),
-      runInTerminal: (input: { file: string; args: string[] } & Record<string, unknown>) => {
-        ran.push(input)
+    }),
+    agents: fakeAgents(),
+    pty: partialFake<ExtensionAPI['pty']>({
+      closeTerminalTab: (terminal) => void closed.push(terminal),
+      runInTerminal: (input) => {
+        ran.push({ ...input })
         if (terminalId === null) return Promise.resolve(null)
         if (nextExit === null) return new Promise(() => {})
         return Promise.resolve({ sessionId: terminalId, ...nextExit })
       },
-      onExit: (_sessionId: string, listener: (exitCode: number | null) => void) => {
-        exitListener = listener
-        return () => {
-          exitDetached = true
-        }
-      },
-    },
-  } as never
+    }),
+  })
 }
 
 function runner(now: () => number = () => 1_000) {
@@ -81,21 +99,6 @@ function runner(now: () => number = () => 1_000) {
     stateDir: join(dir, 'state'),
     now,
   })
-}
-
-/**
- * What the terminal was actually asked to run.
- *
- * The launch is a file now, not a typed line — a terminal in canonical mode
- * mangles anything past 1024 bytes on one line, and a brief is always longer.
- * These assertions belong on the script's contents rather than on the
- * keystrokes.
- */
-function launchScriptBody(): string {
-  const typed = written.map((w) => w.data).join('')
-  const match = /([^'\s]*\/launch\/[\w-]+\.sh)/.exec(typed)
-  if (match === null) throw new Error(`no launch script was typed: ${typed}`)
-  return readFileSync(match[1], 'utf8')
 }
 
 /**
@@ -135,15 +138,18 @@ beforeEach(async () => {
   dir = makeTempDir('supervised-runner-')
   control = await createControlServer()
   created = []
-  opened = []
-  written = []
-  terminalId = 'terminal-1'
   projectId = 'project-1'
-  exitListener = null
-  exitDetached = false
+  terminalId = 'terminal-1'
   closed = []
   ran = []
   nextExit = null
+  agentStarts = []
+  prompts = []
+  cancelled = []
+  agentsClosed = []
+  endListeners = []
+  detachedEnd = 0
+  startsAs = { sessionId: 'acp-1' }
 })
 
 afterEach(async () => {
@@ -151,799 +157,441 @@ afterEach(async () => {
   rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
 })
 
-describe('starting a supervised run', () => {
-  describe('the project', theProjectTests)
-  describe('the terminal and session', theTerminalAndSessionTests)
-  describe('skills and transcripts', skillsAndTranscriptsTests)
-  describe('resuming', supervisedRunnerResumingTests)
-  describe('nothing started', nothingStartedTests)
-})
+/** The options the runner handed Claude: settings file, model, env and the rest. */
+function claudeOptions(): Record<string, unknown> {
+  const meta = agentStarts[0].agentMeta as { claudeCode: { options: Record<string, unknown> } }
+  return meta.claudeCode.options
+}
 
-function ask(sessionId: string): Promise<unknown> {
+/** The id the hook script is given: the last quoted argument of the PreToolUse command. */
+function runIdOfHook(): string {
+  const settings = JSON.parse(readFileSync(claudeOptions().settings as string, 'utf8'))
+  const match = /'([^']+)'$/.exec(settings.hooks.PreToolUse[0].hooks[0].command)
+  if (match === null) throw new Error('no run id in the hook command')
+  return match[1]
+}
+
+function ask(runId: string): Promise<unknown> {
   const pending = fetch(control.url, {
     method: 'POST',
     headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ sessionId, toolName: 'Bash', input: { command: 'rm -rf /' } }),
+    body: JSON.stringify({ sessionId: runId, toolName: 'Bash', input: { command: 'rm -rf /' } }),
   }).then((r) => r.json())
   pending.catch(() => {})
   return pending
 }
 
-function theProjectTests() {
-  it('registers the worktree as a project, so the run has somewhere to live', async () => {
-    await runner().start(start)
+/** Ends the turn that began with `text`, as the agent does when it stops responding. */
+function endTurn(text: string, stopReason = 'end_turn'): void {
+  const turn = prompts.find((p) => p.text === text)
+  if (turn === undefined) throw new Error(`no prompt "${text}" among ${prompts.map((p) => p.text)}`)
+  turn.end({ stopReason })
+}
+
+/** Writes `count` assistant lines where the transcript of session `acp-1` would be. */
+function writeTranscript(count: number): void {
+  const file = transcriptPathFor(start.worktreePath, 'acp-1')
+  mkdirSync(dirname(file), { recursive: true })
+  writeFileSync(file, '{"type":"assistant"}\n'.repeat(count))
+}
+
+describe('the supervised runner over ACP', () => {
+  beforeEach(() => {
+    vi.stubEnv('HOME', join(dir, 'home'))
+  })
+  afterEach(() => vi.unstubAllEnvs())
+
+  describe('starting a run', startingARunTests)
+  describe('the options Claude gets', claudeOptionsTests)
+  describe('mode and resume', modeAndResumeTests)
+  describe('tracking the run', trackingTests)
+  describe('nothing started', nothingStartedTests)
+  describe('a tool call the agent may not make on its own', toolCallTests)
+  describe('the operator answers', answeringTests)
+  describe('the ladder answers', ladderTests)
+  describe('turns', turnTests)
+  describe('kinds of turn end', turnKindsTests)
+  describe('the next phase', nextPhaseTests)
+  describe('the next phase’s clock', phaseClockTests)
+  describe('the end of the agent', endOfTheAgentTests)
+  describe('disposing', disposeTests)
+  describe('taking the run over', takingOverTests)
+  describe('sending to the session', sendingTests)
+  describe('stopping', stoppingTests)
+  describe('a session that is not there', missingSessionTests)
+})
+
+function startingARunTests() {
+  it('registers the worktree as a project and links the ticket (ADR-061)', async () => {
+    await runner().start({ ...start, issue: { tracker: 'linear', key: 'TAV-15' } })
     expect(created[0]).toMatchObject({
       workspaceId: 'ws-1',
       name: 'feat/thing',
       worktreePath: '/wt/feat-thing',
       gitBranch: 'feat/thing',
+      issue: { tracker: 'linear', key: 'TAV-15' },
     })
   })
 
-  it("links the order's ticket to the project, so the sidebar shows it (ADR-061)", async () => {
-    await runner().start({ ...start, issue: { tracker: 'linear', key: 'TAV-15' } })
-    expect(created[0]).toMatchObject({ issue: { tracker: 'linear', key: 'TAV-15' } })
-  })
-}
-
-function theTerminalAndSessionTests() {
-  it('opens a terminal in that project rather than a hidden child process', async () => {
+  it('starts the agent in the worktree, as a tab of that project', async () => {
     await runner().start(start)
-    expect(opened[0]).toMatchObject({
-      projectId: 'project-1',
+    expect(agentStarts[0]).toMatchObject({
       cwd: '/wt/feat-thing',
-      tabTitle: 'Builder',
-      type: 'agent',
+      tab: { projectId: 'project-1', title: 'Builder' },
     })
-  })
-
-  it('launches under a session id it chose itself', async () => {
-    const run = await runner().start(start)
-    const command = launchScriptBody()
-    expect(command).toContain(`--session-id ${run?.sessionId}`)
-    expect(command).toContain('/speckit-implement')
-  })
-
-  it('never bypasses permissions — that is the whole point of the change', async () => {
-    await runner().start(start)
-    expect(written.map((w) => w.data).join('')).not.toContain('bypassPermissions')
-    expect(launchScriptBody()).not.toContain('bypassPermissions')
+    expect(agentStarts[0].resume).toBeUndefined()
   })
 }
 
-function skillsAndTranscriptsTests() {
-  it('points the skills at the card, so they work whatever the branch is called', async () => {
-    await runner().start(start)
-    // Quoted: it goes into the operator's shell, and a slug is not guaranteed
-    // to be a bare word.
-    const body = launchScriptBody()
-    expect(body).toContain("SPECIFY_FEATURE='021-thing'")
-    expect(body).toContain("SPECIFY_FEATURE_DIRECTORY='specs/021-thing'")
-  })
-
-  it('knows where the transcript will be before the process exists', async () => {
-    const run = await runner().start(start)
-    expect(run?.transcriptPath).toContain(run?.sessionId ?? 'nope')
-  })
-
-  it('says which terminal it is running in', async () => {
-    const r = runner()
-    const run = await r.start(start)
-    // The project as well as the tab: the core's navigation selects the
-    // workspace and project before the session.
-    expect(r.terminalFor(run?.sessionId ?? '')).toMatchObject({
-      terminalSessionId: 'terminal-1',
+function claudeOptionsTests() {
+  it('gives Claude its settings, model, effort, skill folders and environment', async () => {
+    await runner().start({
+      ...start,
+      model: 'opus',
+      effort: 'high',
+      addDirs: ['/order/skills/build'],
     })
+    expect(claudeOptions()).toMatchObject({
+      model: 'opus',
+      effort: 'high',
+      additionalDirectories: ['/order/skills/build'],
+      env: {
+        SPECIFY_FEATURE: '021-thing',
+        SPECIFY_FEATURE_DIRECTORY: 'specs/021-thing',
+        CLAUDE_CODE_FORCE_SESSION_PERSISTENCE: '1',
+        FOUNDRY_RUN: '1',
+        CLAUDE_CODE_ARTIFACT_AUTO_OPEN: '0',
+      },
+    })
+    expect(existsSync(claudeOptions().settings as string)).toBe(true)
+  })
+
+  it('leaves the model and effort off when none was chosen, so the operator config wins', async () => {
+    await runner().start({ ...start, model: '' })
+    expect(claudeOptions().model).toBeUndefined()
+    expect(claudeOptions().effort).toBeUndefined()
   })
 }
 
-function supervisedRunnerResumingTests() {
+function modeAndResumeTests() {
+  it('asks for auto mode, which decides what the ladder defers', async () => {
+    await runner().start(start)
+    expect(agentStarts[0].mode).toBe('auto')
+  })
+
   it('resumes an existing conversation rather than starting a second one', async () => {
-    const run = await runner().start({ ...start, resumeSessionId: 'earlier-session' })
-    expect(run?.sessionId).toBe('earlier-session')
+    await runner().start({ ...start, resumeSessionId: 'earlier' })
+    expect(agentStarts[0].resume).toBe('earlier')
+  })
+}
+
+function trackingTests() {
+  it('tracks the run under the id the agent chose, and says which tab it is', async () => {
+    const run = await runner().start(start)
+    expect(run).toMatchObject({
+      sessionId: 'acp-1',
+      terminalSessionId: 'acp-1',
+      transcriptPath: transcriptPathFor('/wt/feat-thing', 'acp-1'),
+      transcriptFrom: 0,
+    })
   })
 
-  // A lane is one conversation, so the transcript a resumed node reads already
-  // holds every earlier node's tool calls. Without a mark of where its own
-  // turn begins, a rung answered with the architect's `npm test` — run on the
-  // tree as it was before the change existed.
   it('marks where its own turn starts in a transcript it did not begin', async () => {
-    const r = runner()
-    const first = await r.start(start)
-    expect(first?.transcriptFrom).toBe(0)
+    writeTranscript(2)
+    const run = await runner().start({ ...start, resumeSessionId: 'acp-1' })
+    expect(run?.transcriptFrom).toBe(readFileSync(run?.transcriptPath ?? '').length)
+  })
 
-    mkdirSync(dirname(first?.transcriptPath ?? ''), { recursive: true })
-    writeFileSync(first?.transcriptPath ?? '', 'x'.repeat(512))
-
-    const second = await r.start({ ...start, resumeSessionId: first?.sessionId })
-    expect(second?.transcriptFrom).toBe(512)
+  it('registers the run before the first prompt is sent', async () => {
+    const order: string[] = []
+    const supervised = runner()
+    await supervised.start({
+      ...start,
+      onRegistered: () => order.push(`registered after ${prompts.length} prompts`),
+    })
+    expect(order).toEqual(['registered after 0 prompts'])
+    expect(prompts.map((p) => p.text)).toEqual(['/speckit-implement'])
+    expect(supervised.terminalFor('acp-1')).toEqual({
+      terminalSessionId: 'acp-1',
+      projectId: 'project-1',
+    })
   })
 }
 
 function nothingStartedTests() {
   it('starts nothing when the worktree cannot be made a project', async () => {
     projectId = null
-    expect(await runner().start(start)).toBeNull()
-    expect(opened).toEqual([])
+    await expect(runner().start(start)).resolves.toBeNull()
+    expect(agentStarts).toEqual([])
   })
 
-  it('starts nothing when no terminal can be opened — an unseen agent is the old failure', async () => {
-    terminalId = null
-    expect(await runner().start(start)).toBeNull()
-    expect(written).toEqual([])
-  })
-}
-
-describe('a tool call the agent may not make on its own', () => {
-  describe('reaching the operator', reachingTheOperatorTests)
-  describe('the answer', theAnswerTests)
-  describe('the ladder', theLadderTests)
-})
-
-async function report(sessionId: string, kind: string): Promise<void> {
-  await fetch(control.eventUrl, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ sessionId, kind }),
+  it('starts no run when the agent has no tab to show — an unseen agent is the old failure', async () => {
+    startsAs = null
+    await expect(runner().start(start)).resolves.toBeNull()
+    expect(prompts).toEqual([])
   })
 }
 
-function reachingTheOperatorTests() {
-  it('reaches the operator instead of being approved for them', async () => {
+function toolCallTests() {
+  it('reaches the operator, who is asked rather than the call approved for them', async () => {
     const call = held()
     const r = runner()
-    const run = await r.start({ ...start, onPending: call.onPending })
-    const pending = ask(run?.sessionId ?? '')
+    await r.start({ ...start, onPending: call.onPending })
+    const pending = ask(runIdOfHook())
     await call.arrived
     expect(call.seen[0]).toMatchObject({ toolName: 'Bash', summary: 'rm -rf /' })
-    r.resolve(run?.sessionId ?? '', call.seen[0].requestId, { allow: false })
-    await pending
-  })
-
-  it('waits, rather than proceeding while nobody has answered', async () => {
-    const call = held()
-    const r = runner()
-    const run = await r.start({ ...start, onPending: call.onPending })
-    const pending = ask(run?.sessionId ?? '')
-    await call.arrived
-    await expect(Promise.race([pending, Promise.resolve('unanswered')])).resolves.toBe('unanswered')
-    r.resolve(run?.sessionId ?? '', call.seen[0].requestId, { allow: false })
+    expect(r.resolve('acp-1', call.seen[0].requestId, { allow: false })).toBe(true)
     await pending
   })
 }
 
-function theAnswerTests() {
-  it('proceeds once the operator allows it', async () => {
+function answeringTests() {
+  it('waits while nobody has answered, then proceeds on allow', async () => {
     const call = held()
     const r = runner()
-    const run = await r.start({ ...start, onPending: call.onPending })
-    const pending = ask(run?.sessionId ?? '')
+    await r.start({ ...start, onPending: call.onPending })
+    const pending = ask(runIdOfHook())
     await call.arrived
-    r.resolve(run?.sessionId ?? '', call.seen[0].requestId, { allow: true })
+    await expect(Promise.race([pending, Promise.resolve('unanswered')])).resolves.toBe('unanswered')
+    r.resolve('acp-1', call.seen[0].requestId, { allow: true })
     expect(await pending).toMatchObject({ permissionDecision: 'allow' })
   })
 
   it('carries a real answer back, since the reason is the only channel for words', async () => {
     const call = held()
     const r = runner()
-    const run = await r.start({ ...start, onPending: call.onPending })
-    const pending = ask(run?.sessionId ?? '')
+    await r.start({ ...start, onPending: call.onPending })
+    const pending = ask(runIdOfHook())
     await call.arrived
-    r.resolve(run?.sessionId ?? '', call.seen[0].requestId, {
-      allow: false,
-      answer: 'use the staging host',
-    })
-    expect(await pending).toEqual({
-      permissionDecision: 'deny',
-      reason: 'use the staging host',
-    })
+    r.resolve('acp-1', call.seen[0].requestId, { allow: false, answer: 'use the staging host' })
+    expect(await pending).toEqual({ permissionDecision: 'deny', reason: 'use the staging host' })
   })
 }
 
-function theLadderTests() {
+function ladderTests() {
   it('is settled by the autonomy ladder without troubling the operator', async () => {
     const seen: PendingPermission[] = []
-    const r = runner()
-    const run = await r.start({
+    await runner().start({
       ...start,
       autoDecide: () => ({ allow: true }),
       onPending: (p) => seen.push(p),
     })
-    expect(await ask(run?.sessionId ?? '')).toMatchObject({ permissionDecision: 'allow' })
+    expect(await ask(runIdOfHook())).toMatchObject({ permissionDecision: 'allow' })
     expect(seen).toEqual([])
   })
-}
 
-describe('taking a run over, or ending it', () => {
-  describe('typing and interrupting', typingAndInterruptingTests)
-  describe('stopping and ending', stoppingAndEndingTests)
-  describe('turn and conversation ends', turnAndConversationEndsTests)
-  describe('closing the tab', closingTheTabTests)
-  describe('disposing', disposingTests)
-})
-
-function typingAndInterruptingTests() {
-  it('sends a message by typing it, exactly as the operator would', async () => {
+  it('is not answered once the run has ended', async () => {
     const r = runner()
-    const run = await r.start(start)
-    written.length = 0
-    expect(r.send(run?.sessionId ?? '', 'try the other approach')).toBe(true)
-    expect(written).toEqual([{ terminal: 'terminal-1', data: 'try the other approach\r' }])
+    await r.start(start)
+    r.dispose()
+    expect(await ask(runIdOfHook())).toMatchObject({ permissionDecision: 'ask' })
   })
 
-  it('interrupts the turn without ending the run, so a redirect still lands', async () => {
-    const r = runner()
-    const run = await r.start(start)
-    written.length = 0
-    r.interrupt(run?.sessionId ?? '')
-    r.send(run?.sessionId ?? '', 'do it differently')
-    expect(written.map((w) => w.data)).toEqual([ESC, 'do it differently\r'])
-  })
-}
-
-function stoppingAndEndingTests() {
-  it('stops the turn first, so the reason is not queued behind it', async () => {
-    const r = runner()
-    const run = await r.start(start)
-    written.length = 0
-    expect(r.stop(run?.sessionId ?? '', 'wrong branch')).toBe(true)
-    expect(written.map((w) => w.data)).toEqual([ESC, 'wrong branch\r', '/exit\r'])
-  })
-
-  it('ends the conversation when there is nothing to say', async () => {
-    const r = runner()
-    const run = await r.start(start)
-    written.length = 0
-    r.stop(run?.sessionId ?? '')
-    expect(written.map((w) => w.data)).toEqual([ESC, '/exit\r'])
-  })
-
-  it('reports that there was no live run to stop', async () => {
-    expect(runner().stop('nobody')).toBe(false)
-    expect(runner().send('nobody', 'hi')).toBe(false)
-  })
-}
-
-function turnAndConversationEndsTests() {
-  it('reports the end of a turn without calling the run over', async () => {
-    const turns: number[] = []
-    const ends: number[] = []
-    const r = runner()
-    const run = await r.start({
-      ...start,
-      onTurnEnd: (t) => turns.push(t),
-      onEnd: () => ends.push(1),
-    })
-    await report(run?.sessionId ?? '', 'stop')
-    expect(turns).toHaveLength(1)
-    expect(ends).toEqual([])
-  })
-
-  it('reports the end of the conversation and forgets the run', async () => {
-    const ends: number[] = []
-    const r = runner()
-    const run = await r.start({ ...start, onEnd: () => ends.push(1) })
-    await report(run?.sessionId ?? '', 'session_end')
-    expect(ends).toEqual([1])
-    expect(r.terminalFor(run?.sessionId ?? '')).toBeNull()
-  })
-}
-
-function closingTheTabTests() {
-  it('closes the tab once the conversation has ended, rather than leaving a shell behind', async () => {
-    const r = runner()
-    const run = await r.start(start)
-    await report(run?.sessionId ?? '', 'session_end')
-    expect(closed).toEqual(['terminal-1'])
-  })
-}
-
-function disposingTests() {
-  it('stops answering the agent once disposed, rather than holding a call open', async () => {
+  it('counts as blocked on a person while held, and working again once answered', async () => {
     const call = held()
     const r = runner()
-    const run = await r.start({ ...start, onPending: call.onPending })
-    const pending = fetch(control.url, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionId: run?.sessionId, toolName: 'Bash', input: {} }),
-    }).then((res) => res.json())
-    pending.catch(() => {})
+    await r.start({ ...start, onPending: call.onPending })
+    const pending = ask(runIdOfHook())
     await call.arrived
-    r.dispose()
-    expect(await pending).toMatchObject({ permissionDecision: 'deny' })
+    expect(r.watchable()[0].isWaiting).toBe(true)
+    r.resolve('acp-1', call.seen[0].requestId, { allow: true })
+    await pending
+    expect(r.watchable()[0].isWaiting).toBe(false)
+  })
+}
+
+function turnTests() {
+  it('reports the turn count of the transcript when the first prompt resolves', async () => {
+    const turns: number[] = []
+    const r = runner()
+    await r.start({ ...start, onTurnEnd: (n) => turns.push(n) })
+    writeTranscript(3)
+    endTurn('/speckit-implement')
+    await eventually(() => expect(turns).toEqual([3]))
+    expect(r.watchable()[0].isWaiting).toBe(true)
+  })
+}
+
+function turnKindsTests() {
+  it('does not call a turn end the end of the run', async () => {
+    const ends: unknown[] = []
+    const r = runner()
+    await r.start({ ...start, onEnd: (code) => ends.push(code) })
+    endTurn('/speckit-implement')
+    await eventually(() => expect(r.watchable()[0].isWaiting).toBe(true))
+    expect(ends).toEqual([])
+    expect(r.terminalFor('acp-1')).not.toBeNull()
   })
 
-  // A run waiting for a turn to end waited for ever once the runner was gone: deactivating the
-  // extension left the run with no end and no record of why.
-  it('ends each running session, with no exit code, so nothing waits on it for ever', async () => {
-    const ends: Array<number | null> = []
+  it.each(['cancelled', 'error'])('reports no turn end for a %s turn', async (stopReason) => {
+    const turns: number[] = []
+    const r = runner()
+    await r.start({ ...start, onTurnEnd: (n) => turns.push(n) })
+    endTurn('/speckit-implement', stopReason)
+    r.send('acp-1', 'later')
+    endTurn('later')
+    await eventually(() => expect(turns).toHaveLength(1))
+  })
+}
+
+function nextPhaseTests() {
+  it('moves the next phase into the same session and reports its turn, not the last', async () => {
+    const reported: string[] = []
+    const r = runner()
+    const run = await r.start({ ...start, onTurnEnd: () => reported.push('implement') })
+    const next = r.continueRun('acp-1', {
+      prompt: '/speckit-plan\nwith a second line',
+      phase: 'plan' as never,
+      onPending: () => {},
+      onResolved: () => {},
+      onTurnEnd: () => reported.push('plan'),
+    })
+    expect(next).toMatchObject({ sessionId: 'acp-1', terminalSessionId: run?.terminalSessionId })
+    expect(agentStarts).toHaveLength(1)
+    endTurn('/speckit-plan\nwith a second line')
+    await eventually(() => expect(reported).toEqual(['plan']))
+  })
+}
+
+function phaseClockTests() {
+  it('clears the waiting flag and restarts the silence clock on a new phase', async () => {
+    let clock = 1_000
+    const r = runner(() => clock)
+    await r.start(start)
+    endTurn('/speckit-implement')
+    await eventually(() => expect(r.watchable()[0].isWaiting).toBe(true))
+    clock = 20 * 60_000
+    r.continueRun('acp-1', {
+      prompt: '/speckit-plan',
+      phase: 'plan' as never,
+      onPending: () => {},
+      onResolved: () => {},
+    })
+    expect(r.watchable()[0]).toMatchObject({ isWaiting: false, startedAt: 20 * 60_000 })
+  })
+
+  it('answers null for a session that is gone, so the caller starts a fresh one', () => {
+    const next = runner().continueRun('nope', {
+      prompt: '/x',
+      phase: 'plan' as never,
+      onPending: () => {},
+      onResolved: () => {},
+    })
+    expect(next).toBeNull()
+    expect(prompts).toEqual([])
+  })
+}
+
+function endOfTheAgentTests() {
+  it('ends the run clean on exit 0, and closes the tab', async () => {
+    const ends: unknown[] = []
+    const r = runner()
+    await r.start({ ...start, onEnd: (code) => ends.push(code) })
+    endListeners[0](0)
+    expect(ends).toEqual([0])
+    expect(agentsClosed).toEqual(['acp-1'])
+    expect(r.terminalFor('acp-1')).toBeNull()
+    expect(r.watchable()).toEqual([])
+  })
+
+  it.each([1, null])('ends on exit %s and leaves the tab open to read why', async (code) => {
+    const ends: unknown[] = []
+    await runner().start({ ...start, onEnd: (exitCode) => ends.push(exitCode) })
+    endListeners[0](code)
+    expect(ends).toEqual([code])
+    expect(agentsClosed).toEqual([])
+  })
+
+  it('stops listening for the exit once the run is over', async () => {
+    await runner().start(start)
+    endListeners[0](0)
+    expect(detachedEnd).toBe(1)
+  })
+}
+
+function disposeTests() {
+  it('ends each running session with no exit code on dispose, so nothing waits for ever', async () => {
+    const ends: unknown[] = []
     const r = runner()
     await r.start({ ...start, onEnd: (code) => ends.push(code) })
     r.dispose()
     expect(ends).toEqual([null])
+    expect(r.watchable()).toEqual([])
   })
 }
 
-describe('the environment the agent runs in', () => {
-  it('forces session persistence, or there is no transcript to read', async () => {
-    // Everything this runtime knows it reads from the transcript. The runtime
-    // sets CLAUDE_CODE_CHILD_SESSION=1 in everything it spawns, and a nested
-    // interactive session carrying that marker writes none — so when the
-    // console itself was started from a Claude Code session, the stall
-    // detector, the turn count and the card's console all read empty forever.
-    await runner().start(start)
-    expect(launchScriptBody()).toContain('CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1')
+function takingOverTests() {
+  it('sends a message to the session, multi-line text as it is', async () => {
+    const r = runner()
+    await r.start(start)
+    expect(r.send('acp-1', 'use staging\nnot prod')).toBe(true)
+    expect(prompts.at(-1)).toMatchObject({ sessionId: 'acp-1', text: 'use staging\nnot prod' })
   })
-})
+}
 
-describe('when the terminal itself goes', () => {
-  describe('ending the run', endingTheRunTests)
-  describe('a host that cannot close tabs', aHostThatCannotCloseTabsTests)
-  describe('killed and failed runs', killedAndFailedRunsTests)
-})
+function sendingTests() {
+  it('is working again once it has been given something to do', async () => {
+    let clock = 1_000
+    const r = runner(() => clock)
+    await r.start(start)
+    endTurn('/speckit-implement')
+    await eventually(() => expect(r.watchable()[0].isWaiting).toBe(true))
+    clock = 9 * 60_000
+    r.send('acp-1', 'carry on')
+    expect(r.watchable()[0]).toMatchObject({ isWaiting: false, startedAt: 9 * 60_000 })
+  })
 
-function endingTheRunTests() {
-  // Supervised runs ended on the runtime's `session_end` hook. Closing the tab
-  // fires no hook, so the phase stayed running with no completion ever
-  // delivered.
+  it('interrupts by cancelling the turn, leaving the run open', async () => {
+    const r = runner()
+    await r.start(start)
+    r.interrupt('acp-1')
+    expect(cancelled).toEqual(['acp-1'])
+    expect(r.terminalFor('acp-1')).not.toBeNull()
+  })
+}
 
-  it('ends the run, carrying the terminal’s exit code', async () => {
-    const ends: Array<number | null> = []
+function stoppingTests() {
+  it('cancels the turn, says the reason, waits for that turn, then closes', async () => {
+    const r = runner()
+    await r.start(start)
+    expect(r.stop('acp-1', 'budget is spent')).toBe(true)
+    expect(cancelled).toEqual(['acp-1'])
+    expect(prompts.at(-1)?.text).toBe('budget is spent')
+    expect(agentsClosed).toEqual([])
+    endTurn('budget is spent')
+    await eventually(() => expect(agentsClosed).toEqual(['acp-1']))
+  })
+
+  it('closes at once when there is nothing to say', async () => {
+    const r = runner()
+    await r.start(start)
+    r.stop('acp-1')
+    await eventually(() => expect(agentsClosed).toEqual(['acp-1']))
+    expect(prompts.map((p) => p.text)).toEqual(['/speckit-implement'])
+  })
+}
+
+function missingSessionTests() {
+  it('refuses, reports false or shrugs, for every action', () => {
+    const r = runner()
+    expect(r.resolve('nope', 'r', { allow: true })).toBe(false)
+    expect(r.stop('nope')).toBe(false)
+    expect(r.send('nope', 'hi')).toBe(false)
+    expect(r.terminalFor('nope')).toBeNull()
+    r.interrupt('nope')
+    r.handBackToTerminal('nope', 'r')
+    expect(cancelled).toEqual([])
+  })
+
+  it('ends twice without complaint, since the agent and a dispose may both report it', async () => {
+    const ends: unknown[] = []
     const r = runner()
     await r.start({ ...start, onEnd: (code) => ends.push(code) })
-    exitListener?.(137)
-    expect(ends).toEqual([137])
-  })
-
-  it('takes the run off the register, so nothing keeps watching it', async () => {
-    const r = runner()
-    const run = await r.start(start)
-    exitListener?.(0)
-    expect(r.watchable().map((w) => w.sessionId)).not.toContain(run?.sessionId)
-  })
-
-  it('ends the run once when the hook arrives after the terminal has gone', async () => {
-    // The typed `; exit` closes the shell as the agent leaves, so the exit can beat the hook.
-    const ends: Array<number | null> = []
-    const run = await runner().start({ ...start, onEnd: (code) => ends.push(code) })
-    exitListener?.(0)
-    await report(run?.sessionId ?? '', 'session_end')
+    endListeners[0](0)
+    expect(() => r.dispose()).not.toThrow()
     expect(ends).toEqual([0])
   })
-
-  it('closes the tab of a run that ended cleanly, so finished agents do not pile up', async () => {
-    await runner().start(start)
-    exitListener?.(0)
-    expect(closed).toEqual(['terminal-1'])
-  })
 }
-
-function aHostThatCannotCloseTabsTests() {
-  it('still stops answering the agent on a host that cannot close the tab', async () => {
-    const host = runnerCoreApi() as { pty: { closeTerminalTab?: unknown } }
-    delete host.pty.closeTerminalTab
-    const r = createSupervisedRunner({
-      api: host as never,
-      control,
-      stateDir: join(dir, 'state'),
-      now: () => 1_000,
-    })
-    const call = held()
-    const run = await r.start({ ...start, onPending: call.onPending })
-    const pending = fetch(control.url, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionId: run?.sessionId, toolName: 'Bash', input: {} }),
-    }).then((res) => res.json())
-    pending.catch(() => {})
-    await call.arrived
-    expect(() => exitListener?.(0)).not.toThrow()
-    expect(await pending).toMatchObject({ permissionDecision: 'deny' })
-  })
-}
-
-function killedAndFailedRunsTests() {
-  // Closing the tab kills the shell with SIGHUP. The core reports that as no
-  // exit status; it used to arrive as 0, and the phase was recorded as ended.
-  it('ends a run whose terminal was killed with no exit status, never a clean 0', async () => {
-    const ends: Array<number | null> = []
-    await runner().start({ ...start, onEnd: (code) => ends.push(code) })
-    exitListener?.(null)
-    expect(ends).toEqual([null])
-    expect(closed).toEqual([])
-  })
-
-  it('keeps the tab of a run that failed, so the operator can read why', async () => {
-    await runner().start(start)
-    exitListener?.(137)
-    expect(closed).toEqual([])
-  })
-
-  it('stops listening once the run is over', async () => {
-    const r = runner()
-    const run = await r.start(start)
-    r.stop(run?.sessionId ?? '')
-    exitListener?.(0)
-    expect(exitDetached).toBe(true)
-  })
-}
-
-// Awaiting the response is enough: the control server runs an event's
-// handler synchronously in the tick it answers, before the answer can be read.
-async function reportEvent(sessionId: string, kind: string): Promise<void> {
-  await fetch(control.eventUrl, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ sessionId, kind }),
-  })
-}
-
-function askPermission(sessionId: string): void {
-  const pending = fetch(control.url, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ sessionId, toolName: 'Bash', input: { command: 'ls' } }),
-  })
-  pending.catch(() => {})
-}
-
-describe('running the next phase in the conversation that is already open', () => {
-  describe('no second terminal', noSecondTerminalTests)
-  describe('keeping the session', keepingTheSessionTests)
-  describe('gone sessions and turn ends', goneSessionsAndTurnEndsTests)
-  describe('permission asks', permissionAsksTests)
-  describe('the waiting flag', theWaitingFlagTests)
-})
-
-function noSecondTerminalTests() {
-  it('opens no second terminal, which is where the tab-per-phase sprawl came from', async () => {
-    const supervised = runner()
-    const run = await supervised.start(start)
-    opened.length = 0
-    supervised.continueRun(run!.sessionId, {
-      prompt: '/speckit-plan',
-      phase: 'plan' as never,
-      onPending: () => {},
-      onResolved: () => {},
-    })
-    expect(opened).toEqual([])
-    expect(created).toHaveLength(1)
-  })
-
-  it('types the next phase into the terminal the agent is already sitting in', async () => {
-    const supervised = runner()
-    const run = await supervised.start(start)
-    written.length = 0
-    supervised.continueRun(run!.sessionId, {
-      prompt: '/speckit-plan',
-      phase: 'plan' as never,
-      onPending: () => {},
-      onResolved: () => {},
-    })
-    expect(written).toEqual([{ terminal: 'terminal-1', data: '/speckit-plan\r' }])
-  })
-}
-
-function keepingTheSessionTests() {
-  it('keeps the session and its transcript, which is the point of reusing it', async () => {
-    const supervised = runner()
-    const run = await supervised.start(start)
-    const continued = supervised.continueRun(run!.sessionId, {
-      prompt: '/speckit-plan',
-      phase: 'plan' as never,
-      onPending: () => {},
-      onResolved: () => {},
-    })
-    expect(continued).toEqual(run)
-  })
-
-  it('flattens a multi-line prompt, since a newline in a terminal means send', async () => {
-    const supervised = runner()
-    const run = await supervised.start(start)
-    written.length = 0
-    supervised.continueRun(run!.sessionId, {
-      prompt: 'do this\nand that',
-      phase: 'plan' as never,
-      onPending: () => {},
-      onResolved: () => {},
-    })
-    expect(written[0].data).toBe('do this and that\r')
-  })
-}
-
-function goneSessionsAndTurnEndsTests() {
-  it('reports nothing for a session that is gone, rather than typing into thin air', () => {
-    // The tab was closed, or the console restarted. The caller's signal to open
-    // a fresh conversation instead of silently dropping the phase.
-    expect(
-      runner().continueRun('never-existed', {
-        prompt: '/speckit-plan',
-        phase: 'plan' as never,
-        onPending: () => {},
-        onResolved: () => {},
-      })
-    ).toBeNull()
-  })
-
-  it('reports the new phase’s turn end, not the one that just finished', async () => {
-    const supervised = runner()
-    const seen: string[] = []
-    const run = await supervised.start({ ...start, onTurnEnd: () => seen.push('specify') })
-    supervised.continueRun(run!.sessionId, {
-      prompt: '/speckit-plan',
-      phase: 'plan' as never,
-      onPending: () => {},
-      onResolved: () => {},
-      onTurnEnd: () => seen.push('plan'),
-    })
-    await reportEvent(run!.sessionId, 'stop')
-    expect(seen).toEqual(['plan'])
-  })
-}
-
-function permissionAsksTests() {
-  it('reports the new phase’s permission asks, not the one that just finished', async () => {
-    const supervised = runner()
-    const seen: string[] = []
-    const plan = held()
-    const run = await supervised.start({
-      ...start,
-      onPending: () => seen.push('specify'),
-    })
-    supervised.continueRun(run!.sessionId, {
-      prompt: '/speckit-plan',
-      phase: 'plan' as never,
-      onPending: (p) => {
-        seen.push('plan')
-        plan.onPending(p)
-      },
-      onResolved: () => {},
-    })
-    askPermission(run!.sessionId)
-    await plan.arrived
-    expect(seen).toEqual(['plan'])
-  })
-}
-
-function theWaitingFlagTests() {
-  it('clears the waiting flag, so the new phase is not born already blocked', async () => {
-    const supervised = runner()
-    const run = await supervised.start(start)
-    await reportEvent(run!.sessionId, 'stop')
-    expect(supervised.watchable()[0].isWaiting).toBe(true)
-    supervised.continueRun(run!.sessionId, {
-      prompt: '/speckit-plan',
-      phase: 'plan' as never,
-      onPending: () => {},
-      onResolved: () => {},
-    })
-    expect(supervised.watchable()[0].isWaiting).toBe(false)
-  })
-}
-
-describe('an agent sitting at its prompt', () => {
-  it('counts as blocked on a person, not as having stopped making progress', async () => {
-    // A phase that finished cleanly and was waiting to be approved went quiet,
-    // fired a stall eight minutes later, and stayed in the Stalls tab offering
-    // to interrupt work that was already done.
-    const supervised = runner()
-    const run = await supervised.start(start)
-    expect(supervised.watchable()[0].isWaiting).toBe(false)
-    await reportEvent(run!.sessionId, 'stop')
-    expect(supervised.watchable()[0].isWaiting).toBe(true)
-  })
-
-  it('is working again once it has been given something to do', async () => {
-    const supervised = runner()
-    const run = await supervised.start(start)
-    await reportEvent(run!.sessionId, 'stop')
-    supervised.send(run!.sessionId, 'carry on')
-    expect(supervised.watchable()[0].isWaiting).toBe(false)
-  })
-})
-
-describe('acting on a session that is not there', () => {
-  // Every one of these is reachable from the panel: it polls every five
-  // seconds, so a row can be clicked after the run behind it has ended.
-  it('refuses to answer a tool call for it, rather than reporting success', () => {
-    expect(runner().resolve('gone', 'request-1', { allow: true })).toBe(false)
-  })
-
-  it('shrugs off handing one back to a terminal that is not there', () => {
-    expect(() => runner().handBackToTerminal('gone', 'request-1')).not.toThrow()
-  })
-
-  it('shrugs off interrupting it', () => {
-    const supervised = runner()
-    supervised.interrupt('gone')
-    expect(written).toEqual([])
-  })
-
-  it('says so when asked to stop it, so a surface can report the truth', () => {
-    expect(runner().stop('gone')).toBe(false)
-  })
-
-  it('says so when asked to send it a message', () => {
-    expect(runner().send('gone', 'carry on')).toBe(false)
-  })
-
-  it('has no terminal to send anyone to', () => {
-    expect(runner().terminalFor('gone')).toBeNull()
-  })
-
-  it('ends twice without complaint, since the terminal and the runtime both report it', async () => {
-    // A clean `/exit` fires the runtime's SessionEnd hook and the terminal's
-    // own exit; whichever arrives second finds the run already gone.
-    const supervised = runner()
-    const run = await supervised.start(start)
-    exitListener?.(0)
-    expect(() => exitListener?.(0)).not.toThrow()
-    expect(supervised.terminalFor(run!.sessionId)).toBeNull()
-  })
-})
-
-const longPrompt = [
-  'Turn intent and context into criteria and a plan.',
-  '',
-  '# Read the session TTL from the environment',
-  '',
-  'x'.repeat(4000),
-].join('\n')
-
-// A terminal in canonical mode silently mangles anything past `MAX_CANON` on
-// one line — 1024 bytes on macOS. A brief is a role prompt plus a whole work
-// order, which is always longer, and it was typed at the shell prompt. A live
-// run's agent came up with a fragment of the order repeated fifteen times and
-// the rest cut off mid-word, and nothing could see it: the terminal shows the
-// first line correctly, the agent starts, and it does the wrong work or none.
-describe('launching with a brief longer than a terminal line', () => {
-  describe('line length', lineLengthTests)
-  describe('what still shows', whatStillShowsTests)
-  describe('the heredoc', theHeredocTests)
-})
-
-const IDENTITY = [
-  'CLAUDE_CODE_BRIDGE_SESSION_ID',
-  'CLAUDE_CODE_MESSAGING_SOCKET',
-  'CLAUDE_CODE_MESSAGING_TOKEN',
-  'CLAUDE_CODE_SESSION_ID',
-  'CLAUDE_CODE_CHILD_SESSION',
-  'CLAUDE_PID',
-  'CLAUDECODE',
-]
-
-function lineLengthTests() {
-  /** The canonical-mode line limit this is all about. */
-  const MAX_CANON = 1024
-
-  it('never types a line the terminal cannot carry', async () => {
-    await runner().start({ ...start, prompt: longPrompt })
-    for (const { data } of written) {
-      for (const line of data.split(/\r|\n/)) {
-        expect(line.length, `typed ${line.length} bytes: ${line.slice(0, 60)}…`).toBeLessThan(
-          MAX_CANON
-        )
-      }
-    }
-  })
-
-  it('puts the whole brief in a file the terminal runs instead', async () => {
-    await runner().start({ ...start, prompt: longPrompt })
-    const body = launchScriptBody()
-    expect(body).toContain(longPrompt.slice(0, 48))
-    // Intact, not truncated: the tail of the brief is there too.
-    expect(body).toContain('x'.repeat(4000))
-  })
-}
-
-function whatStillShowsTests() {
-  it('still shows the whole command in the terminal, which is the point of a terminal', async () => {
-    await runner().start({ ...start, prompt: longPrompt })
-    const body = launchScriptBody()
-    // A quoted heredoc, so the brief is echoed rather than expanded or run.
-    expect(body).toContain("cat <<'TERMINATOR_LAUNCH'")
-    expect(body).toMatch(/claude --session-id/)
-    expect(body).toContain('exec ')
-  })
-
-  it('carries the environment the skills read, as it always did', async () => {
-    await runner().start({ ...start, prompt: longPrompt })
-    const body = launchScriptBody()
-    expect(body).toContain('SPECIFY_FEATURE=')
-    expect(body).toContain('CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1')
-  })
-}
-
-function theHeredocTests() {
-  it('never lets the brief out of the quoted heredoc, so nothing in it is run', async () => {
-    await runner().start({ ...start, prompt: 'plan it\nTERMINATOR_LAUNCH\nrm -rf /' })
-    const body = launchScriptBody()
-    // The brief reaches the script as a single shell-quoted argument, so a line
-    // that looks like the terminator is inside quotes rather than ending it.
-    const afterHeredoc = body.slice(body.indexOf("cat <<'TERMINATOR_LAUNCH'"))
-    const firstEnd = afterHeredoc.indexOf('\nTERMINATOR_LAUNCH\n')
-    expect(firstEnd).toBeGreaterThan(0)
-    expect(afterHeredoc.slice(firstEnd)).toContain('exec ')
-  })
-}
-
-// A fresh agent must not inherit another session's identity.
-//
-// Terminator launched from a Claude Code terminal passes its whole environment
-// down. The agent came up carrying the *parent's* bridge session, messaging
-// socket and session id, joined that bridge, and sat at `lastSequenceNum: 0`
-// waiting for instructions only the parent could send. It produced no turn at
-// all, and from the console it looked exactly like an agent thinking. Four
-// live runs died on it.
-describe('the parent session it must not inherit', () => {
-  describe('unsetting', unsettingTests)
-  describe('what it keeps', supervisedRunnerWhatItKeepsTests)
-})
-
-function unsettingTests() {
-  it.each(IDENTITY)('unsets %s before the agent starts', async (name) => {
-    await runner().start(start)
-    const body = launchScriptBody()
-    const line = body.split('\n').find((l) => l.startsWith('unset '))
-    expect(line, 'no unset line in the launch script').toBeDefined()
-    expect(line?.split(/\s+/)).toContain(name)
-  })
-
-  it('unsets them before anything else runs, not after', async () => {
-    await runner().start(start)
-    const body = launchScriptBody()
-    expect(body.indexOf('unset ')).toBeLessThan(body.indexOf('exec '))
-    expect(body.indexOf('unset ')).toBeLessThan(body.indexOf('SPECIFY_FEATURE='))
-  })
-}
-
-function supervisedRunnerWhatItKeepsTests() {
-  it('still forces session persistence, which is the other half of the same problem', async () => {
-    await runner().start(start)
-    expect(launchScriptBody()).toContain('CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1')
-  })
-
-  it('keeps the session id it was given, which is not inherited but chosen', async () => {
-    const run = await runner().start(start)
-    expect(launchScriptBody()).toContain(`--session-id ${run?.sessionId}`)
-  })
-}
-
-// The other half of the stall the detector could not have seen through. A
-// session's `startedAt` was written once, at registration, and the stall
-// detector measures silence from the later of that and the last tool call —
-// so a conversation the operator came back to after twenty minutes was judged
-// against a start twenty minutes stale, and fired the instant it was given
-// work again. When a session is handed a new turn it enters a new state, and
-// that is when the state began.
-describe('when a session is given something new to do', () => {
-  it('measures from the new turn, not from when the conversation opened', async () => {
-    let clock = 1_000
-    const supervised = runner(() => clock)
-    const run = await supervised.start(start)
-    expect(supervised.watchable()[0].startedAt).toBe(1_000)
-
-    clock = 20 * 60_000
-    supervised.continueRun(run!.sessionId, {
-      prompt: '/speckit-plan',
-      phase: 'plan' as never,
-      onPending: () => {},
-      onResolved: () => {},
-    })
-    expect(supervised.watchable()[0].startedAt).toBe(20 * 60_000)
-  })
-
-  it('does the same for a message typed into a run already open', async () => {
-    let clock = 1_000
-    const supervised = runner(() => clock)
-    const run = await supervised.start(start)
-
-    clock = 9 * 60_000
-    expect(supervised.send(run!.sessionId, 'carry on')).toBe(true)
-    expect(supervised.watchable()[0].startedAt).toBe(9 * 60_000)
-  })
-})
 
 const command = {
   worktreePath: '/wt/feat-thing',
@@ -982,7 +630,6 @@ function openingTheTabTests() {
   it("runs the command's script as the terminal's process, typing nothing", async () => {
     exitWith({ exitCode: 0 })
     await runner().runCommand(command)
-    expect(written).toEqual([])
     const shell = process.env.SHELL ?? '/bin/sh'
     expect(ran[0].file).toBe(shell)
     // An interactive login shell reads the startup files, then execs the script.
@@ -1102,56 +749,6 @@ function exportedEnvironmentTests(shell: string) {
     expect(script.indexOf("export TWO='2'")).toBeLessThan(script.lastIndexOf('true'))
   })
 }
-
-/** A `claude` on PATH that records FOUNDRY_RUN and exits with `status`. */
-function stubClaude(stubDir: string, status: number): { env: NodeJS.ProcessEnv; marker: string } {
-  const marker = join(stubDir, 'foundry-run.txt')
-  const stub = join(stubDir, 'claude')
-  writeFileSync(stub, `#!/bin/sh\nprintf '%s' "$FOUNDRY_RUN" > '${marker}'\nexit ${status}\n`, {
-    mode: 0o700,
-  })
-  return { env: { ...process.env, PATH: `${stubDir}:${process.env.PATH ?? ''}` }, marker }
-}
-
-/** The line typed into the tab, without its carriage return. */
-async function typedLine(): Promise<string> {
-  await runner().start(start)
-  const typed = written.map((w) => w.data).join('')
-  expect(typed.endsWith('; exit\r')).toBe(true)
-  return typed.slice(0, -1)
-}
-
-// The agent is `exec`ed by its launch script, so nothing before the binary name may be a
-// `VAR=1` assignment (`exec VAR=1 claude` is "command not found", exit 127).
-describe('the agent launch under a real shell', () => {
-  let stubDir: string
-
-  beforeEach(() => {
-    stubDir = makeTempDir('supervised-runner-stub-')
-  })
-
-  afterEach(() => {
-    rmSync(stubDir, { recursive: true, force: true, maxRetries: 5 })
-  })
-
-  for (const shell of LOG_SHELLS) {
-    it(`(${shell}) starts the agent with FOUNDRY_RUN=1 set`, async () => {
-      const { env, marker } = stubClaude(stubDir, 0)
-      await runner().start(start)
-      const script = /([^'\s]*\/launch\/[\w-]+\.sh)/.exec(written.map((w) => w.data).join(''))?.[1]
-      if (script === undefined) throw new Error('no launch script was typed')
-      const result = spawnSync(shell, [script], { env })
-      expect(result.status).toBe(0)
-      expect(readFileSync(marker, 'utf8')).toBe('1')
-    })
-
-    it(`(${shell}) ends the tab's shell with the agent's exit status`, async () => {
-      const { env } = stubClaude(stubDir, 127)
-      const result = spawnSync(shell, ['-c', await typedLine()], { env })
-      expect(result.status).toBe(127)
-    })
-  }
-})
 
 // The app adopts only PATH from the login shell, so a bare `$SHELL script` lost what startup
 // files export (extensions/foundry/CLAUDE.md, "Verification commands"). A real PTY and a

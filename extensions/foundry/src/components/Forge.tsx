@@ -293,7 +293,7 @@ export interface ForgeProps {
 
 async function attachToSession(sessionId: string): Promise<string | null> {
   const r = (await invoke('foundry:run-terminal', { sessionId })) as { ok?: boolean }
-  return r.ok === true ? null : 'that conversation no longer has a terminal'
+  return r.ok === true ? null : 'that conversation no longer has an agent tab'
 }
 
 /** One row's icon, from its state. */

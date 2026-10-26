@@ -1,19 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import * as fs from 'node:fs'
-import * as path from 'node:path'
-import type { ExtensionAPI } from '@terminator/extension-sdk'
+import { describe, it, expect } from 'vitest'
 
-import {
-  trustRepository,
-  isProbedCommand,
-  readOnlyAutoDecide,
-} from '../../src/runtime/agent-policy.js'
+import { isProbedCommand, readOnlyAutoDecide } from '../../src/runtime/agent-policy.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-import type { LedgerEntry } from '../../src/ledger/append.js'
-import { temporaryDirectory } from '../helpers/foundry-host.js'
-import { partialFake } from '../../../../tests/support/fakes'
-import { eventually } from '../../../../tests/support/eventually'
 
 function orderProbing(test: string | null): WorkOrder {
   const base = draftOrder({
@@ -70,53 +59,3 @@ describe('a read-only turn in the Forge', () => {
     expect(decide('Read', { file_path: '/repos/app/src/a.ts' }).allow).toBe(true)
   })
 })
-
-let home: string
-const entries: LedgerEntry[] = []
-const api = partialFake<ExtensionAPI>({ log: partialFake<ExtensionAPI['log']>({ error: vi.fn() }) })
-
-describe('trusting the repository an agent starts in', () => {
-  beforeEach(() => {
-    home = temporaryDirectory('fdry-home')
-    vi.stubEnv('HOME', home)
-    entries.length = 0
-    vi.mocked(api.log.error).mockClear()
-  })
-
-  afterEach(() => vi.unstubAllEnvs())
-
-  describe('trusting', agentPolicyTrustingTests)
-})
-
-function agentPolicyTrustingTests() {
-  const store = { record: async (entry: LedgerEntry) => void entries.push(entry) }
-
-  it('marks it trusted in the Claude Code configuration and says so on the order', async () => {
-    fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ projects: {} }))
-    trustRepository(api, '/repos/app', { orderId: 'WO-1', store })
-    const config = JSON.parse(fs.readFileSync(path.join(home, '.claude.json'), 'utf8'))
-    expect(config.projects['/repos/app'].hasTrustDialogAccepted).toBe(true)
-    await eventually(() => expect(entries.map((e) => e.action)).toEqual(['workspace.trusted']))
-    expect(entries[0]).toMatchObject({ orderId: 'WO-1', subject: '/repos/app' })
-  })
-
-  it('records nothing when it was already trusted', () => {
-    fs.writeFileSync(
-      path.join(home, '.claude.json'),
-      JSON.stringify({ projects: { '/repos/app': { hasTrustDialogAccepted: true } } })
-    )
-    trustRepository(api, '/repos/app', { orderId: 'WO-1', store })
-    expect(entries).toEqual([])
-    expect(api.log.error).not.toHaveBeenCalled()
-  })
-
-  it('logs that the agent will stop at the dialog when the configuration cannot be written', () => {
-    const config = path.join(home, '.claude.json')
-    fs.writeFileSync(config, JSON.stringify({ projects: {} }))
-    // Something already sits where the new configuration is written first.
-    fs.mkdirSync(`${config}.foundry-${process.pid}.tmp`)
-    trustRepository(api, '/repos/app', { orderId: 'WO-1', store })
-    expect(api.log.error).toHaveBeenCalledWith(expect.stringContaining('trust dialog'))
-    expect(entries).toEqual([])
-  })
-}

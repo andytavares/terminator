@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import type { ExtensionAPI } from '@terminator/extension-sdk'
+import type { ExtensionAPI, StartAgentInput } from '@terminator/extension-sdk'
 import { shellQuote } from '@terminator/extension-sdk/node'
-import { buildLaunchSpec } from './claude-launch.js'
+import { transcriptPathFor, writeRunSettings } from './claude-launch.js'
 import { installHookScript } from './hook-script.js'
 import type { ControlServer } from './control-server.js'
 import {
@@ -13,6 +13,7 @@ import {
   type PermissionOutcome,
 } from './permission-bridge.js'
 import { countTurns, transcriptSize } from './transcript-tailer.js'
+import { letAutoModeDecide } from '../state/settings.js'
 import type { WatchedRun } from './stall-watcher.js'
 
 /**
@@ -25,24 +26,16 @@ type StepLabel = string
 
 // Running a phase where the operator can see it.
 //
-// This replaces spawning `claude --print --permission-mode bypassPermissions`
-// as a hidden child process. Two things were wrong with that, and they
-// compounded: the run was invisible — no terminal, nothing to read, nothing to
-// type into, and taking over meant resuming the conversation somewhere else —
-// and it approved every tool call on the operator's behalf without telling
-// them. A card could rewrite anything in its worktree and the first you knew
-// was the diff.
-//
-// So the agent runs in a real terminal, in the card's own worktree project, and
-// every tool call goes through a PreToolUse hook that holds it still until
-// somebody decides. The operator can type in that same terminal at any time
-// without the runner losing track, because what it watches is the transcript
-// and the hooks rather than the process.
+// The agent runs over ACP (`api.agents`, ADR 130) in a tab of the card's own
+// worktree project, and every tool call goes through a PreToolUse hook that
+// holds it still until somebody decides. The operator can type in that same
+// tab at any time without the runner losing track, because what it watches is
+// the transcript, the hooks and the end of each prompt rather than the process.
 
 export interface SupervisedRun {
-  /** The claude session id, which this chose. `--resume` continues it. */
+  /** The claude session id, which the agent chose. `resume` continues it. */
   readonly sessionId: string
-  /** The terminal it is running in, so a surface can go to it. */
+  /** The agent tab it is running in (the ACP session id), so a surface can go to it. */
   readonly terminalSessionId: string
   /** Where the runtime writes its record, known before it exists. */
   readonly transcriptPath: string
@@ -72,13 +65,12 @@ export interface StartSupervisedRunOptions {
   phase: StepLabel
   /** Resume an existing conversation rather than starting one. */
   resumeSessionId?: string
-  /** What `--model` gets. Empty or absent leaves the flag off entirely. */
+  /** The model to run. Empty or absent leaves the operator's own configuration. */
   model?: string
-  /** What `--effort` gets. Absent leaves the flag off entirely. */
+  /** The effort to run at. Absent leaves the operator's own configuration. */
   effort?: string
   /**
-   * Where this node's skills were mounted, one `--add-dir` per entry. Absent
-   * or empty mounts none.
+   * Where this node's skills were mounted. Absent or empty mounts none.
    */
   addDirs?: string[]
   /** Decides without asking when the autonomy ladder allows it. */
@@ -88,21 +80,20 @@ export interface StartSupervisedRunOptions {
   onPending: (pending: PendingPermission) => void
   onResolved: (requestId: string, decision: PermissionOutcome) => void
   /**
-   * The run exists and can be found, before anything is typed into it.
+   * The run exists and can be found, before the first prompt is sent.
    *
-   * Ordering, not decoration: the launch command goes to the terminal inside
-   * `start`, and anything the agent does between that write and `start`
-   * returning would reach a caller that had not registered the run yet.
+   * Ordering, not decoration: the prompt is sent inside `start`, and anything
+   * the agent does after it would reach a caller that had not registered the
+   * run yet.
    */
   onRegistered?: (run: SupervisedRun) => void
   /** The agent stopped responding and is waiting. Not an ending. */
   onTurnEnd?: (turns: number) => void
   /**
-   * The conversation is over, with the terminal's exit code when there is one.
+   * The conversation is over, with the agent process's exit code when there is one.
    *
-   * Zero when the runtime reported a clean `SessionEnd`; whatever the shell
-   * exited with when the process died, and null when closing the tab or a
-   * signal ended it. A phase that
+   * Zero when it exited cleanly; whatever it exited with when it died, and
+   * null when a signal ended it. A phase that
    * crashed must not land in `awaiting_review`, which is an approval gate over
    * nothing.
    */
@@ -113,7 +104,7 @@ export interface StartSupervisedRunOptions {
  * The parts of a run that belong to the phase rather than to the session.
  *
  * Everything here is rebound when a card moves from one phase to the next in
- * the same conversation: the terminal, the session id and the transcript are
+ * the same conversation: the tab, the session id and the transcript are
  * the card's, but "which phase finished" is not.
  */
 interface PhaseCallbacks {
@@ -146,7 +137,7 @@ export interface SupervisedRunner {
   /**
    * Runs the next phase inside a conversation that is already open.
    *
-   * A card used to get one terminal, one session and one `claude` process per
+   * A card used to get one tab, one session and one `claude` process per
    * phase: five tabs for a single card, five transcripts, five agents that had
    * each read the spec from scratch — and, because the earlier ones never
    * exited, four of them sitting idle in the run list looking stalled.
@@ -177,7 +168,7 @@ export interface SupervisedRunner {
    * changed nothing.
    */
   resolve(sessionId: string, requestId: string, decision: PermissionDecision): boolean
-  /** Gives one back to the terminal, for answering where the agent is. */
+  /** Gives one back to the agent tab, for answering where the agent is. */
   handBackToTerminal(sessionId: string, requestId: string): void
   /** Ends the current turn, leaving the session open so a redirect lands. */
   interrupt(sessionId: string): void
@@ -201,17 +192,6 @@ export interface SupervisedRunner {
   dispose(): void
 }
 
-/**
- * One line, whatever was typed.
- *
- * A newline in a terminal is "send". A three-line redirect pasted into the box
- * therefore arrived as three separate turns, the agent answering the first
- * fragment before it had read the rest.
- */
-function oneLine(text: string): string {
-  return text.replace(/\r?\n/g, ' ').trim()
-}
-
 // The shell's arguments for a check: `-i -l -c` reads the startup files a typed command
 // got (https://zsh.sourceforge.io/Doc/Release/Files.html, https://www.gnu.org/software/bash/manual/html_node/Bash-Startup-Files.html),
 // then `exec` makes the single-quoted script the process whose exit code is reported.
@@ -219,16 +199,10 @@ function startupFilesThen(shell: string, script: string): string[] {
   return ['-i', '-l', '-c', `exec ${shellQuote(shell)} ${shellQuote(script)}`]
 }
 
-/** Escape. Ends the turn and keeps the session, which is what makes a redirect land. */
-const INTERRUPT = '\x1b'
-
-/** Ends the conversation the way a person would, so the runtime writes its record. */
-const EXIT = '/exit\r'
-
 interface Running {
   bridge: ReturnType<typeof createPermissionBridge>
-  /** Stops listening for the terminal's exit once the run is over. */
-  detachExit: (() => void) | null
+  /** Stops listening for the agent's exit once the run is over. */
+  detachEnd: () => void
   terminalSessionId: string
   projectId: string
   transcriptPath: string
@@ -256,24 +230,6 @@ export interface SupervisedRunnerOptions {
   stateDir: string
   now?: () => number
 }
-
-/**
- * The parent Claude Code session's own variables.
- *
- * Identity and transport, never preferences: an agent that inherits these is
- * an agent talking on somebody else's channel.
- */
-const INHERITED_SESSION_VARS = [
-  'CLAUDE_CODE_BRIDGE_SESSION_ID',
-  'CLAUDE_CODE_MESSAGING_SOCKET',
-  'CLAUDE_CODE_MESSAGING_TOKEN',
-  'CLAUDE_CODE_SESSION_ID',
-  'CLAUDE_CODE_ENTRYPOINT',
-  'CLAUDE_CODE_CHILD_SESSION',
-  'CLAUDE_CODE_EXECPATH',
-  'CLAUDE_PID',
-  'CLAUDECODE',
-] as const
 
 /** What every part of one runner shares: the host, the control server, and the live runs. */
 interface RunnerContext {
@@ -321,38 +277,6 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       }
     },
   }
-}
-
-// The launch as a file the terminal runs, not a typed line: canonical mode mangles a
-// line past `MAX_CANON`, and a brief is longer. The `cat` echo keeps the whole command
-// readable in the terminal (SUPERVISION.md, "The launch is a file, not a typed line").
-function writeLaunchScript(
-  stateDir: string,
-  sessionId: string,
-  parts: { exports: string; command: string }
-): string {
-  const dir = path.join(stateDir, 'launch')
-  fs.mkdirSync(dir, { recursive: true })
-  const file = path.join(dir, `${sessionId}.sh`)
-  fs.writeFileSync(
-    file,
-    [
-      '#!/bin/sh',
-      '# Written by Terminator. One per session; overwritten on every start.',
-      // A fresh agent must not inherit the parent Claude Code session's identity from
-      // the environment (SUPERVISION.md, "A fresh agent, not the parent's session").
-      `unset ${INHERITED_SESSION_VARS.join(' ')}`,
-      parts.exports,
-      // A quoted heredoc: nothing in the brief is expanded or run.
-      "cat <<'TERMINATOR_LAUNCH'",
-      parts.command,
-      'TERMINATOR_LAUNCH',
-      `exec ${parts.command}`,
-      '',
-    ].join('\n'),
-    { mode: 0o700 }
-  )
-  return file
 }
 
 /** One check's command, the id its script is named by, and where its output is kept. */
@@ -405,55 +329,52 @@ function end(context: RunnerContext, sessionId: string, clean: boolean): void {
   const run = context.running.get(sessionId)
   if (run === undefined) return
   context.running.delete(sessionId)
-  run.detachExit?.()
+  run.detachEnd()
   // Anything still waiting can no longer be answered from here, and an
   // unresolved promise holds the agent's tool call open forever.
   run.bridge.rejectAll('This run has ended')
   run.release()
-  // Last and optional: an installed host older than `closeTerminalTab`
-  // threw here and skipped everything after it.
-  if (clean) context.api.pty.closeTerminalTab?.(run.terminalSessionId)
+  if (clean) void context.api.agents.close(sessionId).catch(() => undefined)
 }
 
 async function startSupervisedRun(
   context: RunnerContext,
   start: StartSupervisedRunOptions
 ): Promise<SupervisedRun | null> {
-  // Ours, not the runtime's. Choosing it means the transcript path is known
-  // before the process exists and a hook callback needs no correlation.
-  const sessionId = start.resumeSessionId ?? randomUUID()
+  // The worktree becomes a project, so the agent has a tab to live in and the
+  // operator can find it in the sidebar rather than only in a card.
+  const project = await addWorktreeProject(context.api, start)
+  if (project === null) return null
 
+  // Ours: the hook and the control server are keyed by it, and the agent's own
+  // session id is not known until it has started.
+  const runId = randomUUID()
+  const started = await context.api.agents.start(
+    agentStartInput(context, start, { projectId: project.id, runId })
+  )
+  // No tab, no run. Said out loud rather than starting an agent nobody can see.
+  if (started === null) return null
+
+  const { sessionId } = started
   // A box shared with the record, so `continueRun` can move a hook to another phase
   // without a new session; the closures exist before the record does.
   const phase: Running['phase'] = { current: { id: start.phase, ...start } }
-
   const bridge = permissionBridgeFor(context, sessionId, { phase, autoDecide: start.autoDecide })
-  const spec = launchSpecFor(context, sessionId, start)
-  const release = registerControl(context, sessionId, { bridge, phase, spec })
-
-  const opened = await openSupervisedTerminal(context, start)
-  if (opened === null) {
-    release()
-    return null
-  }
-  const { projectId, terminalSessionId } = opened
-  const { transcriptPath } = spec
-  const featureDir = start.featureDir
+  const release = registerControl(context, runId, bridge)
   const run = trackRun(context, sessionId, {
     bridge,
     release,
     phase,
-    projectId,
-    terminalSessionId,
-    transcriptPath,
-    featureDir,
+    projectId: project.id,
+    terminalSessionId: sessionId,
+    transcriptPath: transcriptPathFor(start.worktreePath, sessionId),
+    featureDir: start.featureDir,
   })
 
-  // Registered before a single keystroke reaches the terminal: the launch
-  // command is written below, and a hook or turn-end arriving before the
+  // Registered before the first prompt: a hook or turn end arriving before the
   // caller had added the run would hit an empty registry and be dropped.
   start.onRegistered?.({ ...run })
-  typeLaunch(context, run, { featureDir, command: spec.command })
+  promptSession(context, sessionId, start.prompt)
   return run
 }
 
@@ -492,110 +413,115 @@ function permissionBridgeFor(
   })
 }
 
-function launchSpecFor(
-  context: RunnerContext,
-  sessionId: string,
-  start: StartSupervisedRunOptions
-): ReturnType<typeof buildLaunchSpec> {
-  const { control } = context
-  return buildLaunchSpec({
-    sessionId,
-    resume: start.resumeSessionId !== undefined,
-    cwd: start.worktreePath,
-    prompt: start.prompt,
-    model: start.model,
-    effort: start.effort,
-    addDirs: start.addDirs,
-    settingsDirectory: path.join(context.stateDir, 'settings'),
-    hookScriptPath: context.hookScriptPath,
-    controlUrl: control.url,
-    controlEventUrl: control.eventUrl,
-    controlToken: control.token,
-  })
+/** The Claude options for one run: settings file, model, effort, skill folders and environment. */
+function claudeOptions(start: StartSupervisedRunOptions, settings: string): object {
+  const featureSlug = path.basename(start.featureDir)
+  return {
+    settings,
+    // Empty means "follow the operator's own configuration", so it is left out.
+    ...(start.model ? { model: start.model } : {}),
+    ...(start.effort ? { effort: start.effort } : {}),
+    additionalDirectories: start.addDirs ?? [],
+    env: {
+      SPECIFY_FEATURE: featureSlug,
+      SPECIFY_FEATURE_DIRECTORY: path.join('specs', featureSlug),
+      CLAUDE_CODE_FORCE_SESSION_PERSISTENCE: '1',
+      FOUNDRY_RUN: '1',
+      CLAUDE_CODE_ARTIFACT_AUTO_OPEN: '0',
+    },
+  }
 }
 
-/** What the control server's hooks for one session reach. */
-interface ControlSeams {
-  readonly bridge: Running['bridge']
-  readonly phase: Running['phase']
-  readonly spec: { readonly transcriptPath: string }
+/** What `api.agents.start` is given for one run. */
+function agentStartInput(
+  context: RunnerContext,
+  start: StartSupervisedRunOptions,
+  { projectId, runId }: { projectId: string; runId: string }
+): StartAgentInput {
+  const settings = writeRunSettings({
+    runId,
+    settingsDirectory: path.join(context.stateDir, 'settings'),
+    hookScriptPath: context.hookScriptPath,
+    controlUrl: context.control.url,
+    controlToken: context.control.token,
+  })
+  return {
+    cwd: start.worktreePath,
+    resume: start.resumeSessionId,
+    // Auto mode answers what the ladder defers; `default` asks the operator.
+    mode: letAutoModeDecide(context.api) ? 'auto' : 'default',
+    tab: { projectId, title: start.title },
+    agentMeta: { claudeCode: { options: claudeOptions(start, settings) } },
+  }
 }
 
 /** The session's hooks on the control server; returns what releases them. */
 function registerControl(
   context: RunnerContext,
-  sessionId: string,
-  { bridge, phase, spec }: ControlSeams
+  runId: string,
+  bridge: Running['bridge']
 ): () => void {
-  return context.control.register(sessionId, {
+  return context.control.register(runId, {
     decide: (request) => bridge.canUseTool(request.toolName, request.input),
-    onEvent: (kind) => {
-      const run = context.running.get(sessionId)
-      if (kind === 'stop') {
-        // Finished responding and sitting at the prompt is blocked on a person, like a
-        // held call, so the stall detector must not read a finished phase as stuck.
-        if (run !== undefined) run.isWaiting = true
-        phase.current.onTurnEnd?.(countTurns(spec.transcriptPath))
-        return
-      }
-      phase.current.onEnd?.(0)
-      end(context, sessionId, true)
+  })
+}
+
+/** Sends a prompt; its end is a turn end, unless the turn was cut short or failed. */
+function promptSession(context: RunnerContext, sessionId: string, text: string): void {
+  context.api.agents.prompt(sessionId, text).then(
+    ({ stopReason }) => {
+      if (stopReason !== 'cancelled' && stopReason !== 'error') turnEnded(context, sessionId)
     },
+    // A dead agent is reported by `onEnd`; a failed prompt adds nothing to it.
+    () => undefined
+  )
+}
+
+function turnEnded(context: RunnerContext, sessionId: string): void {
+  const run = context.running.get(sessionId)
+  if (run === undefined) return
+  // Finished responding and sitting at the prompt is blocked on a person, like a
+  // held call, so the stall detector must not read a finished phase as stuck.
+  run.isWaiting = true
+  run.phase.current.onTurnEnd?.(countTurns(run.transcriptPath))
+}
+
+/** The worktree as a project of the card's workspace. */
+function addWorktreeProject(
+  api: ExtensionAPI,
+  options: Pick<RunCommandOptions, 'workspaceId' | 'branch' | 'worktreePath' | 'issue'>
+) {
+  return api.workspace.addProject({
+    workspaceId: options.workspaceId,
+    name: options.branch,
+    worktreePath: options.worktreePath,
+    gitBranch: options.branch,
+    issue: options.issue,
   })
 }
 
-/** Where a run lives: its worktree's project, and the terminal tab in it. */
-async function openSupervisedTerminal(
-  { api }: RunnerContext,
-  start: StartSupervisedRunOptions
-): Promise<{ projectId: string; terminalSessionId: string } | null> {
-  // The worktree becomes a project, so the terminal has somewhere to live
-  // and the operator can find it in the sidebar rather than only in a card.
-  const project = await api.workspace.addProject({
-    workspaceId: start.workspaceId,
-    name: start.branch,
-    worktreePath: start.worktreePath,
-    gitBranch: start.branch,
-    issue: start.issue,
-  })
-  if (project === null) return null
-
-  const terminalSessionId = await api.pty.openTerminal({
-    projectId: project.id,
-    cwd: start.worktreePath,
-    tabTitle: start.title,
-    type: 'agent',
-  })
-  // No terminal, no run. Said out loud rather than starting an agent
-  // nobody can see, which is the thing this replaced.
-  if (terminalSessionId === null) return null
-  return { projectId: project.id, terminalSessionId }
-}
-
-/** The record of a run, from the moment its terminal exists; returns how a caller finds it. */
+/** The record of a run, from the moment its agent exists; returns how a caller finds it. */
 function trackRun(
   context: RunnerContext,
   sessionId: string,
-  run: Omit<Running, 'detachExit' | 'startedAt' | 'isWaiting'>
+  run: Omit<Running, 'detachEnd' | 'startedAt' | 'isWaiting'>
 ): SupervisedRun {
-  // The terminal dying is the other way a run ends: `session_end` fires only when the
-  // runtime exits cleanly, so a closed tab would leave the phase `running`.
-  const detachExit =
-    context.api.pty.onExit?.(run.terminalSessionId, (exitCode: number | null) => {
-      run.phase.current.onEnd?.(exitCode)
-      end(context, sessionId, exitCode === 0)
-    }) ?? null
+  // The agent dying is how a run ends, whether it exited or the tab was closed.
+  const detachEnd = context.api.agents.onEnd(sessionId, (exitCode: number | null) => {
+    run.phase.current.onEnd?.(exitCode)
+    end(context, sessionId, exitCode === 0)
+  })
 
   context.running.set(sessionId, {
     ...run,
-    detachExit,
+    detachEnd,
     startedAt: context.now(),
     isWaiting: false,
   })
 
-  // Before a keystroke reaches the terminal: everything already in this
-  // file belongs to the nodes that came before this one in the lane's
-  // conversation, and reading past it attributes their work to this node.
+  // Before the first prompt: everything already in this file belongs to the
+  // nodes that came before this one in the lane's conversation, and reading
+  // past it attributes their work to this node.
   const { terminalSessionId, transcriptPath } = run
   return {
     sessionId,
@@ -605,36 +531,11 @@ function trackRun(
   }
 }
 
-// The launch, run through its script with the card's paths exported for the skills, and
-// `; exit` so the tab ends with the script's status (SUPERVISION.md, "Two things the runtime
-// does to a supervised run" and "The launch is a file, not a typed line").
-function typeLaunch(
-  context: RunnerContext,
-  { sessionId, terminalSessionId }: SupervisedRun,
-  { featureDir, command }: { featureDir: string; command: string }
-): void {
-  const featureSlug = path.basename(featureDir)
-  const launchScript = writeLaunchScript(context.stateDir, sessionId, {
-    exports: `export SPECIFY_FEATURE=${shellQuote(featureSlug)} SPECIFY_FEATURE_DIRECTORY=${shellQuote(path.join('specs', featureSlug))} CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1 FOUNDRY_RUN=1`,
-    command,
-  })
-  context.api.pty.write(
-    terminalSessionId,
-    `${shellQuote(process.env.SHELL ?? '/bin/sh')} ${shellQuote(launchScript)}; exit\r`
-  )
-}
-
 async function runCommandInTab(
   { api, stateDir }: RunnerContext,
   options: RunCommandOptions
 ): Promise<number | null> {
-  const project = await api.workspace.addProject({
-    workspaceId: options.workspaceId,
-    name: options.branch,
-    worktreePath: options.worktreePath,
-    gitBranch: options.branch,
-    issue: options.issue,
-  })
+  const project = await addWorktreeProject(api, options)
   if (project === null) return null
 
   // The script is the tab's own process, so the exit the core reports is
@@ -663,11 +564,11 @@ function continueRun(
 ): SupervisedRun | null {
   const run = context.running.get(sessionId)
   // Gone: the tab was closed, the agent exited, or the console restarted.
-  // Saying so lets the caller open a fresh one rather than typing a
-  // `/speckit-plan` into a terminal that is not there.
+  // Saying so lets the caller open a fresh one rather than sending a
+  // `/speckit-plan` to a session that is not there.
   if (run === undefined) return null
 
-  // Swapped before a keystroke reaches the terminal, or the first thing the
+  // Swapped before the prompt is sent, or the first thing the
   // new phase does is reported against the phase that just finished.
   run.phase.current = { id: next.phase, ...next }
   // A phase that begins on a held tool call is a phase that begins blocked,
@@ -678,10 +579,10 @@ function continueRun(
   // conversation resumed after a gap is not judged against a stale start.
   run.startedAt = context.now()
 
-  // Typed as a person would type it. The agent is sitting at its prompt
-  // with the whole card's conversation behind it: the spec it wrote, the
-  // plan it derived from it, and every decision made in between.
-  context.api.pty.write(run.terminalSessionId, `${oneLine(next.prompt)}\r`)
+  // The agent is sitting at its prompt with the whole card's conversation
+  // behind it: the spec it wrote, the plan it derived from it, and every
+  // decision made in between.
+  promptSession(context, sessionId, next.prompt)
 
   return {
     sessionId,
@@ -693,21 +594,21 @@ function continueRun(
 
 /** Ends the current turn, leaving the session open so a redirect lands. */
 function interruptRun(context: RunnerContext, sessionId: string): void {
-  const run = context.running.get(sessionId)
-  if (run !== undefined) context.api.pty.write(run.terminalSessionId, INTERRUPT)
+  if (context.running.has(sessionId)) context.api.agents.cancel(sessionId)
 }
 
 function stopSupervisedRun(context: RunnerContext, sessionId: string, reason?: string): boolean {
-  const run = context.running.get(sessionId)
-  if (run === undefined) return false
-  const { pty } = context.api
+  if (!context.running.has(sessionId)) return false
+  const { agents } = context.api
   // The turn first, or the reason queues behind whatever it is part-way
   // through and the run outlives the instruction to end.
-  pty.write(run.terminalSessionId, INTERRUPT)
-  if (reason !== undefined && reason.trim() !== '') {
-    pty.write(run.terminalSessionId, `${oneLine(reason)}\r`)
-  }
-  pty.write(run.terminalSessionId, EXIT)
+  agents.cancel(sessionId)
+  const said =
+    reason !== undefined && reason.trim() !== ''
+      ? agents.prompt(sessionId, reason.trim())
+      : Promise.resolve(undefined)
+  // Closing ends the agent, whose exit is then reported by `onEnd`.
+  void said.then(() => agents.close(sessionId)).catch(() => undefined)
   return true
 }
 
@@ -718,9 +619,7 @@ function sendToSession(context: RunnerContext, sessionId: string, message: strin
   // and the silence the detector measures starts again here.
   run.isWaiting = false
   run.startedAt = context.now()
-  // Claude Code queues input arriving mid-turn, so a redirect does not
-  // require the agent to be idle first.
-  context.api.pty.write(run.terminalSessionId, `${oneLine(message)}\r`)
+  promptSession(context, sessionId, message)
   return true
 }
 

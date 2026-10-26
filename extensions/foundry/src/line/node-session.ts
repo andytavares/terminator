@@ -10,7 +10,7 @@ import type {
 } from '../runtime/supervised-runner.js'
 import { agentTitle } from '../runtime/agent-title.js'
 import { decideTool } from '../runtime/tool-decision.js'
-import { trustRepository, isProbedCommand } from '../runtime/agent-policy.js'
+import { isProbedCommand } from '../runtime/agent-policy.js'
 import { runtime, strandedAgents } from '../runtime/runtime-state.js'
 import { notePending, noteResolved } from '../runtime/held-calls.js'
 import { readOnlyTools, autonomyFor, letAutoModeDecide, modelForTier } from '../state/settings.js'
@@ -58,10 +58,6 @@ function startNode(
   resolve: (run: StartedRun) => void
 ): void {
   const turn = openTurn(launch.input.node.id, resolve)
-  // Trust the repository first (the key Claude Code uses for a worktree): its trust
-  // dialog shows in interactive sessions, and an agent sitting at it never starts.
-  const { context, checkout } = launch
-  trustRepository(context.api, checkout.origin, { orderId: context.order.id, store: context.store })
   void runner
     .start(startOptions(launch, turn))
     .then((run) => {

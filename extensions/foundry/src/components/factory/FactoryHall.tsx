@@ -701,7 +701,7 @@ function gateDecided(gateId: string, [option, limit]: readonly [string, (number 
 function terminalOpened(sessionId: string) {
   return async (): Promise<string | null> => {
     const r = (await invoke('foundry:run-terminal', { sessionId })) as { ok?: boolean }
-    return r.ok === true ? null : 'That agent is no longer in a terminal.'
+    return r.ok === true ? null : 'That agent is no longer in an agent tab.'
   }
 }
 
@@ -1141,7 +1141,7 @@ function AskButtons({
         Deny
       </button>
       <button type="button" className="fdry-hall-btn" disabled={busy} onClick={onTerminal}>
-        <Terminal aria-hidden="true" /> Terminal
+        <Terminal aria-hidden="true" /> Agent tab
       </button>
     </>
   )
@@ -1422,7 +1422,7 @@ function AskActions({ item, busy, onAllow, onDeny, onTerminal }: InterruptionCar
           disabled={busy}
           onClick={onTerminal}
         >
-          <Terminal aria-hidden="true" /> Go to terminal
+          <Terminal aria-hidden="true" /> Go to agent tab
         </button>
       )}
     </div>
