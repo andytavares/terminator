@@ -236,6 +236,7 @@ function startingARunTests() {
   it('starts the agent in the worktree, as a tab of that project', async () => {
     await runner().start(start)
     expect(agentStarts[0]).toMatchObject({
+      agentId: 'claude',
       cwd: '/wt/feat-thing',
       tab: { projectId: 'project-1', title: 'Builder' },
     })

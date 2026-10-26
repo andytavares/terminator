@@ -13,14 +13,18 @@ export interface AgentLaunch {
 
 const CLAUDE_LABEL = 'Claude Code'
 
+/** The built-in agent first, unless a custom agent named `claude` replaces it. */
 export function listAgents(settings: AgentsSettings): AgentDescriptor[] {
   const custom = settings.custom.map(({ id, label }) => ({ id, label }))
-  return [{ id: CLAUDE_AGENT_ID, label: CLAUDE_LABEL }, ...custom]
+  const replaced = custom.some((agent) => agent.id === CLAUDE_AGENT_ID)
+  return replaced ? custom : [{ id: CLAUDE_AGENT_ID, label: CLAUDE_LABEL }, ...custom]
 }
 
-/** The built-in agent runs the Claude adapter on Electron's own Node; a custom one runs as set. */
+/** A custom agent runs as set; the built-in one runs the Claude adapter on Electron's own Node. */
 export function resolveAgent(settings: AgentsSettings, agentId: string): AgentLaunch | null {
   const env = envWithoutParentClaude(process.env)
+  const custom = settings.custom.find((agent) => agent.id === agentId)
+  if (custom) return { command: custom.command, args: custom.args, env }
   if (agentId === CLAUDE_AGENT_ID) {
     const adapter = createRequire(import.meta.url)
       .resolve('@agentclientprotocol/claude-agent-acp/dist/index.js')
@@ -32,8 +36,7 @@ export function resolveAgent(settings: AgentsSettings, agentId: string): AgentLa
       env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
     }
   }
-  const custom = settings.custom.find((agent) => agent.id === agentId)
-  return custom ? { command: custom.command, args: custom.args, env } : null
+  return null
 }
 
 const asRecord = (value: unknown): Record<string, unknown> =>

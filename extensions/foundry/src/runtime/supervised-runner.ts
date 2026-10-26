@@ -446,6 +446,8 @@ function agentStartInput(
     controlToken: context.control.token,
   })
   return {
+    // Claude, whatever the default agent is: the hook and the transcript are Claude Code's.
+    agentId: 'claude',
     cwd: start.worktreePath,
     resume: start.resumeSessionId,
     // Auto mode answers what the ladder defers; `default` asks the operator.

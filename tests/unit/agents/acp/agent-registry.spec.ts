@@ -32,6 +32,13 @@ describe('agent registry', () => {
     expect(resolveAgent(settings, 'gemini')).toMatchObject({ command: 'gemini', args: ['--acp'] })
   })
 
+  it('lets a custom agent named claude replace the built-in one', () => {
+    const own = { id: 'claude', label: 'My Claude', command: 'my-acp', args: ['--x'] }
+    const replaced = { default: 'claude', custom: [own] }
+    expect(listAgents(replaced)).toEqual([{ id: 'claude', label: 'My Claude' }])
+    expect(resolveAgent(replaced, 'claude')).toMatchObject({ command: 'my-acp', args: ['--x'] })
+  })
+
   it('resolves an unknown id to nothing', () => {
     expect(resolveAgent(settings, 'nope')).toBeNull()
   })
