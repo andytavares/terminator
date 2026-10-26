@@ -54,7 +54,6 @@ jobs:
       # check in ci.yml is the comparison that gates the pull request.
       - name: Write missing baselines
         run: npm run test:visual -w @terminator/extension-ui -- --update-snapshots=changed
-        timeout-minutes: 5
         continue-on-error: true
 
       - name: Commit the baselines

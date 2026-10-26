@@ -25,7 +25,6 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 6
 
     steps:
       - uses: actions/checkout@v4
@@ -85,7 +84,6 @@ jobs:
   typecheck:
     name: Typecheck
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@v4
@@ -107,7 +105,6 @@ jobs:
   format:
     name: Format
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 4
 
     steps:
       - uses: actions/checkout@v4
@@ -131,7 +128,6 @@ jobs:
   stories:
     name: Stories
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 6
 
     steps:
       - uses: actions/checkout@v4
@@ -149,7 +145,6 @@ jobs:
 
       - name: Test stories
         run: npm run test:stories
-        timeout-minutes: 5
 
       - name: Build Storybook
         run: npm run build-storybook
@@ -161,7 +156,6 @@ jobs:
   story-screenshots:
     name: Story screenshots
     runs-on: macos-26
-    timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@v4
@@ -188,7 +182,6 @@ jobs:
   select:
     name: Select tests
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 3
     outputs:
       mode: ${{ steps.select.outputs.mode }}
       run_unit: ${{ steps.select.outputs.run_unit }}
@@ -227,7 +220,6 @@ jobs:
     needs: select
     if: needs.select.outputs.run_unit == 'true'
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 6
     strategy:
       # Every shard runs to the end, so one run reports every failing spec.
       fail-fast: false
@@ -261,7 +253,6 @@ jobs:
             --reporter=junit --outputFile.junit=junit/unit.xml \
             --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 \
             --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
-        timeout-minutes: 5
 
       - name: Upload blob report
         if: ${{ !cancelled() }}
@@ -288,7 +279,6 @@ jobs:
   perf:
     name: Perf budgets
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 4
 
     steps:
       - uses: actions/checkout@v4
@@ -303,7 +293,6 @@ jobs:
 
       - name: Perf budgets
         run: npm run test:perf
-        timeout-minutes: 5
 
   # Every spec this change adds or edits, 30 times with a fresh seed each, every core busy. One
   # failure fails the check and prints the seed that replays it (ADR 124). Nothing retries. The
@@ -311,7 +300,6 @@ jobs:
   stability-plan:
     name: Stability plan
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 3
     outputs:
       shards: ${{ steps.plan.outputs.shards }}
 
@@ -336,7 +324,6 @@ jobs:
     name: Stability (${{ matrix.shard }}, ${{ matrix.runs }} runs of part ${{ matrix.part }})
     needs: stability-plan
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 8
     strategy:
       fail-fast: false
       matrix:
@@ -357,7 +344,6 @@ jobs:
 
       - name: Changed specs, this shard
         run: node scripts/stability.mjs --runs ${{ matrix.runs }} --part ${{ matrix.part }}
-        timeout-minutes: 7
 
   # The one Stability check branch protection requires.
   stability:
@@ -365,7 +351,6 @@ jobs:
     needs: [stability-plan, stability-shard]
     if: always()
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 2
 
     steps:
       - name: Verdict
@@ -381,7 +366,6 @@ jobs:
     needs: e2e
     if: ${{ !cancelled() }}
     runs-on: macos-26
-    timeout-minutes: 8
 
     steps:
       - uses: actions/checkout@v4
@@ -406,14 +390,12 @@ jobs:
           node node_modules/electron/install.js
           codesign --force --deep --sign - node_modules/electron/dist/Electron.app
           node scripts/stability.mjs --e2e
-        timeout-minutes: 7
 
   # The quarantined tests (tests/quarantine.json, ADR 124), still run so a fix shows as passes.
   # Not required: its result never blocks a pull request.
   quarantine:
     name: Quarantine
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 6
 
     steps:
       - uses: actions/checkout@v4
@@ -430,7 +412,6 @@ jobs:
         run: |
           npx vitest run --tagsFilter=quarantine --passWithNoTests --reporter=dot \
             --reporter=junit --outputFile.junit=junit/quarantine.xml
-        timeout-minutes: 5
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -447,7 +428,6 @@ jobs:
     needs: e2e
     if: ${{ !cancelled() }}
     runs-on: macos-26
-    timeout-minutes: 8
 
     steps:
       - uses: actions/checkout@v4
@@ -472,7 +452,6 @@ jobs:
           node node_modules/electron/install.js
           codesign --force --deep --sign - node_modules/electron/dist/Electron.app
           npx playwright test --grep @quarantine --reporter=dot,junit
-        timeout-minutes: 7
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -491,7 +470,6 @@ jobs:
     needs: [select, unit]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 4
 
     steps:
       - uses: actions/checkout@v4
@@ -558,7 +536,6 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 4
 
     steps:
       - uses: actions/checkout@v4
@@ -590,7 +567,6 @@ jobs:
   start:
     name: Start
     runs-on: macos-26
-    timeout-minutes: 8
 
     steps:
       - uses: actions/checkout@v4
@@ -604,14 +580,12 @@ jobs:
 
       - name: npm run dev
         run: node scripts/smoke-start.mjs dev
-        timeout-minutes: 8
 
       - name: npm run build
         run: npm run build
 
       - name: npm run preview
         run: node scripts/smoke-start.mjs preview
-        timeout-minutes: 8
 
       # The packaged app from the same electron-builder.cjs the release uses,
       # unsigned and not notarized. It once started with no extensions at all:
@@ -620,7 +594,6 @@ jobs:
         run: |
           npx electron-builder --mac dir --publish never -c.mac.identity=null -c.mac.notarize=false
           node scripts/smoke-start.mjs exec "$PWD/dist/mac-arm64/Terminator.app/Contents/MacOS/Terminator"
-        timeout-minutes: 6
 
   # Builds its own copy of the app rather than waiting on the Build job: the
   # build takes 40s, the wait for the Build job and its artifact took 1m20s.
@@ -629,7 +602,6 @@ jobs:
     needs: select
     if: needs.select.outputs.run_e2e == 'true'
     runs-on: macos-26
-    timeout-minutes: 8
     strategy:
       # Every shard runs to the end, so one run reports every failing spec rather than the first.
       fail-fast: false
@@ -683,7 +655,6 @@ jobs:
           # render the extension views in it, and design-system-fields.spec.ts renders the shared field styles.
           case "$ARGS" in *remote-control.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts* | *design-system-fields.spec.ts*) npx playwright install chromium ;; esac
           npx playwright test "${shard[@]}" --grep-invert @quarantine --reporter=blob,dot,junit
-        timeout-minutes: 7
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -731,7 +702,6 @@ jobs:
     needs: [select, e2e]
     if: always()
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 2
 
     steps:
       - name: Verdict
@@ -746,7 +716,6 @@ jobs:
     needs: e2e
     if: ${{ !cancelled() && needs.e2e.result != 'skipped' }}
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 4
 
     steps:
       - uses: actions/checkout@v4

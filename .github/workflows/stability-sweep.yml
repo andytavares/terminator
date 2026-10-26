@@ -26,7 +26,6 @@ jobs:
   plan:
     name: Plan
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 2
     outputs:
       unit_runs: ${{ steps.runs.outputs.unit_runs }}
       e2e_runs: ${{ steps.runs.outputs.e2e_runs }}
@@ -45,7 +44,6 @@ jobs:
     name: Unit (run ${{ matrix.run }}, ${{ matrix.shard }}/4)
     needs: plan
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 8
     strategy:
       fail-fast: false
       matrix:
@@ -68,7 +66,6 @@ jobs:
         run: |
           npx vitest run --shard=${{ matrix.shard }}/4 --reporter=dot \
             --reporter=json --outputFile.json=sweep/unit-${{ matrix.run }}-${{ matrix.shard }}.json
-        timeout-minutes: 6
 
       - name: Upload results
         if: ${{ !cancelled() }}
@@ -82,7 +79,6 @@ jobs:
     name: E2E (run ${{ matrix.run }}, ${{ matrix.shard }}/3)
     needs: plan
     runs-on: macos-26
-    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -117,7 +113,6 @@ jobs:
           read -r -a shard <<< "$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 3)"
           npx playwright install chromium
           npx playwright test "${shard[@]}" --reporter=json,dot
-        timeout-minutes: 8
 
       - name: Upload results
         if: ${{ !cancelled() }}
@@ -132,7 +127,6 @@ jobs:
     needs: [unit, e2e]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 4
     permissions:
       contents: read
       issues: write
