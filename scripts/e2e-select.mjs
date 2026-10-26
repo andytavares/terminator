@@ -110,6 +110,7 @@ export const CORE_SPECS = [
   'session-home.spec.ts',
   'session-surfaces.spec.ts',
   'settings.spec.ts',
+  'sidebar-marks-the-shown-session.spec.ts',
   'sidebar-sorting.spec.ts',
   'terminal-breakout.spec.ts',
 ]
