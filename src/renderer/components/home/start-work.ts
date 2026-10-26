@@ -133,9 +133,10 @@ export const branchOf = (issue: IssueSummary): string => issue.branchName ?? iss
 
 export const worktreeFolder = (branch: string): string => `.worktrees/${branch}`
 
-export const PROMPT_TOO_LONG = 'That prompt is too long to start an agent with. Shorten it.'
+const PROMPT_TOO_LONG = 'That prompt is too long to start an agent with. Shorten it.'
 
-/** `claude '<prompt>'`, or plain `claude` for none; null when the line would be too long to type. */
+/** `claude '<prompt>'`, or plain `claude` for none; null when the line would be too long to type.
+ *  @internal */
 export function agentCommand(prompt: string | null): string | null {
   if (prompt === null) return 'claude'
   const command = `claude ${singleQuoted(prompt.replace(/\s+/g, ' ').trim())}`

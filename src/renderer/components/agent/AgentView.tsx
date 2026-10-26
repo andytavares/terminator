@@ -8,7 +8,7 @@ import { useAgentTranscript } from './use-agent-transcript'
 import './AgentView.css'
 
 /** Context used as a percentage, and the cost when the agent reports one. */
-export function usageLabel({ used, size, cost }: Usage): string {
+function contextLabel({ used, size, cost }: Usage): string {
   const percent = size > 0 ? Math.round((used / size) * 100) : 0
   const spent = cost
     ? ` · ${cost.currency === 'USD' ? '$' : `${cost.currency} `}${cost.amount.toFixed(2)}`
@@ -143,7 +143,9 @@ export function AgentView({ sessionId }: { sessionId: string }): JSX.Element {
       {asks.map((ask) => (
         <AskBand key={ask.requestId} ask={ask} onAnswer={(id) => answer(ask.requestId, id)} />
       ))}
-      {transcript.usage && <div className="agent-view__usage">{usageLabel(transcript.usage)}</div>}
+      {transcript.usage && (
+        <div className="agent-view__usage">{contextLabel(transcript.usage)}</div>
+      )}
       <TranscriptLog transcript={transcript} />
       {exited && <p className="agent-view__exited">The agent exited.</p>}
       <Composer sessionId={sessionId} disabled={exited} running={running} />

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useSettingsStore } from '../../stores/settings.store'
 import type { AgentsSettings as AgentsValue } from '../../../shared/types'
+import { FormButtons } from './QuickActionsSettings'
 import './QuickActionsSettings.css'
 
 type CustomAgent = AgentsValue['custom'][number]
@@ -132,19 +133,6 @@ function AgentForm(props: {
       <DraftFields draft={draft} onChange={setDraft} />
       {error && <p className="qa-settings-form__error">{error}</p>}
       <FormButtons onSave={save} onCancel={() => setDraft(null)} />
-    </div>
-  )
-}
-
-function FormButtons(props: { onSave: () => void; onCancel: () => void }): JSX.Element {
-  return (
-    <div className="qa-settings-form__actions">
-      <button className="settings-section__btn" onClick={props.onSave}>
-        Save
-      </button>
-      <button className="settings-section__btn-link" onClick={props.onCancel}>
-        Cancel
-      </button>
     </div>
   )
 }

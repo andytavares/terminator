@@ -40,7 +40,7 @@ const DEFAULT_TIMEOUT_MS = 300_000
 const DEFAULT_START_TIMEOUT_MS = 60_000
 
 /** The calls the service makes on an agent: a `ClientSideConnection` has them all. */
-export interface AgentCalls {
+interface AgentCalls {
   initialize(params: InitializeRequest): Promise<unknown>
   newSession(params: NewSessionRequest): Promise<NewSessionResponse>
   loadSession(params: LoadSessionRequest): Promise<LoadSessionResponse | void>
@@ -52,7 +52,7 @@ export interface AgentCalls {
   cancel(params: CancelNotification): Promise<void>
 }
 
-/** A started agent process: its ACP calls, and how to learn of and force its end. */
+/** A started agent process: its ACP calls, and how to learn of and force its end. @internal */
 export interface AgentLink {
   agent: AgentCalls
   onExit(listener: (exitCode: number | null) => void): void
@@ -125,9 +125,7 @@ function flattenChoices(
 }
 
 /** The select options of a session; a toggle has no choices to show. */
-export function toConfigOptions(
-  options: SessionConfigOption[] | null | undefined
-): AgentConfigOption[] {
+function toConfigOptions(options: SessionConfigOption[] | null | undefined): AgentConfigOption[] {
   return (options ?? []).flatMap((option) =>
     'options' in option
       ? [

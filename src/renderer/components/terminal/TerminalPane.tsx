@@ -152,9 +152,9 @@ function useRefocusActive(activeSessionId: string | null): () => void {
 export function TerminalPane({ projectId }: Props): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const pane = usePaneState(projectId)
-  const { activeSessionId, layout } = pane
+  const { activeSessionId, layout, shownSessionId } = pane
   useShownTabSeen(projectId, pane)
-  useSinglePaneMount(containerRef, pane.shownSessionId, layout)
+  useSinglePaneMount(containerRef, shownSessionId, layout)
   useFocusRequests(projectId, pane)
   const refocusActive = useRefocusActive(activeSessionId)
   const handleRatioChange = useCallback(
@@ -171,14 +171,8 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
       </div>
     )
   }
-  return (
-    <SingleTab
-      containerRef={containerRef}
-      activeSessionId={activeSessionId}
-      shownSessionId={pane.shownSessionId}
-      refocusActive={refocusActive}
-    />
-  )
+  const tab = { containerRef, activeSessionId, shownSessionId, refocusActive }
+  return <SingleTab {...tab} />
 }
 
 /** No tab yet: a prompt to open one, or why the last one would not open. */

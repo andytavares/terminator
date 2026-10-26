@@ -204,7 +204,7 @@ function ActionForm({ form, draft }: { form: ActionDraft; draft: Draft }): JSX.E
   )
 }
 
-function FormButtons({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) {
+export function FormButtons({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) {
   return (
     <div className="qa-settings-form__actions">
       <button className="settings-section__btn" onClick={onSave}>

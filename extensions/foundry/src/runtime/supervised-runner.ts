@@ -24,13 +24,9 @@ import type { WatchedRun } from './stall-watcher.js'
  */
 type StepLabel = string
 
-// Running a phase where the operator can see it.
-//
-// The agent runs over ACP (`api.agents`, ADR 130) in a tab of the card's own
-// worktree project, and every tool call goes through a PreToolUse hook that
-// holds it still until somebody decides. The operator can type in that same
-// tab at any time without the runner losing track, because what it watches is
-// the transcript, the hooks and the end of each prompt rather than the process.
+// A phase runs over ACP in an agent tab the operator can see and type in (ADR 130); every
+// tool call waits in the PreToolUse hook until somebody decides, and the runner watches the
+// transcript, the hooks and each prompt's end, not the process.
 
 export interface SupervisedRun {
   /** The claude session id, which the agent chose. `resume` continues it. */

@@ -26,6 +26,8 @@
         "electron-builder.cjs",
         // Installed by path as an extension: extension-lifecycle.spec.ts:25.
         "tests/e2e/fixtures/extensions/probe/*.{cjs,js}",
+        // Run by path as the e2e profiles' agent: tests/e2e/helpers.ts (STUB_AGENT).
+        "tests/e2e/fixtures/acp-stub-agent.mjs",
       ],
       // Tools the e2e stubs call on the runner's PATH: openssl makes the stub
       // servers' throwaway CA (tracker-stub.ts, jira-stub.ts) and jq shapes the
@@ -38,7 +40,13 @@
       // tests/integration/remote-bridge-allowlist.spec.ts drives Remote Control's
       // bridge route against the core's allowlist, so it imports the server
       // packages that extensions/remote-control/package.json declares.
-      "ignoreDependencies": ["fastify", "@fastify/websocket"],
+      // The Claude agent's process runs the adapter by path, resolved with createRequire:
+      // src/main/agents/acp/agent-registry.ts.
+      "ignoreDependencies": [
+        "fastify",
+        "@fastify/websocket",
+        "@agentclientprotocol/claude-agent-acp",
+      ],
     },
     "packages/extension-ui": {
       "project": ["**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}!", "!stories/**!"],

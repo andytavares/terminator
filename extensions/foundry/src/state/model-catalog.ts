@@ -7,14 +7,9 @@ import type { AgentsAPI } from '@terminator/extension-sdk'
 // successor. Worse, nothing read the setting: `defaultModel` was stored,
 // rendered and never passed to `--model`, so choosing one changed nothing.
 //
-// Two sources, in the order they can be trusted:
-//
-//   1. The aliases. `opus` is documented as "an alias for the latest model", so
-//      the runtime resolves it at launch and the list cannot go stale by
-//      sitting here. Always available: it needs no agent and no network.
-//   2. The `model` option of the Claude agent (`api.agents.models('claude')`),
-//      which gives exact ids and display names for pinning a run to one
-//      generation. An addition, never a requirement.
+// The aliases first: `opus` is "an alias for the latest model", so they never go stale and
+// need no agent. Then the Claude agent's `model` option (`api.agents.models('claude')`), for
+// pinning a run to exact ids; an addition, never a requirement.
 
 /** One row in the model picker. */
 export interface ModelChoice {

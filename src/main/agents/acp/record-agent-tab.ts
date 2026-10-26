@@ -21,15 +21,14 @@ function realPath(target: string): string {
   }
 }
 
-/**
- * Where Claude Code keeps a session's transcript. It names the folder after the
- * resolved working directory, so `/var/...` on macOS is `-private-var-...`.
- */
+/** Where Claude Code keeps a session's transcript: a folder named after the resolved
+ *  working directory, so `/var/...` on macOS is `-private-var-...`. @internal */
 export function transcriptPathFor(cwd: string, sessionId: string, home = homedir()): string {
   const encoded = realPath(cwd).replace(/[/.]/g, '-')
   return join(home, '.claude', 'projects', encoded, `${sessionId}.jsonl`)
 }
 
+/** @internal */
 export function conversationOfTab(session: AgentTab, capturedAt: string): AgentConversation {
   return {
     agentId: session.agentId,

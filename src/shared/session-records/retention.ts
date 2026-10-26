@@ -1,6 +1,6 @@
 import type { SessionRecord } from '../types/index.js'
 
-/** How long a closed session's context stays findable. @internal */
+/** How long a closed session's context stays findable. */
 export const RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 
 /**
