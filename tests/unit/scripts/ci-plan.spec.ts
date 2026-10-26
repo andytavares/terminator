@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
   artifactPaths,
@@ -159,13 +159,13 @@ describe('the deterministic workflow (ADR 123)', () => {
     expect(macRunners.reduce((sum, count) => sum + count, 0)).toBeLessThanOrEqual(5)
   })
 
-  it('gives every job a time limit inside the eight minutes a run may take', () => {
-    for (const [id, job] of Object.entries(workflow.jobs))
-      expect({ id, limit: job['timeout-minutes'] }).toEqual({ id, limit: expect.any(Number) })
-    const over = Object.entries(workflow.jobs).filter(
-      ([, job]) => Number(job['timeout-minutes']) > 8
+  // ADR 129: a slow job is a finding to fix, not a reason to cancel the run.
+  it('sets no job or step time limit in any workflow', () => {
+    const workflowsDirectory = resolve(REPO_ROOT, '.github/workflows')
+    const limited = readdirSync(workflowsDirectory).filter((file) =>
+      /timeout-minutes/.test(readFileSync(resolve(workflowsDirectory, file), 'utf8'))
     )
-    expect(over).toEqual([])
+    expect(limited).toEqual([])
   })
 })
 
