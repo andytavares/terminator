@@ -1,8 +1,15 @@
 import { expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { launchApp, closeApp, workspaceRow, e2eTempDir, inExtensionView } from './helpers'
+import {
+  agentRecordFile,
+  launchApp,
+  closeApp,
+  workspaceRow,
+  e2eTempDir,
+  inExtensionView,
+} from './helpers'
 import { extensionPage } from './extension-page'
 import type { AppHandle } from './helpers'
 
@@ -249,43 +256,54 @@ export async function openListedOrder(handle: AppHandle, id: string): Promise<vo
   expect(opened, `no row for ${id} in the Forge`).toBe(true)
 }
 
-/**
- * The launch script the terminal was told to run, and what is in it.
- *
- * The launch is a file rather than a typed line — a terminal in canonical
- * mode mangles anything past 1024 bytes, and a brief is always longer. So
- * "what is this agent running" is answered by reading that file, not by
- * scraping a screen an agent's own output may since have scrolled past.
- */
-/** The newest launch script that starts an agent. Order creation also launches the environment
- *  baseline (build, test) through the same folder, so the newest script is not always the agent's. */
-export function agentLaunchScript(handle: AppHandle): string {
-  // Foundry's own folder (ADR 103): <userData>/extensions/<id>/runtime.
-  const dir = join(handle.userDataDir, 'extensions', 'terminator.foundry', 'runtime', 'launch')
-  const agentScripts = readdirSync(dir)
-    .filter((name) => name.endsWith('.sh'))
-    .map((name) => join(dir, name))
-    .sort((a, b) => statSync(a).mtimeMs - statSync(b).mtimeMs)
-    .map((path) => readFileSync(path, 'utf8'))
-    .filter(launchesAgent)
-  if (agentScripts.length === 0) throw new Error(`no agent launch script was written in ${dir}`)
-  return agentScripts[agentScripts.length - 1]
+/** What a supervised agent was started with, as the stand-in agent recorded it over ACP. */
+export interface SupervisedLaunch {
+  cwd: string
+  /** The settings file Foundry passed, which carries its PreToolUse hook. */
+  settings: string
+  /** The permission mode set after the session opened; null when none was. */
+  mode: string | null
+  /** Characters in the first prompt: the whole brief, not a typed line's first kilobyte. */
+  briefLength: number
+  /** Whether the agent's process saw the parent Claude Code session's bridge. */
+  inherited: boolean
 }
 
-/** True when the script's command line starts claude, not a baseline step such as `npm run test`. */
-function launchesAgent(script: string): boolean {
-  return /(^|[\s(;])claude\s/m.test(script)
+interface RecordEntry {
+  kind: 'session' | 'mode' | 'prompt'
+  sessionId: string
+  cwd?: string
+  meta?: { claudeCode?: { options?: { settings?: string } } } | null
+  inherited?: boolean
+  modeId?: string
+  length?: number
 }
 
-/** Whether an agent launch script has been written yet — the poll condition to wait
- *  on instead of reading terminal scrollback, which a talkative agent scrolls
- *  out of view. */
-export function hasAgentLaunchScript(handle: AppHandle): boolean {
-  try {
-    agentLaunchScript(handle)
-    return true
-  } catch {
-    return false
+function recordEntries(handle: AppHandle): RecordEntry[] {
+  const file = agentRecordFile(handle.userDataDir)
+  if (!existsSync(file)) return []
+  return readFileSync(file, 'utf8')
+    .split('\n')
+    .filter((line) => line !== '')
+    .map((line) => JSON.parse(line) as RecordEntry)
+}
+
+const settingsOf = (entry: RecordEntry | undefined): string =>
+  entry?.meta?.claudeCode?.options?.settings ?? ''
+
+/** The newest session started with Foundry's settings file, once its brief has been sent. */
+export function supervisedLaunch(handle: AppHandle): SupervisedLaunch | null {
+  const entries = recordEntries(handle)
+  const session = entries.filter((e) => e.kind === 'session' && settingsOf(e) !== '').at(-1)
+  const ofSession = entries.filter((e) => e.sessionId === session?.sessionId)
+  const brief = ofSession.find((e) => e.kind === 'prompt')
+  if (!session || !brief) return null
+  return {
+    cwd: session.cwd ?? '',
+    settings: settingsOf(session),
+    mode: ofSession.filter((e) => e.kind === 'mode').at(-1)?.modeId ?? null,
+    briefLength: brief.length ?? 0,
+    inherited: session.inherited === true,
   }
 }
 

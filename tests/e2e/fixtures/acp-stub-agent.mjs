@@ -1,8 +1,9 @@
 // Stand-in ACP agent for e2e runs, seeded as the `claude` agent (tests/e2e/helpers.ts), so no run
 // starts the real Claude adapter. A prompt answers with the file E2E_AGENT_REPLY names when a spec
 // has written it; otherwise the turn stays open until the client cancels, as a working agent's does.
+// Every request it gets is appended to the file its first argument names, for specs to read.
 import { randomUUID } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync } from 'node:fs'
 import { Readable, Writable } from 'node:stream'
 import { AgentSideConnection, ndJsonStream, PROTOCOL_VERSION } from '@agentclientprotocol/sdk'
 
@@ -25,6 +26,11 @@ const CONFIG_OPTIONS = [
 ]
 
 const cancels = new Map()
+const RECORD = process.argv[2]
+
+function record(entry) {
+  if (RECORD) appendFileSync(RECORD, `${JSON.stringify(entry)}\n`)
+}
 
 function reply() {
   const file = process.env.E2E_AGENT_REPLY
@@ -38,13 +44,25 @@ function agent(connection) {
       agentCapabilities: { loadSession: true },
     }),
     authenticate: async () => ({}),
-    newSession: async () => ({ sessionId: randomUUID(), configOptions: CONFIG_OPTIONS }),
-    loadSession: async () => ({ configOptions: CONFIG_OPTIONS }),
-    setSessionMode: async () => ({}),
+    newSession: async ({ cwd, _meta }) => {
+      const sessionId = randomUUID()
+      const inherited = Boolean(process.env.CLAUDE_CODE_BRIDGE_SESSION_ID)
+      record({ kind: 'session', sessionId, cwd, meta: _meta ?? null, inherited })
+      return { sessionId, configOptions: CONFIG_OPTIONS }
+    },
+    loadSession: async ({ sessionId, cwd, _meta }) => {
+      record({ kind: 'session', sessionId, cwd, meta: _meta ?? null, resumed: true })
+      return { configOptions: CONFIG_OPTIONS }
+    },
+    setSessionMode: async ({ sessionId, modeId }) => {
+      record({ kind: 'mode', sessionId, modeId })
+      return {}
+    },
     setSessionConfigOption: async () => ({ configOptions: CONFIG_OPTIONS }),
     cancel: async ({ sessionId }) => cancels.get(sessionId)?.(),
     prompt: async ({ sessionId, prompt }) => {
       const asked = prompt.map((block) => block.text ?? '').join(' ')
+      record({ kind: 'prompt', sessionId, length: asked.length })
       const text = reply() ?? `acp-stub: ${asked.slice(0, 200)}`
       await connection.sessionUpdate({
         sessionId,

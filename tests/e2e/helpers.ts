@@ -236,19 +236,28 @@ export interface LaunchOptions {
   hideSidebarOnHome?: boolean
 }
 
+const STUB_AGENT_SCRIPT = join(
+  dirname(fileURLToPath(import.meta.url)),
+  'fixtures',
+  'acp-stub-agent.mjs'
+)
+
+/** Where the stand-in agent writes what it was asked, one JSON line per request. */
+export function agentRecordFile(userDataDir: string): string {
+  return join(userDataDir, 'agent-record.jsonl')
+}
+
 /** The stand-in ACP agent, seeded as `claude` so no run starts the real Claude adapter. */
-const STUB_AGENT = {
-  id: 'claude',
-  label: 'Claude Code',
-  command: process.execPath,
-  args: [join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'acp-stub-agent.mjs')],
+function stubAgent(userDataDir: string) {
+  const args = [STUB_AGENT_SCRIPT, agentRecordFile(userDataDir)]
+  return { id: 'claude', label: 'Claude Code', command: process.execPath, args }
 }
 
 /** electron-store's file for the settings store (`name: 'settings'`); `global` is merged over the defaults. */
 function seedSettings(userDataDir: string, options: LaunchOptions): void {
   const file = join(userDataDir, 'settings.json')
   if (existsSync(file)) return
-  const agents = { default: 'claude', custom: [STUB_AGENT] }
+  const agents = { default: 'claude', custom: [stubAgent(userDataDir)] }
   const ui = options.hideSidebarOnHome === true ? {} : { ui: { hideSidebarOnHome: false } }
   writeFileSync(file, JSON.stringify({ global: { ...ui, agents } }))
 }
