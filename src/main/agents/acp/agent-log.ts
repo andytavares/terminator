@@ -38,9 +38,18 @@ export function createAgentLog({
     prune(maxAgeMs) {
       const oldest = now() - maxAgeMs
       for (const file of logFilesIn(directory)) {
-        if (statSync(file).mtimeMs < oldest) rmSync(file, { force: true })
+        if (lastWritten(file) < oldest) rmSync(file, { force: true })
       }
     },
+  }
+}
+
+/** When the file was last written; never for one that cannot be read, so it is left alone. */
+function lastWritten(file: string): number {
+  try {
+    return statSync(file).mtimeMs
+  } catch {
+    return Infinity
   }
 }
 

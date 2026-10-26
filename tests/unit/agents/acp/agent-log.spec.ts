@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, utimesSync } from 'node:fs'
+import { appendFileSync, existsSync, symlinkSync, utimesSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { createAgentLog } from '../../../../src/main/agents/acp/agent-log'
@@ -50,5 +50,15 @@ describe('agent log pruning', () => {
   it('prunes nothing when the folder does not exist yet', () => {
     const log = createAgentLog({ directory: join(makeTempDir('agent-log-'), 'none'), now: () => 0 })
     expect(() => log.prune(1)).not.toThrow()
+  })
+
+  it('prunes the rest when one log cannot be read, as one removed meanwhile', () => {
+    const directory = makeTempDir('agent-log-')
+    const log = createAgentLog({ directory, now: () => 10_000_000 })
+    log.append('old', { sessionUpdate: 'plan' })
+    utimesSync(join(directory, 'old.jsonl'), 1, 1)
+    symlinkSync(join(directory, 'gone'), join(directory, 'dangling.jsonl'))
+    expect(() => log.prune(1)).not.toThrow()
+    expect(existsSync(join(directory, 'old.jsonl'))).toBe(false)
   })
 })
