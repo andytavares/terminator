@@ -1,0 +1,58 @@
+packages/extension-sdk/CHANGELOG.md
+  s_a80af929ba8425::t_07c90e618f0d5b 16-18
+extensions/foundry/CLAUDE.md
+  s_a80af929ba8425::t_07c90e618f0d5b 45-48
+src/main/agents/acp/agent-service.ts
+  s_a80af929ba8425::t_4526b242b732db 26,117,188-197,266-268,549-552
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_a80af929ba8425::t_47b6f36c59a4db 417
+  s_a80af929ba8425::t_0ef0bf606595f4 478-482
+  s_a80af929ba8425::t_7c6fabcefc12c6 441-451,455,473-477,483-484,497-499
+  s_a80af929ba8425::t_b8cf90bb75ae69 76-77
+tests/unit/main/extensions/host/host-agents.spec.ts
+  s_a80af929ba8425::t_4526b242b732db 7,48-50,59,77-80,159,164-167
+extensions/foundry/src/runtime/deny-rules.ts
+  s_a80af929ba8425::t_2832c9311589c3 1-21,31-47
+  s_a80af929ba8425::t_0ef0bf606595f4 22-30
+extensions/foundry/tests/runtime/deny-rules.spec.ts
+  s_a80af929ba8425::t_79c62246e9534b 1-24
+tests/unit/agents/acp/agent-service.spec.ts
+  s_a80af929ba8425::t_c18a41e9cb8178 2-7,223-224,227-239,244-245,264
+docs/EXTENSION-DEVELOPMENT.md
+  s_a80af929ba8425::t_07c90e618f0d5b 917
+extensions/foundry/tests/runtime/permission-bridge.spec.ts
+  s_a80af929ba8425::t_b1006ae6708fa5 182,185,187,194,201-203,205,207-210,394
+  s_a80af929ba8425::t_6c573db6e5dd2e 204,206
+packages/extension-sdk/types/api.d.ts
+  s_a80af929ba8425::t_4526b242b732db 310-315,353-356
+extensions/foundry/tests/runtime/supervised-runner.spec.ts
+  s_a80af929ba8425::t_da3f65bd562bd4 276-279,281
+  s_a80af929ba8425::t_79c62246e9534b 13
+  s_a80af929ba8425::t_6c573db6e5dd2e 275,280
+  s_a80af929ba8425::t_6ef6e7e6ac1615 229
+  s_a80af929ba8425::t_b1006ae6708fa5 44,393-402,435,442-444,472-473,513-515
+extensions/foundry/src/line/node-session.ts
+  s_a80af929ba8425::t_0ef0bf606595f4 14,105
+extensions/foundry/SUPERVISION.md
+  s_a80af929ba8425::t_9f22d6480a89f2 593-597
+docs/adr/130-agents-the-app-drives-run-over-acp.md
+  s_a80af929ba8425::t_07c90e618f0d5b 47-48
+extensions/foundry/src/runtime/permission-bridge.ts
+  s_a80af929ba8425::t_2832c9311589c3 99,273,305,375-378,382-383
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "40e2e57aa76b6648fc9b3e730d4f3292a23b223f",
+  "prompts": {},
+  "sessions": {
+    "s_a80af929ba8425": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4966b7a9-21f0-4823-b753-f496f1c5df05",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
