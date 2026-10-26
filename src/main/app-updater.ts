@@ -1,4 +1,4 @@
-import { app } from 'electron'
+import { app, dialog } from 'electron'
 // Default import: electron-updater defines autoUpdater with a getter that ESM named imports miss.
 import electronUpdater from 'electron-updater'
 import { runsInBackground } from './background-mode'
@@ -52,28 +52,41 @@ function announceUpdate(version: string, revealApp: () => void): void {
   })
 }
 
-/** The "Check for Updates…" menu item. An update found announces itself when its download ends. */
+/** The "Check for Updates…" menu item. It answers in a dialog: notification settings can silence
+ * every notification kind, and a click that shows nothing reads as a broken menu item. */
 export async function checkForUpdatesNow(): Promise<void> {
   if (!checksForUpdates()) return
   try {
     const result = await electronUpdater.autoUpdater.checkForUpdates()
-    // A download that fails after the check found an update only emits 'error'.
-    if (result?.isUpdateAvailable) {
-      await result.downloadPromise
+    if (!result?.isUpdateAvailable) {
+      await dialog.showMessageBox({
+        message: 'No update available',
+        detail: `Terminator ${app.getVersion()} is the latest version.`,
+      })
       return
     }
-    notificationManager.create({
-      key: 'updateNotFound',
-      type: 'info',
-      title: 'No update available',
-      message: `Terminator ${app.getVersion()} is the latest version.`,
-    })
+    // This dialog is the announcement; the Update ready notification would repeat it.
+    announcedVersion = result.updateInfo.version
+    // A download that fails after the check found an update rejects here.
+    await result.downloadPromise
+    await offerRestart(result.updateInfo.version)
   } catch {
-    notificationManager.create({
-      key: 'updateCheckFailed',
+    await dialog.showMessageBox({
       type: 'error',
-      title: 'Could not check for updates',
-      message: 'Check your connection and try again.',
+      message: 'Could not check for updates',
+      detail: 'Check your connection and try again.',
     })
   }
+}
+
+async function offerRestart(version: string): Promise<void> {
+  const { response } = await dialog.showMessageBox({
+    message: `Terminator ${version} is ready`,
+    detail:
+      'It installs the next time you quit. Restarting now closes your open terminals and agents.',
+    buttons: ['Restart now', 'Later'],
+    defaultId: 0,
+    cancelId: 1,
+  })
+  if (response === 0) electronUpdater.autoUpdater.quitAndInstall()
 }

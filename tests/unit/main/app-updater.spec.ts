@@ -4,6 +4,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 const electron = vi.hoisted(() => ({
   app: { isPackaged: true, getVersion: () => '0.1.163', dock: { bounce: () => {} } },
   BrowserWindow: { getAllWindows: () => [] },
+  dialog: {
+    shown: [] as Array<{ message: string; detail?: string; type?: string; buttons?: string[] }>,
+    response: 0,
+    showMessageBox(options: { message: string }) {
+      this.shown.push(options)
+      return Promise.resolve({ response: this.response })
+    },
+  },
   Notification: Object.assign(
     function () {
       return { show: () => {}, on: () => {} }
@@ -59,6 +67,8 @@ beforeEach(async () => {
   vi.resetModules()
   vi.useFakeTimers()
   electron.app.isPackaged = true
+  electron.dialog.shown = []
+  electron.dialog.response = 0
   fake = new FakeUpdater()
   updater.current = fake
   revealed = 0
@@ -131,18 +141,17 @@ describe('the Update ready notification', () => {
   })
 })
 
+// A menu click asks a question, so the answer is a dialog: notification settings can silence every kind.
 describe('checkForUpdatesNow', () => {
-  it('says the running version is the latest when no update exists', async () => {
+  it('answers in a dialog when no update exists, even with every notification turned off', async () => {
     startAppUpdates(reveal)
     await checkForUpdatesNow()
-    const [latest] = notificationsWithTitle('No update available')
-    expect(latest.message).toBe('Terminator 0.1.163 is the latest version.')
-  })
-
-  it('says nothing extra when an update exists, since the download announces itself', async () => {
-    fake.nextCheck = () => Promise.resolve({ isUpdateAvailable: true })
-    startAppUpdates(reveal)
-    await checkForUpdatesNow()
+    expect(electron.dialog.shown).toEqual([
+      expect.objectContaining({
+        message: 'No update available',
+        detail: 'Terminator 0.1.163 is the latest version.',
+      }),
+    ])
     expect(notificationManager.list()).toEqual([])
   })
 
@@ -150,29 +159,87 @@ describe('checkForUpdatesNow', () => {
     fake.nextCheck = () => Promise.reject(new Error('HttpError: 504 Gateway Time-out'))
     startAppUpdates(reveal)
     await checkForUpdatesNow()
-    const [failed] = notificationsWithTitle('Could not check for updates')
-    expect(failed.type).toBe('error')
-    expect(failed.message).toBe('Check your connection and try again.')
-  })
-
-  it('does nothing in an unpackaged app', async () => {
-    electron.app.isPackaged = false
-    await checkForUpdatesNow()
-    expect(fake.checks).toBe(0)
-    expect(notificationManager.list()).toEqual([])
+    expect(electron.dialog.shown).toEqual([
+      expect.objectContaining({
+        type: 'error',
+        message: 'Could not check for updates',
+        detail: 'Check your connection and try again.',
+      }),
+    ])
   })
 })
 
+describe('checkForUpdatesNow in an unpackaged app', () => {
+  it('does nothing', async () => {
+    electron.app.isPackaged = false
+    await checkForUpdatesNow()
+    expect(fake.checks).toBe(0)
+    expect(electron.dialog.shown).toEqual([])
+  })
+})
+
+// The download ends only after the check returns, as a real download over the network does.
+const found = (version: string) => () =>
+  Promise.resolve({
+    isUpdateAvailable: true,
+    updateInfo: { version },
+    downloadPromise: {
+      then(resolve: () => void) {
+        fake.emit('update-downloaded', { version })
+        resolve()
+      },
+    },
+  })
+
 describe('checkForUpdatesNow with an update found', () => {
+  it('offers a restart once the download ends, and restarts only from Restart now', async () => {
+    fake.nextCheck = found('0.1.170')
+    startAppUpdates(reveal)
+    electron.dialog.response = 1
+    await checkForUpdatesNow()
+    expect(electron.dialog.shown).toEqual([
+      expect.objectContaining({
+        message: 'Terminator 0.1.170 is ready',
+        buttons: ['Restart now', 'Later'],
+      }),
+    ])
+    expect(fake.installs).toBe(0)
+    electron.dialog.response = 0
+    await checkForUpdatesNow()
+    expect(fake.installs).toBe(1)
+  })
+
+  it('answers again for a version a background check already announced', async () => {
+    fake.nextCheck = found('0.1.170')
+    startAppUpdates(reveal)
+    fake.emit('update-downloaded', { version: '0.1.170' })
+    electron.dialog.response = 1
+    await checkForUpdatesNow()
+    expect(electron.dialog.shown).toHaveLength(1)
+  })
+})
+
+describe('checkForUpdatesNow when the update download ends or fails', () => {
+  it('does not also post the Update ready notification for the version it answered', async () => {
+    fake.nextCheck = found('0.1.170')
+    startAppUpdates(reveal)
+    electron.dialog.response = 1
+    await checkForUpdatesNow()
+    expect(notificationsWithTitle('Update ready')).toEqual([])
+  })
+
   it('reports a download that fails after the check found an update', async () => {
     fake.nextCheck = () =>
       Promise.resolve({
         isUpdateAvailable: true,
+        updateInfo: { version: '0.1.170' },
         downloadPromise: Promise.reject(new Error('sha512 checksum mismatch')),
       })
     startAppUpdates(reveal)
     await checkForUpdatesNow()
-    expect(notificationsWithTitle('Could not check for updates')).toHaveLength(1)
+    expect(electron.dialog.shown).toEqual([
+      expect.objectContaining({ message: 'Could not check for updates' }),
+    ])
   })
 })
 
