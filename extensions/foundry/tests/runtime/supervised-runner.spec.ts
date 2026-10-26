@@ -10,6 +10,7 @@ import { makeTempDir } from '../../../../tests/support/temp-dir'
 import { partialFake } from '../../../../tests/support/fakes'
 import type {
   AgentPermissionAsk,
+  AgentPermissionSettled,
   AgentsAPI,
   AgentTurnEnd,
   ExtensionAPI,
@@ -40,7 +41,7 @@ let endListeners: Array<(exitCode: number | null) => void>
 let detachedEnd: number
 let startsAs: { sessionId: string } | null
 let askListeners: Array<(ask: AgentPermissionAsk) => void>
-let settledListeners: Array<(requestId: string) => void>
+let settledListeners: Array<(settled: AgentPermissionSettled) => void>
 let detachedAsks: number
 let answers: Array<{ sessionId: string; requestId: string; optionId: string | null }>
 
@@ -225,6 +226,7 @@ describe('the supervised runner over ACP', () => {
 
   describe('starting a run', startingARunTests)
   describe('the options Claude gets', claudeOptionsTests)
+  describe('the deny rules', denyRuleTests)
   describe('mode and resume', modeAndResumeTests)
   describe('tracking the run', trackingTests)
   describe('nothing started', nothingStartedTests)
@@ -267,6 +269,13 @@ function startingARunTests() {
       tab: { projectId: 'project-1', title: 'Builder' },
     })
     expect(agentStarts[0].resume).toBeUndefined()
+  })
+}
+
+function denyRuleTests() {
+  it('gives Claude the deny rules, which hold in auto mode too', async () => {
+    await runner().start({ ...start, denyRules: ['Bash(git push *)'] })
+    expect(claudeOptions().disallowedTools).toEqual(['Bash(git push *)'])
   })
 }
 
@@ -381,7 +390,16 @@ function toolCallTests() {
     raise(askOf({ requestId: 'b', toolCallMeta: null, kind: 'execute' }))
     raise(askOf({ requestId: 'c', toolCallMeta: null, kind: 'read' }))
     raise(askOf({ requestId: 'd', toolCallMeta: null, kind: 'edit' }))
-    expect(call.seen.map((pending) => pending.toolName)).toEqual(['Edit', 'Bash', 'Read', 'Write'])
+    raise(askOf({ requestId: 'e', toolCallMeta: null, kind: 'fetch' }))
+    raise(askOf({ requestId: 'f', toolCallMeta: null, kind: 'other', title: 'mcp__docs__search' }))
+    expect(call.seen.map((pending) => pending.toolName)).toEqual([
+      'Edit',
+      'Bash',
+      'Read',
+      'Write',
+      'WebFetch',
+      'mcp__docs__search',
+    ])
   })
 }
 
@@ -414,15 +432,16 @@ function answeringTests() {
 }
 
 function plainDenyTests() {
-  it('sends no prompt for a plain deny', async () => {
+  it('cancels the turn and tells the agent it was refused, so one turn ends after it reads why', async () => {
     const call = held()
     const r = runner()
     await r.start({ ...start, onPending: call.onPending })
     raise()
     await call.arrived
     r.resolve('acp-1', call.seen[0].requestId, { allow: false })
-    await eventually(() => expect(answers.map((a) => a.optionId)).toEqual(['reject-once']))
-    expect(prompts.map((p) => p.text)).toEqual(['/speckit-implement'])
+    await eventually(() => expect(prompts.at(-1)?.text).toBe('Denied by the operator'))
+    expect(answers.map((a) => a.optionId)).toEqual(['reject-once'])
+    expect(cancelled).toEqual(['acp-1'])
   })
 }
 
@@ -450,8 +469,8 @@ function tabAnswersTests() {
     })
     raise()
     await call.arrived
-    for (const settled of settledListeners) settled('acp-ask-1')
-    expect(resolved).toEqual([[call.seen[0].requestId, 'answered']])
+    for (const settled of settledListeners) settled({ requestId: 'acp-ask-1', outcome: 'allowed' })
+    expect(resolved).toEqual([[call.seen[0].requestId, 'allow']])
     expect(r.resolve('acp-1', call.seen[0].requestId, { allow: true })).toBe(false)
     expect(answers).toEqual([])
   })
@@ -491,6 +510,9 @@ function ladderTests() {
     raise()
     await eventually(() => expect(answers.map((a) => a.optionId)).toEqual(['reject-once']))
     expect(refused).toEqual(['Bash: outside the checkout'])
+    // The reason reaches the agent, as it did in the tool result before ACP.
+    await eventually(() => expect(prompts.at(-1)?.text).toBe('outside the checkout'))
+    expect(cancelled).toEqual(['acp-1'])
   })
 }
 

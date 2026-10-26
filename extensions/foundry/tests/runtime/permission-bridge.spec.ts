@@ -179,22 +179,32 @@ function anAbstainingDeciderTests() {
 }
 
 describe('an ask answered in the agent tab', () => {
-  it('drops the held call it raised and reports it answered', async () => {
+  it('drops the held call it raised and reports how it was settled', async () => {
     const { bridge, events, resolved } = bridgeWith(10_000)
     const pending = bridge.canUseTool('Bash', { command: 'ls' }, 'ask-1')
-    bridge.withdraw('ask-1')
+    bridge.withdraw('ask-1', 'allowed')
     await expect(pending).resolves.toEqual({ permissionDecision: 'ask' })
-    expect(resolved).toEqual([{ requestId: events[0].requestId, decision: 'answered' }])
+    expect(resolved).toEqual([{ requestId: events[0].requestId, decision: 'allow' }])
     expect(bridge.resolve(events[0].requestId, { allow: true })).toBe(false)
   })
 
   it('leaves the calls of other asks held', async () => {
     const { bridge, events, resolved } = bridgeWith(10_000)
     const pending = bridge.canUseTool('Bash', { command: 'ls' }, 'ask-1')
-    bridge.withdraw('ask-2')
+    bridge.withdraw('ask-2', 'rejected')
     expect(resolved).toEqual([])
     expect(bridge.resolve(events[0].requestId, { allow: true })).toBe(true)
     await pending
+  })
+})
+
+describe('an ask cancelled by an interrupt or an end', () => {
+  it('reports the held call denied, not answered', async () => {
+    const { bridge, events, resolved } = bridgeWith(10_000)
+    const pending = bridge.canUseTool('Bash', { command: 'ls' }, 'ask-1')
+    bridge.withdraw('ask-1', 'cancelled')
+    await expect(pending).resolves.toEqual({ permissionDecision: 'ask' })
+    expect(resolved).toEqual([{ requestId: events[0].requestId, decision: 'deny' }])
   })
 })
 
@@ -381,7 +391,7 @@ function answersTests() {
     return events[0].requestId
   }
 
-  it('carries the answer as the reason and as the message for the agent', async () => {
+  it('carries the answer as the reason', async () => {
     const { bridge, events } = bridgeFor()
     const pending = bridge.canUseTool('AskUserQuestion', {
       questions: [{ question: 'Which scope?' }],
@@ -390,7 +400,6 @@ function answersTests() {
     await expect(pending).resolves.toEqual({
       permissionDecision: 'deny',
       reason: 'terminal output only',
-      message: 'terminal output only',
     })
   })
 

@@ -11,8 +11,6 @@
 export interface ToolVerdict {
   permissionDecision: 'allow' | 'deny' | 'ask'
   reason?: string
-  /** What the operator typed: it reaches the agent as its next prompt. */
-  message?: string
 }
 
 export interface PermissionDecision {
@@ -98,7 +96,7 @@ export interface PermissionBridge {
   /** Leaves one to the agent's tab, as the timeout does. */
   handBackToTerminal(requestId: string): void
   /** The ask was answered elsewhere (in the agent's tab): drop its held call. */
-  withdraw(askId: string): void
+  withdraw(askId: string, outcome: 'allowed' | 'rejected' | 'cancelled'): void
   /** Denies everything outstanding. An unresolved promise would hang the turn. */
   rejectAll(reason: string): void
 }
@@ -272,7 +270,7 @@ export function createPermissionBridge(options: PermissionBridgeOptions): Permis
     canUseTool: (toolName, input, askId) => canUseTool(state, { toolName, input, askId }),
     resolve: (requestId, decision) => resolveRequest(state, requestId, decision),
     handBackToTerminal: (requestId) => handBack(state, requestId),
-    withdraw: (askId) => withdrawAsk(state, askId),
+    withdraw: (askId, outcome) => withdrawAsk(state, { askId, outcome }),
     rejectAll: (reason) => rejectAll(state, reason),
   }
 }
@@ -304,7 +302,7 @@ function answerOf(decision: PermissionDecision): string {
 
 function toResult(decision: PermissionDecision): ToolVerdict {
   const answer = answerOf(decision)
-  if (answer !== '') return { permissionDecision: 'deny', reason: answer, message: answer }
+  if (answer !== '') return { permissionDecision: 'deny', reason: answer }
   return decision.allow
     ? { permissionDecision: 'allow' }
     : {
@@ -374,12 +372,15 @@ function resolveRequest(
   return true
 }
 
-function withdrawAsk(state: BridgeState, askId: string): void {
+function withdrawAsk(
+  state: BridgeState,
+  { askId, outcome }: { askId: string; outcome: 'allowed' | 'rejected' | 'cancelled' }
+): void {
   for (const [requestId, entry] of state.outstanding) {
     if (entry.askId !== askId) continue
     takeOutstanding(state, requestId)
-    // Answered where the agent is; nothing is left to send.
-    state.options.onResolved(requestId, 'answered')
+    // Settled where the agent is, or cancelled with its turn; nothing is left to send.
+    state.options.onResolved(requestId, outcome === 'allowed' ? 'allow' : 'deny')
     entry.settle({ permissionDecision: 'ask' })
   }
 }

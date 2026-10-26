@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { AgentPermissionAsk, AgentUpdate, StartAgentInput } from '@terminator/extension-sdk'
+import type {
+  AgentPermissionAsk,
+  AgentPermissionSettled,
+  AgentUpdate,
+  StartAgentInput,
+} from '@terminator/extension-sdk'
 import {
   createAgentService,
   type AgentLink,
@@ -215,17 +220,29 @@ describe('permission ask fields', () => {
 describe('permission settled', () => {
   it('tells a listener when an ask is settled', async () => {
     const context = await started()
-    const settled: string[] = []
-    context.service.onPermissionSettled(context.sessionId, (id) => settled.push(id))
+    const settled: AgentPermissionSettled[] = []
+    context.service.onPermissionSettled(context.sessionId, (s) => settled.push(s))
     const { ask } = await askedOf(context)
     await context.service.answer(context.sessionId, ask.requestId, 'allow')
-    expect(settled).toEqual([ask.requestId])
+    expect(settled).toEqual([{ requestId: ask.requestId, outcome: 'allowed' }])
+  })
+
+  it('says whether the ask was rejected or cancelled', async () => {
+    const context = await started()
+    const settled: AgentPermissionSettled[] = []
+    context.service.onPermissionSettled(context.sessionId, (s) => settled.push(s))
+    const first = await askedOf(context)
+    await context.service.answer(context.sessionId, first.ask.requestId, 'reject')
+    const second = await askedOf(context)
+    context.service.cancel(context.sessionId)
+    expect(settled.map((s) => s.outcome)).toEqual(['rejected', 'cancelled'])
+    expect(settled[1].requestId).toBe(second.ask.requestId)
   })
 
   it('stops telling a listener that was disposed', async () => {
     const context = await started()
-    const settled: string[] = []
-    const dispose = context.service.onPermissionSettled(context.sessionId, (id) => settled.push(id))
+    const settled: AgentPermissionSettled[] = []
+    const dispose = context.service.onPermissionSettled(context.sessionId, (s) => settled.push(s))
     dispose()
     const { ask } = await askedOf(context)
     await context.service.answer(context.sessionId, ask.requestId, 'allow')
@@ -244,6 +261,7 @@ describe('permission answers', () => {
     expect(broadcast).toHaveBeenCalledWith('agents:permission-settled', {
       sessionId,
       requestId: ask.requestId,
+      outcome: 'rejected',
     })
     expect(asks.clearAsk).toHaveBeenCalledWith(sessionId)
   })

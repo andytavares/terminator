@@ -590,8 +590,11 @@ picks the ask's `allow_once` option; deny picks `reject_once`. What the ladder
 abstains on is held for a person. In `auto` mode Foundry sees only what Claude's
 classifier asks about, and the ladder decides those the same way.
 
-**A refusal carries no reason.** ACP's reject option has no text, so the agent
-reads "rejected", not Foundry's reason. The reason stays in the console feed.
+**A refusal is followed by its reason.** ACP's reject option has no text, so the
+runner cancels the turn and sends the reason (or the operator's typed answer) as
+the next prompt; the turn ends once, after the agent has read why. The hard
+refusals also reach Claude as deny rules (`runtime/deny-rules.ts`), which hold in
+`auto` mode, where the ladder sees only what the classifier asks about.
 
 ### An "ask" has no unattended resolution
 

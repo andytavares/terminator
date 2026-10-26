@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { defineChannel, dispatchChannel } from '@terminator/extension-sdk'
 import type {
   AgentPermissionAsk,
+  AgentPermissionSettled,
   AgentUpdate,
   ChannelSpec,
   ExtensionAPI,
@@ -44,7 +45,9 @@ const backend: BackendModule = {
       api.agents.onUpdate('s1', (update) => api.window.broadcast('demo:update', update))
       api.agents.onPermission('s1', (ask) => api.window.broadcast('demo:ask', ask))
       api.agents.onEnd('s1', (code) => api.window.broadcast('demo:end', code))
-      api.agents.onPermissionSettled('s1', (id) => api.window.broadcast('demo:settled', id))
+      api.agents.onPermissionSettled('s1', (settled) =>
+        api.window.broadcast('demo:settled', settled)
+      )
     })
   },
 }
@@ -53,7 +56,7 @@ type Listeners = {
   update?: (update: AgentUpdate) => void
   ask?: (ask: AgentPermissionAsk) => void
   end?: (exitCode: number | null) => void
-  settled?: (requestId: string) => void
+  settled?: (settled: AgentPermissionSettled) => void
 }
 
 /** Main's agents: calls are spies, and the listeners an extension adds are kept for the test. */
@@ -71,7 +74,10 @@ function agentsInMain(listeners: Listeners) {
       listeners.ask = listener
       return () => void delete listeners.ask
     },
-    onPermissionSettled: (_session: string, listener: (requestId: string) => void) => {
+    onPermissionSettled: (
+      _session: string,
+      listener: (settled: AgentPermissionSettled) => void
+    ) => {
       listeners.settled = listener
       return () => void delete listeners.settled
     },
@@ -150,12 +156,15 @@ describe('api.agents in the extension host — cancel and listeners', () => {
     listeners.update?.({ sessionUpdate: 'plan' })
     listeners.ask?.({ requestId: 'r1' } as AgentPermissionAsk)
     listeners.end?.(2)
-    listeners.settled?.('r1')
+    listeners.settled?.({ requestId: 'r1', outcome: 'cancelled' })
     await eventually(() => {
       expect(broadcast).toHaveBeenCalledWith('demo:update', { sessionUpdate: 'plan' })
       expect(broadcast).toHaveBeenCalledWith('demo:ask', { requestId: 'r1' })
       expect(broadcast).toHaveBeenCalledWith('demo:end', 2)
-      expect(broadcast).toHaveBeenCalledWith('demo:settled', 'r1')
+      expect(broadcast).toHaveBeenCalledWith('demo:settled', {
+        requestId: 'r1',
+        outcome: 'cancelled',
+      })
     })
   })
 })

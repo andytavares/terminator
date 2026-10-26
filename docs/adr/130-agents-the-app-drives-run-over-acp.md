@@ -44,7 +44,8 @@ A spike drove the adapter (0.89.1, SDK 1.8.0) against claude 2.1.310 in a tempor
 ## Consequences
 
 - Foundry still reads Claude's transcript, because the adapter still writes it. Foundry stays Claude-only.
-- A refusal reaches the agent as "rejected", without Foundry's reason: an ACP reject option carries no text. The reason stays in Foundry's feed. An operator's typed answer is sent after the refusal as the agent's next prompt.
+- An ACP reject option carries no text, so a refusal also cancels the turn and sends Foundry's reason, or the operator's typed answer, as the agent's next prompt. The turn ends once, after the agent has read why.
+- Foundry's hard refusals (`git push`, `gh pr` changes, edits under the skills mount, tools a role does not use) are passed as Claude deny rules (`disallowedTools`, `runtime/deny-rules.ts`). Deny rules are checked before any mode, so they hold in `auto` mode too (https://code.claude.com/docs/en/permissions).
 - Inside an ask there is no auto mode to defer to, so the policy's old "leave it to auto mode" answer is gone: what it leaves open is asked, or refused with the reason at `lights-out`.
 - In `auto` mode Foundry sees only what Claude's classifier asks about, not every tool call. In `default` mode reads do not ask, so Foundry no longer sees them either.
 - The app ships the adapter but not its 241 MB Claude binary; `claude` must be installed, as before.

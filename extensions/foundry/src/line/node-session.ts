@@ -11,6 +11,7 @@ import type {
 import { agentTitle } from '../runtime/agent-title.js'
 import { decideTool } from '../runtime/tool-decision.js'
 import { modeFor } from '../runtime/permission-mode.js'
+import { denyRules } from '../runtime/deny-rules.js'
 import { isProbedCommand } from '../runtime/agent-policy.js'
 import { runtime, strandedAgents } from '../runtime/runtime-state.js'
 import { notePending, noteResolved } from '../runtime/held-calls.js'
@@ -101,6 +102,7 @@ function startOptions(launch: NodeLaunch, turn: NodeTurn): StartSupervisedRunOpt
     effort: input.effort ?? undefined,
     addDirs: addDirsFor(input),
     mode: permissionModeOf(launch),
+    denyRules: denyRules({ skillsMount: input.skillsMount, mayUseTool: input.mayUseTool }),
     autoDecide: toolDecisionFor(launch),
     onPending: (pending) => onPending(context, pending),
     onResolved: (requestId, outcome) => recordResolution(context, turn, { requestId, outcome }),

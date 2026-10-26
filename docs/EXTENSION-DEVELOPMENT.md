@@ -914,7 +914,7 @@ if (started) {
 }
 ```
 
-An ask (`onPermission`) carries `toolCallId` and `toolCallMeta`, the `_meta` of that tool call (the Claude agent sends `{ claudeCode: { toolName } }`). `answer` takes one of the ask's `options`; `onPermissionSettled(sessionId, listener)` tells you when an ask was answered anywhere, including the session's tab. Set `mode` in `start` (`default` asks for every write and state-changing command, `auto` lets the agent decide).
+An ask (`onPermission`) carries `toolCallId` and `toolCallMeta`, the `_meta` of that tool call (the Claude agent sends `{ claudeCode: { toolName } }`). `answer` takes one of the ask's `options`; `onPermissionSettled(sessionId, listener)` tells you when an ask ended anywhere, including the session's tab, with `outcome` `allowed`, `rejected` or `cancelled`. Set `mode` in `start` (`default` asks for every write and state-changing command, `auto` lets the agent decide).
 
 ### `api.window`
 

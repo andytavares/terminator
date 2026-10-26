@@ -42,8 +42,10 @@ and Claude's classifier answers what this policy does not decide. Every other ro
 runs in `default` mode, where each write and state-changing command is an ask this
 policy decides. Inside an ask there is no auto mode to defer to: what the policy
 leaves open is held for a person, or refused with the reason at `lights-out`
-(`unattendedRule`). A refusal reaches the agent as "rejected", without the reason;
-an operator's typed answer is sent after it as the agent's next prompt.
+(`unattendedRule`). A refusal cancels the turn and sends the reason, or the
+operator's typed answer, as the next prompt, since an ACP reject carries no text.
+The hard refusals also go to Claude as deny rules (`runtime/deny-rules.ts`), so they
+hold in `auto` mode, where this policy sees only what the classifier asks about.
 
 When you change `shell-split.ts`, `autonomy-policy.ts` or `read-only-policy.ts`,
 the question is not only "does this let the wrong thing through". It is also

@@ -73,6 +73,8 @@ export interface StartSupervisedRunOptions {
    * state-changing command an ask, so `autoDecide` still sees it; `auto` leaves them to Claude.
    */
   mode: PermissionMode
+  /** Claude deny rules (`denyRules`): Foundry's hard refusals, which hold in `auto` mode too. */
+  denyRules?: string[]
   /** Decides without asking when the autonomy ladder allows it. */
   autoDecide?: (toolName: string, input: unknown) => PermissionDecision | null
   /** The ladder refused something without asking. Only refusals are reported. */
@@ -412,6 +414,7 @@ function claudeOptions(start: StartSupervisedRunOptions): object {
     ...(start.model ? { model: start.model } : {}),
     ...(start.effort ? { effort: start.effort } : {}),
     additionalDirectories: start.addDirs ?? [],
+    disallowedTools: start.denyRules ?? [],
     env: {
       SPECIFY_FEATURE: featureSlug,
       SPECIFY_FEATURE_DIRECTORY: path.join('specs', featureSlug),
@@ -435,12 +438,21 @@ function agentStartInput(start: StartSupervisedRunOptions, projectId: string): S
   }
 }
 
-/** The tool a permission ask is about, as Claude names it. */
+/** The Claude tool an ACP kind stands for, when the agent sent no tool name. */
+const TOOL_OF_KIND: Readonly<Record<string, string>> = {
+  execute: 'Bash',
+  read: 'Read',
+  search: 'Grep',
+  edit: 'Write',
+  delete: 'Bash',
+  move: 'Bash',
+  fetch: 'WebFetch',
+}
+
 function toolNameOf(ask: AgentPermissionAsk): string {
   const named = (ask.toolCallMeta?.claudeCode as { toolName?: unknown } | undefined)?.toolName
   if (typeof named === 'string') return named
-  if (ask.kind === 'execute') return 'Bash'
-  return ask.kind === 'read' || ask.kind === 'search' ? 'Read' : 'Write'
+  return TOOL_OF_KIND[ask.kind ?? ''] ?? ask.title
 }
 
 /** The option that carries a verdict, or null (which cancels the ask) when the agent offers none. */
@@ -458,8 +470,18 @@ async function decideAsk(
   const verdict: ToolVerdict = await bridge.canUseTool(toolNameOf(ask), ask.rawInput, ask.requestId)
   if (verdict.permissionDecision === 'ask') return
   await api.agents.answer(ask.sessionId, ask.requestId, optionFor(ask, verdict.permissionDecision))
-  // A refusal carries no words over ACP, so the operator's reach the agent as its next prompt.
-  if (verdict.message !== undefined) sendToSession(context, ask.sessionId, verdict.message)
+  if (verdict.permissionDecision === 'deny') tellWhyRefused(context, ask.sessionId, verdict.reason)
+}
+
+/** An ACP refusal carries no words: the turn is cancelled, so it does not end before the agent
+ *  has read why, and the reason (or the operator's own words) is its next prompt. */
+function tellWhyRefused(
+  context: RunnerContext,
+  sessionId: string,
+  reason: string | undefined
+): void {
+  context.api.agents.cancel(sessionId)
+  sendToSession(context, sessionId, reason ?? 'Refused.')
 }
 
 /** Listens for the session's asks and for the tab answering one; returns what stops both. */
@@ -472,7 +494,9 @@ function listenForAsks(
   const stopAsks = agents.onPermission(sessionId, (ask) => {
     decideAsk(context, { bridge, ask }).catch(() => undefined)
   })
-  const stopSettled = agents.onPermissionSettled(sessionId, (askId) => bridge.withdraw(askId))
+  const stopSettled = agents.onPermissionSettled(sessionId, ({ requestId, outcome }) =>
+    bridge.withdraw(requestId, outcome)
+  )
   return () => {
     stopAsks()
     stopSettled()

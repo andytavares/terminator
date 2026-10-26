@@ -13,8 +13,9 @@
 - `api.agents.setConfig(sessionId, configId, value)`: sets a session option such as the model.
 - `api.agents.close(sessionId)`: ends the agent process and closes its tab.
 - `api.agents.onUpdate`, `onPermission`, `onEnd`: listen to a session's updates, asks and exit.
-- `api.agents.onPermissionSettled(sessionId, listener)`: an ask was answered, cancelled or answered
-  in the session's tab. `AgentPermissionAsk` carries `toolCallId` and `toolCallMeta`.
+- `api.agents.onPermissionSettled(sessionId, listener)`: an ask ended, wherever it was answered,
+  as `{ requestId, outcome: 'allowed' | 'rejected' | 'cancelled' }` (`AgentPermissionSettled`).
+  `AgentPermissionAsk` carries `toolCallId` and `toolCallMeta`.
 - `api.agents.answer(sessionId, requestId, optionId)`: answers a tool-call ask.
 - `api.agents.runOnce(input)`: one prompt in a throwaway session, with every ask rejected.
 - `api.agents.models(agentId?)`: the `model` option of an agent's sessions.

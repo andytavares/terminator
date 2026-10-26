@@ -307,6 +307,12 @@ export interface AgentPermissionAsk {
   options: Array<{ optionId: string; name: string; kind: string }>
 }
 
+/** An ask that was answered, wherever it was answered, or cancelled by a cancel or an end. */
+export interface AgentPermissionSettled {
+  requestId: string
+  outcome: 'allowed' | 'rejected' | 'cancelled'
+}
+
 /** How a prompt turn ended: `end_turn`, `max_tokens`, `max_turn_requests`, `refusal` or
  * `cancelled`; `error` when the agent failed or exited. */
 export interface AgentTurnEnd {
@@ -344,7 +350,10 @@ export interface AgentsAPI {
   /** False when the ask was already answered or the session ended. Null cancels the ask. */
   answer(sessionId: string, requestId: string, optionId: string | null): Promise<boolean>
   /** An ask was answered or cancelled, by this client or by the session's tab. */
-  onPermissionSettled(sessionId: string, listener: (requestId: string) => void): () => void
+  onPermissionSettled(
+    sessionId: string,
+    listener: (settled: AgentPermissionSettled) => void
+  ): () => void
   /** The agent process exited; exit code null when a signal ended it. */
   onEnd(sessionId: string, listener: (exitCode: number | null) => void): () => void
   runOnce(input: RunAgentOnceInput): Promise<RunAgentOnceResult>

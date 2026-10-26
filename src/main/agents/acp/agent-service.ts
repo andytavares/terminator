@@ -23,6 +23,7 @@ import type {
   AgentConfigOption,
   AgentDescriptor,
   AgentPermissionAsk,
+  AgentPermissionSettled,
   AgentStarted,
   AgentsAPI,
   AgentUpdate,
@@ -113,7 +114,7 @@ interface Session {
   toolCallMeta: Map<string, Record<string, unknown>>
   updateListeners: Set<(update: AgentUpdate) => void>
   permissionListeners: Set<(ask: AgentPermissionAsk) => void>
-  settledListeners: Set<(requestId: string) => void>
+  settledListeners: Set<(settled: AgentPermissionSettled) => void>
   endListeners: Set<(exitCode: number | null) => void>
 }
 
@@ -184,6 +185,16 @@ function newSession(fields: Pick<Session, 'id' | 'agentId' | 'link' | 'unattende
   }
 }
 
+/** How an ask ended, by the kind of the option chosen. */
+function settledAs(
+  ask: AgentPermissionAsk,
+  outcome: RequestPermissionOutcome
+): AgentPermissionSettled['outcome'] {
+  if (outcome.outcome === 'cancelled') return 'cancelled'
+  const kind = ask.options.find((option) => option.optionId === outcome.optionId)?.kind ?? ''
+  return kind.startsWith('allow') ? 'allowed' : 'rejected'
+}
+
 /** `work`, or a rejection once `ms` pass without it settling. */
 function withinTime<T>(work: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -252,8 +263,9 @@ class AcpAgentService implements AgentService {
     if (!open) return false
     session.asks.delete(requestId)
     open.resolve({ outcome })
-    notify(session.settledListeners, requestId)
-    this.deps.broadcast('agents:permission-settled', { sessionId: session.id, requestId })
+    const settled = { requestId, outcome: settledAs(open.ask, outcome) }
+    notify(session.settledListeners, settled)
+    this.deps.broadcast('agents:permission-settled', { sessionId: session.id, ...settled })
     if (session.asks.size === 0) clearAsk(session.id)
     return true
   }
@@ -534,7 +546,10 @@ class AcpAgentService implements AgentService {
     return session ? disposer(session.permissionListeners, listener) : () => undefined
   }
 
-  onPermissionSettled(sessionId: string, listener: (requestId: string) => void): () => void {
+  onPermissionSettled(
+    sessionId: string,
+    listener: (settled: AgentPermissionSettled) => void
+  ): () => void {
     const session = this.live(sessionId)
     return session ? disposer(session.settledListeners, listener) : () => undefined
   }
