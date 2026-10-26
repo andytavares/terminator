@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { join } from 'node:path'
 import { getGlobalSettings } from '../../storage/settings-store.js'
+import { RETENTION_MS } from '../../../shared/session-records/retention.js'
 import { createAgentLog } from './agent-log.js'
 import { agentMeta, createConnector } from './agent-connection.js'
 import { listAgents } from './agent-registry.js'
@@ -14,12 +15,15 @@ export function startAgentService(
   broadcast: (channel: string, payload: unknown) => void
 ): AgentService {
   const userData = app.getPath('userData')
+  const log = createAgentLog({ directory: join(userData, 'agent-log'), now: Date.now })
+  // As long as a session record outlives its session.
+  log.prune(RETENTION_MS)
   service = createAgentService({
     connect: createConnector(() => getGlobalSettings().agents),
     listAgents: () => listAgents(getGlobalSettings().agents),
     defaultAgentId: () => getGlobalSettings().agents.default,
     agentMeta,
-    log: createAgentLog({ directory: join(userData, 'agent-log'), now: Date.now }),
+    log,
     scratchDirectory: join(userData, 'agent-scratch'),
     scrollbackLimit: () => getGlobalSettings().terminal.scrollbackLimit,
     broadcast,

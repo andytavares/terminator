@@ -51,7 +51,12 @@ it('asks haiku with no tools, the instruction as system prompt and the thread as
     mode: 'default',
     agentMeta: {
       claudeCode: {
-        options: { model: 'claude-haiku-5-5', tools: [], systemPrompt: SUMMARY_INSTRUCTION },
+        options: {
+          model: 'claude-haiku-5-5',
+          tools: [],
+          systemPrompt: SUMMARY_INSTRUCTION,
+          persistSession: false,
+        },
       },
     },
     timeoutMs: SUMMARY_TIMEOUT_MS,

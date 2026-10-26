@@ -228,7 +228,8 @@ class AcpAgentService implements AgentService {
   private publishUpdate(session: Session, update: AgentUpdate): void {
     if (session.replaying) return
     try {
-      this.deps.log.append(session.id, update)
+      // Nobody opens a one-shot session again, so its updates are not kept.
+      if (!session.unattended) this.deps.log.append(session.id, update)
     } catch (error) {
       logger.error('agent log write failed', { error: String(error) })
     }

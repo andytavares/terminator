@@ -385,6 +385,20 @@ describe('resuming a session that still runs', () => {
   })
 })
 
+describe('runOnce keeps no log', () => {
+  it('writes nothing to the agent log for a session nobody can open', async () => {
+    const { service, firstAgent } = setup()
+    const run = service.runOnce({ cwd: '/w', prompt: 'say hi' })
+    const agent = await firstAgent
+    agent.onPrompt = async () => {
+      await chunk(agent, 'hi')
+      return { stopReason: 'end_turn' }
+    }
+    expect(await run).toMatchObject({ text: 'hi' })
+    expect(service.readHistory(SESSION_ID)).toEqual([])
+  })
+})
+
 describe('runOnce without an agent', () => {
   it('reports an agent that cannot start in plain words', async () => {
     const service = serviceWith(() => Promise.reject(new Error('spawn ENOENT')))

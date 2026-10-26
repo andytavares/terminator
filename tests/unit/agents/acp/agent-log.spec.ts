@@ -1,4 +1,4 @@
-import { appendFileSync } from 'node:fs'
+import { appendFileSync, existsSync, utimesSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { createAgentLog } from '../../../../src/main/agents/acp/agent-log'
@@ -30,5 +30,25 @@ describe('agent log', () => {
     log.append('s1', { sessionUpdate: 'plan' })
     appendFileSync(join(directory, 's1.jsonl'), '{"at":1,"upd')
     expect(log.readHistory('s1')).toEqual([{ sessionUpdate: 'plan' }])
+  })
+})
+
+describe('agent log pruning', () => {
+  it('prunes the logs nobody has written to within the age given', () => {
+    const directory = makeTempDir('agent-log-')
+    const day = 24 * 60 * 60 * 1000
+    const log = createAgentLog({ directory, now: () => 40 * day })
+    log.append('old', { sessionUpdate: 'plan' })
+    log.append('recent', { sessionUpdate: 'plan' })
+    utimesSync(join(directory, 'old.jsonl'), 1, 1)
+    utimesSync(join(directory, 'recent.jsonl'), 35 * 24 * 3600, 35 * 24 * 3600)
+    log.prune(30 * day)
+    expect(existsSync(join(directory, 'old.jsonl'))).toBe(false)
+    expect(log.readHistory('recent')).toEqual([{ sessionUpdate: 'plan' }])
+  })
+
+  it('prunes nothing when the folder does not exist yet', () => {
+    const log = createAgentLog({ directory: join(makeTempDir('agent-log-'), 'none'), now: () => 0 })
+    expect(() => log.prune(1)).not.toThrow()
   })
 })

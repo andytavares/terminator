@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import type { AgentUpdate } from '@terminator/extension-sdk'
 
@@ -6,6 +6,8 @@ export interface AgentLog {
   append(sessionId: string, update: AgentUpdate): void
   /** The updates of a session in the order they arrived; empty when it has none. */
   readHistory(sessionId: string): AgentUpdate[]
+  /** Deletes every log nothing was written to within `maxAgeMs`. */
+  prune(maxAgeMs: number): void
 }
 
 /** The update a line holds; none for an empty line or one half written when the app stopped. */
@@ -32,14 +34,31 @@ export function createAgentLog({
       mkdirSync(directory, { recursive: true })
       appendFileSync(fileOf(sessionId), `${JSON.stringify({ at: now(), update })}\n`)
     },
-    readHistory(sessionId) {
-      let text: string
-      try {
-        text = readFileSync(fileOf(sessionId), 'utf8')
-      } catch {
-        return []
+    readHistory: (sessionId) => readLines(fileOf(sessionId)).flatMap(updateOf),
+    prune(maxAgeMs) {
+      const oldest = now() - maxAgeMs
+      for (const file of logFilesIn(directory)) {
+        if (statSync(file).mtimeMs < oldest) rmSync(file, { force: true })
       }
-      return text.split('\n').flatMap(updateOf)
     },
+  }
+}
+
+/** The file's lines; none when it does not exist. */
+function readLines(file: string): string[] {
+  try {
+    return readFileSync(file, 'utf8').split('\n')
+  } catch {
+    return []
+  }
+}
+
+function logFilesIn(directory: string): string[] {
+  try {
+    return readdirSync(directory)
+      .filter((name) => name.endsWith('.jsonl'))
+      .map((name) => join(directory, name))
+  } catch {
+    return [] // No folder yet: nothing was ever logged.
   }
 }

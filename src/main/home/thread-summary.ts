@@ -64,7 +64,13 @@ async function generate(
     mode: 'default',
     agentMeta: {
       claudeCode: {
-        options: { model: SUMMARY_MODEL, tools: [], systemPrompt: SUMMARY_INSTRUCTION },
+        // A summary is never resumed, so Claude keeps no transcript of it.
+        options: {
+          model: SUMMARY_MODEL,
+          tools: [],
+          systemPrompt: SUMMARY_INSTRUCTION,
+          persistSession: false,
+        },
       },
     },
     timeoutMs: SUMMARY_TIMEOUT_MS,
