@@ -17,6 +17,8 @@ module.exports = {
   npmRebuild: false,
   files: [
     'out/**/*',
+    // The adapter runs the user's own `claude`, so the 241 MB platform binaries stay out.
+    '!**/node_modules/@anthropic-ai/claude-agent-sdk-*/**',
     // The bundled extensions, at app.asar/extensions where main looks for them.
     // What they read at run time ships (built code, data, fonts); sources and tests do not.
     {
@@ -45,6 +47,9 @@ module.exports = {
   asarUnpack: [
     '**/node_modules/@electric-sql/pglite/dist/postgres.wasm',
     '**/node_modules/@electric-sql/pglite/dist/postgres.data',
+    // The adapter runs as a child process, which cannot read from inside app.asar.
+    '**/node_modules/@agentclientprotocol/**',
+    '**/node_modules/@anthropic-ai/claude-agent-sdk/**',
   ],
   mac: {
     icon: 'resources/icon.png',

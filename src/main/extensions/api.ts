@@ -88,6 +88,7 @@ import { listConnections as listTrackerConnections } from '../integrations/track
 import { setLink as setIssueLink } from '../integrations/issue-link-store.js'
 import { REMOTE_ACCESSIBLE_CHANNELS } from '../remote/remote-accessible-channels.js'
 import { BatchedPtyStream } from './pty-stream.js'
+import { agentService } from '../agents/acp/agent-service-instance.js'
 
 // Extension bundles are plain JavaScript at run time; a handler without a
 // schema would otherwise fail only when its first payload arrives (ADR 096).
@@ -861,6 +862,25 @@ function ptySessionApi({
   }
 }
 
+/** Every call goes to the app's one agent service, which starts with the app. */
+function agentsApi(): ExtensionAPI['agents'] {
+  return {
+    list: () => agentService().list(),
+    start: (input) => agentService().start(input),
+    prompt: (sessionId, text) => agentService().prompt(sessionId, text),
+    cancel: (sessionId) => agentService().cancel(sessionId),
+    setConfig: (sessionId, configId, value) => agentService().setConfig(sessionId, configId, value),
+    close: (sessionId) => agentService().close(sessionId),
+    onUpdate: (sessionId, listener) => agentService().onUpdate(sessionId, listener),
+    onPermission: (sessionId, listener) => agentService().onPermission(sessionId, listener),
+    answer: (sessionId, requestId, optionId) =>
+      agentService().answer(sessionId, requestId, optionId),
+    onEnd: (sessionId, listener) => agentService().onEnd(sessionId, listener),
+    runOnce: (input) => agentService().runOnce(input),
+    models: (agentId) => agentService().models(agentId),
+  }
+}
+
 /** Points an auxiliary window at `query`: the extension's own renderer, the dev server, or the app. */
 function navigateAuxiliary(
   win: BrowserWindow,
@@ -955,6 +975,15 @@ function windowApi(context: ApiContext): ExtensionAPI['window'] {
   }
 }
 
+/** The members that run or watch a session: its terminal, its pty and its agent. */
+function sessionMembers(context: ApiContext): Pick<ExtensionAPI, 'terminal' | 'pty' | 'agents'> {
+  return {
+    terminal: terminalApi(context),
+    pty: { ...ptyTabsApi(context), ...ptyStreamApi(context), ...ptySessionApi(context) },
+    agents: agentsApi(),
+  }
+}
+
 export function createExtensionAPI(
   extensionId: string,
   deps?: ExtensionAPIDeps,
@@ -978,8 +1007,7 @@ export function createExtensionAPI(
     nativeMenu: nativeMenuApi(context),
     commands: commandsApi(context),
     ipc: { ...ipcRegistrationApi(context), ...ipcBridgeApi(context) },
-    terminal: terminalApi(context),
-    pty: { ...ptyTabsApi(context), ...ptyStreamApi(context), ...ptySessionApi(context) },
+    ...sessionMembers(context),
     window: windowApi(context),
   }
   // The live disposables array (registrations keep pushing into it after

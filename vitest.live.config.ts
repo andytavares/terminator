@@ -12,7 +12,7 @@ export default defineConfig({
   test: {
     name: 'live',
     environment: 'node',
-    include: ['extensions/*/tests/live/**/*.spec.ts'],
+    include: ['extensions/*/tests/live/**/*.spec.ts', 'tests/live/**/*.spec.ts'],
     // One at a time: they push branches and open pull requests on the same
     // remote, and two of them racing would interleave those.
     fileParallelism: false,

@@ -21,6 +21,7 @@
     "tests/unit/**/*",
     "tests/integration/**/*",
     "tests/e2e/**/*",
+    "tests/live/**/*",
     "tests/support/**/*",
     "tests/setup.ts",
     "tests/global-setup.ts",

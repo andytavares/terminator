@@ -12,5 +12,6 @@ export function defaultGlobalSettings(defaultShell: string): GlobalSettings {
     sidebar: { staleAfterMs: 2 * 60 * 60 * 1000 },
     notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },
     quickActions: { pins: [], usage: [], directUse: [], custom: [] },
+    agents: { default: 'claude', custom: [] },
   }
 }

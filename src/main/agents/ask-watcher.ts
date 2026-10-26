@@ -41,6 +41,12 @@ export function clearAsk(sessionId: string): void {
   if (asks.delete(sessionId)) announce(sessionId, null)
 }
 
+/** An ACP agent waits on a permission answer: shown like a hook's ask, until `clearAsk`. */
+export function raiseAsk(sessionId: string, ask: AgentAsk): void {
+  asks.set(sessionId, ask)
+  announce(sessionId, ask)
+}
+
 // Claude Code's interrupt keys. An interrupted turn sends no Stop hook
 // (https://code.claude.com/docs/en/hooks#stop), so the key itself ends it.
 const INTERRUPT_KEYS: readonly string[] = ['\x1b', '\x03']

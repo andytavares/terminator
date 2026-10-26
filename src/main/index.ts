@@ -27,6 +27,8 @@ import { makeSnapshotFor } from './sessions/session-snapshot.js'
 import { registerSessionRecordsHandlers } from './ipc/session-records.ipc.js'
 import { registerAgentAskHandlers } from './ipc/agent-ask.ipc.js'
 import { registerAgentTurnHandlers } from './ipc/agent-turn.ipc.js'
+import { registerAgentsHandlers } from './ipc/agents.ipc.js'
+import { disposeAgentService, startAgentService } from './agents/acp/agent-service-instance.js'
 import { registerTaskHandlers } from './ipc/task.ipc.js'
 import { loadTasks } from './tasks/task-store.js'
 import { registerAttentionHandlers } from './ipc/attention.ipc.js'
@@ -387,6 +389,8 @@ function registerSessionHandlers(): OutputRelay {
   registerSessionRecordsHandlers(() => mainWindow)
   registerAgentAskHandlers(() => mainWindow)
   registerAgentTurnHandlers(() => mainWindow)
+  startAgentService(broadcastToWindows)
+  registerAgentsHandlers()
   registerTaskHandlers(() => mainWindow)
   registerAttentionHandlers()
   registerAgentUsageHandlers()
@@ -572,6 +576,7 @@ app.on('before-quit', async (event) => {
   // After the extensions, which start most of them: a git or gh command still
   // running, and whatever it started, would outlive the app.
   await stopRunningCommands()
+  await disposeAgentService()
   await ptyManager.killAll()
   closeAppDb()
   // Last, so what the steps above logged reaches the file before the process ends.

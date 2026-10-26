@@ -129,11 +129,16 @@ function hostWorkspaceApi(context: HostContext, main: MainCalls): ExtensionAPI['
   }
 }
 
-function ptyFor(main: MainCalls): ExtensionAPI['pty'] {
-  const listenAcross = (path: string, sessionId: string, callback: unknown) => {
+/** Registers a per-session listener in main; the disposer ends it. */
+function listenAcrossFrom(main: MainCalls) {
+  return (path: string, sessionId: string, callback: unknown) => {
     const { disposable } = main.registerAcross('api', path, sessionId, callback)
     return () => disposable.dispose()
   }
+}
+
+function ptyFor(main: MainCalls): ExtensionAPI['pty'] {
+  const listenAcross = listenAcrossFrom(main)
   return {
     spawnSession: (options) => main.ask('pty.spawnSession', options),
     openTerminal: (input) => main.ask('pty.openTerminal', input),
@@ -147,6 +152,26 @@ function ptyFor(main: MainCalls): ExtensionAPI['pty'] {
     resize: (sessionId, cols, rows) => main.tell('pty.resize', sessionId, cols, rows),
     kill: (sessionId) => main.tell('pty.kill', sessionId),
     listSessions: () => main.ask('pty.listSessions'),
+  }
+}
+
+function agentsFor(main: MainCalls): ExtensionAPI['agents'] {
+  const listenAcross = listenAcrossFrom(main)
+  return {
+    list: () => main.ask('agents.list'),
+    start: (input) => main.ask('agents.start', input),
+    prompt: (sessionId, text) => main.ask('agents.prompt', sessionId, text),
+    cancel: (sessionId) => main.tell('agents.cancel', sessionId),
+    setConfig: (sessionId, configId, value) =>
+      main.ask('agents.setConfig', sessionId, configId, value),
+    close: (sessionId) => main.ask('agents.close', sessionId),
+    onUpdate: (sessionId, callback) => listenAcross('agents.onUpdate', sessionId, callback),
+    onPermission: (sessionId, callback) => listenAcross('agents.onPermission', sessionId, callback),
+    answer: (sessionId, requestId, optionId) =>
+      main.ask('agents.answer', sessionId, requestId, optionId),
+    onEnd: (sessionId, callback) => listenAcross('agents.onEnd', sessionId, callback),
+    runOnce: (input) => main.ask('agents.runOnce', input),
+    models: (agentId) => main.ask('agents.models', agentId),
   }
 }
 
@@ -319,6 +344,7 @@ export function createHostExtensionAPI(context: HostContext): ExtensionAPI {
     commands: commandsFor(context, main),
     ipc: ipcFor(context, main),
     pty: ptyFor(main),
+    agents: agentsFor(main),
     window: windowFor(main),
   }
 }
