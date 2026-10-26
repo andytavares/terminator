@@ -73,6 +73,10 @@ jobs:
           }
           xcrun stapler validate "$APP"
 
+      - name: Check the update feed
+        # Installed apps read latest-mac.yml to find this release; without it they stay on the old one.
+        run: ls dist/*.zip dist/*.blockmap dist/latest-mac.yml
+
       - name: Get version
         id: version
         run: echo "value=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
@@ -111,7 +115,11 @@ jobs:
           draft: false
           prerelease: false
           body_path: release_notes.md
-          files: dist/*.dmg
+          files: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.blockmap
+            dist/latest-mac.yml
           token: ${{ secrets.GITHUB_TOKEN }}
 
   cleanup:
