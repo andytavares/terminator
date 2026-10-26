@@ -1,0 +1,30 @@
+extensions/git-integration/src/review/review-agent.ts
+  s_a80af929ba8425::t_b6f31e79f38b3e 282-283,317-318,334,505,594
+extensions/git-integration/tests/unit/review-agent.spec.ts
+  s_a80af929ba8425::t_1581826dbd9bf5 366-378
+extensions/git-integration/tests/unit/review-agent-ipc.spec.ts
+  s_a80af929ba8425::t_1581826dbd9bf5 401-415
+  s_a80af929ba8425::t_c0d7025fe84ebd 416-419
+extensions/git-integration/src/components/pr-review/AgentPanel.tsx
+  s_a80af929ba8425::t_e3a356c4c1c690 372-374
+extensions/git-integration/CLAUDE.md
+  s_a80af929ba8425::t_7e8f9d11113416 48,52,56
+extensions/git-integration/src/ipc/review-agent.ipc.ts
+  s_a80af929ba8425::t_4cb5dfb6c4bbad 182,186-187,200
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "555f90e17c66b992cd127830ba4fb0bdf0f37750",
+  "prompts": {},
+  "sessions": {
+    "s_a80af929ba8425": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4966b7a9-21f0-4823-b753-f496f1c5df05",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
