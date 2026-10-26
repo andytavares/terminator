@@ -1,0 +1,22 @@
+tests/e2e/sidebar-marks-the-shown-session.spec.ts
+  s_4442da545bd38a::t_d8690102c35c3a 1-22,34-38,42-57,61,63,65-72,74-77,80-91
+  s_4442da545bd38a::t_adb84c76e582e3 23-33,78-79
+  s_4442da545bd38a::t_7ebe080d6cefe1 59-60,62
+  s_4442da545bd38a::t_26dc85fea8bc95 39-41,58,64,73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b906da93077dd777ffeadc2dbed8d949142c3857",
+  "prompts": {},
+  "sessions": {
+    "s_4442da545bd38a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d287f4c8-4059-43c7-8a40-e53bdb0bc217",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
