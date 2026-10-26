@@ -311,7 +311,7 @@
   font: inherit;
   padding: 4px 6px;
   color: var(--tm-text-primary);
-  background: var(--tm-bg-secondary);
+  background: var(--tm-bg-input);
   border: 1px solid var(--tm-border-strong);
   border-radius: 4px;
 }
