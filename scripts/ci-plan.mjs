@@ -43,7 +43,7 @@ const SETUP = /^npm ci\b/
 
 /**
  * @typedef {{ name?: string, run?: string, if?: string, env?: Record<string, string>, uses?: string, with?: Record<string, unknown> }} Step
- * @typedef {{ name?: string, 'runs-on'?: string, 'timeout-minutes'?: number, if?: string, needs?: string | string[], strategy?: Record<string, unknown>, permissions?: Record<string, string>, steps?: Step[] }} Job
+ * @typedef {{ name?: string, 'runs-on'?: string, if?: string, needs?: string | string[], strategy?: Record<string, unknown>, permissions?: Record<string, string>, steps?: Step[] }} Job
  * @typedef {{ on?: Record<string, unknown>, jobs: Record<string, Job> }} Workflow
  */
 

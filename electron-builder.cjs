@@ -48,7 +48,11 @@ module.exports = {
   ],
   mac: {
     icon: 'resources/icon.png',
-    target: [{ target: 'dmg', arch: 'arm64' }],
+    target: [
+      { target: 'dmg', arch: 'arm64' },
+      // The update payload: Squirrel.Mac installs from a zip, never a DMG (ADR 128).
+      { target: 'zip', arch: 'arm64' },
+    ],
     category: 'public.app-category.developer-tools',
     hardenedRuntime: true,
     gatekeeperAssess: false,
@@ -56,4 +60,7 @@ module.exports = {
     entitlementsInherit: 'resources/entitlements.mac.plist',
     notarize: true,
   },
+  // Writes app-update.yml into the app and latest-mac.yml beside the zip, which the
+  // installed app reads to find a newer release (ADR 128).
+  publish: { provider: 'github', owner: 'andytavares', repo: 'terminator' },
 }
