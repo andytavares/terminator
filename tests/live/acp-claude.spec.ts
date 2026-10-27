@@ -112,3 +112,33 @@ describe('Claude Code over ACP — cancel and resume', () => {
     expect(text.join('').toLowerCase()).toContain('pelican')
   })
 })
+
+describe('Claude Code over ACP — a prompt right after a cancel', () => {
+  /** Foundry's refusal: reject the ask, cancel the turn, say why at once. */
+  async function refusedThenTold(afterTurnEnds: boolean) {
+    const service = newService()
+    const { sessionId } = await startedIn(service, { cwd: gitRepo(), mode: 'default' })
+    const text: string[] = []
+    service.onUpdate(sessionId, (update) => {
+      const content = update.content as { text?: string } | undefined
+      if (update.sessionUpdate === 'agent_message_chunk') text.push(content?.text ?? '')
+    })
+    const asked = new Promise<AgentPermissionAsk>((resolve) =>
+      service.onPermission(sessionId, resolve)
+    )
+    const turn = service.prompt(sessionId, 'Use the Bash tool to run: touch made.txt')
+    const ask = await asked
+    const reject = ask.options.find((option) => option.kind === 'reject_once')
+    await service.answer(sessionId, ask.requestId, reject!.optionId)
+    if (afterTurnEnds) await turn
+    service.cancel(sessionId)
+    const told = await service.prompt(sessionId, 'That was refused. Reply with the word PONG only.')
+    return { told, reply: text.join('') }
+  }
+
+  it.each([false, true])('is answered (cancel after the turn ended: %s)', async (afterTurnEnds) => {
+    const { told, reply } = await refusedThenTold(afterTurnEnds)
+    expect(told).toEqual({ stopReason: 'end_turn' })
+    expect(reply).toContain('PONG')
+  })
+})

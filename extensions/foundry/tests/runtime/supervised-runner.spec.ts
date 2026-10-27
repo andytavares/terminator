@@ -239,6 +239,7 @@ describe('the supervised runner over ACP', () => {
   describe('the end of a run with asks', endWithAsksTests)
   describe('turns', turnTests)
   describe('kinds of turn end', turnKindsTests)
+  describe('a failed prompt', failedPromptTests)
   describe('the next phase', nextPhaseTests)
   describe('the next phase’s clock', phaseClockTests)
   describe('the end of the agent', endOfTheAgentTests)
@@ -569,14 +570,37 @@ function turnKindsTests() {
     expect(r.terminalFor('acp-1')).not.toBeNull()
   })
 
-  it.each(['cancelled', 'error'])('reports no turn end for a %s turn', async (stopReason) => {
+  it('reports no turn end for a cancelled turn', async () => {
     const turns: number[] = []
     const r = runner()
     await r.start({ ...start, onTurnEnd: (n) => turns.push(n) })
-    endTurn('/speckit-implement', stopReason)
+    endTurn('/speckit-implement', 'cancelled')
     r.send('acp-1', 'later')
     endTurn('later')
     await eventually(() => expect(turns).toHaveLength(1))
+  })
+}
+
+function failedPromptTests() {
+  it('ends the run as failed when a prompt fails, so nothing waits for its turn for ever', async () => {
+    const ends: unknown[] = []
+    const turns: number[] = []
+    const r = runner()
+    await r.start({ ...start, onEnd: (code) => ends.push(code), onTurnEnd: (n) => turns.push(n) })
+    endTurn('/speckit-implement', 'error')
+    await eventually(() => expect(ends).toEqual([null]))
+    expect(turns).toEqual([])
+    expect(r.watchable()).toEqual([])
+    expect(agentsClosed).toEqual([])
+  })
+
+  it('ends the run once when the agent also exits after a failed prompt', async () => {
+    const ends: unknown[] = []
+    await runner().start({ ...start, onEnd: (code) => ends.push(code) })
+    endTurn('/speckit-implement', 'error')
+    await eventually(() => expect(ends).toEqual([null]))
+    endListeners[0](1)
+    expect(ends).toEqual([null])
   })
 }
 

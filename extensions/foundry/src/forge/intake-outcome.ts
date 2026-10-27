@@ -41,6 +41,8 @@ const REDRAFTED = 'order.redrafted'
 // this file is the only place that has to know the loop exists.
 const REVIEW_STARTED = 'review.started'
 const SCOUT_STARTED = 'scout.started'
+// What `forge-loop.ts` writes when the scout's turn ends, found or not.
+const SCOUT_ENDS: readonly string[] = ['scout.collected', 'scout.refused']
 const REVIEW_ROUND = 'review.round'
 // What `readOnlyRound` writes for the red team: `${roleId}.refused`.
 const REVIEW_REFUSED = 'red-team.refused'
@@ -172,9 +174,13 @@ const INTAKE_READERS: Record<string, IntakeReader> = {
  * unambiguous latest outcome, and that is the only thing any surface asks for.
  */
 export function lastIntake(entries: readonly LedgerEntry[]): IntakeOutcome {
+  // The scout reads beside the architect: once it has ended, the turn is whatever it ran beside.
+  let scoutEnded = false
   for (let i = entries.length - 1; i >= 0; i -= 1) {
     const entry = entries[i]
-    if (Object.hasOwn(INTAKE_READERS, entry.action)) {
+    if (SCOUT_ENDS.includes(entry.action)) scoutEnded = true
+    else if (entry.action === SCOUT_STARTED && scoutEnded) scoutEnded = false
+    else if (Object.hasOwn(INTAKE_READERS, entry.action)) {
       return INTAKE_READERS[entry.action](entry, entries, i)
     }
   }

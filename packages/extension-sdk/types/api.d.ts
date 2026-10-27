@@ -338,8 +338,9 @@ export interface AgentsAPI {
   list(): Promise<AgentDescriptor[]>
   /** Null when the agent could not start; the reason is logged. */
   start(input: StartAgentInput): Promise<AgentStarted | null>
-  /** Resolves when the turn ends. */
+  /** Resolves when the turn ends. A prompt sent after a `cancel` waits for the cancelled turn to end. */
   prompt(sessionId: string, text: string): Promise<AgentTurnEnd>
+  /** Cancels the running and waiting prompts. With none, it does nothing. */
   cancel(sessionId: string): void
   /** False when the session or the option does not exist. */
   setConfig(sessionId: string, configId: string, value: string): Promise<boolean>

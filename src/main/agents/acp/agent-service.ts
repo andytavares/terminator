@@ -111,6 +111,14 @@ interface Session {
   permissionListeners: Set<(ask: AgentPermissionAsk) => void>
   settledListeners: Set<(settled: AgentPermissionSettled) => void>
   endListeners: Set<(exitCode: number | null) => void>
+  /** The prompts asked for and not answered yet, sent or still waiting to be. */
+  pending: Set<Promise<unknown>>
+  /** How many of them the agent has now. */
+  sent: number
+  /** Settles once the prompts the last cancel was for have ended. */
+  cancelling: Promise<unknown>
+  /** How many cancels there were; a prompt cancelled by none since it was asked was dropped. */
+  cancels: number
 }
 
 function flattenChoices(
@@ -161,6 +169,9 @@ function textOf(update: AgentUpdate): string {
 
 const UNAVAILABLE_MESSAGE = 'The agent could not start. Check that it is installed and signed in.'
 
+const PROMPT_FAILED_MESSAGE =
+  '\n\nThe agent stopped with an error before it answered. Send the message again, or start a new agent.'
+
 const timeoutMessage = (timeoutMs: number): string =>
   `The agent did not finish within ${Math.round(timeoutMs / 1000)} seconds.`
 
@@ -177,6 +188,10 @@ function newSession(fields: Pick<Session, 'id' | 'agentId' | 'link' | 'unattende
     permissionListeners: new Set(),
     settledListeners: new Set(),
     endListeners: new Set(),
+    pending: new Set(),
+    sent: 0,
+    cancelling: Promise.resolve(),
+    cancels: 0,
   }
 }
 
@@ -204,6 +219,14 @@ function whenExited(link: AgentLink): Promise<never> {
   return new Promise<never>((_, reject) =>
     link.onExit((exitCode) => reject(new Error(`the agent exited with ${exitCode}`)))
   )
+}
+
+/** What the conversation shows when a prompt fails: plain words, the detail is in the log. */
+function failureNotice(): AgentUpdate {
+  return {
+    sessionUpdate: 'agent_message_chunk',
+    content: { type: 'text', text: PROMPT_FAILED_MESSAGE },
+  } as AgentUpdate
 }
 
 /** Starts collecting the session's reply text; the returned function reads what came so far. */
@@ -411,20 +434,49 @@ class AcpAgentService implements AgentService {
     return session ? this.promptSession(session, text) : { stopReason: 'error' }
   }
 
-  private async promptSession(session: Session, text: string): Promise<{ stopReason: string }> {
-    const sessionId = session.id
-    setTurn(sessionId, true)
+  private promptSession(session: Session, text: string): Promise<{ stopReason: string }> {
+    const turn = this.runTurn(session, text, session.cancels)
+    session.pending.add(turn)
+    void turn.finally(() => session.pending.delete(turn))
+    return turn
+  }
+
+  private async runTurn(
+    session: Session,
+    text: string,
+    cancelsAtAsk: number
+  ): Promise<{ stopReason: string }> {
+    // An agent's cancel also drops a prompt that reaches it before the cancelled turn has ended.
+    await session.cancelling
+    if (session.ended) return { stopReason: 'error' }
+    if (session.cancels !== cancelsAtAsk) return { stopReason: 'cancelled' }
+    setTurn(session.id, true)
     try {
-      const { stopReason } = await session.link.agent.prompt({
-        sessionId,
-        prompt: [{ type: 'text', text }],
-      })
-      return { stopReason }
+      const first = await this.send(session, text)
+      // Cancelled, but by no cancel since it was asked: the one before it dropped it.
+      const dropped = first === 'cancelled' && cancelsAtAsk > 0 && session.cancels === cancelsAtAsk
+      return { stopReason: dropped && !session.ended ? await this.send(session, text) : first }
     } catch (error) {
-      logger.error('agent prompt failed', { error: String(error) })
+      this.promptFailed(session, error)
       return { stopReason: 'error' }
     } finally {
-      if (!session.ended) setTurn(sessionId, false)
+      if (!session.ended) setTurn(session.id, false)
+    }
+  }
+
+  private promptFailed(session: Session, error: unknown): void {
+    logger.error('agent prompt failed', { error: String(error) })
+    // A one-shot session has no tab to show it in, and its reply is read as the answer.
+    if (!session.ended && !session.unattended) this.publishUpdate(session, failureNotice())
+  }
+
+  private async send(session: Session, text: string): Promise<string> {
+    session.sent += 1
+    try {
+      const prompt: PromptRequest['prompt'] = [{ type: 'text', text }]
+      return (await session.link.agent.prompt({ sessionId: session.id, prompt })).stopReason
+    } finally {
+      session.sent -= 1
     }
   }
 
@@ -437,6 +489,12 @@ class AcpAgentService implements AgentService {
     if (session.ended) return
     const { id: sessionId } = session
     this.cancelAsks(session)
+    if (session.pending.size === 0) return
+    session.cancels += 1
+    session.cancelling = Promise.all(session.pending)
+    // Only prompts still waiting: they see the cancel themselves. The agent's cancel would
+    // land on whichever of them reached it next.
+    if (session.sent === 0) return
     session.link.agent.cancel({ sessionId }).catch((error) => {
       logger.error('agent cancel failed', { error: String(error) })
     })
@@ -492,10 +550,12 @@ class AcpAgentService implements AgentService {
       return { error: 'AGENT_UNAVAILABLE', message: UNAVAILABLE_MESSAGE }
     }
     const reply = collectReply(session)
+    // Asked first, so a cancel from `onStarted` finds it.
+    const turn = this.promptSession(session, prompt)
     onStarted?.(session.id)
     try {
       // An agent that ignores the cancel is killed by the close below, not waited for.
-      const { stopReason } = await withinTime(this.promptSession(session, prompt), timeoutMs)
+      const { stopReason } = await withinTime(turn, timeoutMs)
       return { text: reply(), stopReason, sessionId: session.id }
     } catch {
       this.cancelSession(session)
