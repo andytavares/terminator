@@ -461,11 +461,28 @@ describe('the setting that turns pushing off (FR-054)', () => {
 
 describe('the pull request body (FR-056)', () => {
   describe('summary and verdicts', summaryAndVerdictsTests)
+  describe('Linear magic word', magicWordTests)
   describe('inspection', integrateInspectionTests)
   describe('provenance', provenanceTests)
   describe("what's left for you", leftForYouTests)
   describe("what's left for you, edges", leftForYouEdgeTests)
 })
+
+function magicWordTests() {
+  it('closes a Linear issue with a magic word when the order came from one', () => {
+    const order = refreshTokenOrder({
+      source: { kind: 'tracker', tracker: 'linear', key: 'ENG-7', url: null },
+    })
+    expect(prBody(order, { verdicts: [], findings: [] }).split('\n')).toContain('Fixes ENG-7')
+  })
+  it('adds no magic word for a Jira issue or a typed order', () => {
+    const jira = refreshTokenOrder({
+      source: { kind: 'tracker', tracker: 'jira', key: 'ENG-7', url: null },
+    })
+    expect(prBody(jira, { verdicts: [], findings: [] })).not.toContain('Fixes ')
+    expect(prBody(refreshTokenOrder(), { verdicts: [], findings: [] })).not.toContain('Fixes ')
+  })
+}
 
 function summaryAndVerdictsTests() {
   it('carries a written summary of the work', () => {

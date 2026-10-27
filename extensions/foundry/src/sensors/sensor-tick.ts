@@ -88,6 +88,8 @@ async function tickSensors(api: ExtensionAPI, root: string, store: SignalStore):
 export function startSensorTick({ api, dataRoot }: ActivationContext): SignalStore {
   const signalStore = liveSignalStore(dataRoot)
   sensorTimer = setInterval(() => {
+    // A tick longer than the interval must not overlap itself.
+    if (ticksInFlight.size > 0) return
     const tick = tickSensors(api, dataRoot(), signalStore).finally(() => ticksInFlight.delete(tick))
     ticksInFlight.add(tick)
   }, 60_000)

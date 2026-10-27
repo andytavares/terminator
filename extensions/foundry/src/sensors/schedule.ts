@@ -44,14 +44,16 @@ export interface RunSensorResult {
 /** One run of one sensor: collect, merge, save, remember. */
 export async function runSensor(def: SensorDef, deps: RunSensorDeps): Promise<RunSensorResult> {
   const now = deps.now()
+  // Started is recorded first, so a tick that overlaps this run does not find the sensor due.
+  await deps.store.setSensorState(def.id, { lastRunAt: now })
   const result = await collect(def.source, deps.collectDeps)
   const existing = await deps.store.list()
   const merged = mergeSensed(
     existing,
     { id: def.id, severity: def.severity },
-    { items: result.items, now, newId: deps.newId }
+    { items: result.items, now, newId: deps.newId, resolvedKeys: result.resolvedKeys }
   )
   await deps.store.save(merged)
-  await deps.store.setSensorState(def.id, { lastRunAt: now, lastProblem: result.problem })
+  await deps.store.setSensorState(def.id, { lastProblem: result.problem })
   return { recorded: result.items.length, problem: result.problem }
 }

@@ -34,6 +34,7 @@ describe('mergeSensed', () => {
   describe('reopening', clusterReopeningTests)
   describe('untouched keys', untouchedKeysTests)
   describe('no recorded count', noRecordedCountTests)
+  describe('resolved signals', resolvedSignalsTests)
   describe('promoted signals', promotedSignalsTests)
   describe('other sensors', otherSensorsTests)
 })
@@ -163,6 +164,33 @@ function clusterReopeningTests() {
     expect(signals[0].status).toBe('open')
     expect(signals[0].dismissedAt).toBeNull()
     expect(signals[0].occurrences).toBe(6)
+  })
+}
+
+function resolvedSignalsTests() {
+  const failing = () =>
+    mergeSensed([], CI, sweptAt('2026-01-01T00:00:00.000Z', [item('wf-a', 'https://ci/run/1')]))
+
+  it('closes a signal whose key the sweep reports as resolved', () => {
+    const [after] = mergeSensed(failing(), CI, {
+      ...sweptAt('2026-01-02T00:00:00.000Z', []),
+      resolvedKeys: ['wf-a'],
+    })
+    expect(after.status).toBe('resolved')
+    expect(ranked([after])).toEqual([])
+  })
+
+  it('reopens a resolved signal when the workflow fails again', () => {
+    const resolved = mergeSensed(failing(), CI, {
+      ...sweptAt('2026-01-02T00:00:00.000Z', []),
+      resolvedKeys: ['wf-a'],
+    })
+    const [after] = mergeSensed(
+      resolved,
+      CI,
+      sweptAt('2026-01-03T00:00:00.000Z', [item('wf-a', 'https://ci/run/2')])
+    )
+    expect(after.status).toBe('open')
   })
 }
 
