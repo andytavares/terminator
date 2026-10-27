@@ -1,0 +1,69 @@
+extensions/git-integration/src/components/merge-flow/KeepBothModal.tsx
+  s_567c3310a5db4e::t_ccc329ba867bdb 5,69,218,294
+extensions/git-integration/src/components/merge-flow/ResultPreviewStrip.tsx
+  s_567c3310a5db4e::t_ccc329ba867bdb 2,11-12
+extensions/git-integration/src/components/pr-review/ReviewDiffPane.tsx
+  s_567c3310a5db4e::t_ccc329ba867bdb 3,262
+  s_567c3310a5db4e::t_26c3af8163dff1 140,156,161
+extensions/git-integration/src/review/insights.ts
+  s_567c3310a5db4e::t_1ee1a977c3a9cc 3,86,91-95,97-100,102-104,106-111
+  s_567c3310a5db4e::t_be6dd2c7eae03f 68-71,96,101,105,123
+  s_567c3310a5db4e::t_3926591b07173a 2
+extensions/git-integration/tests/unit/hljs.spec.ts
+  s_567c3310a5db4e::t_0786ee48095ac6 51-52,55-62
+  s_567c3310a5db4e::t_c324f09298bdf6 76
+  s_567c3310a5db4e::t_ccc329ba867bdb 3,5-6,50,65-75,77-78
+extensions/git-integration/src/ipc/github/pr-detail.ts
+  s_567c3310a5db4e::t_478e5c32cd0f49 83-88,217
+extensions/git-integration/tests/unit/ReviewDiffPane.spec.tsx
+  s_567c3310a5db4e::t_ccc329ba867bdb 33-34
+  s_567c3310a5db4e::t_abd43ed4b0b7e2 90-92
+extensions/git-integration/tests/unit/insights.spec.ts
+  s_567c3310a5db4e::t_c5de56bc1003a4 3-7,10,147-148,150,152,154-181
+extensions/git-integration/src/utils/syntax.ts
+  s_567c3310a5db4e::t_95f0ffbd41090a 12-14,17-19,22-25
+extensions/git-integration/tests/unit/pr-review-service.spec.ts
+  s_567c3310a5db4e::t_b0d8f253446ac7 1016-1017,1024
+  s_567c3310a5db4e::t_bf72c3cf48a1ea 1049-1055
+  s_567c3310a5db4e::t_7d183615049e90 1048,1056-1059
+extensions/git-integration/src/ipc/github/pr-files.ts
+  s_567c3310a5db4e::t_478e5c32cd0f49 44-50,53-54
+extensions/git-integration/src/utils/hljs.ts
+  s_567c3310a5db4e::t_95f0ffbd41090a 7
+extensions/git-integration/src/github/pr-review-service.ts
+  s_567c3310a5db4e::t_b0d8f253446ac7 71,966-967
+  s_567c3310a5db4e::t_cb9486fd467e47 22,725-743,819,821,1175
+extensions/git-integration/src/components/pr-review/DiffLineRows.tsx
+  s_567c3310a5db4e::t_ccc329ba867bdb 4,11
+extensions/git-integration/src/components/FileDiffView.tsx
+  s_567c3310a5db4e::t_95f0ffbd41090a 268
+  s_567c3310a5db4e::t_ccc329ba867bdb 6
+extensions/git-integration/src/components/merge-flow/ConflictPanel.tsx
+  s_567c3310a5db4e::t_ccc329ba867bdb 3,131,190
+extensions/git-integration/src/components/pr-review/diff-pane/usePaneState.ts
+  s_567c3310a5db4e::t_4d24840af8ea99 45,238,255-258,265,270-272,274,280,283
+  s_567c3310a5db4e::t_be6dd2c7eae03f 5-6,269,273,275-278
+  s_567c3310a5db4e::t_1bc4f976241b0f 284
+extensions/git-integration/src/ipc/github/context.ts
+  s_567c3310a5db4e::t_478e5c32cd0f49 47-48,140
+extensions/git-integration/tests/unit/github-ipc.spec.ts
+  s_567c3310a5db4e::t_a2b96a789a05e0 520-537,544,747,750-756,759,766,2823-2850
+extensions/git-integration/tests/unit/risk-score.spec.ts
+  s_567c3310a5db4e::t_dfe88077cd6222 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bb1249c374d37f648f7aee07c473a8a2940c0425",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
