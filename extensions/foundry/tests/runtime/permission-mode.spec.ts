@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { modeFor, READ_ONLY_MODE } from '../../src/runtime/permission-mode.js'
+import { modeFor } from '../../src/runtime/permission-mode.js'
 
 const writer = {
   readOnly: false,
@@ -22,9 +22,8 @@ describe('the permission mode of an agent', () => {
     expect(modeFor({ ...writer, letModeDecide: false })).toBe('default')
   })
 
-  it('is default for a read-only role, as READ_ONLY_MODE says for the Forge’s turns', () => {
-    expect(modeFor({ ...writer, readOnly: true })).toBe(READ_ONLY_MODE)
-    expect(READ_ONLY_MODE).toBe('default')
+  it('is default for a read-only role', () => {
+    expect(modeFor({ ...writer, readOnly: true })).toBe('default')
   })
 
   it('is default for a documentation-only role', () => {

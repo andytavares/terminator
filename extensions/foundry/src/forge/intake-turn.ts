@@ -21,9 +21,15 @@ import type { StartSupervisedRunOptions, SupervisedRunner } from '../runtime/sup
 import { resolveSources } from '../workspace-root.js'
 import { announceLive, orderStoreAt } from '../state/live-index.js'
 import { intakeSessions, deletedOrders } from './intake-sessions.js'
-import { askModel, modelForTier } from '../state/settings.js'
-import { readOnlyAutoDecide } from '../runtime/agent-policy.js'
-import { READ_ONLY_MODE } from '../runtime/permission-mode.js'
+import {
+  askModel,
+  autonomyFor,
+  letAutoModeDecide,
+  modelForTier,
+  readOnlyTools,
+} from '../state/settings.js'
+import { decideTool } from '../runtime/tool-decision.js'
+import { roleSettings } from '../runtime/role-settings.js'
 import { runtime } from '../runtime/runtime-state.js'
 import { notePending, noteResolved } from '../runtime/held-calls.js'
 import { shellExecOf } from '../host-calls.js'
@@ -198,11 +204,10 @@ function architectStartOptions(launch: ArchitectLaunch): StartSupervisedRunOptio
       { draft: modelForTier(api, plan.role.modelTier), ask: askModel(api) },
       turn.loop === true ? { loop: true } : undefined
     ),
-    mode: READ_ONLY_MODE,
-    // Read-only, enforced by the policy rather than by the prompt. The
+    // Read-only, enforced by Claude's settings rather than by the prompt. The
     // architect proposes; it does not edit the repository it is reading.
     // Its one exception is the proposal itself, and only at that path.
-    autoDecide: readOnlyAutoDecide(plan.proposalPath),
+    ...readOnlyTurn(api, { checkout, outputPath: plan.proposalPath }),
     // Intake is where questions belong, so one asked here is not a defect
     // — it is the Forge working.
     ...heldCallNotes(api, featureDir),
@@ -238,6 +243,32 @@ function sessionPlace(
     workspaceId: workspaceFor(api.workspace?.list() ?? [], checkout.origin),
     branch: checkout.branch,
     issue: issueOf(order),
+  }
+}
+
+/** The mode, settings and fallback decision of a turn that reads and writes one file. */
+function readOnlyTurn(
+  api: ExtensionAPI,
+  turn: { checkout: Checkout; outputPath: string }
+): Pick<StartSupervisedRunOptions, 'mode' | 'settings' | 'autoDecide'> {
+  const { permissionMode, settings } = roleSettings({
+    readOnly: true,
+    docsOnly: false,
+    restrictedWrites: true,
+    autonomy: autonomyFor(api),
+    letModeDecide: letAutoModeDecide(api),
+    outputPath: turn.outputPath,
+    outputsDir: null,
+    skillsMount: null,
+    mayUseTool: () => true,
+    probedCommands: [],
+    readOnlyTools: readOnlyTools(api, turn.checkout.origin),
+  })
+  const autonomy = autonomyFor(api)
+  return {
+    mode: permissionMode,
+    settings,
+    autoDecide: (tool, input) => decideTool({ tool, input, autonomy, outputsDir: null }),
   }
 }
 
@@ -439,10 +470,9 @@ function roundStartOptions(launch: RoundLaunch): StartSupervisedRunOptions {
     prompt: input.prompt(role),
     phase: roleId,
     model: input.model ?? modelForTier(api, role.modelTier),
-    mode: READ_ONLY_MODE,
-    // Read-only, enforced by the policy rather than by the prompt, with the
+    // Read-only, enforced by Claude's settings rather than by the prompt, with the
     // one exception being the rung's own output file.
-    autoDecide: readOnlyAutoDecide(launch.outputPath),
+    ...readOnlyTurn(api, { checkout, outputPath: launch.outputPath }),
     ...heldCallNotes(api, featureDir),
     onAutoDenied: (tool, reason) => postRefusal(order.id, { tool, reason }),
     onRegistered: (run) => {

@@ -11,7 +11,7 @@ import {
   type PermissionOutcome,
   type ToolVerdict,
 } from './permission-bridge.js'
-import type { PermissionMode } from './permission-mode.js'
+import type { ClaudePermissionMode, ClaudeSettings } from './role-settings.js'
 import { countTurns, transcriptSize } from './transcript-tailer.js'
 import type { WatchedRun } from './stall-watcher.js'
 
@@ -68,11 +68,10 @@ export interface StartSupervisedRunOptions {
    * Where this node's skills were mounted. Absent or empty mounts none.
    */
   addDirs?: string[]
-  /** The permission mode `modeFor` chose: `default` makes every write and state-changing
-   *  command an ask `autoDecide` sees; `auto` leaves them to Claude. */
-  mode: PermissionMode
-  /** Claude deny rules (`denyRules`): Foundry's hard refusals, which hold in `auto` mode too. */
-  denyRules?: string[]
+  /** The permission mode `roleSettings` chose. */
+  mode: ClaudePermissionMode
+  /** The role's permission rules and sandbox (`roleSettings`), which Claude enforces itself. */
+  settings?: ClaudeSettings
   /** Decides without asking when the autonomy ladder allows it. */
   autoDecide?: (toolName: string, input: unknown) => PermissionDecision | null
   /** The ladder refused something without asking. Only refusals are reported. */
@@ -210,6 +209,8 @@ interface Running {
   startedAt: number
   /** True while a tool call is held: blocked on a person is not stuck. */
   isWaiting: boolean
+  /** Settles when the prompt now running has ended, however it ended. */
+  turn: Promise<void>
   /** Stops listening for the agent's asks. */
   release: () => void
   /**
@@ -406,16 +407,17 @@ function permissionBridgeFor(
 
 /** The Claude options for one run: model, effort, skill folders and environment. */
 function claudeOptions(start: StartSupervisedRunOptions): object {
-  const featureSlug = path.basename(start.featureDir)
   return {
     // Empty means "follow the operator's own configuration", so it is left out.
     ...(start.model ? { model: start.model } : {}),
     ...(start.effort ? { effort: start.effort } : {}),
     additionalDirectories: start.addDirs ?? [],
-    disallowedTools: start.denyRules ?? [],
+    // The agent must not load the operator's ~/.claude CLAUDE.md, hooks or MCP connectors.
+    settingSources: ['project'],
+    ...(start.settings ? { settings: start.settings } : {}),
+    // Also removes the denied tools from the agent's view, which a settings rule alone does not.
+    disallowedTools: start.settings?.permissions.deny ?? [],
     env: {
-      SPECIFY_FEATURE: featureSlug,
-      SPECIFY_FEATURE_DIRECTORY: path.join('specs', featureSlug),
       CLAUDE_CODE_FORCE_SESSION_PERSISTENCE: '1',
       FOUNDRY_RUN: '1',
       CLAUDE_CODE_ARTIFACT_AUTO_OPEN: '0',
@@ -468,18 +470,12 @@ async function decideAsk(
   const verdict: ToolVerdict = await bridge.canUseTool(toolNameOf(ask), ask.rawInput, ask.requestId)
   if (verdict.permissionDecision === 'ask') return
   await api.agents.answer(ask.sessionId, ask.requestId, optionFor(ask, verdict.permissionDecision))
-  if (verdict.permissionDecision === 'deny') tellWhyRefused(context, ask.sessionId, verdict.reason)
+  if (verdict.answer !== undefined) sendWhenTurnEnds(context, ask.sessionId, verdict.answer)
 }
 
-/** An ACP refusal carries no words: the turn is cancelled, so it does not end before the agent
- *  has read why, and the reason (or the operator's own words) is its next prompt. */
-function tellWhyRefused(
-  context: RunnerContext,
-  sessionId: string,
-  reason: string | undefined
-): void {
-  context.api.agents.cancel(sessionId)
-  sendToSession(context, sessionId, reason ?? 'Refused.')
+/** A refusal never cancels the turn; the operator's words follow as a prompt once it has ended. */
+function sendWhenTurnEnds(context: RunnerContext, sessionId: string, message: string): void {
+  void context.running.get(sessionId)?.turn.then(() => sendToSession(context, sessionId, message))
 }
 
 /** Listens for the session's asks and for the tab answering one; returns what stops both. */
@@ -503,13 +499,15 @@ function listenForAsks(
 
 /** Sends a prompt; its end is a turn end, unless the turn was cut short or failed. */
 function promptSession(context: RunnerContext, sessionId: string, text: string): void {
-  context.api.agents.prompt(sessionId, text).then(
+  const prompted = context.api.agents.prompt(sessionId, text).then(
     ({ stopReason }) => {
       if (stopReason === 'error') promptFailed(context, sessionId)
       else if (stopReason !== 'cancelled') turnEnded(context, sessionId)
     },
     () => promptFailed(context, sessionId)
   )
+  const run = context.running.get(sessionId)
+  if (run !== undefined) run.turn = prompted
 }
 
 /** The agent cannot answer, though its process may live on: the run ends as a crash does. */
@@ -547,7 +545,7 @@ function addWorktreeProject(
 function trackRun(
   context: RunnerContext,
   sessionId: string,
-  run: Omit<Running, 'detachEnd' | 'startedAt' | 'isWaiting'>
+  run: Omit<Running, 'detachEnd' | 'startedAt' | 'isWaiting' | 'turn'>
 ): SupervisedRun {
   // The agent dying is how a run ends, whether it exited or the tab was closed.
   const detachEnd = context.api.agents.onEnd(sessionId, (exitCode: number | null) => {
@@ -562,6 +560,7 @@ function trackRun(
     detachEnd,
     startedAt: context.now(),
     isWaiting: false,
+    turn: Promise.resolve(),
   })
 
   // Before the first prompt: everything already in this file belongs to the

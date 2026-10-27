@@ -58,14 +58,13 @@ beforeEach(async () => {
   theRunner.terminalFor.mockReset().mockReturnValue(null)
 })
 
-function heldCall(requestId: string, questions?: Array<{ question: string; options: string[] }>) {
+function heldCall(requestId: string) {
   return {
     sessionId: 'builder-1',
     requestId,
     toolName: 'Bash',
     summary: 'rm -rf build',
     detail: null,
-    questions,
     at: Date.now(),
     featureDir: orderDir(dataDir, 'WO-1'),
   }
@@ -73,7 +72,7 @@ function heldCall(requestId: string, questions?: Array<{ question: string; optio
 
 describe('a held tool call', () => {
   describe('listing and answering', listingAndAnsweringTests)
-  describe('questions and words', questionsAndWordsTests)
+  describe('words', wordsTests)
   describe('let go and unheld', letGoAndUnheldTests)
   describe('handing back', handingBackTests)
 })
@@ -115,16 +114,7 @@ function listingAndAnsweringTests() {
   })
 }
 
-function questionsAndWordsTests() {
-  it('asked as a question during a run is recorded against the order as an intake defect', async () => {
-    notePending(host.api, heldCall('req-2', [{ question: 'Which colour?', options: ['red'] }]), {
-      id: 'WO-1',
-      root: dataDir,
-    })
-    await eventually(async () => expect(await ledgerActions(dataDir)).toContain('intake.defect'))
-    noteResolved('req-2')
-  })
-
+function wordsTests() {
   it('is answered through the console with the operator’s own words', async () => {
     notePending(host.api, heldCall('req-3'))
     expect(

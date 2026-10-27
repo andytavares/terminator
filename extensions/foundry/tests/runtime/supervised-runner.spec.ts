@@ -175,6 +175,10 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
 })
 
+function settingsDenying(...deny: string[]) {
+  return { permissions: { allow: ['Read'], ask: ['Artifact'], deny } }
+}
+
 /** The options the runner handed Claude: model, env and the rest. */
 function claudeOptions(): Record<string, unknown> {
   const meta = agentStarts[0].agentMeta as { claudeCode: { options: Record<string, unknown> } }
@@ -226,7 +230,7 @@ describe('the supervised runner over ACP', () => {
 
   describe('starting a run', startingARunTests)
   describe('the options Claude gets', claudeOptionsTests)
-  describe('the deny rules', denyRuleTests)
+  describe('the settings Claude gets', claudeSettingsTests)
   describe('mode and resume', modeAndResumeTests)
   describe('tracking the run', trackingTests)
   describe('nothing started', nothingStartedTests)
@@ -273,13 +277,6 @@ function startingARunTests() {
   })
 }
 
-function denyRuleTests() {
-  it('gives Claude the deny rules, which hold in auto mode too', async () => {
-    await runner().start({ ...start, denyRules: ['Bash(git push *)'] })
-    expect(claudeOptions().disallowedTools).toEqual(['Bash(git push *)'])
-  })
-}
-
 function claudeOptionsTests() {
   it('gives Claude its model, effort, skill folders and environment', async () => {
     await runner().start({
@@ -293,14 +290,36 @@ function claudeOptionsTests() {
       effort: 'high',
       additionalDirectories: ['/order/skills/build'],
       env: {
-        SPECIFY_FEATURE: '021-thing',
-        SPECIFY_FEATURE_DIRECTORY: 'specs/021-thing',
         CLAUDE_CODE_FORCE_SESSION_PERSISTENCE: '1',
         FOUNDRY_RUN: '1',
         CLAUDE_CODE_ARTIFACT_AUTO_OPEN: '0',
       },
     })
     expect(claudeOptions().settings).toBeUndefined()
+  })
+}
+
+function claudeSettingsTests() {
+  it('gives Claude the deny rules, which hold in auto mode too', async () => {
+    await runner().start({ ...start, settings: settingsDenying('Bash(git push *)') })
+    expect(claudeOptions().disallowedTools).toEqual(['Bash(git push *)'])
+  })
+
+  it('loads only the project’s settings, never the operator’s CLAUDE.md, hooks or connectors', async () => {
+    await runner().start(start)
+    expect(claudeOptions().settingSources).toEqual(['project'])
+  })
+
+  it('names no Spec Kit feature in the environment', async () => {
+    await runner().start(start)
+    const env = claudeOptions().env as Record<string, string>
+    expect(Object.keys(env).filter((name) => name.startsWith('SPECIFY_'))).toEqual([])
+  })
+
+  it('hands Claude the role’s settings', async () => {
+    const settings = settingsDenying('Bash(git -C * push*)')
+    await runner().start({ ...start, settings })
+    expect(claudeOptions().settings).toEqual(settings)
   })
 
   it('leaves the model and effort off when none was chosen, so the operator config wins', async () => {
@@ -311,7 +330,7 @@ function claudeOptionsTests() {
 }
 
 function modeAndResumeTests() {
-  it.each(['auto', 'default'] as const)(
+  it.each(['auto', 'default', 'acceptEdits', 'dontAsk'] as const)(
     'starts the agent in the %s mode it was given',
     async (mode) => {
       await runner().start({ ...start, mode })
@@ -428,21 +447,24 @@ function answeringTests() {
     await call.arrived
     r.resolve('acp-1', call.seen[0].requestId, { allow: false, answer: 'use the staging host' })
     await eventually(() => expect(answers.map((a) => a.optionId)).toEqual(['reject-once']))
+    expect(prompts.map((p) => p.text)).toEqual(['/speckit-implement'])
+    endTurn('/speckit-implement')
     await eventually(() => expect(prompts.at(-1)?.text).toBe('use the staging host'))
+    expect(cancelled).toEqual([])
   })
 }
 
 function plainDenyTests() {
-  it('cancels the turn and tells the agent it was refused, so one turn ends after it reads why', async () => {
+  it('rejects without cancelling the turn or sending a prompt', async () => {
     const call = held()
     const r = runner()
     await r.start({ ...start, onPending: call.onPending })
     raise()
     await call.arrived
     r.resolve('acp-1', call.seen[0].requestId, { allow: false })
-    await eventually(() => expect(prompts.at(-1)?.text).toBe('Denied by the operator'))
-    expect(answers.map((a) => a.optionId)).toEqual(['reject-once'])
-    expect(cancelled).toEqual(['acp-1'])
+    await eventually(() => expect(answers.map((a) => a.optionId)).toEqual(['reject-once']))
+    expect(cancelled).toEqual([])
+    expect(prompts.map((p) => p.text)).toEqual(['/speckit-implement'])
   })
 }
 
@@ -501,7 +523,7 @@ function ladderTests() {
     expect(seen).toEqual([])
   })
 
-  it('refuses with the reject option and says so when the ladder refuses', async () => {
+  it('refuses with the reject option, never cancelling the turn, when the policy refuses', async () => {
     const refused: string[] = []
     await runner().start({
       ...start,
@@ -511,9 +533,8 @@ function ladderTests() {
     raise()
     await eventually(() => expect(answers.map((a) => a.optionId)).toEqual(['reject-once']))
     expect(refused).toEqual(['Bash: outside the checkout'])
-    // The reason reaches the agent, as it did in the tool result before ACP.
-    await eventually(() => expect(prompts.at(-1)?.text).toBe('outside the checkout'))
-    expect(cancelled).toEqual(['acp-1'])
+    expect(cancelled).toEqual([])
+    expect(prompts.map((p) => p.text)).toEqual(['/speckit-implement'])
   })
 }
 

@@ -9,6 +9,8 @@
 export interface ToolVerdict {
   permissionDecision: 'allow' | 'deny' | 'ask'
   reason?: string
+  /** The operator's own words, which the runner sends as a prompt once the turn has ended. */
+  answer?: string
 }
 
 export interface PermissionDecision {
@@ -46,7 +48,6 @@ export interface PendingPermission {
   readonly summary: string
   /** The ask in full — a question's options, a command's every field. */
   readonly detail: string | null
-  readonly questions?: ReadonlyArray<{ question: string; options: readonly string[] }>
   readonly targetHost?: string
   readonly at: number
 }
@@ -71,11 +72,6 @@ export interface PermissionBridgeOptions {
    * nothing at all, which is what it did.
    */
   onAutoDenied?: (toolName: string, reason: string) => void
-  /**
-   * How long to hold a tool call before leaving it to the agent's tab: the bridge drops it
-   * from its held list and the ask stays open in the tab, where the operator can answer it.
-   */
-  askAfterMs?: number
 }
 
 export interface PermissionBridge {
@@ -83,7 +79,7 @@ export interface PermissionBridge {
   canUseTool(toolName: string, input: unknown, askId?: string): Promise<ToolVerdict>
   /** True when it was still waiting; false when there was nothing to answer. */
   resolve(requestId: string, decision: PermissionDecision): boolean
-  /** Leaves one to the agent's tab, as the timeout does. */
+  /** Leaves one to the agent's tab, where the operator can answer it. */
   handBackToTerminal(requestId: string): void
   /** The ask was answered elsewhere (in the agent's tab): drop its held call. */
   withdraw(askId: string, outcome: 'allowed' | 'rejected' | 'cancelled'): void
@@ -117,19 +113,13 @@ function targetHostOf(input: unknown): string | undefined {
  * One readable line describing what the agent wants to do, because a decision
  * needs the ask rather than the tool's name.
  *
- * Deciding requires seeing the ask. A summary of "AskUserQuestion request" is
- * the tool's name, not its question — you cannot approve or deny that, and
- * FR-007 exists precisely so a surface never puts you in that position.
+ * Deciding requires seeing the ask. A summary that is only the tool's name cannot be
+ * approved or denied, and FR-007 exists so a surface never puts you in that position.
  */
 function summarise(toolName: string, input: unknown): { summary: string; detail: string | null } {
   if (typeof input !== 'object' || input === null)
     return { summary: `${toolName} request`, detail: null }
   const record = input as Record<string, unknown>
-
-  // A question carries its text in a shape of its own, and its options are
-  // most of what you need to answer it.
-  const asked = questionSummary(toolName, record.questions)
-  if (asked !== null) return asked
 
   // The headline: the field an operator would recognise the request by.
   const headline = ['command', 'url', 'file_path', 'path', 'pattern', 'prompt']
@@ -144,70 +134,6 @@ function summarise(toolName: string, input: unknown): { summary: string; detail:
     detail: renderInput(record),
   }
 }
-
-/** A question's summary and its questions in full, or null when nothing is asked. */
-function questionSummary(
-  toolName: string,
-  questions: unknown
-): { summary: string; detail: string } | null {
-  if (!Array.isArray(questions) || questions.length === 0) return null
-  const asked = questions
-    .map((entry) => {
-      const question = entry as Record<string, unknown>
-      const text = typeof question.question === 'string' ? question.question : ''
-      const options = optionLabels(question.options)
-      return options.length === 0 ? text : `${text}\n  ${options.join('\n  ')}`
-    })
-    .filter((text) => text.trim() !== '')
-  if (asked.length === 0) return null
-
-  const first = (questions[0] as Record<string, unknown>).question
-  return {
-    summary: typeof first === 'string' ? first : `${toolName} request`,
-    detail: asked.join('\n\n'),
-  }
-}
-
-/** What each of a question's options is called; none when it offers none. */
-function optionLabels(options: unknown): string[] {
-  if (!Array.isArray(options)) return []
-  return options
-    .map((option) =>
-      typeof option === 'object' && option !== null
-        ? String((option as Record<string, unknown>).label ?? '')
-        : String(option)
-    )
-    .filter((label) => label !== '')
-}
-
-/**
- * The questions being asked and the answers each offers.
- *
- * Grouped rather than flattened: an ask with two questions produced one pile of
- * labels, and clicking "Throwaway" told the agent nothing about which question
- * it answered.
- */
-function questionsOf(input: unknown): Array<{ question: string; options: string[] }> | undefined {
-  if (typeof input !== 'object' || input === null) return undefined
-  const questions = (input as Record<string, unknown>).questions
-  if (!Array.isArray(questions)) return undefined
-
-  const asked = questions.flatMap((entry) => {
-    const record = entry as Record<string, unknown>
-    const question = typeof record.question === 'string' ? record.question : ''
-    const options = optionLabels(record.options)
-    return question === '' && options.length === 0 ? [] : [{ question, options }]
-  })
-
-  return asked.length === 0 ? undefined : asked
-}
-
-/**
- * Five minutes. Long enough to walk back to the console, short enough that a
- * run left alone keeps moving on the operator's own terminal rather than
- * sitting on a held hook for the twelve hours the hook itself allows.
- */
-const DEFAULT_ASK_AFTER_MS = 5 * 60_000
 
 const FIELD_LIMIT = 4_000
 const FIELD_COUNT = 24
@@ -233,17 +159,15 @@ function renderInput(record: Record<string, unknown>): string | null {
   return lines.length === 0 ? null : lines.join('\n')
 }
 
-/** A held tool call: how to answer it, what it asked with, and its hand-back timer. */
+/** A held tool call: how to answer it, and what it asked with. */
 interface Outstanding {
   readonly settle: (result: ToolVerdict) => void
   readonly askId: string | undefined
-  readonly timer: ReturnType<typeof setTimeout>
 }
 
 /** One bridge's options, and the tool calls it is holding. */
 interface BridgeState {
   readonly options: PermissionBridgeOptions
-  readonly askAfterMs: number
   readonly outstanding: Map<string, Outstanding>
   /** How many calls this session has held, which numbers each request. */
   held: number
@@ -252,7 +176,6 @@ interface BridgeState {
 export function createPermissionBridge(options: PermissionBridgeOptions): PermissionBridge {
   const state: BridgeState = {
     options,
-    askAfterMs: options.askAfterMs ?? DEFAULT_ASK_AFTER_MS,
     outstanding: new Map(),
     held: 0,
   }
@@ -270,7 +193,6 @@ function takeOutstanding(state: BridgeState, requestId: string): Outstanding | u
   const entry = state.outstanding.get(requestId)
   if (entry === undefined) return undefined
   state.outstanding.delete(requestId)
-  clearTimeout(entry.timer)
   return entry
 }
 
@@ -292,7 +214,7 @@ function answerOf(decision: PermissionDecision): string {
 
 function toResult(decision: PermissionDecision): ToolVerdict {
   const answer = answerOf(decision)
-  if (answer !== '') return { permissionDecision: 'deny', reason: answer }
+  if (answer !== '') return { permissionDecision: 'deny', reason: answer, answer }
   return decision.allow
     ? { permissionDecision: 'allow' }
     : {
@@ -317,7 +239,7 @@ function canUseTool(
   return holdForAnswer(state, call)
 }
 
-/** Raises the call for a person and holds it until answered or handed back. */
+/** Raises the call for a person at once and holds it until answered or handed back. */
 function holdForAnswer(
   state: BridgeState,
   call: { toolName: string; input: unknown; askId: string | undefined }
@@ -331,16 +253,12 @@ function holdForAnswer(
     requestId,
     toolName,
     ...summarise(toolName, input),
-    questions: questionsOf(input),
     targetHost: targetHostOf(input),
     at: options.now(),
   })
 
   return new Promise<ToolVerdict>((resolvePromise) => {
-    const timer = setTimeout(() => handBack(state, requestId), state.askAfterMs)
-    // Never keep the process alive for a prompt nobody is watching.
-    timer.unref?.()
-    state.outstanding.set(requestId, { settle: resolvePromise, askId, timer })
+    state.outstanding.set(requestId, { settle: resolvePromise, askId })
   })
 }
 
@@ -383,7 +301,6 @@ function permissionOutcomeOf(decision: PermissionDecision): PermissionOutcome {
 function rejectAll(state: BridgeState, reason: string): void {
   for (const [requestId, entry] of state.outstanding) {
     state.outstanding.delete(requestId)
-    clearTimeout(entry.timer)
     entry.settle({ permissionDecision: 'deny', reason })
     // Told, not just settled. Without this the board went on listing tool
     // calls from a run that had ended, and clicking them did nothing.

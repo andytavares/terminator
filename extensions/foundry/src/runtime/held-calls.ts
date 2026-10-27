@@ -4,10 +4,9 @@ import * as path from 'node:path'
 import type { PendingAsk } from './pending-permissions.js'
 import { channelFor, type NotifiableEvent } from './feed/notification-channel.js'
 
-import { announceLive, orderStoreAt } from '../state/live-index.js'
+import { announceLive } from '../state/live-index.js'
 import { runtime, pendingPermissions, raisedNotifications } from './runtime-state.js'
 import { gotoRun } from './palette-commands.js'
-import { inBackground } from '../background.js'
 
 /** Something to say, about which event, and what answering or clicking it does. */
 export interface Notice {
@@ -42,27 +41,10 @@ export function notifyPerson(api: ExtensionAPI, notice: Notice): Disposable | nu
 
 // A tool call is held and somebody must see it: the one thing allowed to interrupt,
 // since the run is stopped dead until it is answered.
-export function notePending(api: ExtensionAPI, ask: PendingAsk, order?: OrderRef): void {
+export function notePending(api: ExtensionAPI, ask: PendingAsk): void {
   pendingPermissions.add(ask)
   announceLive('')
 
-  // A question during execution is an intake defect (FR-083): questions belong in the
-  // Forge. Recorded against the order as well as answered, so that fact is kept.
-  if (order !== undefined && (ask.questions?.length ?? 0) > 0) {
-    inBackground(
-      orderStoreAt(order.root).record({
-        at: new Date().toISOString(),
-        orderId: order.id,
-        actor: 'rule:forge-defect',
-        action: 'intake.defect',
-        subject: ask.sessionId,
-        reason: `asked during execution, which intake should have settled: ${ask.questions
-          ?.map((q) => q.question)
-          .join('; ')}`,
-        evidence: [{ kind: 'stdout', excerpt: ask.summary }],
-      })
-    )
-  }
   const notification = notifyPerson(api, {
     event: { kind: 'permission_requested', sessionId: ask.sessionId },
     message: `${path.basename(ask.featureDir)} is asking: ${ask.summary}`,
@@ -83,12 +65,6 @@ function answerAction(
     label: allow ? 'Allow' : 'Deny',
     handler: () => runtime.supervisedRunner?.resolve(ask.sessionId, ask.requestId, { allow }),
   }
-}
-
-/** Which order a held tool call belongs to, so a question can be recorded. */
-interface OrderRef {
-  readonly id: string
-  readonly root: string
 }
 
 /** Answered, by whoever. The notification goes with the request. */

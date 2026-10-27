@@ -19,6 +19,3 @@ export function modeFor(facts: ModeFacts): PermissionMode {
   const freeWriter = !facts.readOnly && !facts.docsOnly && !facts.restrictedWrites
   return freeWriter && facts.letModeDecide && facts.autonomy !== 'escorted' ? 'auto' : 'default'
 }
-
-/** What `modeFor` gives every read-only turn: the architect's rounds, the red team, the scout. */
-export const READ_ONLY_MODE: PermissionMode = 'default'
