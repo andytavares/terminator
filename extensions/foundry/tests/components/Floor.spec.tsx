@@ -568,7 +568,7 @@ function silentClicksAndTheTerminalTests() {
   it('hands one back to the terminal and goes there', async () => {
     mount(reply(), { pending: [ASK] })
     await screen.findByText('Waiting on you — 1')
-    fireEvent.click(await screen.findByRole('button', { name: /In the terminal/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /In the agent tab/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:permission-hand-back', { requestId: 'r-1' })
     )
@@ -990,14 +990,14 @@ describe('the refusals a click used to swallow', () => {
 
   it('says so when the request is no longer waiting to be handed back', async () => {
     mount(reply(), { pending: [ASK], handBack: { ok: false } })
-    fireEvent.click(await screen.findByRole('button', { name: /In the terminal/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /In the agent tab/i }))
     await screen.findByText(/no longer waiting/)
   })
 
   it('says so when it handed back but there is no terminal to open', async () => {
     mount(reply(), { pending: [ASK], handBack: { ok: true }, terminal: { ok: false } })
-    fireEvent.click(await screen.findByRole('button', { name: /In the terminal/i }))
-    await screen.findByText(/no longer has a terminal/)
+    fireEvent.click(await screen.findByRole('button', { name: /In the agent tab/i }))
+    await screen.findByText(/no longer has an agent tab/)
   })
 })
 
@@ -1012,7 +1012,7 @@ const ORPHANED = reply({
     label: 'nothing running it',
     headline: 'Nothing is running this',
     detail:
-      "1 step was still working when the application last closed, and an agent's terminal does not outlive it.",
+      '1 step was still working when the application last closed, and an agent does not outlive it.',
     done: 0,
     total: 2,
     gateId: null,
@@ -1463,7 +1463,7 @@ function handedBackTerminalsTests() {
       })
     )
     await screen.findByText('An agent is waiting at its terminal')
-    fireEvent.click(await screen.findByRole('button', { name: /Go to its terminal/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Go to its agent tab/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 's-1' })
     )
@@ -1869,7 +1869,7 @@ function refusalsBesideTheStepTests() {
     mount(reply(), { terminal: { ok: false } })
     await screen.findAllByText('builder')
     fireEvent.click(await screen.findByRole('button', { name: /^Attach to/ }))
-    const message = await screen.findByText('That agent is no longer in a terminal.')
+    const message = await screen.findByText('That agent is no longer in an agent tab.')
     expect(chipOf('builder').nextElementSibling).toBe(message)
   })
 }

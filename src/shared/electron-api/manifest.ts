@@ -18,7 +18,14 @@
 // main process. Type-only imports are erased and therefore allowed.
 
 import type { z } from 'zod'
-import type { SettingsChange } from '@terminator/extension-sdk'
+import type {
+  AgentDescriptor,
+  AgentPermissionAsk,
+  AgentStarted,
+  AgentTurnEnd,
+  AgentUpdate,
+  SettingsChange,
+} from '@terminator/extension-sdk'
 import type {
   AgentContext,
   Branch,
@@ -52,6 +59,13 @@ import type {
   SetMineInputSchema,
   StatusInputSchema,
 } from '../schemas/integrations.schema'
+import type {
+  AgentAnswerInputSchema,
+  AgentPromptInputSchema,
+  AgentSessionInputSchema,
+  AgentSetConfigInputSchema,
+  AgentStartInputSchema,
+} from '../schemas/agents.schema'
 import type { AgentUsageInputSchema, ThreadSummaryInputSchema } from '../schemas/agent-usage.schema'
 import type { AgentUsage } from '../agents/agent-usage'
 import type {
@@ -1306,6 +1320,150 @@ export const ELECTRON_API_MANIFEST = [
     signature:
       signature<
         (handler: (payload: { sessionId: string; inTurn: boolean }) => void) => Unsubscribe
+      >(),
+    remote: 'omit',
+  }),
+
+  // ── agents over ACP (the core's AgentService; extensions use api.agents) ──
+  method({
+    path: 'agents.list',
+    kind: 'invoke',
+    channel: 'agents:list',
+    signature:
+      signature<() => Promise<{ data: AgentDescriptor[] } | { error: string; message: string }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.start',
+    kind: 'invoke',
+    channel: 'agents:start',
+    signature:
+      signature<
+        (
+          input: z.input<typeof AgentStartInputSchema>
+        ) => Promise<{ data: AgentStarted | null } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.prompt',
+    kind: 'invoke',
+    channel: 'agents:prompt',
+    signature:
+      signature<
+        (
+          input: z.input<typeof AgentPromptInputSchema>
+        ) => Promise<{ data: AgentTurnEnd } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.cancel',
+    kind: 'invoke',
+    channel: 'agents:cancel',
+    signature:
+      signature<
+        (
+          input: z.input<typeof AgentSessionInputSchema>
+        ) => Promise<{ data: true } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.answer',
+    kind: 'invoke',
+    channel: 'agents:answer',
+    signature:
+      signature<
+        (
+          input: z.input<typeof AgentAnswerInputSchema>
+        ) => Promise<{ data: boolean } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.setConfig',
+    kind: 'invoke',
+    channel: 'agents:set-config',
+    signature:
+      signature<
+        (
+          input: z.input<typeof AgentSetConfigInputSchema>
+        ) => Promise<{ data: boolean } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.close',
+    kind: 'invoke',
+    channel: 'agents:close',
+    signature:
+      signature<
+        (
+          input: z.input<typeof AgentSessionInputSchema>
+        ) => Promise<{ data: true } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.history',
+    kind: 'invoke',
+    channel: 'agents:history',
+    signature:
+      signature<
+        (
+          input: z.input<typeof AgentSessionInputSchema>
+        ) => Promise<{ data: AgentUpdate[] } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.openAsks',
+    kind: 'invoke',
+    channel: 'agents:open-asks',
+    signature:
+      signature<
+        () => Promise<{ data: AgentPermissionAsk[] } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.onUpdate',
+    kind: 'event',
+    channel: 'agents:update',
+    signature:
+      signature<
+        (handler: (payload: { sessionId: string; update: AgentUpdate }) => void) => Unsubscribe
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.onPermission',
+    kind: 'event',
+    channel: 'agents:permission',
+    signature:
+      signature<
+        (handler: (payload: { sessionId: string; ask: AgentPermissionAsk }) => void) => Unsubscribe
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.onPermissionSettled',
+    kind: 'event',
+    channel: 'agents:permission-settled',
+    signature:
+      signature<
+        (handler: (payload: { sessionId: string; requestId: string }) => void) => Unsubscribe
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.onEnd',
+    kind: 'event',
+    channel: 'agents:end',
+    signature:
+      signature<
+        (handler: (payload: { sessionId: string; exitCode: number | null }) => void) => Unsubscribe
       >(),
     remote: 'omit',
   }),

@@ -22,7 +22,7 @@ export function registerModelChannels(api: ExtensionAPI): void {
     // in the view. `selected` comes with the list so the view's copy cannot drift from
     // what runs are launched with.
     foundryChannel('foundry:models-list', noPayload, async () => ({
-      models: await modelCatalog(),
+      models: await modelCatalog(api.agents),
       selected: defaultModel(api),
     })),
     // Persisted where the main process can read it, which is the only place that

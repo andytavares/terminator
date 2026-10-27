@@ -14,6 +14,7 @@ interface AgentStateSource {
 export class BellAndBusySource implements AgentStateSource {
   derive(session: TerminalSession): AgentState {
     if (session.status === 'closed') return 'exited'
+    if (session.surface === 'agent') return agentTabState(session)
     if (session.agentAsk !== undefined || inferredAskSignal(session) !== null) {
       return 'awaiting-input'
     }
@@ -21,6 +22,12 @@ export class BellAndBusySource implements AgentStateSource {
     if (session.agentTurn !== undefined) return 'idle'
     return session.busy ? 'working' : 'idle'
   }
+}
+
+/** An agent tab has no bell or byte flow: its turn and ask are the whole truth. */
+function agentTabState(session: TerminalSession): AgentState {
+  if (session.agentAsk !== undefined) return 'awaiting-input'
+  return session.agentTurn === true ? 'working' : 'idle'
 }
 
 /** Which guess says the session is asking, when no hook did: the bell outranks a screen choice. */

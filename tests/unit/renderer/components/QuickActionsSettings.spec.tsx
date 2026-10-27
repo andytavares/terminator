@@ -239,7 +239,7 @@ describe('QuickActionsSettings — actions without a key, and scopes with nothin
   it('lists a prompt action against the focused Claude session, with no key', () => {
     mockStore([askClaude])
     render(<QuickActionsSettings scope="global" />)
-    expect(screen.getByText('Focused Claude session')).toBeTruthy()
+    expect(screen.getByText('Focused agent session')).toBeTruthy()
     expect(document.querySelector('.qa-settings-list__key')!.textContent).toBe('')
   })
 

@@ -288,7 +288,7 @@ async function handAskBack(ask: PendingAsk): Promise<string | null> {
   const gone = (await invoke('foundry:run-terminal', { sessionId: ask.sessionId })) as {
     ok?: boolean
   }
-  return gone.ok === true ? null : 'handed back, but that run no longer has a terminal to open'
+  return gone.ok === true ? null : 'handed back, but that run no longer has an agent tab to open'
 }
 
 function useAskAnswers(setProblem: SetProblem, pollLive: () => Promise<void>) {
@@ -782,7 +782,7 @@ function StrandedGate({ floor, view }: PageProps) {
               disabled={floor.busy}
               onClick={() => void floor.control('foundry:run-terminal', { sessionId: session })}
             >
-              Go to its terminal
+              Go to its agent tab
             </Button>
             <small>{strandedLabel(view, session)}</small>
           </div>
@@ -939,10 +939,10 @@ function AskActions({ ask, answer, handBack }: HeldCallProps) {
       <Button
         size="sm"
         icon={Terminal}
-        title="Answer it in the terminal instead"
+        title="Answer it in the agent tab instead"
         onClick={() => void handBack(ask)}
       >
-        In the terminal
+        In the agent tab
       </Button>
     </div>
   )

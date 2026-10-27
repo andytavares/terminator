@@ -2,6 +2,8 @@
 
 **Status**: Accepted
 
+Amended by ADR 130: the review agent now runs over ACP (`api.agents.runOnce`), not `claude -p`.
+
 **Date**: 2026-09-27
 
 ## Context

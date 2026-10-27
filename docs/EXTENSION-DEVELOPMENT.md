@@ -94,18 +94,18 @@ Each surface shows the extension's view, with its `view` string passed as `?view
 
 A page shows only the view its `?view=` names, so an `App.tsx` that routes between heavy views can load each with [`React.lazy`](https://react.dev/reference/react/lazy) behind a `Suspense` boundary. Vite then builds each as its own chunk ([dynamic import](https://vite.dev/guide/features#dynamic-import)), and a page loads only the view it shows. git-integration's `src/renderer/App.tsx` does this.
 
-| Key                | Fields                                                           | Where it appears                                                                                                            | Default `view` |
-| ------------------ | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------- |
-| `globalTab`        | `label`, `icon?`, `view?`                                        | An icon in the sidebar's app band; the view fills the main area                                                             | `main`         |
-| `workspaceTab`     | `label`, `icon?`, `view?`                                        | A tab scoped to the active workspace                                                                                        | `workspace`    |
-| `projectTab`       | `label`, `view?`                                                 | A tab scoped to the selected project                                                                                        | `project`      |
-| `sidebarPanel`     | `label`, `icon?`, `defaultOpen?`, `view?`                        | A panel beside the terminal                                                                                                 | `sidebar`      |
-| `insightsSection`  | `label`, `view?`                                                 | A section on the Insights view of Home, as tall as its content                                                              | `home`         |
-| `windowViews`      | `[{ id, view }]`                                                 | Views `api.window.openAuxiliary(id)` opens in their own window                                                              | —              |
-| `commands`         | `[{ id, label, description?, shortcut?, mnemonic?, requires? }]` | Reserves the command's row in the Quick Actions panel (see [`api.commands`](#apicommands))                                  | —              |
-| `quickActions`     | `{ group: { mnemonic?, label } }`                                | Your group's letter and label in the Quick Actions panel                                                                    | —              |
-| `startWorkOptions` | `[{ id, label, description, command }]`                          | A way to run work in Home's Start work launcher, after Claude agent and Terminal only; `command` is one of your command ids | —              |
-| `shellRoots`       | `[settingKey]`                                                   | Nowhere: directories `api.shell.exec` and `api.github` may run in (see [`api.shell`](#apishell))                            | —              |
+| Key                | Fields                                                           | Where it appears                                                                                                                                   | Default `view` |
+| ------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| `globalTab`        | `label`, `icon?`, `view?`                                        | An icon in the sidebar's app band; the view fills the main area                                                                                    | `main`         |
+| `workspaceTab`     | `label`, `icon?`, `view?`                                        | A tab scoped to the active workspace                                                                                                               | `workspace`    |
+| `projectTab`       | `label`, `view?`                                                 | A tab scoped to the selected project                                                                                                               | `project`      |
+| `sidebarPanel`     | `label`, `icon?`, `defaultOpen?`, `view?`                        | A panel beside the terminal                                                                                                                        | `sidebar`      |
+| `insightsSection`  | `label`, `view?`                                                 | A section on the Insights view of Home, as tall as its content                                                                                     | `home`         |
+| `windowViews`      | `[{ id, view }]`                                                 | Views `api.window.openAuxiliary(id)` opens in their own window                                                                                     | —              |
+| `commands`         | `[{ id, label, description?, shortcut?, mnemonic?, requires? }]` | Reserves the command's row in the Quick Actions panel (see [`api.commands`](#apicommands))                                                         | —              |
+| `quickActions`     | `{ group: { mnemonic?, label } }`                                | Your group's letter and label in the Quick Actions panel                                                                                           | —              |
+| `startWorkOptions` | `[{ id, label, description, command }]`                          | A way to run work in Home's Start work launcher, after the agent tab, Claude in a terminal and Terminal only; `command` is one of your command ids | —              |
+| `shellRoots`       | `[settingKey]`                                                   | Nowhere: directories `api.shell.exec` and `api.github` may run in (see [`api.shell`](#apishell))                                                   | —              |
 
 `icon` takes one of the names `iconFromName` knows (`src/renderer/extensions/icon-from-name.ts`), such as `puzzle`, `wrench`, `terminal`, `git-branch`, `database`, `list` or `calendar`.
 
@@ -901,6 +901,20 @@ const exit = await api.pty.runInTerminal({
 })
 if (exit?.exitCode === 0) api.pty.closeTerminalTab(exit.sessionId)
 ```
+
+### `api.agents`
+
+Agents over the Agent Client Protocol (Since 5.2.0): `list`, `start`, `prompt`, `cancel`, `answer`, `setConfig`, `close`, `onUpdate`, `onPermission`, `onPermissionSettled`, `onEnd`, `runOnce` and `models`. `start({ cwd, tab: { projectId, title } })` shows the session as an agent tab. Git integration's "Send to agent" starts one tab per folder, prompts it, and forgets it when it ends:
+
+```ts
+const started = await api.agents.start({ cwd: folder, tab: { projectId, title: tabTitle } })
+if (started) {
+  api.agents.onEnd(started.sessionId, () => agentTabs.delete(key))
+  void api.agents.prompt(started.sessionId, message)
+}
+```
+
+An ask (`onPermission`) carries `toolCallId` and `toolCallMeta`, the `_meta` of that tool call (the Claude agent sends `{ claudeCode: { toolName } }`). `answer` takes one of the ask's `options`; `onPermissionSettled(sessionId, listener)` tells you when an ask ended anywhere, including the session's tab, with `outcome` `allowed`, `rejected` or `cancelled`. Set `mode` in `start` (`default` asks for every write and state-changing command, `auto` lets the agent decide).
 
 ### `api.window`
 

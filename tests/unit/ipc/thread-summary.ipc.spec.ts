@@ -5,6 +5,8 @@ import { ThreadSummaryInputSchema } from '../../../src/shared/schemas/agent-usag
 type Handler = (event: unknown, payload?: unknown) => unknown
 const handlers = vi.hoisted(() => new Map<string, Handler>())
 const summarize = vi.hoisted(() => vi.fn())
+const runOnce = vi.hoisted(() => vi.fn())
+const summarizerDeps = vi.hoisted(() => [] as Array<{ runOnce: (input: object) => unknown }>)
 const records = vi.hoisted(() => [] as unknown[])
 
 vi.mock('electron', () => ({
@@ -12,16 +14,28 @@ vi.mock('electron', () => ({
 }))
 vi.mock('../../../src/main/logger', () => ({ logger: { error: vi.fn() } }))
 vi.mock('../../../src/main/home/thread-summary', () => ({
-  createThreadSummarizer: () => summarize,
+  createThreadSummarizer: (deps: { runOnce: (input: object) => unknown }) => {
+    summarizerDeps.push(deps)
+    return summarize
+  },
 }))
-vi.mock('../../../src/main/shell/command-runner', () => ({ runTextCommand: vi.fn() }))
+vi.mock('../../../src/main/agents/acp/agent-service-instance', () => ({
+  agentService: () => ({ runOnce }),
+}))
 vi.mock('../../../src/main/shell/login-shell-path', () => ({ loginShellPathReady: vi.fn() }))
 vi.mock('../../../src/main/sessions/session-record-store', () => ({ listRecords: () => records }))
 
 const TRANSCRIPT = path.resolve(__dirname, '../../fixtures/transcripts/sample-transcript.jsonl')
-const recordOf = (sessionId: string, transcriptPath: string) => ({
+const recordOf = (sessionId: string, transcriptPath: string | null) => ({
   sessionId,
-  agent: { provider: 'claude', sessionId: 'c1', transcriptPath, cwd: '/', capturedAt: '' },
+  agent: {
+    agentId: 'claude',
+    transport: transcriptPath === null ? 'acp' : 'tui',
+    sessionId: 'c1',
+    transcriptPath,
+    cwd: '/',
+    capturedAt: '',
+  },
 })
 
 async function summarizeWith(
@@ -65,6 +79,17 @@ describe('thread summary input', () => {
   })
 })
 
+describe('home:thread-summary agent', () => {
+  it('summarizes through the agent service', async () => {
+    vi.resetModules()
+    summarizerDeps.length = 0
+    await import('../../../src/main/ipc/thread-summary.ipc')
+    runOnce.mockResolvedValue({ text: 'ok', stopReason: 'end_turn', sessionId: 's' })
+    await expect(summarizerDeps[0].runOnce({ prompt: 'p' })).resolves.toMatchObject({ text: 'ok' })
+    expect(runOnce).toHaveBeenCalledWith({ prompt: 'p' })
+  })
+})
+
 describe('home:thread-summary', () => {
   it('fills the opening prompt and last words from the session record transcript', async () => {
     records.push(recordOf('s1', TRANSCRIPT))
@@ -80,16 +105,18 @@ describe('home:thread-summary', () => {
   })
 
   it('keeps the given texts without a record, a transcript or a readable file', async () => {
-    records.push(recordOf('s3', '/no/such/transcript.jsonl'))
+    records.push(recordOf('s3', '/no/such/transcript.jsonl'), recordOf('s4', null))
     const sessions = await summarizeWith([
       { lastAssistantTexts: ['no id'] },
       { sessionId: 's2', lastAssistantTexts: ['no record'] },
       { sessionId: 's3', lastAssistantTexts: ['unreadable'] },
+      { sessionId: 's4', lastAssistantTexts: ['agent tab, no transcript'] },
     ])
     expect(sessions.map((s) => [s.firstUserPrompt, s.lastAssistantTexts])).toEqual([
       ['given', ['no id']],
       ['given', ['no record']],
       ['given', ['unreadable']],
+      ['given', ['agent tab, no transcript']],
     ])
   })
 })

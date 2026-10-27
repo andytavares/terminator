@@ -1,116 +1,70 @@
 import { describe, it, expect, vi } from 'vitest'
-import { MODEL_ALIASES, fetchLiveModels, modelCatalog } from '../../src/state/model-catalog.js'
+import { MODEL_ALIASES, modelCatalog } from '../../src/state/model-catalog.js'
+import type { AgentConfigOption, AgentsAPI } from '@terminator/extension-sdk'
 import { partialFake } from '../../../../tests/support/fakes'
 
-const withKey: NodeJS.ProcessEnv = { ANTHROPIC_API_KEY: 'sk-test' }
-const respond = (body: unknown, ok = true): typeof fetch =>
-  partialFake<typeof fetch>(vi.fn().mockResolvedValue({ ok, json: async () => body }))
+const modelOption = (options: AgentConfigOption['options']): AgentConfigOption => ({
+  id: 'model',
+  name: 'Model',
+  currentValue: 'default',
+  options,
+})
+const agentsOffering = (answer: AgentConfigOption | null) =>
+  partialFake<Pick<AgentsAPI, 'models'>>({ models: vi.fn().mockResolvedValue(answer) })
 
 /**
  * The picker used to be three `<option>` tags typed into the settings view,
- * naming a generation that had already shipped its successor — and nothing
- * read the value anyway. What matters here is that the list cannot go stale by
- * sitting in the source, and that a failure to reach the API is a shorter list
- * rather than a broken settings page.
+ * naming a generation that had already shipped its successor. What matters
+ * here is that the list cannot go stale by sitting in the source, and that an
+ * agent that cannot say is a shorter list rather than a broken settings page.
  */
 describe('the model catalog', () => {
-  describe('without a credential', withoutACredentialTests)
-  describe('with a credential', withACredentialTests)
-  describe('ordering and degrading', orderingAndDegradingTests)
-  describe('entries and overrides', entriesAndOverridesTests)
-})
-
-function withoutACredentialTests() {
-  const noCredentials: NodeJS.ProcessEnv = {}
-
-  it('offers the aliases with no credential, because they need none', async () => {
-    const models = await modelCatalog(noCredentials, respond({}))
-    expect(models).toEqual([...MODEL_ALIASES])
-  })
-
-  it('leads with an empty id, which means "pass no --model at all"', async () => {
-    // The correct default for a console wrapping somebody else's CLI: follow
-    // whatever their own configuration says.
+  it('leads with an empty id, which means "pass no model at all"', () => {
     expect(MODEL_ALIASES[0].id).toBe('')
   })
 
-  it('makes no request at all without a credential', async () => {
-    const fetchImpl = respond({})
-    await modelCatalog(noCredentials, fetchImpl)
-    expect(fetchImpl).not.toHaveBeenCalled()
-  })
-}
-
-function withACredentialTests() {
-  it('sends an API key as x-api-key and a token as a bearer', async () => {
-    const keyed = respond({ data: [] })
-    await fetchLiveModels({ ANTHROPIC_API_KEY: 'sk-test' }, keyed)
-    expect(vi.mocked(keyed).mock.calls[0][1]?.headers).toMatchObject({
-      'x-api-key': 'sk-test',
-    })
-
-    const tokened = respond({ data: [] })
-    await fetchLiveModels({ ANTHROPIC_AUTH_TOKEN: 'oat-test' }, tokened)
-    expect(vi.mocked(tokened).mock.calls[0][1]?.headers).toMatchObject({
-      authorization: 'Bearer oat-test',
-    })
+  it('asks the Claude agent which models it offers', async () => {
+    const agents = agentsOffering(null)
+    await modelCatalog(agents)
+    expect(agents.models).toHaveBeenCalledWith('claude')
   })
 
-  it('appends what the account can reach, under its display name', async () => {
+  it('appends what the agent offers, under its display name', async () => {
     const models = await modelCatalog(
-      withKey,
-      respond({ data: [{ id: 'claude-opus-5', display_name: 'Claude Opus 5' }] })
+      agentsOffering(modelOption([{ value: 'claude-opus-5', name: 'Claude Opus 5' }]))
     )
-    expect(models.at(-1)).toEqual({
-      id: 'claude-opus-5',
-      label: 'Claude Opus 5',
-      floating: false,
-    })
+    expect(models.at(-1)).toEqual({ id: 'claude-opus-5', label: 'Claude Opus 5', floating: false })
   })
-}
+})
 
-function orderingAndDegradingTests() {
-  it('keeps the aliases first, so the list does not depend on an env var', async () => {
-    const models = await modelCatalog(withKey, respond({ data: [{ id: 'claude-opus-5' }] }))
+describe('the model catalog — ordering and degrading', () => {
+  it('keeps the aliases first, so the list does not depend on the agent', async () => {
+    const models = await modelCatalog(agentsOffering(modelOption([{ value: 'x', name: 'X' }])))
     expect(models.slice(0, MODEL_ALIASES.length)).toEqual([...MODEL_ALIASES])
   })
 
-  it('never lists an alias twice when the API happens to return one', async () => {
-    const models = await modelCatalog(withKey, respond({ data: [{ id: 'opus' }] }))
+  it('never lists an alias twice when the agent happens to offer one', async () => {
+    const models = await modelCatalog(
+      agentsOffering(modelOption([{ value: 'opus', name: 'Opus' }]))
+    )
     expect(models.filter((model) => model.id === 'opus')).toHaveLength(1)
   })
 
-  it('degrades to the aliases when the API refuses, rather than reporting an error', async () => {
-    // Nobody asked for this list; a settings page that shows an error for a
-    // background fetch is worse than one that quietly offers less.
-    expect(await modelCatalog(withKey, respond({}, false))).toEqual([...MODEL_ALIASES])
+  it('drops an entry with no id rather than offering a blank row', async () => {
+    const models = await modelCatalog(agentsOffering(modelOption([{ value: '', name: 'Default' }])))
+    expect(models).toEqual([...MODEL_ALIASES])
   })
 
-  it('degrades to the aliases when the network throws', async () => {
-    const boom = partialFake<typeof fetch>(vi.fn().mockRejectedValue(new Error('offline')))
-    expect(await modelCatalog(withKey, boom)).toEqual([...MODEL_ALIASES])
+  it('offers the aliases alone when the agent has no model option', async () => {
+    expect(await modelCatalog(agentsOffering(null))).toEqual([...MODEL_ALIASES])
   })
 
-  it('degrades to the aliases when the response is not the shape it claims', async () => {
-    expect(await modelCatalog(withKey, respond({ data: 'nope' }))).toEqual([...MODEL_ALIASES])
+  // Nobody asked for this list; a settings page that shows an error for a
+  // background read is worse than one that quietly offers less.
+  it('offers the aliases alone when asking the agent fails', async () => {
+    const agents = partialFake<Pick<AgentsAPI, 'models'>>({
+      models: vi.fn().mockRejectedValue(new Error('no agent')),
+    })
+    expect(await modelCatalog(agents)).toEqual([...MODEL_ALIASES])
   })
-}
-
-function entriesAndOverridesTests() {
-  it('drops entries with no usable id rather than offering a blank row', async () => {
-    const models = await fetchLiveModels(withKey, respond({ data: [{ id: '' }, { id: 42 }] }))
-    expect(models).toEqual([])
-  })
-
-  it('honours a base URL override, for a gateway or a proxy', async () => {
-    const fetchImpl = respond({ data: [] })
-    await fetchLiveModels({ ...withKey, ANTHROPIC_BASE_URL: 'https://gw.example/' }, fetchImpl)
-    expect(vi.mocked(fetchImpl).mock.calls[0][0]).toBe('https://gw.example/v1/models?limit=100')
-  })
-
-  it('ignores a credential that is only whitespace', async () => {
-    const fetchImpl = respond({ data: [] })
-    await fetchLiveModels({ ANTHROPIC_API_KEY: '   ' }, fetchImpl)
-    expect(fetchImpl).not.toHaveBeenCalled()
-  })
-}
+})

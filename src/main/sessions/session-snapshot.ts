@@ -19,7 +19,7 @@ function recordedSnapshot(sessionId: string): SessionSnapshot | null {
 type ProjectPlace = Pick<SessionSnapshot, 'workspaceName' | 'projectName' | 'branch'>
 
 /** The workspace, project and branch a project id names, as far as the store knows them. */
-function projectPlace(projectId: string | undefined): ProjectPlace {
+export function projectPlace(projectId: string | undefined): ProjectPlace {
   const project = projectId === undefined ? undefined : getProjectById(projectId)
   const workspace =
     project === undefined ? undefined : listWorkspaces().find((w) => w.id === project.workspaceId)

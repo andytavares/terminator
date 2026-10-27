@@ -378,6 +378,16 @@ describe('adoptTerminalSession', () => {
   })
 })
 
+describe('adoptTerminalSession — an agent tab', () => {
+  it('stores an agent tab as one and builds no xterm for it', () => {
+    adoptTerminalSession({ ...adopted, surface: 'agent' })
+    expect(sessionOf('terminal-1')).toMatchObject({ surface: 'agent' })
+    expect(capturedCtorArgs).toEqual([])
+    expect(useSessionStore.getState().getTerminalInstance('terminal-1')).toBeUndefined()
+    expect(activeIn('proj-1')).toBe('terminal-1')
+  })
+})
+
 describe('adoptTerminalSession — does nothing for a session it already has, so a repeat is not a second tab', () => {
   it('does nothing for a session it already has, so a repeat is not a second tab', () => {
     storeSession('terminal-1', { tabTitle: 'feat/x', type: 'human' })
@@ -676,6 +686,18 @@ describe('answerChoice (054)', () => {
 
   it('sends nothing for a session without a terminal', () => {
     useSessionStore.setState({ terminalInstances: new Map() })
+    expect(answerChoice('s1', 1)).toBe(false)
+    expect(terminalApi.input).not.toHaveBeenCalled()
+  })
+})
+
+describe('answerChoice — an agent tab', () => {
+  setUpAnswerChoice054()
+
+  it('never reads or answers the screen of an agent tab', () => {
+    useSessionStore.setState((s) => ({
+      sessions: new Map(s.sessions).set('s1', { ...sessionOf('s1')!, surface: 'agent' }),
+    }))
     expect(answerChoice('s1', 1)).toBe(false)
     expect(terminalApi.input).not.toHaveBeenCalled()
   })

@@ -10,7 +10,9 @@ import type {
 } from '../runtime/supervised-runner.js'
 import { agentTitle } from '../runtime/agent-title.js'
 import { decideTool } from '../runtime/tool-decision.js'
-import { trustRepository, isProbedCommand } from '../runtime/agent-policy.js'
+import { modeFor } from '../runtime/permission-mode.js'
+import { denyRules } from '../runtime/deny-rules.js'
+import { isProbedCommand } from '../runtime/agent-policy.js'
 import { runtime, strandedAgents } from '../runtime/runtime-state.js'
 import { notePending, noteResolved } from '../runtime/held-calls.js'
 import { readOnlyTools, autonomyFor, letAutoModeDecide, modelForTier } from '../state/settings.js'
@@ -58,10 +60,6 @@ function startNode(
   resolve: (run: StartedRun) => void
 ): void {
   const turn = openTurn(launch.input.node.id, resolve)
-  // Trust the repository first (the key Claude Code uses for a worktree): its trust
-  // dialog shows in interactive sessions, and an agent sitting at it never starts.
-  const { context, checkout } = launch
-  trustRepository(context.api, checkout.origin, { orderId: context.order.id, store: context.store })
   void runner
     .start(startOptions(launch, turn))
     .then((run) => {
@@ -103,6 +101,8 @@ function startOptions(launch: NodeLaunch, turn: NodeTurn): StartSupervisedRunOpt
     model: modelForTier(context.api, input.modelTier),
     effort: input.effort ?? undefined,
     addDirs: addDirsFor(input),
+    mode: permissionModeOf(launch),
+    denyRules: denyRules({ skillsMount: input.skillsMount, mayUseTool: input.mayUseTool }),
     autoDecide: toolDecisionFor(launch),
     onPending: (pending) => onPending(context, pending),
     onResolved: (requestId, outcome) => recordResolution(context, turn, { requestId, outcome }),
@@ -122,7 +122,19 @@ function addDirsFor(input: NodeInput): string[] | undefined {
   return dirs.length === 0 ? undefined : dirs
 }
 
-// The hook's own decision, composed and tested in `runtime/tool-decision.ts`: the
+/** `auto` only for a role free to write anywhere in its checkout; see `modeFor`. */
+function permissionModeOf({ context, input }: NodeLaunch): StartSupervisedRunOptions['mode'] {
+  const { api } = context
+  return modeFor({
+    readOnly: input.readOnly,
+    docsOnly: input.docsOnly === true,
+    restrictedWrites: input.outputPath != null || input.outputsDir != null,
+    autonomy: autonomyFor(api),
+    letModeDecide: letAutoModeDecide(api),
+  })
+}
+
+// The tool policy's own decision, composed and tested in `runtime/tool-decision.ts`: the
 // whole-role read-only gate, then the role's declared write paths, so a writer that
 // strays from them is refused rather than reminded.
 function toolDecisionFor({
@@ -142,7 +154,6 @@ function toolDecisionFor({
       isProbed: (name, given) => isProbedCommand(order, name, given),
       readOnlyTools: readOnlyTools(api, checkout.origin),
       autonomy: autonomyFor(api),
-      letModeDecide: letAutoModeDecide(api),
       worktreePath: checkout.path,
       outputPath: input.outputPath ?? null,
       outputsDir: input.outputsDir ?? null,
@@ -179,14 +190,14 @@ function recordResolution(
     outcome: Parameters<StartSupervisedRunOptions['onResolved']>[1]
   }
 ): void {
-  // A hand-back is not an answer. The runtime puts its own prompt in the
-  // terminal instead, which an unattended run never reaches — so this is
+  // A hand-back is not an answer. The ask stays open in the agent tab
+  // instead, which an unattended run never reaches — so this is
   // the moment the agent stops, and it should say so.
   if (resolution.outcome === 'handback') {
     const { sessionId } = turn
     postToConsole(
       sessionId,
-      'nobody answered, so the question went to the prompt in the terminal — an agent waits there'
+      'nobody answered, so the question stays open in the agent tab — an agent waits there'
     )
     // Recorded, not only posted. A feed entry scrolls away; this is
     // what lets the order say it is waiting on a person rather than

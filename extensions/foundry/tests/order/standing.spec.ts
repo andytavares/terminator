@@ -244,7 +244,7 @@ function strandedAndStalledTests() {
     const standing = standingOf(input({ stranded: 1 }))
     expect(standing.kind).toBe('stranded')
     expect(standing.turn).toBe('you')
-    expect(standing.detail).toMatch(/terminal/)
+    expect(standing.detail).toMatch(/agent tab/)
   })
 
   // A live held call is answerable from the surface in one click; a handed-back

@@ -2,7 +2,7 @@
  * The channels behind the four things you do about a run: read it, redirect it,
  * end it, or throw it away.
  *
- * Driven through `activate` with a stubbed runner and control server, because
+ * Driven through `activate` with a stubbed runner, because
  * the thing worth asserting is not that the runner interrupts — its own tests
  * cover that — but that the channel a surface calls reaches it. Every bug this
  * branch shipped was in exactly that gap.
@@ -22,7 +22,6 @@ import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../
 import { theRunner } from '../helpers/supervision-mocks.js'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
-vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 vi.mock('../../src/runner/agent-runner.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>

@@ -16,7 +16,6 @@ import { ledgerActions } from '../helpers/order-ledger.js'
 import { eventually } from '../../../../tests/support/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
-vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 const { runtime, stallFirings } = await import('../../src/runtime/runtime-state.ts')
 const { startPaletteRefresh, stopPaletteRefresh } = await import(

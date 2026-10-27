@@ -21,7 +21,6 @@ import { partialFake } from '../../../../tests/support/fakes'
 import { runningOrder } from '../helpers/order-parts.js'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
-vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 let dataDir = ''
 let host: FoundryHost

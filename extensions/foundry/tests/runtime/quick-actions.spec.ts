@@ -19,7 +19,6 @@ import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../
 import { disposableStub } from '../helpers/foundry-host.js'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
-vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 vi.mock('../../src/runner/agent-runner.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>

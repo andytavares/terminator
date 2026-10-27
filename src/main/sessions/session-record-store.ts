@@ -60,18 +60,39 @@ async function persist(): Promise<void> {
 
 const stringOrNull = (value: unknown): string | null => (typeof value === 'string' ? value : null)
 
+/** The agent's id; a record from before agent tabs names `provider: 'claude'` instead. */
+function agentIdOf(a: { agentId?: unknown; provider?: unknown }): string | null {
+  if (typeof a.agentId === 'string' && a.agentId !== '') return a.agentId
+  return a.provider === 'claude' ? 'claude' : null
+}
+
+/** A terminal conversation always has its transcript; an agent tab may have none. */
+function transcriptOf(a: Partial<AgentConversation>, transport: string): string | null | undefined {
+  if (typeof a.transcriptPath === 'string') return a.transcriptPath
+  return transport === 'acp' && a.transcriptPath === null ? null : undefined
+}
+
+function transportOf(a: Partial<AgentConversation>): AgentConversation['transport'] | null {
+  const transport = a.transport ?? 'tui'
+  return transport === 'tui' || transport === 'acp' ? transport : null
+}
+
 function agentOf(value: unknown): AgentConversation | null {
   if (typeof value !== 'object' || value === null) return null
   const a = value as Partial<AgentConversation>
-  // An agent this version cannot resume loses its conversation, not the record.
-  if (a.provider !== 'claude') return null
-  if (typeof a.sessionId !== 'string' || a.sessionId === '') return null
-  if (typeof a.transcriptPath !== 'string' || typeof a.cwd !== 'string') return null
+  const agentId = agentIdOf(a)
+  const transport = transportOf(a)
+  // A conversation this version cannot place loses its conversation, not the record.
+  if (agentId === null || transport === null) return null
+  const transcriptPath = transcriptOf(a, transport)
+  const placed = typeof a.sessionId === 'string' && a.sessionId !== '' && typeof a.cwd === 'string'
+  if (!placed || transcriptPath === undefined) return null
   return {
-    provider: 'claude',
-    sessionId: a.sessionId,
-    transcriptPath: a.transcriptPath,
-    cwd: a.cwd,
+    agentId,
+    transport,
+    sessionId: a.sessionId as string,
+    transcriptPath,
+    cwd: a.cwd as string,
     capturedAt: typeof a.capturedAt === 'string' ? a.capturedAt : new Date().toISOString(),
   }
 }

@@ -5,6 +5,9 @@ const mockElectronAPI = {
     create: vi.fn(),
     close: vi.fn(),
   },
+  agents: {
+    close: vi.fn(),
+  },
 }
 
 Object.defineProperty(globalThis, 'window', {
@@ -208,6 +211,27 @@ describe('useSessionStore — closeSession', () => {
     mockElectronAPI.terminal.close.mockResolvedValue({})
     await useSessionStore.getState().closeSession('sess-1')
     expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(0)
+  })
+})
+
+describe('useSessionStore — closeSession — an agent tab', () => {
+  setUpUseSessionStore()
+
+  it('closes an agent tab through agents.close, not the terminal', async () => {
+    useSessionStore.setState({
+      sessions: new Map([['sess-1', makeSession({ surface: 'agent' })]]),
+    })
+    mockElectronAPI.agents.close.mockResolvedValue({ data: true })
+    await useSessionStore.getState().closeSession('sess-1')
+    expect(mockElectronAPI.agents.close).toHaveBeenCalledWith({ sessionId: 'sess-1' })
+    expect(mockElectronAPI.terminal.close).not.toHaveBeenCalled()
+    expect(useSessionStore.getState().sessions.has('sess-1')).toBe(false)
+  })
+
+  it('does nothing for a session already removed, so main closing the tab cannot loop', async () => {
+    await useSessionStore.getState().closeSession('gone')
+    expect(mockElectronAPI.agents.close).not.toHaveBeenCalled()
+    expect(mockElectronAPI.terminal.close).not.toHaveBeenCalled()
   })
 })
 

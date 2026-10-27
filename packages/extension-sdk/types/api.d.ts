@@ -245,6 +245,122 @@ export interface PtyManagerAPI {
   listSessions(): Promise<SessionInfo[]>
 }
 
+/** An agent the app can start over the Agent Client Protocol (ACP). Since 5.2.0. */
+export interface AgentDescriptor {
+  /** `claude` for the built-in Claude Code agent; other ids come from the `agents` setting. */
+  id: string
+  label: string
+}
+
+/** One choice of an agent's session setting (model, mode, effort…), as ACP reports it. */
+export interface AgentConfigOption {
+  id: string
+  name: string
+  currentValue: string
+  options: Array<{ value: string; name: string }>
+}
+
+export interface StartAgentInput {
+  /** The agent to run. Absent: the default from the `agents` setting. */
+  agentId?: string
+  /** Absolute working directory of the session. */
+  cwd: string
+  /** A session id from an earlier `start` to continue (ACP `session/load`). */
+  resume?: string
+  /** Sent as the `_meta` of `session/new` or `session/load`. Agent-specific: the Claude agent
+   * reads `{ claudeCode: { options: { model, effort, settings, additionalDirectories, tools,
+   * env, systemPrompt } } }`. Other agents ignore keys they do not know. */
+  agentMeta?: Record<string, unknown>
+  /** The permission mode to set once the session exists, when the agent offers it
+   * (`default`, `acceptEdits`, `plan`, `auto`…). Absent: the agent's own default. */
+  mode?: string
+  /** Shows the session as a tab of this project. Absent: no tab. */
+  tab?: { projectId: string; title: string }
+}
+
+export interface AgentStarted {
+  sessionId: string
+  agentId: string
+  configOptions: AgentConfigOption[]
+}
+
+/** One ACP `session/update`, as the agent sent it (`sessionUpdate` names the kind). */
+export type AgentUpdate = { sessionUpdate: string } & Record<string, unknown>
+
+/** A tool call the agent asks to run (ACP `session/request_permission`). */
+export interface AgentPermissionAsk {
+  sessionId: string
+  /** Pass to `answer`. */
+  requestId: string
+  title: string
+  /** ACP tool kind: `read`, `edit`, `delete`, `move`, `search`, `execute`, `fetch`, `think`,
+   * `other`, or null when the agent gave none. */
+  kind: string | null
+  /** The tool's input as the agent reported it, such as `{ command }` or `{ file_path }`. */
+  rawInput: unknown
+  /** The ACP id of the tool call the ask is about. */
+  toolCallId: string
+  /** The `_meta` of that tool call as last reported in a `tool_call` or `tool_call_update`, so a
+   * client can read agent-specific facts (the Claude agent sends `{ claudeCode: { toolName } }`).
+   * Null when the agent sent none. */
+  toolCallMeta: Record<string, unknown> | null
+  options: Array<{ optionId: string; name: string; kind: string }>
+}
+
+/** An ask that was answered, wherever it was answered, or cancelled by a cancel or an end. */
+export interface AgentPermissionSettled {
+  requestId: string
+  outcome: 'allowed' | 'rejected' | 'cancelled'
+}
+
+/** How a prompt turn ended: `end_turn`, `max_tokens`, `max_turn_requests`, `refusal` or
+ * `cancelled`; `error` when the agent failed or exited. */
+export interface AgentTurnEnd {
+  stopReason: string
+}
+
+/** A single prompt in a session that is closed afterwards. */
+export interface RunAgentOnceInput extends Omit<StartAgentInput, 'resume' | 'tab'> {
+  prompt: string
+  /** Default 5 minutes. On expiry the session is cancelled and closed. */
+  timeoutMs?: number
+  /** Called once the session exists, so the caller can `cancel` it. Since 5.2.0. */
+  onStarted?: (sessionId: string) => void
+}
+
+export type RunAgentOnceResult =
+  | { text: string; stopReason: string; sessionId: string }
+  | { error: string; message: string }
+
+/** Agents over ACP (Since 5.2.0). An ask goes to each `onPermission` listener and to the
+ * session's tab; the first `answer` wins. `runOnce` rejects every ask: nobody can answer. */
+export interface AgentsAPI {
+  list(): Promise<AgentDescriptor[]>
+  /** Null when the agent could not start; the reason is logged. */
+  start(input: StartAgentInput): Promise<AgentStarted | null>
+  /** Resolves when the turn ends. */
+  prompt(sessionId: string, text: string): Promise<AgentTurnEnd>
+  cancel(sessionId: string): void
+  /** False when the session or the option does not exist. */
+  setConfig(sessionId: string, configId: string, value: string): Promise<boolean>
+  /** Ends the session's agent process and closes its tab. */
+  close(sessionId: string): Promise<void>
+  onUpdate(sessionId: string, listener: (update: AgentUpdate) => void): () => void
+  onPermission(sessionId: string, listener: (ask: AgentPermissionAsk) => void): () => void
+  /** False when the ask was already answered or the session ended. Null cancels the ask. */
+  answer(sessionId: string, requestId: string, optionId: string | null): Promise<boolean>
+  /** An ask was answered or cancelled, by this client or by the session's tab. */
+  onPermissionSettled(
+    sessionId: string,
+    listener: (settled: AgentPermissionSettled) => void
+  ): () => void
+  /** The agent process exited; exit code null when a signal ended it. */
+  onEnd(sessionId: string, listener: (exitCode: number | null) => void): () => void
+  runOnce(input: RunAgentOnceInput): Promise<RunAgentOnceResult>
+  /** The `model` option of the agent's sessions, read once per agent from a throwaway session. */
+  models(agentId?: string): Promise<AgentConfigOption | null>
+}
+
 export interface ShellExecOptions {
   command: 'git' | 'gh'
   args: string[]
@@ -516,6 +632,8 @@ export interface ExtensionAPI {
     onSessionClose(handler: (sessionId: string) => void): Disposable
   }
   pty: PtyManagerAPI
+  /** Agents over the Agent Client Protocol. Since 5.2.0. */
+  agents: AgentsAPI
   window: {
     openAuxiliary(view: string, params?: Record<string, string>): void
     broadcast(channel: string, data: unknown): void

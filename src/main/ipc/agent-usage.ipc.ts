@@ -1,4 +1,6 @@
 import { defineChannel, validationError, type ChannelSpec } from '@terminator/extension-sdk'
+import type { AgentUpdate } from '@terminator/extension-sdk'
+import { agentService } from '../agents/acp/agent-service-instance.js'
 import { registerInvokeTable } from './invoke-table.js'
 import { listRecords } from '../sessions/session-record-store.js'
 import { readTranscriptUsage, type TranscriptUsage } from '../agents/transcript-usage.js'
@@ -34,17 +36,40 @@ async function readOrNull(file: string): Promise<TranscriptUsage | null> {
   }
 }
 
+/** The cost the agent last reported for a session; tokens are not in the log, so they count as zero. */
+function loggedUsage(sessionId: string, history: AgentUpdate[]): SessionUsage | null {
+  const last = [...history].reverse().find((update) => update.sessionUpdate === 'usage_update')
+  const amount = (last?.cost as { amount?: unknown } | undefined)?.amount
+  if (typeof amount !== 'number') return null
+  return { sessionId, tokens: emptyTokens(), costUsd: amount, costIsPartial: false, models: [] }
+}
+
+/** What one record adds to the usage, or null when it adds nothing in the range. */
+async function usageOf(
+  record: SessionRecord,
+  input: AgentUsageInput,
+  readHistory: (agentSessionId: string) => AgentUpdate[]
+): Promise<SessionUsage | null> {
+  const agent = record.agent
+  if (!agent) return null
+  if (agent.transcriptPath === null)
+    return loggedUsage(record.sessionId, readHistory(agent.sessionId))
+  const usage = await readOrNull(agent.transcriptPath)
+  return usage && spansRange(usage, input) ? sessionUsage(record.sessionId, usage) : null
+}
+
 /** @internal */
 export async function collectAgentUsage(
   records: SessionRecord[],
-  input: AgentUsageInput
+  input: AgentUsageInput,
+  readHistory: (agentSessionId: string) => AgentUpdate[]
 ): Promise<AgentUsage> {
   const wanted = input.sessionIds && new Set(input.sessionIds)
   const sessions: SessionUsage[] = []
   for (const record of records) {
-    if (!record.agent || (wanted && !wanted.has(record.sessionId))) continue
-    const usage = await readOrNull(record.agent.transcriptPath)
-    if (usage && spansRange(usage, input)) sessions.push(sessionUsage(record.sessionId, usage))
+    if (wanted && !wanted.has(record.sessionId)) continue
+    const usage = await usageOf(record, input, readHistory)
+    if (usage) sessions.push(usage)
   }
   const tokens = emptyTokens()
   for (const session of sessions) addTokens(tokens, session.tokens)
@@ -64,7 +89,9 @@ const usageChannels: ChannelSpec[] = [
     channel: 'agents:usage',
     schema: AgentUsageInputSchema,
     invalid: validationError,
-    run: async (input) => ({ data: await collectAgentUsage(listRecords(), input) }),
+    run: async (input) => ({
+      data: await collectAgentUsage(listRecords(), input, (id) => agentService().readHistory(id)),
+    }),
     onError: (error) => ({
       error: 'failed',
       message: error instanceof Error ? error.message : String(error),

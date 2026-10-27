@@ -52,7 +52,7 @@ const AUTONOMY: SettingsProperties = {
     type: 'boolean',
     label: 'Let auto mode decide',
     description:
-      "On: a tool call Foundry's own rules have no opinion on is decided by Claude Code's auto mode, destructive actions included. Off: it waits for you. The escorted setting always asks you.",
+      "On: an agent that may write anywhere in its checkout runs in Claude Code's auto mode, which decides what Foundry's own rules have no opinion on, destructive actions included. Read-only and documentation roles always ask Foundry. Off: every agent asks. The escorted setting always asks you.",
     default: true,
   },
 }

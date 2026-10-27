@@ -183,6 +183,7 @@ interface SessionState {
     projectId: string
     tabTitle: string
     scrollbackLimit: number
+    surface?: 'terminal' | 'agent'
   }) => void
   closeSession: (sessionId: string) => Promise<void>
   /** Forget a deleted project's tabs; the main process already ended them. */
@@ -336,6 +337,7 @@ function adoptedSession(s: SessionData, adopted: Adopted): Partial<SessionData> 
     status: 'active',
     type: 'agent',
     scrollbackLimit: adopted.scrollbackLimit,
+    surface: adopted.surface,
     createdAt,
     lastActivityAt: Date.parse(createdAt),
     agentState: 'idle',
@@ -394,6 +396,14 @@ function withoutSession(s: SessionData, sessionId: string): Partial<SessionData>
 }
 
 async function closeSession(set: SetSessions, get: GetSessions, sessionId: string): Promise<void> {
+  const session = get().sessions.get(sessionId)
+  // Main broadcasts terminal:close-tab after agents.close; the second call finds nothing.
+  if (!session) return
+  if (session.surface === 'agent') {
+    await window.electronAPI.agents.close({ sessionId })
+    set((s) => withoutSession(s, sessionId))
+    return
+  }
   // Close any split children that belong to this session before closing the parent
   const children = [...get().sessions.values()].filter((s) => s.parentSessionId === sessionId)
   for (const child of children) {

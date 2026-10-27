@@ -10,28 +10,26 @@ import {
 } from '../schemas/review-agent.schema.js'
 import type { PrHead } from '../schemas/pr-review.schema.js'
 import { ensureReviewWorktree } from '../review/worktree.js'
-import { runAgentReview, runSummary } from '../review/review-agent.js'
+import { runAgentReview, runSummary, type RunAgentReviewDeps } from '../review/review-agent.js'
 import {
   defineChannel,
   noPayload,
   type ChannelSpec,
+  type AgentsAPI,
   type Disposable,
 } from '@terminator/extension-sdk'
 import { RepoRoot } from './repo-root.js'
 import { VALIDATION_ERROR, errorEnvelope, type RegisterFn } from './register.js'
 
-export interface OpenTerminalInput {
-  repoRoot: string
-  cwd: string
-  title: string
-  command: string
-}
-
 export interface ReviewAgentDeps {
   getSetting: <T>(key: string) => T | undefined
   broadcast: (channel: string, data: unknown) => void
-  openTerminal: (input: OpenTerminalInput) => void
-  /** The extension's own globalStorage folder, where a summary's claude runs: `repoRoot` can be a
+  /** The core's `api.agents`: reviews and summaries ask through `runOnce`, a run's conversation
+   *  opens through `start`. */
+  agents: Pick<AgentsAPI, 'runOnce' | 'start' | 'cancel'>
+  /** The workspace project that holds the repo's checkout, or undefined. */
+  projectIdFor: (repoRoot: string) => string | undefined
+  /** The extension's own globalStorage folder, where a summary's agent runs: `repoRoot` can be a
    *  `gh:owner/name` with no folder, and a summary reads no checkout. */
   storagePath: string
   /** Injectable for tests; defaults to the real worktree/agent implementations. */
@@ -147,17 +145,17 @@ function configuredModel(deps: ReviewAgentDeps): string {
 /** The run's model (its own, else the setting), effort and timeout. */
 function runSettings(deps: ReviewAgentDeps, model?: string): RunSettings {
   const effortSetting = deps.getSetting<string>(`${SETTING}.agentEffort`)
-  // 'default' (or a value saved before it existed, '') leaves --effort off so claude's own config wins.
+  // 'default' (or a value saved before it existed, '') leaves effort off so the agent's own config wins.
   const effort = effortSetting === 'default' ? undefined : effortSetting || undefined
   const timeoutMinutes = deps.getSetting<number>(`${SETTING}.agentTimeoutMinutes`) ?? 5
   return { model: model || configuredModel(deps), effort, timeoutMs: timeoutMinutes * 60_000 }
 }
 
-function newRun(input: StartInput, sessionId: string): AgentRun {
+function newRun(input: StartInput): AgentRun {
   return {
     id: randomUUID(),
     ...headOf(input),
-    sessionId,
+    sessionId: '',
     scope: input.scope,
     request: input.request,
     question: input.question ?? null,
@@ -180,23 +178,33 @@ async function finishAgentRun(ctx: AgentContext, slot: RunSlot, finished: AgentR
   ctx.deps.broadcast('review-agent:event', { run: finished })
 }
 
+/** `runOnce` bound to the service, which keeps state a bare method reference would lose. */
+function agentDepsOf(ctx: AgentContext): RunAgentReviewDeps {
+  return {
+    runOnce: (input) => ctx.deps.agents.runOnce(input),
+    cancelSession: (sessionId) => ctx.deps.agents.cancel(sessionId),
+  }
+}
+
 /** Runs the agent in the PR head's worktree; any failure ends the run as failed. */
 async function runAgentToEnd(ctx: AgentContext, input: StartInput, slot: RunSlot) {
   const { run } = slot
+  // Cancellable from the moment the run exists, not only once its agent starts.
+  const gate = { cancelled: false, cancel: () => {} }
+  ctx.liveRuns.set(run.id, () => {
+    gate.cancelled = true
+    gate.cancel()
+  })
   try {
     const worktreePath = await ctx.ensureWorktree(input)
+    if (gate.cancelled) return await finishAgentRun(ctx, slot, cancelledBeforeStart(run))
     const { model, effort, timeoutMs } = runSettings(ctx.deps, input.model)
     const { model: _requested, ...review } = input
-    const { cancel, done } = ctx.runReview({
-      ...review,
-      question: input.question ?? null,
-      worktreePath,
-      sessionId: run.sessionId,
-      model,
-      effort,
-      timeoutMs,
-    })
-    ctx.liveRuns.set(run.id, cancel)
+    const { cancel, done } = ctx.runReview(
+      { ...review, question: input.question ?? null, worktreePath, model, effort, timeoutMs },
+      agentDepsOf(ctx)
+    )
+    gate.cancel = cancel
     await finishAgentRun(ctx, slot, await done)
   } catch (e) {
     const finishedAt = new Date().toISOString()
@@ -204,12 +212,16 @@ async function runAgentToEnd(ctx: AgentContext, input: StartInput, slot: RunSlot
   }
 }
 
+function cancelledBeforeStart(run: AgentRun): AgentRun {
+  return { ...run, status: 'cancelled', finishedAt: new Date().toISOString() }
+}
+
 /** Starts a run for the PR and scope, or answers the one already running for them. */
 async function startAgentRun(ctx: AgentContext, input: StartInput): Promise<{ run: AgentRun }> {
   const runningKey = `${input.repoRoot}:::${input.prNumber}:::${JSON.stringify(input.scope)}`
   const existing = ctx.runningByScope.get(runningKey)
   if (existing && existing.status === 'running') return { run: existing }
-  const run = newRun(input, randomUUID())
+  const run = newRun(input)
   ctx.runningByScope.set(runningKey, run)
   await upsertRun(input, run)
   void runAgentToEnd(ctx, input, { run, runningKey, head: headOf(input) })
@@ -227,18 +239,21 @@ async function dismissFinding(input: PrHead & { runId: string; findingId: string
   return { ok: true }
 }
 
-/** Opens a terminal resuming the run's claude session, in its PR head's worktree. */
-async function openRunTerminal(ctx: AgentContext, runId: string) {
+/** Opens the run's agent conversation in a tab of its repo's project, in its PR head's worktree. */
+async function openRunConversation(ctx: AgentContext, runId: string) {
   const found = await findStoredRun(runId)
   if (!found) return { error: 'NOT_FOUND' }
+  const { sessionId } = found.run
+  if (!sessionId) return { error: 'NO_SESSION' }
+  const projectId = ctx.deps.projectIdFor(found.repoRoot)
+  if (!projectId) return { error: 'NO_PROJECT' }
   const cwd = await ctx.ensureWorktree(found)
-  ctx.deps.openTerminal({
-    repoRoot: found.repoRoot,
+  const started = await ctx.deps.agents.start({
     cwd,
-    title: `Review #${found.prNumber}`,
-    command: `claude --resume ${found.run.sessionId}`,
+    resume: sessionId,
+    tab: { projectId, title: `Review #${found.prNumber}` },
   })
-  return { ok: true }
+  return started ? { ok: true } : { error: 'AGENT_UNAVAILABLE' }
 }
 
 /** Summarizes the text with the agent's settings; the summary is answered, never stored. */
@@ -249,7 +264,10 @@ async function summarize(
   const { model, effort, timeoutMs } = runSettings(ctx.deps)
   const { prNumber, kind, text } = input
   const cwd = ctx.deps.storagePath
-  const { done, cancel } = ctx.runSummary({ prNumber, kind, text, cwd, model, effort, timeoutMs })
+  const { done, cancel } = ctx.runSummary(
+    { prNumber, kind, text, cwd, model, effort, timeoutMs },
+    agentDepsOf(ctx)
+  )
   const id = randomUUID()
   ctx.liveRuns.set(id, cancel)
   try {
@@ -284,7 +302,7 @@ function runChannels(ctx: AgentContext): ChannelSpec[] {
       channel: 'review-agent:open-terminal',
       schema: RunIdPayload,
       invalid: VALIDATION_ERROR,
-      run: ({ runId }) => openRunTerminal(ctx, runId),
+      run: ({ runId }) => openRunConversation(ctx, runId),
       onError: errorEnvelope,
     }),
     defineChannel({
@@ -320,8 +338,7 @@ function storedRunChannels(deps: ReviewAgentDeps): ChannelSpec[] {
   ]
 }
 
-/** Disposing the result cancels every run and summary still going: its `claude` is this process's child, and
- *  a quitting extension host leaves its children running, so a run left alone outlives the app. */
+/** Disposing the result cancels every run and summary still going, so none answers after the extension is gone. */
 export function registerReviewAgentHandlers(
   register: RegisterFn,
   deps: ReviewAgentDeps

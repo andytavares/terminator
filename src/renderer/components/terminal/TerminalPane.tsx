@@ -11,6 +11,7 @@ import { LeafPane } from './LeafPane'
 import { leafIds } from '../../utils/pane-tree'
 import './TerminalPane.css'
 import { droppedPaths } from './dropped-paths'
+import { AgentView } from '../agent/AgentView'
 
 interface Props {
   projectId: string
@@ -151,9 +152,9 @@ function useRefocusActive(activeSessionId: string | null): () => void {
 export function TerminalPane({ projectId }: Props): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const pane = usePaneState(projectId)
-  const { activeSessionId, layout } = pane
+  const { activeSessionId, layout, shownSessionId } = pane
   useShownTabSeen(projectId, pane)
-  useSinglePaneMount(containerRef, pane.shownSessionId, layout)
+  useSinglePaneMount(containerRef, shownSessionId, layout)
   useFocusRequests(projectId, pane)
   const refocusActive = useRefocusActive(activeSessionId)
   const handleRatioChange = useCallback(
@@ -170,13 +171,8 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
       </div>
     )
   }
-  return (
-    <SingleTerminal
-      containerRef={containerRef}
-      activeSessionId={activeSessionId}
-      refocusActive={refocusActive}
-    />
-  )
+  const tab = { containerRef, activeSessionId, shownSessionId, refocusActive }
+  return <SingleTab {...tab} />
 }
 
 /** No tab yet: a prompt to open one, or why the last one would not open. */
@@ -207,7 +203,23 @@ interface SingleTerminalProps {
   refocusActive: () => void
 }
 
-/** One tab alone: a click focuses it, and files dropped on it paste their paths. */
+/** One tab alone: an agent's transcript, or a terminal. */
+function SingleTab({
+  shownSessionId,
+  ...terminal
+}: SingleTerminalProps & { shownSessionId: string | null }) {
+  const showsAgent = useSessionStore(
+    (s) => shownSessionId !== null && s.sessions.get(shownSessionId)?.surface === 'agent'
+  )
+  if (!showsAgent || !shownSessionId) return <SingleTerminal {...terminal} />
+  return (
+    <div className="terminal-pane">
+      <AgentView sessionId={shownSessionId} />
+    </div>
+  )
+}
+
+/** One terminal alone: a click focuses it, and files dropped on it paste their paths. */
 function SingleTerminal({ containerRef, activeSessionId, refocusActive }: SingleTerminalProps) {
   function handleMouseDown(e: React.MouseEvent): void {
     if (e.button !== 0) return

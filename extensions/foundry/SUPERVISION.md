@@ -7,8 +7,9 @@ The premise: you cap out at two to six concurrent agents because **review** is
 the bottleneck, and the failure nobody instruments is an agent that is stuck
 _without asking for help_. Everything below exists for one of those two facts.
 
-Architecture and the verified hook contract:
-[ADR-026](../../docs/adr/026-supervised-runs-in-a-terminal.md).
+Architecture: [ADR-026](../../docs/adr/026-supervised-runs-in-a-terminal.md), as
+[ADR-130](../../docs/adr/130-agents-the-app-drives-run-over-acp.md) amended it (agents run
+over ACP; there is no hook).
 
 ## The surfaces
 
@@ -61,7 +62,7 @@ stopped**, worst first:
 | `halted`   | **you**    | an undecided gate has stopped the line; nothing is scheduled                                      |
 | `adrift`   | **you**    | the graph says running and no process is                                                          |
 | `asking`   | **you**    | an agent is holding a tool call, answerable from the surface                                      |
-| `stranded` | **you**    | a call was handed back to a terminal prompt nobody is at                                          |
+| `stranded` | **you**    | a call was handed back to the agent tab, where nobody is                                          |
 | `stalled`  | **you**    | a run stopped making progress without asking for anything                                         |
 | `stopped`  | **you**    | the run stopped on an error, or finished every step and still failed to ship                      |
 | `failed`   | **you**    | a step failed                                                                                     |
@@ -76,7 +77,7 @@ that was refused_ below.
 `halted` outranks everything because a gate stops the whole line and every other
 condition under it is a symptom. `asking` outranks `stranded` because a held
 call is answerable here in one click and a handed-back one can only be answered
-in the terminal it was handed to. A **shadow** stall firing is deliberately
+in the agent tab it was handed to. A **shadow** stall firing is deliberately
 never notified, so it is not counted: a standing is a notification.
 
 `readStanding` is the one place the inputs are assembled — the graph from disk,
@@ -107,7 +108,7 @@ ticket, and while CI is watching or fixing says so with a spinner and
 **k of n checks done**.
 
 `adrift` and `stranded` carry their moves the same way — _Pick it back up_ and
-_Go to its terminal_. The separate "nothing is running this" panel is gone with
+_Go to its agent tab_. The separate "nothing is running this" panel is gone with
 them: two panels saying the same thing in two voices is what the band replaced.
 
 ### A turn that was refused
@@ -222,7 +223,7 @@ left off the list is not "the agent can ask for it", it is "the agent cannot do
 it" — and one that is _on_ the list is allowed outright, not sent to the
 operator. It answered `null` on an allowed command for a while, which abstains,
 and an abstention is a held tool call: five minutes on the inbox before it
-falls back to the terminal. Six reads was half an hour of waiting, with the
+is left open in the agent tab. Six reads was half an hour of waiting, with the
 console showing an agent thinking. Four live runs in a row died on that, each on a different command, and the
 architect said so itself before giving up: _"Bash is restricted to single
 commands here. Working within that."_
@@ -284,110 +285,54 @@ and that is why finding the five above took five live runs and five readings of
 a transcript: on the console, an agent being turned down and an agent that had
 gone quiet looked exactly the same.
 
-## Trusting the folder, or the agent never starts
+## No trust dialog, no environment from the parent
 
-Claude Code shows a workspace trust dialog for a directory it has not seen, and
-its documentation is explicit that the dialog "appears in interactive sessions
-only and is bypassed in non-interactive `claude -p` or SDK runs". Foundry runs
-interactively on purpose — an agent in a terminal you can go and type at is the
-whole design — so every launch meets that dialog.
+Foundry starts its agents over ACP (`api.agents`,
+[ADR-130](../../docs/adr/130-agents-the-app-drives-run-over-acp.md)). Two
+problems of the old terminal launch are gone with it:
 
-An agent sitting at it looks exactly like one hard at work: the process is up,
-the run register holds it, the graph says `running`, the stall detector counts
-its silence as thinking. It has simply never started. The live run that found
-this had an agent at 0% CPU with no transcript at all.
+- **No workspace trust dialog.** An ACP session shows none, so Foundry no
+  longer edits `~/.claude.json`. `runtime/workspace-trust.ts` and the
+  `workspace.trusted` ledger entry are deleted.
+- **No parent identity.** The core scrubs the parent Claude Code session's
+  variables (`CLAUDE_CODE_BRIDGE_SESSION_ID` and the rest) from the agent's
+  environment, so an agent cannot join somebody else's bridge session.
 
-`runtime/workspace-trust.ts` sets `projects["<repo>"].hasTrustDialogAccepted` in
-`~/.claude.json`, which is the mechanism the documentation names for granting it
-without a prompt. Three things about how:
+## What an agent is started with
 
-- **Keyed to the repository, not the worktree.** "Trust is keyed to the git
-  repository root (or main checkout root in worktrees)" — an entry for the
-  worktree path would do nothing at all.
-- **Additive, and never creating.** It sets one boolean on one project entry and
-  leaves every other key and every other project alone. It will not create
-  `~/.claude.json`: a machine with no Claude Code configuration is one where a
-  run was never going to work, and inventing the operator's config file is not
-  this extension's business.
-- **Recorded.** `workspace.trusted` goes in the ledger, because amending the
-  operator's own configuration is something they should be able to find, even
-  though it is the answer they would have given the dialog themselves.
+`startSupervisedRun` (`runtime/supervised-runner.ts`) calls `api.agents.start` with
+the permission mode its caller chose, the model and effort when chosen, the skill
+folders, and the environment the skills read. It writes no settings file and
+installs no hook:
 
-## A fresh agent, not the parent's session
+| Variable                                | Why                                               |
+| --------------------------------------- | ------------------------------------------------- |
+| `SPECIFY_FEATURE`, `..._DIRECTORY`      | the card's paths, for the skills                  |
+| `CLAUDE_CODE_FORCE_SESSION_PERSISTENCE` | a nested session still writes a transcript        |
+| `FOUNDRY_RUN`                           | lets the operator's own hooks tell a Foundry run  |
+| `CLAUDE_CODE_ARTIFACT_AUTO_OPEN`        | an unattended run must not open a browser per doc |
 
-Terminator launched from a Claude Code terminal passes its whole environment
-down: Electron inherits the shell, the pty inherits Electron, and `claude`
-inherits the pty. So an agent came up carrying the **parent's** identity —
-`CLAUDE_CODE_BRIDGE_SESSION_ID`, `CLAUDE_CODE_MESSAGING_SOCKET` and
-`CLAUDE_CODE_MESSAGING_TOKEN`, `CLAUDE_CODE_SESSION_ID`.
+The session id is the agent's own (Claude Code's session id), so the transcript
+is still `~/.claude/projects/<cwd>/<sessionId>.jsonl`. The brief is sent with
+`api.agents.prompt`, as a message and not as a line typed into a terminal, so
+its length and its line breaks are no concern.
 
-It then did exactly what those variables told it to: joined the parent's bridge
-session, sat at `lastSequenceNum: 0`, and waited for instructions only the
-parent could send. No turn, no tool call, no output — five open connections to
-the API and 0% CPU. From the console it was indistinguishable from an agent
-thinking hard. Four live runs died on it before the transcript's
-`bridge-session` line gave it away.
+The turn end is the end of a `prompt` (`end_turn`); the end of the run is
+`api.agents.onEnd`. A `cancelled` or `error` turn is not reported as a turn end.
+`mode` is chosen per role by `modeFor` (`runtime/permission-mode.ts`): `auto` for a
+role that may write anywhere in its checkout, at `standard` or `lights-out`, with
+`letAutoModeDecide` on; `default` for every other role. A read-only role (red team,
+scout, review, the architect's rounds), a role limited to declared write paths
+(`docsOnly`, an output file or directory), `escorted`, or `letAutoModeDecide` off
+all get `default`.
 
-`CLAUDE_CODE_CHILD_SESSION` was already known about, and worked around with
-`CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1` so that a nested session still writes
-a transcript. That was one of a family, found because it broke something
-visible. The launch script now unsets the rest before `exec`.
-
-Identity and transport only. A preference such as `CLAUDE_EFFORT` is the
-operator's and is left alone.
-
-One variable goes the other way: every launch sets `FOUNDRY_RUN=1`, on the
-launch script's export line (`exec VAR=1 claude` is not valid shell, so it
-cannot ride on the command). The
-operator's own Claude Code configuration (user-level hooks, plugins, `CLAUDE.md`)
-loads in every agent this runtime starts, because `--settings` adds to it rather
-than replacing it. The variable lets those hooks tell a Foundry agent from the
-operator's own sessions, for example to keep agent sessions out of a personal
-record of where the operator's time went.
-
-## The launch is a file, not a typed line
-
-A terminal in canonical mode silently drops or corrupts anything past
-`MAX_CANON` on a single line — **1024 bytes on macOS**. The launch is
-`claude … <the whole brief>`, and a brief is a role prompt plus a work order,
-which is always longer than that. Typed, it arrived like this — read off a live
-agent's own argv:
-
-```
-# Read the session TTL from the environment\n\nWork ordeWork ordeWork orde
-…×15… WorkTL_MS reads SESSION_TTL_MS …
-```
-
-A fragment of the order repeated fifteen times, then cut off mid-word. **Every
-agent this runtime launched was handed a brief like that**, and nothing could
-see it: the terminal renders the first line correctly, so an assertion that
-`claude --session-id` is visible passes; the process starts, so the run
-register, the stall detector and the run graph all report it running. It simply
-does the wrong work — or, in the run that found this, sits at 0% CPU with no
-transcript at all for half an hour.
-
-So the launch is written to `<stateDir>/launch/<session>.sh` and the terminal is
-told to run that file. The script `cat`s itself through a quoted heredoc before
-`exec`, so the whole command still appears in the terminal and what an agent was
-told is readable there — which is the point of running it in a terminal at all.
-
-The typed line ends `; exit`, so the tab's shell leaves with the script's
-status. A launch that dies early (a missing binary, a refused session id) then
-ends the run through the terminal's exit, instead of leaving a live shell and a
-run that never ends.
-
-The guard is the one that matters rather than the one that is easy: no line the
-runner types may reach `MAX_CANON`.
-
-`continueRun` still types, because by then the agent owns the terminal and its
-TUI reads in raw mode rather than canonical — a different discipline, without
-that limit.
+Checks (`runCommand`) still run in terminal tabs: a command is not an agent.
 
 ## One conversation per lane
 
 A lane keeps **one Claude session per role**. A role continuing its own work
 resumes it — the executor hands `start` a `resumeSessionId` and the launch
-becomes `claude --resume <id>` — so a builder taking a second unit in the lane
+passes `resume: <id>` to `api.agents.start` — so a builder taking a second unit in the lane
 keeps everything it learned taking the first.
 
 **A change of role starts a fresh conversation.** It used to resume across the
@@ -634,16 +579,22 @@ is not on offer is readable rather than inferred.
 
 ## Which model, and how many questions
 
-A run is launched with `--permission-mode auto` and, when one is chosen,
-`--model`.
+A run is started with a permission mode (`modeFor`) and, when one is chosen, a model.
 
-**The autonomy ladder still decides first.** A `PreToolUse` hook runs under every
-permission mode and its `allow`/`deny` is honoured before the mode is consulted
-at all, so the ladder's judgement is unchanged. What the mode picks up is only
-what the ladder _abstains_ on — and under `default` that was a prompt. A single
-phase routinely asked twenty-five times. Under `auto` the runtime's own
-classifier answers those instead, so the questions that reach you are the ones
-the ladder actually wanted a person for.
+**Foundry decides every ask it sees.** In `default` mode Claude raises an ACP
+permission ask for every write and every state-changing command (reads and plain
+`ls` do not ask). `runtime/supervised-runner.ts` subscribes to the session's asks,
+takes the tool name from the ask's `toolCallMeta` (`claudeCode.toolName`), and
+gives the call to the permission bridge, which runs the autonomy ladder. Allow
+picks the ask's `allow_once` option; deny picks `reject_once`. What the ladder
+abstains on is held for a person. In `auto` mode Foundry sees only what Claude's
+classifier asks about, and the ladder decides those the same way.
+
+**A refusal is followed by its reason.** ACP's reject option has no text, so the
+runner cancels the turn and sends the reason (or the operator's typed answer) as
+the next prompt; the turn ends once, after the agent has read why. The hard
+refusals also reach Claude as deny rules (`runtime/deny-rules.ts`), which hold in
+`auto` mode, where the ladder sees only what the classifier asks about.
 
 ### An "ask" has no unattended resolution
 
@@ -651,20 +602,21 @@ This is worth knowing before turning `lights-out` on, because for a whole
 session it looked like Claude Code hanging at random.
 
 When the ladder abstains, the call is held and the operator is asked. If nobody
-answers within five minutes the bridge **hands the call back** — which means
-Claude Code puts its own prompt in the terminal instead. That is the right
+answers within five minutes the bridge **hands the call back**: it drops the call
+from Foundry's held list and leaves the ask open in the agent tab. That is the right
 answer when somebody is at the console. When nobody is, the agent waits at that
-prompt for ever, and only the wall-clock budget ends the run.
+ask for ever, and only the wall-clock budget ends the run. An ask the operator
+answers in the agent tab clears its held call in Foundry (`onPermissionSettled`).
 
 Measured on a live run:
 
-|           |                                                                  |
-| --------- | ---------------------------------------------------------------- |
-| 09:11:49  | the builder runs `npm test > /tmp/claude-501/…`                  |
-|           | a redirect outside the checkout, so FR-050 asks                  |
-| ~09:16:49 | nobody answers; the call is handed back to the terminal's prompt |
-| 09:19:17  | the stall detector notices silence                               |
-| 09:41     | the wall-clock budget ends the run                               |
+|           |                                                                |
+| --------- | -------------------------------------------------------------- |
+| 09:11:49  | the builder runs `npm test > /tmp/claude-501/…`                |
+|           | a redirect outside the checkout, so FR-050 asks                |
+| ~09:16:49 | nobody answers; the call is handed back to the agent tab's ask |
+| 09:19:17  | the stall detector notices silence                             |
+| 09:41     | the wall-clock budget ends the run                             |
 
 **How to recognise it in a transcript**: a held call is a `tool_use` record with
 no `tool_result` after it. The agent never ran the tool; it is waiting to be
@@ -682,7 +634,7 @@ policy. It changes what FR-029 and FR-050 mean, so it is a decision to take on
 purpose rather than a fix.
 
 What has changed is that the silence is legible: the console says when a
-question is asked, and says again when it is handed back to the terminal, which
+question is asked, and says again when it is handed back to the agent tab, which
 is the moment the agent stops.
 
 A feed entry scrolls away, so the hand-back is also **recorded**. The session is
@@ -713,7 +665,7 @@ is the automatic half:
 nobody can.** At `escorted` and `standard` these two hold the call and ask. At
 `lights-out` there is by definition nobody to ask, and a held call becomes a
 half-hour of silence: the question goes to the operator, five minutes later to
-the runtime's own prompt in the terminal, and the agent stands at that prompt
+the runtime's own ask in the agent tab, and the agent stands at that ask
 until the wall-clock budget ends the run. Watched live — the builder redirected
 its test output to a scratch file, which is outside the checkout and so worth a
 question, and thirty minutes later the order had shipped nothing.
@@ -806,7 +758,7 @@ directory the first time it runs in one, and a worktree is a new directory every
 time — so a fresh run waits at that prompt having said nothing. There is no
 documented flag or settings key to pre-answer it (only `-p`, which would give up
 the terminal), so nothing here guesses at one: the card says the run is probably
-waiting on it and sends you to the terminal.
+waiting on it and sends you to the agent tab.
 
 ## Where state lives
 
@@ -816,8 +768,7 @@ waiting on it and sends you to the terminal.
   survives is the **graph**, not the sessions — see "A run whose agents are
   gone" for how the two are reconciled when the application reopens.
 - **On disk**, under `runtime/` in Foundry's own `api.paths.globalStorage` — the feed
-  (`feed.jsonl`), mute rules, and the per-session
-  `--settings` files and hook script.
+  (`feed.jsonl`) and mute rules.
 - **In the browser** — when you last read the feed. That is a property of the
   person looking, not of the runs.
 
@@ -904,7 +855,7 @@ What a comment in the code points here for: the live run that showed why the
 code is the way it is.
 
 - `resume` (`src/ipc/run-channels.ts`) keeps the executor already driving an order: starting a second one produced `run.halted: waiting on a gate` three times in 23 seconds on WO-0927-4fd.
-- `onPending` (`src/line/node-session.ts`) posts a held question to the console as well as the inbox. Before it did, a builder redirected its test output to a scratch file outside the checkout, FR-050 asked about it, nobody was there, the bridge handed the call back to the terminal five minutes later, and the run sat until the wall-clock budget ended it half an hour on, with nothing saying a question had been asked.
+- `onPending` (`src/line/node-session.ts`) posts a held question to the console as well as the inbox. Before it did, a builder redirected its test output to a scratch file outside the checkout, FR-050 asked about it, nobody was there, the bridge handed the call back to the agent tab five minutes later, and the run sat until the wall-clock budget ended it half an hour on, with nothing saying a question had been asked.
 - `stallInputs` (`src/runtime/evaluate-stall.ts`) counts silence from the later of the last activity and `stateSince`. A session spans turns and the transcript keeps every turn's tool calls, so a session given a new turn after a long gap carried the previous turn's last call as its latest activity: a run twenty-three seconds old was reported silent for twenty-one minutes, and `run.stalled` was on the order before the builder's third command.
 - `runtimeStateDir` (`src/runtime/runtime-state.ts`) is absolute. It used to be `resolveWorktreeBaseDir('')`, which is `join('', '.worktrees')`, a relative path, so the `--settings` handed to claude resolved against the worktree it started in. The file was never there, so every supervised run died on "Settings file not found" the moment it launched: the card sat at WORKING with 0 turns and the console stayed empty.
 - `recordStall` (`src/runtime/supervision-runtime.ts`) writes a stall to the order's ledger as well as the console. The detector was timely and nothing consumed it: on a live run the builder fell silent at 07:27:08, the stall fired at 07:34:21, and the run waited until the wall-clock budget stopped it at 07:52:10, eighteen minutes after the console knew. With shadow mode on by default, nothing an operator reads afterwards showed those minutes; the ledger said "budget exceeded".

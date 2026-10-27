@@ -155,7 +155,8 @@ describe('WallTile — offers Resume on a stopped session whose conversation is 
           ...facts,
           state: 'exited',
           agent: {
-            provider: 'claude',
+            agentId: 'claude',
+            transport: 'tui',
             sessionId: 'conv-1',
             transcriptPath: '/t/c.jsonl',
             cwd: '/code/repo',
@@ -181,7 +182,8 @@ describe('WallTile — says when a stopped session’s conversation has gone', (
           ...facts,
           state: 'exited',
           agent: {
-            provider: 'claude',
+            agentId: 'claude',
+            transport: 'tui',
             sessionId: 'conv-1',
             transcriptPath: '/t/gone.jsonl',
             cwd: '/code/repo',

@@ -10,8 +10,10 @@ import {
   type RendererCommand,
 } from '../quick-actions/extension-actions'
 import { CORE_GROUPS } from '../quick-actions/groups'
+import { promptAgentTab } from '../terminal/agent-tab'
 import { buildCustomQuickActions } from '../quick-actions/custom-runtime'
 import type { CustomRunEnv } from '../quick-actions/custom-actions'
+import type { TerminalSession } from '../../shared/types/index'
 import { rankFirstScreen } from '../quick-actions/rank'
 import { recordUsage, pruneUsage, togglePin, shouldShowHint } from '../quick-actions/usage'
 import {
@@ -116,6 +118,16 @@ function rendererCommand(c: CommandRegistration): RendererCommand {
   }
 }
 
+/** What a custom action needs to know about the focused tab. */
+function focusedFacts(session: TerminalSession): NonNullable<CustomRunEnv['focused']> {
+  return {
+    sessionId: session.id,
+    isAgent: session.type === 'agent',
+    isAgentTab: session.surface === 'agent',
+    agentState: agentStateOf(session),
+  }
+}
+
 /** What a custom action runs against: the focused terminal, and the variables its body can use. */
 function useCustomEnv(target: QuickActionTarget): CustomRunEnv {
   const { activeWorkspace, activeProject } = useActiveScope()
@@ -126,13 +138,7 @@ function useCustomEnv(target: QuickActionTarget): CustomRunEnv {
   const { projectId, focusedSessionId, focusedSession } = target
   return useMemo(
     () => ({
-      focused: focusedSession
-        ? {
-            sessionId: focusedSession.id,
-            isAgent: focusedSession.type === 'agent',
-            agentState: agentStateOf(focusedSession),
-          }
-        : null,
+      focused: focusedSession ? focusedFacts(focusedSession) : null,
       projectId,
       vars: {
         cwd: useWorkspaceStore.getState().resolveActiveCwd(),
@@ -166,6 +172,7 @@ function useCustomQuickActions(target: QuickActionTarget): QuickAction[] {
     () =>
       buildCustomQuickActions([...(globalCustom ?? []), ...(workspaceCustom ?? [])], env, {
         input: (sessionId, data) => window.electronAPI.terminal.input(sessionId, data),
+        prompt: promptAgentTab,
         openTab: (tabProjectId) => openProjectTab(tabProjectId, activeWorkspaceId, createSession),
         notify: (message) => useToastStore.getState().addToast({ type: 'error', message }),
       }),

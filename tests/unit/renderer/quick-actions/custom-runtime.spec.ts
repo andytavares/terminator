@@ -31,6 +31,7 @@ function promptAction(overrides: Partial<CustomAction> = {}): CustomAction {
 function makeDeps() {
   return {
     input: vi.fn(),
+    prompt: vi.fn(),
     openTab: vi.fn().mockResolvedValue('new-session-id'),
     notify: vi.fn(),
   }
@@ -57,7 +58,7 @@ describe('buildCustomQuickActions', () => {
 
   it('describes a prompt targeting the agent', () => {
     const actions = buildCustomQuickActions([promptAction()], makeEnv(), makeDeps())
-    expect(actions[0].description).toBe('prompt · Claude')
+    expect(actions[0].description).toBe('prompt · agent')
   })
 
   it('precomputes a disabledReason when the plan is not ok', () => {
@@ -82,7 +83,7 @@ describe('buildCustomQuickActions — re-plans at run time and refuses when stat
     env.focused = { sessionId: 's1', isAgent: true, agentState: 'working' }
     await actions[0].run()
 
-    expect(deps.notify).toHaveBeenCalledWith('Claude is mid-turn')
+    expect(deps.notify).toHaveBeenCalledWith('The agent is mid-turn')
     expect(deps.input).not.toHaveBeenCalled()
   })
 
@@ -127,6 +128,19 @@ describe('buildCustomQuickActions — runs a new-tab plan by opening a tab then 
     expect(deps.input).not.toHaveBeenCalled()
     expect(deps.openTab).not.toHaveBeenCalled()
     expect(deps.notify).toHaveBeenCalledWith(`Command is longer than ${MAX_TYPED_LINE_BYTES} bytes`)
+  })
+})
+
+describe('buildCustomQuickActions — a prompt on an agent tab', () => {
+  it('sends the text to the agent and types nothing', async () => {
+    const deps = makeDeps()
+    const env = makeEnv({
+      focused: { sessionId: 'tab1', isAgent: true, isAgentTab: true, agentState: 'idle' },
+    })
+    const actions = buildCustomQuickActions([promptAction({ body: 'hi {branch}' })], env, deps)
+    await actions[0].run()
+    expect(deps.prompt).toHaveBeenCalledWith('tab1', 'hi main')
+    expect(deps.input).not.toHaveBeenCalled()
   })
 })
 

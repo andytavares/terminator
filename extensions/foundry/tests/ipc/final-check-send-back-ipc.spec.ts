@@ -16,17 +16,19 @@ import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import { builderUnit } from '../helpers/order-parts.js'
 import { agentNode } from '../helpers/run-nodes.js'
-import { orderStoreAt } from '../../src/state/live-index.js'
+import { indexFor, orderStoreAt } from '../../src/state/live-index.js'
+import { createGateStore } from '../../src/gates/store.js'
+import { writeRunGraph } from '../../src/ipc/run-channels.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import type { Gate } from '../../src/gates/rules.js'
 import type { Evidence } from '../../src/verify/verdict.js'
 import type { RunGraph, RunNode } from '../../src/line/run-graph.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
+import { settleBackground } from '../../src/background.js'
 
 /** Agents that start and never finish: the reopened nodes stay where they were put. */
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
-vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 let dataDir = ''
 let host: FoundryHost
@@ -81,16 +83,26 @@ async function seedFailedFinalCheck(gates: readonly Gate[]): Promise<void> {
     recipe: 'direct',
     plan: { ...base.plan, units: [builderUnit('U-1', { title: 'the first bit' })] },
   })
-  fs.writeFileSync(path.join(orderFolder(), 'run-graph.json'), JSON.stringify(passedGraph()))
-  fs.writeFileSync(path.join(orderFolder(), 'gates.json'), JSON.stringify(gates))
+  // Through the index, as every writer must (CLAUDE.md rule 4): written behind its back, a
+  // graph or gate is unseen by an index that background work loaded for this folder first.
+  const index = indexFor(dataDir)
+  await createGateStore(dataDir, index).list()
+  await writeRunGraph(dataDir, passedGraph(), index)
+  for (const gate of gates) await createGateStore(dataDir, index).save(gate)
 }
 
 /** The graph once the executor the resume hands it to has started the reopened nodes. */
 async function graphOnceSentBack(): Promise<RunGraph> {
-  // The resume runs after decide returns; awaiting the runner's own start has no clock to
-  // lose a race with on a slow machine, which a polled one-second waitFor did.
-  await runnerStarted
+  // Two signals, no clock: the runner's start, or the run's end without one, which fails
+  // here with what the run recorded instead of waiting out the test's time limit.
+  await Promise.race([runnerStarted, settleBackground().then(endedWithoutAnAgent)])
   return JSON.parse(fs.readFileSync(path.join(orderFolder(), 'run-graph.json'), 'utf8')) as RunGraph
+}
+
+function endedWithoutAnAgent(): never {
+  const ledger = path.join(orderFolder(), 'ledger.jsonl')
+  const lines = fs.existsSync(ledger) ? fs.readFileSync(ledger, 'utf8') : '(no ledger)'
+  throw new Error(`the resumed run ended without starting an agent:\n${lines}`)
 }
 
 const nodeIn = (graph: RunGraph, id: string): RunNode | undefined =>

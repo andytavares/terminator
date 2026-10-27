@@ -75,12 +75,12 @@ describe('resolving a request', () => {
 })
 
 function allowingAndDenyingTests() {
-  it('allowing returns the documented allow shape with the input unchanged', async () => {
+  it('allowing returns the allow verdict', async () => {
     const { bridge, events } = harness()
     const input = { command: 'ls' }
     const pending = bridge.canUseTool('Bash', input)
     bridge.resolve((events[0] as { requestId: string }).requestId, { allow: true })
-    await expect(pending).resolves.toEqual({ permissionDecision: 'allow', updatedInput: input })
+    await expect(pending).resolves.toEqual({ permissionDecision: 'allow' })
   })
 
   it('denying returns the documented deny shape carrying the reason', async () => {
@@ -178,20 +178,33 @@ function anAbstainingDeciderTests() {
   })
 }
 
-describe('a call the ladder leaves to auto mode', () => {
-  it('answers with no decision, and never raises a request', async () => {
-    const events: PendingPermission[] = []
-    const bridge = createPermissionBridge({
-      sessionId: 's1',
-      now: () => 1_000,
-      onPending: (p) => events.push(p),
-      onResolved: () => {},
-      autoDecide: () => 'mode',
-    })
-    await expect(bridge.canUseTool('Edit', { file_path: '/etc/hosts' })).resolves.toEqual({
-      permissionDecision: 'defer',
-    })
-    expect(events).toHaveLength(0)
+describe('an ask answered in the agent tab', () => {
+  it('drops the held call it raised and reports how it was settled', async () => {
+    const { bridge, events, resolved } = bridgeWith(10_000)
+    const pending = bridge.canUseTool('Bash', { command: 'ls' }, 'ask-1')
+    bridge.withdraw('ask-1', 'allowed')
+    await expect(pending).resolves.toEqual({ permissionDecision: 'ask' })
+    expect(resolved).toEqual([{ requestId: events[0].requestId, decision: 'allow' }])
+    expect(bridge.resolve(events[0].requestId, { allow: true })).toBe(false)
+  })
+
+  it('leaves the calls of other asks held', async () => {
+    const { bridge, events, resolved } = bridgeWith(10_000)
+    const pending = bridge.canUseTool('Bash', { command: 'ls' }, 'ask-1')
+    bridge.withdraw('ask-2', 'rejected')
+    expect(resolved).toEqual([])
+    expect(bridge.resolve(events[0].requestId, { allow: true })).toBe(true)
+    await pending
+  })
+})
+
+describe('an ask cancelled by an interrupt or an end', () => {
+  it('reports the held call denied, not answered', async () => {
+    const { bridge, events, resolved } = bridgeWith(10_000)
+    const pending = bridge.canUseTool('Bash', { command: 'ls' }, 'ask-1')
+    bridge.withdraw('ask-1', 'cancelled')
+    await expect(pending).resolves.toEqual({ permissionDecision: 'ask' })
+    expect(resolved).toEqual([{ requestId: events[0].requestId, decision: 'deny' }])
   })
 })
 
@@ -378,7 +391,7 @@ function answersTests() {
     return events[0].requestId
   }
 
-  it('sends the answer to the agent as the decision reason', async () => {
+  it('carries the answer as the reason', async () => {
     const { bridge, events } = bridgeFor()
     const pending = bridge.canUseTool('AskUserQuestion', {
       questions: [{ question: 'Which scope?' }],

@@ -326,7 +326,8 @@ describe('session-record-store — announcing', () => {
 })
 
 const CONVERSATION = {
-  provider: 'claude' as const,
+  agentId: 'claude',
+  transport: 'tui' as const,
   sessionId: 'b610a882-41f3-4833-a6a3-dc3a33aea060',
   transcriptPath: '/transcripts/b610a882.jsonl',
   cwd: '/code/northwind-api',
@@ -403,6 +404,54 @@ describe('session-record-store — unreadable conversations', () => {
     const second = await load()
     await second.loadRecords()
     expect(second.listRecords()[0]).toMatchObject({ description: 'why', agent: null })
+  })
+})
+
+async function storedAgent(agent: unknown) {
+  const first = await load()
+  await first.setDescription(SNAP, 'why')
+  const onDisk = JSON.parse(fs.readFileSync(FILE(), 'utf8'))
+  onDisk[0].agent = agent
+  fs.writeFileSync(FILE(), JSON.stringify(onDisk))
+  const second = await load()
+  await second.loadRecords()
+  return second.listRecords()[0]?.agent
+}
+
+describe('session-record-store — conversations stored by an earlier version', () => {
+  it('reads a provider record as a Claude conversation in a terminal', async () => {
+    const old = { provider: 'claude', sessionId: 'c1', transcriptPath: '/t.jsonl', cwd: '/c' }
+    expect(await storedAgent(old)).toMatchObject({
+      agentId: 'claude',
+      transport: 'tui',
+      sessionId: 'c1',
+      transcriptPath: '/t.jsonl',
+    })
+  })
+
+  it('reads an agent tab conversation, with or without a transcript', async () => {
+    const tab = { agentId: 'opencode', transport: 'acp', sessionId: 'a1', cwd: '/c' }
+    expect(await storedAgent({ ...tab, transcriptPath: null })).toMatchObject({
+      agentId: 'opencode',
+      transport: 'acp',
+      transcriptPath: null,
+    })
+    expect(await storedAgent({ ...tab, transcriptPath: '/t.jsonl' })).toMatchObject({
+      transcriptPath: '/t.jsonl',
+    })
+  })
+})
+
+describe('session-record-store — conversations stored by an earlier version, invalid', () => {
+  it('drops a terminal conversation that has no transcript', async () => {
+    const bad = {
+      agentId: 'claude',
+      transport: 'tui',
+      sessionId: 'c1',
+      transcriptPath: null,
+      cwd: '/c',
+    }
+    expect(await storedAgent(bad)).toBeNull()
   })
 })
 

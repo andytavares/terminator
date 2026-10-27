@@ -45,7 +45,7 @@ describe('planCustomAction — prompt actions', () => {
       projectId: null,
       vars: {},
     })
-    expect(plan).toEqual({ ok: false, reason: 'Focused terminal is not a Claude session' })
+    expect(plan).toEqual({ ok: false, reason: 'Focused terminal is not an agent session' })
   })
 
   it('refuses a prompt when the focused terminal is not an agent', () => {
@@ -54,7 +54,7 @@ describe('planCustomAction — prompt actions', () => {
       projectId: null,
       vars: {},
     })
-    expect(plan).toEqual({ ok: false, reason: 'Focused terminal is not a Claude session' })
+    expect(plan).toEqual({ ok: false, reason: 'Focused terminal is not an agent session' })
   })
 
   it('refuses a prompt when the agent is mid-turn', () => {
@@ -63,7 +63,7 @@ describe('planCustomAction — prompt actions', () => {
       projectId: null,
       vars: {},
     })
-    expect(plan).toEqual({ ok: false, reason: 'Claude is mid-turn' })
+    expect(plan).toEqual({ ok: false, reason: 'The agent is mid-turn' })
   })
 })
 
@@ -93,6 +93,33 @@ describe('planCustomAction — prompt actions — plans an input with bracketed 
   })
 })
 
+describe('planCustomAction — prompt actions on an agent tab', () => {
+  const tab = { sessionId: 'tab1', isAgent: true, isAgentTab: true }
+
+  it('plans a message for the agent, not typed keys', () => {
+    const plan = planCustomAction(promptAction({ body: 'review {branch}' }), {
+      focused: { ...tab, agentState: 'idle' },
+      projectId: null,
+      vars: { branch: 'main' },
+    })
+    expect(plan).toEqual({
+      ok: true,
+      kind: 'agent-prompt',
+      sessionId: 'tab1',
+      text: 'review main',
+    })
+  })
+
+  it('refuses while the agent is mid-turn', () => {
+    const plan = planCustomAction(promptAction(), {
+      focused: { ...tab, agentState: 'working' },
+      projectId: null,
+      vars: {},
+    })
+    expect(plan).toEqual({ ok: false, reason: 'The agent is mid-turn' })
+  })
+})
+
 describe('planCustomAction — shell actions', () => {
   it('refuses a shell action targeting the agent', () => {
     const plan = planCustomAction(shellAction({ target: 'agent' }), {
@@ -100,7 +127,7 @@ describe('planCustomAction — shell actions', () => {
       projectId: null,
       vars: {},
     })
-    expect(plan).toEqual({ ok: false, reason: 'Shell actions cannot target a Claude session' })
+    expect(plan).toEqual({ ok: false, reason: 'Shell actions cannot target an agent session' })
   })
 
   it('refuses a shell action targeting focused with no session focused', () => {
@@ -120,7 +147,7 @@ describe('planCustomAction — shell actions', () => {
     })
     expect(plan).toEqual({
       ok: false,
-      reason: 'Focused terminal is running Claude, use a new tab',
+      reason: 'Focused terminal is running an agent, use a new tab',
     })
   })
 })

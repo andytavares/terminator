@@ -132,7 +132,7 @@ type StartInput = {
   worktreePath: string
   model: string
   addDirs?: string[]
-  autoDecide: (tool: string, input: unknown) => { allow: boolean } | 'mode' | null
+  autoDecide: (tool: string, input: unknown) => { allow: boolean } | null
   onRegistered: (run: { sessionId: string; transcriptFrom: number }) => void
   onTurnEnd: (turns: number) => void
   onEnd: (exitCode: number | null) => void

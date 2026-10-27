@@ -170,10 +170,13 @@ export function adoptTerminalSession(adopted: {
   projectId: string
   tabTitle: string
   scrollbackLimit: number
+  surface?: 'terminal' | 'agent'
 }): void {
   const store = useSessionStore.getState()
   if (store.sessions.has(adopted.sessionId)) return
   store.adoptSession(adopted)
+  // An agent tab draws its transcript, not a terminal.
+  if (adopted.surface === 'agent') return
   // `adoptSession` shows it when the project has nothing selected and keeps an
   // existing selection, so a supervised run starting in the background does not
   // take the operator away from the terminal they are reading.
@@ -230,7 +233,8 @@ export function answerChoice(sessionId: string, number: number): boolean {
   const store = useSessionStore.getState()
   const session = store.sessions.get(sessionId)
   const instance = store.getTerminalInstance(sessionId)
-  if (session === undefined || instance === undefined) return false
+  // An agent tab asks through the protocol; there is no screen to read.
+  if (session === undefined || instance === undefined || session.surface === 'agent') return false
   const onScreen = parseChoicePrompt(instance.readVisibleRows())
   const offered = onScreen?.options.some((o) => o.number === number) === true
   if (!samePrompt(session.choicePrompt ?? null, onScreen) || !offered) {

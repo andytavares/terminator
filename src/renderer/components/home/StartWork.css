@@ -299,3 +299,19 @@
   font-family: var(--tm-font-mono);
   font-size: 10.5px;
 }
+
+.start-work__agent {
+  display: grid;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--tm-text-secondary);
+}
+
+.start-work__agent select {
+  font: inherit;
+  padding: 4px 6px;
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 4px;
+}

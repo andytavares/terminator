@@ -11,10 +11,9 @@ import {
   clickByName,
   fillByName,
   foundryChannel,
-  hasAgentLaunchScript,
+  supervisedLaunch,
   inFoundry,
   listOrdersInForge,
-  agentLaunchScript,
   makeFixtureRepo,
   openFoundry,
   openListedOrder,
@@ -134,29 +133,28 @@ async function startForgeRun(id: string): Promise<void> {
   expect(started.graph?.nodes.length).toBeGreaterThan(0)
 }
 
-/** The agent's launch: supervised, with its settings and its whole brief, on its own. */
+/** The agent's launch: supervised, in the mode its role earns, with its whole brief, on its own. */
 async function expectSupervisedLaunch(): Promise<void> {
-  const screen = handle.page.locator('.xterm-screen')
-  await expect.poll(() => hasAgentLaunchScript(handle)).toBe(true)
-  const launched = agentLaunchScript(handle)
-  expect(launched).toContain('claude --session-id')
+  await expect.poll(() => supervisedLaunch(handle)).not.toBeNull()
+  const launched = supervisedLaunch(handle)!
 
-  // Never the thing this replaced: an invisible agent approving its own tool
-  // calls.
-  expect(launched).not.toContain('bypassPermissions')
+  // Never the thing this replaced: an invisible agent approving its own tool calls.
+  expect(launched.mode).not.toBe('bypassPermissions')
 
-  // A relative settings path resolves against the worktree, where it does not
-  // exist, and the run dies on "Settings file not found" while the graph still
-  // says running.
-  expect(launched).toMatch(/--settings '\//)
-  await expect(screen).not.toContainText('Settings file not found')
+  // The builder writes anywhere in its checkout, at the default autonomy with auto mode on:
+  // `modeFor` gives it auto mode, and Foundry decides what auto mode still asks about.
+  expect(launched.mode).toBe('auto')
 
   // And it does not carry the parent Claude Code session in with it, which is
   // how an agent ends up waiting on somebody else's bridge for ever.
-  expect(launched).toMatch(/^unset .*CLAUDE_CODE_BRIDGE_SESSION_ID/m)
+  expect(launched.inherited).toBe(false)
 
   // The whole brief reached it, rather than the first kilobyte of it.
-  expect(launched.length).toBeGreaterThan(1024)
+  expect(launched.briefLength).toBeGreaterThan(1024)
+
+  // It shows in an agent tab, not an invisible process.
+  await handle.page.locator('.tab-bar__tab--session').filter({ hasText: 'Builder' }).click()
+  await expect(handle.page.getByRole('log', { name: 'Agent transcript' })).toBeVisible()
 }
 
 const AGREED_ORDER = 'WO-E2E-1'

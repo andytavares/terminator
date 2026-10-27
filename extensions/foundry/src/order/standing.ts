@@ -327,7 +327,7 @@ const adriftRule: Rule = (input, { counts }) => {
     turn: 'you',
     label: 'nothing running it',
     headline: 'Nothing is running this',
-    detail: `${n} ${plural(n, 'step was', 'steps were')} still working when the application last closed, and an agent's terminal does not outlive it.`,
+    detail: `${n} ${plural(n, 'step was', 'steps were')} still working when the application last closed, and an agent does not outlive it.`,
   }
 }
 
@@ -353,13 +353,9 @@ const strandedRule: Rule = (input, { counts }) => {
     ...counts,
     kind: 'stranded',
     turn: 'you',
-    label: plural(n, 'waiting at its terminal', `${n} waiting at their terminals`),
-    headline: plural(
-      n,
-      'An agent is waiting at its terminal',
-      `${n} agents are waiting at their terminals`
-    ),
-    detail: `Nobody answered in time, so Foundry handed the question back to the terminal's own prompt. ${plural(n, 'That agent is', 'Those agents are')} stopped there until somebody answers it in the terminal.`,
+    label: plural(n, 'waiting in its tab', `${n} waiting in their tabs`),
+    headline: plural(n, 'An agent is waiting in its tab', `${n} agents are waiting in their tabs`),
+    detail: `Nobody answered in time, so Foundry handed the question back to the agent tab. ${plural(n, 'That agent is', 'Those agents are')} stopped there until somebody answers it in the agent tab.`,
   }
 }
 

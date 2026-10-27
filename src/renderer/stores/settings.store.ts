@@ -1,6 +1,7 @@
 import { create, type StoreApi } from 'zustand'
 import type { ElectronAPI } from '../../shared/electron-api/api-type'
 import type {
+  AgentsSettings,
   CustomAction,
   GlobalSettings,
   NotificationTarget,
@@ -37,6 +38,7 @@ interface SettingsState {
   updateNotificationDefaultTargets: (targets: NotificationTarget[]) => Promise<void>
   updateNotificationOverride: (key: string, targets: NotificationTarget[]) => Promise<void>
   updateQuickActions: (patch: Partial<QuickActionsSettings>) => Promise<void>
+  updateAgents: (patch: Partial<AgentsSettings>) => Promise<void>
   updateWorkspaceQuickActions: (workspaceId: string, custom: CustomAction[]) => Promise<void>
   /** A `workspaceScoped` extension setting's own value here; undefined hands it back to the global one. */
   updateWorkspaceExtensionSetting: (
@@ -180,6 +182,7 @@ function preferenceSlice(
   | 'updateNotificationDefaultTargets'
   | 'updateNotificationOverride'
   | 'updateQuickActions'
+  | 'updateAgents'
 > {
   return {
     markWelcomeSeen: () => saveGlobal(set, { ui: { hasSeenWelcome: true } }),
@@ -191,6 +194,7 @@ function preferenceSlice(
     updateNotificationOverride: (key, targets) =>
       saveGlobal(set, { notifications: { overrides: { [key]: targets } } }),
     updateQuickActions: (patch) => saveGlobal(set, { quickActions: patch }),
+    updateAgents: (patch) => saveGlobal(set, { agents: patch }),
   }
 }
 

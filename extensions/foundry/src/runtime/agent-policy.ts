@@ -1,40 +1,6 @@
-import type { ExtensionAPI } from '@terminator/extension-sdk'
-
 import { decideReadOnly } from './read-only-policy.js'
 import { readShell } from './shell-split.js'
-import { ensureTrusted } from './workspace-trust.js'
-import type { LedgerEntry } from '../ledger/append.js'
 import type { WorkOrder } from '../order/schema.js'
-
-// Make sure the repository an agent will work in is trusted, and record it: the
-// operator's Claude Code configuration was amended, and the ledger should say so.
-export function trustRepository(
-  api: ExtensionAPI,
-  repoRoot: string,
-  { orderId, store }: { orderId: string; store: { record: (entry: LedgerEntry) => Promise<void> } }
-): void {
-  const result = ensureTrusted(repoRoot)
-  if (!result.changed) {
-    if (result.reason === 'could not write') {
-      api.log.error(
-        `Foundry could not mark ${repoRoot} trusted; its agents will stop at the trust dialog.`
-      )
-    }
-    return
-  }
-  void store
-    .record({
-      at: new Date().toISOString(),
-      orderId,
-      actor: 'rule:line',
-      action: 'workspace.trusted',
-      subject: repoRoot,
-      reason:
-        'Claude Code shows its trust dialog for a directory it has not seen, and an agent waiting at one never starts.',
-      evidence: [],
-    })
-    .catch(() => undefined)
-}
 
 // Whether this is exactly a command the toolchain probe found, after trimming: a role
 // that may run the project's tests may run those, not anything sharing the first word.

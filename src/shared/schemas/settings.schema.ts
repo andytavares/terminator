@@ -27,6 +27,21 @@ const QuickActionsSettingsSchema = z
   })
   .default({ pins: [], usage: [], directUse: [], custom: [] })
 
+const CustomAgentSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  command: z.string().min(1),
+  args: z.array(z.string()),
+})
+
+/** Agents the app starts over the Agent Client Protocol; `claude` is built in. */
+const AgentsSettingsSchema = z
+  .object({
+    default: z.string().min(1).default('claude'),
+    custom: z.array(CustomAgentSchema).default([]),
+  })
+  .default({ default: 'claude', custom: [] })
+
 /** Classic is the Desk as it was; Tasks is the queue above the task list. */
 const HomeLayoutSchema = z.enum(['classic', 'tasks'])
 export type HomeLayout = z.infer<typeof HomeLayoutSchema>
@@ -87,6 +102,7 @@ export const GlobalSettingsSchema = z.object({
     })
     .default({ defaultTargets: ['system', 'center', 'toast'], overrides: {} }),
   quickActions: QuickActionsSettingsSchema,
+  agents: AgentsSettingsSchema,
 })
 
 export const WorkspaceSettingsSchema = z.object({
@@ -127,6 +143,7 @@ export const DEFAULT_GLOBAL_SETTINGS = defaultGlobalSettings(process.env.SHELL |
 export type GlobalSettings = z.infer<typeof GlobalSettingsSchema>
 export type WorkspaceSettings = z.infer<typeof WorkspaceSettingsSchema>
 export type QuickActionsSettings = GlobalSettings['quickActions']
+export type AgentsSettings = GlobalSettings['agents']
 export type CustomAction = z.infer<typeof CustomActionSchema>
 export type CustomActionKind = z.infer<typeof CustomActionKindSchema>
 export type CustomActionTarget = z.infer<typeof CustomActionTargetSchema>

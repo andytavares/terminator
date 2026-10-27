@@ -13,5 +13,5 @@ export async function attachTo(orderId: string, nodeId: string): Promise<string 
   const gone = (await invoke('foundry:run-terminal', {
     sessionId: r.terminalSessionId,
   })) as { ok?: boolean }
-  return gone.ok === true ? null : 'That agent is no longer in a terminal.'
+  return gone.ok === true ? null : 'That agent is no longer in an agent tab.'
 }

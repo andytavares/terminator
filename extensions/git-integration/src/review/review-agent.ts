@@ -1,6 +1,5 @@
-// child_process only for finding and running `claude`, which is not a command shell.exec runs.
-import { spawn as spawnCb, type ChildProcess } from 'child_process'
 import { randomUUID } from 'crypto'
+import type { AgentsAPI } from '@terminator/extension-sdk'
 import {
   AgentOutputSchema,
   FINDING_SEVERITIES,
@@ -13,7 +12,6 @@ import {
   type AgentScope,
 } from '../schemas/review-agent.schema.js'
 import { runGit } from '../shell/run-git.js'
-import { envWithoutParentClaude } from '@terminator/extension-sdk/node'
 
 const DIFF_CAP_BYTES = 200 * 1024
 const DEFAULT_TIMEOUT_MS = 5 * 60_000
@@ -28,95 +26,6 @@ export type ExecFn = (
 const defaultExec: ExecFn = async (_cmd, args, opts) => ({
   stdout: await runGit(opts.cwd, args, { raw: true, maxBuffer: 20 * 1024 * 1024 }),
 })
-
-/** Minimal shape a spawned `claude` child needs; a real ChildProcess satisfies it. @internal */
-export interface SpawnedProcess {
-  stdin: { write(data: string): void; end(): void }
-  stdout: { on(event: 'data', cb: (d: Buffer | string) => void): void }
-  stderr: { on(event: 'data', cb: (d: Buffer | string) => void): void }
-  on(event: 'exit', cb: (code: number | null) => void): void
-  on(event: 'error', cb: (err: Error) => void): void
-  kill(signal?: string): void
-}
-
-type SpawnFn = (
-  cmd: string,
-  args: string[],
-  opts: { cwd: string; env: Record<string, string> }
-) => SpawnedProcess
-
-/** claude leads its own process group and kill() signals the whole group, so a cancel also ends
- *  what claude started (https://nodejs.org/api/child_process.html#optionsdetached). Not on Windows,
- *  where `detached` gives the child a console of its own instead. */
-const OWN_PROCESS_GROUP = process.platform !== 'win32'
-
-/** Signals `child` and, on POSIX, every process in its group. */
-function killGroup(child: ChildProcess, signal?: NodeJS.Signals): void {
-  if (!OWN_PROCESS_GROUP || child.pid === undefined) return void child.kill(signal)
-  try {
-    process.kill(-child.pid, signal)
-  } catch {
-    // Already gone.
-  }
-}
-
-function defaultSpawn(
-  cmd: string,
-  args: string[],
-  opts: { cwd: string; env: Record<string, string> }
-): SpawnedProcess {
-  const child = spawnCb(cmd, args, { cwd: opts.cwd, env: opts.env, detached: OWN_PROCESS_GROUP })
-  const killChild = (signal?: NodeJS.Signals): void => killGroup(child, signal)
-  return Object.assign(child, { kill: killChild })
-}
-
-/** The last absolute path in a shell's `command -v` output; rc files may print before it.
- *  @internal */
-export function claudeFromShellOutput(stdout: string): string | null {
-  const paths = stdout
-    .split('\n')
-    .map((l) => l.trim())
-    .filter((l) => l.startsWith('/'))
-  return paths.at(-1) ?? null
-}
-
-let resolvedClaude: string | undefined
-
-/**
- * An app launched from the Dock inherits PATH=/usr/bin:/bin, so a bare `claude`
- * is not found. Ask the person's interactive login shell, the one their
- * terminal runs, where it is. Only a hit is cached, so installing claude later
- * needs no restart.
- */
-async function defaultResolveClaude(control: RunControl): Promise<string> {
-  if (resolvedClaude) return resolvedClaude
-  const found = claudeFromShellOutput(await askLoginShell(control))
-  if (found) resolvedClaude = found
-  return found ?? 'claude'
-}
-
-const LOGIN_SHELL_TIMEOUT_MS = 10_000
-
-/** `command -v claude` in the login shell, or '' when it fails. The shell leads its own process
- *  group, which its timeout and a cancel stop whole: rc files can start processes of their own. */
-function askLoginShell(control: RunControl): Promise<string> {
-  return new Promise((resolve) => {
-    const shell = spawnCb(process.env.SHELL || '/bin/zsh', ['-ilc', 'command -v claude'], {
-      detached: OWN_PROCESS_GROUP,
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })
-    control.stopProbe = () => killGroup(shell, 'SIGKILL')
-    const timer = setTimeout(control.stopProbe, LOGIN_SHELL_TIMEOUT_MS)
-    let stdout = ''
-    shell.stdout?.on('data', (chunk: Buffer) => (stdout += chunk.toString()))
-    shell.once('error', () => resolve(''))
-    shell.once('close', (code) => {
-      clearTimeout(timer)
-      control.stopProbe = undefined
-      resolve(code === 0 ? stdout : '')
-    })
-  })
-}
 
 // ─── Prompt ────────────────────────────────────────────────────────────────
 
@@ -253,33 +162,35 @@ export function buildAgentJsonSchema(): Record<string, unknown> {
   }
 }
 
-// ─── claude CLI args ───────────────────────────────────────────────────────
+// ─── Reply format ──────────────────────────────────────────────────────────
 
-/** @internal */
-export interface BuildClaudeArgsInput {
-  sessionId: string
-  model: string
-  effort?: string
-  schemaJson: string
+const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob']
+
+/** ACP has no structured output, so the prompt asks for the JSON in the reply text. */
+function withJsonReplyRule(prompt: string, schema: Record<string, unknown>): string {
+  return (
+    `${prompt}\n\nReply with only one JSON object matching this JSON schema, ` +
+    `with no text around it:\n${JSON.stringify(schema)}`
+  )
 }
 
-/** @internal */
-export function buildClaudeArgs(input: BuildClaudeArgsInput): string[] {
-  const args = [
-    '-p',
-    '--output-format',
-    'json',
-    '--json-schema',
-    input.schemaJson,
-    '--tools',
-    'Read,Grep,Glob',
-    '--session-id',
-    input.sessionId,
-    '--model',
-    input.model,
-  ]
-  if (input.effort) args.push('--effort', input.effort)
-  return args
+/** The first top-level `{…}` of the text, parsed; throws when there is none. */
+function firstJsonObject(text: string): unknown {
+  const start = text.indexOf('{')
+  if (start < 0) throw new Error('the reply has no JSON object')
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (let i = start; i < text.length; i++) {
+    const char = text[i]
+    if (inString) {
+      inString = escaped || char !== '"'
+      escaped = !escaped && char === '\\'
+    } else if (char === '"') inString = true
+    else if (char === '{') depth++
+    else if (char === '}' && --depth === 0) return JSON.parse(text.slice(start, i + 1))
+  }
+  throw new Error('the JSON object in the reply is not closed')
 }
 
 // ─── Diff text ─────────────────────────────────────────────────────────────
@@ -358,16 +269,17 @@ export interface RunAgentReviewInput extends DiffTarget {
   body: string
   request: 'review' | 'explain' | 'ask'
   question?: string | null
-  sessionId: string
   model: string
   effort?: string
   timeoutMs?: number
 }
 
 export interface RunAgentReviewDeps {
-  spawn?: SpawnFn
+  /** The core's `api.agents.runOnce`. */
+  runOnce: AgentsAPI['runOnce']
+  /** The core's `api.agents.cancel`: what stops a session a cancelled run started. */
+  cancelSession?: AgentsAPI['cancel']
   exec?: ExecFn
-  resolveClaude?: () => Promise<string>
 }
 
 export interface RunAgentReviewResult {
@@ -382,29 +294,62 @@ interface RunContext {
   runId: string
   startedAt: string
   activity: string[]
+  /** The agent's session, once it has started; '' before. */
+  sessionId: string
 }
 
-/** Lets `cancel()` reach a run already under way. */
+/** How one agent call ended. */
+type AgentExit =
+  | { kind: 'replied'; text: string; sessionId: string }
+  | { kind: 'failed'; error: string }
+  | { kind: 'cancelled' }
+
+/** Lets `cancel()` reach a run already under way: a cancel wins the race against the answer,
+ *  and stops the agent's session as soon as the run knows its id. */
 interface RunControl {
   cancelled: boolean
-  proc?: SpawnedProcess
-  /** Stops the login shell asked where claude is, while it runs. */
-  stopProbe?: () => void
+  whenCancelled: Promise<AgentExit>
+  cancel: () => void
+  /** The run's session exists. */
+  started: (sessionId: string) => void
 }
 
-/** What to ask `claude`, where, and how long it may take. */
-interface ClaudeCall {
-  args: string[]
+interface ControlDeps {
+  cancelSession?: AgentsAPI['cancel']
+  onSession?: (sessionId: string) => void
+}
+
+function newRunControl({ cancelSession, onSession }: ControlDeps): RunControl {
+  const stopSession = (id: string) => cancelSession?.(id)
+  let settle: () => void = () => {}
+  let sessionId: string | null = null
+  const whenCancelled = new Promise<AgentExit>((resolve) => {
+    settle = () => resolve({ kind: 'cancelled' })
+  })
+  const control: RunControl = {
+    cancelled: false,
+    whenCancelled,
+    cancel: () => {
+      control.cancelled = true
+      if (sessionId !== null) stopSession(sessionId)
+      settle()
+    },
+    started: (id) => {
+      sessionId = id
+      onSession?.(id)
+      if (control.cancelled) stopSession(id)
+    },
+  }
+  return control
+}
+
+/** What to ask the agent, where, and how long it may take. */
+interface AgentCall {
   prompt: string
   cwd: string
+  model: string
+  effort?: string
   timeoutMs: number
-}
-
-/** A `claude` call ready to start: the call, the binary and the spawner. */
-interface ClaudeLaunch extends ClaudeCall {
-  spawn: SpawnFn
-  claudePath: string
-  env: Record<string, string>
 }
 
 function baseFields(run: RunContext) {
@@ -414,7 +359,7 @@ function baseFields(run: RunContext) {
     repoRoot: input.repoRoot,
     prNumber: input.prNumber,
     headSHA: input.headSHA,
-    sessionId: input.sessionId,
+    sessionId: run.sessionId,
     scope: input.scope,
     request: input.request,
     question: input.question ?? null,
@@ -462,9 +407,10 @@ function findingFrom(f: AgentOutput['findings'][number]): AgentFinding {
   }
 }
 
-function doneRun(run: RunContext, output: AgentOutput): AgentRun {
+function doneRun(run: RunContext, output: AgentOutput, sessionId: string): AgentRun {
   return {
     ...baseFields(run),
+    sessionId,
     status: 'done',
     finishedAt: new Date().toISOString(),
     summary: output.summary,
@@ -474,110 +420,48 @@ function doneRun(run: RunContext, output: AgentOutput): AgentRun {
   }
 }
 
-function parseStructuredOutput(stdout: string): unknown {
-  const parsed = JSON.parse(stdout) as { structured_output?: unknown; result?: unknown }
-  if (parsed.structured_output !== undefined) return parsed.structured_output
-  if (typeof parsed.result === 'string') return JSON.parse(parsed.result)
-  return parsed.result
-}
-
-/** The run a `claude` exit produces: its error output on failure, else its parsed findings. */
-function exitedRun(
-  run: RunContext,
-  code: number | null,
-  output: { stdout: string; stderr: string }
-) {
-  if (code !== 0) return failedRun(run, output.stderr.trim() || `claude exited with code ${code}`)
+/** The run a reply produces: its parsed findings, or why they could not be read. */
+function repliedRun(run: RunContext, exit: Extract<AgentExit, { kind: 'replied' }>): AgentRun {
   try {
-    return doneRun(run, AgentOutputSchema.parse(parseStructuredOutput(output.stdout)))
+    const output = AgentOutputSchema.parse(firstJsonObject(exit.text))
+    return doneRun(run, output, exit.sessionId)
   } catch (e) {
     return failedRun(run, `Could not parse agent output: ${String(e)}`)
   }
 }
 
-function sendPrompt(child: SpawnedProcess, prompt: string): void {
-  try {
-    child.stdin.write(prompt)
-    child.stdin.end()
-  } catch {
-    // handled by the 'error' listener runClaude adds
-  }
+function toAgentExit(result: Awaited<ReturnType<AgentsAPI['runOnce']>>): AgentExit {
+  return 'error' in result
+    ? { kind: 'failed', error: result.message }
+    : { kind: 'replied', text: result.text, sessionId: result.sessionId }
 }
 
-function collectChildOutput(child: SpawnedProcess): { stdout: string; stderr: string } {
-  const output = { stdout: '', stderr: '' }
-  child.stdout.on('data', (d) => {
-    output.stdout += d.toString()
-  })
-  child.stderr.on('data', (d) => {
-    output.stderr += d.toString()
-  })
-  return output
-}
-
-/** How one `claude` invocation ended. */
-type ClaudeExit =
-  | { kind: 'exited'; code: number | null; stdout: string; stderr: string }
-  | { kind: 'failed'; error: string }
-  | { kind: 'cancelled' }
-
-/** "Timed out after 12 min": the limit the person set, not a fixed one. */
-function timeoutMessage(timeoutMs: number): string {
-  return `Timed out after ${Number((timeoutMs / 60_000).toFixed(1))} min`
-}
-
-/** Starts claude, sends it the prompt and settles when it exits or fails to start, or kills it
- *  when it outlasts its timeout. */
-function spawnClaude(launch: ClaudeLaunch, control: RunControl): Promise<ClaudeExit> {
-  return new Promise<ClaudeExit>((resolve) => {
-    const { cwd, env } = launch
-    const child = launch.spawn(launch.claudePath, launch.args, { cwd, env })
-    control.proc = child
-    const timer = setTimeout(() => {
-      child.kill('SIGKILL')
-      resolve({ kind: 'failed', error: timeoutMessage(launch.timeoutMs) })
-    }, launch.timeoutMs)
-    sendPrompt(child, launch.prompt)
-    const output = collectChildOutput(child)
-    child.on('error', (e) => {
-      clearTimeout(timer)
-      resolve({ kind: 'failed', error: `Failed to start claude: ${String(e)}` })
-    })
-    child.on('exit', (code) => {
-      clearTimeout(timer)
-      resolve(control.cancelled ? { kind: 'cancelled' } : { kind: 'exited', code, ...output })
-    })
-  })
-}
-
-/** Finds claude and runs `call` with it, unless a cancel arrives first. */
-async function launchClaude(
-  call: ClaudeCall,
-  deps: RunAgentReviewDeps,
+/** Asks the agent once, read-only, unless a cancel comes first. */
+async function askAgent(
+  call: AgentCall,
+  runOnce: AgentsAPI['runOnce'],
   control: RunControl
-): Promise<ClaudeExit> {
-  const claudePath = await (deps.resolveClaude ?? (() => defaultResolveClaude(control)))()
-  if (control.cancelled) return { kind: 'cancelled' }
-  const spawn = deps.spawn ?? defaultSpawn
-  return spawnClaude(
-    { ...call, spawn, claudePath, env: envWithoutParentClaude(process.env) },
-    control
-  )
-}
-
-/** Stops a run wherever it is: finding claude, or running it. */
-function cancelOf(control: RunControl): () => void {
-  return () => {
-    control.cancelled = true
-    control.stopProbe?.()
-    control.proc?.kill('SIGKILL')
+): Promise<AgentExit> {
+  const options = {
+    model: call.model,
+    ...(call.effort && { effort: call.effort }),
+    tools: READ_ONLY_TOOLS,
   }
+  const reply = runOnce({
+    cwd: call.cwd,
+    prompt: call.prompt,
+    mode: 'default',
+    agentMeta: { claudeCode: { options } },
+    timeoutMs: call.timeoutMs,
+    onStarted: control.started,
+  }).then(toAgentExit, (e): AgentExit => ({ kind: 'failed', error: String(e) }))
+  return Promise.race([reply, control.whenCancelled])
 }
 
-function runFromExit(run: RunContext, exit: ClaudeExit): AgentRun {
+function runFromExit(run: RunContext, exit: AgentExit): AgentRun {
   if (exit.kind === 'cancelled') return cancelledRun(run)
   if (exit.kind === 'failed') return failedRun(run, exit.error)
-  return exitedRun(run, exit.code, exit)
+  return repliedRun(run, exit)
 }
 
 function agentReviewPrompt(
@@ -606,25 +490,28 @@ async function executeAgentRun(
     return failedRun(run, `Could not compute diff: ${String(e)}`)
   }
   if (control.cancelled) return cancelledRun(run)
-  const schemaJson = JSON.stringify(buildAgentJsonSchema())
-  const { sessionId, model, effort } = input
-  const call: ClaudeCall = {
-    args: buildClaudeArgs({ sessionId, model, effort, schemaJson }),
-    prompt: agentReviewPrompt(input, diff),
+  const { model, effort } = input
+  const call: AgentCall = {
+    prompt: withJsonReplyRule(agentReviewPrompt(input, diff), buildAgentJsonSchema()),
     cwd: input.worktreePath,
+    model,
+    effort,
     timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
   }
-  return runFromExit(run, await launchClaude(call, deps, control))
+  return runFromExit(run, await askAgent(call, deps.runOnce, control))
 }
 
 export function runAgentReview(
   input: RunAgentReviewInput,
-  deps: RunAgentReviewDeps = {}
+  deps: RunAgentReviewDeps
 ): RunAgentReviewResult {
   const runId = randomUUID()
-  const run: RunContext = { input, runId, startedAt: new Date().toISOString(), activity: [] }
-  const control: RunControl = { cancelled: false }
-  return { runId, done: executeAgentRun(run, deps, control), cancel: cancelOf(control) }
+  const startedAt = new Date().toISOString()
+  const run: RunContext = { input, runId, startedAt, activity: [], sessionId: '' }
+  // A failed or cancelled run keeps its session, so its conversation can still be continued.
+  const onSession = (sessionId: string) => void (run.sessionId = sessionId)
+  const control = newRunControl({ cancelSession: deps.cancelSession, onSession })
+  return { runId, done: executeAgentRun(run, deps, control), cancel: control.cancel }
 }
 
 // ─── Summary ───────────────────────────────────────────────────────────────
@@ -633,7 +520,7 @@ export interface RunSummaryInput {
   prNumber: number
   kind: SummaryKind
   text: string
-  /** Where claude runs: a summary needs no checkout. */
+  /** Where the agent runs: a summary needs no checkout. */
   cwd: string
   model: string
   effort?: string
@@ -695,39 +582,30 @@ function summaryJsonSchema(): Record<string, unknown> {
 
 const NO_SUMMARY = 'The review agent answered without a summary.'
 
-function summaryFromStdout(stdout: string): SummaryResult {
+function summaryFromReply(text: string): SummaryResult {
   try {
-    const parsed = SummaryOutputSchema.safeParse(parseStructuredOutput(stdout))
+    const parsed = SummaryOutputSchema.safeParse(firstJsonObject(text))
     return parsed.success ? { summary: parsed.data.summary } : { error: NO_SUMMARY }
   } catch {
     return { error: NO_SUMMARY }
   }
 }
 
-function summaryFromExit(exit: ClaudeExit): SummaryResult {
+function summaryFromExit(exit: AgentExit): SummaryResult {
   if (exit.kind === 'cancelled') return { error: 'Summary cancelled.' }
   if (exit.kind === 'failed') return { error: exit.error }
-  if (exit.code !== 0)
-    return { error: exit.stderr.trim() || `claude exited with code ${exit.code}` }
-  return summaryFromStdout(exit.stdout)
+  return summaryFromReply(exit.text)
 }
 
-/** Summarizes a PR's description or discussion with the review agent's read-only claude. */
-export function runSummary(
-  input: RunSummaryInput,
-  deps: RunAgentReviewDeps = {}
-): RunSummaryResult {
-  const control: RunControl = { cancelled: false }
-  const schemaJson = JSON.stringify(summaryJsonSchema())
-  const { model, effort } = input
-  const call: ClaudeCall = {
-    args: buildClaudeArgs({ sessionId: randomUUID(), model, effort, schemaJson }),
-    prompt: buildSummaryPrompt(input),
-    cwd: input.cwd,
-    timeoutMs: input.timeoutMs,
-  }
+/** Summarizes a PR's description or discussion with the review agent, read-only. */
+export function runSummary(input: RunSummaryInput, deps: RunAgentReviewDeps): RunSummaryResult {
+  const control = newRunControl(deps)
+  const { cwd, model, effort, timeoutMs } = input
+  const prompt = withJsonReplyRule(buildSummaryPrompt(input), summaryJsonSchema())
   return {
-    done: launchClaude(call, deps, control).then(summaryFromExit),
-    cancel: cancelOf(control),
+    done: askAgent({ prompt, cwd, model, effort, timeoutMs }, deps.runOnce, control).then(
+      summaryFromExit
+    ),
+    cancel: control.cancel,
   }
 }

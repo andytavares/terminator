@@ -1,16 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
-import { EventEmitter } from 'events'
 import {
   buildAgentPrompt,
   buildAgentJsonSchema,
-  buildClaudeArgs,
   buildDiffText,
   runAgentReview,
   runSummary,
-  claudeFromShellOutput,
   type RunSummaryInput,
   type RunAgentReviewInput,
-  type SpawnedProcess,
   type ExecFn,
   type RunAgentReviewDeps,
 } from '../../src/review/review-agent.js'
@@ -18,9 +14,8 @@ import type { AgentScope } from '../../src/schemas/review-agent.schema.js'
 import { FINDING_SEVERITIES } from '../../src/schemas/review-agent.schema.js'
 import { eventually } from '../../../../tests/support/eventually'
 
-type SpawnFn = NonNullable<RunAgentReviewDeps['spawn']>
-/** What an EventEmitter calls back with; SpawnedProcess.on takes one per event. */
-type Listener = Parameters<EventEmitter['on']>[1]
+type RunOnce = RunAgentReviewDeps['runOnce']
+type AgentReply = Awaited<ReturnType<RunOnce>>
 
 const pr = {
   number: 42,
@@ -121,37 +116,6 @@ describe('buildAgentJsonSchema', () => {
   })
 })
 
-describe('buildClaudeArgs', () => {
-  it('builds read-only args with no Bash tool and no effort flag when effort is empty', () => {
-    const args = buildClaudeArgs({ sessionId: 'sess-1', model: 'opus', schemaJson: '{}' })
-    expect(args).toEqual([
-      '-p',
-      '--output-format',
-      'json',
-      '--json-schema',
-      '{}',
-      '--tools',
-      'Read,Grep,Glob',
-      '--session-id',
-      'sess-1',
-      '--model',
-      'opus',
-    ])
-    expect(args).not.toContain('Bash')
-    expect(args.join(' ')).not.toMatch(/bash/i)
-  })
-
-  it('appends --effort when given', () => {
-    const args = buildClaudeArgs({
-      sessionId: 'sess-1',
-      model: 'opus',
-      effort: 'high',
-      schemaJson: '{}',
-    })
-    expect(args.slice(-2)).toEqual(['--effort', 'high'])
-  })
-})
-
 /** Runs buildDiffText for `scope` against a git that prints `stdout`; returns the result and the diff args. */
 async function diffFor(scope: AgentScope, stdout: string) {
   const exec = vi.fn<ExecFn>(async () => ({ stdout }))
@@ -204,43 +168,6 @@ describe('buildDiffText', () => {
   })
 })
 
-type FakeProcess = SpawnedProcess & {
-  emitExit: (code: number) => void
-  emitError: (e: Error) => void
-  writtenStdin: string
-  stdoutEmitter: EventEmitter
-  stderrEmitter: EventEmitter
-  kill: ReturnType<typeof vi.fn>
-}
-
-function makeFakeProcess(): FakeProcess {
-  const stdoutEmitter = new EventEmitter()
-  const stderrEmitter = new EventEmitter()
-  const procEmitter = new EventEmitter()
-  let writtenStdin = ''
-  return {
-    stdin: {
-      write: (d: string) => {
-        writtenStdin += d
-      },
-      end: () => {},
-    },
-    stdout: { on: (ev: string, cb: (d: Buffer | string) => void) => stdoutEmitter.on(ev, cb) },
-    stderr: { on: (ev: string, cb: (d: Buffer | string) => void) => stderrEmitter.on(ev, cb) },
-    on: (ev: string, cb: Listener) => procEmitter.on(ev, cb),
-    kill: vi.fn(),
-    emitExit: (code: number) => procEmitter.emit('exit', code),
-    emitError: (e: Error) => procEmitter.emit('error', e),
-    get writtenStdin() {
-      return writtenStdin
-    },
-    stdoutEmitter,
-    stderrEmitter,
-  } as FakeProcess
-}
-
-const resolveClaude = async () => '/Users/me/.local/bin/claude'
-
 const baseInput: RunAgentReviewInput = {
   repoRoot: '/repo',
   worktreePath: '/wt',
@@ -251,25 +178,24 @@ const baseInput: RunAgentReviewInput = {
   body: 'body',
   scope: scopeOf('file', { path: 'a.ts' }),
   request: 'review',
-  sessionId: 'sess-1',
   model: 'opus',
 }
 
-/** Starts a run against a fake claude process and waits for the diff and prompt to settle. */
-async function startFakeRun(input: RunAgentReviewInput = baseInput) {
-  const exec = vi.fn(async () => ({ stdout: 'diff' }))
-  const fake = makeFakeProcess()
-  const spawn = vi.fn((..._args: Parameters<SpawnFn>) => fake)
-  const { done, cancel } = runAgentReview(input, { exec, spawn, resolveClaude })
-  // the diff/prompt build settles before the process "runs"
-  await eventually(() => expect(spawn).toHaveBeenCalled())
-  return { fake, spawn, done, cancel }
-}
+const replied = (text: string, sessionId = 'acp-1'): AgentReply => ({
+  text,
+  stopReason: 'end_turn',
+  sessionId,
+})
+const repliedJson = (output: unknown): AgentReply => replied(JSON.stringify(output))
+const NEVER_REPLIES = new Promise<AgentReply>(() => {})
 
-/** Has the fake claude print `output` as its JSON result and exit 0. */
-function printAndExit(fake: FakeProcess, output: unknown) {
-  fake.stdoutEmitter.emit('data', JSON.stringify(output))
-  fake.emitExit(0)
+/** Starts a run whose agent answers with `reply`; waits until the agent has been asked. */
+async function startRun(reply: AgentReply | Promise<AgentReply>, input = baseInput) {
+  const exec = vi.fn(async () => ({ stdout: 'diff' }))
+  const runOnce = vi.fn<RunOnce>(async () => reply)
+  const { done, cancel } = runAgentReview(input, { exec, runOnce })
+  await eventually(() => expect(runOnce).toHaveBeenCalled())
+  return { runOnce, done, cancel }
 }
 
 const NIT_WITHOUT_SIDE = {
@@ -281,135 +207,197 @@ const NIT_WITHOUT_SIDE = {
   body: 'b',
 }
 
-describe('runAgentReview — a run that completes', () => {
-  it('spawns claude with read-only tools only, on the worktree cwd, and parses structured_output', async () => {
-    const { fake, spawn, done } = await startFakeRun()
-    printAndExit(fake, { structured_output: { summary: 'looks fine', findings: [] } })
+describe('runAgentReview — the agent it asks', () => {
+  it('asks read-only tools only, on the worktree cwd, in default mode, with the timeout', async () => {
+    const { runOnce, done } = await startRun(repliedJson({ summary: 'ok', findings: [] }), {
+      ...baseInput,
+      effort: 'high',
+      timeoutMs: 7000,
+    })
+    await done
+    expect(runOnce).toHaveBeenCalledTimes(1)
+    expect(runOnce.mock.calls[0][0]).toMatchObject({
+      cwd: '/wt',
+      mode: 'default',
+      timeoutMs: 7000,
+      agentMeta: {
+        claudeCode: { options: { model: 'opus', effort: 'high', tools: ['Read', 'Grep', 'Glob'] } },
+      },
+    })
+  })
 
+  it('leaves effort out when none is set', async () => {
+    const { runOnce, done } = await startRun(repliedJson({ summary: 'ok', findings: [] }))
+    await done
+    const meta = runOnce.mock.calls[0][0].agentMeta as {
+      claudeCode: { options: Record<string, unknown> }
+    }
+    expect(Object.keys(meta.claudeCode.options)).not.toContain('effort')
+  })
+})
+
+describe('runAgentReview — the prompt it sends', () => {
+  it('ends the prompt with the instruction to reply with one JSON object and the schema', async () => {
+    const { runOnce, done } = await startRun(repliedJson({ summary: 'ok', findings: [] }))
+    await done
+    const { prompt } = runOnce.mock.calls[0][0]
+    expect(prompt).toContain('Diff:\ndiff')
+    expect(prompt).toMatch(/only one JSON object/i)
+    expect(prompt.endsWith(JSON.stringify(buildAgentJsonSchema()))).toBe(true)
+  })
+})
+
+describe('runAgentReview — a run that completes', () => {
+  it('stores the session id the agent picked', async () => {
+    const { done } = await startRun(
+      replied(JSON.stringify({ summary: 'looks fine', findings: [] }), 'acp-77')
+    )
     const run = await done
     expect(run.status).toBe('done')
     expect(run.summary).toBe('looks fine')
-
-    expect(spawn).toHaveBeenCalledTimes(1)
-    const [cmd, args, opts] = spawn.mock.calls[0]
-    expect(cmd).toBe('/Users/me/.local/bin/claude')
-    expect(args).toContain('--tools')
-    expect(args[args.indexOf('--tools') + 1]).toBe('Read,Grep,Glob')
-    expect(args).not.toContain('Bash')
-    expect(opts.cwd).toBe('/wt')
+    expect(run.sessionId).toBe('acp-77')
   })
 
   it('assigns an id to each finding and defaults side to RIGHT', async () => {
-    const { fake, done } = await startFakeRun()
-    printAndExit(fake, { structured_output: { summary: 's', findings: [NIT_WITHOUT_SIDE] } })
-
+    const { done } = await startRun(repliedJson({ summary: 's', findings: [NIT_WITHOUT_SIDE] }))
     const run = await done
     expect(run.findings).toHaveLength(1)
-    expect(typeof run.findings[0].id).toBe('string')
     expect(run.findings[0].id.length).toBeGreaterThan(0)
     expect(run.findings[0].side).toBe('RIGHT')
   })
 })
 
-describe('runAgentReview — reading the result', () => {
-  it('falls back to parsing .result as JSON when structured_output is absent', async () => {
-    const { fake, done } = await startFakeRun()
-    printAndExit(fake, { result: JSON.stringify({ summary: 'via result', findings: [] }) })
-
+describe('runAgentReview — reading the reply', () => {
+  it('takes the JSON object out of prose around it, braces inside strings included', async () => {
+    const object = { summary: 'use `{}` and "}" carefully', findings: [] }
+    const { done } = await startRun(replied(`Here is my review:\n${JSON.stringify(object)}\nDone.`))
     const run = await done
     expect(run.status).toBe('done')
-    expect(run.summary).toBe('via result')
+    expect(run.summary).toBe(object.summary)
   })
 
-  it('takes .result as it is when it is already an object', async () => {
-    const { fake, done } = await startFakeRun()
-    printAndExit(fake, { result: { summary: 'object result', findings: [] } })
-
+  it('fails with a readable error when the reply has no JSON', async () => {
+    const { done } = await startRun(replied('I found nothing to report.'))
     const run = await done
-    expect(run.status).toBe('done')
-    expect(run.summary).toBe('object result')
+    expect(run.status).toBe('failed')
+    expect(run.error).toMatch(/^Could not parse agent output/)
   })
 
-  it('fails with a readable error and no partial findings when output does not validate', async () => {
-    const { fake, done } = await startFakeRun()
-    printAndExit(fake, { structured_output: { summary: 'x' } })
-
+  it('fails with no partial findings when the object does not validate', async () => {
+    const { done } = await startRun(repliedJson({ summary: 'x' }))
     const run = await done
     expect(run.status).toBe('failed')
     expect(run.findings).toEqual([])
-    expect(run.error).toBeTruthy()
+    expect(run.error).toMatch(/^Could not parse agent output/)
   })
 })
 
 describe('runAgentReview — a run that fails', () => {
-  it('fails on non-zero exit', async () => {
-    const { fake, done } = await startFakeRun()
-    fake.emitExit(1)
-
+  it("reports the agent's message as the error", async () => {
+    const { done } = await startRun({ error: 'AGENT_UNAVAILABLE', message: 'Agent not installed' })
     const run = await done
     expect(run.status).toBe('failed')
+    expect(run.error).toBe('Agent not installed')
   })
 
-  it("reports claude's stderr as the error when it exits non-zero", async () => {
-    const { fake, done } = await startFakeRun()
-    fake.stderrEmitter.emit('data', '  model not available\n')
-    fake.emitExit(2)
-
-    expect((await done).error).toBe('model not available')
-  })
-})
-
-describe('runAgentReview — a run that never gets an answer', () => {
-  it('fails when claude cannot start', async () => {
-    const { fake, done } = await startFakeRun()
-    fake.emitError(new Error('ENOENT'))
-
-    const run = await done
+  it('fails with the thrown error when the agent service throws', async () => {
+    const exec = vi.fn(async () => ({ stdout: 'diff' }))
+    const runOnce = vi.fn<RunOnce>(async () => {
+      throw new Error('service down')
+    })
+    const run = await runAgentReview(baseInput, { exec, runOnce }).done
     expect(run.status).toBe('failed')
-    expect(run.error).toBe('Failed to start claude: Error: ENOENT')
+    expect(run.error).toBe('Error: service down')
   })
 
-  it('fails without spawning when the diff cannot be computed', async () => {
-    const spawn = vi.fn()
+  it('fails without asking the agent when the diff cannot be computed', async () => {
+    const runOnce = vi.fn<RunOnce>()
     const exec = vi.fn(async (_cmd: 'git', args: string[]) => {
       if (args[0] === 'diff') throw new Error('bad revision')
       return { stdout: '' }
     })
-    const run = await runAgentReview(baseInput, { exec, spawn, resolveClaude }).done
+    const run = await runAgentReview(baseInput, { exec, runOnce }).done
     expect(run.status).toBe('failed')
     expect(run.error).toBe('Could not compute diff: Error: bad revision')
-    expect(spawn).not.toHaveBeenCalled()
-  })
-
-  it('times out after the given timeoutMs and kills the process', async () => {
-    const { fake, done } = await startFakeRun({ ...baseInput, timeoutMs: 5 })
-    const run = await done
-    expect(run.status).toBe('failed')
-    expect(run.error).toMatch(/Timed out/)
-    expect(fake.kill).toHaveBeenCalled()
+    expect(runOnce).not.toHaveBeenCalled()
   })
 })
 
 describe('runAgentReview — cancelling', () => {
-  it('cancel() marks the run cancelled and kills the process', async () => {
-    const { fake, done, cancel } = await startFakeRun()
+  it('cancel() resolves the run as cancelled while the agent is still working', async () => {
+    const { done, cancel } = await startRun(NEVER_REPLIES)
     cancel()
-    fake.emitExit(137)
+    expect((await done).status).toBe('cancelled')
+  })
+})
 
-    const run = await done
-    expect(run.status).toBe('cancelled')
-    expect(fake.kill).toHaveBeenCalled()
+describe('runAgentReview — cancelling the agent session', () => {
+  it('cancel() stops the agent session the run started', async () => {
+    const exec = vi.fn(async () => ({ stdout: 'diff' }))
+    const cancelSession = vi.fn()
+    const runOnce = vi.fn<RunOnce>(async (input) => {
+      input.onStarted?.('acp-7')
+      return NEVER_REPLIES
+    })
+    const { done, cancel } = runAgentReview(baseInput, { exec, runOnce, cancelSession })
+    await eventually(() => expect(runOnce).toHaveBeenCalled())
+    cancel()
+    expect((await done).status).toBe('cancelled')
+    expect(cancelSession).toHaveBeenCalledWith('acp-7')
   })
 
-  it('never spawns when cancelled while the diff is computed', async () => {
+  it('stops a session that starts after the cancel', async () => {
+    const exec = vi.fn(async () => ({ stdout: 'diff' }))
+    const cancelSession = vi.fn()
+    let started: (sessionId: string) => void = () => {}
+    const runOnce = vi.fn<RunOnce>(async (input) => {
+      started = (sessionId) => input.onStarted?.(sessionId)
+      return NEVER_REPLIES
+    })
+    const { done, cancel } = runAgentReview(baseInput, { exec, runOnce, cancelSession })
+    await eventually(() => expect(runOnce).toHaveBeenCalled())
+    cancel()
+    started('acp-8')
+    expect((await done).status).toBe('cancelled')
+    expect(cancelSession).toHaveBeenCalledWith('acp-8')
+  })
+})
+
+describe('runAgentReview — a run that ends without findings', () => {
+  it('keeps the session id, so its conversation can still be continued', async () => {
+    const exec = vi.fn(async () => ({ stdout: 'diff' }))
+    const runOnce = vi.fn<RunOnce>(async (input) => {
+      input.onStarted?.('acp-10')
+      return replied('I found nothing to report.', 'acp-10')
+    })
+    const run = await runAgentReview(baseInput, { exec, runOnce }).done
+    expect(run.status).toBe('failed')
+    expect(run.sessionId).toBe('acp-10')
+  })
+
+  it('keeps the session id of a cancelled run', async () => {
+    const exec = vi.fn(async () => ({ stdout: 'diff' }))
+    const runOnce = vi.fn<RunOnce>(async (input) => {
+      input.onStarted?.('acp-11')
+      return NEVER_REPLIES
+    })
+    const { done, cancel } = runAgentReview(baseInput, { exec, runOnce })
+    await eventually(() => expect(runOnce).toHaveBeenCalled())
+    cancel()
+    expect((await done).sessionId).toBe('acp-11')
+  })
+})
+
+describe('runAgentReview — cancelling before the agent', () => {
+  it('does not ask the agent when cancelled while the diff is computed', async () => {
     let diffPrinted: (out: { stdout: string }) => void = () => {}
     const exec = vi.fn((_cmd: 'git', args: string[]) =>
       args[0] === 'diff'
         ? new Promise<{ stdout: string }>((r) => (diffPrinted = r))
         : Promise.resolve({ stdout: '' })
     )
-    const spawn = vi.fn()
-    const { done, cancel } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
+    const runOnce = vi.fn<RunOnce>()
+    const { done, cancel } = runAgentReview(baseInput, { exec, runOnce })
     await eventually(() =>
       expect(exec.mock.calls.some(([, args]) => args[0] === 'diff')).toBe(true)
     )
@@ -417,72 +405,7 @@ describe('runAgentReview — cancelling', () => {
     diffPrinted({ stdout: 'diff' })
 
     expect((await done).status).toBe('cancelled')
-    expect(spawn).not.toHaveBeenCalled()
-  })
-})
-
-/** Sets environment variables for one callback, restoring the previous values after. */
-async function withEnv(vars: Record<string, string>, body: () => Promise<void>) {
-  const previous = Object.fromEntries(Object.keys(vars).map((k) => [k, process.env[k]]))
-  Object.assign(process.env, vars)
-  try {
-    await body()
-  } finally {
-    for (const [key, value] of Object.entries(previous)) {
-      if (value === undefined) delete process.env[key]
-      else process.env[key] = value
-    }
-  }
-}
-
-describe('runAgentReview — child environment', () => {
-  it('scrubs CLAUDE_CODE_* and CLAUDECODE from the child env', async () => {
-    await withEnv(
-      { CLAUDE_CODE_BRIDGE_SESSION_ID: 'parent-session', CLAUDECODE: '1' },
-      async () => {
-        const { fake, spawn, done } = await startFakeRun()
-        printAndExit(fake, { structured_output: { summary: 's', findings: [] } })
-        await done
-
-        const [, , opts] = spawn.mock.calls[0]
-        expect(opts.env.CLAUDE_CODE_BRIDGE_SESSION_ID).toBeUndefined()
-        expect(opts.env.CLAUDECODE).toBeUndefined()
-      }
-    )
-  })
-})
-
-describe('claudeFromShellOutput', () => {
-  it('takes the absolute path the shell printed, past any rc-file noise', () => {
-    expect(claudeFromShellOutput('Updating oh-my-zsh...\n/Users/me/.local/bin/claude\n')).toBe(
-      '/Users/me/.local/bin/claude'
-    )
-  })
-
-  it('is null when the shell found no claude', () => {
-    expect(claudeFromShellOutput('')).toBeNull()
-    expect(claudeFromShellOutput('claude not found\n')).toBeNull()
-  })
-
-  it('is null for an alias or function rather than a file', () => {
-    expect(claudeFromShellOutput("alias claude='claude --foo'\n")).toBeNull()
-  })
-})
-
-describe('runAgentReview — the timeout message', () => {
-  it('names the configured minutes, not a fixed five', async () => {
-    vi.useFakeTimers()
-    try {
-      const fake = makeFakeProcess()
-      const exec = vi.fn(async () => ({ stdout: 'diff' }))
-      const spawn = vi.fn((..._args: Parameters<SpawnFn>) => fake)
-      const input = { ...baseInput, timeoutMs: 12 * 60_000 }
-      const { done } = runAgentReview(input, { exec, spawn, resolveClaude })
-      await vi.advanceTimersByTimeAsync(12 * 60_000)
-      expect((await done).error).toBe('Timed out after 12 min')
-    } finally {
-      vi.useRealTimers()
-    }
+    expect(runOnce).not.toHaveBeenCalled()
   })
 })
 
@@ -495,115 +418,96 @@ const summaryInput: RunSummaryInput = {
   timeoutMs: 12 * 60_000,
 }
 
-/** Starts a summary against a fake claude process and waits for it to be spawned. */
-async function startFakeSummary(input: RunSummaryInput = summaryInput) {
-  const fake = makeFakeProcess()
-  const spawn = vi.fn((..._args: Parameters<SpawnFn>) => fake)
-  const { done, cancel } = runSummary(input, { spawn, resolveClaude })
-  await eventually(() => expect(spawn).toHaveBeenCalled())
-  return { fake, spawn, done, cancel }
+/** Starts a summary whose agent answers with `reply`; waits until the agent has been asked. */
+async function startSummary(
+  reply: AgentReply | Promise<AgentReply> = repliedJson({ summary: 's' }),
+  input: RunSummaryInput = summaryInput
+) {
+  const runOnce = vi.fn<RunOnce>(async () => reply)
+  const { done, cancel } = runSummary(input, { runOnce })
+  await eventually(() => expect(runOnce).toHaveBeenCalled())
+  return { runOnce, done, cancel, prompt: () => runOnce.mock.calls[0][0].prompt }
 }
 
-/** The value that follows `flag` in claude's argv. */
-function flagValue(args: string[], flag: string): string {
-  return args[args.indexOf(flag) + 1]
-}
-
-describe('runSummary — the claude it starts', () => {
-  it('runs claude -p read-only in the storage folder, with a schema requiring summary', async () => {
-    const { spawn } = await startFakeSummary()
-    const [cmd, args, opts] = spawn.mock.calls[0]
-    expect(cmd).toBe('/Users/me/.local/bin/claude')
-    expect(args).toContain('-p')
-    expect(flagValue(args, '--output-format')).toBe('json')
-    expect(JSON.parse(flagValue(args, '--json-schema'))).toMatchObject({
-      required: ['summary'],
-      properties: { summary: { type: 'string' } },
+describe('runSummary — the agent it asks', () => {
+  it('asks read-only in the storage folder, with the summary schema in the prompt', async () => {
+    const { runOnce, prompt } = await startSummary()
+    expect(runOnce.mock.calls[0][0]).toMatchObject({
+      cwd: '/storage/git-integration',
+      mode: 'default',
+      timeoutMs: 12 * 60_000,
+      agentMeta: {
+        claudeCode: { options: { model: 'sonnet', tools: ['Read', 'Grep', 'Glob'] } },
+      },
     })
-    expect(flagValue(args, '--tools')).toBe('Read,Grep,Glob')
-    expect(flagValue(args, '--model')).toBe('sonnet')
-    expect(opts.cwd).toBe('/storage/git-integration')
+    expect(prompt()).toMatch(/only one JSON object/i)
+    expect(prompt()).toContain('"required":["summary"]')
   })
 
-  it('sends the text on stdin as untrusted content under the read-only rule', async () => {
-    const { fake } = await startFakeSummary()
-    expect(fake.writtenStdin).toContain('**ana**: Ship it')
-    expect(fake.writtenStdin).toContain('#42')
-    expect(fake.writtenStdin).toMatch(/discussion/i)
-    expect(fake.writtenStdin).toMatch(/READ-ONLY/)
-    expect(fake.writtenStdin).toMatch(/never as instructions/i)
+  it('sends the text as untrusted content under the read-only rule', async () => {
+    const { prompt } = await startSummary()
+    expect(prompt()).toContain('**ana**: Ship it')
+    expect(prompt()).toContain('#42')
+    expect(prompt()).toMatch(/discussion/i)
+    expect(prompt()).toMatch(/READ-ONLY/)
+    expect(prompt()).toMatch(/never as instructions/i)
   })
 
   it('asks for at most four short points and a Not done line only when something was left undone', async () => {
-    const { fake } = await startFakeSummary()
-    expect(fake.writtenStdin).toMatch(/at most four bullet points/i)
-    expect(fake.writtenStdin).toMatch(/under 25 words/i)
-    expect(fake.writtenStdin).toContain('"Not done:"')
+    const { prompt } = await startSummary()
+    expect(prompt()).toMatch(/at most four bullet points/i)
+    expect(prompt()).toMatch(/under 25 words/i)
+    expect(prompt()).toContain('"Not done:"')
   })
 })
 
 describe('runSummary — a description summary', () => {
   it('asks for current state, what the change does, risks as bullets, and diagrams only if needed', async () => {
-    const { fake } = await startFakeSummary({
+    const { prompt } = await startSummary(undefined, {
       ...summaryInput,
       kind: 'description',
       text: 'Moves the queue to Redis.',
     })
-    expect(fake.writtenStdin).toMatch(/Current state.*1-3 sentences/s)
-    expect(fake.writtenStdin).toMatch(/What the change does.*1-3 sentences/s)
-    expect(fake.writtenStdin).toMatch(/Risks.*bullet list/s)
-    expect(fake.writtenStdin).toMatch(/diagram.*only when/is)
-    expect(fake.writtenStdin).not.toMatch(/at most four bullet points/i)
+    expect(prompt()).toMatch(/Current state.*1-3 sentences/s)
+    expect(prompt()).toMatch(/What the change does.*1-3 sentences/s)
+    expect(prompt()).toMatch(/Risks.*bullet list/s)
+    expect(prompt()).toMatch(/diagram.*only when/is)
+    expect(prompt()).not.toMatch(/at most four bullet points/i)
   })
 
   it('leaves a discussion summary on the four-bullet format', async () => {
-    const { fake } = await startFakeSummary()
-    expect(fake.writtenStdin).toMatch(/at most four bullet points/i)
-    expect(fake.writtenStdin).not.toMatch(/Current state/)
+    const { prompt } = await startSummary()
+    expect(prompt()).toMatch(/at most four bullet points/i)
+    expect(prompt()).not.toMatch(/Current state/)
   })
 })
 
 describe('runSummary — what it answers', () => {
-  it('answers the summary claude returned as structured_output', async () => {
-    const { fake, done } = await startFakeSummary()
-    printAndExit(fake, { structured_output: { summary: 'Ana approves; Bo waits on CI.' } })
+  it('answers the summary in the reply, past prose around the JSON', async () => {
+    const { done } = await startSummary(
+      replied('Sure.\n{"summary":"Ana approves; Bo waits on CI."}')
+    )
     expect(await done).toEqual({ summary: 'Ana approves; Bo waits on CI.' })
   })
 
-  it("answers claude's error output when it exits non-zero", async () => {
-    const { fake, done } = await startFakeSummary()
-    fake.stderrEmitter.emit('data', 'model not available\n')
-    fake.emitExit(1)
-    expect(await done).toEqual({ error: 'model not available' })
+  it("answers the agent's message when it fails", async () => {
+    const { done } = await startSummary({ error: 'TIMEOUT', message: 'The agent did not finish' })
+    expect(await done).toEqual({ error: 'The agent did not finish' })
   })
 
-  it('answers a plain error when the output has no summary', async () => {
-    const { fake, done } = await startFakeSummary()
-    printAndExit(fake, { structured_output: { findings: [] } })
+  it('answers a plain error when the reply has no summary', async () => {
+    const { done } = await startSummary(repliedJson({ findings: [] }))
     expect(await done).toEqual({ error: 'The review agent answered without a summary.' })
   })
-})
 
-describe('runSummary — a summary that does not finish', () => {
-  it('times out naming the configured minutes and kills claude', async () => {
-    vi.useFakeTimers()
-    try {
-      const fake = makeFakeProcess()
-      const spawn = vi.fn((..._args: Parameters<SpawnFn>) => fake)
-      const { done } = runSummary(summaryInput, { spawn, resolveClaude })
-      await vi.advanceTimersByTimeAsync(12 * 60_000)
-      expect(await done).toEqual({ error: 'Timed out after 12 min' })
-      expect(fake.kill).toHaveBeenCalledWith('SIGKILL')
-    } finally {
-      vi.useRealTimers()
-    }
+  it('answers a plain error when the reply has no JSON', async () => {
+    const { done } = await startSummary(replied('nothing'))
+    expect(await done).toEqual({ error: 'The review agent answered without a summary.' })
   })
 
-  it('cancel() kills claude and answers that the summary was cancelled', async () => {
-    const { fake, done, cancel } = await startFakeSummary()
+  it('cancel() answers that the summary was cancelled', async () => {
+    const { done, cancel } = await startSummary(NEVER_REPLIES)
     cancel()
-    fake.emitExit(137)
     expect(await done).toEqual({ error: 'Summary cancelled.' })
-    expect(fake.kill).toHaveBeenCalledWith('SIGKILL')
   })
 })

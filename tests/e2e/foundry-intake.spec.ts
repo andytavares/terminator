@@ -15,8 +15,7 @@ import {
   bodyText,
   clickByName,
   foundryChannel,
-  hasAgentLaunchScript,
-  agentLaunchScript,
+  supervisedLaunch,
   inFoundry,
   makeFixtureRepo,
   openFoundry,
@@ -294,16 +293,14 @@ async function repositoryUntouched(): Promise<void> {
 
 /** The architect was launched as an interactive, permission-asking session of its own. */
 async function expectReadOnlyLaunch(): Promise<void> {
-  // What the launch wrote, not the terminal's scrollback, which a talkative
-  // agent scrolls out of view.
-  await expect.poll(() => hasAgentLaunchScript(handle)).toBe(true)
-  const launched = agentLaunchScript(handle)
-  expect(launched).toContain('claude --session-id')
-  expect(launched).not.toContain('bypassPermissions')
-  // A relative settings path resolves against the worktree, where it does not exist.
-  expect(launched).toMatch(/--settings '\//)
+  // What the agent was sent over ACP, not what an agent tab happens to show.
+  await expect.poll(() => supervisedLaunch(handle)).not.toBeNull()
+  const launched = supervisedLaunch(handle)!
+  expect(launched.mode).not.toBe('bypassPermissions')
+  // Read-only, so every write and state-changing command is an ask that Foundry's policy decides.
+  expect(launched.mode).toBe('default')
   // And it does not carry the parent Claude Code session in with it.
-  expect(launched).toMatch(/^unset .*CLAUDE_CODE_BRIDGE_SESSION_ID/m)
+  expect(launched.inherited).toBe(false)
 }
 
 interface ConvergedOrder {

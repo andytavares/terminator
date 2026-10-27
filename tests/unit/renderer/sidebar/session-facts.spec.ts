@@ -311,7 +311,8 @@ describe('buildSessionFacts — carries an agent ask from the session', () => {
 describe('buildSessionFacts — carries the conversation from the record', () => {
   it('carries the conversation that ran in the session, and whether it can come back', () => {
     const conversation = {
-      provider: 'claude' as const,
+      agentId: 'claude',
+      transport: 'tui' as const,
       sessionId: 'conv-1',
       transcriptPath: '/t/conv-1.jsonl',
       cwd: '/code/northwind-api',
@@ -336,7 +337,8 @@ describe('buildSessionFacts — has no conversation for a session nothing report
 
   it("carries a closed session's conversation from its record", () => {
     const conversation = {
-      provider: 'claude' as const,
+      agentId: 'claude',
+      transport: 'tui' as const,
       sessionId: 'conv-2',
       transcriptPath: '/t/conv-2.jsonl',
       cwd: '/code/northwind-api',
@@ -358,7 +360,8 @@ describe('buildSessionFacts — leaves Closed once its record has moved to the s
   // live one beside a ghost of itself under Closed.
   it('leaves Closed once its record has moved to the session that resumed it', () => {
     const conversation = {
-      provider: 'claude' as const,
+      agentId: 'claude',
+      transport: 'tui' as const,
       sessionId: 'conv-3',
       transcriptPath: '/t/conv-3.jsonl',
       cwd: '/code/northwind-api',

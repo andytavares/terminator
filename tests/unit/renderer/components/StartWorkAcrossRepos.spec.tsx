@@ -11,9 +11,14 @@ import { task } from '../home/fixtures'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 import type { Project, Workspace } from '../../../../src/shared/types/index'
 
-const launched = vi.hoisted(() => ({ inBranch: vi.fn(), createFromDraft: vi.fn() }))
+const launched = vi.hoisted(() => ({
+  inBranch: vi.fn(),
+  agentInBranch: vi.fn(),
+  createFromDraft: vi.fn(),
+}))
 vi.mock('../../../../src/renderer/terminal/start-session', () => ({
   startSessionInBranch: launched.inBranch,
+  startAgentInBranch: launched.agentInBranch,
   startScratchSession: vi.fn(),
 }))
 vi.mock('../../../../src/renderer/components/sidebar/create-project', async (importOriginal) => ({
@@ -71,8 +76,13 @@ beforeEach(() => {
     branches: [{ name: 'main', isCurrent: true, isRemote: false }],
   })
   git.listWorktrees.mockResolvedValue({ worktrees: [] })
-  installElectronApi({ git, extension: { executeCommand: vi.fn() } })
+  installElectronApi({
+    git,
+    agents: { list: async () => ({ data: [{ id: 'claude', label: 'Claude Code' }] }) },
+    extension: { executeCommand: vi.fn() },
+  })
   launched.inBranch.mockResolvedValue('s-new')
+  launched.agentInBranch.mockResolvedValue('s-new')
   launched.createFromDraft.mockImplementation(async ({ workspaceId }) => `p-${workspaceId}`)
   useWorkspaceStore.setState({
     workspaces: WORKSPACES,
@@ -119,8 +129,10 @@ describe('Start work, Across repos — all repos start', () => {
     })
     fireEvent.click(startButton(/Start 3 lanes/))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
-    expect(launched.inBranch).toHaveBeenCalledTimes(3)
-    expect(launched.inBranch).toHaveBeenCalledWith('p-ws-2', "claude 'Add per-tenant limits'")
+    expect(launched.agentInBranch).toHaveBeenCalledTimes(3)
+    expect(launched.agentInBranch).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: 'p-ws-2', prompt: 'Add per-tenant limits' })
+    )
     const { tasks } = useTaskStore.getState()
     expect(tasks).toHaveLength(1)
     expect(tasks[0].title).toBe('Rate limits')
@@ -153,7 +165,7 @@ describe('Start work, Across repos — a repo that cannot take the branch', () =
     fireEvent.click(startButton(/Start 3 lanes/))
     const row = repoRow('api-gateway')
     await within(row).findByText(/rate-limits is already checked out in \/elsewhere/)
-    expect(launched.inBranch).not.toHaveBeenCalled()
+    expect(launched.agentInBranch).not.toHaveBeenCalled()
     expect(launched.createFromDraft).not.toHaveBeenCalled()
     expect(useTaskStore.getState().tasks).toEqual([])
     expect(onClose).not.toHaveBeenCalled()
@@ -166,7 +178,7 @@ describe('Start work, Across repos — a repo that cannot take the branch', () =
     await openAcrossRepos()
     fireEvent.click(startButton(/Start 3 lanes/))
     await within(repoRow('web')).findByText('web is not a git repo.')
-    expect(launched.inBranch).not.toHaveBeenCalled()
+    expect(launched.agentInBranch).not.toHaveBeenCalled()
   })
 })
 

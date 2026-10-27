@@ -1,7 +1,7 @@
 import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { registerInvokeTable } from './invoke-table.js'
 import { createThreadSummarizer } from '../home/thread-summary.js'
-import { runTextCommand } from '../shell/command-runner.js'
+import { agentService } from '../agents/acp/agent-service-instance.js'
 import { loginShellPathReady } from '../shell/login-shell-path.js'
 import { listRecords } from '../sessions/session-record-store.js'
 import { readTranscriptUsage } from '../agents/transcript-usage.js'
@@ -11,8 +11,7 @@ import {
 } from '../../shared/schemas/agent-usage.schema.js'
 
 const summarize = createThreadSummarizer({
-  run: runTextCommand,
-  env: () => process.env,
+  runOnce: (input) => agentService().runOnce(input),
   now: Date.now,
   ready: loginShellPathReady,
 })
@@ -22,11 +21,10 @@ type SummarySession = ThreadSummaryInput['sessions'][number]
 /** The session with its opening prompt and last words read from its transcript, when it has one. */
 async function withTranscript(session: SummarySession): Promise<SummarySession> {
   const record = listRecords().find((r) => r.sessionId === session.sessionId)
-  if (session.sessionId === undefined || !record?.agent) return session
+  const transcriptPath = record?.agent?.transcriptPath ?? null
+  if (session.sessionId === undefined || transcriptPath === null) return session
   try {
-    const { firstUserPrompt, lastAssistantTexts } = await readTranscriptUsage(
-      record.agent.transcriptPath
-    )
+    const { firstUserPrompt, lastAssistantTexts } = await readTranscriptUsage(transcriptPath)
     return { ...session, firstUserPrompt, lastAssistantTexts }
   } catch {
     return session

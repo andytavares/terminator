@@ -13,8 +13,10 @@ vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({
 import {
   startSessionInBranch,
   startScratchSession,
+  startAgentInBranch,
   resumeSession,
 } from '../../../../src/renderer/terminal/start-session'
+import { electronApiOf } from '../../../support/electron-api'
 import { fact } from '../sidebar/fixtures/facts'
 import { SCRATCH_PROJECT_ID } from '../../../../src/shared/types/index'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
@@ -184,7 +186,8 @@ describe('startScratchSession — stays on Home when the scratch terminal cannot
 })
 
 const conversation = {
-  provider: 'claude' as const,
+  agentId: 'claude',
+  transport: 'tui' as const,
   sessionId: 'conv-1',
   transcriptPath: '/t/conv-1.jsonl',
   cwd: '/code/repo-wt',
@@ -237,6 +240,116 @@ describe('resumeSession', () => {
     expect(records.transfer.mock.invocationCallOrder[0]).toBeLessThan(
       closeSession.mock.invocationCallOrder[0]
     )
+  })
+})
+
+const startAgent = vi.fn()
+const promptAgent = vi.fn()
+
+/** The hooks every "startAgentInBranch" describe registers. */
+function setUpAgentStubs(): void {
+  beforeEach(() => {
+    startAgent.mockReset().mockResolvedValue({ data: { sessionId: 'agent-1', agentId: 'claude' } })
+    promptAgent.mockReset().mockReturnValue(new Promise(() => undefined))
+    vi.stubGlobal('window', {
+      electronAPI: electronApiOf({ agents: { start: startAgent, prompt: promptAgent } }),
+    })
+  })
+}
+
+describe('startAgentInBranch', () => {
+  setUpAgentStubs()
+
+  it("starts the agent as a tab in the branch's checkout, prompts it without waiting, and shows it", async () => {
+    const sessionId = await startAgentInBranch({
+      projectId: 'p2',
+      title: 'TAV-1',
+      prompt: 'Work on TAV-1',
+      agentId: 'opencode',
+    })
+    expect(startAgent).toHaveBeenCalledWith({
+      agentId: 'opencode',
+      cwd: '/code/repo-wt',
+      tab: { projectId: 'p2', title: 'TAV-1' },
+    })
+    expect(promptAgent).toHaveBeenCalledWith({ sessionId: 'agent-1', text: 'Work on TAV-1' })
+    expect(navigate).toHaveBeenCalledWith('agent-1')
+    expect(sessionId).toBe('agent-1')
+  })
+})
+
+describe('startAgentInBranch — without a prompt or an agent', () => {
+  setUpAgentStubs()
+
+  it('sends no prompt when there is none', async () => {
+    await startAgentInBranch({ projectId: 'p1', title: 'Agent', prompt: null })
+    expect(promptAgent).not.toHaveBeenCalled()
+  })
+
+  it('shows nothing when the agent does not start', async () => {
+    startAgent.mockResolvedValue({ data: null })
+    expect(await startAgentInBranch({ projectId: 'p1', title: 'Agent', prompt: 'x' })).toBeNull()
+    expect(navigate).not.toHaveBeenCalled()
+  })
+})
+
+const resumeStart = vi.fn()
+const tabConversation = {
+  agentId: 'opencode',
+  transport: 'acp' as const,
+  sessionId: 'acp-1',
+  transcriptPath: null,
+  cwd: '/code/repo-wt',
+  capturedAt: '2026-09-15T18:00:00.000Z',
+}
+const stoppedTab = () =>
+  stopped({
+    agent: tabConversation,
+    snapshot: { ...fact().snapshot, sessionId: 'old', projectId: 'p1', tabTitle: 'Fix login' },
+  })
+
+/** The hooks every agent tab "resumeSession" describe registers. */
+function setUpResumeTab(): void {
+  setUpResumeSession()
+  beforeEach(() => {
+    resumeStart.mockReset().mockResolvedValue({ data: { sessionId: 'acp-1', agentId: 'opencode' } })
+    vi.stubGlobal('window', { electronAPI: electronApiOf({ agents: { start: resumeStart } }) })
+  })
+}
+
+describe('resumeSession — a conversation run in an agent tab', () => {
+  setUpResumeTab()
+
+  it('starts the agent with the session to resume and a tab, not a terminal', async () => {
+    await resumeSession(stoppedTab())
+    expect(resumeStart).toHaveBeenCalledWith({
+      agentId: 'opencode',
+      cwd: '/code/repo-wt',
+      resume: 'acp-1',
+      tab: { projectId: 'p1', title: 'Fix login' },
+    })
+    expect(create).not.toHaveBeenCalled()
+    expect(navigate).toHaveBeenCalledWith('acp-1')
+  })
+})
+
+describe('resumeSession — an agent tab, moving context', () => {
+  setUpResumeTab()
+
+  it('moves the context onto the new tab, then closes the old one', async () => {
+    await resumeSession(stoppedTab())
+    expect(records.transfer).toHaveBeenCalledWith(
+      'old',
+      expect.objectContaining({ sessionId: 'acp-1' })
+    )
+    expect(closeSession).toHaveBeenCalledWith('old')
+  })
+
+  it('leaves the old session as it was when the agent does not start', async () => {
+    resumeStart.mockResolvedValue({ data: null })
+    await resumeSession(stoppedTab())
+    expect(records.transfer).not.toHaveBeenCalled()
+    expect(closeSession).not.toHaveBeenCalled()
   })
 })
 

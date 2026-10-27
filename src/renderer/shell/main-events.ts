@@ -192,13 +192,7 @@ function terminalBridgeHandlers(): BridgeHandlers {
     // process runs and nothing on screen ever shows it, and its output is held until the tab is
     // mounted rather than delivered to nobody.
     'terminal:adopt': (data) => {
-      const { sessionId, projectId, tabTitle, scrollbackLimit } = data as {
-        sessionId: string
-        projectId: string
-        tabTitle: string
-        scrollbackLimit: number
-      }
-      adoptTerminalSession({ sessionId, projectId, tabTitle, scrollbackLimit })
+      adoptTerminalSession(data as Parameters<typeof adoptTerminalSession>[0])
     },
     'terminal:close-tab': (data) =>
       void useSessionStore.getState().closeSession((data as { sessionId: string }).sessionId),

@@ -1,12 +1,10 @@
 import { createHash } from 'node:crypto'
-import { envWithoutParentClaude } from '@terminator/extension-sdk/node'
+import type { RunAgentOnceInput, RunAgentOnceResult } from '@terminator/extension-sdk'
 import { tmpdir } from 'node:os'
-import type { ShellExecInput, ShellExecOutput } from '../shell/command-runner.js'
 import type { ThreadSummaryInput } from '../../shared/schemas/agent-usage.schema.js'
 
-// Runs Claude Code headless, as the review agent does, but with no tools. Unlike the review agent
-// there is no resolver: the app adopts the login-shell PATH at start-up (login-shell-path.ts), so
-// a bare `claude` is found once `ready` has resolved.
+// Runs the agent through ACP with no tools and no tab. The login-shell PATH is adopted at
+// start-up (login-shell-path.ts), so the agent is found once `ready` has resolved.
 
 const SUMMARY_MODEL = 'claude-haiku-5-5'
 /** @internal */
@@ -14,32 +12,18 @@ export const SUMMARY_TIMEOUT_MS = 30_000
 /** @internal */
 export const SUMMARY_COOLDOWN_MS = 2 * 60_000
 
-const INSTRUCTION =
+/** @internal */
+export const SUMMARY_INSTRUCTION =
   'Write two or three plain sentences saying what is happening on this piece of work right now ' +
   'and what is blocking it. No lists, no headings.'
 
 export type ThreadSummary = { text: string; generatedAt: string } | { error: string }
 
 export interface ThreadSummaryDeps {
-  run: (input: Omit<ShellExecInput, 'encoding'>, env: NodeJS.ProcessEnv) => Promise<ShellExecOutput>
-  env: () => NodeJS.ProcessEnv
+  runOnce: (input: RunAgentOnceInput) => Promise<RunAgentOnceResult>
   now: () => number
-  /** Resolves once `claude` can be found on PATH. */
+  /** Resolves once the agent can be found on PATH. */
   ready: () => Promise<void>
-}
-
-/** @internal */
-export function summaryArgs(): string[] {
-  return [
-    '-p',
-    '--model',
-    SUMMARY_MODEL,
-    '--tools',
-    '',
-    '--no-session-persistence',
-    '--system-prompt',
-    INSTRUCTION,
-  ]
 }
 
 /** @internal */
@@ -54,13 +38,15 @@ export function summaryPrompt(input: ThreadSummaryInput): string {
     if (session.firstUserPrompt) lines.push(`Asked: ${session.firstUserPrompt}`)
     for (const text of session.lastAssistantTexts) lines.push(`Said: ${text}`)
   })
-  return lines.join('\n')
+  return `${SUMMARY_INSTRUCTION}\n\n${lines.join('\n')}`
 }
 
-function plainFailure(result: ShellExecOutput): string {
-  if (result.timedOut) return 'Claude Code took too long to answer'
-  if (/ENOENT/.test(result.stderr)) return 'Claude Code is not installed'
-  return 'Claude Code stopped with an error'
+function plainFailure(result: RunAgentOnceResult): string {
+  if ('error' in result) {
+    if (result.error === 'TIMEOUT') return 'the agent took too long to answer'
+    if (result.error === 'AGENT_UNAVAILABLE') return 'the agent is not installed or did not start'
+  }
+  return 'the agent stopped with an error'
 }
 
 function hashOf(input: ThreadSummaryInput): string {
@@ -72,20 +58,25 @@ async function generate(
   input: ThreadSummaryInput
 ): Promise<ThreadSummary> {
   await deps.ready()
-  const result = await deps.run(
-    {
-      command: 'claude',
-      args: summaryArgs(),
-      cwd: tmpdir(),
-      timeoutMs: SUMMARY_TIMEOUT_MS,
-      input: summaryPrompt(input),
+  const result = await deps.runOnce({
+    cwd: tmpdir(),
+    prompt: summaryPrompt(input),
+    mode: 'default',
+    agentMeta: {
+      claudeCode: {
+        // A summary is never resumed, so Claude keeps no transcript of it.
+        options: {
+          model: SUMMARY_MODEL,
+          tools: [],
+          systemPrompt: SUMMARY_INSTRUCTION,
+          persistSession: false,
+        },
+      },
     },
-    envWithoutParentClaude(deps.env())
-  )
-  const text = result.stdout.trim()
-  if (result.exitCode !== 0 || !text) {
-    return { error: `Could not write a summary: ${plainFailure(result)}` }
-  }
+    timeoutMs: SUMMARY_TIMEOUT_MS,
+  })
+  const text = 'text' in result ? result.text.trim() : ''
+  if (!text) return { error: `Could not write a summary: ${plainFailure(result)}` }
   return { text, generatedAt: new Date(deps.now()).toISOString() }
 }
 

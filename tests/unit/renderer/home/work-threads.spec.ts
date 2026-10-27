@@ -253,7 +253,8 @@ describe('thread fields: scratch title', () => {
 
 describe('latestResumableThread', () => {
   const agent = {
-    provider: 'claude' as const,
+    agentId: 'claude',
+    transport: 'tui' as const,
     sessionId: 'conv-1',
     cwd: '/repos/terminator',
     transcriptPath: '/repos/terminator/conv-1.jsonl',

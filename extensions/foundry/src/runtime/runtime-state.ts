@@ -1,7 +1,6 @@
 import type { Disposable } from '@terminator/extension-sdk'
 import * as path from 'node:path'
 
-import { type ControlServer } from './control-server.js'
 import { type SupervisedRunner } from './supervised-runner.js'
 import { createPendingPermissions } from './pending-permissions.js'
 import { type StallWatcher } from './stall-watcher.js'
@@ -13,10 +12,7 @@ import { endAndWait } from './end-session.js'
 // The supervision runtime's parts for the life of the extension: one record, not
 // module `let`s, so every reader sees what `startSupervisionRuntime` set.
 export const runtime: {
-  // The loopback endpoint the agents' hooks answer on, and the runner that owns
-  // their terminals. Started once for the extension rather than per run: a port
-  // per agent would be a port per card.
-  control: ControlServer | null
+  // The runner that owns the agents' tabs.
   supervisedRunner: SupervisedRunner | null
   stallWatcher: StallWatcher | null
   // What is running, what it changed, what needs looking at, and what must not
@@ -26,7 +22,6 @@ export const runtime: {
   // feed stays complete.
   mutes: MuteStore | null
 } = {
-  control: null,
   supervisedRunner: null,
   stallWatcher: null,
   supervision: null,

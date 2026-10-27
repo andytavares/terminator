@@ -1,5 +1,4 @@
 import type { ExtensionAPI } from '@terminator/extension-sdk'
-import { shellQuote } from '@terminator/extension-sdk/node'
 import type { DashboardPR } from '../schemas/pr-review.schema.js'
 import { canonical } from '../ipc/repo-root.js'
 import { openPrReviewWindow } from '../review-command.js'
@@ -12,6 +11,11 @@ interface ActionDeps {
   api: ExtensionAPI
   storage: string
   pullRequests: () => DashboardPR[]
+}
+
+/** What an action handler runs with: the deps, and the agent tabs it has started. */
+interface RunDeps extends ActionDeps {
+  agentTabs: AgentTabs
 }
 
 /** The folder `branch` is checked out in, from `git worktree list --porcelain`.
@@ -42,32 +46,24 @@ async function openLog({ api, storage }: ActionDeps, pr: DashboardPR): Promise<v
   await api.shell.exec({ command: 'gh', args: logOpeningArgs(pr), cwd: storage })
 }
 
-async function agentSessionIn(api: ExtensionAPI, folder: string): Promise<string | undefined> {
-  const sessions = await api.pty.listSessions()
-  return sessions.find((s) => s.type === 'agent' && canonical(s.cwd) === canonical(folder))
-    ?.sessionId
-}
+/** The agent tabs this extension started, by folder; an ended tab is dropped. */
+type AgentTabs = Map<string, string>
 
-/** A terminal to open in `folder` and the one line to start it with. */
+/** The folder to open an agent tab in, and its title. */
 interface AgentLaunch {
   folder: string
   tabTitle: string
-  message: string
 }
 
-async function startAgentIn(api: ExtensionAPI, { folder, tabTitle, message }: AgentLaunch) {
+async function startAgentIn(api: ExtensionAPI, { folder, tabTitle }: AgentLaunch) {
   const projectId = projectForCheckout(api.workspace, folder)
   if (!projectId) return api.log.warn(`home: no project holds ${folder}; nothing sent to an agent`)
-  const sessionId = await api.pty.openTerminal({
-    projectId,
-    cwd: folder,
-    tabTitle,
-    type: 'agent',
-  })
-  if (sessionId) api.pty.write(sessionId, `claude ${shellQuote(message)}\r`)
+  const started = await api.agents.start({ cwd: folder, tab: { projectId, title: tabTitle } })
+  if (!started) return api.log.warn(`home: the agent did not start in ${folder}`)
+  return started.sessionId
 }
 
-async function sendToAgent({ api }: ActionDeps, pr: DashboardPR): Promise<void> {
+async function sendToAgent({ api, agentTabs }: RunDeps, pr: DashboardPR): Promise<void> {
   const branch = pr.headRefName ?? ''
   const folder =
     pr.localRepoRoot && branch
@@ -78,12 +74,19 @@ async function sendToAgent({ api }: ActionDeps, pr: DashboardPR): Promise<void> 
       : undefined
   if (!folder) return api.log.warn(`home: ${branch || pr.url} is checked out nowhere; nothing sent`)
   const message = `Checks are failing on ${pr.url}. Find the failing checks, fix them and push.`
-  const sessionId = await agentSessionIn(api, folder)
-  if (sessionId) api.pty.write(sessionId, `${message}\r`)
-  else await startAgentIn(api, { folder, tabTitle: `Fix checks #${pr.number}`, message })
+  const key = canonical(folder)
+  const sessionId =
+    agentTabs.get(key) ??
+    (await startAgentIn(api, { folder, tabTitle: `Fix checks #${pr.number}` }))
+  if (!sessionId) return
+  if (!agentTabs.has(key)) {
+    agentTabs.set(key, sessionId)
+    api.agents.onEnd(sessionId, () => agentTabs.delete(key))
+  }
+  void api.agents.prompt(sessionId, message)
 }
 
-const ACTIONS: Record<string, (deps: ActionDeps, pr: DashboardPR) => void | Promise<void>> = {
+const ACTIONS: Record<string, (deps: RunDeps, pr: DashboardPR) => void | Promise<void>> = {
   'start-review': ({ api }, pr) => openReviewWindowFor(api, pr),
   'open-log': openLog,
   'send-to-agent': sendToAgent,
@@ -91,10 +94,11 @@ const ACTIONS: Record<string, (deps: ActionDeps, pr: DashboardPR) => void | Prom
 
 /** The handler for `api.home.onAction`; the item id is `<kind>:<owner/name>#<number>`. */
 export function createHomeActionHandler(deps: ActionDeps) {
+  const runDeps: RunDeps = { ...deps, agentTabs: new Map() }
   return async (itemId: string, actionId: string): Promise<void> => {
     const pr = deps.pullRequests().find((p) => pullRequestId(p) === itemId.replace(/^[a-z]+:/, ''))
     const run = ACTIONS[actionId]
     if (!pr || !run) return deps.api.log.warn(`home: no ${actionId} for ${itemId}`)
-    await run(deps, pr)
+    await run(runDeps, pr)
   }
 }

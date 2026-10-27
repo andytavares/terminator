@@ -4,7 +4,7 @@ import type { PendingPermission } from './permission-bridge.js'
 //
 // The runner raises a request and clears it again; something has to hold the
 // ones in between, or the surface has nothing to render and a phase blocks at
-// its hook until the console hands the decision back to the terminal.
+// its ask until the console leaves it to the agent tab.
 //
 // Deliberately not a second session registry. A supervised run belongs to a
 // card, so requests are keyed by the card's feature directory — the identifier

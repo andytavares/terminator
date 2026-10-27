@@ -1,6 +1,7 @@
 # ADR 111: PR summaries run the review agent's claude
 
 **Status**: Accepted
+Amended by ADR 130: the summary now runs over ACP (`api.agents.runOnce`), not `claude -p`.
 **Date**: 2026-10-14
 **Relates to**: [ADR 073](073-the-review-agent-reads-and-never-writes.md), [ADR 091](091-sanitised-html-in-pr-comments.md), [ADR 096](096-every-ipc-channel-has-a-schema.md)
 

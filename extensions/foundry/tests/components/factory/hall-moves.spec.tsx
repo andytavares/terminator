@@ -103,9 +103,9 @@ describe('a held call on its card', () => {
 describe('a parked agent with no terminal left', () => {
   it('says so on its card', async () => {
     mountHall(hallView({ stranded: ['s-1'] }), { 'foundry:run-terminal': () => ({ ok: false }) })
-    const card = await screen.findByRole('group', { name: 'Waiting at its terminal' })
-    fireEvent.click(within(card).getByRole('button', { name: 'Go to terminal' }))
-    await within(card).findByText('That agent is no longer in a terminal.')
+    const card = await screen.findByRole('group', { name: 'Waiting in its agent tab' })
+    fireEvent.click(within(card).getByRole('button', { name: 'Go to agent tab' }))
+    await within(card).findByText('That agent is no longer in an agent tab.')
   })
 })
 

@@ -2,13 +2,7 @@ import { test, expect } from '@playwright/test'
 import { existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import {
-  closeApp,
-  launchApp,
-  readTerminalRowsIn,
-  visibleTerminalScreen,
-  type AppHandle,
-} from './helpers'
+import { closeApp, launchApp, type AppHandle } from './helpers'
 import { misalignedOn } from './control-alignment'
 import {
   git,
@@ -22,8 +16,8 @@ import { popoutPage, type ExtensionView } from './extension-page'
 import { startGithubStub, type GithubStub } from './github-stub'
 
 /** The Reviews dashboard and the review agent, against the stub GitHub. The dashboard runs
- * first, while no workspace has the repository, so it offers to clone it. The `claude` stub
- * (fixtures/bin/claude) idles until E2E_CLAUDE_REVIEW_REPLY holds what `claude -p` prints. */
+ * first, while no workspace has the repository, so it offers to clone it. The stub ACP agent
+ * (fixtures/acp-stub-agent.mjs) keeps a turn open until E2E_AGENT_REPLY holds its reply. */
 
 let handle: AppHandle
 let stub: GithubStub
@@ -33,23 +27,20 @@ let replyDir: string
 let cloneFolder: string
 
 const REPLY = {
-  type: 'result',
-  structured_output: {
-    summary: 'One real problem in subtract.',
-    findings: [
-      {
-        severity: 'must-fix',
-        path: 'src/math.ts',
-        startLine: 5,
-        endLine: 6,
-        side: 'RIGHT',
-        title: 'subtract swaps its operands',
-        body: 'It returns `b - a`.',
-        suggestedCode: null,
-      },
-    ],
-    walkthrough: [],
-  },
+  summary: 'One real problem in subtract.',
+  findings: [
+    {
+      severity: 'must-fix',
+      path: 'src/math.ts',
+      startLine: 5,
+      endLine: 6,
+      side: 'RIGHT',
+      title: 'subtract swaps its operands',
+      body: 'It returns `b - a`.',
+      suggestedCode: null,
+    },
+  ],
+  walkthrough: [],
 }
 
 test.beforeAll(async () => {
@@ -64,7 +55,7 @@ test.beforeAll(async () => {
   cloneFolder = mkdtempSync(join(tmpdir(), 'terminator-e2e-clones-'))
   handle = await launchApp(undefined, {
     ...stub.env,
-    E2E_CLAUDE_REVIEW_REPLY: join(replyDir, 'reply.json'),
+    E2E_AGENT_REPLY: join(replyDir, 'reply.json'),
   })
 })
 
@@ -177,39 +168,43 @@ async function askReviewAgent(): Promise<ExtensionView> {
 const panel = (view: Pick<ExtensionView, 'getByRole'>) =>
   view.getByRole('complementary', { name: 'Agent panel' })
 
-async function aRunningReviewContinuesInATerminal(): Promise<void> {
-  const view = await askReviewAgent()
-  await panel(view).getByRole('button', { name: 'Run' }).click()
-  await expect(panel(view)).toContainText('Reviewing')
+/** Starts a review: Run, or the button an ended review offers, which leads back to Run. */
+async function startReview(view: ExtensionView): Promise<void> {
+  const offered = panel(view)
+    .getByRole('button', { name: /^(Run|Try again|Ask again)$/ })
+    .first()
+  const label = await offered.textContent()
+  await offered.click()
+  if (label?.trim() !== 'Run') await panel(view).getByRole('button', { name: 'Run' }).click()
+}
 
-  await panel(view).getByRole('button', { name: 'Continue in terminal' }).click()
-  await handle.page.locator('.branch-row').first().click()
-  const tab = handle.page.locator('.tab-bar__tab').filter({ hasText: 'Review #1' })
-  await expect(tab).toBeVisible()
-  await tab.click()
-  const screen = visibleTerminalScreen(handle.page)
-  await expect(screen).toBeVisible()
-  await expect
-    .poll(async () => (await readTerminalRowsIn(screen)).join('\n'))
-    .toContain('claude-stub --resume')
+async function runReview(view: ExtensionView): Promise<void> {
+  await startReview(view)
+  await expect(panel(view)).toContainText('Reviewing')
 }
 
 async function aRunningReviewIsCancelled(): Promise<void> {
   const view = await askReviewAgent()
-  await expect(panel(view)).toContainText('Reviewing')
+  await runReview(view)
   await panel(view).getByRole('button', { name: 'Cancel' }).click()
   await expect(panel(view)).not.toContainText('Reviewing')
+}
+
+/** A finding's follow-up continues the review's conversation in an agent tab of the project. */
+async function aFindingsFollowUpContinuesInAnAgentTab(): Promise<void> {
+  const view = await aFinishedReviewListsItsFinding()
+  await panel(view).getByRole('button', { name: 'Ask follow-up' }).click()
+  await handle.page.locator('.branch-row').first().click()
+  const tab = handle.page.locator('.tab-bar__tab').filter({ hasText: 'Review #1' })
+  await expect(tab).toBeVisible()
+  await tab.click()
+  await expect(handle.page.getByRole('log', { name: 'Agent transcript' })).toBeVisible()
 }
 
 async function aFinishedReviewListsItsFinding(): Promise<ExtensionView> {
   writeFileSync(join(replyDir, 'reply.json'), JSON.stringify(REPLY))
   const view = await askReviewAgent()
-  await panel(view)
-    .getByRole('button', { name: /^(Run|Try again|Ask again)$/ })
-    .click()
-  if (await panel(view).getByRole('button', { name: 'Run' }).isVisible()) {
-    await panel(view).getByRole('button', { name: 'Run' }).click()
-  }
+  await startReview(view)
   await expect(panel(view)).toContainText('1 findings')
   await expect(panel(view)).toContainText('subtract swaps its operands')
   return view
@@ -226,14 +221,14 @@ async function aDismissedFindingStaysDismissed(): Promise<void> {
   await expect(panel(view)).not.toContainText('subtract swaps its operands')
 }
 
-test('the review agent runs on a pull request, moves to a terminal, and its dismissed finding stays dismissed', async () => {
+test('the review agent runs on a pull request, keeps a dismissed finding dismissed, and continues in an agent tab', async () => {
   await openAgentWorkspace()
   await runSteps([
-    ['a running review can be continued in a terminal', aRunningReviewContinuesInATerminal],
-    ['a running review can then be cancelled', aRunningReviewIsCancelled],
+    ['a running review can be cancelled', aRunningReviewIsCancelled],
     [
-      'a finished review lists its finding, and a dismissed finding stays dismissed',
-      aDismissedFindingStaysDismissed,
+      'a finished review lists its finding, whose follow-up continues in an agent tab',
+      aFindingsFollowUpContinuesInAnAgentTab,
     ],
+    ['a dismissed finding stays dismissed', aDismissedFindingStaysDismissed],
   ])
 })
