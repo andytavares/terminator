@@ -1,3 +1,4 @@
+import { answered } from '../helpers/answer-shape.js'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { queueEntry } from '../helpers/queue-entries.js'
 import { builderUnit, testCriterion } from '../helpers/order-parts.js'
@@ -769,9 +770,7 @@ function theLiveSessionTests() {
 function noSessionYetTests() {
   it('says why rather than pretending, when a node has no session yet', async () => {
     await store.save(order())
-    const started = (await freshRunChannels().start({ id: 'WO-1' })) as {
-      graph: { nodes: { id: string }[] }
-    }
+    const started = answered(await freshRunChannels().start({ id: 'WO-1' }))
     const r = (await freshRunChannels().attach({
       orderId: 'WO-1',
       nodeId: started.graph.nodes[0].id,
@@ -924,17 +923,6 @@ function twoLanes(): WorkOrder {
     },
   }
 }
-interface Observed {
-  lanes: {
-    ord: number
-    repo: string
-    role: string | null
-    collisions: string[]
-    blockedBy: number[]
-    hold: string | null
-  }[]
-}
-
 describe('what run.observe says about lanes (FR-067, FR-068)', () => {
   describe('lanes', runChannelsLanesTests)
 })
@@ -943,14 +931,14 @@ function runChannelsLanesTests() {
   it('reports each lane in merge order, by repository', async () => {
     await store.save(twoLanes())
     await freshRunChannels().start({ id: 'WO-1' })
-    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as Observed
+    const r = answered(await freshRunChannels().observe({ id: 'WO-1' }))
     expect(r.lanes.map((l) => l.repo)).toEqual(['proto', 'cli'])
   })
 
   it('names the shared file on both lanes, not only on the producer', async () => {
     await store.save(twoLanes())
     await freshRunChannels().start({ id: 'WO-1' })
-    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as Observed
+    const r = answered(await freshRunChannels().observe({ id: 'WO-1' }))
     expect(r.lanes.length).toBeGreaterThan(1)
     for (const lane of r.lanes) expect(lane.collisions).toEqual(['proto/session.proto'])
   })
@@ -958,7 +946,7 @@ function runChannelsLanesTests() {
   it('gives the hold as a sentence, so the surface does not reassemble it', async () => {
     await store.save(twoLanes())
     await freshRunChannels().start({ id: 'WO-1' })
-    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as Observed
+    const r = answered(await freshRunChannels().observe({ id: 'WO-1' }))
     expect(r.lanes[0].hold).toBeNull()
     expect(r.lanes[1].hold).toContain('must merge first')
     expect(r.lanes[1].hold).toContain('proto/session.proto')
@@ -967,7 +955,7 @@ function runChannelsLanesTests() {
   it('reports one unremarkable lane for a single-repository order', async () => {
     await store.save(order())
     await freshRunChannels().start({ id: 'WO-1' })
-    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as Observed
+    const r = answered(await freshRunChannels().observe({ id: 'WO-1' }))
     expect(r.lanes).toHaveLength(1)
     expect(r.lanes[0]).toMatchObject({ collisions: [], blockedBy: [], hold: null })
   })
@@ -1389,7 +1377,7 @@ function theTimelineTests() {
   it('hands back no gates when the host has no gate store to ask', async () => {
     await store.save(order())
     await freshRunChannels().start({ id: 'WO-1' })
-    const r = (await freshRunChannels().timeline({ id: 'WO-1' })) as { gates: unknown[] }
+    const r = answered(await freshRunChannels().timeline({ id: 'WO-1' }))
     expect(r.gates).toEqual([])
   })
 }

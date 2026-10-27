@@ -85,12 +85,12 @@ export interface ProfileChannelDeps {
 }
 
 export interface ProfileChannels {
-  read(payload: z.infer<typeof RepoPayload>): Promise<unknown>
-  save(payload: SaveInput): Promise<unknown>
-  prove(payload: z.infer<typeof ProvePayload>): Promise<unknown>
-  list(): Promise<unknown>
-  forget(payload: z.infer<typeof RepoPayload>): Promise<unknown>
-  logTail(payload: z.infer<typeof LogPayload>): Promise<unknown>
+  read(payload: z.infer<typeof RepoPayload>): ReturnType<typeof read>
+  save(payload: SaveInput): ReturnType<typeof save>
+  prove(payload: z.infer<typeof ProvePayload>): ReturnType<typeof proveCommand>
+  list(): ReturnType<typeof list>
+  forget(payload: z.infer<typeof RepoPayload>): ReturnType<typeof forget>
+  logTail(payload: z.infer<typeof LogPayload>): ReturnType<typeof logTail>
 }
 
 export function createProfileChannels(deps: ProfileChannelDeps): ProfileChannels {
@@ -109,7 +109,7 @@ async function resolvedFor(deps: ProfileChannelDeps, repoPath: string) {
   return { stored, resolved: resolveProfile({ repoPath, hintsDir: deps.hintsDir, stored }) }
 }
 
-async function read(deps: ProfileChannelDeps, repoPath: string): Promise<unknown> {
+async function read(deps: ProfileChannelDeps, repoPath: string) {
   const { stored, resolved } = await resolvedFor(deps, repoPath)
   return {
     repository: repoPath,
@@ -184,7 +184,7 @@ function changedProfile(stored: Profile, payload: SaveInput): Profile {
   }
 }
 
-async function save(deps: ProfileChannelDeps, payload: SaveInput): Promise<unknown> {
+async function save(deps: ProfileChannelDeps, payload: SaveInput) {
   const { repoPath } = payload
   const stored = (await readProfile(deps.dataRoot(), repoPath)) ?? emptyProfile(repoPath)
   await writeProfile(deps.dataRoot(), repoPath, operatorProfile(stored, payload))
@@ -211,7 +211,7 @@ async function seedDrafts(deps: ProfileChannelDeps, repoPath: string): Promise<v
 async function proveCommand(
   deps: ProfileChannelDeps,
   { repoPath, command }: z.infer<typeof ProvePayload>
-): Promise<unknown> {
+) {
   const baseline = deps.baseline()
   const order = draftOrder({
     id: `profile-${profileKey(repoPath)}`,
@@ -242,7 +242,7 @@ function commandsIn(profile: Profile): number {
   )
 }
 
-async function list(deps: ProfileChannelDeps): Promise<unknown> {
+async function list(deps: ProfileChannelDeps) {
   const profiles = await listProfiles(deps.dataRoot())
   return {
     profiles: profiles.map((profile) => ({
@@ -254,7 +254,7 @@ async function list(deps: ProfileChannelDeps): Promise<unknown> {
   }
 }
 
-async function forget(deps: ProfileChannelDeps, repoPath: string): Promise<unknown> {
+async function forget(deps: ProfileChannelDeps, repoPath: string) {
   await deleteProfile(deps.dataRoot(), repoPath)
   return { ok: true }
 }
@@ -268,7 +268,7 @@ const liesUnder = (parent: string, child: string): boolean =>
   child === parent || child.startsWith(parent + path.sep)
 
 /** The last lines of a log, only when its real path lies under the data root's records. */
-async function logTail(root: string, target: string): Promise<unknown> {
+async function logTail(root: string, target: string) {
   let real: string
   try {
     real = await fs.promises.realpath(path.resolve(target))

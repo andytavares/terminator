@@ -127,7 +127,7 @@ const TurnPayload = z.object({
   settle: SettlePayload.optional(),
 })
 
-const CompilePayload = z.object({
+export const CompilePayload = z.object({
   id: z.string(),
   commit: z.boolean().default(false),
   /** Foundry agreeing an order the operator already released, after an amendment. */
@@ -240,27 +240,27 @@ export interface ForgeDeps {
 
 export interface ForgeChannels {
   /** Run one turn of intake: the architect drafts, or redrafts, the plan. */
-  converge(payload: z.infer<typeof TurnPayload>): Promise<unknown>
-  create(payload: z.infer<typeof CreatePayload>): Promise<unknown>
-  turn(payload: z.infer<typeof TurnPayload>): Promise<unknown>
-  compile(payload: z.infer<typeof CompilePayload>): Promise<unknown>
-  list(): Promise<unknown>
+  converge(payload: z.infer<typeof TurnPayload>): ReturnType<typeof converge>
+  create(payload: z.infer<typeof CreatePayload>): ReturnType<typeof create>
+  turn(payload: z.infer<typeof TurnPayload>): ReturnType<typeof turn>
+  compile(payload: z.infer<typeof CompilePayload>): ReturnType<typeof compile>
+  list(): ReturnType<typeof list>
   /** The candidate states, for the operator to map intents against. */
-  states(payload: z.infer<typeof StatesPayload>): Promise<unknown>
+  states(payload: z.infer<typeof StatesPayload>): ReturnType<typeof states>
   /** Record which state one intent means for this order. */
-  mapState(payload: z.infer<typeof MapStatePayload>): Promise<unknown>
+  mapState(payload: z.infer<typeof MapStatePayload>): ReturnType<typeof mapState>
   /** Turn each write-back on or off for this order (FR-062). */
-  setWriteBack(payload: z.infer<typeof WriteBackPayload>): Promise<unknown>
+  setWriteBack(payload: z.infer<typeof WriteBackPayload>): ReturnType<typeof setWriteBack>
   /** Set a draft order's budgets. Null is no limit. */
-  setBudgets(payload: z.infer<typeof BudgetsPayload>): Promise<unknown>
+  setBudgets(payload: z.infer<typeof BudgetsPayload>): ReturnType<typeof setBudgets>
   /** Discard an order that should not have been made. */
-  cancel(payload: z.infer<typeof CancelPayload>): Promise<unknown>
+  cancel(payload: z.infer<typeof CancelPayload>): ReturnType<typeof cancel>
   /** Choose which shape hand-off will run (FR-014's override). */
-  recipe(payload: z.infer<typeof RecipePayload>): Promise<unknown>
+  recipe(payload: z.infer<typeof RecipePayload>): ReturnType<typeof recipe>
   /** Hold the loop for the operator, or release it. */
-  hold(payload: z.infer<typeof HoldPayload>): Promise<unknown>
+  hold(payload: z.infer<typeof HoldPayload>): ReturnType<typeof hold>
   /** Check the base branch again, or hand off without it. */
-  environment(payload: z.infer<typeof EnvironmentPayload>): Promise<unknown>
+  environment(payload: z.infer<typeof EnvironmentPayload>): ReturnType<typeof environment>
 }
 
 /** The order plus its checks — what every Forge channel hands back. */
@@ -356,7 +356,7 @@ function seedInput({ source, repoPaths }: CreateInput): SeedInput {
   return { kind: 'typed', text: source.text ?? '', repoPaths }
 }
 
-async function create(deps: ForgeDeps, payload: CreateInput): Promise<unknown> {
+async function create(deps: ForgeDeps, payload: CreateInput) {
   const seeded = await seedOrder(seedInput(payload), {
     now: deps.now,
     newId: () => newOrderId(new Date(deps.now())),
@@ -422,7 +422,7 @@ function recordOperator(
 
 type TurnInput = z.infer<typeof TurnPayload>
 
-async function turn(deps: ForgeDeps, payload: TurnInput): Promise<unknown> {
+async function turn(deps: ForgeDeps, payload: TurnInput) {
   const { id, strike, answer, finding, unverifiable, message } = payload
   const order = await deps.store.load(id)
   if (order === null) return { error: `No order ${id}.` }
@@ -437,7 +437,7 @@ async function turn(deps: ForgeDeps, payload: TurnInput): Promise<unknown> {
   return view(order)
 }
 
-async function strikeTurn(deps: ForgeDeps, order: WorkOrder, strike: string): Promise<unknown> {
+async function strikeTurn(deps: ForgeDeps, order: WorkOrder, strike: string) {
   const result = strikeAssumption(order, strike)
   await deps.store.save(result.order)
   await recordOperator(deps, order.id, {
@@ -452,7 +452,7 @@ async function findingTurn(
   deps: ForgeDeps,
   order: WorkOrder,
   { id: findingId, decision, reason }: NonNullable<TurnInput['finding']>
-): Promise<unknown> {
+) {
   if (reason.trim() === '') {
     // An accepted finding with no reason is a shrug, and the compile check
     // would refuse it anyway — said here rather than silently ignored.
@@ -472,7 +472,7 @@ async function unverifiableTurn(
   deps: ForgeDeps,
   order: WorkOrder,
   { criterionId, reason }: NonNullable<TurnInput['unverifiable']>
-): Promise<unknown> {
+) {
   if (reason.trim() === '') {
     // The schema refuses an empty reason too, but it would refuse it as a
     // malformed order rather than as the thing it is: an accepted
@@ -500,7 +500,7 @@ async function unverifiableTurn(
 
 type Answer = NonNullable<TurnInput['answer']>
 
-async function answerTurn(deps: ForgeDeps, order: WorkOrder, answer: Answer): Promise<unknown> {
+async function answerTurn(deps: ForgeDeps, order: WorkOrder, answer: Answer) {
   const next: WorkOrder = {
     ...order,
     openQuestions: answerQuestion(order.openQuestions, answer.questionId, answer.option),
@@ -532,11 +532,7 @@ function recordArchitectStart(
 
 // Start one architect turn on the order with the message given: shared by a plain
 // turn and a settle ending in a fix or an ask, so one place starts and records it.
-async function runArchitectTurn(
-  deps: ForgeDeps,
-  order: WorkOrder,
-  message?: string
-): Promise<unknown> {
+async function runArchitectTurn(deps: ForgeDeps, order: WorkOrder, message?: string) {
   // Once, from inside the turn when the architect starts, or here when
   // `converge` answered without starting one.
   let recorded: Promise<void> | null = null
@@ -569,7 +565,7 @@ async function settleTurn(
   deps: ForgeDeps,
   order: WorkOrder,
   { settle, message }: { settle: SettleInput; message: string | undefined }
-): Promise<unknown> {
+) {
   const accepts = settle.accepts ?? []
   if (accepts.some((a) => a.reason.trim() === '')) {
     return { ...view(order), error: 'Accepting a finding costs a written reason.' }
@@ -645,7 +641,7 @@ function fixMessage(
 // One intake turn: the architect reads the draft and the repository and proposes
 // criteria, plan, risk and budgets, read-only, in one file validated before it
 // reaches the order, so no agent can set its own status or agree its own work.
-async function converge(deps: ForgeDeps, payload: z.infer<typeof TurnPayload>): Promise<unknown> {
+async function converge(deps: ForgeDeps, payload: z.infer<typeof TurnPayload>) {
   const id = payload.id
   const order = await deps.store.load(id)
   if (order === null) return { error: `No order ${id}.` }
@@ -660,7 +656,19 @@ async function converge(deps: ForgeDeps, payload: z.infer<typeof TurnPayload>): 
   return runArchitectTurn(deps, order, payload.message)
 }
 
-async function compile(deps: ForgeDeps, payload: z.infer<typeof CompilePayload>): Promise<unknown> {
+/** What compile answers when it read the order: the facts, and what hand-off added. */
+export type CompileAnswer = Awaited<ReturnType<typeof readFacts>> & {
+  compile: ReturnType<typeof compileOrder>
+  order: WorkOrder
+  refused?: string
+  capability?: CapabilityReport
+  advisory?: string | null
+}
+
+async function compile(
+  deps: ForgeDeps,
+  payload: z.infer<typeof CompilePayload>
+): Promise<CompileAnswer | { error: string }> {
   const { id, commit, automatic } = payload
 
   const order = await deps.store.load(id)
@@ -736,11 +744,12 @@ async function afterAgreed(
 
 // What the tracker offers, for the mapping panel. Its own channel because compile is
 // polled and this is a network read that would spend the operator's rate limit.
-async function states(deps: ForgeDeps, payload: z.infer<typeof StatesPayload>): Promise<unknown> {
+async function states(deps: ForgeDeps, payload: z.infer<typeof StatesPayload>) {
   const order = await deps.store.load(payload.id)
   if (order === null) return { error: `No order ${payload.id}.` }
   if (deps.capability === undefined) {
-    return { capability: { transitions: 'no_issue', states: [], unreachable: [] } }
+    const capability: CapabilityReport = { transitions: 'no_issue', states: [], unreachable: [] }
+    return { capability }
   }
   try {
     return { capability: await deps.capability(order), mapping: order.stateMapping }
@@ -749,10 +758,7 @@ async function states(deps: ForgeDeps, payload: z.infer<typeof StatesPayload>): 
   }
 }
 
-async function mapState(
-  deps: ForgeDeps,
-  payload: z.infer<typeof MapStatePayload>
-): Promise<unknown> {
+async function mapState(deps: ForgeDeps, payload: z.infer<typeof MapStatePayload>) {
   const { id, intent, optionId } = payload
 
   const order = await deps.store.load(id)
@@ -778,7 +784,7 @@ async function mapState(
 // Discard an order: marked `cancelled`, not deleted, because the records are the
 // point. A running order is refused: its agents' work is in their worktrees, so
 // stop it at its gate first.
-async function cancel(deps: ForgeDeps, payload: z.infer<typeof CancelPayload>): Promise<unknown> {
+async function cancel(deps: ForgeDeps, payload: z.infer<typeof CancelPayload>) {
   const order = await deps.store.load(payload.id)
   if (order === null) return { error: `No order ${payload.id}.` }
   if (order.status === 'running') {
@@ -803,7 +809,7 @@ async function cancel(deps: ForgeDeps, payload: z.infer<typeof CancelPayload>): 
 }
 
 /** Every order still to be done, each with where it stands. */
-async function list(deps: ForgeDeps): Promise<unknown> {
+async function list(deps: ForgeDeps) {
   const orders = await deps.store.list()
   // A discarded order stays in the records and leaves the list; the list is
   // what needs doing, not what was ever asked for.
@@ -820,7 +826,7 @@ async function listRow(
   deps: ForgeDeps,
   order: WorkOrder,
   queuePositions: ReturnType<typeof queue>
-): Promise<unknown> {
+) {
   const { standing, gate } = await rowStanding(deps, order)
   return {
     id: order.id,
@@ -901,10 +907,7 @@ async function rowPulls(
 
 // Which write-backs this order does: per order, defaulting from configuration
 // (FR-062), so one run against someone else's repository can turn one off alone.
-async function setWriteBack(
-  deps: ForgeDeps,
-  payload: z.infer<typeof WriteBackPayload>
-): Promise<unknown> {
+async function setWriteBack(deps: ForgeDeps, payload: z.infer<typeof WriteBackPayload>) {
   const order = await deps.store.load(payload.id)
   if (order === null) return { error: `No order ${payload.id}.` }
 
@@ -925,10 +928,7 @@ async function setWriteBack(
   return view(next, ['writeBack'])
 }
 
-async function setBudgets(
-  deps: ForgeDeps,
-  payload: z.infer<typeof BudgetsPayload>
-): Promise<unknown> {
+async function setBudgets(deps: ForgeDeps, payload: z.infer<typeof BudgetsPayload>) {
   const order = await deps.store.load(payload.id)
   if (order === null) return { error: `No order ${payload.id}.` }
   if (order.status !== 'draft') {
@@ -953,7 +953,7 @@ async function setBudgets(
 
 // Choose the shape hand-off will run, overriding the proposal (FR-014). A draft only:
 // a running order's recipe was fixed by `run.start`.
-async function recipe(deps: ForgeDeps, payload: z.infer<typeof RecipePayload>): Promise<unknown> {
+async function recipe(deps: ForgeDeps, payload: z.infer<typeof RecipePayload>) {
   const order = await deps.store.load(payload.id)
   if (order === null) return { error: `No order ${payload.id}.` }
   if (order.status !== 'draft') {
@@ -976,7 +976,7 @@ async function recipe(deps: ForgeDeps, payload: z.infer<typeof RecipePayload>): 
 
 // Hold the loop for the operator, or release it. This only records the decision;
 // what release resumes is `deps.onReleased`'s job, in the loop.
-async function hold(deps: ForgeDeps, payload: z.infer<typeof HoldPayload>): Promise<unknown> {
+async function hold(deps: ForgeDeps, payload: z.infer<typeof HoldPayload>) {
   const order = await deps.store.load(payload.id)
   if (order === null) return { error: `No order ${payload.id}.` }
 
@@ -1018,10 +1018,7 @@ const MOVE_RECORDS: Record<
 
 // Check the base branch again, or hand off without it. A check runs on after the answer;
 // the Forge reads its result when baseline.json announces.
-async function environment(
-  deps: ForgeDeps,
-  payload: z.infer<typeof EnvironmentPayload>
-): Promise<unknown> {
+async function environment(deps: ForgeDeps, payload: z.infer<typeof EnvironmentPayload>) {
   const order = await deps.store.load(payload.id)
   if (order === null) return { error: `No order ${payload.id}.` }
   if (order.status !== 'draft') {

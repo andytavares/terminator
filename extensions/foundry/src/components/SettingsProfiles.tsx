@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Button } from '@terminator/extension-ui'
-import { invoke } from '@terminator/extension-sdk/renderer'
-import { checkRows, hasCommand, type ProfileFacts } from '../forge/checks-view.js'
+import { foundryInvoke } from '../renderer/foundry-invoke.js'
+import { checkRows, hasCommand } from '../forge/checks-view.js'
 import { useFoundryQuery } from '../renderer/foundry-query.js'
 
 // The repositories Foundry holds commands for. They are kept in Foundry's own
@@ -31,10 +31,10 @@ const NO_PROFILES: readonly ProfileSummary[] = []
 function useProfiles() {
   const { data, refetch } = useFoundryQuery(
     { key: ['profiles'], kinds: ['profile'] },
-    async () => (await invoke('foundry:profiles-list')) as { profiles?: ProfileSummary[] }
+    async () => await foundryInvoke('foundry:profiles-list')
   )
   const forget = async (repoPath: string): Promise<void> => {
-    await invoke('foundry:profile-forget', { repoPath })
+    await foundryInvoke('foundry:profile-forget', { repoPath })
     await refetch()
   }
   return { profiles: data?.profiles ?? NO_PROFILES, loaded: data !== undefined, forget }
@@ -43,7 +43,7 @@ function useProfiles() {
 function CommandList({ repoPath }: { readonly repoPath: string }) {
   const { data: profile } = useFoundryQuery(
     { key: ['profile', repoPath], kinds: ['profile'] },
-    async () => (await invoke('foundry:profile-read', { repoPath })) as ProfileFacts
+    async () => await foundryInvoke('foundry:profile-read', { repoPath })
   )
   if (profile === undefined) return <p className="fdry-note">Reading…</p>
   const rows = checkRows(profile, 'main', false).filter(hasCommand)

@@ -49,7 +49,8 @@ import {
   type StripIcon,
   type StepMark,
 } from '../forge/readiness.js'
-import { invoke } from '@terminator/extension-sdk/renderer'
+import { foundryInvoke } from '../renderer/foundry-invoke.js'
+import type { FoundryApi } from '../ipc/foundry-api.js'
 
 // The Forge.
 //
@@ -82,25 +83,11 @@ interface StatesView {
   error?: string
 }
 
-/** One shape of work this order could take, and why not where it cannot. */
-interface RecipeOption {
-  name: string
-  available: boolean
-  unmet: string[]
-  rung: string | null
-  description?: string
-}
+type Budgets = FoundryApi['foundry:order.budgets']['payload']['budgets']
 
-interface RecipesView {
-  recipes?: RecipeOption[]
-  proposed?: string
-  /** Why that shape was proposed (FR-014) — the grounds, not just the answer. */
-  proposedWhy?: string
-  /** The operator's saved pick (`order.recipe`), and when it was made. */
-  chosen?: string | null
-  chosenAt?: string | null
-  error?: string
-}
+type RecipesView = FoundryApi['foundry:run.recipes']['answer']
+
+type RecipeOption = Extract<RecipesView, { recipes: unknown }>['recipes'][number]
 
 const INTENTS: readonly TransitionIntent[] = ['started', 'in_review', 'done']
 
@@ -207,15 +194,7 @@ function findingDecided(choice: FindingChoice | undefined): boolean {
 }
 
 /** What one settle turn asks the backend to do in a single converge call. */
-interface Settle {
-  readonly answers: readonly {
-    readonly questionId: string
-    readonly option: number | readonly number[]
-  }[]
-  readonly accepts: readonly { readonly findingId: string; readonly reason: string }[]
-  readonly fixes: readonly { readonly findingId: string; readonly how: string }[]
-  readonly asks: readonly string[]
-}
+type Settle = NonNullable<FoundryApi['foundry:order.converge']['payload']['settle']>
 
 /**
  * Fold every local selection into the one payload `foundry:order.converge`
@@ -233,7 +212,8 @@ function buildSettle(
     .filter(([, picked]) => picked.length > 0)
     .map(([questionId, picked]) => ({
       questionId,
-      option: questions.find((q) => q.id === questionId)?.multiple === true ? picked : picked[0],
+      option:
+        questions.find((q) => q.id === questionId)?.multiple === true ? [...picked] : picked[0],
     }))
   const accepts: { findingId: string; reason: string }[] = []
   const fixes: { findingId: string; how: string }[] = []
@@ -269,15 +249,13 @@ function goTo(target: string): void {
 
 // A refused compile throws, so the view last drawn stays up.
 async function readCompiled(orderId: string): Promise<OrderView> {
-  const next = (await invoke('foundry:order.compile', { id: orderId, commit: false })) as
-    | OrderView
-    | { error: string }
+  const next = await foundryInvoke('foundry:order.compile', { id: orderId, commit: false })
   if ('error' in next) throw new Error(next.error)
   return next
 }
 
 async function readRecipes(orderId: string): Promise<RecipesView> {
-  return (await invoke('foundry:run.recipes', { id: orderId })) as RecipesView
+  return await foundryInvoke('foundry:run.recipes', { id: orderId })
 }
 
 function clockOf(iso: string): string {
@@ -294,7 +272,7 @@ export interface ForgeProps {
 }
 
 async function attachToSession(sessionId: string): Promise<string | null> {
-  const r = (await invoke('foundry:run-terminal', { sessionId })) as { ok?: boolean }
+  const r = await foundryInvoke('foundry:run-terminal', { sessionId })
   return r.ok === true ? null : 'that conversation no longer has an agent tab'
 }
 
@@ -496,7 +474,7 @@ function useTrackerStates(orderId: string) {
   useEffect(() => {
     let live = true
     void (async () => {
-      const next = (await invoke('foundry:order.states', { id: orderId })) as StatesView
+      const next = await foundryInvoke('foundry:order.states', { id: orderId })
       if (live) setStates(next)
     })()
     return () => {
@@ -505,10 +483,8 @@ function useTrackerStates(orderId: string) {
   }, [orderId])
   const mapIntent = useCallback(
     async (intent: TransitionIntent, optionId: string | null) => {
-      const next = (await invoke('foundry:order.mapState', { id: orderId, intent, optionId })) as {
-        mapping?: StateMapping
-      }
-      if (next.mapping !== undefined) {
+      const next = await foundryInvoke('foundry:order.mapState', { id: orderId, intent, optionId })
+      if ('mapping' in next) {
         setStates((current) => (current === null ? current : { ...current, mapping: next.mapping }))
       }
     },
@@ -533,9 +509,7 @@ type Shapes = ReturnType<typeof useRecipes>
 function useWriteBack(orderId: string, setView: Shown['setView']) {
   const setWriteBack = useCallback(
     async (writeBack: WriteBack[]) => {
-      const next = (await invoke('foundry:order.writeBack', { id: orderId, writeBack })) as
-        | OrderView
-        | { error: string }
+      const next = await foundryInvoke('foundry:order.writeBack', { id: orderId, writeBack })
       if ('order' in next) setView(next)
     },
     [orderId, setView]
@@ -546,27 +520,23 @@ function useWriteBack(orderId: string, setView: Shown['setView']) {
 /** Edits that are not a turn of the architect's: budgets, and a struck or excused line. */
 function useOrderEdits(orderId: string, { setView, setProblem, setMoved, busyWith }: Shown) {
   const setBudgets = useCallback(
-    (budgets: Record<string, number | null>) =>
+    (budgets: Budgets) =>
       busyWith(async () => {
-        const next = (await invoke('foundry:order.budgets', { id: orderId, budgets })) as
-          | OrderView
-          | { error: string }
+        const next = await foundryInvoke('foundry:order.budgets', { id: orderId, budgets })
         if ('order' in next) setView(next)
         else setProblem(next.error)
       }),
     [orderId, busyWith, setView, setProblem]
   )
   const turn = useCallback(
-    (payload: Record<string, unknown>) =>
+    (payload: Omit<FoundryApi['foundry:order.turn']['payload'], 'id'>) =>
       busyWith(async () => {
-        const next = (await invoke('foundry:order.turn', { id: orderId, ...payload })) as
-          | (OrderView & { error?: string })
-          | { error: string }
+        const next = await foundryInvoke('foundry:order.turn', { id: orderId, ...payload })
         if ('order' in next) {
           setView(next)
           setMoved(next.changed ?? [])
         }
-        if (next.error !== undefined) setProblem(next.error)
+        if ('error' in next) setProblem(next.error)
       }),
     [orderId, busyWith, setView, setMoved, setProblem]
   )
@@ -578,11 +548,9 @@ function useConverge(orderId: string, { setView, setProblem, busyWith }: Shown) 
   const sendConverge = useCallback(
     (turn: { message?: string; settle?: Settle }) =>
       busyWith(async () => {
-        const next = (await invoke('foundry:order.converge', { id: orderId, ...turn })) as
-          | (OrderView & { error?: string; converging?: string })
-          | { error: string }
+        const next = await foundryInvoke('foundry:order.converge', { id: orderId, ...turn })
         if ('order' in next) setView(next)
-        if (next.error !== undefined) setProblem(next.error)
+        if ('error' in next) setProblem(next.error)
       }),
     [orderId, busyWith, setView, setProblem]
   )
@@ -595,10 +563,8 @@ function useConverge(orderId: string, { setView, setProblem, busyWith }: Shown) 
 }
 
 /** Agrees the order; what compile said, which is the order or why not. */
-async function commitOrder(orderId: string): Promise<OrderView | { error: string }> {
-  return (await invoke('foundry:order.compile', { id: orderId, commit: true })) as
-    | OrderView
-    | { error: string }
+function commitOrder(orderId: string) {
+  return foundryInvoke('foundry:order.compile', { id: orderId, commit: true })
 }
 
 /** Starts the agreed order's run in the shape chosen, if one was; why not, when it did not start. */
@@ -606,13 +572,10 @@ async function startAgreedRun(
   orderId: string,
   chosen: string | null | undefined
 ): Promise<string | null> {
-  const started = (await invoke('foundry:run.start', {
+  const started = await foundryInvoke('foundry:run.start', {
     id: orderId,
     ...(chosen != null ? { recipe: chosen } : {}),
-  })) as {
-    error?: string
-    order?: { status: string }
-  }
+  })
   return started.error ?? null
 }
 
@@ -623,10 +586,8 @@ function useEnvironmentMove(
 ) {
   return useCallback(
     async (move: 'check' | 'waive' | 'continue-unmeasured' | 'decline-pictures') => {
-      const next = (await invoke('foundry:forge.environment', { id: orderId, move })) as
-        | OrderView
-        | { error: string }
-      if ('error' in next) setProblem(next.error)
+      const next = await foundryInvoke('foundry:forge.environment', { id: orderId, move })
+      if (next.error !== undefined) setProblem(next.error)
       else if ('order' in next) setView(next)
     },
     [orderId, setView, setProblem]
@@ -649,7 +610,7 @@ function useOrderMoves(orderId: string, { shown, shapes }: Pick<HandOffDeps, 'sh
     async (held: boolean) => {
       setBusy(true)
       try {
-        await invoke('foundry:order.hold', { id: orderId, held })
+        await foundryInvoke('foundry:order.hold', { id: orderId, held })
         await refresh()
       } finally {
         setBusy(false)
@@ -659,7 +620,7 @@ function useOrderMoves(orderId: string, { shown, shapes }: Pick<HandOffDeps, 'sh
   )
   const pickRecipe = useCallback(
     async (recipe: string | null) => {
-      await invoke('foundry:order.recipe', { id: orderId, recipe })
+      await foundryInvoke('foundry:order.recipe', { id: orderId, recipe })
       await Promise.all([refresh(), refreshRecipes()])
     },
     [orderId, refresh, refreshRecipes]
@@ -1631,7 +1592,9 @@ function DraftBudgets({ forge }: ForgeProp) {
       ]}
       submitLabel="Save budgets"
       disabled={forge.locked}
-      onSubmit={(next) => void forge.setBudgets(next)}
+      onSubmit={(next) =>
+        void forge.setBudgets({ agents: next.agents, wallClockMinutes: next.wallClockMinutes })
+      }
     />
   )
 }

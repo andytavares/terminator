@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { invoke } from '@terminator/extension-sdk/renderer'
+import { foundryInvoke } from '../renderer/foundry-invoke.js'
 import type { Baseline } from '../line/baseline.js'
 import type { WorkOrder } from '../order/schema.js'
 import {
@@ -89,7 +89,7 @@ function decidedFrom(facts: OrderFacts | null): Decision[] {
 function useProfile(repoPath: string | null) {
   const { data } = useFoundryQuery({ key: ['profile', repoPath], kinds: ['profile'] }, async () => {
     if (repoPath === null) return null
-    const answer = await invoke('foundry:profile-read', { repoPath })
+    const answer = await foundryInvoke('foundry:profile-read', { repoPath })
     if (!isProfile(answer)) throw new Error(errorOf(answer) ?? 'The profile could not be read.')
     return answer
   })
@@ -106,7 +106,7 @@ function useProfile(repoPath: string | null) {
 function useProve(repoPath: string | null) {
   return useCallback(
     async (command: string): Promise<ProveOutcome> =>
-      (await invoke('foundry:profile-prove', { repoPath, command })) as ProveOutcome,
+      await foundryInvoke('foundry:profile-prove', { repoPath: repoPath ?? '', command }),
     [repoPath]
   )
 }
@@ -140,7 +140,12 @@ function useProfileMoves(
 ) {
   const save = useCallback(
     async (change: SaveChange): Promise<string | null> => {
-      const answer = await invoke('foundry:profile-save', { repoPath, ...change })
+      const answer = await foundryInvoke('foundry:profile-save', {
+        repoPath: repoPath ?? '',
+        ...change,
+        remove: change.remove && [...change.remove],
+        additional: change.additional && [...change.additional],
+      })
       show(answer)
       return errorOf(answer)
     },
@@ -150,7 +155,7 @@ function useProfileMoves(
 }
 
 const tailOf = async (path: string): Promise<LogTail> =>
-  (await invoke('foundry:log-tail', { path })) as LogTail
+  await foundryInvoke('foundry:log-tail', { path })
 
 function logFinder(baseline: Baseline | null | undefined) {
   return (command: string): string | null => {

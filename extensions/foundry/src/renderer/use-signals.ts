@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { invoke } from '@terminator/extension-sdk/renderer'
+import { foundryInvoke } from './foundry-invoke.js'
 import type { Signal } from '../sensors/types.js'
 import { readSignals, type SensorRow } from '../components/signals-read.js'
 import { useFoundryQuery } from './foundry-query.js'
@@ -39,14 +39,8 @@ const NO_PROMOTION: Promotion = {
   promoted: null,
 }
 
-async function requestPromotion(
-  id: string,
-  repoPath: string
-): Promise<{ order?: { id: string }; error?: string }> {
-  return (await invoke('foundry:signals.promote', { id, repoPaths: [repoPath] })) as {
-    order?: { id: string }
-    error?: string
-  }
+function requestPromotion(id: string, repoPath: string) {
+  return foundryInvoke('foundry:signals.promote', { id, repoPaths: [repoPath] })
 }
 
 // Promoting a signal into a draft: opened with the sensor's repository as the
@@ -67,7 +61,7 @@ export function usePromotion(sensors: readonly SensorRow[], refreshSignals: () =
   const confirmPromote = async (id: string) => {
     patchPromotion({ signalProblem: null })
     const result = await requestPromotion(id, state.repoDraft)
-    if (result.error !== undefined) {
+    if ('error' in result) {
       patchPromotion({ signalProblem: result.error })
       return
     }

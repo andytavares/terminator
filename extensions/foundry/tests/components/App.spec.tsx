@@ -569,7 +569,7 @@ function unreadableViewTests() {
       return channel in replies ? replies[channel](payload) : {}
     })
     render(<App />)
-    await waitFor(() => expect(mockBridgeInvoke).toHaveBeenCalledWith('foundry:ui.view'))
+    await waitFor(() => expect(mockBridgeInvoke).toHaveBeenCalledWith('foundry:ui.view', {}))
     expect(screen.getByRole('button', { name: 'List view' }).getAttribute('aria-pressed')).toBe(
       'true'
     )
@@ -582,7 +582,7 @@ function unreadableViewTests() {
     })
     render(<App />)
     await waitFor(() =>
-      expect(mockBridgeInvoke).toHaveBeenCalledWith('foundry:ui.consume-pending-new-order')
+      expect(mockBridgeInvoke).toHaveBeenCalledWith('foundry:ui.consume-pending-new-order', {})
     )
     expect(screen.getByRole('tab', { name: 'Forge' }).getAttribute('aria-selected')).toBe('true')
   })

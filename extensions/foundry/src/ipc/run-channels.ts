@@ -136,17 +136,17 @@ export interface RunDeps {
 
 export interface RunChannels {
   /** Continue a run that halted at a gate the operator has now answered. */
-  resume(payload: z.infer<typeof ObservePayload>): Promise<unknown>
-  start(payload: z.infer<typeof StartPayload>): Promise<unknown>
-  observe(payload: z.infer<typeof ObservePayload>): Promise<unknown>
+  resume(payload: z.infer<typeof ObservePayload>): ReturnType<typeof resume>
+  start(payload: z.infer<typeof StartPayload>): ReturnType<typeof start>
+  observe(payload: z.infer<typeof ObservePayload>): ReturnType<typeof observe>
   /** Which shapes of work this order could actually take, and why not. */
-  recipes(payload: z.infer<typeof ObservePayload>): Promise<unknown>
+  recipes(payload: z.infer<typeof ObservePayload>): ReturnType<typeof recipes>
   /** The live session behind a running agent, so a surface can go to it. */
-  attach(payload: z.infer<typeof AttachPayload>): Promise<unknown>
+  attach(payload: z.infer<typeof AttachPayload>): ReturnType<typeof attach>
   /** What each running node's agent has been doing, for the Factory view. */
-  activity(payload: z.infer<typeof ActivityPayload>): Promise<unknown>
+  activity(payload: z.infer<typeof ActivityPayload>): ReturnType<typeof activity>
   /** Everything recorded about a run, for the Factory view to play back. */
-  timeline(payload: z.infer<typeof ActivityPayload>): Promise<unknown>
+  timeline(payload: z.infer<typeof ActivityPayload>): ReturnType<typeof timeline>
 }
 
 /**
@@ -380,7 +380,7 @@ async function loadGraph(deps: RunDeps, orderId: string): Promise<RunGraph | nul
   return readRunGraph(deps.dataRoot(), orderId, deps.index?.(deps.dataRoot()))
 }
 
-async function start(deps: RunDeps, payload: z.infer<typeof StartPayload>): Promise<unknown> {
+async function start(deps: RunDeps, payload: z.infer<typeof StartPayload>) {
   const order = await deps.store.load(payload.id)
   if (order === null) return { error: `No order ${payload.id}.` }
   if (order.status !== 'agreed') {
@@ -473,7 +473,7 @@ async function markRunning(
   return running
 }
 
-async function observe(deps: RunDeps, payload: z.infer<typeof ObservePayload>): Promise<unknown> {
+async function observe(deps: RunDeps, payload: z.infer<typeof ObservePayload>) {
   const { id } = payload
   const graph = await loadGraph(deps, id)
   if (graph === null) return { error: `No run for ${id}.` }
@@ -614,7 +614,7 @@ function laneRows(order: WorkOrder) {
 // Pick a halted run back up by re-entering the executor over the graph on disk, the
 // one statement of where it got to. A node sent back is retried; a run already going
 // is unaffected, since the scheduler never offers a running node.
-async function resume(deps: RunDeps, payload: z.infer<typeof ObservePayload>): Promise<unknown> {
+async function resume(deps: RunDeps, payload: z.infer<typeof ObservePayload>) {
   const order = await deps.store.load(payload.id)
   if (order === null) return { error: `No order ${payload.id}.` }
   if (order.status !== 'running') {
@@ -682,7 +682,7 @@ function recordLine(
   })
 }
 
-async function recipes(deps: RunDeps, payload: z.infer<typeof ObservePayload>): Promise<unknown> {
+async function recipes(deps: RunDeps, payload: z.infer<typeof ObservePayload>) {
   const order = await deps.store.load(payload.id)
   if (order === null) return { error: `No order ${payload.id}.` }
 
@@ -723,7 +723,7 @@ async function recipes(deps: RunDeps, payload: z.infer<typeof ObservePayload>): 
 }
 
 /** Where the agent is: the backstop, one action from any surface, to type at it. */
-async function attach(deps: RunDeps, payload: z.infer<typeof AttachPayload>): Promise<unknown> {
+async function attach(deps: RunDeps, payload: z.infer<typeof AttachPayload>) {
   const graph = await loadGraph(deps, payload.orderId)
   if (graph === null) return { error: `No run for ${payload.orderId}.` }
 
@@ -761,7 +761,7 @@ function finishedAgent(step: string, node: RunNode): string | null {
 
 // What each node's agent has been doing lately: the last 20 transcript entries, enough
 // for a station to say "reading" or "running a shell command".
-async function activity(deps: RunDeps, payload: z.infer<typeof ActivityPayload>): Promise<unknown> {
+async function activity(deps: RunDeps, payload: z.infer<typeof ActivityPayload>) {
   const graph = await loadGraph(deps, payload.id)
   if (graph === null) return { error: `No run for ${payload.id}.` }
 
@@ -776,7 +776,7 @@ async function activity(deps: RunDeps, payload: z.infer<typeof ActivityPayload>)
 
 // The run as recorded while it ran: the graph, each frame of node states and tool
 // calls, and every gate raised, decided ones too, since a replay shows the waits.
-async function timeline(deps: RunDeps, payload: z.infer<typeof ActivityPayload>): Promise<unknown> {
+async function timeline(deps: RunDeps, payload: z.infer<typeof ActivityPayload>) {
   const graph = await loadGraph(deps, payload.id)
   if (graph === null) return { error: `No run for ${payload.id}.` }
 

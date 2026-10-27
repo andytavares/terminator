@@ -1,5 +1,6 @@
 import { defineChannel, noPayload } from '@terminator/extension-sdk'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
+import type { z } from 'zod'
 import { modelCatalog } from '../state/model-catalog.js'
 
 import { foundryChannel } from './channel.js'
@@ -37,15 +38,19 @@ export function registerModelChannels(api: ExtensionAPI): void {
       },
     }),
     // What answers an ask: a narrow amendment, so Sonnet unless overridden.
-    foundryChannel('foundry:ask-model', noPayload, () => ({ selected: askModel(api) })),
+    foundryChannel('foundry:ask-model', noPayload, () => currentAskModel(api)),
     defineChannel({
       channel: 'foundry:ask-model-set',
       schema: AskModelSetPayload,
       invalid: { error: `model must be one of ${ASK_MODELS.join(', ')}` },
-      run: ({ model }) => {
-        api.settings.set(ASK_MODEL_SETTING_KEY, model)
-        return { ok: true, selected: model }
-      },
+      run: (payload) => setAskModel(api, payload),
     })
   )
+}
+
+export const currentAskModel = (api: ExtensionAPI) => ({ selected: askModel(api) })
+
+export function setAskModel(api: ExtensionAPI, { model }: z.infer<typeof AskModelSetPayload>) {
+  api.settings.set(ASK_MODEL_SETTING_KEY, model)
+  return { ok: true, selected: model }
 }

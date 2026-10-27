@@ -45,7 +45,7 @@ const METRICS = {
 let bus = createChangeBus()
 
 function mount(
-  orders: FactoryOrderRow[],
+  orders: Partial<Record<keyof FactoryOrderRow, unknown>>[],
   metrics: Record<string, unknown> = METRICS,
   extra: { signals?: Signal[]; sensors?: unknown[]; promote?: unknown } = {}
 ) {

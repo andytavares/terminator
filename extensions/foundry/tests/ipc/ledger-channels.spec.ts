@@ -1,3 +1,4 @@
+import { answered } from '../helpers/answer-shape.js'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -206,9 +207,7 @@ describe('foundry:rules.propose', () => {
 
   it('proposes one rule for three rejections of the same thing, with its citations', async () => {
     await repeatedRejections()
-    const r = (await channels().proposeRules({})) as {
-      proposals: { id: string; citations: unknown[]; origin: string }[]
-    }
+    const r = answered(await channels().proposeRules({}))
     expect(r.proposals).toHaveLength(1)
     expect(r.proposals[0].citations).toHaveLength(3)
     expect(r.proposals[0].origin).toMatch(/^curator:/)
@@ -333,9 +332,7 @@ describe('removing an accepted check (FR-081)', () => {
 function listingAndRemovingTests() {
   it('lists what the operator accepted, and nothing that shipped with the tool', async () => {
     const id = await accept()
-    const view = (await channels().rulesInForce()) as {
-      rules: { id: string; rung: string }[]
-    }
+    const view = answered(await channels().rulesInForce())
     expect(view.rules.map((rule) => rule.id)).toEqual([id])
     expect(view.rules.every((rule) => rule.rung === 'data-root')).toBe(true)
   })
@@ -464,12 +461,7 @@ function gatheringTests() {
 
     await seedLedgerOrder('WO-2')
 
-    const r = (await channels().factoryMetrics({})) as {
-      window: string
-      shipped: number
-      firstPassYield: number | null
-      orders: { orderId: string }[]
-    }
+    const r = answered(await channels().factoryMetrics({}))
     expect(r.window).toBe('30d')
     expect(r.shipped).toBe(1)
     expect(r.firstPassYield).toBe(1)

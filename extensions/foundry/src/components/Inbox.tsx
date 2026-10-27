@@ -13,12 +13,13 @@ import {
   Unplug,
   Hand,
 } from 'lucide-react'
-import type { Gate, GateRuleId } from '../gates/rules.js'
+import type { GateRuleId } from '../gates/rules.js'
 import { ExternalLink } from './ExternalLink.js'
 import { useFoundryQuery, ANY_RECORD } from '../renderer/foundry-query.js'
 import { Button } from '@terminator/extension-ui'
 import type { Signal } from '../sensors/types.js'
-import { invoke } from '@terminator/extension-sdk/renderer'
+import { foundryInvoke } from '../renderer/foundry-invoke.js'
+import type { FoundryApi } from '../ipc/foundry-api.js'
 import type { SensorRow } from './signals-read.js'
 import { usePromotion, useSignalFeed } from '../renderer/use-signals.js'
 
@@ -29,15 +30,7 @@ import { usePromotion, useSignalFeed } from '../renderer/use-signals.js'
 // happens if it is ignored — because an interruption the operator cannot
 // attribute is one they learn to click through without reading.
 
-interface InboxView {
-  gates: (Gate & {
-    orderTitle: string | null
-    pulls?: { number: number; url: string }[]
-    source?: { key: string; url: string } | null
-  })[]
-  /** Orders waiting on you that no gate stands for, with why. */
-  waiting?: { orderId: string; title: string; headline: string; detail: string }[]
-}
+type InboxView = FoundryApi['foundry:inbox.list']['answer']
 
 /** The evidence a signal was last seen with, most recent first. */
 function latestEvidence(signal: Signal): Signal['evidence'][number] | undefined {
@@ -72,7 +65,7 @@ const RULE_TONE: Record<GateRuleId, string> = {
 }
 
 async function readInbox(): Promise<InboxView> {
-  return (await invoke('foundry:inbox.list')) as InboxView
+  return await foundryInvoke('foundry:inbox.list')
 }
 
 // An order can start waiting on you at any moment; Foundry says when.
@@ -128,9 +121,7 @@ function useAnswers(refreshList: () => Promise<void>, refreshSignals: () => Prom
         // a rule that threw — used to look exactly like one it took, because
         // the reply was thrown away and the list simply redrew.
         const payload = limit === undefined ? { gateId, option } : { gateId, option, limit }
-        const result = (await invoke('foundry:inbox.decide', payload)) as {
-          error?: string
-        }
+        const result = await foundryInvoke('foundry:inbox.decide', payload)
         if (result.error !== undefined) setProblem(result.error)
         await refreshList()
         await refreshSignals()
@@ -149,7 +140,7 @@ function useSignals() {
   const promotion = usePromotion(sensors, refreshSignals)
   const dismissSignal = useCallback(
     async (id: string) => {
-      await invoke('foundry:signals.dismiss', { id })
+      await foundryInvoke('foundry:signals.dismiss', { id })
       await refreshSignals()
     },
     [refreshSignals]
@@ -163,7 +154,7 @@ function WaitingOrders({
   waiting,
   onOpenOrder,
 }: {
-  readonly waiting: NonNullable<InboxView['waiting']>
+  readonly waiting: InboxView['waiting']
   readonly onOpenOrder?: (orderId: string) => void
 }) {
   if (waiting.length === 0) return null
@@ -180,7 +171,7 @@ function WaitingRow({
   row,
   onOpen,
 }: {
-  readonly row: NonNullable<InboxView['waiting']>[number]
+  readonly row: InboxView['waiting'][number]
   readonly onOpen: () => void
 }) {
   return (
@@ -212,7 +203,7 @@ interface GateQueueProps {
   readonly onAnswer: (gateId: string, option: string, limit?: number | null) => Promise<void>
 }
 
-function WaitingText({ row }: { readonly row: NonNullable<InboxView['waiting']>[number] }) {
+function WaitingText({ row }: { readonly row: InboxView['waiting'][number] }) {
   return (
     <div className="fdry-waiting-main">
       <b>{row.headline}</b>

@@ -44,7 +44,8 @@ import {
   type FloorView,
   type PendingAsk,
 } from '../renderer/use-run-observation.js'
-import { invoke } from '@terminator/extension-sdk/renderer'
+import { foundryInvoke, refusalOf } from '../renderer/foundry-invoke.js'
+import type { FoundryApi } from '../ipc/foundry-api.js'
 
 // Where you watch, not where you act.
 //
@@ -54,34 +55,14 @@ import { invoke } from '@terminator/extension-sdk/renderer'
 // gets, there are moments when the only useful thing is to be in the terminal
 // typing at it.
 
-interface FeedEntry {
-  id: string
-  at: number
-  sessionId: string
-  author: string
-  summary: string
-}
+type FeedEntry = FoundryApi['foundry:feed-list']['answer']['entries'][number]
 
 /** A run whose posts are silenced. Shown, because a mute you cannot find is
  *  a mute you never undo. */
-interface MuteRule {
-  sessionId?: string
-  author?: string
-}
+type MuteRule = FoundryApi['foundry:feed-list']['answer']['mutes'][number]
 
 /** A run that stopped making progress without asking for anything. */
-interface StallFiring {
-  firing: {
-    sessionId: string
-    /** The detector's own vocabulary: these two and nothing else. */
-    signal: 'silence' | 'loop'
-    firedAt: number
-    /** The values that satisfied the condition, so the row can say them. */
-    inputs?: { toolSilenceMs: number }
-  }
-  featureDir: string
-  shadow: boolean
-}
+type StallFiring = FoundryApi['foundry:stalls-list']['answer']['firings'][number]
 
 /**
  * What a firing means, in a sentence.
@@ -158,14 +139,8 @@ interface LiveRead {
 }
 
 async function readLiveState(): Promise<LiveRead> {
-  const stalled = (await invoke('foundry:stalls-list')) as {
-    firings?: StallFiring[]
-    shadowMode?: boolean
-  }
-  const activity = (await invoke('foundry:feed-list')) as {
-    entries?: FeedEntry[]
-    mutes?: MuteRule[]
-  }
+  const stalled = await foundryInvoke('foundry:stalls-list')
+  const activity = await foundryInvoke('foundry:feed-list')
   return {
     stalls: stalled.firings ?? [],
     shadowMode: stalled.shadowMode ?? true,
@@ -177,9 +152,7 @@ async function readLiveState(): Promise<LiveRead> {
 /** The transcript of the agent being watched; null when none is. */
 async function readWatched(watching: string | null): Promise<TranscriptLine[] | null> {
   if (watching === null) return null
-  const tail = (await invoke('foundry:run-transcript', { sessionId: watching, limit: 40 })) as {
-    lines?: TranscriptLine[]
-  }
+  const tail = await foundryInvoke('foundry:run-transcript', { sessionId: watching, limit: 40 })
   return tail.lines ?? []
 }
 
@@ -189,10 +162,10 @@ async function readRunningTails(
 ): Promise<Record<string, TranscriptLine[]>> {
   const tails: Record<string, TranscriptLine[]> = {}
   for (const sessionId of runningSessions === '' ? [] : runningSessions.split(' ')) {
-    const tail = (await invoke('foundry:run-transcript', {
+    const tail = await foundryInvoke('foundry:run-transcript', {
       sessionId,
       limit: LIVE_LINES * 3,
-    })) as { lines?: TranscriptLine[] }
+    })
     // The agent's own words and calls. The user side is the brief and
     // tool results, which are either enormous or empty here.
     tails[sessionId] = byMessage((tail.lines ?? []).filter((l) => l.role === 'assistant'))
@@ -273,26 +246,24 @@ type SetProblem = (problem: string | null) => void
 
 /** Allows or denies a held call; why not, when it is no longer waiting. */
 async function resolveAsk(ask: PendingAsk, decision: 'allow' | 'deny'): Promise<string | null> {
-  const result = (await invoke('foundry:permission-resolve', {
+  const result = await foundryInvoke('foundry:permission-resolve', {
     requestId: ask.requestId,
     decision,
-  })) as { ok: boolean; reason?: string }
+  })
   // A click that did nothing is worse than a refusal that says why.
   return result.ok ? null : (result.reason ?? 'that request is no longer waiting')
 }
 
 /** Hands a held call back to its terminal and goes there; what went wrong, if anything. */
 async function handAskBack(ask: PendingAsk): Promise<string | null> {
-  const given = (await invoke('foundry:permission-hand-back', {
+  const given = await foundryInvoke('foundry:permission-hand-back', {
     requestId: ask.requestId,
-  })) as { ok?: boolean }
+  })
   if (given.ok !== true) return 'that request is no longer waiting'
   // Handing back and going there are two things, and the second can fail on
   // its own: a run whose terminal has been closed accepts the hand-back and
   // has nowhere to send you. Silently, until this said so.
-  const gone = (await invoke('foundry:run-terminal', { sessionId: ask.sessionId })) as {
-    ok?: boolean
-  }
+  const gone = await foundryInvoke('foundry:run-terminal', { sessionId: ask.sessionId })
   return gone.ok === true ? null : 'handed back, but that run no longer has an agent tab to open'
 }
 
@@ -317,10 +288,16 @@ function useAskAnswers(setProblem: SetProblem, pollLive: () => Promise<void>) {
 }
 
 /** Steering a live agent, and clearing or silencing what the feed says. */
+type SessionControl =
+  | 'foundry:run-redirect'
+  | 'foundry:run-interrupt'
+  | 'foundry:run-stop'
+  | 'foundry:run-terminal'
+
 function useSessionControl(setProblem: SetProblem, pollLive: () => Promise<void>) {
   const control = useCallback(
-    async (channel: string, payload: Record<string, unknown>) => {
-      const result = (await invoke(channel, payload)) as { ok?: boolean }
+    async <K extends SessionControl>(channel: K, payload: FoundryApi[K]['payload']) => {
+      const result = await foundryInvoke(channel, payload)
       if (result.ok !== true) setProblem('that run is no longer live')
       await pollLive()
     },
@@ -328,7 +305,7 @@ function useSessionControl(setProblem: SetProblem, pollLive: () => Promise<void>
   )
   const dismiss = useCallback(
     async (entry: FeedEntry, mute: boolean) => {
-      await invoke(mute ? 'foundry:feed-mute' : 'foundry:feed-dismiss', {
+      await foundryInvoke(mute ? 'foundry:feed-mute' : 'foundry:feed-dismiss', {
         id: entry.id,
         sessionId: entry.sessionId,
       })
@@ -338,7 +315,7 @@ function useSessionControl(setProblem: SetProblem, pollLive: () => Promise<void>
   )
   const unmute = useCallback(
     async (rule: MuteRule) => {
-      await invoke('foundry:feed-unmute', rule)
+      await foundryInvoke('foundry:feed-unmute', rule)
       await pollLive()
     },
     [pollLive]
@@ -425,19 +402,21 @@ function useAttach(orderId: string) {
 
 type RunChannel = 'foundry:run.resume' | 'foundry:run.stop' | 'foundry:run.reset'
 
+type DecisionChannel = RunChannel | 'foundry:inbox.decide'
+
 // Resume or stop a run nothing is running, and answer the gate holding this order on
 // the inbox's own channel: one queue, shown where the person looking at the order is.
 function useDecisions(orderId: string, setProblem: SetProblem, refresh: () => Promise<void>) {
   const [busy, setBusy] = useState(false)
   const decide = useCallback(
-    async (channel: string, payload: Record<string, unknown>) => {
+    async <K extends DecisionChannel>(channel: K, payload: FoundryApi[K]['payload']) => {
       setBusy(true)
       try {
-        const r = (await invoke(channel, payload)) as { error?: string; actionError?: string }
+        const r = await foundryInvoke(channel, payload)
         // Said out loud. A refusal that leaves the band exactly as it was reads
         // as a button that does nothing, which is what sent people to the
         // terminal to find out.
-        setProblem(r.error ?? r.actionError ?? null)
+        setProblem(refusalOf(r))
         await refresh()
       } finally {
         setBusy(false)

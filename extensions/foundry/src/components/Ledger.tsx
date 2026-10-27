@@ -12,7 +12,8 @@ import { rungLevelInWords } from '../verify/ladder.js'
 import type { Rung } from '../verify/ladder.js'
 import { rungInWords } from '../recipe/rung.js'
 import type { Rung as ResolveRung } from '../recipe/rung.js'
-import { invoke } from '@terminator/extension-sdk/renderer'
+import { foundryInvoke } from '../renderer/foundry-invoke.js'
+import type { FoundryApi } from '../ipc/foundry-api.js'
 
 // The record: every decision, by whom or by what rule, and why.
 //
@@ -21,31 +22,11 @@ import { invoke } from '@terminator/extension-sdk/renderer'
 // get accepted without being read, and a rule accepted without being read is
 // worse than no rule.
 
-interface LedgerView {
-  entries: LedgerEntry[]
-  total: number
-  actors: string[]
-  actions: string[]
-  orders: string[]
-}
+type LedgerView = FoundryApi['foundry:ledger.query']['answer']
 
-interface AcceptedRule {
-  id: string
-  asserts: string
-  rung: string
-  origin: string
-}
+type RulesView = FoundryApi['foundry:rules.inForce']['answer']
 
-interface AvailableSkill {
-  id: string
-  rung: string
-}
-
-interface RulesView {
-  rules: AcceptedRule[]
-  declined: { id: string; reason: string; asserts?: string | null }[]
-  skills: AvailableSkill[]
-}
+type AcceptedRule = RulesView['rules'][number]
 
 const PAGE = 200
 
@@ -63,33 +44,24 @@ function whenRead<T>(show: (value: T) => void): (value: T | null) => void {
   }
 }
 
-async function readRulesView(): Promise<RulesView | null> {
-  const next = (await invoke('foundry:rules.inForce', {})) as Partial<RulesView> & {
-    error?: string
-  }
-  if (next.error !== undefined) return null
-  // Normalised on arrival rather than guarded at every read: a reply missing
-  // an array is the same thing to this panel as an empty one.
+// Normalised on arrival rather than guarded at every read: a reply missing an array is the
+// same thing to this panel as an empty one.
+async function readRulesView(): Promise<RulesView> {
+  const next = await foundryInvoke('foundry:rules.inForce')
   return { rules: next.rules ?? [], declined: next.declined ?? [], skills: next.skills ?? [] }
 }
 
-async function readLedger(orderId: string, actor: string, action: string): Promise<LedgerView> {
-  const next = (await invoke('foundry:ledger.query', {
+function readLedger(orderId: string, actor: string, action: string): Promise<LedgerView> {
+  return foundryInvoke('foundry:ledger.query', {
     orderId: orderId === '' ? undefined : orderId,
     actor: actor === '' ? undefined : actor,
     action: action === '' ? undefined : action,
     limit: PAGE,
-  })) as LedgerView | { error: string }
-  if ('error' in next) throw new Error(next.error)
-  return next
+  })
 }
 
-async function readMetrics(window: '30d' | 'all'): Promise<FactoryMetrics> {
-  const next = (await invoke('foundry:factory.metrics', { window })) as
-    | FactoryMetrics
-    | { error: string }
-  if ('error' in next) throw new Error(next.error)
-  return next
+function readMetrics(window: '30d' | 'all'): Promise<FactoryMetrics> {
+  return foundryInvoke('foundry:factory.metrics', { window })
 }
 
 /** `operator`, `rule:budget.exceeded`, `role:verifier` — the kind, for the eye. */
@@ -199,7 +171,7 @@ function useProposals(refreshRules: () => Promise<void>) {
   const [proposals, setProposals] = useState<Proposal[] | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const ask = useCallback(async () => {
-    const next = (await invoke('foundry:rules.propose', {})) as { proposals?: Proposal[] }
+    const next = await foundryInvoke('foundry:rules.propose', {})
     setProposals(next.proposals ?? [])
     setNote(null)
   }, [])
@@ -226,10 +198,10 @@ function useProposals(refreshRules: () => Promise<void>) {
 
 /** Accepts or declines a proposal; the refusal, or null when it took. */
 async function sendProposalDecision(proposal: Proposal, accept: boolean): Promise<string | null> {
-  const result = (await invoke('foundry:rules.decide', {
+  const result = await foundryInvoke('foundry:rules.decide', {
     proposalId: proposal.id,
     accept,
-  })) as { error?: string; rule?: string }
+  })
   return result.error ?? null
 }
 
@@ -238,9 +210,7 @@ async function sendProposalDecision(proposal: Proposal, accept: boolean): Promis
 function useRemoveRule(setNote: (note: string | null) => void, refreshRules: () => Promise<void>) {
   return useCallback(
     async (rule: AcceptedRule) => {
-      const result = (await invoke('foundry:rules.remove', { ruleId: rule.id })) as {
-        error?: string
-      }
+      const result = await foundryInvoke('foundry:rules.remove', { ruleId: rule.id })
       if (result.error !== undefined) {
         setNote(result.error)
         return

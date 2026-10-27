@@ -3,6 +3,8 @@ import { Settings, ArrowLeft, List, Factory } from 'lucide-react'
 import { Button, IconButton, Tab, TabList, TabsRoot } from '@terminator/extension-ui'
 import { Inbox } from '../components/Inbox.js'
 import { useFoundryQuery, ANY_RECORD } from './foundry-query.js'
+import { foundryInvoke } from './foundry-invoke.js'
+import type { FoundryApi } from '../ipc/foundry-api.js'
 import type { FactoryOrderRow } from '../components/factory/FactorySite.js'
 
 // The window shows one view under the queue, so each is its own chunk and the
@@ -41,15 +43,12 @@ const SURFACES: readonly { id: Surface; label: string }[] = [
 ]
 
 /** What is waiting for the operator, per surface. */
-interface Attention {
-  inbox: number
-  forge: number
-}
+type Attention = Pick<FoundryApi['foundry:attention']['answer'], 'inbox' | 'forge'>
 
 // The badge is an affordance, not the queue. A failed read leaves the last count up
 // rather than taking the chrome down with it.
-async function readAttention(): Promise<Attention> {
-  return (await window.electronAPI.extensionBridge.invoke('foundry:attention', {})) as Attention
+function readAttention() {
+  return foundryInvoke('foundry:attention')
 }
 
 type ForgeViewKind = 'list' | 'factory'
@@ -96,7 +95,7 @@ function useForgeView(): ForgeView {
     choose: (next) => {
       clearOpened()
       setView(next)
-      void window.electronAPI.extensionBridge.invoke('foundry:ui.set-view', { view: next })
+      void foundryInvoke('foundry:ui.set-view', { view: next })
     },
     openFromSite: (order) => (isShaping(order) ? openInList(order.id) : setHall(order)),
     openInList,
@@ -108,10 +107,9 @@ function useForgeView(): ForgeView {
 /** The view the operator last chose, and any change to it made elsewhere. */
 function useSavedForgeView(setView: (view: ForgeViewKind) => void): void {
   useEffect(() => {
-    window.electronAPI.extensionBridge
-      .invoke('foundry:ui.view')
-      .then((result: unknown) => {
-        if ((result as { view?: string }).view === 'factory') setView('factory')
+    foundryInvoke('foundry:ui.view')
+      .then((result) => {
+        if (result.view === 'factory') setView('factory')
       })
       .catch(() => {})
   }, [setView])
@@ -173,10 +171,9 @@ function useNewOrderRequests(open: () => void): void {
   }, [])
 
   useEffect(() => {
-    window.electronAPI.extensionBridge
-      .invoke('foundry:ui.consume-pending-new-order')
-      .then((result: unknown) => {
-        if ((result as { pending?: boolean }).pending) latest.current()
+    foundryInvoke('foundry:ui.consume-pending-new-order')
+      .then((result) => {
+        if (result.pending) latest.current()
       })
       .catch(() => {})
   }, [])

@@ -149,6 +149,18 @@ describe('every Foundry channel the source declares', () => {
   })
 })
 
+describe('the typed channel map', () => {
+  // `FoundryApi` is types only, so its keys are read from the text. A key with no channel behind it
+  // types a call that fails at runtime.
+  it('lists only channels that are registered', () => {
+    const source = fs.readFileSync(path.join(here, '..', 'src', 'ipc', 'foundry-api.ts'), 'utf8')
+    const listed = [...source.matchAll(/^ {2}'(foundry:[^']+)': /gm)].map((match) => match[1])
+    const unregistered = listed.filter((name) => !registeredChannels().includes(name))
+    expect(listed.length).toBeGreaterThan(30)
+    expect(unregistered, `typed but never registered: ${unregistered.join(', ')}`).toEqual([])
+  })
+})
+
 /** Every `foundry:` channel name the IPC sources declare, read from the text. */
 function declaredChannels(): string[] {
   const src = path.join(here, '..', 'src')
