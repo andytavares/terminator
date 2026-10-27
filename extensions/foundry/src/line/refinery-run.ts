@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from '@terminator/extension-sdk'
 
-import { createLiveGateStore } from '../gates/store.js'
+import { createLiveGateStore, raiseUnlessDecided } from '../gates/store.js'
 import { raiseGate } from '../gates/rules.js'
 import { readPulls } from './integrate.js'
 import { branchFor, reattachCheckout } from './worktree.js'
@@ -53,10 +53,10 @@ async function raiseRefineryConflict(
     evidence: files.map((file) => ({ kind: 'diff' as const, path: file })),
     at: new Date().toISOString(),
   })
-  const gates = createLiveGateStore(() => root, indexFor)
-  // `save` replaces by id, which would reopen a gate the operator already decided.
-  if ((await gates.get(gate.id))?.decision != null) return
-  await gates.save(gate)
+  await raiseUnlessDecided(
+    createLiveGateStore(() => root, indexFor),
+    gate
+  )
 }
 
 /** Where one refinery pass works: the host, the data root, and its order store. */
