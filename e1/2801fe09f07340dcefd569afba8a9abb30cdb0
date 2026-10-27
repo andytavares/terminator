@@ -1,0 +1,32 @@
+extensions/notepad/tests/unit/editor/markdownTable.spec.ts
+  s_567c3310a5db4e::t_236447727373dc 73-74
+  s_567c3310a5db4e::t_bceae0f3994684 21-22,75-107,112-115
+extensions/notepad/src/components/notepad.css
+  s_567c3310a5db4e::t_a6df9749df59e3 105
+extensions/notepad/README.md
+  s_567c3310a5db4e::t_86debdb67675ec 47
+  s_567c3310a5db4e::t_29089756123b56 15
+extensions/notepad/src/editor/markdownTable.ts
+  s_567c3310a5db4e::t_abd43ed4b0b7e2 4-8,16,29,37-38,40,44-47,51-69,72-86,89-92
+extensions/notepad/tests/components/NoteEditorView.spec.tsx
+  s_567c3310a5db4e::t_521068291f2dfe 74
+  s_567c3310a5db4e::t_3592f02a9fa8eb 73
+extensions/notepad/src/editor/NoteEditor.tsx
+  s_567c3310a5db4e::t_cc464f2d3b91eb 6,8,32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e12801fe09f07340dcefd569afba8a9abb30cdb0",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
