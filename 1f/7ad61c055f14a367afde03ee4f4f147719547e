@@ -1,0 +1,19 @@
+extensions/foundry/tests/ipc/forge-defect-answer-ipc.spec.ts
+  s_a9e8c58b3eee1f::t_34af69656940a2 233-235,240
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1f7ad61c055f14a367afde03ee4f4f147719547e",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
