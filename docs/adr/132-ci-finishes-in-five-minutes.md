@@ -4,7 +4,7 @@
 
 **Date**: 2026-10-27
 
-Amends ADR 123 (the job layout), ADR 124 (where the quarantined tests run) and ADR 129 (the goal).
+Amends ADR 123 (the job layout, and what a push to `main` runs), ADR 124 (where the quarantined tests run) and ADR 129 (the goal).
 
 ## Context
 
@@ -22,12 +22,13 @@ Inside the run:
 1. **The goal is five minutes per run**, from push to the last check. A run over five minutes is a finding to fix, as ADR 129 says of a slow step. There is still no `timeout-minutes`.
 2. **At most five macOS jobs per run**: three E2E shards, Start and Story screenshots. Nothing waits on E2E:
    - Each E2E shard runs its part of the five repeats of every changed e2e spec after its own tests (`scripts/stability.mjs --e2e --part K/3`, which passes Playwright's own `--shard`). The E2E stability job is gone.
-   - Each E2E shard runs two apps at once, planned as two lanes (`scripts/e2e-shard.mjs` prints `--workers=2`): the suite ran in 610 s against 815 s with one app per shard (runs 40572074278 and 40566760766), every test passing. The timings it records are per worker.
+   - Each E2E shard runs one app at a time. Two at once ran the suite in 610 s against 815 s (runs 40572074278 and 40566760766), but `extension-escape.spec.ts` then hung on a key press (run 40579399555), a failure the nightly sweep never saw with one app. `scripts/e2e-shard.mjs` prints the worker count with each shard's arguments, so CI, `ci:local:e2e` and the sweep agree.
    - Each E2E shard selects its own tests (`scripts/test-select.mjs --github-output`) instead of waiting for Select tests, and stops after the install when nothing is selected.
    - The quarantined unit and e2e tests run in the nightly `stability-sweep.yml`, in jobs that do not gate (Constitution XIV). They no longer run on a pull request.
 3. **Fewer Linux jobs**: Select tests also plans the stability shards, Stories also runs the perf budgets (not Format, which is a required check), Start's build also fails on build warnings (the Build job is gone), and E2E report runs only when an E2E shard failed. Stability shards plan for 3 minutes and are at most 4.
 4. **Cheaper steps**: `lint:quarantine` lists only the spec files that contain the tag or that `tests/quarantine.json` names, and none when there are none. `npm run lint` runs up to 3 ESLint groups at once, as memory allows. An E2E shard restores the build from `actions/cache` when no tracked file outside the tests and docs changed.
-5. **One Dependabot pull request a week** for every package outside the lockstep groups.
+5. **A push to `main` runs what its change reaches** (Constitution XIV, 5.0.0, approved by the maintainer on 2026-10-27), compared with the commit `main` was at before (`selectionBase` in `scripts/test-select.mjs`). The nightly sweep and the release run every test. A full run is 777–971 s of single-app E2E over three shards, more than five minutes on the free macOS runners.
+6. **One Dependabot pull request a week** for every package outside the lockstep groups.
 
 ## Alternatives considered
 
@@ -38,7 +39,7 @@ Inside the run:
 
 ## Consequences
 
-- A full run (a push to `main`, `test: all`, a lockfile change) still runs 827 to 971 s of single-worker E2E over three shards, so it can take more than five minutes until the suite itself is cheaper.
+- A full run (`test: all`, or a change to what every test depends on, such as the lockfile or the test tooling) still takes more than five minutes. A push to `main` no longer is one.
 - Two runs at once still share five macOS runners.
 - A fix to a quarantined test shows in the nightly sweep, not on its pull request.
 - A change that edits many specs gets longer stability shards, not more of them: the cap of 4 keeps a run under 20 jobs, so 50 changed specs plan about 400 s per shard.

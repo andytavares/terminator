@@ -204,17 +204,16 @@ function alwaysAllHit(changed) {
   return changed.find((file) => matchesAny(file, ALWAYS_ALL))
 }
 
-/** @param {{ changed: string[], base: string, allRequested?: boolean, isMainPush?: boolean }} input */
+/** @param {{ changed: string[], base: string, allRequested?: boolean }} input */
 export async function selectTests(input, tools) {
   const { changed, base } = input
   if (input.allRequested) return everything('everything was asked for (--all or TEST_ALL=1)', base)
-  if (input.isMainPush) return everything('a push to main runs everything', base)
   const always = alwaysAllHit(changed)
   if (always) return everything(`${always} can change every test's result`, base)
   const chosen = await unitSelection(changed, tools)
   if (chosen.unknown)
     return everything(`${chosen.unknown} is read by no spec and no map claims it`, base)
-  const e2e = select({ changed, specs: tools.e2eSpecs(), isMainPush: false })
+  const e2e = select({ changed, specs: tools.e2eSpecs() })
   const mode = chosen.unit.length === 0 && e2e.mode === 'none' ? 'none' : 'selected'
   return { mode, unit: chosen.unit, e2e: e2e.specs, e2eMode: e2e.mode, base, reason: 'by the diff' }
 }
@@ -260,10 +259,11 @@ export function changedInCheckout(base, cwd = REPO_ROOT) {
   return [...new Set(`${edited}\n${untracked}`.split('\n').filter(Boolean))]
 }
 
-/** The commit this change forked from main: GITHUB_BASE_REF in CI, main elsewhere. */
-function mergeBase(env) {
-  const target = `origin/${env.GITHUB_BASE_REF || 'main'}`
-  return gitOutput(['merge-base', target, 'HEAD'])
+/** What the change is compared with: for a push to main, the commit main was at before (its first
+ * parent); otherwise the commit it forked from main, GITHUB_BASE_REF in CI (Constitution XIV). */
+export function selectionBase(env, cwd = REPO_ROOT) {
+  if (isMainPush(env)) return gitOutput(['rev-parse', 'HEAD^1'], cwd)
+  return gitOutput(['merge-base', `origin/${env.GITHUB_BASE_REF || 'main'}`, 'HEAD'], cwd)
 }
 
 /** A spec that reads repository files by path sees changes no import shows. */
@@ -314,18 +314,10 @@ const noTools = {
   scanners: async () => [],
 }
 
-function decisionWithoutDiff(argv, env, main) {
+async function selectForCheckout(argv, env) {
   if (isAllRequested(argv, env))
     return everything('everything was asked for (--all or TEST_ALL=1)', '')
-  if (main) return everything('a push to main runs everything', '')
-  return null
-}
-
-async function selectForCheckout(argv, env) {
-  const main = isMainPush(env)
-  const early = decisionWithoutDiff(argv, env, main)
-  if (early) return early
-  const base = mergeBase(env)
+  const base = selectionBase(env)
   const changed = changedInCheckout(base)
   if (alwaysAllHit(changed)) return selectTests({ changed, base }, noTools)
   const tools = await vitestTools()

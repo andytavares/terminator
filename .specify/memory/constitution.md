@@ -1,4 +1,20 @@
 <!--
+SYNC IMPACT REPORT (5.0.0)
+==========================
+Version change: 4.0.0 → 5.0.0 (MAJOR: Principle XIV's "Only the tests a change can reach" redefined)
+
+Modified principles:
+  - XIV: a push to `main` no longer runs everything. It runs what its change reaches, compared
+    with the commit `main` was at before, as a pull request does. The nightly sweep and the
+    release run everything. Approved by the maintainer on 2026-10-27 to keep every CI run within
+    five minutes on GitHub's free macOS runners. ADR 132.
+
+Added sections: none
+Removed sections: none
+Templates requiring updates: none
+Follow-up TODOs: none
+-->
+<!--
 SYNC IMPACT REPORT (4.0.0)
 ==========================
 Version change: 3.0.0 → 4.0.0 (MAJOR: Principle XIV's "One run" redefined)
@@ -356,8 +372,9 @@ code has no value; it is a defect. ADR 123 records the reasoning.
   registry MUST NOT turn a change red that did not touch what they check.
 - **Only the tests a change can reach.** `scripts/test-select.mjs` picks the unit,
   integration and end-to-end tests a diff can reach, the same way in CI and locally. A path
-  it cannot place runs everything. The pull request label `test: all`, `--all` locally, and
-  every push to `main` run everything.
+  it cannot place runs everything. A push to `main` runs what its change reaches, compared with
+  the commit `main` was at before. The pull request label `test: all`, `--all` locally, the
+  nightly sweep and the release run everything.
 - **Enforced, not trusted.** `eslint.config.mjs` rejects sleeps, ticks, time limits and
   promises left unawaited in specs. These rules MUST NOT be disabled, suppressed or
   loosened.
@@ -387,4 +404,4 @@ This constitution supersedes all other practices, conventions, and ad-hoc guidan
 - The constitution version and amendment history are the authoritative record of governance
   decisions affecting this project.
 
-**Version**: 4.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-10-23
+**Version**: 5.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-10-27
