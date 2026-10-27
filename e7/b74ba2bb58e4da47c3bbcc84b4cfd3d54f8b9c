@@ -1,0 +1,32 @@
+tests/unit/scripts/ci-local.spec.ts
+  s_567c3310a5db4e::t_ab09a5d64eff69 2,177-178,180-189,194-199,203-209,211-212,218-224,230,234-239,245-249,254-257,260-261,269
+  s_567c3310a5db4e::t_8bd9b2c40e946d 6,9-10,19,174-176,179,190-193,200-202,210,213-217,225-229,231-233,240-244,250-253,258-259,262-268,270-281
+scripts/ci-local.mjs
+  s_567c3310a5db4e::t_6d123dee28e13c 13,32-35,40-44,54-64,67-69,72-105,109-113,116-123,129-134,136-138,141,146-149,216-217,219,221-225,262-268,332-333,335
+  s_567c3310a5db4e::t_7d84cadbcc2ca3 65-66,106-108,114-115,142-145
+  s_567c3310a5db4e::t_ab09a5d64eff69 36
+tests/unit/scripts/ci-linux.spec.ts
+  s_567c3310a5db4e::t_ab09a5d64eff69 27-28,36-37
+  s_567c3310a5db4e::t_7d84cadbcc2ca3 2-7
+  s_567c3310a5db4e::t_d16fbc1a3c77d7 11,23-26,29-35,38-41
+  s_567c3310a5db4e::t_6076c87e8b6dc1 42-43
+scripts/ci-linux.mjs
+  s_567c3310a5db4e::t_ab09a5d64eff69 50-51,114
+  s_567c3310a5db4e::t_7d84cadbcc2ca3 3,5,52-63,113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e7b74ba2bb58e4da47c3bbcc84b4cfd3d54f8b9c",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
