@@ -6,6 +6,10 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# Read only by default; the release job asks for what it writes (contents: write) itself.
+permissions:
+  contents: read
+
 jobs:
   # Every test, before anything is bumped or packaged: a push to main runs only what its change
   # reaches (Constitution XIV, ADR 132), so the release is where the whole suite gates.
