@@ -7,8 +7,9 @@ import { fakeHost, gitAt, temporaryDirectory, execSucceeded } from '../helpers/f
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import { agentsAnswer, agreedLineOrder, checks, repositoryWithRemote } from '../helpers/line-run.js'
-import { ledgerActions } from '../helpers/order-ledger.js'
+import { ledgerActions, ledgerFileText } from '../helpers/order-ledger.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
+import { settleBackground } from '../../src/background.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { createGateStore } from '../../src/gates/store.js'
 import { orderStoreAt } from '../../src/state/live-index.js'
@@ -138,6 +139,14 @@ async function runAgreed(created: WorkOrder): Promise<void> {
 
 const statusOf = async (id: string) => (await createOrderStore(dataDir).load(id))?.status
 const gateRules = async () => (await createGateStore(dataDir).list()).map((gate) => gate.rule)
+/** The gate `rule` once the run's background work has ended. A run that ends without it fails here
+ * with what it recorded, instead of waiting out the test's bound (CI run 40572074278, not reproduced). */
+async function gateOnceSettled(rule: string): Promise<void> {
+  await settleBackground()
+  if (!(await gateRules()).includes(rule))
+    throw new Error(`the run ended without the ${rule} gate:\n${ledgerFileText(dataDir)}`)
+}
+
 const runsInLanes = (command: string) =>
   finished.filter((run) => run.command === command && !run.where.endsWith('@baseline'))
 
@@ -199,7 +208,7 @@ describe('a repository with nothing to read', () => {
       Object.values(order.context.toolchain).map(() => null)
     )
     await runAgreed(order)
-    await eventually(async () => expect(await gateRules()).toContain('ready-for-review'))
+    await gateOnceSettled('ready-for-review')
     expect(finished).toEqual([])
     expect(await ledgerActions(dataDir)).not.toContain('step.passed')
   })
