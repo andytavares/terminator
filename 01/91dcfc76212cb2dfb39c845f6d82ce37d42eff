@@ -1,0 +1,28 @@
+docs/adr/131-agents-permissions-are-claude-code-settings.md
+  s_a9e8c58b3eee1f::t_99bbdef82a6a3e 1-29
+docs/adr/077-auto-mode-answers-what-foundry-abstains-on.md
+  s_a9e8c58b3eee1f::t_ba1ec3764a190f 3
+extensions/foundry/SUPERVISION.md
+  s_a9e8c58b3eee1f::t_ba1ec3764a190f 604-607,649-665
+docs/adr/049-an-accidental-question-costs-five-minutes.md
+  s_a9e8c58b3eee1f::t_ba1ec3764a190f 3
+docs/ARCHITECTURE.md
+  s_a9e8c58b3eee1f::t_dce3b1a8a1ba15 1159-1160,1456
+  s_a9e8c58b3eee1f::t_51656c507faca4 1161-1169
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0191dcfc76212cb2dfb39c845f6d82ce37d42eff",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
