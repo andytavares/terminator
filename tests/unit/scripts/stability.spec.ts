@@ -181,8 +181,8 @@ describe('capping the unit shards', () => {
     }
   })
 
-  it('keeps one spec at 30 runs on one shard', () => {
-    expect(stabilityShards(1, 30)).toEqual([{ shard: 1, runs: 30, part: '1/1' }])
+  it('keeps one spec at 10 runs on one shard', () => {
+    expect(stabilityShards(1, 10)).toEqual([{ shard: 1, runs: 10, part: '1/1' }])
   })
 })
 
@@ -211,8 +211,8 @@ describe('splitting the runs over CI runners', () => {
     })
   })
 
-  it('keeps a small change on one runner, with all 30 runs', () => {
-    expect(stabilityShards(1, 30)).toEqual([{ shard: 1, runs: 30, part: '1/1' }])
+  it('keeps a small change on one runner, with all 10 runs', () => {
+    expect(stabilityShards(1, 10)).toEqual([{ shard: 1, runs: 10, part: '1/1' }])
   })
 
   it('splits the runs of a change too slow to run 30 times on one runner, and keeps 30 in all', () => {

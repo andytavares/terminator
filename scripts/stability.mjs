@@ -20,8 +20,9 @@ const E2E_RUNS = 5
 const SPEC_FILE = /\.spec\.(tsx?|js)$/
 // What vitest.config.ts leaves out of the default run: `vitest run <file>` finds no test there.
 const NOT_IN_DEFAULT_RUN = [/\.perf\.spec\.ts$/, /^extensions\/[^/]+\/tests\/live\//]
-// One unit run on CI's ubuntu-24.04-arm under load: 96 specs took 81-86 s (run 39976627567).
-const SECONDS_PER_SPEC = 0.9
+// One unit run on CI's ubuntu-24.04-arm under load: 13 specs took 58 s (run 40594749096); light
+// specs are faster (96 in 81-86 s, run 39976627567), and planning for the slow ones keeps a shard short.
+const SECONDS_PER_SPEC = 4
 const SECONDS_PER_RUN = 5
 // The goal is a CI run of 5 minutes, so a shard plans for 3 and a slow run still finishes.
 const SHARD_SECONDS = 180
