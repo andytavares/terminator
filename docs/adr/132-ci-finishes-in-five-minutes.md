@@ -1,4 +1,4 @@
-# ADR 131: CI finishes in five minutes
+# ADR 132: CI finishes in five minutes
 
 **Status**: Accepted
 
