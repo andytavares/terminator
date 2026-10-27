@@ -27,7 +27,10 @@ function dependenciesSettled(graph: RunGraph, node: RunNode): boolean {
     // settled rather than deadlocking the whole graph on a typo the recipe
     // parser already refuses.
     if (dependency === undefined) return true
-    return dependency.state === 'passed' || dependency.state === 'skipped'
+    if (dependency.state === 'passed') return true
+    // A skipped step stands in for what it waited on: check after a skipped lint
+    // still waits for the build, or it runs on work not yet committed.
+    return dependency.state === 'skipped' && dependenciesSettled(graph, dependency)
   })
 }
 
