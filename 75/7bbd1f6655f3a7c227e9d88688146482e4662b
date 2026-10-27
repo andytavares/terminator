@@ -1,0 +1,45 @@
+extensions/remote-control/tests/unit/bridge.route.spec.ts
+  s_567c3310a5db4e::t_b8f7b371f95ca2 161,164,167-168
+  s_567c3310a5db4e::t_9bec01bc591ae7 165-166
+  s_567c3310a5db4e::t_53de0ad5212c56 8-9,63,105,116,138-160,162-163,169-175
+extensions/remote-control/src/server/ngrok-manager.ts
+  s_567c3310a5db4e::t_e3c4b6fe123581 4
+extensions/remote-control/src/components/RemoteControlSettings.tsx
+  s_567c3310a5db4e::t_e3c4b6fe123581 321
+extensions/remote-control/src/index.ts
+  s_567c3310a5db4e::t_e3c4b6fe123581 12,343
+extensions/remote-control/tests/unit/extension-index.spec.ts
+  s_567c3310a5db4e::t_c7268f6e879df4 29
+extensions/remote-control/src/components/remote-control-view.css
+  s_567c3310a5db4e::t_13731b1efeba78 103
+extensions/remote-control/tests/unit/terminal.routes.spec.ts
+  s_567c3310a5db4e::t_53de0ad5212c56 11,390
+  s_567c3310a5db4e::t_b6d39b34538574 163-164,167-171,549-551,553-554,557-567
+  s_567c3310a5db4e::t_b8f7b371f95ca2 552,555-556
+  s_567c3310a5db4e::t_9bec01bc591ae7 165-166
+  s_567c3310a5db4e::t_44e7333a9d622a 568
+extensions/remote-control/src/server/heartbeat.ts
+  s_567c3310a5db4e::t_b11d0f7016354b 1-24
+extensions/remote-control/src/server/remote-server.ts
+  s_567c3310a5db4e::t_4a4910d2d6667f 314
+extensions/remote-control/src/server/routes/bridge.route.ts
+  s_567c3310a5db4e::t_2e346fb914f491 4,6-7,15-16,44,55-59,61-68,73
+extensions/remote-control/src/server/routes/terminal.routes.ts
+  s_567c3310a5db4e::t_33435f4c166309 11,280
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "757bbd1f6655f3a7c227e9d88688146482e4662b",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
