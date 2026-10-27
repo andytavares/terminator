@@ -172,6 +172,8 @@ async function main() {
   }
   await requireQuietMachine()
   if (!run('npm', ['run', 'build'])) process.exit(1)
+  // The shards start together; unpacked lazily, Electron's binary is written over itself (b2181135).
+  if (!run('npx', ['install-electron'])) process.exit(1)
   console.log(`${specs.length} spec(s) selected: ${chosen.reason}`)
   const failed = await runShards(only, specs)
   if (failed.length > 0) console.error(`\nShards failed: ${failed.join(', ')}`)
