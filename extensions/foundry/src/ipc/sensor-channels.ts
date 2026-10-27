@@ -52,12 +52,12 @@ export interface SensorChannelDeps {
 }
 
 export interface SensorChannels {
-  list(): Promise<unknown>
-  dismiss(payload: z.infer<typeof IdPayload>): Promise<unknown>
-  promote(payload: z.infer<typeof PromotePayload>): Promise<unknown>
-  sensorsList(): Promise<unknown>
-  sensorsSet(payload: z.infer<typeof SetPayload>): Promise<unknown>
-  sensorsRunNow(payload: z.infer<typeof IdPayload>): Promise<unknown>
+  list(): ReturnType<typeof list>
+  dismiss(payload: z.infer<typeof IdPayload>): ReturnType<typeof dismissSignal>
+  promote(payload: z.infer<typeof PromotePayload>): ReturnType<typeof promoteSignal>
+  sensorsList(): ReturnType<typeof sensorsList>
+  sensorsSet(payload: z.infer<typeof SetPayload>): ReturnType<typeof sensorsSet>
+  sensorsRunNow(payload: z.infer<typeof IdPayload>): ReturnType<typeof sensorsRunNow>
 }
 
 function nextDueAt(state: SensorState, def: SensorDef, now: string): string | null {
@@ -77,15 +77,12 @@ export function createSensorChannels(deps: SensorChannelDeps): SensorChannels {
   }
 }
 
-async function list(deps: SensorChannelDeps): Promise<unknown> {
+async function list(deps: SensorChannelDeps) {
   const signals = ranked(await deps.store.list())
   return { signals, counts: { open: signals.length } }
 }
 
-async function dismissSignal(
-  deps: SensorChannelDeps,
-  payload: z.infer<typeof IdPayload>
-): Promise<unknown> {
+async function dismissSignal(deps: SensorChannelDeps, payload: z.infer<typeof IdPayload>) {
   const signal = await deps.store.get(payload.id)
   if (signal === null) return { error: `No signal ${payload.id}.` }
 
@@ -94,10 +91,7 @@ async function dismissSignal(
   return { signal: dismissed }
 }
 
-async function promoteSignal(
-  deps: SensorChannelDeps,
-  payload: z.infer<typeof PromotePayload>
-): Promise<unknown> {
+async function promoteSignal(deps: SensorChannelDeps, payload: z.infer<typeof PromotePayload>) {
   const { id, repoPaths } = payload
 
   const signal = await deps.store.get(id)
@@ -130,7 +124,7 @@ async function promoteSignal(
   return { order: seeded.order }
 }
 
-async function sensorsList(deps: SensorChannelDeps): Promise<unknown> {
+async function sensorsList(deps: SensorChannelDeps) {
   const states = await deps.store.sensorState()
   const now = deps.now()
   return {
@@ -141,10 +135,7 @@ async function sensorsList(deps: SensorChannelDeps): Promise<unknown> {
   }
 }
 
-async function sensorsSet(
-  deps: SensorChannelDeps,
-  payload: z.infer<typeof SetPayload>
-): Promise<unknown> {
+async function sensorsSet(deps: SensorChannelDeps, payload: z.infer<typeof SetPayload>) {
   const { id, enabled, repoPath } = payload
 
   const states = await deps.store.sensorState()
@@ -165,10 +156,7 @@ async function sensorsSet(
   return { state: updated[id] }
 }
 
-async function sensorsRunNow(
-  deps: SensorChannelDeps,
-  payload: z.infer<typeof IdPayload>
-): Promise<unknown> {
+async function sensorsRunNow(deps: SensorChannelDeps, payload: z.infer<typeof IdPayload>) {
   const found = deps.availableSensors().find(({ def }) => def.id === payload.id)
   if (found === undefined) return { error: `No sensor ${payload.id}.` }
 

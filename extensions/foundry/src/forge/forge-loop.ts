@@ -2,7 +2,12 @@ import type { ExtensionAPI } from '@terminator/extension-sdk'
 
 import { rulesFor } from '../verify/rules.js'
 import { followUpFor, retryForRefusal, REWRITING_UNREADABLE } from './autonomy.js'
-import { anotherPassWanted, loopFacts, lastIntake, reviewedCurrentPlan } from './intake-outcome.js'
+import {
+  anotherPassWanted,
+  loopFacts,
+  currentIntake,
+  reviewedCurrentPlan,
+} from './intake-outcome.js'
 import { readyToHandOff } from './release-again.js'
 import type { ReleaseDeps, Step } from './release-again.js'
 import { compileOrder } from '../order/compile.js'
@@ -38,9 +43,10 @@ import type { RunChannels } from '../ipc/run-channels.js'
 import type { ActivationContext } from '../ipc/register.js'
 import { resolveSources } from '../workspace-root.js'
 import { orderStoreAt } from '../state/live-index.js'
+import { intakeAt, setIntake } from './intake-state.js'
 import { intakeSessions } from './intake-sessions.js'
 import { lighterRedTeam, defaultModel } from '../state/settings.js'
-import { endLiveSession } from '../runtime/runtime-state.js'
+import { endLiveSession, isLiveSession } from '../runtime/runtime-state.js'
 import { convergeOnce, readOnlyRound } from './intake-turn.js'
 import type { Deciding } from '../ipc/standing.js'
 import { plural } from '@terminator/extension-sdk'
@@ -151,10 +157,21 @@ async function convergeWithFollowUps(forge: Forge, ask: ArchitectAsk): Promise<C
       },
     })
     await ask.recordStart?.(started)
+    await setIntake(forge.dataRoot(), order.id, startedIntake(ask, started))
     return started
   } finally {
     startWritten()
   }
+}
+
+// A follow-up or a fix turn is `fixing`; the operator's ask and the first draft are `drafting`.
+function startedIntake(
+  ask: ArchitectAsk,
+  started: ConvergeStarted
+): Parameters<typeof setIntake>[2] {
+  if (!started.ok) return { state: 'failed', reason: started.reason }
+  const fixing = ask.autoTurns > 0 || ask.loopRound !== undefined
+  return { state: fixing ? 'fixing' : 'drafting' }
 }
 
 async function continueAutomatically(
@@ -216,6 +233,7 @@ async function afterRefusedProposal(
     subject: order.id,
     reason,
   })
+  await setIntake(root, order.id, { state: 'failed', reason })
   // A proposal in the wrong shape is the architect's to fix, from the
   // field paths it can read and the operator cannot.
   const retry =
@@ -253,7 +271,7 @@ async function afterRedraft(
   // The scout runs beside a first draft, so it may have stored its
   // findings while this turn was still writing.
   const drafted = withScoutContext(outcome.order, await store.load(order.id))
-  await store.save(drafted)
+  await store.save({ ...drafted, intake: intakeAt('ready', new Date()) })
   await recordLoopEntry(root, {
     orderId: order.id,
     actor: 'role:architect',
@@ -317,6 +335,7 @@ async function startReviewRound(forge: Forge, review: Review): Promise<void> {
   // team from the store rather than from the draft it is attacking.
   await waitForScout(order.id)
   const attacked = withScoutContext(order, (await orderStoreAt(root).load(order.id)) ?? null)
+  await setIntake(root, order.id, { state: 'reviewing' })
   await readOnlyRound({
     api,
     root,
@@ -329,13 +348,27 @@ async function startReviewRound(forge: Forge, review: Review): Promise<void> {
     startedAction: 'review.started',
     startedReason: `round ${round}`,
     onFinished: (updated, anotherPass) =>
-      forge.deciding.during(order.id, async () => {
-        // A refusal was already recorded by readOnlyRound, where the standing
-        // reads it — nothing more to decide here.
-        if (updated === null) return
-        await afterReviewRound(forge, { ...review, root, order: updated }, anotherPass)
-      }),
+      forge.deciding.during(order.id, () =>
+        afterRound(forge, { ...review, root }, { updated, anotherPass })
+      ),
   })
+}
+
+// A refusal was already recorded by readOnlyRound, where the standing reads it; the
+// intake state is what says the round is over.
+async function afterRound(
+  forge: Forge,
+  review: ReviewAt,
+  { updated, anotherPass }: { updated: WorkOrder | null; anotherPass: boolean | undefined }
+): Promise<void> {
+  if (updated === null) {
+    await setIntake(review.root, review.order.id, {
+      state: 'failed',
+      reason: 'The red team did not answer.',
+    })
+    return
+  }
+  await afterReviewRound(forge, { ...review, order: updated }, anotherPass)
 }
 
 // Recorded rather than silent: the Forge reads this as the red team
@@ -377,6 +410,7 @@ async function afterReviewRound(
 ): Promise<void> {
   const { root, order: updated, round } = review
   await recordReviewRound(root, review, anotherPass)
+  await setIntake(root, updated.id, { state: 'ready' })
 
   // The operator's hold stops every automatic continuation this round
   // could lead to — the next round, "ready", or a fix turn — the same
@@ -538,7 +572,9 @@ async function resumeAfterRelease(forge: Forge, order: WorkOrder): Promise<void>
   if (order.status !== 'draft') return
   const root = forge.dataRoot()
   const entries = await orderStoreAt(root).entries(order.id)
-  if (lastIntake(entries).kind === 'running') return
+  const { intake } = (await orderStoreAt(root).load(order.id)) ?? order
+  if (currentIntake(entries, intake, { now: Date.now(), isLive: isLiveSession }).kind === 'running')
+    return
 
   const next = afterRelease(order, {
     loop: loopFacts(entries),

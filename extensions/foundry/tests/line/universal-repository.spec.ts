@@ -164,13 +164,15 @@ describe('a repository with a script and no manifest', () => {
   })
 })
 
-describe('a script that fails in the final check', () => {
+// A pass on the exact commit is reused by the final check (verify/pass-cache.ts), so the
+// script fails from the recipe's own check on, and its rework fails too.
+describe('a script that keeps failing after the base passed', () => {
   beforeEach(glyphRepositoryWithOperatorTest)
 
-  it('stops at a gate when the script exits 1 in the final check', async () => {
+  it('stops at a gate when the script exits 1', async () => {
     const order = await createOrder()
     await untilBaseProven('./glyph test')
-    glyphExits(0, 1)
+    glyphExits(1)
     await runAgreed(order)
     await eventually(async () => expect(await gateRules()).toContain('verify.repeat-fail'))
     expect(await statusOf(order.id)).not.toBe('shipped')

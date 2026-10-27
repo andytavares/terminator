@@ -26,37 +26,15 @@ Knowledge of a toolchain is **data in `hints/*.yaml`**, one file per ecosystem, 
 
 `tests/verify/ecosystem-neutral.spec.ts` guards this: it tokenises every file under `src/` and fails on a string, template or regex literal naming an ecosystem's tool (`npm`, `node_modules`, `pytest`, `cargo`, `.tsx`, …). A code path that needs to know it is looking at one toolchain is a hint file or a profile field that has not been written yet. The guard reads literals, so a comment may still give an example.
 
-### 3. A question this policy asks by accident costs five minutes
+### 3. Claude Code's settings decide; Foundry decides two things
 
-`runtime/tool-decision.ts` decides every permission ask an agent raises over ACP.
-Anything it does not decide is **held for `DEFAULT_ASK_AFTER_MS` — five minutes** —
-before it is left open in the agent tab, where, in an unattended run, nobody is sitting.
+Each agent starts with `settingSources: ['project']` (it never loads the operator's `~/.claude`) and the settings `runtime/role-settings.ts` builds from its role: a permission mode, `allow`, `ask` and `deny` rules, and a sandbox for roles that do not write freely. Claude reads every subcommand, subshell and control-flow body against those rules, so Foundry reads no shell command. Read-only, documentation-only and restricted-write roles run in `dontAsk` mode: what no rule allows is refused at once, so nothing waits. A free writer runs in `auto` (or `acceptEdits` when `terminator.foundry.letAutoModeDecide` is off); `escorted` keeps `default`. Hard refusals (`runtime/deny-rules.ts`, and `git -C … push`) are `deny` rules, so they hold in every mode.
 
-So reading a command correctly is a latency requirement here, not only a
-correctness one: a held call costs minutes where a decided one costs seconds.
+What reaches `runtime/tool-decision.ts` is an ask the settings left open. It decides one thing itself: an `Artifact` publish is allowed only for the order's own page in its outputs directory. At `lights-out` it refuses any other ask with a reason; elsewhere it returns `null` and the ask goes to the operator at once (`permission-bridge.ts` holds it with no timer). A role that publishes a document runs in `default` mode instead of `dontAsk`, since `dontAsk` would refuse its `Artifact` ask before Foundry saw it.
 
-Each agent gets its permission mode per role (`runtime/permission-mode.ts`, ADR 130).
-With `terminator.foundry.letAutoModeDecide` on (the default), a role that may write
-anywhere in its checkout runs in Claude's `auto` mode at `standard` or `lights-out`,
-and Claude's classifier answers what this policy does not decide. Every other role
-runs in `default` mode, where each write and state-changing command is an ask this
-policy decides. Inside an ask there is no auto mode to defer to: what the policy
-leaves open is held for a person, or refused with the reason at `lights-out`
-(`unattendedRule`). A refusal cancels the turn and sends the reason, or the
-operator's typed answer, as the next prompt, since an ACP reject carries no text.
-The hard refusals also go to Claude as deny rules (`runtime/deny-rules.ts`), so they
-hold in `auto` mode, where this policy sees only what the classifier asks about.
+A refusal never cancels a turn: the runner answers the ask with the agent's reject option and the agent carries on. An operator's typed answer is rejected the same way, then sent as a normal prompt once the running turn has ended. The core starts agents with `clientCapabilities: {}`, so `AskUserQuestion` is unavailable and Foundry has no question path.
 
-When you change `shell-split.ts`, `autonomy-policy.ts` or `read-only-policy.ts`,
-the question is not only "does this let the wrong thing through". It is also
-"does this hold the right thing", and the second one has a price tag. Every
-defect ADR-049 found was the second kind: a discard that needed whitespace
-after it, a parenthesis inside a quoted argument, a heredoc body read as shell,
-a scratch file in the OS temp directory.
-
-`shell-split.ts` tracks quoting and escaping. It is not a shell parser and must
-not become one — heredocs are in because a heredoc is quoting, and that is the
-whole of the licence.
+When you change a role's rules, test them in `tests/runtime/role-settings.spec.ts`. The documentation-only globs there are checked against `isDocumentationRelative`.
 
 ### 4. Disk is the truth, memory is the read path, and a change is pushed
 
@@ -83,11 +61,12 @@ what was there before.
   changed from `observed-files.json`, written by the executor when a step settles
   (`recordObservedFiles`). `computeQueueEntries` spawns nothing, and
   `tests/ipc/read-path-ipc.spec.ts` fails if it does.
-- **The renderer does not poll Foundry's own data.** `usePushed(read, show,
-{ kinds, orderId })` reads on mount and again for a matching change. The one
+- **The renderer does not poll Foundry's own data.** `useFoundryQuery({ key, kinds, orderId }, read)`
+  (`src/renderer/foundry-query.ts`, TanStack Query) reads on mount and again, once a burst
+  settles, for a matching `foundry:changed` or any `workspace:changed`. The one
   fallback poll a view may keep (`usePolling` from `@terminator/extension-ui`) is for what changes without a
-  Foundry write — an agent's transcript, a sensor's signals — and it stops while
-  `document.hidden`. `rg -c "setInterval\(" extensions/foundry/src/components
+  Foundry write — an agent's transcript — and it stops while
+  `document.hidden`. Signals are pushed: the signal store's writes announce `signals`. `rg -c "setInterval\(" extensions/foundry/src/components
 extensions/foundry/src/renderer` is the count to keep small.
 
 ### 5. Every function within the size limits
@@ -123,7 +102,7 @@ the owning module, never back into `index.ts`.
 | Starting and stopping the runtime, the stall watcher                                                         | `src/runtime/supervision-runtime.ts`                                                              |
 | Notifications for a held call, `notePending` / `noteResolved`                                                | `src/runtime/held-calls.ts`                                                                       |
 | The palette's run entries and `gotoRun`                                                                      | `src/runtime/palette-commands.ts`                                                                 |
-| Workspace trust, the probed-command and read-only decisions                                                  | `src/runtime/agent-policy.ts`                                                                     |
+| A role's Claude settings (mode, allow, ask, deny, sandbox); the project's proven commands                    | `src/runtime/role-settings.ts`, `src/runtime/agent-policy.ts`                                     |
 | The tracker port and write-back deps                                                                         | `src/trackers/issues-port.ts`                                                                     |
 | The sensor tick                                                                                              | `src/sensors/sensor-tick.ts`                                                                      |
 | One architect turn, one read-only round (red team, scout)                                                    | `src/forge/intake-turn.ts`, `src/forge/intake-sessions.ts`                                        |
@@ -142,7 +121,7 @@ the owning module, never back into `index.ts`.
 | The Forge's state (`useForgeState`), what it draws (`deriveForge`), its steps (`STEP_BODIES`)                | `src/components/Forge.tsx`                                                                        |
 | The Floor's state (`useFloor`) and its panels                                                                | `src/components/Floor.tsx`                                                                        |
 | The factory hall's state (`useFactoryHall`), what it draws (`hallModel`), its parts                          | `src/components/factory/FactoryHall.tsx`                                                          |
-| The signal dock's poll and promotion, shared by the Inbox and the factory site                               | `src/renderer/use-signals.ts`                                                                     |
+| The signal dock's shared query and promotion, used by the Inbox and the factory site                         | `src/renderer/use-signals.ts`                                                                     |
 | The window's chrome; each view loaded with `React.lazy` as its own chunk (budget: `vite.renderer.config.ts`) | `src/renderer/App.tsx`                                                                            |
 
 ## Extension Isolation (MANDATORY)

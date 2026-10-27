@@ -7,6 +7,7 @@
     "build:renderer": "vite build --config vite.renderer.config.ts"
   },
   "dependencies": {
+    "@tanstack/react-query": "5.104.2",
     "@terminator/extension-sdk": "5.2.0",
     "@terminator/extension-ui": "1.0.0",
     "js-yaml": "4.3.2",

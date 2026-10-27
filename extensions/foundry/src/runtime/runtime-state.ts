@@ -64,7 +64,14 @@ export function isLiveSession(sessionId: string): boolean {
 
 /** Stop a session this process runs and wait until it is gone: one process per conversation. */
 export async function endLiveSession(sessionId: string, reason: string): Promise<void> {
-  await endAndWait({ stop: stopSupervisedSession, isLive: isLiveSession }, { sessionId, reason })
+  await endAndWait(
+    { stop: stopSupervisedSession, isLive: isLiveSession, onEnd: onSessionEnd },
+    { sessionId, reason }
+  )
+}
+
+function onSessionEnd(sessionId: string, listener: () => void): () => void {
+  return runtime.supervisedRunner?.onEnd(sessionId, listener) ?? (() => {})
 }
 
 function stopSupervisedSession(sessionId: string, reason: string): boolean {

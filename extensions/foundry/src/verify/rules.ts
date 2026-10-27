@@ -5,6 +5,7 @@ import type { ResolveSources } from '../recipe/resolve.js'
 import type { Rule } from '../recipe/parse.js'
 import type { Proposal } from '../ledger/curator.js'
 import type { Rung } from './ladder.js'
+import { dump } from 'js-yaml'
 import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
 // Which checks apply here.
@@ -107,20 +108,21 @@ function declinedFile(root: string): string {
 export async function acceptProposal(root: string, proposal: Proposal): Promise<string> {
   await fs.promises.mkdir(rulesDir(root), { recursive: true })
   const file = path.join(rulesDir(root), `${proposal.id}.yaml`)
-  const body = [
-    'schemaVersion: 1',
-    `id: ${proposal.id}`,
+  const body = dump({
+    schemaVersion: 1,
+    id: proposal.id,
     // Universal: the operator accepted it for their own factory, and the data
     // root is theirs. A rule scoped to a project would need a condition
     // nobody has stated.
-    'scope: universal',
-    `rung: ${proposal.rung}`,
-    'asserts: >',
-    ...proposal.asserts.split('\n').map((line) => `  ${line.trim()}`),
-    'appliesWhen: always',
-    `origin: ${proposal.origin}`,
-    '',
-  ].join('\n')
+    scope: 'universal',
+    rung: proposal.rung,
+    asserts: proposal.asserts
+      .split('\n')
+      .map((line) => line.trim())
+      .join(' '),
+    appliesWhen: 'always',
+    origin: proposal.origin,
+  })
   await fs.promises.writeFile(file, body, 'utf8')
   return file
 }

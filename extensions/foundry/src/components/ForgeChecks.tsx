@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useState } from 'react'
-import { Button, SegmentedControl } from '@terminator/extension-ui'
+import { Button, Chip, SegmentedControl } from '@terminator/extension-ui'
+import type { ChipTone } from '@terminator/extension-ui'
 import { AlertCircle, Check, Image, Minus, Package, Play, X } from 'lucide-react'
 import {
   RUNG_GROUPS,
@@ -35,12 +36,12 @@ interface RowProps {
   readonly row: CheckRowView
 }
 
-const PILL: Record<CheckState, string> = {
-  passed: 'pass',
+const PILL: Record<CheckState, ChipTone> = {
+  passed: 'good',
   failing: 'bad',
-  untried: 'note',
-  missing: 'note',
-  notNeeded: 'note',
+  untried: 'neutral',
+  missing: 'neutral',
+  notNeeded: 'neutral',
 }
 
 function RowGlyph({ row }: { readonly row: CheckRowView }): JSX.Element {
@@ -288,7 +289,7 @@ function CheckRow({ checks, row }: RowProps) {
           <CheckLine checks={checks} row={row} />
         )}
       </div>
-      <span className={`fdry-pill fdry-pill--${PILL[row.state]}`}>{row.proofWord}</span>
+      <Chip tone={PILL[row.state]}>{row.proofWord}</Chip>
     </div>
   )
 }
@@ -433,7 +434,7 @@ function NothingFound({ checks, actions }: ChecksProps) {
           <ProveResult checks={checks} outcome={ask.outcome} kept={ask.kept} />
           {checks.editing === 'new' ? <AddCheckForm checks={checks} /> : null}
         </div>
-        <span className="fdry-pill fdry-pill--you">Your move</span>
+        <Chip tone="waiting">Your move</Chip>
       </div>
     </div>
   )
@@ -515,9 +516,7 @@ function ProvenRow({ checks, actions }: ChecksProps) {
           </Button>
         </div>
       </div>
-      <span
-        className={`fdry-pill fdry-pill--${proven === total ? 'pass' : 'note'}`}
-      >{`${proven} of ${total}`}</span>
+      <Chip tone={proven === total ? 'good' : 'neutral'}>{`${proven} of ${total}`}</Chip>
     </div>
   )
 }
@@ -551,7 +550,7 @@ function PicturesRow({ checks, actions }: ChecksProps) {
           </Button>
         </div>
       </div>
-      <span className="fdry-pill fdry-pill--you">Your move</span>
+      <Chip tone="waiting">Your move</Chip>
     </div>
   )
 }

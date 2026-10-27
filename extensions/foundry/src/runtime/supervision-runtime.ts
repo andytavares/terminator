@@ -120,24 +120,12 @@ function closeHalfStartedRuntime(): void {
 }
 
 function watchForStalls(api: ExtensionAPI, runner: SupervisedRunner): StallWatcher {
-  // How much each run's working copy has grown since the previous look. The
-  // watcher reads transcripts and nothing else, so without this the loop
-  // signal could never tell circling from steady work — and never fired.
-  const lastSeenChange = new Map<string, number>()
   return createStallWatcher({
     runs: () => runner.watchable(),
     // Each tool call, recorded once, beside the order's run graph — what the
     // Factory view plays back after the fact.
     onActivity: (run, activity) => {
       recordToolsInFlight(run.featureDir, run.sessionId, activity)
-    },
-    netChangeSince: (sessionId) => {
-      const diff = runtime.supervision?.runs.get(sessionId)?.diff
-      if (diff === undefined) return 1
-      const total = diff.added + diff.removed
-      const growth = total - (lastSeenChange.get(sessionId) ?? 0)
-      lastSeenChange.set(sessionId, total)
-      return growth
     },
     onFiring: (firing, featureDir) => onStallFiring(api, firing, featureDir),
   })
@@ -162,7 +150,6 @@ function onStallFiring(api: ExtensionAPI, firing: StallFiring, featureDir: strin
     author: 'console',
     summary: `stopped making progress (${firing.signal}) in ${path.basename(featureDir)}`,
   })
-  api.window.broadcast('foundry:stall-fired', { firing, featureDir, shadow })
   announceLive('')
   if (shadow) return
   // Muted runs are recorded and shown, never surfaced — which is the only

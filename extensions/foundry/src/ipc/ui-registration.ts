@@ -1,5 +1,6 @@
 import { noPayload } from '@terminator/extension-sdk'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
+import type { z } from 'zod'
 
 import { foundryChannel } from './channel.js'
 import { ViewPayload } from './payloads.js'
@@ -15,7 +16,7 @@ let pendingNewOrderTimer: NodeJS.Timeout | null = null
 
 // Anything but 'factory' reads as 'list' — an unset or corrupted setting is
 // the same as never having chosen the newer view.
-function viewSetting(api: ExtensionAPI): 'list' | 'factory' {
+export function viewSetting(api: ExtensionAPI): 'list' | 'factory' {
   return api.settings.get<string>('terminator.foundry.view') === 'factory' ? 'factory' : 'list'
 }
 
@@ -24,23 +25,27 @@ export function registerViewChannels(api: ExtensionAPI): void {
   reg(
     api,
     foundryChannel('foundry:ui.view', noPayload, () => ({ view: viewSetting(api) })),
-    foundryChannel('foundry:ui.set-view', ViewPayload, ({ view }) => {
-      api.settings.set('terminator.foundry.view', view)
-      api.window.broadcast('foundry:ui.view-changed', { view })
-      return { view }
-    }),
+    foundryChannel('foundry:ui.set-view', ViewPayload, (payload) => setView(api, payload)),
     // Renderer calls this on mount to pick up an intake request triggered
     // before the main view existed.
-    foundryChannel('foundry:ui.consume-pending-new-order', noPayload, () => {
-      const pending = pendingNewOrder
-      pendingNewOrder = false
-      if (pendingNewOrderTimer !== null) {
-        clearTimeout(pendingNewOrderTimer)
-        pendingNewOrderTimer = null
-      }
-      return { pending }
-    })
+    foundryChannel('foundry:ui.consume-pending-new-order', noPayload, consumePendingNewOrder)
   )
+}
+
+export function setView(api: ExtensionAPI, { view }: z.infer<typeof ViewPayload>) {
+  api.settings.set('terminator.foundry.view', view)
+  api.window.broadcast('foundry:ui.view-changed', { view })
+  return { view }
+}
+
+export function consumePendingNewOrder() {
+  const pending = pendingNewOrder
+  pendingNewOrder = false
+  if (pendingNewOrderTimer !== null) {
+    clearTimeout(pendingNewOrderTimer)
+    pendingNewOrderTimer = null
+  }
+  return { pending }
 }
 
 /** The palette's fixed commands: a new work order, the view toggle, and opening Foundry from Home. */

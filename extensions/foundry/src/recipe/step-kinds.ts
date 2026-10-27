@@ -249,7 +249,7 @@ function compareNumbers(left: number, operator: string, right: number): boolean 
 /**
  * What a step promised about its own result.
  *
- * This is how the bugfix recipe says a reproduction has to *fail* before the
+ * This is how a recipe says a reproduction has to *fail* before the
  * fix exists — `suite_exit_code: '!= 0'` — which is the one place a passing
  * command is the wrong answer.
  */

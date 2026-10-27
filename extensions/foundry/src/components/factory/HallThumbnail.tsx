@@ -5,7 +5,7 @@ import { createWorld } from '../../factory/sim.js'
 import type { World } from '../../factory/sim.js'
 import type { RunGraph } from '../../line/run-graph.js'
 import { HallScene } from './HallScene.js'
-import { invoke } from '@terminator/extension-sdk/renderer'
+import { foundryInvoke } from '../../renderer/foundry-invoke.js'
 
 // One still frame of an order's own hall, for its card in the Factory grid.
 //
@@ -51,11 +51,8 @@ function useOnScreen(containerRef: React.MutableRefObject<HTMLDivElement | null>
 
 /** The order's run graph; undefined for an order that has not started. */
 async function readThumbnailGraph(orderId: string): Promise<RunGraph | undefined> {
-  const r = (await invoke('foundry:run.timeline', { id: orderId })) as {
-    graph?: RunGraph
-    error?: string
-  }
-  return r.graph
+  const r = await foundryInvoke('foundry:run.timeline', { id: orderId })
+  return 'graph' in r ? r.graph : undefined
 }
 
 /** The world settled on `graph`, with nothing going on in it. */

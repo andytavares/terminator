@@ -1,197 +1,106 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { execFile, execFileSync } from 'node:child_process'
-import * as fs from 'node:fs'
-import * as path from 'node:path'
+import { describe, it, expect } from 'vitest'
 import { restack } from '../../src/line/restack.js'
 import type { ExecResult, ShellExec } from '../../src/line/integrate.js'
-import { makeTempDir } from '../../../../tests/support/temp-dir'
 
-// Real git in temp dirs, never the real repository. A known hazard: unscrubbed
-// GIT_DIR/GIT_INDEX_FILE/GIT_WORK_TREE from the outer test run leak into
-// whatever `cwd` git is given, so every git call here goes through `gitIn`,
-// which strips them and sets a local identity.
+// `gh pr update-branch --rebase` does the rebase on GitHub; the checkout is
+// only brought forward afterwards, and only when it is clean.
 
-const exec: ShellExec = ({ command, args, cwd }) =>
-  new Promise<ExecResult>((resolve) => {
-    execFile(command, args, { cwd, maxBuffer: 8 * 1024 * 1024 }, (error, stdout, stderr) => {
-      const code = error === null ? 0 : typeof error.code === 'number' ? error.code : 1
-      resolve({ exitCode: code, stdout, stderr, timedOut: false })
-    })
-  })
+const lane = { cwd: '/work', branch: 'lane/1', base: 'main' }
 
-function gitIn(cwd: string, ...args: string[]): void {
-  const env = { ...process.env }
-  delete env.GIT_DIR
-  delete env.GIT_INDEX_FILE
-  delete env.GIT_WORK_TREE
-  execFileSync('git', args, { cwd, env, stdio: 'pipe' })
+type Call = { command: string; args: string[]; timeoutMs?: number }
+
+/** A fake exec that records every call and answers by the first two args. */
+function scripted(answers: Record<string, Partial<ExecResult>>, calls: Call[] = []): ShellExec {
+  return async ({ command, args, timeoutMs }) => {
+    calls.push({ command, args, timeoutMs })
+    const answer = answers[`${command} ${args[0]} ${args[1] ?? ''}`.trim()] ?? {}
+    return { exitCode: 0, stdout: '', stderr: '', timedOut: false, ...answer }
+  }
 }
-
-function initIdentity(cwd: string): void {
-  gitIn(cwd, 'config', 'user.name', 'Test')
-  gitIn(cwd, 'config', 'user.email', 'test@example.com')
-}
-
-let origin: string
-let lane: string
-let other: string
-
-beforeEach(() => {
-  const root = makeTempDir('fdry-restack-')
-  origin = path.join(root, 'origin.git')
-  lane = path.join(root, 'lane')
-  other = path.join(root, 'other')
-
-  fs.mkdirSync(origin)
-  gitIn(origin, 'init', '--bare', '-b', 'main')
-
-  // Seed origin via a throwaway clone, so the bare repo starts with a commit.
-  const seed = path.join(root, 'seed')
-  gitIn(root, 'clone', origin, seed)
-  initIdentity(seed)
-  fs.writeFileSync(path.join(seed, 'file.txt'), 'line one\nline two\nline three\n')
-  gitIn(seed, 'add', '-A')
-  gitIn(seed, 'commit', '-m', 'seed')
-  gitIn(seed, 'push', 'origin', 'main')
-
-  gitIn(root, 'clone', origin, lane)
-  initIdentity(lane)
-  gitIn(lane, 'checkout', '-b', 'lane/1')
-  gitIn(lane, 'push', 'origin', 'lane/1')
-
-  gitIn(root, 'clone', origin, other)
-  initIdentity(other)
-})
 
 describe('restack', () => {
   describe('rebasing', rebasingTests)
-  describe('conflicts', restackConflictsTests)
-  describe('push failures', restackPushFailuresTests)
+  describe('a dirty checkout', dirtyCheckoutTests)
+  describe('not rebasing', notRebasingTests)
+  describe('a refusal that is not a conflict', refusalTests)
 })
 
 function rebasingTests() {
-  it('rebases and pushes when the base moved without overlap', async () => {
-    // A commit on the lane branch that does not touch main's change.
-    fs.appendFileSync(path.join(lane, 'lane-only.txt'), 'lane work\n')
-    gitIn(lane, 'add', '-A')
-    gitIn(lane, 'commit', '-m', 'lane work')
-    gitIn(lane, 'push', 'origin', 'lane/1')
+  it('asks GitHub to rebase the lane branch, with an explicit timeout', async () => {
+    const calls: Call[] = []
+    await restack(lane, scripted({}, calls))
 
-    // The predecessor merges: a non-overlapping change lands on main.
-    fs.writeFileSync(path.join(other, 'main-only.txt'), 'main work\n')
-    gitIn(other, 'add', '-A')
-    gitIn(other, 'commit', '-m', 'predecessor merged')
-    gitIn(other, 'push', 'origin', 'main')
+    expect(calls[0]).toEqual({
+      command: 'gh',
+      args: ['pr', 'update-branch', 'lane/1', '--rebase'],
+      timeoutMs: 120_000,
+    })
+  })
 
-    const result = await restack({ cwd: lane, branch: 'lane/1', base: 'main' }, exec)
+  it('pulls the rebased branch into a clean checkout', async () => {
+    const calls: Call[] = []
+    const result = await restack(lane, scripted({}, calls))
 
     expect(result).toEqual({ kind: 'rebased', pushed: true })
-
-    const remoteLog = execIn(lane, ['log', '--oneline', 'origin/lane/1'])
-    expect(remoteLog).toContain('predecessor merged')
-    expect(remoteLog).toContain('lane work')
+    expect(calls.map((c) => c.args.slice(0, 2).join(' '))).toEqual([
+      'pr update-branch',
+      'status --porcelain',
+      'pull --rebase',
+    ])
+    expect(calls[2]?.args).toEqual(['pull', '--rebase', 'origin', 'lane/1'])
   })
 }
 
-function restackConflictsTests() {
-  it('aborts and reports the conflicting file when the same line changed on both sides', async () => {
-    // The lane edits line one.
-    fs.writeFileSync(path.join(lane, 'file.txt'), 'lane change\nline two\nline three\n')
-    gitIn(lane, 'add', '-A')
-    gitIn(lane, 'commit', '-m', 'lane edits line one')
-    gitIn(lane, 'push', 'origin', 'lane/1')
+function notRebasingTests() {
+  it('reports a conflict with no file list', async () => {
+    const result = await restack(
+      lane,
+      scripted({ 'gh pr update-branch': { exitCode: 1, stderr: 'merge conflict' } })
+    )
 
-    // The predecessor also edits line one, on main.
-    fs.writeFileSync(path.join(other, 'file.txt'), 'main change\nline two\nline three\n')
-    gitIn(other, 'add', '-A')
-    gitIn(other, 'commit', '-m', 'predecessor edits line one')
-    gitIn(other, 'push', 'origin', 'main')
-
-    const headBefore = gitRevParse(lane, 'HEAD')
-
-    const result = await restack({ cwd: lane, branch: 'lane/1', base: 'main' }, exec)
-
-    expect(result).toEqual({ kind: 'conflict', files: ['file.txt'] })
-
-    const status = execIn(lane, ['status'])
-    expect(status).not.toContain('rebase in progress')
-    expect(gitRevParse(lane, 'HEAD')).toBe(headBefore)
-  })
-}
-
-function restackPushFailuresTests() {
-  it('fails when the force-with-lease is refused because origin moved underneath it', async () => {
-    // Someone else pushes a new commit to the lane branch on origin, out from
-    // under the local clone's tracking ref.
-    gitIn(other, 'fetch', 'origin', 'lane/1')
-    gitIn(other, 'checkout', 'lane/1')
-    fs.writeFileSync(path.join(other, 'stolen.txt'), 'someone else pushed this\n')
-    gitIn(other, 'add', '-A')
-    gitIn(other, 'commit', '-m', 'someone else pushed this')
-    gitIn(other, 'push', 'origin', 'lane/1')
-
-    // A non-overlapping commit on the lane so the rebase itself is clean.
-    fs.appendFileSync(path.join(lane, 'lane-only.txt'), 'lane work\n')
-    gitIn(lane, 'add', '-A')
-    gitIn(lane, 'commit', '-m', 'lane work')
-
-    const result = await restack({ cwd: lane, branch: 'lane/1', base: 'main' }, exec)
-
-    expect(result.kind).toBe('failed')
-  })
-
-  it('fails when origin is unreachable', async () => {
-    fs.rmSync(origin, { recursive: true, force: true })
-
-    const result = await restack({ cwd: lane, branch: 'lane/1', base: 'main' }, exec)
-
-    expect(result.kind).toBe('failed')
-  })
-}
-
-describe('restack when a step does not finish', () => {
-  const timingOut =
-    (verb: string, calls: string[][]): ShellExec =>
-    async ({ args }) => {
-      calls.push(args)
-      return { exitCode: 0, stdout: '', stderr: '', timedOut: args[0] === verb }
-    }
-  const laneToRestack = { cwd: '/work', branch: 'lane/1', base: 'main' }
-
-  it('reports a rebase that timed out as a failure, not a conflict, and abandons the rebase', async () => {
-    const calls: string[][] = []
-    const result = await restack(laneToRestack, timingOut('rebase', calls))
-
-    expect(result).toEqual({ kind: 'failed', reason: 'git rebase timed out after 120 seconds' })
-    expect(calls).toContainEqual(['rebase', '--abort'])
-  })
-
-  it('reports a push that timed out as a failure', async () => {
-    const result = await restack(laneToRestack, timingOut('push', []))
-
-    expect(result).toEqual({ kind: 'failed', reason: 'git push timed out after 120 seconds' })
-  })
-
-  it('gives the rebase and the push an explicit timeout', async () => {
-    const seen: Array<[string, number | undefined]> = []
-    await restack(laneToRestack, async ({ args, timeoutMs }) => {
-      seen.push([args[0], timeoutMs])
-      return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+    expect(result).toEqual({
+      kind: 'conflict',
+      files: [],
+      reason: 'GitHub could not rebase the branch: merge conflict',
     })
-
-    expect(seen).toContainEqual(['rebase', 120_000])
-    expect(seen).toContainEqual(['push', 120_000])
   })
-})
 
-function gitRevParse(cwd: string, ref: string): string {
-  return execIn(cwd, ['rev-parse', ref]).trim()
+  it('reports a timeout as a failure, not a conflict', async () => {
+    const result = await restack(
+      lane,
+      scripted({ 'gh pr update-branch': { exitCode: 1, timedOut: true } })
+    )
+
+    expect(result).toEqual({
+      kind: 'failed',
+      reason: 'gh pr update-branch timed out after 120 seconds',
+    })
+  })
 }
 
-function execIn(cwd: string, args: string[]): string {
-  const env = { ...process.env }
-  delete env.GIT_DIR
-  delete env.GIT_INDEX_FILE
-  delete env.GIT_WORK_TREE
-  return execFileSync('git', args, { cwd, env }).toString()
+function refusalTests() {
+  it('reports a refusal that is not a conflict as a failure, so it is tried again', async () => {
+    const result = await restack(
+      lane,
+      scripted({ 'gh pr update-branch': { exitCode: 1, stderr: 'HTTP 401: Bad credentials' } })
+    )
+
+    expect(result).toEqual({
+      kind: 'failed',
+      reason: 'GitHub could not rebase the branch: HTTP 401: Bad credentials',
+    })
+  })
+}
+
+function dirtyCheckoutTests() {
+  it('leaves a dirty checkout alone and says it is behind', async () => {
+    const calls: Call[] = []
+    const result = await restack(
+      lane,
+      scripted({ 'git status --porcelain': { stdout: ' M a.ts\n' } }, calls)
+    )
+
+    expect(result).toEqual({ kind: 'rebased', pushed: true, checkoutBehind: true })
+    expect(calls.some((c) => c.args[0] === 'pull')).toBe(false)
+  })
 }

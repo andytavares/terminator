@@ -6,8 +6,8 @@ import { ensureCheckout } from '../line/worktree.js'
 import type { Checkout } from '../line/worktree.js'
 import { issueOf, workspaceFor } from '../line/order-project.js'
 import { resumableIn } from '../runtime/claude-launch.js'
-import { architectModel, convergeBrief, readProposal } from './converge.js'
-import type { ConvergeBrief } from './converge.js'
+import { architectModel, convergeBrief, applyArchitectAnswer } from './converge.js'
+import type { ConvergeBrief, ConvergeResult } from './converge.js'
 import type { ConvergeOutcome, ConvergeStarted } from '../ipc/forge-channels.js'
 import type { Role } from '../recipe/parse.js'
 import { collectableWrites, readRungOutput, rungOutputPath } from '../line/rung-output.js'
@@ -21,9 +21,15 @@ import type { StartSupervisedRunOptions, SupervisedRunner } from '../runtime/sup
 import { resolveSources } from '../workspace-root.js'
 import { announceLive, orderStoreAt } from '../state/live-index.js'
 import { intakeSessions, deletedOrders } from './intake-sessions.js'
-import { askModel, modelForTier } from '../state/settings.js'
-import { readOnlyAutoDecide } from '../runtime/agent-policy.js'
-import { READ_ONLY_MODE } from '../runtime/permission-mode.js'
+import {
+  askModel,
+  autonomyFor,
+  letAutoModeDecide,
+  modelForTier,
+  readOnlyTools,
+} from '../state/settings.js'
+import { decideTool } from '../runtime/tool-decision.js'
+import { roleSettings } from '../runtime/role-settings.js'
 import { runtime } from '../runtime/runtime-state.js'
 import { notePending, noteResolved } from '../runtime/held-calls.js'
 import { shellExecOf } from '../host-calls.js'
@@ -64,7 +70,7 @@ const reasonOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
 
 // One intake turn, in a session the operator can see, read-only in the order's lane
-// checkout (ADR-061). It writes one file, validated before it reaches the order, and
+// checkout (ADR-061). It answers in structured output, validated before it reaches the order, and
 // resolves once the architect is running, not when the minutes-long turn finishes.
 export async function convergeOnce(
   api: ExtensionAPI,
@@ -141,12 +147,11 @@ function rememberSessions(root: string, orderId: string): SessionMemory {
     announceLive(orderId)
     remembering = remembering
       .then(async () => {
-        const current = await orderStoreAt(root).load(orderId)
-        if (current === null || current.provenance.forgeSession === sessionId) return
-        await orderStoreAt(root).save({
+        // Through `update`, which queues behind the intake state's own write to the order.
+        await orderStoreAt(root).update(orderId, (current) => ({
           ...current,
           provenance: { ...current.provenance, forgeSession: sessionId },
-        })
+        }))
       })
       .catch(() => {
         // A record of which conversation this was is a courtesy. Losing it
@@ -164,7 +169,7 @@ function launchArchitect(launch: ArchitectLaunch): void {
       .start(architectStartOptions(launch))
       .then((run) => {
         if (run === null) {
-          collectProposal(launch, true, null)
+          architectEnded(launch, null)
           return
         }
         memory.remember(run.sessionId)
@@ -198,11 +203,11 @@ function architectStartOptions(launch: ArchitectLaunch): StartSupervisedRunOptio
       { draft: modelForTier(api, plan.role.modelTier), ask: askModel(api) },
       turn.loop === true ? { loop: true } : undefined
     ),
-    mode: READ_ONLY_MODE,
-    // Read-only, enforced by the policy rather than by the prompt. The
+    // Read-only, enforced by Claude's settings rather than by the prompt. The
     // architect proposes; it does not edit the repository it is reading.
-    // Its one exception is the proposal itself, and only at that path.
-    autoDecide: readOnlyAutoDecide(plan.proposalPath),
+    ...readOnlyTurn(api, { checkout, outputPath: null }),
+    outputSchema: plan.outputSchema,
+    onStructuredOutput: (answer) => receiveAnswer(launch, answer),
     // Intake is where questions belong, so one asked here is not a defect
     // — it is the Forge working.
     ...heldCallNotes(api, featureDir),
@@ -213,8 +218,7 @@ function architectStartOptions(launch: ArchitectLaunch): StartSupervisedRunOptio
       launch.memory.remember(run.sessionId)
       launch.answer({ ok: true, sessionId: run.sessionId })
     },
-    onTurnEnd: () => collectProposal(launch, false, 0),
-    onEnd: (exitCode) => collectProposal(launch, true, exitCode),
+    onEnd: (exitCode) => architectEnded(launch, exitCode),
   }
 }
 
@@ -241,6 +245,32 @@ function sessionPlace(
   }
 }
 
+/** The mode, settings and fallback decision of a turn that reads and writes one file. */
+function readOnlyTurn(
+  api: ExtensionAPI,
+  turn: { checkout: Checkout; outputPath: string | null }
+): Pick<StartSupervisedRunOptions, 'mode' | 'settings' | 'autoDecide'> {
+  const { permissionMode, settings } = roleSettings({
+    readOnly: true,
+    docsOnly: false,
+    restrictedWrites: true,
+    autonomy: autonomyFor(api),
+    letModeDecide: letAutoModeDecide(api),
+    outputPath: turn.outputPath,
+    outputsDir: null,
+    skillsMount: null,
+    mayUseTool: () => true,
+    probedCommands: [],
+    readOnlyTools: readOnlyTools(api, turn.checkout.origin),
+  })
+  const autonomy = autonomyFor(api)
+  return {
+    mode: permissionMode,
+    settings,
+    autoDecide: (tool, input) => decideTool({ tool, input, autonomy, outputsDir: null }),
+  }
+}
+
 function heldCallNotes(
   api: ExtensionAPI,
   featureDir: string
@@ -260,44 +290,40 @@ function postRefusal(sessionId: string, refused: { tool: string; reason: string 
   })
 }
 
-// What a turn left: a session that exited non-zero with no file says its code.
-function endedOutcome(launch: ArchitectLaunch, deadline: boolean, code: number | null) {
-  const { turn, plan } = launch
-  if (deadline && code === null) {
-    return { ok: false as const, reason: 'The architect could not be started.' }
+/** Why a session that ended without a proposal ended, in the operator's words. */
+function endedReason(code: number | null): string {
+  if (code === null) return 'The architect could not be started.'
+  if (code !== 0) {
+    return `The architect's terminal exited with code ${code} before it wrote a plan. Its tab is still open.`
   }
-  if (deadline && code !== 0 && !fs.existsSync(plan.proposalPath)) {
-    return {
-      ok: false as const,
-      reason: `The architect's terminal exited with code ${code} before it wrote a plan. Its tab is still open.`,
-    }
-  }
-  return readProposal(turn.order, plan.proposalPath, new Date().toISOString())
+  return 'the architect wrote no proposal'
 }
 
-// Take the proposal if it is there. A turn ending is not the architect finishing (it
-// may write on a later turn), so a turn counts only when the file exists; the
-// session ending is the deadline, and then the answer is whatever it left.
-function collectProposal(launch: ArchitectLaunch, deadline: boolean, code: number | null): void {
-  const { turn, plan, progress } = launch
-  const { order } = turn
-  if (progress.done || deletedOrders.has(order.id)) return
-  if (!deadline && !fs.existsSync(plan.proposalPath)) return
+// The proposal arrives as the architect's structured answer. The turn ending is not
+// the architect finishing, so only the answer (or the session ending) closes the turn.
+function receiveAnswer(launch: ArchitectLaunch, answer: unknown): void {
+  const { turn, progress } = launch
+  if (progress.done || deletedOrders.has(turn.order.id)) return
   progress.done = true
   // The proposal is in, so the turn's terminal has nothing left to do. A
   // follow-up resumes the conversation in a fresh one.
-  if (!deadline && progress.architectSession !== null) {
-    launch.runner.stop(progress.architectSession)
-  }
-  // The session is over either way, so it must not be resumed: `--resume`
-  // on one the runtime has forgotten silently starts a fresh agent that
-  // believes it is continuing.
-  if (deadline) {
-    intakeSessions.delete(order.id)
-    announceLive(order.id)
-  }
-  const outcome = endedOutcome(launch, deadline, code)
-  inBackground(launch.memory.remembered().then(() => turn.onFinished(outcome)))
+  if (progress.architectSession !== null) launch.runner.stop(progress.architectSession)
+  finishTurn(launch, applyArchitectAnswer(turn.order, answer, new Date().toISOString()))
+}
+
+// The session is over, so it must not be resumed: `--resume` on one the runtime has
+// forgotten silently starts a fresh agent that believes it is continuing.
+function architectEnded(launch: ArchitectLaunch, code: number | null): void {
+  const { turn, progress } = launch
+  if (progress.done || deletedOrders.has(turn.order.id)) return
+  progress.done = true
+  intakeSessions.delete(turn.order.id)
+  announceLive(turn.order.id)
+  finishTurn(launch, { ok: false, reason: endedReason(code) })
+}
+
+function finishTurn(launch: ArchitectLaunch, outcome: ConvergeResult): void {
+  inBackground(launch.memory.remembered().then(() => launch.turn.onFinished(outcome)))
   launch.answer({ ok: false, reason: 'The architect ended before it started.' })
 }
 
@@ -439,10 +465,9 @@ function roundStartOptions(launch: RoundLaunch): StartSupervisedRunOptions {
     prompt: input.prompt(role),
     phase: roleId,
     model: input.model ?? modelForTier(api, role.modelTier),
-    mode: READ_ONLY_MODE,
-    // Read-only, enforced by the policy rather than by the prompt, with the
+    // Read-only, enforced by Claude's settings rather than by the prompt, with the
     // one exception being the rung's own output file.
-    autoDecide: readOnlyAutoDecide(launch.outputPath),
+    ...readOnlyTurn(api, { checkout, outputPath: launch.outputPath }),
     ...heldCallNotes(api, featureDir),
     onAutoDenied: (tool, reason) => postRefusal(order.id, { tool, reason }),
     onRegistered: (run) => {

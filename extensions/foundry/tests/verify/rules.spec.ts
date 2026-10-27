@@ -74,6 +74,14 @@ function rulesWritingTests() {
     expect(resolved.ok).toBe(true)
   })
 
+  it('keeps colons and hashes in the assertion, joined on one line', async () => {
+    const p = { ...proposal(), asserts: 'first line\n  second: line # kept' }
+    await acceptProposal(root, p)
+    const resolved = resolveRule(p.id, sources())
+    if (!resolved.ok) throw new Error(resolved.reason)
+    expect(resolved.resolved.value.asserts).toBe('first line second: line # kept')
+  })
+
   it('puts it on the data-root rung, so it applies to every repository', async () => {
     const p = proposal()
     await acceptProposal(root, p)

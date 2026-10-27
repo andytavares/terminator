@@ -16,11 +16,9 @@ import { createOrderStore } from '../../src/order/store.js'
 import { createGateStore } from '../../src/gates/store.js'
 import { checkoutPath } from '../../src/line/worktree.js'
 import { failingOnBaseOf } from '../../src/line/execute-run.js'
-import type { Recipe } from '../../src/recipe/parse.js'
 import { writeBaseline } from '../../src/line/baseline.js'
 import type { Baseline } from '../../src/line/baseline.js'
 import { orderDir } from '../../src/data-root.js'
-import { partialFake } from '../../../../tests/support/fakes'
 import { orderStoreAt, readGraph } from '../../src/state/live-index.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
@@ -141,7 +139,7 @@ describe('an order whose base branch was already failing', () => {
     expect(body).not.toContain('**Lint**: fails on')
   })
 
-  it('leaves the failing tests out for a bugfix, where they are the bug', async () => {
+  it('lists the failing tests on the base', async () => {
     await writeBaseline(dataDir, 'WO-1', failingBaseline(baseTip()))
     const exec = async () => ({
       exitCode: 0,
@@ -150,12 +148,7 @@ describe('an order whose base branch was already failing', () => {
       timedOut: false,
     })
     const run = { root: dataDir, order: agreedLineOrder(repo), exec }
-    expect(
-      await failingOnBaseOf({ ...run, recipe: partialFake<Recipe>({ id: 'direct' }) })
-    ).toEqual(['Tests'])
-    expect(
-      await failingOnBaseOf({ ...run, recipe: partialFake<Recipe>({ id: 'bugfix' }) })
-    ).toEqual([])
+    expect(await failingOnBaseOf(run)).toEqual(['Tests'])
   })
 
   it('lists nothing when the base branch has moved since the baseline was taken', async () => {

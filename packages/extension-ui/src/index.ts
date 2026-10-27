@@ -68,6 +68,9 @@ export type { PopoverProps } from './Popover'
 export { ConfirmDialog } from './ConfirmDialog'
 export type { ConfirmDialogProps } from './ConfirmDialog'
 
+export { ConfirmButton } from './ConfirmButton'
+export type { ConfirmButtonProps } from './ConfirmButton'
+
 export { Toast, ToastRegion } from './Toast'
 export { installIconTooltips } from './icon-tooltips'
 export { PushedToasts } from './PushedToasts'

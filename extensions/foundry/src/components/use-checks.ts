@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { invoke } from '@terminator/extension-sdk/renderer'
+import { foundryInvoke } from '../renderer/foundry-invoke.js'
 import type { Baseline } from '../line/baseline.js'
 import type { WorkOrder } from '../order/schema.js'
 import {
@@ -17,7 +17,7 @@ import {
   type SaveChange,
 } from '../forge/checks-view.js'
 import { leadRepo } from '../order/lead-repo.js'
-import { usePushed } from '../renderer/use-pushed.js'
+import { foundryKey, foundryQueries, useFoundryQuery } from '../renderer/foundry-query.js'
 
 // The Checks step's state. The profile is read once and again when Foundry says a
 // profile changed; the renderer never polls it.
@@ -87,23 +87,26 @@ function decidedFrom(facts: OrderFacts | null): Decision[] {
 
 /** The profile of the order's first repository, read again when a profile changes. */
 function useProfile(repoPath: string | null) {
-  const [profile, setProfile] = useState<ProfileFacts | null>(null)
-  const read = useCallback(
-    async (): Promise<unknown> =>
-      repoPath === null ? null : invoke('foundry:profile-read', { repoPath }),
+  const { data } = useFoundryQuery({ key: ['profile', repoPath], kinds: ['profile'] }, async () => {
+    if (repoPath === null) return null
+    const answer = await foundryInvoke('foundry:profile-read', { repoPath })
+    if (!isProfile(answer)) throw new Error(errorOf(answer) ?? 'The profile could not be read.')
+    return answer
+  })
+  // A save answers with the profile as written; it is the newest read there is.
+  const show = useCallback(
+    (answer: unknown): void => {
+      if (isProfile(answer)) foundryQueries.setQueryData(foundryKey(['profile', repoPath]), answer)
+    },
     [repoPath]
   )
-  const show = useCallback((answer: unknown) => {
-    if (isProfile(answer)) setProfile(answer)
-  }, [])
-  usePushed(read, show, { kinds: ['profile'] })
-  return { profile, show }
+  return { profile: data ?? null, show }
 }
 
 function useProve(repoPath: string | null) {
   return useCallback(
     async (command: string): Promise<ProveOutcome> =>
-      (await invoke('foundry:profile-prove', { repoPath, command })) as ProveOutcome,
+      await foundryInvoke('foundry:profile-prove', { repoPath: repoPath ?? '', command }),
     [repoPath]
   )
 }
@@ -137,7 +140,12 @@ function useProfileMoves(
 ) {
   const save = useCallback(
     async (change: SaveChange): Promise<string | null> => {
-      const answer = await invoke('foundry:profile-save', { repoPath, ...change })
+      const answer = await foundryInvoke('foundry:profile-save', {
+        repoPath: repoPath ?? '',
+        ...change,
+        remove: change.remove && [...change.remove],
+        additional: change.additional && [...change.additional],
+      })
       show(answer)
       return errorOf(answer)
     },
@@ -147,7 +155,7 @@ function useProfileMoves(
 }
 
 const tailOf = async (path: string): Promise<LogTail> =>
-  (await invoke('foundry:log-tail', { path })) as LogTail
+  await foundryInvoke('foundry:log-tail', { path })
 
 function logFinder(baseline: Baseline | null | undefined) {
   return (command: string): string | null => {

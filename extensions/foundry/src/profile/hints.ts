@@ -197,16 +197,20 @@ function fromTargets(repo: string, hint: Hint, check: CheckName): Proposal | nul
   return { command: hint.targets.run.replace('{name}', check), evidence: file }
 }
 
-/** The first `run:` line, in file order, that the check's words match. */
-function runLineMatching(body: string, words: RegExp): string | null {
-  for (const line of body.split('\n')) {
-    const run = /^\s*-?\s*run:\s*(.+?)\s*$/.exec(line)
-    if (run === null) continue
-    const command = run[1].replace(/^['"]|['"]$/g, '')
-    if (command.startsWith('|') || command === '') continue
-    if (words.test(command)) return command
-  }
-  return null
+/** Every shell line of every step's `run`, in file order; a line holding a GitHub expression is no shell. */
+function workflowCommands(body: string, file: string): string[] {
+  const parsed = loadYaml(body, file)
+  const jobs = (parsed.ok ? (parsed.value as { jobs?: unknown } | null)?.jobs : null) ?? {}
+  return Object.values(jobs as Record<string, { steps?: Array<{ run?: unknown }> }>)
+    .flatMap((job) => job?.steps ?? [])
+    .flatMap((step) => (typeof step?.run === 'string' ? step.run.split('\n') : []))
+    .map((line) => line.trim())
+    .filter((line) => line !== '' && !line.includes('${{'))
+}
+
+/** The first command, in file order, that the check's words match. */
+function runLineMatching(body: string, file: string, words: RegExp): string | null {
+  return workflowCommands(body, file).find((command) => words.test(command)) ?? null
 }
 
 function fromCiRuns(repo: string, hint: Hint, check: CheckName): Proposal | null {
@@ -224,7 +228,7 @@ function fromCiRuns(repo: string, hint: Hint, check: CheckName): Proposal | null
   )
   for (const file of workflows.sort()) {
     const rel = path.posix.join(ciRuns.dir, file)
-    const command = runLineMatching(readText(repo, rel) ?? '', new RegExp(pattern, 'i'))
+    const command = runLineMatching(readText(repo, rel) ?? '', rel, new RegExp(pattern, 'i'))
     if (command !== null) return { command, evidence: rel }
   }
   return null

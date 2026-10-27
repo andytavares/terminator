@@ -88,6 +88,14 @@ function dependenciesAndCriticalPathsTests() {
     ).toContain('critical_path')
   })
 
+  it('reads a critical path file name as a path, not as a security trigger in its words', () => {
+    const o = order()
+    o.risk.criticalPaths = ['tools/migration-notes/**']
+    expect(inspectionFor(o, input(['tools/migration-notes/a.ts'])).triggers).toEqual([
+      'critical_path',
+    ])
+  })
+
   it('does not invent a critical path where the operator declared none', () => {
     expect(inspectionFor(order(), input(['src/anything.ts'])).triggers).not.toContain(
       'critical_path'

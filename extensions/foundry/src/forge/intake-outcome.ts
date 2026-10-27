@@ -1,4 +1,5 @@
 import type { LedgerEntry } from '../ledger/append.js'
+import type { OrderIntake } from '../order/schema.js'
 import type { LoopFacts, AgreedFacts } from './readiness.js'
 
 // How the last intake turn ended.
@@ -185,6 +186,54 @@ export function lastIntake(entries: readonly LedgerEntry[]): IntakeOutcome {
     }
   }
   return { kind: 'none' }
+}
+
+const RUNNING_STATES: readonly string[] = ['drafting', 'reviewing', 'fixing']
+
+/** Why a turn that claims to run has stopped, or null while it is still inside its deadline. */
+/** When the intake is read, and whether an agent session is live in this process. */
+export interface IntakeClock {
+  readonly now: number
+  readonly isLive: (sessionId: string) => boolean
+}
+
+function stoppedReason(
+  turn: Extract<IntakeOutcome, { kind: 'running' }>,
+  {
+    entries,
+    intake,
+    now,
+    isLive,
+  }: IntakeClock & { entries: readonly LedgerEntry[]; intake: OrderIntake }
+): string | null {
+  const since = Date.parse(intake.since)
+  const stalled = entries.some(
+    (entry) =>
+      entry.action === 'run.stalled' &&
+      entry.subject === turn.sessionId &&
+      Date.parse(entry.at) > since
+  )
+  if (stalled) return 'The agent stopped making progress.'
+  // A live agent is still working; a stuck one is caught by the stall above.
+  const expired = intake.deadline !== null && Date.parse(intake.deadline) <= now
+  return expired && !isLive(turn.sessionId ?? '') ? 'The turn did not answer in time.' : null
+}
+
+// The last intake turn: "running" comes from `order.intake`, who is working from the ledger.
+// A stalled turn, or one past its deadline whose agent is gone, reads as refused, so the
+// Forge offers the moves it offers for a refusal.
+export function currentIntake(
+  entries: readonly LedgerEntry[],
+  intake: OrderIntake | undefined,
+  clock: IntakeClock
+): IntakeOutcome {
+  const last = lastIntake(entries)
+  if (last.kind !== 'running') return last
+  if (intake?.state === 'failed')
+    return { kind: 'refused', at: intake.since, reason: intake.reason ?? 'The turn failed.' }
+  if (intake === undefined || !RUNNING_STATES.includes(intake.state)) return { kind: 'none' }
+  const reason = stoppedReason(last, { entries, intake, ...clock })
+  return reason === null ? last : { kind: 'refused', at: intake.since, reason }
 }
 
 /**

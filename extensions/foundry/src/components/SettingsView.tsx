@@ -3,7 +3,7 @@ import { Button } from '@terminator/extension-ui'
 import { getFoundryAPI, type ModelChoiceView } from '../types/electron.js'
 import { rungInWords } from '../recipe/rung.js'
 import type { Rung } from '../recipe/rung.js'
-import { invoke } from '@terminator/extension-sdk/renderer'
+import { foundryInvoke } from '../renderer/foundry-invoke.js'
 import { RepositoryChecks } from './SettingsProfiles.js'
 
 // What is left for a bespoke settings surface.
@@ -42,7 +42,7 @@ const ASK_MODEL_CHOICES = [
 ] as const
 
 async function readSensors(): Promise<SensorRow[]> {
-  const answer = (await invoke('foundry:sensors.list')) as { sensors?: SensorRow[] }
+  const answer = await foundryInvoke('foundry:sensors.list')
   return answer.sensors ?? []
 }
 
@@ -133,18 +133,16 @@ function useAskModel({ save }: Saver) {
   const [askModel, setAskModel] = useState<string>('sonnet')
   useEffect(() => {
     void (async () => {
-      const answer = (await invoke('foundry:ask-model')) as { selected?: unknown }
+      const answer = await foundryInvoke('foundry:ask-model')
       if (typeof answer?.selected === 'string') setAskModel(answer.selected)
     })()
   }, [])
   const chooseAskModel = useCallback(
-    (id: string) =>
+    (id: (typeof ASK_MODEL_CHOICES)[number]['id']) =>
       save(
         async () => {
-          const result = (await invoke('foundry:ask-model-set', { model: id })) as {
-            error?: string
-          }
-          return result.error !== undefined ? result.error : null
+          const result = await foundryInvoke('foundry:ask-model-set', { model: id })
+          return 'error' in result ? result.error : null
         },
         () => setAskModel(id)
       ),
@@ -277,11 +275,9 @@ function useSensorActions({
   const setSensor = useCallback(
     async (id: string, patch: { enabled?: boolean; repoPath?: string | null }) => {
       setSensorProblems((current) => ({ ...current, [id]: '' }))
-      const result = (await invoke('foundry:sensors.set', { id, ...patch })) as {
-        error?: string
-      }
+      const result = await foundryInvoke('foundry:sensors.set', { id, ...patch })
       if (result.error !== undefined) {
-        setSensorProblems((current) => ({ ...current, [id]: result.error as string }))
+        setSensorProblems((current) => ({ ...current, [id]: result.error }))
       }
       await refreshSensors()
     },
@@ -302,16 +298,10 @@ function useRunNow(
 ) {
   return useCallback(
     async (id: string) => {
-      const result = (await invoke('foundry:sensors.run-now', { id })) as {
-        recorded?: number
-        problem?: string | null
-      }
+      const result = await foundryInvoke('foundry:sensors.run-now', { id })
       setRunNotes((current) => ({
         ...current,
-        [id]:
-          result.problem !== undefined && result.problem !== null
-            ? result.problem
-            : `Recorded ${result.recorded ?? 0}.`,
+        [id]: 'error' in result ? result.error : (result.problem ?? `Recorded ${result.recorded}.`),
       }))
       await refreshSensors()
     },

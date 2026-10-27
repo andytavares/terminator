@@ -33,7 +33,7 @@ export interface ToolActivity {
 // defensively: pull the handful of fields we need, ignore everything else, and
 // never fail a session because one line did not parse.
 
-const SHELL_TOOLS = new Set(['Bash', 'BashOutput', 'KillShell'])
+export const SHELL_TOOLS = new Set(['Bash', 'BashOutput', 'KillShell'])
 
 interface ToolUseBlock {
   type?: unknown
@@ -119,7 +119,7 @@ function startedEvent(
 }
 
 /** The file a call's input names, if it names one. */
-function namedFile(input: unknown): unknown {
+export function namedFile(input: unknown): unknown {
   if (typeof input !== 'object' || input === null) return null
   const fields = input as Record<string, unknown>
   return fields.file_path ?? fields.notebook_path

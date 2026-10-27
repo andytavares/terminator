@@ -1,15 +1,11 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { TriangleAlert } from 'lucide-react'
-import { Button } from '@terminator/extension-ui'
+import { Button } from './Button'
+import './extension-ui.css'
 
-// A control that destroys something, and says what, before it does it.
-//
-// Two clicks in place rather than a modal. `window.confirm` inside an
-// extension's WebContentsView blocks every event the view would receive
-// afterwards, and a dialog that must be dismissed before the consequence can
-// be read is a dialog nobody reads. Arming puts the sentence and the button
-// in the same place, so the thing being agreed to is on screen at the moment
-// of agreeing.
+// Two clicks in place, not a modal: `window.confirm` in an extension's WebContentsView
+// blocks every later event the view would receive. Arming shows what will be
+// destroyed beside the button that destroys it.
 
 export interface ConfirmButtonProps {
   /** What the control is, before it is armed. */
@@ -19,6 +15,8 @@ export interface ConfirmButtonProps {
   /** Exactly what will be destroyed. Not a warning about danger in general. */
   readonly warning: string
   readonly disabled?: boolean
+  /** For the caller's layout, on the button before it is armed. */
+  readonly className?: string
   readonly onConfirm: () => void
 }
 
@@ -27,8 +25,9 @@ export function ConfirmButton({
   confirmLabel,
   warning,
   disabled = false,
+  className,
   onConfirm,
-}: ConfirmButtonProps) {
+}: ConfirmButtonProps): JSX.Element {
   const [armed, setArmed] = useState(false)
 
   if (!armed) {
@@ -36,7 +35,7 @@ export function ConfirmButton({
       <Button
         variant="ghost"
         size="sm"
-        className="fdry-discard"
+        className={className}
         disabled={disabled}
         onClick={() => setArmed(true)}
       >
@@ -61,7 +60,9 @@ function ArmedConfirm({
   disabled,
   onConfirm,
   onDisarm,
-}: Required<ConfirmButtonProps> & { readonly onDisarm: () => void }) {
+}: Required<Omit<ConfirmButtonProps, 'className'>> & {
+  readonly onDisarm: () => void
+}): JSX.Element {
   // Disarmed before the work, not after: the second run of a
   // destructive action is a second decision, and leaving it armed
   // through a slow teardown invites a double click into being one.
@@ -70,11 +71,11 @@ function ArmedConfirm({
     onConfirm()
   }
   return (
-    <div className="fdry-confirm" role="group" aria-label={label}>
-      <p className="fdry-note">
+    <div className="tmui-confirm" role="group" aria-label={label}>
+      <p className="tmui-confirm__warning">
         <TriangleAlert aria-hidden="true" /> {warning}
       </p>
-      <div className="fdry-ask-actions">
+      <div className="tmui-confirm__actions">
         <Button variant="danger" size="sm" disabled={disabled} onClick={disarmThenConfirm}>
           {confirmLabel}
         </Button>

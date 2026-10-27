@@ -72,8 +72,8 @@ interface WaitingRow {
 }
 
 export interface InboxChannels {
-  list(): Promise<unknown>
-  decide(payload: z.infer<typeof DecidePayload>): Promise<unknown>
+  list(): ReturnType<typeof list>
+  decide(payload: z.infer<typeof DecidePayload>): ReturnType<typeof decideGate>
 }
 
 export function createInboxChannels(deps: InboxDeps): InboxChannels {
@@ -85,7 +85,7 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
 
 type DecideInput = z.infer<typeof DecidePayload>
 
-async function list(deps: InboxDeps): Promise<unknown> {
+async function list(deps: InboxDeps) {
   const autonomy = deps.autonomy()
   const settled = await settleOverdue(deps, autonomy)
   const orders = await deps.orders.list()
@@ -185,7 +185,7 @@ function ticketOf(order: WorkOrder): { key: string; url: string } | null {
   return key != null && url != null ? { key, url } : null
 }
 
-async function decideGate(deps: InboxDeps, payload: DecideInput): Promise<unknown> {
+async function decideGate(deps: InboxDeps, payload: DecideInput) {
   const gate = await deps.gates.get(payload.gateId)
   if (gate === null) return { error: `No gate ${payload.gateId}.` }
   if (gate.decision !== null) {
