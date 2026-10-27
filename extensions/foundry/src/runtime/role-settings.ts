@@ -55,7 +55,18 @@ const READ_ONLY_ALLOWS = [
 ]
 
 /** The paths `isDocumentationRelative` (verify/documentation-path.ts) accepts, as globs. */
-const DOCUMENTATION_GLOBS = ['**/*.md', '**/README*', '**/CHANGELOG*', 'docs/**', 'specs/**']
+const DOCUMENTATION_GLOBS = [
+  '**/*.md',
+  '**/*.MD',
+  '**/README*',
+  '**/Readme*',
+  '**/readme*',
+  '**/CHANGELOG*',
+  '**/Changelog*',
+  '**/changelog*',
+  'docs/**',
+  'specs/**',
+]
 
 const FILE_WRITE_TOOLS = ['Edit', 'MultiEdit', 'Write', 'NotebookEdit']
 

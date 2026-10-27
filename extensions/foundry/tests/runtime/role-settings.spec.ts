@@ -183,6 +183,22 @@ describe('a read-only role’s tools and sandbox', () => {
   })
 })
 
+const DOCUMENTATION_CASES = [
+  'README.md',
+  'docs/guide/setup.txt',
+  'specs/054/plan.md',
+  'src/deep/notes.md',
+  'packages/ui/README',
+  'CHANGELOG',
+  'src/index.ts',
+  'docs',
+  'package.json',
+  'srcdocs/a.ts',
+  'notes/NOTES.MD',
+  'packages/ui/readme.md',
+  'Changelog',
+]
+
 describe('a documentation-only role', () => {
   const allow = allowOf({ ...docsOnly, outputPath: '/data/out.json', outputsDir: '/data/outputs' })
 
@@ -191,22 +207,14 @@ describe('a documentation-only role', () => {
     expect(ruleCovers(allow, 'Write', 'package.json')).toBe(false)
   })
 
-  it.each([
-    'README.md',
-    'docs/guide/setup.txt',
-    'specs/054/plan.md',
-    'src/deep/notes.md',
-    'packages/ui/README',
-    'CHANGELOG',
-    'src/index.ts',
-    'docs',
-    'package.json',
-    'srcdocs/a.ts',
-  ])('has write globs that agree with isDocumentationRelative on %s', (relative) => {
-    for (const tool of ['Edit', 'Write']) {
-      expect(ruleCovers(allow, tool, relative)).toBe(isDocumentationRelative(relative))
+  it.each(DOCUMENTATION_CASES)(
+    'has write globs that agree with isDocumentationRelative on %s',
+    (relative) => {
+      for (const tool of ['Edit', 'Write']) {
+        expect(ruleCovers(allow, tool, relative)).toBe(isDocumentationRelative(relative))
+      }
     }
-  })
+  )
 
   it('may write its output file and its outputs directory', () => {
     expect(allow).toEqual(
