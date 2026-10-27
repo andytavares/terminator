@@ -64,6 +64,7 @@ function MenuButton({
     <button
       type="button"
       className={`sidebar-menu__button${marked ? ' sidebar-menu__button--on' : ''}`}
+      aria-haspopup="menu"
       aria-expanded={open}
       aria-label={ariaLabel}
       onClick={toggle}
