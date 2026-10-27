@@ -18,6 +18,7 @@ import {
   publishWhenPushed,
   runScheduled,
   oneAtATime,
+  unitSelected,
 } from '../../../scripts/ci-local.mjs'
 
 describe('what ci:local leaves to CI', () => {
@@ -305,5 +306,12 @@ describe('jobs that fill every core run one at a time', () => {
     expect(await unit).toBe(false)
     expect(await stability).toBe(true)
     expect(events).toEqual(['start unit', 'end unit', 'start stability'])
+  })
+})
+
+describe('unitSelected', () => {
+  it('reads run_unit from the select step output, as the unit job does', () => {
+    expect(unitSelected('mode=none\nrun_unit=false\nrun_e2e=false\n')).toBe(false)
+    expect(unitSelected('mode=selected\nrun_unit=true\n')).toBe(true)
   })
 })

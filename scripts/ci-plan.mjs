@@ -33,7 +33,8 @@ function expressionsFor(all) {
   ]
 }
 
-const CONDITIONS = { 'always()': true, "needs.unit.result == 'success'": true }
+const NEEDS_UNIT = "needs.unit.result == 'success'"
+const CONDITIONS = { 'always()': true, [NEEDS_UNIT]: true }
 
 const SETUP = /^npm ci\b/
 
@@ -82,6 +83,8 @@ function stepsOf(id, job, expressions) {
         name: step.name,
         script: resolveScript(step.run, where, expressions),
         env: resolveEnv(step.env ?? {}, where, expressions),
+        // CI skips these when the selection names no unit spec: the unit job and what reads its blobs.
+        needsUnit: id === 'unit' || step.if === NEEDS_UNIT,
       },
     ]
   })
@@ -94,6 +97,10 @@ export function planFor(workflow, { all = false } = {}) {
     .filter(([id]) => !(id in SKIPPED_JOBS))
     .flatMap(([id, job]) => stepsOf(id, job, expressions))
 }
+
+/** The plan for a selection with no unit spec: CI skips the unit job, and with it the steps that
+ * merge its blobs, so ci:local does too. */
+export const withoutUnitWork = (steps) => steps.filter((step) => !step.needsUnit)
 
 /** How many shards the e2e job runs in, for scripts/ci-e2e-local.mjs to run the same. */
 export function e2eShardCount(workflow) {
