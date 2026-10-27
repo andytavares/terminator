@@ -1,0 +1,21 @@
+docs/CONTRIBUTING.md
+  s_a9e8c58b3eee1f::t_fcc269fc7b7154 18
+package.json
+  s_a9e8c58b3eee1f::t_fcc269fc7b7154 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b2181135005a207139bf13db0f9806c07fcde2cc",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
