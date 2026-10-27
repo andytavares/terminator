@@ -1,0 +1,23 @@
+scripts/check-quarantine.mjs
+  s_567c3310a5db4e::t_66594e23086e15 108-122,133-141,143,162-163,216-217
+  s_567c3310a5db4e::t_0390003cfb53fa 123-132,165-173
+tests/unit/scripts/check-quarantine.spec.ts
+  s_567c3310a5db4e::t_66594e23086e15 4-10,13-20,149-172,177-187
+  s_567c3310a5db4e::t_bc875acd149d03 1,173-176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4fa26fc3577290d11633bd3405ee1786b82643c4",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
