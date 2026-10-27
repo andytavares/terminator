@@ -33,8 +33,6 @@ export interface Checkout {
   readonly created: boolean
   /** The folders the origin's install lends, from the order's environment. */
   readonly share: readonly string[]
-  /** True when Foundry cut the lane's branch; only such a branch is Foundry's to delete. */
-  readonly branchCreated?: boolean
 }
 
 export interface CheckoutDeps {
@@ -271,7 +269,6 @@ async function prepareCheckout(plan: CheckoutPlan, deps: CheckoutDeps): Promise<
     branch,
     created: added !== 'present',
     share,
-    branchCreated: fs.existsSync(createdBranchMarker(target)),
   }
   await provisionDependencies(checkout, deps)
   return checkout

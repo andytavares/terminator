@@ -78,6 +78,7 @@ describe('refineryTick', () => {
   describe('conflicts', refineryTickConflictsTests)
   describe('a conflict seen again', refineryTickRepeatedConflictTests)
   describe('failed restacks', failedRestacksTests)
+  describe('a checkout left behind', checkoutBehindTests)
 })
 
 const pulls = [{ url: 'u1' }, { url: 'u2' }]
@@ -310,5 +311,27 @@ function refineryTickTrackerFailuresTests() {
     })
     await refineryTick(deps)
     expect(deps.states.get('WO-1')?.mergedAt).not.toBeNull()
+  })
+}
+
+function checkoutBehindTests() {
+  it('records that the lane checkout is behind its rebased branch', async () => {
+    const deps = baseDeps({
+      candidates: async () => [
+        { order: { id: 'WO-1', title: 'Predecessor' }, pulls: [{ url: 'u1' }] },
+      ],
+      viewPr: async () => ({ merged: true }),
+      entries: async () => [
+        entry({ orderId: 'WO-1', files: ['a.ts'] }),
+        entry({ orderId: 'WO-2', agreedAt: '2026-09-02T00:00:00.000Z', files: ['a.ts'] }),
+      ],
+      restack: vi.fn(async () => ({
+        kind: 'rebased' as const,
+        pushed: true,
+        checkoutBehind: true as const,
+      })),
+    })
+    await refineryTick(deps)
+    expect(deps.records.map((r) => r.action)).toContain('refinery.checkout-behind')
   })
 }

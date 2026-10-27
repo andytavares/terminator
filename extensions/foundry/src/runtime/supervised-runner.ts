@@ -1,12 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import type {
-  AgentPermissionAsk,
-  AgentUpdate,
-  ExtensionAPI,
-  StartAgentInput,
-} from '@terminator/extension-sdk'
+import type { AgentPermissionAsk, ExtensionAPI, StartAgentInput } from '@terminator/extension-sdk'
 import { shellQuote } from '@terminator/extension-sdk/node'
 import { transcriptPathFor } from './claude-launch.js'
 import {
@@ -19,7 +14,11 @@ import {
 import type { ClaudePermissionMode, ClaudeSettings } from './role-settings.js'
 import { countTurns, transcriptSize } from './transcript-tailer.js'
 import type { WatchedRun } from './stall-watcher.js'
-import { trackToolActivity, type ToolActivityTracker } from './tool-activity.js'
+import {
+  toolNameOf as updateToolName,
+  trackToolActivity,
+  type ToolActivityTracker,
+} from './tool-activity.js'
 
 /**
  * Which step of the run this is — a run-graph node id.
@@ -538,10 +537,6 @@ function listenForAnswer(
     onAnswer(latest.get(update.toolCallId))
     latest.delete(update.toolCallId)
   })
-}
-
-function updateToolName(update: AgentUpdate): unknown {
-  return (update._meta as { claudeCode?: { toolName?: unknown } } | undefined)?.claudeCode?.toolName
 }
 
 /** Sends a prompt; its end is a turn end, unless the turn was cut short or failed. */

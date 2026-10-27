@@ -6,7 +6,7 @@ import { namedFile, SHELL_TOOLS, type ToolActivity } from './transcript-tailer.j
 // Code's transcript file, whose format Claude does not publish.
 
 export interface ToolActivityTracker {
-  /** Every tool start and finish seen so far, oldest first. */
+  /** The most recent tool starts and finishes, oldest first. */
   activity(): readonly ToolActivity[]
   stop(): void
 }
@@ -14,7 +14,7 @@ export interface ToolActivityTracker {
 const FINISHED = new Set(['completed', 'failed'])
 
 /** The tool's name from the agent's `_meta`, or null when it sent none. */
-function toolNameOf(update: AgentUpdate): string | null {
+export function toolNameOf(update: AgentUpdate): string | null {
   const meta = update._meta as { claudeCode?: { toolName?: unknown } } | undefined
   const name = meta?.claudeCode?.toolName
   return typeof name === 'string' ? name : null
@@ -45,7 +45,15 @@ function finishedFrom(update: AgentUpdate, started: ToolActivity | undefined, at
   } satisfies ToolActivity
 }
 
-/** Listens to one session's updates and keeps its tool calls, in memory, for as long as it lives. */
+/** The most recent events a session keeps; the stall rule and the hall read only the tail. */
+const KEPT_EVENTS = 1000
+
+function keep(activity: ToolActivity[], event: ToolActivity): void {
+  activity.push(event)
+  if (activity.length > KEPT_EVENTS) activity.splice(0, activity.length - KEPT_EVENTS)
+}
+
+/** Listens to one session's updates and keeps its recent tool calls in memory while it lives. */
 export function trackToolActivity(
   agents: Pick<AgentsAPI, 'onUpdate'>,
   sessionId: string,
@@ -59,9 +67,10 @@ export function trackToolActivity(
     if (update.sessionUpdate === 'tool_call') {
       const event = startedFrom(update, toolCallId, now())
       started.set(toolCallId, event)
-      activity.push(event)
+      keep(activity, event)
     } else if (update.sessionUpdate === 'tool_call_update' && FINISHED.has(String(update.status))) {
-      activity.push(finishedFrom(update, started.get(toolCallId), now()))
+      keep(activity, finishedFrom(update, started.get(toolCallId), now()))
+      started.delete(toolCallId)
     }
   })
   return { activity: () => activity, stop }

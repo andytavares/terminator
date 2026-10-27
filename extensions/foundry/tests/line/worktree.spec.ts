@@ -15,6 +15,7 @@ import {
   branchFor,
   checkoutPath,
   CheckoutFailedError,
+  createdBranchMarker,
 } from '../../src/line/worktree.js'
 import type { CheckoutDeps, Checkout } from '../../src/line/worktree.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -403,13 +404,15 @@ function realGitBranchOwnershipTests() {
     const checkout = await ensureCheckout(named, 1, real)
 
     expect(git(target, 'rev-parse', 'HEAD')).toBe(mine)
-    expect(checkout.branchCreated).toBe(false)
+    expect(fs.existsSync(createdBranchMarker(checkout.path))).toBe(false)
   })
 
   it('records that Foundry created the branch it cut, and remembers it on a resume', async () => {
     const { deps: real, order: o } = realRepo()
-    expect((await ensureCheckout(o, 1, real)).branchCreated).toBe(true)
-    expect((await ensureCheckout(o, 1, real)).branchCreated).toBe(true)
+    const first = await ensureCheckout(o, 1, real)
+    expect(fs.existsSync(createdBranchMarker(first.path))).toBe(true)
+    const resumed = await ensureCheckout(o, 1, real)
+    expect(fs.existsSync(createdBranchMarker(resumed.path))).toBe(true)
   })
 }
 
@@ -472,7 +475,7 @@ function realGitResetTests() {
     const checkout = await ensureCheckout(o, 1, real)
 
     expect(checkout.created).toBe(true)
-    expect(checkout.branchCreated).toBe(false)
+    expect(fs.existsSync(createdBranchMarker(checkout.path))).toBe(false)
     expect(git(target, 'rev-parse', 'HEAD')).toBe(leftover)
   })
 
