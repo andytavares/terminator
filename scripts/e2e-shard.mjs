@@ -96,9 +96,9 @@ export function pack(unitList, total) {
   return bins
 }
 
-// One app per shard. Two at once on CI's 3-core macOS runner ran the suite in 610 s against 815 s,
-// but extension-escape.spec.ts then hung on a key press (run 40579399555); with one it never has.
-export const APPS_PER_SHARD = 1
+// Two apps at once on CI's 3-core macOS runner ran the suite in 610 s against 815 s with one
+// (runs 40572074278 and 40566760766). Each shard gets two lanes of the plan.
+export const APPS_PER_SHARD = 2
 
 /** Shard `shard` of `total`: its lanes' arguments and Playwright's worker count, or none. */
 export function shardPlan(unitList, shard, total) {

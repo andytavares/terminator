@@ -65,7 +65,7 @@ The `zip` target and the `publish` section exist for self-update (ADR 128): each
 
 ```bash
 npm run ci:local        # Every check CI runs, at once as CI runs them; e2e last
-npm run ci:local:e2e    # Only the e2e job: specs selected by the diff, ci.yml's three shards at once, one app each
+npm run ci:local:e2e    # Only the e2e job: specs selected by the diff, ci.yml's three shards at once, two apps each
 ```
 
 `npm run ci:local` runs what `.github/workflows/ci.yml` runs, where CI runs it. A local pass must predict a CI pass, so it tests what CI tests:
