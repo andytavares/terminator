@@ -92,6 +92,20 @@ export async function runScheduled(jobs, runJob) {
   return Promise.all(jobs.map(async (job) => ({ id: job.id, status: await statusOf(job.id) })))
 }
 
+// Jobs that fill every core by design: the unit suite, and the stability gate, which runs under
+// load on purpose. Two at once overloaded the container until a spec hit its hang bound.
+const WHOLE_MACHINE = new Set(['unit', 'stability-shard'])
+
+/** `exclusive(work)` runs `work` after every earlier one has ended, in call order. */
+export function oneAtATime() {
+  let last = Promise.resolve()
+  return (work) => {
+    const result = last.then(work)
+    last = result.catch(() => {})
+    return result
+  }
+}
+
 /** One job's steps in order, in the lane CI runs it. Its output prints as one block when it ends. */
 async function runJob(job, context, durations) {
   const output = []
@@ -145,7 +159,11 @@ async function runChecks(checkouts, { all }) {
     }
     const durations = new Map()
     const jobs = jobsOf(planFor(workflow, { all }), workflow)
-    const outcomes = await runScheduled(jobs, (job) => runJob(job, context, durations))
+    const exclusive = oneAtATime()
+    const run = (job) => runJob(job, context, durations)
+    const outcomes = await runScheduled(jobs, (job) =>
+      WHOLE_MACHINE.has(job.id) ? exclusive(() => run(job)) : run(job)
+    )
     return reportJobs(outcomes, durations) && (await runE2e(context, { all }))
   } finally {
     linux.stop()

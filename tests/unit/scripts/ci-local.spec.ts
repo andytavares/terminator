@@ -17,6 +17,7 @@ import {
   unverifiedPushes,
   publishWhenPushed,
   runScheduled,
+  oneAtATime,
 } from '../../../scripts/ci-local.mjs'
 
 describe('what ci:local leaves to CI', () => {
@@ -277,5 +278,32 @@ describe('the two checkouts', () => {
       mac: '/repo/.worktrees/.ci-local',
       linux: '/repo/.worktrees/.ci-local-linux',
     })
+  })
+})
+
+describe('jobs that fill every core run one at a time', () => {
+  it('starts the next only after the one before has ended, even when it failed', async () => {
+    const exclusive = oneAtATime()
+    const events: string[] = []
+    let endUnit: (passed: boolean) => void = () => {}
+    const unit = exclusive(
+      () =>
+        new Promise<boolean>((resolve) => {
+          events.push('start unit')
+          endUnit = (passed) => {
+            events.push('end unit')
+            resolve(passed)
+          }
+        })
+    )
+    const stability = exclusive(async () => {
+      events.push('start stability')
+      return true
+    })
+    await eventually(() => expect(events).toEqual(['start unit']))
+    endUnit(false)
+    expect(await unit).toBe(false)
+    expect(await stability).toBe(true)
+    expect(events).toEqual(['start unit', 'end unit', 'start stability'])
   })
 })
