@@ -1,0 +1,27 @@
+docs/adr/123-tests-run-once-sealed-and-selected.md
+  s_567c3310a5db4e::t_9807e8c2c1bc0f 3
+docs/adr/129-ci-jobs-have-no-time-limit.md
+  s_567c3310a5db4e::t_9807e8c2c1bc0f 3
+docs/adr/124-flaky-tests-are-caught-before-merge-and-quarantined-with-an-expiry.md
+  s_567c3310a5db4e::t_9807e8c2c1bc0f 3
+docs/adr/131-ci-finishes-in-five-minutes.md
+  s_567c3310a5db4e::t_276e9d3e2bd45f 1-41
+docs/CONTRIBUTING.md
+  s_567c3310a5db4e::t_9807e8c2c1bc0f 102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9c3b2aff891c6579dc1fbfd55a9ea1c6e4ea0c3b",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
