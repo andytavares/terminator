@@ -1,0 +1,28 @@
+extensions/foundry/src/forge/intake-outcome.ts
+  s_6768753e2f34eb::t_86a87257539d2a 44-45,177-178,181-183
+extensions/foundry/tests/forge/intake-outcome.spec.ts
+  s_6768753e2f34eb::t_6686f9ac8ed18f 203,241
+  s_6768753e2f34eb::t_7405b3d194dca6 242-261
+  s_6768753e2f34eb::t_fcfa2729f5b1ef 262-264
+src/main/agents/acp/agent-service.ts
+  s_6768753e2f34eb::t_e375b881fad040 460,467-470
+  s_6768753e2f34eb::t_c20e11d9057e11 471-472
+tests/unit/agents/acp/agent-service.spec.ts
+  s_6768753e2f34eb::t_abd2a1d13ee231 315-322
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "863f6cc0033b0af98c3ef57a98a294f94e5a0fc9",
+  "prompts": {},
+  "sessions": {
+    "s_6768753e2f34eb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9cb01023-8291-4030-a541-66d7d8df379b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
