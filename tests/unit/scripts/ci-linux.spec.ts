@@ -66,9 +66,9 @@ describe('the container', () => {
 
 describe('a step in the container', () => {
   const step = { script: 'npm run lint', env: { TEST_ALL: '1' } }
-  const args = stepArguments('ci', step, checkout)
+  const args = stepArguments('ci', step)
 
-  it('runs its script in bash as CI does, from the checkout', () => {
+  it('runs its script in bash as CI does, with no path in the command', () => {
     expect(args.slice(args.indexOf('ci') + 1)).toEqual([
       'bash',
       '-e',
@@ -77,7 +77,8 @@ describe('a step in the container', () => {
       '-c',
       'npm run lint',
     ])
-    expect(args).toEqual(expect.arrayContaining(['-w', checkout]))
+    expect(args).not.toContain('-w')
+    expect(args.join(' ')).not.toContain(checkout)
   })
 
   // CI's runner is the user `runner` with sudo, not root: root writes where a spec expects a
