@@ -1,6 +1,6 @@
 # ADR 077: Auto mode answers what Foundry's policy abstains on
 
-**Status**: Accepted
+**Status**: Superseded by ADR 131
 
 **Date**: 2026-09-28
 

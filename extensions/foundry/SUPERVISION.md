@@ -601,12 +601,10 @@ refusals also reach Claude as deny rules (`runtime/deny-rules.ts`), which hold i
 This is worth knowing before turning `lights-out` on, because for a whole
 session it looked like Claude Code hanging at random.
 
-When the ladder abstains, the call is held and the operator is asked. If nobody
-answers within five minutes the bridge **hands the call back**: it drops the call
-from Foundry's held list and leaves the ask open in the agent tab. That is the right
-answer when somebody is at the console. When nobody is, the agent waits at that
-ask for ever, and only the wall-clock budget ends the run. An ask the operator
-answers in the agent tab clears its held call in Foundry (`onPermissionSettled`).
+An ask the settings leave open goes to the operator at once, and stays open in
+the agent tab until somebody answers it there or in the inbox. At `lights-out`
+Foundry refuses it instead, since nobody is there. An ask the operator answers
+in the agent tab clears its held call in Foundry (`onPermissionSettled`).
 
 Measured on a live run:
 
@@ -648,100 +646,23 @@ For 90 minutes on `WO-0909-30a` there was no such record: the builder was parked
 at a prompt, its node still said `running`, and every surface drew a working
 build over it until the wall-clock budget fired.
 
-### What the ladder takes for itself
+### What the settings decide
 
-FR-029 says every action is held against a decision — _automatic where the
-autonomy setting allows it_, and by asking where it does not. `src/runtime/autonomy-policy.ts`
-is the automatic half:
+FR-029 says every action is held against a decision, automatic where the
+autonomy setting allows it and asked where it does not. Claude Code makes that
+decision now (ADR 131). `src/runtime/role-settings.ts` gives each role a
+permission mode and `allow`, `ask` and `deny` rules, and Claude applies them to
+every subcommand, subshell and control-flow body:
 
-|                                                                                                                                    |                              |
-| ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| **Destructive** — `rm`, `git reset --hard`, `git clean -fd`, a force push, a `-D` branch delete, or a command built inside another | **never automatic** (FR-050) |
-| **Writes outside the unit's own checkout**, including a shell redirection to a path outside it                                     | **never automatic**          |
-| Anything else, at `escorted`                                                                                                       | asks                         |
-| Anything else, at `standard` or `lights-out`                                                                                       | taken, and recorded          |
+| Calls                                                                                                 | Rule                                                                           |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Pushing, changing a pull request, editing the skills mount, a tool the role file leaves out           | `deny`: never, in every mode                                                   |
+| `rm -rf`, `sudo`, `git reset --hard`, `git checkout --`, `git restore`, `git clean`, `git stash drop` | `ask`: the operator decides; refused at `lights-out` (FR-050)                  |
+| Every call from a read-only, docs-only or restricted-write role                                       | `dontAsk`: only what an `allow` rule names runs                                |
+| Every call from a free writer                                                                         | `auto`, or `acceptEdits` with `letAutoModeDecide` off; `default` at `escorted` |
 
-**Never automatic means asked where somebody can answer, and refused where
-nobody can.** At `escorted` and `standard` these two hold the call and ask. At
-`lights-out` there is by definition nobody to ask, and a held call becomes a
-half-hour of silence: the question goes to the operator, five minutes later to
-the runtime's own ask in the agent tab, and the agent stands at that ask
-until the wall-clock budget ends the run. Watched live — the builder redirected
-its test output to a scratch file, which is outside the checkout and so worth a
-question, and thirty minutes later the order had shipped nothing.
-
-So at `lights-out` the same two are **refused, with the reason**, and the agent
-does the work another way. Nothing became more permissive: the action does not
-happen either way, and that is the property to hold on to. What changed is that
-the agent is told, instead of left standing at a prompt nobody will ever reach.
-The reason names the alternative — "write inside the worktree instead" — because
-a refusal an agent cannot act on wastes the turn it was given to adapt.
-
-**Every segment is judged, rather than every compound refused** — the same
-correction the read-only policy needed, and for the same reason. Reading
-`git status` off the front of `git status; rm -rf .` reads the wrong command,
-so the answer is to read _all_ of it: a joined command whose second half
-destroys is caught by that half.
-
-Refusing the shape instead does not stop at the dangerous ones.
-`pwd && git rev-parse --abbrev-ref HEAD && git status --short` and
-`npm test 2>&1 | tail -20` are the ordinary sentences every agent writes, and
-each was called destruction and sent to the operator at every setting,
-lights-out included. Watched live: a builder's first two tool calls were held,
-and it sat there while the graph said `running` and the worktree stayed clean.
-
-**A substitution is read, not refused.** `$(…)` and backticks were treated as
-unreadable — "whatever they expand to is not in front of us". The result is
-not; the command is, right there in the text. So their contents are read and
-judged as commands of their own, nesting included: `cd "$(pwd)"` is ordinary
-work, `echo $(rm -rf /)` asks because `rm -rf /` does, and single quotes stay
-text because a shell expands nothing inside them. Only one that cannot be read
-to the end — an unbalanced `$(` — is refused outright, which is the single case
-the old rule was right about.
-
-Refusing the shape cost a live run: the builder's second command was
-`cd "$(pwd)" && cat -n src/session.js`, it was called destruction and sent to
-an operator who was not there, and it sat for eighteen minutes until the
-wall-clock budget stopped the run with an empty worktree.
-
-Both policies read commands through `runtime/shell-split.ts`, which tracks
-quoting and escaping and nothing else. It is not a shell parser and must not
-grow into one — it exists so that punctuation inside an argument stops being
-read as punctuation belonging to the shell.
-
-A redirection is a write of the file it names, and it names that file in the
-command rather than in a tool's path field. While every command containing `>`
-was destructive, that was covered by accident; it is read properly now, so
-`> /etc/hosts` asks and `> notes.txt` and `2>/dev/null` do not.
-
-This half was missing, and it is not a small thing: without it a builder's
-first `Edit` went to the operator at every setting, so no run could finish
-unattended and "lights-out" named something the factory could not do. A live
-run sat for half an hour with a clean worktree and an agent waiting on a click
-nobody was there to make.
-
-**The model is an alias, not a pinned id.** `--model opus` is documented as
-resolving to the latest of that family, so the default cannot go a generation
-stale sitting in the source — which is exactly what the pinned `claude-opus-4-6`
-it replaces did. Choosing nothing passes no `--model` at all, so the run follows
-your own Claude Code configuration.
-
-The picker reads `foundry:models-list`: the aliases always, plus every model the
-account can reach from `GET /v1/models` when the environment carries an
-`ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`. There is no CLI subcommand that
-lists models, and a subscription login is not a Models API credential, so for
-most people the aliases are the whole list — which is why they are the ones that
-have to keep working.
-
-The choice is persisted through `foundry:model-set` into the extension's own
-settings, because the main process is the only thing that builds a `claude`
-command line. It previously lived only in the renderer's `localStorage`, which
-is why the setting existed, rendered, and did nothing at all.
-
-The architect's first draft runs on that choice. A turn that amends the draft
-(an ask, an answer, or a follow-up the Forge starts on its own) runs on the ask
-model instead: `sonnet` by default, `opus` when the operator overrides it in
-Settings. It is persisted through `foundry:ask-model-set`.
+A refusal answers the ask with the agent's reject option. It never cancels the
+turn, so the agent carries on and does the work another way.
 
 ## Two things the runtime does to a supervised run
 
