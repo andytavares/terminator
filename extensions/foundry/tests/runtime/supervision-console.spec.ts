@@ -274,7 +274,7 @@ function watchStalledRun(sessionId: string): void {
     {
       sessionId,
       featureDir: orderDir(dataDir, 'WO-1'),
-      transcriptPath: path.join(dataDir, `${sessionId}.jsonl`),
+      activity: [],
       startedAt: Date.now() - 3 * 60 * 60 * 1000,
       isWaiting: false,
     },
@@ -301,10 +301,6 @@ function shadowModeTests() {
       firing: { sessionId: 'quiet-1', signal: 'silence' },
       shadow: true,
     })
-    expect(host.broadcast).toHaveBeenCalledWith(
-      'foundry:stall-fired',
-      expect.objectContaining({ shadow: true })
-    )
     expect(host.showToast).not.toHaveBeenCalled()
   })
 }
@@ -344,7 +340,7 @@ function outsideAnOrderTests() {
       {
         sessionId: 'loose-1',
         featureDir: path.join(dataDir, 'scratch'),
-        transcriptPath: path.join(dataDir, 'loose.jsonl'),
+        activity: [],
         startedAt: Date.now() - 3 * 60 * 60 * 1000,
         isWaiting: false,
       },

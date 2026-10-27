@@ -236,14 +236,13 @@ function writeTranscript(count: number): void {
 describe('the supervised runner over ACP', () => {
   beforeEach(() => {
     vi.stubEnv('HOME', join(dir, 'home'))
+    return () => vi.unstubAllEnvs()
   })
-  afterEach(() => vi.unstubAllEnvs())
-
   describe('starting a run', startingARunTests)
   describe('the options Claude gets', claudeOptionsTests)
   describe('the settings Claude gets', claudeSettingsTests)
   describe('mode and resume', modeAndResumeTests)
-  describe('tracking the run', trackingTests)
+  describe('tracking the run', () => (trackingTests(), heldCallsTests()))
   describe('nothing started', nothingStartedTests)
   describe('a tool call the agent may not make on its own', toolCallTests)
   describe('the operator answers', answeringTests)
@@ -346,7 +345,8 @@ describe('the structured answer', () => {
   it('stops listening when the run ends', async () => {
     await runner().start({ ...start, outputSchema, onStructuredOutput: () => undefined })
     endListeners[0](0)
-    expect(detachedUpdates).toBe(1)
+    // The answer listener and the run's tool-call tracker.
+    expect(detachedUpdates).toBe(2)
   })
 })
 
@@ -616,6 +616,34 @@ function endWithAsksTests() {
     expect(r.watchable()[0].isWaiting).toBe(true)
     r.resolve('acp-1', call.seen[0].requestId, { allow: true })
     expect(r.watchable()[0].isWaiting).toBe(false)
+  })
+}
+
+function heldCallsTests() {
+  it('stays blocked while one of two held calls is still open', async () => {
+    const seen: PendingPermission[] = []
+    const r = runner()
+    await r.start({ ...start, onPending: (p) => seen.push(p) })
+    raise(askOf({ requestId: 'req-1' }))
+    raise(askOf({ requestId: 'req-2' }))
+    await eventually(() => expect(seen).toHaveLength(2))
+    r.resolve('acp-1', seen[0].requestId, { allow: true })
+    expect(r.watchable()[0].isWaiting).toBe(true)
+    r.resolve('acp-1', seen[1].requestId, { allow: true })
+    expect(r.watchable()[0].isWaiting).toBe(false)
+  })
+
+  it('hands the stall watcher the tool calls seen in the agent’s updates', async () => {
+    const r = runner()
+    await r.start(start)
+    for (const listener of updateListeners) {
+      listener({
+        sessionUpdate: 'tool_call',
+        toolCallId: 't1',
+        _meta: { claudeCode: { toolName: 'Read' } },
+      })
+    }
+    expect(r.watchable()[0].activity).toMatchObject([{ kind: 'tool_started', callId: 't1' }])
   })
 }
 

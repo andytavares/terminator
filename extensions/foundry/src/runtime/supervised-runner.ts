@@ -14,6 +14,7 @@ import {
 import type { ClaudePermissionMode, ClaudeSettings } from './role-settings.js'
 import { countTurns, transcriptSize } from './transcript-tailer.js'
 import type { WatchedRun } from './stall-watcher.js'
+import { trackToolActivity, type ToolActivityTracker } from './tool-activity.js'
 
 /**
  * Which step of the run this is — a run-graph node id.
@@ -192,6 +193,8 @@ export interface SupervisedRunner {
    * subscribed to, so a run that ends simply drops out.
    */
   watchable(): WatchedRun[]
+  /** Calls the listener once the agent behind the session has exited; returns how to stop listening. */
+  onEnd(sessionId: string, listener: () => void): () => void
   dispose(): void
 }
 
@@ -211,8 +214,12 @@ interface Running {
   transcriptPath: string
   featureDir: string
   startedAt: number
-  /** True while a tool call is held: blocked on a person is not stuck. */
-  isWaiting: boolean
+  /** The ids of the tool calls held on a person. Blocked on a person is not stuck, however many. */
+  readonly heldCalls: Set<string>
+  /** True once a turn has ended and the agent sits at its prompt. */
+  atPrompt: boolean
+  /** The run's tool calls, from its ACP updates. */
+  readonly tools: ToolActivityTracker
   /** Settles when the prompt now running has ended, however it ended. */
   turn: Promise<void>
   /** Stops listening for the agent's asks. */
@@ -270,6 +277,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
     send: (sessionId, message) => sendToSession(context, sessionId, message),
     terminalFor: (sessionId) => terminalOf(running.get(sessionId)),
     watchable: () => watchableRuns(running),
+    onEnd: (sessionId, listener) => context.api.agents.onEnd(sessionId, () => listener()),
     dispose: () => {
       for (const [sessionId, run] of [...running.entries()]) {
         end(context, sessionId, false)
@@ -331,6 +339,7 @@ function end(context: RunnerContext, sessionId: string, clean: boolean): void {
   if (run === undefined) return
   context.running.delete(sessionId)
   run.detachEnd()
+  run.tools.stop()
   // Anything still waiting can no longer be answered from here, and an
   // unresolved promise holds the agent's tool call open forever.
   run.bridge.rejectAll('This run has ended')
@@ -398,14 +407,13 @@ function permissionBridgeFor(
     onAutoDenied: (toolName, reason) => phase.current.onAutoDenied?.(toolName, reason),
     onPending: (pending) => {
       // Held on a person, so the detector must not call it stuck.
-      const run = running.get(sessionId)
-      if (run !== undefined) run.isWaiting = true
+      running.get(sessionId)?.heldCalls.add(pending.requestId)
       phase.current.onPending(pending)
     },
     onResolved: (requestId, decision) => {
       const run = running.get(sessionId)
       if (run !== undefined) {
-        run.isWaiting = false
+        run.heldCalls.delete(requestId)
         // However long the operator took is not the agent's silence.
         run.startedAt = now()
       }
@@ -440,7 +448,7 @@ function claudeOptions(start: StartSupervisedRunOptions): object {
 /** What `api.agents.start` is given for one run. */
 function agentStartInput(start: StartSupervisedRunOptions, projectId: string): StartAgentInput {
   return {
-    // Claude, whatever the default agent is: Foundry reads Claude Code's transcript.
+    // Claude, whatever the default agent is: its tool names and ask options are what Foundry's policy knows.
     agentId: 'claude',
     cwd: start.worktreePath,
     resume: start.resumeSessionId,
@@ -549,7 +557,7 @@ function turnEnded(context: RunnerContext, sessionId: string): void {
   if (run === undefined) return
   // Finished responding and sitting at the prompt is blocked on a person, like a
   // held call, so the stall detector must not read a finished phase as stuck.
-  run.isWaiting = true
+  run.atPrompt = true
   run.phase.current.onTurnEnd?.(countTurns(run.transcriptPath))
 }
 
@@ -571,7 +579,7 @@ function addWorktreeProject(
 function trackRun(
   context: RunnerContext,
   sessionId: string,
-  run: Omit<Running, 'detachEnd' | 'startedAt' | 'isWaiting' | 'turn'>
+  run: Omit<Running, 'detachEnd' | 'startedAt' | 'heldCalls' | 'atPrompt' | 'tools' | 'turn'>
 ): SupervisedRun {
   // The agent dying is how a run ends, whether it exited or the tab was closed.
   const detachEnd = context.api.agents.onEnd(sessionId, (exitCode: number | null) => {
@@ -585,7 +593,9 @@ function trackRun(
     ...run,
     detachEnd,
     startedAt: context.now(),
-    isWaiting: false,
+    heldCalls: new Set(),
+    atPrompt: false,
+    tools: trackToolActivity(context.api.agents, sessionId, context.now),
     turn: Promise.resolve(),
   })
 
@@ -641,10 +651,8 @@ function continueRun(
   // Swapped before the prompt is sent, or the first thing the
   // new phase does is reported against the phase that just finished.
   run.phase.current = { id: next.phase, ...next }
-  // A phase that begins on a held tool call is a phase that begins blocked,
-  // not stalled — but the previous phase left this true if it ended while
-  // something was waiting, and nothing else clears it.
-  run.isWaiting = false
+  // Held calls stay counted: a call still open from the last phase still blocks this one.
+  run.atPrompt = false
   // A new turn is a new state, and silence counts from when the state began, so a
   // conversation resumed after a gap is not judged against a stale start.
   run.startedAt = context.now()
@@ -692,7 +700,7 @@ function sendToSession(context: RunnerContext, sessionId: string, message: strin
   if (run === undefined) return false
   // It has been given something to do, so it is no longer waiting on us,
   // and the silence the detector measures starts again here.
-  run.isWaiting = false
+  run.atPrompt = false
   run.startedAt = context.now()
   promptSession(context, sessionId, message)
   return true
@@ -710,8 +718,8 @@ function watchableRuns(running: ReadonlyMap<string, Running>): WatchedRun[] {
   return [...running].map(([sessionId, run]) => ({
     sessionId,
     featureDir: run.featureDir,
-    transcriptPath: run.transcriptPath,
+    activity: run.tools.activity(),
     startedAt: run.startedAt,
-    isWaiting: run.isWaiting,
+    isWaiting: run.atPrompt || run.heldCalls.size > 0,
   }))
 }

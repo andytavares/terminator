@@ -1,4 +1,4 @@
-import { readTranscript, type ToolActivity } from './transcript-tailer.js'
+import type { ToolActivity } from './transcript-tailer.js'
 import {
   evaluateStall,
   DEFAULT_THRESHOLDS,
@@ -15,13 +15,14 @@ import {
 // at all — it looks exactly like a run that is working, until you check on it an
 // hour later.
 //
-// Facts come from the transcript, which is the agent's own record: it survives
-// the console restarting, and it is written whether or not anything is watching.
+// Facts come from the ACP tool-call updates the runner keeps for each run, in memory:
+// no file is read, and a run the console did not start is not watched.
 
 export interface WatchedRun {
   readonly sessionId: string
   readonly featureDir: string
-  readonly transcriptPath: string
+  /** The run's tool starts and finishes so far, from its ACP updates. */
+  readonly activity: readonly ToolActivity[]
   /** When the run began, so a run that has done nothing yet is measured from it. */
   readonly startedAt: number
   /** False while a run is waiting on a person — blocked is not stuck. */
@@ -29,24 +30,15 @@ export interface WatchedRun {
 }
 
 export interface StallWatcherOptions {
-  /**
-   * How much the run's working copy has grown since the previous tick.
-   *
-   * Injected because the watcher reads transcripts and nothing else; the
-   * supervision layer is what measures diffs. Absent, it reports growth, which
-   * keeps the loop signal quiet rather than firing it on every run.
-   */
-  netChangeSince?: (sessionId: string) => number
   /** The runs to look at. Read each tick, so a run that ends drops out. */
   runs: () => readonly WatchedRun[]
   /** Fired when one is judged stuck. Shadow mode is the caller's decision. */
   onFiring: (firing: StallFiring, featureDir: string) => void
   /**
-   * Everything a tick read from a run's transcript, fired or not.
+   * Everything a tick saw of a run's tool calls, fired or not.
    *
-   * The watcher is the one thing already reading every live run's transcript
-   * on a clock, so the Factory view's recording rides on it rather than
-   * reading each transcript a second time.
+   * The watcher is the one thing already looking at every live run on a clock,
+   * so the Factory view's recording rides on it.
    */
   onActivity?: (run: WatchedRun, activity: readonly ToolActivity[]) => void
   thresholds?: StallThresholds
@@ -66,18 +58,14 @@ export interface StallWatcher {
 const RECENT_WINDOW = 8
 
 /**
- * What the transcript says about a run, as the detector needs it.
+ * What a run's tool calls say about it, as the detector needs it.
  *
  * A shell call still in flight is the load-bearing fact here: without it every
  * test suite longer than the threshold reads as a stall, which the spec calls
  * the obvious first bug and makes the gate on shipping this at all.
  * @internal
  */
-export function factsFrom(
-  run: WatchedRun,
-  activity: readonly ToolActivity[],
-  netChange = 1
-): SessionFacts {
+export function factsFrom(run: WatchedRun, activity: readonly ToolActivity[]): SessionFacts {
   const { lastToolActivityAt, openShellStartedAt } = shellActivity(activity)
   return {
     sessionId: run.sessionId,
@@ -85,18 +73,17 @@ export function factsFrom(
     canStall: !run.isWaiting,
     stateSince: run.startedAt,
     lastToolActivityAt,
-    lastNetChangeAt: lastToolActivityAt,
+    // Not measured: the diff is read once per turn (supervision.ts `finishTurn`), never
+    // while one runs, so "no net change" cannot be told from "not looked at yet".
+    lastNetChangeAt: null,
     openShellStartedAt,
-    // The files the recent window touched. Eight calls against one file, with
-    // the working copy no bigger than it was, is the loop signal — and until
-    // this was read from the transcript that signal could never fire.
+    // The files the recent window touched.
     recentToolPaths: activity
       .filter((event) => event.kind === 'tool_started' && event.path !== null)
       .slice(-RECENT_WINDOW)
       .map((event) => event.path as string),
-    // How much the working copy grew since the last look. Supplied by the
-    // caller, which is the only thing that measures diffs.
-    recentNetChange: netChange,
+    // Reported as growth, which keeps the loop signal quiet until the diff is measured.
+    recentNetChange: 1,
   }
 }
 
@@ -163,12 +150,9 @@ function checkRunsOnce(options: StallWatcherOptions, fired: Set<string>): void {
   const now = options.now ?? Date.now
   const thresholds = options.thresholds ?? DEFAULT_THRESHOLDS
   for (const run of live) {
-    const activity = readTranscript(run.transcriptPath)
-    options.onActivity?.(run, activity)
+    options.onActivity?.(run, run.activity)
     if (fired.has(run.sessionId)) continue
-    // Growth since the last look. Without it the loop signal cannot tell
-    // "going round in circles" from "working steadily on one file".
-    const facts = factsFrom(run, activity, options.netChangeSince?.(run.sessionId) ?? 1)
+    const facts = factsFrom(run, run.activity)
     const firing = evaluateStall(facts, thresholds, now())
     if (firing === null) continue
     fired.add(run.sessionId)
