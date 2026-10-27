@@ -1,0 +1,23 @@
+tests/unit/scripts/e2e-shard.spec.ts
+  s_567c3310a5db4e::t_915eb9b56236a0 136,140-141,144
+scripts/e2e-shard.mjs
+  s_567c3310a5db4e::t_915eb9b56236a0 96-98
+.github/workflows/ci.yml
+  s_567c3310a5db4e::t_915eb9b56236a0 517-518
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "efe1f54aabc08cb3a4d70d4c2cfe7bfd39e7a9bc",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
