@@ -100,7 +100,7 @@
   line-height: 1.5;
 }
 
-/* ── Address, credential, code ────────────────────────────────────────── */
+/* ── Address, code ────────────────────────────────────────── */
 
 .rc-reach {
   display: flex;
@@ -140,29 +140,6 @@
   font-family: var(--tm-font-mono);
   font-size: 13px;
   color: var(--tm-accent-text);
-}
-
-.rc-credential {
-  display: flex;
-  align-items: center;
-  gap: var(--tm-space-2);
-  margin-top: var(--tm-space-3);
-}
-
-.rc-credential .rc-label {
-  margin: 0;
-}
-
-.rc-credential__value {
-  font-family: var(--tm-font-mono);
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  color: var(--tm-text-secondary);
-}
-
-.rc-credential__value[data-revealed] {
-  letter-spacing: normal;
-  color: var(--tm-text-primary);
 }
 
 /* The one line that says what access this grants. Not a warning banner — a

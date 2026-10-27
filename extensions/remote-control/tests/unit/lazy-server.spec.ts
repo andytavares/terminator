@@ -21,7 +21,6 @@ vi.mock('../../src/server/ngrok-manager', () => ({
   NgrokManager: class {
     static isInstalled = () => false
   },
-  generateCaddyfile: () => '',
 }))
 
 const settings = new Map<string, unknown>()

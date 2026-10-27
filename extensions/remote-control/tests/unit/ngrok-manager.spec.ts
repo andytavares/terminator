@@ -5,7 +5,6 @@ import { eventually } from '../../../../tests/support/eventually'
 const mockSpawn = vi.fn()
 const mockExecSync = vi.fn()
 const mockFetch = vi.fn()
-const mockNetworkInterfaces = vi.fn()
 const mockWriteFileSync = vi.fn()
 const mockRmSync = vi.fn()
 /** The port the OS hands out for the agent API. */
@@ -18,7 +17,6 @@ vi.mock('child_process', () => ({
 }))
 
 vi.mock('os', () => ({
-  networkInterfaces: mockNetworkInterfaces,
   tmpdir: () => '/tmp',
 }))
 
@@ -37,10 +35,6 @@ vi.mock('net', () => ({
 }))
 
 global.fetch = mockFetch as never
-
-let generateCaddyfile: typeof import('../../src/server/ngrok-manager').generateCaddyfile
-
-describe('generateCaddyfile', caddyfileTests)
 
 /** The ngrok agent API answering with one tunnel at `publicUrl`. */
 function mockTunnelUrl(publicUrl: string): void {
@@ -100,62 +94,6 @@ const mockProcess = {
 }
 
 describe('NgrokManager', ngrokManagerTests)
-
-function caddyfileTests() {
-  beforeEach(async () => {
-    vi.resetModules()
-    mockNetworkInterfaces.mockReset()
-    const mod = await import('../../src/server/ngrok-manager')
-    generateCaddyfile = mod.generateCaddyfile
-  })
-
-  describe('a LAN address', caddyfileLanAddressTests)
-  describe('falling back to localhost', caddyfileLocalhostTests)
-  describe('IPv6 interfaces', caddyfileIpv6Tests)
-}
-
-function caddyfileLanAddressTests() {
-  it('uses local IPv4 address when a non-internal interface is found', () => {
-    mockNetworkInterfaces.mockReturnValue({
-      eth0: [{ family: 'IPv4', address: '192.168.1.100', internal: false }],
-    })
-    const result = generateCaddyfile(7681)
-    expect(result).toContain('192.168.1.100')
-    expect(result).toContain('reverse_proxy localhost:7681')
-    expect(result).toContain('tls internal')
-  })
-}
-
-function caddyfileLocalhostTests() {
-  it('falls back to localhost when only internal addresses exist', () => {
-    mockNetworkInterfaces.mockReturnValue({
-      lo: [{ family: 'IPv4', address: '127.0.0.1', internal: true }],
-    })
-    const result = generateCaddyfile(8080)
-    expect(result).toMatch(/^localhost \{/)
-    expect(result).toContain('reverse_proxy localhost:8080')
-  })
-
-  it('falls back to localhost when networkInterfaces returns empty object', () => {
-    mockNetworkInterfaces.mockReturnValue({})
-    const result = generateCaddyfile(7681)
-    expect(result).toMatch(/^localhost \{/)
-  })
-}
-
-function caddyfileIpv6Tests() {
-  it('skips IPv6 addresses and uses first IPv4 non-internal', () => {
-    mockNetworkInterfaces.mockReturnValue({
-      eth0: [
-        { family: 'IPv6', address: 'fe80::1', internal: false },
-        { family: 'IPv4', address: '10.0.0.5', internal: false },
-      ],
-    })
-    const result = generateCaddyfile(9000)
-    expect(result).toContain('10.0.0.5')
-    expect(result).not.toContain('fe80')
-  })
-}
 
 function ngrokManagerTests() {
   beforeEach(async () => {

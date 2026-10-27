@@ -311,6 +311,7 @@ async function registerApi(parts: RemoteServerParts): Promise<ServerConnections>
     sendChannel: deps.sendChannel,
     onWindowEvent: deps.onWindowEvent,
     isRemoteAccessible: deps.isRemoteAccessible,
+    deviceRegistry: parts.deviceRegistry,
   })
   return { terminalCleanup, bridgeCleanup }
 }

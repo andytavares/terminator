@@ -5,6 +5,8 @@ import type { FastifyInstance } from 'fastify'
 import websocketPlugin from '@fastify/websocket'
 import { WebSocket } from 'ws'
 import { WsTicketStore } from '../../src/server/ws-ticket-store'
+import { HEARTBEAT_INTERVAL_MS } from '../../src/server/heartbeat'
+import { ConnectedDeviceRegistry } from '../../src/server/connected-devices'
 import { eventually } from '../../../../tests/support/eventually'
 
 type BridgeIpc = ExtensionAPI['ipc']
@@ -58,6 +60,7 @@ async function buildBridgeApp(): Promise<{
     sendChannel: mockSendChannel,
     onWindowEvent: mockOnWindowEvent,
     isRemoteAccessible: mockIsRemoteAccessible,
+    deviceRegistry,
   })
   return { app, ticketStore, bridgeCleanup }
 }
@@ -99,6 +102,7 @@ let app: FastifyInstance
 let ticketStore: WsTicketStore
 let bridgeCleanup: { disconnectAll: () => void }
 let baseUrl: string
+let deviceRegistry: ConnectedDeviceRegistry
 
 describe('bridge.route', bridgeRouteTests)
 
@@ -109,6 +113,7 @@ function bridgeRouteTests() {
     mockSendChannel = vi.fn<BridgeIpc['sendChannel']>()
     mockOnWindowEvent = vi.fn<BridgeIpc['onWindowEvent']>().mockReturnValue(vi.fn())
     mockIsRemoteAccessible = vi.fn<BridgeIpc['isRemoteAccessible']>().mockResolvedValue(true)
+    deviceRegistry = new ConnectedDeviceRegistry()
     ;({ app, ticketStore, bridgeCleanup } = await buildBridgeApp())
     await app.listen({ port: 0, host: '127.0.0.1' })
     const addr = app.server.address() as { port: number; address: string }
@@ -130,6 +135,44 @@ function bridgeRouteTests() {
   describe('ticket purpose scoping', bridgeTicketPurposeTests)
   describe('invalid messages', bridgeInvalidMessageTests)
   describe('remote-access allowlist', bridgeAllowlistTests)
+  describe('connected devices', bridgeDeviceTests)
+  describe('heartbeat', bridgeHeartbeatTests)
+}
+
+function bridgeDeviceTests() {
+  it('lists a browser on /app while connected and drops it when it leaves', async () => {
+    const ws = await openBridge()
+    await eventually(() => expect(deviceRegistry.list()).toHaveLength(1))
+    await closeBridge(ws)
+    await eventually(() => expect(deviceRegistry.count()).toBe(0))
+  })
+
+  it('disconnecting the listed device closes the browser', async () => {
+    const ws = await openBridge()
+    await eventually(() => expect(deviceRegistry.count()).toBe(1))
+    expect(deviceRegistry.disconnect(deviceRegistry.list()[0].id)).toBe(true)
+    await expectClosed(ws)
+    await eventually(() => expect(deviceRegistry.count()).toBe(0))
+  })
+}
+
+function bridgeHeartbeatTests() {
+  it('terminates a browser that stops answering pings', async () => {
+    // Faked before connecting, so the heartbeat's interval lands on the fake clock.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    try {
+      const ticket = ticketStore.createTicket('__bridge__', 'bridge')
+      const ws = new WebSocket(`${baseUrl}/api/bridge?ticket=${ticket}`)
+      ws.pong = () => {} // never answers the server's pings
+      await waitForOpen(ws)
+      await eventually(() => expect(deviceRegistry.count()).toBe(1))
+      await vi.advanceTimersByTimeAsync(2 * HEARTBEAT_INTERVAL_MS)
+      await expectClosed(ws)
+      await eventually(() => expect(deviceRegistry.count()).toBe(0))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 }
 
 function bridgeTicketEndpointTests() {

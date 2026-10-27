@@ -26,7 +26,7 @@ vi.mock('../../src/server/ngrok-manager', () => {
     stop = mockNgrokStop
     setOnCrash = mockNgrokSetOnCrash
   }
-  return { NgrokManager: MockNgrokManager, generateCaddyfile: vi.fn(() => '') }
+  return { NgrokManager: MockNgrokManager }
 })
 
 vi.mock('os', () => ({

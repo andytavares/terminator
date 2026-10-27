@@ -313,24 +313,12 @@ function NgrokMissing(): React.JSX.Element {
 
 function LocalAddress(props: { lanUrl?: string | null; port: number }): React.JSX.Element {
   const { lanUrl, port } = props
-  const copyCaddyfile = () => {
-    void window.electronAPI.extensionBridge
-      .invoke('remote:caddyfile', { port })
-      .then((caddyfile) => navigator.clipboard.writeText(caddyfile as string))
-  }
   return (
     <div className="settings-section__field">
       <label className="settings-section__label">Local address</label>
       <div className="settings-section__hint" style={ADDRESS_ROW_STYLE}>
         <code style={ADDRESS_STYLE}>{lanUrl ?? `http://…:${port}`}</code>
-        {lanUrl && (
-          <>
-            <CopyTextButton text={lanUrl} />
-            <Button size="sm" style={{ flexShrink: 0 }} onClick={copyCaddyfile}>
-              Copy Caddyfile
-            </Button>
-          </>
-        )}
+        {lanUrl && <CopyTextButton text={lanUrl} />}
       </div>
     </div>
   )

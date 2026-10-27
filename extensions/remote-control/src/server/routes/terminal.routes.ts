@@ -8,6 +8,7 @@ import type { PtyManagerAPI } from '@terminator/extension-sdk'
 import type { WsTicketStore } from '../ws-ticket-store.js'
 import type { WsSubscriberManager } from '../ws-subscriber-manager.js'
 import type { ConnectedDeviceRegistry } from '../connected-devices'
+import { watchForBrokenConnection } from '../heartbeat.js'
 
 const CreateTerminalSchema = z.object({
   cwd: z.string().min(1),
@@ -276,6 +277,7 @@ function acceptTerminalSocket(
   const { ptyManager, subscriberManager, deviceRegistry, streams } = context
   const { sessionId } = request.params
   if (!hasValidTicket(context.ticketStore, ws, request)) return
+  watchForBrokenConnection(ws)
 
   const userAgent = request.headers['user-agent']
   const socket: TerminalSocket = { ws, sessionId, userAgent, deviceId: null }

@@ -1,7 +1,10 @@
 import type { FastifyInstance } from 'fastify'
 import type { FastifyRequest } from 'fastify'
 import type WebSocket from 'ws'
+import { randomUUID } from 'crypto'
 import type { WsTicketStore } from '../ws-ticket-store.js'
+import type { ConnectedDeviceRegistry } from '../connected-devices.js'
+import { watchForBrokenConnection } from '../heartbeat.js'
 
 interface BridgeOptions {
   ticketStore: WsTicketStore
@@ -9,6 +12,8 @@ interface BridgeOptions {
   sendChannel: (channel: string, payload: unknown) => void
   onWindowEvent: (channel: string, handler: (...args: unknown[]) => void) => () => void
   isRemoteAccessible: (channel: string) => Promise<boolean>
+  /** Lists a connected browser in the Remote Control view. */
+  deviceRegistry?: ConnectedDeviceRegistry
 }
 
 interface BridgeMessage {
@@ -36,7 +41,7 @@ export async function registerBridgeRoute(
       ws.close(4001, 'unauthorized')
       return
     }
-    acceptBridgeSocket(ws, opts, bridgeConnections)
+    acceptBridgeSocket({ ws, request }, opts, bridgeConnections)
   })
 
   return {
@@ -47,12 +52,25 @@ export async function registerBridgeRoute(
   }
 }
 
-function acceptBridgeSocket(ws: WebSocket, opts: BridgeOptions, connections: Set<WebSocket>) {
+function acceptBridgeSocket(
+  { ws, request }: { ws: WebSocket; request: FastifyRequest },
+  opts: BridgeOptions,
+  connections: Set<WebSocket>
+) {
   connections.add(ws)
+  watchForBrokenConnection(ws)
+  const deviceId = `app:${randomUUID()}`
+  opts.deviceRegistry?.add({
+    id: deviceId,
+    userAgent: request.headers['user-agent'],
+    viewing: 'Terminator in the browser',
+    close: () => ws.close(4004, 'disconnected from the app'),
+  })
   const connection = new BridgeConnection(ws, opts)
   ws.on('message', (raw) => connection.receive(raw.toString()))
   ws.on('close', () => {
     connections.delete(ws)
+    opts.deviceRegistry?.remove(deviceId)
     connection.unsubscribeAll()
   })
 }

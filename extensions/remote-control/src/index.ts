@@ -9,7 +9,7 @@ import {
 } from '@terminator/extension-sdk'
 import type { RemoteServerHandle } from './server/remote-server.js'
 import { PortInUseError } from './server/port-in-use-error.js'
-import { NgrokManager, generateCaddyfile } from './server/ngrok-manager.js'
+import { NgrokManager } from './server/ngrok-manager.js'
 import { CredentialStore } from './server/credential-store.js'
 
 const EXT = 'terminator.remote-control'
@@ -323,12 +323,6 @@ function preferenceChannels(api: ExtensionAPI): ChannelSpec[] {
 }
 
 function settingsChannels({ api, credentials }: RemoteControlContext): ChannelSpec[] {
-  const caddyfile = defineChannel({
-    channel: 'remote:caddyfile',
-    schema: noPayload,
-    invalid: VALIDATION_ERROR,
-    run: () => generateCaddyfile(getPort(api)),
-  })
   const getSettings = defineChannel({
     channel: 'remote:get-settings',
     schema: noPayload,
@@ -346,7 +340,7 @@ function settingsChannels({ api, credentials }: RemoteControlContext): ChannelSp
       }
     },
   })
-  return [caddyfile, getSettings]
+  return [getSettings]
 }
 
 function connectionChannels(api: ExtensionAPI): ChannelSpec[] {
