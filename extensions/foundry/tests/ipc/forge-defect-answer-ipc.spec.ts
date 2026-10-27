@@ -230,15 +230,14 @@ describe('after the architect amends an answered defect', () => {
   describe('the order before', theOrderBeforeTests)
 })
 
-/** Waits for the run's last write: the timeline frame where every agent has its session. A run
- * still writing as the file ends recreates the folder cleanup removed, and CI fails the leak. */
+/** Waits for the run's last write: the builder never finishes here, and the verifier and scribe
+ * wait on its build, so the frame with its session is the last. A run still writing as the
+ * file ends recreates the folder cleanup removed, and CI fails the leak. */
 async function untilRunSettles(): Promise<void> {
   const timeline = path.join(dataDir, 'orders', 'WO-1', 'run-timeline.jsonl')
   await eventually(() => {
     const last = fs.readFileSync(timeline, 'utf8').trim().split('\n').at(-1) ?? ''
-    for (const session of ['builder-session', 'verifier-session', 'scribe-session']) {
-      expect(last).toContain(`"sessionId":"${session}"`)
-    }
+    expect(last).toContain('"sessionId":"builder-session"')
   })
 }
 
