@@ -1,4 +1,5 @@
-import { Button, Markdown } from '@terminator/extension-ui'
+import { Button, Chip, Markdown, StatusDot } from '@terminator/extension-ui'
+import type { ChipTone } from '@terminator/extension-ui'
 import { openInBrowser } from '@terminator/extension-sdk/renderer'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -25,7 +26,6 @@ import { liveAssumptions } from '../forge/assumptions.js'
 import type { StateMapping, TransitionIntent, WriteBack } from '../order/schema.js'
 import type { CapabilityReport } from '../trackers/write-back.js'
 import type { IntakeOutcome } from '../forge/intake-outcome.js'
-import { PROPOSAL_FILE } from '../order/proposal.js'
 import { openingStep, forgeSteps, type StepId } from '../forge/steps.js'
 import { budgetsInWords } from '../order/render.js'
 import { BudgetForm } from './BudgetForm.js'
@@ -306,11 +306,11 @@ function RowIcon({ state }: { readonly state: Row['state'] }): JSX.Element {
   return <X aria-hidden="true" />
 }
 
-const ROW_PILL: Record<Row['state'], { readonly label: string; readonly cls: string }> = {
-  passed: { label: 'Passed', cls: 'pass' },
-  'in-progress': { label: 'In progress', cls: 'work' },
-  'needs-you': { label: 'Needs you', cls: 'you' },
-  failing: { label: 'Failing', cls: 'bad' },
+const ROW_PILL: Record<Row['state'], { readonly label: string; readonly tone: ChipTone }> = {
+  passed: { label: 'Passed', tone: 'good' },
+  'in-progress': { label: 'In progress', tone: 'neutral' },
+  'needs-you': { label: 'Needs you', tone: 'waiting' },
+  failing: { label: 'Failing', tone: 'bad' },
 }
 
 function StripIconGlyph({ icon }: { readonly icon: StripIcon }): JSX.Element {
@@ -907,7 +907,7 @@ function handleAttach(forge: ForgeModel, sessionId: string): void {
 
 /** What the architect is told after a refused proposal: the reason, and to change nothing else. */
 function refusedRetry(reason: string): string {
-  return `Your last proposal was refused and nothing was changed. The reason: ${reason}. Write ${PROPOSAL_FILE} again, fixing exactly that and changing nothing else.`
+  return `Your last proposal was refused and nothing was changed. The reason: ${reason}. Answer again with the proposal as your structured output, fixing exactly that and changing nothing else.`
 }
 
 const STRIP_MOVES: Record<StripAction, (forge: ForgeModel) => void> = {
@@ -982,12 +982,12 @@ function ForgeHeader({ forge }: ForgeProp) {
 }
 
 function SourceChip({ source }: { readonly source: WorkOrder['source'] }) {
-  if (source.kind === 'signal') return <span className="fdry-chip">From a sensor signal</span>
+  if (source.kind === 'signal') return <Chip>From a sensor signal</Chip>
   if (source.key === null) return null
   return (
-    <span className="fdry-chip">
+    <Chip>
       {capitalise(source.tracker ?? '')} {source.key}
-    </span>
+    </Chip>
   )
 }
 
@@ -1204,6 +1204,16 @@ function PlanCheck({ forge, id }: ForgeProp & { readonly id: CheckId }) {
   return row === undefined || row.state === 'passed' ? null : <CheckRow forge={forge} row={row} />
 }
 
+/** The row's state in words; a row in progress also carries the working dot. */
+function RowChip({ state }: { readonly state: Row['state'] }): JSX.Element {
+  const { label, tone } = ROW_PILL[state]
+  return (
+    <Chip tone={tone} icon={state === 'in-progress' ? <StatusDot tone="working" /> : undefined}>
+      {label}
+    </Chip>
+  )
+}
+
 function CheckRow({ forge, row }: ForgeProp & { readonly row: Row }) {
   return (
     <div className={`fdry-chk${row.state === 'in-progress' ? ' fdry-chk--work' : ''}`}>
@@ -1215,9 +1225,7 @@ function CheckRow({ forge, row }: ForgeProp & { readonly row: Row }) {
         <small>{row.detail}</small>
         <RowMoves forge={forge} row={row} />
       </div>
-      <span className={`fdry-pill fdry-pill--${ROW_PILL[row.state].cls}`}>
-        {ROW_PILL[row.state].label}
-      </span>
+      <RowChip state={row.state} />
     </div>
   )
 }
@@ -1828,7 +1836,7 @@ function ShapeOption({ forge, recipes, option }: ShapeOptionProps) {
     return (
       <ReasonButton
         plain
-        tip="fit"
+        align="fit"
         reason={reason}
         className={`fdry-shape${isSelected ? ' is-on' : ''} fdry-shape--off`}
       >
@@ -2000,7 +2008,7 @@ function AgreedRows({ forge }: ForgeProp) {
               Questions, proof, coverage, risk, red team, base branch, nobody changing the plan.
             </small>
           </div>
-          <span className="fdry-pill fdry-pill--pass">Agreed</span>
+          <Chip tone="good">Agreed</Chip>
         </div>
         <RunStartedRow forge={forge} />
       </div>
@@ -2021,7 +2029,7 @@ function RunStartedRow({ forge }: ForgeProp) {
           {forge.recipes?.recipes?.find((r2) => r2.name === shapeName)?.description ?? ''}
         </small>
       </div>
-      <span className="fdry-pill fdry-pill--work">{forge.r.runState}</span>
+      <Chip icon={<StatusDot tone="working" />}>{forge.r.runState}</Chip>
     </div>
   )
 }

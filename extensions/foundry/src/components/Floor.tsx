@@ -22,9 +22,15 @@ import type { RunNode } from '../line/run-graph.js'
 import { ciLabel } from '../line/ci-label.js'
 import { pullNumber } from '../line/pull-number.js'
 import type { TranscriptLine } from '../runtime/transcript-excerpt.js'
-import { ConfirmButton } from './ConfirmButton.js'
 import { ordinal } from '../factory/format.js'
-import { Button, IconButton, Markdown, RelativeTime, usePolling } from '@terminator/extension-ui'
+import {
+  Button,
+  ConfirmButton,
+  IconButton,
+  Markdown,
+  RelativeTime,
+  usePolling,
+} from '@terminator/extension-ui'
 import { useFoundryQuery } from '../renderer/foundry-query.js'
 import { openInBrowser } from '@terminator/extension-sdk/renderer'
 import { ExternalLink } from './ExternalLink.js'
@@ -865,6 +871,7 @@ function RunControls({ view, busy, decideRun }: RunControlsProps) {
       <ConfirmButton
         label="Stop the run"
         confirmLabel="Stop it"
+        className="fdry-discard"
         warning={`This ends every agent still working on ${view.graph.orderId}. What is in the worktree stays there.`}
         disabled={busy}
         onConfirm={() => void decideRun('foundry:run.stop')}
@@ -872,6 +879,7 @@ function RunControls({ view, busy, decideRun }: RunControlsProps) {
       <ConfirmButton
         label="Start over"
         confirmLabel="Destroy it and start over"
+        className="fdry-discard"
         warning={`This destroys the checkout, the branch, the run graph and every gate ${view.graph.orderId} raised. The order, its criteria and its plan stay, and it can be run again from the beginning.`}
         disabled={busy}
         onConfirm={() => void decideRun('foundry:run.reset')}

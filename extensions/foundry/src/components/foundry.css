@@ -245,15 +245,6 @@
   align-items: center;
 }
 
-.fdry-chip {
-  font-size: 11.5px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--tm-border-strong);
-  color: var(--tm-text-secondary);
-  white-space: nowrap;
-}
-
 .fdry-wiz-actions {
   display: flex;
   gap: 8px;
@@ -478,29 +469,6 @@
   gap: 6px;
   margin-top: 6px;
   flex-wrap: wrap;
-}
-
-.fdry-pill {
-  font-size: 11.5px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  white-space: nowrap;
-  border: 1px solid currentColor;
-}
-.fdry-pill--pass {
-  color: var(--tm-success);
-}
-.fdry-pill--work {
-  color: var(--tm-accent-text);
-}
-.fdry-pill--you {
-  color: var(--tm-warning);
-}
-.fdry-pill--bad {
-  color: var(--tm-danger);
-}
-.fdry-pill--note {
-  color: var(--tm-text-muted);
 }
 
 .fdry-group {
@@ -1355,26 +1323,9 @@
 
 /* ─── Foundry: orders list and shell ─────────────────────────────── */
 
-.fdry-tabs {
-  display: flex;
-  gap: 2px;
+.fdry-surface-tabs {
   margin-left: 8px;
-}
-
-.fdry-tabs button {
-  appearance: none;
-  background: transparent;
-  border: 0;
-  color: var(--tm-text-secondary);
-  font-size: 12.5px;
-  padding: 4px 10px;
-  border-radius: var(--tm-radius-sm);
-  cursor: pointer;
-}
-
-.fdry-tabs button.is-on {
-  background: var(--tm-bg-card);
-  color: var(--tm-text-primary);
+  border-bottom: 0;
 }
 
 /* How many things are waiting behind this tab.
@@ -2374,36 +2325,6 @@
 .fdry-shell.is-open > .fdry-order-controls {
   flex: none;
   margin: 12px 0 0;
-}
-
-/* Armed: the sentence and the button in one place, so what is being agreed to
-   is on screen at the moment of agreeing. */
-.fdry-confirm {
-  border: 1px solid var(--tm-border);
-  border-radius: 6px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1 1 320px;
-}
-
-.fdry-confirm .fdry-note {
-  margin: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.fdry-confirm .fdry-note svg {
-  width: 14px;
-  height: 14px;
-  flex: none;
-  margin-top: 2px;
-}
-
-.fdry-confirm .fdry-ask-actions {
-  margin: 0;
 }
 
 /* ── Where an order stands ──────────────────────────────────────────────────
@@ -3879,28 +3800,6 @@
   margin-bottom: 16px;
 }
 
-.fdry-metrics-tile {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px;
-  border: 1px solid var(--tm-border);
-  border-radius: var(--tm-radius-md);
-  background: var(--tm-bg-card);
-}
-
-.fdry-metrics-tile__value {
-  font-size: 20px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--tm-text-primary);
-}
-
-.fdry-metrics-tile__label {
-  font-size: 11.5px;
-  color: var(--tm-text-secondary);
-}
-
 /* The factory site: the hall cards, with the status wall beside them. The
    cards share one column, so a tall wall cannot stretch the row they sit in. */
 .fdry-site {
@@ -3945,19 +3844,29 @@
   margin-bottom: 0;
 }
 
-.fdry-status-wall .fdry-metrics-tile {
+.fdry-status-wall .tmui-metric-card {
+  display: flex;
   flex-direction: row-reverse;
   justify-content: space-between;
   align-items: baseline;
   padding: 6px 0;
   border: 0;
-  border-bottom: 1px solid var(--tm-border-subtle);
+  border-bottom: 1px solid var(--tm-border);
   border-radius: 0;
   background: transparent;
 }
 
-.fdry-status-wall .fdry-metrics-tile__value {
+.fdry-status-wall .tmui-metric-card__question {
+  font-size: 11.5px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.fdry-status-wall .tmui-metric-card__value {
+  margin-top: 0;
   font-size: 14px;
+  font-weight: 600;
+  color: var(--tm-text-primary);
 }
 
 @media (max-width: 760px) {
@@ -4011,60 +3920,6 @@
   cursor: not-allowed;
 }
 
-.fdry-reason-tip {
-  position: absolute;
-  bottom: calc(100% + 10px);
-  right: 0;
-  width: 300px;
-  background: var(--tm-text-primary);
-  color: var(--tm-bg-surface);
-  font-size: 12.5px;
-  line-height: 1.45;
-  padding: 9px 11px;
-  border-radius: var(--tm-radius-sm);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-  white-space: normal;
-  z-index: var(--tm-layer-overlay);
-  visibility: hidden;
-  opacity: 0;
-  transition: opacity 0.1s ease;
-}
-
-.fdry-reason-tip::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  right: 22px;
-  border: 6px solid transparent;
-  border-top-color: var(--tm-text-primary);
-}
-
-.fdry-reason--left .fdry-reason-tip {
-  right: auto;
-  left: 0;
-}
-
-.fdry-reason--left .fdry-reason-tip::after {
-  right: auto;
-  left: 22px;
-}
-
-.fdry-reason--fit .fdry-reason-tip {
-  left: 0;
-  right: 0;
-  width: auto;
-}
-
-.fdry-reason--fit .fdry-reason-tip::after {
-  right: 50%;
-}
-
-.fdry-reason:hover .fdry-reason-tip,
-.fdry-reason:focus-within .fdry-reason-tip {
-  visibility: visible;
-  opacity: 1;
-}
-
 .fdry-inline-why {
   display: block;
   margin-top: 6px;
@@ -4074,12 +3929,6 @@
   padding: 4px 8px;
   background: var(--tm-accent-dim);
   border-radius: 0 4px 4px 0;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .fdry-reason-tip {
-    transition: none;
-  }
 }
 
 /* ─── Foundry: the Checks step ───────────────────────────────────── */

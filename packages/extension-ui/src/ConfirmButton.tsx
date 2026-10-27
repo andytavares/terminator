@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { TriangleAlert } from 'lucide-react'
-import { Button } from '@terminator/extension-ui'
+import { Button } from './Button'
+import './extension-ui.css'
 
 // A control that destroys something, and says what, before it does it.
 //
@@ -19,6 +20,8 @@ export interface ConfirmButtonProps {
   /** Exactly what will be destroyed. Not a warning about danger in general. */
   readonly warning: string
   readonly disabled?: boolean
+  /** For the caller's layout, on the button before it is armed. */
+  readonly className?: string
   readonly onConfirm: () => void
 }
 
@@ -27,8 +30,9 @@ export function ConfirmButton({
   confirmLabel,
   warning,
   disabled = false,
+  className,
   onConfirm,
-}: ConfirmButtonProps) {
+}: ConfirmButtonProps): JSX.Element {
   const [armed, setArmed] = useState(false)
 
   if (!armed) {
@@ -36,7 +40,7 @@ export function ConfirmButton({
       <Button
         variant="ghost"
         size="sm"
-        className="fdry-discard"
+        className={className}
         disabled={disabled}
         onClick={() => setArmed(true)}
       >
@@ -61,7 +65,9 @@ function ArmedConfirm({
   disabled,
   onConfirm,
   onDisarm,
-}: Required<ConfirmButtonProps> & { readonly onDisarm: () => void }) {
+}: Required<Omit<ConfirmButtonProps, 'className'>> & {
+  readonly onDisarm: () => void
+}): JSX.Element {
   // Disarmed before the work, not after: the second run of a
   // destructive action is a second decision, and leaving it armed
   // through a slow teardown invites a double click into being one.
@@ -70,11 +76,11 @@ function ArmedConfirm({
     onConfirm()
   }
   return (
-    <div className="fdry-confirm" role="group" aria-label={label}>
-      <p className="fdry-note">
+    <div className="tmui-confirm" role="group" aria-label={label}>
+      <p className="tmui-confirm__warning">
         <TriangleAlert aria-hidden="true" /> {warning}
       </p>
-      <div className="fdry-ask-actions">
+      <div className="tmui-confirm__actions">
         <Button variant="danger" size="sm" disabled={disabled} onClick={disarmThenConfirm}>
           {confirmLabel}
         </Button>

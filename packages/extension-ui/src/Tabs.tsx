@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useId, useLayoutEffect, useState } from 'react'
+import React, { createContext, useContext, useId, useLayoutEffect, useRef, useState } from 'react'
 import './extension-ui.css'
 
 /* WAI-ARIA tabs with automatic activation (https://www.w3.org/WAI/ARIA/apg/patterns/tabs/).
@@ -73,6 +73,30 @@ export interface TabListProps {
   children: React.ReactNode
 }
 
+// One keyboard stop: the selected tab, or the first enabled tab while none is
+// selected. React would leave a stop set here in place once another is selected.
+function keepOneTabReachable(list: HTMLDivElement | null): void {
+  if (list === null) return
+  const tabs = enabledTabs(list)
+  const stop = tabs.find((tab) => tab.getAttribute('aria-selected') === 'true') ?? tabs[0]
+  for (const tab of tabs) tab.setAttribute('tabindex', tab === stop ? '0' : '-1')
+}
+
+/** Arrow, Home and End move focus along the list and select the tab they land on. */
+function moveTabFocus(
+  event: React.KeyboardEvent<HTMLDivElement>,
+  { orientation, onSelect }: { orientation: TabOrientation; onSelect: (id: string) => void }
+): void {
+  const move = MOVES[orientation][event.key]
+  const tabs = enabledTabs(event.currentTarget)
+  const current = tabs.indexOf(event.target as HTMLButtonElement)
+  if (!move || current < 0) return
+  event.preventDefault()
+  const next = tabs[targetIndex(move, tabs.length, current)]
+  next.focus()
+  onSelect(next.dataset.tabId ?? '')
+}
+
 export function TabList({
   label,
   orientation = 'horizontal',
@@ -80,19 +104,14 @@ export function TabList({
   children,
 }: TabListProps): JSX.Element {
   const { onSelect } = useTabsContext('TabList')
-  const moveFocusByKey = (event: React.KeyboardEvent<HTMLDivElement>): void => {
-    const move = MOVES[orientation][event.key]
-    const tabs = enabledTabs(event.currentTarget)
-    const current = tabs.indexOf(event.target as HTMLButtonElement)
-    if (!move || current < 0) return
-    event.preventDefault()
-    const next = tabs[targetIndex(move, tabs.length, current)]
-    next.focus()
-    onSelect(next.dataset.tabId ?? '')
-  }
+  const moveFocusByKey = (event: React.KeyboardEvent<HTMLDivElement>): void =>
+    moveTabFocus(event, { orientation, onSelect })
   const classes = ['tmui-tabs__list', className].filter(Boolean).join(' ')
+  const list = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => keepOneTabReachable(list.current))
   return (
     <div
+      ref={list}
       role="tablist"
       aria-label={label}
       aria-orientation={orientation}

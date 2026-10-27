@@ -380,6 +380,7 @@ describe('the palette', () => {
       expect(host.broadcast).toHaveBeenCalledWith('foundry:palette-goto', {
         kind: 'run',
         sessionId: 'waiting-1',
+        orderId: 'WO-1',
       })
       runtime.supervision?.runs.forget('waiting-1')
       vi.advanceTimersByTime(5_000)

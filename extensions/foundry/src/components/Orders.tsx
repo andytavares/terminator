@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Plus, CheckCircle2, AlertCircle, Loader } from 'lucide-react'
-import { Button, SegmentedControl } from '@terminator/extension-ui'
+import { Button, ConfirmButton, SegmentedControl } from '@terminator/extension-ui'
 import { GateAnswers } from './GateCard.js'
 import { OrderLinks } from './OrderLinks.js'
 import { DocumentChip } from './DocumentChip.js'
@@ -11,7 +11,6 @@ import type { Gate, GateOption } from '../gates/rules.js'
 import { useFoundryQuery, ANY_RECORD } from '../renderer/foundry-query.js'
 import { Forge } from './Forge.js'
 import { Floor } from './Floor.js'
-import { ConfirmButton } from './ConfirmButton.js'
 import type { Standing } from '../order/standing.js'
 import { statusInWords } from '../order/render.js'
 import type { OrderStatus } from '../order/schema.js'
@@ -510,6 +509,7 @@ function DeleteOrder({
     <ConfirmButton
       label="Delete this order"
       confirmLabel="Delete it and everything it made"
+      className="fdry-discard"
       warning={`This removes ${open} entirely — its records and ledger, its run graph and gates, its checkout and its branch. Nothing about it can be read back afterwards.`}
       disabled={busy}
       onConfirm={onConfirm}
