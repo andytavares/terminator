@@ -1,0 +1,23 @@
+extensions/foundry/tests/forge/forge-loop-release.spec.ts
+  s_a9e8c58b3eee1f::t_83a9330ad6173b 69
+  s_a9e8c58b3eee1f::t_6d353ec2bbd36f 158
+extensions/foundry/tests/helpers/foundry-host.ts
+  s_a9e8c58b3eee1f::t_9729431c06c1a4 28-29,31-34,40-43
+  s_a9e8c58b3eee1f::t_6d353ec2bbd36f 44-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "62df22a7812c0a9dc209cb04798835de241ccb18",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
