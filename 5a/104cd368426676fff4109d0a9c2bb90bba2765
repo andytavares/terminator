@@ -1,0 +1,21 @@
+extensions/foundry/src/line/run-context.ts
+  s_a9e8c58b3eee1f::t_dced8496e0354c 53-54,61,114-127
+extensions/foundry/tests/line/run-context.spec.ts
+  s_a9e8c58b3eee1f::t_dc13633cd8463a 1-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5a104cd368426676fff4109d0a9c2bb90bba2765",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
