@@ -174,7 +174,11 @@ const ACCEPTED = {
 
 describe('the record of earlier decisions', () => {
   it('names the newest decisions about the files a plan touches, and nothing else', async () => {
-    const store = createOrderStore(dataDir)
+    // Through the index, as every writer must (CLAUDE.md rule 4): a disk-only write is unseen
+    // by an index that background work loaded for this folder first.
+    const store = orderStoreAt(dataDir)
+    // The index loaded before the writes, as a background read can load it.
+    await store.list()
     await store.save(
       draftOrder({
         id: 'WO-1',
