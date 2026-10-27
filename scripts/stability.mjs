@@ -144,7 +144,14 @@ async function runUnitBurnIn({ specs, runs, part }) {
 /** The commands an e2e burn-in runs, in order: Chromium's install when a spec needs it, then
  * Playwright, which gives this `part` of the repeated tests to this E2E shard. */
 export function e2eBurnInCommands(specs, runs, part = '1/1') {
-  const args = ['playwright', 'test', ...specs, `--repeat-each=${runs}`]
+  const args = [
+    'playwright',
+    'test',
+    ...specs,
+    `--repeat-each=${runs}`,
+    '--grep-invert',
+    '@quarantine',
+  ]
   const test = ['npx', part === '1/1' ? args : [...args, `--shard=${part}`]]
   return needsChromium(specs) ? [['npx', ['playwright', 'install', 'chromium']], test] : [test]
 }

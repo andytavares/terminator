@@ -125,7 +125,7 @@ async function main() {
   if (failed.length > 0) console.error(`\nShards failed: ${failed.join(', ')}`)
   // CI repeats the changed specs in each shard, by part; with no shard named, one run covers every part.
   const part = only === null ? [] : ['--part', `${only}/${SHARDS}`]
-  const stable = run('node', ['scripts/stability.mjs', '--e2e', ...part])
+  const stable = run('node', ['scripts/stability.mjs', '--e2e', ...part], { CI: '1' })
   process.exit(failed.length === 0 && stable ? 0 : 1)
 }
 

@@ -120,12 +120,6 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
-      # The wall-clock budgets (`*.perf.spec.ts`), one file at a time, after the unit shards'
-      # work is done: in a unit shard they share the CPU with every other spec and measure the
-      # load rather than the code.
-      - name: Perf budgets
-        run: npm run test:perf
-
   # Every story is a test (ADR 098): it renders in Chromium and runs its play
   # function, in the light and the dark theme. The build proves the Storybook
   # site itself still compiles.
@@ -154,6 +148,12 @@ jobs:
 
       - name: Build Storybook
         run: npm run build-storybook
+
+      # The wall-clock budgets (`*.perf.spec.ts`), one file at a time, alone on the runner: in a
+      # unit shard they share the CPU with every other spec and measure the load rather than the
+      # code. Here and not in Format, because Format is a required check and a budget is not.
+      - name: Perf budgets
+        run: npm run test:perf
 
   # Screenshots of every story against the macOS baselines in
   # packages/extension-ui/visual/__screenshots__/darwin (ADR 098): what a Mac draws, so on a Mac.
@@ -221,10 +221,12 @@ jobs:
 
       # Every spec this change adds or edits, 30 times with a fresh seed each, every core busy. One
       # failure fails the check and prints the seed that replays it (ADR 124). Nothing retries. The
-      # plan splits the 30 runs, and the specs when there are many, so each shard fits in 7 minutes.
+      # plan splits the 30 runs, and the specs when there are many, so each shard plans for 3 minutes, in at most 4 shards.
       - name: Size the stability shards
         id: stability
-        run: node scripts/stability.mjs --github-output | sed 's/^shards=/stability_shards=/' >> "$GITHUB_OUTPUT"
+        run: |
+          set -o pipefail
+          node scripts/stability.mjs --github-output | sed 's/^shards=/stability_shards=/' >> "$GITHUB_OUTPUT"
 
   # One shard when the selection is under 100 specs, four otherwise. Each shard writes a
   # blob; coverage is limited to the changed files when only some specs run, and is
@@ -420,6 +422,7 @@ jobs:
       # bundle with node:fs stubbed out, and chunks past their size budget.
       - name: npm run build
         run: |
+          set -o pipefail
           npm run build 2>&1 | tee build.log
           if grep -nE '\(!\)|\[plugin |\[WARNING\]|⚠|is not exported by|externalized for browser' build.log; then
             echo "::error::npm run build printed the warnings above"
@@ -529,13 +532,13 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
-      - name: Process census (after the suite)
-        if: ${{ !cancelled() }}
-        run: scripts/process-census.sh "after the suite"
-
       # The changed e2e specs, five runs each, this shard's part of them (ADR 124).
       - name: Changed e2e specs, 5 runs, this shard's part
         run: node scripts/stability.mjs --e2e --part ${{ matrix.shard }}/3
+
+      - name: Process census (after the suite)
+        if: ${{ !cancelled() }}
+        run: scripts/process-census.sh "after the suite"
 
       - name: Upload blob report
         if: ${{ !cancelled() }}

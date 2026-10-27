@@ -48,9 +48,9 @@ describe('which e2e specs the local run gives its shards', () => {
     expect(e2eSpecsOf({ e2eMode: 'some', e2e: ['b.spec.ts'] }, allSpecs)).toEqual(['b.spec.ts'])
   })
 
-  it('runs each spec once: no burn-in or repeat is left in the script', () => {
+  it('runs each spec once in its shard: the repeats are scripts/stability.mjs, run after', () => {
     const source = readFileSync(resolve(__dirname, '../../../scripts/ci-e2e-local.mjs'), 'utf8')
-    expect(source).not.toMatch(/burn|repeat/i)
+    expect(source).not.toMatch(/--repeat-each/)
   })
 })
 

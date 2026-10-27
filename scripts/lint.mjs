@@ -10,10 +10,11 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const MEMORY_PER_PROCESS = 3 * 2 ** 30
+// Matches --max-old-space-size=4096 below: a group may grow to it.
+const MEMORY_PER_PROCESS = 4 * 2 ** 30
 const MAX_PROCESSES = 3
 
-/** How many ESLint processes run at once: a core each, 3 GB each, and no more than 3. */
+/** How many ESLint processes run at once: a core each, 4 GB each, and no more than 3. */
 export function lintConcurrency({ cores, memory }) {
   return Math.max(1, Math.min(MAX_PROCESSES, cores, Math.floor(memory / MEMORY_PER_PROCESS)))
 }

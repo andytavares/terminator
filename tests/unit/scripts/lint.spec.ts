@@ -29,10 +29,11 @@ describe('the lint runs', () => {
 const GB = 2 ** 30
 
 describe('how many lint processes run at once', () => {
-  it('runs a core each, 3 GB each, and no more than 3', () => {
+  it('runs a core each, 4 GB each, and no more than 3', () => {
     expect(lintConcurrency({ cores: 4, memory: 16 * GB })).toBe(3)
     expect(lintConcurrency({ cores: 2, memory: 16 * GB })).toBe(2)
-    expect(lintConcurrency({ cores: 8, memory: 7 * GB })).toBe(2)
+    expect(lintConcurrency({ cores: 8, memory: 7 * GB })).toBe(1)
+    expect(lintConcurrency({ cores: 8, memory: 8 * GB })).toBe(2)
     expect(lintConcurrency({ cores: 4, memory: 4 * GB })).toBe(1)
     expect(lintConcurrency({ cores: 1, memory: 1 * GB })).toBe(1)
   })

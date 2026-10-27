@@ -23,7 +23,7 @@ Inside the run:
 2. **At most five macOS jobs per run**: three E2E shards, Start and Story screenshots. Nothing waits on E2E:
    - Each E2E shard runs its part of the five repeats of every changed e2e spec after its own tests (`scripts/stability.mjs --e2e --part K/3`, which passes Playwright's own `--shard`). The E2E stability job is gone.
    - The quarantined unit and e2e tests run in the nightly `stability-sweep.yml`, in jobs that do not gate (Constitution XIV). They no longer run on a pull request.
-3. **Fewer Linux jobs**: Select tests also plans the stability shards, Format also runs the perf budgets, Start's build also fails on build warnings (the Build job is gone), and E2E report runs only when an E2E shard failed. Stability shards plan for 3 minutes and are at most 4.
+3. **Fewer Linux jobs**: Select tests also plans the stability shards, Stories also runs the perf budgets (not Format, which is a required check), Start's build also fails on build warnings (the Build job is gone), and E2E report runs only when an E2E shard failed. Stability shards plan for 3 minutes and are at most 4.
 4. **Cheaper steps**: `lint:quarantine` lists only the spec files that contain the tag or that `tests/quarantine.json` names, and none when there are none. `npm run lint` runs up to 3 ESLint groups at once, as memory allows. An E2E shard restores the build from `actions/cache` when no tracked file outside the tests and docs changed.
 5. **One Dependabot pull request a week** for every package outside the lockstep groups.
 
@@ -39,3 +39,4 @@ Inside the run:
 - A full run (a push to `main`, `test: all`, a lockfile change) still runs 827 to 971 s of single-worker E2E over three shards, so it can take more than five minutes until the suite itself is cheaper.
 - Two runs at once still share five macOS runners.
 - A fix to a quarantined test shows in the nightly sweep, not on its pull request.
+- A change that edits many specs gets longer stability shards, not more of them: the cap of 4 keeps a run under 20 jobs, so 50 changed specs plan about 400 s per shard.

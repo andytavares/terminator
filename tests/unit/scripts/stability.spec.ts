@@ -126,16 +126,21 @@ describe('burning in nothing', () => {
 })
 
 describe('burning in e2e specs', () => {
+  const repeated = (spec: string) => [
+    'npx',
+    ['playwright', 'test', spec, '--repeat-each=5', '--grep-invert', '@quarantine'],
+  ]
+
   it('installs Chromium first when a spec drives the browser', () => {
     expect(e2eBurnInCommands(['tests/e2e/remote-control.spec.ts'], 5)).toEqual([
       ['npx', ['playwright', 'install', 'chromium']],
-      ['npx', ['playwright', 'test', 'tests/e2e/remote-control.spec.ts', '--repeat-each=5']],
+      repeated('tests/e2e/remote-control.spec.ts'),
     ])
   })
 
   it('runs only Playwright when no spec needs Chromium', () => {
     expect(e2eBurnInCommands(['tests/e2e/settings.spec.ts'], 5)).toEqual([
-      ['npx', ['playwright', 'test', 'tests/e2e/settings.spec.ts', '--repeat-each=5']],
+      repeated('tests/e2e/settings.spec.ts'),
     ])
   })
 })
@@ -145,7 +150,18 @@ describe('splitting e2e repeats over the E2E shards', () => {
 
   it('passes the shard to Playwright so each shard runs its share of the repeats', () => {
     expect(e2eBurnInCommands([spec], 5, '2/3')).toEqual([
-      ['npx', ['playwright', 'test', spec, '--repeat-each=5', '--shard=2/3']],
+      [
+        'npx',
+        [
+          'playwright',
+          'test',
+          spec,
+          '--repeat-each=5',
+          '--grep-invert',
+          '@quarantine',
+          '--shard=2/3',
+        ],
+      ],
     ])
   })
 

@@ -63,7 +63,7 @@ describe('where ci:local runs a step', () => {
   })
 
   it('runs the perf budgets and the build warning check, in the jobs that took them over', () => {
-    expect(stepOf('format', 'Perf budgets')?.script).toBe('npm run test:perf')
+    expect(stepOf('stories', 'Perf budgets')?.script).toBe('npm run test:perf')
     expect(stepOf('start', 'npm run build')?.script).toContain('tee build.log')
   })
 
@@ -201,7 +201,11 @@ describe('the stability jobs (ADR 124)', () => {
 
 describe('the Stability shards (ADR 124)', () => {
   it('sizes the shards from the change, and each runs its share', () => {
-    expect(stepsOf('select').map((step) => step.run)).toContain(
+    expect(
+      stepsOf('select')
+        .map((step) => step.run)
+        .join('\n')
+    ).toContain(
       `node scripts/stability.mjs --github-output | sed 's/^shards=/stability_shards=/' >> "$GITHUB_OUTPUT"`
     )
     expect(workflow.jobs['stability-shard'].needs).toBe('select')
