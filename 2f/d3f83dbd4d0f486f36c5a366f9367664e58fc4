@@ -1,0 +1,19 @@
+docs/research/foundry-paved-paths.html
+  s_a9e8c58b3eee1f::t_6314f9baeadc4a 1-1574
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2fd3f83dbd4d0f486f36c5a366f9367664e58fc4",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
