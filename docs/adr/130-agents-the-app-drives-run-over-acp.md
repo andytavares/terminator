@@ -12,18 +12,18 @@ The app reached Claude Code in 21 places, through typed `claude …` lines, hook
 
 A spike drove the adapter (0.89.1, SDK 1.8.0) against claude 2.1.310 in a temporary git repository. Results:
 
-| Question                                                                                          | Result                                                                                  |
-| ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Does it run on a claude.ai subscription login?                                                    | Yes. No `ANTHROPIC_API_KEY` was set.                                                    |
-| In `default` mode, which tools ask?                                                               | Write, Edit and `echo x > b.txt` asked. Read and `ls` did not.                          |
-| Which mode does a new session start in?                                                           | The user's `permissions.defaultMode` (`auto` here). The client must set the mode.       |
-| Does a `PreToolUse` hook in a `settings` file passed as `_meta.claudeCode.options.settings` fire? | Yes, for all five tools, Read included.                                                 |
-| Does `session/load` restore a conversation after the agent process is killed?                     | Yes, in 640 ms, with history replayed.                                                  |
-| Is cost reported?                                                                                 | Yes: `usage_update.cost` in USD and the model in `_meta`.                               |
-| Do reject and cancel work?                                                                        | Reject: the file is not written and the agent says so. Cancel: `stopReason: cancelled`. |
-| Does it use client terminals (`terminal: true`)?                                                  | No. Commands run inside Claude Code.                                                    |
-| Can it use the user's own `claude`?                                                               | Yes, with `pathToClaudeCodeExecutable`.                                                 |
-| Does a permission ask carry the Claude tool name?                                                 | No. It carries `kind` and `rawInput`.                                                   |
+| Question                                                                                          | Result                                                                                             |
+| ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Does it run on a claude.ai subscription login?                                                    | Yes. No `ANTHROPIC_API_KEY` was set.                                                               |
+| In `default` mode, which tools ask?                                                               | Write, Edit and `echo x > b.txt` asked. Read and `ls` did not.                                     |
+| Which mode does a new session start in?                                                           | The user's `permissions.defaultMode` (`auto` here). The client must set the mode.                  |
+| Does a `PreToolUse` hook in a `settings` file passed as `_meta.claudeCode.options.settings` fire? | Yes, for all five tools, Read included.                                                            |
+| Does `session/load` restore a conversation after the agent process is killed?                     | Yes, in 640 ms, with history replayed.                                                             |
+| Is cost reported?                                                                                 | Yes: `usage_update.cost` in USD and the model in `_meta`.                                          |
+| Do reject and cancel work?                                                                        | Reject: the file is not written and the agent says so. Cancel: `stopReason: cancelled`.            |
+| Does it use client terminals (`terminal: true`)?                                                  | No. Commands run inside Claude Code.                                                               |
+| Can it use the user's own `claude`?                                                               | Yes, with `CLAUDE_CODE_EXECUTABLE` in its environment; it overwrites `pathToClaudeCodeExecutable`. |
+| Does a permission ask carry the Claude tool name?                                                 | No. It carries `kind` and `rawInput`.                                                              |
 
 ## Decision
 

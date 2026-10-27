@@ -20,8 +20,13 @@ export function listAgents(settings: AgentsSettings): AgentDescriptor[] {
   return replaced ? custom : [{ id: CLAUDE_AGENT_ID, label: CLAUDE_LABEL }, ...custom]
 }
 
-/** A custom agent runs as set; the built-in one runs the Claude adapter on Electron's own Node. */
-export function resolveAgent(settings: AgentsSettings, agentId: string): AgentLaunch | null {
+/** A custom agent runs as set; the built-in one runs the Claude adapter on Electron's own Node,
+ * with the user's `claude` when one was found. */
+export function resolveAgent(
+  settings: AgentsSettings,
+  agentId: string,
+  claudeExecutable: string | null = null
+): AgentLaunch | null {
   const env = envWithoutParentClaude(process.env)
   const custom = settings.custom.find((agent) => agent.id === agentId)
   if (custom) return { command: custom.command, args: custom.args, env }
@@ -30,27 +35,15 @@ export function resolveAgent(settings: AgentsSettings, agentId: string): AgentLa
       .resolve('@agentclientprotocol/claude-agent-acp/dist/index.js')
       // asarUnpack puts the adapter on disk, where a child process can read it.
       .replace('app.asar/', 'app.asar.unpacked/')
+    // The adapter reads its binary only from this variable; a session option is overwritten.
+    const executable: Record<string, string> = claudeExecutable
+      ? { CLAUDE_CODE_EXECUTABLE: claudeExecutable }
+      : {}
     return {
       command: process.execPath,
       args: [adapter],
-      env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
+      env: { ...env, ...executable, ELECTRON_RUN_AS_NODE: '1' },
     }
   }
   return null
-}
-
-const asRecord = (value: unknown): Record<string, unknown> =>
-  typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
-
-/** `meta` with the user's own `claude` set for the adapter; an option the caller set stays. */
-export function withClaudeExecutable(
-  meta: Record<string, unknown> | undefined,
-  executable: string
-): Record<string, unknown> {
-  const claudeCode = asRecord(meta?.claudeCode)
-  const options = asRecord(claudeCode.options)
-  return {
-    ...meta,
-    claudeCode: { ...claudeCode, options: { pathToClaudeCodeExecutable: executable, ...options } },
-  }
 }

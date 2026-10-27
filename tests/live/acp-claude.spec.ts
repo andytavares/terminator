@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentPermissionAsk } from '@terminator/extension-sdk'
 import { createAgentLog } from '../../src/main/agents/acp/agent-log'
-import { agentMeta, createConnector } from '../../src/main/agents/acp/agent-connection'
+import { createConnector } from '../../src/main/agents/acp/agent-connection'
 import { createAgentService, type AgentService } from '../../src/main/agents/acp/agent-service'
 import { makeTempDir, removeTempDirs } from '../support/temp-dir'
 
@@ -24,7 +24,6 @@ function serviceFor(): AgentService {
     connect: createConnector(() => ({ default: 'claude', custom: [] })),
     listAgents: () => [],
     defaultAgentId: () => 'claude',
-    agentMeta,
     log: createAgentLog({ directory: makeTempDir('acp-live-log-'), now: Date.now }),
     scratchDirectory: makeTempDir('acp-live-scratch-'),
     scrollbackLimit: () => 1000,
