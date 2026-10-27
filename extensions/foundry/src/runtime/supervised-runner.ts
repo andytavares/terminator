@@ -505,11 +505,19 @@ function listenForAsks(
 function promptSession(context: RunnerContext, sessionId: string, text: string): void {
   context.api.agents.prompt(sessionId, text).then(
     ({ stopReason }) => {
-      if (stopReason !== 'cancelled' && stopReason !== 'error') turnEnded(context, sessionId)
+      if (stopReason === 'error') promptFailed(context, sessionId)
+      else if (stopReason !== 'cancelled') turnEnded(context, sessionId)
     },
-    // A dead agent is reported by `onEnd`; a failed prompt adds nothing to it.
-    () => undefined
+    () => promptFailed(context, sessionId)
   )
+}
+
+/** The agent cannot answer, though its process may live on: the run ends as a crash does. */
+function promptFailed(context: RunnerContext, sessionId: string): void {
+  const run = context.running.get(sessionId)
+  if (run === undefined) return
+  run.phase.current.onEnd?.(null)
+  end(context, sessionId, false)
 }
 
 function turnEnded(context: RunnerContext, sessionId: string): void {
@@ -543,6 +551,8 @@ function trackRun(
 ): SupervisedRun {
   // The agent dying is how a run ends, whether it exited or the tab was closed.
   const detachEnd = context.api.agents.onEnd(sessionId, (exitCode: number | null) => {
+    // Already ended by a failed prompt or a stop.
+    if (!context.running.has(sessionId)) return
     run.phase.current.onEnd?.(exitCode)
     end(context, sessionId, exitCode === 0)
   })
