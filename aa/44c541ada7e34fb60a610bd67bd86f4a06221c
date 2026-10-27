@@ -1,0 +1,151 @@
+extensions/foundry/tests/helpers/answer-shape.ts
+  s_a9e8c58b3eee1f::t_141cce1d7fdc64 1-6
+  s_a9e8c58b3eee1f::t_8d5f29dc5472ca 7
+extensions/foundry/src/ipc/inbox-channels.ts
+  s_a9e8c58b3eee1f::t_8aaaa4ea3ce629 75-76,88,188
+extensions/foundry/tests/components/factory/FactorySite.spec.tsx
+  s_a9e8c58b3eee1f::t_9f9c84795a992a 48
+extensions/foundry/src/renderer/attach-to-step.ts
+  s_a9e8c58b3eee1f::t_42e4869e23a535 1,6,11,13
+  s_a9e8c58b3eee1f::t_e8cdba0641bb39 7
+extensions/foundry/src/components/Orders.tsx
+  s_a9e8c58b3eee1f::t_b09d5654a9bfeb 16-17,38,40,163-164,182,216-219,252,255,275,292,330-331,486
+  s_a9e8c58b3eee1f::t_296c28e9a7befb 43,48,481
+  s_a9e8c58b3eee1f::t_27cf3316801836 222-227,261,351
+  s_a9e8c58b3eee1f::t_df4207af317f15 491
+  s_a9e8c58b3eee1f::t_67d741aa16836b 319-320,342,345,482
+  s_a9e8c58b3eee1f::t_434b4601521305 490
+  s_a9e8c58b3eee1f::t_b364aca65df085 220
+extensions/foundry/tests/components/App.spec.tsx
+  s_a9e8c58b3eee1f::t_258964bf412d5b 572,585
+extensions/foundry/src/components/factory/HallThumbnail.tsx
+  s_a9e8c58b3eee1f::t_296c28e9a7befb 8
+  s_a9e8c58b3eee1f::t_ae28cbf1923455 54-55
+extensions/foundry/src/ipc/forge-registration.ts
+  s_a9e8c58b3eee1f::t_582f3fb42cd2bf 152,159-163,192-194,197-222
+extensions/foundry/src/components/factory/FactorySite.tsx
+  s_a9e8c58b3eee1f::t_296c28e9a7befb 10,189
+  s_a9e8c58b3eee1f::t_e363f5fa8f6f3a 11,17
+  s_a9e8c58b3eee1f::t_ae28cbf1923455 197
+extensions/foundry/src/forge/checks-view.ts
+  s_a9e8c58b3eee1f::t_bb85c8c44e92c4 107,224-226,232
+extensions/foundry/src/ipc/forge-channels.ts
+  s_a9e8c58b3eee1f::t_b9101d11a998d7 659-671,751-752
+  s_a9e8c58b3eee1f::t_8aaaa4ea3ce629 243-247,249,251,253,255,257,259,261,263,359,425,440,455,475,503,568,644,747,787,812,829,956,979
+  s_a9e8c58b3eee1f::t_13e3e0acf03d6e 535,761,910,931,1021
+  s_a9e8c58b3eee1f::t_646cf760b6b262 130
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_a9e8c58b3eee1f::t_c728b80ebe69e7 2141
+  s_a9e8c58b3eee1f::t_141cce1d7fdc64 1,252,259,269,310,333,658,798,840,998,1072,1376,1468,1476,1822,1847,2114,2124,2133,2151,2159
+  s_a9e8c58b3eee1f::t_ea8e128b9dadb0 842,999,1074
+extensions/foundry/src/components/Forge.tsx
+  s_a9e8c58b3eee1f::t_296c28e9a7befb 52,258,275,477,613,623
+  s_a9e8c58b3eee1f::t_13e3e0acf03d6e 215-216,1595-1597
+  s_a9e8c58b3eee1f::t_646cf760b6b262 88-90
+  s_a9e8c58b3eee1f::t_99ba7d133adb99 53,252,486-487,512,525,532,534,539,551,553,566-567,575,578,589
+  s_a9e8c58b3eee1f::t_d90daa80549f7d 86,197,523,590
+extensions/foundry/src/ipc/run-channels.ts
+  s_a9e8c58b3eee1f::t_8aaaa4ea3ce629 139-141,143,145,147,149,383,476,617,685,726,764,779
+extensions/foundry/src/ipc/inbox-registration.ts
+  s_a9e8c58b3eee1f::t_019a1788b51337 42-48,58,267-269,272-289
+extensions/foundry/src/ipc/sensor-channels.ts
+  s_a9e8c58b3eee1f::t_8aaaa4ea3ce629 55-60,80,127
+  s_a9e8c58b3eee1f::t_13e3e0acf03d6e 85,94,138,159
+extensions/foundry/src/ipc/line-registration.ts
+  s_a9e8c58b3eee1f::t_5a96cb8b80a9c4 98,102-106,117
+extensions/foundry/src/renderer/use-run-observation.ts
+  s_a9e8c58b3eee1f::t_a42e25ed6a94b7 13
+  s_a9e8c58b3eee1f::t_0d6d6609d7a3aa 3-4,6-7,10,18
+extensions/foundry/src/renderer/foundry-invoke.ts
+  s_a9e8c58b3eee1f::t_d013fde259872b 1-8,16-22
+  s_a9e8c58b3eee1f::t_b09d5654a9bfeb 9-15
+extensions/foundry/src/components/Ledger.tsx
+  s_a9e8c58b3eee1f::t_296c28e9a7befb 15,174,201,204
+  s_a9e8c58b3eee1f::t_df4207af317f15 47-50
+  s_a9e8c58b3eee1f::t_9b3dcbb125e91a 16,25,27,29,54-55,60,63-64,213
+extensions/foundry/src/components/use-checks.ts
+  s_a9e8c58b3eee1f::t_296c28e9a7befb 2,92,158
+  s_a9e8c58b3eee1f::t_9c96334a3a0a01 109
+  s_a9e8c58b3eee1f::t_f010c2b7d1af51 143-148
+extensions/foundry/tests/ipc/inbox-channels.spec.ts
+  s_a9e8c58b3eee1f::t_141cce1d7fdc64 1,108
+  s_a9e8c58b3eee1f::t_494ed586d31ce5 109-110
+extensions/foundry/src/ipc/model-registration.ts
+  s_a9e8c58b3eee1f::t_5a96cb8b80a9c4 41,46,50-55
+  s_a9e8c58b3eee1f::t_4f439b0721b8d7 3
+  s_a9e8c58b3eee1f::t_1614a1b2be27e4 56
+extensions/foundry/src/components/SettingsView.tsx
+  s_a9e8c58b3eee1f::t_434b4601521305 141,144-145,278,280,301
+  s_a9e8c58b3eee1f::t_fd8f0d944eff27 304
+  s_a9e8c58b3eee1f::t_296c28e9a7befb 6,45,136
+extensions/foundry/src/ipc/profile-channels.ts
+  s_a9e8c58b3eee1f::t_8aaaa4ea3ce629 88-93,112,187,214,245,257,271
+extensions/foundry/src/components/factory/FactoryHall.tsx
+  s_a9e8c58b3eee1f::t_3ac4ed765fb2f9 325-326,557,667
+  s_a9e8c58b3eee1f::t_df4207af317f15 558,668
+  s_a9e8c58b3eee1f::t_ae28cbf1923455 232
+  s_a9e8c58b3eee1f::t_e8cdba0641bb39 746,1224,1242,1263
+  s_a9e8c58b3eee1f::t_296c28e9a7befb 56,564,567,676,684
+extensions/foundry/src/ipc/foundry-api.ts
+  s_a9e8c58b3eee1f::t_f8b3e7aa3c638e 1-6,8-68,70-80,86-109,111-125,131
+  s_a9e8c58b3eee1f::t_646cf760b6b262 7,69
+  s_a9e8c58b3eee1f::t_434b4601521305 126-130
+  s_a9e8c58b3eee1f::t_d013fde259872b 110
+  s_a9e8c58b3eee1f::t_b09d5654a9bfeb 81-85
+extensions/foundry/src/components/Inbox.tsx
+  s_a9e8c58b3eee1f::t_c9135f75dc9dcb 16
+  s_a9e8c58b3eee1f::t_e511fcfcf60684 22,33,124,157,174,206
+  s_a9e8c58b3eee1f::t_296c28e9a7befb 21,68,143
+extensions/foundry/src/ipc/ledger-channels.ts
+  s_a9e8c58b3eee1f::t_13e3e0acf03d6e 132,141,179,196
+  s_a9e8c58b3eee1f::t_8aaaa4ea3ce629 81-86,108,169
+extensions/foundry/src/renderer/use-signals.ts
+  s_a9e8c58b3eee1f::t_af74a325169e16 2,42-43
+  s_a9e8c58b3eee1f::t_cecf03caadc656 64
+extensions/foundry/src/ipc/supervision-registration.ts
+  s_a9e8c58b3eee1f::t_13e3e0acf03d6e 179-181
+  s_a9e8c58b3eee1f::t_aaf6190e70619f 198
+  s_a9e8c58b3eee1f::t_1f5fba93ae9cdf 36,39-40,43-45,49-77,84-96,108,112,152,165
+  s_a9e8c58b3eee1f::t_4f439b0721b8d7 78-83,156
+extensions/foundry/tests/channel-schemas.spec.ts
+  s_a9e8c58b3eee1f::t_53bd75cacf11c6 152-163
+extensions/foundry/src/components/SettingsProfiles.tsx
+  s_a9e8c58b3eee1f::t_296c28e9a7befb 3,34,37,46
+  s_a9e8c58b3eee1f::t_c9135f75dc9dcb 4
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_a9e8c58b3eee1f::t_141cce1d7fdc64 1,773,934,941,949,958,1380
+extensions/foundry/tests/ipc/ledger-channels.spec.ts
+  s_a9e8c58b3eee1f::t_141cce1d7fdc64 1,210,335,464
+extensions/foundry/src/ipc/ui-registration.ts
+  s_a9e8c58b3eee1f::t_5a96cb8b80a9c4 3,19,28,31,35-49
+  s_a9e8c58b3eee1f::t_ec86edd03db97c 50
+extensions/foundry/src/renderer/App.tsx
+  s_a9e8c58b3eee1f::t_cecf03caadc656 46
+  s_a9e8c58b3eee1f::t_af74a325169e16 50-51,98,110-112,174-176
+  s_a9e8c58b3eee1f::t_f4fd0b66c05ad0 6-7
+extensions/foundry/src/components/Floor.tsx
+  s_a9e8c58b3eee1f::t_b09d5654a9bfeb 47
+  s_a9e8c58b3eee1f::t_7b749af8ed8eb2 58,62,65,142-143,155,266
+  s_a9e8c58b3eee1f::t_296c28e9a7befb 165,168,249,252,259,261,300,308,318,415
+  s_a9e8c58b3eee1f::t_450d6150a934d0 48,296,299
+  s_a9e8c58b3eee1f::t_3f84fbda3bca51 291-295,405-406,412,419
+extensions/foundry/src/components/signals-read.ts
+  s_a9e8c58b3eee1f::t_296c28e9a7befb 1
+  s_a9e8c58b3eee1f::t_3ac4ed765fb2f9 20-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "aa44c541ada7e34fb60a610bd67bd86f4a06221c",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": null
+    }
+  }
+}
