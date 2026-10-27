@@ -1,0 +1,19 @@
+src/renderer/components/AlertBadge.tsx
+  s_6305604343e57b::t_d0f6d7d7b93d73 21-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d18c35857e2acd3e67ecec7c722c57fd91623f8e",
+  "prompts": {},
+  "sessions": {
+    "s_6305604343e57b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a9d6b900c96f7f5f3",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
