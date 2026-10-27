@@ -45,6 +45,8 @@ A spike drove the adapter (0.89.1, SDK 1.8.0) against claude 2.1.310 in a tempor
 
 - Foundry still reads Claude's transcript, because the adapter still writes it. Foundry stays Claude-only.
 - An ACP reject option carries no text, so a refusal also cancels the turn and sends Foundry's reason, or the operator's typed answer, as the agent's next prompt. The turn ends once, after the agent has read why.
+- The Claude adapter's cancel also drops a prompt that reaches it before the cancelled turn has ended, so the reason was lost and the run waited for ever (WO-1027-eea). The service sends a prompt only after the cancelled turn ends, sends no cancel when no prompt runs, and sends a prompt once more when an earlier cancel still dropped it.
+- A prompt that fails shows "The agent stopped with an error" in its tab, and ends a Foundry run as failed, so nothing waits for a turn that cannot end.
 - Foundry's hard refusals (`git push`, `gh pr` changes, edits under the skills mount, tools a role does not use) are passed as Claude deny rules (`disallowedTools`, `runtime/deny-rules.ts`). Deny rules are checked before any mode, so they hold in `auto` mode too (https://code.claude.com/docs/en/permissions).
 - Inside an ask there is no auto mode to defer to, so the policy's old "leave it to auto mode" answer is gone: what it leaves open is asked, or refused with the reason at `lights-out`.
 - In `auto` mode Foundry sees only what Claude's classifier asks about, not every tool call. In `default` mode reads do not ask, so Foundry no longer sees them either.

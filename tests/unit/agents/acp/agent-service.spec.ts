@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { PromptResponse } from '@agentclientprotocol/sdk'
 import type {
   AgentPermissionAsk,
   AgentPermissionSettled,
@@ -13,6 +14,7 @@ import {
 import { partialFake } from '../../../support/fakes'
 import { createAgentLog } from '../../../../src/main/agents/acp/agent-log'
 import { makeTempDir } from '../../../support/temp-dir'
+import { eventually } from '../../../support/eventually'
 import { fakeConnector, SESSION_ID, type FakeAgent } from './fake-agent'
 
 const turns = vi.hoisted(() => ({ setTurn: vi.fn(), clearTurn: vi.fn() }))
@@ -297,13 +299,115 @@ describe('prompt', () => {
   })
 })
 
+describe('a failed prompt', () => {
+  it('says in the conversation, in plain words, that the agent failed', async () => {
+    const { service, agent, sessionId } = await started()
+    const heard: AgentUpdate[] = []
+    service.onUpdate(sessionId, (update) => heard.push(update))
+    agent.onPrompt = () => Promise.reject(new Error('Internal error: query closed'))
+    await service.prompt(sessionId, 'hello')
+    expect(heard).toHaveLength(1)
+    expect(heard[0].sessionUpdate).toBe('agent_message_chunk')
+    const text = (heard[0].content as { text: string }).text
+    expect(text).toContain('The agent stopped with an error')
+    expect(text).not.toContain('query closed')
+  })
+
+  it('adds nothing to the reply of a one-shot run', async () => {
+    const { service, firstAgent } = setup()
+    const run = service.runOnce({ cwd: '/w', prompt: 'review' })
+    const agent = await firstAgent
+    agent.onPrompt = () => Promise.reject(new Error('boom'))
+    expect(await run).toMatchObject({ text: '', stopReason: 'error' })
+  })
+})
+
+describe('a prompt sent right after a cancel', () => {
+  it('waits for the cancelled turn to end, so the cancel cannot drop it', async () => {
+    const { service, agent, sessionId } = await started()
+    const { texts, turn, received } = heldTurn(agent)
+    const first = service.prompt(sessionId, 'first')
+    await received
+    service.cancel(sessionId)
+    const second = service.prompt(sessionId, 'second')
+    await flushed(service, sessionId)
+    expect(texts).toEqual(['first'])
+    turn.end('cancelled')
+    expect(await first).toEqual({ stopReason: 'cancelled' })
+    await eventually(() => expect(texts).toEqual(['first', 'second']))
+    turn.end('end_turn')
+    expect(await second).toEqual({ stopReason: 'end_turn' })
+  })
+})
+
+describe('a cancel with no prompt running', () => {
+  it('sends no cancel when no prompt is running, so it cannot reach the next one', async () => {
+    const { service, agent, sessionId } = await started()
+    service.cancel(sessionId)
+    await flushed(service, sessionId)
+    expect(agent.calls.map((call) => call.method)).not.toContain('cancel')
+  })
+})
+
+describe('a prompt an earlier cancel dropped', () => {
+  it('is sent once more when the cancel before it still dropped it', async () => {
+    const { service, agent, sessionId } = await started()
+    const { texts, turn, received } = heldTurn(agent)
+    const first = service.prompt(sessionId, 'first')
+    await received
+    service.cancel(sessionId)
+    const second = service.prompt(sessionId, 'second')
+    turn.end('end_turn') // The first turn had already ended when the cancel arrived.
+    expect(await first).toEqual({ stopReason: 'end_turn' })
+    await eventually(() => expect(texts).toEqual(['first', 'second']))
+    turn.end('cancelled')
+    await eventually(() => expect(texts).toEqual(['first', 'second', 'second']))
+    turn.end('end_turn')
+    expect(await second).toEqual({ stopReason: 'end_turn' })
+  })
+
+  it('is not sent again when it was the one cancelled', async () => {
+    const { service, agent, sessionId } = await started()
+    const { texts, turn, received } = heldTurn(agent)
+    const only = service.prompt(sessionId, 'only')
+    await received
+    service.cancel(sessionId)
+    turn.end('cancelled')
+    expect(await only).toEqual({ stopReason: 'cancelled' })
+    await flushed(service, sessionId)
+    expect(texts).toEqual(['only'])
+  })
+})
+
+/** A prompt the test ends: `received` settles once the agent has it. */
+function heldTurn(agent: FakeAgent) {
+  const texts: string[] = []
+  const turn = { end: (_stopReason: PromptResponse['stopReason']): void => {} }
+  let markReceived = (): void => {}
+  const received = new Promise<void>((resolve) => (markReceived = resolve))
+  agent.onPrompt = (params) => {
+    texts.push((params.prompt[0] as { text: string }).text)
+    markReceived()
+    return new Promise((resolve) => (turn.end = (stopReason) => resolve({ stopReason })))
+  }
+  return { texts, turn, received }
+}
+
+/** A request round trip: everything the service sent before it has reached the agent. */
+const flushed = (service: Started['service'], sessionId: string) =>
+  service.setConfig(sessionId, 'mode', 'auto')
+
 describe('cancel, setConfig and models', () => {
   it('cancel tells the agent and cancels the open asks', async () => {
     const context = await started()
+    const { turn } = heldTurn(context.agent)
+    const running = context.service.prompt(context.sessionId, 'hello')
     const { outcome } = await askedOf(context)
     context.service.cancel(context.sessionId)
     expect(await outcome).toEqual({ outcome: { outcome: 'cancelled' } })
     await context.agent.cancelled
+    turn.end('cancelled')
+    expect(await running).toEqual({ stopReason: 'cancelled' })
   })
 
   it('sets a known option and refuses an unknown one', async () => {
