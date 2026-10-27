@@ -54,16 +54,6 @@ export function e2eTempDir(prefix: string): string {
   return mkdtempSync(join(e2eRunRoot(), prefix))
 }
 
-/** Task Vault asks for its weekly review on one weekday; a profile that moves it off today keeps
- * Home's queue to what the test puts there. */
-export function profileWithoutWeeklyReview(): string {
-  const profile = e2eTempDir('profile-')
-  const otherDay = String((new Date().getDay() + 3) % 7)
-  const values = { 'terminator.task-vault.weeklyReviewDay': otherDay }
-  writeFileSync(join(profile, 'extension-settings.json'), JSON.stringify({ values }))
-  return profile
-}
-
 function e2eProfileDir(): string {
   return e2eTempDir('profile-')
 }

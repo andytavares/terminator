@@ -1,5 +1,4 @@
 import type { IncomingMessage } from 'node:http'
-import type { StubAnswer } from './tracker-stub-jira'
 
 // The stub Linear API: the SDK's GraphQL operations answered by name, with the fields its
 // models read, and variables checked against their declared types as Linear's server does
@@ -12,6 +11,11 @@ interface LinearStubIssue {
   state: { name: string; type: 'unstarted' | 'started' | 'completed' }
   assigneeEmail: string | null
   comments: Array<{ author: string; body: string; createdAt: string }>
+}
+
+export interface StubAnswer {
+  status: number
+  body: unknown
 }
 
 export interface LinearState {

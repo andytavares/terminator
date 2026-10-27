@@ -5,7 +5,6 @@ import {
   closeApp,
   createWorkspace,
   e2eTempDir,
-  profileWithoutWeeklyReview,
   projectGroup,
   workspaceRow,
 } from './helpers'
@@ -129,7 +128,7 @@ test.afterEach(async () => {
 })
 
 test('a task across three repos shows on Home, asks, grows and groups the sidebar', async () => {
-  handle = await launchApp(profileWithoutWeeklyReview(), NO_GITHUB())
+  handle = await launchApp(undefined, NO_GITHUB())
   const { page } = handle
   for (const repo of REPOS) await createWorkspace(page, repo, gitFolder())
   await test.step('Start work → Across repos starts three lanes', () => startTaskAcrossRepos(page))
@@ -142,7 +141,7 @@ test('a task across three repos shows on Home, asks, grows and groups the sideba
 })
 
 test('Home with nothing asking says so', async () => {
-  handle = await launchApp(profileWithoutWeeklyReview(), NO_GITHUB())
+  handle = await launchApp(undefined, NO_GITHUB())
   const { page } = handle
   await openHome(page)
   await expect(page.getByText('Nothing needs you.')).toBeVisible()

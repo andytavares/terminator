@@ -48,7 +48,6 @@ const CHOSEN: Record<string, unknown> = {
   'terminator.foundry.criticalPaths': ['src/auth/**'],
   'terminator.notepad.defaultTags': 'e2e-tag',
   'terminator.remote-control.maxSubscribers': 13,
-  'terminator.task-vault.weeklyReviewDay': '3',
   'terminator.task-vault.dueDateAlertTime': '07:30',
   'terminator.task-vault.contexts': 'deep-work,errands',
 }

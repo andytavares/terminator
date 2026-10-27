@@ -6,7 +6,6 @@ import {
   createWorkspace,
   addAndSelectProject,
   e2eTempDir,
-  profileWithoutWeeklyReview,
   readTerminalRows,
   runQuickActionFromPanel,
 } from './helpers'
@@ -36,7 +35,7 @@ let handle: AppHandle
 test.beforeAll(async () => {
   // An empty gh config keeps the developer's own pull requests from joining Needs you.
   const env = { XDG_CONFIG_HOME: e2eTempDir('no-gh-'), GH_TOKEN: '', GITHUB_TOKEN: '' }
-  handle = await launchApp(profileWithoutWeeklyReview(), env, { hideSidebarOnHome: true })
+  handle = await launchApp(undefined, env, { hideSidebarOnHome: true })
 })
 
 test.afterAll(async () => {

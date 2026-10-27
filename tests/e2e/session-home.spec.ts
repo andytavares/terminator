@@ -78,7 +78,7 @@ async function linkDialogNamesWhereToConnect(page: Page): Promise<void> {
   const dialog = await openLinkDialog(page)
   await expectCentredInWindow(dialog, 'Link a work item')
   await expect(dialog.getByRole('alert')).toHaveText(
-    'No issue tracker is connected. Connect Linear or Jira in Settings → Integrations.'
+    'No issue tracker is connected. Connect Linear in Settings → Integrations.'
   )
   await clickOnceDrawn(dialog.getByRole('button', { name: 'Cancel' }))
   await expect(dialog).toBeHidden()

@@ -6,7 +6,6 @@ import {
   closeApp,
   createWorkspace,
   e2eTempDir,
-  profileWithoutWeeklyReview,
   runQuickActionFromPanel,
 } from '../helpers'
 import type { AppHandle } from '../helpers'
@@ -95,7 +94,7 @@ async function settleOnHome(page: Page): Promise<void> {
 }
 
 test('capture Home and Insights', async () => {
-  handle = await launchApp(profileWithoutWeeklyReview(), {}, { hideSidebarOnHome: true })
+  handle = await launchApp(undefined, {}, { hideSidebarOnHome: true })
   const { page } = handle
   await page.setViewportSize({ width: 1440, height: 900 })
   await runQuickActionFromPanel(page, 'Toggle sidebar')

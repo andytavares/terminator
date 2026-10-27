@@ -1,13 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import {
-  launchApp,
-  closeApp,
-  createWorkspace,
-  e2eTempDir,
-  profileWithoutWeeklyReview,
-  projectGroup,
-} from './helpers'
+import { launchApp, closeApp, createWorkspace, e2eTempDir, projectGroup } from './helpers'
 import type { AppHandle } from './helpers'
 import { openHome } from './session-views'
 
@@ -45,7 +38,7 @@ async function openNewestMain(page: Page, repo: string): Promise<void> {
 let handle: AppHandle
 
 test.beforeEach(async () => {
-  handle = await launchApp(profileWithoutWeeklyReview())
+  handle = await launchApp()
 })
 
 test.afterEach(async () => {

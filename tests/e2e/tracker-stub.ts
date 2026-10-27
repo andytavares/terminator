@@ -6,21 +6,18 @@ import type { AddressInfo, Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { readJsonBody, sendJson, type StubServer } from './stub-http'
-import { answerJira, type JiraState } from './tracker-stub-jira'
 import { answerLinear, type LinearState } from './tracker-stub-linear'
 
-// Stub Linear and Jira at their real addresses: the app's fetch tunnels through this proxy
+// Stub Linear at its real address: the app's fetch tunnels through this proxy
 // (NODE_USE_ENV_PROXY=1, HTTPS_PROXY), which answers TLS from a CA made for the run
 // (NODE_EXTRA_CA_CERTS) and refuses every other host. See https://nodejs.org/api/cli.html.
 
 const LINEAR_HOST = 'api.linear.app'
-export const JIRA_SITE = 'acme.atlassian.net'
 
 export interface TrackerStub extends StubServer {
   /** Environment the app needs for its tracker calls to reach this stub. */
   env: Record<string, string>
   linear: LinearState
-  jira: JiraState
   /** Each tunnel the app opened and each TLS handshake it refused, for a failure message. */
   diagnostics: string[]
 }
@@ -34,7 +31,7 @@ const CA_EXTENSIONS = [
   'subjectKeyIdentifier=hash',
 ]
 const LEAF_EXTENSIONS = [
-  `subjectAltName=DNS:${LINEAR_HOST},DNS:${JIRA_SITE}`,
+  `subjectAltName=DNS:${LINEAR_HOST}`,
   'basicConstraints=CA:FALSE',
   'keyUsage=critical,digitalSignature,keyEncipherment',
   'extendedKeyUsage=serverAuth',
@@ -42,7 +39,7 @@ const LEAF_EXTENSIONS = [
   'authorityKeyIdentifier=keyid,issuer',
 ]
 
-/** A CA and a server certificate for both hosts, with openssl(1) commands LibreSSL also takes. */
+/** A CA and a server certificate for the host, with openssl(1) commands LibreSSL also takes. */
 function makeCertificates(dir: string): { ca: string; key: Buffer; cert: Buffer } {
   const opensslInDir = (args: string) =>
     execFileSync('openssl', args.split(' '), { cwd: dir, stdio: 'pipe' })
@@ -66,23 +63,19 @@ function makeCertificates(dir: string): { ca: string; key: Buffer; cert: Buffer 
   }
 }
 
-/** Answers TLS for both hosts itself, each request by the host it names. */
-function trackerServer(linear: LinearState, jira: JiraState, tls: { key: Buffer; cert: Buffer }) {
+/** Answers TLS for the host itself. */
+function trackerServer(linear: LinearState, tls: { key: Buffer; cert: Buffer }) {
   return createHttpsServer(tls, (request, response) => {
     readJsonBody(request)
       .then((body) => {
-        const host = request.headers.host ?? ''
-        const answer =
-          host === LINEAR_HOST
-            ? answerLinear(linear, request, body)
-            : answerJira(jira, request, body)
+        const answer = answerLinear(linear, request, body)
         sendJson(response, answer.status, answer.body)
       })
       .catch((error: Error) => response.destroy(error))
   })
 }
 
-/** A CONNECT proxy that tunnels the two tracker hosts to `tls` and refuses every other. */
+/** A CONNECT proxy that tunnels the tracker host to `tls` and refuses every other. */
 function trackerProxy(tls: ReturnType<typeof trackerServer>, diagnostics: string[]) {
   tls.on('tlsClientError', (error) => diagnostics.push(`TLS: ${error.message}`))
   const proxy = createHttpServer((_request, response) => sendJson(response, 403, {}))
@@ -92,7 +85,7 @@ function trackerProxy(tls: ReturnType<typeof trackerServer>, diagnostics: string
     socket.on('close', () => tunnels.delete(socket))
     const host = (request.url ?? '').split(':')[0]
     diagnostics.push(`CONNECT ${request.url}`)
-    if (host !== LINEAR_HOST && host !== JIRA_SITE) {
+    if (host !== LINEAR_HOST) {
       socket.end('HTTP/1.1 403 Forbidden\r\n\r\n')
       return
     }
@@ -122,18 +115,17 @@ function proxyEnvironment(url: string, ca: string): Record<string, string> {
 }
 
 /** Starts the stub; pass its `env` to `launchApp`. */
-export async function startTrackerStub(linear: LinearState, jira: JiraState): Promise<TrackerStub> {
+export async function startTrackerStub(linear: LinearState): Promise<TrackerStub> {
   const { ca, key, cert } = makeCertificates(
     mkdtempSync(join(tmpdir(), 'terminator-e2e-trackers-'))
   )
   const diagnostics: string[] = []
-  const { proxy, tunnels } = trackerProxy(trackerServer(linear, jira, { key, cert }), diagnostics)
+  const { proxy, tunnels } = trackerProxy(trackerServer(linear, { key, cert }), diagnostics)
   await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve))
   const url = `http://127.0.0.1:${(proxy.address() as AddressInfo).port}`
   return {
     env: proxyEnvironment(url, ca),
     linear,
-    jira,
     diagnostics,
     shutDown: () => closeProxy(proxy, tunnels),
   }
