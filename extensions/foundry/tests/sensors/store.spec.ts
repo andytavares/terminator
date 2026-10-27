@@ -168,3 +168,27 @@ function theSignalsDirectoryTests() {
     expect(signalsEntries).toEqual(['signals.jsonl', 'state.json'])
   })
 }
+
+describe('the signal log over time', () => {
+  it('stays bounded: an old update is folded into the latest line per signal', async () => {
+    const root = tempRoot()
+    const store = createSignalStore(root)
+    for (let n = 1; n <= 1200; n++) await store.save([signal({ occurrences: n })])
+    const file = path.join(root, 'signals', 'signals.jsonl')
+    const lines = fs
+      .readFileSync(file, 'utf-8')
+      .split('\n')
+      .filter((line) => line !== '')
+    expect(lines.length).toBeLessThanOrEqual(1000)
+    expect((await store.get('sig-1'))?.occurrences).toBe(1200)
+  })
+
+  it('keeps the next signal after a torn last line', async () => {
+    const root = tempRoot()
+    const store = createSignalStore(root)
+    await store.save([signal({ id: 'sig-1' })])
+    fs.appendFileSync(path.join(root, 'signals', 'signals.jsonl'), '{"id":"sig-x","sens', 'utf-8')
+    await store.save([signal({ id: 'sig-2' })])
+    expect((await store.list()).map((s) => s.id)).toEqual(['sig-1', 'sig-2'])
+  })
+})
