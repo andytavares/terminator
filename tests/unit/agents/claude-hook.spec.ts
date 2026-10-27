@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { makeTempDir } from '../../support/temp-dir'
@@ -16,7 +16,7 @@ vi.mock('electron', () => ({
 
 async function load() {
   vi.resetModules()
-  return import('../../../src/main/agents/agent-session-hook')
+  return import('../../../src/main/agents/claude-hook')
 }
 
 const PAYLOAD = {
@@ -28,7 +28,7 @@ const PAYLOAD = {
 }
 
 beforeEach(() => {
-  userData = makeTempDir('agent-hook-ud-')
+  userData = makeTempDir('claude-hook-ud-')
   home = makeTempDir('agent-hook-home-')
   vi.stubEnv('HOME', home)
 })
@@ -40,7 +40,7 @@ async function run(
   env: Record<string, string> = { TERMINATOR_SESSION_ID: 'sess-1' }
 ): Promise<{ out: string; dir: string }> {
   const mod = await load()
-  const scriptPath = await mod.installCaptureScript(userData)
+  const scriptPath = await mod.installHookScript(userData)
   const dir = path.join(userData, 'agent-sessions')
   const out = execFileSync(process.execPath, [scriptPath, dir], {
     encoding: 'utf8',
@@ -50,7 +50,7 @@ async function run(
   return { out, dir }
 }
 
-describe('the capture script, executed', () => {
+describe('the hook script, a session, executed', () => {
   it('writes the conversation under the terminal it ran in, and says nothing', async () => {
     const { out, dir } = await run(PAYLOAD)
     expect(out).toBe('')
@@ -75,7 +75,7 @@ describe('the capture script, executed', () => {
   })
 })
 
-describe('the capture script, executed — terminals it does not own', () => {
+describe('the hook script, a session, executed — terminals it does not own', () => {
   it('keeps two terminals apart', async () => {
     await run(PAYLOAD)
     const { dir } = await run(
@@ -95,7 +95,7 @@ describe('the capture script, executed — terminals it does not own', () => {
   })
 })
 
-describe('the capture script, executed — unusable input', () => {
+describe('the hook script, a session, executed — unusable input', () => {
   it.each([['not json at all'], [''], [JSON.stringify({ hook_event_name: 'SessionStart' })]])(
     'exits quietly on input it cannot use: %s',
     async (input) => {
@@ -107,7 +107,7 @@ describe('the capture script, executed — unusable input', () => {
 
   it('exits quietly when it cannot write', async () => {
     const mod = await load()
-    const scriptPath = await mod.installCaptureScript(userData)
+    const scriptPath = await mod.installHookScript(userData)
     const blocked = path.join(userData, 'blocked')
     fs.writeFileSync(blocked, 'not a directory')
     const out = execFileSync(process.execPath, [scriptPath, blocked], {
@@ -125,7 +125,7 @@ async function runWithSessionContext(
   env: Record<string, string> = { TERMINATOR_SESSION_ID: 'sess-1' }
 ): Promise<{ out: string; dir: string }> {
   const mod = await load()
-  const scriptPath = await mod.installCaptureScript(userData)
+  const scriptPath = await mod.installHookScript(userData)
   const dir = path.join(userData, 'agent-sessions')
   const out = execFileSync(process.execPath, [scriptPath, dir, sessionContextDir], {
     encoding: 'utf8',
@@ -141,7 +141,7 @@ function useSessionContextDir(): void {
   })
 }
 
-describe('the capture script, executed — printing the session’s own agent context', () => {
+describe('the hook script, a session, executed — printing the session’s own agent context', () => {
   useSessionContextDir()
 
   it('prints additionalContext when the terminal has a session context file', async () => {
@@ -166,7 +166,7 @@ describe('the capture script, executed — printing the session’s own agent co
   })
 })
 
-describe('the capture script, executed — empty or foreign session context', () => {
+describe('the hook script, a session, executed — empty or foreign session context', () => {
   useSessionContextDir()
 
   it('prints nothing when the session context has no markdown', async () => {
@@ -191,8 +191,8 @@ const read = <T = { hooks: unknown }>(): T => JSON.parse(fs.readFileSync(setting
 
 async function install(): Promise<void> {
   const mod = await load()
-  const scriptPath = await mod.installCaptureScript(userData)
-  await mod.installUserHook({
+  const scriptPath = await mod.installHookScript(userData)
+  await mod.installUserHooks({
     execPath: '/Applications/Terminator.app/Contents/MacOS/Terminator',
     scriptPath,
   })
@@ -206,7 +206,7 @@ describe('installing the hook in the operator’s Claude settings', () => {
     }
     expect(hooks.SessionStart).toHaveLength(1)
     expect(hooks.SessionStart[0].matcher).toBe('*')
-    expect(hooks.SessionStart[0].hooks[0].command).toContain('agent-session-hook.cjs')
+    expect(hooks.SessionStart[0].hooks[0].command).toContain('claude-hook.cjs')
   })
 
   it('merges: every other entry and every other key survives', async () => {
@@ -224,7 +224,7 @@ describe('installing the hook in the operator’s Claude settings', () => {
     await install()
     const settings = read<{ model: string; hooks: { SessionStart: unknown[]; Stop: unknown[] } }>()
     expect(settings.model).toBe('opus')
-    expect(settings.hooks.Stop).toHaveLength(1)
+    expect(JSON.stringify(settings.hooks.Stop)).toContain('stop.sh')
     expect(settings.hooks.SessionStart).toHaveLength(2)
     expect(JSON.stringify(settings.hooks.SessionStart)).toContain('theirs.sh')
   })
@@ -294,8 +294,8 @@ describe('installing the hook — collapsing earlier installs', () => {
 describe('installing the hook — a missing script', () => {
   it('does nothing rather than failing when its script has gone', async () => {
     const mod = await load()
-    const scriptPath = await mod.installCaptureScript(userData)
-    await mod.installUserHook({ execPath: process.execPath, scriptPath })
+    const scriptPath = await mod.installHookScript(userData)
+    await mod.installUserHooks({ execPath: process.execPath, scriptPath })
     const hooks = read().hooks as { SessionStart: Array<{ hooks: Array<{ command: string }> }> }
     const command = hooks.SessionStart[0].hooks[0].command
     fs.rmSync(scriptPath)
@@ -309,5 +309,237 @@ describe('the settings file the hooks go in', () => {
   it("is under HOME, so a sealed run's hooks land in its own home", async () => {
     const { userSettingsPath } = await load()
     expect(userSettingsPath()).toBe(path.join(home, '.claude', 'settings.json'))
+  })
+})
+
+const NOTIFICATION = {
+  session_id: 'abc',
+  transcript_path: '/t.jsonl',
+  cwd: '/repo',
+  hook_event_name: 'Notification',
+  message: 'Claude needs your permission to use Bash',
+  notification_type: 'permission_prompt',
+}
+
+// The script is run for real: what matters is the file it writes.
+async function runAsk(
+  payload: unknown,
+  env: Record<string, string> = { TERMINATOR_SESSION_ID: 's1' }
+) {
+  const mod = await load()
+  const scriptPath = await mod.installHookScript(userData)
+  const dir = path.join(userData, 'agent-sessions')
+  const out = execFileSync(process.execPath, [scriptPath, dir], {
+    encoding: 'utf8',
+    input: typeof payload === 'string' ? payload : JSON.stringify(payload),
+    env: { ...process.env, ...env },
+  })
+  const asks = path.join(dir, 'asks')
+  return { out, asks, files: fs.existsSync(asks) ? fs.readdirSync(asks) : [] }
+}
+
+function onlyReport(asks: string): Record<string, string | null> {
+  const names = fs.readdirSync(asks)
+  expect(names).toHaveLength(1)
+  return JSON.parse(fs.readFileSync(path.join(asks, names[0]), 'utf8'))
+}
+
+describe('the hook script, an ask, executed', () => {
+  it('writes a notification under the terminal it ran in, and says nothing', async () => {
+    const { out, asks } = await runAsk(NOTIFICATION)
+    expect(out).toBe('')
+    const written = onlyReport(asks)
+    expect(written).toMatchObject({
+      terminal: 's1',
+      event: 'notification',
+      message: 'Claude needs your permission to use Bash',
+      notificationType: 'permission_prompt',
+    })
+    expect(Date.parse(written.at ?? '')).not.toBeNaN()
+  })
+
+  it('writes a stop with no message and no type', async () => {
+    const { asks } = await runAsk({ hook_event_name: 'Stop', session_id: 'abc' })
+    expect(onlyReport(asks)).toMatchObject({
+      event: 'stop',
+      message: '',
+      notificationType: null,
+    })
+  })
+})
+
+describe('the hook script, an ask, executed — events in a row', () => {
+  it('keeps every event: a stop written before the notification is read does not replace it', async () => {
+    await runAsk(NOTIFICATION)
+    const { asks, files } = await runAsk({ hook_event_name: 'Stop', session_id: 'abc' })
+    expect(files).toHaveLength(2)
+    const events = files
+      .sort()
+      .map((name) => JSON.parse(fs.readFileSync(path.join(asks, name), 'utf8')).event)
+    expect(events).toEqual(['notification', 'stop'])
+  })
+})
+
+describe('the hook script, an ask, executed — file names', () => {
+  // Two hooks of one turn can land in the same millisecond, and pids say nothing about order:
+  // the name carries the time to the microsecond, fixed width, so names sort by time.
+  it('names the event by its time to the microsecond, then the process', async () => {
+    const { files } = await runAsk(NOTIFICATION)
+    expect(files[0]).toMatch(/^\d{13}\.\d{3}-\d+\.json$/)
+  })
+})
+
+describe('the hook script, an ask, executed — a prompt', () => {
+  it('writes a UserPromptSubmit as a prompt', async () => {
+    const { asks } = await runAsk({ hook_event_name: 'UserPromptSubmit', prompt: 'do it' })
+    expect(onlyReport(asks)).toMatchObject({
+      terminal: 's1',
+      event: 'prompt',
+      message: '',
+    })
+  })
+})
+
+describe('the hook script, an ask, executed — a failed turn', () => {
+  it('writes a StopFailure as a stop: the turn ended on an API error', async () => {
+    const { asks } = await runAsk({ hook_event_name: 'StopFailure', error: 'rate_limit' })
+    expect(onlyReport(asks)).toMatchObject({
+      terminal: 's1',
+      event: 'stop',
+    })
+  })
+})
+
+describe('the hook script, an ask, executed — input it cannot use', () => {
+  it.each([
+    ['garbage', 'not json at all', { TERMINATOR_SESSION_ID: 's1' }],
+    ['empty input', '', { TERMINATOR_SESSION_ID: 's1' }],
+    ['another event', { hook_event_name: 'SessionStart' }, { TERMINATOR_SESSION_ID: 's1' }],
+    ['a terminal this app does not own', NOTIFICATION, { TERMINATOR_SESSION_ID: '' }],
+  ])('is silent and writes nothing for %s', async (_label, payload, env) => {
+    const { out, files } = await runAsk(payload, env)
+    expect(out).toBe('')
+    expect(files).toEqual([])
+  })
+
+  it('is silent when it cannot write', async () => {
+    const mod = await load()
+    const scriptPath = await mod.installHookScript(userData)
+    const blocked = path.join(userData, 'blocked')
+    fs.writeFileSync(blocked, 'not a directory')
+    const out = execFileSync(process.execPath, [scriptPath, blocked], {
+      encoding: 'utf8',
+      input: JSON.stringify(NOTIFICATION),
+      env: { ...process.env, TERMINATOR_SESSION_ID: 's1' },
+    })
+    expect(out).toBe('')
+  })
+})
+
+describe('installing the hooks', () => {
+  it('adds a Notification, a UserPromptSubmit and a Stop entry and keeps the operator’s own', async () => {
+    const settings = path.join(home, '.claude', 'settings.json')
+    fs.mkdirSync(path.dirname(settings), { recursive: true })
+    fs.writeFileSync(
+      settings,
+      JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: 'mine.sh' }] }] } })
+    )
+    const mod = await load()
+    const scriptPath = await mod.installHookScript(userData)
+    await mod.installUserHooks({ execPath: process.execPath, scriptPath })
+    await mod.installUserHooks({ execPath: process.execPath, scriptPath })
+    const hooks = JSON.parse(fs.readFileSync(settings, 'utf8')).hooks
+    expect(hooks.Notification).toHaveLength(1)
+    expect(hooks.UserPromptSubmit).toHaveLength(1)
+    expect(hooks.UserPromptSubmit[0].hooks[0].command).toContain('claude-hook.cjs')
+    expect(hooks.StopFailure).toHaveLength(1)
+    expect(hooks.Stop).toHaveLength(2)
+    expect(JSON.stringify(hooks.Stop)).toContain('mine.sh')
+    expect(hooks.Notification[0].hooks[0].command).toContain('claude-hook.cjs')
+  })
+})
+
+// A stand-in for Electron that records it was started.
+async function installedCommand(): Promise<{ command: string; started: string }> {
+  const started = path.join(userData, 'electron-started')
+  const stub = path.join(userData, 'stub-electron.sh')
+  fs.writeFileSync(stub, `#!/bin/sh\ntouch ${started}\n`, { mode: 0o755 })
+  const mod = await load()
+  const scriptPath = await mod.installHookScript(userData)
+  await mod.installUserHooks({ execPath: stub, scriptPath })
+  const settings = path.join(home, '.claude', 'settings.json')
+  const hooks = JSON.parse(fs.readFileSync(settings, 'utf8')).hooks
+  return { command: hooks.Stop[0].hooks[0].command, started }
+}
+
+describe('the installed hook command, run through a shell', () => {
+  const shell = (command: string, env: Record<string, string>) =>
+    spawnSync('/bin/sh', ['-c', command], { env: { PATH: process.env.PATH ?? '', ...env } })
+
+  it('starts nothing outside Terminator, and still exits 0', async () => {
+    const { command, started } = await installedCommand()
+    const result = shell(command, {})
+    expect(result.status).toBe(0)
+    expect(fs.existsSync(started)).toBe(false)
+  })
+
+  it('starts the script inside a Terminator terminal', async () => {
+    const { command, started } = await installedCommand()
+    const result = shell(command, { TERMINATOR_SESSION_ID: 's1' })
+    expect(result.status).toBe(0)
+    expect(fs.existsSync(started)).toBe(true)
+  })
+})
+
+const entry = (command: string) => ({ matcher: '*', hooks: [{ type: 'command', command }] })
+const oldEntry = (name: string) => entry(`ELECTRON_RUN_AS_NODE=1 /old/profile/${name} x`)
+const THEIRS = entry('mine.sh')
+
+function seedSettingsFromThreeOldScripts(): void {
+  fs.mkdirSync(path.join(home, '.claude'), { recursive: true })
+  const session = oldEntry('agent-session-hook.cjs')
+  const ask = oldEntry('agent-ask-hook.cjs')
+  const hooks = {
+    SessionStart: [session, THEIRS, session],
+    Notification: [ask, ask],
+    UserPromptSubmit: [ask],
+    Stop: [THEIRS, ask],
+    StopFailure: [ask],
+  }
+  fs.writeFileSync(settingsPath(), JSON.stringify({ hooks }))
+}
+
+type Entries = Array<{ hooks: Array<{ command: string }> }>
+
+describe('installing the hooks — the three scripts of earlier versions', () => {
+  it('ends with exactly one entry of ours per event, keeping the operator’s own', async () => {
+    seedSettingsFromThreeOldScripts()
+    await install()
+    await install()
+    const hooks = read<{ hooks: Record<string, Entries> }>().hooks
+    for (const event of [
+      'SessionStart',
+      'Notification',
+      'UserPromptSubmit',
+      'Stop',
+      'StopFailure',
+    ]) {
+      const ours = hooks[event].filter((e) => e.hooks[0].command.includes('claude-hook.cjs'))
+      expect(ours).toHaveLength(1)
+      expect(JSON.stringify(hooks[event])).not.toContain('/old/profile/')
+    }
+    expect(hooks.Notification).toHaveLength(1)
+    expect(hooks.SessionStart).toEqual([THEIRS, expect.anything()])
+    expect(hooks.Stop).toEqual([THEIRS, expect.anything()])
+  })
+})
+
+describe('installing the hook script', () => {
+  it('removes the scripts of earlier versions from the integrations folder', async () => {
+    for (const name of ['agent-ask-hook.cjs', 'agent-session-hook.cjs', 'session-start-hook.cjs'])
+      fs.writeFileSync(path.join(userData, name), '')
+    const mod = await load()
+    await mod.installHookScript(userData)
+    expect(fs.readdirSync(userData)).toEqual(['claude-hook.cjs'])
   })
 })

@@ -4,7 +4,8 @@ import type { AgentContext } from '../../shared/types/index.js'
 import { getProjectById, listWorkspaces } from '../storage/workspace-store.js'
 import { buildAgentContext, deleteContextFile, writeContextFile } from './agent-context.js'
 import { getLink } from './issue-link-store.js'
-import { installHookScript, installProjectHook, removeProjectHook } from './session-hook.js'
+import { installHookScript } from '../agents/claude-hook.js'
+import { installProjectHook, removeProjectHook } from './session-hook.js'
 import type { IssueService } from './issue-service.js'
 
 // Keeping what an agent session will be told in step with the link.

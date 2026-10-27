@@ -8,7 +8,7 @@ import {
   type AgentAsk,
 } from '../../shared/agent-sessions/ask.js'
 import { endTurn, setTurn } from './agent-turns.js'
-import { asksDirectory } from './agent-ask-hook.js'
+import { asksDirectory } from './claude-hook.js'
 import { probeUntilArmed } from './agent-session-watcher.js'
 import { makeLogger } from '../logger.js'
 

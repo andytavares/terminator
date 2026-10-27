@@ -37,14 +37,15 @@ async function runScript(
   contextFileContents: string | null,
   options: { sessionContextDir?: string; env?: Record<string, string> } = {}
 ): Promise<string> {
-  const mod = await load()
-  const scriptPath = await mod.installHookScript(userData)
+  const { installHookScript } = await import('../../../src/main/agents/claude-hook')
+  const scriptPath = await installHookScript(userData)
   const contextFile = path.join(userData, 'ctx.json')
   if (contextFileContents !== null) fs.writeFileSync(contextFile, contextFileContents, 'utf8')
   const args = [
     scriptPath,
+    path.join(userData, 'agent-sessions'),
+    options.sessionContextDir ?? '',
     contextFile,
-    ...(options.sessionContextDir ? [options.sessionContextDir] : []),
   ]
   return execFileSync(process.execPath, args, {
     encoding: 'utf8',
@@ -118,6 +119,15 @@ describe('the hook script, when the session has its own link', () => {
   })
 })
 
+describe('the hook script, in a project entry', () => {
+  it('writes no session record: the user-level entry owns that', async () => {
+    await runScript(JSON.stringify({ markdown: '# project link', key: 'PROJ-1' }), {
+      env: { TERMINATOR_SESSION_ID: 'term-1' },
+    })
+    expect(fs.existsSync(path.join(userData, 'agent-sessions'))).toBe(false)
+  })
+})
+
 describe('the hook script, with no terminal id', () => {
   let sessionContextDir: string
 
@@ -145,6 +155,7 @@ describe('hookCommand', () => {
     expect(command.startsWith('ELECTRON_RUN_AS_NODE=1 ')).toBe(true)
     expect(command).toContain('/tmp/hook.cjs')
     expect(command).toContain(PROJECT_ID)
+    expect(command).toContain(path.join(userData, 'agent-sessions'))
   })
 
   it('passes the session-context directory, so the project link can defer to the session’s own', async () => {
@@ -178,6 +189,31 @@ const HOOK_OPTIONS = {
   hookScriptPath: '/tmp/hook.cjs',
   projectId: PROJECT_ID,
 }
+
+describe('installProjectHook — entries of earlier versions', () => {
+  it('collapses an entry that ran the old session-start-hook.cjs into one', async () => {
+    fs.mkdirSync(path.join(projectDir, '.claude'))
+    fs.writeFileSync(
+      settingsPath(),
+      JSON.stringify({
+        hooks: {
+          SessionStart: [
+            {
+              matcher: '*',
+              hooks: [{ type: 'command', command: '/old/session-start-hook.cjs a' }],
+            },
+          ],
+        },
+      }),
+      'utf8'
+    )
+    const mod = await load()
+    await mod.installProjectHook(projectDir, HOOK_OPTIONS)
+    const settings = readClaudeSettingsFile() as { hooks: { SessionStart: unknown[] } }
+    expect(settings.hooks.SessionStart).toHaveLength(1)
+    expect(JSON.stringify(settings)).not.toContain('/old/')
+  })
+})
 
 describe('installProjectHook', () => {
   it('creates the settings file with a SessionStart hook', async () => {
