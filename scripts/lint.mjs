@@ -8,17 +8,12 @@ import { readdirSync } from 'node:fs'
 import { availableParallelism, totalmem } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { eachLimited } from './each-limited.mjs'
+import { eachLimited, processesAtOnce } from './each-limited.mjs'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 // Matches --max-old-space-size=4096 below: a group may grow to it.
 const MEMORY_PER_PROCESS = 4 * 2 ** 30
 const MAX_PROCESSES = 3
-
-/** How many ESLint processes run at once: a core each, 4 GB each, and no more than 3. */
-export function lintConcurrency({ cores, memory }) {
-  return Math.max(1, Math.min(MAX_PROCESSES, cores, Math.floor(memory / MEMORY_PER_PROCESS)))
-}
 
 /** Runs every group, `limit` at a time. Resolves 1 if any group's status is not 0, else 0. */
 export async function runAll(runs, spawnRun, limit) {
@@ -50,7 +45,12 @@ function spawnEslint(args, env) {
 async function main() {
   const extra = process.argv.slice(2)
   const env = { ...process.env, NODE_OPTIONS: '--max-old-space-size=4096' }
-  const limit = lintConcurrency({ cores: availableParallelism(), memory: totalmem() })
+  const limit = processesAtOnce({
+    cores: availableParallelism(),
+    memory: totalmem(),
+    bytesEach: MEMORY_PER_PROCESS,
+    most: MAX_PROCESSES,
+  })
   const runs = lintRuns(extensionNames()).map((run) => [...run, ...extra])
   process.exit(await runAll(runs, (args) => spawnEslint(args, env), limit))
 }

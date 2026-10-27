@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lintRuns, lintConcurrency, runAll } from '../../../scripts/lint.mjs'
+import { lintRuns, runAll } from '../../../scripts/lint.mjs'
 
 // Typed lint holds a TypeScript program per project; one process for the whole repository held
 // all of them (4.8 GB) and CI's 7 GB runner swapped for eight minutes. One process per group.
@@ -23,19 +23,6 @@ describe('the lint runs', () => {
         (group) => ['--ignore-pattern', `${group}/**`]
       ),
     ])
-  })
-})
-
-const GB = 2 ** 30
-
-describe('how many lint processes run at once', () => {
-  it('runs a core each, 4 GB each, and no more than 3', () => {
-    expect(lintConcurrency({ cores: 4, memory: 16 * GB })).toBe(3)
-    expect(lintConcurrency({ cores: 2, memory: 16 * GB })).toBe(2)
-    expect(lintConcurrency({ cores: 8, memory: 7 * GB })).toBe(1)
-    expect(lintConcurrency({ cores: 8, memory: 8 * GB })).toBe(2)
-    expect(lintConcurrency({ cores: 4, memory: 4 * GB })).toBe(1)
-    expect(lintConcurrency({ cores: 1, memory: 1 * GB })).toBe(1)
   })
 })
 

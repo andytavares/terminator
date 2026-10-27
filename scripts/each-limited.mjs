@@ -11,3 +11,8 @@ export async function eachLimited(items, limit, work) {
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
   return results
 }
+
+/** How many processes run at once: a core each, `bytesEach` of memory each, and no more than `most`. */
+export function processesAtOnce({ cores, memory, bytesEach, most }) {
+  return Math.max(1, Math.min(most, cores, Math.floor(memory / bytesEach)))
+}

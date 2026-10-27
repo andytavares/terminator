@@ -15,4 +15,4 @@ Each extension's own `CLAUDE.md` adds what is specific to it.
 
 ## Typecheck
 
-`tsconfig.json` checks `src/`; `tsconfig.test.json` extends it and checks `tests/`, with Vitest's globals and Node 24's library. `npm run typecheck` runs both for every extension (`typecheck:extensions`). Vitest strips types, so a spec that no longer matches the types it builds still runs green; only the second check catches it. A spec fakes part of an object with `partialFake` (`tests/support/fakes.ts`), never `as unknown as`.
+`tsconfig.json` checks `src/`; `tsconfig.test.json` extends it and checks `tests/`, with Vitest's globals and Node 24's library. `npm run typecheck` runs both for every extension (`scripts/typecheck.mjs`). Vitest strips types, so a spec that no longer matches the types it builds still runs green; only the second check catches it. A spec fakes part of an object with `partialFake` (`tests/support/fakes.ts`), never `as unknown as`.
