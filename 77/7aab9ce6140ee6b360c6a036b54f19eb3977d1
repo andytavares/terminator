@@ -1,0 +1,23 @@
+docs/user-guide/USER-GUIDE.md
+  s_567c3310a5db4e::t_0f209ac48550e3 531
+src/renderer/components/home/InsightsLower.tsx
+  s_567c3310a5db4e::t_06f024e19e9abb 3,17,192-193
+tests/unit/renderer/components/Insights.spec.tsx
+  s_567c3310a5db4e::t_40f21442e4ac66 320-321
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "777aab9ce6140ee6b360c6a036b54f19eb3977d1",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
