@@ -3,19 +3,9 @@ import { EditorView, keymap } from '@codemirror/view'
 import { Annotation, Compartment, EditorState, type Extension } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
-import { LanguageDescription, LanguageSupport, syntaxHighlighting } from '@codemirror/language'
+import { syntaxHighlighting } from '@codemirror/language'
 import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark'
-import { javascript } from '@codemirror/lang-javascript'
-import { css } from '@codemirror/lang-css'
-import { html } from '@codemirror/lang-html'
-import { python } from '@codemirror/lang-python'
-import { java } from '@codemirror/lang-java'
-import { json } from '@codemirror/lang-json'
-import { cpp } from '@codemirror/lang-cpp'
-import { yaml } from '@codemirror/lang-yaml'
-import { go } from '@codemirror/legacy-modes/mode/go'
-import { shell } from '@codemirror/legacy-modes/mode/shell'
-import { StreamLanguage } from '@codemirror/language'
+import { languages } from '@codemirror/language-data'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { searchKeymap } from '@codemirror/search'
 import { livePreviewPlugin } from './livePreview'
@@ -36,32 +26,10 @@ import { useLatest } from '../components/useLatest'
 // autosave/broadcast loop.
 const externalUpdate = Annotation.define<boolean>()
 
-/** A fenced-code language, loaded the first time a block uses it. */
-function codeLanguage(name: string, alias: string[], load: () => LanguageSupport) {
-  return LanguageDescription.of({ name, alias, load: async () => load() })
-}
-
-const CODE_LANGUAGES = [
-  codeLanguage('JavaScript', ['js', 'javascript', 'jsx', 'ts', 'tsx', 'typescript'], javascript),
-  codeLanguage('CSS', ['css'], css),
-  codeLanguage('HTML', ['html'], html),
-  codeLanguage('Python', ['python', 'py'], python),
-  codeLanguage('Java', ['java'], java),
-  codeLanguage('JSON', ['json'], json),
-  codeLanguage('C++', ['c', 'cpp', 'c++', 'cxx', 'cc'], cpp),
-  codeLanguage('YAML', ['yaml', 'yml'], yaml),
-  codeLanguage('Go', ['go', 'golang'], () => new LanguageSupport(StreamLanguage.define(go))),
-  codeLanguage(
-    'Shell',
-    ['sh', 'bash', 'shell', 'zsh'],
-    () => new LanguageSupport(StreamLanguage.define(shell))
-  ),
-]
-
 /** Everything an editor carries that does not depend on its props. */
 const BASE_EXTENSIONS: Extension[] = [
   history(),
-  markdown({ extensions: [GFM], codeLanguages: CODE_LANGUAGES }),
+  markdown({ extensions: [GFM], codeLanguages: languages }),
   syntaxHighlighting(oneDarkHighlightStyle),
   commentAnchorField,
   hoveredAnchorField,

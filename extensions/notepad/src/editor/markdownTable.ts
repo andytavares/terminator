@@ -1,10 +1,11 @@
 // Pure parsing for GFM tables and GitHub alerts, kept free of DOM so the
 // widgets in livePreview.ts stay thin and this logic stays testable.
 //
-// The parser already produces Table/TableRow/TableCell nodes (GFM is enabled in
-// NoteEditor), but live preview only ever styled inline constructs, so a table
-// rendered as raw pipes. Cell splitting mirrors @lezer/markdown's parseRow:
-// split on unescaped '|', trim each cell.
+// Tables are read from @lezer/markdown's GFM nodes (Table, TableHeader,
+// TableRow, TableCell, TableDelimiter), the same ones the editor parses.
+
+import { parser, GFM } from '@lezer/markdown'
+import type { SyntaxNode } from '@lezer/common'
 
 /** @internal */
 export type ColumnAlign = 'left' | 'center' | 'right' | null
@@ -12,8 +13,7 @@ export type ColumnAlign = 'left' | 'center' | 'right' | null
 /**
  * A cell's text plus where that text starts, so clicking a rendered cell can
  * put the caret in the matching place in the source. Offsets are relative to
- * whatever text was parsed: the row line for splitTableRow, the whole table
- * source for parseTable.
+ * the source passed to parseTable.
  */
 export interface TableCell {
   text: string
@@ -26,76 +26,7 @@ export interface ParsedTable {
   rows: TableCell[][]
 }
 
-/**
- * Splits one table row into cells on unescaped pipes, dropping the empty
- * segments produced by leading and trailing pipes. Empty interior cells are
- * kept so columns stay aligned.
- * @internal
- */
-export function splitTableRow(line: string): TableCell[] {
-  const segments = splitOnUnescapedPipes(line)
-
-  // A row is conventionally fenced by pipes; those produce an empty leading and
-  // trailing segment that is not a column.
-  if (segments.length > 1 && segments[0].raw.trim() === '') segments.shift()
-  if (segments.length > 1 && segments[segments.length - 1].raw.trim() === '') segments.pop()
-
-  return segments.map(({ raw, start: segmentStart }) => {
-    // Point at the trimmed text, not the padding, so a click lands on a
-    // character the user can actually see.
-    const leading = raw.length - raw.trimStart().length
-    return { text: raw.trim(), offset: segmentStart + leading }
-  })
-}
-
-/** A row's text between pipes, and where it starts in the row. */
-interface RowSegment {
-  raw: string
-  start: number
-}
-
-function splitOnUnescapedPipes(line: string): RowSegment[] {
-  const segments: RowSegment[] = []
-  let current = ''
-  let start = 0
-  let escaped = false
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i]
-    if (char === '|' && !escaped) {
-      segments.push({ raw: current, start })
-      current = ''
-      start = i + 1
-      continue
-    }
-    current += char
-    escaped = !escaped && char === '\\'
-  }
-  segments.push({ raw: current, start })
-  return segments
-}
-
-const DELIMITER_CELL = /^:?-+:?$/
-
-/**
- * Parses the `---|:--:|---:` row into per-column alignments. Returns null when
- * the line is not a delimiter row, which is what makes a table a table.
- * @internal
- */
-export function parseDelimiterRow(line: string): ColumnAlign[] | null {
-  const cells = splitTableRow(line).map((c) => c.text)
-  if (cells.length === 0) return null
-  if (!cells.every((c) => DELIMITER_CELL.test(c))) return null
-
-  return cells.map((cell) => {
-    const left = cell.startsWith(':')
-    const right = cell.endsWith(':')
-    if (left && right) return 'center'
-    if (right) return 'right'
-    if (left) return 'left'
-    return null
-  })
-}
+const gfmParser = parser.configure(GFM)
 
 /**
  * Parses a table's source text. Returns null when the text is not a table.
@@ -103,50 +34,62 @@ export function parseDelimiterRow(line: string): ColumnAlign[] | null {
  * grid is always rectangular.
  */
 export function parseTable(source: string): ParsedTable | null {
-  const lines = source.split('\n')
-  if (lines.length < 2) return null
+  const table = gfmParser.parse(source).topNode.firstChild
+  if (table?.name !== 'Table') return null
 
-  const lineStarts = lineStartOffsets(lines)
-  const header = shiftCells(splitTableRow(lines[0]), lineStarts[0])
-  const align = parseDelimiterRow(lines[1])
-  if (!align) return null
-
+  const header = rowCells(table.getChild('TableHeader')!, source)
   const columnCount = header.length
   return {
     header,
-    align: Array.from({ length: columnCount }, (_, i) => align[i] ?? null),
-    rows: parseBodyRows(lines, lineStarts, columnCount),
+    align: columnAlignments(table, source, columnCount),
+    rows: table
+      .getChildren('TableRow')
+      .map((row) => padCells(rowCells(row, source), columnCount, row.to)),
   }
 }
 
-/** Absolute start of each line within the source, so cell offsets can be
- * reported against the table as a whole. */
-function lineStartOffsets(lines: string[]): number[] {
-  const lineStarts: number[] = []
-  let cursor = 0
-  for (const line of lines) {
-    lineStarts.push(cursor)
-    cursor += line.length + 1
-  }
-  return lineStarts
+/**
+ * The cells of one row. Lezer emits no TableCell for an empty cell, so each cell is the gap
+ * between two pipes, and an empty gap is an empty cell just after its pipe.
+ */
+function rowCells(row: SyntaxNode, source: string): TableCell[] {
+  const pipes = row.getChildren('TableDelimiter')
+  const textNodes = row.getChildren('TableCell')
+  const gapStarts = [row.from, ...pipes.map((pipe) => pipe.to)]
+  const gapEnds = [...pipes.map((pipe) => pipe.from), row.to]
+  const cells = gapStarts.map((start, index) => {
+    const node = textNodes.find((cell) => cell.from >= start && cell.to <= gapEnds[index])
+    return node
+      ? { text: source.slice(node.from, node.to), offset: node.from }
+      : { text: '', offset: start }
+  })
+  // A pipe at the very start or end of the row fences it; it does not open a column.
+  if (pipes[0]?.from === row.from) cells.shift()
+  if (pipes.at(-1)?.to === row.to) cells.pop()
+  return cells
 }
 
-function shiftCells(cells: TableCell[], lineStart: number): TableCell[] {
-  return cells.map((cell) => ({ ...cell, offset: cell.offset + lineStart }))
+/** `:--`, `:-:`, `--:` read from the delimiter row, one entry per header column. */
+function columnAlignments(table: SyntaxNode, source: string, columnCount: number): ColumnAlign[] {
+  const delimiter = table.getChild('TableDelimiter')!
+  const markers = source
+    .slice(delimiter.from, delimiter.to)
+    .split('|')
+    .map((marker) => marker.trim())
+    .filter(Boolean)
+  return Array.from({ length: columnCount }, (_, index) => {
+    const marker = markers[index] ?? ''
+    if (marker.startsWith(':') && marker.endsWith(':')) return 'center'
+    if (marker.endsWith(':')) return 'right'
+    if (marker.startsWith(':')) return 'left'
+    return null
+  })
 }
 
-function parseBodyRows(lines: string[], lineStarts: number[], columnCount: number): TableCell[][] {
-  return lines
-    .map((line, index) => ({ line, index }))
-    .slice(2)
-    .filter(({ line }) => line.trim() !== '')
-    .map(({ line, index }) => {
-      const cells = shiftCells(splitTableRow(line), lineStarts[index])
-      // Pad short rows so the grid stays rectangular; a padded cell points at
-      // the end of its row, which is where new text would go.
-      const padding = { text: '', offset: lineStarts[index] + line.length }
-      return Array.from({ length: columnCount }, (_, i) => cells[i] ?? padding)
-    })
+/** A padded cell points at the end of its row, which is where new text would go. */
+function padCells(cells: TableCell[], columnCount: number, rowEnd: number): TableCell[] {
+  const padding = { text: '', offset: rowEnd }
+  return Array.from({ length: columnCount }, (_, index) => cells[index] ?? padding)
 }
 
 // ── Inline spans ──────────────────────────────────────────────────

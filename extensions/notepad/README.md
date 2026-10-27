@@ -12,7 +12,7 @@ Markdown notepad with live preview, margin comments, tags, and full-text search.
 - **One note, one body** — a note open in both the docked panel and a pop-out window stays in sync; each surface adopts saves made by the other
 - **Margin comments** — anchored, threaded comments (max depth 2) that re-map as the document changes; comments that fail to re-anchor are marked orphaned
 - **Tags** — tag notes, rename or delete tags globally, filter the note list by tag
-- **Full-text search** — FTS5 + BM25 ranking across notes, with `tag:` / `-tag:` query tokens
+- **Full-text search** — substring match across note titles and bodies (newest first, any letter case), with `tag:` / `-tag:` query tokens
 - **Diagrams** — diagram notes with their own comments and tags
 - **Export / Import** — export notes to a folder (`.md`), with comments as sidecar/inline/both; import `.md` files, matching existing notes by frontmatter `id`
 
@@ -44,6 +44,6 @@ A view reads the values with `extension.getSettingsValues()` and again on `exten
 
 ## Storage
 
-Notes, tags, comments, diagrams, and settings are stored in the shared SQLite database (`app.sqlite`) via the injected `ExtensionDB`. Note, tag, and comment IDs are UUIDs assigned at creation and stable across restarts. The schema is created with `CREATE TABLE IF NOT EXISTS` on every launch, so a launch never alters data that is already there. Search matches with `LIKE`, which ignores case for ASCII letters only.
+Notes, tags, comments, diagrams, and settings are stored in the shared SQLite database (`app.sqlite`) via the injected `ExtensionDB`. Note, tag, and comment IDs are UUIDs assigned at creation and stable across restarts. The schema is created with `CREATE TABLE IF NOT EXISTS` on every launch, so a launch never alters data that is already there. Search applies the tag filters in SQL and matches the text in JavaScript, so case folds for every script (`é` matches `É`). FTS5 was tried and rejected: its `trigram` tokenizer finds no match for a query under 3 characters, and its word tokenizer cannot match inside a word.
 
 See also: `specs/010-markdown-notepad/contracts/ipc-channels.md` for the full IPC surface.

@@ -102,8 +102,7 @@
 
 /* A text field */
 .notepad-composer__body,
-.notepad-input,
-.notepad-textarea {
+.notepad-input {
   width: 100%;
   box-sizing: border-box;
   background: var(--tm-bg-input);
@@ -529,21 +528,6 @@
   text-overflow: ellipsis;
 }
 
-.notepad-note-row__preview {
-  font-size: 11px;
-  color: var(--tm-text-muted);
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.notepad-note-row__preview mark {
-  background: color-mix(in srgb, var(--tm-warning) 25%, transparent);
-  color: inherit;
-  border-radius: 2px;
-}
-
 .notepad-note-row__tags {
   display: flex;
   flex-wrap: wrap;
@@ -559,12 +543,6 @@
   color: var(--tm-text-muted);
   padding: 1px 6px;
   white-space: nowrap;
-}
-
-.notepad-note-row__tag--more {
-  background: transparent;
-  border-color: transparent;
-  color: var(--tm-text-muted);
 }
 
 .notepad-note-row__meta {
@@ -692,21 +670,6 @@
   background: var(--tm-bg-card-hover);
 }
 
-.notepad-tag-chip--active {
-  background: color-mix(in srgb, var(--tm-accent) 20%, transparent);
-  border-color: color-mix(in srgb, var(--tm-accent) 40%, transparent);
-  color: var(--tm-accent-text);
-}
-
-.notepad-tag-chip__hash {
-  opacity: 0.6;
-}
-
-.notepad-tag-chip__count {
-  opacity: 0.5;
-  font-size: 11px;
-}
-
 /* ── Form inputs ────────────────────────────────────────────────── */
 .notepad-input {
   font-size: 13px;
@@ -720,22 +683,6 @@
 }
 
 .notepad-input::placeholder {
-  color: var(--tm-text-muted);
-}
-
-.notepad-textarea {
-  font-size: 13px;
-  font-family: var(--tm-font-mono, monospace);
-  padding: 8px 10px;
-  resize: vertical;
-  transition: border-color 100ms ease;
-}
-
-.notepad-textarea:focus {
-  border-color: var(--tm-accent, color-mix(in srgb, var(--tm-accent) 50%, transparent));
-}
-
-.notepad-textarea::placeholder {
   color: var(--tm-text-muted);
 }
 
@@ -766,12 +713,6 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px 8px;
-}
-
-.notepad-quick-create__heading {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--tm-text-primary);
 }
 
 .notepad-quick-create__vault-status {
@@ -942,12 +883,6 @@
   color: var(--tm-text-muted);
 }
 
-.notepad-quick-create__hint {
-  flex: 1;
-  font-size: 11px;
-  color: var(--tm-text-muted);
-}
-
 /* ── Comment anchor highlight (matches commentAnchorDecorations) ── */
 
 /* .notepad-comment-anchor: visual background drawn by highlightOverlayPlugin.
@@ -1051,82 +986,6 @@
   font-size: 12px;
   padding: 16px;
   text-align: center;
-}
-
-.notepad-comment-card {
-  border-bottom: 1px solid var(--tm-border);
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.notepad-comment-card--orphaned {
-  opacity: 0.45;
-}
-
-.notepad-comment-card__quote {
-  font-size: 11px;
-  font-style: italic;
-  color: var(--tm-text-muted);
-  border-left: 2px solid var(--tm-border);
-  padding-left: 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.notepad-comment-card__body {
-  font-size: 12px;
-  color: var(--tm-text-primary);
-  line-height: 1.5;
-}
-
-.notepad-comment-card__meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 10px;
-  color: var(--tm-text-muted);
-}
-
-.notepad-comment-card__actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.notepad-comment-card__orphan-label {
-  font-size: 10px;
-  color: var(--tm-text-muted);
-  font-style: italic;
-}
-
-.notepad-comment-reply {
-  padding: 6px 12px 6px 24px;
-  border-bottom: 1px solid var(--tm-border);
-}
-
-.notepad-status-badge {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 10px;
-  font-weight: 500;
-}
-
-.notepad-status-badge--open {
-  background: var(--tm-overlay-soft);
-  color: var(--tm-text-muted);
-}
-
-.notepad-status-badge--resolved {
-  background: color-mix(in srgb, var(--tm-success) 10%, transparent);
-  color: var(--tm-success);
-}
-
-.notepad-status-badge--orphaned {
-  background: color-mix(in srgb, var(--tm-warning) 10%, transparent);
-  color: var(--tm-warning);
 }
 
 /* ── Export dialog ──────────────────────────────────────────────── */
@@ -1566,15 +1425,6 @@ input[type='checkbox'].notepad-task-checkbox {
   border-left-color: var(--tm-border);
 }
 
-.notepad-comment__orphan-label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  color: var(--tm-warning);
-  font-style: italic;
-}
-
 .notepad-comment__body {
   font-size: 12px;
   color: var(--tm-text-primary);
@@ -1609,13 +1459,6 @@ input[type='checkbox'].notepad-task-checkbox {
   gap: 5px;
 }
 
-.notepad-comment__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-}
-
 .notepad-comment__author {
   font-size: 10px;
   color: var(--tm-text-muted);
@@ -1625,31 +1468,6 @@ input[type='checkbox'].notepad-task-checkbox {
   display: flex;
   align-items: center;
   gap: 2px;
-}
-
-.notepad-comment__icon-btn {
-  background: transparent;
-  border: none;
-  color: var(--tm-text-muted);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  padding: 3px;
-  border-radius: 4px;
-  line-height: 0;
-  transition:
-    color 80ms ease,
-    background 80ms ease;
-}
-
-.notepad-comment__icon-btn:hover {
-  color: var(--tm-text-primary);
-  background: var(--tm-bg-card-hover);
-}
-
-.notepad-comment__icon-btn--delete:hover {
-  color: var(--tm-danger);
-  background: color-mix(in srgb, var(--tm-danger) 10%, transparent);
 }
 
 .notepad-comment__reply-form {
@@ -1684,19 +1502,6 @@ input[type='checkbox'].notepad-task-checkbox {
   border-top: 1px solid var(--tm-border);
   padding-top: 5px;
   margin-top: 2px;
-}
-
-.notepad-comment__replies-toggle {
-  background: transparent;
-  border: none;
-  color: var(--tm-text-muted);
-  font-size: 10px;
-  font-family: inherit;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  padding: 0;
 }
 
 .notepad-comment__reply {
@@ -1853,13 +1658,6 @@ input[type='checkbox'].notepad-task-checkbox {
 
 .notepad-context-menu__item:hover {
   background: var(--tm-bg-card-hover);
-}
-
-.notepad-note-row__archived-badge {
-  font-size: 10px;
-  font-weight: 500;
-  color: color-mix(in srgb, var(--tm-warning) 75%, transparent);
-  margin-right: 6px;
 }
 
 .notepad-context-menu__item--danger {
@@ -2261,7 +2059,6 @@ input[type='checkbox'].notepad-task-checkbox {
   cursor: crosshair;
 }
 
-.diagram-view__canvas > .excalidraw-wrapper,
 .diagram-view__canvas > div:first-child {
   width: 100%;
   height: 100%;
