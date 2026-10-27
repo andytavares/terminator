@@ -1,0 +1,49 @@
+package.json
+  s_567c3310a5db4e::t_8bd9b2c40e946d 42,44
+extensions/git-integration/tsconfig.test.json
+  s_567c3310a5db4e::t_dadae9876c7494 2
+extensions/foundry/tsconfig.test.json
+  s_567c3310a5db4e::t_dadae9876c7494 2
+scripts/each-limited.mjs
+  s_567c3310a5db4e::t_8bd9b2c40e946d 14-18
+extensions/foundry/CLAUDE.md
+  s_567c3310a5db4e::t_dadae9876c7494 190
+tests/unit/scripts/lint.spec.ts
+  s_567c3310a5db4e::t_8bd9b2c40e946d 2
+scripts/lint.mjs
+  s_567c3310a5db4e::t_8bd9b2c40e946d 11,48-53
+tests/unit/scripts/each-limited.spec.ts
+  s_567c3310a5db4e::t_76fbe16f92f848 1-19
+docs/CONTRIBUTING.md
+  s_567c3310a5db4e::t_dadae9876c7494 166
+extensions/remote-control/tsconfig.test.json
+  s_567c3310a5db4e::t_dadae9876c7494 2
+extensions/task-vault/tsconfig.test.json
+  s_567c3310a5db4e::t_dadae9876c7494 2
+tests/unit/scripts/typecheck.spec.ts
+  s_567c3310a5db4e::t_76fbe16f92f848 1-55,59-65,69-71
+  s_567c3310a5db4e::t_9334ad4a10b416 56-58,66-68
+extensions/notepad/tsconfig.test.json
+  s_567c3310a5db4e::t_dadae9876c7494 2
+scripts/typecheck.mjs
+  s_567c3310a5db4e::t_9334ad4a10b416 59,84
+  s_567c3310a5db4e::t_8bd9b2c40e946d 1-58,60-83,85-87
+extensions/CLAUDE.md
+  s_567c3310a5db4e::t_dadae9876c7494 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bc66577b87207c2c84ad3d0e755615b0288d242b",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
