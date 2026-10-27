@@ -11,7 +11,7 @@ import type { RunNode } from './run-graph.js'
 import type { GateRuleId } from '../gates/rules.js'
 import { isGateRule } from './execution-parts.js'
 import type { Execution } from './execution.js'
-import { launchNode } from './execution-launch.js'
+import { launchNode, type Launched } from './execution-launch.js'
 import { settleNode } from './execution-settle.js'
 
 // Runs everything that can run, a wave at a time: the agent budget is the whole
@@ -127,28 +127,34 @@ async function runWave(run: Execution): Promise<boolean> {
 }
 
 // A slot freed by one node goes to the next ready one at once, not when the whole
-// wave ends. Settlements run one at a time: each reads and rewrites the graph.
+// wave ends. Settlements run one at a time: each reads and rewrites the graph. One
+// that throws does not stop the others; the first error fails the run after them.
 async function drainWave(run: Execution): Promise<void> {
   const flights: Promise<void>[] = []
+  const failures: unknown[] = []
   let turn: Promise<void> = Promise.resolve()
+  const settleInTurn = (launched: Launched): Promise<void> => {
+    const mine = turn.then(async () => {
+      await settleNode(run, launched)
+      if (await canRefill(run)) await launchReady()
+    })
+    turn = mine.catch(() => undefined)
+    return mine.catch((error: unknown) => void failures.push(error))
+  }
   const launchReady = async (): Promise<void> => {
     const started = startReady(run.current, run.order.budgets, run.deps.now())
     await run.advance(started.graph)
     for (const id of started.started) {
       const node = nodeById(run.current, id)
       if (node === undefined || node.kind === 'gate') continue
-      const settled = launchNode(run, node).then((launched) => {
-        turn = turn.then(async () => {
-          await settleNode(run, launched)
-          if (await canRefill(run)) await launchReady()
-        })
-        return turn
-      })
-      flights.push(settled)
+      flights.push(
+        launchNode(run, node).then(settleInTurn, (error: unknown) => void failures.push(error))
+      )
     }
   }
   await launchReady()
   for (let next = 0; next < flights.length; next++) await flights[next]
+  if (failures.length > 0) throw failures[0]
 }
 
 // Joins pass on the spot. Work is offered only when no gate stands ready: a gate

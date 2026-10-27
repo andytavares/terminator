@@ -125,3 +125,34 @@ describe('a freed slot after the budget is spent', () => {
     expect(releases.has('build:U-3')).toBe(false)
   })
 })
+
+describe('a settlement that throws', () => {
+  it('still settles the nodes that end after it, then fails the run with its error', async () => {
+    const releases = new Map<string, () => void>()
+    const committed: string[] = []
+    const run = async (input: Parameters<ExecutorDeps['run']>[0]): Promise<StartedRun> => {
+      await new Promise<void>((resolve) => releases.set(input.node.id, resolve))
+      return { sessionId: `s-${input.node.id}`, exitCode: 0 }
+    }
+    const executing = execute(planOfTwoLanes(), {
+      ...idleExecutorSeams(),
+      run,
+      commitNode: async ({ node }) => {
+        committed.push(node.id)
+        if (node.id === 'build:U-1') throw new Error('disk full')
+        return { kind: 'committed', sha: 'abc' }
+      },
+      runCommand: async () => 0,
+      collect: async () => null,
+      now: () => '2026-09-06T11:00:00.000Z',
+      sources: { dataRoot, repoPaths: [repo], builtInDir },
+      onEvent: () => undefined,
+    })
+    const outcome = executing.catch((error: unknown) => error)
+    await eventually(() => expect(releases.size).toBe(2))
+    releases.get('build:U-1')?.()
+    releases.get('build:U-2')?.()
+    expect(await outcome).toBeInstanceOf(Error)
+    expect(committed).toContain('build:U-2')
+  })
+})
