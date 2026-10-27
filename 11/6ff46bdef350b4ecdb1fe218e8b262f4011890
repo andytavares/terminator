@@ -1,0 +1,36 @@
+extensions/foundry/src/line/ci.ts
+  s_a9e8c58b3eee1f::t_be4a7aedfa20bf 1
+  s_a9e8c58b3eee1f::t_75bfaa168d7af9 69,133-134,157-166
+extensions/foundry/tests/line/refinery-tick.spec.ts
+  s_a9e8c58b3eee1f::t_a918a1cbd24691 79,214
+  s_a9e8c58b3eee1f::t_723d1a7b113cff 209,215-234
+  s_a9e8c58b3eee1f::t_e0929f6b3cd0de 235-237
+extensions/foundry/src/line/refinery-run.ts
+  s_a9e8c58b3eee1f::t_6823c437d0f893 56-59
+extensions/foundry/tests/line/restack.spec.ts
+  s_a9e8c58b3eee1f::t_a918a1cbd24691 1,5-6,8,10,12-18,23,27-35,38-40,42-47,50-55,57-58,62-73,76-80,82-84
+extensions/foundry/tests/line/refinery-run.spec.ts
+  s_a9e8c58b3eee1f::t_d1c2f92f120fad 39,41,55-66,153
+extensions/foundry/src/line/refinery-tick.ts
+  s_a9e8c58b3eee1f::t_6823c437d0f893 121-122
+extensions/foundry/src/line/restack.ts
+  s_a9e8c58b3eee1f::t_9c8371fc3b4dc9 6-7,10-16,22-24,28-32,34-40,43-47,49,53
+extensions/foundry/tests/line/ci.spec.ts
+  s_a9e8c58b3eee1f::t_b2f3c5cedc0504 298-323
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "116ff46bdef350b4ecdb1fe218e8b262f4011890",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
