@@ -6,7 +6,6 @@ import { askOnce, createLiveGateStore } from '../gates/store.js'
 import type { GateStore } from '../gates/store.js'
 import { shipOrder } from './integrate.js'
 import { readBaseline } from './baseline.js'
-import { isTestStep } from './baseline-steps.js'
 import { baseBranchCommit } from './lane-commands.js'
 import { afterFinalCheck, ciRounds, settledOnce } from './ship-tail.js'
 import { createEarlyShip } from './early-ship.js'
@@ -123,25 +122,22 @@ async function prepareRun(api: ExtensionAPI, run: OrderRun): Promise<RunTail> {
     graphRef: { current: graph },
     shippedOrderRef: { current: order },
     finalCheck: settledOnce<boolean>(),
-    failingOnBase: await failingOnBaseOf({ root, order, recipe, exec: built.exec }),
+    failingOnBase: await failingOnBaseOf({ root, order, exec: built.exec }),
   }
 }
 
-// A baseline on an older base commit says nothing about this one, and a bug
-// fix's failing tests are the bug, not something left for the reader.
+// A baseline on an older base commit says nothing about this one.
 /** @internal */
 export async function failingOnBaseOf(run: {
   root: string
   order: WorkOrder
-  recipe: Recipe
   exec: ShellExec
 }): Promise<string[]> {
   const baseline = await readBaseline(run.root, run.order.id)
   const repo = run.order.context.repos[0]
   if (baseline?.state !== 'failing' || repo === undefined) return []
   if (baseline.commit !== (await baseBranchCommit(run.exec, repo))) return []
-  const leftOut = run.recipe.id === 'bugfix' ? isTestStep : () => false
-  return baseline.steps.filter((s) => s.result === 'fail' && !leftOut(s)).map((s) => s.name)
+  return baseline.steps.filter((s) => s.result === 'fail').map((s) => s.name)
 }
 
 function shipmentFor(tail: RunTail, found: Found): Shipment {

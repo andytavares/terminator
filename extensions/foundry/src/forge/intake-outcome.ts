@@ -1,4 +1,5 @@
 import type { LedgerEntry } from '../ledger/append.js'
+import type { OrderIntake } from '../order/schema.js'
 import type { LoopFacts, AgreedFacts } from './readiness.js'
 
 // How the last intake turn ended.
@@ -185,6 +186,46 @@ export function lastIntake(entries: readonly LedgerEntry[]): IntakeOutcome {
     }
   }
   return { kind: 'none' }
+}
+
+const RUNNING_STATES: readonly string[] = ['drafting', 'reviewing', 'fixing']
+
+/** Why a turn that claims to run has stopped, or null while it is still inside its deadline. */
+function stoppedReason(
+  turn: Extract<IntakeOutcome, { kind: 'running' }>,
+  { entries, intake, now }: { entries: readonly LedgerEntry[]; intake: OrderIntake; now: number }
+): string | null {
+  const since = Date.parse(intake.since)
+  const stalled = entries.some(
+    (entry) =>
+      entry.action === 'run.stalled' &&
+      entry.subject === turn.sessionId &&
+      Date.parse(entry.at) > since
+  )
+  if (stalled) return 'The agent stopped making progress.'
+  const expired = intake.deadline !== null && Date.parse(intake.deadline) <= now
+  return expired ? 'The turn did not answer in time.' : null
+}
+
+/**
+ * The last intake turn, with "running" taken from `order.intake`, not guessed from the ledger.
+ *
+ * The ledger still names who is working (actor, session, round). A running turn past its
+ * deadline, or whose session stalled after it began, reads as refused, so the Forge
+ * offers the same moves it offers for a refusal.
+ */
+export function currentIntake(
+  entries: readonly LedgerEntry[],
+  intake: OrderIntake | undefined,
+  now: number
+): IntakeOutcome {
+  const last = lastIntake(entries)
+  if (last.kind !== 'running') return last
+  if (intake?.state === 'failed')
+    return { kind: 'refused', at: intake.since, reason: intake.reason ?? 'The turn failed.' }
+  if (intake === undefined || !RUNNING_STATES.includes(intake.state)) return { kind: 'none' }
+  const reason = stoppedReason(last, { entries, intake, now })
+  return reason === null ? last : { kind: 'refused', at: intake.since, reason }
 }
 
 /**

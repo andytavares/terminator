@@ -82,6 +82,16 @@ describe('a redraft the red team finds nothing in', () => {
   })
 })
 
+describe('starting an architect turn', () => {
+  it('writes a drafting intake with a deadline on the order', async () => {
+    writes = { architect: () => ({ note: 'tightened' }) }
+    await convergeFromTheArchitect(readyDraft(repo))
+    const order = await createOrderStore(dataDir).load('WO-1')
+    expect(order?.intake?.state).toBe('drafting')
+    expect(order?.intake?.deadline).not.toBeNull()
+  })
+})
+
 describe('a small one-lane plan', () => {
   it('skips the red team, says why, and is ready to hand off', async () => {
     writes = { architect: () => ({ note: 'tightened' }) }

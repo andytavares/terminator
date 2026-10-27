@@ -11,7 +11,7 @@ import {
   writeBaseline,
 } from '../../src/line/baseline.js'
 import type { Baseline, BaselineDeps } from '../../src/line/baseline.js'
-import { failedStepSentence, isTestStep } from '../../src/line/baseline-steps.js'
+import { failedStepSentence } from '../../src/line/baseline-steps.js'
 import { checkoutPath } from '../../src/line/worktree.js'
 import { runStepOnBaseCheckout } from '../../src/line/lane-commands.js'
 import type { RunContext } from '../../src/line/run-context.js'
@@ -438,16 +438,11 @@ describe('proveEnvironment when nothing could be measured', () => {
   })
 })
 
-describe('failedStepSentence and isTestStep', () => {
+describe('failedStepSentence', () => {
   it('names the step, branch, exit code and command', () => {
     expect(failedStepSentence(TESTS_FAILED, 'main')).toBe(
       'Tests failed on main with exit code 1: `npm test`.'
     )
-  })
-
-  it('knows the test step by its rung, not its label', () => {
-    expect(isTestStep({ ...TESTS_FAILED, name: 'Unit' })).toBe(true)
-    expect(isTestStep({ ...BUILD_NOT_RUN, rung: 'L5' })).toBe(false)
   })
 })
 

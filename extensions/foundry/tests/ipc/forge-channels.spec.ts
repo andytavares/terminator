@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { intakeAt } from '../../src/forge/intake-state.js'
 import { queueEntry } from '../helpers/queue-entries.js'
 import { builderUnit, openQuestion, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
@@ -1069,6 +1070,8 @@ function theLastTurnTests() {
 function forgeChannelsARunningTurnTests() {
   it('says a turn is running the moment it starts one', async () => {
     const seed = await drafted()
+    // The Forge loop, which the converge dep stands in for, writes this when a turn starts.
+    await store.save({ ...seed.order, intake: intakeAt('drafting', new Date()) })
     const c = createForgeChannels(
       forgeDeps({ converge: async () => ({ ok: true, sessionId: 'sess-arch' }) })
     )
@@ -2149,18 +2152,6 @@ function manualHandOffTests() {
 }
 
 function manualHandOffAgreesTests() {
-  it('agrees a bug fix whose only failure is its tests', async () => {
-    const order = await handOffReadyOrder(
-      provenBaseline({
-        state: 'failing',
-        steps: [baseStep('Build'), baseStep('Tests', { result: 'fail', exitCode: 1 })],
-      })
-    )
-    await store.save({ ...order, recipe: 'bugfix' })
-    const r = (await channels().compile(compiling(order.id, true))) as Refusal
-    expect(r.order.status).toBe('agreed')
-  })
-
   it('still only previews while the base is failing', async () => {
     const order = await handOffReadyOrder(failingBaseline)
     const r = (await channels().compile(compiling(order.id, false))) as Refusal

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  currentIntake,
   lastIntake,
   intakeRefusal,
   loopFacts,
@@ -9,6 +10,7 @@ import {
   reviewedCurrentPlan,
   anotherPassWanted,
 } from '../../src/forge/intake-outcome.js'
+import { intakeAt } from '../../src/forge/intake-state.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
 
 // How the last intake turn ended, read back out of the ledger.
@@ -568,5 +570,49 @@ describe('environmentWaivedAt', () => {
     expect(environmentWaivedAt([waived], '2026-09-09T19:40:00Z')).toBeNull()
     expect(environmentWaivedAt([waived], '2026-09-09T19:31:00Z')).toBe('2026-09-09T19:31:00Z')
     expect(environmentWaivedAt([waived], '2026-09-09T19:20:00Z')).toBe('2026-09-09T19:31:00Z')
+  })
+})
+
+describe('currentIntake', () => {
+  const NOW = Date.parse('2026-09-09T19:35:00Z')
+  const started = entry({ action: 'converge.started', subject: 'sess-1', reason: 'draft' })
+  const drafting = (at: string) => intakeAt('drafting', new Date(at))
+
+  it('is running while the turn is inside its deadline', () => {
+    const out = currentIntake([started], drafting('2026-09-09T19:30:00Z'), NOW)
+    expect(out).toMatchObject({ kind: 'running', sessionId: 'sess-1' })
+  })
+
+  it('is refused once the deadline has passed', () => {
+    const out = currentIntake([started], drafting('2026-09-09T19:20:00Z'), NOW)
+    expect(out).toEqual({
+      kind: 'refused',
+      at: '2026-09-09T19:20:00.000Z',
+      reason: 'The turn did not answer in time.',
+    })
+  })
+})
+
+describe('currentIntake and a stalled session', () => {
+  const NOW = Date.parse('2026-09-09T19:35:00Z')
+  const started = entry({ action: 'converge.started', subject: 'sess-1', reason: 'draft' })
+  const drafting = (at: string) => intakeAt('drafting', new Date(at))
+
+  it('is refused when the turn session stalled after it began', () => {
+    const stalled = entry({ action: 'run.stalled', subject: 'sess-1', at: '2026-09-09T19:31:00Z' })
+    const out = currentIntake([started, stalled], drafting('2026-09-09T19:30:00Z'), NOW)
+    expect(out).toMatchObject({ kind: 'refused', reason: 'The agent stopped making progress.' })
+  })
+
+  it('ignores a stall from before the turn began or from another session', () => {
+    const before = entry({ action: 'run.stalled', subject: 'sess-1', at: '2026-09-09T19:10:00Z' })
+    const other = entry({ action: 'run.stalled', subject: 'sess-2', at: '2026-09-09T19:31:00Z' })
+    const out = currentIntake([before, started, other], drafting('2026-09-09T19:30:00Z'), NOW)
+    expect(out.kind).toBe('running')
+  })
+
+  it('is not running when the order records no running turn', () => {
+    expect(currentIntake([started], undefined, NOW).kind).toBe('none')
+    expect(currentIntake([started], intakeAt('ready', new Date(NOW)), NOW).kind).toBe('none')
   })
 })

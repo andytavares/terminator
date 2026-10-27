@@ -147,12 +147,11 @@ function rememberSessions(root: string, orderId: string): SessionMemory {
     announceLive(orderId)
     remembering = remembering
       .then(async () => {
-        const current = await orderStoreAt(root).load(orderId)
-        if (current === null || current.provenance.forgeSession === sessionId) return
-        await orderStoreAt(root).save({
+        // Through `update`, which queues behind the intake state's own write to the order.
+        await orderStoreAt(root).update(orderId, (current) => ({
           ...current,
           provenance: { ...current.provenance, forgeSession: sessionId },
-        })
+        }))
       })
       .catch(() => {
         // A record of which conversation this was is a courtesy. Losing it

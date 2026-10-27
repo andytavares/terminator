@@ -12,7 +12,7 @@ import { documentLinkOf } from '../line/document-outcome.js'
 import { readStanding } from '../order/standing.js'
 import { orderStandingSources } from '../order/order-standing-sources.js'
 import {
-  lastIntake,
+  currentIntake,
   loopFacts,
   agreedFacts,
   environmentWaivedAt,
@@ -287,9 +287,10 @@ async function readFacts(
   environment: EnvironmentFacts
 }> {
   const entries = await deps.store.entries(orderId)
+  const order = await deps.store.load(orderId)
   const baseline = await readBaseline(deps.dataRoot(), orderId)
   return {
-    intake: lastIntake(entries),
+    intake: currentIntake(entries, order?.intake, Date.now()),
     loop: loopFacts(entries),
     agreed: agreedFacts(entries),
     turnEndedAt: turnEndedAtOf(entries),

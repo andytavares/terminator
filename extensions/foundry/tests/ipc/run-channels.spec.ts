@@ -142,10 +142,22 @@ function unknownSkillsTests() {
   })
 }
 
+/** A shape the repository carries that needs the `.specify` folder, as the removed speckit one did. */
+function writeToolkitShape(): void {
+  const direct = fs.readFileSync(path.join(__dirname, '../../recipes/direct.yaml'), 'utf8')
+  const toolkit = direct
+    .replace('id: direct', 'id: toolkit')
+    .replace('requires: []', 'requires:\n  - path_exists: .specify')
+  const dir = path.join(repo, '.foundry', 'recipes')
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(path.join(dir, 'toolkit.yaml'), toolkit)
+}
+
 function shapesTests() {
   it('refuses a shape this repository cannot support, and says why', async () => {
+    writeToolkitShape()
     await store.save(order())
-    const r = (await freshRunChannels().start({ id: 'WO-1', recipe: 'speckit' })) as {
+    const r = (await freshRunChannels().start({ id: 'WO-1', recipe: 'toolkit' })) as {
       error: string
     }
     expect(r.error).toMatch(/cannot run here/)
@@ -153,12 +165,13 @@ function shapesTests() {
   })
 
   it('runs that same shape once the repository supports it', async () => {
+    writeToolkitShape()
     fs.mkdirSync(path.join(repo, '.specify'), { recursive: true })
     await store.save(order())
-    const r = (await freshRunChannels().start({ id: 'WO-1', recipe: 'speckit' })) as {
+    const r = (await freshRunChannels().start({ id: 'WO-1', recipe: 'toolkit' })) as {
       graph: RunGraph
     }
-    expect(r.graph.recipe).toBe('speckit')
+    expect(r.graph.recipe).toBe('toolkit')
   })
 }
 
@@ -403,14 +416,15 @@ function graded(grade: WorkOrder['risk']['grade'], triggers: WorkOrder['risk']['
 
 function offeringTests() {
   it('offers every shape, marking the ones this repository cannot support', async () => {
+    writeToolkitShape()
     await store.save(order())
     const r = (await freshRunChannels().recipes({ id: 'WO-1' })) as {
       recipes: { name: string; available: boolean; unmet: string[] }[]
       proposed: string
     }
-    const speckit = r.recipes.find((x) => x.name === 'speckit')
-    expect(speckit?.available).toBe(false)
-    expect(speckit?.unmet[0]).toMatch(/\.specify/)
+    const toolkit = r.recipes.find((x) => x.name === 'toolkit')
+    expect(toolkit?.available).toBe(false)
+    expect(toolkit?.unmet[0]).toMatch(/\.specify/)
     expect(r.recipes.find((x) => x.name === 'direct')?.available).toBe(true)
   })
 
@@ -477,8 +491,8 @@ describe('proposeRecipe', () => {
 
 function directTests() {
   it('keeps a shape the order already carries', () => {
-    expect(proposeRecipe(order({ recipe: 'bugfix' }))).toEqual({
-      name: 'bugfix',
+    expect(proposeRecipe(order({ recipe: 'research' }))).toEqual({
+      name: 'research',
       why: 'the order already names this shape',
     })
   })
@@ -595,11 +609,12 @@ function directAndRefusedChoicesTests() {
   // Never quietly swapped: an operator who names a shape gets it or gets told
   // why not, because a silent substitution is a decision nobody made.
   it('refuses an operator choice this repository cannot run, rather than stepping down', async () => {
+    writeToolkitShape()
     await store.save(order())
-    const result = (await freshRunChannels().start({ id: 'WO-1', recipe: 'speckit' })) as {
+    const result = (await freshRunChannels().start({ id: 'WO-1', recipe: 'toolkit' })) as {
       error?: string
     }
-    expect(result.error).toContain('speckit')
+    expect(result.error).toContain('toolkit')
     expect(result.error).toContain('.specify')
   })
 }
