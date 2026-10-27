@@ -68,10 +68,8 @@ export interface StartSupervisedRunOptions {
    * Where this node's skills were mounted. Absent or empty mounts none.
    */
   addDirs?: string[]
-  /**
-   * The agent's permission mode, chosen per role by `modeFor`. `default` makes every write and
-   * state-changing command an ask, so `autoDecide` still sees it; `auto` leaves them to Claude.
-   */
+  /** The permission mode `modeFor` chose: `default` makes every write and state-changing
+   *  command an ask `autoDecide` sees; `auto` leaves them to Claude. */
   mode: PermissionMode
   /** Claude deny rules (`denyRules`): Foundry's hard refusals, which hold in `auto` mode too. */
   denyRules?: string[]

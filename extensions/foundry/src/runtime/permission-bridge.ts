@@ -4,10 +4,8 @@
 // The agent asks over ACP (ADR 130) and the call stays asked until the verdict
 // is sent, so a held call is simply an ask nobody has answered yet.
 
-/**
- * What the bridge settles a tool call with. `ask` means nobody decided here: the
- * ask stays open in the agent's tab for whoever is watching it.
- */
+/** What the bridge settles a tool call with. `ask`: nobody decided here, and the ask stays
+ *  open in the agent's tab. */
 export interface ToolVerdict {
   permissionDecision: 'allow' | 'deny' | 'ask'
   reason?: string
@@ -17,12 +15,8 @@ export interface PermissionDecision {
   allow: boolean
   reason?: string
   /**
-   * A real answer, for a request that is a question rather than a yes/no.
-   *
-   * An ACP ask has two ways back to the agent: an allow option or a reject
-   * option, with no words. An answer travels as a rejection, so the tool call
-   * does not proceed; the words stay in the console's record. Nothing is
-   * denied in the sense the operator would mean it.
+   * A real answer, for a request that is a question rather than a yes/no. It travels as a
+   * rejection, since an ACP ask takes no words, and the runner sends the words next.
    */
   answer?: string
 }
@@ -78,12 +72,8 @@ export interface PermissionBridgeOptions {
    */
   onAutoDenied?: (toolName: string, reason: string) => void
   /**
-   * How long to hold a tool call before leaving it to the agent's tab.
-   *
-   * When this elapses the bridge drops the call from its held list and settles
-   * it `ask`; the ask itself stays open in the agent's tab, where the operator
-   * can answer it. That is a worse surface than the console but an available
-   * one.
+   * How long to hold a tool call before leaving it to the agent's tab: the bridge drops it
+   * from its held list and the ask stays open in the tab, where the operator can answer it.
    */
   askAfterMs?: number
 }
