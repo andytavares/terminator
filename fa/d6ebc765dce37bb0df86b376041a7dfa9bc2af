@@ -1,0 +1,31 @@
+extensions/foundry/src/line/execution-waves.ts
+  s_a9e8c58b3eee1f::t_58f8f649b53267 158-159
+extensions/foundry/tests/line/executor-deps.spec.ts
+  s_a9e8c58b3eee1f::t_b021cbfef23176 681-685
+extensions/foundry/src/line/restack.ts
+  s_a9e8c58b3eee1f::t_87f45c8897dc7d 36-39,53
+  s_a9e8c58b3eee1f::t_4a66f0bf821c58 46-47
+  s_a9e8c58b3eee1f::t_b08a901321c8f1 57-60
+extensions/foundry/tests/line/execution-waves.spec.ts
+  s_a9e8c58b3eee1f::t_bf46be2e70406e 100-127
+extensions/foundry/tests/line/restack.spec.ts
+  s_a9e8c58b3eee1f::t_87f45c8897dc7d 40,48,50,80
+  s_a9e8c58b3eee1f::t_08b453634a5777 23,25,55,81-93,95-97,100,103-104
+  s_a9e8c58b3eee1f::t_b4abc29f9060f7 94,98-99,101-102,105-106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fad6ebc765dce37bb0df86b376041a7dfa9bc2af",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
