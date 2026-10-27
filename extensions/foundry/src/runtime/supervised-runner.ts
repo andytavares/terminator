@@ -86,6 +86,10 @@ export interface StartSupervisedRunOptions {
    * run yet.
    */
   onRegistered?: (run: SupervisedRun) => void
+  /** A JSON Schema the agent's final answer must match; Claude validates and retries it itself. */
+  outputSchema?: object
+  /** The agent's answer in `outputSchema`, as Claude validated it. Needs `outputSchema`. */
+  onStructuredOutput?: (answer: unknown) => void
   /** The agent stopped responding and is waiting. Not an ending. */
   onTurnEnd?: (turns: number) => void
   /**
@@ -352,7 +356,12 @@ async function startSupervisedRun(
   // without a new session; the closures exist before the record does.
   const phase: Running['phase'] = { current: { id: start.phase, ...start } }
   const bridge = permissionBridgeFor(context, sessionId, { phase, autoDecide: start.autoDecide })
-  const release = listenForAsks(context, sessionId, bridge)
+  const stopAsks = listenForAsks(context, sessionId, bridge)
+  const stopAnswer = listenForAnswer(context.api, sessionId, start.onStructuredOutput)
+  const release = (): void => {
+    stopAsks()
+    stopAnswer()
+  }
   const run = trackRun(context, sessionId, {
     bridge,
     release,
@@ -415,6 +424,9 @@ function claudeOptions(start: StartSupervisedRunOptions): object {
     // The agent must not load the operator's ~/.claude CLAUDE.md, hooks or MCP connectors.
     settingSources: ['project'],
     ...(start.settings ? { settings: start.settings } : {}),
+    ...(start.outputSchema
+      ? { outputFormat: { type: 'json_schema', schema: start.outputSchema } }
+      : {}),
     // Also removes the denied tools from the agent's view, which a settings rule alone does not.
     disallowedTools: start.settings?.permissions.deny ?? [],
     env: {
@@ -495,6 +507,20 @@ function listenForAsks(
     stopAsks()
     stopSettled()
   }
+}
+
+/** Hands over the agent's answer in the requested schema, which arrives as a `StructuredOutput` tool call. */
+function listenForAnswer(
+  api: ExtensionAPI,
+  sessionId: string,
+  onAnswer: StartSupervisedRunOptions['onStructuredOutput']
+): () => void {
+  if (onAnswer === undefined) return () => undefined
+  return api.agents.onUpdate(sessionId, (update) => {
+    const toolName = (update._meta as { claudeCode?: { toolName?: unknown } } | undefined)
+      ?.claudeCode?.toolName
+    if (toolName === 'StructuredOutput' && update.rawInput !== undefined) onAnswer(update.rawInput)
+  })
 }
 
 /** Sends a prompt; its end is a turn end, unless the turn was cut short or failed. */

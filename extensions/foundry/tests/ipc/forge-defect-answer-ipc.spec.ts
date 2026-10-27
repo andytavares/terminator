@@ -111,21 +111,16 @@ function regression(id: string, text: string): WorkOrder['redTeam'][number] {
   }
 }
 
-/** What the architect hands back: the finding resolved, and how. */
-function writeAmendment(): void {
-  fs.writeFileSync(
-    path.join(dataDir, 'orders', 'WO-1', 'proposal.json'),
-    JSON.stringify({
-      note: 'Added AC-5 so footnote links survive the sanitizer',
-      resolveFindings: [{ id: 'RT-inspector-6', how: 'prefix #… hrefs in the a override' }],
-    })
-  )
+/** What the architect answers: the finding resolved, and how. */
+const AMENDMENT = {
+  note: 'Added AC-5 so footnote links survive the sanitizer',
+  resolveFindings: [{ id: 'RT-inspector-6', how: 'prefix #… hrefs in the a override' }],
 }
 
 type StartInput = {
   phase: string
   onRegistered?: (run: { sessionId: string }) => void
-  onTurnEnd?: () => void
+  onStructuredOutput?: (answer: unknown) => void
 }
 
 function cleanOrder(): WorkOrder {
@@ -149,8 +144,7 @@ function architectAmends(): void {
     const sessionId = `${input.phase}-session`
     input.onRegistered?.({ sessionId })
     if (input.phase === 'architect') {
-      writeAmendment()
-      setTimeout(() => input.onTurnEnd?.(), 0)
+      setTimeout(() => input.onStructuredOutput?.(AMENDMENT), 0)
     }
     return { sessionId }
   })

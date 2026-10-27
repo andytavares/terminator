@@ -70,6 +70,11 @@ const ProposalSchema = z
 
 export type Proposal = z.infer<typeof ProposalSchema>
 
+/** The proposal's JSON Schema, for Claude to hold its answer to. */
+export function proposalJsonSchema(): object {
+  return z.toJSONSchema(ProposalSchema, { target: 'draft-7', io: 'input' })
+}
+
 const REFUSED = 'The proposal was refused: '
 
 // The parts of a proposal an operator can find on the order, by the name the
@@ -147,10 +152,21 @@ function contextWithFindings(
   }
 }
 
+// A sent item replaces the one with its id, a new id is added, and the rest stay: the schema
+// has no way to say "remove", so a partial list must not drop what it leaves out.
+function mergedById<T extends { id: string }>(current: readonly T[], sent: readonly T[]): T[] {
+  const replaced = current.map((item) => sent.find((s) => s.id === item.id) ?? item)
+  return [...replaced, ...sent.filter((s) => !current.some((item) => item.id === s.id))]
+}
+
 // The proposal's plan over the order's, keeping a lane branch the ticket fixed when
 // the proposal leaves it blank.
 function mergedPlan(plan: WorkOrder['plan'], proposed: Proposal['plan']): WorkOrder['plan'] {
-  const merged = { ...plan, ...proposed }
+  const merged = {
+    ...plan,
+    ...proposed,
+    units: mergedById(plan.units, proposed?.units ?? []),
+  }
   if (proposed?.lanes === undefined) return merged
   const lanes = proposed.lanes.map((lane) => {
     const kept = plan.lanes.find((l) => l.ord === lane.ord)?.branch ?? ''
@@ -208,7 +224,7 @@ export function applyProposal(order: WorkOrder, proposal: Proposal, at: string):
     ...order,
     intent: { ...order.intent, ...proposal.intent },
     context: contextWithFindings(order.context, proposal.findings),
-    acceptance: proposal.acceptance ?? order.acceptance,
+    acceptance: mergedById(order.acceptance, proposal.acceptance ?? []),
     risk: { ...order.risk, ...proposal.risk },
     plan: mergedPlan(order.plan, proposal.plan),
     assumptions: keptStruck(order.assumptions, proposal.assumptions ?? order.assumptions),

@@ -12,6 +12,7 @@ import type {
   AgentPermissionAsk,
   AgentPermissionSettled,
   AgentsAPI,
+  AgentUpdate,
   AgentTurnEnd,
   ExtensionAPI,
   StartAgentInput,
@@ -43,6 +44,8 @@ let startsAs: { sessionId: string } | null
 let askListeners: Array<(ask: AgentPermissionAsk) => void>
 let settledListeners: Array<(settled: AgentPermissionSettled) => void>
 let detachedAsks: number
+let updateListeners: Array<(update: AgentUpdate) => void>
+let detachedUpdates: number
 let answers: Array<{ sessionId: string; requestId: string; optionId: string | null }>
 
 function exitWith(exit: { exitCode: number | null }): void {
@@ -54,6 +57,16 @@ function scriptOf(input: { args: string[] }): string {
   const match = /'([^']+)'$/.exec(input.args[input.args.length - 1])
   if (match === null) throw new Error(`no script in ${input.args.join(' ')}`)
   return match[1]
+}
+
+function recordUpdateListener(_sessionId: string, listener: (update: AgentUpdate) => void) {
+  updateListeners.push(listener)
+  return () => void (detachedUpdates += 1)
+}
+
+function recordEndListener(_sessionId: string, listener: (exitCode: number | null) => void) {
+  endListeners.push(listener)
+  return () => void (detachedEnd += 1)
 }
 
 function fakeAgents(): AgentsAPI {
@@ -69,6 +82,7 @@ function fakeAgents(): AgentsAPI {
       askListeners.push(listener)
       return () => void (detachedAsks += 1)
     },
+    onUpdate: recordUpdateListener,
     onPermissionSettled: (_sessionId, listener) => {
       settledListeners.push(listener)
       return () => undefined
@@ -78,12 +92,7 @@ function fakeAgents(): AgentsAPI {
       return true
     },
     close: async (sessionId) => void agentsClosed.push(sessionId),
-    onEnd: (_sessionId, listener) => {
-      endListeners.push(listener)
-      return () => {
-        detachedEnd += 1
-      }
-    },
+    onEnd: recordEndListener,
   })
 }
 
@@ -168,6 +177,8 @@ beforeEach(() => {
   askListeners = []
   settledListeners = []
   detachedAsks = 0
+  updateListeners = []
+  detachedUpdates = 0
   answers = []
 })
 
@@ -298,6 +309,46 @@ function claudeOptionsTests() {
     expect(claudeOptions().settings).toBeUndefined()
   })
 }
+
+/** The update Claude's adapter sends when the agent answers in the requested JSON schema. */
+const structuredUpdate = (rawInput: unknown): AgentUpdate => ({
+  sessionUpdate: 'tool_call_update',
+  rawInput,
+  _meta: { claudeCode: { toolName: 'StructuredOutput' } },
+})
+
+describe('the structured answer', () => {
+  const outputSchema = { type: 'object', properties: { note: { type: 'string' } } }
+
+  it('asks Claude to answer in the schema', async () => {
+    await runner().start({ ...start, outputSchema, onStructuredOutput: () => undefined })
+    expect(claudeOptions().outputFormat).toEqual({ type: 'json_schema', schema: outputSchema })
+  })
+
+  it('leaves the output format out without a schema', async () => {
+    await runner().start(start)
+    expect(claudeOptions()).not.toHaveProperty('outputFormat')
+  })
+
+  it('hands the starter the answer, and ignores every other update', async () => {
+    const answers: unknown[] = []
+    await runner().start({ ...start, outputSchema, onStructuredOutput: (a) => answers.push(a) })
+    updateListeners[0]({ sessionUpdate: 'agent_message_chunk' })
+    updateListeners[0]({
+      sessionUpdate: 'tool_call_update',
+      rawInput: { command: 'ls' },
+      _meta: { claudeCode: { toolName: 'Bash' } },
+    })
+    updateListeners[0](structuredUpdate({ note: 'done' }))
+    expect(answers).toEqual([{ note: 'done' }])
+  })
+
+  it('stops listening when the run ends', async () => {
+    await runner().start({ ...start, outputSchema, onStructuredOutput: () => undefined })
+    endListeners[0](0)
+    expect(detachedUpdates).toBe(1)
+  })
+})
 
 function claudeSettingsTests() {
   it('gives Claude the deny rules, which hold in auto mode too', async () => {
