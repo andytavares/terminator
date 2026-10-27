@@ -1,0 +1,21 @@
+src/renderer/hooks/useSurfaceOpen.ts
+  s_567c3310a5db4e::t_8df1eb373e2449 2
+src/renderer/components/terminal/TerminalPane.tsx
+  s_567c3310a5db4e::t_8df1eb373e2449 6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4aaa7a1235699ec8c1b7954ede88b21cfbfc5154",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
