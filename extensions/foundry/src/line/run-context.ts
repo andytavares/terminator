@@ -112,7 +112,7 @@ export const workspaceOf = (api: ExtensionAPI, checkout: { origin: string }): st
 export const firstLane = (checkouts: ReadonlyMap<number, Checkout>): number =>
   [...checkouts.keys()].sort((a, b) => a - b)[0] ?? 1
 
-/** Records what checkout provisioning had to fall back on, so the ledger says why. */
+/** Records what checkout provisioning had to fall back on, so the ledger says why. @internal */
 export function noteOn(store: OrderStore, orderId: string): (message: string) => void {
   return (message) =>
     void store.record({

@@ -3,9 +3,16 @@ import { keepPreviousData, QueryClient, useQuery, type Query } from '@tanstack/r
 import type { ChangeKind, FoundryChange } from '../state/foundry-index.js'
 
 /** Which changes a view cares about. No `orderId` means any order's. */
-export interface ChangeFilter {
+interface ChangeFilter extends Record<string, unknown> {
   readonly kinds: readonly ChangeKind[]
   readonly orderId?: string
+}
+
+// Every Foundry query carries the changes it answers to as its `meta`.
+declare module '@tanstack/react-query' {
+  interface Register {
+    queryMeta: ChangeFilter
+  }
 }
 
 /** Every kind of record an order's state is drawn from. */
@@ -47,7 +54,7 @@ function invalidate(client: QueryClient, burst: Burst): void {
     queryKey: ['foundry'],
     predicate: (query: Query) =>
       burst.everything ||
-      burst.changes.some((change) => isRelevant(change, query.meta as unknown as ChangeFilter)),
+      burst.changes.some((change) => query.meta !== undefined && isRelevant(change, query.meta)),
   }
   void client.cancelQueries(filter).then(() => client.invalidateQueries(filter))
 }
