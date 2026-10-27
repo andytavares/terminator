@@ -1,8 +1,22 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { playwrightTests, quarantineProblems } from '../../../scripts/check-quarantine.mjs'
+import {
+  candidateSpecs,
+  e2eTagged,
+  playwrightTests,
+  quarantineProblems,
+  unitTagged,
+} from '../../../scripts/check-quarantine.mjs'
 import { resultsOf } from '../../../scripts/flaky-sweep.mjs'
+
+const startedProcesses = vi.hoisted(() => ({ count: 0 }))
+vi.mock('node:child_process', () => ({
+  execFileSync: () => {
+    startedProcesses.count += 1
+    throw new Error('a child process was started')
+  },
+}))
 
 const FOUNDRY_SPEC = 'extensions/foundry/tests/components/App.spec.tsx'
 const FOUNDRY_TEST = `${FOUNDRY_SPEC} > the Factory view toggle > a shaping order > sends a shaping order back to the list, open`
@@ -130,5 +144,44 @@ describe('playwrightTests', () => {
 describe('quarantineProblems on the change that quarantines', () => {
   it('lets the change that quarantines a test edit its spec file to add the tag', () => {
     expect(check({ changedFiles: [FOUNDRY_SPEC], quarantinedOnBase: [] })).toEqual([])
+  })
+})
+
+describe('candidateSpecs', () => {
+  it('has no candidates when no spec mentions the tag and nothing is listed', () => {
+    expect(candidateSpecs({ sourceFiles: [], entries: [] })).toEqual({ unit: [], e2e: [] })
+  })
+
+  it('passes a spec that mentions the tag, split by unit and e2e', () => {
+    const sourceFiles = ['tests/e2e/settings.spec.ts', FOUNDRY_SPEC]
+    expect(candidateSpecs({ sourceFiles, entries: [] })).toEqual({
+      unit: [FOUNDRY_SPEC],
+      e2e: ['tests/e2e/settings.spec.ts'],
+    })
+  })
+
+  it('adds the spec a quarantine.json entry names, once', () => {
+    const entries = [entry, { ...entry, test: `${FOUNDRY_SPEC} > another` }]
+    expect(candidateSpecs({ sourceFiles: [FOUNDRY_SPEC], entries })).toEqual({
+      unit: [FOUNDRY_SPEC],
+      e2e: [],
+    })
+  })
+})
+
+describe('listing the tagged tests', () => {
+  beforeEach(() => {
+    startedProcesses.count = 0
+  })
+
+  it('starts no vitest or playwright process when there is no candidate file', () => {
+    expect(unitTagged([])).toEqual([])
+    expect(e2eTagged([])).toEqual([])
+    expect(startedProcesses.count).toBe(0)
+  })
+
+  it('starts a process when a candidate file is given', () => {
+    expect(() => unitTagged([FOUNDRY_SPEC])).toThrow('a child process was started')
+    expect(startedProcesses.count).toBe(1)
   })
 })
