@@ -1,0 +1,32 @@
+tests/unit/scripts/test-select.spec.ts
+  s_567c3310a5db4e::t_e9e40a1a65f5ee 13,74-75,142-152
+  s_567c3310a5db4e::t_bdd6697244b9b4 153-155
+docs/CONTRIBUTING.md
+  s_567c3310a5db4e::t_a5d8437a6116d9 68,98
+docs/adr/132-ci-finishes-in-five-minutes.md
+  s_567c3310a5db4e::t_a5d8437a6116d9 7,25,30-31,42
+scripts/test-select.mjs
+  s_567c3310a5db4e::t_7f7106ba706495 207,216,262-266,317,320
+scripts/e2e-select.mjs
+  s_567c3310a5db4e::t_7f7106ba706495 152,155
+tests/unit/scripts/e2e-select.spec.ts
+  s_567c3310a5db4e::t_e9e40a1a65f5ee 54,97,103,144,151
+.specify/memory/constitution.md
+  s_567c3310a5db4e::t_a5d8437a6116d9 2-17,375-377,407
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "272a84618f0b10ff01da823d2b78528c77bf2ff8",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
