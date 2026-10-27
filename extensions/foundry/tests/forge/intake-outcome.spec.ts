@@ -200,6 +200,7 @@ function otherLinesAndTheLastTurnTests() {
 // docs/research/foundry-red-team-loop.md.
 describe('lastIntake, for the review loop', () => {
   describe('running rounds', runningRoundsTests)
+  describe('a scout beside the architect', scoutBesideTheArchitectTests)
   describe('finished rounds', finishedRoundsTests)
   describe('a loop that could not converge', aLoopThatCouldNotConvergeTests)
   describe('a refused round', aRefusedRoundTests)
@@ -234,6 +235,30 @@ function runningRoundsTests() {
       round: null,
       autoTurn: null,
     })
+  })
+}
+
+function scoutBesideTheArchitectTests() {
+  it.each(['scout.collected', 'scout.refused'])(
+    'shows the architect drafting beside it once the scout ends with %s',
+    (scoutEnd) => {
+      const out = lastIntake([
+        entry({ action: 'converge.started', subject: 'sess-1', reason: 'drafting the plan' }),
+        entry({ action: 'scout.started', subject: 'sess-4' }),
+        entry({ action: scoutEnd, actor: 'role:scout' }),
+      ])
+      expect(out).toMatchObject({ kind: 'running', actor: 'architect', sessionId: 'sess-1' })
+    }
+  )
+
+  it('reads the redraft after a scout that ended, not the scout', () => {
+    const out = lastIntake([
+      entry({ action: 'converge.started', subject: 'sess-1' }),
+      entry({ action: 'scout.started', subject: 'sess-4' }),
+      entry({ action: 'order.redrafted', reason: 'drafted' }),
+      entry({ action: 'scout.collected', actor: 'role:scout' }),
+    ])
+    expect(out).toMatchObject({ kind: 'redrafted', note: 'drafted' })
   })
 }
 
