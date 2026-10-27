@@ -1,0 +1,60 @@
+src/renderer/sidebar/wall-prefs.ts
+  s_567c3310a5db4e::t_f69b6a3b5ef6d0 1-2,21-22,34-37,40
+src/renderer/components/screen-chrome.css
+  s_567c3310a5db4e::t_a5d07bd976b4be 101
+  s_567c3310a5db4e::t_dc67ae782fcdb1 1-2,88
+src/renderer/components/home/StartWork.tsx
+  s_567c3310a5db4e::t_be6dd2c7eae03f 3,235,242-254
+  s_567c3310a5db4e::t_0afd05d8cbe196 236-241
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_567c3310a5db4e::t_67eb442e0fe793 82
+  s_567c3310a5db4e::t_45fcb1faa6cbea 91
+  s_567c3310a5db4e::t_ccc15a21906191 88-90,255-256,258-259,333-335,339-340,390
+src/renderer/components/overview/OverviewScreen.tsx
+  s_567c3310a5db4e::t_0afd05d8cbe196 4
+  s_567c3310a5db4e::t_6f8b5277da8178 217-227
+src/renderer/sidebar/views.ts
+  s_567c3310a5db4e::t_f69b6a3b5ef6d0 1,87-88,90-98,100-115,127-136,138,140
+src/renderer/components/home/StartWork.css
+  s_567c3310a5db4e::t_6f8b5277da8178 138-140,143,146,151-153,156,159,162,178
+tests/e2e/start-work-run-as-keyboard.spec.ts
+  s_567c3310a5db4e::t_be0e373588c032 2,10
+  s_567c3310a5db4e::t_ae240881cd9ed3 1,3-9,11-33
+src/renderer/components/home/RunAsChoices.tsx
+  s_567c3310a5db4e::t_6f8b5277da8178 2,14-32
+tests/unit/renderer/components/RunAsChoices.spec.tsx
+  s_567c3310a5db4e::t_5faa62226bef79 1-34
+src/renderer/shell/panels.ts
+  s_567c3310a5db4e::t_f69b6a3b5ef6d0 4,23-25,32
+src/renderer/sidebar/collapse-state.ts
+  s_567c3310a5db4e::t_f69b6a3b5ef6d0 1,35-39,41-45,49
+src/renderer/components/terminal/TabBar.tsx
+  s_567c3310a5db4e::t_be03c590290dfd 474-502,510,517
+  s_567c3310a5db4e::t_483066b12a3bf6 15,503-509,511-516,518-531,535
+src/renderer/stores/workspace.store.ts
+  s_567c3310a5db4e::t_f69b6a3b5ef6d0 3
+  s_567c3310a5db4e::t_b7e6a418487a9b 46-48,52
+tests/unit/schemas/settings.schema.spec.ts
+  s_567c3310a5db4e::t_e8b7e71f272c90 1,8-10,24-25,27,35-37,40-41,49-50,55-58,62-74,76-78,81-82,86-90
+  s_567c3310a5db4e::t_be03c590290dfd 48
+tests/unit/renderer/quick-actions/shortcut-conflict-guard.spec.tsx
+  s_567c3310a5db4e::t_64ce2324bb5525 56-62
+tests/unit/renderer/sidebar/purity.spec.ts
+  s_567c3310a5db4e::t_8a1c1bfb63e568 39-40,43,51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bbd0f0b99f27de5a3711412871083398437a3e26",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
