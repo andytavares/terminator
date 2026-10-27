@@ -27,22 +27,25 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const E2E_DIR = 'tests/e2e'
 const TIMINGS = join(REPO_ROOT, E2E_DIR, 'timings.json')
 
+/** One spec's record: where it is, when its last result ended, and on which worker. */
+function testOf(spec, path) {
+  const results = (spec.tests ?? []).flatMap((t) => t.results ?? [])
+  const ends = results.map((r) => Date.parse(r.startTime) + r.duration)
+  return {
+    file: spec.file,
+    line: spec.line,
+    key: [spec.file, ...path, spec.title].join(' › '),
+    ended: ends.length === 0 ? null : Math.max(...ends),
+    worker: results.at(-1)?.parallelIndex ?? 0,
+  }
+}
+
 /** Every test in a Playwright JSON report, keyed by file and title path. */
 export function testsFromReport(report) {
   const tests = []
   const walk = (suite, titles) => {
     const path = suite.title === suite.file ? titles : [...titles, suite.title]
-    for (const spec of suite.specs ?? []) {
-      const results = (spec.tests ?? []).flatMap((t) => t.results ?? [])
-      const ends = results.map((r) => Date.parse(r.startTime) + r.duration)
-      tests.push({
-        file: spec.file,
-        line: spec.line,
-        key: [spec.file, ...path, spec.title].join(' › '),
-        ended: ends.length === 0 ? null : Math.max(...ends),
-        worker: results.at(-1)?.parallelIndex ?? 0,
-      })
-    }
+    for (const spec of suite.specs ?? []) tests.push(testOf(spec, path))
     for (const child of suite.suites ?? []) walk(child, path)
   }
   for (const suite of report.suites ?? []) walk(suite, [])
