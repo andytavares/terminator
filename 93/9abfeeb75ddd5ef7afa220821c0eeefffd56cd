@@ -1,0 +1,42 @@
+scripts/lint.mjs
+  s_567c3310a5db4e::t_87a52c2ac40849 13-14,17
+tests/unit/scripts/lint.spec.ts
+  s_567c3310a5db4e::t_87a52c2ac40849 32,35-36
+tests/unit/scripts/ci-e2e-local.spec.ts
+  s_567c3310a5db4e::t_62500f65d416de 51,53
+.github/workflows/ci.yml
+  s_567c3310a5db4e::t_87a52c2ac40849 224,227-229,425
+  s_567c3310a5db4e::t_4851f04805d509 152-157,539-541
+  s_567c3310a5db4e::t_c804586ae8d066 542
+tests/unit/scripts/stability.spec.ts
+  s_567c3310a5db4e::t_4851f04805d509 137,143,153-164
+  s_567c3310a5db4e::t_22afe6ae1bcc76 129-133
+tests/unit/scripts/ci-plan.spec.ts
+  s_567c3310a5db4e::t_d75b23f29eff3a 204-208
+  s_567c3310a5db4e::t_4851f04805d509 66
+docs/adr/131-ci-finishes-in-five-minutes.md
+  s_567c3310a5db4e::t_02f9c79eb99e7d 42
+  s_567c3310a5db4e::t_4851f04805d509 26
+scripts/ci-e2e-local.mjs
+  s_567c3310a5db4e::t_87a52c2ac40849 128
+docs/CONTRIBUTING.md
+  s_567c3310a5db4e::t_4851f04805d509 102
+scripts/stability.mjs
+  s_567c3310a5db4e::t_4851f04805d509 147-154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "939abfeeb75ddd5ef7afa220821c0eeefffd56cd",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
