@@ -1,0 +1,19 @@
+src/main/zz-orphan.ts
+  s_6305604343e57b::t_eeb16458bba98e 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5783a7418b048d925b603993018e4bab1e6d2942",
+  "prompts": {},
+  "sessions": {
+    "s_6305604343e57b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a9d6b900c96f7f5f3",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
