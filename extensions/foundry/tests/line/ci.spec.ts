@@ -295,3 +295,29 @@ function nonErrorThrowsTests() {
     expect(out).toBe('## CI/Test (run 1)\nlog could not be read: gh went away')
   })
 }
+
+describe('explicit timeouts', () => {
+  it('gives gh pr checks 60 seconds', async () => {
+    const exec = vi.fn(async () => ok([check({ bucket: 'pass' })]))
+    await watchChecks(pull, exec, { sleep: noopSleep(), pollMs: 1, timeoutMs: 10 })
+
+    expect(exec).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 60_000 }))
+  })
+
+  it('gives gh run view 120 seconds', async () => {
+    const exec = vi.fn(async () => ok(''))
+    await failedLogs([check({ bucket: 'fail' })], '/repos/app', exec)
+
+    expect(exec).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 120_000 }))
+  })
+
+  it.each([
+    ['timed out', { exitCode: 1, stdout: '', stderr: '', timedOut: true }],
+    ['exited non-zero', { exitCode: 1, stdout: '', stderr: 'HTTP 502', timedOut: false }],
+  ])('says the log could not be read when the read %s', async (_label, result) => {
+    const exec = vi.fn(async () => result)
+    const out = await failedLogs([check({ bucket: 'fail' })], '/repos/app', exec)
+
+    expect(out).toContain('log could not be read')
+  })
+})

@@ -53,7 +53,10 @@ async function raiseRefineryConflict(
     evidence: files.map((file) => ({ kind: 'diff' as const, path: file })),
     at: new Date().toISOString(),
   })
-  await createLiveGateStore(() => root, indexFor).save(gate)
+  const gates = createLiveGateStore(() => root, indexFor)
+  // `save` replaces by id, which would reopen a gate the operator already decided.
+  if ((await gates.get(gate.id))?.decision != null) return
+  await gates.save(gate)
 }
 
 /** Where one refinery pass works: the host, the data root, and its order store. */

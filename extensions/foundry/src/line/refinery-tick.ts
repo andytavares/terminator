@@ -118,6 +118,8 @@ async function restackBehind(
   const recordOnLedger = (action: string, reason: string) =>
     deps.record({ orderId, action, subject: orderId, reason })
   if (conflictFiles !== null) {
+    // Marked handled so the next tick does not raise the same conflict again.
+    await deps.writeState(orderId, { ...state, restackedFor: [...state.restackedFor, merged.id] })
     const title = await deps.titleOf(orderId)
     const why = `${title} no longer rebases onto its base after ${merged.title} merged`
     await deps.raiseConflict(orderId, why, conflictFiles)
