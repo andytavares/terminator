@@ -1,0 +1,37 @@
+src/main/agents/acp/agent-service.ts
+  s_6768753e2f34eb::t_d39b64243ff4f4 114-118,120,191-192,437-448,451-453,456-457,464,469-474,487,489-492,548-549,553
+  s_6768753e2f34eb::t_474b0f7f8178b3 119,121,172-174,193-194,224-229,449-450,455,458,461,466-468,488
+  s_6768753e2f34eb::t_a4c5ef67dc0f3a 230-231,465
+docs/adr/130-agents-the-app-drives-run-over-acp.md
+  s_6768753e2f34eb::t_184702f31118ef 48-49
+tests/live/acp-claude.spec.ts
+  s_6768753e2f34eb::t_7c95e439d09a78 115-144
+docs/EXTENSION-DEVELOPMENT.md
+  s_6768753e2f34eb::t_184702f31118ef 907
+tests/unit/agents/acp/agent-service.spec.ts
+  s_6768753e2f34eb::t_5007728dcc7ee8 374-391
+  s_6768753e2f34eb::t_285804ff1f78c8 336-341,343
+  s_6768753e2f34eb::t_3e966412d66e97 335,342,344,372
+  s_6768753e2f34eb::t_45766ad3d9167d 303-332,334,345-347,349-352,354-371
+  s_6768753e2f34eb::t_c935fb81819563 2,17
+  s_6768753e2f34eb::t_49b8575aaefdb6 302,333,348,353,395-396,401-402
+  s_6768753e2f34eb::t_e3b640d9209a0a 373
+packages/extension-sdk/types/api.d.ts
+  s_6768753e2f34eb::t_184702f31118ef 341,343
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "288cc2917a57212553402c14821fa8ca4a8a5e18",
+  "prompts": {},
+  "sessions": {
+    "s_6768753e2f34eb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9cb01023-8291-4030-a541-66d7d8df379b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
