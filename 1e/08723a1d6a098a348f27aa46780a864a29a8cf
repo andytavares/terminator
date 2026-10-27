@@ -1,0 +1,55 @@
+extensions/foundry/src/order/proposal.ts
+  s_a9e8c58b3eee1f::t_6f272e875636fc 73-77,160
+  s_a9e8c58b3eee1f::t_ca33dcdbf47eba 155-159,161,165-169,227
+extensions/foundry/tests/forge/converge.spec.ts
+  s_a9e8c58b3eee1f::t_ca08be487afdef 9,148,150-152,322,325,334-335,344,354-355,363,372,379,384,386-387,395,397,403,413,415,425,435,437,447,454,456-457,462-463,510
+  s_a9e8c58b3eee1f::t_69964e60d7d758 61,93-94,97,99,108-109,141,216,220,233,238
+extensions/foundry/tests/runtime/supervised-runner.spec.ts
+  s_a9e8c58b3eee1f::t_85a051a1b5a4c0 67-71,95
+  s_a9e8c58b3eee1f::t_ade9b89c329ca8 15,47-48,180-181,313-319,321-350
+  s_a9e8c58b3eee1f::t_e42a0050373c9c 62-66,85,320
+  s_a9e8c58b3eee1f::t_e38f8a9b8db744 351
+  s_a9e8c58b3eee1f::t_95faf11c2050ad 352
+extensions/foundry/src/forge/converge.ts
+  s_a9e8c58b3eee1f::t_03091ec6c14307 3-8,26-27,30-31,33,44-46,51,53-59,232-233,252-253,315,324-329,331
+  s_a9e8c58b3eee1f::t_5164a7b2d996ba 314
+extensions/foundry/tests/order/proposal.spec.ts
+  s_a9e8c58b3eee1f::t_f48626444bfe71 3-8
+  s_a9e8c58b3eee1f::t_6f272e875636fc 331-350
+  s_a9e8c58b3eee1f::t_7b310092bdd34c 94,198-223,351
+  s_a9e8c58b3eee1f::t_cf2ebcb5cbf831 224-225
+  s_a9e8c58b3eee1f::t_88408af0fa458a 352
+extensions/foundry/src/line/rung-output.ts
+  s_a9e8c58b3eee1f::t_c954c95ed6dbdb 638
+extensions/foundry/tests/helpers/forge-turns.ts
+  s_a9e8c58b3eee1f::t_b918111ee7f3e2 17-18,66-67,74,87-88,91-98
+extensions/foundry/src/forge/intake-turn.ts
+  s_a9e8c58b3eee1f::t_93a819fb16c64c 9-10,73,173,209-211,222,252,294-298,300,303-307,311-327
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_a9e8c58b3eee1f::t_b44e5a3fe1b551 89-92,359-364,427-429,512-523
+  s_a9e8c58b3eee1f::t_aaef9af89eccc0 524-525
+extensions/foundry/tests/forge/intake-turn-ends.spec.ts
+  s_a9e8c58b3eee1f::t_f99172ea7f68de 101-102,113,115-125,129,133,169,183
+  s_a9e8c58b3eee1f::t_a7c642e562ee98 194
+  s_a9e8c58b3eee1f::t_d07aac9c58b27d 59-60
+extensions/foundry/tests/forge/refused-turn.spec.ts
+  s_a9e8c58b3eee1f::t_5e15f74835fd14 4,86-87,141,155,164,192,202
+extensions/foundry/tests/ipc/forge-defect-answer-ipc.spec.ts
+  s_a9e8c58b3eee1f::t_f2a1e1a673cc1a 114-117,123,147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1e08723a1d6a098a348f27aa46780a864a29a8cf",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
