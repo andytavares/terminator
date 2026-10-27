@@ -1,0 +1,22 @@
+extensions/foundry/tests/verify/ladder.spec.ts
+  s_a9e8c58b3eee1f::t_03c8f78ebdab27 514,518-537
+  s_a9e8c58b3eee1f::t_f37fa4b1ded6a2 538
+extensions/foundry/src/verify/ladder.ts
+  s_a9e8c58b3eee1f::t_03c8f78ebdab27 259-262,265,281-285,297-304
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "67efce9b637344f02a39d0b8875c1afd98d78b07",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

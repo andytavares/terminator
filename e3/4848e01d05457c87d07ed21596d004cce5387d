@@ -1,0 +1,28 @@
+extensions/foundry/tests/sensors/store.spec.ts
+  s_a9e8c58b3eee1f::t_602368d6d7255d 171-191
+  s_a9e8c58b3eee1f::t_6193adfd8e0dda 192-194
+extensions/foundry/tests/ledger/append.spec.ts
+  s_a9e8c58b3eee1f::t_a8bd5de4e10460 171-180
+extensions/foundry/src/ledger/append.ts
+  s_a9e8c58b3eee1f::t_df83b46d605b5b 50-67,69,71-72
+  s_a9e8c58b3eee1f::t_d3a30e641c5ff5 68
+extensions/foundry/src/sensors/store.ts
+  s_a9e8c58b3eee1f::t_953e08bb512120 6
+  s_a9e8c58b3eee1f::t_91f883f0883495 108-109,116-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e34848e01d05457c87d07ed21596d004cce5387d",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
