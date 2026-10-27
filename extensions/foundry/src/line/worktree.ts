@@ -33,12 +33,21 @@ export interface Checkout {
   readonly created: boolean
   /** The folders the origin's install lends, from the order's environment. */
   readonly share: readonly string[]
+  /** True when Foundry cut the lane's branch; only such a branch is Foundry's to delete. */
+  readonly branchCreated?: boolean
 }
 
 export interface CheckoutDeps {
   readonly exec: ShellExec
   /** The resolved data root. Worktrees live under it, never in a repository. */
   readonly root: string
+  /** Where a fallback to the local base branch is said; the caller decides where it goes. */
+  readonly note?: (message: string) => void
+}
+
+/** Beside the lane's checkout: present when Foundry cut the lane's branch itself. */
+export function createdBranchMarker(target: string): string {
+  return `${target}.branch-created`
 }
 
 /**
@@ -167,13 +176,15 @@ async function branchExists(
 
 interface WorktreeAddition {
   readonly target: string
-  /** The flags for a fresh add, before the target. */
+  /** The flags for a fresh add that cuts a new ref, before the target. */
   readonly how: readonly string[]
-  /** The lane's branch: a stale checkout is re-attached to it, commits kept. */
+  /** The lane's branch: an existing one is checked out as it is, commits kept. */
   readonly branch?: string
   readonly reattachOnly?: boolean
 }
 
+// Locked at creation, without a race: a locked registration is never pruned, by Foundry
+// or by anyone else running `git worktree prune` in the repository.
 async function runAdd(
   repo: CheckoutPlan['repo'],
   args: readonly string[],
@@ -181,50 +192,86 @@ async function runAdd(
 ): Promise<void> {
   const added = await deps.exec({
     command: 'git',
-    args: ['worktree', 'add', ...args],
+    args: ['worktree', 'add', '--lock', ...args],
     cwd: repo.path,
     timeoutMs: 120_000,
   })
   if (added.exitCode !== 0) throw new CheckoutFailedError(repo.name, added.stderr)
 }
 
-// Whether `target` was already a worktree. A stale one is replaced with `--force`, never
-// `git worktree prune`: that drops every lane's stale registration, and those lanes would
-// then be cut afresh from the base, losing their commits.
+// Where a new branch is cut from: `origin/<base>` after one fetch, so a lane does not
+// start behind the remote. No remote, or a failed fetch, falls back to the local base.
+async function startPointFor(repo: CheckoutPlan['repo'], deps: CheckoutDeps): Promise<string> {
+  const base = repo.baseBranch
+  const remotes = await deps.exec({
+    command: 'git',
+    args: ['remote'],
+    cwd: repo.path,
+    timeoutMs: 30_000,
+  })
+  if (!remotes.stdout.split(/\r?\n/).includes('origin')) {
+    deps.note?.(`${repo.name} has no origin remote; cut from the local ${base}`)
+    return base
+  }
+  const fetched = await deps.exec({
+    command: 'git',
+    args: ['fetch', 'origin', base],
+    cwd: repo.path,
+    timeoutMs: 120_000,
+  })
+  if (fetched.exitCode === 0) return `origin/${base}`
+  deps.note?.(
+    `fetching origin/${base} failed (${fetched.stderr.trim()}); cut from the local ${base}`
+  )
+  return base
+}
+
+type Addition = 'present' | 'attached' | 'cut'
+
+// A stale registration (folder gone, still locked) is replaced with `--force --force`,
+// never `git worktree prune`: that drops every lane's stale registration, and those lanes
+// would then be cut afresh from the base, losing their commits.
 async function addWorktree(
   repo: CheckoutPlan['repo'],
   addition: WorktreeAddition,
   deps: CheckoutDeps
-): Promise<boolean> {
+): Promise<Addition> {
   const { target, how, branch, reattachOnly } = addition
   const state = await worktreeState(repo.path, target, deps)
-  if (state === 'present') return true
-  const force = state === 'stale' ? ['--force'] : []
-  const attach = branch !== undefined && (state === 'stale' || reattachOnly === true)
-  if (attach && (await branchExists(repo, branch, deps))) {
+  if (state === 'present') return 'present'
+  const force = state === 'stale' ? ['--force', '--force'] : []
+  if (branch !== undefined && (await branchExists(repo, branch, deps))) {
     await runAdd(repo, [...force, target, branch], deps)
-    return false
+    return 'attached'
   }
   if (reattachOnly === true)
     throw new CheckoutFailedError(repo.name, `the branch ${branch ?? ''} no longer exists`)
-  await runAdd(repo, [...force, ...how, target, repo.baseBranch], deps)
-  return false
+  await runAdd(repo, [...force, ...how, target, await startPointFor(repo, deps)], deps)
+  return 'cut'
+}
+
+function markBranchCreated(target: string): void {
+  try {
+    fs.writeFileSync(createdBranchMarker(target), '')
+  } catch {
+    // unmarked, the branch is kept at teardown: the safe side
+  }
 }
 
 async function prepareCheckout(plan: CheckoutPlan, deps: CheckoutDeps): Promise<Checkout> {
   const { repo, target, branch, reattachOnly, share } = plan
-  // `-B` rather than `-b`: when nothing was registered at the target, a branch left over
-  // from a previous attempt is reset onto the base rather than failing with "already
-  // exists". The base is named explicitly so this does not depend on what is checked out.
-  const addition = { target, how: ['-B', branch], branch, reattachOnly }
-  const existing = await addWorktree(repo, addition, deps)
+  // `-b`: a branch that already exists is attached as it is, never reset, because it may
+  // be the operator's own (a tracker's suggested name).
+  const added = await addWorktree(repo, { target, how: ['-b', branch], branch, reattachOnly }, deps)
+  if (added === 'cut') markBranchCreated(target)
   const checkout = {
     repo: repo.name,
     origin: repo.path,
     path: target,
     branch,
-    created: !existing,
+    created: added !== 'present',
     share,
+    branchCreated: fs.existsSync(createdBranchMarker(target)),
   }
   await provisionDependencies(checkout, deps)
   return checkout
@@ -380,6 +427,7 @@ export async function ensureCheckouts(
 
 /** Take a lane's checkout away again. Best effort; never throws. @internal */
 export async function removeCheckout(checkout: Checkout, deps: CheckoutDeps): Promise<boolean> {
+  await unlockCheckout(checkout.origin, checkout.path, deps)
   const removed = await deps.exec({
     command: 'git',
     args: ['worktree', 'remove', '--force', checkout.path],
@@ -387,6 +435,20 @@ export async function removeCheckout(checkout: Checkout, deps: CheckoutDeps): Pr
     timeoutMs: 60_000,
   })
   return removed.exitCode === 0
+}
+
+/** Lanes are created locked; git refuses to remove a locked worktree without it. Best effort. */
+export async function unlockCheckout(
+  origin: string,
+  target: string,
+  deps: Pick<CheckoutDeps, 'exec'>
+): Promise<void> {
+  await deps.exec({
+    command: 'git',
+    args: ['worktree', 'unlock', target],
+    cwd: origin,
+    timeoutMs: 30_000,
+  })
 }
 
 /**
@@ -440,23 +502,17 @@ async function detachedBaseCheckout(
     share,
   }
   if (fresh) await removeBaseCheckout({ ...leftover, created: false }, deps)
-  const existing = await addWorktree(repo, { target, how: ['--detach'] }, deps)
+  const added = await addWorktree(repo, { target, how: ['--detach'] }, deps)
 
-  const checkout = { ...leftover, created: !existing }
+  const checkout = { ...leftover, created: added !== 'present' }
   await provisionDependencies(checkout, deps)
   return checkout
 }
 
-/** Take a base checkout away and forget it. Best effort; never throws. */
+/** Take a base checkout away. Best effort; never throws. */
 export async function removeBaseCheckout(checkout: Checkout, deps: CheckoutDeps): Promise<void> {
   try {
     await removeCheckout(checkout, deps)
-    await deps.exec({
-      command: 'git',
-      args: ['worktree', 'prune'],
-      cwd: checkout.origin,
-      timeoutMs: 30_000,
-    })
   } catch {
     // nothing left to do if cleanup itself fails
   }

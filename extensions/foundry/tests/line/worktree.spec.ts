@@ -7,6 +7,7 @@ import {
   ensureCheckout,
   ensureCheckouts,
   ensureBaseCheckout,
+  ensureBaselineCheckout,
   removeBaseCheckout,
   removeCheckout,
   provisionDependencies,
@@ -126,6 +127,10 @@ describe('preparing a checkout', () => {
   describe('real git, other starts', realGitResetTests)
   describe('real git, two orders in one repository', realGitTwoOrdersTests)
   describe('real git, re-attaching only', realGitReattachTests)
+  describe('real git, safety', realGitSafetyTests)
+  describe('real git, fetching the base', realGitFetchTests)
+  describe('real git, branch ownership', realGitBranchOwnershipTests)
+  describe('real git, fetch fallbacks', realGitFallbackTests)
 })
 
 function twoLanes(): WorkOrder {
@@ -149,9 +154,20 @@ function twoLanes(): WorkOrder {
   }
 }
 
+/** A mock exec where no branch exists yet, as for a lane about to be cut. */
+function depsWithoutBranch(): ReturnType<typeof deps> {
+  const exec = vi.fn(async (options: { args: string[] }) => ({
+    exitCode: options.args[0] === 'rev-parse' ? 1 : 0,
+    stdout: '',
+    stderr: '',
+    timedOut: false,
+  }))
+  return deps({ exec: exec as never })
+}
+
 function worktreeAddingTests() {
-  it('adds a worktree on a branch cut from the base', async () => {
-    const d = deps()
+  it('adds a locked worktree on a new branch cut from the base', async () => {
+    const d = depsWithoutBranch()
     const checkout = await ensureCheckout(order(), 1, d)
 
     const add = calls(d.exec).find((c) => c.args[1] === 'add')
@@ -159,7 +175,8 @@ function worktreeAddingTests() {
     expect(add?.args).toEqual([
       'worktree',
       'add',
-      '-B',
+      '--lock',
+      '-b',
       'foundry/wo-1',
       path.join(ROOT, 'orders', 'WO-1', 'worktrees', 'app'),
       'main',
@@ -167,11 +184,17 @@ function worktreeAddingTests() {
     expect(checkout.created).toBe(true)
   })
 
-  it('resets a branch left over from a previous attempt rather than failing', async () => {
-    // `-B`, not `-b`: "already exists" would end a resumed run before it began.
+  it('puts a worktree on a branch that exists without resetting it', async () => {
     const d = deps()
     await ensureCheckout(order(), 1, d)
-    expect(calls(d.exec).find((c) => c.args[1] === 'add')?.args).toContain('-B')
+    const add = calls(d.exec).find((c) => c.args[1] === 'add')
+    expect(add?.args).toEqual([
+      'worktree',
+      'add',
+      '--lock',
+      path.join(ROOT, 'orders', 'WO-1', 'worktrees', 'app'),
+      'foundry/wo-1',
+    ])
   })
 }
 
@@ -327,6 +350,112 @@ function realGitReattachTests() {
   })
 }
 
+/** `origin` as a bare clone of `repoPath`, so the repository has a remote to fetch from. */
+function addOrigin(repoPath: string): string {
+  const bare = tmpDir('foundry-origin-')
+  git(bare, 'init', '-q', '--bare')
+  git(repoPath, 'remote', 'add', 'origin', bare)
+  git(repoPath, 'push', '-q', 'origin', 'main')
+  return bare
+}
+
+/** Moves origin's main one commit ahead of the local main; that commit. */
+function advanceOrigin(bare: string): string {
+  const other = tmpDir('foundry-other-')
+  git(other, 'clone', '-q', bare, '.')
+  const tip = commitOn(other, 'upstream work')
+  git(other, 'push', '-q', 'origin', 'main')
+  return tip
+}
+
+function realGitSafetyTests() {
+  it('locks the worktree and leaves a stale lane its registration when another is removed', async () => {
+    const { deps: real, order: first } = realRepo()
+    const extra = await workThenDelete(first, real)
+    const baseline = await ensureBaselineCheckout(first, 1, real)
+
+    await removeBaseCheckout(baseline, real)
+    const again = await ensureCheckout(first, 1, real)
+
+    expect(git(again.path, 'rev-parse', 'HEAD')).toBe(extra)
+  })
+
+  it('creates every worktree locked, and removes a locked one', async () => {
+    const { deps: real, repoPath, target, order: o } = realRepo()
+    const checkout = await ensureCheckout(o, 1, real)
+
+    expect(git(repoPath, 'worktree', 'list', '--porcelain')).toMatch(
+      new RegExp(`worktree ${target}\\n[^]*?locked`)
+    )
+    expect(await removeCheckout(checkout, real)).toBe(true)
+    expect(fs.existsSync(target)).toBe(false)
+  })
+}
+
+function realGitBranchOwnershipTests() {
+  it("puts the worktree on the operator's existing branch and does not reset it", async () => {
+    const { deps: real, repoPath, target, order: o } = realRepo()
+    const named: WorkOrder = { ...o, source: { ...o.source, branch: 'andrew/tav-1-mine' } }
+    git(repoPath, 'checkout', '-q', '-b', 'andrew/tav-1-mine')
+    const mine = commitOn(repoPath, 'my own work')
+    git(repoPath, 'checkout', '-q', 'main')
+
+    const checkout = await ensureCheckout(named, 1, real)
+
+    expect(git(target, 'rev-parse', 'HEAD')).toBe(mine)
+    expect(checkout.branchCreated).toBe(false)
+  })
+
+  it('records that Foundry created the branch it cut, and remembers it on a resume', async () => {
+    const { deps: real, order: o } = realRepo()
+    expect((await ensureCheckout(o, 1, real)).branchCreated).toBe(true)
+    expect((await ensureCheckout(o, 1, real)).branchCreated).toBe(true)
+  })
+}
+
+function realGitFetchTests() {
+  it('cuts a new lane from origin after fetching it, not from a local base that is behind', async () => {
+    const { deps: real, repoPath, target, order: o } = realRepo()
+    const upstream = advanceOrigin(addOrigin(repoPath))
+
+    await ensureCheckout(o, 1, real)
+
+    expect(git(target, 'rev-parse', 'HEAD')).toBe(upstream)
+  })
+
+  it('cuts from the local base and says so when the fetch fails', async () => {
+    const { deps: real, repoPath, target, order: o } = realRepo()
+    fs.rmSync(addOrigin(repoPath), { recursive: true, force: true })
+    const note = vi.fn()
+
+    await ensureCheckout(o, 1, { ...real, note })
+
+    expect(git(target, 'rev-parse', 'HEAD')).toBe(git(repoPath, 'rev-parse', 'main'))
+    expect(note).toHaveBeenCalledWith(expect.stringContaining('local main'))
+  })
+}
+
+function realGitFallbackTests() {
+  it('cuts from the local base and says so when there is no remote', async () => {
+    const { deps: real, order: o } = realRepo()
+    const note = vi.fn()
+    await ensureCheckout(o, 1, { ...real, note })
+    expect(note).toHaveBeenCalledWith(expect.stringContaining('local main'))
+  })
+
+  it('fetches with a timeout longer than the ten seconds the host allows by default', async () => {
+    const seen: { args: string[]; timeoutMs?: number }[] = []
+    const real = realRepo()
+    const exec: CheckoutDeps['exec'] = (options) => {
+      seen.push(options)
+      return gitExec(options)
+    }
+    addOrigin(real.repoPath)
+    await ensureCheckout(real.order, 1, { ...real.deps, exec })
+    expect(seen.find((c) => c.args[0] === 'fetch')?.timeoutMs).toBeGreaterThanOrEqual(120_000)
+  })
+}
+
 function realGitResetTests() {
   it('reports a checkout that is still there as not created', async () => {
     const { deps: real, order: o } = realRepo()
@@ -334,17 +463,17 @@ function realGitResetTests() {
     expect((await ensureCheckout(o, 1, real)).created).toBe(false)
   })
 
-  it('resets a leftover branch onto the base when the order never registered a checkout', async () => {
+  it('keeps a leftover branch and its commits when the order never registered a checkout', async () => {
     const { deps: real, repoPath, target, order: o } = realRepo()
-    const base = git(repoPath, 'rev-parse', 'main')
     git(repoPath, 'checkout', '-q', '-b', branchFor(o, 1))
-    commitOn(repoPath, 'leftover')
+    const leftover = commitOn(repoPath, 'leftover')
     git(repoPath, 'checkout', '-q', 'main')
 
     const checkout = await ensureCheckout(o, 1, real)
 
     expect(checkout.created).toBe(true)
-    expect(git(target, 'rev-parse', 'HEAD')).toBe(base)
+    expect(checkout.branchCreated).toBe(false)
+    expect(git(target, 'rev-parse', 'HEAD')).toBe(leftover)
   })
 
   it('recreates a deleted base checkout detached', async () => {
@@ -486,10 +615,11 @@ describe('taking one away', () => {
     d.exec.mockClear()
 
     expect(await removeCheckout(checkout, d)).toBe(true)
-    expect(calls(d.exec)[0]).toMatchObject({
-      cwd: '/repos/app',
-      args: ['worktree', 'remove', '--force', checkout.path],
-    })
+    expect(calls(d.exec).map((c) => c.args)).toEqual([
+      ['worktree', 'unlock', checkout.path],
+      ['worktree', 'remove', '--force', checkout.path],
+    ])
+    expect(calls(d.exec)[1].cwd).toBe('/repos/app')
   })
 
   it('reports a refusal rather than throwing at a caller that is cleaning up', async () => {
@@ -877,7 +1007,7 @@ function addingAndReusingTests() {
 
     expect(calls(d.exec).find((c) => c.args[1] === 'add')).toMatchObject({
       cwd: '/repos/app',
-      args: ['worktree', 'add', '--detach', baseTarget, 'main'],
+      args: ['worktree', 'add', '--lock', '--detach', baseTarget, 'main'],
     })
     expect(checkout).toMatchObject({ path: baseTarget, branch: 'main', created: true })
     expect(checkout.path).not.toBe(checkoutPath(ROOT, order(), 'app'))
@@ -919,15 +1049,15 @@ function baseFailuresTests() {
 }
 
 function removingItTests() {
-  it('removes it and prunes, and never throws at a caller that is cleaning up', async () => {
+  it('unlocks and removes it, never prunes, and never throws at a caller that is cleaning up', async () => {
     const d = deps()
     const checkout = await ensureBaseCheckout(order(), 1, d)
     d.exec.mockClear()
 
     await removeBaseCheckout(checkout, d)
     expect(calls(d.exec).map((c) => c.args)).toEqual([
+      ['worktree', 'unlock', baseTarget],
       ['worktree', 'remove', '--force', baseTarget],
-      ['worktree', 'prune'],
     ])
 
     const failing = deps({
