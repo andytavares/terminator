@@ -1,0 +1,14 @@
+extensions/foundry/hints/apple.yaml
+  h_16ba00fe96244d 9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "efb75abfc4798340f18951200f2cb38ba376f9fb",
+  "prompts": {},
+  "humans": {
+    "h_16ba00fe96244d": {
+      "author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
