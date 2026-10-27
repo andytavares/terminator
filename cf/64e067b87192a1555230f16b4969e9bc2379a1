@@ -1,0 +1,21 @@
+scripts/stability.mjs
+  s_567c3310a5db4e::t_15f6bacf7c9a66 23-25
+tests/unit/scripts/stability.spec.ts
+  s_567c3310a5db4e::t_241e65aab8babc 184-185,214-215
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cf64e067b87192a1555230f16b4969e9bc2379a1",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
