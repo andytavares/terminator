@@ -1,0 +1,21 @@
+tests/unit/scripts/ci-linux.spec.ts
+  s_567c3310a5db4e::t_7719b2189dbc76 69,71,80-81
+scripts/ci-linux.mjs
+  s_567c3310a5db4e::t_7719b2189dbc76 40-42,48,89,115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "59c11782c8fef23578e0831d0e25bd976c9a5df5",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
