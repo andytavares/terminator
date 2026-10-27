@@ -33,22 +33,29 @@ export async function restack(lane: Lane, exec: ShellExec): Promise<RestackResul
   }
   if (update.exitCode !== 0) {
     const reason = `GitHub could not rebase the branch: ${update.stderr.trim()}`
-    return { kind: 'conflict', files: [], reason }
+    // Only a conflict is the operator's to resolve; auth or network trouble is retried next tick.
+    return /conflict/i.test(update.stderr)
+      ? { kind: 'conflict', files: [], reason }
+      : { kind: 'failed', reason }
   }
   return (await pullCleanCheckout(lane, exec))
     ? { kind: 'rebased', pushed: true }
     : { kind: 'rebased', pushed: true, checkoutBehind: true }
 }
 
-/** Fast-forwards the lane checkout; false when it was left behind (dirty or the pull failed). */
+// Brings a clean checkout onto the rebased branch; false when left behind. `--rebase`, not
+// `--ff-only`: GitHub rewrote the lane's commits, so the local copies are never an ancestor.
 async function pullCleanCheckout(lane: Lane, exec: ShellExec): Promise<boolean> {
   const status = await exec({ command: 'git', args: ['status', '--porcelain'], cwd: lane.cwd })
   if (status.exitCode !== 0 || status.stdout.trim() !== '') return false
   const pull = await exec({
     command: 'git',
-    args: ['pull', '--ff-only'],
+    args: ['pull', '--rebase', 'origin', lane.branch],
     cwd: lane.cwd,
     timeoutMs: NETWORK_STEP_TIMEOUT_MS,
   })
-  return pull.exitCode === 0 && !pull.timedOut
+  if (pull.exitCode === 0 && !pull.timedOut) return true
+  // A pull that stopped part-way leaves a rebase in progress; the checkout stays as it was.
+  await exec({ command: 'git', args: ['rebase', '--abort'], cwd: lane.cwd })
+  return false
 }

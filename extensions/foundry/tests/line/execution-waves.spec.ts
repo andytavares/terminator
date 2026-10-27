@@ -97,3 +97,31 @@ describe('a node starts when its slot frees', () => {
     await executing
   })
 })
+
+describe('a freed slot after the budget is spent', () => {
+  it('does not start the unit waiting on it', async () => {
+    const releases = new Map<string, () => void>()
+    let elapsedMinutes = 0
+    const run = async (input: Parameters<ExecutorDeps['run']>[0]): Promise<StartedRun> => {
+      const label = input.node.id
+      await new Promise<void>((resolve) => releases.set(label, resolve))
+      return { sessionId: `s-${label}`, exitCode: 0 }
+    }
+    const executing = execute(planOfTwoLanes(), {
+      ...idleExecutorSeams(),
+      observe: async () => ({ elapsedMinutes }),
+      run,
+      runCommand: async () => 0,
+      collect: async () => null,
+      now: () => '2026-09-06T11:00:00.000Z',
+      sources: { dataRoot, repoPaths: [repo], builtInDir },
+      onEvent: () => undefined,
+    })
+    await eventually(() => expect(releases.size).toBe(2))
+    elapsedMinutes = 60
+    releases.get('build:U-1')?.()
+    releases.get('build:U-2')?.()
+    await executing
+    expect(releases.has('build:U-3')).toBe(false)
+  })
+})

@@ -155,7 +155,8 @@ async function drainWave(run: Execution): Promise<void> {
 // stops the run, and the loop in `runWaves` handles it once the agents in flight end.
 async function canRefill(run: Execution): Promise<boolean> {
   for (;;) {
-    if (run.halted) return false
+    // A breach stops new agents even when its gate is silenced and the run is not halted.
+    if (run.halted || (await run.currentBreach()) !== null) return false
     const ready = readyNodes(run.current, run.order.budgets)
     const join = ready.find((node) => node.kind === 'join')
     if (join === undefined) return ready.length > 0 && !ready.some((n) => n.kind === 'gate')

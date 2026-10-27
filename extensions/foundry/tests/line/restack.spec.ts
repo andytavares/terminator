@@ -20,7 +20,9 @@ function scripted(answers: Record<string, Partial<ExecResult>>, calls: Call[] = 
 
 describe('restack', () => {
   describe('rebasing', rebasingTests)
+  describe('a dirty checkout', dirtyCheckoutTests)
   describe('not rebasing', notRebasingTests)
+  describe('a refusal that is not a conflict', refusalTests)
 })
 
 function rebasingTests() {
@@ -35,7 +37,7 @@ function rebasingTests() {
     })
   })
 
-  it('fast-forwards a clean checkout after the rebase', async () => {
+  it('pulls the rebased branch into a clean checkout', async () => {
     const calls: Call[] = []
     const result = await restack(lane, scripted({}, calls))
 
@@ -43,24 +45,14 @@ function rebasingTests() {
     expect(calls.map((c) => c.args.slice(0, 2).join(' '))).toEqual([
       'pr update-branch',
       'status --porcelain',
-      'pull --ff-only',
+      'pull --rebase',
     ])
-  })
-
-  it('leaves a dirty checkout alone and says it is behind', async () => {
-    const calls: Call[] = []
-    const result = await restack(
-      lane,
-      scripted({ 'git status --porcelain': { stdout: ' M a.ts\n' } }, calls)
-    )
-
-    expect(result).toEqual({ kind: 'rebased', pushed: true, checkoutBehind: true })
-    expect(calls.some((c) => c.args[0] === 'pull')).toBe(false)
+    expect(calls[2]?.args).toEqual(['pull', '--rebase', 'origin', 'lane/1'])
   })
 }
 
 function notRebasingTests() {
-  it('reports a non-zero exit as a conflict with no file list', async () => {
+  it('reports a conflict with no file list', async () => {
     const result = await restack(
       lane,
       scripted({ 'gh pr update-branch': { exitCode: 1, stderr: 'merge conflict' } })
@@ -83,5 +75,32 @@ function notRebasingTests() {
       kind: 'failed',
       reason: 'gh pr update-branch timed out after 120 seconds',
     })
+  })
+}
+
+function refusalTests() {
+  it('reports a refusal that is not a conflict as a failure, so it is tried again', async () => {
+    const result = await restack(
+      lane,
+      scripted({ 'gh pr update-branch': { exitCode: 1, stderr: 'HTTP 401: Bad credentials' } })
+    )
+
+    expect(result).toEqual({
+      kind: 'failed',
+      reason: 'GitHub could not rebase the branch: HTTP 401: Bad credentials',
+    })
+  })
+}
+
+function dirtyCheckoutTests() {
+  it('leaves a dirty checkout alone and says it is behind', async () => {
+    const calls: Call[] = []
+    const result = await restack(
+      lane,
+      scripted({ 'git status --porcelain': { stdout: ' M a.ts\n' } }, calls)
+    )
+
+    expect(result).toEqual({ kind: 'rebased', pushed: true, checkoutBehind: true })
+    expect(calls.some((c) => c.args[0] === 'pull')).toBe(false)
   })
 }
