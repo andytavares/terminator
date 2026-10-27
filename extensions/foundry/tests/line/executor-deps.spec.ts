@@ -316,8 +316,9 @@ function executorDepsResumingTests() {
     runner.terminalFor.mockImplementation(() =>
       live ? { terminalSessionId: 'tab-1', projectId: 'p-1' } : null
     )
-    runner.stop.mockImplementation(() => {
+    runner.stop.mockImplementation((sessionId: string) => {
       live = false
+      runner.endSession(sessionId)
       return true
     })
     await deps.endSession('builder-old')
