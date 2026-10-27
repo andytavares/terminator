@@ -1,0 +1,19 @@
+extensions/foundry/tests/line/universal-repository.spec.ts
+  s_567c3310a5db4e::t_0fbd31b79cb40b 10,12,142-149,211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "49e42fc7d029ea3dc6cb542cb54e75962e310448",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
