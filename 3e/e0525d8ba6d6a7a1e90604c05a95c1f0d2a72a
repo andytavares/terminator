@@ -1,0 +1,81 @@
+extensions/foundry/CLAUDE.md
+  s_a9e8c58b3eee1f::t_3069476b169774 64-66,68-69,124
+extensions/foundry/src/components/Floor.tsx
+  s_a9e8c58b3eee1f::t_0a10a9cd831bf0 28,257,259,262-263
+extensions/foundry/src/components/factory/FactorySite.tsx
+  s_a9e8c58b3eee1f::t_779cc72f55a827 1
+  s_a9e8c58b3eee1f::t_8a408ae37fa185 12,239-240,244-245,248-249,253-257,262
+extensions/foundry/src/renderer/foundry-query.ts
+  s_a9e8c58b3eee1f::t_953b4bb59f9426 1,24,57,88-112,122-131
+  s_a9e8c58b3eee1f::t_2eb9e8c27edb48 85-87
+  s_a9e8c58b3eee1f::t_af78a2f1f2f64a 3-23,25-26,33-36,42,47,53-56,58,60,63-64,68-70,77-84,113-119,132
+  s_a9e8c58b3eee1f::t_880dc4cced08ad 2,43-44,46,48,51-52
+  s_a9e8c58b3eee1f::t_43fce4c8f3a049 27-32,37-41,45,49-50,59,61-62,65-67,71-76,120-121
+extensions/foundry/tests/renderer/foundry-query.spec.tsx
+  s_a9e8c58b3eee1f::t_725a3b3dbc10a3 3,32,37,46,54,66,77-78,91,99,106,114,116,123,137,145-148,158-160
+  s_a9e8c58b3eee1f::t_f9fd4f8cc57128 38-39,132,134,149,157,161
+  s_a9e8c58b3eee1f::t_8555707cf748c4 1-2,4-31,33-36,40-45,47-53,55-65,67-76,79-90,92-98,100-105,107-113,115,117-122,124-131,133,135-136,138-144,150-156,162-180
+extensions/foundry/src/renderer/App.tsx
+  s_a9e8c58b3eee1f::t_8d48937e674b47 49-52
+  s_a9e8c58b3eee1f::t_779cc72f55a827 1
+  s_a9e8c58b3eee1f::t_c954c95ed6dbdb 5,173-174
+extensions/foundry/tests/sensors/sensor-tick.spec.ts
+  s_a9e8c58b3eee1f::t_855642efdb33b0 45,67-86
+  s_a9e8c58b3eee1f::t_7d469e78da1cbd 87-89
+extensions/foundry/src/renderer/use-run-observation.ts
+  s_a9e8c58b3eee1f::t_6caea59cbb72ac 1
+  s_a9e8c58b3eee1f::t_52bebedb3e108b 2,100-108,126-128,130-140
+extensions/foundry/src/components/SettingsProfiles.tsx
+  s_a9e8c58b3eee1f::t_779cc72f55a827 1
+  s_a9e8c58b3eee1f::t_6caea59cbb72ac 5,29-30,32-34,38,40,44-46,48
+extensions/foundry/package.json
+  s_a9e8c58b3eee1f::t_a87255e52ee2be 10
+extensions/foundry/src/state/foundry-index.ts
+  s_a9e8c58b3eee1f::t_43fce4c8f3a049 10,13
+extensions/foundry/src/components/Forge.tsx
+  s_a9e8c58b3eee1f::t_d3ee545c0deb5b 270-271,275-276,472-473,475-480,484-488
+  s_a9e8c58b3eee1f::t_2eb9e8c27edb48 465,474,481
+  s_a9e8c58b3eee1f::t_779cc72f55a827 34,471,482-483
+docs/ARCHITECTURE.md
+  s_a9e8c58b3eee1f::t_3069476b169774 1389
+extensions/foundry/src/components/use-checks.ts
+  s_a9e8c58b3eee1f::t_88f64d0c3b5eb9 90,97-98,100
+  s_a9e8c58b3eee1f::t_24dba2cea9da4e 91-96,103
+  s_a9e8c58b3eee1f::t_779cc72f55a827 20,99
+extensions/foundry/src/renderer/use-signals.ts
+  s_a9e8c58b3eee1f::t_cbb0fe8beae091 4-5,10-24
+extensions/foundry/src/components/Ledger.tsx
+  s_a9e8c58b3eee1f::t_0e2cfa438440cb 9,76,83-84,87,91-92,170-172,174,190-192,194
+extensions/foundry/src/components/Inbox.tsx
+  s_a9e8c58b3eee1f::t_8a408ae37fa185 18,78-85,92,148
+extensions/foundry/src/components/Orders.tsx
+  s_a9e8c58b3eee1f::t_78b5c3b8322357 11,182-183,186-195,215
+extensions/foundry/src/components/factory/FactoryHall.tsx
+  s_a9e8c58b3eee1f::t_d7ccf888966665 54,230-231,236,242-246
+extensions/foundry/src/sensors/sensor-tick.ts
+  s_a9e8c58b3eee1f::t_62e3eb859e57b8 9,51,53-57,60,63
+extensions/foundry/tests/components/ForgeChecks.spec.tsx
+  s_a9e8c58b3eee1f::t_cfcae90a8559ca 77
+extensions/foundry/tests/components/Inbox.spec.tsx
+  s_a9e8c58b3eee1f::t_31a1347798171a 4,475-484
+extensions/foundry/tests/components/factory/FactorySite.spec.tsx
+  s_a9e8c58b3eee1f::t_832a9b6a6e6c52 311,319
+package-lock.json
+  s_a9e8c58b3eee1f::t_252672de775b2d 80,4437-4462
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3ee0525d8ba6d6a7a1e90604c05a95c1f0d2a72a",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
