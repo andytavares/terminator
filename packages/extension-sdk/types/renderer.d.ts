@@ -85,7 +85,9 @@ export interface ElectronAPI {
       repoRoot: string,
       worktreePath: string
     ): Promise<{ success: true } | { error: string }>
-    listWorktrees(path: string): Promise<{ worktrees: Array<{ path: string; branch?: string }> }>
+    listWorktrees(path: string): Promise<{
+      worktrees: Array<{ path: string; branch?: string; detached?: boolean; prunable?: boolean }>
+    }>
   }
   shell: {
     exec(options: {

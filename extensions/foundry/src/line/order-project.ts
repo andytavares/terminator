@@ -32,7 +32,7 @@ export function workspaceFor(workspaces: readonly WorkspaceRef[], repoPath: stri
 }
 
 /** The ticket the project is for, when the order was seeded from one. */
-export function issueOf(order: WorkOrder): { tracker: 'linear' | 'jira'; key: string } | undefined {
+export function issueOf(order: WorkOrder): { tracker: 'linear'; key: string } | undefined {
   const { tracker, key } = order.source
   return tracker === null || key === null ? undefined : { tracker, key }
 }

@@ -49,13 +49,8 @@ describe('LinkIssueDialog — opening', () => {
   })
 
   it('shows which tracker each issue came from', async () => {
-    listMine.mockResolvedValue({
-      issues: [issueSummaryOf(), issueSummaryOf({ tracker: 'jira', key: 'TAV-7', id: 'id-2' })],
-      failures: [],
-    })
     open()
-    await screen.findByText('Jira')
-    expect(screen.getByText('Linear')).toBeTruthy()
+    expect(await screen.findByText('Linear')).toBeTruthy()
   })
 
   it('shows each issue state by name', async () => {
@@ -74,20 +69,20 @@ describe('LinkIssueDialog — partial failures', () => {
   it('shows what arrived and names the tracker that did not', async () => {
     listMine.mockResolvedValue({
       issues: [issueSummaryOf()],
-      failures: [{ tracker: 'jira', error: 'auth-failed' }],
+      failures: [{ tracker: 'linear', error: 'auth-failed' }],
     })
     open()
 
     expect(await screen.findByText('TAV-42')).toBeTruthy()
     const status = await screen.findByRole('status')
-    expect(status.textContent).toContain('Jira')
+    expect(status.textContent).toContain('Linear')
     expect(status.textContent).toContain('credential rejected')
   })
 
   it('names an unconnected tracker without hiding the other one', async () => {
     listMine.mockResolvedValue({
       issues: [issueSummaryOf()],
-      failures: [{ tracker: 'jira', error: 'not-connected' }],
+      failures: [{ tracker: 'linear', error: 'not-connected' }],
     })
     open()
     const status = await screen.findByRole('status')
@@ -262,9 +257,9 @@ describe('LinkIssueDialog — shortcuts and odd failures', () => {
   it('names a failure it has no words for by its code', async () => {
     listMine.mockResolvedValue({
       issues: [issueSummaryOf()],
-      failures: [{ tracker: 'jira', error: 'brand-new-error' }],
+      failures: [{ tracker: 'linear', error: 'brand-new-error' }],
     })
     open()
-    expect((await screen.findByRole('status')).textContent).toBe('Jira brand-new-error')
+    expect((await screen.findByRole('status')).textContent).toBe('Linear brand-new-error')
   })
 })

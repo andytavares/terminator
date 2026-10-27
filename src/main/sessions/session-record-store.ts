@@ -100,7 +100,7 @@ function agentOf(value: unknown): AgentConversation | null {
 function linkOf(value: unknown): WorkItemRef | null {
   if (typeof value !== 'object' || value === null) return null
   const link = value as Partial<WorkItemRef>
-  if (link.tracker !== 'linear' && link.tracker !== 'jira') return null
+  if (link.tracker !== 'linear') return null
   if (typeof link.key !== 'string' || link.key === '') return null
   return { tracker: link.tracker, key: link.key }
 }

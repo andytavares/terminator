@@ -166,7 +166,7 @@ describe('task store merge — what the receiver keeps', () => {
     const into = await store.createTask({
       title: 'Billing',
       lanes: [api],
-      ticket: { tracker: 'jira', key: 'BIL-1' },
+      ticket: { tracker: 'linear', key: 'BIL-1' },
     })
     const from = await store.createTask({
       title: 'Infra',
@@ -174,7 +174,7 @@ describe('task store merge — what the receiver keeps', () => {
       ticket: { tracker: 'linear', key: 'NW-88' },
     })
     expect((await store.mergeTasks(from.id, into.id)).ticket).toEqual({
-      tracker: 'jira',
+      tracker: 'linear',
       key: 'BIL-1',
     })
   })

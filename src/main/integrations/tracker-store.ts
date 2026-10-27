@@ -19,20 +19,12 @@ import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 // inspect is a file you cannot debug. Written atomically so a crash mid-write
 // cannot leave a half-file that reads as "not connected" on next launch.
 
-const TRACKERS: readonly TrackerId[] = ['linear', 'jira']
+const TRACKERS: readonly TrackerId[] = ['linear']
 const FILE_NAME = 'integrations.json'
-const LEGACY_FILE_NAME = 'speckit-pilot-creds.json'
-
-const DEFAULT_JIRA_JQL =
-  'assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC'
 
 interface StoredTracker {
   /** base64 of the safeStorage ciphertext. Absent means not connected. */
   secret?: string
-  /** Jira only. Not a secret — it is in every issue URL. */
-  site?: string
-  /** Jira only. Not a secret. */
-  email?: string
   mine?: MineSelector
   account?: TrackerAccount
   lastError?: TrackerErrorKind
@@ -42,10 +34,6 @@ type StoreFile = Partial<Record<TrackerId, StoredTracker>>
 
 function filePath(): string {
   return path.join(app.getPath('userData'), FILE_NAME)
-}
-
-function legacyPath(): string {
-  return path.join(app.getPath('userData'), LEGACY_FILE_NAME)
 }
 
 function encrypt(value: string): string {
@@ -72,7 +60,10 @@ async function readStoreFile(file: string): Promise<StoreFile> {
   try {
     const raw = await fs.readFile(file, 'utf8')
     const parsed: unknown = JSON.parse(raw)
-    return typeof parsed === 'object' && parsed !== null ? (parsed as StoreFile) : {}
+    if (typeof parsed !== 'object' || parsed === null) return {}
+    // An older release stored a second tracker here; only known trackers are kept.
+    const { linear } = parsed as StoreFile
+    return linear === undefined ? {} : { linear }
   } catch {
     // Missing or unreadable: no credentials. Never a startup failure.
     return {}
@@ -109,20 +100,14 @@ function update(tracker: TrackerId, patch: Partial<StoredTracker>): Promise<void
   })
 }
 
-function defaultMine(tracker: TrackerId): MineSelector {
-  return tracker === 'linear'
-    ? { kind: 'assignee', email: null }
-    : { kind: 'query', jql: DEFAULT_JIRA_JQL }
+function defaultMine(): MineSelector {
+  return { kind: 'assignee', email: null }
 }
 
 export async function setCredential(cred: StoredCredential): Promise<void> {
   // Encrypt before touching the file: an unavailable keychain must leave no
   // trace behind, not a half-written entry.
-  const secret = encrypt(cred.tracker === 'linear' ? cred.apiKey : cred.apiToken)
-  await update(cred.tracker, {
-    secret,
-    ...(cred.tracker === 'jira' ? { site: cred.site, email: cred.email } : {}),
-  })
+  await update(cred.tracker, { secret: encrypt(cred.apiKey) })
 }
 
 export async function getCredential(tracker: TrackerId): Promise<StoredCredential | null> {
@@ -130,17 +115,13 @@ export async function getCredential(tracker: TrackerId): Promise<StoredCredentia
   if (entry?.secret === undefined) return null
   const secret = decrypt(entry.secret)
   if (secret === null) return null
-
-  if (tracker === 'linear') return { tracker: 'linear', apiKey: secret }
-  if (entry.site === undefined || entry.email === undefined) return null
-  return { tracker: 'jira', site: entry.site, email: entry.email, apiToken: secret }
+  return { tracker, apiKey: secret }
 }
 
 export function clearCredential(tracker: TrackerId): Promise<void> {
   return editStoreFile((data) => {
     // The mine selector survives a disconnect: it is the operator's
-    // configuration, not the credential's, and retyping a JQL query because a
-    // token expired is a small insult that adds up.
+    // configuration, not the credential's.
     const kept = data[tracker]?.mine
     data[tracker] = kept === undefined ? {} : { mine: kept }
   })
@@ -162,7 +143,7 @@ export async function setMine(tracker: TrackerId, mine: MineSelector): Promise<v
 }
 
 export async function getMine(tracker: TrackerId): Promise<MineSelector> {
-  return (await serialized(readStoreFile))[tracker]?.mine ?? defaultMine(tracker)
+  return (await serialized(readStoreFile))[tracker]?.mine ?? defaultMine()
 }
 
 /**
@@ -177,73 +158,8 @@ export async function listConnections(): Promise<TrackerConnection[]> {
       tracker,
       connected: entry.secret !== undefined,
       account: entry.account ?? null,
-      site: tracker === 'jira' ? (entry.site ?? null) : null,
-      mine: entry.mine ?? defaultMine(tracker),
+      mine: entry.mine ?? defaultMine(),
       lastError: entry.lastError ?? null,
     }
   })
-}
-
-interface LegacyFile {
-  linearKey?: string
-  linearEmail?: string
-  jiraCreds?: { domain?: string; email?: string; apiToken?: string; jql?: string }
-}
-
-/**
- * Adopt the credentials the SpecKit Pilot extension stored, once (FR-004).
- *
- * The operator already gave these; asking again because the code moved would
- * be the migration failing at the only thing it exists to do. The legacy file
- * is renamed rather than deleted so a bad migration is recoverable by hand,
- * and an existing credential here always wins — this never overwrites
- * something entered in the new settings.
- */
-export async function migrateLegacyCredentials(): Promise<void> {
-  let legacy: LegacyFile
-  try {
-    legacy = JSON.parse(await fs.readFile(legacyPath(), 'utf8')) as LegacyFile
-  } catch {
-    // Absent, or corrupt beyond use. Neither is worth failing startup over.
-    return
-  }
-
-  try {
-    await editStoreFile((data) => adoptLegacy(data, legacy))
-    await fs.rename(legacyPath(), `${legacyPath()}.bak`)
-  } catch {
-    // A migration that cannot finish leaves the legacy file in place so it can
-    // be retried, and the operator can still connect by hand.
-  }
-}
-
-/** The legacy file's credentials, for any tracker that has none yet. */
-function adoptLegacy(data: StoreFile, legacy: LegacyFile): void {
-  adoptLegacyLinear(data, legacy)
-  adoptLegacyJira(data, legacy)
-}
-
-function adoptLegacyLinear(data: StoreFile, legacy: LegacyFile): void {
-  if (legacy.linearKey === undefined || data.linear?.secret !== undefined) return
-  const key = decrypt(legacy.linearKey)
-  if (key === null) return
-  data.linear = {
-    ...data.linear,
-    secret: encrypt(key),
-    mine: { kind: 'assignee', email: legacy.linearEmail ?? null },
-  }
-}
-
-function adoptLegacyJira(data: StoreFile, legacy: LegacyFile): void {
-  const jira = legacy.jiraCreds
-  if (jira?.apiToken === undefined || data.jira?.secret !== undefined) return
-  const token = decrypt(jira.apiToken)
-  if (token === null || jira.domain === undefined || jira.email === undefined) return
-  data.jira = {
-    ...data.jira,
-    secret: encrypt(token),
-    site: jira.domain,
-    email: jira.email,
-    mine: { kind: 'query', jql: jira.jql ?? DEFAULT_JIRA_JQL },
-  }
 }

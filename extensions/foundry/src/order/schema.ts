@@ -34,7 +34,7 @@ export const WriteBackSchema = z.enum(['summary_comment', 'status', 'pr_link'])
 
 const SourceSchema = z.object({
   kind: z.enum(['typed', 'tracker', 'failing_run', 'review_comment', 'deferred', 'signal']),
-  tracker: z.enum(['linear', 'jira']).nullable().default(null),
+  tracker: z.enum(['linear']).nullable().default(null),
   key: z.string().nullable().default(null),
   url: z.string().nullable().default(null),
   // The tracker's own branch name. Kept here because the plan's lanes are the

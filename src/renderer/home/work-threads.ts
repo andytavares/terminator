@@ -79,7 +79,7 @@ export interface ThreadGroup {
 }
 
 /** Ticket keys read "<tracker>:<key>"; a repo key starts with a path. */
-const TICKET_KEY = /^(linear|jira):/
+const TICKET_KEY = /^linear:/
 
 /** One string per piece of work, so sessions, facets and issues can be joined on it. */
 export function workKeyId(key: WorkKey): string {

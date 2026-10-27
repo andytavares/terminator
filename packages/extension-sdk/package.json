@@ -1,6 +1,6 @@
 {
   "name": "@terminator/extension-sdk",
-  "version": "5.2.0",
+  "version": "6.0.0",
   "description": "The Extension API declaration and the helpers every Terminator extension shares",
   "type": "module",
   "main": "./src/index.ts",

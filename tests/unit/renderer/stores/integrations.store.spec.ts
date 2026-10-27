@@ -30,7 +30,6 @@ function connection(over: Partial<TrackerConnection> = {}): TrackerConnection {
     tracker: 'linear',
     connected: true,
     account: { name: 'Andrew', email: 'a@b.co' },
-    site: null,
     mine: { kind: 'assignee', email: null },
     lastError: null,
     ...over,
@@ -96,31 +95,19 @@ describe('integrations store — connect', () => {
 
   it('falls back to a plain message when the error carries none', async () => {
     api.connect.mockResolvedValue({ error: 'failed' })
-    await useIntegrationsStore
-      .getState()
-      .connect({ tracker: 'jira', site: 's', email: 'e', apiToken: 't', jql: 'q' })
-    expect(useIntegrationsStore.getState().connectError.jira).toBe('Could not connect')
-  })
-
-  it('keeps each tracker error separate', async () => {
-    api.connect.mockResolvedValue({ error: 'failed', message: 'linear broke' })
     await useIntegrationsStore.getState().connect({ tracker: 'linear', apiKey: 'x' })
-    expect(useIntegrationsStore.getState().connectError.jira).toBeUndefined()
+    expect(useIntegrationsStore.getState().connectError.linear).toBe('Could not connect')
   })
 })
 
-describe('integrations store — connect — clears one tracker error without touching the other', () => {
-  it('clears one tracker error without touching the other', async () => {
+describe('integrations store — connect — clears a tracker error', () => {
+  it('clears the error of the tracker named', async () => {
     api.connect.mockResolvedValue({ error: 'failed', message: 'boom' })
     await useIntegrationsStore.getState().connect({ tracker: 'linear', apiKey: 'x' })
-    await useIntegrationsStore
-      .getState()
-      .connect({ tracker: 'jira', site: 's', email: 'e', apiToken: 't', jql: 'q' })
 
     useIntegrationsStore.getState().clearConnectError('linear')
 
     expect(useIntegrationsStore.getState().connectError.linear).toBeUndefined()
-    expect(useIntegrationsStore.getState().connectError.jira).toBe('boom')
   })
 })
 
@@ -137,10 +124,10 @@ describe('integrations store — disconnect and mine', () => {
   it('stores a mine selector and reloads', async () => {
     api.setMine.mockResolvedValue({ ok: true })
     api.status.mockResolvedValue({ connections: [connection()] })
-    await useIntegrationsStore.getState().setMine('jira', { kind: 'query', jql: 'project = TAV' })
+    await useIntegrationsStore.getState().setMine('linear', { kind: 'assignee', email: 'me@x.co' })
     expect(api.setMine).toHaveBeenCalledWith({
-      tracker: 'jira',
-      mine: { kind: 'query', jql: 'project = TAV' },
+      tracker: 'linear',
+      mine: { kind: 'assignee', email: 'me@x.co' },
     })
   })
 })
@@ -154,9 +141,9 @@ describe('integrations store — subscription', () => {
     })
 
     useIntegrationsStore.getState().subscribe()
-    push?.({ connections: [connection({ tracker: 'jira' })] })
+    push?.({ connections: [connection({ connected: false })] })
 
-    expect(useIntegrationsStore.getState().connections[0].tracker).toBe('jira')
+    expect(useIntegrationsStore.getState().connections[0].connected).toBe(false)
   })
 
   it('ignores a malformed push rather than blanking the panel', () => {
@@ -191,8 +178,7 @@ describe('integrations store — subscription — unsubscribes from both channel
 
 describe('integrations store — selectors', () => {
   it('finds a connection by tracker', () => {
-    useIntegrationsStore.setState({ connections: [connection(), connection({ tracker: 'jira' })] })
-    expect(useIntegrationsStore.getState().connectionFor('jira')?.tracker).toBe('jira')
+    useIntegrationsStore.setState({ connections: [connection()] })
     expect(useIntegrationsStore.getState().connectionFor('linear')?.tracker).toBe('linear')
   })
 
@@ -437,12 +423,6 @@ describe('integrations store — issues by key', () => {
     expect(api.getIssue).toHaveBeenCalledTimes(1)
     expect(api.getIssue).toHaveBeenCalledWith({ tracker: 'linear', key: 'NW-88' })
     expect(useIntegrationsStore.getState().issueByKey('linear', 'NW-88')).toEqual(ISSUE)
-  })
-
-  it('keeps the same key apart across trackers', async () => {
-    api.getIssue.mockResolvedValue({ issue: ISSUE })
-    await useIntegrationsStore.getState().loadIssue('linear', 'NW-88')
-    expect(useIntegrationsStore.getState().issueByKey('jira', 'NW-88')).toBeUndefined()
   })
 
   it('records an issue that could not be read as null', async () => {

@@ -193,12 +193,12 @@ function findingByIssueTests() {
 }
 
 function trackersAndTheLedgerTests() {
-  it('does not confuse the same key on two different trackers', async () => {
+  it('does not find an order for a key it was not made from', async () => {
     const store = createOrderStore(root)
     await store.save(
       order({ id: 'WO-l', source: { kind: 'tracker', tracker: 'linear', key: 'X-1', url: 'u' } })
     )
-    expect(await store.findByIssue('jira', 'X-1')).toBeNull()
+    expect(await store.findByIssue('linear', 'X-2')).toBeNull()
   })
 
   it('appends a decision to that order own ledger', async () => {

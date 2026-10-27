@@ -19,7 +19,6 @@ import type {
   TrackerTeam,
   TransitionIntent,
 } from './issues'
-import type { BuiltInExtensionExports } from './extensions'
 import type { GithubAPI } from './github'
 
 export interface Disposable {
@@ -101,13 +100,6 @@ export interface NativeMenuItemContribution {
 }
 
 export type ToastType = 'info' | 'success' | 'warning' | 'error'
-
-export interface SessionSnapshot {
-  readonly id: string
-  readonly projectId: string
-  readonly tabTitle: string
-  readonly type: 'human' | 'agent'
-}
 
 export interface CommandContribution {
   id: string
@@ -442,9 +434,7 @@ export interface HomeAsk {
   open: { command: string; args?: unknown }
 }
 
-export type WorkKey =
-  | { tracker: 'linear' | 'jira'; key: string }
-  | { repoRoot: string; branch: string }
+export type WorkKey = { tracker: TrackerId; key: string } | { repoRoot: string; branch: string }
 
 export interface ThreadFacet {
   workKey: WorkKey
@@ -538,14 +528,6 @@ export interface ExtensionAPI {
     addProject(input: CreateProjectInput): Promise<ProjectSnapshot | null>
     deleteProject(projectId: string): void
   }
-  /** Other extensions' APIs, each the value its `activate` returns (since 2.1.0). List the
-   * provider in your manifest's `extensionDependencies`: the host activates it first, and fails
-   * yours when it is missing, failed, or in a dependency cycle. */
-  extensions: {
-    /** The provider's `activate` return value. Throws for an id the manifest does not declare. */
-    get<K extends keyof BuiltInExtensionExports>(extensionId: K): BuiltInExtensionExports[K]
-    get<T = unknown>(extensionId: string): T
-  }
   shell: {
     /** Runs git or gh without a shell. Resolves for every outcome of the command; read
      * `exitCode`. Rejects, running nothing, with an error named 'CwdOutOfScopeError' when `cwd`
@@ -627,10 +609,6 @@ export interface ExtensionAPI {
     onWindowEvent(channel: string, handler: (...args: unknown[]) => void): () => void
     /** A promise since 4.0.0. */
     isRemoteAccessible(channel: string): Promise<boolean>
-  }
-  terminal: {
-    onSessionCreate(handler: (session: Readonly<SessionSnapshot>) => void): Disposable
-    onSessionClose(handler: (sessionId: string) => void): Disposable
   }
   pty: PtyManagerAPI
   /** Agents over the Agent Client Protocol. Since 5.2.0. */

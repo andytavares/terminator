@@ -99,7 +99,8 @@ export function planFor(workflow, { all = false } = {}) {
 }
 
 /** The plan for a selection with no unit spec: CI skips the unit job, and with it the steps that
- * merge its blobs, so ci:local does too. */
+ * merge its blobs, so ci:local does too.
+ * @template {{ needsUnit?: boolean }} T @param {T[]} steps @returns {T[]} */
 export const withoutUnitWork = (steps) => steps.filter((step) => !step.needsUnit)
 
 /** How many shards the e2e job runs in, for scripts/ci-e2e-local.mjs to run the same. */

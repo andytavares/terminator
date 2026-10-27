@@ -29,11 +29,11 @@ describe('branchFromIssue — the tracker knows best', () => {
 })
 
 describe('branchFromIssue — deriving one when the tracker offers none', () => {
-  it('falls back to key and title for Jira', () => {
+  it('falls back to key and title when the tracker suggests none', () => {
     const branch = branchFromIssue(
-      summary({ tracker: 'jira', key: 'TAV-7', title: 'Move Jira behind it', branchName: null })
+      summary({ key: 'TAV-7', title: 'Move Linear behind it', branchName: null })
     )
-    expect(branch).toBe('tav-7-move-jira-behind-it')
+    expect(branch).toBe('tav-7-move-linear-behind-it')
   })
 
   it('lower-cases and hyphenates', () => {

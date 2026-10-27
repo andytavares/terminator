@@ -14,7 +14,7 @@ interface CoreWorkspaceSummary {
 
 interface CoreIssueLink {
   key: string
-  tracker: 'linear' | 'jira'
+  tracker: 'linear'
 }
 
 export interface CoreActionDeps {
@@ -202,8 +202,6 @@ const RESUME: CoreActionSpec = {
 }
 
 const linkedIssueKey = (d: CoreActionDeps): string | undefined => d.issueLink?.key
-const trackerName = (d: CoreActionDeps): string =>
-  d.issueLink?.tracker === 'linear' ? 'Linear' : 'Jira'
 
 const WORKSPACE_ACTIONS: CoreActionSpec[] = [
   {
@@ -258,8 +256,7 @@ const WORKSPACE_ACTIONS: CoreActionSpec[] = [
   },
   {
     id: 'core.open-issue',
-    label: (d) =>
-      d.issueLink ? `Open ${linkedIssueKey(d)} in ${trackerName(d)}` : 'Open issue in tracker',
+    label: (d) => (d.issueLink ? `Open ${linkedIssueKey(d)} in Linear` : 'Open issue in tracker'),
     group: 'workspace',
     mnemonic: 'o',
     requires: 'issue',

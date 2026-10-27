@@ -11,7 +11,6 @@ import type { ExtensionSettingsSnapshot } from '../setting-scope.js'
 /** What main sends to activate one backend in the extension host. */
 export interface BackendRecord extends BackendFiles {
   id: string
-  dependencies: string[]
 }
 
 /** What the runtime reads and loads backends with, besides its port to main. */
@@ -24,7 +23,6 @@ export interface HostRuntimeDeps {
 interface Active {
   record: BackendRecord
   module: BackendModule
-  exports: unknown
   callbacks: CallbackRegistry
 }
 
@@ -74,11 +72,10 @@ export class HostRuntime {
       const active: Active = {
         record,
         module,
-        exports: undefined,
         callbacks: new CallbackRegistry(),
       }
       this.active.set(record.id, active)
-      active.exports = await module.activate?.(this.apiFor(record, active.callbacks))
+      await module.activate?.(this.apiFor(record, active.callbacks))
     } catch (error) {
       this.active.delete(record.id)
       this.loader.forget(record)
@@ -95,7 +92,6 @@ export class HostRuntime {
       callbacks,
       channels: this.channels,
       commands: this.commands,
-      exportsOf: (dependencyId) => this.exportsFor(record, dependencyId),
       report: (error) => console.error(`[${record.id}]`, error),
     })
   }
@@ -109,15 +105,6 @@ export class HostRuntime {
     } finally {
       this.loader.forget(active.record)
     }
-  }
-
-  private exportsFor(record: BackendRecord, dependencyId: string): unknown {
-    if (!record.dependencies.includes(dependencyId)) {
-      throw new Error(
-        `Extension "${record.id}" did not declare "${dependencyId}" in extensionDependencies`
-      )
-    }
-    return this.active.get(dependencyId)?.exports
   }
 
   private dispatch(channel: string, payload: unknown): Promise<unknown> {

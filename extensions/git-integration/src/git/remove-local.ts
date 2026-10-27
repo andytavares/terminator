@@ -1,4 +1,4 @@
-import { parseWorktreePorcelain } from './local-inventory.js'
+import type { WorktreeEntry } from './local-inventory.js'
 
 // The Worktrees tab's removals: each item's worktree first, then its branch,
 // and one `git worktree prune` at the end.
@@ -31,6 +31,7 @@ interface ShellSession {
 /** The part of the shell removeLocalItems needs. */
 export interface RemoveShell {
   exec(cwd: string, args: string[]): Promise<string>
+  listWorktrees(repoRoot: string): Promise<WorktreeEntry[]>
   listProjects(): Promise<ShellProject[]>
   listSessions(): Promise<ShellSession[]>
   deleteProject(projectId: string): void
@@ -98,11 +99,11 @@ function errorMessage(error: unknown): string {
 }
 
 async function contextFor(repoRoot: string, shell: RemoveShell): Promise<RemoveContext> {
-  const porcelain = await shell.exec(repoRoot, ['worktree', 'list', '--porcelain'])
+  const worktrees = await shell.listWorktrees(repoRoot)
   return {
     repoRoot,
     shell,
-    mainWorktree: parseWorktreePorcelain(porcelain)[0]?.path ?? repoRoot,
+    mainWorktree: worktrees[0]?.path ?? repoRoot,
     currentBranch: (await shell.exec(repoRoot, ['rev-parse', '--abbrev-ref', 'HEAD'])).trim(),
     projects: await shell.listProjects(),
     sessions: await shell.listSessions(),

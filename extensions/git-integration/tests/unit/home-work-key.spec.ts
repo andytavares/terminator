@@ -23,7 +23,7 @@ describe('parseTicketKey', () => {
 
 const MY_ISSUES: TicketIndex = new Map([
   ['TAV-20', 'linear'],
-  ['ENG-9', 'jira'],
+  ['ENG-9', 'linear'],
 ])
 
 describe('workKeyOf', () => {
@@ -34,7 +34,7 @@ describe('workKeyOf', () => {
 
   it('falls back to the title ticket', () => {
     const pr = dashboardPrFixture({ headRefName: 'fix/cache', title: 'ENG-9 Fix the cache' })
-    expect(workKeyOf(pr, MY_ISSUES)).toEqual({ tracker: 'jira', key: 'ENG-9' })
+    expect(workKeyOf(pr, MY_ISSUES)).toEqual({ tracker: 'linear', key: 'ENG-9' })
   })
 
   it('falls back to the checkout and branch', () => {

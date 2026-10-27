@@ -8,12 +8,12 @@ import type { Task, TaskCreateInput, TaskLane } from '../../../shared/schemas/ta
 import { TASK_TITLE_MAX_LENGTH } from '../../../shared/task-title'
 import type { Workspace } from '../../../shared/types/index'
 
-const TICKET_KEY = /^(linear|jira):(.+)$/
+const TICKET_KEY = /^(linear):(.+)$/
 
 /** The ticket a ticket-keyed thread is joined under, so storing it as a task keeps its ticket. */
 function ticketOf(thread: WorkThread): TaskCreateInput['ticket'] {
   const [, tracker, key] = TICKET_KEY.exec(thread.key) ?? []
-  return tracker ? { tracker: tracker as 'linear' | 'jira', key } : null
+  return tracker ? { tracker: tracker as 'linear', key } : null
 }
 
 /** The stored task holding the first of these lanes; a write returns no id, so it is looked up. */

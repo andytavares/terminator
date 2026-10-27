@@ -106,9 +106,7 @@ function NotConnected(): JSX.Element {
   return (
     <div className="link-issue__empty">
       <p>No issue tracker is connected.</p>
-      <p className="link-issue__hint">
-        Connect Linear or Jira in Settings → Integrations, then come back.
-      </p>
+      <p className="link-issue__hint">Connect Linear in Settings → Integrations, then come back.</p>
     </div>
   )
 }

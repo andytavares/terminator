@@ -14,11 +14,7 @@ vi.mock('../src/ipc/projects.ipc.js', () => ({
   registerProjectsIpcHandlers: vi.fn(() => vi.fn()),
 }))
 vi.mock('../src/ipc/links.ipc.js', () => ({ registerLinksIpcHandlers: vi.fn(() => vi.fn()) }))
-vi.mock('../src/ipc/kanban.ipc.js', () => ({ registerKanbanIpcHandlers: vi.fn(() => vi.fn()) }))
 vi.mock('../src/ipc/admin.ipc.js', () => ({ registerAdminIpcHandlers: vi.fn(() => vi.fn()) }))
-vi.mock('../src/ipc/weekly-review.ipc.js', () => ({
-  registerWeeklyReviewIpcHandlers: vi.fn(() => vi.fn()),
-}))
 vi.mock('../src/vault/db.js', () => ({
   applyTaskVaultSchema: vi.fn().mockResolvedValue(undefined),
 }))
@@ -80,8 +76,6 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('the weekly review nudge', weeklyReviewNudgeTests)
-
 describe('task-vault manifest quick action', () => {
   it('declares a Task Vault group and a mnemonic on the capture command', () => {
     const manifest = JSON.parse(readFileSync(join(__dirname, '../manifest.json'), 'utf-8')) as {
@@ -108,107 +102,6 @@ describe(
   'task-vault activate() quick-actions command registration',
   taskVaultActivateQuickActionsTests
 )
-
-describe('task-vault activate() exports (ADR 094)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('returns an API whose open() takes the operator to the destination it was given', async () => {
-    const { api } = makeApi()
-    const { activate } = await import('../src/index.ts')
-    const { openInVault } = await import('../src/navigation.js')
-    const vault = await activate(api)
-    vault.open({ taskId: 'task-1', view: 'daily' })
-
-    expect(openInVault).toHaveBeenCalledWith(api, { taskId: 'task-1', view: 'daily' })
-  })
-
-  it('returns an API whose openCapture() opens the capture overlay, as the command does', async () => {
-    const { api } = makeApi()
-    const { activate } = await import('../src/index.ts')
-    const vault = await activate(api)
-    vault.openCapture()
-
-    expect(api.window.raise).toHaveBeenCalled()
-    expect(api.window.broadcast).toHaveBeenCalledWith('task-vault:push:open-capture', undefined)
-    expect(api.window.broadcast).toHaveBeenCalledWith(
-      'extension:activate-global-tab',
-      'terminator.task-vault'
-    )
-    expect(api.window.focusSelf).toHaveBeenCalledWith('main')
-  })
-})
-
-const REVIEW_DAY = 'terminator.task-vault.weeklyReviewDay'
-// 2026-10-14 is a Wednesday, day 3.
-const WEDNESDAY_MORNING = new Date(2026, 9, 14, 9, 0)
-const DAY_MS = 24 * 60 * 60 * 1000
-
-/** How many "Weekly review is ready" notifications the API was asked for. */
-function reviewNudges(api: ExtensionAPI): number {
-  return vi
-    .mocked(api.notifications.createNotification)
-    .mock.calls.filter(([notification]) => notification.title === 'Weekly review is ready').length
-}
-
-function weeklyReviewNudgeTests() {
-  beforeEach(() => vi.setSystemTime(WEDNESDAY_MORNING))
-
-  it('comes on the day "Weekly Review Day" names, and not on another', async () => {
-    const { activate, deactivate } = await import('../src/index.ts')
-    const onWednesday = makeApi({ [REVIEW_DAY]: '3' }).api
-    await activate(onWednesday)
-    await deactivate()
-    const onMonday = makeApi({ [REVIEW_DAY]: '1' }).api
-    await activate(onMonday)
-    await deactivate()
-
-    expect(reviewNudges(onWednesday)).toBe(1)
-    expect(reviewNudges(onMonday)).toBe(0)
-  })
-
-  it('follows a day changed after activation, from the next daily check', async () => {
-    const settings: Record<string, unknown> = { [REVIEW_DAY]: '1' }
-    const { api } = makeApi(settings)
-    const { activate, deactivate } = await import('../src/index.ts')
-    await activate(api)
-    settings[REVIEW_DAY] = '4'
-    vi.advanceTimersByTime(DAY_MS)
-    await deactivate()
-
-    expect(reviewNudges(api)).toBe(1)
-  })
-
-  describe('the daily check', weeklyReviewNudgeDailyCheckTests)
-}
-
-function weeklyReviewNudgeDailyCheckTests() {
-  it('comes on a review day that has 23 hours, when the app was started late the evening before', async () => {
-    vi.stubEnv('TZ', 'America/New_York')
-    // Saturday 23:30; the clocks go forward on Sunday, so 24 hours later is Monday 00:30.
-    vi.setSystemTime(new Date('2026-03-07T23:30:00'))
-    const { api } = makeApi({ [REVIEW_DAY]: '0' })
-    const { activate, deactivate } = await import('../src/index.ts')
-    await activate(api)
-    vi.advanceTimersByTime(DAY_MS)
-    await deactivate()
-    vi.unstubAllEnvs()
-
-    expect(reviewNudges(api)).toBe(1)
-  })
-
-  it('checks once a day for as long as the app runs', async () => {
-    const { api } = makeApi({ [REVIEW_DAY]: '3' })
-    const { activate, deactivate } = await import('../src/index.ts')
-    await activate(api)
-    vi.advanceTimersByTime(14 * DAY_MS)
-    await deactivate()
-    vi.advanceTimersByTime(14 * DAY_MS)
-
-    expect(reviewNudges(api)).toBe(3)
-  })
-}
 
 function taskVaultActivateQuickActionsTests() {
   beforeEach(() => {

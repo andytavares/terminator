@@ -122,7 +122,7 @@ describe('SessionLinkDialog — says where to connect a tracker when none is', (
     useIntegrationsStore.setState({ connections: [] })
     render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
     expect(screen.getByRole('alert').textContent).toBe(
-      'No issue tracker is connected. Connect Linear or Jira in Settings → Integrations.'
+      'No issue tracker is connected. Connect Linear in Settings → Integrations.'
     )
     expect(screen.queryByRole('button', { name: 'pick NW-88' })).toBeNull()
   })

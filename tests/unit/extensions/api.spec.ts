@@ -322,28 +322,6 @@ describe('api.nativeMenu.addViewMenuItem — menu rebuilds', () => {
   })
 })
 
-describe('api.terminal session handlers', () => {
-  it('onSessionCreate registers handler and returns disposable', async () => {
-    const { createExtensionAPI, globalRegistry } = await import('../../../src/main/extensions/api')
-    const api = createExtensionAPI('com.term.test')
-    const handler = vi.fn()
-    const disposable = api.terminal.onSessionCreate(handler)
-    expect(globalRegistry.sessionCreateHandlers.has(handler)).toBe(true)
-    disposable.dispose()
-    expect(globalRegistry.sessionCreateHandlers.has(handler)).toBe(false)
-  })
-
-  it('onSessionClose registers handler and returns disposable', async () => {
-    const { createExtensionAPI, globalRegistry } = await import('../../../src/main/extensions/api')
-    const api = createExtensionAPI('com.term.test2')
-    const handler = vi.fn()
-    const disposable = api.terminal.onSessionClose(handler)
-    expect(globalRegistry.sessionCloseHandlers.has(handler)).toBe(true)
-    disposable.dispose()
-    expect(globalRegistry.sessionCloseHandlers.has(handler)).toBe(false)
-  })
-})
-
 function useEmptySettingsStore(): void {
   beforeEach(() => {
     // Clear mock store between tests
@@ -730,13 +708,6 @@ describe('what the extension host cannot reach itself — refusals and paths', (
   it('refuses the database before the app database is open', () => {
     const api = createExtensionAPI('com.nodb')
     expect(() => api.db.exec('SELECT 1')).toThrow('Extension "com.nodb": AppDB not initialized')
-  })
-
-  it("refuses another extension's exports, which only the extension host holds", () => {
-    const api = createExtensionAPI('com.exports')
-    expect(() => api.extensions.get('com.other')).toThrow(
-      '"com.other" exports are only reachable in the extension host'
-    )
   })
 
   it("paths are the app's directory and the extension's own folder under userData", () => {

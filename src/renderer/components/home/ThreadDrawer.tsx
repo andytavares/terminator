@@ -21,7 +21,7 @@ import type { WorkThread } from '../../home/work-threads'
 import './ThreadDrawer.css'
 
 const MINUTE_MS = 60_000
-const TRACKER_NAMES: Record<string, string> = { linear: 'Linear', jira: 'Jira' }
+const TRACKER_NAMES: Record<string, string> = { linear: 'Linear' }
 
 function LinkButtons({ thread }: { thread: WorkThread }): JSX.Element {
   const pr = pullRequestOf(thread)

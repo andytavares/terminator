@@ -66,7 +66,6 @@ function terminalHostApi(): ExtensionAPI {
     callbacks: new CallbackRegistry(),
     channels: new Map(),
     commands: new Map(),
-    exportsOf: () => undefined,
     report: () => {},
   })
 }

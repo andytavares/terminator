@@ -29,7 +29,7 @@ const DEFAULT_LIMIT = 50
 const MAX_RATE_LIMIT_RETRIES = 1
 const DEFAULT_RATE_LIMIT_WAIT_MS = 5000
 
-const TRACKERS: readonly TrackerId[] = ['linear', 'jira']
+const TRACKERS: readonly TrackerId[] = ['linear']
 
 /** `TAV-42`, `ENG-7` — a term shaped like a key is almost always meant as one. */
 const ISSUE_KEY = /^[A-Za-z][A-Za-z0-9_]*-\d+$/

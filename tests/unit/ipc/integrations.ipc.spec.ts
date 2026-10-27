@@ -25,13 +25,10 @@ vi.mock('electron-store', async () =>
 
 // The trackers are the network, so the providers and the issue service built
 // on them are stand-ins. The stores and the agent-context files are real.
-const verify = vi.hoisted(() => ({ linear: vi.fn(), jira: vi.fn() }))
+const verify = vi.hoisted(() => ({ linear: vi.fn() }))
 
 vi.mock('../../../src/main/integrations/providers/linear.provider', () => ({
   createLinearProvider: () => ({ id: 'linear', verify: verify.linear }),
-}))
-vi.mock('../../../src/main/integrations/providers/jira.provider', () => ({
-  createJiraProvider: () => ({ id: 'jira', verify: verify.jira }),
 }))
 
 const service = vi.hoisted(() => ({
@@ -119,7 +116,6 @@ beforeEach(async () => {
   projectDir = makeTempDir('integrations-ipc-proj-')
   sent = []
   verify.linear.mockResolvedValue({ name: 'Andrew', email: 'a@b.c' })
-  verify.jira.mockResolvedValue({ name: 'Andrew', email: 'a@b.c', site: 's.atlassian.net' })
   service.get.mockResolvedValue(TAV_42)
   trackers = await import('../../../src/main/integrations/tracker-store')
   links = await import('../../../src/main/integrations/issue-link-store')
@@ -134,18 +130,22 @@ describe('integrations:status', () => {
       'integrations:status',
       {}
     )
-    expect(result.connections.map((c) => [c.tracker, c.connected])).toEqual([
-      ['linear', true],
-      ['jira', false],
-    ])
+    expect(result.connections.map((c) => [c.tracker, c.connected])).toEqual([['linear', true]])
     expect(JSON.stringify(result)).not.toMatch(/stored-key|secret/)
   })
 
   it('can be narrowed to one tracker', async () => {
-    const result = (await invoke('integrations:status', { tracker: 'jira' })) as {
+    const result = (await invoke('integrations:status', { tracker: 'linear' })) as {
       connections: { tracker: string }[]
     }
-    expect(result.connections.map((c) => c.tracker)).toEqual(['jira'])
+    expect(result.connections.map((c) => c.tracker)).toEqual(['linear'])
+  })
+
+  it('refuses a tracker this release does not have', async () => {
+    await expect(invoke('integrations:status', { tracker: 'jira' })).resolves.toEqual({
+      error: 'failed',
+      message: 'Invalid payload',
+    })
   })
 })
 
@@ -159,17 +159,15 @@ describe('integrations:connect', () => {
   it('stores nothing when the credential is rejected', async () => {
     // The module the handlers were registered with, after this test's resetModules.
     const { TrackerError } = await import('../../../src/main/integrations/tracker-error')
-    verify.jira.mockRejectedValue(new TrackerError('auth-failed', 'Authentication required'))
-    const result = await invoke('integrations:connect', {
-      tracker: 'jira',
-      site: 's.atlassian.net',
-      email: 'a@b.c',
-      apiToken: 'bad',
-      jql: 'x',
-    })
+    verify.linear.mockRejectedValue(new TrackerError('auth-failed', 'Authentication required'))
+    const result = await invoke('integrations:connect', { tracker: 'linear', apiKey: 'bad' })
 
     expect(result).toEqual({ error: 'auth-failed', message: 'Authentication required' })
-    expect(await connectionOf('jira')).toMatchObject({ connected: false, account: null })
+    expect(await trackers.getCredential('linear')).toEqual({
+      tracker: 'linear',
+      apiKey: 'stored-key',
+    })
+    expect((await connectionOf('linear'))?.account).toBeNull()
   })
 })
 
@@ -179,18 +177,9 @@ describe('integrations:connect — what it stores', () => {
     expect((await connectionOf('linear'))?.account).toEqual({ name: 'Andrew', email: 'a@b.c' })
   })
 
-  it('stores the Jira query as its mine selector', async () => {
-    await invoke('integrations:connect', {
-      tracker: 'jira',
-      site: 's.atlassian.net',
-      email: 'a@b.c',
-      apiToken: 't',
-      jql: 'assignee = currentUser()',
-    })
-    expect(await trackers.getMine('jira')).toEqual({
-      kind: 'query',
-      jql: 'assignee = currentUser()',
-    })
+  it('stores the lookup email as its mine selector', async () => {
+    await invoke('integrations:connect', { tracker: 'linear', apiKey: 'k', email: 'me@x.co' })
+    expect(await trackers.getMine('linear')).toEqual({ kind: 'assignee', email: 'me@x.co' })
   })
 
   it('never echoes the credential back', async () => {
@@ -203,16 +192,9 @@ describe('integrations:connect — what it stores', () => {
 })
 
 describe('integrations:disconnect', () => {
-  it('destroys that tracker only', async () => {
-    await trackers.setCredential({
-      tracker: 'jira',
-      site: 's.atlassian.net',
-      email: 'a@b.c',
-      apiToken: 't',
-    })
+  it('destroys the credential', async () => {
     await invoke('integrations:disconnect', { tracker: 'linear' })
     expect(await trackers.getCredential('linear')).toBeNull()
-    expect(await connectionOf('jira')).toMatchObject({ connected: true })
   })
 })
 
@@ -220,11 +202,11 @@ describe('integrations:issue-list-mine', () => {
   it('passes results and failures through unchanged', async () => {
     service.listMine.mockResolvedValue({
       issues: [{ tracker: 'linear', key: 'TAV-42' }],
-      failures: [{ tracker: 'jira', error: 'not-connected' }],
+      failures: [{ tracker: 'linear', error: 'not-connected' }],
     })
     await expect(invoke('integrations:issue-list-mine', {})).resolves.toMatchObject({
       issues: [{ key: 'TAV-42' }],
-      failures: [{ tracker: 'jira', error: 'not-connected' }],
+      failures: [{ tracker: 'linear', error: 'not-connected' }],
     })
   })
 
@@ -318,7 +300,7 @@ describe('integrations:status-changed', () => {
     await invoke('integrations:connect', { tracker: 'linear', apiKey: 'super-secret' })
     const announcement = sent.find((s) => s.channel === 'integrations:status-changed')
     expect(announcement?.data).toMatchObject({
-      connections: [{ tracker: 'linear', account: { name: 'Andrew' } }, { tracker: 'jira' }],
+      connections: [{ tracker: 'linear', account: { name: 'Andrew' } }],
     })
     expect(JSON.stringify(announcement?.data)).not.toContain('super-secret')
   })

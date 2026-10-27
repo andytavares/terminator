@@ -79,13 +79,13 @@ function ownAndSearchedTests() {
 
     vi.mocked(host.issues.search).mockResolvedValueOnce({
       issues: [],
-      failures: [{ tracker: 'jira', message: 'jira is unreachable' }],
+      failures: [{ tracker: 'linear', message: 'linear is unreachable' }],
     } as never)
     const searched = (await host.call('foundry:issues.mine', { term: '  export ' })) as {
       failures: string[]
     }
     expect(host.issues.search).toHaveBeenCalledWith('export', { limit: 50 })
-    expect(searched.failures).toEqual(['jira is unreachable'])
+    expect(searched.failures).toEqual(['linear is unreachable'])
   })
 
   it('answer with the tracker’s own error when it cannot be read', async () => {
@@ -142,7 +142,7 @@ function capabilitiesAndUnknownTrackersTests() {
       draftOrder({
         id: 'WO-1',
         title: 'Make text red',
-        source: { kind: 'tracker', tracker: 'jira', key: 'APP-3', url: null },
+        source: { kind: 'tracker', tracker: 'linear', key: 'APP-3', url: null },
         repoPaths: ['/repos/app'],
         now: '2026-10-12T10:00:00.000Z',
       })

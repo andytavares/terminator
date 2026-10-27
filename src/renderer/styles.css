@@ -165,31 +165,6 @@ button {
   border-radius: var(--tm-radius-sm);
 }
 
-.skeleton--row {
-  height: 12px;
-  width: 70%;
-  margin: 6px 8px;
-  display: block;
-}
-
-.skeleton--text-sm {
-  height: 10px;
-  width: 60%;
-  display: block;
-}
-
-.skeleton--text-md {
-  height: 12px;
-  width: 80%;
-  display: block;
-}
-
-.skeleton--icon {
-  width: 16px;
-  height: 16px;
-  display: inline-block;
-}
-
 /* ── Context Menus ───────────────────────────────────────────── */
 .ctx-menu {
   position: fixed;

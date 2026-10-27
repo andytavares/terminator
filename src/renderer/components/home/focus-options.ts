@@ -6,7 +6,7 @@ import type { WorkThread } from '../../home/work-threads'
  * @internal */
 export function workKeyOfThread(thread: WorkThread): WorkKey | undefined {
   const [tracker, ticket] = thread.key.split(/:(.*)/s)
-  if (thread.ticketKey && (tracker === 'linear' || tracker === 'jira') && ticket) {
+  if (thread.ticketKey && tracker === 'linear' && ticket) {
     return { tracker, key: ticket }
   }
   return thread.facets[0]?.workKey

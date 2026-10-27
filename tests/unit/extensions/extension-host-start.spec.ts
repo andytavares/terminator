@@ -58,8 +58,8 @@ beforeEach(() => {
 afterEach(() => rmSync(bundle, { recursive: true, force: true }))
 
 /** Bundled extensions: a manifest each; the fake extension host holds their backends. */
-function writeBundle(dependenciesById: Record<string, string[] | undefined>): string {
-  for (const [id, extensionDependencies] of Object.entries(dependenciesById)) {
+function writeBundle(ids: Record<string, unknown>): string {
+  for (const id of Object.keys(ids)) {
     const directory = join(bundle, id)
     mkdirSync(directory, { recursive: true })
     const manifest = { id, name: id, version: '1.0.0', description: 'Test extension' }
@@ -69,7 +69,6 @@ function writeBundle(dependenciesById: Record<string, string[] | undefined>): st
         ...manifest,
         main: 'main.js',
         minAppVersion: '0.0.1',
-        extensionDependencies,
       })
     )
   }
@@ -253,91 +252,5 @@ describe('ExtensionHost.whenActivated', () => {
     const { host } = await newExtensionHost()
     await host.startAll({ bundledDirectory: '/nonexistent/bundle', beforeActivation: ready })
     await expect(host.whenActivated('com.unknown')).resolves.toBeUndefined()
-  })
-})
-
-describe('ExtensionHost.start with extensionDependencies (ADR 094)', () => {
-  it('activates a dependency first and tells the extension host what the dependant declared', async () => {
-    const events: string[] = []
-    const { host, backendHost } = await newExtensionHost({
-      'com.a-consumer': () => {
-        events.push('consumer')
-      },
-      'com.z-provider': async () => {
-        events.push('provider')
-      },
-    })
-
-    // Directory order would activate the consumer first.
-    await host.startAll({
-      bundledDirectory: writeBundle({ 'com.a-consumer': ['com.z-provider'], 'com.z-provider': [] }),
-      beforeActivation: ready,
-    })
-
-    expect(events).toEqual(['provider', 'consumer'])
-    expect(backendHost.activated.find((record) => record.id === 'com.a-consumer')).toMatchObject({
-      dependencies: ['com.z-provider'],
-    })
-    expect(extensionsById(host)['com.a-consumer']).toMatchObject({ status: 'enabled' })
-  })
-})
-
-describe('ExtensionHost.start with extensionDependencies — missing dependencies', () => {
-  it('fails activation with a clear message when a dependency is not installed', async () => {
-    const { host, backendHost } = await newExtensionHost()
-
-    await host.startAll({
-      bundledDirectory: writeBundle({ 'com.orphan': ['com.missing'] }),
-      beforeActivation: ready,
-    })
-
-    expect(extensionsById(host)['com.orphan']).toMatchObject({
-      status: 'error',
-      errorMessage: 'Missing extension dependency "com.missing"',
-    })
-    expect(backendHost.activated).toEqual([])
-  })
-
-  it('fails activation when a dependency itself failed to activate', async () => {
-    const { host, backendHost } = await newExtensionHost({
-      'com.broken': () => {
-        throw new Error('boom')
-      },
-    })
-
-    await host.startAll({
-      bundledDirectory: writeBundle({ 'com.broken': [], 'com.dependant': ['com.broken'] }),
-      beforeActivation: ready,
-    })
-
-    expect(extensionsById(host)['com.dependant']).toMatchObject({
-      status: 'error',
-      errorMessage: 'Extension dependency "com.broken" failed to activate',
-    })
-    expect(backendHost.activated).toEqual([])
-  })
-})
-
-describe('ExtensionHost.start with extensionDependencies — cycles', () => {
-  it('fails every extension in a dependency cycle, naming the cycle, and activates the rest', async () => {
-    const { host, backendHost } = await newExtensionHost()
-
-    await host.startAll({
-      bundledDirectory: writeBundle({
-        'com.one': ['com.two'],
-        'com.two': ['com.one'],
-        'com.free': [],
-      }),
-      beforeActivation: ready,
-    })
-
-    const extensions = extensionsById(host)
-    expect(extensions['com.one']).toMatchObject({
-      errorMessage: 'Extension dependency cycle: com.one -> com.two -> com.one',
-    })
-    expect(extensions['com.two']).toMatchObject({
-      errorMessage: 'Extension dependency cycle: com.two -> com.one -> com.two',
-    })
-    expect(backendHost.activated.map((record) => record.id)).toEqual(['com.free'])
   })
 })

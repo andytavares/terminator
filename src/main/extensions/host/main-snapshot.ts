@@ -1,7 +1,7 @@
 import type { ExtensionAPI, TrackerId } from '@terminator/extension-sdk'
 import type { TrackerAbilities, WorkspacesSnapshot } from './snapshot.js'
 
-const TRACKERS: readonly TrackerId[] = ['linear', 'jira']
+const TRACKERS: readonly TrackerId[] = ['linear']
 
 /** Workspaces and projects as `api.workspace` answers in main, for the extension host's copy. */
 export function workspacesOf(workspace: ExtensionAPI['workspace']): WorkspacesSnapshot {

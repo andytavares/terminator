@@ -26,7 +26,7 @@ export const MAX_CONTEXT_CHARS = 10_000
 const MAX_DESCRIPTION_CHARS = 4_000
 const MAX_COMMENTS = 5
 
-const TRACKER_LABELS = { linear: 'Linear', jira: 'Jira' } as const
+const TRACKER_LABELS = { linear: 'Linear' } as const
 
 /**
  * Trim to a length without leaving a fenced code block open.

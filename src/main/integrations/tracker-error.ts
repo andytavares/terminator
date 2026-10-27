@@ -46,7 +46,7 @@ const STATUS_KINDS: ReadonlyMap<number, TrackerErrorKind> = new Map([
 
 /**
  * Translate an HTTP response into the taxonomy. The tracker's own message is
- * kept verbatim — a Jira JQL syntax error is far more useful to the operator
+ * kept verbatim — a query syntax error is far more useful to the operator
  * than "request failed".
  */
 export function fromHttpStatus(

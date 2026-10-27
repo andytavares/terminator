@@ -58,7 +58,7 @@ const CreatePayload = z.object({
   source: z.object({
     kind: z.enum(['typed', 'tracker', 'failing_run', 'review_comment', 'deferred']),
     text: z.string().optional(),
-    tracker: z.enum(['linear', 'jira']).optional(),
+    tracker: z.enum(['linear']).optional(),
     key: z.string().optional(),
   }),
   repoPaths: z.array(z.string()),
@@ -172,7 +172,7 @@ export interface ForgeDeps {
    * them in the order record.
    */
   readonly standingSources: StandingSources & Required<Pick<StandingSources, 'gatesFor'>>
-  readonly readIssue: (tracker: 'linear' | 'jira', key: string) => Promise<IssueLike | null>
+  readonly readIssue: (tracker: 'linear', key: string) => Promise<IssueLike | null>
   /**
    * Which write-backs a new order starts with (FR-062), from configuration.
    *

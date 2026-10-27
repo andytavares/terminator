@@ -114,7 +114,7 @@ function PickerOrNotice({ connected, selected, onSelect }: PickerProps): JSX.Ele
   if (!connected) {
     return (
       <p className="tmui-dialog__description" role="alert">
-        No issue tracker is connected. Connect Linear or Jira in Settings → Integrations.
+        No issue tracker is connected. Connect Linear in Settings → Integrations.
       </p>
     )
   }

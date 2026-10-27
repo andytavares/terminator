@@ -3,10 +3,9 @@
  * accepts these, and the core declares its own tracker code with them.
  */
 
-export type TrackerId = 'linear' | 'jira'
+export type TrackerId = 'linear'
 
-/** Two trackers can issue the same key (`TAV-42` in both), so nothing is identified by key
- * alone. This pair is the identity. */
+/** A tracker and a key together identify an issue; the key alone does not. */
 export interface IssueRef {
   tracker: TrackerId
   key: string
@@ -24,12 +23,11 @@ export type TrackerErrorKind =
    * FR-063). */
   | 'unsupported'
 
-/** How "my issues" is defined, per tracker. Tracker-shaped rather than flattened: Linear
- * identifies an assignee directly, Jira expresses it as a saved query, and pretending those are
- * the same loses information. */
-export type MineSelector =
-  | { kind: 'assignee'; email: string | null }
-  | { kind: 'query'; jql: string }
+/** How "my issues" is defined: Linear identifies an assignee directly. */
+export interface MineSelector {
+  kind: 'assignee'
+  email: string | null
+}
 
 export interface TrackerAccount {
   name: string
@@ -42,8 +40,6 @@ export interface TrackerConnection {
   connected: boolean
   /** Proof the credential was verified — absent means it never was. */
   account: TrackerAccount | null
-  /** Jira only: the site domain. Always null for Linear. */
-  site: string | null
   mine: MineSelector
   /** Set when a credential that worked starts failing. */
   lastError: TrackerErrorKind | null
@@ -68,21 +64,21 @@ export interface IssueComment {
 /** The subset lists and pickers need. No description, no comments. */
 export interface IssueSummary {
   tracker: TrackerId
-  /** The tracker's own stable id — a UUID for Linear, a numeric string for Jira. */
+  /** The tracker's own stable id — a UUID for Linear. */
   id: string
   key: string
   title: string
   url: string
   state: IssueState
   assignee: TrackerAccount | null
-  /** The tracker's suggested VCS branch; always null for Jira. On the summary because the
+  /** The tracker's suggested VCS branch. On the summary because the
    * new-project dialog prefills a branch from a picked row, and Linear returns it on the list's own
    * query: fetching the whole issue for one string would be a request for nothing. */
   branchName: string | null
 }
 
 export interface Issue extends IssueSummary {
-  /** Always markdown. Jira's ADF is converted before it reaches this type. */
+  /** Always markdown. */
   description: string
   labels: string[]
   completed: boolean
@@ -118,7 +114,7 @@ export type TransitionIntent = 'started' | 'in_review' | 'done'
 
 /** One position an issue could be moved to, as this tracker describes it. */
 export interface TrackerStateOption {
-  /** Provider-native identifier: a Linear state id, or a Jira transition id. */
+  /** Provider-native identifier: a Linear state id. */
   readonly id: string
   readonly name: string
   /** Which intent this option satisfies, as the provider understands it. */

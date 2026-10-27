@@ -1,7 +1,11 @@
 import { z } from 'zod'
 import { stat, readFile } from 'node:fs/promises'
 import { defineChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
-import { loadLocalInventory, type InventoryShell } from '../git/local-inventory.js'
+import {
+  loadLocalInventory,
+  type InventoryShell,
+  type WorktreeEntry,
+} from '../git/local-inventory.js'
 import { removeLocalItems, type RemoveShell } from '../git/remove-local.js'
 import { runGit } from '../shell/run-git.js'
 import { RepoRoot } from './repo-root.js'
@@ -38,9 +42,33 @@ function listAllProjects(workspace: Workspace) {
       )
 }
 
-function inventoryShell(workspace: Workspace): InventoryShell {
+/** The core's worktree list for `repoRoot`; git's own order, so the first is the main checkout. */
+function worktreesOf(api: Pick<ExtensionAPI, 'ipc'>) {
+  return async (repoRoot: string): Promise<WorktreeEntry[]> => {
+    const answer = (await api.ipc.invokeChannel('git:list-worktrees', { path: repoRoot })) as
+      | {
+          worktrees: Array<{
+            path: string
+            branch?: string
+            detached?: boolean
+            prunable?: boolean
+          }>
+        }
+      | undefined
+    return (answer?.worktrees ?? []).map((worktree) => ({
+      path: worktree.path,
+      branch: worktree.detached ? null : (worktree.branch ?? null),
+      detached: worktree.detached === true,
+      prunable: worktree.prunable === true,
+    }))
+  }
+}
+
+function inventoryShell(api: Pick<ExtensionAPI, 'workspace' | 'ipc'>): InventoryShell {
+  const { workspace } = api
   return {
     exec: (cwd, args) => runGit(cwd, args, { raw: true }),
+    listWorktrees: worktreesOf(api),
     stat: async (path) => {
       const times = await stat(path).catch(() => null)
       return times ? { birthtimeMs: times.birthtimeMs, mtimeMs: times.mtimeMs } : null
@@ -50,9 +78,11 @@ function inventoryShell(workspace: Workspace): InventoryShell {
   }
 }
 
-function removeShell({ workspace, pty }: Pick<ExtensionAPI, 'workspace' | 'pty'>): RemoveShell {
+function removeShell(api: Pick<ExtensionAPI, 'workspace' | 'pty' | 'ipc'>): RemoveShell {
+  const { workspace, pty } = api
   return {
     exec: (cwd, args) => runGit(cwd, args),
+    listWorktrees: worktreesOf(api),
     listProjects: async () => listAllProjects(workspace)(),
     listSessions: async () =>
       (await pty.listSessions()).map((s) => ({ cwd: s.cwd, projectId: s.projectId })),
@@ -61,15 +91,14 @@ function removeShell({ workspace, pty }: Pick<ExtensionAPI, 'workspace' | 'pty'>
 }
 
 /** git:local-inventory and git:remove-local, the Worktrees tab's two channels. */
-function worktreesChannels(api: Pick<ExtensionAPI, 'workspace' | 'pty'>): ChannelSpec[] {
-  const { workspace } = api
+function worktreesChannels(api: Pick<ExtensionAPI, 'workspace' | 'pty' | 'ipc'>): ChannelSpec[] {
   return [
     defineChannel({
       channel: 'git:local-inventory',
       schema: LocalInventoryPayload,
       invalid: VALIDATION_ERROR,
       run: async ({ repoRoot }) => ({
-        rows: await loadLocalInventory(repoRoot, inventoryShell(workspace)),
+        rows: await loadLocalInventory(repoRoot, inventoryShell(api)),
       }),
       onError: errorEnvelope,
     }),
@@ -85,7 +114,7 @@ function worktreesChannels(api: Pick<ExtensionAPI, 'workspace' | 'pty'>): Channe
 
 export function registerWorktreesHandlers(
   register: RegisterFn,
-  api: Pick<ExtensionAPI, 'workspace' | 'pty'>
+  api: Pick<ExtensionAPI, 'workspace' | 'pty' | 'ipc'>
 ): void {
   for (const spec of worktreesChannels(api)) register(spec)
 }

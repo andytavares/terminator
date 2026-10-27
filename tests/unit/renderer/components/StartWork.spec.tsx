@@ -167,6 +167,16 @@ const open = async (onClose = vi.fn()) => {
 const goToTab = (name: string) => fireEvent.click(screen.getByRole('tab', { name }))
 const rowKeys = () => screen.getAllByTestId('start-work-key').map((n) => n.textContent)
 
+/** A worktree git still has a checkout for. */
+const NOT_DETACHED = { detached: false, prunable: false }
+const DEV_WORKTREE = {
+  path: '/repo/.worktrees/dev',
+  branch: 'dev',
+  isMain: false,
+  head: 'abc',
+  ...NOT_DETACHED,
+}
+
 describe('StartWork — my tickets', () => {
   it('groups tickets by state type, in progress first, and names each group', async () => {
     await open()
@@ -506,7 +516,7 @@ describe('StartWork — scratch and branch tabs', () => {
 describe('StartWork — branch tab', () => {
   it('Branch tab lists the repo worktrees and starts a session on the chosen one', async () => {
     git.listWorktrees.mockResolvedValue({
-      worktrees: [{ path: '/repo/.worktrees/dev', branch: 'dev', isMain: false, head: 'abc' }],
+      worktrees: [DEV_WORKTREE],
     })
     useWorkspaceStore.setState({
       projectsByWorkspaceId: new Map([

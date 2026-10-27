@@ -121,7 +121,7 @@ function harness() {
     onBackendsFailed: vi.fn(),
     log: () => {},
   })
-  const record = { id: 'demo', entryPoint: '/demo/main.cjs', directory: '/demo', dependencies: [] }
+  const record = { id: 'demo', entryPoint: '/demo/main.cjs', directory: '/demo' }
   return { ...main, listeners, process, record }
 }
 

@@ -25,10 +25,6 @@ await window.electronAPI.extensionBridge.invoke('task-vault:vault:list-areas', p
 - **Never** import from other extensions (`extensions/git-integration/...`, `extensions/foundry/...`)
 - **Never** hardcode the extension ID (`terminator.task-vault`) in core app files
 
-## The API task-vault offers other extensions
-
-`activate` returns a `TaskVaultAPI` (`open(destination?)`, `openCapture()`), declared in the SDK (`packages/extension-sdk/types/extensions.d.ts`) so a consumer types it without importing this extension (ADR 094). A consumer lists `terminator.task-vault` in its manifest's `extensionDependencies` and calls `api.extensions.get('terminator.task-vault')`. Change the SDK declaration and the return value together; keep it small: it is a public API.
-
 ## NPM Dependencies
 
 Add deps to `extensions/task-vault/package.json` only. npm workspaces hoist them automatically.

@@ -1,6 +1,5 @@
 import { createIssueService, type IssueService } from './issue-service.js'
 import { createLinearProvider } from './providers/linear.provider.js'
-import { createJiraProvider } from './providers/jira.provider.js'
 import { getCredential, getMine, setLastError } from './tracker-store.js'
 
 // Where the pieces are put together.
@@ -14,7 +13,7 @@ let service: IssueService | null = null
 export function getIssueService(): IssueService {
   if (service === null) {
     service = createIssueService({
-      providers: { linear: createLinearProvider(), jira: createJiraProvider() },
+      providers: { linear: createLinearProvider() },
       getCredential,
       getMine,
       // A credential that has started failing is worth showing in settings —

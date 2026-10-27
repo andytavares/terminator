@@ -237,7 +237,37 @@ describe('listWorktrees', () => {
       isMain: false,
     })
   })
+})
 
+describe('listWorktrees — detached and prunable', () => {
+  it('reports a detached worktree and one git marks prunable', async () => {
+    mockResolve(
+      [
+        'worktree /repo',
+        'HEAD abc1234',
+        'branch refs/heads/main',
+        '',
+        'worktree /repo/.worktrees/detached',
+        'HEAD def5678',
+        'detached',
+        '',
+        'worktree /gone/old',
+        'HEAD 0123456',
+        'branch refs/heads/old',
+        'prunable gitdir file points to non-existent location',
+        '',
+      ].join('\n')
+    )
+    const worktrees = await listWorktrees('/repo')
+    expect(worktrees.map(({ detached, prunable }) => ({ detached, prunable }))).toEqual([
+      { detached: false, prunable: false },
+      { detached: true, prunable: false },
+      { detached: false, prunable: true },
+    ])
+  })
+})
+
+describe('listWorktrees — a worktree with no branch', () => {
   it('uses HEAD as branch fallback when branch line is absent', async () => {
     mockResolve('worktree /detached\nHEAD abc1234\n\n')
     const worktrees = await listWorktrees('/detached')

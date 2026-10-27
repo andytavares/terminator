@@ -22,7 +22,7 @@ describe('ticketOffer', () => {
   })
 
   it('offers nothing when Linear is not connected, so nobody is asked', async () => {
-    const port = issues({ connections: vi.fn().mockResolvedValue([{ tracker: 'jira' }]) })
+    const port = issues({ connections: vi.fn().mockResolvedValue([]) })
     await expect(ticketOffer(port)).resolves.toBeNull()
     expect(port.teams).not.toHaveBeenCalled()
   })

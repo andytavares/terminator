@@ -20,14 +20,6 @@ interface ConnectLinearInput {
   email?: string | null
 }
 
-interface ConnectJiraInput {
-  tracker: 'jira'
-  site: string
-  email: string
-  apiToken: string
-  jql: string
-}
-
 interface IntegrationsState {
   connections: TrackerConnection[]
   /** Per-project links, keyed by project id. Populated as projects are seen. */
@@ -67,7 +59,7 @@ interface IntegrationsState {
   unlinkIssue: (projectId: string) => Promise<void>
   listMine: (opts?: { limit?: number }) => Promise<IssueListResult>
   searchIssues: (term: string) => Promise<IssueListResult>
-  connect: (input: ConnectLinearInput | ConnectJiraInput) => Promise<boolean>
+  connect: (input: ConnectLinearInput) => Promise<boolean>
   disconnect: (tracker: TrackerId) => Promise<void>
   setMine: (tracker: TrackerId, mine: MineSelector) => Promise<void>
   clearConnectError: (tracker: TrackerId) => void
@@ -150,7 +142,7 @@ async function loadConnections(set: SetIntegrations): Promise<void> {
 async function submitCredential(
   set: SetIntegrations,
   get: GetIntegrations,
-  input: ConnectLinearInput | ConnectJiraInput
+  input: ConnectLinearInput
 ): Promise<boolean> {
   const result = await api().connect?.(input)
   if (result === undefined || isError(result)) {

@@ -11,16 +11,14 @@ import './IntegrationsSettings.css'
 // moment it is handed to the main process, and what comes back is a connected
 // flag plus the account the credential proved to belong to.
 
-const TRACKER_LABELS: Record<TrackerId, string> = { linear: 'Linear', jira: 'Jira' }
+const TRACKER_LABELS: Record<TrackerId, string> = { linear: 'Linear' }
 
 function statusText(connection: TrackerConnection | undefined): string {
   if (connection === undefined || !connection.connected) return 'Not connected'
   if (connection.lastError === 'auth-failed') return 'Credential rejected — reconnect'
   if (connection.account === null) return 'Connected'
   const who = connection.account.email || connection.account.name
-  return connection.site === null
-    ? `Connected as ${who}`
-    : `Connected as ${who} · ${connection.site}`
+  return `Connected as ${who}`
 }
 
 function StatusDot({ connection }: { connection: TrackerConnection | undefined }): JSX.Element {
@@ -150,114 +148,25 @@ function LinearForm(): JSX.Element {
   )
 }
 
-const DEFAULT_JQL = 'assignee = currentUser() AND resolution = Unresolved'
-
-type JiraDraft = { site: string; email: string; apiToken: string; jql: string }
-
-/** The Jira form's fields and sending them. The token is cleared after every attempt, the site
- * and email only once connected. */
-function useJiraForm() {
-  const { connect, clearError, ...state } = useConnect('jira')
-  const [draft, setDraft] = useState<JiraDraft>({
-    site: '',
-    email: '',
-    apiToken: '',
-    jql: DEFAULT_JQL,
-  })
-  const updateDraft = (patch: Partial<JiraDraft>): void => setDraft((d) => ({ ...d, ...patch }))
-  async function submit(): Promise<void> {
-    const { site, email, apiToken, jql } = draft
-    const ok = await connect({
-      tracker: 'jira',
-      site: site.trim(),
-      email: email.trim(),
-      apiToken,
-      jql,
-    })
-    updateDraft(ok ? { apiToken: '', site: '', email: '' } : { apiToken: '' })
-  }
-  const editDraft = (patch: Partial<JiraDraft>): void => {
-    updateDraft(patch)
-    clearError()
-  }
-  const ready =
-    draft.site.trim().length > 0 && draft.email.trim().length > 0 && draft.apiToken.length > 0
-  return { ...state, draft, update: updateDraft, edit: editDraft, ready, submit }
-}
-
-function JiraForm(): JSX.Element {
-  const form = useJiraForm()
-  const { draft, update } = form
-  return (
-    <div className="integrations__form">
-      <JiraCredentialFields form={form} />
-      <CredentialField
-        id="jira-jql"
-        label="My issues (JQL)"
-        value={draft.jql}
-        onChange={(jql) => update({ jql })}
-      />
-      <ConnectError error={form.error} />
-      <ConnectButton
-        label="Connect Jira"
-        busy={form.busy}
-        ready={form.ready}
-        onConnect={form.submit}
-      />
-    </div>
-  )
-}
-
-/** Site, account email and API token; editing the site or token clears a rejection. */
-function JiraCredentialFields({ form }: { form: ReturnType<typeof useJiraForm> }) {
-  const { draft, update, edit } = form
-  return (
-    <>
-      <CredentialField
-        id="jira-site"
-        label="Site"
-        value={draft.site}
-        placeholder="your-team.atlassian.net"
-        onChange={(site) => edit({ site })}
-      />
-      <CredentialField
-        id="jira-email"
-        label="Account email"
-        value={draft.email}
-        onChange={(email) => update({ email })}
-      />
-      <CredentialField
-        id="jira-token"
-        label="API token"
-        secret
-        value={draft.apiToken}
-        onChange={(apiToken) => edit({ apiToken })}
-      />
-    </>
-  )
-}
-
-/** What "my issues" means for a connection: an assignee email, or a JQL query. */
+/** What "my issues" means for a connection: the assignee email, blank for the key's own account. */
 function mineText(connection: TrackerConnection | undefined): string {
-  if (connection?.mine.kind === 'assignee') return connection.mine.email ?? ''
-  return connection?.mine.kind === 'query' ? connection.mine.jql : ''
+  return connection?.mine.email ?? ''
 }
 
 function ConnectedPanel({ tracker }: { tracker: TrackerId }): JSX.Element {
   const connection = useIntegrationsStore((s) => s.connectionFor(tracker))
   const [mineValue, setMineValue] = useState(() => mineText(connection))
-  const isAssignee = connection?.mine.kind === 'assignee'
 
   return (
     <div className="integrations__form">
       <label className="settings-section__label" htmlFor={`${tracker}-mine`}>
-        {isAssignee ? 'Assigned-issue lookup' : 'My issues (JQL)'}
+        Assigned-issue lookup
       </label>
       <input
         id={`${tracker}-mine`}
         className="settings-section__input"
         value={mineValue}
-        placeholder={isAssignee ? "Blank uses the key's own account" : ''}
+        placeholder="Blank uses the key's own account"
         onChange={(e) => setMineValue(e.target.value)}
         onBlur={() => saveMine(tracker, connection, mineValue)}
       />
@@ -271,12 +180,7 @@ function saveMine(tracker: TrackerId, connection: TrackerConnection | undefined,
   if (connection === undefined) return
   void useIntegrationsStore
     .getState()
-    .setMine(
-      tracker,
-      connection.mine.kind === 'assignee'
-        ? { kind: 'assignee', email: text.trim() || null }
-        : { kind: 'query', jql: text.trim() }
-    )
+    .setMine(tracker, { kind: 'assignee', email: text.trim() || null })
 }
 
 function ConnectedActions({ tracker }: { tracker: TrackerId }): JSX.Element {
@@ -307,13 +211,7 @@ function TrackerRow({ tracker }: { tracker: TrackerId }): JSX.Element {
         <span className="integrations__status">{statusText(connection)}</span>
         {connected && <Check className="integrations__check" />}
       </div>
-      {connected ? (
-        <ConnectedPanel tracker={tracker} />
-      ) : tracker === 'linear' ? (
-        <LinearForm />
-      ) : (
-        <JiraForm />
-      )}
+      {connected ? <ConnectedPanel tracker={tracker} /> : <LinearForm />}
     </div>
   )
 }
@@ -339,7 +237,6 @@ export function IntegrationsSettings(): JSX.Element {
         leave this machine. Every part of the app reads this one connection.
       </p>
       <TrackerRow tracker="linear" />
-      <TrackerRow tracker="jira" />
     </div>
   )
 }

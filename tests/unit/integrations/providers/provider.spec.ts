@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { createLinearProvider } from '../../../../src/main/integrations/providers/linear.provider'
-import { createJiraProvider } from '../../../../src/main/integrations/providers/jira.provider'
 
 // FR-034 and SC-014: no field of an issue other than its comments and its
 // own workflow position is ever modified by this application.
@@ -35,10 +34,7 @@ const PROVIDER_WRITE_OPERATIONS = ['comment', 'transition', 'create'] as const
 /** What a provider may expose but need not: callers ask the issue service first. */
 const PROVIDER_OPTIONAL_OPERATIONS = ['states', 'transition', 'teams', 'create'] as const
 
-const providers = [
-  ['linear', createLinearProvider(() => ({}) as never)],
-  ['jira', createJiraProvider()],
-] as const
+const providers = [['linear', createLinearProvider(() => ({}) as never)]] as const
 
 // Anything matching these would be a write we have not sanctioned.
 const MUTATION_PATTERNS = [
@@ -88,15 +84,7 @@ describe('TrackerProvider surface', () => {
   })
 })
 
-describe('TrackerProvider optional operations and writes', () => {
-  // Asked about one, the issue service answers "unsupported" (issue-service-transition.spec).
-  it('jira omits every optional operation', () => {
-    const [, jira] = providers[1]
-    for (const operation of PROVIDER_OPTIONAL_OPERATIONS) {
-      expect(methodsOf(jira)).not.toContain(operation)
-    }
-  })
-
+describe('TrackerProvider writes', () => {
   it.each(providers)('%s exposes no mutation beyond the sanctioned writes', (_name, provider) => {
     for (const method of methodsOf(provider)) {
       if ((PROVIDER_WRITE_OPERATIONS as readonly string[]).includes(method)) continue

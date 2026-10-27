@@ -24,7 +24,7 @@ import { eventually } from '../../../support/eventually'
 // The issue a focused terminal resolves to comes from the facts and the tracker;
 // both are given here so the actions can be read against them.
 const focused = vi.hoisted(() => ({
-  workItem: null as null | { ref: { tracker: 'linear' | 'jira'; key: string } },
+  workItem: null as null | { ref: { tracker: 'linear'; key: string } },
   issue: null as null | { url: string },
 }))
 vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({

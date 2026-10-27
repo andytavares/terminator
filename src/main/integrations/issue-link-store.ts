@@ -52,7 +52,7 @@ function storedLink(entry: unknown): IssueLink | null {
   if (typeof entry !== 'object' || entry === null) return null
   const link = entry as Partial<IssueLink>
   if (typeof link.projectId !== 'string' || typeof link.key !== 'string') return null
-  if (link.tracker !== 'linear' && link.tracker !== 'jira') return null
+  if (link.tracker !== 'linear') return null
   return {
     projectId: link.projectId,
     tracker: link.tracker,

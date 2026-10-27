@@ -252,12 +252,12 @@ describe('buildCoreActions — every action runs its own handler', () => {
 })
 
 describe('buildCoreActions — issue labels name the linked issue', () => {
-  it('names a Jira issue and its tracker', () => {
-    const actions = buildCoreActions(makeDeps({ issueLink: { key: 'J-7', tracker: 'jira' } }))
+  it('names a linked issue and its tracker', () => {
+    const actions = buildCoreActions(makeDeps({ issueLink: { key: 'J-7', tracker: 'linear' } }))
     expect(actionLabelOf(actions, 'core.link-issue')).toBe('Change linked issue')
     expect(actionLabelOf(actions, 'core.view-issue')).toBe('View J-7')
     expect(actionLabelOf(actions, 'core.copy-issue-key')).toBe('Copy issue key (J-7)')
-    expect(actionLabelOf(actions, 'core.open-issue')).toBe('Open J-7 in Jira')
+    expect(actionLabelOf(actions, 'core.open-issue')).toBe('Open J-7 in Linear')
   })
 
   it('says what it would do when nothing is linked', () => {

@@ -110,7 +110,5 @@ export const ExtensionManifestSchema = z
     renderer: z.string().optional(),
     minAppVersion: z.string().regex(semverRangeRegex, 'minAppVersion must be a valid semver range'),
     contributes: ExtensionContributesSchema.optional(),
-    /** Extensions activated before this one, whose `activate` exports it may read (ADR 094). */
-    extensionDependencies: z.array(ExtensionIdSchema).optional(),
   })
   .superRefine(refuseForeignShellRoots)
