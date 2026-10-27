@@ -44,6 +44,6 @@ A view reads the values with `extension.getSettingsValues()` and again on `exten
 
 ## Storage
 
-Notes, tags, comments, diagrams, and settings are stored in the shared SQLite database (`app.sqlite`) via the injected `ExtensionDB`. Note, tag, and comment IDs are UUIDs assigned at creation and stable across restarts. The schema is created with `CREATE TABLE IF NOT EXISTS` on every launch, so a launch never alters data that is already there. Search matches with `LIKE`, which ignores case for ASCII letters only. Notes from the previous PGlite database are imported once on the first start after the upgrade.
+Notes, tags, comments, diagrams, and settings are stored in the shared SQLite database (`app.sqlite`) via the injected `ExtensionDB`. Note, tag, and comment IDs are UUIDs assigned at creation and stable across restarts. The schema is created with `CREATE TABLE IF NOT EXISTS` on every launch, so a launch never alters data that is already there. Search matches with `LIKE`, which ignores case for ASCII letters only.
 
 See also: `specs/010-markdown-notepad/contracts/ipc-channels.md` for the full IPC surface.

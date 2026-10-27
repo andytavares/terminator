@@ -74,13 +74,11 @@ The window comes first; everything slow happens beside it. `app.whenReady()` in 
 1. Starts the login-shell PATH probe (macOS only; a login shell takes hundreds of milliseconds) without waiting for it.
 2. Opens the database (synchronous `node:sqlite`), registers the `ext://` protocol and the IPC handlers.
 3. Starts the extension host process (`startExtensionHostProcess`), builds the menu and creates the window.
-4. Calls `ExtensionHost.start({ bundledDirectory, beforeActivation, afterActivation })` (`src/main/extensions/extension-host.ts`).
+4. Calls `ExtensionHost.start({ bundledDirectory, beforeActivation })` (`src/main/extensions/extension-host.ts`).
 
 `start` registers every extension synchronously (the stored enabled ones, and any bundled one not yet in the store), so `extension:list` is complete as soon as the renderer can ask. It then activates them concurrently once `beforeActivation` (the PATH probe, which extension code that spawns tools needs) has resolved. An extension that lists others in its manifest's `extensionDependencies` waits for their activation first; a dependency cycle fails every extension in it. Activation is isolated per extension: a throwing `activate` marks that extension `error` and nothing else. The one table two extensions share (`settings`) is created with `CREATE TABLE IF NOT EXISTS`, so activation order does not matter for it.
 
-`afterActivation` runs once every extension has activated. It is where the legacy PGlite import (`src/main/db/legacy-pglite-import.ts`) runs, because it copies into tables the extensions create in `activate`.
-
-An extension frame is given its port by `extension:open-frame-port`, which first awaits `ExtensionHost.whenActivated(extensionId)`: the extension's own activation, and the import when one is pending. A frame therefore never talks to a backend that is not there yet, and one slow extension delays only its own frame.
+An extension frame is given its port by `extension:open-frame-port`, which first awaits `ExtensionHost.whenActivated(extensionId)`, the extension's own activation. A frame therefore never talks to a backend that is not there yet, and one slow extension delays only its own frame.
 
 Because the PATH probe runs beside the window, a child process started from a core IPC handler in the first moments after launch can still see the app's own PATH on macOS. Extension code is not affected (it waits on `beforeActivation`).
 

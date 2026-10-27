@@ -248,32 +248,7 @@ describe('ExtensionHost.start — disabled extensions and whenActivated', () => 
   })
 })
 
-describe('ExtensionHost.start — afterActivation', () => {
-  it('whenActivated also waits for afterActivation, which runs once every extension is done', async () => {
-    const events: string[] = []
-    const { host } = await newExtensionHost({
-      'com.first': () => {
-        events.push('first')
-      },
-      'com.second': async () => {
-        events.push('second')
-      },
-    })
-    const recordAfterActivation = async () => {
-      events.push('after')
-    }
-
-    const started = host.startAll({
-      bundledDirectory: writeBundle({ 'com.first': [], 'com.second': [] }),
-      beforeActivation: ready,
-      afterActivation: recordAfterActivation,
-    })
-    await host.whenActivated('com.first')
-
-    expect(events).toEqual(['first', 'second', 'after'])
-    await started
-  })
-
+describe('ExtensionHost.whenActivated', () => {
   it('whenActivated resolves at once for an unknown extension', async () => {
     const { host } = await newExtensionHost()
     await host.startAll({ bundledDirectory: '/nonexistent/bundle', beforeActivation: ready })

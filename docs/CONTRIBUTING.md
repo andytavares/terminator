@@ -45,8 +45,6 @@ Starts the app on a fresh profile and passes when the main log says `App ready`,
 
 `npmRebuild` is off: the one native module, node-pty, loads the N-API prebuild it ships for the platform (`node_modules/node-pty/lib/utils.js`), which does not depend on Electron's ABI. Rebuilding failed outright for Electron 44: "Could not detect abi for version 44.7.0" (@electron/rebuild's node-abi).
 
-`asarUnpack` lists only `postgres.wasm` and `postgres.data` of `@electric-sql/pglite`, which the one-time import (`src/main/db/legacy-pglite-import.ts`, ADR 099) reads with `readFileSync`; Electron's asar fs interception redirects those reads to `app.asar.unpacked`. Unpacking all of the package breaks Electron's ESM dynamic import handler: from `app.asar.unpacked`, pglite's `import("./fs/nodefs.js")` fails to resolve through the asar virtual path, the NodeFS adapter never loads, and `pg_initdb` aborts. The entries go when PGlite is removed, one release after the import ships.
-
 `asarUnpack` also lists the Claude adapter (`@agentclientprotocol/claude-agent-acp`) and every package it imports. It runs as a child process, which resolves its imports on disk and cannot read `app.asar`; a missing one makes every agent start fail with "ACP connection closed". `tests/unit/config/asar-unpack.spec.ts` fails when an adapter dependency is not listed.
 
 The `zip` target and the `publish` section exist for self-update (ADR 128): each build writes `dist/latest-mac.yml`, and `release.yml` uploads it with the zip and the blockmaps. Installed apps find a release only through that file.

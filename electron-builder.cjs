@@ -42,11 +42,7 @@ module.exports = {
       filter: extensionRuntimeModules(__dirname, EXTENSION_EXTERNALS).map((name) => `${name}/**/*`),
     },
   ],
-  // Only PGlite's two binaries, never its JS: unpacked JS breaks its dynamic
-  // imports (docs/CONTRIBUTING.md, "Packaging"). They go with PGlite (ADR 099).
   asarUnpack: [
-    '**/node_modules/@electric-sql/pglite/dist/postgres.wasm',
-    '**/node_modules/@electric-sql/pglite/dist/postgres.data',
     // The adapter runs as a child process, which cannot read from inside app.asar.
     '**/node_modules/@agentclientprotocol/**',
     '**/node_modules/@anthropic-ai/claude-agent-sdk/**',

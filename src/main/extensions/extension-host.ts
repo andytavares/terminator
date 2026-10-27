@@ -30,8 +30,6 @@ interface StartOptions {
   bundledDirectory: string
   /** Work extensions need before activating, such as the login-shell PATH. */
   beforeActivation: Promise<void>
-  /** Work that needs every extension's tables to exist, such as the legacy database import. */
-  afterActivation?: () => Promise<void>
 }
 
 type RegisterResult =
@@ -129,7 +127,6 @@ export class ExtensionHost {
   /** Each active backend's registrations in main, by extension id. */
   private loaded = new Map<string, Disposable[]>()
   private activations = new Map<string, Promise<void>>()
-  private afterActivation: Promise<void> = Promise.resolve()
   private deps: ExtensionAPIDeps = {}
   /** The main-side API of each backend in the extension host, which its calls run on. */
   private readonly hostedApis = new Map<string, ExtensionAPI>()
@@ -341,15 +338,12 @@ export class ExtensionHost {
         : this.activateAtStartup(record, isNew, options.beforeActivation)
       this.activations.set(record.id, activation)
     }
-    const allActivated = Promise.all(this.activations.values())
-    if (options.afterActivation) this.afterActivation = allActivated.then(options.afterActivation)
-    await Promise.all([allActivated, this.afterActivation])
+    await Promise.all(this.activations.values())
   }
 
-  /** Resolves once the extension's backend is up and any startup data import is done. */
+  /** Resolves once the extension's backend is up. */
   async whenActivated(id: string): Promise<void> {
     await this.activations.get(id)
-    await this.afterActivation
   }
 
   private registerBundled(bundledDir: string): ExtensionRecord[] {

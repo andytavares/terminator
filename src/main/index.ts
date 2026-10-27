@@ -68,7 +68,6 @@ import { breakoutWindowOpen, sessionOfWindow, watchBreakoutWindows } from './bre
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
 import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
-import { legacyImportPending, importLegacyDatabase } from './db/legacy-pglite-import.js'
 import {
   createExtensionAPI,
   listNativeViewMenuItems,
@@ -497,18 +496,12 @@ function extensionDeps(terminalRelay: OutputRelay, userData: string): ExtensionA
 }
 
 /** The renderer lists the extensions (complete as soon as start is called) and each extension
- * view waits for its own backend, so none of this holds the window back. The legacy import
- * needs every extension's tables to exist. */
-function startExtensions(
-  loginShellPath: Promise<void>,
-  importLegacy: boolean,
-  userData: string
-): void {
+ * view waits for its own backend, so none of this holds the window back. */
+function startExtensions(loginShellPath: Promise<void>): void {
   extensionHost
     .startAll({
       bundledDirectory: join(__dirname, '../../extensions'),
       beforeActivation: loginShellPath,
-      afterActivation: importLegacy ? () => importLegacyDatabase(userData, getAppDb()) : undefined,
     })
     .then(setupMenu)
     .catch((error) => logger.error('extension startup failed', { error: String(error) }))
@@ -525,7 +518,6 @@ app.whenReady().then(async () => {
     process.platform === 'darwin' ? startAdoptingLoginShellPath() : Promise.resolve()
 
   const userData = app.getPath('userData')
-  const importLegacy = legacyImportPending(userData)
   initAppDb(userData)
   registerExtProtocol()
 
@@ -553,7 +545,7 @@ app.whenReady().then(async () => {
       createWindow()
     }
   })
-  startExtensions(loginShellPath, importLegacy, userData)
+  startExtensions(loginShellPath)
 })
 
 // A rejection in the startup chain above (e.g. database or extension init
