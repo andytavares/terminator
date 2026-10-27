@@ -14,14 +14,14 @@ export interface ToolActivityTracker {
 const FINISHED = new Set(['completed', 'failed'])
 
 /** The tool's name from the agent's `_meta`, or null when it sent none. */
-export function toolNameOf(update: AgentUpdate): string | null {
+export function updateToolName(update: AgentUpdate): string | null {
   const meta = update._meta as { claudeCode?: { toolName?: unknown } } | undefined
   const name = meta?.claudeCode?.toolName
   return typeof name === 'string' ? name : null
 }
 
 function startedFrom(update: AgentUpdate, callId: string, at: number): ToolActivity {
-  const toolName = toolNameOf(update) ?? 'unknown'
+  const toolName = updateToolName(update) ?? 'unknown'
   const named = namedFile(update.rawInput)
   return {
     kind: 'tool_started',
@@ -34,7 +34,7 @@ function startedFrom(update: AgentUpdate, callId: string, at: number): ToolActiv
 }
 
 function finishedFrom(update: AgentUpdate, started: ToolActivity | undefined, at: number) {
-  const toolName = started?.toolName ?? toolNameOf(update) ?? ''
+  const toolName = started?.toolName ?? updateToolName(update) ?? ''
   return {
     kind: 'tool_finished',
     toolName,

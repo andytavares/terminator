@@ -5,11 +5,6 @@ import userEvent from '@testing-library/user-event'
 import { ConfirmButton } from '../../../../packages/extension-ui/src/ConfirmButton'
 
 // A control that destroys something says what it will destroy, first.
-//
-// Two clicks rather than a modal: a `window.confirm` inside an extension's
-// WebContentsView blocks every subsequent event the view would receive, and a
-// dialog that has to be dismissed to read the consequence is a dialog nobody
-// reads. Arming in place puts the sentence and the button in the same spot.
 
 function setup(over: Partial<Parameters<typeof ConfirmButton>[0]> = {}) {
   const onConfirm = vi.fn()

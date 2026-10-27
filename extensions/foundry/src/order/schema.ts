@@ -327,7 +327,7 @@ const ProvenanceSchema = z.object({
 })
 
 /** What the Forge's intake is doing now; a running state carries the time it gives up. */
-export const INTAKE_STATES = ['drafting', 'reviewing', 'fixing', 'ready', 'failed'] as const
+const INTAKE_STATES = ['drafting', 'reviewing', 'fixing', 'ready', 'failed'] as const
 
 const IntakeSchema = z.object({
   state: z.enum(INTAKE_STATES),

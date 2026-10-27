@@ -219,13 +219,9 @@ function stoppedReason(
   return expired && !isLive(turn.sessionId ?? '') ? 'The turn did not answer in time.' : null
 }
 
-/**
- * The last intake turn, with "running" taken from `order.intake`, not guessed from the ledger.
- *
- * The ledger still names who is working (actor, session, round). A running turn past its
- * deadline, or whose session stalled after it began, reads as refused, so the Forge
- * offers the same moves it offers for a refusal.
- */
+// The last intake turn: "running" comes from `order.intake`, who is working from the ledger.
+// A stalled turn, or one past its deadline whose agent is gone, reads as refused, so the
+// Forge offers the moves it offers for a refusal.
 export function currentIntake(
   entries: readonly LedgerEntry[],
   intake: OrderIntake | undefined,

@@ -1,10 +1,9 @@
 import * as path from 'node:path'
 import type { Autonomy } from '../gates/autonomy.js'
 
-// What happens when a permission ask reaches Foundry. Claude Code's settings
-// (`runtime/role-settings.ts`) have already decided every call they cover, so an ask
-// here is one they left open: an Artifact publish, which this checks, or anything else
-// a person decides. At `lights-out` nobody can, so it is refused and the agent told.
+// An ask reaching Foundry is one the role's settings left open (`runtime/role-settings.ts`):
+// an Artifact publish, checked here, or anything else, for a person to decide. At
+// `lights-out` nobody can, so it is refused and the agent told.
 
 interface PolicyDecision {
   allow: boolean

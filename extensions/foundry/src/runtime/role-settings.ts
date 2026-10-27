@@ -100,10 +100,8 @@ function declaredWrites(facts: RoleFacts): string[] {
   ]
 }
 
-/**
- * `denyRules` removes Write and Edit from a role whose file lacks the `edit` tool class, which
- * would also remove its output file. Its allow rules name the only paths it can write instead.
- */
+// `denyRules` drops Write and Edit from a role without the `edit` class, and with them its
+// output file; such a role keeps both, and its allow rules name the only paths it may write.
 function denyOf(facts: RoleFacts): string[] {
   const keepsWriteTools = declaredWrites(facts).length > 0
   return denyRules(facts).filter((rule) => !(keepsWriteTools && FILE_WRITE_TOOLS.includes(rule)))

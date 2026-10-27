@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import type { FactoryMetrics } from '../../factory/metrics.js'
 import { MetricsTiles, WindowToggle } from '../MetricsTiles.js'
 import type { Signal } from '../../sensors/types.js'
 import { DocumentChip } from '../DocumentChip.js'
@@ -193,10 +192,6 @@ async function readOrders(): Promise<FactoryOrderRow[]> {
 }
 
 // A refused read throws, so the numbers last drawn stay up.
-async function readMetrics(window: '30d' | 'all'): Promise<FactoryMetrics> {
-  return foundryInvoke('foundry:factory.metrics', { window })
-}
-
 const NO_ROWS: FactoryOrderRow[] = []
 
 /** Every order, and the factory's numbers over the window chosen; both pushed. */
@@ -204,7 +199,7 @@ function useSiteRecords() {
   const [window_, setWindow] = useState<'30d' | 'all'>('30d')
   const orders = useFoundryQuery({ key: ['site-orders'], kinds: ANY_RECORD }, readOrders)
   const metrics = useFoundryQuery({ key: ['metrics', window_], kinds: ANY_RECORD }, () =>
-    readMetrics(window_)
+    foundryInvoke('foundry:factory.metrics', { window: window_ })
   )
   return { rows: orders.data ?? NO_ROWS, window_, setWindow, metrics: metrics.data ?? null }
 }

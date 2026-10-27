@@ -3,14 +3,9 @@ import { TriangleAlert } from 'lucide-react'
 import { Button } from './Button'
 import './extension-ui.css'
 
-// A control that destroys something, and says what, before it does it.
-//
-// Two clicks in place rather than a modal. `window.confirm` inside an
-// extension's WebContentsView blocks every event the view would receive
-// afterwards, and a dialog that must be dismissed before the consequence can
-// be read is a dialog nobody reads. Arming puts the sentence and the button
-// in the same place, so the thing being agreed to is on screen at the moment
-// of agreeing.
+// Two clicks in place, not a modal: `window.confirm` in an extension's WebContentsView
+// blocks every later event the view would receive. Arming shows what will be
+// destroyed beside the button that destroys it.
 
 export interface ConfirmButtonProps {
   /** What the control is, before it is armed. */

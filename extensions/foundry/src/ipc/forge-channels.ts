@@ -658,7 +658,7 @@ async function converge(deps: ForgeDeps, payload: z.infer<typeof TurnPayload>) {
 }
 
 /** What compile answers when it read the order: the facts, and what hand-off added. */
-export type CompileAnswer = Awaited<ReturnType<typeof readFacts>> & {
+type CompileAnswer = Awaited<ReturnType<typeof readFacts>> & {
   compile: ReturnType<typeof compileOrder>
   order: WorkOrder
   refused?: string

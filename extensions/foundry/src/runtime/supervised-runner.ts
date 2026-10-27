@@ -14,11 +14,7 @@ import {
 import type { ClaudePermissionMode, ClaudeSettings } from './role-settings.js'
 import { countTurns, transcriptSize } from './transcript-tailer.js'
 import type { WatchedRun } from './stall-watcher.js'
-import {
-  toolNameOf as updateToolName,
-  trackToolActivity,
-  type ToolActivityTracker,
-} from './tool-activity.js'
+import { updateToolName, trackToolActivity, type ToolActivityTracker } from './tool-activity.js'
 
 /**
  * Which step of the run this is — a run-graph node id.

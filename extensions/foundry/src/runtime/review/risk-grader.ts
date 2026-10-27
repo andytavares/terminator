@@ -22,12 +22,7 @@ export interface ChangeSummary {
 }
 
 /** What a P0 file touched, as the order's trigger vocabulary spells it. */
-export type GradedTrigger =
-  | 'authentication'
-  | 'payments'
-  | 'secrets'
-  | 'migration'
-  | 'public_interface'
+type GradedTrigger = 'authentication' | 'payments' | 'secrets' | 'migration' | 'public_interface'
 
 export interface GradedChange {
   readonly grade: RiskGrade

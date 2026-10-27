@@ -257,6 +257,3 @@ export function applyProposal(order: WorkOrder, proposal: Proposal, at: string):
   // proposal — the two can differ, and the next reader is the compile gate.
   return WorkOrderSchema.parse(next)
 }
-
-/** Where an intake agent writes what it proposes. One path, known to both. */
-export const PROPOSAL_FILE = 'proposal.json'

@@ -60,10 +60,6 @@ function readLedger(orderId: string, actor: string, action: string): Promise<Led
   })
 }
 
-function readMetrics(window: '30d' | 'all'): Promise<FactoryMetrics> {
-  return foundryInvoke('foundry:factory.metrics', { window })
-}
-
 /** `operator`, `rule:budget.exceeded`, `role:verifier` — the kind, for the eye. */
 function actorKind(actor: string): string {
   if (actor.startsWith('rule:')) return 'rule'
@@ -161,7 +157,10 @@ function useFactoryMetrics(tab: LedgerTab): FactoryViewProps {
   const [metricsWindow, setMetricsWindow] = useState<'30d' | 'all'>('30d')
   const { data } = useFoundryQuery(
     { key: ['metrics', tab, metricsWindow], kinds: tab === 'factory' ? ANY_RECORD : [] },
-    () => (tab === 'factory' ? readMetrics(metricsWindow) : Promise.resolve(null))
+    () =>
+      tab === 'factory'
+        ? foundryInvoke('foundry:factory.metrics', { window: metricsWindow })
+        : Promise.resolve(null)
   )
   return { metrics: data ?? null, metricsWindow, onWindow: setMetricsWindow }
 }

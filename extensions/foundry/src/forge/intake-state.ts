@@ -2,7 +2,7 @@ import type { OrderIntake, WorkOrder } from '../order/schema.js'
 import { orderStoreAt } from '../state/live-index.js'
 
 /** How long a turn may run before the Forge stops waiting for its answer. */
-export const INTAKE_TURN_MS = 10 * 60_000
+const INTAKE_TURN_MS = 10 * 60_000
 
 type IntakeState = OrderIntake['state']
 
