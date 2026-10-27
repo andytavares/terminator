@@ -1,0 +1,44 @@
+extensions/foundry/tests/runtime/supervised-runner.spec.ts
+  s_a9e8c58b3eee1f::t_49733322f8dd49 623-629,631,633-642,644-647
+  s_a9e8c58b3eee1f::t_af97480650c371 622
+  s_a9e8c58b3eee1f::t_e209412ce1da64 239,245,348-349,630,632,643,648-649
+extensions/foundry/src/runtime/tool-activity.ts
+  s_a9e8c58b3eee1f::t_066b121e309ffe 1-68
+extensions/foundry/src/runtime/stall-watcher.ts
+  s_a9e8c58b3eee1f::t_552fad2b3fe9d8 1,18-19,24-25,38,40-41,61,68,76-78,80,85-86,153,155
+extensions/foundry/src/runtime/transcript-tailer.ts
+  s_a9e8c58b3eee1f::t_066b121e309ffe 36,122
+extensions/foundry/tests/runtime/end-session.spec.ts
+  s_a9e8c58b3eee1f::t_9283d31f4f86cd 8-21,24-30,34-37,41-50,52
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_a9e8c58b3eee1f::t_ea5cf7fd58ec54 17,196-197,217-222,280,342,410,416,451,560,582,596-598,654-655,703,721,723
+extensions/foundry/tests/runtime/stall-watcher.spec.ts
+  s_a9e8c58b3eee1f::t_a18a3b508b8990 357,359,380-381
+  s_a9e8c58b3eee1f::t_9283d31f4f86cd 1-2,5-6,14,17-35,42,123,130,136,146,154,161,183,200,210,221-222,231,275,279,282-289,291-296,298,302-312,314-336,339-356,358,360-378,391
+  s_a9e8c58b3eee1f::t_af97480650c371 300-301,379
+  s_a9e8c58b3eee1f::t_ec7758bd6fec13 313,382
+extensions/foundry/src/runtime/runtime-state.ts
+  s_a9e8c58b3eee1f::t_ea5cf7fd58ec54 67-74
+extensions/foundry/src/runtime/end-session.ts
+  s_a9e8c58b3eee1f::t_552fad2b3fe9d8 2,12-13,16,19-24,26-30
+extensions/foundry/tests/runtime/stop-supervision-runtime.spec.ts
+  s_a9e8c58b3eee1f::t_91c85dc1c35130 54
+extensions/foundry/tests/runtime/supervision-console.spec.ts
+  s_a9e8c58b3eee1f::t_32f90188923722 277,343
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a711e0a6a1a2e85b514c7bc25a6935a1075e8744",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
