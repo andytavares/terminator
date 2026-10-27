@@ -46,7 +46,7 @@ import { orderStoreAt } from '../state/live-index.js'
 import { intakeAt, setIntake } from './intake-state.js'
 import { intakeSessions } from './intake-sessions.js'
 import { lighterRedTeam, defaultModel } from '../state/settings.js'
-import { endLiveSession } from '../runtime/runtime-state.js'
+import { endLiveSession, isLiveSession } from '../runtime/runtime-state.js'
 import { convergeOnce, readOnlyRound } from './intake-turn.js'
 import type { Deciding } from '../ipc/standing.js'
 import { plural } from '@terminator/extension-sdk'
@@ -573,7 +573,8 @@ async function resumeAfterRelease(forge: Forge, order: WorkOrder): Promise<void>
   const root = forge.dataRoot()
   const entries = await orderStoreAt(root).entries(order.id)
   const { intake } = (await orderStoreAt(root).load(order.id)) ?? order
-  if (currentIntake(entries, intake, Date.now()).kind === 'running') return
+  if (currentIntake(entries, intake, { now: Date.now(), isLive: isLiveSession }).kind === 'running')
+    return
 
   const next = afterRelease(order, {
     loop: loopFacts(entries),

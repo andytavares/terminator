@@ -1457,7 +1457,7 @@ describe('an intake turn that ran out its deadline', () => {
     const intake = currentIntake(
       [started],
       intakeAt('drafting', new Date('2026-09-09T19:00:00Z')),
-      Date.parse('2026-09-09T20:00:00Z')
+      { now: Date.parse('2026-09-09T20:00:00Z'), isLive: () => false }
     )
     const result = readiness(baseInput({ intake }))
     expect(result.strip.tone).toBe('bad')

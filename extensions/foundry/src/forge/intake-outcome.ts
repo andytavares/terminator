@@ -191,9 +191,20 @@ export function lastIntake(entries: readonly LedgerEntry[]): IntakeOutcome {
 const RUNNING_STATES: readonly string[] = ['drafting', 'reviewing', 'fixing']
 
 /** Why a turn that claims to run has stopped, or null while it is still inside its deadline. */
+/** When the intake is read, and whether an agent session is live in this process. */
+export interface IntakeClock {
+  readonly now: number
+  readonly isLive: (sessionId: string) => boolean
+}
+
 function stoppedReason(
   turn: Extract<IntakeOutcome, { kind: 'running' }>,
-  { entries, intake, now }: { entries: readonly LedgerEntry[]; intake: OrderIntake; now: number }
+  {
+    entries,
+    intake,
+    now,
+    isLive,
+  }: IntakeClock & { entries: readonly LedgerEntry[]; intake: OrderIntake }
 ): string | null {
   const since = Date.parse(intake.since)
   const stalled = entries.some(
@@ -203,8 +214,9 @@ function stoppedReason(
       Date.parse(entry.at) > since
   )
   if (stalled) return 'The agent stopped making progress.'
+  // A live agent is still working; a stuck one is caught by the stall above.
   const expired = intake.deadline !== null && Date.parse(intake.deadline) <= now
-  return expired ? 'The turn did not answer in time.' : null
+  return expired && !isLive(turn.sessionId ?? '') ? 'The turn did not answer in time.' : null
 }
 
 /**
@@ -217,14 +229,14 @@ function stoppedReason(
 export function currentIntake(
   entries: readonly LedgerEntry[],
   intake: OrderIntake | undefined,
-  now: number
+  clock: IntakeClock
 ): IntakeOutcome {
   const last = lastIntake(entries)
   if (last.kind !== 'running') return last
   if (intake?.state === 'failed')
     return { kind: 'refused', at: intake.since, reason: intake.reason ?? 'The turn failed.' }
   if (intake === undefined || !RUNNING_STATES.includes(intake.state)) return { kind: 'none' }
-  const reason = stoppedReason(last, { entries, intake, now })
+  const reason = stoppedReason(last, { entries, intake, ...clock })
   return reason === null ? last : { kind: 'refused', at: intake.since, reason }
 }
 

@@ -38,6 +38,7 @@ import { budgetsInWords } from '../order/render.js'
 import type { CapabilityReport } from '../trackers/write-back.js'
 import { noPayload, type ChannelSpec } from '@terminator/extension-sdk'
 import { foundryChannel } from './channel.js'
+import { isLiveSession } from '../runtime/runtime-state.js'
 
 /** What one turn of intake produced, or why it produced nothing. */
 export type ConvergeOutcome =
@@ -290,7 +291,7 @@ async function readFacts(
   const order = await deps.store.load(orderId)
   const baseline = await readBaseline(deps.dataRoot(), orderId)
   return {
-    intake: currentIntake(entries, order?.intake, Date.now()),
+    intake: currentIntake(entries, order?.intake, { now: Date.now(), isLive: isLiveSession }),
     loop: loopFacts(entries),
     agreed: agreedFacts(entries),
     turnEndedAt: turnEndedAtOf(entries),
