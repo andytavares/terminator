@@ -36,7 +36,6 @@ function serviceWith(connect: AgentServiceDeps['connect'], broadcast = vi.fn()) 
     connect,
     listAgents: () => [{ id: 'claude', label: 'Claude Code' }],
     defaultAgentId: () => 'claude',
-    agentMeta: async ({ meta }) => meta ?? {},
     log: createAgentLog({ directory: makeTempDir('agent-service-'), now: () => 1 }),
     scratchDirectory: makeTempDir('agent-scratch-'),
     scrollbackLimit: () => 5000,

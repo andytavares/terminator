@@ -65,11 +65,6 @@ export interface AgentServiceDeps {
   connect(request: { agentId: string; client: Client }): Promise<AgentLink>
   listAgents(): AgentDescriptor[]
   defaultAgentId(): string
-  /** The `_meta` to send with the session, with whatever the agent needs added. */
-  agentMeta(request: {
-    agentId: string
-    meta?: Record<string, unknown>
-  }): Promise<Record<string, unknown>>
   log: AgentLog
   scratchDirectory: string
   scrollbackLimit(): number
@@ -326,8 +321,7 @@ class AcpAgentService implements AgentService {
   private async begin(session: Session, input: StartAgentInput): Promise<AgentConfigOption[]> {
     const { agent } = session.link
     await agent.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
-    const _meta = await this.deps.agentMeta({ agentId: session.agentId, meta: input.agentMeta })
-    const request = { cwd: input.cwd, mcpServers: [], _meta }
+    const request = { cwd: input.cwd, mcpServers: [], _meta: input.agentMeta ?? {} }
     if (input.resume === undefined) {
       const created = await agent.newSession(request)
       session.id = created.sessionId

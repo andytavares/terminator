@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  listAgents,
-  resolveAgent,
-  withClaudeExecutable,
-} from '../../../../src/main/agents/acp/agent-registry'
+import { listAgents, resolveAgent } from '../../../../src/main/agents/acp/agent-registry'
 
 const settings = {
   default: 'claude',
@@ -44,23 +40,16 @@ describe('agent registry', () => {
   })
 })
 
-describe('withClaudeExecutable', () => {
-  it('adds the executable and keeps the caller options and other meta', () => {
-    const meta = { other: 1, claudeCode: { options: { model: 'haiku' }, extra: true } }
-    expect(withClaudeExecutable(meta, '/bin/claude')).toEqual({
-      other: 1,
-      claudeCode: {
-        options: { model: 'haiku', pathToClaudeCodeExecutable: '/bin/claude' },
-        extra: true,
-      },
-    })
+describe('the Claude executable', () => {
+  // The adapter reads only this variable; an option in the session meta is overwritten.
+  it('reaches the built-in agent as CLAUDE_CODE_EXECUTABLE', () => {
+    const launch = resolveAgent(settings, 'claude', '/Users/me/.local/bin/claude')
+    expect(launch?.env.CLAUDE_CODE_EXECUTABLE).toBe('/Users/me/.local/bin/claude')
   })
 
-  it('works without meta, and lets the caller choose the executable', () => {
-    expect(withClaudeExecutable(undefined, '/bin/claude')).toEqual({
-      claudeCode: { options: { pathToClaudeCodeExecutable: '/bin/claude' } },
-    })
-    const own = { claudeCode: { options: { pathToClaudeCodeExecutable: '/mine' } } }
-    expect(withClaudeExecutable(own, '/bin/claude')).toEqual(own)
+  it('is left out when none is found, and never given to a custom agent', () => {
+    expect(resolveAgent(settings, 'claude', null)?.env.CLAUDE_CODE_EXECUTABLE).toBeUndefined()
+    const gemini = resolveAgent(settings, 'gemini', '/Users/me/.local/bin/claude')
+    expect(gemini?.env.CLAUDE_CODE_EXECUTABLE).toBeUndefined()
   })
 })

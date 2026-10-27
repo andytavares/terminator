@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { getGlobalSettings } from '../../storage/settings-store.js'
 import { RETENTION_MS } from '../../../shared/session-records/retention.js'
 import { createAgentLog } from './agent-log.js'
-import { agentMeta, createConnector } from './agent-connection.js'
+import { createConnector } from './agent-connection.js'
 import { listAgents } from './agent-registry.js'
 import { recordAgentTab } from './record-agent-tab.js'
 import { createAgentService, type AgentService } from './agent-service.js'
@@ -22,7 +22,6 @@ export function startAgentService(
     connect: createConnector(() => getGlobalSettings().agents),
     listAgents: () => listAgents(getGlobalSettings().agents),
     defaultAgentId: () => getGlobalSettings().agents.default,
-    agentMeta,
     log,
     scratchDirectory: join(userData, 'agent-scratch'),
     scrollbackLimit: () => getGlobalSettings().terminal.scrollbackLimit,

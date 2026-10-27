@@ -50,6 +50,9 @@ module.exports = {
     // The adapter runs as a child process, which cannot read from inside app.asar.
     '**/node_modules/@agentclientprotocol/**',
     '**/node_modules/@anthropic-ai/claude-agent-sdk/**',
+    // What the adapter imports. Missing, it exits on start and no agent ever starts.
+    '**/node_modules/diff/**',
+    '**/node_modules/zod/**',
   ],
   mac: {
     icon: 'resources/icon.png',
