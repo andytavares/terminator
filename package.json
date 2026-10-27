@@ -25,6 +25,7 @@
     "test:live": "vitest run --config vitest.live.config.ts",
     "test:perf": "vitest run --config vitest.perf.config.ts",
     "test:watch": "vitest",
+    "pretest:e2e": "install-electron",
     "test:e2e": "playwright test",
     "ci:local": "node scripts/ci-local.mjs",
     "ci:local:e2e": "node scripts/ci-e2e-local.mjs",

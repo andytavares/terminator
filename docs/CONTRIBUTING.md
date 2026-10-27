@@ -15,7 +15,7 @@ nvm use            # Node 24.21.0, from .nvmrc: the Node that Electron 44 ships
 npm install
 ```
 
-Electron 44 no longer downloads its binary when it is installed: it does so on first run or through its `install-electron` bin ([breaking changes](https://github.com/electron/electron/blob/v44.7.0/docs/breaking-changes.md)). electron-vite does not run that bin, so `predev` and `prepreview` call `install-electron` before starting the app; it returns at once when the binary is already there.
+Electron 44 no longer downloads its binary when it is installed: it does so on first run or through its `install-electron` bin ([breaking changes](https://github.com/electron/electron/blob/v44.7.0/docs/breaking-changes.md)). electron-vite does not run that bin, so `predev` and `prepreview` call `install-electron` before starting the app; it returns at once when the binary is already there. `pretest:e2e` does the same: otherwise each Playwright worker downloads the binary on its first launch, and the workers unpack it over each other in a fresh checkout.
 
 ---
 
