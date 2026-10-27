@@ -1,0 +1,43 @@
+extensions/git-integration/src/schemas/merge-flow.schema.ts
+  s_567c3310a5db4e::t_16a86e27733675 16,18,25,29,38-57
+  s_567c3310a5db4e::t_145677aacdbaf6 12-15,17,19-24,26-28,30-37
+extensions/notepad/src/editor/markdownTable.ts
+  s_567c3310a5db4e::t_791f80f662bcb5 10
+extensions/git-integration/src/utils/syntax.ts
+  s_567c3310a5db4e::t_791f80f662bcb5 3
+src/shared/schemas/home-feed.schema.ts
+  s_567c3310a5db4e::t_791f80f662bcb5 29
+src/shared/schemas/settings.schema.ts
+  s_567c3310a5db4e::t_791f80f662bcb5 5
+extensions/git-integration/src/schemas/pr-review.schema.ts
+  s_567c3310a5db4e::t_16a86e27733675 399-410
+  s_567c3310a5db4e::t_791f80f662bcb5 8,20,41,57,310
+extensions/remote-control/src/server/heartbeat.ts
+  s_567c3310a5db4e::t_f96724d09dd7b3 3
+extensions/task-vault/CLAUDE.md
+  s_567c3310a5db4e::t_07997df3355093 40
+extensions/task-vault/tests/vault/clock.spec.ts
+  s_567c3310a5db4e::t_c8d923aae08d3b 2
+scripts/e2e-select.mjs
+  s_567c3310a5db4e::t_5e3efb7fb89209 115
+src/main/agents/claude-hook.ts
+  s_567c3310a5db4e::t_ac3c254753bdf9 148
+tests/unit/integrations/tracker-error.spec.ts
+  s_567c3310a5db4e::t_1429fee8fe5f1c 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7822ae7db67a7c4fa8f366c0097f2641adc932ae",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
