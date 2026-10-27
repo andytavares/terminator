@@ -1,8 +1,8 @@
 // The steps CI runs on Ubuntu, run by ci:local in a container of the same: Ubuntu 24.04 on
 // arm64, as CI's ubuntu-24.04-arm runner, with the Node of .nvmrc (ADR 123). The checkout is
-// shared with the Mac; its node_modules are volumes of Linux installs, kept between runs.
+// its own worktree, apart from the Mac's, so both lanes run at once; its node_modules are volumes of Linux installs, kept between runs.
 
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -45,6 +45,20 @@ export function stepArguments(name, step, checkout) {
   ])
   const bash = ['bash', '-e', '-o', 'pipefail', '-c', step.script]
   return ['exec', '-u', RUNNER, '-w', checkout, ...variables, name, ...bash]
+}
+
+/** Runs a command, giving each chunk of its stdout and stderr to `options.write`; resolves its exit status. */
+export function spawnToSink(command, args, { write, ...options }) {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] })
+    child.stdout.on('data', write)
+    child.stderr.on('data', write)
+    child.on('error', (error) => {
+      write(`${error.message}\n`)
+      resolve(1)
+    })
+    child.on('close', (status) => resolve(status ?? 1))
+  })
 }
 
 const docker = (args, options = {}) => spawnSync('docker', args, { stdio: 'inherit', ...options })
@@ -96,7 +110,8 @@ export function startLinux(setup) {
   givesVolumesToRunner(checkout)
   installInContainer(checkout)
   return {
-    run: (step) => docker(stepArguments(CONTAINER, step, checkout)).status,
+    run: (step, write) =>
+      spawnToSink('docker', stepArguments(CONTAINER, step, checkout), { write }),
     stop: () => execFileSync('docker', ['rm', '-f', CONTAINER], { stdio: 'ignore' }),
   }
 }
