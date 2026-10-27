@@ -1,0 +1,228 @@
+extensions/git-integration/tests/unit/home-publisher.spec.ts
+  s_567c3310a5db4e::t_6c128b8ef5164e 10
+extensions/git-integration/tests/unit/local-inventory.spec.ts
+  s_567c3310a5db4e::t_3340688db0333b 11,15-26,105,198-199,252-268,271
+extensions/foundry/src/ipc/ui-registration.ts
+  s_567c3310a5db4e::t_7816d5d37b8a0f 107,115
+tests/unit/integrations/providers/provider.spec.ts
+  s_567c3310a5db4e::t_0be7ad5f82874f 37
+  s_567c3310a5db4e::t_79230ef7a8dbc1 87
+tests/unit/integrations/providers/linear.provider.spec.ts
+  s_567c3310a5db4e::t_79230ef7a8dbc1 128
+  s_567c3310a5db4e::t_0be7ad5f82874f 131-133,229-231
+tests/unit/ipc/integrations.ipc.spec.ts
+  s_567c3310a5db4e::t_7972359e8b98bd 28,133,138,141-148,162-163,180-182,195,205,209,303
+  s_567c3310a5db4e::t_193160f8e324d7 166-170
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_567c3310a5db4e::t_fbc38f5f361e50 952-957,959-960
+  s_567c3310a5db4e::t_ef9e564fda9cca 530,601-602
+  s_567c3310a5db4e::t_7e78e49bdd2ebd 75-77,958
+extensions/foundry/tests/forge/ticket-offer.spec.ts
+  s_567c3310a5db4e::t_9772ccbb326c78 25
+src/renderer/components/integrations/use-issue-search.ts
+  s_567c3310a5db4e::t_6c128b8ef5164e 6
+src/renderer/components/home/ThreadDrawer.tsx
+  s_567c3310a5db4e::t_6c128b8ef5164e 24
+packages/extension-sdk/types/issues.d.ts
+  s_567c3310a5db4e::t_99cbcabf5c423c 6
+  s_567c3310a5db4e::t_c324f09298bdf6 8,26-30,67,74,81,117
+tests/unit/renderer/components/LinkIssueDialog.spec.tsx
+  s_567c3310a5db4e::t_ef9e564fda9cca 53,72,78,85,260,263
+src/shared/schemas/integrations.schema.ts
+  s_567c3310a5db4e::t_3b6f259dc8424a 7,13-16,20-24
+src/renderer/components/settings/IntegrationsSettings.tsx
+  s_567c3310a5db4e::t_6c128b8ef5164e 14,21,151,153,163,169,183,214
+extensions/git-integration/tests/unit/home-work-key.spec.ts
+  s_567c3310a5db4e::t_6c128b8ef5164e 26,37
+extensions/foundry/src/line/order-project.ts
+  s_567c3310a5db4e::t_7816d5d37b8a0f 35
+extensions/notepad/package.json
+  s_567c3310a5db4e::t_48fcfef65500e5 21
+tests/unit/extensions/extension-host-start.spec.ts
+  s_567c3310a5db4e::t_7f9b11fc8aa4cc 61-62
+extensions/foundry/tests/trackers/write-back.spec.ts
+  s_567c3310a5db4e::t_9772ccbb326c78 367
+extensions/task-vault/src/index.ts
+  s_567c3310a5db4e::t_a8838322c0af1b 280,287
+  s_567c3310a5db4e::t_27bdec1cbcc170 308-309
+  s_567c3310a5db4e::t_afe89f0b384406 83
+packages/extension-sdk/README.md
+  s_567c3310a5db4e::t_a9e026dc44f328 6
+  s_567c3310a5db4e::t_f1ecd01d9dbea4 48
+  s_567c3310a5db4e::t_3b256a42445e71 20
+  s_567c3310a5db4e::t_2546c81c6226f9 18-19,21-23,27-32
+extensions/foundry/src/forge/intake-source.ts
+  s_567c3310a5db4e::t_7816d5d37b8a0f 46,64
+src/main/extensions/host/host-process.ts
+  s_567c3310a5db4e::t_0df32367034d30 127,129-134
+tests/unit/integrations/branch-from-issue.spec.ts
+  s_567c3310a5db4e::t_79230ef7a8dbc1 32,34,36
+tests/unit/renderer/components/IssuePicker.spec.tsx
+  s_567c3310a5db4e::t_ef9e564fda9cca 53,57
+  s_567c3310a5db4e::t_17b282fade128c 96,102,109,114
+  s_567c3310a5db4e::t_e89d8e16aa4445 51
+scripts/ci-plan.mjs
+  s_567c3310a5db4e::t_258257fd1cb3ef 102-103
+src/main/integrations/tracker-error.ts
+  s_567c3310a5db4e::t_fbc38f5f361e50 49
+src/main/integrations/providers/linear.provider.ts
+  s_567c3310a5db4e::t_8812bddcecec76 350
+src/renderer/components/home/focus-options.ts
+  s_567c3310a5db4e::t_6c128b8ef5164e 9
+tests/unit/integrations/index.spec.ts
+  s_567c3310a5db4e::t_79230ef7a8dbc1 69
+tests/unit/tasks/task-store.spec.ts
+  s_567c3310a5db4e::t_17b282fade128c 169,177
+tests/unit/sessions/session-record-store.spec.ts
+  s_567c3310a5db4e::t_ef9e564fda9cca 103
+tests/unit/extensions/api-issues.spec.ts
+  s_567c3310a5db4e::t_79230ef7a8dbc1 67,76,80,118,151,223,229
+src/main/ipc/integrations.ipc.ts
+  s_567c3310a5db4e::t_3b6f259dc8424a 47-48,90,93,96
+extensions/foundry/CLAUDE.md
+  s_567c3310a5db4e::t_7816d5d37b8a0f 153
+packages/extension-sdk/types/renderer.d.ts
+  s_567c3310a5db4e::t_4bf69e846ec564 88-90
+extensions/foundry/tests/ipc/forge-registration.spec.ts
+  s_567c3310a5db4e::t_9772ccbb326c78 82,88,145
+extensions/foundry/src/order/schema.ts
+  s_567c3310a5db4e::t_7816d5d37b8a0f 37
+src/renderer/components/integrations/LinkIssueDialog.tsx
+  s_567c3310a5db4e::t_dd25f1315bd345 109
+extensions/git-integration/src/ipc/worktrees.ipc.ts
+  s_567c3310a5db4e::t_6ebccf96d77207 4-8,45-48,57-68,71,81-82,85,94,101,117
+  s_567c3310a5db4e::t_3a0aec5c0272a0 49-56
+src/main/extensions/api.ts
+  s_567c3310a5db4e::t_3a3e37338e9597 953-954
+packages/extension-sdk/types/api.d.ts
+  s_567c3310a5db4e::t_44df3baf141630 437
+src/main/integrations/agent-context.ts
+  s_567c3310a5db4e::t_b0d8f253446ac7 29
+packages/extension-sdk/CHANGELOG.md
+  s_567c3310a5db4e::t_de0f264a7d5015 3-23
+src/main/sessions/session-record-store.ts
+  s_567c3310a5db4e::t_b0d8f253446ac7 103
+tests/unit/renderer/components/StartWorkAcrossRepos.spec.tsx
+  s_567c3310a5db4e::t_2d7a3404e25ed0 114-120,169
+  s_567c3310a5db4e::t_7e78e49bdd2ebd 112-113,121
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_567c3310a5db4e::t_7816d5d37b8a0f 58,129
+src/renderer/quick-actions/core-actions.ts
+  s_567c3310a5db4e::t_6c128b8ef5164e 17
+  s_567c3310a5db4e::t_dffd68e7230265 259
+src/renderer/home/work-threads.ts
+  s_567c3310a5db4e::t_6c128b8ef5164e 82
+tests/unit/renderer/components/StartWork.spec.tsx
+  s_567c3310a5db4e::t_2d7a3404e25ed0 172-178,519
+  s_567c3310a5db4e::t_7e78e49bdd2ebd 170-171,179
+extensions/git-integration/src/git/local-inventory.ts
+  s_567c3310a5db4e::t_6ebccf96d77207 4,30,105,179,263-264,279
+tests/unit/integrations/issue-link-store.spec.ts
+  s_567c3310a5db4e::t_ef9e564fda9cca 56,59,77,79
+src/main/git/git-service.ts
+  s_567c3310a5db4e::t_4bf69e846ec564 161-162
+package.json
+  s_567c3310a5db4e::t_a3d65a9dd59668 70
+tests/unit/integrations/agent-context.spec.ts
+  s_567c3310a5db4e::t_79230ef7a8dbc1 76
+src/renderer/components/home/task-actions.ts
+  s_567c3310a5db4e::t_6c128b8ef5164e 11,16
+tests/unit/renderer/sidebar/work-item.spec.ts
+  s_567c3310a5db4e::t_17b282fade128c 15,17
+extensions/foundry/tests/line/integrate.spec.ts
+  s_567c3310a5db4e::t_9772ccbb326c78 478
+src/renderer/stores/integrations.store.ts
+  s_567c3310a5db4e::t_6c128b8ef5164e 62,145
+src/main/extensions/extension-host.ts
+  s_567c3310a5db4e::t_5db7326f179707 88,379
+  s_567c3310a5db4e::t_7f9b11fc8aa4cc 310-313
+tests/unit/git/git-service.spec.ts
+  s_567c3310a5db4e::t_60a8e3ffe7bc1a 240-242,268,270
+  s_567c3310a5db4e::t_782ffd5654e05b 243-267
+src/main/integrations/issue-link-store.ts
+  s_567c3310a5db4e::t_b0d8f253446ac7 55
+packages/extension-sdk/package.json
+  s_567c3310a5db4e::t_2c1daad69828ab 3
+src/main/extensions/host/host-runtime.ts
+  s_567c3310a5db4e::t_5db7326f179707 78
+src/main/extensions/host/host-api.ts
+  s_567c3310a5db4e::t_3a3e37338e9597 301
+extensions/foundry/package.json
+  s_567c3310a5db4e::t_09393b83618b7f 11
+tests/unit/integrations/issue-service-transition.spec.ts
+  s_567c3310a5db4e::t_0be7ad5f82874f 51-54,64-65,70,81,88,106-107,124-125,131-132,167-169,209,211,213
+extensions/foundry/src/components/Orders.tsx
+  s_567c3310a5db4e::t_0d445cb5e99d4e 688-689
+  s_567c3310a5db4e::t_3f9d7919a6b528 342
+src/main/integrations/issue-service.ts
+  s_567c3310a5db4e::t_b0d8f253446ac7 32
+tests/unit/extensions/extension-host.spec.ts
+  s_567c3310a5db4e::t_7f9b11fc8aa4cc 73
+extensions/git-integration/package.json
+  s_567c3310a5db4e::t_298eb748ee9e7b 16
+extensions/remote-control/package.json
+  s_567c3310a5db4e::t_7f4aa0d3d3b952 12
+src/main/extensions/host/main-snapshot.ts
+  s_567c3310a5db4e::t_b0d8f253446ac7 4
+tests/unit/integrations/tracker-store.spec.ts
+  s_567c3310a5db4e::t_d10ff3b5c054c9 70,100,106,108,157-161,163-164,169,171,174-175,177,179
+src/shared/types/index.ts
+  s_567c3310a5db4e::t_4bf69e846ec564 59-62
+extensions/git-integration/src/git/remove-local.ts
+  s_567c3310a5db4e::t_6ebccf96d77207 1,34,102,106
+extensions/foundry/src/ipc/forge-channels.ts
+  s_567c3310a5db4e::t_7816d5d37b8a0f 61,175
+src/main/integrations/index.ts
+  s_567c3310a5db4e::t_8812bddcecec76 16
+tests/unit/renderer/stores/integrations.store.spec.ts
+  s_567c3310a5db4e::t_f1dcd2a42068dc 99,103-104,127,129-130,144,146,181
+tests/unit/renderer/quick-actions/core-actions.spec.ts
+  s_567c3310a5db4e::t_17b282fade128c 255-256,260
+tests/unit/main/extensions/host/host-agents.spec.ts
+  s_567c3310a5db4e::t_7f9b11fc8aa4cc 124
+tests/unit/integrations/issue-service.spec.ts
+  s_567c3310a5db4e::t_e279e67c0c8400 52,57,59,66,95,147-148,151,156,159,162-163,167,169,171,173,214,225-229,246,321,328-329,343,356
+src/main/integrations/tracker-store.ts
+  s_567c3310a5db4e::t_fbc38f5f361e50 64
+  s_567c3310a5db4e::t_99cbcabf5c423c 65-66
+  s_567c3310a5db4e::t_157c921ee32811 22,63,103-104,110,118,124,146,161
+tests/unit/renderer/quick-actions/use-core-quick-actions.spec.tsx
+  s_567c3310a5db4e::t_17b282fade128c 27
+tests/unit/renderer/components/SessionLinkDialog.spec.tsx
+  s_567c3310a5db4e::t_17b282fade128c 125
+tests/unit/main/extensions/host/host-process.spec.ts
+  s_567c3310a5db4e::t_7f9b11fc8aa4cc 154
+src/renderer/components/session/SessionLinkDialog.tsx
+  s_567c3310a5db4e::t_6c128b8ef5164e 117
+extensions/task-vault/src/navigation.ts
+  s_567c3310a5db4e::t_c6e912af417868 42
+  s_567c3310a5db4e::t_45e51dcf92cec8 1,3-8
+extensions/git-integration/tests/unit/remove-local.spec.ts
+  s_567c3310a5db4e::t_3340688db0333b 29-34,75
+src/main/integrations/providers/provider.ts
+  s_567c3310a5db4e::t_8812bddcecec76 16,20-21,24,26,29
+  s_567c3310a5db4e::t_3b6f259dc8424a 25
+  s_567c3310a5db4e::t_a40a5be79f4508 30
+extensions/foundry/tests/order/store.spec.ts
+  s_567c3310a5db4e::t_9772ccbb326c78 196,201
+package-lock.json
+  s_567c3310a5db4e::t_59c1a037ada647 19,80,102,130,147,165,18687
+tests/unit/renderer/components/IntegrationsSettings.spec.tsx
+  s_567c3310a5db4e::t_241292e62ab1df 47-48,50,74,80,88,109,120,122,131,143,155,157,166,183,207,211,229-230,238
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ee8cc76255180bd7726be0d79bf814ad704ecfb5",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
