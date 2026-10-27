@@ -1,5 +1,6 @@
 import type WebSocket from 'ws'
 
+/** @internal */
 export const HEARTBEAT_INTERVAL_MS = 30_000
 
 /**

@@ -22,11 +22,6 @@ export function today(): string {
   return zonedNow().toPlainDate().toString()
 }
 
-/** The local date `days` calendar days before today, as YYYY-MM-DD. */
-export function daysAgo(days: number): string {
-  return zonedNow().toPlainDate().subtract({ days }).toString()
-}
-
 /** An instant as created_at and updated_at hold it: what Date.toISOString() writes. */
 export function storedInstant(at: Temporal.ZonedDateTime): string {
   return at.toInstant().toString({ fractionalSecondDigits: 3 })

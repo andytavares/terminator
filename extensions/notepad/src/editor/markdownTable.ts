@@ -7,8 +7,7 @@
 import { parser, GFM } from '@lezer/markdown'
 import type { SyntaxNode } from '@lezer/common'
 
-/** @internal */
-export type ColumnAlign = 'left' | 'center' | 'right' | null
+type ColumnAlign = 'left' | 'center' | 'right' | null
 
 /**
  * A cell's text plus where that text starts, so clicking a rendered cell can

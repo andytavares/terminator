@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  TrackerError,
-  fromHttpStatus,
-  toErrorKind,
-} from '../../../src/main/integrations/tracker-error'
+import { TrackerError, toErrorKind } from '../../../src/main/integrations/tracker-error'
 
 describe('TrackerError', () => {
   it('carries a kind and a message', () => {
@@ -20,32 +16,6 @@ describe('TrackerError', () => {
 
   it('leaves retryAfterMs undefined for every other kind', () => {
     expect(new TrackerError('unavailable', 'offline').retryAfterMs).toBeUndefined()
-  })
-})
-
-describe('fromHttpStatus', () => {
-  it.each([
-    [401, 'auth-failed'],
-    [403, 'auth-failed'],
-    [404, 'not-found'],
-    [429, 'rate-limited'],
-    [500, 'unavailable'],
-    [502, 'unavailable'],
-    [503, 'unavailable'],
-    [418, 'failed'],
-  ])('maps %i to %s', (status, kind) => {
-    expect(fromHttpStatus(status, 'x').kind).toBe(kind)
-  })
-
-  it('reads Retry-After seconds into retryAfterMs', () => {
-    const err = fromHttpStatus(429, 'rate limited', { retryAfterSeconds: 45 })
-    expect(err.retryAfterMs).toBe(45_000)
-  })
-
-  it('keeps the tracker message verbatim — the operator sees what the tracker said', () => {
-    expect(fromHttpStatus(400, "jql is invalid: unknown field 'foo'").message).toBe(
-      "jql is invalid: unknown field 'foo'"
-    )
   })
 })
 

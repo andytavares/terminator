@@ -112,6 +112,7 @@ export const CORE_SPECS = [
   'settings.spec.ts',
   'sidebar-marks-the-shown-session.spec.ts',
   'sidebar-sorting.spec.ts',
+  'start-work-run-as-keyboard.spec.ts',
   'terminal-breakout.spec.ts',
 ]
 

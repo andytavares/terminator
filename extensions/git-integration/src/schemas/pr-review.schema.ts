@@ -5,7 +5,7 @@ import { z } from 'zod'
 const SignalValueSchema = z.enum(['pass', 'warn', 'fail', 'unknown'])
 
 /** @internal */
-export const SignalDotsSchema = z.object({
+const SignalDotsSchema = z.object({
   tests: SignalValueSchema,
   coverage: SignalValueSchema,
   ci: SignalValueSchema,
@@ -17,7 +17,7 @@ export const SignalDotsSchema = z.object({
 // ─── Risk score ───────────────────────────────────────────────────────────────
 
 /** @internal */
-export const RiskScoreSchema = z.object({
+const RiskScoreSchema = z.object({
   level: z.enum(['low', 'medium', 'high']),
   composite: z.number().nullable(),
   metrics: z.object({
@@ -35,24 +35,10 @@ export const RiskScoreSchema = z.object({
 
 // ─── File metrics (raw input to computeRiskScore) ────────────────────────────
 
-/** @internal */
-export const FileMetricsSchema = z.object({
-  path: z.string(),
-  additions: z.number(),
-  deletions: z.number(),
-  churn90d: z.number().nullable(),
-  blastRadius: z.number().nullable(),
-  testFilePresent: z.boolean(),
-  complexityDelta: z.number().nullable(),
-  patchCoverage: z.number().nullable(),
-  topImporters: z.array(z.string()),
-  importerCount: z.number(),
-})
-
 // ─── Changed file ─────────────────────────────────────────────────────────────
 
 /** @internal */
-export const PrChangedFileSchema = z.object({
+const PrChangedFileSchema = z.object({
   path: z.string(),
   oldPath: z.string().optional(),
   changeType: z.enum(['added', 'modified', 'deleted', 'renamed']),
@@ -68,7 +54,7 @@ export const PrChangedFileSchema = z.object({
 // ─── Chapter ──────────────────────────────────────────────────────────────────
 
 /** @internal */
-export const ChapterSchema = z.object({
+const ChapterSchema = z.object({
   id: z.string(),
   name: z.string(),
   files: z.array(PrChangedFileSchema),
@@ -321,7 +307,7 @@ export interface IssueComment {
 // ─── Inline comments ─────────────────────────────────────────────────────────
 
 /** @internal */
-export const InlineCommentSchema = z.object({
+const InlineCommentSchema = z.object({
   id: z.number(),
   author: z.string(),
   authorAvatarUrl: z.string(),
@@ -410,7 +396,18 @@ export interface PrHead {
 
 export type SignalDots = z.infer<typeof SignalDotsSchema>
 export type RiskScore = z.infer<typeof RiskScoreSchema>
-export type FileMetrics = z.infer<typeof FileMetricsSchema>
+export interface FileMetrics {
+  path: string
+  additions: number
+  deletions: number
+  churn90d: number | null
+  blastRadius: number | null
+  testFilePresent: boolean
+  complexityDelta: number | null
+  patchCoverage: number | null
+  topImporters: string[]
+  importerCount: number
+}
 export type PrChangedFile = z.infer<typeof PrChangedFileSchema>
 export type Chapter = z.infer<typeof ChapterSchema>
 export type PrReviewDetail = z.infer<typeof PrReviewDetailSchema>

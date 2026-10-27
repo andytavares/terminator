@@ -37,31 +37,6 @@ export class TrackerError extends Error {
   }
 }
 
-const STATUS_KINDS: ReadonlyMap<number, TrackerErrorKind> = new Map([
-  [401, 'auth-failed'],
-  [403, 'auth-failed'],
-  [404, 'not-found'],
-  [429, 'rate-limited'],
-])
-
-/**
- * Translate an HTTP response into the taxonomy. The tracker's own message is
- * kept verbatim — a query syntax error is far more useful to the operator
- * than "request failed".
- */
-export function fromHttpStatus(
-  status: number,
-  message: string,
-  options: { retryAfterSeconds?: number } = {}
-): TrackerError {
-  const mapped = STATUS_KINDS.get(status)
-  const kind: TrackerErrorKind = mapped ?? (status >= 500 ? 'unavailable' : 'failed')
-  return new TrackerError(kind, message, {
-    retryAfterMs:
-      options.retryAfterSeconds === undefined ? undefined : options.retryAfterSeconds * 1000,
-  })
-}
-
 // Node surfaces a dead network as a TypeError from fetch with one of these on
 // the cause. Without this they would all read as 'failed', and the operator
 // would be told their credential was wrong when their wifi was off.

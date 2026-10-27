@@ -145,7 +145,7 @@ export function asksDirectory(): string {
 }
 
 /** The operator's Claude settings, under HOME. Not Electron's home: on macOS that is the account's
- * whatever HOME says, so a sealed test run wrote the developer's own file. */
+ * whatever HOME says, so a sealed test run wrote the developer's own file. @internal */
 export function userSettingsPath(): string {
   return path.join(os.homedir(), '.claude', 'settings.json')
 }
