@@ -1,3 +1,4 @@
+import { timeoutNotice } from './integrate.js'
 import type { ExecResult, ShellExec } from './integrate.js'
 
 // A pull request's CI is read through `gh`, never re-derived: `gh pr checks`
@@ -65,6 +66,7 @@ async function pollChecks(
     command: 'gh',
     args: ['pr', 'checks', pull.url, '--json', 'name,bucket,link,workflow'],
     cwd: pull.cwd,
+    timeoutMs: CHECKS_TIMEOUT_MS,
   })
   const message = `${result.stderr}${result.stdout}`.trim()
   if (result.exitCode !== 0) {
@@ -128,6 +130,8 @@ export function runIdFrom(link: string): string | null {
 
 /** How much of the failed runs' logs to keep: the end, where the failure is. */
 const MAX_LOG_LINES = 200
+const CHECKS_TIMEOUT_MS = 60_000
+const RUN_LOG_TIMEOUT_MS = 120_000
 
 export async function failedLogs(
   checks: readonly Check[],
@@ -150,7 +154,16 @@ export async function failedLogs(
 
 async function runLog(id: string, cwd: string, exec: ShellExec): Promise<string> {
   try {
-    return (await exec({ command: 'gh', args: ['run', 'view', id, '--log-failed'], cwd })).stdout
+    const result = await exec({
+      command: 'gh',
+      args: ['run', 'view', id, '--log-failed'],
+      cwd,
+      timeoutMs: RUN_LOG_TIMEOUT_MS,
+    })
+    if (result.timedOut)
+      return `log could not be read: ${timeoutNotice('gh run view', RUN_LOG_TIMEOUT_MS)}`
+    if (result.exitCode !== 0) return `log could not be read: ${result.stderr.trim()}`
+    return result.stdout
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)
     return `log could not be read: ${reason}`

@@ -94,8 +94,19 @@ describe('Foundry in a repository it has never seen: seeding an order', () => {
   })
 })
 
+/** A repository's own shape that needs a `.specify` folder this repository lacks. */
+function writeToolkitShape(): void {
+  const direct = fs.readFileSync(path.join(builtInDir, 'recipes', 'direct.yaml'), 'utf8')
+  const toolkit = direct
+    .replace('id: direct', 'id: toolkit')
+    .replace('requires: []', 'requires:\n  - path_exists: .specify')
+  fs.mkdirSync(path.join(repo, '.foundry', 'recipes'), { recursive: true })
+  fs.writeFileSync(path.join(repo, '.foundry', 'recipes', 'toolkit.yaml'), toolkit)
+}
+
 describe('Foundry in a repository it has never seen: the recipes on offer', () => {
-  it('does not offer the specification pipeline where the toolkit is absent', async () => {
+  it('does not offer a shape whose toolkit is absent', async () => {
+    writeToolkitShape()
     const store = createOrderStore(dataRoot)
     const seeded = (await forge().create({
       source: { kind: 'typed', text: 'x' },
@@ -113,9 +124,9 @@ describe('Foundry in a repository it has never seen: the recipes on offer', () =
       recipes: { name: string; available: boolean; unmet: string[] }[]
     }
 
-    const speckit = offered.recipes.find((r) => r.name === 'speckit')
-    expect(speckit?.available).toBe(false)
-    expect(speckit?.unmet.join(' ')).toContain('.specify')
+    const toolkit = offered.recipes.find((r) => r.name === 'toolkit')
+    expect(toolkit?.available).toBe(false)
+    expect(toolkit?.unmet.join(' ')).toContain('.specify')
 
     // And the shapes that need nothing are still on offer, so the repository
     // is usable rather than merely refused.

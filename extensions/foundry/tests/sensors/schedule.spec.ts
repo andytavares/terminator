@@ -75,6 +75,7 @@ function fakeCollectDeps(over: Partial<CollectDeps> = {}): CollectDeps {
 describe('runSensor', () => {
   describe('recording', scheduleRecordingTests)
   describe('failures', scheduleFailuresTests)
+  describe('started', scheduleStartedTests)
 })
 
 /** gh listing one open bug. */
@@ -113,6 +114,27 @@ function scheduleRecordingTests() {
       lastRunAt: '2026-01-01T00:20:00.000Z',
       lastProblem: null,
     })
+  })
+}
+
+function scheduleStartedTests() {
+  it('marks the sensor started before it collects, so an overlapping tick finds it not due', async () => {
+    const store = createSignalStore(tempRoot())
+    const def = sensor({ source: { kind: 'github-issues', label: 'bug', limit: 5 } })
+    let lastRunAtWhileCollecting: string | null = null
+    const exec = async () => {
+      lastRunAtWhileCollecting = (await store.sensorState())['ci-flake']?.lastRunAt ?? null
+      return LOGIN_CRASHES
+    }
+
+    await runSensor(def, {
+      store,
+      collectDeps: fakeCollectDeps({ exec }),
+      now: () => '2026-01-01T00:20:00.000Z',
+      newId: () => 'sig-1',
+    })
+
+    expect(lastRunAtWhileCollecting).toBe('2026-01-01T00:20:00.000Z')
   })
 }
 

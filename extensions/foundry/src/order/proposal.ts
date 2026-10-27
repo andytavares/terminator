@@ -47,6 +47,11 @@ const ProposalSchema = z
     plan: orderShape.plan.partial().optional(),
     assumptions: orderShape.assumptions.optional(),
     openQuestions: orderShape.openQuestions.optional(),
+    // Lists merge by id, so dropping a criterion or a unit has to be said by id.
+    remove: z
+      .object({ acceptance: z.array(z.string()).optional(), units: z.array(z.string()).optional() })
+      .strict()
+      .optional(),
     // Findings the architect is sure do not apply. Only low and medium ones are
     // honoured, and only at the confidence bar (spec 062); `redTeam` itself
     // stays out of reach.
@@ -69,6 +74,11 @@ const ProposalSchema = z
   .strict()
 
 export type Proposal = z.infer<typeof ProposalSchema>
+
+/** The proposal's JSON Schema, for Claude to hold its answer to. */
+export function proposalJsonSchema(): object {
+  return z.toJSONSchema(ProposalSchema, { target: 'draft-7', io: 'input' })
+}
 
 const REFUSED = 'The proposal was refused: '
 
@@ -147,10 +157,30 @@ function contextWithFindings(
   }
 }
 
+// A sent item replaces the one with its id, a new id is added, and the rest stay: the schema
+// has no way to say "remove", so a partial list must not drop what it leaves out.
+function mergedById<T extends { id: string }>(
+  current: readonly T[],
+  sent: readonly T[],
+  removed: readonly string[] = []
+): T[] {
+  const replaced = current.map((item) => sent.find((s) => s.id === item.id) ?? item)
+  const merged = [...replaced, ...sent.filter((s) => !current.some((item) => item.id === s.id))]
+  return merged.filter((item) => !removed.includes(item.id))
+}
+
 // The proposal's plan over the order's, keeping a lane branch the ticket fixed when
 // the proposal leaves it blank.
-function mergedPlan(plan: WorkOrder['plan'], proposed: Proposal['plan']): WorkOrder['plan'] {
-  const merged = { ...plan, ...proposed }
+function mergedPlan(
+  plan: WorkOrder['plan'],
+  proposed: Proposal['plan'],
+  removedUnits: readonly string[]
+): WorkOrder['plan'] {
+  const merged = {
+    ...plan,
+    ...proposed,
+    units: mergedById(plan.units, proposed?.units ?? [], removedUnits),
+  }
   if (proposed?.lanes === undefined) return merged
   const lanes = proposed.lanes.map((lane) => {
     const kept = plan.lanes.find((l) => l.ord === lane.ord)?.branch ?? ''
@@ -208,9 +238,13 @@ export function applyProposal(order: WorkOrder, proposal: Proposal, at: string):
     ...order,
     intent: { ...order.intent, ...proposal.intent },
     context: contextWithFindings(order.context, proposal.findings),
-    acceptance: proposal.acceptance ?? order.acceptance,
+    acceptance: mergedById(
+      order.acceptance,
+      proposal.acceptance ?? [],
+      proposal.remove?.acceptance
+    ),
     risk: { ...order.risk, ...proposal.risk },
-    plan: mergedPlan(order.plan, proposal.plan),
+    plan: mergedPlan(order.plan, proposal.plan, proposal.remove?.units ?? []),
     assumptions: keptStruck(order.assumptions, proposal.assumptions ?? order.assumptions),
     openQuestions: keptAnswered(order.openQuestions, proposal.openQuestions ?? order.openQuestions),
     provenance: {
@@ -223,6 +257,3 @@ export function applyProposal(order: WorkOrder, proposal: Proposal, at: string):
   // proposal — the two can differ, and the next reader is the compile gate.
   return WorkOrderSchema.parse(next)
 }
-
-/** Where an intake agent writes what it proposes. One path, known to both. */
-export const PROPOSAL_FILE = 'proposal.json'

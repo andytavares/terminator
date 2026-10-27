@@ -86,38 +86,6 @@ describe('what ends a node', () => {
   })
 })
 
-// A read-only role exists to decide without a person — that is why the policy
-// reads the command rather than the tool. Returning `null` for an *allowed*
-// command abstains, and an abstention is a held tool call: five minutes on the
-// inbox before it falls back to the terminal. Six calls was half an hour of
-// waiting while the console showed an agent thinking.
-//
-// Only the running application can show this, so what stops it coming back is
-// the shape of the source.
-// The Line's decision is `runtime/tool-decision.ts` now, with a spec that
-// exercises it rather than grepping for it — these assertions existed only
-// because it was inline in `activate` and nothing could reach it. What is left
-// here is intake's own path, which is still inline and much simpler: read-only,
-// plus the one file the architect is allowed to write.
-describe('what a read-only role is told, on the intake path', () => {
-  it('never abstains on a command its own policy allowed', () => {
-    expect(src, 'an allowed read-only command is being sent to the operator').not.toMatch(
-      /decision\.allow \? null/
-    )
-  })
-
-  it('answers with the policy decision, both ways', () => {
-    const answers = [
-      ...src.matchAll(/return \{ allow: decision\.allow, reason: decision\.reason \}/g),
-    ]
-    expect(answers.length, 'the intake path does not return its own decision').toBe(1)
-  })
-
-  it('hands the run path to the function that can be tested', () => {
-    expect(src).toContain('decideTool({')
-  })
-})
-
 // A refusal was posted to the console and a *question* was not, so an agent
 // waiting on one looked exactly like an agent that had gone quiet — which is
 // what it then became. Watched live: a builder redirected its test output to a
@@ -208,44 +176,5 @@ describe('tools the operator says only read', () => {
     const body = fn.slice(0, fn.indexOf('\n}'))
     expect(body).toContain("get<string[]>('terminator.foundry.readOnlyTools', { repoPath })")
     expect(body).not.toMatch(/startsWith\('mcp__'\)|includes\('get_'\)|\/read|search\//)
-  })
-})
-
-// The verifier's whole job is a verdict from an exit status (FR-033), and its
-// role file declares `run_tests`. The read-only policy refused `npm test` like
-// any other unknown binary — so the role vocabulary said one thing and the gate
-// did another, and a live architect burned three turns discovering it.
-describe("running the project's own commands", () => {
-  it('lets a role that declared run_tests run them', () => {
-    // The rule itself lives in `tool-decision.ts` and is exercised there; what
-    // this file can still say is that the run path is wired to ask.
-    expect(src).toContain('isProbed: (name, given) => isProbedCommand(order, name, given)')
-  })
-
-  it('matches them exactly, rather than by prefix', () => {
-    const fn = src.slice(src.indexOf('function isProbedCommand'))
-    const body = fn.slice(0, fn.indexOf('\n}'))
-    // Exact set membership, per segment. A prefix match would let
-    // `npm test; rm -rf .` in on the strength of its first two words, which is
-    // the whole reason this assertion exists.
-    expect(body).toContain('probed.has(segment)')
-    expect(body).not.toMatch(/startsWith|includes\(asked\)/)
-  })
-
-  it('reads a joined command per segment, so capturing an exit status is allowed', () => {
-    // A verdict from an exit status is the verifier's job, and an exit status
-    // is something you have to ask for: `npm test; echo "EXIT=$?"`. A
-    // whole-command match refused that, naming `npm` as not on the list.
-    const fn = src.slice(src.indexOf('function isProbedCommand'))
-    const body = fn.slice(0, fn.indexOf('\n}'))
-    expect(body).toContain('readShell(command).segments')
-    // And every other segment still has to stand on its own, or
-    // `npm test; rm -rf .` rides in behind the one that was declared.
-    expect(body).toContain("decideReadOnly('Bash', { command: segment }).allow")
-  })
-
-  it('only ever considers a shell call', () => {
-    const fn = src.slice(src.indexOf('function isProbedCommand'))
-    expect(fn.slice(0, fn.indexOf('\n}'))).toContain("tool !== 'Bash'")
   })
 })

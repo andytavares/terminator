@@ -168,3 +168,13 @@ function evidenceGapsAndOrderTests() {
     expect(own.map((e) => e.subject)).toEqual(['b'])
   })
 }
+
+describe('a torn last line', () => {
+  it('costs only the torn line, never the entry written after it', async () => {
+    await appendEntry(file, entry({ subject: 'before' }))
+    // A process killed part-way through a write leaves a line with no newline.
+    await fs.promises.appendFile(file, '{"at":"2026-09-06T10:01:00.000Z","orderId":"WO-0', 'utf8')
+    await appendEntry(file, entry({ subject: 'after' }))
+    expect((await readEntries(file)).map((e) => e.subject)).toEqual(['before', 'after'])
+  })
+})

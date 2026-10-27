@@ -25,6 +25,8 @@ export interface CollectDeps {
 export interface CollectResult {
   readonly items: SensedItem[]
   readonly problem: string | null
+  /** Keys of signals this run proves are over (a workflow now green); absent means none. */
+  readonly resolvedKeys?: string[]
 }
 
 /** Lowercases, strips digits/hex ids/quoted strings/paths, collapses whitespace. */
@@ -87,6 +89,40 @@ interface FailedRun {
   url: string
 }
 
+const LATEST_RUN_TIMEOUT_MS = 30_000
+
+/** True when the newest completed run of `workflow` on `branch` succeeded; false when unknown. */
+async function latestRunSucceeded(
+  deps: CollectDeps,
+  branch: string,
+  workflow: string
+): Promise<boolean> {
+  const result = await deps.exec({
+    command: 'gh',
+    args: [
+      ...['run', 'list', '--branch', branch, '--workflow', workflow, '--status', 'completed'],
+      ...['--limit', '1', '--json', 'conclusion,url,headSha'],
+    ],
+    cwd: deps.cwd,
+    timeoutMs: LATEST_RUN_TIMEOUT_MS,
+  })
+  if (result.exitCode !== 0) return false
+  return parseJson<{ conclusion: string }[]>(result.stdout)?.[0]?.conclusion === 'success'
+}
+
+/** The workflows among `failed` whose newest run on `branch` now passes. */
+async function greenWorkflows(
+  deps: CollectDeps,
+  branch: string,
+  failed: readonly FailedRun[]
+): Promise<Set<string>> {
+  const green = new Set<string>()
+  for (const workflow of new Set(failed.map((run) => run.workflowName))) {
+    if (await latestRunSucceeded(deps, branch, workflow)) green.add(workflow)
+  }
+  return green
+}
+
 async function collectGithubRuns(
   source: Extract<SensorSource, { kind: 'github-runs' }>,
   deps: CollectDeps
@@ -106,12 +142,15 @@ async function collectGithubRuns(
     }
   )
   if ('problem' in listed) return problem(listed.problem)
-  const items: SensedItem[] = listed.rows.map((run) => ({
-    key: `workflow:${run.workflowName}`,
-    title: `${run.workflowName} failing on ${branch}`,
-    evidence: { kind: 'ci-run', title: run.displayTitle, url: run.url, at: run.createdAt },
-  }))
-  return { items, problem: null }
+  const green = await greenWorkflows(deps, branch, listed.rows)
+  const items: SensedItem[] = listed.rows
+    .filter((run) => !green.has(run.workflowName))
+    .map((run) => ({
+      key: `workflow:${run.workflowName}`,
+      title: `${run.workflowName} failing on ${branch}`,
+      evidence: { kind: 'ci-run', title: run.displayTitle, url: run.url, at: run.createdAt },
+    }))
+  return { items, problem: null, resolvedKeys: [...green].map((name) => `workflow:${name}`) }
 }
 
 async function collectGithubIssues(
@@ -157,7 +196,7 @@ async function collectTracker(
       : await deps.issues.listMine({ limit: source.limit })
 
   const items: SensedItem[] = found.map((issue) => ({
-    key: `tracker:${normalise(issue.title)}`,
+    key: `tracker:${issue.key}`,
     title: issue.title,
     evidence: {
       kind: 'issue',

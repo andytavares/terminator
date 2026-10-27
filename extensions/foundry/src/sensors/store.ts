@@ -3,6 +3,7 @@ import * as path from 'node:path'
 
 import type { Signal } from './types'
 import { writeJsonAtomic } from '@terminator/extension-sdk/node'
+import { appendLines } from '../ledger/append.js'
 
 // Everything a sensor produces or remembers lives under
 // `<dataRoot>/signals/`, never inside a repository (ADR-066): the data root is
@@ -104,16 +105,26 @@ async function writeState(file: string, state: Record<string, SensorState>): Pro
 async function appendChanged(dataRoot: string, signals: readonly Signal[]): Promise<void> {
   if (signals.length === 0) return
   const jsonlFile = signalsPath(dataRoot)
-  const latest = latestById(await readSignalLines(jsonlFile))
+  const lines = await readSignalLines(jsonlFile)
+  const latest = latestById(lines)
   const toAppend = signals.filter((signal) => {
     const current = latest.get(signal.id)
     return current === undefined || JSON.stringify(current) !== JSON.stringify(signal)
   })
   if (toAppend.length === 0) return
 
-  await fs.promises.mkdir(signalsDir(dataRoot), { recursive: true })
-  const text = toAppend.map((signal) => JSON.stringify(signal) + '\n').join('')
-  await fs.promises.appendFile(jsonlFile, text, 'utf-8')
+  if (lines.length + toAppend.length > MAX_SIGNAL_LINES) await compact(jsonlFile, latest)
+  await appendLines(jsonlFile, toAppend.map((signal) => JSON.stringify(signal) + '\n').join(''))
+}
+
+/** The log is rewritten to its latest line per signal once it grows past this. */
+const MAX_SIGNAL_LINES = 1000
+
+async function compact(file: string, latest: Map<string, Signal>): Promise<void> {
+  const text = [...latest.values()].map((signal) => JSON.stringify(signal) + '\n').join('')
+  const temporary = `${file}.${process.pid}.tmp`
+  await fs.promises.writeFile(temporary, text, 'utf-8')
+  await fs.promises.rename(temporary, file)
 }
 
 /** Merges one sensor's patch into its stored state, and returns every sensor's. */

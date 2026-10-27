@@ -11,7 +11,7 @@ import {
   writeBaseline,
 } from '../../src/line/baseline.js'
 import type { Baseline, BaselineDeps } from '../../src/line/baseline.js'
-import { failedStepSentence, isTestStep } from '../../src/line/baseline-steps.js'
+import { failedStepSentence } from '../../src/line/baseline-steps.js'
 import { checkoutPath } from '../../src/line/worktree.js'
 import { runStepOnBaseCheckout } from '../../src/line/lane-commands.js'
 import type { RunContext } from '../../src/line/run-context.js'
@@ -22,6 +22,7 @@ import type { SupervisedRunner } from '../../src/runtime/supervised-runner.js'
 import type { StepOutcome } from '../../src/verify/ladder.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
 import { probeToolchain } from '../../src/verify/toolchain-probe.js'
+import type { ShellExec } from '../../src/line/integrate.js'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
 import { partialFake } from '../../../../tests/support/fakes'
 import { gitAt, realGit, seededRepository, temporaryDirectory } from '../helpers/foundry-host.js'
@@ -40,7 +41,12 @@ beforeEach(async () => {
   fs.writeFileSync(
     path.join(repo, 'package.json'),
     JSON.stringify({
-      scripts: { format: 'prettier --check .', lint: 'eslint .', test: 'vitest run', build: 'tsc' },
+      scripts: {
+        'format:check': 'prettier --check .',
+        lint: 'eslint .',
+        test: 'vitest run',
+        build: 'tsc',
+      },
     })
   )
   fs.writeFileSync(path.join(repo, 'package-lock.json'), '{}')
@@ -432,15 +438,85 @@ describe('proveEnvironment when nothing could be measured', () => {
   })
 })
 
-describe('failedStepSentence and isTestStep', () => {
+describe('failedStepSentence', () => {
   it('names the step, branch, exit code and command', () => {
     expect(failedStepSentence(TESTS_FAILED, 'main')).toBe(
       'Tests failed on main with exit code 1: `npm test`.'
     )
   })
+})
 
-  it('knows the test step by its rung, not its label', () => {
-    expect(isTestStep({ ...TESTS_FAILED, name: 'Unit' })).toBe(true)
-    expect(isTestStep({ ...BUILD_NOT_RUN, rung: 'L5' })).toBe(false)
+function withCi(h: ReturnType<typeof harness>, runs: unknown[] | null) {
+  const gh: string[][] = []
+  const exec: ShellExec = (options) => {
+    if (options.command !== 'gh') return realGit(options)
+    gh.push(options.args)
+    return Promise.resolve({
+      exitCode: runs === null ? 1 : 0,
+      stdout: JSON.stringify(runs ?? []),
+      stderr: '',
+      timedOut: false,
+    })
+  }
+  return { deps: { ...h.deps, exec }, gh }
+}
+
+const failedRun = { workflowName: 'CI', status: 'completed', conclusion: 'failure', url: 'u/1' }
+
+describe('proveEnvironment with the base commit CI result', () => {
+  const failed = failedRun
+
+  it('records a failing base from CI and runs nothing locally', async () => {
+    const h = harness()
+    const ci = withCi(h, [failed])
+    await proveEnvironment(orderOn(repo), ci.deps)
+    const baseline = await readBaseline(h.deps.root, 'WO-1')
+    const head = (await gitAt(repo, 'rev-parse', 'main')).stdout.trim()
+    expect(baseline).toMatchObject({ state: 'failing', commit: head, steps: [] })
+    expect(h.ran).toEqual([])
+    expect(h.ledger[h.ledger.length - 1]?.reason).toBe('main failed in CI: CI (u/1).')
+    expect(ci.gh[0]).toEqual(expect.arrayContaining(['run', 'list', '--commit', head]))
+  })
+})
+
+describe('proveEnvironment when CI does not call the base failing', ciNotFailingTests)
+
+function ciNotFailingTests() {
+  const failed = failedRun
+
+  it('runs locally when CI is green, pending or absent', async () => {
+    for (const runs of [
+      [{ ...failed, conclusion: 'success' }],
+      [{ ...failed, status: 'in_progress', conclusion: '' }],
+      null,
+    ]) {
+      const h = harness()
+      await proveEnvironment(orderOn(repo), withCi(h, runs).deps)
+      expect((await readBaseline(h.deps.root, 'WO-1'))?.state).toBe('proven')
+      expect(h.ran).toContain(commands.Tests)
+    }
+  })
+}
+
+describe('proveEnvironment on a [skip ci] base commit', () => {
+  const failed = failedRun
+
+  it('reads the nearest ancestor with runs when the base commit says [skip ci]', async () => {
+    const earlier = (await gitAt(repo, 'rev-parse', 'main')).stdout.trim()
+    await gitAt(repo, 'commit', '-q', '--allow-empty', '-m', 'bump [skip ci]')
+    const h = harness()
+    const ci = withCi(h, [])
+    const exec: ShellExec = (options) =>
+      options.command === 'gh' && options.args.includes(earlier)
+        ? Promise.resolve({
+            exitCode: 0,
+            stdout: JSON.stringify([failed]),
+            stderr: '',
+            timedOut: false,
+          })
+        : ci.deps.exec(options)
+    await proveEnvironment(orderOn(repo), { ...h.deps, exec })
+    expect((await readBaseline(h.deps.root, 'WO-1'))?.state).toBe('failing')
+    expect(h.ran).toEqual([])
   })
 })

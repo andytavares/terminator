@@ -51,9 +51,9 @@ import { DocumentChip, openDocument } from '../DocumentChip.js'
 import { OPEN_LABEL } from '../../line/document-kind.js'
 import type { DocumentLink } from '../../line/document-kind.js'
 import { Button, Markdown, usePolling, everyWhileVisible } from '@terminator/extension-ui'
-import { usePushed, ANY_RECORD } from '../../renderer/use-pushed.js'
+import { useFoundryQuery, ANY_RECORD } from '../../renderer/foundry-query.js'
 import './hall.css'
-import { invoke } from '@terminator/extension-sdk/renderer'
+import { foundryInvoke } from '../../renderer/foundry-invoke.js'
 
 /** Half of a gate card's width, `min(360px, 60%)`, plus 16px to the scene's edge. */
 const GATE_CARD_INSET = 'calc(min(180px, 30%) + 16px)'
@@ -227,25 +227,19 @@ function useLiveStore() {
   return { liveHall, live }
 }
 
-/** This order's numbers from the factory's metrics; undefined when they could not be read. */
-async function readOrderMetrics(orderId: string): Promise<OrderMetrics | null | undefined> {
-  const r = (await invoke('foundry:factory.metrics', { window: 'all' })) as {
-    orders?: OrderMetrics[]
-    error?: string
-  }
-  if (r.error !== undefined) return undefined
+/** This order's numbers from the factory's metrics; throws when they could not be read. */
+async function readOrderMetrics(orderId: string): Promise<OrderMetrics | null> {
+  const r = await foundryInvoke('foundry:factory.metrics', { window: 'all' })
   return r.orders?.find((o) => o.orderId === orderId) ?? null
 }
 
 /** The order's numbers for the status wall, read again when any record of it changes. */
 function useOrderMetrics(orderId: string): OrderMetrics | null {
-  const [orderMetrics, setOrderMetrics] = useState<OrderMetrics | null>(null)
-  const read = useCallback(() => readOrderMetrics(orderId), [orderId])
-  const show = useCallback((read: OrderMetrics | null | undefined) => {
-    if (read !== undefined) setOrderMetrics(read)
-  }, [])
-  usePushed(read, show, { kinds: ANY_RECORD, orderId })
-  return orderMetrics
+  const { data } = useFoundryQuery(
+    { key: ['order-metrics', orderId], kinds: ANY_RECORD, orderId },
+    () => readOrderMetrics(orderId)
+  )
+  return data ?? null
 }
 
 /** The callouts raised at their stations, how high each is stacked, and the sentence for a screen reader. */
@@ -328,15 +322,8 @@ interface Recording {
 
 /** The run as recorded; null when nothing was. */
 async function readRecording(orderId: string): Promise<Recording | null> {
-  const r = (await invoke('foundry:run.timeline', { id: orderId })) as {
-    graph?: RunGraph
-    timeline?: Timeline
-    gates?: Gate[]
-    error?: string
-  }
-  if (r.graph === undefined || r.timeline === undefined || r.timeline.frames.length === 0) {
-    return null
-  }
+  const r = await foundryInvoke('foundry:run.timeline', { id: orderId })
+  if ('error' in r || r.timeline.frames.length === 0) return null
   return { graph: r.graph, timeline: r.timeline, gates: r.gates ?? [] }
 }
 
@@ -567,20 +554,17 @@ function useCalloutLayout({ liveMap, shownCi, talk, overlayRef }: LayoutDeps) {
 }
 
 async function readActivity(orderId: string): Promise<Activity | null> {
-  const r = (await invoke('foundry:run.activity', { id: orderId })) as {
-    activity?: Record<string, readonly ToolActivity[]>
-    error?: string
-  }
-  return r.error === undefined ? (r.activity ?? {}) : null
+  const r = await foundryInvoke('foundry:run.activity', { id: orderId })
+  return 'error' in r ? null : (r.activity ?? {})
 }
 
 /** The open station's transcript; null when no station with a session is open. */
 async function readStationLines(sessionId: string | null): Promise<TranscriptLine[] | null> {
   if (sessionId === null) return null
-  const r = (await invoke('foundry:run-transcript', {
+  const r = await foundryInvoke('foundry:run-transcript', {
     sessionId,
     limit: MONITOR_LINES,
-  })) as { lines?: TranscriptLine[] }
+  })
   return r.lines ?? []
 }
 
@@ -680,11 +664,8 @@ function useAnswers(refresh: () => Promise<void>) {
 /** Allows or denies a held call; why not, when it is no longer waiting. */
 function askResolved(requestId: string, decision: 'allow' | 'deny') {
   return async (): Promise<string | null> => {
-    const r = (await invoke('foundry:permission-resolve', { requestId, decision })) as {
-      ok?: boolean
-      reason?: string
-    }
-    return r.ok === true ? null : (r.reason ?? 'That request is no longer waiting.')
+    const r = await foundryInvoke('foundry:permission-resolve', { requestId, decision })
+    return r.ok ? null : (r.reason ?? 'That request is no longer waiting.')
   }
 }
 
@@ -692,7 +673,7 @@ function askResolved(requestId: string, decision: 'allow' | 'deny') {
 function gateDecided(gateId: string, [option, limit]: readonly [string, (number | null)?]) {
   return async (): Promise<string | null> => {
     const payload = limit === undefined ? { gateId, option } : { gateId, option, limit }
-    const r = (await invoke('foundry:inbox.decide', payload)) as { error?: string }
+    const r = await foundryInvoke('foundry:inbox.decide', payload)
     return r.error ?? null
   }
 }
@@ -700,7 +681,7 @@ function gateDecided(gateId: string, [option, limit]: readonly [string, (number 
 /** Goes to an agent's terminal; why not, when it has none. */
 function terminalOpened(sessionId: string) {
   return async (): Promise<string | null> => {
-    const r = (await invoke('foundry:run-terminal', { sessionId })) as { ok?: boolean }
+    const r = await foundryInvoke('foundry:run-terminal', { sessionId })
     return r.ok === true ? null : 'That agent is no longer in an agent tab.'
   }
 }
@@ -762,7 +743,7 @@ function monitorStatusOf(
 interface AlertFacts {
   readonly interruptions: readonly Interruption[]
   readonly node: HallNode | null
-  readonly standing: FloorView['standing']
+  readonly standing: FloorView['standing'] | undefined
 }
 
 function monitorAlertOf(status: MonitorStatus, { interruptions, node, standing }: AlertFacts) {
@@ -1240,7 +1221,7 @@ function HudLinks({
   standing,
 }: {
   readonly view: FloorView
-  readonly standing: FloorView['standing']
+  readonly standing: FloorView['standing'] | undefined
 }) {
   const document = view.document ?? null
   if (!hasHudLinks(view)) return null
@@ -1258,7 +1239,7 @@ function HudLinks({
 interface HudOrderProps {
   readonly view: FloorView
   readonly shownGraph: RunGraph
-  readonly standing: FloorView['standing']
+  readonly standing: FloorView['standing'] | undefined
 }
 
 function HudOrder({ view, shownGraph, standing }: HudOrderProps) {
@@ -1279,7 +1260,7 @@ function HudOrder({ view, shownGraph, standing }: HudOrderProps) {
 }
 
 interface HudAlertProps {
-  readonly standing: FloorView['standing']
+  readonly standing: FloorView['standing'] | undefined
   readonly waitingCount: number
   readonly onOpenInList: () => void
 }

@@ -78,12 +78,12 @@ export interface LedgerDeps {
 }
 
 export interface LedgerChannels {
-  query(payload: z.infer<typeof QueryPayload>): Promise<unknown>
-  proposeRules(payload: z.infer<typeof ProposePayload>): Promise<unknown>
-  decideProposal(payload: z.infer<typeof DecidePayload>): Promise<unknown>
-  rulesInForce(): Promise<unknown>
-  removeAcceptedRule(payload: z.infer<typeof RemovePayload>): Promise<unknown>
-  factoryMetrics(payload: z.infer<typeof FactoryMetricsPayload>): Promise<unknown>
+  query(payload: z.infer<typeof QueryPayload>): ReturnType<typeof query>
+  proposeRules(payload: z.infer<typeof ProposePayload>): ReturnType<typeof proposeRules>
+  decideProposal(payload: z.infer<typeof DecidePayload>): ReturnType<typeof decideProposal>
+  rulesInForce(): ReturnType<typeof rulesInForce>
+  removeAcceptedRule(payload: z.infer<typeof RemovePayload>): ReturnType<typeof removeAcceptedRule>
+  factoryMetrics(payload: z.infer<typeof FactoryMetricsPayload>): ReturnType<typeof factoryMetrics>
 }
 
 export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
@@ -105,7 +105,7 @@ async function entriesFor(deps: LedgerDeps, orderId: string | undefined): Promis
   return perOrder.flat().sort((a, b) => a.at.localeCompare(b.at))
 }
 
-async function query(deps: LedgerDeps, payload: z.infer<typeof QueryPayload>): Promise<unknown> {
+async function query(deps: LedgerDeps, payload: z.infer<typeof QueryPayload>) {
   const { orderId, actor, action, since, limit } = payload
 
   const all = await entriesFor(deps, orderId)
@@ -129,10 +129,7 @@ async function query(deps: LedgerDeps, payload: z.infer<typeof QueryPayload>): P
   }
 }
 
-async function proposeRules(
-  deps: LedgerDeps,
-  payload: z.infer<typeof ProposePayload>
-): Promise<unknown> {
+async function proposeRules(deps: LedgerDeps, payload: z.infer<typeof ProposePayload>) {
   const proposals = propose({
     entries: await entriesFor(deps, payload.orderId),
     existingRuleIds: deps.existingRuleIds(),
@@ -141,10 +138,7 @@ async function proposeRules(
   return { proposals }
 }
 
-async function decideProposal(
-  deps: LedgerDeps,
-  payload: z.infer<typeof DecidePayload>
-): Promise<unknown> {
+async function decideProposal(deps: LedgerDeps, payload: z.infer<typeof DecidePayload>) {
   const { proposalId, accept, reason } = payload
 
   // Re-derived rather than carried in from the surface: a proposal the
@@ -172,7 +166,7 @@ async function decideProposal(
 }
 
 /** The checks the operator put in force and the ones they turned down (FR-081). */
-async function rulesInForce(deps: LedgerDeps): Promise<unknown> {
+async function rulesInForce(deps: LedgerDeps) {
   return {
     rules: deps.acceptedRules(),
     declined: await declinedWithReasons(deps.dataRoot()),
@@ -182,10 +176,7 @@ async function rulesInForce(deps: LedgerDeps): Promise<unknown> {
 
 // Remove an accepted check. Anything the operator did not accept is refused, with
 // why: deleting a built-in would leave the tool quietly weaker than it ships.
-async function removeAcceptedRule(
-  deps: LedgerDeps,
-  payload: z.infer<typeof RemovePayload>
-): Promise<unknown> {
+async function removeAcceptedRule(deps: LedgerDeps, payload: z.infer<typeof RemovePayload>) {
   const { ruleId } = payload
 
   const accepted = deps.acceptedRules().find((rule) => rule.id === ruleId)
@@ -202,10 +193,7 @@ async function removeAcceptedRule(
 
 // The factory's dashboard: every order's ledger, gates and run graph reduced by
 // `factoryMetrics`, recomputed per call from the records, never stored.
-async function factoryMetrics(
-  deps: LedgerDeps,
-  payload: z.infer<typeof FactoryMetricsPayload>
-): Promise<unknown> {
+async function factoryMetrics(deps: LedgerDeps, payload: z.infer<typeof FactoryMetricsPayload>) {
   const window = payload.window ?? '30d'
 
   const orders = await deps.store.list()

@@ -291,6 +291,7 @@ export function prBody(
 ): string {
   return [
     ...introLines(order),
+    ...linearMagicWordLines(order),
     ...verdictTable(order, shipment),
     ...leftForYouLines(order, shipment),
     ...verificationLines(shipment.ladder ?? null),
@@ -306,6 +307,11 @@ export function prBody(
     `Opened as a draft by Foundry from work order \`${order.id}\`. Risk ${order.risk.grade}.`,
     'Nothing here was merged by a machine — marking it ready and merging are both yours.',
   ].join('\n')
+}
+
+/** Linear's GitHub integration moves the issue when the pull request body says `Fixes <KEY>`. */
+function linearMagicWordLines({ source }: WorkOrder): string[] {
+  return source.tracker === 'linear' && source.key !== null ? ['', `Fixes ${source.key}`] : []
 }
 
 function introLines(order: WorkOrder): string[] {

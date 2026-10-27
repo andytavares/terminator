@@ -50,7 +50,7 @@ export function ruleInWords(rule: string): string {
   return RULE_IN_WORDS[rule as GateRuleId] ?? rule
 }
 
-export interface GateOption {
+interface GateOption {
   readonly id: string
   readonly label: string
   /** What happens if this is chosen. Shown, not implied. */

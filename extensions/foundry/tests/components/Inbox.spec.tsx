@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
-import { Inbox, SIGNAL_POLL_MS } from '../../src/components/Inbox.js'
+import { Inbox } from '../../src/components/Inbox.js'
 import { createChangeBus } from '../helpers/change-bus.js'
 import { raiseGate, GATE_RULES, ruleInWords } from '../../src/gates/rules.js'
 import type { Signal } from '../../src/sensors/types.js'
@@ -472,23 +472,16 @@ function severalSignalsAndArrivalsTests() {
   // Seen live: a sensor recorded a signal while the Inbox was open, and the
   // Inbox went on saying "Nothing needs you." until something remounted it.
   it('shows a signal that arrives while the Inbox is open', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    try {
-      mount({ signals: [] })
-      await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:signals.list', {}))
-      const before = invoke.getMockImplementation() as (c: string, p?: unknown) => Promise<unknown>
-      invoke.mockImplementation(async (channel: string, payload?: unknown) =>
-        channel === 'foundry:signals.list'
-          ? { signals: [highSignal()], counts: { open: 1 } }
-          : before(channel, payload)
-      )
-      await act(async () => {
-        vi.advanceTimersByTime(SIGNAL_POLL_MS)
-      })
-      await screen.findByText('test-foo flakes on main')
-    } finally {
-      vi.useRealTimers()
-    }
+    mount({ signals: [] })
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:signals.list', {}))
+    const before = invoke.getMockImplementation() as (c: string, p?: unknown) => Promise<unknown>
+    invoke.mockImplementation(async (channel: string, payload?: unknown) =>
+      channel === 'foundry:signals.list'
+        ? { signals: [highSignal()], counts: { open: 1 } }
+        : before(channel, payload)
+    )
+    act(() => bus.emit({ kind: 'signals', orderId: '' }))
+    await screen.findByText('test-foo flakes on main')
   })
 }
 

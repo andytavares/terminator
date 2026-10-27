@@ -343,7 +343,7 @@ function layoutWallFixturesTests({ map }: Pick<LaidOut, 'map'>) {
 describe('layoutHall', () => {
   const FIXTURES: { file: string; lanes: number[] }[] = [
     { file: 'standard.yaml', lanes: [1, 2] },
-    { file: 'bugfix.yaml', lanes: [1] },
+    { file: 'direct.yaml', lanes: [1] },
   ]
 
   for (const { file, lanes } of FIXTURES) {

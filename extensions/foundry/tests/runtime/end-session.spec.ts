@@ -5,67 +5,48 @@ import { endAndWait } from '../../src/runtime/end-session.js'
 // the last turn's process still sits at its prompt puts two agents on one
 // transcript, so the old one is ended first — and waited for, within bounds.
 
-const noSleep = () => Promise.resolve()
+/** A session whose end the test fires by hand. */
+function session(live = true) {
+  const listeners = new Set<() => void>()
+  return {
+    stop: vi.fn(() => true),
+    isLive: () => live,
+    onEnd: vi.fn((_id: string, listener: () => void) => {
+      listeners.add(listener)
+      return () => void listeners.delete(listener)
+    }),
+    end: () => listeners.forEach((listener) => listener()),
+    listeners,
+  }
+}
 
 describe('endAndWait', () => {
-  describe('stopping', stoppingTests)
-  describe('the timeout', theTimeoutTests)
-  describe('the real clock', theRealClockTests)
-})
-
-function stoppingTests() {
-  it('stops the session and resolves once it is gone', async () => {
-    let checks = 0
-    const stop = vi.fn(() => true)
-    const gone = await endAndWait(
-      { stop, isLive: () => ++checks < 3, sleep: noSleep },
-      { sessionId: 'sid', reason: 'reason' }
-    )
-    expect(stop).toHaveBeenCalledWith('sid', 'reason')
-    expect(gone).toBe(true)
+  it('stops the session and resolves when its end is announced', async () => {
+    const s = session()
+    const gone = endAndWait(s, { sessionId: 'sid', reason: 'reason' })
+    expect(s.stop).toHaveBeenCalledWith('sid', 'reason')
+    s.end()
+    await expect(gone).resolves.toBe(true)
+    expect(s.listeners.size).toBe(0)
   })
 
   it('does nothing for a session that is already gone', async () => {
-    const stop = vi.fn(() => true)
-    await expect(
-      endAndWait({ stop, isLive: () => false, sleep: noSleep }, { sessionId: 'sid', reason: 'r' })
-    ).resolves.toBe(true)
-    expect(stop).not.toHaveBeenCalled()
+    const s = session(false)
+    await expect(endAndWait(s, { sessionId: 'sid', reason: 'r' })).resolves.toBe(true)
+    expect(s.stop).not.toHaveBeenCalled()
+    expect(s.onEnd).not.toHaveBeenCalled()
   })
-}
 
-function theTimeoutTests() {
   it('gives up after the timeout and says so, rather than waiting for ever', async () => {
-    let waited = 0
-    const gone = await endAndWait(
-      {
-        stop: () => true,
-        isLive: () => true,
-        sleep: (ms) => {
-          waited += ms
-          return Promise.resolve()
-        },
-      },
-      { sessionId: 'sid', reason: 'r' },
-      { timeoutMs: 1000, intervalMs: 250 }
-    )
-    expect(gone).toBe(false)
-    expect(waited).toBe(1000)
+    vi.useFakeTimers()
+    try {
+      const s = session()
+      const gone = endAndWait(s, { sessionId: 'sid', reason: 'r' }, { timeoutMs: 1000 })
+      await vi.advanceTimersByTimeAsync(1000)
+      await expect(gone).resolves.toBe(false)
+      expect(s.listeners.size).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
   })
-}
-
-function theRealClockTests() {
-  it('waits on the real clock when no sleep is given', async () => {
-    let live = true
-    setTimeout(() => (live = false), 5)
-    const gone = await endAndWait(
-      { stop: () => true, isLive: () => live },
-      { sessionId: 'sid', reason: 'r' },
-      {
-        timeoutMs: 1000,
-        intervalMs: 2,
-      }
-    )
-    expect(gone).toBe(true)
-  })
-}
+})

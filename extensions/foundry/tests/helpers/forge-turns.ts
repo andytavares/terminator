@@ -1,6 +1,5 @@
 /** The Forge's intake turns as specs drive them through `activate`: a draft worth reviewing,
  * and agents that answer by writing the one file each is allowed to write. */
-import * as path from 'node:path'
 import { builderUnit, testCriterion } from './order-parts.js'
 import type { FoundryHost } from './foundry-host.js'
 import { orderStoreAt } from '../../src/state/live-index.js'
@@ -15,7 +14,8 @@ type ForgePhase = 'architect' | 'red-team' | 'scout'
 export interface ForgeTurnInput {
   phase: ForgePhase
   onRegistered: (run: { sessionId: string; transcriptFrom: number }) => void
-  onTurnEnd: () => void
+  onTurnEnd?: () => void
+  onStructuredOutput?: (answer: unknown) => void
   onEnd: (exitCode: number | null) => void
 }
 
@@ -63,23 +63,15 @@ export function redTeamRegression(text: string) {
   return { severity: 'high', category: 'regression', text }
 }
 
-/** The one file a turn of `phase` may write: the architect's proposal, or a rung's output. */
-function forgeAnswerPath(dataDir: string, phase: ForgePhase, turn: number): string {
+/** The one file a rung may write: the red team's round or the scout's output. */
+function rungAnswerPath(dataDir: string, phase: 'red-team' | 'scout', turn: number): string {
   const order = orderDir(dataDir, 'WO-1')
-  if (phase === 'architect') return path.join(order, 'proposal.json')
   return rungOutputPath(order, phase === 'scout' ? 'forge-scout' : `review-${turn}`)
-}
-
-/** Writes the architect's proposal for `orderId` under `dataDir`; where it went. */
-export function writeProposalFor(dataDir: string, orderId: string, proposal: unknown): string {
-  const file = path.join(orderDir(dataDir, orderId), 'proposal.json')
-  writeFileWithDirs(file, proposal)
-  return file
 }
 
 /** Ends a turn: its answer is in, and a turn that wrote nothing is over when its session ends. */
 function endTurn(input: ForgeTurnInput, wrote: boolean): void {
-  input.onTurnEnd()
+  input.onTurnEnd?.()
   if (!wrote) input.onEnd(0)
 }
 
@@ -92,11 +84,18 @@ export function scriptedTurns(script: () => TurnScript) {
     const { dataDir, writes, heldTurn } = script()
     const sessionId = `${input.phase}-${turn}`
     const written = writes[input.phase]?.(turn)
-    if (written !== undefined)
-      writeFileWithDirs(forgeAnswerPath(dataDir, input.phase, turn), written)
+    if (written !== undefined && input.phase !== 'architect')
+      writeFileWithDirs(rungAnswerPath(dataDir, input.phase, turn), written)
     input.onRegistered({ sessionId, transcriptFrom: 0 })
     const wait = heldTurn?.phase === input.phase ? heldTurn.release : Promise.resolve()
-    void wait.then(() => setTimeout(() => endTurn(input, written !== undefined), 0))
+    void wait.then(() =>
+      setTimeout(() => {
+        // The architect hands its proposal back as structured output, not a file.
+        if (input.phase === 'architect' && written !== undefined)
+          input.onStructuredOutput?.(written)
+        endTurn(input, written !== undefined)
+      }, 0)
+    )
     return { sessionId, transcriptFrom: 0, terminalSessionId: 't', transcriptPath: '/none' }
   }
 }

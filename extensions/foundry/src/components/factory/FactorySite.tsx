@@ -1,64 +1,19 @@
-import React, { useCallback, useState } from 'react'
-import type { Standing } from '../../order/standing.js'
-import type { FactoryMetrics } from '../../factory/metrics.js'
+import React, { useState } from 'react'
 import { MetricsTiles, WindowToggle } from '../MetricsTiles.js'
 import type { Signal } from '../../sensors/types.js'
-import type { CiState } from '../../line/ci-state.js'
 import { DocumentChip } from '../DocumentChip.js'
-import type { DocumentLink } from '../../line/document-kind.js'
 import { HallThumbnail } from './HallThumbnail.js'
 import { ciLabel } from '../../line/ci-label.js'
 import { Button } from '@terminator/extension-ui'
-import { usePushed, ANY_RECORD } from '../../renderer/use-pushed.js'
-import { invoke } from '@terminator/extension-sdk/renderer'
+import { useFoundryQuery, ANY_RECORD } from '../../renderer/foundry-query.js'
+import { foundryInvoke } from '../../renderer/foundry-invoke.js'
+import type { FoundryApi } from '../../ipc/foundry-api.js'
 import { usePromotion, useSignalFeed } from '../../renderer/use-signals.js'
 
 // The Factory's front door: every order in the workspace, as a hall card, in
 // place of the list rows `Orders.tsx` draws in List mode.
 
-export interface FactoryOrderRow {
-  readonly id: string
-  readonly title: string
-  readonly status: string
-  /** Absent, like `standing`, from a host part way through an upgrade. */
-  readonly createdAt?: string
-  /** The document the author handed back outside the checkout; absent or null when none. */
-  readonly document?: DocumentLink | null
-  /**
-   * Where the order stands, and whose move it is.
-   *
-   * Optional for the same reason `Orders.tsx`'s own row carries it as
-   * optional: the list is polled, and a host part way through an upgrade
-   * answers without one — the card shows the title alone rather than
-   * guessing.
-   */
-  readonly standing?: Standing
-  /**
-   * Where this order's CI stands, in brief.
-   *
-   * Null when nothing has shipped a pull yet, and absent (like `standing`)
-   * when the host answering the list has never heard of CI.
-   */
-  readonly ci?: {
-    readonly status: CiState['status']
-    readonly round: number
-    readonly max: number
-  } | null
-  /**
-   * Where this order stands in the refinery's file-overlap queue.
-   *
-   * Null when it is not in a queue at all, and absent (like `standing`) when
-   * the host answering the list has never heard of the refinery.
-   */
-  readonly queue?: {
-    readonly position: number
-    readonly behind: {
-      readonly orderId: string
-      readonly title: string
-      readonly files: string[]
-    }[]
-  } | null
-}
+export type FactoryOrderRow = FoundryApi['foundry:order.list']['answer']['orders'][number]
 
 interface QueueChainToken {
   readonly id: string
@@ -229,41 +184,29 @@ function newestFirst(a: FactoryOrderRow, b: FactoryOrderRow): number {
   return byTime !== 0 ? byTime : b.id.localeCompare(a.id)
 }
 
-/** How often the sensors' signals are asked for. Sensors record on their own
- *  tick and announce nothing; orders and metrics are pushed. */
-const SIGNALS_POLL_MS = 4000
-
 async function readOrders(): Promise<FactoryOrderRow[]> {
-  const r = (await invoke('foundry:order.list')) as { orders?: FactoryOrderRow[] }
+  const r = await foundryInvoke('foundry:order.list')
   // Newest first, with the id breaking ties rather than whatever order the
   // store returned: a grid that reshuffles itself between polls is unreadable.
   return [...(r.orders ?? [])].sort(newestFirst)
 }
 
-async function readMetrics(window: '30d' | 'all'): Promise<FactoryMetrics | null> {
-  const r = (await invoke('foundry:factory.metrics', { window })) as
-    | FactoryMetrics
-    | { error: string }
-  return 'error' in r ? null : r
-}
+// A refused read throws, so the numbers last drawn stay up.
+const NO_ROWS: FactoryOrderRow[] = []
 
 /** Every order, and the factory's numbers over the window chosen; both pushed. */
 function useSiteRecords() {
-  const [rows, setRows] = useState<FactoryOrderRow[]>([])
   const [window_, setWindow] = useState<'30d' | 'all'>('30d')
-  const [metrics, setMetrics] = useState<FactoryMetrics | null>(null)
-  const readMetricsFor = useCallback(() => readMetrics(window_), [window_])
-  const showMetrics = useCallback((read: FactoryMetrics | null): void => {
-    if (read !== null) setMetrics(read)
-  }, [])
-  usePushed(readOrders, setRows, { kinds: ANY_RECORD })
-  usePushed(readMetricsFor, showMetrics, { kinds: ANY_RECORD })
-  return { rows, window_, setWindow, metrics }
+  const orders = useFoundryQuery({ key: ['site-orders'], kinds: ANY_RECORD }, readOrders)
+  const metrics = useFoundryQuery({ key: ['metrics', window_], kinds: ANY_RECORD }, () =>
+    foundryInvoke('foundry:factory.metrics', { window: window_ })
+  )
+  return { rows: orders.data ?? NO_ROWS, window_, setWindow, metrics: metrics.data ?? null }
 }
 
 /** The sensors' signals on the dock, and promoting one into a draft. */
 function useDock() {
-  const { signals, sensors, refreshSignals } = useSignalFeed(SIGNALS_POLL_MS)
+  const { signals, sensors, refreshSignals } = useSignalFeed()
   return { signals, ...usePromotion(sensors, refreshSignals) }
 }
 

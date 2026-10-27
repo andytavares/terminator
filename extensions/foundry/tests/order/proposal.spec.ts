@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { builderUnit } from '../helpers/order-parts.js'
-import { parseProposal, applyProposal, ProposalRejected } from '../../src/order/proposal.js'
+import {
+  parseProposal,
+  applyProposal,
+  proposalJsonSchema,
+  ProposalRejected,
+} from '../../src/order/proposal.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 
@@ -80,12 +85,16 @@ function emptyProposalsAndUnprovableCriteriaTests() {
   })
 }
 
+const SECOND_CRITERION = { ...CRITERION, id: 'AC-2', statement: 'a fresh token is accepted' }
+
 describe('merging one in', () => {
   describe('untouched fields and budgets', untouchedFieldsAndBudgetsTests)
   describe('what it said', whatItSaidTests)
   describe('struck assumptions', proposalStruckAssumptionsTests)
   describe('answered questions', answeredQuestionsTests)
   describe('new assumptions and plans', newAssumptionsAndPlansTests)
+  describe('lists sent in part', partialListsTests)
+  describe('removing by id', removingByIdTests)
   describe('intent, risk and refusals', intentRiskAndRefusalsTests)
 })
 
@@ -186,6 +195,46 @@ function newAssumptionsAndPlansTests() {
     const after = applyProposal(before, parseProposal({ plan: { units: [unit] } }), NOW)
     expect(after.plan.units.map((u) => u.id)).toEqual(['U-9'])
     expect(after.plan.lanes).toEqual(before.plan.lanes)
+  })
+}
+
+function partialListsTests() {
+  it('keeps the criteria a partial list does not mention', () => {
+    const before = order({ acceptance: [CRITERION, SECOND_CRITERION] })
+    const reworded = { ...CRITERION, statement: 'an expired token gets a 401' }
+    const after = applyProposal(before, parseProposal({ acceptance: [reworded] }), NOW)
+    expect(after.acceptance.map((c) => [c.id, c.statement])).toEqual([
+      ['AC-1', 'an expired token gets a 401'],
+      ['AC-2', 'a fresh token is accepted'],
+    ])
+  })
+
+  it('adds a criterion with a new id', () => {
+    const before = order({ acceptance: [CRITERION] })
+    const after = applyProposal(before, parseProposal({ acceptance: [SECOND_CRITERION] }), NOW)
+    expect(after.acceptance.map((c) => c.id)).toEqual(['AC-1', 'AC-2'])
+  })
+
+  it('keeps the units a partial list does not mention', () => {
+    const kept = builderUnit('U-1', { title: 'kept', touches: ['src/a.ts'] })
+    const before = order({ plan: { ...order().plan, units: [kept] } })
+    const added = builderUnit('U-2', { title: 'added', touches: ['src/b.ts'] })
+    const after = applyProposal(before, parseProposal({ plan: { units: [added] } }), NOW)
+    expect(after.plan.units.map((u) => u.id)).toEqual(['U-1', 'U-2'])
+  })
+}
+
+function removingByIdTests() {
+  it('drops the criteria and units the proposal names in remove', () => {
+    const unit = builderUnit('U-1', { title: 'gone', touches: ['src/a.ts'] })
+    const before = order({
+      acceptance: [CRITERION, SECOND_CRITERION],
+      plan: { ...order().plan, units: [unit] },
+    })
+    const proposal = parseProposal({ remove: { acceptance: ['AC-1'], units: ['U-1'] } })
+    const after = applyProposal(before, proposal, NOW)
+    expect(after.acceptance.map((c) => c.id)).toEqual(['AC-2'])
+    expect(after.plan.units).toEqual([])
   })
 }
 
@@ -292,5 +341,28 @@ describe('a lane branch the ticket fixed', () => {
       plan: { lanes: [{ ...lane, repo: '/repos/app', branch: 'other' }] },
     })
     expect(applyProposal(seeded(), proposal, NOW).plan.lanes[0].branch).toBe('other')
+  })
+})
+
+describe('the proposal as a JSON Schema', () => {
+  it('names every key an agent may send, and nothing else', () => {
+    const schema = proposalJsonSchema() as { properties: object; additionalProperties: boolean }
+    expect(Object.keys(schema.properties).sort()).toEqual(
+      [
+        'acceptance',
+        'assumptions',
+        'budgets',
+        'dismissFindings',
+        'findings',
+        'intent',
+        'note',
+        'openQuestions',
+        'plan',
+        'remove',
+        'resolveFindings',
+        'risk',
+      ].sort()
+    )
+    expect(schema.additionalProperties).toBe(false)
   })
 })

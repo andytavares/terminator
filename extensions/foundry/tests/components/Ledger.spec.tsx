@@ -426,10 +426,10 @@ describe('the skills in force', () => {
 })
 
 function tileValue(label: string): string | null {
-  const tiles = document.querySelectorAll('.fdry-metrics-tile')
+  const tiles = document.querySelectorAll('.tmui-metric-card')
   for (const tile of Array.from(tiles)) {
     if (within(tile as HTMLElement).queryByText(label) !== null) {
-      return tile.querySelector('.fdry-metrics-tile__value')?.textContent ?? null
+      return tile.querySelector('.tmui-metric-card__value')?.textContent ?? null
     }
   }
   return null

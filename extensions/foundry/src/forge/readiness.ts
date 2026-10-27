@@ -6,7 +6,7 @@ import type { CheckId, CompileResult } from '../order/compile.js'
 import { refusedParts } from '../order/proposal.js'
 import { REWRITING_UNREADABLE } from './autonomy.js'
 import type { IntakeOutcome } from './intake-outcome.js'
-import { failedStepSentence, isTestStep } from '../line/baseline-steps.js'
+import { failedStepSentence } from '../line/baseline-steps.js'
 import type { Baseline } from '../line/baseline.js'
 import type { StepOutcome } from '../verify/ladder.js'
 import type { StepId } from './steps.js'
@@ -676,18 +676,6 @@ function failedDetail({ baseBranch, steps }: Baseline): string {
   return failed.map((step) => failedStepSentence(step, baseBranch)).join(' ')
 }
 
-/** A bug fix starts from a failing test; a base whose only failure is its tests is its start. */
-function bugfixStartsHere(baseline: Baseline, shapeName: string | null): boolean {
-  const failed = baseline.steps.filter((step) => step.result === 'fail')
-  return shapeName === 'bugfix' && failed.length > 0 && failed.every(isTestStep)
-}
-
-function bugfixDetail(baseline: Baseline): string {
-  const starts = `Tests fail on ${baseline.baseBranch}, which is where a bug fix starts.`
-  const built = baseline.steps.some((step) => step.rung === 'L5' && step.result === 'pass')
-  return built ? `${starts} It builds.` : starts
-}
-
 /** Shapes that ship a document and never build or test anything. */
 const SHAPES_THAT_RUN_NO_CODE: readonly (string | null)[] = ['research']
 
@@ -716,7 +704,6 @@ function checkedRow(baseline: Baseline, proving: boolean, shapeName: string | nu
     return row('in-progress', detail)
   }
   if (baseline.state === 'proven') return row('passed', provenDetail(baseline))
-  if (bugfixStartsHere(baseline, shapeName)) return row('passed', bugfixDetail(baseline))
   if (nothingToMeasure(baseline, shapeName)) {
     return row(
       'passed',

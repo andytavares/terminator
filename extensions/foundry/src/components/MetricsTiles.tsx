@@ -1,5 +1,5 @@
 import React from 'react'
-import { SegmentedControl } from '@terminator/extension-ui'
+import { MetricCard, SegmentedControl } from '@terminator/extension-ui'
 import type { FactoryMetrics } from '../factory/metrics.js'
 import { formatDuration } from '../factory/format.js'
 
@@ -41,10 +41,7 @@ export function MetricsTiles({ metrics }: MetricsTilesProps): JSX.Element {
   return (
     <div className="fdry-metrics-tiles">
       {metricsTiles(metrics).map(([label, value]) => (
-        <div key={label} className="fdry-metrics-tile">
-          <span className="fdry-metrics-tile__value">{value}</span>
-          <span className="fdry-metrics-tile__label">{label}</span>
-        </div>
+        <MetricCard key={label} question={label} value={value} />
       ))}
     </div>
   )

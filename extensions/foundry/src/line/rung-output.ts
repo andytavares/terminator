@@ -635,8 +635,7 @@ export type CollectResult =
 /**
  * Read back what a rung wrote, apply it, and clear the file.
  *
- * Cleared whatever happened, for the reason `readProposal` clears a proposal:
- * a stale file from an earlier turn read as this turn's answer is what makes a
+ * Cleared whatever happened: a stale file from an earlier turn read as this turn's answer is what makes a
  * rung that produced nothing look like one that produced the same thing twice.
  *
  * Null when there is nothing there, which is a result — the rung's turn ended
