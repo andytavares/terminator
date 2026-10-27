@@ -1,0 +1,21 @@
+extensions/foundry/src/renderer/foundry-query.ts
+  s_a9e8c58b3eee1f::t_cf1d1be2e93ae8 6,11-17,57
+extensions/foundry/src/line/run-context.ts
+  s_a9e8c58b3eee1f::t_cf1d1be2e93ae8 115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2dea0759fb037c96a85a6b6682510a3a170df296",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
