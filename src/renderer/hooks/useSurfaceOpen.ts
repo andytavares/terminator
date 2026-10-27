@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { isSurfaceOpen } from '@shared/double-escape'
+import { isSurfaceOpen } from '../../shared/double-escape'
 
 /** A dialog opening or closing changes its `open` attribute or the tree; a popover only fires
  * `toggle`, which does not bubble, so it is heard in the capture phase. */
