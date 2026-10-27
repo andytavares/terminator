@@ -2,7 +2,7 @@
 // The E2E job of .github/workflows/ci.yml, run here step for step (selection, its shards at
 // CI=1, each spec once, then every changed spec five times). `npm run ci:local:e2e` runs all of it; `-- 3` runs only shard 3.
 
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { cpus, loadavg } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -91,37 +91,89 @@ function argumentsOfShard(shard, specs) {
 export const needsChromium = (specs) =>
   NEEDS_CHROMIUM.some((spec) => specs.some((arg) => arg.endsWith(spec)))
 
-function playwright(args) {
-  if (needsChromium(args) && !run('npx', ['playwright', 'install', 'chromium'])) return false
-  return run(
+/** The `playwright` arguments for one shard; its own output directory keeps shards from clearing each other's. */
+export const playwrightArguments = (shard, args) => [
+  'test',
+  ...args,
+  '--grep-invert',
+  '@quarantine',
+  '--reporter=dot',
+  '--output',
+  `test-results/shard-${shard}`,
+]
+
+/** True when no e2e spec is selected and none changed: no build, no wait, no run. */
+export const nothingToRun = (selected, changed) => selected.length === 0 && changed.length === 0
+
+/** Runs every shard at once; `runShard(shard)` resolves true on a pass. Returns the failed shards. */
+export async function runShardsTogether(shards, runShard) {
+  const passed = await Promise.all(shards.map(runShard))
+  return shards.filter((_, index) => !passed[index])
+}
+
+/** Runs a command with its output held back; resolves with whether it passed and what it printed. */
+const runBuffered = (command, args, env) =>
+  new Promise((resolve) => {
+    const child = spawn(command, args, {
+      cwd: REPO_ROOT,
+      env: { ...process.env, ...env },
+    })
+    let output = ''
+    child.stdout.on('data', (chunk) => (output += chunk))
+    child.stderr.on('data', (chunk) => (output += chunk))
+    child.on('close', (code) => resolve({ passed: code === 0, output }))
+  })
+
+/** Runs one shard and prints its output as one block when it ends. */
+async function runShard({ shard, args }) {
+  const started = Date.now()
+  const { passed, output } = await runBuffered(
     'npx',
-    ['playwright', 'test', ...args, '--grep-invert', '@quarantine', '--reporter=dot'],
+    ['playwright', ...playwrightArguments(shard, args)],
     {
       CI: '1',
     }
   )
+  const seconds = Math.round((Date.now() - started) / 1000)
+  console.log(
+    `\n== shard ${shard}/${SHARDS} (${seconds}s, ${passed ? 'passed' : 'FAILED'})\n${output}`
+  )
+  return passed
 }
 
-function runShards(only, specs) {
-  const failed = []
-  for (let shard = 1; shard <= SHARDS; shard++) {
-    if (only !== null && shard !== only) continue
-    const args = argumentsOfShard(shard, specs)
-    if (args.length === 0) continue
-    console.log(`\n== shard ${shard}/${SHARDS}`)
-    if (!playwright(args)) failed.push(shard)
+async function runShards(only, specs) {
+  const shards = Array.from({ length: SHARDS }, (_, index) => index + 1)
+    .filter((shard) => only === null || shard === only)
+    .map((shard) => ({ shard, args: argumentsOfShard(shard, specs) }))
+    .filter(({ args }) => args.length > 0)
+  // Installed once here: two shards must not race to download the same browser.
+  if (shards.some(({ args }) => needsChromium(args))) {
+    if (!run('npx', ['playwright', 'install', 'chromium'])) return shards.map(({ shard }) => shard)
   }
-  return failed
+  const failed = await runShardsTogether(shards, runShard)
+  return failed.map(({ shard }) => shard)
 }
+
+const changedSpecs = () =>
+  execFileSync('node', ['scripts/stability.mjs', '--e2e', '--list'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  })
+    .split('\n')
+    .filter(Boolean)
 
 async function main() {
   const only = process.argv[2] ? Number(process.argv[2]) : null
-  await requireQuietMachine()
-  if (!run('npm', ['run', 'build'])) process.exit(1)
   const chosen = selection()
   const specs = e2eSpecsOf(chosen, listSpecs())
+  if (nothingToRun(specs, changedSpecs())) {
+    console.log(`No e2e spec selected or changed: ${chosen.reason}`)
+    process.exit(0)
+  }
+  await requireQuietMachine()
+  if (!run('npm', ['run', 'build'])) process.exit(1)
   console.log(`${specs.length} spec(s) selected: ${chosen.reason}`)
-  const failed = runShards(only, specs)
+  const failed = await runShards(only, specs)
   if (failed.length > 0) console.error(`\nShards failed: ${failed.join(', ')}`)
   // CI repeats the changed specs in each shard, by part; with no shard named, one run covers every part.
   const part = only === null ? [] : ['--part', `${only}/${SHARDS}`]
