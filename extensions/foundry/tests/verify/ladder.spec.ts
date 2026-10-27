@@ -511,30 +511,8 @@ const step = (name: string, command: string): LadderStep => ({
 })
 
 describe('climb with two steps that resolve to the same command', () => {
-  describe('reusing', ladderReusingTests)
   describe('distinct commands and failures', distinctCommandsAndFailuresTests)
 })
-
-function ladderReusingTests() {
-  it('runs the command once and says the later step reused it', async () => {
-    const run = vi.fn(async () => 0)
-    const outcome = await climb(
-      [
-        step('The unit’s own tests', 'vitest run --coverage'),
-        step('Repository gate', 'vitest run --coverage'),
-      ],
-      run
-    )
-    expect(run).toHaveBeenCalledTimes(1)
-    expect(outcome.ok).toBe(true)
-    expect(outcome.steps[1]).toMatchObject({
-      result: 'pass',
-      exitCode: 0,
-      reusedFrom: 'The unit’s own tests',
-    })
-    expect(outcome.steps[1].reason).toContain('same command as The unit’s own tests')
-  })
-}
 
 function distinctCommandsAndFailuresTests() {
   it('runs distinct commands each', async () => {

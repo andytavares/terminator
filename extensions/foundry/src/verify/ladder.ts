@@ -256,13 +256,9 @@ const NOT_RUN: Record<Exclude<RungStatus, 'runnable'>, StepOutcome['result']> = 
 export async function climb(steps: readonly LadderStep[], run: RunStep): Promise<LadderOutcome> {
   const outcomes: StepOutcome[] = []
   let stoppedAt: Rung | null = null
-  // A command that passed in this climb. A repository whose `test` and
-  // `coverage` are both `vitest run --coverage` would otherwise run it twice
-  // on the same commit for the same answer.
-  const passed = new Map<string, string>()
 
   for (const step of steps) {
-    const outcome = await rungOutcomeOf(step, run, passed)
+    const outcome = await rungOutcomeOf(step, run)
     outcomes.push(outcome)
     if (outcome.result === 'fail') {
       stoppedAt = step.rung
@@ -278,11 +274,8 @@ export async function climb(steps: readonly LadderStep[], run: RunStep): Promise
   }
 }
 
-async function rungOutcomeOf(
-  step: LadderStep,
-  run: RunStep,
-  passed: Map<string, string>
-): Promise<StepOutcome> {
+// A command that already passed on this commit is answered by the runner's PassCache.
+async function rungOutcomeOf(step: LadderStep, run: RunStep): Promise<StepOutcome> {
   const { rung, name, command } = step
   if (step.status !== 'runnable') {
     return {
@@ -294,14 +287,7 @@ async function rungOutcomeOf(
       command,
     }
   }
-  const earlier = command === null ? undefined : passed.get(command)
-  if (earlier !== undefined) {
-    const reason = `same command as ${earlier}; its result was reused, not run again`
-    return { rung, name, result: 'pass', reason, exitCode: 0, command, reusedFrom: earlier }
-  }
-  const outcome = ranOutcome(step, await run(step))
-  if (outcome.result === 'pass' && command !== null) passed.set(command, name)
-  return outcome
+  return ranOutcome(step, await run(step))
 }
 
 /** What a step's exit status says: a pass, a failure, or nothing when it did not run. */

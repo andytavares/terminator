@@ -21,18 +21,44 @@ export interface ChangeSummary {
   readonly formattingFiles: readonly string[]
 }
 
+/** What a P0 file touched, as the order's trigger vocabulary spells it. */
+export type GradedTrigger =
+  | 'authentication'
+  | 'payments'
+  | 'secrets'
+  | 'migration'
+  | 'public_interface'
+
 export interface GradedChange {
   readonly grade: RiskGrade
+  /** Set when the change grades P0 by what it touches; the reason above is prose for people. */
+  readonly kind?: GradedTrigger
   /** The specific reason, shown on every queue item (FR-050). */
   readonly trigger: string
 }
 
-const P0_PATTERNS: ReadonlyArray<{ label: string; pattern: RegExp }> = [
-  { label: 'authentication', pattern: /(^|\/)(auth|authn|authz|login|session-auth)(\/|\.)/i },
-  { label: 'payments', pattern: /(^|\/)(payment|payments|billing|charge)(\/|\.)/i },
-  { label: 'secrets', pattern: /(^|\/)(secret|secrets|credential|credentials|\.env)/i },
-  { label: 'a data migration', pattern: /(^|\/)migrations?(\/|_)/i },
-  { label: 'a public interface', pattern: /(extension-sdk|public-api)\/.*\.d\.ts$|\/api\.d\.ts$/i },
+const P0_PATTERNS: ReadonlyArray<{ label: string; kind: GradedTrigger; pattern: RegExp }> = [
+  {
+    label: 'authentication',
+    kind: 'authentication',
+    pattern: /(^|\/)(auth|authn|authz|login|session-auth)(\/|\.)/i,
+  },
+  {
+    label: 'payments',
+    kind: 'payments',
+    pattern: /(^|\/)(payment|payments|billing|charge)(\/|\.)/i,
+  },
+  {
+    label: 'secrets',
+    kind: 'secrets',
+    pattern: /(^|\/)(secret|secrets|credential|credentials|\.env)/i,
+  },
+  { label: 'a data migration', kind: 'migration', pattern: /(^|\/)migrations?(\/|_)/i },
+  {
+    label: 'a public interface',
+    kind: 'public_interface',
+    pattern: /(extension-sdk|public-api)\/.*\.d\.ts$|\/api\.d\.ts$/i,
+  },
 ]
 
 const SCHEMA_PATTERN = /\.schema\.[jt]s$|(^|\/)schemas?\//i
@@ -64,8 +90,8 @@ export function gradeRisk(change: ChangeSummary): GradedChange {
 // ── P0 ────────────────────────────────────────────────────────────────────
 function p0Of(change: ChangeSummary): GradedChange | null {
   for (const file of change.files) {
-    for (const { label, pattern } of P0_PATTERNS) {
-      if (pattern.test(file)) return { grade: 'P0', trigger: `touches ${label}: ${file}` }
+    for (const { label, kind, pattern } of P0_PATTERNS) {
+      if (pattern.test(file)) return { grade: 'P0', kind, trigger: `touches ${label}: ${file}` }
     }
     if (matchesAnyGlob(file, change.criticalPaths)) {
       return { grade: 'P0', trigger: `on this repository's critical-path list: ${file}` }

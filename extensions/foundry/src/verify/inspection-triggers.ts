@@ -13,18 +13,6 @@ import { isDocumentationRelative } from './documentation-path.js'
 // The inspection reads the *accumulated* change rather than any single unit,
 // which is what stops a unit finishing early from skipping it (FR-045).
 
-/** The grader's prose reasons, mapped onto the order's trigger vocabulary. */
-const TRIGGER_FROM_GRADER: ReadonlyArray<{
-  match: RegExp
-  trigger: RiskAssessment['triggers'][number]
-}> = [
-  { match: /authentication/i, trigger: 'authentication' },
-  { match: /payments?/i, trigger: 'payments' },
-  { match: /secrets?/i, trigger: 'secrets' },
-  { match: /migration/i, trigger: 'migration' },
-  { match: /public interface/i, trigger: 'public_interface' },
-]
-
 const NETWORK = /(^|\/)(fetch|http|client|api-client|webhook)[.-]/i
 
 export interface InspectionInput {
@@ -91,9 +79,7 @@ export function inspectionFor(order: WorkOrder, input: InspectionInput): Inspect
     formattingFiles: order.context.environment.paths.formatting,
   })
 
-  const triggers = new Set<Trigger>(
-    TRIGGER_FROM_GRADER.filter(({ match }) => match.test(graded.trigger)).map((t) => t.trigger)
-  )
+  const triggers = new Set<Trigger>(graded.kind === undefined ? [] : [graded.kind])
   for (const trigger of whatTheChangeTripped(order, input.changedFiles)) triggers.add(trigger)
 
   return {
