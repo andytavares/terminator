@@ -13,6 +13,7 @@ export async function eachLimited(items, limit, work) {
 }
 
 /** How many processes run at once: a core each, `bytesEach` of memory each, and no more than `most`. */
-export function processesAtOnce({ cores, memory, bytesEach, most }) {
+export function processesAtOnce(machine) {
+  const { cores, memory, bytesEach, most } = machine
   return Math.max(1, Math.min(most, cores, Math.floor(memory / bytesEach)))
 }

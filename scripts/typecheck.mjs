@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-// `npm run typecheck`: tsc over every project, a few at a time, each incrementally.
-// The build info files live in node_modules/.cache, which ci:local's `git clean -fdx -e node_modules`
-// and CI's cache both keep, so a warm run only rechecks what changed. Output is buffered per project
-// and printed once, only for a project that failed.
+// `npm run typecheck`: tsc over every project, a few at a time, each incrementally. Build info
+// lives in node_modules/.cache, which ci:local's `git clean -e node_modules` keeps, so a warm run
+// rechecks only what changed. Only a failed project's output is printed.
 
 import { spawn } from 'node:child_process'
 import { availableParallelism, totalmem } from 'node:os'

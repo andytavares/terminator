@@ -48,7 +48,8 @@ export function stepArguments(name, step, checkout) {
 }
 
 /** Runs a command, giving each chunk of its stdout and stderr to `options.write`; resolves its exit status. */
-export function spawnToSink(command, args, { write, ...options }) {
+export function spawnToSink(command, args, sinkOptions) {
+  const { write, ...options } = sinkOptions
   return new Promise((resolve) => {
     const child = spawn(command, args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] })
     child.stdout.on('data', write)

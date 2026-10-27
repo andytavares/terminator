@@ -70,26 +70,24 @@ export function jobsOf(steps, workflow) {
 }
 
 /** Where CI runs the job: Ubuntu jobs in the Linux container, the others on this Mac. */
-export const laneOf = (job) => (job.runner?.startsWith('ubuntu') ? 'linux' : 'mac')
+export const ciLaneOf = (job) => (job.runner?.startsWith('ubuntu') ? 'linux' : 'mac')
 
-/**
- * Runs every job, each as soon as the jobs it needs have passed, as CI does. A need outside
- * `jobs` (one ci:local skips) counts as passed. A failure stops no running job; a job whose need
- * did not pass never starts. Resolves `{ id, status }` per job: passed, failed or skipped.
- */
+/** Runs every job as soon as the jobs it needs have passed, as CI does; a need ci:local skips
+ * counts as passed. A failure stops no running job; a job whose need did not pass never starts.
+ * Resolves `{ id, status }` per job: passed, failed or skipped. */
 export async function runScheduled(jobs, runJob) {
   const byId = new Map(jobs.map((job) => [job.id, job]))
   const statuses = new Map()
-  const statusOf = (id) => {
-    if (!statuses.has(id)) statuses.set(id, begin(byId.get(id)))
+  const jobStatus = (id) => {
+    if (!statuses.has(id)) statuses.set(id, startWhenNeedsPass(byId.get(id)))
     return statuses.get(id)
   }
-  const begin = async (job) => {
-    const needed = await Promise.all(job.needs.filter((id) => byId.has(id)).map(statusOf))
+  const startWhenNeedsPass = async (job) => {
+    const needed = await Promise.all(job.needs.filter((id) => byId.has(id)).map(jobStatus))
     if (needed.some((status) => status !== 'passed')) return 'skipped'
     return (await runJob(job)) ? 'passed' : 'failed'
   }
-  return Promise.all(jobs.map(async (job) => ({ id: job.id, status: await statusOf(job.id) })))
+  return Promise.all(jobs.map(async (job) => ({ id: job.id, status: await jobStatus(job.id) })))
 }
 
 // Jobs that fill every core by design: the unit suite, and the stability gate, which runs under
@@ -113,7 +111,7 @@ async function runJob(job, context, durations) {
   let passed = true
   for (const step of job.steps) {
     if (!passed) break
-    passed = await runStep(step, context[laneOf(job)], (chunk) => output.push(String(chunk)))
+    passed = await runStep(step, context[ciLaneOf(job)], (chunk) => output.push(String(chunk)))
   }
   const seconds = Math.round((Date.now() - started) / 1000)
   durations.set(job.id, seconds)

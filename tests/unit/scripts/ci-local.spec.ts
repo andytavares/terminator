@@ -7,7 +7,7 @@ import {
   checksPushes,
   cleanArguments,
   jobsOf,
-  laneOf,
+  ciLaneOf,
   lockHash,
   needsInstall,
   nodeMismatch,
@@ -267,8 +267,8 @@ describe('the plan, as jobs', () => {
   })
 
   it('puts a job on the Linux lane when CI runs it on Ubuntu, and on the Mac lane otherwise', () => {
-    expect(laneOf(jobsOf([step('lint')], workflow)[0])).toBe('linux')
-    expect(laneOf(jobsOf([step('start', 'macos-26')], workflow)[0])).toBe('mac')
+    expect(ciLaneOf(jobsOf([step('lint')], workflow)[0])).toBe('linux')
+    expect(ciLaneOf(jobsOf([step('start', 'macos-26')], workflow)[0])).toBe('mac')
   })
 })
 
