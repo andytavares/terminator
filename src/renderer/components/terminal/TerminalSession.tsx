@@ -5,7 +5,6 @@ import '@xterm/xterm/css/xterm.css'
 import { previewWindow } from '../../terminal/preview-window'
 import { subscribeToSessionOutput } from '../../terminal/output-router'
 import { webglContexts } from '../../terminal/webgl-contexts'
-import { LinkPointer } from '../../terminal/link-pointer'
 import { registerLinkProviders as registerTerminalLinkProviders } from '../../terminal/terminal-links'
 import { isQuickActionsLeader } from '../../../shared/quick-actions-leader'
 
@@ -128,7 +127,7 @@ export class TerminalInstance {
   private webglAddon: WebglAddon | null = null
   private outputUnsubscribe: (() => void) | null = null
   private resizeObserver: ResizeObserver | null = null
-  private linkPointer: LinkPointer | null = null
+  private stopLinkTracking: (() => void) | null = null
   private themeObserver: MutationObserver | null = null
   private openedIn: Document | null = null
   private sessionId: string
@@ -136,8 +135,6 @@ export class TerminalInstance {
 
   // The root element xterm renders into — created on first mount(), moved between containers.
   readonly element: HTMLDivElement
-  // Underline overlay for hovered links — positioned absolutely inside this.element.
-  linkOverlay: HTMLDivElement | null = null
 
   constructor(sessionId: string, scrollbackLimit: number, hooks?: TerminalInstanceHooks) {
     this.sessionId = sessionId
@@ -154,7 +151,7 @@ export class TerminalInstance {
 
     this.terminal.attachCustomKeyEventHandler((e) => handleCustomKey(this.terminal, e))
     this.wireToPty(sessionId)
-    this.registerLinkProviders()
+    this.stopLinkTracking = registerTerminalLinkProviders(this.terminal)
     this.outputUnsubscribe = this.subscribeToOutput(sessionId)
 
     // Subscribed first, then attached: what the process printed before this terminal was on screen
@@ -190,12 +187,6 @@ export class TerminalInstance {
         this.hooks?.onIdle?.()
       }, IDLE_DEBOUNCE_MS)
     })
-  }
-
-  private registerLinkProviders(): void {
-    registerTerminalLinkProviders(this.terminal)
-    this.linkPointer = new LinkPointer(this.terminal, this.element)
-    this.linkOverlay = this.linkPointer.overlay
   }
 
   // A visible terminal draws on the GPU. Without a context to spare, or when the
@@ -362,9 +353,8 @@ export class TerminalInstance {
     }
     this.themeObserver?.disconnect()
     this.themeObserver = null
-    this.linkPointer?.dispose()
-    this.linkPointer = null
-    this.linkOverlay = null
+    this.stopLinkTracking?.()
+    this.stopLinkTracking = null
     this.hooks?.onIdle?.()
     this.hooks?.onDispose?.()
     this.unmount()

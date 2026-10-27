@@ -831,17 +831,7 @@ describe('TerminalInstance — link providers (visual decoration)', () => {
   })
 })
 
-describe('TerminalInstance — link providers (visual decoration) — URL provider activate is a no-op (mousedown handler owns activation)', () => {
-  it('URL provider activate is a no-op (mousedown handler owns activation)', () => {
-    const provider = getProvider('https://example.com', 0)
-    let link: { activate: (e: MouseEvent, t: string) => void } | undefined
-    provider.provideLinks(0, (links: unknown[]) => {
-      link = links?.[0] as typeof link
-    })
-    link!.activate({ metaKey: true } as MouseEvent, 'https://example.com')
-    expect(mockOpenExternal).not.toHaveBeenCalled()
-  })
-
+describe('TerminalInstance — link providers (visual decoration) — URL provider returns undefined for a line with no URLs', () => {
   it('URL provider returns undefined for line with no URLs', () => {
     const provider = getProvider('no links here', 0)
     let result: unknown = 'sentinel'
@@ -937,413 +927,244 @@ describe('TerminalInstance — link providers (visual decoration) — quoted-pat
   })
 })
 
-// xterm draws 80 × 24 cells of 8 × 16 px from the screen's top left, which
-// jsdom puts at 0,0 along with the terminal's element; viewportY=0.
-
-/** Gives the mocked terminal the `.xterm-screen` xterm sizes to its cells. */
-function drawTerminalScreen(
-  termMock: Record<string, unknown>,
-  cell: { width: number; height: number },
-  screen = { left: 0, top: 0 }
-) {
-  const screenElement = document.createElement('div')
-  screenElement.className = 'xterm-screen'
-  screenElement.getBoundingClientRect = () =>
-    new DOMRect(screen.left, screen.top, 80 * cell.width, 24 * cell.height)
-  const xtermElement = document.createElement('div')
-  xtermElement.appendChild(screenElement)
-  Object.assign(termMock, { element: xtermElement, rows: 24, cols: 80 })
+interface ProvidedLink {
+  text: string
+  range: { start: { x: number }; end: { x: number } }
+  decorations: { underline: boolean; pointerCursor: boolean }
+  activate: (event: MouseEvent, text: string) => void
+  hover: (event: MouseEvent, text: string) => void
+  leave: (event: MouseEvent, text: string) => void
 }
 
-function makeInstanceWithLine(lineText: string) {
+/** A terminal whose buffer rows (0-based) read `lines`; xterm's providers are asked 1-based. */
+function terminalWithLines(lines: Record<number, string>) {
   const instance = new TerminalInstance('ses-link', 1000)
   const termMock = vi.mocked(Terminal).mock.results.at(-1)!.value
-  drawTerminalScreen(termMock, { width: 8, height: 16 })
-  Object.defineProperty(termMock, 'buffer', {
-    value: makeMockBuffer(lineText, 0),
-    configurable: true,
-  })
-  return instance
-}
-
-const fire = (element: HTMLElement, type: string, opts: Partial<MouseEventInit> = {}) =>
-  element.dispatchEvent(new MouseEvent(type, { bubbles: true, ...opts }))
-
-describe('TerminalInstance — link interaction (hover overlay + cmd+click) — hover overlay', () => {
-  it('shows overlay when hovering over a URL with cmd held', () => {
-    const instance = makeInstanceWithLine('https://example.com')
-    fire(instance.element, 'mousemove', { clientX: 8, clientY: 0, metaKey: true })
-    expect(instance.linkOverlay?.style.display).toBe('block')
-  })
-
-  it('does not show overlay when hovering over a URL without cmd', () => {
-    const instance = makeInstanceWithLine('https://example.com')
-    fire(instance.element, 'mousemove', { clientX: 8, clientY: 0, metaKey: false })
-    expect(instance.linkOverlay?.style.display).toBe('none')
-  })
-
-  it('hides overlay when hovering over plain text', () => {
-    const instance = makeInstanceWithLine('just some text')
-    fire(instance.element, 'mousemove', { clientX: 8, clientY: 0, metaKey: true })
-    expect(instance.linkOverlay?.style.display).toBe('none')
-  })
-
-  it('hides overlay on mouseleave', () => {
-    const instance = makeInstanceWithLine('https://example.com')
-    fire(instance.element, 'mousemove', { clientX: 8, clientY: 0, metaKey: true })
-    expect(instance.linkOverlay?.style.display).toBe('block')
-    fire(instance.element, 'mouseleave')
-    expect(instance.linkOverlay?.style.display).toBe('none')
-  })
-})
-
-describe('TerminalInstance — link interaction (hover overlay + cmd+click) — hover overlay — positions overlay correctly for a URL at start of line', () => {
-  it('positions overlay correctly for a URL at start of line', () => {
-    // URL 'https://example.com' at index 0, length 19
-    // overlay.left = 0*8=0, top = (0+1)*16-1=15, width = 19*8=152
-    const instance = makeInstanceWithLine('https://example.com')
-    fire(instance.element, 'mousemove', { clientX: 8, clientY: 0, metaKey: true })
-    expect(instance.linkOverlay?.style.left).toBe('0px')
-    expect(instance.linkOverlay?.style.top).toBe('15px')
-    expect(instance.linkOverlay?.style.width).toBe('152px')
-  })
-
-  it('shows overlay when hovering over a www. URL with cmd held', () => {
-    const instance = makeInstanceWithLine('www.google.com')
-    fire(instance.element, 'mousemove', { clientX: 0, clientY: 0, metaKey: true })
-    expect(instance.linkOverlay?.style.display).toBe('block')
-  })
-
-  it('shows overlay when hovering over a bare domain URL with cmd held', () => {
-    const instance = makeInstanceWithLine('google.com')
-    fire(instance.element, 'mousemove', { clientX: 0, clientY: 0, metaKey: true })
-    expect(instance.linkOverlay?.style.display).toBe('block')
-  })
-
-  it('shows overlay when hovering over an absolute path', () => {
-    const instance = makeInstanceWithLine('/Users/foo/bar.ts')
-    fire(instance.element, 'mousemove', { clientX: 4, clientY: 0, metaKey: true })
-    expect(instance.linkOverlay?.style.display).toBe('block')
-  })
-})
-
-describe('TerminalInstance — link interaction (hover overlay + cmd+click) — hover overlay — hides overlay when cursor moves off a link', () => {
-  it('hides overlay when cursor moves off a link', () => {
-    const instance = makeInstanceWithLine('text https://x.com more')
-    // Hover over URL with cmd (clientX=44 → col=5, URL starts at index 5)
-    fire(instance.element, 'mousemove', { clientX: 44, clientY: 0, metaKey: true })
-    expect(instance.linkOverlay?.style.display).toBe('block')
-    // Move to plain text before URL (col=0)
-    fire(instance.element, 'mousemove', { clientX: 0, clientY: 0, metaKey: true })
-    expect(instance.linkOverlay?.style.display).toBe('none')
-  })
-
-  it('hides overlay when cmd is released while hovering', () => {
-    const instance = makeInstanceWithLine('https://example.com')
-    fire(instance.element, 'mousemove', { clientX: 8, clientY: 0, metaKey: true })
-    expect(instance.linkOverlay?.style.display).toBe('block')
-    document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta', bubbles: true }))
-    expect(instance.linkOverlay?.style.display).toBe('none')
-  })
-
-  it('shows overlay when cmd is pressed while already hovering a link', () => {
-    const instance = makeInstanceWithLine('https://example.com')
-    // Hover without cmd first to record the position, overlay stays hidden.
-    fire(instance.element, 'mousemove', { clientX: 8, clientY: 0, metaKey: false })
-    expect(instance.linkOverlay?.style.display).toBe('none')
-    // Pressing cmd while hovering re-checks and shows the overlay.
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', bubbles: true }))
-    expect(instance.linkOverlay?.style.display).toBe('block')
-  })
-})
-
-describe('TerminalInstance — link interaction (hover overlay + cmd+click) — cmd+click mousedown', () => {
-  it('opens URL with openExternal on cmd+click', () => {
-    const instance = makeInstanceWithLine('https://example.com')
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 8, clientY: 0 })
-    expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com')
-  })
-
-  it('opens full URL including balanced parentheses (e.g. Wikipedia)', () => {
-    const url = 'https://en.wikipedia.org/wiki/Foo_(bar)'
-    const instance = makeInstanceWithLine(url)
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 8, clientY: 0 })
-    expect(mockOpenExternal).toHaveBeenCalledWith(url)
-  })
-
-  it('opens the inner path of a double-quoted string with a space on cmd+click', () => {
-    // A space means the bare path regex misses it, so the quoted-path hit-test runs.
-    const instance = makeInstanceWithLine('see "/Users/foo bar/x.ts"')
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 6 * 8, clientY: 0 })
-    expect(mockOpenPath).toHaveBeenCalledWith('/Users/foo bar/x.ts')
-  })
-
-  it('opens the inner path of a single-quoted string with a space on cmd+click', () => {
-    const instance = makeInstanceWithLine("see '/Users/foo bar/x.ts'")
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 6 * 8, clientY: 0 })
-    expect(mockOpenPath).toHaveBeenCalledWith('/Users/foo bar/x.ts')
-  })
-})
-
-describe('TerminalInstance — link interaction (hover overlay + cmd+click) — cmd+click mousedown — opens without the punctuation that ends it', () => {
-  // Reported: a URL ending a sentence opened with the full stop on it.
-  it.each([
-    [
-      'draft PR https://github.com/andytavares/terminator/pull/208. Lint',
-      'https://github.com/andytavares/terminator/pull/208',
-    ],
-    ['see https://example.com/a, then', 'https://example.com/a'],
-    ['(https://example.com/a)', 'https://example.com/a'],
-    ['is it https://example.com/a?', 'https://example.com/a'],
-    ['go to https://example.com/a!', 'https://example.com/a'],
-    ['with https://example.com/a; and', 'https://example.com/a'],
-    ['per https://example.com/a: yes', 'https://example.com/a'],
-    ['quoted "https://example.com/a".', 'https://example.com/a'],
-    ['check www.google.com.', 'https://www.google.com'],
-    ['check google.com.', 'https://google.com'],
-  ])('opens %j without the punctuation that ends it', (line, url) => {
-    const instance = makeInstanceWithLine(line)
-    const col = line.indexOf(
-      url.replace('https://www.', 'www.').replace(/^https:\/\/(?=google)/, '')
-    )
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: (col + 2) * 8, clientY: 0 })
-    expect(mockOpenExternal).toHaveBeenCalledWith(url)
-  })
-
-  it('opens a path that ends a sentence without the full stop', () => {
-    const instance = makeInstanceWithLine('Wrote /Users/foo/bar.ts.')
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 8 * 8, clientY: 0 })
-    expect(mockOpenPath).toHaveBeenCalledWith('/Users/foo/bar.ts')
-  })
-})
-
-describe('TerminalInstance — link interaction (hover overlay + cmd+click) — cmd+click mousedown — keeps punctuation inside a URL', () => {
-  it('keeps punctuation inside a URL', () => {
-    const url = 'https://example.com/a.b?q=1,2&x=y#frag.c'
-    const instance = makeInstanceWithLine(`${url}.`)
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 8, clientY: 0 })
-    expect(mockOpenExternal).toHaveBeenCalledWith(url)
-  })
-
-  it('opens a path ending a sentence without the full stop, keeping its line number', () => {
-    const instance = makeInstanceWithLine('Fixed in /Users/foo/bar.ts:12.')
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 12 * 8, clientY: 0 })
-    expect(mockOpenPath).toHaveBeenCalledWith(
-      expect.stringMatching(/^\/Users\/foo\/bar\.ts(:12)?$/)
-    )
-    expect(mockOpenPath.mock.calls[0][0]).not.toMatch(/\.$/)
-  })
-
-  it('does not open URL without metaKey or ctrlKey', () => {
-    const instance = makeInstanceWithLine('https://example.com')
-    fire(instance.element, 'mousedown', {
-      metaKey: false,
-      ctrlKey: false,
-      clientX: 8,
-      clientY: 0,
-    })
-    expect(mockOpenExternal).not.toHaveBeenCalled()
-  })
-})
-
-describe('TerminalInstance — link interaction (hover overlay + cmd+click) — cmd+click mousedown — opens URL with openExternal on ctrl+click (Windows/Linux)', () => {
-  it('opens URL with openExternal on ctrl+click (Windows/Linux)', () => {
-    mockPlatform = 'Win32'
-    const instance = makeInstanceWithLine('https://example.com')
-    fire(instance.element, 'mousedown', {
-      metaKey: false,
-      ctrlKey: true,
-      clientX: 8,
-      clientY: 0,
-    })
-    expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com')
-  })
-
-  it('does not open on macOS ctrl+click (context menu key)', () => {
-    // macOS: ctrl+click = right-click, should not open link
-    const instance = makeInstanceWithLine('https://example.com')
-    fire(instance.element, 'mousedown', {
-      metaKey: false,
-      ctrlKey: true,
-      clientX: 8,
-      clientY: 0,
-    })
-    expect(mockOpenExternal).not.toHaveBeenCalled()
-  })
-
-  it('opens www. URL with https:// prepended on cmd+click', () => {
-    const instance = makeInstanceWithLine('www.google.com')
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 0, clientY: 0 })
-    expect(mockOpenExternal).toHaveBeenCalledWith('https://www.google.com')
-  })
-})
-
-describe('TerminalInstance — link interaction (hover overlay + cmd+click) — cmd+click mousedown — opens bare domain URL with https:// prepended on cmd+click', () => {
-  it('opens bare domain URL with https:// prepended on cmd+click', () => {
-    const instance = makeInstanceWithLine('google.com')
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 0, clientY: 0 })
-    expect(mockOpenExternal).toHaveBeenCalledWith('https://google.com')
-  })
-
-  it('does not treat protocol-relative URL as a path', () => {
-    const instance = makeInstanceWithLine('//example.com/path')
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 4, clientY: 0 })
-    expect(mockOpenPath).not.toHaveBeenCalled()
-    expect(mockOpenExternal).not.toHaveBeenCalled()
-  })
-
-  it('does not match mid-string slash as a path', () => {
-    // 'src/renderer/foo.ts' contains '/renderer/foo.ts' which is NOT a word-boundary path
-    const instance = makeInstanceWithLine('src/renderer/foo.ts')
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 4, clientY: 0 })
-    expect(mockOpenPath).not.toHaveBeenCalled()
-  })
-
-  it('opens double-quoted path with spaces', () => {
-    // Python tracebacks: File "/Users/Jane Doe/foo.py", line 5
-    const instance = makeInstanceWithLine('File "/Users/Jane Doe/foo.py", line 5')
-    // col inside the quoted path (char 6 = 'U' in /Users, offset by 1 for opening quote)
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 48, clientY: 0 })
-    expect(mockOpenPath).toHaveBeenCalledWith('/Users/Jane Doe/foo.py')
-  })
-
-  it('opens single-quoted path with spaces', () => {
-    const instance = makeInstanceWithLine("error: '/Users/Jane Doe/bar.ts'")
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 64, clientY: 0 })
-    expect(mockOpenPath).toHaveBeenCalledWith('/Users/Jane Doe/bar.ts')
-  })
-})
-
-describe('TerminalInstance — link interaction (hover overlay + cmd+click) — cmd+click mousedown — strips line:col suffix from quoted path', () => {
-  it('strips line:col suffix from quoted path', () => {
-    const instance = makeInstanceWithLine('File "/Users/foo/bar.ts:10:3"')
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 48, clientY: 0 })
-    expect(mockOpenPath).toHaveBeenCalledWith('/Users/foo/bar.ts')
-  })
-
-  it('opens absolute path with openPath on cmd+click', () => {
-    const instance = makeInstanceWithLine('/Users/foo/bar')
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 4, clientY: 0 })
-    expect(mockOpenPath).toHaveBeenCalledWith('/Users/foo/bar')
-  })
-
-  it('strips line:col suffix from path before opening', () => {
-    const instance = makeInstanceWithLine('/Users/foo/bar.ts:12:3')
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 4, clientY: 0 })
-    expect(mockOpenPath).toHaveBeenCalledWith('/Users/foo/bar.ts')
-  })
-
-  it('strips only col suffix when line number present', () => {
-    const instance = makeInstanceWithLine('/home/user/file.go:99')
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 4, clientY: 0 })
-    expect(mockOpenPath).toHaveBeenCalledWith('/home/user/file.go')
-  })
-
-  it('does nothing when cmd+clicking on plain text', () => {
-    const instance = makeInstanceWithLine('just some output text')
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 4, clientY: 0 })
-    expect(mockOpenExternal).not.toHaveBeenCalled()
-    expect(mockOpenPath).not.toHaveBeenCalled()
-  })
-})
-
-describe('TerminalInstance — link interaction (hover overlay + cmd+click) — cmd+click mousedown — neither underlines nor opens before xterm has drawn a screen', () => {
-  it('neither underlines nor opens before xterm has drawn a screen', () => {
-    const instance = new TerminalInstance('ses-unopened', 1000)
-    const termMock = vi.mocked(Terminal).mock.results.at(-1)!.value
-    Object.defineProperty(termMock, 'buffer', {
-      value: makeMockBuffer('https://example.com', 0),
-      configurable: true,
-    })
-    fire(instance.element, 'mousemove', { metaKey: true, clientX: 8, clientY: 0 })
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', bubbles: true }))
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 8, clientY: 0 })
-    expect(instance.linkOverlay?.style.display).toBe('none')
-    expect(mockOpenExternal).not.toHaveBeenCalled()
-  })
-
-  it('removes listeners on dispose — no action after dispose', () => {
-    const instance = makeInstanceWithLine('https://example.com')
-    instance.dispose()
-    fire(instance.element, 'mousedown', { metaKey: true, clientX: 8, clientY: 0 })
-    expect(mockOpenExternal).not.toHaveBeenCalled()
-  })
-})
-
-// The WebGL renderer leaves no `.xterm-rows` to measure, and xterm draws
-// its cells from `.xterm-screen`, inside the padding the pane gives `.xterm`.
-const CELL = { width: 7, height: 18 }
-
-function makeDrawnTerminal(lines: Record<number, string>, screen = { left: 0, top: 0 }) {
-  const instance = new TerminalInstance('ses-drawn', 1000)
-  const termMock = vi.mocked(Terminal).mock.results.at(-1)!.value
-  drawTerminalScreen(termMock, CELL, screen)
   Object.defineProperty(termMock, 'buffer', {
     value: {
       active: {
         viewportY: 0,
-        getLine: (row: number) => ({ translateToString: () => lines[row] ?? '' }),
+        getLine: (row: number) =>
+          lines[row] === undefined ? undefined : { translateToString: () => lines[row] },
       },
     },
     configurable: true,
   })
-  return instance
+  return { instance, termMock }
 }
 
-const atCell = (col: number, row: number, screen = { left: 0, top: 0 }) => ({
-  metaKey: true,
-  clientX: screen.left + (col + 0.5) * CELL.width,
-  clientY: screen.top + (row + 0.5) * CELL.height,
-})
+/** The link xterm would pick at 0-based `col` of 1-based buffer line `y`: the first provider's. */
+function linkAtColumn(termMock: Record<string, unknown>, col: number, y = 1) {
+  const registerCalls = (termMock.registerLinkProvider as ReturnType<typeof vi.fn>).mock.calls
+  for (const [provider] of registerCalls) {
+    let links: ProvidedLink[] | undefined
+    provider.provideLinks(y, (found: ProvidedLink[] | undefined) => (links = found))
+    const hit = links?.find((link) => col + 1 >= link.range.start.x && col + 1 <= link.range.end.x)
+    if (hit) return hit
+  }
+  return undefined
+}
 
-describe('TerminalInstance — link interaction (hover overlay + cmd+click) — on the cells xterm draws', () => {
-  it('opens the link on the row clicked, at the height xterm draws its rows', () => {
-    const instance = makeDrawnTerminal({ 5: 'https://example.com/row-five' })
-    fire(instance.element, 'mousedown', atCell(2, 5))
-    expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com/row-five')
+function cmdClick(line: string, col: number, init: MouseEventInit = { metaKey: true }) {
+  const { termMock } = terminalWithLines({ 0: line })
+  const link = linkAtColumn(termMock, col)
+  link?.activate(new MouseEvent('mouseup', init), link.text)
+  return link
+}
+
+const press = (type: 'keydown' | 'keyup', key: string, init: KeyboardEventInit = {}) =>
+  document.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true, ...init }))
+
+describe('TerminalInstance — links — the provider order and rows', () => {
+  it('asks for the 1-based line xterm passes: row 5 of the buffer is line 6', () => {
+    const { termMock } = terminalWithLines({ 5: 'https://example.com/row-five' })
+    expect(linkAtColumn(termMock, 2, 6)?.text).toBe('https://example.com/row-five')
+    expect(linkAtColumn(termMock, 2, 5)).toBeUndefined()
   })
 
-  it('counts rows and columns from where the screen starts, inside the padding', () => {
-    const padding = { left: 12, top: 6 }
-    const instance = makeDrawnTerminal({ 0: '/tmp/notes.txt' }, padding)
-    fire(instance.element, 'mousedown', {
-      ...atCell(0, 0, padding),
-      clientY: padding.top + CELL.height - 1,
+  it('places the range on the 1-based columns of the link', () => {
+    const { termMock } = terminalWithLines({ 0: 'see https://example.com' })
+    const link = linkAtColumn(termMock, 5)
+    expect([link?.range.start.x, link?.range.end.x]).toEqual([5, 23])
+  })
+
+  it('prefers the full URL over the domain inside it', () => {
+    cmdClick('https://example.com/a', 10)
+    expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com/a')
+  })
+
+  it('finds nothing on a row past the end of the buffer', () => {
+    const { termMock } = terminalWithLines({})
+    expect(linkAtColumn(termMock, 0)).toBeUndefined()
+  })
+})
+
+function hoveredLink(init: MouseEventInit) {
+  const { termMock } = terminalWithLines({ 0: 'https://example.com' })
+  const link = linkAtColumn(termMock, 2)!
+  link.hover(new MouseEvent('mousemove', init), link.text)
+  return link
+}
+
+describe('TerminalInstance — links — hover decorations follow the modifier key', () => {
+  it('shows no underline and no pointer cursor without cmd', () => {
+    const { termMock } = terminalWithLines({ 0: 'https://example.com' })
+    expect(linkAtColumn(termMock, 2)?.decorations).toEqual({
+      underline: false,
+      pointerCursor: false,
     })
-    expect(mockOpenPath).toHaveBeenCalledWith('/tmp/notes.txt')
   })
 
-  it('opens nothing on a row past the end of the buffer', () => {
-    const instance = makeDrawnTerminal({})
-    const termMock = vi.mocked(Terminal).mock.results.at(-1)!.value
-    termMock.buffer.active.getLine = () => undefined
-    fire(instance.element, 'mousedown', atCell(0, 0))
-    expect(mockOpenExternal).not.toHaveBeenCalled()
-    expect(mockOpenPath).not.toHaveBeenCalled()
+  it('underlines when cmd is pressed while the link is hovered, and stops on release', () => {
+    const link = hoveredLink({})
+    press('keydown', 'Meta', { metaKey: true })
+    expect(link.decorations).toEqual({ underline: true, pointerCursor: true })
+    press('keyup', 'Meta')
+    expect(link.decorations).toEqual({ underline: false, pointerCursor: false })
+  })
+
+  it('underlines a link found while cmd is already held', () => {
+    const { termMock } = terminalWithLines({ 0: 'https://example.com' })
+    press('keydown', 'Meta', { metaKey: true })
+    expect(linkAtColumn(termMock, 2)?.decorations.underline).toBe(true)
+    press('keyup', 'Meta')
   })
 })
 
-describe('TerminalInstance — link interaction (hover overlay + cmd+click) — on the cells xterm draws — swallows a refusal to open, so a click never throws', () => {
+describe('TerminalInstance — links — hover decorations after the pointer leaves or the terminal is gone', () => {
+  it('ignores a modifier change after the pointer left the link', () => {
+    const link = hoveredLink({})
+    link.leave(new MouseEvent('mousemove'), link.text)
+    press('keydown', 'Meta', { metaKey: true })
+    expect(link.decorations.underline).toBe(false)
+    press('keyup', 'Meta')
+  })
+
+  it('stops listening to the keyboard on dispose', () => {
+    const { instance, termMock } = terminalWithLines({ 0: 'https://example.com' })
+    const link = linkAtColumn(termMock, 2)!
+    link.hover(new MouseEvent('mousemove'), link.text)
+    instance.dispose()
+    press('keydown', 'Meta', { metaKey: true })
+    expect(link.decorations.underline).toBe(false)
+    press('keyup', 'Meta')
+  })
+
+  it('uses Ctrl off macOS', () => {
+    mockPlatform = 'Win32'
+    const link = hoveredLink({})
+    press('keydown', 'Meta', { metaKey: true })
+    expect(link.decorations.underline).toBe(false)
+    press('keydown', 'Control', { ctrlKey: true })
+    expect(link.decorations.underline).toBe(true)
+    press('keyup', 'Control')
+  })
+})
+
+describe('TerminalInstance — links — activate on cmd+click', () => {
+  it('opens a URL with openExternal', () => {
+    cmdClick('https://example.com', 1)
+    expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com')
+  })
+
+  it('opens the full URL including balanced parentheses', () => {
+    const url = 'https://en.wikipedia.org/wiki/Foo_(bar)'
+    cmdClick(url, 1)
+    expect(mockOpenExternal).toHaveBeenCalledWith(url)
+  })
+
+  it('opens the inner path of a quoted string with a space', () => {
+    cmdClick('see "/Users/foo bar/x.ts"', 6)
+    expect(mockOpenPath).toHaveBeenCalledWith('/Users/foo bar/x.ts')
+    cmdClick("see '/Users/foo bar/x.ts'", 6)
+    expect(mockOpenPath).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('TerminalInstance — links — activate on cmd+click — what is opened', () => {
+  it.each([
+    ['draft PR https://github.com/x/y/pull/208. Lint', 12, 'https://github.com/x/y/pull/208'],
+    ['see https://example.com/a, then', 8, 'https://example.com/a'],
+    ['(https://example.com/a)', 4, 'https://example.com/a'],
+    ['is it https://example.com/a?', 10, 'https://example.com/a'],
+    ['go to https://example.com/a!', 10, 'https://example.com/a'],
+    ['with https://example.com/a; and', 10, 'https://example.com/a'],
+    ['per https://example.com/a: yes', 8, 'https://example.com/a'],
+    ['quoted "https://example.com/a".', 10, 'https://example.com/a'],
+    ['check www.google.com.', 8, 'https://www.google.com'],
+    ['check google.com.', 8, 'https://google.com'],
+  ])('opens %j without the punctuation that ends it', (line, col, url) => {
+    cmdClick(line, col)
+    expect(mockOpenExternal).toHaveBeenCalledWith(url)
+  })
+})
+
+describe('TerminalInstance — links — activate on cmd+click — punctuation and paths', () => {
+  it('keeps punctuation inside a URL', () => {
+    const url = 'https://example.com/a.b?q=1,2&x=y#frag.c'
+    cmdClick(`${url}.`, 3)
+    expect(mockOpenExternal).toHaveBeenCalledWith(url)
+  })
+
+  it.each([
+    ['/Users/foo/bar', '/Users/foo/bar'],
+    ['/Users/foo/bar.ts:12:3', '/Users/foo/bar.ts'],
+    ['/home/user/file.go:99', '/home/user/file.go'],
+    ['Wrote /Users/foo/bar.ts.', '/Users/foo/bar.ts'],
+    ['Fixed in /Users/foo/bar.ts:12.', '/Users/foo/bar.ts'],
+    ['File "/Users/foo/bar.ts:10:3"', '/Users/foo/bar.ts'],
+    ['File "/Users/Jane Doe/foo.py", line 5', '/Users/Jane Doe/foo.py'],
+  ])('opens the path in %j with openPath, without its position', (line, path) => {
+    cmdClick(line, line.indexOf('/') + 2)
+    expect(mockOpenPath).toHaveBeenCalledWith(path)
+  })
+
+  it('opens www. and bare domain links with https:// prepended', () => {
+    cmdClick('www.google.com', 0)
+    cmdClick('google.com', 0)
+    expect(mockOpenExternal.mock.calls).toEqual([
+      ['https://www.google.com'],
+      ['https://google.com'],
+    ])
+  })
+})
+
+describe('TerminalInstance — links — activate on cmd+click — what is not opened', () => {
+  it.each(['//example.com/path', 'src/renderer/foo.ts', 'just some output text'])(
+    'recognises no link in %j',
+    (line) => {
+      expect(cmdClick(line, 0)).toBeUndefined()
+      expect(mockOpenExternal).not.toHaveBeenCalled()
+      expect(mockOpenPath).not.toHaveBeenCalled()
+    }
+  )
+})
+
+describe('TerminalInstance — links — activate on cmd+click — the modifier', () => {
+  it('opens nothing without cmd, and nothing for ctrl on macOS', () => {
+    cmdClick('https://example.com', 1, {})
+    cmdClick('https://example.com', 1, { ctrlKey: true })
+    expect(mockOpenExternal).not.toHaveBeenCalled()
+  })
+
+  it('opens with ctrl off macOS, and not with cmd', () => {
+    mockPlatform = 'Win32'
+    cmdClick('https://example.com', 1, { metaKey: true })
+    expect(mockOpenExternal).not.toHaveBeenCalled()
+    cmdClick('https://example.com', 1, { ctrlKey: true })
+    expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com')
+  })
+
   it('swallows a refusal to open, so a click never throws', async () => {
     mockOpenExternal.mockRejectedValueOnce(new Error('no browser'))
     mockOpenPath.mockRejectedValueOnce(new Error('no app'))
-    const instance = makeDrawnTerminal({ 0: 'https://example.com', 1: '/tmp/a.txt' })
-    fire(instance.element, 'mousedown', atCell(0, 0))
-    fire(instance.element, 'mousedown', atCell(0, 1))
+    cmdClick('https://example.com', 0)
+    cmdClick('/tmp/a.txt', 0)
     await Promise.allSettled(
       [...mockOpenExternal.mock.results, ...mockOpenPath.mock.results].map((call) => call.value)
     )
     expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com')
     expect(mockOpenPath).toHaveBeenCalledWith('/tmp/a.txt')
-  })
-
-  it('underlines the link at the row and columns xterm draws it in', () => {
-    const padding = { left: 12, top: 6 }
-    const instance = makeDrawnTerminal({ 3: 'see https://example.com' }, padding)
-    fire(instance.element, 'mousemove', atCell(5, 3, padding))
-    expect(instance.linkOverlay?.style.left).toBe(`${12 + 4 * CELL.width}px`)
-    expect(instance.linkOverlay?.style.top).toBe(`${6 + 4 * CELL.height - 1}px`)
-    expect(instance.linkOverlay?.style.width).toBe(`${19 * CELL.width}px`)
   })
 })
 
