@@ -270,14 +270,6 @@ const insightsFeedAsk = (patch: Partial<Sourced<HomeAsk>>): Sourced<HomeAsk> => 
   open: { command: 'x' },
   ...patch,
 })
-const weeklyReview = insightsFeedAsk({
-  id: 'weekly-review',
-  source: 'vault',
-  kind: 'task',
-  title: 'Weekly review is ready',
-  detail: 'Look back',
-  actions: [{ id: 'start-review', label: 'Start', primary: true }],
-})
 const oldestReviewAsk = insightsFeedAsk({
   id: 'review:acme#41',
   title: 'Review requested',
@@ -325,13 +317,10 @@ describe('Insights: a snoozed row in looking back', () => {
 })
 
 describe('Insights: looking back', () => {
-  it('offers the weekly review through the feed action, the longest wait and the oldest review', async () => {
-    const runAction = vi.fn().mockResolvedValue(true)
-    useHomeFeedStore.setState({ runAction, asks: [weeklyReview, oldestReviewAsk] })
+  it('shows the longest wait and the oldest review', async () => {
+    useHomeFeedStore.setState({ asks: [oldestReviewAsk] })
     render(<Insights />)
     const back = card('Looking back')
-    fireEvent.click(within(back).getByRole('button', { name: 'Start' }))
-    expect(runAction).toHaveBeenCalledWith('vault', 'weekly-review', 'start-review')
     expect(within(back).getByText(/Fluent #41 · 3 h/)).toBeTruthy()
     await waitFor(() => expect(within(back).getByText(/52 min/)).toBeTruthy())
   })

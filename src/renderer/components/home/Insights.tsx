@@ -78,7 +78,6 @@ function LookingBackRow({ data, feed }: Pick<RowProps, 'data' | 'feed'>): JSX.El
     <div className="ins__row ins__row--two">
       <ShipSections />
       <LookingBackCard
-        asks={open}
         longestWaitMinutes={data.attention?.longestWait ?? 0}
         oldestReview={oldest && { ask: oldest, ageMs: now - Date.parse(oldest.since) }}
       />

@@ -528,7 +528,7 @@ To keep the earlier layout, set **Settings → Interface → Home layout** to **
 - **How often does it pass first time?** The share of Foundry orders whose checks passed on the first try. It is hidden when Foundry publishes nothing.
 - **How am I spending agent time?** Agent hours, how many agents ran at once, the share that finished without asking you, and Foundry orders shipped. Below them, **Tokens** and **Estimated cost** come from the agents' own conversation files. The cost is an estimate from public prices, and says **partial** when a model had no price.
 - **When do I ship?** A view an extension adds to Insights; Git integration's contribution heatmap lives here. **Show contributions on Insights** in Git Integration's settings switches it off.
-- **Looking back** gathers the weekly review (when Task Vault offers it), the longest wait on you, and the oldest review you owe.
+- **Looking back** gathers the longest wait on you and the oldest review you owe.
 
 A card with no number to show says why instead of showing a made-up one. Terminator keeps 90 days of how agents waited, so **Year** shows at most that much of it.
 
