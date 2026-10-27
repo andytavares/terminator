@@ -16,7 +16,9 @@ import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import { builderUnit } from '../helpers/order-parts.js'
 import { agentNode } from '../helpers/run-nodes.js'
-import { orderStoreAt } from '../../src/state/live-index.js'
+import { indexFor, orderStoreAt } from '../../src/state/live-index.js'
+import { createGateStore } from '../../src/gates/store.js'
+import { writeRunGraph } from '../../src/ipc/run-channels.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import type { Gate } from '../../src/gates/rules.js'
@@ -81,8 +83,12 @@ async function seedFailedFinalCheck(gates: readonly Gate[]): Promise<void> {
     recipe: 'direct',
     plan: { ...base.plan, units: [builderUnit('U-1', { title: 'the first bit' })] },
   })
-  fs.writeFileSync(path.join(orderFolder(), 'run-graph.json'), JSON.stringify(passedGraph()))
-  fs.writeFileSync(path.join(orderFolder(), 'gates.json'), JSON.stringify(gates))
+  // Through the index, as every writer must (CLAUDE.md rule 4): written behind its back, a
+  // graph or gate is unseen by an index that background work loaded for this folder first.
+  const index = indexFor(dataDir)
+  await createGateStore(dataDir, index).list()
+  await writeRunGraph(dataDir, passedGraph(), index)
+  for (const gate of gates) await createGateStore(dataDir, index).save(gate)
 }
 
 /** The graph once the executor the resume hands it to has started the reopened nodes. */
