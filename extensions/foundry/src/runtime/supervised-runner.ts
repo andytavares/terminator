@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import type { AgentPermissionAsk, ExtensionAPI, StartAgentInput } from '@terminator/extension-sdk'
+import type {
+  AgentPermissionAsk,
+  AgentUpdate,
+  ExtensionAPI,
+  StartAgentInput,
+} from '@terminator/extension-sdk'
 import { shellQuote } from '@terminator/extension-sdk/node'
 import { transcriptPathFor } from './claude-launch.js'
 import {
@@ -524,11 +529,19 @@ function listenForAnswer(
   onAnswer: StartSupervisedRunOptions['onStructuredOutput']
 ): () => void {
   if (onAnswer === undefined) return () => undefined
+  // The adapter streams the answer as it grows; only `completed` means it is whole.
+  const latest = new Map<unknown, unknown>()
   return api.agents.onUpdate(sessionId, (update) => {
-    const toolName = (update._meta as { claudeCode?: { toolName?: unknown } } | undefined)
-      ?.claudeCode?.toolName
-    if (toolName === 'StructuredOutput' && update.rawInput !== undefined) onAnswer(update.rawInput)
+    if (updateToolName(update) !== 'StructuredOutput') return
+    if (update.rawInput != null) latest.set(update.toolCallId, update.rawInput)
+    if (update.status !== 'completed' || !latest.has(update.toolCallId)) return
+    onAnswer(latest.get(update.toolCallId))
+    latest.delete(update.toolCallId)
   })
+}
+
+function updateToolName(update: AgentUpdate): unknown {
+  return (update._meta as { claudeCode?: { toolName?: unknown } } | undefined)?.claudeCode?.toolName
 }
 
 /** Sends a prompt; its end is a turn end, unless the turn was cut short or failed. */

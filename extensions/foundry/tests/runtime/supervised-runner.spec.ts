@@ -310,10 +310,30 @@ function claudeOptionsTests() {
 }
 
 /** The update Claude's adapter sends when the agent answers in the requested JSON schema. */
-const structuredUpdate = (rawInput: unknown): AgentUpdate => ({
+const structuredUpdate = (rawInput: unknown, status?: string): AgentUpdate => ({
   sessionUpdate: 'tool_call_update',
+  toolCallId: 'answer-1',
   rawInput,
+  ...(status === undefined ? {} : { status }),
   _meta: { claudeCode: { toolName: 'StructuredOutput' } },
+})
+
+describe('a streamed structured answer', () => {
+  const outputSchema = { type: 'object', properties: { note: { type: 'string' } } }
+
+  // Measured live: the adapter streams the answer, `{}` first, then a growing object,
+  // then a `completed` update with no input.
+  it('hands over only the finished answer, once', async () => {
+    const answers: unknown[] = []
+    await runner().start({ ...start, outputSchema, onStructuredOutput: (a) => answers.push(a) })
+    updateListeners[0](structuredUpdate({}))
+    updateListeners[0](structuredUpdate({ note: 'do' }))
+    updateListeners[0](structuredUpdate({ note: 'done' }))
+    updateListeners[0](structuredUpdate(null))
+    expect(answers).toEqual([])
+    updateListeners[0](structuredUpdate(null, 'completed'))
+    expect(answers).toEqual([{ note: 'done' }])
+  })
 })
 
 describe('the structured answer', () => {
@@ -339,6 +359,7 @@ describe('the structured answer', () => {
       _meta: { claudeCode: { toolName: 'Bash' } },
     })
     updateListeners[0](structuredUpdate({ note: 'done' }))
+    updateListeners[0](structuredUpdate(null, 'completed'))
     expect(answers).toEqual([{ note: 'done' }])
   })
 
