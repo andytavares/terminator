@@ -14,6 +14,7 @@ import { createOrderStore } from '../../src/order/store.js'
 import { createGateStore } from '../../src/gates/store.js'
 import { orderStoreAt } from '../../src/state/live-index.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import type { GateRuleId } from '../../src/gates/rules.js'
 import { eventually } from '../../../../tests/support/eventually'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
@@ -141,7 +142,7 @@ const statusOf = async (id: string) => (await createOrderStore(dataDir).load(id)
 const gateRules = async () => (await createGateStore(dataDir).list()).map((gate) => gate.rule)
 /** The gate `rule` once the run's background work has ended. A run that ends without it fails here
  * with what it recorded, instead of waiting out the test's bound (CI run 40572074278, not reproduced). */
-async function gateOnceSettled(rule: string): Promise<void> {
+async function gateOnceSettled(rule: GateRuleId): Promise<void> {
   await settleBackground()
   if (!(await gateRules()).includes(rule))
     throw new Error(`the run ended without the ${rule} gate:\n${ledgerFileText(dataDir)}`)
