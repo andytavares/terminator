@@ -6,6 +6,7 @@ import type { SignalStore } from './store.js'
 import { dueSensors, runSensor } from './schedule.js'
 import type { CollectDeps } from './collect.js'
 import { availableSensors } from '../recipe/resolve.js'
+import { indexFor } from '../state/live-index.js'
 
 import type { ActivationContext } from '../ipc/register.js'
 import { resolveSources } from '../workspace-root.js'
@@ -47,14 +48,19 @@ export function sensorCollectDepsFor(api: ExtensionAPI, repoPath: string): Colle
 }
 
 // A signal store resolving its root on every call: the records location follows the
-// open workspace, as with `createLiveOrderStore`.
+// open workspace, as with `createLiveOrderStore`. Every write tells the windows (rule 4).
 function liveSignalStore(root: () => string): SignalStore {
+  const announced = async <T>(write: Promise<T>): Promise<T> => {
+    const done = await write
+    indexFor(root()).announce({ kind: 'signals', orderId: '' })
+    return done
+  }
   return {
     list: () => createSignalStore(root()).list(),
-    save: (signals) => createSignalStore(root()).save(signals),
+    save: (signals) => announced(createSignalStore(root()).save(signals)),
     get: (id) => createSignalStore(root()).get(id),
     sensorState: () => createSignalStore(root()).sensorState(),
-    setSensorState: (id, patch) => createSignalStore(root()).setSensorState(id, patch),
+    setSensorState: (id, patch) => announced(createSignalStore(root()).setSensorState(id, patch)),
   }
 }
 

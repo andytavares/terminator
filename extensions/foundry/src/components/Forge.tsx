@@ -31,7 +31,7 @@ import { budgetsInWords } from '../order/render.js'
 import { BudgetForm } from './BudgetForm.js'
 import { ChecksStep, HandOffChecks, type ChecksActions } from './ForgeChecks.js'
 import { useChecks, type Decision } from './use-checks.js'
-import { usePushed } from '../renderer/use-pushed.js'
+import { foundryKey, foundryQueries, useFoundryQuery } from '../renderer/foundry-query.js'
 import { ReasonButton } from './ReasonButton.js'
 import {
   readiness,
@@ -267,11 +267,13 @@ function goTo(target: string): void {
   element.focus({ preventScroll: true })
 }
 
-async function readCompiled(orderId: string): Promise<OrderView | null> {
+// A refused compile throws, so the view last drawn stays up.
+async function readCompiled(orderId: string): Promise<OrderView> {
   const next = (await invoke('foundry:order.compile', { id: orderId, commit: false })) as
     | OrderView
     | { error: string }
-  return 'error' in next ? null : next
+  if ('error' in next) throw new Error(next.error)
+  return next
 }
 
 async function readRecipes(orderId: string): Promise<RecipesView> {
@@ -460,25 +462,30 @@ function useBusy() {
 
 /** The order as compiled, what the last turn moved, and reading it again. */
 function useOrderView(orderId: string) {
-  const [view, setView] = useState<OrderView | null>(null)
+  const key = ['order-view', orderId]
   const busy = useBusy()
   const [moved, setMoved] = useState<string[]>([])
-  const showCompiled = useCallback((next: OrderView | null): void => {
-    if (next !== null) setView(next)
-  }, [])
-  const refresh = useCallback(
-    () => readCompiled(orderId).then(showCompiled),
-    [orderId, showCompiled]
-  )
   // While the architect is redrafting, the order, its ledger and the intake
   // session change under this view; Foundry says when. Nothing is pushed for a
   // settled order, so only a draft listens.
-  const readThisOrder = useCallback(() => readCompiled(orderId), [orderId])
-  usePushed(readThisOrder, showCompiled, {
-    kinds: view?.order.status === 'draft' ? ['order', 'ledger', 'live', 'graph'] : [],
-    orderId,
-  })
-  return { view, setView, ...busy, moved, setMoved, refresh }
+  const drafting = foundryQueries.getQueryData<OrderView>(foundryKey(key))?.order.status === 'draft'
+  const { data, refetch } = useFoundryQuery(
+    {
+      key,
+      kinds: drafting ? ['order', 'ledger', 'live', 'graph'] : [],
+      orderId,
+    },
+    () => readCompiled(orderId)
+  )
+  const setView = useCallback(
+    (next: OrderView): void =>
+      void foundryQueries.setQueryData(foundryKey(['order-view', orderId]), next),
+    [orderId]
+  )
+  const refresh = useCallback(async (): Promise<void> => {
+    await refetch()
+  }, [refetch])
+  return { view: data ?? null, setView, ...busy, moved, setMoved, refresh }
 }
 
 type Shown = ReturnType<typeof useOrderView>

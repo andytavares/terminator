@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react'
-import { usePushed, ANY_RECORD } from './use-pushed.js'
+import { useCallback } from 'react'
+import { useFoundryQuery, ANY_RECORD } from './foundry-query.js'
 import type { RunGraph } from '../line/run-graph.js'
 import type { Standing } from '../order/standing.js'
 import type { Gate } from '../gates/rules.js'
@@ -97,6 +97,15 @@ async function readPending(): Promise<PendingAsk[]> {
   return asks.pending ?? []
 }
 
+// A refused observation throws, so the view last drawn stays up beside the problem.
+async function readObservation(orderId: string): Promise<FloorView> {
+  const answer = (await invoke('foundry:run.observe', { id: orderId })) as
+    | FloorView
+    | { error: string }
+  if ('error' in answer) throw new Error(answer.error)
+  return answer
+}
+
 export interface UseRunObservation {
   view: FloorView | null
   problem: string | null
@@ -114,31 +123,19 @@ export interface UseRunObservation {
  * back.
  */
 export function useRunObservation(orderId: string): UseRunObservation {
-  const [view, setView] = useState<FloorView | null>(null)
-  const [problem, setProblem] = useState<string | null>(null)
-  const [pending, setPending] = useState<PendingAsk[]>([])
-
-  const readObservation = useCallback(
-    async () =>
-      (await invoke('foundry:run.observe', { id: orderId })) as FloorView | { error: string },
-    [orderId]
+  const observation = useFoundryQuery(
+    { key: ['observe', orderId], kinds: ANY_RECORD, orderId },
+    () => readObservation(orderId)
   )
-  const showObservation = useCallback((next: FloorView | { error: string }): void => {
-    if ('error' in next) {
-      setProblem(next.error)
-      return
-    }
-    setProblem(null)
-    setView(next)
-  }, [])
-
-  const refresh = useCallback(
-    () => readObservation().then(showObservation),
-    [readObservation, showObservation]
-  )
-
-  usePushed(readObservation, showObservation, { kinds: ANY_RECORD, orderId })
-  usePushed(readPending, setPending, { kinds: ['live'] })
-
-  return { view, problem, pending, refresh }
+  const asks = useFoundryQuery({ key: ['pending-asks'], kinds: ['live'] }, readPending)
+  const { refetch } = observation
+  const refresh = useCallback(async (): Promise<void> => {
+    await refetch()
+  }, [refetch])
+  return {
+    view: observation.data ?? null,
+    problem: observation.error?.message ?? null,
+    pending: asks.data ?? [],
+    refresh,
+  }
 }

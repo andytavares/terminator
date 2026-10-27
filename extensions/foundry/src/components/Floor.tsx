@@ -25,7 +25,7 @@ import type { TranscriptLine } from '../runtime/transcript-excerpt.js'
 import { ConfirmButton } from './ConfirmButton.js'
 import { ordinal } from '../factory/format.js'
 import { Button, IconButton, Markdown, RelativeTime, usePolling } from '@terminator/extension-ui'
-import { usePushed } from '../renderer/use-pushed.js'
+import { useFoundryQuery } from '../renderer/foundry-query.js'
 import { openInBrowser } from '@terminator/extension-sdk/renderer'
 import { ExternalLink } from './ExternalLink.js'
 import { OrderLinks } from './OrderLinks.js'
@@ -254,14 +254,13 @@ const NO_LIVE: LiveRead = { stalls: [], shadowMode: true, feed: [], mutes: [] }
 // The feed and the stall firings, which are pushed. What the agents say is read by
 // the one fallback poll (`useAgentWords`), and by `pollLive` after an action.
 function useActivity({ watching, setTranscript }: Watch) {
-  const [activity, showLive] = useState<LiveRead>(NO_LIVE)
-  usePushed(readLiveState, showLive, { kinds: ['live'] })
+  const { data, refetch } = useFoundryQuery({ key: ['live-state'], kinds: ['live'] }, readLiveState)
   const pollLive = useCallback(async () => {
-    showLive(await readLiveState())
+    await refetch()
     const lines = await readWatched(watching)
     if (lines !== null) setTranscript(lines)
-  }, [watching, setTranscript])
-  return { ...activity, pollLive }
+  }, [refetch, watching, setTranscript])
+  return { ...(data ?? NO_LIVE), pollLive }
 }
 
 type SetProblem = (problem: string | null) => void

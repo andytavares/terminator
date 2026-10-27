@@ -8,7 +8,7 @@ import type { DocumentLink } from '../line/document-kind.js'
 import { ciLabel } from '../line/ci-label.js'
 import type { CiState } from '../line/ci-state.js'
 import type { Gate, GateOption } from '../gates/rules.js'
-import { usePushed, ANY_RECORD } from '../renderer/use-pushed.js'
+import { useFoundryQuery, ANY_RECORD } from '../renderer/foundry-query.js'
 import { Forge } from './Forge.js'
 import { Floor } from './Floor.js'
 import { ConfirmButton } from './ConfirmButton.js'
@@ -179,10 +179,20 @@ function useFrom(focusIdeaSignal: number | undefined) {
   return [from, setFrom] as const
 }
 
+const NO_ROWS: OrderRow[] = []
+
 /** The orders, kept current, and answering a row's gate from where it stands. */
 function useOrderRows(setProblem: (problem: string | null) => void) {
-  const [rows, setRows] = useState<OrderRow[]>([])
-  const refresh = useCallback(() => readOrderRows().then(setRows), [])
+  // The counts on these rows go stale the moment a question is answered in
+  // another window or a run raises one, and this list is where the tab's
+  // badge sends you — so it is read again when Foundry says any of that changed.
+  const { data, refetch } = useFoundryQuery(
+    { key: ['order-rows'], kinds: ANY_RECORD },
+    readOrderRows
+  )
+  const refresh = useCallback(async (): Promise<void> => {
+    await refetch()
+  }, [refetch])
   // The same channel the inbox answers with: the row is not a second queue, it
   // is the gate that holds this order put where you are already looking.
   const [answering, setAnswering] = useState<string | null>(null)
@@ -202,11 +212,7 @@ function useOrderRows(setProblem: (problem: string | null) => void) {
     },
     [refresh, setProblem]
   )
-  // The counts on these rows go stale the moment a question is answered in
-  // another window or a run raises one, and this list is where the tab's
-  // badge sends you — so it is read again when Foundry says any of that changed.
-  usePushed(readOrderRows, setRows, { kinds: ANY_RECORD })
-  return { rows, refresh, answering, answer }
+  return { rows: data ?? NO_ROWS, refresh, answering, answer }
 }
 
 /** Your tickets, listed; refreshed when the picker opens and on search, not per keystroke. */

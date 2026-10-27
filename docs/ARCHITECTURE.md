@@ -1386,7 +1386,7 @@ App
   disk first (disk is the source of truth) and then tells the index, which
   broadcasts `foundry:changed` `{ kind: 'order' | 'graph' | 'gates' | 'ledger' |
 'live', orderId }` through `api.window.broadcast`. The renderer reads once on
-  mount and again only for a change it draws (`renderer/use-pushed.ts`), so an
+  mount and again only for a change it draws (`renderer/foundry-query.ts`), so an
   open Floor costs the core nothing while nothing happens. `live` is the
   one kind with no file behind it — a held tool call, a stall, a running or
   stranded agent, an open intake, the feed — and carries an empty `orderId` when

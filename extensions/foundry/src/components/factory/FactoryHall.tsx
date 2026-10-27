@@ -51,7 +51,7 @@ import { DocumentChip, openDocument } from '../DocumentChip.js'
 import { OPEN_LABEL } from '../../line/document-kind.js'
 import type { DocumentLink } from '../../line/document-kind.js'
 import { Button, Markdown, usePolling, everyWhileVisible } from '@terminator/extension-ui'
-import { usePushed, ANY_RECORD } from '../../renderer/use-pushed.js'
+import { useFoundryQuery, ANY_RECORD } from '../../renderer/foundry-query.js'
 import './hall.css'
 import { invoke } from '@terminator/extension-sdk/renderer'
 
@@ -227,25 +227,23 @@ function useLiveStore() {
   return { liveHall, live }
 }
 
-/** This order's numbers from the factory's metrics; undefined when they could not be read. */
-async function readOrderMetrics(orderId: string): Promise<OrderMetrics | null | undefined> {
+/** This order's numbers from the factory's metrics; throws when they could not be read. */
+async function readOrderMetrics(orderId: string): Promise<OrderMetrics | null> {
   const r = (await invoke('foundry:factory.metrics', { window: 'all' })) as {
     orders?: OrderMetrics[]
     error?: string
   }
-  if (r.error !== undefined) return undefined
+  if (r.error !== undefined) throw new Error(r.error)
   return r.orders?.find((o) => o.orderId === orderId) ?? null
 }
 
 /** The order's numbers for the status wall, read again when any record of it changes. */
 function useOrderMetrics(orderId: string): OrderMetrics | null {
-  const [orderMetrics, setOrderMetrics] = useState<OrderMetrics | null>(null)
-  const read = useCallback(() => readOrderMetrics(orderId), [orderId])
-  const show = useCallback((read: OrderMetrics | null | undefined) => {
-    if (read !== undefined) setOrderMetrics(read)
-  }, [])
-  usePushed(read, show, { kinds: ANY_RECORD, orderId })
-  return orderMetrics
+  const { data } = useFoundryQuery(
+    { key: ['order-metrics', orderId], kinds: ANY_RECORD, orderId },
+    () => readOrderMetrics(orderId)
+  )
+  return data ?? null
 }
 
 /** The callouts raised at their stations, how high each is stacked, and the sentence for a screen reader. */

@@ -1,8 +1,8 @@
-import React, { useCallback, useState } from 'react'
+import React, { useState } from 'react'
 import { Button } from '@terminator/extension-ui'
 import { invoke } from '@terminator/extension-sdk/renderer'
 import { checkRows, hasCommand, type ProfileFacts } from '../forge/checks-view.js'
-import { usePushed } from '../renderer/use-pushed.js'
+import { useFoundryQuery } from '../renderer/foundry-query.js'
 
 // The repositories Foundry holds commands for. They are kept in Foundry's own
 // records, never in the repository; an order's Checks step changes them.
@@ -26,33 +26,26 @@ function provenWords({ proofCommit, provedAt }: ProfileSummary): string {
   return `proven at ${proofCommit.slice(0, 7)}${day === '' ? '' : ` on ${day}`}`
 }
 
+const NO_PROFILES: readonly ProfileSummary[] = []
+
 function useProfiles() {
-  const [profiles, setProfiles] = useState<readonly ProfileSummary[]>([])
-  const [loaded, setLoaded] = useState(false)
-  const read = useCallback(
-    async () => (await invoke('foundry:profiles-list')) as { profiles?: ProfileSummary[] },
-    []
+  const { data, refetch } = useFoundryQuery(
+    { key: ['profiles'], kinds: ['profile'] },
+    async () => (await invoke('foundry:profiles-list')) as { profiles?: ProfileSummary[] }
   )
-  const show = useCallback((answer: { profiles?: ProfileSummary[] }) => {
-    setProfiles(answer.profiles ?? [])
-    setLoaded(true)
-  }, [])
-  usePushed(read, show, { kinds: ['profile'] })
   const forget = async (repoPath: string): Promise<void> => {
     await invoke('foundry:profile-forget', { repoPath })
-    show(await read())
+    await refetch()
   }
-  return { profiles, loaded, forget }
+  return { profiles: data?.profiles ?? NO_PROFILES, loaded: data !== undefined, forget }
 }
 
 function CommandList({ repoPath }: { readonly repoPath: string }) {
-  const [profile, setProfile] = useState<ProfileFacts | null>(null)
-  const read = useCallback(
-    async () => (await invoke('foundry:profile-read', { repoPath })) as ProfileFacts,
-    [repoPath]
+  const { data: profile } = useFoundryQuery(
+    { key: ['profile', repoPath], kinds: ['profile'] },
+    async () => (await invoke('foundry:profile-read', { repoPath })) as ProfileFacts
   )
-  usePushed(read, setProfile, { kinds: ['profile'] })
-  if (profile === null) return <p className="fdry-note">Reading…</p>
+  if (profile === undefined) return <p className="fdry-note">Reading…</p>
   const rows = checkRows(profile, 'main', false).filter(hasCommand)
   return (
     <ul className="fdry-profile-commands">

@@ -6,7 +6,7 @@ import type { FactoryMetrics } from '../factory/metrics.js'
 import { formatDuration } from '../factory/format.js'
 import { Button, Markdown, Tab, TabList, TabPanel, TabsRoot } from '@terminator/extension-ui'
 import { openInBrowser } from '@terminator/extension-sdk/renderer'
-import { usePushed, ANY_RECORD } from '../renderer/use-pushed.js'
+import { useFoundryQuery, ANY_RECORD } from '../renderer/foundry-query.js'
 import { MetricsTiles, WindowToggle } from './MetricsTiles.js'
 import { rungLevelInWords } from '../verify/ladder.js'
 import type { Rung } from '../verify/ladder.js'
@@ -73,25 +73,23 @@ async function readRulesView(): Promise<RulesView | null> {
   return { rules: next.rules ?? [], declined: next.declined ?? [], skills: next.skills ?? [] }
 }
 
-async function readLedger(
-  orderId: string,
-  actor: string,
-  action: string
-): Promise<LedgerView | null> {
+async function readLedger(orderId: string, actor: string, action: string): Promise<LedgerView> {
   const next = (await invoke('foundry:ledger.query', {
     orderId: orderId === '' ? undefined : orderId,
     actor: actor === '' ? undefined : actor,
     action: action === '' ? undefined : action,
     limit: PAGE,
   })) as LedgerView | { error: string }
-  return 'error' in next ? null : next
+  if ('error' in next) throw new Error(next.error)
+  return next
 }
 
-async function readMetrics(window: '30d' | 'all'): Promise<FactoryMetrics | null> {
+async function readMetrics(window: '30d' | 'all'): Promise<FactoryMetrics> {
   const next = (await invoke('foundry:factory.metrics', { window })) as
     | FactoryMetrics
     | { error: string }
-  return 'error' in next ? null : next
+  if ('error' in next) throw new Error(next.error)
+  return next
 }
 
 /** `operator`, `rule:budget.exceeded`, `role:verifier` — the kind, for the eye. */
@@ -166,19 +164,14 @@ function RecordTab({ entries, view, rules, proposals }: RecordTabProps) {
 
 /** The record as filtered, kept current: Foundry says when it grows, and for which order. */
 function useLedgerEntries() {
-  const [view, setView] = useState<LedgerView | null>(null)
   const [orderId, setOrderId] = useState('')
   const [actor, setActor] = useState('')
   const [action, setAction] = useState('')
-  const readEntries = useCallback(
-    () => readLedger(orderId, actor, action),
-    [orderId, actor, action]
+  const { data } = useFoundryQuery(
+    { key: ['ledger', orderId, actor, action], kinds: ['ledger'] },
+    () => readLedger(orderId, actor, action)
   )
-  const showEntries = useCallback((next: LedgerView | null) => {
-    if (next !== null) setView(next)
-  }, [])
-  usePushed(readEntries, showEntries, { kinds: ['ledger'] })
-  return { view, orderId, setOrderId, actor, setActor, action, setAction }
+  return { view: data ?? null, orderId, setOrderId, actor, setActor, action, setAction }
 }
 
 function useRules() {
@@ -194,16 +187,11 @@ function useRules() {
 // that fetches before it is looked at goes stale unnoticed.
 function useFactoryMetrics(tab: LedgerTab): FactoryViewProps {
   const [metricsWindow, setMetricsWindow] = useState<'30d' | 'all'>('30d')
-  const [metrics, setMetrics] = useState<FactoryMetrics | null>(null)
-  const readShownMetrics = useCallback(
-    () => (tab === 'factory' ? readMetrics(metricsWindow) : Promise.resolve(null)),
-    [tab, metricsWindow]
+  const { data } = useFoundryQuery(
+    { key: ['metrics', tab, metricsWindow], kinds: tab === 'factory' ? ANY_RECORD : [] },
+    () => (tab === 'factory' ? readMetrics(metricsWindow) : Promise.resolve(null))
   )
-  const showMetrics = useCallback((next: FactoryMetrics | null) => {
-    if (next !== null) setMetrics(next)
-  }, [])
-  usePushed(readShownMetrics, showMetrics, { kinds: tab === 'factory' ? ANY_RECORD : [] })
-  return { metrics, metricsWindow, onWindow: setMetricsWindow }
+  return { metrics: data ?? null, metricsWindow, onWindow: setMetricsWindow }
 }
 
 /** Proposed rules, asked for by the operator, and what accepting, declining or removing one said. */

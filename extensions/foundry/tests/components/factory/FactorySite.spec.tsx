@@ -308,7 +308,7 @@ function factorySiteOpeningTests() {
 describe('FactorySite status wall', () => {
   it('shows the 30-day numbers as tiles', async () => {
     mount([])
-    await screen.findByText('Status wall')
+    await screen.findByText('Shipped')
     expect(screen.getByText('Shipped').previousSibling?.textContent).toBe('3')
     expect(screen.getByText('Median lead time').previousSibling?.textContent).toBe('1 h 20 min')
     expect(screen.getByText('First-pass yield').previousSibling?.textContent).toBe('50%')
@@ -316,7 +316,7 @@ describe('FactorySite status wall', () => {
 
   it('renders a null number as —, never 0', async () => {
     mount([], { ...METRICS, medianLeadTimeMs: null, firstPassYield: null })
-    await screen.findByText('Status wall')
+    await screen.findByText('Median lead time')
     expect(screen.getByText('Median lead time').previousSibling?.textContent).toBe('—')
     expect(screen.getByText('First-pass yield').previousSibling?.textContent).toBe('—')
   })

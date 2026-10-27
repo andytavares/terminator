@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import type { Gate, GateRuleId } from '../gates/rules.js'
 import { ExternalLink } from './ExternalLink.js'
-import { usePushed, ANY_RECORD } from '../renderer/use-pushed.js'
+import { useFoundryQuery, ANY_RECORD } from '../renderer/foundry-query.js'
 import { Button } from '@terminator/extension-ui'
 import type { Signal } from '../sensors/types.js'
 import { invoke } from '@terminator/extension-sdk/renderer'
@@ -75,18 +75,21 @@ async function readInbox(): Promise<InboxView> {
   return (await invoke('foundry:inbox.list')) as InboxView
 }
 
-/** @internal */
-export const SIGNAL_POLL_MS = 4000
+// An order can start waiting on you at any moment; Foundry says when.
+function useInbox() {
+  const { data, refetch } = useFoundryQuery({ key: ['inbox'], kinds: ANY_RECORD }, readInbox)
+  const refreshList = useCallback(async (): Promise<void> => {
+    await refetch()
+  }, [refetch])
+  return { view: data ?? null, refreshList }
+}
 
 export function Inbox({
   onOpenOrder,
 }: {
   onOpenOrder?: (orderId: string) => void
 } = {}): JSX.Element | null {
-  const [view, setView] = useState<InboxView | null>(null)
-  const refreshList = useCallback(() => readInbox().then(setView), [])
-  // An order can start waiting on you at any moment; Foundry says when.
-  usePushed(readInbox, setView, { kinds: ANY_RECORD })
+  const { view, refreshList } = useInbox()
   const signals = useSignals()
   const answers = useAnswers(refreshList, signals.refreshSignals)
 
@@ -142,7 +145,7 @@ function useAnswers(refreshList: () => Promise<void>, refreshSignals: () => Prom
 
 /** The sensors' signals, and promoting one into a draft. */
 function useSignals() {
-  const { signals, sensors, refreshSignals } = useSignalFeed(SIGNAL_POLL_MS)
+  const { signals, sensors, refreshSignals } = useSignalFeed()
   const promotion = usePromotion(sensors, refreshSignals)
   const dismissSignal = useCallback(
     async (id: string) => {

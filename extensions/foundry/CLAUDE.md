@@ -61,11 +61,12 @@ what was there before.
   changed from `observed-files.json`, written by the executor when a step settles
   (`recordObservedFiles`). `computeQueueEntries` spawns nothing, and
   `tests/ipc/read-path-ipc.spec.ts` fails if it does.
-- **The renderer does not poll Foundry's own data.** `usePushed(read, show,
-{ kinds, orderId })` reads on mount and again for a matching change. The one
+- **The renderer does not poll Foundry's own data.** `useFoundryQuery({ key, kinds, orderId }, read)`
+  (`src/renderer/foundry-query.ts`, TanStack Query) reads on mount and again, once a burst
+  settles, for a matching `foundry:changed` or any `workspace:changed`. The one
   fallback poll a view may keep (`usePolling` from `@terminator/extension-ui`) is for what changes without a
-  Foundry write — an agent's transcript, a sensor's signals — and it stops while
-  `document.hidden`. `rg -c "setInterval\(" extensions/foundry/src/components
+  Foundry write — an agent's transcript — and it stops while
+  `document.hidden`. Signals are pushed: the signal store's writes announce `signals`. `rg -c "setInterval\(" extensions/foundry/src/components
 extensions/foundry/src/renderer` is the count to keep small.
 
 ### 5. Every function within the size limits
@@ -120,7 +121,7 @@ the owning module, never back into `index.ts`.
 | The Forge's state (`useForgeState`), what it draws (`deriveForge`), its steps (`STEP_BODIES`)                | `src/components/Forge.tsx`                                                                        |
 | The Floor's state (`useFloor`) and its panels                                                                | `src/components/Floor.tsx`                                                                        |
 | The factory hall's state (`useFactoryHall`), what it draws (`hallModel`), its parts                          | `src/components/factory/FactoryHall.tsx`                                                          |
-| The signal dock's poll and promotion, shared by the Inbox and the factory site                               | `src/renderer/use-signals.ts`                                                                     |
+| The signal dock's shared query and promotion, used by the Inbox and the factory site                         | `src/renderer/use-signals.ts`                                                                     |
 | The window's chrome; each view loaded with `React.lazy` as its own chunk (budget: `vite.renderer.config.ts`) | `src/renderer/App.tsx`                                                                            |
 
 ## Extension Isolation (MANDATORY)

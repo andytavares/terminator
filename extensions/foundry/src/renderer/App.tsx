@@ -1,8 +1,8 @@
-import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { Settings, ArrowLeft, List, Factory } from 'lucide-react'
 import { Button, IconButton } from '@terminator/extension-ui'
 import { Inbox } from '../components/Inbox.js'
-import { usePushed, ANY_RECORD } from './use-pushed.js'
+import { useFoundryQuery, ANY_RECORD } from './foundry-query.js'
 import type { FactoryOrderRow } from '../components/factory/FactorySite.js'
 
 // The window shows one view under the queue, so each is its own chunk and the
@@ -46,14 +46,10 @@ interface Attention {
   forge: number
 }
 
-async function readAttention(): Promise<Attention | null> {
-  try {
-    return (await window.electronAPI.extensionBridge.invoke('foundry:attention', {})) as Attention
-  } catch {
-    // The badge is an affordance, not the queue. A failed read leaves the
-    // last count up rather than taking the chrome down with it.
-    return null
-  }
+// The badge is an affordance, not the queue. A failed read leaves the last count up
+// rather than taking the chrome down with it.
+async function readAttention(): Promise<Attention> {
+  return (await window.electronAPI.extensionBridge.invoke('foundry:attention', {})) as Attention
 }
 
 type ForgeViewKind = 'list' | 'factory'
@@ -174,12 +170,8 @@ function useNewOrderRequests(open: () => void): void {
 // The counts, on the one piece of chrome on screen whatever the surface, so an open
 // question or a held tool call is seen without clicking each tab to look.
 function useAttention(): Attention {
-  const [waiting, setWaiting] = useState<Attention>({ inbox: 0, forge: 0 })
-  const show = useCallback((next: Attention | null): void => {
-    if (next !== null) setWaiting({ inbox: next.inbox ?? 0, forge: next.forge ?? 0 })
-  }, [])
-  usePushed(readAttention, show, { kinds: ANY_RECORD })
-  return waiting
+  const { data } = useFoundryQuery({ key: ['attention'], kinds: ANY_RECORD }, readAttention)
+  return { inbox: data?.inbox ?? 0, forge: data?.forge ?? 0 }
 }
 
 /** Orders are per-repository, so a workspace switch resets the surfaces. */

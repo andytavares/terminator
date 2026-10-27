@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react'
+import React, { useState } from 'react'
 import type { Standing } from '../../order/standing.js'
 import type { FactoryMetrics } from '../../factory/metrics.js'
 import { MetricsTiles, WindowToggle } from '../MetricsTiles.js'
@@ -9,7 +9,7 @@ import type { DocumentLink } from '../../line/document-kind.js'
 import { HallThumbnail } from './HallThumbnail.js'
 import { ciLabel } from '../../line/ci-label.js'
 import { Button } from '@terminator/extension-ui'
-import { usePushed, ANY_RECORD } from '../../renderer/use-pushed.js'
+import { useFoundryQuery, ANY_RECORD } from '../../renderer/foundry-query.js'
 import { invoke } from '@terminator/extension-sdk/renderer'
 import { usePromotion, useSignalFeed } from '../../renderer/use-signals.js'
 
@@ -229,10 +229,6 @@ function newestFirst(a: FactoryOrderRow, b: FactoryOrderRow): number {
   return byTime !== 0 ? byTime : b.id.localeCompare(a.id)
 }
 
-/** How often the sensors' signals are asked for. Sensors record on their own
- *  tick and announce nothing; orders and metrics are pushed. */
-const SIGNALS_POLL_MS = 4000
-
 async function readOrders(): Promise<FactoryOrderRow[]> {
   const r = (await invoke('foundry:order.list')) as { orders?: FactoryOrderRow[] }
   // Newest first, with the id breaking ties rather than whatever order the
@@ -240,30 +236,30 @@ async function readOrders(): Promise<FactoryOrderRow[]> {
   return [...(r.orders ?? [])].sort(newestFirst)
 }
 
-async function readMetrics(window: '30d' | 'all'): Promise<FactoryMetrics | null> {
+// A refused read throws, so the numbers last drawn stay up.
+async function readMetrics(window: '30d' | 'all'): Promise<FactoryMetrics> {
   const r = (await invoke('foundry:factory.metrics', { window })) as
     | FactoryMetrics
     | { error: string }
-  return 'error' in r ? null : r
+  if ('error' in r) throw new Error(r.error)
+  return r
 }
+
+const NO_ROWS: FactoryOrderRow[] = []
 
 /** Every order, and the factory's numbers over the window chosen; both pushed. */
 function useSiteRecords() {
-  const [rows, setRows] = useState<FactoryOrderRow[]>([])
   const [window_, setWindow] = useState<'30d' | 'all'>('30d')
-  const [metrics, setMetrics] = useState<FactoryMetrics | null>(null)
-  const readMetricsFor = useCallback(() => readMetrics(window_), [window_])
-  const showMetrics = useCallback((read: FactoryMetrics | null): void => {
-    if (read !== null) setMetrics(read)
-  }, [])
-  usePushed(readOrders, setRows, { kinds: ANY_RECORD })
-  usePushed(readMetricsFor, showMetrics, { kinds: ANY_RECORD })
-  return { rows, window_, setWindow, metrics }
+  const orders = useFoundryQuery({ key: ['site-orders'], kinds: ANY_RECORD }, readOrders)
+  const metrics = useFoundryQuery({ key: ['metrics', window_], kinds: ANY_RECORD }, () =>
+    readMetrics(window_)
+  )
+  return { rows: orders.data ?? NO_ROWS, window_, setWindow, metrics: metrics.data ?? null }
 }
 
 /** The sensors' signals on the dock, and promoting one into a draft. */
 function useDock() {
-  const { signals, sensors, refreshSignals } = useSignalFeed(SIGNALS_POLL_MS)
+  const { signals, sensors, refreshSignals } = useSignalFeed()
   return { signals, ...usePromotion(sensors, refreshSignals) }
 }
 
