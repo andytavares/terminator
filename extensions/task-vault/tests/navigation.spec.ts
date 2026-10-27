@@ -82,13 +82,6 @@ function takingSomeoneTaskDestinationsTests() {
     expect(calls(a)[1][1]).toMatchObject({ taskId: 't-1', date: '2026-05-21' })
   })
 
-  it('carries the view, for a destination that is not a task at all', () => {
-    // The weekly-review nudge, whose whole content is "go to the review".
-    const a = api()
-    openInVault(a, { view: 'review' })
-    expect(calls(a)[1][1]).toMatchObject({ view: 'review' })
-  })
-
   it('just opens the vault when asked for nowhere in particular', () => {
     const a = api()
     openInVault(a)

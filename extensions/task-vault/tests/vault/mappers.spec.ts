@@ -115,33 +115,7 @@ function rowToTaskRecurrenceColumnsTests() {
 }
 
 function rowToTaskMetadataFallbacksTests() {
-  describe('end fields', rowToTaskMetadataFallbacksEndFieldsTests)
   describe('malformed metadata', rowToTaskMetadataFallbacksMalformedMetadataTests)
-}
-
-function rowToTaskMetadataFallbacksEndFieldsTests() {
-  it('falls back to metadata for recurrence end fields when columns are null', () => {
-    const task = rowToTask(
-      baseTaskRow({
-        blocked_reason: null,
-        blocked_check_interval: null,
-        recurrence_end_type: null,
-        recurrence_end_date: null,
-        recurrence_end_count: null,
-        recurrence_completed_count: null,
-        metadata: JSON.stringify({
-          recurrence_end_type: 'on_date',
-          recurrence_end_date: '2099-12-31',
-          recurrence_end_count: 10,
-          recurrence_completed_count: 3,
-        }),
-      })
-    )
-    expect(task.recurrenceEndType).toBe('on_date')
-    expect(task.recurrenceEndDate).toBe('2099-12-31')
-    expect(task.recurrenceEndCount).toBe(10)
-    expect(task.recurrenceCompletedCount).toBe(3)
-  })
 }
 
 function rowToTaskMetadataFallbacksMalformedMetadataTests() {

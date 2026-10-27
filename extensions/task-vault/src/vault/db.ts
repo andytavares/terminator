@@ -87,45 +87,22 @@ const AREA_ARCHIVE_SCHEMA = `
       PRIMARY KEY (area_id, entity_type, entity_id)
     );`
 
-const WEEKLY_REVIEWS_SCHEMA = `
-    CREATE TABLE IF NOT EXISTS weekly_reviews (
-      id           TEXT PRIMARY KEY,
-      started_at   TEXT NOT NULL,
-      completed_at TEXT,
-      status       TEXT NOT NULL DEFAULT 'in_progress',
-      worked       TEXT,
-      didnt_work   TEXT,
-      try_next     TEXT
-    );
-    CREATE INDEX IF NOT EXISTS idx_weekly_reviews_started ON weekly_reviews(started_at DESC);`
-
-const WEEKLY_REVIEW_ACTIONS_SCHEMA = `
-    CREATE TABLE IF NOT EXISTS weekly_review_actions (
-      id           TEXT PRIMARY KEY,
-      review_id    TEXT NOT NULL REFERENCES weekly_reviews(id) ON DELETE CASCADE,
-      step         INTEGER NOT NULL,
-      action       TEXT NOT NULL,
-      entity_type  TEXT NOT NULL,
-      entity_id    TEXT,
-      entity_label TEXT NOT NULL,
-      detail       TEXT,
-      created_at   TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_weekly_review_actions_review
-      ON weekly_review_actions(review_id, created_at);
-  `
+/** Run on every launch, after the schema. Each statement is safe to repeat. */
+const MIGRATIONS = `
+    DROP TABLE IF EXISTS weekly_review_actions;
+    DROP TABLE IF EXISTS weekly_reviews;
+    DELETE FROM settings WHERE extension_id = 'task-vault' AND key = 'kanban_config';
+    UPDATE tasks SET
+      recurrence_end_type = json_extract(metadata, '$.recurrence_end_type'),
+      recurrence_end_date = json_extract(metadata, '$.recurrence_end_date'),
+      recurrence_end_count = json_extract(metadata, '$.recurrence_end_count'),
+      recurrence_completed_count = COALESCE(json_extract(metadata, '$.recurrence_completed_count'), 0)
+    WHERE COALESCE(recurrence_end_type, 'none') = 'none'
+      AND COALESCE(CASE WHEN json_valid(metadata) THEN json_extract(metadata, '$.recurrence_end_type') END, '') <> '';`
 
 /** Every statement of the schema, in creation order. */
-const SCHEMA = [
-  SETTINGS_SCHEMA,
-  AREAS_SCHEMA,
-  PROJECTS_SCHEMA,
-  TASKS_SCHEMA,
-  AREA_ARCHIVE_SCHEMA,
-  WEEKLY_REVIEWS_SCHEMA,
-  WEEKLY_REVIEW_ACTIONS_SCHEMA,
-]
+const SCHEMA = [SETTINGS_SCHEMA, AREAS_SCHEMA, PROJECTS_SCHEMA, TASKS_SCHEMA, AREA_ARCHIVE_SCHEMA]
 
 export async function applyTaskVaultSchema(db: ExtensionDB): Promise<void> {
-  await db.exec(`\n${SCHEMA.join('\n\n')}\n  `)
+  await db.exec(`\n${SCHEMA.join('\n\n')}\n${MIGRATIONS}\n  `)
 }

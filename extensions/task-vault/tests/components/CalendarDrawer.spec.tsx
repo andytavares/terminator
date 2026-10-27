@@ -14,14 +14,12 @@ vi.mock('../../src/stores/vault.store', () => ({
       loadDate: typeof mockLoadDate
       loadToday: typeof mockLoadToday
       calendarRefreshKey: number
-      kanbanLanes: never[]
     }) => unknown
   ) => {
     const store = {
       loadDate: mockLoadDate,
       loadToday: mockLoadToday,
       calendarRefreshKey: 0,
-      kanbanLanes: [],
     }
     if (sel) return sel(store)
     return store

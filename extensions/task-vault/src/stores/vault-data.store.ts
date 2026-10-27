@@ -1,5 +1,5 @@
 import { create, type StoreApi } from 'zustand'
-import type { DailyLog, IndexedTask, KanbanLane } from '../vault/types'
+import type { DailyLog, IndexedTask } from '../vault/types'
 import { useVaultNavStore } from './vault-nav.store'
 import { localDate } from '../utils/local-date'
 
@@ -9,8 +9,6 @@ interface VaultDataStore {
   somedayTasks: IndexedTask[]
   calendarRefreshKey: number
   tickCalendar: () => void
-  kanbanLanes: KanbanLane[]
-  setKanbanLanes: (lanes: KanbanLane[]) => void
   isLoading: boolean
   error: string | null
   lastRolledOver: number
@@ -112,8 +110,6 @@ export const useVaultDataStore = create<VaultDataStore>((set) => ({
   somedayTasks: [],
   calendarRefreshKey: 0,
   tickCalendar: () => set((s) => ({ calendarRefreshKey: s.calendarRefreshKey + 1 })),
-  kanbanLanes: [],
-  setKanbanLanes: (lanes: KanbanLane[]) => set({ kanbanLanes: lanes }),
   isLoading: false,
   error: null,
   lastRolledOver: 0,

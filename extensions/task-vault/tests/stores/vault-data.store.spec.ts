@@ -17,7 +17,6 @@ function resetStores() {
     inboxCount: 0,
     somedayTasks: [],
     calendarRefreshKey: 0,
-    kanbanLanes: [],
     isLoading: false,
     error: null,
     lastRolledOver: 0,
@@ -44,7 +43,6 @@ function useVaultDataStoreTests() {
 
 function useVaultDataStoreTickCalendarTests() {
   describe('tickCalendar', tickCalendarTests)
-  describe('setKanbanLanes', setKanbanLanesTests)
   describe('loadToday', loadTodayTests)
   describe('loadDate', loadDateTests)
   describe('refreshInboxCount', refreshInboxCountTests)
@@ -57,14 +55,6 @@ function tickCalendarTests() {
     const before = useVaultDataStore.getState().calendarRefreshKey
     useVaultDataStore.getState().tickCalendar()
     expect(useVaultDataStore.getState().calendarRefreshKey).toBe(before + 1)
-  })
-}
-
-function setKanbanLanesTests() {
-  it('sets kanbanLanes', () => {
-    const lanes = [{ id: 'todo', title: 'Todo', tasks: [] }]
-    useVaultDataStore.getState().setKanbanLanes(lanes as never)
-    expect(useVaultDataStore.getState().kanbanLanes).toEqual(lanes)
   })
 }
 

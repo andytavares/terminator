@@ -1,8 +1,5 @@
 import { create } from 'zustand'
 
-export type ViewMode = 'list' | 'kanban'
-
-const KANBAN_MODE_KEY = 'task-vault.kanbanMode'
 const CONTEXT_FILTER_KEY = 'task-vault.selectedContexts'
 
 function loadSelectedContexts(): string[] {
@@ -18,21 +15,13 @@ function loadSelectedContexts(): string[] {
 }
 
 interface VaultFilterStore {
-  viewMode: ViewMode
   selectedContexts: string[]
-  setViewMode: (mode: ViewMode) => void
   setSelectedContexts: (ctxs: string[]) => void
   toggleContext: (ctx: string) => void
 }
 
 export const useVaultFilterStore = create<VaultFilterStore>((set, get) => ({
-  viewMode: (localStorage.getItem(KANBAN_MODE_KEY) as ViewMode | null) ?? 'list',
   selectedContexts: loadSelectedContexts(),
-
-  setViewMode: (mode: ViewMode) => {
-    localStorage.setItem(KANBAN_MODE_KEY, mode)
-    set({ viewMode: mode })
-  },
 
   setSelectedContexts: (ctxs: string[]) => {
     if (ctxs.length === 0) {

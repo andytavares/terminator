@@ -7,31 +7,6 @@ export type TaskStatus =
   | 'in-review'
   | 'blocked'
 
-export interface KanbanLane {
-  id: string
-  label: string
-  taskStatuses: TaskStatus[]
-  dotColor?: string
-}
-
-export type SwimlaneGrouping = 'none' | 'project' | 'area'
-
-export interface KanbanConfig {
-  viewMode: 'list' | 'kanban'
-  lanes: KanbanLane[]
-  swimlaneGrouping: SwimlaneGrouping
-}
-
-export const DEFAULT_KANBAN_CONFIG: KanbanConfig = {
-  viewMode: 'list',
-  lanes: [
-    { id: 'todo', label: 'Todo', taskStatuses: ['open'] },
-    { id: 'in-progress', label: 'In Progress', taskStatuses: ['in-progress'] },
-    { id: 'in-review', label: 'In Review', taskStatuses: ['in-review'] },
-    { id: 'done', label: 'Done', taskStatuses: ['done'] },
-  ],
-  swimlaneGrouping: 'none',
-}
 export type ProjectStatus = 'active' | 'someday' | 'done' | 'archived'
 
 export interface Task {

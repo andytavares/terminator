@@ -1,8 +1,6 @@
 import type { z } from 'zod'
 import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
-import { noPayload } from '@terminator/extension-sdk'
 import { registerRoutes, route, type IpcContext } from './register'
-import { lastCompletedReviewDate } from '../vault/weekly-review-repository'
 import { randomUUID } from '../vault/db'
 import { toDisplayName } from '../vault/tags'
 import {
@@ -16,17 +14,8 @@ import {
 } from '../schemas/vault.schema'
 import type { ProjectStatus } from '../vault/types'
 import { setProjectStatus } from '../vault/project-status'
-import { staleDaysThreshold } from '../stale-threshold'
-import {
-  rowToTask,
-  rowToProject,
-  PROJECT_COLS,
-  PROJECT_JOINS,
-  TASK_COLS,
-  TASK_JOINS,
-} from '../vault/mappers'
+import { rowToProject, PROJECT_COLS, PROJECT_JOINS } from '../vault/mappers'
 import { findOrCreateArea, indexUpdated, nowIso } from './vault-shared'
-import { daysAgo, storedInstant, zonedNow } from '../vault/clock'
 
 type Row = Record<string, unknown>
 
@@ -54,63 +43,6 @@ async function queryProjects({ db }: IpcContext, args: z.infer<typeof ListProjec
     statusFilter
   )
   return { projects: await Promise.all(rows.map((p) => withNextActions(db, p))) }
-}
-
-/** Daily tasks that have sat on the log since the threshold date or earlier. */
-async function staleTasks(db: ExtensionDB, thresholdDays: number) {
-  const rows = await db.query<Row>(
-    `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
-       WHERE t.source='daily' AND t.parent_id IS NULL
-         AND t.status IN ('open','in-progress','blocked')
-         AND t.today_since IS NOT NULL AND t.today_since <= ?`,
-    [daysAgo(thresholdDays)]
-  )
-  return rows.map(rowToTask)
-}
-
-async function reviewProjects(db: ExtensionDB) {
-  const activeRows = await db.query<Row>(
-    `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.status='active'`
-  )
-  const activeProjects = await Promise.all(activeRows.map((p) => withNextActions(db, p)))
-  const somedayRows = await db.query<Row>(
-    `SELECT ${PROJECT_COLS} FROM projects p ${PROJECT_JOINS} WHERE p.status='someday'`
-  )
-  return {
-    activeProjects,
-    staleProjects: activeProjects.filter((p) => p.isStale),
-    somedayProjects: somedayRows.map(rowToProject),
-  }
-}
-
-async function reviewTasks(db: ExtensionDB) {
-  const tasks = async (sql: string, params?: unknown[]) =>
-    (await db.query<Row>(sql, params)).map(rowToTask)
-  const sevenDaysAgo = storedInstant(zonedNow().subtract({ days: 7 }))
-  return {
-    inboxItems: await tasks(`SELECT * FROM tasks WHERE source='inbox' AND status='open'`),
-    somedayTasks: await tasks(
-      `SELECT * FROM tasks WHERE source='someday' AND status='open' AND parent_id IS NULL ORDER BY created_at ASC`
-    ),
-    completedLastWeek: await tasks(`SELECT * FROM tasks WHERE status='done' AND updated_at >= ?`, [
-      sevenDaysAgo,
-    ]),
-  }
-}
-
-async function weeklyReview({ api, db }: IpcContext) {
-  const { inboxItems, somedayTasks, completedLastWeek } = await reviewTasks(db)
-  const projects = await reviewProjects(db)
-  const threshold = staleDaysThreshold(api)
-  return {
-    inboxItems,
-    ...projects,
-    somedayTasks,
-    completedLastWeek,
-    staleTasks: await staleTasks(db, threshold),
-    staleDaysThreshold: threshold,
-    lastReviewDate: await lastCompletedReviewDate(db),
-  }
 }
 
 async function insertProject({ db }: IpcContext, args: z.infer<typeof CreateProjectRequestSchema>) {
@@ -220,7 +152,6 @@ async function renameProjectRow(
 
 const PROJECT_ROUTES = [
   route('task-vault:projects:list', ListProjectsRequestSchema.default({}), queryProjects),
-  route('task-vault:projects:weekly-review', noPayload, weeklyReview),
   route('task-vault:projects:create', CreateProjectRequestSchema, insertProject),
   route('task-vault:projects:delete', DeleteProjectRequestSchema, deleteProjectRow),
   route(

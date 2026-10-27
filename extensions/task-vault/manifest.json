@@ -28,7 +28,7 @@
       {
         "id": "task-vault:open",
         "label": "Open Task Vault",
-        "description": "Open the vault on a task or on the weekly review"
+        "description": "Open the vault on a task"
       }
     ],
     "quickActions": { "group": { "mnemonic": "v", "label": "Task Vault" } }

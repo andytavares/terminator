@@ -1,5 +1,5 @@
 import type { z } from 'zod'
-import type { ExtensionDB } from '@terminator/extension-sdk'
+import { noPayload, type ExtensionDB } from '@terminator/extension-sdk'
 import { route, type IpcContext } from './register'
 import { storedInstant, zonedNow } from '../vault/clock'
 import {
@@ -179,9 +179,22 @@ async function queryTasks({ db }: IpcContext, args: QueryArgs) {
   return { tasks: rows.map(rowToTask) }
 }
 
+/** The contexts tasks carry, for the context filter. */
+function listContexts({ db }: IpcContext) {
+  return orErrorString(async () => {
+    const rows = await db.query<{ context: string }>(
+      `SELECT DISTINCT context FROM tasks
+         WHERE context IS NOT NULL AND context != ''
+         ORDER BY context`
+    )
+    return { contexts: rows.map((r) => r.context) }
+  })
+}
+
 /** Read-only channels: the area overview, a project's tasks, the archive and task queries. */
 export const QUERY_ROUTES = [
   route('task-vault:vault:query', QueryRequestSchema, queryTasks),
+  route('task-vault:vault:list-contexts', noPayload, listContexts),
   route('task-vault:vault:list-areas', ListAreasRequestSchema, listAreas),
   route('task-vault:projects:get-tasks', GetProjectTasksRequestSchema, projectTasks),
   route('task-vault:vault:list-archive', ListArchiveRequestSchema.default({}), listArchive),

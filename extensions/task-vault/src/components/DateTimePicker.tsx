@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Button, IconButton, useDismissible } from '@terminator/extension-ui'
 import { Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
+import { localDate, monthName, weekdayName } from '../utils/local-date'
 
 export interface DateTimePickerProps {
   mode: 'date' | 'time' | 'datetime'
@@ -71,25 +72,7 @@ interface TriggerProps {
 
 // ── Helpers ───────────────────────────────────────────────────────
 
-const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-]
-const DAY_HEADERS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
-
-function toLocalDateStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+const DAY_HEADERS = [0, 1, 2, 3, 4, 5, 6].map((day) => weekdayName(day, 'short').slice(0, 2))
 
 function toLocalTimeStr(d: Date): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
@@ -150,13 +133,13 @@ function defaultAmPm(timePart: string): AmPm {
 }
 
 const DATE_SHORTCUTS: Shortcut[] = [
-  { label: 'Today', getValue: () => toLocalDateStr(new Date()) },
+  { label: 'Today', getValue: () => localDate(new Date()) },
   {
     label: 'Tomorrow',
     getValue: () => {
       const d = new Date()
       d.setDate(d.getDate() + 1)
-      return toLocalDateStr(d)
+      return localDate(d)
     },
   },
   {
@@ -164,7 +147,7 @@ const DATE_SHORTCUTS: Shortcut[] = [
     getValue: () => {
       const d = new Date()
       d.setDate(d.getDate() + 7)
-      return toLocalDateStr(d)
+      return localDate(d)
     },
   },
   {
@@ -172,7 +155,7 @@ const DATE_SHORTCUTS: Shortcut[] = [
     getValue: () => {
       const d = new Date()
       d.setDate(d.getDate() + 14)
-      return toLocalDateStr(d)
+      return localDate(d)
     },
   },
   {
@@ -180,7 +163,7 @@ const DATE_SHORTCUTS: Shortcut[] = [
     getValue: () => {
       const d = new Date()
       d.setMonth(d.getMonth() + 1)
-      return toLocalDateStr(d)
+      return localDate(d)
     },
   },
 ]
@@ -247,7 +230,7 @@ function mirrorHalf(timePart: string, half: AmPm): string {
 
 /** A datetime value from its parts; a missing date means today. */
 function joinDateTime(datePart: string, time: string): string {
-  return `${datePart || toLocalDateStr(new Date())}T${time}`
+  return `${datePart || localDate(new Date())}T${time}`
 }
 
 /** The date and time parts a value holds in each mode. */
@@ -430,13 +413,13 @@ function ShortcutChips({ picker, props }: PaneProps): React.JSX.Element {
 }
 
 function CalendarDay({ cell, datePart, min, onSelect }: DayProps): React.JSX.Element {
-  const cellStr = toLocalDateStr(cell.date)
+  const cellStr = localDate(cell.date)
   const isSelected = cellStr === datePart
   const isDisabled = min ? cellStr < min : false
   const className = [
     'dtp__cal-day',
     !cell.currentMonth && 'dtp__cal-day--other',
-    cellStr === toLocalDateStr(new Date()) && !isSelected && 'dtp__cal-day--today',
+    cellStr === localDate(new Date()) && !isSelected && 'dtp__cal-day--today',
     isSelected && 'dtp__cal-day--selected',
     isDisabled && 'dtp__cal-day--disabled',
   ]
@@ -461,7 +444,7 @@ function CalendarPane({ picker, props }: PaneProps): React.JSX.Element {
       <div className="dtp__cal-header">
         <IconButton icon={ChevronLeft} label="Previous month" size="sm" onClick={prev} />
         <span className="dtp__cal-month-label">
-          {MONTH_NAMES[displayMonth]} {displayYear}
+          {monthName(displayMonth)} {displayYear}
         </span>
         <IconButton icon={ChevronRight} label="Next month" size="sm" onClick={next} />
       </div>

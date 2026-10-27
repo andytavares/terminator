@@ -3,20 +3,16 @@ import type { ExtensionAPI, ExtensionDB, HomeFeed } from '@terminator/extension-
 import { partialFake } from '../../../../tests/support/fakes'
 import { createVaultDb, seedTask, selectTaskRow } from '../support/vault-db'
 import { startHomePublisher } from '../../src/home/publisher'
-import { startOrResumeReview } from '../../src/vault/weekly-review-repository'
 
 vi.mock('../../src/navigation.js', () => ({ openInVault: vi.fn() }))
 vi.mock('../../src/notifications/task-scheduler.js', () => ({ broadcast: vi.fn() }))
 
 const NOW = new Date(2026, 9, 18, 10, 0, 0) // Sunday 18 October 2026, local time
 
-function fakeVaultApi(reviewDay = '3') {
+function fakeVaultApi() {
   const published: HomeFeed[] = []
   let actionHandler: (itemId: string, actionId: string) => Promise<void> = async () => {}
   const api = partialFake<ExtensionAPI>({
-    settings: partialFake<ExtensionAPI['settings']>({
-      get: <T>() => reviewDay as T,
-    }),
     home: {
       publish: (feed) => void published.push(feed),
       onAction: (handler) => {
@@ -55,20 +51,6 @@ describe('the Home publisher feed', () => {
     expect(published).toHaveLength(1)
     expect(published[0].asks.map((a) => a.id)).toEqual(['task:due'])
   })
-
-  it('asks for the weekly review on the review day until one is started', async () => {
-    const { api, published } = fakeVaultApi('0')
-    const publisher = startHomePublisher(api, db)
-
-    publisher.schedule()
-    await vi.advanceTimersByTimeAsync(500)
-    expect(published[0].asks.map((a) => a.id)).toEqual(['weekly-review'])
-
-    await startOrResumeReview(db, NOW.toISOString())
-    publisher.schedule()
-    await vi.advanceTimersByTimeAsync(500)
-    expect(published[1].asks).toEqual([])
-  })
 })
 
 describe('the Home publisher date rollover', () => {
@@ -95,15 +77,13 @@ describe('the Home publisher actions', () => {
     expect((await selectTaskRow(db, 'a'))?.status).toBe('open')
   })
 
-  it('opens the vault on the task for "open" and on the review for "start-review"', async () => {
+  it('opens the vault on the task for "open"', async () => {
     const { openInVault } = await import('../../src/navigation.js')
     const { api, pressHomeAction } = fakeVaultApi()
     startHomePublisher(api, db)
 
     await pressHomeAction('task:a', 'open')
     expect(openInVault).toHaveBeenCalledWith(api, { taskId: 'a' })
-    await pressHomeAction('weekly-review', 'start-review')
-    expect(openInVault).toHaveBeenCalledWith(api, { view: 'review' })
   })
 })
 

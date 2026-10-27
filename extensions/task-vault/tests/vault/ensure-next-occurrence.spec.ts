@@ -228,19 +228,6 @@ function ensureNextOccurrenceCountLimitsTests() {
     })
     expect(await ensureNextOccurrence(db, id)).toBeNull()
   })
-
-  it('does not spawn when after_count limit is exhausted (metadata fallback)', async () => {
-    const id = await insertTask({
-      recurrence_rule: 'daily',
-      due_date: '2099-03-10',
-      metadata: JSON.stringify({
-        recurrence_end_type: 'after_count',
-        recurrence_end_count: 3,
-        recurrence_completed_count: 2,
-      }),
-    })
-    expect(await ensureNextOccurrence(db, id)).toBeNull()
-  })
 }
 
 function ensureNextOccurrenceDateLimitsTests() {
@@ -255,18 +242,6 @@ function ensureNextOccurrenceDateLimitsPassedDatesTests() {
       due_date: '2099-03-10',
       recurrence_end_type: 'on_date',
       recurrence_end_date: '2099-03-10', // next would be 2099-03-11 > end date
-    })
-    expect(await ensureNextOccurrence(db, id)).toBeNull()
-  })
-
-  it('does not spawn when on_date end condition has passed (metadata fallback)', async () => {
-    const id = await insertTask({
-      recurrence_rule: 'daily',
-      due_date: '2099-03-10',
-      metadata: JSON.stringify({
-        recurrence_end_type: 'on_date',
-        recurrence_end_date: '2099-03-10', // next would be 2099-03-11 > end date
-      }),
     })
     expect(await ensureNextOccurrence(db, id)).toBeNull()
   })

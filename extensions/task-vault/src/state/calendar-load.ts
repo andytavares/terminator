@@ -6,6 +6,8 @@
  * of dots could not be read without clicking into every day.
  */
 
+import { localDate } from '../utils/local-date'
+
 /** Statuses that still want something from you. */
 const UNFINISHED = new Set(['open', 'in-progress', 'in-review', 'blocked'])
 
@@ -36,7 +38,7 @@ export function weekOf(dateStr: string): string[] {
   return Array.from({ length: 7 }, (_, i) => {
     const day = new Date(start)
     day.setDate(start.getDate() + i)
-    return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
+    return localDate(day)
   })
 }
 

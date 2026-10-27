@@ -56,8 +56,7 @@ function explicitNoEnd(row: Row): RecurrenceEndFields {
 }
 
 /** Read through the scheduler's own reader (readRecurrenceEndState), so the UI and
- *  ensure-next-occurrence agree on every row, including partly migrated ones whose column says
- *  'none' while the end-conditions still live in the metadata JSON. */
+ *  ensure-next-occurrence agree on every row. */
 function recurrenceEndFields(row: Row): RecurrenceEndFields {
   const endState = readRecurrenceEndState(row as Parameters<typeof readRecurrenceEndState>[0])
   if (endState.endType !== 'none') {
