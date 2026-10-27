@@ -19,7 +19,7 @@ const stepsOf = (id: string) => (workflow.jobs[id].steps ?? []) as Array<Record<
 const workflowText = readFileSync(resolve(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8')
 
 /** The jobs that run the app or draw as a Mac does, in ci.yml's order. */
-const MAC_JOBS = ['story-screenshots', 'e2e-stability', 'quarantine-e2e', 'start', 'e2e']
+const MAC_JOBS = ['story-screenshots', 'start', 'e2e']
 
 /** The jobs ci:local runs, in ci.yml's order. */
 const PLANNED_JOBS = [
@@ -29,11 +29,8 @@ const PLANNED_JOBS = [
   'stories',
   'story-screenshots',
   'unit',
-  'perf',
   'stability-shard',
-  'e2e-stability',
   'test',
-  'build',
   'start',
 ]
 
@@ -63,6 +60,29 @@ describe('where ci:local runs a step', () => {
   it("gives each step its job's runner, so a step CI runs on Ubuntu runs in the Linux container", () => {
     expect(stepOf('unit', 'Test')?.runner).toBe('ubuntu-24.04-arm')
     expect(stepOf('story-screenshots', 'Compare story screenshots')?.runner).toBe('macos-26')
+  })
+
+  it('runs the perf budgets and the build warning check, in the jobs that took them over', () => {
+    expect(stepOf('format', 'Perf budgets')?.script).toBe('npm run test:perf')
+    expect(stepOf('start', 'npm run build')?.script).toContain('tee build.log')
+  })
+
+  it('plans without a throw, with and without the test: all label, and names no deleted job', () => {
+    const deleted = [
+      'quarantine',
+      'quarantine-e2e',
+      'e2e-stability',
+      'stability-plan',
+      'build',
+      'perf',
+    ]
+    for (const all of [false, true]) {
+      const planned = planFor(workflow, { all })
+      expect(planned.length).toBeGreaterThan(0)
+      expect(planned.filter((step) => deleted.includes(step.job))).toEqual([])
+    }
+    expect(deleted.filter((job) => job in workflow.jobs)).toEqual([])
+    expect(deleted.filter((job) => job in SKIPPED_JOBS)).toEqual([])
   })
 
   it('reads the number of e2e shards from the e2e job, for the local e2e run', () => {
@@ -181,11 +201,12 @@ describe('the stability jobs (ADR 124)', () => {
 
 describe('the Stability shards (ADR 124)', () => {
   it('sizes the shards from the change, and each runs its share', () => {
-    expect(stepsOf('stability-plan').map((step) => step.run)).toContain(
-      'node scripts/stability.mjs --github-output >> "$GITHUB_OUTPUT"'
+    expect(stepsOf('select').map((step) => step.run)).toContain(
+      `node scripts/stability.mjs --github-output | sed 's/^shards=/stability_shards=/' >> "$GITHUB_OUTPUT"`
     )
+    expect(workflow.jobs['stability-shard'].needs).toBe('select')
     expect(workflow.jobs['stability-shard'].strategy?.matrix).toEqual({
-      include: '${{ fromJSON(needs.stability-plan.outputs.shards) }}',
+      include: '${{ fromJSON(needs.select.outputs.stability_shards) }}',
     })
   })
 
@@ -195,11 +216,45 @@ describe('the Stability shards (ADR 124)', () => {
     )
   })
 
-  it('has one Stability verdict, red unless the plan and every shard passed', () => {
+  it('has one Stability verdict, red unless the selection and every shard passed', () => {
     const verdict = workflow.jobs.stability
     expect(verdict.name).toBe('Stability')
-    expect(verdict.needs).toEqual(['stability-plan', 'stability-shard'])
+    expect(verdict.needs).toEqual(['select', 'stability-shard'])
     expect(verdict.if).toBe('always()')
+  })
+})
+
+describe('the e2e job and the nightly sweep (ADR 124)', () => {
+  const sweep = readWorkflow(resolve(REPO_ROOT, '.github/workflows/stability-sweep.yml'))
+
+  it("repeats a changed e2e spec in the job's own shard, after the suite", () => {
+    const steps = stepsOf('e2e').map((step) => step.run ?? '')
+    const suite = steps.findIndex((run) => run.includes('npx playwright test'))
+    const repeat = steps.findIndex((run) =>
+      run.includes('node scripts/stability.mjs --e2e --part ${{ matrix.shard }}/3')
+    )
+    expect(suite).toBeGreaterThan(-1)
+    expect(repeat).toBeGreaterThan(suite)
+    expect(stepsOf('e2e')[0].with).toMatchObject({ 'fetch-depth': 0 })
+  })
+
+  it('runs the quarantined tests in the nightly sweep, which gates nothing', () => {
+    expect(Object.keys(sweep.jobs)).toEqual(
+      expect.arrayContaining(['quarantine', 'quarantine-e2e'])
+    )
+  })
+
+  it('reports an e2e report only when a shard failed', () => {
+    expect(workflow.jobs['e2e-report'].if).toBe(
+      "${{ !cancelled() && needs.e2e.result == 'failure' }}"
+    )
+  })
+
+  it('skips the e2e build on a build cache hit, and pins the cache action to a commit', () => {
+    const build = stepsOf('e2e').find((step) => step.name === 'Build')
+    expect(build?.if).toMatch(/cache-hit != 'true'/)
+    const cache = stepsOf('e2e').find((step) => String(step.uses).startsWith('actions/cache@'))
+    expect(String(cache?.uses)).toMatch(/^actions\/cache@[0-9a-f]{40}$/)
   })
 })
 

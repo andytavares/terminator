@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The E2E job of .github/workflows/ci.yml, run here step for step (selection, its shards at
-// CI=1, each spec once). `npm run ci:local:e2e` runs all of it; `-- 3` runs only shard 3.
+// CI=1, each spec once, then every changed spec five times). `npm run ci:local:e2e` runs all of it; `-- 3` runs only shard 3.
 
 import { execFileSync, spawnSync } from 'node:child_process'
 import { cpus, loadavg } from 'node:os'
@@ -123,7 +123,10 @@ async function main() {
   console.log(`${specs.length} spec(s) selected: ${chosen.reason}`)
   const failed = runShards(only, specs)
   if (failed.length > 0) console.error(`\nShards failed: ${failed.join(', ')}`)
-  process.exit(failed.length === 0 ? 0 : 1)
+  // CI repeats the changed specs in each shard, by part; with no shard named, one run covers every part.
+  const part = only === null ? [] : ['--part', `${only}/${SHARDS}`]
+  const stable = run('node', ['scripts/stability.mjs', '--e2e', ...part])
+  process.exit(failed.length === 0 && stable ? 0 : 1)
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main()

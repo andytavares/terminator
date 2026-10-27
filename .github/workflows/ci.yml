@@ -120,6 +120,12 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
+      # The wall-clock budgets (`*.perf.spec.ts`), one file at a time, after the unit shards'
+      # work is done: in a unit shard they share the CPU with every other spec and measure the
+      # load rather than the code.
+      - name: Perf budgets
+        run: npm run test:perf
+
   # Every story is a test (ADR 098): it renders in Chromium and runs its play
   # function, in the light and the dark theme. The build proves the Storybook
   # site itself still compiles.
@@ -190,6 +196,7 @@ jobs:
       e2e_specs: ${{ steps.select.outputs.e2e_specs }}
       shard_count: ${{ steps.select.outputs.shard_count }}
       shards: ${{ steps.select.outputs.shards }}
+      stability_shards: ${{ steps.stability.outputs.stability_shards }}
 
     steps:
       - uses: actions/checkout@v4
@@ -211,6 +218,13 @@ jobs:
         run: |
           node scripts/test-select.mjs | tee /dev/stderr
           node scripts/test-select.mjs --github-output >> "$GITHUB_OUTPUT"
+
+      # Every spec this change adds or edits, 30 times with a fresh seed each, every core busy. One
+      # failure fails the check and prints the seed that replays it (ADR 124). Nothing retries. The
+      # plan splits the 30 runs, and the specs when there are many, so each shard fits in 7 minutes.
+      - name: Size the stability shards
+        id: stability
+        run: node scripts/stability.mjs --github-output | sed 's/^shards=/stability_shards=/' >> "$GITHUB_OUTPUT"
 
   # One shard when the selection is under 100 specs, four otherwise. Each shard writes a
   # blob; coverage is limited to the changed files when only some specs run, and is
@@ -273,61 +287,14 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  # The wall-clock budgets (`*.perf.spec.ts`), one file at a time in a job of
-  # their own: in the unit shards they share the CPU with every other spec and
-  # measure the load rather than the code.
-  perf:
-    name: Perf budgets
-    runs-on: ubuntu-24.04-arm
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Perf budgets
-        run: npm run test:perf
-
-  # Every spec this change adds or edits, 30 times with a fresh seed each, every core busy. One
-  # failure fails the check and prints the seed that replays it (ADR 124). Nothing retries. The
-  # plan splits the 30 runs, and the specs when there are many, so each shard fits in 7 minutes.
-  stability-plan:
-    name: Stability plan
-    runs-on: ubuntu-24.04-arm
-    outputs:
-      shards: ${{ steps.plan.outputs.shards }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Size the shards
-        id: plan
-        run: node scripts/stability.mjs --github-output >> "$GITHUB_OUTPUT"
-
   stability-shard:
     name: Stability (${{ matrix.shard }}, ${{ matrix.runs }} runs of part ${{ matrix.part }})
-    needs: stability-plan
+    needs: select
     runs-on: ubuntu-24.04-arm
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.stability-plan.outputs.shards) }}
+        include: ${{ fromJSON(needs.select.outputs.stability_shards) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -348,119 +315,16 @@ jobs:
   # The one Stability check branch protection requires.
   stability:
     name: Stability
-    needs: [stability-plan, stability-shard]
+    needs: [select, stability-shard]
     if: always()
     runs-on: ubuntu-24.04-arm
 
     steps:
       - name: Verdict
         run: |
-          echo "plan: ${{ needs.stability-plan.result }}, shards: ${{ needs.stability-shard.result }}"
-          test "${{ needs.stability-plan.result }}" = success
+          echo "select: ${{ needs.select.result }}, shards: ${{ needs.stability-shard.result }}"
+          test "${{ needs.select.result }}" = success
           test "${{ needs.stability-shard.result }}" = success
-
-  # Every e2e spec this change adds or edits, five times. The build only happens when there is one.
-  # It starts once the E2E shards end, so CI never asks for more than five macOS runners at once.
-  e2e-stability:
-    name: E2E stability
-    needs: e2e
-    if: ${{ !cancelled() }}
-    runs-on: macos-26
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Changed e2e specs, 5 runs
-        run: |
-          if [ -z "$(node scripts/stability.mjs --e2e --list)" ]; then
-            echo "stability: no e2e spec added or edited"
-            exit 0
-          fi
-          npm run build
-          node node_modules/electron/install.js
-          codesign --force --deep --sign - node_modules/electron/dist/Electron.app
-          node scripts/stability.mjs --e2e
-
-  # The quarantined tests (tests/quarantine.json, ADR 124), still run so a fix shows as passes.
-  # Not required: its result never blocks a pull request.
-  quarantine:
-    name: Quarantine
-    runs-on: ubuntu-24.04-arm
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Quarantined unit tests
-        run: |
-          npx vitest run --tagsFilter=quarantine --passWithNoTests --reporter=dot \
-            --reporter=junit --outputFile.junit=junit/quarantine.xml
-
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5
-        with:
-          report_type: test_results
-          files: junit/quarantine.xml
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-  # The quarantined e2e tests, run once the E2E shards end. Not required (ADR 124).
-  quarantine-e2e:
-    name: Quarantine (E2E)
-    needs: e2e
-    if: ${{ !cancelled() }}
-    runs-on: macos-26
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Quarantined e2e tests
-        env:
-          PLAYWRIGHT_JUNIT_OUTPUT_NAME: junit/quarantine-e2e.xml
-        run: |
-          if [ "$(jq '[.[] | select(.kind == "e2e")] | length' tests/quarantine.json)" = 0 ]; then
-            echo "Nothing quarantined in e2e."
-            exit 0
-          fi
-          npm run build
-          node node_modules/electron/install.js
-          codesign --force --deep --sign - node_modules/electron/dist/Electron.app
-          npx playwright test --grep @quarantine --reporter=dot,junit
-
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5
-        with:
-          report_type: test_results
-          files: junit/quarantine-e2e.xml
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
 
   # The required "Test" check. Same OS as the shards, because the blobs carry
   # their absolute source paths and coverage is remapped against them. Green when
@@ -529,35 +393,6 @@ jobs:
           test "${{ needs.select.result }}" = success
           case "${{ needs.unit.result }}" in success|skipped) ;; *) exit 1 ;; esac
 
-  # Nothing the build does depends on the other checks, and E2E waits on it,
-  # so it starts with them rather than five minutes after them. Merge still
-  # needs every job.
-  # The build check. Each E2E shard builds for itself, so nothing waits on this.
-  build:
-    name: Build
-    runs-on: ubuntu-24.04-arm
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      # A warning is a failure. The ones this catches were real: a renderer
-      # bundle with node:fs stubbed out, and chunks past their size budget.
-      - name: Build
-        run: |
-          npm run build 2>&1 | tee build.log
-          if grep -nE '\(!\)|\[plugin |\[WARNING\]|⚠|is not exported by|externalized for browser' build.log; then
-            echo "::error::npm run build printed the warnings above"
-            exit 1
-          fi
-
   # The app started the way a developer starts it, from a clean checkout with no
   # npm cache: `npm run dev`, and `npm run preview` after `npm run build`. A
   # fresh install once could not start at all ("Error: Electron uninstall")
@@ -581,8 +416,15 @@ jobs:
       - name: npm run dev
         run: node scripts/smoke-start.mjs dev
 
+      # A warning is a failure. The ones this catches were real: a renderer
+      # bundle with node:fs stubbed out, and chunks past their size budget.
       - name: npm run build
-        run: npm run build
+        run: |
+          npm run build 2>&1 | tee build.log
+          if grep -nE '\(!\)|\[plugin |\[WARNING\]|⚠|is not exported by|externalized for browser' build.log; then
+            echo "::error::npm run build printed the warnings above"
+            exit 1
+          fi
 
       - name: npm run preview
         run: node scripts/smoke-start.mjs preview
@@ -595,8 +437,9 @@ jobs:
           npx electron-builder --mac dir --publish never -c.mac.identity=null -c.mac.notarize=false
           node scripts/smoke-start.mjs exec "$PWD/dist/mac-arm64/Terminator.app/Contents/MacOS/Terminator"
 
-  # Builds its own copy of the app rather than waiting on the Build job: the
-  # build takes 40s, the wait for the Build job and its artifact took 1m20s.
+  # Builds its own copy of the app, unless the build cache holds one for this source: the key
+  # covers every tracked file but tests, docs and specs, so a change to only those skips it.
+  # `Start` runs the build and its warning check on every run.
   e2e:
     name: E2E (${{ matrix.shard }}/3)
     needs: select
@@ -609,7 +452,10 @@ jobs:
         shard: [1, 2, 3]
 
     steps:
+      # Full history: scripts/stability.mjs diffs against origin/<base>.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -619,7 +465,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build cache key
+        id: source
+        run: |
+          echo "hash=$(git ls-tree -r HEAD | grep -v -E $'\t'"(tests|docs|specs)/|/tests/" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      # Everything `npm run build` writes: out/ (main, preload, renderer, renderer-remote),
+      # each extension's bundle and its renderer's dist/.
+      - name: Restore the build
+        id: build-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            out
+            extensions/*/src/index.js
+            extensions/*/dist
+          key: build-${{ runner.os }}-${{ steps.source.outputs.hash }}
+
       - name: Build
+        if: steps.build-cache.outputs.cache-hit != 'true'
         run: npm run build
 
       # The Electron binary on macOS arm64 can have an invalid code signature
@@ -669,6 +533,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: scripts/process-census.sh "after the suite"
 
+      # The changed e2e specs, five runs each, this shard's part of them (ADR 124).
+      - name: Changed e2e specs, 5 runs, this shard's part
+        run: node scripts/stability.mjs --e2e --part ${{ matrix.shard }}/3
+
       - name: Upload blob report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -710,11 +578,11 @@ jobs:
           test "${{ needs.select.result }}" = success
           case "${{ needs.e2e.result }}" in success|skipped) ;; *) exit 1 ;; esac
 
-  # The merged HTML report, beside the verdict rather than in front of it.
+  # The merged HTML report, for a failed run only, beside the verdict rather than in front of it.
   e2e-report:
     name: E2E report
     needs: e2e
-    if: ${{ !cancelled() && needs.e2e.result != 'skipped' }}
+    if: ${{ !cancelled() && needs.e2e.result == 'failure' }}
     runs-on: ubuntu-24.04-arm
 
     steps:
