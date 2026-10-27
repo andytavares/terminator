@@ -1,0 +1,25 @@
+scripts/each-limited.mjs
+  s_567c3310a5db4e::t_5b6db546299807 1-13
+scripts/lint.mjs
+  s_567c3310a5db4e::t_5b6db546299807 11,25-26
+scripts/test-select.mjs
+  s_567c3310a5db4e::t_5b6db546299807 10
+scripts/check-release-age.mjs
+  s_567c3310a5db4e::t_5b6db546299807 15,110-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "35c6192c0c39b7648bc93e9be896b2084dc5bca0",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
