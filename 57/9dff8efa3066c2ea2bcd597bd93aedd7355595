@@ -1,0 +1,29 @@
+tests/unit/scripts/ci-plan.spec.ts
+  s_567c3310a5db4e::t_5bea2ecf80231e 232-236
+  s_567c3310a5db4e::t_c1b4f392d06da8 231,237-238
+tests/unit/scripts/e2e-shard.spec.ts
+  s_567c3310a5db4e::t_674d2b5bc97700 12-13,125,127-152
+  s_567c3310a5db4e::t_2b52fb6c894cc9 58-81,84,96-124,126
+  s_567c3310a5db4e::t_884dde6d9d9029 153
+.github/workflows/ci.yml
+  s_567c3310a5db4e::t_f47574d10c2331 469-476,479,487,497,505,513,517-518,520,522-523,536,549
+scripts/e2e-shard.mjs
+  s_567c3310a5db4e::t_b1b9c0185a2255 36-37,43,96-108,114,116-118,154
+  s_567c3310a5db4e::t_c35b8a31421ea9 15-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "579dff8efa3066c2ea2bcd597bd93aedd7355595",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
