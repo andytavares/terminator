@@ -87,7 +87,7 @@ export async function waitForSave(notepad: ExtensionView): Promise<void> {
 /** Picks `item` from the context menu of the list row titled `title`. */
 export async function rowMenu(notepad: ExtensionView, title: string, item: string): Promise<void> {
   await noteRow(notepad, title).click({ button: 'right' })
-  await notepad.locator('.notepad-context-menu').getByRole('button', { name: item }).click()
+  await notepad.locator('.notepad-context-menu').getByRole('menuitem', { name: item }).click()
 }
 
 /** Deletes the row titled `title` for good from its menu, accepting the host page's confirm. */

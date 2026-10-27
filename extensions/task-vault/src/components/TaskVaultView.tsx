@@ -9,7 +9,7 @@ import {
   TabList,
   TabPanel,
   TabsRoot,
-  useDismissible,
+  Popover,
 } from '@terminator/extension-ui'
 import './task-vault.css'
 import { notify } from '../utils/notify'
@@ -518,7 +518,7 @@ function ContextFilterHeader(): React.JSX.Element {
 function ContextOptions({ availableContexts }: { availableContexts: string[] }): React.JSX.Element {
   const { selectedContexts, toggleContext } = useVaultStore()
   return (
-    <div className="tv-context-filter__dropdown">
+    <>
       <ContextFilterHeader />
       {availableContexts.length === 0 && (
         <span className="tv-context-filter__empty">No contexts found</span>
@@ -534,7 +534,7 @@ function ContextOptions({ availableContexts }: { availableContexts: string[] }):
           <span>{`+${ctx}`}</span>
         </label>
       ))}
-    </div>
+    </>
   )
 }
 
@@ -542,15 +542,8 @@ function ContextOptions({ availableContexts }: { availableContexts: string[] }):
 function ContextFilter({ availableContexts }: { availableContexts: string[] }): React.JSX.Element {
   const { selectedContexts } = useVaultStore()
   const [open, setOpen] = useState(false)
-  const contextMenuRef = useRef<HTMLDivElement>(null)
-  useDismissible({
-    ref: contextMenuRef,
-    onDismiss: () => setOpen(false),
-    manageFocus: false,
-    enabled: open,
-  })
   return (
-    <div className="tv-context-filter" ref={contextMenuRef}>
+    <div className="tv-context-filter">
       <Button
         aria-label="Filter by context"
         variant={selectedContexts.length > 0 ? 'secondary' : 'ghost'}
@@ -561,7 +554,16 @@ function ContextFilter({ availableContexts }: { availableContexts: string[] }): 
         {filterLabel(selectedContexts)}
         <ChevronDown className="tm-icon-sm" />
       </Button>
-      {open && <ContextOptions availableContexts={availableContexts} />}
+      {open && (
+        <Popover
+          label="Filter by context"
+          align="end"
+          className="tv-context-filter__dropdown"
+          onDismiss={() => setOpen(false)}
+        >
+          <ContextOptions availableContexts={availableContexts} />
+        </Popover>
+      )}
     </div>
   )
 }

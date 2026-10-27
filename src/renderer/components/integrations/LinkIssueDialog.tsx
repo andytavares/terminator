@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { Search } from 'lucide-react'
 import { Dialog, type DialogAction } from '@terminator/extension-ui'
 import { useIntegrationsStore } from '../../stores/integrations.store'
-import { useModalEffect } from '../../stores/modal.store'
 import type { IssueSummary } from '../../../shared/types/index'
 import { ERROR_TEXT, TRACKER_LABELS, useIssueSearch } from './use-issue-search'
 import './issue-search.css'
@@ -25,7 +24,6 @@ export interface LinkIssueDialogProps {
 }
 
 export function LinkIssueDialog(props: LinkIssueDialogProps): JSX.Element {
-  useModalEffect()
   const connected = useConnectedTrackers()
   const [term, setTerm] = useState('')
   const link = useLinkCommit(props)

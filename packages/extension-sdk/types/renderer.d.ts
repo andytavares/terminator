@@ -19,11 +19,6 @@ export interface SerializedNotification {
 }
 
 export interface ElectronAPI {
-  ui: {
-    /** How many dialogs the view has open, so the host's double-Escape exit stands down while
-     * one is. @terminator/extension-ui's Dialog reports it. */
-    setModalDepth(depth: number): void
-  }
   terminal: {
     create(payload: unknown): Promise<{ sessionId: string } | { error: string }>
     close(sessionId: string): Promise<{ success: boolean }>

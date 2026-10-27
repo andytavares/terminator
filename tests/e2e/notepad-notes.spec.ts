@@ -156,7 +156,7 @@ async function folderOfReadingList(): Promise<string | null | undefined> {
 /** Picks `item` from the one folder's context menu. */
 async function folderMenu(item: string): Promise<void> {
   await notepad.locator('.notepad-folder-header').click({ button: 'right' })
-  await notepad.locator('.notepad-context-menu').getByRole('button', { name: item }).click()
+  await notepad.locator('.notepad-context-menu').getByRole('menuitem', { name: item }).click()
 }
 
 async function folderHoldsAndGivesBack(): Promise<void> {

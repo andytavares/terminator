@@ -69,7 +69,7 @@ describe('shouldSuppressExitGesture', () => {
   const ctx = (over: Partial<EscapeContext> = {}): EscapeContext => ({
     inTerminal: false,
     inTextField: false,
-    modalDepth: 0,
+    surfaceOpen: false,
     ...over,
   })
 
@@ -86,12 +86,8 @@ describe('shouldSuppressExitGesture', () => {
     expect(shouldSuppressExitGesture(ctx({ inTextField: true }))).toBe(true)
   })
 
-  it('suppresses while a modal surface is open', () => {
-    expect(shouldSuppressExitGesture(ctx({ modalDepth: 1 }))).toBe(true)
-  })
-
-  it('suppresses while nested modal surfaces are open', () => {
-    expect(shouldSuppressExitGesture(ctx({ modalDepth: 3 }))).toBe(true)
+  it('suppresses while a modal dialog or a popover is open', () => {
+    expect(shouldSuppressExitGesture(ctx({ surfaceOpen: true }))).toBe(true)
   })
 
   it('suppresses when several conditions hold at once', () => {

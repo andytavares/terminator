@@ -301,16 +301,13 @@
 }
 
 .notepad-tag-filter__dropdown {
-  position: absolute;
-  top: calc(100% + 2px);
-  left: 8px;
+  left: calc(anchor(left) + 8px);
   min-width: 180px;
   background: var(--tm-bg-elevated);
   border: 1px solid var(--tm-border);
   border-radius: 7px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
   padding: 4px;
-  z-index: var(--tm-layer-modal);
   max-height: 240px;
   overflow-y: auto;
 }
@@ -1635,7 +1632,6 @@ input[type='checkbox'].notepad-task-checkbox {
   border: 1px solid var(--tm-border);
   border-radius: 7px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  z-index: var(--tm-layer-toast);
   padding: 4px;
   display: flex;
   flex-direction: column;

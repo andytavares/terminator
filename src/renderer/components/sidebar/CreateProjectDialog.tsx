@@ -4,7 +4,6 @@ import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSettingsStore } from '../../stores/settings.store'
 import type { Branch, IssueSummary, Project, WorktreeInfo } from '../../../shared/types/index'
 import { BranchSelect } from './BranchSelect'
-import { useModalEffect } from '../../stores/modal.store'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { IssuePicker } from '../integrations/IssuePicker'
 import { branchFromIssue } from '../../../shared/integrations/branch-from-issue'
@@ -24,7 +23,6 @@ interface Props {
 }
 
 export function CreateProjectDialog({ workspaceId, onClose }: Props): JSX.Element {
-  useModalEffect()
   const form = useCreateProjectForm(workspaceId, onClose)
   const { busy, repo, fields } = form
 

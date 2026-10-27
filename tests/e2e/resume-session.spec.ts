@@ -80,7 +80,7 @@ function recordIds(page: Page): Promise<string[]> {
 async function describeAndLearnId(page: Page, tab: { index: number; text: string }) {
   const before = await recordIds(page)
   await page.locator('.tab-bar__tab--session').nth(tab.index).click({ button: 'right' })
-  await page.locator('.ctx-menu').getByRole('button', { name: 'Add description…' }).click()
+  await page.locator('.ctx-menu').getByRole('menuitem', { name: 'Add description…' }).click()
   const box = page.getByRole('textbox', { name: 'What is this session doing?' })
   await box.fill(tab.text)
   await box.press('Enter')

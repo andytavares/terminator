@@ -1,13 +1,13 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { Popover } from '../../../../packages/extension-ui/src/Popover'
-import { MODAL_DEPTH_KEY } from '../../../../packages/extension-ui/src/modal-depth'
-import { layerValue } from '../../../../packages/extension-ui/src/layers'
+import { isSurfaceOpen } from '../../../../src/shared/double-escape'
 
-// A picker, a dropdown, a detail panel. The audit scored these against
-// aria-modal and a focus trap and called them failing; both would be defects
-// here, because the view behind a popover stays live (research R10).
+// A picker, a dropdown, a detail panel. The audit scored these against aria-modal and a focus trap
+// and called them failing; both would be defects here, because the view behind a popover stays
+// live (research R10). Placement, the top layer and light dismiss are a browser's: the stories in
+// packages/extension-ui/stories/Popover.stories.tsx prove those in Chromium.
 
 function renderPopover(onDismiss = vi.fn()) {
   const utils = render(
@@ -19,27 +19,21 @@ function renderPopover(onDismiss = vi.fn()) {
   return { ...utils, onDismiss }
 }
 
-beforeEach(() => {
-  delete window[MODAL_DEPTH_KEY]
-  vi.useFakeTimers()
-})
-
-afterEach(() => {
-  vi.useRealTimers()
-})
-
-/** Runs the timer tick after which a popover listens for clicks outside it. */
-const bindOutsideListener = () =>
-  act(() => {
-    vi.advanceTimersByTime(0)
-  })
-
 describe('Popover', () => {
   it('takes an accessible name', () => {
     renderPopover()
     expect(screen.getByRole('group', { name: 'Pick a date' })).toBeTruthy()
   })
 
+  it('is a native popover, shown as soon as it mounts', () => {
+    renderPopover()
+    const surface = screen.getByRole('group')
+    expect(surface.getAttribute('popover')).toBe('auto')
+    expect(surface.matches(':popover-open')).toBe(true)
+  })
+})
+
+describe('Popover — light dismiss', () => {
   it('closes on Escape', () => {
     const { onDismiss } = renderPopover()
     fireEvent.keyDown(document, { key: 'Escape' })
@@ -48,83 +42,67 @@ describe('Popover', () => {
 
   it('closes on a click outside it', () => {
     const { onDismiss } = renderPopover()
-    // The opening click is still propagating on the tick the popover mounts, so
-    // the outside listener is attached one tick later.
-    bindOutsideListener()
-    fireEvent.mouseDown(document.body)
+    fireEvent.click(document.body)
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 
   it('does not close on a click inside it', () => {
     const { onDismiss } = renderPopover()
-    bindOutsideListener()
-    fireEvent.mouseDown(screen.getByRole('button', { name: 'Today' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Today' }))
+    expect(onDismiss).not.toHaveBeenCalled()
+  })
+
+  it('does not call onDismiss when the caller closes it by unmounting', () => {
+    const { onDismiss, unmount } = renderPopover()
+    unmount()
     expect(onDismiss).not.toHaveBeenCalled()
   })
 })
 
-describe('Popover — moves focus in, and returns it to the opener on close', () => {
+describe('Popover — focus', () => {
   it('moves focus in, and returns it to the opener on close', () => {
     const opener = document.createElement('button')
     document.body.appendChild(opener)
     opener.focus()
 
     const { unmount } = renderPopover()
-    expect(document.activeElement).not.toBe(opener)
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Today' }))
 
     unmount()
     expect(document.activeElement).toBe(opener)
     opener.remove()
   })
 
-  // The two things that separate it from a Dialog. Claiming the page is inert
-  // when it is not misinforms assistive technology.
+  // The two things that separate it from a Dialog. Claiming the page is inert when it is not
+  // misinforms assistive technology.
   it('does not claim the page is inert', () => {
-    const { container } = renderPopover()
-    const el = container.querySelector('.tmui-popover')!
-    expect(el.getAttribute('aria-modal')).toBeNull()
-    expect(el.getAttribute('role')).not.toBe('dialog')
+    renderPopover()
+    const surface = screen.getByRole('group')
+    expect(surface.getAttribute('aria-modal')).toBeNull()
+    expect(surface.getAttribute('role')).not.toBe('dialog')
   })
 
   it('does not trap Tab, because the view behind it is still usable', () => {
-    const outside = document.createElement('button')
-    document.body.appendChild(outside)
-    const { container } = renderPopover()
-    const panel = container.querySelector('.tmui-popover') as HTMLElement
-    const buttons = Array.from(panel.querySelectorAll('button'))
+    renderPopover()
+    const buttons = screen.getAllByRole('button')
     buttons[buttons.length - 1].focus()
-    fireEvent.keyDown(panel, { key: 'Tab' })
-    // No handler intercepted it, so focus is left exactly where the browser
-    // would take it rather than being wrapped back to the top.
+    fireEvent.keyDown(screen.getByRole('group'), { key: 'Tab' })
     expect(document.activeElement).toBe(buttons[buttons.length - 1])
-    outside.remove()
   })
 })
 
-describe('Popover — counts toward the open-surface depth so the exit gesture stands down', () => {
-  it('counts toward the open-surface depth so the exit gesture stands down', () => {
+describe('Popover — the exit gesture reads it from the DOM', () => {
+  it('is an open surface while mounted, and none after', () => {
     const { unmount } = renderPopover()
-    expect(window[MODAL_DEPTH_KEY]).toBe(1)
+    expect(isSurfaceOpen(document)).toBe(true)
     unmount()
-    expect(window[MODAL_DEPTH_KEY]).toBe(0)
-  })
-
-  it('stacks above a plain page, on the published overlay layer', () => {
-    const { container } = renderPopover()
-    const el = container.querySelector('.tmui-popover') as HTMLElement
-    expect(Number(el.style.zIndex)).toBe(layerValue('overlay'))
+    expect(isSurfaceOpen(document)).toBe(false)
   })
 })
 
-/**
- * Staying on screen.
- *
- * The surface is positioned against whatever anchored it, so a control near an
- * edge — the caret beside the commit button — put half the menu outside the
- * window with nothing to scroll. jsdom reports a zero rect, so the geometry is
- * stubbed: what is under test is the arithmetic and which way it nudges.
- */
-function renderWithRect(rect: Partial<DOMRect>) {
+/** jsdom reports a zero rect, so the geometry is stubbed: what is under test is the arithmetic and
+ * which way a surface opened at a point is nudged back. */
+function renderAtPoint(rect: Partial<DOMRect>) {
   const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
     top: 0,
     left: 0,
@@ -137,30 +115,36 @@ function renderWithRect(rect: Partial<DOMRect>) {
     toJSON: () => ({}),
     ...rect,
   } as DOMRect)
-  const view = render(
-    <Popover label="Menu" onDismiss={vi.fn()}>
+  render(
+    <Popover label="Menu" at={{ x: 10, y: 20 }} onDismiss={vi.fn()}>
       <button>Item</button>
     </Popover>
   )
   spy.mockRestore()
-  return view.container.querySelector('[data-tmui-surface]') as HTMLElement
+  return screen.getByRole('group')
 }
 
-describe('Popover viewport clamping', () => {
+describe('Popover opened at a point', () => {
+  it('sits at the point', () => {
+    const surface = renderAtPoint({})
+    expect(surface.style.left).toBe('10px')
+    expect(surface.style.top).toBe('20px')
+  })
+
   it('pulls back a surface overflowing the right edge', () => {
-    const el = renderWithRect({ right: window.innerWidth + 40 })
+    const surface = renderAtPoint({ right: window.innerWidth + 40 })
     // 40 over, plus the 8px margin it keeps.
-    expect(el.style.marginLeft).toBe('-48px')
+    expect(surface.style.marginLeft).toBe('-48px')
   })
 
   it('pulls up a surface overflowing the bottom edge', () => {
-    const el = renderWithRect({ bottom: window.innerHeight + 20 })
-    expect(el.style.marginTop).toBe('-28px')
+    const surface = renderAtPoint({ bottom: window.innerHeight + 20 })
+    expect(surface.style.marginTop).toBe('-28px')
   })
 
   it('leaves a surface that already fits alone', () => {
-    const el = renderWithRect({ right: 100, bottom: 100 })
-    expect(el.style.marginLeft).toBe('')
-    expect(el.style.marginTop).toBe('')
+    const surface = renderAtPoint({ right: 100, bottom: 100 })
+    expect(surface.style.marginLeft).toBe('')
+    expect(surface.style.marginTop).toBe('')
   })
 })

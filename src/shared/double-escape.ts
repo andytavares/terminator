@@ -48,8 +48,8 @@ export interface EscapeContext {
   inTerminal: boolean
   /** Focus is inside a text entry control, where Escape belongs to the field. */
   inTextField: boolean
-  /** How many modal surfaces are open in this document. */
-  modalDepth: number
+  /** A modal dialog or a popover is open in this document, and has claimed Escape. */
+  surfaceOpen: boolean
 }
 
 /**
@@ -57,7 +57,16 @@ export interface EscapeContext {
  * nothing is read from the DOM or the clock.
  */
 export function shouldSuppressExitGesture(context: EscapeContext): boolean {
-  return context.inTerminal || context.inTextField || context.modalDepth > 0
+  return context.inTerminal || context.inTextField || context.surfaceOpen
+}
+
+/** What closes on Escape: a modal `<dialog>` or a popover that is showing. The browser keeps this
+ * state, so no caller counts anything. */
+const OPEN_SURFACE_SELECTOR = 'dialog:modal, :popover-open'
+
+/** Whether a modal dialog or a popover is open in `document`. */
+export function isSurfaceOpen(document: Document): boolean {
+  return document.querySelector(OPEN_SURFACE_SELECTOR) !== null
 }
 
 /** Selector for the terminal surface, which owns Escape outright. */
@@ -70,7 +79,7 @@ const TERMINAL_SELECTOR = '.xterm'
  * the property is unimplemented in jsdom, and a host that reports neither is
  * treated as "not a text field" rather than throwing.
  */
-export function escapeContextFromTarget(target: unknown, modalDepth: number): EscapeContext {
+export function escapeContextFromTarget(target: unknown, document: Document): EscapeContext {
   const el = target instanceof Element ? target : null
   const inTextField =
     el !== null &&
@@ -82,6 +91,6 @@ export function escapeContextFromTarget(target: unknown, modalDepth: number): Es
   return {
     inTerminal: el !== null && el.closest(TERMINAL_SELECTOR) !== null,
     inTextField,
-    modalDepth,
+    surfaceOpen: isSurfaceOpen(document),
   }
 }

@@ -16,6 +16,10 @@ Major: four APIs are removed, and a tracker is no longer one of two.
   activation by dependency, and what `activate` returns is not read. Migrate: share state through
   `api.ipc` channels, or keep each extension self-contained.
 - `SessionSnapshot` is removed with `api.terminal`.
+- `window.electronAPI.ui.setModalDepth` is removed from the view declaration, and with it the
+  `ui` namespace. The double-Escape exit now asks the view's own document whether a modal dialog
+  or a popover is open. Migrate: stop calling it; a `<dialog>` opened with `showModal()` and a
+  `popover` element count without being reported.
 
 ### Added
 

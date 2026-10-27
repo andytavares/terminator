@@ -205,12 +205,25 @@ describe('frame-shim keyboard gestures', () => {
     expect(port.posted).toContainEqual({ type: 'request-exit' })
   })
 
-  it('does not post request-exit while a modal is open', async () => {
-    const { port, api } = await connectedFrame()
-    api.ui.setModalDepth(1)
+  it('does not post request-exit while a modal dialog is open in the frame', async () => {
+    const { port } = await connectedFrame()
+    const dialog = document.body.appendChild(document.createElement('dialog'))
+    dialog.showModal()
     pressFrameKey('Escape')
     pressFrameKey('Escape')
+    dialog.remove()
     expect(port.posted).not.toContainEqual({ type: 'request-exit' })
+  })
+
+  it('posts request-exit again once the dialog has closed', async () => {
+    const { port } = await connectedFrame()
+    const dialog = document.body.appendChild(document.createElement('dialog'))
+    dialog.showModal()
+    dialog.close()
+    dialog.remove()
+    pressFrameKey('Escape')
+    pressFrameKey('Escape')
+    expect(port.posted).toContainEqual({ type: 'request-exit' })
   })
 })
 

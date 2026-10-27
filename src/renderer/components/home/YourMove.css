@@ -174,10 +174,8 @@
 }
 
 .snooze-menu {
-  position: absolute;
-  right: 14px;
-  top: 100%;
-  z-index: var(--tm-layer-overlay);
+  left: auto;
+  right: calc(anchor(right) + 14px);
   display: grid;
   min-width: 160px;
   padding: 4px;

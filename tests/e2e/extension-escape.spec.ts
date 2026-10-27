@@ -108,7 +108,7 @@ async function nothingClaimsTheKey(part: string): Promise<void> {
     `(() => {
       const el = document.activeElement
       if (el && typeof el.blur === 'function') el.blur()
-      window.electronAPI.ui.setModalDepth(0)
+      document.querySelectorAll('[data-e2e-surface]').forEach((surface) => surface.remove())
       return true
     })()`
   )
@@ -156,20 +156,33 @@ async function doubleEscapeReturnsToTerminal(): Promise<void> {
   await leavesWithTwoEscapes(NOTES, 'the extension panel should be gone')
 }
 
-/** Reports an open dialog the way @terminator/extension-ui does — across the bridge. */
-function setModalDepth(part: string, depth: number): Promise<void> {
-  return inView(part, `(() => { window.electronAPI.ui.setModalDepth(${depth}); return true })()`)
+/** Opens real modal dialogs in the view. `cancel` is refused, so the Escape under test cannot
+ * close one before the gesture reads the page. */
+function openDialogs(part: string, count: number): Promise<void> {
+  return inView(
+    part,
+    `(() => {
+      for (let i = 0; i < ${count}; i++) {
+        const dialog = document.createElement('dialog')
+        dialog.setAttribute('data-e2e-surface', '')
+        dialog.addEventListener('cancel', (event) => event.preventDefault())
+        document.body.appendChild(dialog)
+        dialog.showModal()
+      }
+      return true
+    })()`
+  )
 }
 
 async function openDialogsHoldTheKey(): Promise<void> {
   await showPanel(FOUNDRY)
   for (const depth of [1, 3]) {
     await nothingClaimsTheKey(FOUNDRY.part)
-    await setModalDepth(FOUNDRY.part, depth)
+    await openDialogs(FOUNDRY.part, depth)
     await pressEscapeTwice(FOUNDRY.part)
     await stillShowing(FOUNDRY, `two Escapes with ${depth} dialog(s) open exited the extension`)
   }
-  await setModalDepth(FOUNDRY.part, 0)
+  await nothingClaimsTheKey(FOUNDRY.part)
 }
 
 async function gestureWorksOnceNothingClaimsTheKey(): Promise<void> {

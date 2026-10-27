@@ -5,7 +5,6 @@ import { IntegrationsSettings } from './IntegrationsSettings'
 import { WorkspaceSettings } from './WorkspaceSettings'
 import { ExtensionsSection } from './ExtensionsSection'
 import { useWorkspaceStore } from '../../stores/workspace.store'
-import { useModalEffect } from '../../stores/modal.store'
 import '@terminator/extension-ui/settings-fields.css'
 import './SettingsPanel.css'
 
@@ -16,7 +15,6 @@ interface Props {
 }
 
 export function SettingsPanel({ onClose }: Props): JSX.Element {
-  useModalEffect()
   const [section, setSection] = useState<Section>('global')
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
 

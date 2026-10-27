@@ -41,6 +41,7 @@ export function WorkspacePicker(props: WorkspacePickerProps): JSX.Element {
         <Popover
           label="Choose a workspace"
           onDismiss={onClose}
+          align="end"
           className="workspace-picker__popover"
         >
           <WorkspaceChoices {...props} />

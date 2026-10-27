@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { Dialog } from '../../../../packages/extension-ui/src/Dialog'
 import { ConfirmDialog } from '../../../../packages/extension-ui/src/ConfirmDialog'
-import { MODAL_DEPTH_KEY } from '../../../../packages/extension-ui/src/modal-depth'
+import { isSurfaceOpen } from '../../../../src/shared/double-escape'
 import { pressOutside } from '../../../support/modal'
 
 // The five behaviours every dismissible surface in the product must have. They
@@ -27,10 +27,6 @@ function renderDialog(overrides: Partial<React.ComponentProps<typeof Dialog>> = 
   )
   return { ...utils, onDismiss }
 }
-
-beforeEach(() => {
-  delete window[MODAL_DEPTH_KEY]
-})
 
 describe('Dialog — announces itself', () => {
   it('exposes a dialog role', () => {
@@ -126,28 +122,23 @@ describe('Dialog — focus', () => {
   })
 })
 
-describe('Dialog — modal depth', () => {
-  it('registers while open so the exit gesture stands down', () => {
-    renderDialog()
-    expect(window[MODAL_DEPTH_KEY]).toBe(1)
-  })
-
-  it('releases on close', () => {
+describe('Dialog — is open for the exit gesture to read', () => {
+  it('is a modal dialog while open, and none after it closes', () => {
     const { unmount } = renderDialog()
+    expect(isSurfaceOpen(document)).toBe(true)
     unmount()
-    expect(window[MODAL_DEPTH_KEY]).toBe(0)
+    expect(isSurfaceOpen(document)).toBe(false)
   })
 
-  it('counts nested dialogs', () => {
+  it('stays open under the first while a nested one closes', () => {
     const first = renderDialog()
     const second = render(
       <Dialog title="Second" actions={[{ label: 'Ok', onSelect: noop }]} onDismiss={noop} />
     )
-    expect(window[MODAL_DEPTH_KEY]).toBe(2)
     second.unmount()
-    expect(window[MODAL_DEPTH_KEY]).toBe(1)
+    expect(isSurfaceOpen(document)).toBe(true)
     first.unmount()
-    expect(window[MODAL_DEPTH_KEY]).toBe(0)
+    expect(isSurfaceOpen(document)).toBe(false)
   })
 })
 

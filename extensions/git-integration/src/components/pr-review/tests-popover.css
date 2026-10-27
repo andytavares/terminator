@@ -1,7 +1,6 @@
 .tp-popover {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 8px;
+  left: auto;
+  right: calc(anchor(right) + 8px);
   width: 440px;
   max-width: calc(100vw - 32px);
   max-height: 360px;

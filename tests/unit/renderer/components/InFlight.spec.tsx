@@ -319,11 +319,10 @@ const openScratchRow = () => rightClickRow('Scratch shell')
 
 const contextMenuItemNames = () =>
   within(document.body)
-    .getAllByRole('button')
-    .filter((b) => b.className.includes('ctx-menu__item'))
-    .map((b) => b.textContent)
+    .getAllByRole('menuitem')
+    .map((item) => item.textContent)
 
-const openMenuItem = (name: string) => within(document.body).getByRole('button', { name })
+const openMenuItem = (name: string) => within(document.body).getByRole('menuitem', { name })
 
 const TICKETED_MENU = [
   'Open terminal',

@@ -259,15 +259,12 @@ function noteListTagFilterDropdownClosingTests() {
   })
 
   it('closes the dropdown on a click outside it, and keeps it open for one inside', async () => {
-    vi.useFakeTimers()
     render(<NoteList />)
     fireEvent.click(screen.getByText('Tags'))
-    act(() => void vi.runOnlyPendingTimers())
-    fireEvent.mouseDown(document.querySelector('.notepad-tag-filter__dropdown')!)
+    fireEvent.click(document.querySelector('.notepad-tag-filter__dropdown')!)
     expect(document.querySelector('.notepad-tag-filter__dropdown')).not.toBeNull()
-    fireEvent.mouseDown(document.body)
+    fireEvent.click(document.body)
     expect(document.querySelector('.notepad-tag-filter__dropdown')).toBeNull()
-    vi.useRealTimers()
   })
 
   it('closes a note context menu on Escape', () => {

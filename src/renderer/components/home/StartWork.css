@@ -254,10 +254,7 @@
 }
 
 .workspace-picker__popover {
-  top: 100%;
-  right: 0;
   width: 280px;
-  margin-top: 4px;
 }
 
 .workspace-picker__filter {

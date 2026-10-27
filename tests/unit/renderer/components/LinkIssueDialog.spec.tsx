@@ -1,9 +1,9 @@
+import { isSurfaceOpen } from '@shared/double-escape'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { LinkIssueDialog } from '../../../../src/renderer/components/integrations/LinkIssueDialog'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
-import { useModalStore } from '../../../../src/renderer/stores/modal.store'
 import { issueSummaryOf, trackerConnectionOf } from '../../../support/renderer-stores'
 import { pressOutside } from '../../../support/modal'
 
@@ -28,7 +28,6 @@ beforeEach(() => {
     linkIssue,
     loadConnections,
   })
-  useModalStore.setState(useModalStore.getInitialState(), true)
 })
 
 afterEach(() => vi.useRealTimers())
@@ -213,9 +212,9 @@ describe('LinkIssueDialog — dismissal', () => {
   it('counts as an open modal until it closes', async () => {
     const { unmount } = open()
     await screen.findByText('TAV-42')
-    expect(useModalStore.getState().depth).toBe(1)
+    expect(isSurfaceOpen(document)).toBe(true)
     unmount()
-    expect(useModalStore.getState().depth).toBe(0)
+    expect(isSurfaceOpen(document)).toBe(false)
   })
 
   it('closes on Cancel', async () => {

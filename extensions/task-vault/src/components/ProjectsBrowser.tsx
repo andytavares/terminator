@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Button, IconButton, useDismissible } from '@terminator/extension-ui'
+import { Button, IconButton, useCloseOnOutsidePress } from '@terminator/extension-ui'
 import { invoke } from '@terminator/extension-sdk/renderer'
 import { DateTimePicker } from './DateTimePicker'
 import {
@@ -229,12 +229,7 @@ function ComboList({ combo }: { combo: Combo }): React.JSX.Element | null {
 
 /** Closes the list on a click outside the combobox. */
 function useCloseOutside(containerRef: React.RefObject<HTMLDivElement>, combo: Combo): void {
-  useDismissible({
-    ref: containerRef,
-    onDismiss: () => combo.setOpen(false),
-    manageFocus: false,
-    enabled: combo.open,
-  })
+  useCloseOnOutsidePress(containerRef, () => combo.setOpen(false), combo.open)
 }
 
 function AreaCombobox(props: ComboboxProps): React.JSX.Element {

@@ -5,7 +5,6 @@ import {
   shouldSuppressExitGesture,
 } from '../../shared/double-escape'
 import { useExtensionRegistry } from '../extensions/registry'
-import { useModalStore } from '../stores/modal.store'
 import { focusActiveTerminal } from '../lib/focus-terminal'
 
 /**
@@ -33,14 +32,14 @@ export function useExtensionEscapeExit(): void {
       if (e.key !== 'Escape') return
 
       // Escape belongs to the shell inside a terminal, and to the field being
-      // edited inside an input. A core modal owns it too — those close on a
+      // edited inside an input. A modal dialog or popover owns it too — those close on a
       // single Escape and must not also throw the user out of an extension.
       //
       // The rule itself lives in shared/double-escape so the copy running
       // inside every extension view applies exactly the same one. Two
       // implementations is how they came to disagree, and the extension side
       // was the one that lost people's drafts.
-      const context = escapeContextFromTarget(e.target, useModalStore.getState().depth)
+      const context = escapeContextFromTarget(e.target, document)
       if (shouldSuppressExitGesture(context)) {
         detector.reset()
         return

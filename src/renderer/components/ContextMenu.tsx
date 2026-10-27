@@ -1,6 +1,6 @@
-import React, { useEffect, useLayoutEffect, useRef } from 'react'
+import React from 'react'
 import { createPortal } from 'react-dom'
-import { keepOnScreen } from '@terminator/extension-ui'
+import { Menu, MenuItem } from '@terminator/extension-ui'
 
 export interface ContextMenuItem {
   label: string
@@ -18,40 +18,18 @@ interface ContextMenuProps {
   onDismiss: () => void
 }
 
-/**
- * Tells every open context menu to close. Callers dispatch this before opening
- * their own menu so two menus are never open at once.
- */
-export function closeAllContextMenus(): void {
-  window.dispatchEvent(new CustomEvent('close-context-menus'))
-}
-
-/** Drawn in the document body: an ancestor with containment (Home's `container-type: size`)
- * would otherwise hold the fixed menu and clip it at its own edge. */
+/** Drawn in the document body, so the row it opened from does not receive its clicks. The native
+ * popover closes it on Escape or a click outside, and closes any other menu that was open. */
 export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps): JSX.Element {
-  const ref = useRef<HTMLDivElement>(null)
-  // Before paint, so a menu opened near an edge never flashes half off screen.
-  useLayoutEffect(() => keepOnScreen(ref.current), [x, y, items])
-  useEffect(() => {
-    const dismiss = (): void => onDismiss()
-    window.addEventListener('click', dismiss)
-    window.addEventListener('close-context-menus', dismiss)
-    return () => {
-      window.removeEventListener('click', dismiss)
-      window.removeEventListener('close-context-menus', dismiss)
-    }
-  }, [onDismiss])
-
   return createPortal(
     <div
-      ref={ref}
-      className="ctx-menu"
-      style={{ left: x, top: y }}
       // The portal still bubbles through the React tree: the row behind must not act too.
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >
-      <MenuItems items={items} />
+      <Menu label="Actions" className="ctx-menu" at={{ x, y }} onDismiss={onDismiss}>
+        <MenuItems items={items} />
+      </Menu>
     </div>,
     document.body
   )
@@ -62,13 +40,13 @@ function MenuItems({ items }: { items: ContextMenuItem[] }): JSX.Element {
     <>
       {items.map((item) => (
         <React.Fragment key={item.label}>
-          {item.separatorBefore && <div className="ctx-menu__separator" />}
-          <button
+          {item.separatorBefore && <div role="separator" className="ctx-menu__separator" />}
+          <MenuItem
             className={`ctx-menu__item${item.danger ? ' ctx-menu__item--danger' : ''}`}
-            onClick={item.onSelect}
+            onSelect={item.onSelect}
           >
             {item.label}
-          </button>
+          </MenuItem>
         </React.Fragment>
       ))}
     </>

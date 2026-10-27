@@ -337,13 +337,11 @@ describe('buildElectronApi — the manifest is the whole surface', () => {
     for (const api of [native, remote]) {
       expect(methodAt(api, 'extension.runCommand')).toBeUndefined()
       expect(methodAt(api, 'terminal.listSessions')).toBeUndefined()
-      expect(api.ui).toBeUndefined()
     }
   })
 })
 
 const FRAME_LOCALS = {
-  'ui.setModalDepth': () => {},
   'extensionBridge.invoke': vi.fn(),
   'extensionBridge.on': vi.fn(),
 }
@@ -415,7 +413,6 @@ const FRAME_API_PATHS = [
   'terminal.listSessions',
   'terminal.onProcessExit',
   'terminal.resize',
-  'ui.setModalDepth',
   'workspace.create',
   'workspace.delete',
   'workspace.getActive',

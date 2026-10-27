@@ -1,6 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { Button, IconButton, useDismissible } from '@terminator/extension-ui'
+import React, { useEffect, useRef, useState } from 'react'
+import { Button, IconButton, Popover } from '@terminator/extension-ui'
 import { Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 import { localDate, monthName, weekdayName } from '../utils/local-date'
 
@@ -53,17 +52,14 @@ interface TimeProps {
   timeListRef: React.RefObject<HTMLDivElement>
 }
 
-interface PopoverProps extends PaneProps {
-  popoverRef: React.RefObject<HTMLDivElement>
+interface PickerPopoverProps extends PaneProps {
   timeListRef: React.RefObject<HTMLDivElement>
-  pos: { top: number; left: number }
   onDone: () => void
 }
 
 interface TriggerProps {
   props: DateTimePickerProps
   open: boolean
-  triggerRef: React.RefObject<HTMLButtonElement>
   onToggle: () => void
 }
 
@@ -257,47 +253,11 @@ const EMPTY_LABELS: Record<Mode, string> = {
   datetime: 'Pick date & time',
 }
 
-/** Below the trigger when the popover fits there, else above it. */
-function popoverPosition(rect: DOMRect): { top: number; left: number } {
-  const estimatedHeight = 360
-  const spaceBelow = window.innerHeight - rect.bottom - 8
-  const top = spaceBelow >= estimatedHeight ? rect.bottom + 4 : rect.top - estimatedHeight - 4
-  return { top, left: rect.left }
-}
-
-/** Where the popover is drawn, and the element it is drawn into: the modal dialog its trigger is
- *  in, because everything outside an open one is inert and painted over, else the page. */
-interface PopoverPlace {
-  top: number
-  left: number
-  host: Element
-}
-
-/** Whether the popover is open, and where. The trigger counts as inside the shared dismiss hook,
- *  so a click on it to close does not dismiss and immediately reopen. */
+/** Whether the popover is open. It opens under the trigger's wrapper and flips above it when
+ *  there is no room below. */
 function usePopover(defaultOpen: boolean | undefined) {
-  const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState<PopoverPlace | null>(null)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const popoverRef = useRef<HTMLDivElement>(null)
-  useDismissible({
-    ref: popoverRef,
-    onDismiss: () => setOpen(false),
-    alsoInside: [triggerRef],
-    manageFocus: false,
-    enabled: open,
-  })
-  const openPicker = useCallback(() => {
-    const trigger = triggerRef.current
-    if (!trigger) return
-    const host = trigger.closest('dialog') ?? document.body
-    setPos({ ...popoverPosition(trigger.getBoundingClientRect()), host })
-    setOpen(true)
-  }, [])
-  useEffect(() => {
-    if (defaultOpen) openPicker()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-  return { open, setOpen, pos, openPicker, triggerRef, popoverRef }
+  const [open, setOpen] = useState(defaultOpen === true)
+  return { open, setOpen }
 }
 
 /** The month the calendar shows: the value's month, or today's, re-anchored when the value changes. */
@@ -510,15 +470,13 @@ function popoverClass(mode: Mode): string {
   return 'dtp__popover'
 }
 
-function Popover(p: PopoverProps): React.JSX.Element {
-  const { picker, props, popoverRef, timeListRef } = p
+function PickerPopover(p: PickerPopoverProps): React.JSX.Element {
+  const { picker, props, timeListRef } = p
   return (
-    <div
-      data-tmui-surface=""
-      ref={popoverRef}
+    <Popover
+      label={EMPTY_LABELS[props.mode]}
       className={popoverClass(props.mode)}
-      style={{ top: p.pos.top, left: p.pos.left }}
-      onMouseDown={(e) => e.stopPropagation()}
+      onDismiss={p.onDone}
     >
       <ShortcutChips picker={picker} props={props} />
       <div className="dtp__body">
@@ -533,7 +491,7 @@ function Popover(p: PopoverProps): React.JSX.Element {
           Done
         </Button>
       </div>
-    </div>
+    </Popover>
   )
 }
 
@@ -544,15 +502,10 @@ function triggerClass(value: string, open: boolean): string {
   return cls
 }
 
-function TriggerButton({ props, open, triggerRef, onToggle }: TriggerProps): React.JSX.Element {
+function TriggerButton({ props, open, onToggle }: TriggerProps): React.JSX.Element {
   const Icon = props.mode === 'time' ? Clock : Calendar
   return (
-    <button
-      ref={triggerRef}
-      type="button"
-      className={triggerClass(props.value, open)}
-      onClick={onToggle}
-    >
+    <button type="button" className={triggerClass(props.value, open)} onClick={onToggle}>
       <Icon className="tm-icon" />
       <span className="dtp__trigger-label">{triggerLabel(props)}</span>
     </button>
@@ -562,29 +515,18 @@ function TriggerButton({ props, open, triggerRef, onToggle }: TriggerProps): Rea
 export function DateTimePicker(props: DateTimePickerProps): React.JSX.Element {
   const { className } = props
   const picker = usePicker(props)
-  const { open, pos, setOpen, openPicker, triggerRef, popoverRef } = picker.popover
-  const { timeListRef } = picker
+  const { open, setOpen } = picker.popover
   return (
     <div className={`dtp${className ? ` ${className}` : ''}`}>
-      <TriggerButton
-        props={props}
-        open={open}
-        triggerRef={triggerRef}
-        onToggle={() => (open ? setOpen(false) : openPicker())}
-      />
-      {open &&
-        pos &&
-        createPortal(
-          <Popover
-            picker={picker}
-            props={props}
-            popoverRef={popoverRef}
-            timeListRef={timeListRef}
-            pos={pos}
-            onDone={() => setOpen(false)}
-          />,
-          pos.host
-        )}
+      <TriggerButton props={props} open={open} onToggle={() => setOpen(!open)} />
+      {open && (
+        <PickerPopover
+          picker={picker}
+          props={props}
+          timeListRef={picker.timeListRef}
+          onDone={() => setOpen(false)}
+        />
+      )}
     </div>
   )
 }

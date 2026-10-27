@@ -9,7 +9,7 @@ import {
   Tag as TagIcon,
   X,
 } from 'lucide-react'
-import { Button, ConfirmDialog, useDismissible } from '@terminator/extension-ui'
+import { Button, ConfirmDialog, Menu, Popover } from '@terminator/extension-ui'
 import { loadLibrary, useNotesStore } from '../stores/notes.store'
 import { useFilterStore } from '../stores/filter.store'
 import { EmptyState } from './EmptyState'
@@ -83,7 +83,6 @@ interface TagFilterProps {
 
 interface MenuProps {
   ui: ListUi
-  menuRef: React.RefObject<HTMLDivElement>
 }
 
 type DragState = ReturnType<typeof useDragState>
@@ -337,20 +336,21 @@ function tagButtonLabel(count: number): string {
 function TagFilter({ tags }: TagFilterProps): React.JSX.Element {
   const { activeTagIds, clearTags } = useFilterStore()
   const [open, setOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-  useDismissible({
-    ref: dropdownRef,
-    onDismiss: () => setOpen(false),
-    manageFocus: false,
-    enabled: open,
-  })
   return (
-    <div className="notepad-tag-filter" ref={dropdownRef}>
+    <div className="notepad-tag-filter">
       <Button size="sm" icon={TagIcon} onClick={() => setOpen((v) => !v)}>
         {tagButtonLabel(activeTagIds.length)}
         {activeTagIds.length !== 0 && <ClearTagsButton onClear={clearTags} />}
       </Button>
-      {open && <TagOptions tags={tags} />}
+      {open && (
+        <Popover
+          label="Filter by tag"
+          className="notepad-tag-filter__dropdown"
+          onDismiss={() => setOpen(false)}
+        >
+          <TagOptions tags={tags} />
+        </Popover>
+      )}
     </div>
   )
 }
@@ -375,7 +375,7 @@ function TagOptions({ tags }: TagFilterProps): React.JSX.Element {
   const { activeTagIds, toggleTag } = useFilterStore()
   const rank = (tag: Tag) => (activeTagIds.includes(tag.id) ? 0 : 1)
   return (
-    <div className="notepad-tag-filter__dropdown">
+    <>
       {[...tags]
         .sort((a, b) => rank(a) - rank(b))
         .map((tag) => (
@@ -386,7 +386,7 @@ function TagOptions({ tags }: TagFilterProps): React.JSX.Element {
             onToggle={() => toggleTag(tag.id)}
           />
         ))}
-    </div>
+    </>
   )
 }
 
@@ -585,22 +585,12 @@ function ListFooter(): React.JSX.Element {
 // ── Menus and dialogs ─────────────────────────────────────────────
 
 function ListOverlays({ ui }: { ui: ListUi }): React.JSX.Element {
-  const menuRef = useRef<HTMLDivElement>(null)
-  const { setContextMenu, setFolderContextMenu, folderDeletePending } = ui
-  useDismissible({
-    ref: menuRef,
-    onDismiss: () => {
-      setContextMenu(null)
-      setFolderContextMenu(null)
-    },
-    manageFocus: false,
-    enabled: ui.contextMenu !== null || ui.folderContextMenu !== null,
-  })
+  const { folderDeletePending } = ui
 
   return (
     <>
-      {ui.contextMenu && <ItemContextMenu ui={ui} menuRef={menuRef} />}
-      {ui.folderContextMenu && <FolderContextMenu ui={ui} menuRef={menuRef} />}
+      {ui.contextMenu && <ItemContextMenu ui={ui} />}
+      {ui.folderContextMenu && <FolderContextMenu ui={ui} />}
       {ui.editModal && (
         <ItemEditModal
           state={ui.editModal}
@@ -634,7 +624,12 @@ function FolderDeleteConfirm(props: { ui: ListUi; folderId: string }): React.JSX
 function MenuItem({ onClick, danger, children }: MenuItemProps): React.JSX.Element {
   const modifier = danger ? ' notepad-context-menu__item--danger' : ''
   return (
-    <button className={'notepad-context-menu__item' + modifier} onClick={onClick}>
+    <button
+      type="button"
+      role="menuitem"
+      className={'notepad-context-menu__item' + modifier}
+      onClick={onClick}
+    >
       {children}
     </button>
   )
@@ -649,16 +644,17 @@ function itemMenuAction(ui: ListUi, action: (menu: ContextMenuState) => void) {
   }
 }
 
-function ItemContextMenu({ ui, menuRef }: MenuProps): React.JSX.Element | null {
+function ItemContextMenu({ ui }: MenuProps): React.JSX.Element | null {
   const menu = ui.contextMenu
   if (!menu) return null
   const editItem = ({ item, title, tags }: ContextMenuState) =>
     ui.setEditModal({ itemId: item.id, itemType: item.type, title, tags })
   return (
-    <div
-      ref={menuRef}
+    <Menu
+      label="Item actions"
       className="notepad-context-menu"
-      style={{ position: 'fixed', top: menu.y, left: menu.x }}
+      at={{ x: menu.x, y: menu.y }}
+      onDismiss={() => ui.setContextMenu(null)}
     >
       <MenuItem onClick={itemMenuAction(ui, editItem)}>Edit title &amp; tags</MenuItem>
       <MenuItem onClick={itemMenuAction(ui, (m) => void toggleArchived(m.item, m.isArchived))}>
@@ -673,11 +669,11 @@ function ItemContextMenu({ ui, menuRef }: MenuProps): React.JSX.Element | null {
         </MenuItem>
       )}
       {!menu.isArchived && <FolderMoves ui={ui} menu={menu} />}
-    </div>
+    </Menu>
   )
 }
 
-function FolderContextMenu({ ui, menuRef }: MenuProps): React.JSX.Element | null {
+function FolderContextMenu({ ui }: MenuProps): React.JSX.Element | null {
   const menu = ui.folderContextMenu
   if (!menu) return null
   const closeMenuThen = (then: () => void) => () => {
@@ -685,10 +681,11 @@ function FolderContextMenu({ ui, menuRef }: MenuProps): React.JSX.Element | null
     then()
   }
   return (
-    <div
-      ref={menuRef}
+    <Menu
+      label="Folder actions"
       className="notepad-context-menu"
-      style={{ position: 'fixed', top: menu.y, left: menu.x }}
+      at={{ x: menu.x, y: menu.y }}
+      onDismiss={() => ui.setFolderContextMenu(null)}
     >
       <MenuItem onClick={closeMenuThen(() => ui.setRenamingFolderId(menu.folderId))}>
         Rename
@@ -699,7 +696,7 @@ function FolderContextMenu({ ui, menuRef }: MenuProps): React.JSX.Element | null
       >
         Delete folder
       </MenuItem>
-    </div>
+    </Menu>
   )
 }
 

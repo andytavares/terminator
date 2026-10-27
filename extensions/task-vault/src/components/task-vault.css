@@ -2740,11 +2740,6 @@ h2.daily-log__date {
 }
 
 .tv-context-filter__dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  left: auto;
-  z-index: var(--tm-layer-modal);
   background: var(--tm-bg-base);
   border: 1px solid var(--tm-border);
   border-radius: 6px;
@@ -3967,8 +3962,7 @@ h2.daily-log__date {
 
 /* Popover */
 .dtp__popover {
-  position: fixed;
-  z-index: var(--tm-layer-toast);
+  padding: 0;
   background: var(--tm-bg-card);
   border: 1px solid var(--tm-border-strong);
   border-radius: 12px;

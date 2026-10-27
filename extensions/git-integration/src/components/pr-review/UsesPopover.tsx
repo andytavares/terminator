@@ -66,7 +66,7 @@ export function UsesPopover({ uses, compact, onPeekDefinition }: UsesPopoverProp
         {label}
       </Button>
       {open && (
-        <Popover label="Uses" onDismiss={() => setOpen(false)} className="vm-popover">
+        <Popover label="Uses" align="end" onDismiss={() => setOpen(false)} className="vm-popover">
           <UsesList uses={uses} onPeek={peek} />
         </Popover>
       )}

@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
-import { ContextMenu, closeAllContextMenus } from '../../../../src/renderer/components/ContextMenu'
+import { render, screen, fireEvent } from '@testing-library/react'
+import { ContextMenu } from '../../../../src/renderer/components/ContextMenu'
 
 let onDismiss: Mock<() => void>
 
@@ -32,7 +32,7 @@ describe('ContextMenu', () => {
 
   it('renders one item per entry', () => {
     render(<ContextMenu x={0} y={0} items={items} onDismiss={onDismiss} />)
-    expect(screen.getAllByRole('button')).toHaveLength(3)
+    expect(screen.getAllByRole('menuitem')).toHaveLength(3)
   })
 
   it('invokes onSelect when an item is clicked', () => {
@@ -52,10 +52,10 @@ describe('ContextMenu', () => {
   })
 })
 
-describe('ContextMenu — dismisses on an outside click', () => {
+describe('ContextMenu — dismissal is the browser’s light dismiss', () => {
   it('dismisses on an outside click', () => {
     render(<ContextMenu x={0} y={0} items={items} onDismiss={onDismiss} />)
-    fireEvent.click(window)
+    fireEvent.click(document.body)
     expect(onDismiss).toHaveBeenCalledOnce()
   })
 
@@ -65,28 +65,17 @@ describe('ContextMenu — dismisses on an outside click', () => {
     expect(onDismiss).not.toHaveBeenCalled()
   })
 
-  it('dismisses when another menu broadcasts close-context-menus', () => {
+  it('dismisses on Escape', () => {
     render(<ContextMenu x={0} y={0} items={items} onDismiss={onDismiss} />)
-    act(() => closeAllContextMenus())
+    fireEvent.keyDown(document, { key: 'Escape' })
     expect(onDismiss).toHaveBeenCalledOnce()
   })
 
   it('stops listening once unmounted', () => {
     const { unmount } = render(<ContextMenu x={0} y={0} items={items} onDismiss={onDismiss} />)
     unmount()
-    fireEvent.click(window)
-    act(() => closeAllContextMenus())
+    fireEvent.click(document.body)
     expect(onDismiss).not.toHaveBeenCalled()
-  })
-})
-
-describe('ContextMenu — closeAllContextMenus dispatches the coordination event', () => {
-  it('closeAllContextMenus dispatches the coordination event', () => {
-    const handler = vi.fn()
-    window.addEventListener('close-context-menus', handler)
-    closeAllContextMenus()
-    window.removeEventListener('close-context-menus', handler)
-    expect(handler).toHaveBeenCalledOnce()
   })
 })
 
@@ -100,7 +89,7 @@ describe('ContextMenu — never clipped by what holds it', () => {
     )
     const menu = document.querySelector('.ctx-menu') as HTMLElement
     expect(container.contains(menu)).toBe(false)
-    expect(menu.parentElement).toBe(document.body)
+    expect(menu.closest('body > div')?.parentElement).toBe(document.body)
   })
 })
 

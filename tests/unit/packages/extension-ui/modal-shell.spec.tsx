@@ -1,8 +1,8 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ModalShell } from '../../../../packages/extension-ui/src/ModalShell'
-import { getModalDepth, MODAL_DEPTH_KEY } from '../../../../packages/extension-ui/src/modal-depth'
+import { isSurfaceOpen } from '../../../../src/shared/double-escape'
 import { pressOutside } from '../../../support/modal'
 
 // The test DOMs supply only showModal(), close() and Escape's `cancel` (tests/support/
@@ -19,10 +19,6 @@ function renderShell(overrides: Partial<ShellProps> = {}) {
   )
   return { ...utils, onDismiss, dialog: screen.getByRole('dialog') }
 }
-
-beforeEach(() => {
-  delete window[MODAL_DEPTH_KEY]
-})
 
 describe('ModalShell — what it is', () => {
   it('is a native dialog, opened, holding the caller’s content', () => {
@@ -168,12 +164,12 @@ describe('ModalShell — nested', () => {
   })
 })
 
-describe('ModalShell — modal depth', () => {
-  it('counts while open, so the exit gesture stands down, and releases on close', () => {
+describe('ModalShell — is open for the exit gesture to read', () => {
+  it('is a modal dialog while open, so the exit gesture stands down, and none after close', () => {
     const { unmount } = renderShell()
-    expect(getModalDepth(window)).toBe(1)
+    expect(isSurfaceOpen(document)).toBe(true)
     unmount()
-    expect(getModalDepth(window)).toBe(0)
+    expect(isSurfaceOpen(document)).toBe(false)
   })
 })
 

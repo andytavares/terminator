@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { ModalShell } from '@terminator/extension-ui'
 import '@terminator/extension-ui/styles.css'
-import { useModalEffect } from '../../stores/modal.store'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { groupThreads, type ThreadGroup, type WorkThread } from '../../home/work-threads'
 import { revealBranch } from '../../terminal/reveal-branch'
@@ -86,7 +85,6 @@ function SwitcherField({ switcher }: { switcher: Switcher }): JSX.Element {
 }
 
 function SwitcherDialog(): JSX.Element {
-  useModalEffect()
   const switcher = useSwitcher()
   return (
     <ModalShell

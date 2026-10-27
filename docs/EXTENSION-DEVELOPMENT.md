@@ -352,7 +352,7 @@ await window.electronAPI.fs.watchStop()
 ### Keys the core handles in your view
 
 - **`⌘P` / `Ctrl+P`** opens the core's Quick Actions panel even while focus is in your view: the host watches `before-input-event` on every view (`isQuickActionsOpenShortcut`).
-- **`Esc` twice within 500 ms** leaves your extension and returns the operator to their terminal ([ADR 026](adr/026-double-escape-extension-exit.md)). The listener in the core's frame script is passive and bubble-phase, so your own single-`Esc` handlers run as normal. It stands down inside a text field and while a dialog is open; the design system's `ModalShell` (and so `Dialog`) reports open dialogs over `electronAPI.ui.setModalDepth`. Do not write a modal of your own: give `ModalShell` your content. Do not stop `Esc` propagation at the window level, or the gesture stops working in your view.
+- **`Esc` twice within 500 ms** leaves your extension and returns the operator to their terminal ([ADR 026](adr/026-double-escape-extension-exit.md)). The listener in the core's frame script is passive and bubble-phase, so your own single-`Esc` handlers run as normal. It stands down inside a text field and while a modal `<dialog>` or a popover is open in your view; it reads `document.querySelector('dialog:modal, :popover-open')`, so `ModalShell` (and so `Dialog`), `Popover` and `Menu` need no reporting. Do not write a modal of your own: give `ModalShell` your content. Do not stop `Esc` propagation at the window level, or the gesture stops working in your view.
 
 ### Testing your view end to end
 
@@ -407,7 +407,8 @@ An action with `submit: true` makes the dialog a form: Enter in a field runs tha
 | `Markdown`                                       | Sanitised Markdown; links open through your `onOpenLink`         |
 | `RelativeTime`, `formatRelativeTime`             | "5 minutes ago"; nothing for a time that does not parse          |
 | `usePolling`, `everyWhileVisible`                | Read now and on an interval; tick only while the view is visible |
-| `useDismissible`                                 | Outside-click, Escape and focus restore for your own surface     |
+| `Popover`, `Menu`, `MenuItem`                    | A native popover under its anchor; a menu with arrow keys        |
+| `useCloseOnOutsidePress`                         | Outside-click for a list that cannot be a `Popover`              |
 | `LAYERS`, `layerValue`                           | Stacking by name                                                 |
 
 `packages/extension-ui/src/index.ts` is the complete export list.

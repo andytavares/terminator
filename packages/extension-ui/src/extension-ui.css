@@ -378,7 +378,7 @@
 
 /* A surface raised over the view: a toast, a popover, a tooltip. */
 .tmui-toast,
-.tmui-popover,
+:where(.tmui-popover),
 .tmui-tooltip {
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-sm, 6px);
@@ -427,10 +427,61 @@
 
 /* ── Popover ────────────────────────────────────────────────────────────── */
 
-.tmui-popover {
-  position: absolute;
+/* Placed against the element it is rendered inside, flipped at a window edge. `:where` keeps it
+   at no specificity, so a caller's own class decides any of it. */
+:where(.tmui-anchored) {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  top: calc(anchor(bottom) + var(--tm-space-1, 4px));
+  left: anchor(left);
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  position-try-fallbacks:
+    flip-block,
+    flip-inline,
+    flip-block flip-inline;
+}
+
+:where(.tmui-anchored--end) {
+  left: auto;
+  right: anchor(right);
+}
+
+:where(.tmui-popover) {
   min-width: 200px;
   padding: var(--tm-space-2, 8px);
+}
+
+:where(.tmui-menu) {
+  padding: 4px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm, 6px);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-primary);
+  font-family: var(--tm-font-ui);
+  font-size: 13px;
+}
+
+:where(.tmui-menu__item) {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--tm-radius-xs);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+:where(.tmui-menu__item:hover, .tmui-menu__item:focus-visible) {
+  background: var(--tm-overlay);
+}
+
+:where(.tmui-menu__item--danger) {
+  color: var(--tm-danger);
 }
 
 .tmui-toast__action {

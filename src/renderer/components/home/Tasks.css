@@ -187,9 +187,6 @@
   display: inline-block;
 }
 .archived-tasks__panel {
-  position: absolute;
-  right: 0;
-  bottom: 100%;
   min-width: 280px;
   max-height: 320px;
   overflow-y: auto;

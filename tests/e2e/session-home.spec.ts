@@ -55,7 +55,7 @@ async function listsTerminalUnderItsWork(page: Page): Promise<void> {
 
 async function tabMenuItem(page: Page, name: string): Promise<void> {
   await sessionTab(page).click({ button: 'right' })
-  await clickOnceDrawn(page.locator('.ctx-menu').getByRole('button', { name }))
+  await clickOnceDrawn(page.locator('.ctx-menu').getByRole('menuitem', { name }))
 }
 
 async function descriptionNamesTheWork(page: Page): Promise<void> {

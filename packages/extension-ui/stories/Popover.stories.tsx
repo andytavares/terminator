@@ -1,6 +1,6 @@
 import React from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, fn, userEvent } from 'storybook/test'
+import { expect, fn, within } from 'storybook/test'
 import { Popover } from '../src/Popover'
 import { Button } from '../src/Button'
 import { inLight } from './in-light'
@@ -37,12 +37,30 @@ type Story = StoryObj<typeof meta>
 
 export const Default: Story = {}
 
-export const EscapeDismisses: Story = {
-  play: async ({ args }) => {
-    await userEvent.keyboard('{Escape}')
-    await expect(args.onDismiss).toHaveBeenCalledTimes(1)
+const surfaceIn = (canvasElement: HTMLElement): HTMLElement =>
+  within(canvasElement).getByRole('group', { name: 'Branch actions' })
+
+/** Open in the top layer, under the element it is rendered inside, left edges together. */
+export const OpensUnderItsAnchor: Story = {
+  play: async ({ canvasElement }) => {
+    const surface = surfaceIn(canvasElement)
+    await expect(surface.matches(':popover-open')).toBe(true)
+    const anchor = surface.parentElement!.getBoundingClientRect()
+    const box = surface.getBoundingClientRect()
+    await expect(box.top).toBeGreaterThanOrEqual(anchor.bottom)
+    await expect(Math.round(box.left)).toBe(Math.round(anchor.left))
+  },
+}
+
+/** Focus moves in to the first control. Escape and an outside click are the browser's light
+ * dismiss, driven with real keys in visual/popover.visual.ts. */
+export const FocusMovesIn: Story = {
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(surfaceIn(canvasElement)).getByRole('button', { name: 'Rename branch' })
+    ).toHaveFocus()
   },
 }
 
 export const DefaultLight = inLight(Default)
-export const EscapeDismissesLight = inLight(EscapeDismisses)
+export const OpensUnderItsAnchorLight = inLight(OpensUnderItsAnchor)

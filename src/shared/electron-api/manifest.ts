@@ -1685,16 +1685,6 @@ export const ELECTRON_API_MANIFEST = [
     signature: signature<(handler: (payload: unknown) => void) => Unsubscribe>(),
   }),
 
-  // ── ui (extension views) ──────────────────────────────────────────────────
-  // Reported by @terminator/extension-ui whenever a dialog opens or closes, so
-  // the webview preload's Escape listener knows something else has claimed the key.
-  method({
-    path: 'ui.setModalDepth',
-    kind: 'local',
-    signature: signature<(depth: number) => void>(),
-    extensionView: 'only',
-  }),
-
   // ── top-level ─────────────────────────────────────────────────────────────
   // Native: webUtils.getPathForFile. No remote equivalent.
   method({

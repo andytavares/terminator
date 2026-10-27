@@ -167,8 +167,6 @@ button {
 
 /* ── Context Menus ───────────────────────────────────────────── */
 .ctx-menu {
-  position: fixed;
-  z-index: 9999;
   min-width: 160px;
   background: var(--tm-bg-elevated);
   border: 1px solid var(--tm-border-strong);

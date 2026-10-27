@@ -52,10 +52,6 @@
 }
 
 .sidebar-menu__panel {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 40;
   min-width: 168px;
   padding: 4px;
   background: var(--tm-bg-card);
