@@ -55,7 +55,8 @@ function contractHead(order: WorkOrder): string[] {
     'are not changing rather than restating it. Inside `intent`, `risk` and `plan`',
     'the same holds key by key. In `acceptance` and `plan.units`, send only the',
     'items you add or change: an item with a known `id` replaces that item, and a',
-    'new `id` adds one. Every other list you send replaces that list whole.',
+    'new `id` adds one; to drop one, name its `id` in `remove.acceptance` or',
+    '`remove.units`. Every other list you send replaces that list whole.',
     ...(branch === '' ? [] : [`The lane branch to keep is ${JSON.stringify(branch)}.`]),
     '',
   ]
