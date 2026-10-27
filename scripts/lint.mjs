@@ -8,6 +8,7 @@ import { readdirSync } from 'node:fs'
 import { availableParallelism, totalmem } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { eachLimited } from './each-limited.mjs'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 // Matches --max-old-space-size=4096 below: a group may grow to it.
@@ -21,15 +22,8 @@ export function lintConcurrency({ cores, memory }) {
 
 /** Runs every group, `limit` at a time. Resolves 1 if any group's status is not 0, else 0. */
 export async function runAll(runs, spawnRun, limit) {
-  const queue = [...runs]
-  let failed = false
-  async function worker() {
-    for (let run = queue.shift(); run; run = queue.shift()) {
-      if ((await spawnRun(run)) !== 0) failed = true
-    }
-  }
-  await Promise.all(Array.from({ length: limit }, worker))
-  return failed ? 1 : 0
+  const statuses = await eachLimited(runs, limit, spawnRun)
+  return statuses.some((status) => status !== 0) ? 1 : 0
 }
 
 /** ESLint's arguments for each run: each group, then the rest of the repository. */

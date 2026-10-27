@@ -7,6 +7,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { eachLimited } from './each-limited.mjs'
 import { IMPACT_MAP, isMainPush, listSpecs, matchesAny, select } from './e2e-select.mjs'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -188,20 +189,6 @@ async function unitImpact(file, tools, unitSpecs) {
 
 /** How many changed files are looked up at once: each lookup starts a vitest instance. */
 const LOOKUPS_AT_ONCE = 4
-
-/** `work` over each item, at most `limit` at a time, results in the items' order. */
-async function eachLimited(items, limit, work) {
-  const results = new Array(items.length)
-  let next = 0
-  const worker = async () => {
-    while (next < items.length) {
-      const index = next++
-      results[index] = await work(items[index])
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
-  return results
-}
 
 async function unitSelection(changed, tools) {
   const unitSpecs = await tools.unitSpecs()
