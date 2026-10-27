@@ -1,6 +1,6 @@
 import React from 'react'
 import type { ConflictBlock, GitAuthor } from '../../schemas/merge-flow.schema'
-import { langFromBlockId, highlightLine } from '../../utils/syntax'
+import { extensionOfBlock, highlight } from '../../utils/syntax'
 import { choose } from '../text'
 
 interface DiffLine {
@@ -128,7 +128,7 @@ function DiffCodeView(props: DiffCodeViewProps) {
           <span className="conflict-line__prefix">{row.prefix}</span>
           <span
             className="conflict-line__text hljs"
-            dangerouslySetInnerHTML={{ __html: highlightLine(row.line, props.lang) || ' ' }}
+            dangerouslySetInnerHTML={{ __html: highlight(row.line, props.lang) || ' ' }}
           />
         </div>
       ))}
@@ -187,7 +187,7 @@ function SidePanel({ panel }: { panel: SideProps }) {
         diffLines={computeLineDiff(block.baseText, text)}
         contextAfter={block.contextAfter}
         side={side}
-        lang={langFromBlockId(block.blockId)}
+        lang={extensionOfBlock(block.blockId)}
       />
     </div>
   )

@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef } from 'react'
 import { VirtualDiffList, type VirtualDiffListHandle } from './VirtualDiffList'
-import { detectLanguage } from '../FileDiffView'
+import { extensionOf } from '../../utils/syntax'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
 import { useSplitDrag } from '../../hooks/useSplitDrag'
 import type { PrChangedFile, PrReviewDetail, PrHead } from '../../schemas/pr-review.schema'
@@ -137,7 +137,7 @@ function useDiffView(props: Props, store: ReviewStore, ui: UiStore) {
   const request = diffRequest(props, store, ui)
   const loaded = useDiffLoad(request, Boolean(file.isBinary))
   const { diff } = loaded
-  useComplexityPatch({
+  const hotspots = useComplexityPatch({
     diff,
     path: file.path,
     chapters: pr.chapters,
@@ -151,14 +151,14 @@ function useDiffView(props: Props, store: ReviewStore, ui: UiStore) {
   }
   const gaps = useGaps({ target, diff, isBinary: file.isBinary, diffKey: request.diffKey })
   const moved = useMovedMarks(pr.movedBlocks, file.path)
-  const viewedHunks = useViewedHunks(store.viewedHunks[file.path])
   const items = useDiffItems({
     diff,
+    hotspots,
     mode: ui.diffViewMode,
     hideFormattingHunks: ui.hideFormattingHunks,
     gapViews: gaps.gapViews,
     movedMark: moved.movedMark,
-    viewedHunks,
+    viewedHunks: useViewedHunks(store.viewedHunks[file.path]),
   })
   return { request, loaded, gaps, moved, items }
 }
@@ -259,7 +259,7 @@ function paneContext(parts: ContextParts): PaneContext {
     head: w.head,
     diff: view.loaded.diff,
     mode: ui.diffViewMode,
-    lang: detectLanguage(props.file.path),
+    lang: extensionOf(props.file.path),
     selection: ui.selection,
     lookups: lines.lookups,
     drag: lines.drag,

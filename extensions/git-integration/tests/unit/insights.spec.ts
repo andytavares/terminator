@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { Parser, Tree } from 'web-tree-sitter'
-import { computeInsights, type ComputeInsightsOptions } from '../../src/review/insights'
+import {
+  computeInsights,
+  measureDiffComplexity,
+  type ComputeInsightsOptions,
+} from '../../src/review/insights'
 import type { Chapter, DryViolation, ReadingStep } from '../../src/schemas/pr-review.schema'
 import { parsePrFiles } from '../../src/review/parsed-file'
+import { parsePrFileDiff } from '../../src/github/pr-review-service'
 
 const insightsOf = (files: unknown[], opts: ComputeInsightsOptions) =>
   computeInsights(parsePrFiles(files), opts)
@@ -139,15 +144,41 @@ describe('computeInsights() — complexity of skipped, removed and unparsed code
     expect(insights.complexity.branchDelta).toBeLessThan(0)
   })
 
-  it('does not flag a fallback file whose keyword count is unchanged', async () => {
-    const insights = await insightsOf([STEADY_TF_FILE], baseOpts)
+  it('measures nothing for a file with no grammar', async () => {
+    const insights = await insightsOf([STEADY_TF_FILE, DEPLOY_TF_FILE], baseOpts)
     expect(insights.complexity.functions).toEqual([])
+    expect(insights.complexity.branchDelta).toBe(0)
+  })
+})
+
+const BUSY_PATCH = [
+  '@@ -0,0 +1,9 @@',
+  '+export function busy(a: number) {',
+  '+  if (a > 1) return 1',
+  '+  if (a > 2) return 2',
+  '+  if (a > 3) return 3',
+  '+  if (a > 4) return 4',
+  '+  if (a > 5) return 5',
+  '+  if (a > 6) return 6',
+  '+  return 0',
+  '+}',
+  '@@ -20,0 +30,3 @@',
+  '+export function calm(a: number) {',
+  '+  return a',
+  '+}',
+].join('\n')
+
+describe('measureDiffComplexity()', () => {
+  it('flags only the hunk that adds five or more branches', async () => {
+    const measured = await measureDiffComplexity('src/busy.ts', parsePrFileDiff(BUSY_PATCH, 'x'))
+    expect(measured?.delta).toBe(6)
+    expect(measured?.hotspots).toEqual([
+      expect.objectContaining({ hunkIndex: 0, complexityDelta: 6 }),
+    ])
   })
 
-  it('falls back to keyword counting for a file with no grammar', async () => {
-    const insights = await insightsOf([DEPLOY_TF_FILE], baseOpts)
-    expect(insights.complexity.source).toBe('keyword count · approximate')
-    expect(insights.complexity.branchDelta).toBeGreaterThan(0)
+  it('returns null for a file with no grammar', async () => {
+    expect(await measureDiffComplexity('infra/a.tf', parsePrFileDiff(BUSY_PATCH, 'x'))).toBeNull()
   })
 })
 

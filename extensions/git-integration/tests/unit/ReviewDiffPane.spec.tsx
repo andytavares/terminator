@@ -30,8 +30,8 @@ vi.mock('../../src/stores/review-ui.store', async (importOriginal) => {
     },
   }
 })
-vi.mock('../../src/components/FileDiffView', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/components/FileDiffView')>()
+vi.mock('../../src/utils/syntax', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/utils/syntax')>()
   highlightSpy.mockImplementation(actual.highlight)
   return { ...actual, highlight: highlightSpy }
 })
@@ -87,14 +87,9 @@ vi.mock('../../src/components/pr-review/CommentComposer', () => ({
     </div>
   ),
 }))
-vi.mock('../../src/github/pr-review-service', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/github/pr-review-service')>()
-  return {
-    ...actual,
-    detectComplexityHotspots: vi.fn().mockReturnValue([]),
-    computeFileCyclomaticDelta: vi.fn().mockReturnValue(0),
-  }
-})
+vi.mock('../../src/review/insights', () => ({
+  measureDiffComplexity: vi.fn().mockResolvedValue(null),
+}))
 
 const mockPatchFileComplexity = vi.fn()
 const mockAddNote = vi.fn()

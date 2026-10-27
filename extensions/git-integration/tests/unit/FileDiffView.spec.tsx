@@ -3,14 +3,6 @@ import { describe, it, beforeAll, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { FileDiff } from '../../src/schemas/git.schema'
 
-vi.mock('../../src/utils/hljs', () => ({
-  default: {
-    highlight: vi.fn((_content: string, _opts: { language: string }) => ({
-      value: '<span>highlighted</span>',
-    })),
-  },
-}))
-
 const makeDiff = (overrides: Partial<FileDiff> = {}): FileDiff => ({
   path: 'src/foo.ts',
   isBinary: false,

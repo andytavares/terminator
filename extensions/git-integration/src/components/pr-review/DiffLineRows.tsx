@@ -1,14 +1,14 @@
 import React, { memo } from 'react'
 import { Plus } from 'lucide-react'
 import type { DiffLine } from '../../schemas/git.schema'
-import { highlight, type detectLanguage } from '../FileDiffView'
+import { highlight } from '../../utils/syntax'
 import { choose } from '../text'
 import { unifiedSide } from './diff-pane/lines'
 import { markChangedWords, type Span } from './diff-pane/word-diff'
 import './diff-pane/diff-rows.css'
 
 export type Side = 'LEFT' | 'RIGHT'
-type Language = ReturnType<typeof detectLanguage>
+type Language = string | undefined
 
 export interface GutterChip {
   kind: 'danger' | 'warn'

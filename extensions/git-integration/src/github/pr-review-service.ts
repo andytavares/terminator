@@ -19,7 +19,7 @@ import {
   CHURN_HIGH_COMMITS,
   CHURN_MEDIUM_COMMITS,
 } from '../review/risk-thresholds.js'
-import { FileDiffSchema } from '../schemas/git.schema.js'
+import { parseDiff } from '../git/git-parser.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,7 +68,7 @@ interface QueueTotals {
 /** The tracker connection that fills in an issue's title and state. */
 export interface IssueLookup {
   get(
-    tracker: 'linear' | 'jira',
+    tracker: 'linear',
     key: string,
     opts?: { refresh?: boolean }
   ): Promise<{ title: string; state: { name: string } } | null>
@@ -89,59 +89,6 @@ type ReviewRequestNode = {
   requestedReviewer?: { login?: string; avatarUrl?: string; name?: string }
 }
 type Nodes<T> = { nodes?: T[] } | undefined
-
-type DiffLineDraft = FileDiff['hunks'][0]['lines'][0]
-
-// ─── Decision-point keywords for cyclomatic complexity ───────────────────────
-
-const DECISION_KEYWORDS = [
-  /\bif\b/g,
-  /\belse\s+if\b/g,
-  /\bfor\b/g,
-  /\bwhile\b/g,
-  /\bdo\b/g,
-  /\bswitch\b/g,
-  /\bcase\b/g,
-  /\bcatch\b/g,
-  /&&/g,
-  /\|\|/g,
-  /\?\?/g,
-  /\?(?!\?)/g,
-]
-
-function countDecisionPoints(line: string): number {
-  return DECISION_KEYWORDS.reduce((acc, re) => {
-    re.lastIndex = 0
-    return acc + (line.match(re)?.length ?? 0)
-  }, 0)
-}
-
-/** Decision points the hunk adds minus those it removes. */
-function hunkDecisionDelta(hunk: FileDiff['hunks'][0]): number {
-  let delta = 0
-  for (const line of hunk.lines) {
-    if (line.type === 'add') delta += countDecisionPoints(line.content)
-    else if (line.type === 'remove') delta -= countDecisionPoints(line.content)
-  }
-  return delta
-}
-
-// ─── Complexity hotspot detection ─────────────────────────────────────────────
-
-export function detectComplexityHotspots(diff: FileDiff): ComplexityHotspot[] {
-  const hotspots: ComplexityHotspot[] = []
-  diff.hunks.forEach((hunk, hunkIndex) => {
-    const delta = hunkDecisionDelta(hunk)
-    if (delta < 5) return
-    const message = `Complexity hotspot — this block adds ${delta} decision points (cyclomatic delta +${delta}).`
-    hotspots.push({ hunkIndex, complexityDelta: delta, message })
-  })
-  return hotspots
-}
-
-export function computeFileCyclomaticDelta(diff: FileDiff): number {
-  return diff.hunks.reduce((total, hunk) => total + hunkDecisionDelta(hunk), 0)
-}
 
 // ─── Risk score computation ────────────────────────────────────────────────────
 
@@ -775,6 +722,25 @@ function checkStates(checks: RawRecord[], first: 'state' | 'conclusion'): string
   return checks.map((s) => String(s[first] ?? s[second] ?? '').toUpperCase())
 }
 
+export const LINT_CHECK_NAMES = [
+  'lint',
+  'eslint',
+  'rubocop',
+  'flake8',
+  'pylint',
+  'stylelint',
+  'prettier',
+  'tslint',
+]
+export const COVERAGE_CHECK_NAMES = [
+  'coverage',
+  'codecov',
+  'coveralls',
+  'sonar',
+  'codeclimate',
+  'lcov',
+]
+
 function checksNamed(rollup: RawRecord[], keywords: string[]): RawRecord[] {
   return rollup.filter((s) => {
     const name = String(s.name ?? s.context ?? '').toLowerCase()
@@ -788,9 +754,6 @@ function asRollup(rollup: unknown): RawRecord[] | null {
 }
 
 // ─── Queue PR parsing ─────────────────────────────────────────────────────────
-
-const LINT_NAMES = ['lint', 'eslint', 'rubocop', 'flake8', 'pylint', 'stylelint', 'tslint']
-const COVERAGE_NAMES = ['coverage', 'codecov', 'coveralls', 'sonar', 'codeclimate', 'lcov']
 
 function checkSignal(rollup: unknown, keywords: string[]): SignalValue {
   const checks = checksNamed(asRollup(rollup) ?? [], keywords)
@@ -853,9 +816,9 @@ function queueTotals(obj: RawRecord): QueueTotals {
 function signalDotsFor(totals: QueueTotals, rollup: unknown): SignalDots {
   return {
     tests: testsSignal(totals.filePaths),
-    coverage: checkSignal(rollup, COVERAGE_NAMES),
+    coverage: checkSignal(rollup, COVERAGE_CHECK_NAMES),
     ci: ciSignal(rollup),
-    lint: checkSignal(rollup, LINT_NAMES),
+    lint: checkSignal(rollup, LINT_CHECK_NAMES),
     churn: churnSignal(totals.additions + totals.deletions, totals.fileCount),
     blast: blastSignal(totals.fileCount),
   }
@@ -1000,7 +963,8 @@ export function extractIssueRefs(body: string): IssueRef[] {
 }
 
 async function enrichIssueRef(ref: IssueRef, issues: IssueLookup): Promise<IssueRef> {
-  if (ref.type === 'github') return ref
+  // Jira links are recognised in PR text, but no Jira connection exists to enrich them.
+  if (ref.type !== 'linear') return ref
   try {
     const issue = await issues.get(ref.type, ref.ref)
     if (issue === null) return ref
@@ -1096,25 +1060,6 @@ export function normalizeGraphQLNode(node: unknown): Record<string, unknown> {
     assigneeLogins: assigneeNodes.map((n) => n.login ?? '').filter(Boolean),
   }
 }
-
-export const LINT_CHECK_NAMES = [
-  'lint',
-  'eslint',
-  'rubocop',
-  'flake8',
-  'pylint',
-  'stylelint',
-  'prettier',
-  'tslint',
-]
-export const COVERAGE_CHECK_NAMES = [
-  'coverage',
-  'codecov',
-  'coveralls',
-  'sonar',
-  'codeclimate',
-  'lcov',
-]
 
 const MERGE_STATES: Record<string, 'behind' | 'dirty' | 'clean'> = {
   BEHIND: 'behind',
@@ -1226,50 +1171,6 @@ export function mapComment(raw: unknown): InlineComment {
   }
 }
 
-/** The diff line a patch line is, numbered later; null for a file header line. */
-function draftLine(line: string): DiffLineDraft | null {
-  const content = line.slice(1)
-  if (line.startsWith('+++') || line.startsWith('---')) return null
-  const blank = { content, oldLineNumber: null, newLineNumber: null }
-  if (line.startsWith('+')) return { type: 'add', ...blank }
-  if (line.startsWith('-')) return { type: 'remove', ...blank }
-  return { type: 'context', ...blank }
-}
-
-function hunksFromPatch(raw: string): FileDiff['hunks'] {
-  const hunks: FileDiff['hunks'] = []
-  const rawLines = raw.split('\n')
-  for (const [i, line] of rawLines.entries()) {
-    if (line.startsWith('\\')) continue
-    if (line === '' && i === rawLines.length - 1) continue
-    if (line.startsWith('@@ ')) {
-      hunks.push({ header: line, lines: [] })
-      continue
-    }
-    const drafted = hunks.length > 0 ? draftLine(line) : null
-    if (drafted) hunks[hunks.length - 1].lines.push(drafted)
-  }
-  return hunks
-}
-
-function numberHunkLines(hunk: FileDiff['hunks'][0]): void {
-  const match = hunk.header.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
-  let oldN = match ? parseInt(match[1], 10) : 1
-  let newN = match ? parseInt(match[2], 10) : 1
-  for (const dl of hunk.lines) {
-    if (dl.type !== 'add') dl.oldLineNumber = oldN++
-    if (dl.type !== 'remove') dl.newLineNumber = newN++
-  }
-}
-
 export function parsePrFileDiff(raw: string, filePath: string): FileDiff {
-  if (!raw.trim()) return { path: filePath, hunks: [], isBinary: false, truncated: false }
-  if (raw.includes('Binary files')) {
-    return { path: filePath, hunks: [], isBinary: true, truncated: false }
-  }
-  const hunks = hunksFromPatch(raw)
-  hunks.forEach(numberHunkLines)
-  const result = FileDiffSchema.safeParse({ path: filePath, hunks, isBinary: false })
-  if (result.success) return result.data
-  return { path: filePath, hunks, isBinary: false, truncated: false }
+  return { ...parseDiff(raw, Infinity), path: filePath }
 }

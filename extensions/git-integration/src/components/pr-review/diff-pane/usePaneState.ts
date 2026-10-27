@@ -2,11 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { usePrReviewStore } from '../../../stores/pr-review.store'
 import { useReviewUiStore } from '../../../stores/review-ui.store'
-import {
-  classifyHunk,
-  computeFileCyclomaticDelta,
-  detectComplexityHotspots,
-} from '../../../github/pr-review-service'
+import { classifyHunk, type ComplexityHotspot } from '../../../github/pr-review-service'
+import { measureDiffComplexity } from '../../../review/insights'
 import { buildSplitRows } from '../../FileDiffView'
 import { buildDiffItems, type GapView, type MovedMark } from '../../../review/diff-items'
 import type { Chapter, MovedBlock, PrHead, ReviewNote } from '../../../schemas/pr-review.schema'
@@ -45,6 +42,7 @@ interface TestsSource extends JumpTarget {
 
 interface ItemSource {
   diff: FileDiff | null
+  hotspots: ComplexityHotspot[]
   mode: DiffViewMode
   hideFormattingHunks: boolean
   gapViews: Map<string, GapView>
@@ -237,8 +235,7 @@ export function useViewedHunks(headers: string[] | undefined): Set<string> {
 
 /** The virtual list's entries for the diff as shown. */
 export function useDiffItems(source: ItemSource): DiffItem[] {
-  const { diff, mode, hideFormattingHunks, gapViews, movedMark, viewedHunks } = source
-  const hotspots = useMemo(() => (diff && detectComplexityHotspots(diff)) || [], [diff])
+  const { diff, mode, hideFormattingHunks, gapViews, movedMark, viewedHunks, hotspots } = source
   const splitRows = useMemo(() => splitRowsOf(diff), [diff])
   const visibleHunks = useMemo(
     () => visibleHunksOf(diff, hideFormattingHunks),
@@ -255,24 +252,35 @@ function splitRowsOf(diff: FileDiff | null) {
   return (diff?.hunks ?? []).map((hunk) => buildSplitRows(hunk.lines))
 }
 
-/** Feeds the diff's complexity delta into the file's risk score. The chapters and the store action
- *  are read through refs: as dependencies they would loop (patching updates the chapters, which
- *  would refetch the diff and blank the pane). */
-export function useComplexityPatch(target: ComplexityTarget) {
+/** Measures the diff once. Its branch delta feeds the file's risk score, and its hotspot hunks go to
+ *  the list. The chapters and the store action are read through refs: as dependencies they would
+ *  loop (patching updates the chapters, which would refetch the diff and blank the pane). */
+export function useComplexityPatch(target: ComplexityTarget): ComplexityHotspot[] {
   const patchRef = useRef(target.patchFileComplexity)
   const chaptersRef = useRef<Chapter[]>(target.chapters)
   useEffect(() => {
     patchRef.current = target.patchFileComplexity
     chaptersRef.current = target.chapters
   })
+  const [measured, setMeasured] = useState<{ diff: FileDiff; hotspots: ComplexityHotspot[] }>()
   const { diff, path } = target
   useEffect(() => {
     if (!diff) return
-    const delta = computeFileCyclomaticDelta(diff)
-    const chapter = chaptersRef.current.find((c) => c.files.some((f) => f.path === path))
-    if (chapter) patchRef.current(chapter.id, path, delta)
+    let current = true
+    void measureDiffComplexity(path, diff).then((result) => {
+      if (!current) return
+      setMeasured({ diff, hotspots: result?.hotspots ?? [] })
+      const chapter = chaptersRef.current.find((c) => c.files.some((f) => f.path === path))
+      if (chapter) patchRef.current(chapter.id, path, result?.delta ?? 0)
+    })
+    return () => {
+      current = false
+    }
   }, [diff, path])
+  return measured?.diff === diff ? measured.hotspots : NO_HOTSPOTS
 }
+
+const NO_HOTSPOTS: ComplexityHotspot[] = []
 
 /** The chapter holding `path`, if any. */
 export function findChapterId(chapters: Chapter[], path: string): string | null {
