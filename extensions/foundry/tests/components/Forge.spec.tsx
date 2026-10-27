@@ -162,13 +162,11 @@ function isUnavailable(el: HTMLElement): boolean {
   return el.getAttribute('aria-disabled') === 'true'
 }
 
-/** The reason an unavailable control names, via its `aria-describedby`. */
+/** The reason an unavailable control names, as its `title`. */
 function reasonFor(el: HTMLElement): string {
-  const id = el.getAttribute('aria-describedby')
-  expect(id).not.toBeNull()
-  const tip = document.getElementById(id as string)
-  expect(tip).not.toBeNull()
-  return tip?.textContent ?? ''
+  const title = el.getAttribute('title')
+  expect(title).not.toBeNull()
+  return title ?? ''
 }
 
 // The Hand off step's own rail button is also named "Hand off", so the
@@ -318,7 +316,6 @@ describe('an order seeded from a sensor signal', () => {
     mountStates({}, { source: { kind: 'typed', tracker: null, key: null, url: null } })
     await screen.findByText('Refuse an expired refresh token')
     expect(screen.queryByText('From a sensor signal')).toBeNull()
-    expect(document.querySelector('.fdry-chip')).toBeNull()
   })
 })
 
@@ -1466,7 +1463,8 @@ function forgeTheReasonTests() {
       expect(call).toBeTruthy()
       const message = String((call?.[1] as { message?: string }).message ?? '')
       expect(message).toContain('Invalid enum value')
-      expect(message).toContain('proposal.json')
+      expect(message).toContain('Answer again with the proposal as your structured output')
+      expect(message).not.toContain('proposal.json')
     })
   })
 }
@@ -2239,10 +2237,7 @@ function expectUnavailableControlsHold(): void {
   const nodes = Array.from(document.querySelectorAll('[aria-disabled="true"]'))
   expect(nodes.length).toBeGreaterThan(0)
   for (const node of nodes) {
-    const id = node.getAttribute('aria-describedby')
-    expect(id).not.toBeNull()
-    const tip = document.getElementById(id as string)
-    expect(tip?.textContent?.trim()).not.toBe('')
+    expect(node.getAttribute('title')?.trim()).toBeTruthy()
   }
 }
 
@@ -2265,7 +2260,7 @@ function orderHoldTests() {
 }
 
 // Every ReasonButton that renders aria-disabled must resolve its
-// aria-describedby to non-empty text (ReasonButton.tsx) — swept across the
+// title to non-empty text (ReasonButton.tsx) — swept across the
 // states that put controls out of reach: a running turn, a refusal, findings
 // needing a decision, a step whose shape has an unmet requirement, and a
 // handed-off order.

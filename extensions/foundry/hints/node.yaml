@@ -10,7 +10,8 @@ scripts:
   checks:
     test: [test]
     lint: [lint]
-    format: [format]
+    # `format` is left out: in many repositories it is the writer (`prettier --write`).
+    format: ['format:check', check-format, 'lint:format', 'prettier:check']
     coverage: ['test:coverage', coverage]
     e2e: ['test:e2e', e2e]
     build: [build]

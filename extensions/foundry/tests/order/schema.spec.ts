@@ -513,3 +513,14 @@ describe('isBlocking', () => {
     }
   })
 })
+
+describe('an order with an intake state', () => {
+  it('loads an order.json written before the field existed', () => {
+    expect(parseWorkOrder(valid()).intake).toBeUndefined()
+  })
+
+  it('keeps the intake state it was written with', () => {
+    const intake = { state: 'drafting', since: '2026-09-09T19:30:00Z', deadline: null }
+    expect(parseWorkOrder({ ...(valid() as object), intake }).intake).toEqual(intake)
+  })
+})

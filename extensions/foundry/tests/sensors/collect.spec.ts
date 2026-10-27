@@ -37,6 +37,7 @@ const runsSource: SensorSource = { kind: 'github-runs', branch: 'main', limit: 5
 
 describe('collect: github-runs', () => {
   describe('mapping runs', mappingRunsTests)
+  describe('resolved runs', resolvedRunsTests)
   describe('the default branch', theDefaultBranchTests)
   describe('problems', problemsTests)
 })
@@ -77,9 +78,55 @@ const RUN_LIST_ARGS = [
   'databaseId,displayTitle,headSha,workflowName,createdAt,url',
 ]
 
+/** The latest completed run of a workflow, still red. */
+const STILL_FAILING = execSucceeded(
+  JSON.stringify([
+    { conclusion: 'failure', url: 'https://github.com/o/r/actions/runs/9', headSha: 'z' },
+  ])
+)
+const NOW_GREEN = execSucceeded(
+  JSON.stringify([
+    { conclusion: 'success', url: 'https://github.com/o/r/actions/runs/10', headSha: 'y' },
+  ])
+)
+
+function resolvedRunsTests() {
+  it('asks for the latest completed run of each failing workflow on the branch', async () => {
+    const exec = queuedExec([
+      execSucceeded(JSON.stringify(FAILED_RUNS)),
+      STILL_FAILING,
+      STILL_FAILING,
+    ])
+    await collect(runsSource, deps({ exec }))
+
+    expect(exec).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        command: 'gh',
+        args: [
+          ...['run', 'list', '--branch', 'main', '--workflow', 'CI', '--status', 'completed'],
+          ...['--limit', '1', '--json', 'conclusion,url,headSha'],
+        ],
+        timeoutMs: 30000,
+      })
+    )
+  })
+  it('reports a workflow whose latest run succeeded as resolved, with no item', async () => {
+    const exec = queuedExec([execSucceeded(JSON.stringify(FAILED_RUNS)), NOW_GREEN, STILL_FAILING])
+    const result = await collect(runsSource, deps({ exec }))
+
+    expect(result.items.map((item) => item.key)).toEqual(['workflow:Lint'])
+    expect(result.resolvedKeys).toEqual(['workflow:CI'])
+  })
+}
+
 function mappingRunsTests() {
   it('maps failed runs to one item each, keyed by workflow', async () => {
-    const exec = queuedExec([execSucceeded(JSON.stringify(FAILED_RUNS))])
+    const exec = queuedExec([
+      execSucceeded(JSON.stringify(FAILED_RUNS)),
+      STILL_FAILING,
+      STILL_FAILING,
+    ])
     const result = await collect(runsSource, deps({ exec }))
 
     expect(result.problem).toBeNull()
@@ -250,6 +297,7 @@ function issueProblemsTests() {
 
 describe('collect: tracker', () => {
   describe('searching and listing', searchingAndListingTests)
+  describe('tracker keys', trackerKeysTests)
   describe('no tracker', noTrackerTests)
 })
 
@@ -267,6 +315,21 @@ function searchingAndListingTests() {
     expect(listMine).not.toHaveBeenCalled()
     expect(result.problem).toBeNull()
     expect(result.items[0].key).toMatch(/^tracker:/)
+  })
+}
+
+function trackerKeysTests() {
+  it('keeps issues whose titles differ only by a number apart, keyed by issue key', async () => {
+    const built = trackerDeps()
+    search.mockResolvedValue([
+      { key: 'PROJ-1', title: 'Crash on 404 page', url: 'https://tracker/PROJ-1' },
+      { key: 'PROJ-2', title: 'Crash on 500 page', url: 'https://tracker/PROJ-2' },
+    ])
+    const source: SensorSource = { kind: 'tracker', query: 'crash', limit: 15 }
+
+    const result = await collect(source, built)
+
+    expect(result.items.map((item) => item.key)).toEqual(['tracker:PROJ-1', 'tracker:PROJ-2'])
   })
 
   it('lists mine when the query is null', async () => {

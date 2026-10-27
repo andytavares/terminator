@@ -6,15 +6,13 @@ import { fileURLToPath } from 'node:url'
 import {
   architectModel,
   convergeBrief,
-  readProposal,
+  applyArchitectAnswer,
   NoArchitectError,
 } from '../../src/forge/converge.js'
 import { EVIDENCE_KINDS, LANE_ROLES, RISK_TRIGGERS } from '../../src/order/schema.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-import { orderDir } from '../../src/data-root.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
-import { writeProposalFor } from '../helpers/forge-turns.js'
 
 // Converging an order.
 //
@@ -60,7 +58,7 @@ describe('what the architect is told', () => {
   describe('lane branches', laneBranchesTests)
   describe('deciding and dismissing', decidingAndDismissingTests)
   describe('open findings', convergeOpenFindingsTests)
-  describe('the prompt and the file', thePromptAndTheFileTests)
+  describe('the prompt and its schema', thePromptAndSchemaTests)
   describe('triggers and evidence', triggersAndEvidenceTests)
   describe('lane roles and closed sets', laneRolesAndClosedSetsTests)
   describe('units, budgets and refusing checks', unitsBudgetsAndRefusingChecksTests)
@@ -92,13 +90,13 @@ function laneBranchesTests() {
       },
     }
     const plan = convergeBrief({ order: fixed, root, sources: sources(), rules: [] })
-    expect(plan.prompt).toContain('"branch": "andrew/tav-15-the-ticket"')
-    expect(plan.prompt).toContain('fixed by the ticket')
+    expect(plan.prompt).toContain('"andrew/tav-15-the-ticket"')
+    expect(plan.prompt).toContain('keep is')
   })
 
-  it('leaves the branch blank in the template when nothing fixed one', () => {
+  it('names no branch to keep when nothing fixed one', () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    expect(plan.prompt).toContain('"branch": ""')
+    expect(plan.prompt).not.toContain('lane branch to keep')
     expect(plan.prompt).not.toContain('fixed by the ticket')
   })
 }
@@ -107,8 +105,8 @@ function decidingAndDismissingTests() {
   it('tells the architect to decide what it is 90% sure of rather than ask', () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
     expect(plan.prompt).toContain('90%')
-    expect(plan.prompt).toContain('"confidence"')
-    expect(plan.prompt).toContain('"dismissFindings"')
+    expect(plan.prompt).toContain('`confidence`')
+    expect(plan.prompt).toContain('`dismissFindings`')
   })
 
   it('tells the architect only a blocking finding stops hand-off, and any severity may be dismissed', () => {
@@ -140,18 +138,18 @@ function convergeOpenFindingsTests() {
   })
 }
 
-function thePromptAndTheFileTests() {
+function thePromptAndSchemaTests() {
   it("leads with the architect's own prompt and the order", () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
     expect(plan.prompt).toContain('Turn intent and context into criteria and a plan')
     expect(plan.prompt).toContain('expired tokens are accepted')
   })
 
-  it('names the file to write and says nothing else counts', () => {
+  it('says the answer is the structured output, and hands over the proposal schema', () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    expect(plan.proposalPath).toBe(path.join(orderDir(root, 'WO-1'), 'proposal.json'))
-    expect(plan.prompt).toContain(plan.proposalPath)
-    expect(plan.prompt).toContain('Nothing else you do counts')
+    expect(plan.prompt).toContain('Your answer is the structured output')
+    expect(plan.prompt).not.toContain('proposal.json')
+    expect(plan.outputSchema).toMatchObject({ type: 'object', additionalProperties: false })
   })
 }
 
@@ -215,10 +213,11 @@ function laneRolesAndClosedSetsTests() {
       'acceptance[].verify.evidence': EVIDENCE_KINDS,
       'plan.lanes[].role': LANE_ROLES,
     }
+    const schema = JSON.stringify(plan.outputSchema)
     for (const [field, members] of Object.entries(closedSets)) {
       expect(members.length, `${field} has no members`).toBeGreaterThan(0)
       for (const member of members) {
-        expect(plan.prompt, `${field} does not name ${member}`).toContain(member)
+        expect(schema, `${field} does not name ${member}`).toContain(`"${member}"`)
       }
     }
   })
@@ -231,15 +230,13 @@ function unitsBudgetsAndRefusingChecksTests() {
   // TAV-14: the contract showed a unit's `verify` only as `[]`, the architect
   // wrote two command strings into it, and Zod refused the whole plan with
   // "plan.units.0.verify.0: Expected object, received string".
-  it("shows a unit's verify as a list of the same check objects an acceptance uses", () => {
+  it("says a unit's verify is a list of check objects, never a bare string", () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    expect(plan.prompt).toMatch(/"verify": \[\{ "kind": "command"/)
     expect(plan.prompt).toContain('never a bare command string')
   })
 
-  it('shows each unit as touchesInterface false and says when to set it true', () => {
+  it('says when to set touchesInterface to true', () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    expect(plan.prompt).toContain('"touchesInterface": false')
     expect(plan.prompt).toMatch(/Set `touchesInterface` to true .*a person sees/s)
   })
 
@@ -322,10 +319,10 @@ function whereItRunsTests() {
   })
 }
 
-describe('reading back what it wrote', () => {
+describe('applying what it answered', () => {
   describe('merging and deciding', mergingAndDecidingTests)
   describe('dismissed findings', dismissedFindingsTests)
-  describe('nothing, bad or stale files', nothingBadOrStaleFilesTests)
+  describe('bad answers', badAnswersTests)
   describe('cleared findings', clearedFindingsTests)
   describe('reviewer findings', reviewerFindingsTests)
   describe('accepted findings', convergeAcceptedFindingsTests)
@@ -334,8 +331,8 @@ describe('reading back what it wrote', () => {
 
 function mergingAndDecidingTests() {
   it('merges a proposal into the order', () => {
-    const file = writeProposalFor(root, 'WO-1', { acceptance: [CRITERION], note: 'first draft' })
-    const result = readProposal(order(), file, '2026-09-06T12:00:00.000Z')
+    const answer = { acceptance: [CRITERION], note: 'first draft' }
+    const result = applyArchitectAnswer(order(), answer, '2026-09-06T12:00:00.000Z')
     expect(result.ok).toBe(true)
     expect(result.ok && result.order.acceptance).toHaveLength(1)
     expect(result.ok && result.note).toBe('first draft')
@@ -344,7 +341,7 @@ function mergingAndDecidingTests() {
   // Spec 062: the Forge stops the operator only for what the architect
   // cannot settle.
   it('decides a question the architect is at least 90% sure of, instead of asking', () => {
-    const file = writeProposalFor(root, 'WO-1', {
+    const answer = {
       openQuestions: [
         {
           id: 'Q-1',
@@ -354,8 +351,8 @@ function mergingAndDecidingTests() {
           confidence: 0.94,
         },
       ],
-    })
-    const result = readProposal(order(), file, 'now')
+    }
+    const result = applyArchitectAnswer(order(), answer, 'now')
     expect(result.ok && result.order.openQuestions[0].answer).toBe('Hide')
     expect(result.ok && result.order.assumptions.map((a) => a.id)).toContain('A-Q-1')
   })
@@ -363,7 +360,7 @@ function mergingAndDecidingTests() {
 
 function dismissedFindingsTests() {
   it('applies the findings the architect dismissed with confidence, whatever their severity', () => {
-    const file = writeProposalFor(root, 'WO-1', {
+    const answer = {
       dismissFindings: [
         { id: 'RT-no-non-goals', reason: 'nothing to exclude', confidence: 0.95 },
         {
@@ -372,60 +369,38 @@ function dismissedFindingsTests() {
           confidence: 0.99,
         },
       ],
-    })
+    }
     const before = order({
       redTeam: [
         finding({ id: 'RT-no-non-goals', severity: 'low', text: 't' }),
         finding({ id: 'RT-no-runnable-check', severity: 'high', text: 't' }),
       ],
     })
-    const result = readProposal(before, file, 'now')
+    const result = applyArchitectAnswer(before, answer, 'now')
     expect(result.ok && result.order.redTeam.map((f) => f.status)).toEqual(['accepted', 'accepted'])
   })
 }
 
-function nothingBadOrStaleFilesTests() {
-  it('says so when the architect wrote nothing', () => {
-    const result = readProposal(order(), path.join(root, 'nothing.json'), 'now')
-    expect(result).toEqual({ ok: false, reason: 'the architect wrote no proposal' })
-  })
-
-  it('refuses one that is not readable JSON, rather than half-applying it', () => {
-    const file = writeProposalFor(root, 'WO-1', '{{{')
-    const result = readProposal(order(), file, 'now')
-    expect(result.ok).toBe(false)
-    expect(!result.ok && result.reason).toMatch(/not readable/)
-  })
-
+function badAnswersTests() {
   it('refuses one that reaches for a field it may not have', () => {
-    const file = writeProposalFor(root, 'WO-1', { status: 'agreed' })
-    const result = readProposal(order(), file, 'now')
+    const answer = { status: 'agreed' }
+    const result = applyArchitectAnswer(order(), answer, 'now')
     expect(result.ok).toBe(false)
     expect(!result.ok && result.reason).toMatch(/refused/)
-  })
-
-  it('clears the file whatever happened, so a stale one is never read as this turn', () => {
-    const file = writeProposalFor(root, 'WO-1', { note: 'x' })
-    readProposal(order(), file, 'now')
-    expect(fs.existsSync(file)).toBe(false)
-
-    const bad = writeProposalFor(root, 'WO-1', '{{{')
-    readProposal(order(), bad, 'now')
-    expect(fs.existsSync(bad)).toBe(false)
   })
 }
 
 function clearedFindingsTests() {
   it('closes a finding the redraft cleared, so asking for it is enough', () => {
-    const file = writeProposalFor(root, 'WO-1', {
+    const answer = {
       intent: { problem: 'p', outcome: 'o', nonGoals: ['the settings screen'] },
-    })
+    }
     const before = order({
       redTeam: [
         finding({ id: 'RT-no-non-goals', severity: 'low', text: 'The order excludes nothing.' }),
       ],
     })
-    const result = readProposal(before, file, 'now')
+    const result = applyArchitectAnswer(before, answer, 'now')
     expect(result.ok && result.order.redTeam[0].status).toBe('resolved')
   })
 }
@@ -435,9 +410,9 @@ function reviewerFindingsTests() {
   // redrafted, but a reviewer's finding is not re-derivable, and it had no
   // field to say it was cleared — so the finding sat open and unchanged.
   it('closes a reviewer finding the architect says it cleared, with how', () => {
-    const file = writeProposalFor(root, 'WO-1', {
+    const answer = {
       resolveFindings: [{ id: 'RT-red-team-1', how: 'AC-1 now pages past 50 tickets' }],
-    })
+    }
     const before = order({
       redTeam: [
         finding({
@@ -447,7 +422,7 @@ function reviewerFindingsTests() {
         }),
       ],
     })
-    const result = readProposal(before, file, 'now')
+    const result = applyArchitectAnswer(before, answer, 'now')
     expect(result.ok && result.order.redTeam[0]).toMatchObject({
       status: 'resolved',
       reason: 'architect: AC-1 now pages past 50 tickets',
@@ -457,9 +432,9 @@ function reviewerFindingsTests() {
 
 function convergeAcceptedFindingsTests() {
   it('does not reopen or rewrite a finding the operator already accepted', () => {
-    const file = writeProposalFor(root, 'WO-1', {
+    const answer = {
       resolveFindings: [{ id: 'RT-red-team-1', how: 'changed it' }],
-    })
+    }
     const accepted = {
       id: 'RT-red-team-1',
       severity: 'low' as const,
@@ -469,42 +444,26 @@ function convergeAcceptedFindingsTests() {
       category: 'wrong-outcome' as const,
       round: 0,
     }
-    const result = readProposal(order({ redTeam: [accepted] }), file, 'now')
+    const result = applyArchitectAnswer(order({ redTeam: [accepted] }), answer, 'now')
     expect(result.ok && result.order.redTeam[0]).toEqual(accepted)
   })
 }
 
 function refusalsAndDraftsTests() {
   it('refuses a resolution that does not say how', () => {
-    const file = writeProposalFor(root, 'WO-1', {
+    const answer = {
       resolveFindings: [{ id: 'RT-red-team-1', how: '' }],
-    })
-    const result = readProposal(order(), file, 'now')
+    }
+    const result = applyArchitectAnswer(order(), answer, 'now')
     expect(result.ok).toBe(false)
   })
 
   it('leaves the order a draft — converging is not agreeing', () => {
-    const file = writeProposalFor(root, 'WO-1', { acceptance: [CRITERION] })
-    const result = readProposal(order(), file, 'now')
+    const answer = { acceptance: [CRITERION] }
+    const result = applyArchitectAnswer(order(), answer, 'now')
     expect(result.ok && result.order.status).toBe('draft')
   })
 }
-
-describe('when the proposal is read', () => {
-  it('is not read while the file is not there — a turn ending is not the architect finishing', () => {
-    // It thinks, replies, asks something, and may write on a later turn.
-    // Reading at the first turn end reported "wrote no proposal" while it was
-    // still working.
-    const missing = path.join(orderDir(root, 'WO-1'), 'proposal.json')
-    expect(fs.existsSync(missing)).toBe(false)
-  })
-
-  it('is read once it is there, whatever turn wrote it', () => {
-    const file = writeProposalFor(root, 'WO-1', { note: 'on the third turn' })
-    const result = readProposal(order(), file, 'now')
-    expect(result.ok && result.note).toBe('on the third turn')
-  })
-})
 
 function drafted(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = order()
@@ -548,8 +507,7 @@ function prompt(target: WorkOrder, message?: string): string {
 // not the plan or the criteria it was being told were wrong — the architect's
 // `reads:` named neither — so "nothing in the plan builds AC-1" arrived as a
 // complaint about a document it could not see. Its first move was to go and
-// find the proposal it remembered writing, which `readProposal` deletes as it
-// applies it, and its second was to reconstruct the order from `order.json`
+// find the proposal it remembered writing, which the proposal file used to be, and its second was to reconstruct the order from `order.json`
 // and the ledger by hand.
 describe('amending an order the architect has already written', () => {
   describe('what it hands over', whatItHandsOverTests)
@@ -575,13 +533,6 @@ function whatItHandsOverTests() {
 function theAmendingFramingTests() {
   it('says the turn amends the order rather than drafting it again', () => {
     expect(prompt(drafted())).toContain('This turn amends the order above')
-  })
-
-  // Its first move on the live run, and a dead end every time: the file is
-  // unlinked in `readProposal`'s `finally`, so what the architect remembers
-  // writing is never there to be read.
-  it('says the proposal it remembers writing was consumed', () => {
-    expect(prompt(drafted())).toContain('consumed when it was applied')
   })
 
   it('asks for the keys that changed and not for the ones that did not', () => {

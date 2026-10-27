@@ -76,7 +76,9 @@ describe('refineryTick', () => {
   describe('already recorded', alreadyRecordedTests)
   describe('already restacked', alreadyRestackedTests)
   describe('conflicts', refineryTickConflictsTests)
+  describe('a conflict seen again', refineryTickRepeatedConflictTests)
   describe('failed restacks', failedRestacksTests)
+  describe('a checkout left behind', checkoutBehindTests)
 })
 
 const pulls = [{ url: 'u1' }, { url: 'u2' }]
@@ -205,8 +207,32 @@ function refineryTickConflictsTests() {
       files: ['a.ts'],
     })
     expect(deps.records.map((r) => r.action)).toEqual(['refinery.merged', 'refinery.conflict'])
-    expect(deps.states.get('WO-2')?.restackedFor ?? []).toEqual([])
+    expect(deps.states.get('WO-2')?.restackedFor).toEqual(['WO-1'])
     expect(deps.watched).toEqual([])
+  })
+}
+
+function refineryTickRepeatedConflictTests() {
+  it('does not restack, re-record or re-raise the same conflict on the next tick', async () => {
+    const restack = vi.fn(async () => ({ kind: 'conflict' as const, files: ['a.ts'] }))
+    const deps = baseDeps({
+      candidates: async () => [
+        { order: { id: 'WO-1', title: 'Predecessor' }, pulls: [{ url: 'u1' }] },
+      ],
+      viewPr: async () => ({ merged: true }),
+      entries: async () => [
+        entry({ orderId: 'WO-1', files: ['a.ts'] }),
+        entry({ orderId: 'WO-2', agreedAt: '2026-09-02T00:00:00.000Z', files: ['a.ts'] }),
+      ],
+      restack,
+    })
+
+    await refineryTick(deps)
+    await refineryTick(deps)
+
+    expect(restack).toHaveBeenCalledTimes(1)
+    expect(deps.conflicts).toHaveLength(1)
+    expect(deps.records.filter((r) => r.action === 'refinery.conflict')).toHaveLength(1)
   })
 }
 
@@ -285,5 +311,27 @@ function refineryTickTrackerFailuresTests() {
     })
     await refineryTick(deps)
     expect(deps.states.get('WO-1')?.mergedAt).not.toBeNull()
+  })
+}
+
+function checkoutBehindTests() {
+  it('records that the lane checkout is behind its rebased branch', async () => {
+    const deps = baseDeps({
+      candidates: async () => [
+        { order: { id: 'WO-1', title: 'Predecessor' }, pulls: [{ url: 'u1' }] },
+      ],
+      viewPr: async () => ({ merged: true }),
+      entries: async () => [
+        entry({ orderId: 'WO-1', files: ['a.ts'] }),
+        entry({ orderId: 'WO-2', agreedAt: '2026-09-02T00:00:00.000Z', files: ['a.ts'] }),
+      ],
+      restack: vi.fn(async () => ({
+        kind: 'rebased' as const,
+        pushed: true,
+        checkoutBehind: true as const,
+      })),
+    })
+    await refineryTick(deps)
+    expect(deps.records.map((r) => r.action)).toContain('refinery.checkout-behind')
   })
 }

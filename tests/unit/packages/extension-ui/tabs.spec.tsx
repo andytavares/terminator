@@ -272,3 +272,17 @@ describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel — jumps to the ends wit
     quiet.mockRestore()
   })
 })
+
+describe('Tabs with nothing selected', () => {
+  it('keeps the first tab reachable by keyboard', () => {
+    render(<TabsHarness initial="" />)
+    expect(tabNamed('Files').getAttribute('tabindex')).toBe('0')
+    expect(tabNamed('Checks').getAttribute('tabindex')).toBe('-1')
+  })
+  it('moves the stop to a tab once it is selected', () => {
+    render(<TabsHarness initial="" />)
+    fireEvent.click(tabNamed('Checks'))
+    expect(tabNamed('Checks').getAttribute('tabindex')).toBe('0')
+    expect(tabNamed('Files').getAttribute('tabindex')).toBe('-1')
+  })
+})

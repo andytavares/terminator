@@ -313,18 +313,18 @@ describe('the tab strip says how much is waiting', () => {
 
   it('says what the number means, rather than reading out a bare digit', async () => {
     mountApp({ inbox: 3, forge: 0 })
-    await screen.findByRole('button', { name: 'Forge, 3 waiting on you' })
+    await screen.findByRole('tab', { name: 'Forge, 3 waiting on you' })
   })
 
   it('shows no badge at all when nothing is waiting', async () => {
     const { container } = mountApp({ inbox: 0, forge: 0 })
-    await screen.findByRole('button', { name: 'Forge' })
+    await screen.findByRole('tab', { name: 'Forge' })
     expect(container.querySelectorAll('.fdry-tab-count')).toHaveLength(0)
   })
 
   it('never puts a count on the Ledger, which holds nothing for anybody', async () => {
     mountApp({ inbox: 3, forge: 2 })
-    await screen.findByRole('button', { name: 'Forge, 5 waiting on you' })
-    expect(screen.getByRole('button', { name: 'Ledger' })).toBeTruthy()
+    await screen.findByRole('tab', { name: 'Forge, 5 waiting on you' })
+    expect(screen.getByRole('tab', { name: 'Ledger' })).toBeTruthy()
   })
 })

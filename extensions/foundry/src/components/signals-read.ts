@@ -1,4 +1,4 @@
-import { invoke } from '@terminator/extension-sdk/renderer'
+import { foundryInvoke } from '../renderer/foundry-invoke.js'
 import type { Signal } from '../sensors/types.js'
 
 /** A sensor as `sensors.list` answers it — enough to label a signal and offer
@@ -17,8 +17,8 @@ export interface SignalsRead {
  *  factory's front door both poll them (sensors announce nothing). */
 export async function readSignals(): Promise<SignalsRead> {
   const [sig, sen] = await Promise.all([
-    invoke('foundry:signals.list') as Promise<{ signals?: Signal[] }>,
-    invoke('foundry:sensors.list') as Promise<{ sensors?: SensorRow[] }>,
+    foundryInvoke('foundry:signals.list'),
+    foundryInvoke('foundry:sensors.list'),
   ])
   return { signals: sig.signals ?? [], sensors: sen.sensors ?? [] }
 }

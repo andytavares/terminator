@@ -3,6 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { tearDownRun, deleteOrder } from '../../src/line/teardown.js'
 import { orderDir } from '../../src/data-root.js'
+import { checkoutPath, createdBranchMarker } from '../../src/line/worktree.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
@@ -73,6 +74,13 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
   }
 }
 
+/** What `ensureCheckout` leaves when it cut the lane's branch itself. */
+function markBranchCreated(): void {
+  const lane = checkoutPath(root, order(), path.basename(repo))
+  fs.mkdirSync(path.dirname(lane), { recursive: true })
+  fs.writeFileSync(createdBranchMarker(lane), '')
+}
+
 /** Everything a run leaves under the order's directory. */
 function seedRunArtefacts(id = 'WO-1'): string {
   const dir = orderDir(root, id)
@@ -117,14 +125,14 @@ function theWorktreeTests() {
     expect(remove?.args).toContain('--force')
   })
 
-  // A worktree directory removed without git being told leaves a registration
-  // behind, and the next `worktree add` onto that path fails. Pruning is what
-  // makes starting over actually work a second time.
-  it('prunes the registration afterwards, so the path can be used again', async () => {
+  // Pruning drops every lane's registration in the repository, and a lane resumed
+  // after that is cut afresh. Only the worktree being torn down is removed.
+  it('unlocks the worktree, removes it, and never prunes other lanes', async () => {
     const { calls, exec } = recorder()
     await tearDownRun(order(), { exec, root })
-    const order_ = calls.map((c) => c.args.slice(0, 2).join(' '))
-    expect(order_.indexOf('worktree prune')).toBeGreaterThan(order_.indexOf('worktree remove'))
+    const verbs = calls.map((c) => c.args.slice(0, 2).join(' '))
+    expect(verbs.indexOf('worktree unlock')).toBeLessThan(verbs.indexOf('worktree remove'))
+    expect(verbs).not.toContain('worktree prune')
   })
 }
 
@@ -147,10 +155,17 @@ function theSidebarProjectTests() {
 }
 
 function teardownTheBranchTests() {
-  it('deletes the branch the lane was working on', async () => {
+  it('deletes the branch the lane was working on when Foundry created it', async () => {
     const { calls, exec } = recorder()
+    markBranchCreated()
     await tearDownRun(order(), { exec, root })
     expect(calls.some((c) => c.args[0] === 'branch' && c.args.includes('wip'))).toBe(true)
+  })
+
+  it("leaves a branch Foundry did not create, such as the operator's own", async () => {
+    const { calls, exec } = recorder()
+    await tearDownRun(order(), { exec, root })
+    expect(calls.some((c) => c.args[0] === 'branch')).toBe(false)
   })
 }
 
@@ -213,6 +228,7 @@ function recordsTests() {
   it('says what it removed, so the record is not a guess', async () => {
     seedRunArtefacts()
     const { exec } = recorder()
+    markBranchCreated()
     const result = await tearDownRun(order(), { exec, root })
     expect(result.removed.join(' ')).toContain('wip')
     expect(result.failed).toEqual([])
@@ -236,6 +252,7 @@ function gitFailuresTests() {
   // the run standing.
   it('names a branch git would not delete, and removes the records anyway', async () => {
     const dir = seedRunArtefacts()
+    markBranchCreated()
     const { exec } = recorder((args) => args[0] === 'branch')
     const result = await tearDownRun(order(), { exec, root })
     expect(result.failed.join(' ')).toContain('the branch wip')
@@ -307,6 +324,7 @@ describe('deleteOrder', () => {
 
   it('tears the run down first, so no worktree outlives its order', async () => {
     seedRunArtefacts()
+    markBranchCreated()
     const { calls, exec } = recorder()
     await deleteOrder(order(), { exec, root })
     expect(calls.some((c) => c.args[0] === 'worktree' && c.args[1] === 'remove')).toBe(true)

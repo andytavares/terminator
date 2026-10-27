@@ -60,10 +60,18 @@ async function restackLanes(
 ): Promise<{ conflictFiles: readonly string[] | null; failedReason: string | null }> {
   for (const lane of await deps.lanesFor(orderId)) {
     const result = await deps.restack(lane)
+    if (result.kind === 'rebased' && result.checkoutBehind === true) await noteBehind(deps, orderId)
     if (result.kind === 'conflict') return { conflictFiles: result.files, failedReason: null }
     if (result.kind === 'failed') return { conflictFiles: null, failedReason: result.reason }
   }
   return { conflictFiles: null, failedReason: null }
+}
+
+// GitHub rebased the branch, but the lane's checkout had uncommitted work, so it was left.
+function noteBehind(deps: RefineryTickDeps, orderId: string): Promise<void> {
+  const reason =
+    'The branch was rebased on GitHub; the lane checkout has local changes and is behind it.'
+  return deps.record({ orderId, action: 'refinery.checkout-behind', subject: orderId, reason })
 }
 
 export async function refineryTick(deps: RefineryTickDeps): Promise<void> {
@@ -118,6 +126,8 @@ async function restackBehind(
   const recordOnLedger = (action: string, reason: string) =>
     deps.record({ orderId, action, subject: orderId, reason })
   if (conflictFiles !== null) {
+    // Marked handled so the next tick does not raise the same conflict again.
+    await deps.writeState(orderId, { ...state, restackedFor: [...state.restackedFor, merged.id] })
     const title = await deps.titleOf(orderId)
     const why = `${title} no longer rebases onto its base after ${merged.title} merged`
     await deps.raiseConflict(orderId, why, conflictFiles)

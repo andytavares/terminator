@@ -66,7 +66,7 @@ beforeEach(async () => {
   writes = {}
   heldTurn = null
   host.showToast.mockClear()
-  theRunner.stop.mockReset().mockReturnValue(true)
+  theRunner.stop.mockClear()
   theRunner.terminalFor.mockReset().mockReturnValue(null)
   theRunner.start
     .mockReset()
@@ -155,6 +155,7 @@ function terminalsStayOpen(): void {
   const ended = new Set<string>()
   theRunner.stop.mockImplementation((id: unknown, reason?: unknown) => {
     if (reason !== undefined) ended.add(id as string)
+    theRunner.endSession(id as string)
     return true
   })
   theRunner.terminalFor.mockImplementation((id: unknown) =>

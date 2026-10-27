@@ -76,9 +76,15 @@ function graph(units = [unit('U-1'), unit('U-2'), unit('U-3')]): RunGraph {
   return buildRunGraph(order, parsed.value)
 }
 
+/** One plain run node, for a graph a spec spells out. */
+function node(id: string, state: RunNode['state'], dependsOn: string[]): RunNode {
+  return { ...graph([unit('U-1')]).nodes[0], id, kind: 'run', state, dependsOn }
+}
+
 describe('readyNodes', () => {
   describe('readiness and the budget', readinessAndTheBudgetTests)
   describe('dependencies', schedulerDependenciesTests)
+  describe('a skipped step', skippedStepTests)
   describe('gates', schedulerGatesTests)
 })
 
@@ -597,5 +603,22 @@ function theBuilderReopenedTests() {
     expect(byId('check').state).toBe('waiting')
     expect(byId('unrelated').state).toBe('passed')
     expect(isComplete(next)).toBe(false)
+  })
+}
+
+function skippedStepTests() {
+  it('waits through a skipped step for what that step waited on', () => {
+    // build → lint (skipped: no lint command) → check: check still waits for build.
+    const chained: RunGraph = {
+      ...graph([unit('U-1')]),
+      nodes: [
+        node('build:U-1', 'running', []),
+        node('lint', 'skipped', ['build:U-1']),
+        node('check', 'waiting', ['lint']),
+      ],
+    }
+    expect(readyNodes(chained, BUDGETS).map((n) => n.id)).not.toContain('check')
+    const built = markPassed(chained, 'build:U-1', 'now')
+    expect(readyNodes(built, BUDGETS).map((n) => n.id)).toContain('check')
   })
 }

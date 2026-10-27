@@ -1,3 +1,4 @@
+import { answered } from '../helpers/answer-shape.js'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { queueEntry } from '../helpers/queue-entries.js'
 import { builderUnit, testCriterion } from '../helpers/order-parts.js'
@@ -142,10 +143,22 @@ function unknownSkillsTests() {
   })
 }
 
+/** A shape the repository carries that needs the `.specify` folder, as the removed speckit one did. */
+function writeToolkitShape(): void {
+  const direct = fs.readFileSync(path.join(__dirname, '../../recipes/direct.yaml'), 'utf8')
+  const toolkit = direct
+    .replace('id: direct', 'id: toolkit')
+    .replace('requires: []', 'requires:\n  - path_exists: .specify')
+  const dir = path.join(repo, '.foundry', 'recipes')
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(path.join(dir, 'toolkit.yaml'), toolkit)
+}
+
 function shapesTests() {
   it('refuses a shape this repository cannot support, and says why', async () => {
+    writeToolkitShape()
     await store.save(order())
-    const r = (await freshRunChannels().start({ id: 'WO-1', recipe: 'speckit' })) as {
+    const r = (await freshRunChannels().start({ id: 'WO-1', recipe: 'toolkit' })) as {
       error: string
     }
     expect(r.error).toMatch(/cannot run here/)
@@ -153,12 +166,13 @@ function shapesTests() {
   })
 
   it('runs that same shape once the repository supports it', async () => {
+    writeToolkitShape()
     fs.mkdirSync(path.join(repo, '.specify'), { recursive: true })
     await store.save(order())
-    const r = (await freshRunChannels().start({ id: 'WO-1', recipe: 'speckit' })) as {
+    const r = (await freshRunChannels().start({ id: 'WO-1', recipe: 'toolkit' })) as {
       graph: RunGraph
     }
-    expect(r.graph.recipe).toBe('speckit')
+    expect(r.graph.recipe).toBe('toolkit')
   })
 }
 
@@ -403,14 +417,15 @@ function graded(grade: WorkOrder['risk']['grade'], triggers: WorkOrder['risk']['
 
 function offeringTests() {
   it('offers every shape, marking the ones this repository cannot support', async () => {
+    writeToolkitShape()
     await store.save(order())
     const r = (await freshRunChannels().recipes({ id: 'WO-1' })) as {
       recipes: { name: string; available: boolean; unmet: string[] }[]
       proposed: string
     }
-    const speckit = r.recipes.find((x) => x.name === 'speckit')
-    expect(speckit?.available).toBe(false)
-    expect(speckit?.unmet[0]).toMatch(/\.specify/)
+    const toolkit = r.recipes.find((x) => x.name === 'toolkit')
+    expect(toolkit?.available).toBe(false)
+    expect(toolkit?.unmet[0]).toMatch(/\.specify/)
     expect(r.recipes.find((x) => x.name === 'direct')?.available).toBe(true)
   })
 
@@ -477,8 +492,8 @@ describe('proposeRecipe', () => {
 
 function directTests() {
   it('keeps a shape the order already carries', () => {
-    expect(proposeRecipe(order({ recipe: 'bugfix' }))).toEqual({
-      name: 'bugfix',
+    expect(proposeRecipe(order({ recipe: 'research' }))).toEqual({
+      name: 'research',
       why: 'the order already names this shape',
     })
   })
@@ -595,11 +610,12 @@ function directAndRefusedChoicesTests() {
   // Never quietly swapped: an operator who names a shape gets it or gets told
   // why not, because a silent substitution is a decision nobody made.
   it('refuses an operator choice this repository cannot run, rather than stepping down', async () => {
+    writeToolkitShape()
     await store.save(order())
-    const result = (await freshRunChannels().start({ id: 'WO-1', recipe: 'speckit' })) as {
+    const result = (await freshRunChannels().start({ id: 'WO-1', recipe: 'toolkit' })) as {
       error?: string
     }
-    expect(result.error).toContain('speckit')
+    expect(result.error).toContain('toolkit')
     expect(result.error).toContain('.specify')
   })
 }
@@ -754,9 +770,7 @@ function theLiveSessionTests() {
 function noSessionYetTests() {
   it('says why rather than pretending, when a node has no session yet', async () => {
     await store.save(order())
-    const started = (await freshRunChannels().start({ id: 'WO-1' })) as {
-      graph: { nodes: { id: string }[] }
-    }
+    const started = answered(await freshRunChannels().start({ id: 'WO-1' }))
     const r = (await freshRunChannels().attach({
       orderId: 'WO-1',
       nodeId: started.graph.nodes[0].id,
@@ -909,17 +923,6 @@ function twoLanes(): WorkOrder {
     },
   }
 }
-interface Observed {
-  lanes: {
-    ord: number
-    repo: string
-    role: string | null
-    collisions: string[]
-    blockedBy: number[]
-    hold: string | null
-  }[]
-}
-
 describe('what run.observe says about lanes (FR-067, FR-068)', () => {
   describe('lanes', runChannelsLanesTests)
 })
@@ -928,14 +931,14 @@ function runChannelsLanesTests() {
   it('reports each lane in merge order, by repository', async () => {
     await store.save(twoLanes())
     await freshRunChannels().start({ id: 'WO-1' })
-    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as Observed
+    const r = answered(await freshRunChannels().observe({ id: 'WO-1' }))
     expect(r.lanes.map((l) => l.repo)).toEqual(['proto', 'cli'])
   })
 
   it('names the shared file on both lanes, not only on the producer', async () => {
     await store.save(twoLanes())
     await freshRunChannels().start({ id: 'WO-1' })
-    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as Observed
+    const r = answered(await freshRunChannels().observe({ id: 'WO-1' }))
     expect(r.lanes.length).toBeGreaterThan(1)
     for (const lane of r.lanes) expect(lane.collisions).toEqual(['proto/session.proto'])
   })
@@ -943,7 +946,7 @@ function runChannelsLanesTests() {
   it('gives the hold as a sentence, so the surface does not reassemble it', async () => {
     await store.save(twoLanes())
     await freshRunChannels().start({ id: 'WO-1' })
-    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as Observed
+    const r = answered(await freshRunChannels().observe({ id: 'WO-1' }))
     expect(r.lanes[0].hold).toBeNull()
     expect(r.lanes[1].hold).toContain('must merge first')
     expect(r.lanes[1].hold).toContain('proto/session.proto')
@@ -952,7 +955,7 @@ function runChannelsLanesTests() {
   it('reports one unremarkable lane for a single-repository order', async () => {
     await store.save(order())
     await freshRunChannels().start({ id: 'WO-1' })
-    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as Observed
+    const r = answered(await freshRunChannels().observe({ id: 'WO-1' }))
     expect(r.lanes).toHaveLength(1)
     expect(r.lanes[0]).toMatchObject({ collisions: [], blockedBy: [], hold: null })
   })
@@ -1374,7 +1377,7 @@ function theTimelineTests() {
   it('hands back no gates when the host has no gate store to ask', async () => {
     await store.save(order())
     await freshRunChannels().start({ id: 'WO-1' })
-    const r = (await freshRunChannels().timeline({ id: 'WO-1' })) as { gates: unknown[] }
+    const r = answered(await freshRunChannels().timeline({ id: 'WO-1' }))
     expect(r.gates).toEqual([])
   })
 }

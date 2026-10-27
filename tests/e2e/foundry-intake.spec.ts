@@ -95,7 +95,7 @@ async function everySurfaceRenders(): Promise<void> {
   expect(
     await inFoundry<string | null>(
       handle,
-      `(document.querySelector('button[aria-pressed="true"]') || {}).textContent || null`
+      `(document.querySelector('[role="tab"][aria-selected="true"]') || {}).textContent || null`
     )
   ).toBe('Forge')
   // Identified by something the surface always shows, not by its empty state.
@@ -297,8 +297,8 @@ async function expectReadOnlyLaunch(): Promise<void> {
   await expect.poll(() => supervisedLaunch(handle)).not.toBeNull()
   const launched = supervisedLaunch(handle)!
   expect(launched.mode).not.toBe('bypassPermissions')
-  // Read-only, so every write and state-changing command is an ask that Foundry's policy decides.
-  expect(launched.mode).toBe('default')
+  // Read-only: Claude refuses whatever its allow rules do not name, so nothing waits (ADR 131).
+  expect(launched.mode).toBe('dontAsk')
   // And it does not carry the parent Claude Code session in with it.
   expect(launched.inherited).toBe(false)
 }

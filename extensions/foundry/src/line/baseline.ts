@@ -14,6 +14,7 @@ import { lastLines, safeFilename } from './execution-parts.js'
 import type { ShellExec } from './integrate.js'
 import { issueOf } from './order-project.js'
 import { failedStepSentence } from './baseline-steps.js'
+import { ciFailureOf } from './baseline-ci.js'
 import {
   ensureBaselineCheckout,
   removeBaseCheckout,
@@ -319,10 +320,34 @@ async function recordOutcome(proof: Proof, commit: string | null, found: Finding
   })
 }
 
+async function failureFromCi(
+  proof: Proof,
+  checkout: Checkout,
+  commit: string | null
+): Promise<string | null> {
+  if (commit === null) return null
+  return ciFailureOf(proof.deps.exec, {
+    cwd: checkout.path,
+    commit,
+    baseBranch: proof.baseBranch,
+  }).catch(() => null)
+}
+
+async function recordCiFailure(proof: Proof, commit: string | null, reason: string): Promise<void> {
+  await writeBaseline(
+    proof.deps.root,
+    proof.order.id,
+    baselineOf(proof, { state: 'failing', finishedAt: proof.deps.now(), commit })
+  )
+  await announce(proof, { action: 'environment.failing', reason, evidence: [] })
+}
+
 async function proveOnCheckout(proof: Proof): Promise<void> {
   const checkout = await ensureBaselineCheckout(proof.order, proof.lane, proof.deps)
   try {
     const commit = await readCommit(proof, checkout)
+    const reason = await failureFromCi(proof, checkout, commit)
+    if (reason !== null) return await recordCiFailure(proof, commit, reason)
     await recordOutcome(proof, commit, await checkAndMend(proof, checkout))
   } finally {
     await removeBaseCheckout(checkout, proof.deps)

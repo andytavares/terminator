@@ -40,6 +40,7 @@ vi.mock('../../src/state/live-index.js', async (importOriginal) => {
     orderStoreAt: () => ({
       record: recordEntry,
       entries: async () => [...ledger.entries] as never[],
+      update: async () => null,
     }),
   }
 })

@@ -1156,28 +1156,17 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   `ready-for-review`, `run.interrupted`, `ci.red`, `refinery.conflict` — stay
   live at every setting.
 - **The executor** (`line/executor.ts`) joins the scheduler, the roles and the
-  supervised runner: a wave at a time, so the agent budget means something.
-- **An accidental question costs five minutes, not a click** (ADR-049).
-  `runtime/tool-decision.ts` takes the ordinary decisions an agent's tool calls
-  need, and `DEFAULT_ASK_AFTER_MS` holds anything it does not take for five
-  minutes before handing back to a terminal nobody is sitting at. Reading a
-  command correctly is therefore a latency requirement, not only a correctness
-  one: measured on WO-0910-1fb, thirteen of a builder's 131 calls were held and
-  those thirteen ate 16.6 of the run's 26.7 minutes of tool time — 77 seconds
-  a call against 5 for one that was taken. Four defects did it, all in reading:
-  a discard was only a discard with whitespace after it, a parenthesis inside a
-  quoted argument opened a nesting level, a heredoc body was read as shell, and
-  the harness's own scratch directory was treated as territory outside the
-  checkout. `shell-split.ts` tracks quoting and escaping and now heredocs,
-  which are quoting; it is still not a shell parser. The OS temp roots are
-  scratch, with the hole that names — a data root configured inside temp — in
-  the ADR.
-- **Auto mode answers what the policy abstains on (ADR 077).** With
-  `terminator.foundry.letAutoModeDecide` on (the default), `decideTool` returns
-  `mode` instead of `null` for a call it has no opinion on, a destructive one
-  included. The one exception is the `escorted` setting. The bridge answers `defer`,
-  and the hook script prints nothing, so Claude Code's `--permission-mode auto`
-  decides. Returning `ask` would force a confirmation prompt, even in auto mode.
+  supervised runner: a ready node starts as soon as an agent slot frees, within
+  the agent budget.
+- **Agents' permissions are Claude Code settings (ADR 131).** Each role gets
+  settings from `runtime/role-settings.ts`: a permission mode, `allow`, `ask`
+  and `deny` rules that Claude applies to every subcommand, and a sandbox for
+  roles that do not write freely. Read-only, docs-only and restricted-write
+  roles run in `dontAsk`, so a call no rule allows is refused at once and
+  nothing waits. Agents start with `settingSources: ['project']`. Foundry
+  decides only the `Artifact` publish path and `lights-out` refusals, and a
+  refusal answers the ask without cancelling the turn. ADR 049 and ADR 077
+  described the shell reader this replaced.
 - **A stall is measured from the state the session is in now.**
   `evaluate-stall.ts` takes the later of the last tool call and `stateSince`,
   and the runner moves a session's `startedAt` whenever it is given a new turn.
@@ -1397,7 +1386,7 @@ App
   disk first (disk is the source of truth) and then tells the index, which
   broadcasts `foundry:changed` `{ kind: 'order' | 'graph' | 'gates' | 'ledger' |
 'live', orderId }` through `api.window.broadcast`. The renderer reads once on
-  mount and again only for a change it draws (`renderer/use-pushed.ts`), so an
+  mount and again only for a change it draws (`renderer/foundry-query.ts`), so an
   open Floor costs the core nothing while nothing happens. `live` is the
   one kind with no file behind it — a held tool call, a stall, a running or
   stranded agent, an open intake, the feed — and carries an empty `orderId` when
@@ -1464,6 +1453,7 @@ layout and the belts through small state classes (`HallBuilder`, `BeltRouter`).
 - [ADR-042: Foundry installs nothing](adr/042-foundry-installs-nothing.md) — the data root, the three rungs, and the toolchain probe.
 - [ADR-043: an agent proposes the order](adr/043-an-agent-proposes-the-order-and-never-writes-it.md) — intake is an agent turn, and what it may and may not write.
 - [ADR-049: an accidental question costs five minutes](adr/049-an-accidental-question-costs-five-minutes.md) — why a policy that asks by accident is a latency defect, and the eight changes measured against one live run.
+- [ADR-131: agents' permissions are Claude Code settings](adr/131-agents-permissions-are-claude-code-settings.md) — each role's mode and rules come from `runtime/role-settings.ts`; supersedes ADR-049 and ADR-077.
 - [ADR-056: a file count is not a budget](adr/056-a-file-count-is-not-a-budget.md) — budgets are agents and minutes; the files budget and the `budgets` check are gone.
 - [ADR-070: E2E is deterministic and selective](adr/070-e2e-is-deterministic-and-selective.md) — no retries, flakes fixed at their cause, and a PR runs only the specs its diff selects.
 - [ADR-072: a review reads definitions before their callers](adr/072-a-review-reads-definitions-before-callers.md) — tree-sitter orders a PR's files so a function comes before the code that calls it.

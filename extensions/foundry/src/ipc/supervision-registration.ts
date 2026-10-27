@@ -33,36 +33,65 @@ function registerFeedChannels(api: ExtensionAPI): void {
   // answers its agents instead of waiting for the bridge to hand back to the terminal.
   reg(
     api,
-    foundryChannel('foundry:permissions-list', noPayload, () => ({
-      pending: pendingPermissions.list(),
-    })),
+    foundryChannel('foundry:permissions-list', noPayload, permissionsList),
     // The firings, and whether they were recorded or surfaced. Precision is
     // measured against these by hand before shadow mode is turned off.
-    foundryChannel('foundry:stalls-list', noPayload, () => ({
-      firings: stallFirings,
-      shadowMode: stallShadowMode(api),
-    })),
-    foundryChannel('foundry:feed-list', noPayload, () => ({
-      entries: runtime.supervision?.feed.list() ?? [],
-      mutes: runtime.mutes?.list() ?? [],
-    })),
+    foundryChannel('foundry:stalls-list', noPayload, () => stallsList(api)),
+    foundryChannel('foundry:feed-list', noPayload, feedList),
     // Anything shown as a list should be prunable, and a feed you cannot clear a
     // line from is one you stop reading.
-    foundryChannel('foundry:feed-dismiss', FeedDismissPayload, ({ id }) => {
-      runtime.supervision?.feed.removeEntry(id)
-      return { ok: true }
-    }),
-    foundryChannel('foundry:feed-mute', FeedMutePayload, (rule) => {
-      runtime.mutes?.add(rule)
-      announceLive('')
-      return { mutes: runtime.mutes?.list() ?? [] }
-    }),
-    foundryChannel('foundry:feed-unmute', FeedMutePayload, (rule) => {
-      runtime.mutes?.remove(rule)
-      announceLive('')
-      return { mutes: runtime.mutes?.list() ?? [] }
-    })
+    foundryChannel('foundry:feed-dismiss', FeedDismissPayload, dismissFeedEntry),
+    foundryChannel('foundry:feed-mute', FeedMutePayload, muteFeed),
+    foundryChannel('foundry:feed-unmute', FeedMutePayload, unmuteFeed)
   )
+}
+
+export const permissionsList = () => ({ pending: pendingPermissions.list() })
+
+export const stallsList = (api: ExtensionAPI) => ({
+  firings: stallFirings,
+  shadowMode: stallShadowMode(api),
+})
+
+export const feedList = () => ({
+  entries: runtime.supervision?.feed.list() ?? [],
+  mutes: runtime.mutes?.list() ?? [],
+})
+
+export function dismissFeedEntry({ id }: z.infer<typeof FeedDismissPayload>) {
+  runtime.supervision?.feed.removeEntry(id)
+  return { ok: true }
+}
+
+export function muteFeed(rule: z.infer<typeof FeedMutePayload>) {
+  runtime.mutes?.add(rule)
+  announceLive('')
+  return { mutes: runtime.mutes?.list() ?? [] }
+}
+
+export function unmuteFeed(rule: z.infer<typeof FeedMutePayload>) {
+  runtime.mutes?.remove(rule)
+  announceLive('')
+  return { mutes: runtime.mutes?.list() ?? [] }
+}
+
+export function interruptRun({ sessionId }: z.infer<typeof SessionPayload>) {
+  if (runtime.supervisedRunner === null) return { ok: false }
+  runtime.supervisedRunner.interrupt(sessionId)
+  return { ok: true }
+}
+
+export function handBackPermission({ requestId }: z.infer<typeof PermissionHandBackPayload>) {
+  const sessionId = pendingPermissions.sessionFor(requestId)
+  if (sessionId === null || runtime.supervisedRunner === null) return { ok: false }
+  runtime.supervisedRunner.handBackToTerminal(sessionId, requestId)
+  return { ok: true }
+}
+
+export function transcriptTail({ sessionId, limit }: z.infer<typeof TranscriptPayload>) {
+  const run = runtime.supervision?.runs.get(sessionId) ?? null
+  if (run === null) return { lines: [] }
+  return { lines: readTranscriptTail(run.transcriptPath, limit ?? 40) }
 }
 
 function registerPermissionAnswers(api: ExtensionAPI): void {
@@ -76,16 +105,11 @@ function registerPermissionAnswers(api: ExtensionAPI): void {
     }),
     // Hands one back deliberately: the operator would rather answer it in the
     // terminal, where they can see what the agent was doing around it.
-    sessionChannel('foundry:permission-hand-back', PermissionHandBackPayload, ({ requestId }) => {
-      const sessionId = pendingPermissions.sessionFor(requestId)
-      if (sessionId === null || runtime.supervisedRunner === null) return { ok: false }
-      runtime.supervisedRunner.handBackToTerminal(sessionId, requestId)
-      return { ok: true }
-    })
+    sessionChannel('foundry:permission-hand-back', PermissionHandBackPayload, handBackPermission)
   )
 }
 
-function resolvePermission({
+export function resolvePermission({
   requestId,
   decision,
   answer,
@@ -125,19 +149,11 @@ function registerRunActions(api: ExtensionAPI): void {
       channel: 'foundry:run-transcript',
       schema: TranscriptPayload,
       invalid: { lines: [] },
-      run: ({ sessionId, limit }) => {
-        const run = runtime.supervision?.runs.get(sessionId) ?? null
-        if (run === null) return { lines: [] }
-        return { lines: readTranscriptTail(run.transcriptPath, limit ?? 40) }
-      },
+      run: transcriptTail,
     }),
     // Ends the turn and keeps the session, which is what makes the next message
     // land instead of queueing behind whatever it is part-way through.
-    sessionChannel('foundry:run-interrupt', SessionPayload, ({ sessionId }) => {
-      if (runtime.supervisedRunner === null) return { ok: false }
-      runtime.supervisedRunner.interrupt(sessionId)
-      return { ok: true }
-    }),
+    sessionChannel('foundry:run-interrupt', SessionPayload, interruptRun),
     sessionChannel('foundry:run-redirect', RedirectPayload, redirectRun),
     sessionChannel('foundry:run-stop', SessionStopPayload, stopSessionOnRequest)
   )
@@ -146,7 +162,7 @@ function registerRunActions(api: ExtensionAPI): void {
 // Takes you to the run's terminal through the core's `terminal:navigate-to-session`
 // (workspace, project, tab): the extension's UI is another renderer, where a core
 // store it imported would be a copy nothing renders.
-function goToRunTerminal(api: ExtensionAPI, sessionId: string): { ok: boolean } {
+export function goToRunTerminal(api: ExtensionAPI, sessionId: string): { ok: boolean } {
   const terminal = runtime.supervisedRunner?.terminalFor(sessionId) ?? null
   if (terminal === null) return { ok: false }
   api.window.focusSelf()
@@ -160,7 +176,9 @@ function goToRunTerminal(api: ExtensionAPI, sessionId: string): { ok: boolean } 
 // Asking it what is wrong, or telling it what to do instead — the same
 // action, and the reason interrupt does not also end the run. The schema
 // trims the message and refuses an empty one.
-function redirectRun({ sessionId, message }: z.infer<typeof RedirectPayload>): { ok: boolean } {
+export function redirectRun({ sessionId, message }: z.infer<typeof RedirectPayload>): {
+  ok: boolean
+} {
   if (runtime.supervisedRunner === null) return { ok: false }
   runtime.supervisedRunner.interrupt(sessionId)
   const ok = runtime.supervisedRunner.send(sessionId, message)
@@ -177,7 +195,7 @@ function redirectRun({ sessionId, message }: z.infer<typeof RedirectPayload>): {
 }
 
 // Ends the run, saying why first so the agent's own record carries it.
-function stopSessionOnRequest({ sessionId, reason }: z.infer<typeof SessionStopPayload>): {
+export function stopSessionOnRequest({ sessionId, reason }: z.infer<typeof SessionStopPayload>): {
   ok: boolean
 } {
   if (runtime.supervisedRunner === null) return { ok: false }

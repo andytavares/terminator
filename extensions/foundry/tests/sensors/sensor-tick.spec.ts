@@ -42,6 +42,7 @@ async function signals(): Promise<Signals['signals']> {
 describe('a minute after a sensor was enabled', () => {
   describe('assigned issues', assignedIssuesTests)
   describe('failing workflows', failingWorkflowsTests)
+  describe('announcing signals', announcingSignalsTests)
 })
 
 function assignedIssuesTests() {
@@ -60,6 +61,29 @@ function assignedIssuesTests() {
     await eventually(async () =>
       expect((await signals()).map((s) => s.title)).toEqual(['Login is slow'])
     )
+  })
+}
+
+function announcingSignalsTests() {
+  it('announces signals when a tick saves one and when one is dismissed', async () => {
+    vi.mocked(host.issues.listMine).mockResolvedValue({
+      issues: [{ key: 'ENG-7', title: 'Login is slow', url: 'https://linear.app/ENG-7' }],
+      failures: [],
+    } as never)
+    await host.call('foundry:sensors.set', {
+      id: 'tracker-query',
+      enabled: true,
+      repoPath: '/repos/app',
+    })
+    host.broadcast.mockClear()
+
+    await vi.advanceTimersByTimeAsync(60_000)
+    await eventually(async () => expect(await signals()).toHaveLength(1))
+    expect(host.broadcast).toHaveBeenCalledWith('foundry:changed', { kind: 'signals', orderId: '' })
+
+    host.broadcast.mockClear()
+    await host.call('foundry:signals.dismiss', { id: (await signals())[0].id })
+    expect(host.broadcast).toHaveBeenCalledWith('foundry:changed', { kind: 'signals', orderId: '' })
   })
 }
 

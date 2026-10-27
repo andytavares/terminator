@@ -39,6 +39,13 @@ export interface InboxRegistrationDeps {
   readonly loop: ForgeLoop
 }
 
+// Before the list is composed, not after: a run the last application left
+// in flight has to be on it the first time it is read, not the second.
+export async function listInbox({ api, dataRoot }: ActivationContext, inbox: InboxChannels) {
+  await adoptInterruptedRuns(dataRoot(), issuesPortFor(api))
+  return inbox.list()
+}
+
 // The inbox, the one surface the operator must visit, and the attention count every
 // surface shows. Only a named rule raises anything, so "nothing needs you" is trusted.
 export function registerInboxChannels(
@@ -48,12 +55,7 @@ export function registerInboxChannels(
   const inbox = createInbox(context, deps)
   reg(
     context.api,
-    foundryChannel('foundry:inbox.list', noPayload, async () => {
-      // Before the list is composed, not after: a run the last application left
-      // in flight has to be on it the first time it is read, not the second.
-      await adoptInterruptedRuns(context.dataRoot(), issuesPortFor(context.api))
-      return inbox.list()
-    }),
+    foundryChannel('foundry:inbox.list', noPayload, () => listInbox(context, inbox)),
     foundryChannel('foundry:inbox.decide', DecidePayload, inbox.decide)
   )
   registerAttention(context, deps.standingSources)
@@ -262,18 +264,26 @@ function registerAttention(
   const attentionGates = createLiveGateStore(dataRoot, indexFor)
   reg(
     api,
-    foundryChannel('foundry:attention', noPayload, async () => {
-      // The chrome polls this from launch, the earliest place to notice a run the last
-      // process left behind: seconds after opening rather than hours later.
-      await adoptInterruptedRuns(dataRoot(), issuesPortFor(api))
-      const { orders, waiting } = await readLiveStandings(dataRoot, standingSources)
-      return countAttention({
-        gates: await attentionGates.list(),
-        autonomy: autonomyFor(api),
-        orders,
-        pendingAsks: pendingPermissions.list().length,
-        waiting,
-      })
-    })
+    foundryChannel('foundry:attention', noPayload, () =>
+      readAttention({ api, dataRoot }, standingSources, attentionGates)
+    )
   )
+}
+
+// The chrome polls this from launch, the earliest place to notice a run the last
+// process left behind: seconds after opening rather than hours later.
+export async function readAttention(
+  { api, dataRoot }: ActivationContext,
+  standingSources: LiveStandingSources,
+  attentionGates: ReturnType<typeof createLiveGateStore>
+) {
+  await adoptInterruptedRuns(dataRoot(), issuesPortFor(api))
+  const { orders, waiting } = await readLiveStandings(dataRoot, standingSources)
+  return countAttention({
+    gates: await attentionGates.list(),
+    autonomy: autonomyFor(api),
+    orders,
+    pendingAsks: pendingPermissions.list().length,
+    waiting,
+  })
 }

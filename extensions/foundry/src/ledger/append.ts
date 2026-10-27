@@ -47,8 +47,29 @@ export async function appendEntry(file: string, entry: LedgerEntry): Promise<voi
   if (entry.actor.trim() === '') throw new UnattributedEntryError('actor')
   if (entry.action.trim() === '') throw new UnattributedEntryError('action')
 
+  await appendLines(file, `${JSON.stringify(entry)}\n`)
+}
+
+/** Whether the file ends part-way through a line, as a write cut short leaves it. */
+async function endsMidLine(file: string): Promise<boolean> {
+  const handle = await fs.promises.open(file, 'r').catch(() => null)
+  if (handle === null) return false
+  try {
+    const { size } = await handle.stat()
+    if (size === 0) return false
+    const last = Buffer.alloc(1)
+    await handle.read(last, 0, 1, size - 1)
+    return last[0] !== 0x0a
+  } finally {
+    await handle.close()
+  }
+}
+
+/** Appends whole lines; a torn last line is closed first, so it costs only itself. */
+export async function appendLines(file: string, text: string): Promise<void> {
   await fs.promises.mkdir(path.dirname(file), { recursive: true })
-  await fs.promises.appendFile(file, `${JSON.stringify(entry)}\n`, 'utf8')
+  const prefix = (await endsMidLine(file)) ? '\n' : ''
+  await fs.promises.appendFile(file, `${prefix}${text}`, 'utf8')
 }
 
 function isEntry(value: unknown): value is LedgerEntry {

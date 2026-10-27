@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { orderDir } from '../../src/data-root.js'
-import { askOnce, createGateStore } from '../../src/gates/store.js'
+import { askOnce, createGateStore, raiseUnlessDecided } from '../../src/gates/store.js'
 import { decide, raiseGate } from '../../src/gates/rules.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 
@@ -151,3 +151,19 @@ function earlierBuildTests() {
     })
   })
 }
+
+describe('raising a gate that may already be decided', () => {
+  it('leaves a decided gate decided, so a held conflict does not reopen every minute', async () => {
+    const store = createGateStore(root)
+    const held = decide(shipGate(), { option: 'hold', note: '', at: '2026-09-28T19:18:00.000Z' })
+    await store.save(held)
+    await raiseUnlessDecided(store, shipGate())
+    expect((await store.get(held.id))?.decision?.option).toBe('hold')
+  })
+
+  it('raises a gate nobody has decided yet', async () => {
+    const store = createGateStore(root)
+    await raiseUnlessDecided(store, shipGate())
+    expect(await store.get(shipGate().id)).not.toBeNull()
+  })
+})

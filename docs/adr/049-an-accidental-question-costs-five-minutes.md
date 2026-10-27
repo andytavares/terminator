@@ -1,6 +1,6 @@
 # ADR 049: An accidental question costs five minutes, not a click
 
-**Status**: Accepted
+**Status**: Superseded by ADR 131
 
 **Date**: 2026-09-09
 
