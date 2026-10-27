@@ -18,7 +18,7 @@ describe('which specs a change burns in', () => {
     'tests/unit/main/git/status.spec.ts',
     'tests/unit/renderer/Sidebar.spec.tsx',
     'tests/e2e/foundry/order.spec.ts',
-    'tests/support/test-seed.ts',
+    'tests/support/bounds.ts',
     'docs/testing.md',
   ].join('\n')
 
@@ -104,7 +104,7 @@ describe('burning in a failing spec', () => {
     expect(seen).toEqual([11, 22, 33])
     expect(result.code).toBe(1)
     expect(result.message).toBe(
-      `stability: ${specs.join(' ')} failed on run 3 of 5 with TEST_SEED=33`
+      `stability: ${specs.join(' ')} failed on run 3 of 5 with --sequence.seed 33`
     )
   })
 })
@@ -239,12 +239,18 @@ describe('splitting the specs over CI runners', () => {
   })
 
   it('passes a part to Vitest only when the specs are split', () => {
-    expect(unitBurnInArguments(['a.spec.ts'], '1/1')).toEqual(['vitest', 'run', 'a.spec.ts'])
-    expect(unitBurnInArguments(['a.spec.ts', 'b.spec.ts'], '2/3')).toEqual([
+    expect(unitBurnInArguments(['a.spec.ts'], '1/1', 7)).toEqual([
+      'vitest',
+      'run',
+      'a.spec.ts',
+      '--sequence.seed=7',
+    ])
+    expect(unitBurnInArguments(['a.spec.ts', 'b.spec.ts'], '2/3', 9)).toEqual([
       'vitest',
       'run',
       'a.spec.ts',
       'b.spec.ts',
+      '--sequence.seed=9',
       '--shard=2/3',
     ])
   })

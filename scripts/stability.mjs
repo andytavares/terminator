@@ -82,9 +82,9 @@ export function stabilityShards(specCount, runs) {
   return shards
 }
 
-/** Vitest's arguments for one pass over `part` of the specs. */
-export function unitBurnInArguments(specs, part) {
-  const args = ['vitest', 'run', ...specs]
+/** Vitest's arguments for one pass over `part` of the specs, shuffled with `seed`. */
+export function unitBurnInArguments(specs, part, seed) {
+  const args = ['vitest', 'run', ...specs, `--sequence.seed=${seed}`]
   return part === '1/1' ? args : [...args, `--shard=${part}`]
 }
 
@@ -109,7 +109,7 @@ export async function burnIn({ specs, run, seeds }) {
   const runs = seeds.length
   for (let index = 0; index < runs; index++) {
     if ((await run(seeds[index])) !== 0) {
-      const failed = `failed on run ${index + 1} of ${runs} with TEST_SEED=${seeds[index]}`
+      const failed = `failed on run ${index + 1} of ${runs} with --sequence.seed ${seeds[index]}`
       return { code: 1, message: `stability: ${specs.join(' ')} ${failed}` }
     }
   }
@@ -136,8 +136,7 @@ async function runUnitBurnIn({ specs, runs, part }) {
     return await burnIn({
       specs,
       seeds: freshSeeds(runs),
-      run: (seed) =>
-        commandExitCode('npx', unitBurnInArguments(specs, part), { TEST_SEED: String(seed) }),
+      run: (seed) => commandExitCode('npx', unitBurnInArguments(specs, part, seed)),
     })
   } finally {
     await load.stop()

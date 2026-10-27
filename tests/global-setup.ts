@@ -33,20 +33,7 @@ function sealedEnvironmentFor(home: string): Record<string, string> {
   }
 }
 
-// Every project runs this file, each with its own copy of the module; the order is one for the
-// whole run, so the flag is on the process.
-const SEED_ANNOUNCED = Symbol.for('terminator.test-order-announced')
-
-function announceTestOrder(project: TestProject): void {
-  const flags = globalThis as { [SEED_ANNOUNCED]?: boolean }
-  if (flags[SEED_ANNOUNCED]) return
-  flags[SEED_ANNOUNCED] = true
-  const seed = project.vitest.config.sequence.seed
-  console.log(`Test order seed: ${seed} (rerun this order: TEST_SEED=${seed})`)
-}
-
 export default function sealSpecEnvironment(project: TestProject): () => void {
-  announceTestOrder(project)
   const home = mkdtempSync(join(tmpdir(), 'terminator-vitest-home-'))
   project.provide('sealedEnvironment', sealedEnvironmentFor(home))
   return () => rmSync(home, { recursive: true, force: true })
