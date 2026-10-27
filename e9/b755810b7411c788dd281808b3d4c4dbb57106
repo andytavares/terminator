@@ -1,0 +1,46 @@
+.github/dependabot.yml
+  s_567c3310a5db4e::t_85dfe151ae2b59 31-41
+.github/workflows/story-baselines.yml
+  s_567c3310a5db4e::t_85dfe151ae2b59 32,36
+scripts/ci-local.mjs
+  s_567c3310a5db4e::t_d109e61bbacb6b 12,54-67,173-175
+.github/workflows/notarize-test.yml
+  s_567c3310a5db4e::t_85dfe151ae2b59 12,14,19
+.npmrc
+  s_567c3310a5db4e::t_15a5dca7531f1e 1
+scripts/ci-plan.mjs
+  s_567c3310a5db4e::t_d109e61bbacb6b 36-37,86-87,101-103
+  s_567c3310a5db4e::t_cac5b0c68a0fe8 104
+.github/workflows/ci.yml
+  s_567c3310a5db4e::t_85dfe151ae2b59 30,34,89,91,110,112,133,135,167,169,202,206,246,250,275,285,302,306,341,345,353,371,380,409,411,457,461,540,558,566,576,605,607,615,624
+.github/workflows/release.yml
+  s_567c3310a5db4e::t_85dfe151ae2b59 21,23,43,45,77,82,87
+  s_567c3310a5db4e::t_1dd396d6db0e6a 171
+.github/workflows/audit.yml
+  s_567c3310a5db4e::t_85dfe151ae2b59 23,25
+tests/unit/scripts/ci-plan.spec.ts
+  s_567c3310a5db4e::t_d109e61bbacb6b 341-342
+  s_567c3310a5db4e::t_c6d555ff6e97ed 10,331-340,343-345
+.github/workflows/stability-sweep.yml
+  s_567c3310a5db4e::t_85dfe151ae2b59 55,57,73,90,92,120,136,138,142,160,162,177,190,192,215
+.github/workflows/fill-pr-description.yml
+  s_567c3310a5db4e::t_85dfe151ae2b59 19
+tests/unit/scripts/ci-local.spec.ts
+  s_567c3310a5db4e::t_cde2afbb119f00 21,311-317
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e9b755810b7411c788dd281808b3d4c4dbb57106",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
