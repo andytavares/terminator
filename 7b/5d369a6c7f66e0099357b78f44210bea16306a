@@ -1,0 +1,32 @@
+tests/unit/scripts/ci-plan.spec.ts
+  s_567c3310a5db4e::t_8e2b75a1c43220 71-78,248-250
+  s_567c3310a5db4e::t_6d6a30b6220105 22,65-70,79-87,204-205,207,209,219,222,227-247,251-258
+  s_567c3310a5db4e::t_9cf318b85ec660 259-260
+.github/workflows/ci.yml
+  s_567c3310a5db4e::t_8eca2590a49eca 123-128,199,222-228,292,297,318,325-326,419-420,422-427,440-442,455,457-458,468-484,486,536-539,581,585
+.github/dependabot.yml
+  s_567c3310a5db4e::t_c7f4eba538ec8c 27-30
+scripts/ci-plan.mjs
+  s_567c3310a5db4e::t_34ba6a001fe64b 11
+.github/workflows/stability-sweep.yml
+  s_567c3310a5db4e::t_c7f4eba538ec8c 5-6,152-220
+scripts/ci-e2e-local.mjs
+  s_567c3310a5db4e::t_8e2b75a1c43220 126-128
+  s_567c3310a5db4e::t_34ba6a001fe64b 3,129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7b5d369a6c7f66e0099357b78f44210bea16306a",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
