@@ -799,7 +799,7 @@ Channels are named `terminator.notepad:<name>` and register through `notepadChan
 
 Notes and diagrams are stored in the shared SQLite database at `<userData>/app.sqlite`, reached only through `api.db`. `applyNotepadSchema` (`src/db/db.ts`) creates every table and index with `IF NOT EXISTS`, so running it on each launch changes nothing that already exists; the database is created from this schema, which is why there are no column migrations. The import of the old better-sqlite3 `notepad.db` / `vault.db` files through `sql.js` is removed ([ADR 099](adr/099-node-sqlite-replaces-pglite.md)).
 
-**Search** uses `LIKE` rather than an FTS5 table (`src/ipc/search.ipc.ts`). SQLite's `LIKE` folds case for ASCII letters only, so a search for `é` does not match `É`. Tag filters are applied in the same query with `EXISTS` subqueries, and results are returned in `updated_at DESC` order. See [ADR-019](adr/019-ilike-search-over-fts5.md) for the trade-off; its `pg_trgm` upgrade path was PGlite-specific and no longer applies.
+**Search** matches the text in JavaScript, not with an FTS5 table (`src/ipc/search.ipc.ts`). SQLite's `LIKE` folds case for ASCII letters only, so the JavaScript match is what makes `é` match `É`. Tag filters are applied in the SQL query with `EXISTS` subqueries, and results are returned in `updated_at DESC` order. See [ADR-019](adr/019-ilike-search-over-fts5.md) for the trade-off; its `pg_trgm` upgrade path was PGlite-specific and no longer applies.
 
 #### Data flow
 
@@ -1454,6 +1454,7 @@ layout and the belts through small state classes (`HallBuilder`, `BeltRouter`).
 - [ADR-131: agents' permissions are Claude Code settings](adr/131-agents-permissions-are-claude-code-settings.md) — each role's mode and rules come from `runtime/role-settings.ts`; supersedes ADR-049 and ADR-077.
 - [ADR-056: a file count is not a budget](adr/056-a-file-count-is-not-a-budget.md) — budgets are agents and minutes; the files budget and the `budgets` check are gone.
 - [ADR-132: CI finishes in five minutes](adr/132-ci-finishes-in-five-minutes.md) — at most five macOS jobs per run, nothing waits on E2E, quarantined tests run nightly, and `ci:local` runs its jobs at once.
+- [ADR-133: paved-path cleanup](adr/133-paved-path-cleanup.md) — `codecov/patch` is the one outside gate, the seed is Vitest's, the database console is an exception to Principle II, and Jira is removed.
 - [ADR-070: E2E is deterministic and selective](adr/070-e2e-is-deterministic-and-selective.md) — no retries, flakes fixed at their cause, and a PR runs only the specs its diff selects.
 - [ADR-072: a review reads definitions before their callers](adr/072-a-review-reads-definitions-before-callers.md) — tree-sitter orders a PR's files so a function comes before the code that calls it.
 - [ADR-073: the review agent reads, and never writes](adr/073-the-review-agent-reads-and-never-writes.md) — headless `claude -p` with Read, Grep and Glob only, in a worktree at the PR head; findings stay private until posted.
