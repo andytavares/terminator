@@ -1,0 +1,19 @@
+tests/integration/foundry-portability.spec.ts
+  s_a9e8c58b3eee1f::t_68ea4d0593720f 97-106,108-109,127-129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ee593ab91e8e1a25a3644890061704096ebacc6f",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
