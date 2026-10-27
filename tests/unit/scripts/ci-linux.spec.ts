@@ -23,8 +23,9 @@ describe('the Linux image', () => {
 describe('a step run for its output', () => {
   it('gives each chunk of stdout and stderr to the sink, and resolves the exit status', async () => {
     const chunks: string[] = []
-    const script = 'echo out; echo err >&2; exit 3'
-    const status = await spawnToSink('bash', ['-c', script], {
+    // Node, not bash: bash warns when the sealed locale is missing, as in the Linux container.
+    const script = "console.log('out'); console.error('err'); process.exit(3)"
+    const status = await spawnToSink(process.execPath, ['-e', script], {
       write: (chunk: Buffer) => chunks.push(String(chunk)),
     })
     expect(status).toBe(3)
