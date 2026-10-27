@@ -103,8 +103,8 @@ export function retryForRefusal(reason: string, autoTurnsSoFar: number): string 
     '',
     reason,
     '',
-    'Write the whole proposal again with each of those fields in the shape the',
-    'output contract shows.',
+    'Answer again with the whole proposal as your structured output, with each of',
+    'those fields fixed.',
   ].join('\n')
 }
 
