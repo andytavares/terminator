@@ -1,0 +1,79 @@
+extensions/foundry/tests/components/needs-you.spec.tsx
+  s_a9e8c58b3eee1f::t_1fb09eb100fe25 316,321,327-328
+packages/extension-ui/src/Tabs.tsx
+  s_a9e8c58b3eee1f::t_50aa6feae93fa4 83,85-87,89-99,107-108
+  s_a9e8c58b3eee1f::t_aea7fcbd7bb424 88
+  s_a9e8c58b3eee1f::t_928a814c580542 76-82
+  s_a9e8c58b3eee1f::t_e8017709aeed29 1,84,110-111,114
+extensions/foundry/src/components/ForgeChecks.tsx
+  s_a9e8c58b3eee1f::t_aca5acdbbde81c 2-3,39-40,42-44,292,437,519,553
+packages/extension-ui/src/index.ts
+  s_a9e8c58b3eee1f::t_59f801f628cce1 71-72
+  s_a9e8c58b3eee1f::t_36fbef335aa275 70
+extensions/foundry/src/components/ReasonButton.tsx
+  s_a9e8c58b3eee1f::t_2db82ab121dbce 1,7-9,14-15,27,45,56,65,68,76,81,90,107-109
+tests/unit/packages/extension-ui/tabs.spec.tsx
+  s_a9e8c58b3eee1f::t_928a814c580542 282-287
+  s_a9e8c58b3eee1f::t_c41b9b0211b145 275-281,288
+extensions/foundry/src/components/Orders.tsx
+  s_a9e8c58b3eee1f::t_43f33174451308 3,512
+packages/extension-ui/src/ConfirmButton.tsx
+  s_a9e8c58b3eee1f::t_59f801f628cce1 1-93
+extensions/foundry/tests/components/App.spec.tsx
+  s_a9e8c58b3eee1f::t_c074b2455883d9 183,202,247,256,277,300,302,371,375,428,434,436,449,468,504,511,524,537,587,624,639,687
+  s_a9e8c58b3eee1f::t_66505a76f51031 414-416
+  s_a9e8c58b3eee1f::t_d1ab53fe9e607c 408
+  s_a9e8c58b3eee1f::t_70e65eeb47cf63 46-48,50,407,409-413,417-421
+  s_a9e8c58b3eee1f::t_1d5edf627e97ae 49
+  s_a9e8c58b3eee1f::t_d30cf1b8f1ce06 257,278,422-424,453,477
+extensions/foundry/tests/runtime/supervision-console.spec.ts
+  s_a9e8c58b3eee1f::t_85dc16bf735705 383
+tests/unit/packages/extension-ui/confirm-button.spec.tsx
+  s_a9e8c58b3eee1f::t_d020192b7798eb 1-85
+extensions/foundry/src/components/foundry.css
+  s_a9e8c58b3eee1f::t_c074b2455883d9 1326,1328
+  s_a9e8c58b3eee1f::t_0492b5a554a0fc 3847-3848,3854,3859-3866,3868-3869
+extensions/foundry/src/components/Floor.tsx
+  s_a9e8c58b3eee1f::t_43f33174451308 26-31,33,874,882
+  s_a9e8c58b3eee1f::t_12153653e87a1a 32
+extensions/foundry/src/renderer/App.tsx
+  s_a9e8c58b3eee1f::t_c074b2455883d9 3,309,312-322,331-333,335-337,345
+  s_a9e8c58b3eee1f::t_95bee3009ab662 147,149-155,158-161,248,251-253
+  s_a9e8c58b3eee1f::t_d1ab53fe9e607c 148,156-157
+  s_a9e8c58b3eee1f::t_79f131e3d53058 311
+extensions/foundry/src/components/Forge.tsx
+  s_a9e8c58b3eee1f::t_2db82ab121dbce 1839
+  s_a9e8c58b3eee1f::t_36c10d93959f45 910
+  s_a9e8c58b3eee1f::t_aca5acdbbde81c 1-2,309-313,985,988,990,1207-1209,1211-1216,1228,2011,2032
+  s_a9e8c58b3eee1f::t_90940ed3d99aef 1210
+extensions/foundry/tests/components/Ledger.spec.tsx
+  s_a9e8c58b3eee1f::t_0492b5a554a0fc 429,432
+extensions/foundry/src/runtime/palette-commands.ts
+  s_a9e8c58b3eee1f::t_d1ab53fe9e607c 1,29-35
+extensions/foundry/tests/components/factory/FactorySite.spec.tsx
+  s_a9e8c58b3eee1f::t_d53adb9c45aed2 312-314,320-321
+extensions/foundry/src/components/MetricsTiles.tsx
+  s_a9e8c58b3eee1f::t_0492b5a554a0fc 2,44
+extensions/foundry/tests/components/ReasonButton.spec.tsx
+  s_a9e8c58b3eee1f::t_be3116aaf6d3cc 7,25,30,39
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_a9e8c58b3eee1f::t_2db82ab121dbce 165,167-169,1466-1467,2240,2263
+packages/extension-ui/src/extension-ui.css
+  s_a9e8c58b3eee1f::t_59f801f628cce1 741-775
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fc24081dd8702d9d206156d01f376e07ab1f47e8",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
