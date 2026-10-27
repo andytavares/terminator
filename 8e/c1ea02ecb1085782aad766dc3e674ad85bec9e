@@ -1,0 +1,23 @@
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_6768753e2f34eb::t_86a87257539d2a 508-509,511,515-522,554-555
+extensions/foundry/tests/runtime/supervised-runner.spec.ts
+  s_6768753e2f34eb::t_6686f9ac8ed18f 242,584
+  s_6768753e2f34eb::t_7405b3d194dca6 573,577,585-604
+  s_6768753e2f34eb::t_f6be8c4fbad471 605-606
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8ec1ea02ecb1085782aad766dc3e674ad85bec9e",
+  "prompts": {},
+  "sessions": {
+    "s_6768753e2f34eb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9cb01023-8291-4030-a541-66d7d8df379b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
