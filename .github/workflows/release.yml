@@ -6,9 +6,69 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# Read only by default; the release job asks for what it writes (contents: write) itself.
+permissions:
+  contents: read
+
 jobs:
+  # Every test, before anything is bumped or packaged: a push to main runs only what its change
+  # reaches (Constitution XIV, ADR 132), so the release is where the whole suite gates.
+  unit:
+    name: Unit (every test)
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npx vitest run --tagsFilter='!quarantine' --reporter=dot
+
+  e2e:
+    name: E2E (every test, ${{ matrix.shard }}/3)
+    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # The same code-signature workaround as ci.yml's E2E job.
+      - name: Re-sign Electron
+        run: |
+          node node_modules/electron/install.js
+          codesign --force --deep --sign - node_modules/electron/dist/Electron.app
+
+      - name: Test
+        run: |
+          read -r -a shard <<< "$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 3)"
+          if [ "${#shard[@]}" -eq 0 ]; then echo "Nothing in this shard."; exit 0; fi
+          npx playwright install chromium
+          npx playwright test "${shard[@]}" --grep-invert @quarantine --reporter=dot
+
   release:
     name: Package & Release
+    needs: [unit, e2e]
     runs-on: macos-14
     permissions:
       contents: write

@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { busiestProcesses, e2eSpecsOf, waitForQuiet } from '../../../scripts/ci-e2e-local.mjs'
+import {
+  busiestProcesses,
+  e2eSpecsOf,
+  playwrightArguments,
+  runShardsTogether,
+  waitForQuiet,
+} from '../../../scripts/ci-e2e-local.mjs'
 
 /** A machine whose load reads each value in turn, then stays at the last. */
 function machine(loads: number[], cores = 16) {
@@ -48,9 +54,10 @@ describe('which e2e specs the local run gives its shards', () => {
     expect(e2eSpecsOf({ e2eMode: 'some', e2e: ['b.spec.ts'] }, allSpecs)).toEqual(['b.spec.ts'])
   })
 
-  it('runs each spec once: no burn-in or repeat is left in the script', () => {
+  it('runs each spec once, and leaves the repeats to CI (Constitution XIV, ADR 132)', () => {
     const source = readFileSync(resolve(__dirname, '../../../scripts/ci-e2e-local.mjs'), 'utf8')
-    expect(source).not.toMatch(/burn|repeat/i)
+    expect(source).not.toMatch(/--repeat-each/)
+    expect(source).not.toMatch(/scripts\/stability\.mjs/)
   })
 })
 
@@ -72,5 +79,31 @@ describe('what keeps the machine busy', () => {
       '99.6%  yes',
       '55.7%  com.apple.Virtualization.VirtualMachine',
     ])
+  })
+})
+
+describe('shards that run side by side', () => {
+  it('gives each shard its own Playwright output directory, so one start does not clear another', () => {
+    const args = playwrightArguments(2, ['a.spec.ts'])
+    expect(args).toEqual(expect.arrayContaining(['--output', 'test-results/shard-2']))
+    expect(playwrightArguments(3, ['a.spec.ts'])).toContain('test-results/shard-3')
+  })
+
+  it('starts every shard before the first ends', async () => {
+    let started = 0
+    let release = () => {}
+    const allStarted = new Promise<void>((resolve) => (release = resolve))
+    const run = async () => {
+      if (++started === 3) release()
+      await allStarted // a shard run in turn would wait here forever
+      return true
+    }
+    expect(await runShardsTogether([1, 2, 3], run)).toEqual([])
+    expect(started).toBe(3)
+  })
+
+  it('names the shards that failed', async () => {
+    const run = async (shard: number) => shard !== 2
+    expect(await runShardsTogether([1, 2, 3], run)).toEqual([2])
   })
 })

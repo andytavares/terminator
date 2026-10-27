@@ -105,9 +105,42 @@ function listedJson(name, list) {
   }
 }
 
-function unitTagged() {
+const E2E_DIRECTORY = 'tests/e2e/'
+
+/** The spec files that can carry the tag: those whose source says `quarantine`, and those
+ * tests/quarantine.json names. Listing only these keeps the check from loading every spec. */
+export function candidateSpecs({ sourceFiles, entries }) {
+  const files = new Set([...sourceFiles, ...entries.map((entry) => specFile(entry.test))])
+  const all = [...files].sort()
+  return {
+    unit: all.filter((file) => !file.startsWith(E2E_DIRECTORY)),
+    e2e: all.filter((file) => file.startsWith(E2E_DIRECTORY)),
+  }
+}
+
+function filesMentioningQuarantine() {
+  try {
+    return run('git', [
+      'grep',
+      '-l',
+      '-w',
+      'quarantine',
+      '--',
+      '*.spec.ts',
+      '*.spec.tsx',
+      '*.spec.js',
+    ])
+      .split('\n')
+      .filter(Boolean)
+  } catch {
+    return [] // git grep exits 1 when nothing matches
+  }
+}
+
+export function unitTagged(files) {
+  if (files.length === 0) return []
   const listed = listedJson('vitest.json', (file) =>
-    run('npx', ['vitest', 'list', '--tagsFilter=quarantine', `--json=${file}`])
+    run('npx', ['vitest', 'list', '--tagsFilter=quarantine', `--json=${file}`, ...files])
   )
   return listed.map((test) => `${relative(process.cwd(), test.file)}${SEPARATOR}${test.name}`)
 }
@@ -126,9 +159,18 @@ export function playwrightTests(report, root) {
 }
 
 /** Playwright exits 1 with "No tests found" when nothing matches, and still writes its report. */
-function e2eTagged() {
+export function e2eTagged(files) {
+  if (files.length === 0) return []
   const report = listedJson('playwright.json', (file) => {
-    const args = ['playwright', 'test', '--list', '--grep', '@quarantine', '--reporter=json']
+    const args = [
+      'playwright',
+      'test',
+      '--list',
+      '--grep',
+      '@quarantine',
+      '--reporter=json',
+      ...files,
+    ]
     try {
       execFileSync('npx', args, {
         stdio: 'ignore',
@@ -171,7 +213,8 @@ function quarantinedOnBase(branch) {
 
 function main(branch) {
   const entries = JSON.parse(readFileSync('tests/quarantine.json', 'utf8'))
-  const tagged = [...unitTagged(), ...e2eTagged()]
+  const { unit, e2e } = candidateSpecs({ sourceFiles: filesMentioningQuarantine(), entries })
+  const tagged = [...unitTagged(unit), ...e2eTagged(e2e)]
   if (entries.length === 0 && tagged.length === 0) {
     console.log('check-quarantine: nothing quarantined')
     return 0

@@ -2,7 +2,8 @@
 // node scripts/stability.mjs [--runs N] [--part K/N] [--e2e] [--list] [--github-output] [spec ...]:
 // runs each spec a change adds or edits (since origin/<base>, as fetched) many times, shuffled,
 // under load, and fails on the first failure, so a flaky test is caught on the PR that writes it
-// (ADR 124). --github-output sizes CI's Stability shards instead of running anything.
+// (ADR 124). With --e2e, --part K/N hands Playwright --shard=K/N. --github-output sizes CI's
+// Stability shards instead of running anything.
 
 import { execFileSync, spawn } from 'node:child_process'
 import { randomInt } from 'node:crypto'
@@ -12,16 +13,21 @@ import { needsChromium } from './ci-e2e-local.mjs'
 import { baseBranch } from './check-release-age.mjs'
 import { startLoad } from './under-load.mjs'
 
-const UNIT_RUNS = 30
+// At most ten runs of each changed spec: thirty cost ten minutes of CI on a change to fifteen specs
+// (run 40588044519). The maintainer set it on 2026-10-27 (ADR 132).
+const UNIT_RUNS = 10
 const E2E_RUNS = 5
 const SPEC_FILE = /\.spec\.(tsx?|js)$/
 // What vitest.config.ts leaves out of the default run: `vitest run <file>` finds no test there.
 const NOT_IN_DEFAULT_RUN = [/\.perf\.spec\.ts$/, /^extensions\/[^/]+\/tests\/live\//]
-// One unit run on CI's ubuntu-24.04-arm under load: 96 specs took 81-86 s (run 39976627567).
-const SECONDS_PER_SPEC = 0.9
+// One unit run on CI's ubuntu-24.04-arm under load: 13 specs took 58 s (run 40594749096); light
+// specs are faster (96 in 81-86 s, run 39976627567), and planning for the slow ones keeps a shard short.
+const SECONDS_PER_SPEC = 4
 const SECONDS_PER_RUN = 5
-// The step stops at 7 minutes; a shard plans for 5, so a slow run still finishes.
-const SHARD_SECONDS = 300
+// The goal is a CI run of 5 minutes, so a shard plans for 3 and a slow run still finishes.
+const SHARD_SECONDS = 180
+// CI has a 20-job limit; a bigger plan stretches each shard's budget instead of adding shards.
+const MAX_SHARDS = 4
 const FLAGS = ['--e2e', '--list', '--github-output']
 const VALUED = ['--runs', '--part']
 
@@ -48,12 +54,11 @@ export function stabilityArguments(argv) {
   }
 }
 
-/** CI's Stability shards: each runs `runs` passes over one `part` of the specs inside
- * SHARD_SECONDS, and together they run every spec `runs` times in all. */
-export function stabilityShards(specCount, runs) {
-  const parts = Math.max(1, Math.ceil((specCount * SECONDS_PER_SPEC) / SHARD_SECONDS))
+/** One plan for a per-shard budget: `runs` passes over each of the parts of the specs. */
+function planShards(specCount, runs, budgetSeconds) {
+  const parts = Math.max(1, Math.ceil((specCount * SECONDS_PER_SPEC) / budgetSeconds))
   const passSeconds = SECONDS_PER_RUN + (specCount * SECONDS_PER_SPEC) / parts
-  const runsPerShard = Math.max(1, Math.floor(SHARD_SECONDS / passSeconds))
+  const runsPerShard = Math.max(1, Math.floor(budgetSeconds / passSeconds))
   const shards = []
   for (let done = 0; done < runs; done += runsPerShard) {
     for (let part = 1; part <= parts; part++) {
@@ -64,6 +69,16 @@ export function stabilityShards(specCount, runs) {
       })
     }
   }
+  return shards
+}
+
+/** CI's Stability shards: each runs `runs` passes over one `part` of the specs inside
+ * SHARD_SECONDS, and together they run every spec `runs` times in all. At most MAX_SHARDS: when
+ * SHARD_SECONDS needs more, the budget grows one second at a time until the plan fits. */
+export function stabilityShards(specCount, runs) {
+  let budget = SHARD_SECONDS
+  let shards = planShards(specCount, runs, budget)
+  while (shards.length > MAX_SHARDS) shards = planShards(specCount, runs, ++budget)
   return shards
 }
 
@@ -129,16 +144,25 @@ async function runUnitBurnIn({ specs, runs, part }) {
   }
 }
 
-/** The commands an e2e burn-in runs, in order: Chromium's install when a spec needs it. */
-export function e2eBurnInCommands(specs, runs) {
-  const test = ['npx', ['playwright', 'test', ...specs, `--repeat-each=${runs}`]]
+/** The commands an e2e burn-in runs, in order: Chromium's install when a spec needs it, then
+ * Playwright, which gives this `part` of the repeated tests to this E2E shard. */
+export function e2eBurnInCommands(specs, runs, part = '1/1') {
+  const args = [
+    'playwright',
+    'test',
+    ...specs,
+    `--repeat-each=${runs}`,
+    '--grep-invert',
+    '@quarantine',
+  ]
+  const test = ['npx', part === '1/1' ? args : [...args, `--shard=${part}`]]
   return needsChromium(specs) ? [['npx', ['playwright', 'install', 'chromium']], test] : [test]
 }
 
-async function runE2eBurnIn({ specs, runs }) {
+async function runE2eBurnIn({ specs, runs, part }) {
   if (specs.length === 0) return burnIn({ specs, run: () => 0, seeds: [] })
   let code = 0
-  for (const [command, args] of e2eBurnInCommands(specs, runs)) {
+  for (const [command, args] of e2eBurnInCommands(specs, runs, part)) {
     code = await commandExitCode(command, args)
     if (code !== 0) break
   }

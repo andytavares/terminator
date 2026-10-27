@@ -51,7 +51,7 @@ const specs = [
 
 describe('select()', () => {
   it('selects all when a path is unmatched by every rule', () => {
-    const result = select({ changed: ['some/unknown/path.ts'], specs, isMainPush: false })
+    const result = select({ changed: ['some/unknown/path.ts'], specs })
     expect(result.mode).toBe('all')
     expect(result.specs).toEqual(specs.slice().sort())
   })
@@ -63,7 +63,6 @@ describe('select()', () => {
         'specs/054-session-home-wall/plan.md',
       ],
       specs,
-      isMainPush: false,
     })
     expect(result.mode).toBe('none')
     expect(result.specs).toEqual([])
@@ -75,7 +74,6 @@ describe('select() — a foundry-only diff', () => {
     const result = select({
       changed: ['extensions/foundry/src/index.ts'],
       specs,
-      isMainPush: false,
     })
     expect(result.mode).toBe('some')
     expect(result.specs).toEqual(
@@ -96,26 +94,19 @@ describe('select() — a remote-control diff', () => {
   it.each(['extensions/remote-control/src/index.ts', 'src/renderer-remote/MobileApp.tsx'])(
     'selects the remote spec for %s',
     (changed) => {
-      const result = select({ changed: [changed], specs, isMainPush: false })
+      const result = select({ changed: [changed], specs })
       expect(result.specs).toContain('remote-control.spec.ts')
     }
   )
 })
 
-describe('select() — changed specs and main pushes', () => {
+describe('select() — changed specs', () => {
   it('includes a changed spec file itself', () => {
     const result = select({
       changed: ['tests/e2e/session-home.spec.ts'],
       specs,
-      isMainPush: false,
     })
     expect(result.specs).toContain('session-home.spec.ts')
-  })
-
-  it('runs everything on a push to main', () => {
-    const result = select({ changed: ['docs/whatever.md'], specs, isMainPush: true })
-    expect(result.mode).toBe('all')
-    expect(result.specs).toEqual(specs.slice().sort())
   })
 })
 
@@ -124,7 +115,6 @@ describe('select() — mixed diffs', () => {
     const result = select({
       changed: ['docs/README.md', 'extensions/notepad/src/index.ts'],
       specs,
-      isMainPush: false,
     })
     expect(result.mode).toBe('some')
     expect(result.specs).toEqual(
@@ -146,20 +136,19 @@ describe('select() — unmatched paths and empty diffs', () => {
     const result = select({
       changed: ['tests/e2e/helpers.ts'],
       specs,
-      isMainPush: false,
     })
     expect(result.mode).toBe('all')
   })
 
   it('selects none when there are no changed paths', () => {
-    const result = select({ changed: [], specs, isMainPush: false })
+    const result = select({ changed: [], specs })
     expect(result).toEqual({ mode: 'none', specs: [] })
   })
 })
 
 describe('select() — specs the suite lacks', () => {
   it('leaves out a changed spec file the suite no longer has, and still runs the smoke set', () => {
-    const result = select({ changed: ['tests/e2e/deleted.spec.ts'], specs, isMainPush: false })
+    const result = select({ changed: ['tests/e2e/deleted.spec.ts'], specs })
     expect(result).toEqual({ mode: 'some', specs: [...SMOKE_SPECS].sort() })
   })
 
@@ -168,7 +157,6 @@ describe('select() — specs the suite lacks', () => {
     const result = select({
       changed: ['tests/e2e/session-home.spec.ts'],
       specs: withoutTerminal,
-      isMainPush: false,
     })
     expect(result).toEqual({
       mode: 'some',

@@ -149,11 +149,10 @@ export function matchesAny(value, globs) {
 
 /**
  * Pure selection function.
- * @param {{ changed: string[], specs: string[], isMainPush: boolean }} args
+ * @param {{ changed: string[], specs: string[] }} args
  * @returns {{ mode: 'all' | 'none' | 'some', specs: string[] }}
  */
-export function select({ changed, specs, isMainPush }) {
-  if (isMainPush) return everySpec(specs)
+export function select({ changed, specs }) {
   if (changed.length === 0) return { mode: 'none', specs: [] }
 
   const impact = specImpactOf(changed)
@@ -238,7 +237,6 @@ if (isCli) {
   const result = select({
     changed: computeChanged(base),
     specs: listSpecs(),
-    isMainPush: isMainPush(process.env),
   })
   console.log(JSON.stringify(result))
 }

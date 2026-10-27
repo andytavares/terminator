@@ -1,6 +1,6 @@
 # ADR 129: CI jobs have no time limit
 
-**Status**: Accepted
+**Status**: Accepted, amended by ADR 132
 
 **Date**: 2026-10-26
 

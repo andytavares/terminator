@@ -1,4 +1,22 @@
 <!--
+SYNC IMPACT REPORT (5.0.0)
+==========================
+Version change: 4.0.0 → 5.0.0 (MAJOR: Principle XIV's "Only the tests a change can reach" redefined)
+
+Modified principles:
+  - XIV: a push to `main` no longer runs everything. It runs what its change reaches, compared
+    with the commit `main` was at before, as a pull request does. The nightly sweep and the
+    release run everything. The stability gate repeats each changed spec up to ten times,
+    not thirty, and runs in CI only; `npm run ci:local` leaves it out. Approved by the
+    maintainer on 2026-10-27 to keep every CI run within five minutes on GitHub's free macOS
+    runners, and every local run short. ADR 132.
+
+Added sections: none
+Removed sections: none
+Templates requiring updates: none
+Follow-up TODOs: none
+-->
+<!--
 SYNC IMPACT REPORT (4.0.0)
 ==========================
 Version change: 3.0.0 → 4.0.0 (MAJOR: Principle XIV's "One run" redefined)
@@ -325,8 +343,8 @@ code has no value; it is a defect. ADR 123 records the reasoning.
 - **One run decides.** A check's verdict is its first run. A failing test is never
   retried or rerun into a pass, in CI, locally, or in Foundry's final check; it is fixed at
   its cause, or deleted together with the behavior it claimed to cover. Repeats exist only
-  to find flaky tests, never to pass one: the stability gate runs every spec a change adds
-  or edits many times, shuffled and under load, and any failure fails the check; the
+  to find flaky tests, never to pass one: in CI, the stability gate runs every spec a change
+  adds or edits up to ten times, shuffled and under load, and any failure fails the check; the
   nightly sweep runs the whole suite several times on one commit of `main` and opens an
   issue for every test that disagrees with itself. ADR 124.
 - **Quarantine is short, small and visible.** A test the sweep found flaky on `main` may
@@ -349,15 +367,16 @@ code has no value; it is a defect. ADR 123 records the reasoning.
   never falls through to the real tool.
 - **CI and the local check are the same check.** CI runs on macOS, as the product does,
   with the Node in `.nvmrc` and the commands `.github/workflows/ci.yml` lists.
-  `npm run ci:local` runs those same commands on the commit merged with `origin/main`,
-  never the working tree, and the pre-push hook refuses a commit it has not passed. A CI
+  `npm run ci:local` runs those same commands, except the stability gate's repeats, on the
+  commit merged with `origin/main`, never the working tree, and the pre-push hook refuses a commit it has not passed. A CI
   failure after a local pass is a parity defect and is fixed like any other defect.
 - **Outside services never gate.** An advisory database, Codecov, the artifact store or a
   registry MUST NOT turn a change red that did not touch what they check.
 - **Only the tests a change can reach.** `scripts/test-select.mjs` picks the unit,
   integration and end-to-end tests a diff can reach, the same way in CI and locally. A path
-  it cannot place runs everything. The pull request label `test: all`, `--all` locally, and
-  every push to `main` run everything.
+  it cannot place runs everything. A push to `main` runs what its change reaches, compared with
+  the commit `main` was at before. The pull request label `test: all`, `--all` locally, the
+  nightly sweep and the release run everything.
 - **Enforced, not trusted.** `eslint.config.mjs` rejects sleeps, ticks, time limits and
   promises left unawaited in specs. These rules MUST NOT be disabled, suppressed or
   loosened.
@@ -387,4 +406,4 @@ This constitution supersedes all other practices, conventions, and ad-hoc guidan
 - The constitution version and amendment history are the authoritative record of governance
   decisions affecting this project.
 
-**Version**: 4.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-10-23
+**Version**: 5.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-10-27

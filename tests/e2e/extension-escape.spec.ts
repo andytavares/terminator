@@ -126,6 +126,18 @@ async function exitsToTheTerminal(surface: Surface, why: string): Promise<void> 
   await expect.poll(activeExtensionPanel, { message: why }).not.toBe(surface.id)
 }
 
+/** Two Escapes, then the exit. The second key hides the frame it went to, and Chromium can drop
+ * that key's acknowledgement (CI run 40594749096 waited out 180 s), so the exit is the signal. */
+async function leavesWithTwoEscapes(surface: Surface, why: string): Promise<void> {
+  await key(surface.part, 'Escape')
+  const frame = extensionFrame(handle, surface.part)
+  if (!frame) throw new Error(`${surface.id} has no frame to press Escape in`)
+  await frame.evaluate(() => (document.body as HTMLElement).focus())
+  const press = handle.page.keyboard.press('Escape')
+  const exited = exitsToTheTerminal(surface, why)
+  await Promise.race([Promise.all([press, exited]), exited])
+}
+
 // ── Leaving with two Escapes ─────────────────────────────────────────────────
 
 async function singleAndSlowEscapesStay(): Promise<void> {
@@ -141,8 +153,7 @@ async function singleAndSlowEscapesStay(): Promise<void> {
 
 async function doubleEscapeReturnsToTerminal(): Promise<void> {
   await showPanel(NOTES)
-  await pressEscapeTwice(NOTES.part)
-  await exitsToTheTerminal(NOTES, 'the extension panel should be gone')
+  await leavesWithTwoEscapes(NOTES, 'the extension panel should be gone')
 }
 
 /** Reports an open dialog the way @terminator/extension-ui does — across the bridge. */
@@ -164,8 +175,7 @@ async function openDialogsHoldTheKey(): Promise<void> {
 async function gestureWorksOnceNothingClaimsTheKey(): Promise<void> {
   await showPanel(FOUNDRY)
   await nothingClaimsTheKey(FOUNDRY.part)
-  await pressEscapeTwice(FOUNDRY.part)
-  await exitsToTheTerminal(FOUNDRY, 'the extension should have exited')
+  await leavesWithTwoEscapes(FOUNDRY, 'the extension should have exited')
 }
 
 // ── A draft in a text field keeps the extension open ─────────────────────────
@@ -249,8 +259,7 @@ async function remoteControlLeavesOnTwoEscapes(): Promise<void> {
     fields: 0,
     surfaces: 0,
   })
-  await pressEscapeTwice(REMOTE_CONTROL.part)
-  await exitsToTheTerminal(REMOTE_CONTROL, 'with nothing at risk the exit gesture must fire')
+  await leavesWithTwoEscapes(REMOTE_CONTROL, 'with nothing at risk the exit gesture must fire')
 }
 
 /** A flow's steps in order, each titled for the behaviour it checks. */

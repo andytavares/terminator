@@ -8,14 +8,12 @@ import yaml from 'js-yaml'
 /** Jobs ci:local does not run as ci.yml writes them, and why. */
 export const SKIPPED_JOBS = {
   select:
-    'the unit step runs the same scripts/test-select.mjs, and scripts/ci-e2e-local.mjs the e2e one',
+    'the unit step runs the same scripts/test-select.mjs, and scripts/ci-e2e-local.mjs the e2e one; its stability step only sizes the shards',
   e2e: 'scripts/ci-e2e-local.mjs runs its shards, step for step',
   'e2e-result': 'it only reads the results of the jobs above',
   'e2e-report': 'it only merges the e2e reports into one HTML page',
-  'stability-plan': 'it only splits the stability runs over CI runners; ci:local runs them all',
   stability: 'it only reads the results of the stability shards',
-  quarantine: 'it runs the quarantined tests, which never gate (ADR 124)',
-  'quarantine-e2e': 'it runs the quarantined e2e tests, which never gate (ADR 124)',
+  'stability-shard': 'the stability gate runs in CI only (Constitution XIV, ADR 132)',
 }
 
 const TEST_ALL_LABEL =
@@ -28,8 +26,6 @@ function expressionsFor(all) {
     [TEST_ALL_LABEL, all ? '1' : ''],
     // One unit run of the whole selection stands for its shards.
     ['--shard=${{ matrix.shard }}/${{ needs.select.outputs.shard_count }}', ''],
-    // One local stability run, of all 30 passes over every spec, stands for its shards.
-    [' --runs ${{ matrix.runs }} --part ${{ matrix.part }}', ''],
     // ci:local stops at the first failing step, so a later step only runs after unit passed.
     ['${{ needs.unit.result }}', 'success'],
     // The unit step selects for itself, so the selection has succeeded by then.

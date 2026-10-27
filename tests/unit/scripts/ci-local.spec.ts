@@ -1,9 +1,13 @@
 import { describe, it, expect, vi } from 'vitest'
+import { eventually } from '../../support/eventually'
 import {
   NOT_RUN_HERE,
   checkEnvironment,
+  checkoutPaths,
   checksPushes,
   cleanArguments,
+  jobsOf,
+  ciLaneOf,
   lockHash,
   needsInstall,
   nodeMismatch,
@@ -12,6 +16,8 @@ import {
   passedHead,
   unverifiedPushes,
   publishWhenPushed,
+  runScheduled,
+  oneAtATime,
 } from '../../../scripts/ci-local.mjs'
 
 describe('what ci:local leaves to CI', () => {
@@ -164,5 +170,140 @@ describe('the checkout between jobs', () => {
       '-e',
       'blob-report',
     ])
+  })
+})
+
+const job = (id: string, needs: string[] = []) => ({ id, needs, steps: [] })
+
+/** A job runner whose jobs run until the test ends them: `end(id, passed)`. */
+function gatedRunner() {
+  const events: string[] = []
+  const gates = new Map<string, (passed: boolean) => void>()
+  const runJob = (running: { id: string }) =>
+    new Promise<boolean>((resolve) => {
+      events.push(`start ${running.id}`)
+      gates.set(running.id, (passed) => {
+        events.push(`end ${running.id}`)
+        resolve(passed)
+      })
+    })
+  return { events, runJob, end: (id: string, passed = true) => gates.get(id)?.(passed) }
+}
+
+describe('the scheduler runs jobs as CI does, each when what it needs has passed', () => {
+  it('starts independent jobs together', async () => {
+    const { events, runJob, end } = gatedRunner()
+    const done = runScheduled([job('lint'), job('format')], runJob)
+    await eventually(() => expect(events).toEqual(['start lint', 'start format']))
+    end('lint')
+    end('format')
+    await done
+  })
+
+  it('starts a job only after every job it needs has ended', async () => {
+    const { events, runJob, end } = gatedRunner()
+    const jobs = [job('test', ['unit', 'stability']), job('unit'), job('stability')]
+    const done = runScheduled(jobs, runJob)
+    await eventually(() => expect(events).toEqual(['start unit', 'start stability']))
+    end('unit')
+    end('stability')
+    await eventually(() => expect(events).toContain('start test'))
+    expect(events.indexOf('start test')).toBeGreaterThan(events.indexOf('end stability'))
+    end('test')
+    await done
+  })
+})
+
+describe('the scheduler when a job fails', () => {
+  it('never starts a job whose need failed, and reports it skipped, down the chain', async () => {
+    const { events, runJob, end } = gatedRunner()
+    const jobs = [job('unit'), job('test', ['unit']), job('report', ['test']), job('lint')]
+    const done = runScheduled(jobs, runJob)
+    await eventually(() => expect(events).toEqual(['start unit', 'start lint']))
+    end('unit', false)
+    end('lint')
+    expect(await done).toEqual([
+      { id: 'unit', status: 'failed' },
+      { id: 'test', status: 'skipped' },
+      { id: 'report', status: 'skipped' },
+      { id: 'lint', status: 'passed' },
+    ])
+    expect(events).not.toContain('start test')
+  })
+
+  it('lets a job already running finish when another fails', async () => {
+    const { events, runJob, end } = gatedRunner()
+    const done = runScheduled([job('lint'), job('format')], runJob)
+    await eventually(() => expect(events).toHaveLength(2))
+    end('lint', false)
+    end('format')
+    expect((await done).map((outcome) => outcome.status)).toEqual(['failed', 'passed'])
+  })
+})
+
+describe('the scheduler and a need outside the plan', () => {
+  it('counts a need that is not in the plan as passed', async () => {
+    const { events, runJob, end } = gatedRunner()
+    const done = runScheduled([job('unit', ['select'])], runJob)
+    await eventually(() => expect(events).toEqual(['start unit']))
+    end('unit')
+    await done
+  })
+})
+
+describe('the plan, as jobs', () => {
+  const ubuntu = 'ubuntu-24.04-arm'
+  const step = (jobId: string, runner = ubuntu) => ({ job: jobId, runner, name: 'x', script: 'x' })
+  const needs = { unit: { needs: 'select' }, test: { needs: ['select', 'unit'] } }
+  const workflow = { jobs: { ...needs, lint: {} } }
+
+  it('groups the steps of a job, in order, with the jobs it needs', () => {
+    const steps = [step('lint'), step('unit'), step('unit'), step('test')]
+    expect(jobsOf(steps, workflow).map((j) => [j.id, j.steps.length, j.needs])).toEqual([
+      ['lint', 1, []],
+      ['unit', 2, ['select']],
+      ['test', 1, ['select', 'unit']],
+    ])
+  })
+
+  it('puts a job on the Linux lane when CI runs it on Ubuntu, and on the Mac lane otherwise', () => {
+    expect(ciLaneOf(jobsOf([step('lint')], workflow)[0])).toBe('linux')
+    expect(ciLaneOf(jobsOf([step('start', 'macos-26')], workflow)[0])).toBe('mac')
+  })
+})
+
+describe('the two checkouts', () => {
+  it('gives the Linux lane its own worktree beside the Mac lane, so the lanes cannot collide', () => {
+    expect(checkoutPaths('/repo')).toEqual({
+      mac: '/repo/.worktrees/.ci-local',
+      linux: '/repo/.worktrees/.ci-local-linux',
+    })
+  })
+})
+
+describe('jobs that fill every core run one at a time', () => {
+  it('starts the next only after the one before has ended, even when it failed', async () => {
+    const exclusive = oneAtATime()
+    const events: string[] = []
+    let endUnit: (passed: boolean) => void = () => {}
+    const unit = exclusive(
+      () =>
+        new Promise<boolean>((resolve) => {
+          events.push('start unit')
+          endUnit = (passed) => {
+            events.push('end unit')
+            resolve(passed)
+          }
+        })
+    )
+    const stability = exclusive(async () => {
+      events.push('start stability')
+      return true
+    })
+    await eventually(() => expect(events).toEqual(['start unit']))
+    endUnit(false)
+    expect(await unit).toBe(false)
+    expect(await stability).toBe(true)
+    expect(events).toEqual(['start unit', 'end unit', 'start stability'])
   })
 })

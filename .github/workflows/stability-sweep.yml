@@ -2,7 +2,8 @@ name: Stability sweep
 
 # The whole suite, several times on one commit of main, each run with its own seed. A test that
 # passes in one run and fails in another is flaky; it gets one open issue (ADR 124). The sweep
-# reports and never gates, so its test steps carry on past a failure.
+# reports and never gates, so its test steps carry on past a failure. The quarantined tests run in
+# it too (jobs `quarantine` and `quarantine-e2e`).
 
 on:
   schedule:
@@ -148,3 +149,72 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/flaky-sweep.mjs sweep --open-issues | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # The quarantined tests (tests/quarantine.json, ADR 124), still run, nightly, so a fix shows as
+  # passes. Nothing requires this workflow: its result never blocks a pull request.
+  quarantine:
+    name: Quarantine
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Quarantined unit tests
+        run: |
+          npx vitest run --tagsFilter=quarantine --passWithNoTests --reporter=dot \
+            --reporter=junit --outputFile.junit=junit/quarantine.xml
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5
+        with:
+          report_type: test_results
+          files: junit/quarantine.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # The quarantined e2e tests, nightly. Not required (ADR 124).
+  quarantine-e2e:
+    name: Quarantine (E2E)
+    runs-on: macos-26
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Quarantined e2e tests
+        env:
+          PLAYWRIGHT_JUNIT_OUTPUT_NAME: junit/quarantine-e2e.xml
+        run: |
+          if [ "$(jq '[.[] | select(.kind == "e2e")] | length' tests/quarantine.json)" = 0 ]; then
+            echo "Nothing quarantined in e2e."
+            exit 0
+          fi
+          npm run build
+          node node_modules/electron/install.js
+          codesign --force --deep --sign - node_modules/electron/dist/Electron.app
+          npx playwright test --grep @quarantine --reporter=dot,junit
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5
+        with:
+          report_type: test_results
+          files: junit/quarantine-e2e.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}

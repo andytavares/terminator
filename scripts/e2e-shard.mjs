@@ -12,8 +12,8 @@
 //
 // A recorded time runs from the end of the test before it, so a file's
 // beforeAll launch and afterAll close are counted: without them a shard of
-// light whole files ran 146s against 63s of test time (run 36345310476). That
-// holds because CI runs one worker per shard.
+// light whole files ran 146s against 63s of test time (run 36345310476). With two
+// apps per shard, each worker's tests are timed in their own sequence.
 //
 //   node scripts/e2e-shard.mjs <shard> <total> [spec ...]      -> this shard's args
 //   node scripts/e2e-shard.mjs --record <shard-report.json>... -> rewrite timings.json
@@ -27,22 +27,25 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const E2E_DIR = 'tests/e2e'
 const TIMINGS = join(REPO_ROOT, E2E_DIR, 'timings.json')
 
+/** One spec's record: where it is, when its last result ended, and on which worker. */
+function testOf(spec, path) {
+  const results = (spec.tests ?? []).flatMap((t) => t.results ?? [])
+  const ends = results.map((r) => Date.parse(r.startTime) + r.duration)
+  return {
+    file: spec.file,
+    line: spec.line,
+    key: [spec.file, ...path, spec.title].join(' › '),
+    ended: ends.length === 0 ? null : Math.max(...ends),
+    worker: results.at(-1)?.parallelIndex ?? 0,
+  }
+}
+
 /** Every test in a Playwright JSON report, keyed by file and title path. */
 export function testsFromReport(report) {
   const tests = []
   const walk = (suite, titles) => {
     const path = suite.title === suite.file ? titles : [...titles, suite.title]
-    for (const spec of suite.specs ?? []) {
-      const ends = (spec.tests ?? []).flatMap((t) =>
-        (t.results ?? []).map((r) => Date.parse(r.startTime) + r.duration)
-      )
-      tests.push({
-        file: spec.file,
-        line: spec.line,
-        key: [spec.file, ...path, spec.title].join(' › '),
-        ended: ends.length === 0 ? null : Math.max(...ends),
-      })
-    }
+    for (const spec of suite.specs ?? []) tests.push(testOf(spec, path))
     for (const child of suite.suites ?? []) walk(child, path)
   }
   for (const suite of report.suites ?? []) walk(suite, [])
@@ -93,16 +96,29 @@ export function pack(unitList, total) {
   return bins
 }
 
-/** One shard's report: each test costs the time since the previous one ended. */
+// Two apps at once on CI's 3-core macOS runner ran the suite in 610 s against 815 s with one
+// (runs 40572074278 and 40566760766). Each shard gets two lanes of the plan.
+export const APPS_PER_SHARD = 2
+
+/** Shard `shard` of `total`: its lanes' arguments and Playwright's worker count, or none. */
+export function shardPlan(unitList, shard, total) {
+  const lanes = pack(unitList, total * APPS_PER_SHARD)
+  const mine = lanes.slice((shard - 1) * APPS_PER_SHARD, shard * APPS_PER_SHARD)
+  const args = mine.flatMap((lane) => lane.args)
+  return args.length === 0 ? [] : [...args, `--workers=${APPS_PER_SHARD}`]
+}
+
+/** One shard's report: each test costs the time since its worker's previous test ended. */
 export function timingsFromReport(report) {
   const ran = testsFromReport(report)
     .filter((test) => test.ended !== null)
     .sort((a, b) => a.ended - b.ended)
   const timings = {}
-  let previous = Date.parse(report.stats.startTime)
+  const previous = new Map()
   for (const test of ran) {
-    timings[test.key] = Math.round((test.ended - previous) / 100) / 10
-    previous = test.ended
+    const since = previous.get(test.worker) ?? Date.parse(report.stats.startTime)
+    timings[test.key] = Math.round((test.ended - since) / 100) / 10
+    previous.set(test.worker, test.ended)
   }
   return timings
 }
@@ -138,7 +154,7 @@ function shardArgs(shard, total, specArgs) {
     )
   )
   const timings = existsSync(TIMINGS) ? JSON.parse(readFileSync(TIMINGS, 'utf8')) : {}
-  return pack(units(tests, parallelFiles, timings), total)[shard - 1].args
+  return shardPlan(units(tests, parallelFiles, timings), shard, total)
 }
 
 function main(argv) {

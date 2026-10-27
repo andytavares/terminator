@@ -24,3 +24,7 @@ updates:
       security:
         applies-to: security-updates
         patterns: ['*']
+      # GitHub assigns a dependency to the first group it matches, so this one takes the rest
+      # (https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference).
+      everything-else:
+        patterns: ['*']

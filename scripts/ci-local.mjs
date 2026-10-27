@@ -10,7 +10,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { installIfLockChanged } from './ci-install.mjs'
 import { artifactPaths, planFor, readWorkflow, SKIPPED_JOBS } from './ci-plan.mjs'
-import { startLinux } from './ci-linux.mjs'
+import { spawnToSink, startLinux } from './ci-linux.mjs'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -29,16 +29,19 @@ export function checkEnvironment(env) {
   return Object.fromEntries(Object.entries(env).filter(([name]) => !name.startsWith('GIT_')))
 }
 
-function runOnMac({ script, env = {} }, cwd) {
-  const options = { cwd, stdio: 'inherit', env: checkEnvironment({ ...process.env, ...env }) }
-  return spawnSync('bash', ['-e', '-o', 'pipefail', '-c', script], options).status
+const checkEnvironmentOf = (env) => checkEnvironment({ ...process.env, ...env })
+
+function runOnMac({ script, env = {} }, cwd, write) {
+  const bash = ['-e', '-o', 'pipefail', '-c', script]
+  return spawnToSink('bash', bash, { cwd, env: checkEnvironmentOf(env), write })
 }
 
 /** Runs a step where CI does: a step of an Ubuntu job in the Linux container, any other here. */
-function runStep(step, { checkout, linux }) {
-  console.log(`\n== ${step.job}: ${step.name} (${step.runner ?? 'macos'})`)
-  const status = step.runner?.startsWith('ubuntu') ? linux.run(step) : runOnMac(step, checkout)
-  if (status !== 0) console.error(`\nci:local failed: ${step.job}: ${step.name} exited ${status}`)
+async function runStep(step, { checkout, linux }, write) {
+  write(`\n== ${step.job}: ${step.name} (${step.runner ?? 'macos'})\n`)
+  const onLinux = step.runner?.startsWith('ubuntu')
+  const status = await (onLinux ? linux.run(step, write) : runOnMac(step, checkout, write))
+  if (status !== 0) write(`\nci:local failed: ${step.job}: ${step.name} exited ${status}\n`)
   return status === 0
 }
 
@@ -48,32 +51,118 @@ export function cleanArguments(keep) {
   return ['clean', '-fdxq', ...['node_modules', ...keep].flatMap((path) => ['-e', path])]
 }
 
-/** Each step, where CI runs it, from a checkout cleaned whenever a new job starts. */
-function runJobs(steps, { checkout, linux, keep }) {
-  let job = null
-  return steps.every((step) => {
-    if (step.job !== job) git(checkout, ...cleanArguments(keep))
-    job = step.job
-    return runStep(step, { checkout, linux })
-  })
+/** The two checkouts of one commit: the Mac lane's, and the Linux lane's, so the lanes share no files. */
+export const checkoutPaths = (root) => ({
+  mac: join(root, '.worktrees/.ci-local'),
+  linux: join(root, '.worktrees/.ci-local-linux'),
+})
+
+/** The plan's steps as jobs, in workflow order, each with the jobs it needs (`needs` in ci.yml). */
+export function jobsOf(steps, workflow) {
+  const jobs = new Map()
+  for (const step of steps) {
+    const needs = [workflow.jobs[step.job]?.needs ?? []].flat()
+    if (!jobs.has(step.job))
+      jobs.set(step.job, { id: step.job, runner: step.runner, needs, steps: [] })
+    jobs.get(step.job).steps.push(step)
+  }
+  return [...jobs.values()]
 }
 
-function runChecks(checkout, { all }) {
-  const workflow = readWorkflow(join(checkout, '.github/workflows/ci.yml'))
-  const e2eStep = {
+/** Where CI runs the job: Ubuntu jobs in the Linux container, the others on this Mac. */
+export const ciLaneOf = (job) => (job.runner?.startsWith('ubuntu') ? 'linux' : 'mac')
+
+/** Runs every job as soon as the jobs it needs have passed, as CI does; a need ci:local skips
+ * counts as passed. A failure stops no running job; a job whose need did not pass never starts.
+ * Resolves `{ id, status }` per job: passed, failed or skipped. */
+export async function runScheduled(jobs, runJob) {
+  const byId = new Map(jobs.map((job) => [job.id, job]))
+  const statuses = new Map()
+  const jobStatus = (id) => {
+    if (!statuses.has(id)) statuses.set(id, startWhenNeedsPass(byId.get(id)))
+    return statuses.get(id)
+  }
+  const startWhenNeedsPass = async (job) => {
+    const needed = await Promise.all(job.needs.filter((id) => byId.has(id)).map(jobStatus))
+    if (needed.some((status) => status !== 'passed')) return 'skipped'
+    return (await runJob(job)) ? 'passed' : 'failed'
+  }
+  return Promise.all(jobs.map(async (job) => ({ id: job.id, status: await jobStatus(job.id) })))
+}
+
+// Jobs that fill every core by design: the unit suite, and the stability gate, which runs under
+// load on purpose. Two at once overloaded the container until a spec hit its hang bound.
+const WHOLE_MACHINE = new Set(['unit', 'stability-shard'])
+
+/** `exclusive(work)` runs `work` after every earlier one has ended, in call order. */
+export function oneAtATime() {
+  let last = Promise.resolve()
+  return (work) => {
+    const result = last.then(work)
+    last = result.catch(() => {})
+    return result
+  }
+}
+
+/** One job's steps in order, in the lane CI runs it. Its output prints as one block when it ends. */
+async function runJob(job, context, durations) {
+  const output = []
+  const started = Date.now()
+  let passed = true
+  for (const step of job.steps) {
+    if (!passed) break
+    passed = await runStep(step, context[ciLaneOf(job)], (chunk) => output.push(String(chunk)))
+  }
+  const seconds = Math.round((Date.now() - started) / 1000)
+  durations.set(job.id, seconds)
+  process.stdout.write(
+    `\n##### ${job.id}: ${passed ? 'passed' : 'FAILED'} in ${seconds}s\n${output.join('')}`
+  )
+  return passed
+}
+
+function reportJobs(outcomes, durations) {
+  console.log('\nJob seconds:')
+  for (const { id, status } of outcomes)
+    console.log(`  ${id}: ${durations.get(id) ?? 0}s ${status}`)
+  const unpassed = outcomes.filter(({ status }) => status !== 'passed')
+  for (const { id, status } of unpassed) console.error(`ci:local: ${id} ${status}`)
+  return unpassed.length === 0
+}
+
+/** The e2e step runs alone after the lanes: it waits for a quiet machine (ci-e2e-local.mjs). */
+function runE2e(context, { all }) {
+  const step = {
     job: 'e2e',
     name: 'its shards',
     script: 'node scripts/ci-e2e-local.mjs',
     env: all ? { TEST_ALL: '1' } : {},
   }
+  return runStep(step, context.mac, (chunk) => process.stdout.write(chunk))
+}
+
+async function runChecks(checkouts, { all }) {
+  const workflow = readWorkflow(join(checkouts.mac, '.github/workflows/ci.yml'))
+  const keep = artifactPaths(workflow)
   const linux = startLinux({
-    checkout,
-    gitCommonDir: resolve(checkout, git(checkout, 'rev-parse', '--git-common-dir')),
-    nodeVersion: readFileSync(join(checkout, '.nvmrc'), 'utf8').trim(),
+    checkout: checkouts.linux,
+    gitCommonDir: resolve(checkouts.mac, git(checkouts.mac, 'rev-parse', '--git-common-dir')),
+    nodeVersion: readFileSync(join(checkouts.mac, '.nvmrc'), 'utf8').trim(),
   })
   try {
-    const steps = [...planFor(workflow, { all }), e2eStep]
-    return runJobs(steps, { checkout, linux, keep: artifactPaths(workflow) })
+    for (const checkout of Object.values(checkouts)) git(checkout, ...cleanArguments(keep))
+    const context = {
+      mac: { checkout: checkouts.mac },
+      linux: { checkout: checkouts.linux, linux },
+    }
+    const durations = new Map()
+    const jobs = jobsOf(planFor(workflow, { all }), workflow)
+    const exclusive = oneAtATime()
+    const run = (job) => runJob(job, context, durations)
+    const outcomes = await runScheduled(jobs, (job) =>
+      WHOLE_MACHINE.has(job.id) ? exclusive(() => run(job)) : run(job)
+    )
+    return reportJobs(outcomes, durations) && (await runE2e(context, { all }))
   } finally {
     linux.stop()
   }
@@ -140,11 +229,16 @@ function checkPush() {
 
 const COMMITTER = ['-c', 'user.name=ci-local', '-c', 'user.email=ci-local@localhost']
 
+/** Puts a check worktree, made if missing, on `sha`, with nothing left but its node_modules. */
+function checkoutCommit(checkout, sha) {
+  if (!existsSync(checkout)) git(REPO_ROOT, 'worktree', 'add', '--detach', checkout, 'HEAD')
+  git(checkout, 'checkout', '--force', '--detach', sha)
+  git(checkout, 'clean', '-fdxq', '-e', 'node_modules')
+}
+
 /** Puts the check worktree on HEAD merged with origin/main, as CI's pull-request checkout is. */
 function checkoutMerge(checkout, mainSha) {
-  if (!existsSync(checkout)) git(REPO_ROOT, 'worktree', 'add', '--detach', checkout, 'HEAD')
-  git(checkout, 'checkout', '--force', '--detach', git(REPO_ROOT, 'rev-parse', 'HEAD'))
-  git(checkout, 'clean', '-fdxq', '-e', 'node_modules')
+  checkoutCommit(checkout, git(REPO_ROOT, 'rev-parse', 'HEAD'))
   try {
     git(checkout, ...COMMITTER, 'merge', '--no-ff', '--no-edit', mainSha)
   } catch (error) {
@@ -181,11 +275,13 @@ function prepare() {
   const headSha = git(REPO_ROOT, 'rev-parse', 'HEAD')
   const mainSha = git(REPO_ROOT, 'rev-parse', 'origin/main')
   console.log(`HEAD        ${headSha}\norigin/main ${mainSha}`)
-  const checkout = join(mainCheckout(), '.worktrees/.ci-local')
-  checkoutMerge(checkout, mainSha)
-  console.log(`Testing ${git(checkout, 'rev-parse', 'HEAD')} in ${checkout}`)
-  installOnMac(checkout)
-  return { checkout, headSha, mainSha }
+  const checkouts = checkoutPaths(mainCheckout())
+  checkoutMerge(checkouts.mac, mainSha)
+  const merged = git(checkouts.mac, 'rev-parse', 'HEAD')
+  checkoutCommit(checkouts.linux, merged)
+  console.log(`Testing ${merged} in ${checkouts.mac} (Mac) and ${checkouts.linux} (Linux)`)
+  installOnMac(checkouts.mac)
+  return { checkouts, headSha, mainSha }
 }
 
 const STATUS_TRIES = 24
@@ -249,10 +345,10 @@ function recordPass(headSha, mainSha) {
   )
 }
 
-function main(flags) {
-  const { checkout, headSha, mainSha } = prepare()
+async function main(flags) {
+  const { checkouts, headSha, mainSha } = prepare()
   if (flags.prepareOnly) return
-  if (!runChecks(checkout, flags)) process.exit(1)
+  if (!(await runChecks(checkouts, flags))) process.exit(1)
   console.log('\nci:local passed. Not run here:')
   for (const [check, why] of Object.entries(NOT_RUN_HERE)) console.log(`  ${check}: ${why}`)
   recordPass(headSha, mainSha)

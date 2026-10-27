@@ -12,6 +12,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { eachLimited } from './each-limited.mjs'
 
 const COOLDOWN_DAYS = 14
 const REGISTRY = 'https://registry.npmjs.org/'
@@ -106,16 +107,11 @@ async function publishTimes(name) {
 
 /** `name@version` to its publish time, or null where the registry has none. */
 async function fetchPublished(ids) {
-  const published = {}
-  const queue = [...ids]
-  const worker = async () => {
-    for (let id = queue.pop(); id !== undefined; id = queue.pop()) {
-      const at = id.lastIndexOf('@')
-      published[id] = (await publishTimes(id.slice(0, at)))[id.slice(at + 1)] ?? null
-    }
-  }
-  await Promise.all(Array.from({ length: CONCURRENCY }, worker))
-  return published
+  const times = await eachLimited(ids, CONCURRENCY, async (id) => {
+    const at = id.lastIndexOf('@')
+    return (await publishTimes(id.slice(0, at)))[id.slice(at + 1)] ?? null
+  })
+  return Object.fromEntries(ids.map((id, index) => [id, times[index]]))
 }
 
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'))

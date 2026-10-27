@@ -1,8 +1,8 @@
 // The steps CI runs on Ubuntu, run by ci:local in a container of the same: Ubuntu 24.04 on
 // arm64, as CI's ubuntu-24.04-arm runner, with the Node of .nvmrc (ADR 123). The checkout is
-// shared with the Mac; its node_modules are volumes of Linux installs, kept between runs.
+// its own worktree, apart from the Mac's, so both lanes run at once; its node_modules are volumes of Linux installs, kept between runs.
 
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -37,14 +37,30 @@ export function containerArguments(container) {
 }
 
 /** `docker` arguments that run one step in the container: its script in bash, as CI does, with
- * its own environment and CI's, and nothing from the Mac's. */
-export function stepArguments(name, step, checkout) {
+ * its own environment and CI's, and nothing from the Mac's. It starts in the checkout, the
+ * container's working directory (containerArguments), so no path goes into the command. */
+export function stepArguments(name, step) {
   const variables = Object.entries({ CI: 'true', ...step.env }).flatMap(([key, value]) => [
     '-e',
     `${key}=${value}`,
   ])
   const bash = ['bash', '-e', '-o', 'pipefail', '-c', step.script]
-  return ['exec', '-u', RUNNER, '-w', checkout, ...variables, name, ...bash]
+  return ['exec', '-u', RUNNER, ...variables, name, ...bash]
+}
+
+/** Runs a command, giving each chunk of its stdout and stderr to `options.write`; resolves its exit status. */
+export function spawnToSink(command, args, sinkOptions) {
+  const { write, ...options } = sinkOptions
+  return new Promise((resolve) => {
+    const child = spawn(command, args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] })
+    child.stdout.on('data', write)
+    child.stderr.on('data', write)
+    child.on('error', (error) => {
+      write(`${error.message}\n`)
+      resolve(1)
+    })
+    child.on('close', (status) => resolve(status ?? 1))
+  })
 }
 
 const docker = (args, options = {}) => spawnSync('docker', args, { stdio: 'inherit', ...options })
@@ -70,7 +86,7 @@ function installInContainer(checkout) {
     },
     install: (hash) => {
       const script = `npm ci && echo ${hash} > node_modules/.lock-hash`
-      return docker(stepArguments(CONTAINER, { script }, checkout)).status === 0
+      return docker(stepArguments(CONTAINER, { script })).status === 0
     },
   })
 }
@@ -96,7 +112,7 @@ export function startLinux(setup) {
   givesVolumesToRunner(checkout)
   installInContainer(checkout)
   return {
-    run: (step) => docker(stepArguments(CONTAINER, step, checkout)).status,
+    run: (step, write) => spawnToSink('docker', stepArguments(CONTAINER, step), { write }),
     stop: () => execFileSync('docker', ['rm', '-f', CONTAINER], { stdio: 'ignore' }),
   }
 }

@@ -1,6 +1,6 @@
 # ADR 124: Flaky tests are caught before merge, and quarantined with an expiry
 
-**Status**: Accepted
+**Status**: Accepted, amended by ADR 132
 
 **Date**: 2026-10-23
 

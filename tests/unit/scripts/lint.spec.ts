@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lintRuns } from '../../../scripts/lint.mjs'
+import { lintRuns, runAll } from '../../../scripts/lint.mjs'
 
 // Typed lint holds a TypeScript program per project; one process for the whole repository held
 // all of them (4.8 GB) and CI's 7 GB runner swapped for eight minutes. One process per group.
@@ -23,5 +23,45 @@ describe('the lint runs', () => {
         (group) => ['--ignore-pattern', `${group}/**`]
       ),
     ])
+  })
+})
+
+const GROUPS = [['a'], ['b'], ['c'], ['d'], ['e']]
+
+// Each fake run stays open until the test releases it, so the test sees how many are open.
+function fakeSpawn(statusOf: (run: string[]) => number) {
+  const seen = { running: 0, peak: 0, started: [] as string[][] }
+  const releases: Array<() => void> = []
+  const spawnRun = async (run: string[]) => {
+    seen.started.push(run)
+    seen.running += 1
+    seen.peak = Math.max(seen.peak, seen.running)
+    await new Promise<void>((resolve) => releases.push(resolve))
+    seen.running -= 1
+    return statusOf(run)
+  }
+  async function runAllReleasing(limit: number) {
+    const done = runAll(GROUPS, spawnRun, limit)
+    for (let released = 0; released < GROUPS.length; released += 1) {
+      await expect.poll(() => releases.length).toBeGreaterThan(0)
+      releases.shift()?.()
+    }
+    return done
+  }
+  return { seen, runAllReleasing }
+}
+
+describe('running every lint group', () => {
+  it('never runs more than the limit at once, and runs every group', async () => {
+    const { seen, runAllReleasing } = fakeSpawn(() => 0)
+    expect(await runAllReleasing(2)).toBe(0)
+    expect(seen.peak).toBe(2)
+    expect(seen.started).toHaveLength(5)
+  })
+
+  it('exits 1 when one group fails, after running the others', async () => {
+    const { seen, runAllReleasing } = fakeSpawn((run) => (run[0] === 'b' ? 1 : 0))
+    expect(await runAllReleasing(3)).toBe(1)
+    expect(seen.started).toHaveLength(5)
   })
 })

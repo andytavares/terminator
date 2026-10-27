@@ -10,6 +10,7 @@ import {
   isAllRequested,
   printArguments,
   selectTests,
+  selectionBase,
   vitestTools,
 } from '../../../scripts/test-select.mjs'
 import { matchesAny } from '../../../scripts/e2e-select.mjs'
@@ -70,10 +71,8 @@ describe('what makes everything run', () => {
     }
   )
 
-  it('runs everything when asked with --all, TEST_ALL=1 or on a push to main', async () => {
-    for (const asked of [{ allRequested: true }, { isMainPush: true }]) {
-      expect(await choose(['docs/a.md'], asked)).toMatchObject({ mode: 'all' })
-    }
+  it('runs everything when asked with --all or TEST_ALL=1', async () => {
+    expect(await choose(['docs/a.md'], { allRequested: true })).toMatchObject({ mode: 'all' })
     expect(isAllRequested(['--all'], {})).toBe(true)
     expect(isAllRequested([], { TEST_ALL: '1' })).toBe(true)
     expect(isAllRequested([], { TEST_ALL: '' })).toBe(false)
@@ -137,6 +136,20 @@ describe('what a selection hands to vitest', () => {
     expect(all).toContain('shards=[1,2,3,4]\n')
     expect(few).toContain('run_e2e=false')
     expect(all).toContain('run_unit=true')
+  })
+})
+
+describe('what a push to main is compared with (Constitution XIV, ADR 132)', () => {
+  it('is the commit main was at before, so the push runs what its change reaches', () => {
+    const repo = makeTempDir('test-select-main-push-')
+    const git = (...args: string[]) =>
+      execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim()
+    git('init', '-q')
+    git('commit', '-q', '--allow-empty', '-m', 'before')
+    const before = git('rev-parse', 'HEAD')
+    git('commit', '-q', '--allow-empty', '-m', 'merged pull request')
+    const push = { GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main' }
+    expect(selectionBase(push, repo)).toBe(before)
   })
 })
 

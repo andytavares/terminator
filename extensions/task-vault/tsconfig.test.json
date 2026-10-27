@@ -1,5 +1,5 @@
 {
-  // Type-checks this extension's specs (`npm run typecheck:extensions`), the
+  // Type-checks this extension's specs (`npm run typecheck`), the
   // way the root tsconfig.test.json does the core's. Vitest strips types and
   // tsconfig.json includes src/ only, so this is the only check the specs get.
   // It starts from tsconfig.json and adds Vitest's globals (vitest.config.ts
