@@ -1,0 +1,23 @@
+tests/unit/scripts/ci-e2e-local.spec.ts
+  s_567c3310a5db4e::t_050bc9ebb3e9a7 99-108
+  s_567c3310a5db4e::t_e03259c0e40855 4-11,84-98,109-115
+scripts/ci-e2e-local.mjs
+  s_567c3310a5db4e::t_2f1ce4ed7bc9cb 5,94-129,137,141,144-151,153-154,157-164,169-174,176
+  s_567c3310a5db4e::t_be77c66d3d0ad4 130,132,138-140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b66d3fd562c475f0c7924ad4831f42942d3286aa",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
