@@ -521,7 +521,7 @@ jobs:
           # git-integration-contrast.spec.ts and git-integration-stacking.spec.ts
           # render the extension views in it, and design-system-fields.spec.ts renders the shared field styles.
           case "$ARGS" in *remote-control.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts* | *design-system-fields.spec.ts*) npx playwright install chromium ;; esac
-          npx playwright test "${shard[@]}" --grep-invert @quarantine --reporter=blob,dot,junit
+          npx playwright test "${shard[@]}" --workers=2 --grep-invert @quarantine --reporter=blob,dot,junit
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
