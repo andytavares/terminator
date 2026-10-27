@@ -38,10 +38,23 @@ type TodayResult = DailyLog & {
   staleDaysThreshold?: number
 }
 
-async function fetchTodayInto(set: SetState): Promise<void> {
+// Both loads fill `todayLog`. Only the one asked for last may: an earlier answer that arrives
+// after it holds the log from before a change, and nothing loads again to correct it.
+let latestLoad = 0
+
+/** Starts a load; the function it returns says whether a later load has started since. */
+function startLoad(set: SetState): () => boolean {
+  latestLoad += 1
+  const load = latestLoad
   set({ isLoading: true, error: null })
+  return () => load !== latestLoad
+}
+
+async function fetchTodayInto(set: SetState): Promise<void> {
+  const superseded = startLoad(set)
   try {
     const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:get-today')
+    if (superseded()) return
     const error = errorOf(result)
     if (error !== null) return set({ error, isLoading: false })
     const res = result as TodayResult
@@ -55,16 +68,17 @@ async function fetchTodayInto(set: SetState): Promise<void> {
       calendarRefreshKey: s.calendarRefreshKey + 1,
     }))
   } catch (err) {
-    set({ error: String(err), isLoading: false })
+    if (!superseded()) set({ error: String(err), isLoading: false })
   }
 }
 
 async function loadDate(set: SetState, date: string): Promise<void> {
-  set({ isLoading: true, error: null })
+  const superseded = startLoad(set)
   try {
     const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:get-daily', {
       date,
     })
+    if (superseded()) return
     const error = errorOf(result)
     if (error !== null) return set({ error, isLoading: false })
     useVaultNavStore.getState().setViewingDate(date)
@@ -75,7 +89,7 @@ async function loadDate(set: SetState, date: string): Promise<void> {
       calendarRefreshKey: s.calendarRefreshKey + 1,
     }))
   } catch (err) {
-    set({ error: String(err), isLoading: false })
+    if (!superseded()) set({ error: String(err), isLoading: false })
   }
 }
 

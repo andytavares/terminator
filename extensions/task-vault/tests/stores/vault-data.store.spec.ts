@@ -49,6 +49,7 @@ function useVaultDataStoreTickCalendarTests() {
   describe('loadDate', loadDateTests)
   describe('refreshInboxCount', refreshInboxCountTests)
   describe('loadSomeday', loadSomedayTests)
+  describe('loads that answer out of order', outOfOrderLoadTests)
 }
 
 function tickCalendarTests() {
@@ -139,5 +140,42 @@ function loadSomedayTests() {
   it('does not throw when API fails', async () => {
     mockInvoke.mockRejectedValueOnce(new Error('vault not configured'))
     await expect(useVaultDataStore.getState().loadSomeday()).resolves.toBeUndefined()
+  })
+}
+
+/** A vault answer the test gives later, in whatever order it chooses. */
+function answerLater() {
+  let answer = (_value: unknown): void => {}
+  mockInvoke.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
+  return (value: unknown) => answer(value)
+}
+
+function outOfOrderLoadTests() {
+  it('keeps the latest load when an earlier one answers after it', async () => {
+    const answerEarlier = answerLater()
+    const earlier = useVaultDataStore.getState().loadToday()
+    const answerLatest = answerLater()
+    const latest = useVaultDataStore.getState().loadToday()
+    answerLatest({ date: '2026-06-09', tasks: [{ id: 't1', todaySince: '2026-06-09' }] })
+    await latest
+    answerEarlier({ date: '2026-06-09', tasks: [{ id: 't1', todaySince: '2026-06-01' }] })
+    await earlier
+    expect(useVaultDataStore.getState().todayLog?.tasks).toEqual([
+      { id: 't1', todaySince: '2026-06-09' },
+    ])
+    expect(useVaultDataStore.getState().isLoading).toBe(false)
+  })
+
+  it('keeps today when a day asked for before it answers after it', async () => {
+    const answerDay = answerLater()
+    const day = useVaultDataStore.getState().loadDate('2026-06-01')
+    const answerToday = answerLater()
+    const today = useVaultDataStore.getState().loadToday()
+    answerToday({ date: '2026-06-09', tasks: [] })
+    await today
+    answerDay({ date: '2026-06-01', tasks: [] })
+    await day
+    expect(useVaultDataStore.getState().todayLog?.date).toBe('2026-06-09')
+    expect(useVaultNavStore.getState().viewingDate).not.toBe('2026-06-01')
   })
 }
