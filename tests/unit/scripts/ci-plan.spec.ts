@@ -232,7 +232,7 @@ describe('the e2e job and the nightly sweep (ADR 124)', () => {
   const sweep = readWorkflow(resolve(REPO_ROOT, '.github/workflows/stability-sweep.yml'))
 
   it("repeats a changed e2e spec in the job's own shard, after the suite", () => {
-    const steps = stepsOf('e2e').map((step) => step.run ?? '')
+    const steps = stepsOf('e2e').map((step) => String(step.run ?? ''))
     const suite = steps.findIndex((run) => run.includes('npx playwright test'))
     const repeat = steps.findIndex((run) =>
       run.includes('node scripts/stability.mjs --e2e --part ${{ matrix.shard }}/3')
