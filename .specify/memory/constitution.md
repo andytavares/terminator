@@ -6,8 +6,10 @@ Version change: 4.0.0 → 5.0.0 (MAJOR: Principle XIV's "Only the tests a change
 Modified principles:
   - XIV: a push to `main` no longer runs everything. It runs what its change reaches, compared
     with the commit `main` was at before, as a pull request does. The nightly sweep and the
-    release run everything. Approved by the maintainer on 2026-10-27 to keep every CI run within
-    five minutes on GitHub's free macOS runners. ADR 132.
+    release run everything. The stability gate repeats each changed spec up to ten times,
+    not thirty, and runs in CI only; `npm run ci:local` leaves it out. Approved by the
+    maintainer on 2026-10-27 to keep every CI run within five minutes on GitHub's free macOS
+    runners, and every local run short. ADR 132.
 
 Added sections: none
 Removed sections: none
@@ -341,8 +343,8 @@ code has no value; it is a defect. ADR 123 records the reasoning.
 - **One run decides.** A check's verdict is its first run. A failing test is never
   retried or rerun into a pass, in CI, locally, or in Foundry's final check; it is fixed at
   its cause, or deleted together with the behavior it claimed to cover. Repeats exist only
-  to find flaky tests, never to pass one: the stability gate runs every spec a change adds
-  or edits many times, shuffled and under load, and any failure fails the check; the
+  to find flaky tests, never to pass one: in CI, the stability gate runs every spec a change
+  adds or edits up to ten times, shuffled and under load, and any failure fails the check; the
   nightly sweep runs the whole suite several times on one commit of `main` and opens an
   issue for every test that disagrees with itself. ADR 124.
 - **Quarantine is short, small and visible.** A test the sweep found flaky on `main` may
@@ -365,8 +367,8 @@ code has no value; it is a defect. ADR 123 records the reasoning.
   never falls through to the real tool.
 - **CI and the local check are the same check.** CI runs on macOS, as the product does,
   with the Node in `.nvmrc` and the commands `.github/workflows/ci.yml` lists.
-  `npm run ci:local` runs those same commands on the commit merged with `origin/main`,
-  never the working tree, and the pre-push hook refuses a commit it has not passed. A CI
+  `npm run ci:local` runs those same commands, except the stability gate's repeats, on the
+  commit merged with `origin/main`, never the working tree, and the pre-push hook refuses a commit it has not passed. A CI
   failure after a local pass is a parity defect and is fixed like any other defect.
 - **Outside services never gate.** An advisory database, Codecov, the artifact store or a
   registry MUST NOT turn a change red that did not touch what they check.

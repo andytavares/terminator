@@ -103,8 +103,6 @@ export const playwrightArguments = (shard, args) => [
 ]
 
 /** True when no e2e spec is selected and none changed: no build, no wait, no run. */
-export const nothingToRun = (selected, changed) => selected.length === 0 && changed.length === 0
-
 /** Runs every shard at once; `runShard(shard)` resolves true on a pass. Returns the failed shards. */
 export async function runShardsTogether(shards, runShard) {
   const passed = await Promise.all(shards.map(runShard))
@@ -154,20 +152,12 @@ async function runShards(only, specs) {
   return failed.map(({ shard }) => shard)
 }
 
-const changedSpecs = () =>
-  execFileSync('node', ['scripts/stability.mjs', '--e2e', '--list'], {
-    cwd: REPO_ROOT,
-    encoding: 'utf8',
-  })
-    .split('\n')
-    .filter(Boolean)
-
 async function main() {
   const only = process.argv[2] ? Number(process.argv[2]) : null
   const chosen = selection()
   const specs = e2eSpecsOf(chosen, listSpecs())
-  if (nothingToRun(specs, changedSpecs())) {
-    console.log(`No e2e spec selected or changed: ${chosen.reason}`)
+  if (specs.length === 0) {
+    console.log(`No e2e spec selected: ${chosen.reason}`)
     process.exit(0)
   }
   await requireQuietMachine()
@@ -176,11 +166,9 @@ async function main() {
   if (!run('npx', ['install-electron'])) process.exit(1)
   console.log(`${specs.length} spec(s) selected: ${chosen.reason}`)
   const failed = await runShards(only, specs)
+  // The repeats of changed specs run in CI only (Constitution XIV, ADR 132).
   if (failed.length > 0) console.error(`\nShards failed: ${failed.join(', ')}`)
-  // CI repeats the changed specs in each shard, by part; with no shard named, one run covers every part.
-  const part = only === null ? [] : ['--part', `${only}/${SHARDS}`]
-  const stable = run('node', ['scripts/stability.mjs', '--e2e', ...part], { CI: '1' })
-  process.exit(failed.length === 0 && stable ? 0 : 1)
+  process.exit(failed.length === 0 ? 0 : 1)
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main()

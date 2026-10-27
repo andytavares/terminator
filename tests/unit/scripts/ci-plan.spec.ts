@@ -29,7 +29,6 @@ const PLANNED_JOBS = [
   'stories',
   'story-screenshots',
   'unit',
-  'stability-shard',
   'test',
   'start',
 ]
@@ -214,10 +213,9 @@ describe('the Stability shards (ADR 124)', () => {
     })
   })
 
-  it('runs all 30 passes in one step locally, as one shard stands for them all', () => {
-    expect(stepOf('stability-shard', 'Changed specs, this shard')?.script).toBe(
-      'node scripts/stability.mjs'
-    )
+  it('runs in CI only: ci:local plans no stability step (Constitution XIV, ADR 132)', () => {
+    expect(SKIPPED_JOBS).toHaveProperty('stability-shard')
+    expect(stepOf('stability-shard', 'Changed specs, this shard')).toBeUndefined()
   })
 
   it('has one Stability verdict, red unless the selection and every shard passed', () => {

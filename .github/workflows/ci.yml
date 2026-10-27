@@ -219,9 +219,9 @@ jobs:
           node scripts/test-select.mjs | tee /dev/stderr
           node scripts/test-select.mjs --github-output >> "$GITHUB_OUTPUT"
 
-      # Every spec this change adds or edits, 30 times with a fresh seed each, every core busy. One
+      # Every spec this change adds or edits, 10 times with a fresh seed each, every core busy. One
       # failure fails the check and prints the seed that replays it (ADR 124). Nothing retries. The
-      # plan splits the 30 runs, and the specs when there are many, so each shard plans for 3 minutes, in at most 4 shards.
+      # plan splits the 10 runs, and the specs when there are many, so each shard plans for 3 minutes, in at most 4 shards.
       - name: Size the stability shards
         id: stability
         run: |

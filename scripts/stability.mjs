@@ -13,7 +13,9 @@ import { needsChromium } from './ci-e2e-local.mjs'
 import { baseBranch } from './check-release-age.mjs'
 import { startLoad } from './under-load.mjs'
 
-const UNIT_RUNS = 30
+// At most ten runs of each changed spec: thirty cost ten minutes of CI on a change to fifteen specs
+// (run 40588044519). The maintainer set it on 2026-10-27 (ADR 132).
+const UNIT_RUNS = 10
 const E2E_RUNS = 5
 const SPEC_FILE = /\.spec\.(tsx?|js)$/
 // What vitest.config.ts leaves out of the default run: `vitest run <file>` finds no test there.

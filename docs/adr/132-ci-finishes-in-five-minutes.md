@@ -4,7 +4,7 @@
 
 **Date**: 2026-10-27
 
-Amends ADR 123 (the job layout, and what a push to `main` runs), ADR 124 (where the quarantined tests run) and ADR 129 (the goal).
+Amends ADR 123 (the job layout, and what a push to `main` runs), ADR 124 (where the quarantined tests run, and how many times the stability gate repeats a spec) and ADR 129 (the goal).
 
 ## Context
 
@@ -28,7 +28,8 @@ Inside the run:
 3. **Fewer Linux jobs**: Select tests also plans the stability shards, Stories also runs the perf budgets (not Format, which is a required check), Start's build also fails on build warnings (the Build job is gone), and E2E report runs only when an E2E shard failed. Stability shards plan for 3 minutes and are at most 4.
 4. **Cheaper steps**: `lint:quarantine` lists only the spec files that contain the tag or that `tests/quarantine.json` names, and none when there are none. `npm run lint` runs up to 3 ESLint groups at once, as memory allows. An E2E shard restores the build from `actions/cache` when no tracked file outside the tests and docs changed.
 5. **A push to `main` runs what its change reaches** (Constitution XIV, 5.0.0, approved by the maintainer on 2026-10-27), compared with the commit `main` was at before (`selectionBase` in `scripts/test-select.mjs`). The nightly sweep and the release run every test. A full run is 777–971 s of single-app E2E over three shards, more than five minutes on the free macOS runners.
-6. **One Dependabot pull request a week** for every package outside the lockstep groups.
+6. **The stability gate repeats each changed spec up to ten times, in CI only** (Constitution XIV, 5.0.0, approved by the maintainer on 2026-10-27). Thirty repeats took 10.1 minutes of CI on a change to fifteen specs (run 40588044519) and 38 minutes of `ci:local`. `ci:local` and `ci:local:e2e` leave the repeats to CI (`SKIPPED_JOBS` in `scripts/ci-plan.mjs`).
+7. **One Dependabot pull request a week** for every package outside the lockstep groups.
 
 ## Alternatives considered
 

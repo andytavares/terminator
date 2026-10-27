@@ -4,7 +4,6 @@ import { resolve } from 'node:path'
 import {
   busiestProcesses,
   e2eSpecsOf,
-  nothingToRun,
   playwrightArguments,
   runShardsTogether,
   waitForQuiet,
@@ -55,9 +54,10 @@ describe('which e2e specs the local run gives its shards', () => {
     expect(e2eSpecsOf({ e2eMode: 'some', e2e: ['b.spec.ts'] }, allSpecs)).toEqual(['b.spec.ts'])
   })
 
-  it('runs each spec once in its shard: the repeats are scripts/stability.mjs, run after', () => {
+  it('runs each spec once, and leaves the repeats to CI (Constitution XIV, ADR 132)', () => {
     const source = readFileSync(resolve(__dirname, '../../../scripts/ci-e2e-local.mjs'), 'utf8')
     expect(source).not.toMatch(/--repeat-each/)
+    expect(source).not.toMatch(/scripts\/stability\.mjs/)
   })
 })
 
@@ -87,12 +87,6 @@ describe('shards that run side by side', () => {
     const args = playwrightArguments(2, ['a.spec.ts'])
     expect(args).toEqual(expect.arrayContaining(['--output', 'test-results/shard-2']))
     expect(playwrightArguments(3, ['a.spec.ts'])).toContain('test-results/shard-3')
-  })
-
-  it('has nothing to run only when no spec is selected and none changed', () => {
-    expect(nothingToRun([], [])).toBe(true)
-    expect(nothingToRun(['a.spec.ts'], [])).toBe(false)
-    expect(nothingToRun([], ['b.spec.ts'])).toBe(false)
   })
 
   it('starts every shard before the first ends', async () => {

@@ -13,6 +13,7 @@ export const SKIPPED_JOBS = {
   'e2e-result': 'it only reads the results of the jobs above',
   'e2e-report': 'it only merges the e2e reports into one HTML page',
   stability: 'it only reads the results of the stability shards',
+  'stability-shard': 'the stability gate runs in CI only (Constitution XIV, ADR 132)',
 }
 
 const TEST_ALL_LABEL =
@@ -25,8 +26,6 @@ function expressionsFor(all) {
     [TEST_ALL_LABEL, all ? '1' : ''],
     // One unit run of the whole selection stands for its shards.
     ['--shard=${{ matrix.shard }}/${{ needs.select.outputs.shard_count }}', ''],
-    // One local stability run, of all 30 passes over every spec, stands for its shards.
-    [' --runs ${{ matrix.runs }} --part ${{ matrix.part }}', ''],
     // ci:local stops at the first failing step, so a later step only runs after unit passed.
     ['${{ needs.unit.result }}', 'success'],
     // The unit step selects for itself, so the selection has succeeded by then.

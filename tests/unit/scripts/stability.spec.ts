@@ -40,7 +40,7 @@ describe('which specs a change burns in', () => {
 
 describe('reading the command line', () => {
   it('defaults to 30 unit runs and 5 end-to-end runs', () => {
-    expect(stabilityArguments([])).toMatchObject({ runs: 30, e2e: false, list: false, specs: [] })
+    expect(stabilityArguments([])).toMatchObject({ runs: 10, e2e: false, list: false, specs: [] })
     expect(stabilityArguments(['--e2e'])).toMatchObject({ runs: 5, e2e: true, specs: [] })
   })
 
