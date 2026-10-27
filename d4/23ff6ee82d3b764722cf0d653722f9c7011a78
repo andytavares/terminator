@@ -1,0 +1,88 @@
+tests/e2e/tracker-stub-linear.ts
+  s_567c3310a5db4e::t_906f8291a6559b 16-18
+  s_567c3310a5db4e::t_53d6d35be654a1 19-20
+tests/e2e/home-tasks.spec.ts
+  s_567c3310a5db4e::t_be0e373588c032 131,144
+tests/e2e/session-home.spec.ts
+  s_567c3310a5db4e::t_70b2da6db9a8e7 81
+tests/e2e/task-vault-harness.ts
+  s_567c3310a5db4e::t_be0e373588c032 39
+tests/e2e/task-vault-calendar.spec.ts
+  s_567c3310a5db4e::t_be0e373588c032 1-45
+tests/e2e/tracker-stub.ts
+  s_567c3310a5db4e::t_906f8291a6559b 11,34,42,66-67,71,78,88,118,123
+docs/user-guide/USER-GUIDE.md
+  s_567c3310a5db4e::t_2e6a8adf16170a 442
+  s_567c3310a5db4e::t_f91df639034c05 658
+  s_567c3310a5db4e::t_df031b67bd49d5 249
+  s_567c3310a5db4e::t_244e00acc60344 587
+  s_567c3310a5db4e::t_055463a2aa4cc3 1219-1225
+  s_567c3310a5db4e::t_03b91a8abf854a 770
+  s_567c3310a5db4e::t_1505cd5caf7377 273
+  s_567c3310a5db4e::t_5d1326b6fb1a7d 287
+  s_567c3310a5db4e::t_4015c16359ef41 328
+  s_567c3310a5db4e::t_9b6733254ee796 553
+  s_567c3310a5db4e::t_3e79523aadfc2e 256
+  s_567c3310a5db4e::t_54eec580d41634 1236,1239-1240
+tests/e2e/tools/capture-session-home-screenshots.spec.ts
+  s_567c3310a5db4e::t_be0e373588c032 97
+tests/e2e/core-quick-actions.spec.ts
+  s_567c3310a5db4e::t_7e78e49bdd2ebd 223,227,235-236
+  s_567c3310a5db4e::t_70b2da6db9a8e7 17-18,187,214-222,224-226,228-234,237-250,265,269,275-276,283,286-287,305
+tests/e2e/extension-smoke.spec.ts
+  s_567c3310a5db4e::t_be0e373588c032 358
+docs/ARCHITECTURE.md
+  s_567c3310a5db4e::t_2e65a3c4ab4ac2 533
+  s_567c3310a5db4e::t_3c43b307bc47ea 731
+  s_567c3310a5db4e::t_4c8596e166ad41 502
+  s_567c3310a5db4e::t_dc795eab8587c6 603
+  s_567c3310a5db4e::t_f8f085bee535e0 566,568
+  s_567c3310a5db4e::t_779e8444c5c4f7 738
+  s_567c3310a5db4e::t_ed2adc67a0e95f 503
+  s_567c3310a5db4e::t_b6b9f11e85114a 736
+  s_567c3310a5db4e::t_cb4ccdcfc92e74 597
+  s_567c3310a5db4e::t_93f0f56d57b86f 79
+  s_567c3310a5db4e::t_39206758b63b83 138
+  s_567c3310a5db4e::t_c9a1c23b0d33c8 558
+  s_567c3310a5db4e::t_6892ec15b69ec9 130
+  s_567c3310a5db4e::t_6d06197a715124 139
+  s_567c3310a5db4e::t_6f5480ea43de30 578-580
+  s_567c3310a5db4e::t_bd84e867309802 584
+tests/e2e/sidebar-marks-the-shown-session.spec.ts
+  s_567c3310a5db4e::t_be0e373588c032 41
+  s_567c3310a5db4e::t_b3c9a2c55693d9 3
+tests/e2e/issue-trackers.spec.ts
+  s_567c3310a5db4e::t_5fa53e796c8da5 5,9,12,52,99,101,123,189-195,202-203,219
+docs/EXTENSION-DEVELOPMENT.md
+  s_567c3310a5db4e::t_cae205c18ff611 655
+  s_567c3310a5db4e::t_88fe073eac1d79 159
+  s_567c3310a5db4e::t_0c2c634761334c 685
+  s_567c3310a5db4e::t_3566056c1509cf 176
+  s_567c3310a5db4e::t_87f9e02ea46527 700
+  s_567c3310a5db4e::t_055463a2aa4cc3 79-88,174-175,177-179
+tests/e2e/desk.spec.ts
+  s_567c3310a5db4e::t_be0e373588c032 38
+tests/e2e/timings.json
+  s_567c3310a5db4e::t_5fa53e796c8da5 26
+  s_567c3310a5db4e::t_da6e910c6a4565 49
+README.md
+  s_567c3310a5db4e::t_56a4a4a420fbde 23
+  s_567c3310a5db4e::t_60efb0fb4757cc 25
+  s_567c3310a5db4e::t_e41f0790a5d219 32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d423ff6ee82d3b764722cf0d653722f9c7011a78",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
