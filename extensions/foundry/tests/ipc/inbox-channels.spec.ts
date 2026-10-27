@@ -1,3 +1,4 @@
+import { answered } from '../helpers/answer-shape.js'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -104,9 +105,9 @@ function emptyAndOrdersWaitingTests() {
         detail: 'Every check passes.',
       },
     ]
-    const r = (await createInboxChannels(inboxDeps({ waiting: async () => waiting })).list()) as {
-      waiting: typeof waiting
-    }
+    const r = answered(
+      await createInboxChannels(inboxDeps({ waiting: async () => waiting })).list()
+    )
     expect(r.waiting).toEqual(waiting)
   })
 }

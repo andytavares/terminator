@@ -74,7 +74,7 @@ function mount(
   const answer = () => ({
     order,
     compile: compileOrder(order),
-    environment: { ...environment, decisions },
+    environment: { ...environment, decisions: { ...decisions } },
   })
   invoke = vi.fn(async (channel: string, payload?: { move?: string }) => {
     if (channel === 'foundry:forge.environment') recordDecision(payload?.move)

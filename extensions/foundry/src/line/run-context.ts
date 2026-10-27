@@ -50,14 +50,15 @@ export async function createRunContext(api: ExtensionAPI, run: OrderRun): Promis
   const exec = shellExecOf(api)
   // Every checkout before any agent starts: a run that provisions lane 2 half
   // way through and fails has already spent lane 1's agent budget.
-  const checkouts = await ensureCheckouts(order, { exec, root })
+  const store = orderStoreAt(root)
+  const checkouts = await ensureCheckouts(order, { exec, root, note: noteOn(store, order.id) })
   return {
     api,
     root,
     order,
     exec,
     checkouts,
-    store: orderStoreAt(root),
+    store,
     featureDir: orderDir(root, order.id),
     diffCommand: allowedDiffCommand(exec),
     passes: createPassCache(async (args, cwd) => {
@@ -110,3 +111,17 @@ export const workspaceOf = (api: ExtensionAPI, checkout: { origin: string }): st
 
 export const firstLane = (checkouts: ReadonlyMap<number, Checkout>): number =>
   [...checkouts.keys()].sort((a, b) => a - b)[0] ?? 1
+
+/** Records what checkout provisioning had to fall back on, so the ledger says why. @internal */
+export function noteOn(store: OrderStore, orderId: string): (message: string) => void {
+  return (message) =>
+    void store.record({
+      at: new Date().toISOString(),
+      orderId,
+      actor: 'rule:line',
+      action: 'checkout.note',
+      subject: orderId,
+      reason: message,
+      evidence: [],
+    })
+}

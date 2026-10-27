@@ -95,11 +95,13 @@ function transcriptActivity(sessionId: string): ReturnType<typeof readTranscript
 function registerRunStop({ api, dataRoot }: ActivationContext): void {
   reg(
     api,
-    foundryChannel('foundry:run.stop', OrderIdPayload, async ({ id }) => {
-      await stopOrder(dataRoot(), id, 'stopped by the operator')
-      return { ok: true }
-    })
+    foundryChannel('foundry:run.stop', OrderIdPayload, ({ id }) => stopRun(dataRoot(), id))
   )
+}
+
+export async function stopRun(root: string, id: string) {
+  await stopOrder(root, id, 'stopped by the operator')
+  return { ok: true }
 }
 
 // Start the same order over: stop what runs, destroy every lane checkout and branch,
@@ -112,7 +114,7 @@ function registerRunReset(context: ActivationContext): void {
   )
 }
 
-async function resetRun({ api, dataRoot }: ActivationContext, id: string) {
+export async function resetRun({ api, dataRoot }: ActivationContext, id: string) {
   const root = dataRoot()
   const store = orderStoreAt(root)
   const order = await store.load(id)

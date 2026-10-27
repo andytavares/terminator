@@ -10,7 +10,7 @@ import { idleExecutorSeams } from './idle-executor-seams.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
 import { createRoleRegistry } from '../../src/line/roles.js'
 import { collectableWrites, readRungOutput } from '../../src/line/rung-output.js'
-import { decideTool } from '../../src/runtime/tool-decision.js'
+import { roleSettings } from '../../src/runtime/role-settings.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
@@ -163,23 +163,24 @@ function expectMayWriteItsOutput(
   input: AgentInput & { outputPath: string },
   roles: ReturnType<typeof createRoleRegistry>
 ): void {
-  const decision = decideTool({
-    tool: 'Write',
-    input: { file_path: input.outputPath, content: '{}' },
+  const { settings } = roleSettings({
     readOnly: input.readOnly,
-    role: input.role,
-    mayUseTool: (tool) => input.role === null || roles.mayUseTool(input.role, tool),
-    isProbed: () => false,
-    readOnlyTools: [],
+    docsOnly: false,
+    restrictedWrites: true,
     autonomy: 'lights-out',
-    worktreePath: repo,
+    letModeDecide: true,
     outputPath: input.outputPath,
+    outputsDir: null,
     skillsMount: null,
+    mayUseTool: (tool) => input.role === null || roles.mayUseTool(input.role, tool),
+    probedCommands: [],
+    readOnlyTools: [],
   })
-  expect(decision, `${input.node.id} was refused its own output file`).toEqual({
-    allow: true,
-    reason: expect.any(String),
-  })
+  const { allow, deny } = settings.permissions
+  expect(allow, `${input.node.id} was refused its own output file`).toContain(
+    `Write(/${input.outputPath})`
+  )
+  expect(deny).not.toContain('Write')
 }
 
 /** What the scout found in the repository; every other rung has nothing to add. */

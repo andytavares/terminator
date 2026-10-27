@@ -1,3 +1,4 @@
+import * as path from 'node:path'
 import type { ExtensionAPI, Disposable } from '@terminator/extension-sdk'
 
 import { paletteEntries } from './palette.js'
@@ -25,7 +26,13 @@ export function gotoRun(api: ExtensionAPI, kind: 'run', sessionId: string): void
     })
     return
   }
-  api.window.broadcast('foundry:palette-goto', { kind, sessionId })
+  api.window.broadcast('foundry:palette-goto', { kind, sessionId, orderId: orderOfRun(sessionId) })
+}
+
+/** The order a supervised run belongs to: its feature folder is named after it. */
+function orderOfRun(sessionId: string): string | undefined {
+  const run = runtime.supervision?.snapshot().runs.find((r) => r.sessionId === sessionId)
+  return run === undefined ? undefined : path.basename(run.featureDir)
 }
 
 function refreshPalette(api: ExtensionAPI): void {

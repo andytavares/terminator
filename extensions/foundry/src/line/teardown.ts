@@ -1,7 +1,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { orderDir } from '../data-root.js'
-import { branchFor, checkoutPath } from './worktree.js'
+import { branchFor, checkoutPath, createdBranchMarker, unlockCheckout } from './worktree.js'
 import type { CheckoutDeps } from './worktree.js'
 import type { WorkOrder } from '../order/schema.js'
 
@@ -84,8 +84,8 @@ interface Teardown {
  * The worktree is removed from the repository that owns it — git records the
  * registration under the origin's `.git/worktrees/`, so removing the directory
  * from under the data root would leave that behind and the next
- * `worktree add` onto the same path would fail. `prune` afterwards is what
- * makes starting over work a second time.
+ * `worktree add` onto the same path would fail. Only this worktree is removed:
+ * `git worktree prune` would drop the registrations of other lanes too.
  */
 async function tearDownLane({ order, deps, tally }: Teardown, lane: number): Promise<void> {
   const repo = order.context.repos.find((r) => r.lane === lane)
@@ -94,18 +94,14 @@ async function tearDownLane({ order, deps, tally }: Teardown, lane: number): Pro
   const branch = branchFor(order, lane)
   const target = checkoutPath(deps.root, order, repo.name)
   const cwd = repo.path
+  await unlockCheckout(cwd, target, deps)
   const args = ['worktree', 'remove', '--force', target]
   await gitRemove(deps, { cwd, args, timeoutMs: 60_000, what: `the checkout at ${target}` }, tally)
   if (deps.removeProjectAt?.(target) === true) tally.removed.push(`the project ${branch}`)
 
-  // Unconditional: the point of pruning is the registration left by a
-  // directory that is already gone, which is exactly the case where the
-  // removal above just failed.
-  await deps.exec({ command: 'git', args: ['worktree', 'prune'], cwd, timeoutMs: 30_000 })
-
-  // `-D`, not `-d`: the branch holds work that was deliberately thrown away,
-  // and git refusing to delete it because it is unmerged is the normal case
-  // rather than a warning worth stopping for. The operator confirmed this.
+  // Only a branch Foundry cut is Foundry's to delete; a tracker-suggested name may be
+  // the operator's own. `-D`, not `-d`: the work on it was deliberately thrown away.
+  if (!fs.existsSync(createdBranchMarker(target))) return
   const deleteBranch = { cwd, args: ['branch', '-D', branch], timeoutMs: 30_000 }
   await gitRemove(deps, { ...deleteBranch, what: `the branch ${branch}` }, tally)
 }

@@ -149,16 +149,18 @@ function registerIssueChannels(api: ExtensionAPI): void {
   // A ticket for a typed idea, offered before it becomes an order (spec 061).
   reg(
     api,
-    foundryChannel('foundry:ticket.offer', noPayload, async () => ({
-      offer: await ticketOffer(api.issues),
-    })),
+    foundryChannel('foundry:ticket.offer', noPayload, () => offerTicket(api)),
     foundryChannel('foundry:ticket.create', TicketCreatePayload, (payload) =>
       fileTicket(api.issues, payload)
     )
   )
 }
 
-async function listMyIssues(api: ExtensionAPI, rawTerm: string) {
+export async function offerTicket(api: ExtensionAPI) {
+  return { offer: await ticketOffer(api.issues) }
+}
+
+export async function listMyIssues(api: ExtensionAPI, rawTerm: string) {
   const issues = api.issues
   const term = rawTerm.trim()
   const connected = await issues.connections()
@@ -187,30 +189,34 @@ async function listMyIssues(api: ExtensionAPI, rawTerm: string) {
 function registerOrderDelete({ api, dataRoot }: ActivationContext): void {
   reg(
     api,
-    foundryChannel('foundry:order.delete', OrderIdPayload, async ({ id }) => {
-      const root = dataRoot()
-      const order = await orderStoreAt(root).load(id)
-      if (order === null) return { error: `No order ${id}.` }
-
-      deletedOrders.add(id)
-      // Its agents first. Deleting the records out from under a live session
-      // leaves an agent writing into a worktree whose order no longer exists.
-      await stopOrder(root, id, 'the order was deleted')
-      // The architect too: it runs in the checkout about to be removed, and the
-      // run graph that `stopOrder` reads does not know about it.
-      const intake = intakeSessions.get(id)
-      if (intake !== undefined) {
-        runtime.supervisedRunner?.stop(intake, 'the order was deleted')
-        intakeSessions.delete(id)
-        announceLive(id)
-      }
-      const result = await deleteOrder(order, {
-        exec: shellExecOf(api),
-        root,
-        removeProjectAt: projectRemover(api.workspace),
-      })
-      indexFor(root).orderRemoved(id)
-      return { ok: result.failed.length === 0, removed: result.removed, failed: result.failed }
-    })
+    foundryChannel('foundry:order.delete', OrderIdPayload, ({ id }) =>
+      removeOrder({ api, dataRoot }, id)
+    )
   )
+}
+
+export async function removeOrder({ api, dataRoot }: ActivationContext, id: string) {
+  const root = dataRoot()
+  const order = await orderStoreAt(root).load(id)
+  if (order === null) return { error: `No order ${id}.` }
+
+  deletedOrders.add(id)
+  // Its agents first. Deleting the records out from under a live session
+  // leaves an agent writing into a worktree whose order no longer exists.
+  await stopOrder(root, id, 'the order was deleted')
+  // The architect too: it runs in the checkout about to be removed, and the
+  // run graph that `stopOrder` reads does not know about it.
+  const intake = intakeSessions.get(id)
+  if (intake !== undefined) {
+    runtime.supervisedRunner?.stop(intake, 'the order was deleted')
+    intakeSessions.delete(id)
+    announceLive(id)
+  }
+  const result = await deleteOrder(order, {
+    exec: shellExecOf(api),
+    root,
+    removeProjectAt: projectRemover(api.workspace),
+  })
+  indexFor(root).orderRemoved(id)
+  return { ok: result.failed.length === 0, removed: result.removed, failed: result.failed }
 }

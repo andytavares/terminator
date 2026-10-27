@@ -25,13 +25,24 @@ import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 /** The runner's surface every Foundry module reaches, as `vi.fn`s a spec can drive. */
 export function fakeRunner() {
+  // Stopping a session ends it, as the real runner's agent does.
+  const endListeners = new Map<string, () => void>()
   return {
+    onEnd: vi.fn((sessionId: string, listener: () => void) => {
+      endListeners.set(sessionId, listener)
+      return () => endListeners.delete(sessionId)
+    }),
     start: vi.fn(async (..._input: unknown[]): Promise<unknown> => null),
     runCommand: vi.fn(async (..._input: unknown[]): Promise<number | null> => 0),
     resolve: vi.fn((..._answer: unknown[]) => true),
     handBackToTerminal: vi.fn(),
     interrupt: vi.fn(),
-    stop: vi.fn((..._stop: unknown[]) => true),
+    stop: vi.fn((sessionId: string, ..._reason: unknown[]) => {
+      endListeners.get(sessionId)?.()
+      return true
+    }),
+    /** Ends a session as its agent exiting does, for a spec that replaces `stop`. */
+    endSession: (sessionId: string) => endListeners.get(sessionId)?.(),
     send: vi.fn((..._message: unknown[]) => true),
     terminalFor: vi.fn(
       (..._session: unknown[]): { terminalSessionId: string; projectId: string } | null => null

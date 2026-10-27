@@ -56,7 +56,8 @@ beforeEach(async () => {
 interface TurnInput {
   phase: 'architect' | 'red-team'
   onRegistered: (run: { sessionId: string; transcriptFrom: number }) => void
-  onTurnEnd: () => void
+  onTurnEnd?: () => void
+  onStructuredOutput?: (answer: unknown) => void
   onEnd: (exitCode: number | null) => void
   onAutoDenied: (tool: string, reason: string) => void
 }
@@ -69,7 +70,6 @@ const startedTurn = (sessionId: string) => ({
   transcriptPath: '/none',
 })
 
-const proposalPath = (): string => path.join(orderDir(dataDir, 'WO-1'), 'proposal.json')
 const reviewPath = (round: number): string =>
   rungOutputPath(orderDir(dataDir, 'WO-1'), `review-${round}`)
 
@@ -98,8 +98,8 @@ describe('an architect whose session never started', () => {
   })
 })
 
-describe('an architect turn that ends before its proposal is written', () => {
-  it('waits for the proposal its next turn writes, and takes that', async () => {
+describe('an architect that answers in structured output', () => {
+  it('applies the answer when it arrives, with no file and no turn end', async () => {
     const seen: { turn?: TurnInput } = {}
     theRunner.start.mockImplementation((async (input: TurnInput) => {
       seen.turn = input
@@ -109,19 +109,28 @@ describe('an architect turn that ends before its proposal is written', () => {
     expect((await convergeOrder(host, dataDir, readyDraft(repo))).converging).toBe('architect-1')
     const architect = seen.turn
     if (architect === undefined) throw new Error('the architect never started')
-    architect.onTurnEnd() // returns at once when no proposal file exists; nothing is left pending
     expect(await ledgerActions(dataDir)).not.toContain('order.redrafted')
-    writeFileWithDirs(proposalPath(), { note: 'thought about it' })
-    architect.onTurnEnd()
+    architect.onStructuredOutput?.({ note: 'thought about it' })
     expect((await untilLedgerHas(dataDir, 'order.redrafted')).reason).toBe('thought about it')
+    expect(fs.existsSync(path.join(orderDir(dataDir, 'WO-1'), 'proposal.json'))).toBe(false)
+  })
+
+  it('asks Claude for the proposal schema', async () => {
+    theRunner.start.mockImplementation(architectEndsWith(0))
+    await convergeOrder(host, dataDir, readyDraft(repo))
+    expect(theRunner.start.mock.calls[0][0]).toMatchObject({
+      outputSchema: { type: 'object', additionalProperties: false },
+    })
+    await untilLedgerHas(dataDir, 'converge.refused')
+    await untilRefusalIsSaid()
   })
 })
 
-/** An architect that registers, and whose session then ends with `exitCode`, having written `proposal` if given. */
+/** An architect that registers, and whose session then ends with `exitCode`, having answered `proposal` if given. */
 function architectEndsWith(exitCode: number | null, proposal?: unknown) {
   return (async (input: TurnInput) => {
-    if (proposal !== undefined) writeFileWithDirs(proposalPath(), proposal)
     input.onRegistered({ sessionId: 'architect-1', transcriptFrom: 0 })
+    if (proposal !== undefined) input.onStructuredOutput?.(proposal)
     setTimeout(() => input.onEnd(exitCode), 0)
     return startedTurn('architect-1')
   }) as never
@@ -157,7 +166,7 @@ describe('an architect session that exits with a failure code', () => {
     await untilRefusalIsSaid()
   })
 
-  it('has the proposal it wrote read all the same', async () => {
+  it('has the proposal it answered with applied all the same', async () => {
     theRunner.start.mockImplementation(architectEndsWith(127, { note: 'wrote it, then died' }))
     await convergeOrder(host, dataDir, readyDraft(repo))
     expect((await untilLedgerHas(dataDir, 'order.redrafted')).reason).toBe('wrote it, then died')
@@ -170,9 +179,8 @@ type Turn = (input: TurnInput) => Promise<unknown>
 function turns(redTeam: Turn) {
   return (async (input: TurnInput) => {
     if (input.phase === 'red-team') return redTeam(input)
-    writeFileWithDirs(proposalPath(), { note: 'tightened' })
     input.onRegistered({ sessionId: 'architect-1', transcriptFrom: 0 })
-    setTimeout(() => input.onTurnEnd(), 0)
+    setTimeout(() => input.onStructuredOutput?.({ note: 'tightened' }), 0)
     return startedTurn('architect-1')
   }) as never
 }
@@ -183,7 +191,7 @@ function redTeamWriting(output: unknown, before?: (input: TurnInput) => void): T
     before?.(input)
     writeFileWithDirs(reviewPath(1), output)
     input.onRegistered({ sessionId: 'red-team-1', transcriptFrom: 0 })
-    setTimeout(() => input.onTurnEnd(), 0)
+    setTimeout(() => input.onTurnEnd?.(), 0)
     return startedTurn('red-team-1')
   }
 }

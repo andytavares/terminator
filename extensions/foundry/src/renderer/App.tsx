@@ -1,8 +1,10 @@
-import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { Settings, ArrowLeft, List, Factory } from 'lucide-react'
-import { Button, IconButton } from '@terminator/extension-ui'
+import { Button, IconButton, Tab, TabList, TabsRoot } from '@terminator/extension-ui'
 import { Inbox } from '../components/Inbox.js'
-import { usePushed, ANY_RECORD } from './use-pushed.js'
+import { useFoundryQuery, ANY_RECORD } from './foundry-query.js'
+import { foundryInvoke } from './foundry-invoke.js'
+import type { FoundryApi } from '../ipc/foundry-api.js'
 import type { FactoryOrderRow } from '../components/factory/FactorySite.js'
 
 // The window shows one view under the queue, so each is its own chunk and the
@@ -41,19 +43,12 @@ const SURFACES: readonly { id: Surface; label: string }[] = [
 ]
 
 /** What is waiting for the operator, per surface. */
-interface Attention {
-  inbox: number
-  forge: number
-}
+type Attention = Pick<FoundryApi['foundry:attention']['answer'], 'inbox' | 'forge'>
 
-async function readAttention(): Promise<Attention | null> {
-  try {
-    return (await window.electronAPI.extensionBridge.invoke('foundry:attention', {})) as Attention
-  } catch {
-    // The badge is an affordance, not the queue. A failed read leaves the
-    // last count up rather than taking the chrome down with it.
-    return null
-  }
+// The badge is an affordance, not the queue. A failed read leaves the last count up
+// rather than taking the chrome down with it.
+function readAttention() {
+  return foundryInvoke('foundry:attention')
 }
 
 type ForgeViewKind = 'list' | 'factory'
@@ -100,7 +95,7 @@ function useForgeView(): ForgeView {
     choose: (next) => {
       clearOpened()
       setView(next)
-      void window.electronAPI.extensionBridge.invoke('foundry:ui.set-view', { view: next })
+      void foundryInvoke('foundry:ui.set-view', { view: next })
     },
     openFromSite: (order) => (isShaping(order) ? openInList(order.id) : setHall(order)),
     openInList,
@@ -112,10 +107,9 @@ function useForgeView(): ForgeView {
 /** The view the operator last chose, and any change to it made elsewhere. */
 function useSavedForgeView(setView: (view: ForgeViewKind) => void): void {
   useEffect(() => {
-    window.electronAPI.extensionBridge
-      .invoke('foundry:ui.view')
-      .then((result: unknown) => {
-        if ((result as { view?: string }).view === 'factory') setView('factory')
+    foundryInvoke('foundry:ui.view')
+      .then((result) => {
+        if (result.view === 'factory') setView('factory')
       })
       .catch(() => {})
   }, [setView])
@@ -148,6 +142,21 @@ function useOpenOrderRequests(open: (orderId: string) => void): void {
   }, [])
 }
 
+// The palette's and a notification's "go to run" for a run with no live terminal: the
+// order it names, opened on its Floor.
+function usePaletteGotoRequests(open: (orderId: string) => void): void {
+  const latest = useRef(open)
+  useEffect(() => {
+    latest.current = open
+  })
+  useEffect(() => {
+    return window.electronAPI.extensionBridge.on('foundry:palette-goto', (data: unknown) => {
+      const { orderId } = data as { orderId?: string }
+      if (orderId !== undefined) latest.current(orderId)
+    })
+  }, [])
+}
+
 // The "New work order…" quick action, whether or not this view was open: a request
 // now, or one that fired before the view existed, picked up on first mount.
 function useNewOrderRequests(open: () => void): void {
@@ -162,10 +171,9 @@ function useNewOrderRequests(open: () => void): void {
   }, [])
 
   useEffect(() => {
-    window.electronAPI.extensionBridge
-      .invoke('foundry:ui.consume-pending-new-order')
-      .then((result: unknown) => {
-        if ((result as { pending?: boolean }).pending) latest.current()
+    foundryInvoke('foundry:ui.consume-pending-new-order')
+      .then((result) => {
+        if (result.pending) latest.current()
       })
       .catch(() => {})
   }, [])
@@ -174,12 +182,8 @@ function useNewOrderRequests(open: () => void): void {
 // The counts, on the one piece of chrome on screen whatever the surface, so an open
 // question or a held tool call is seen without clicking each tab to look.
 function useAttention(): Attention {
-  const [waiting, setWaiting] = useState<Attention>({ inbox: 0, forge: 0 })
-  const show = useCallback((next: Attention | null): void => {
-    if (next !== null) setWaiting({ inbox: next.inbox ?? 0, forge: next.forge ?? 0 })
-  }, [])
-  usePushed(readAttention, show, { kinds: ANY_RECORD })
-  return waiting
+  const { data } = useFoundryQuery({ key: ['attention'], kinds: ANY_RECORD }, readAttention)
+  return { inbox: data?.inbox ?? 0, forge: data?.forge ?? 0 }
 }
 
 /** Orders are per-repository, so a workspace switch resets the surfaces. */
@@ -238,10 +242,12 @@ function useChrome(): Chrome {
     surfaces.show('forge')
     setFocusIdeaSignal((n) => n + 1)
   })
-  useOpenOrderRequests((orderId) => {
+  const openOrder = (orderId: string): void => {
     surfaces.show('forge')
     forge.openInList(orderId)
-  })
+  }
+  useOpenOrderRequests(openOrder)
+  usePaletteGotoRequests(openOrder)
   useWorkspaceSwitch((next) => {
     setRepoRoot(next)
     surfaces.closeSettings()
@@ -297,47 +303,35 @@ interface SurfaceTabsProps {
 }
 
 function SurfaceTabs({ showing, waiting, onShow }: SurfaceTabsProps): JSX.Element {
+  // Settings covers the surfaces, so while it is open none of them is selected.
   return (
-    <nav className="fdry-tabs" aria-label="Foundry surfaces">
-      {SURFACES.map((tab) => (
-        <SurfaceTab
-          key={tab.id}
-          tab={tab}
-          // The queue above the Forge and the Forge's own questions are one
-          // screen, so they are one count.
-          count={tab.id === 'forge' ? waiting.inbox + waiting.forge : 0}
-          // Settings covers the surfaces, so while it is open none of them is
-          // the one showing. Reporting one as pressed told a screen reader
-          // "Ledger, pressed" over a settings panel.
-          on={showing === tab.id}
-          // Closes settings as well as choosing: without this, clicking a tab
-          // from inside settings changed the surface underneath and did
-          // nothing anybody could see.
-          onShow={() => onShow(tab.id)}
-        />
-      ))}
-    </nav>
+    <TabsRoot selectedId={showing ?? ''} onSelect={(id) => onShow(id as Surface)}>
+      <TabList label="Foundry surfaces" className="fdry-surface-tabs">
+        {SURFACES.map((tab) => (
+          // The queue above the Forge and the Forge's own questions are one screen, so one count.
+          <SurfaceTab
+            key={tab.id}
+            tab={tab}
+            count={tab.id === 'forge' ? waiting.inbox + waiting.forge : 0}
+          />
+        ))}
+      </TabList>
+    </TabsRoot>
   )
 }
 
 interface SurfaceTabProps {
   readonly tab: (typeof SURFACES)[number]
   readonly count: number
-  readonly on: boolean
-  readonly onShow: () => void
 }
 
-function SurfaceTab({ tab, count, on, onShow }: SurfaceTabProps): JSX.Element {
+function SurfaceTab({ tab, count }: SurfaceTabProps): JSX.Element {
+  // The count is in the accessible name, not only in a badge: "Forge 2" tells a
+  // screen reader nothing about what the two are.
   return (
-    <button
-      type="button"
-      className={on ? 'is-on' : ''}
-      aria-pressed={on}
-      // The count is in the accessible name, not only in a badge: a number
-      // rendered beside the label is read as a second, unrelated thing, and
-      // "Forge 2" tells a screen reader nothing about what the two are.
-      aria-label={count > 0 ? `${tab.label}, ${count} waiting on you` : undefined}
-      onClick={onShow}
+    <Tab
+      id={tab.id}
+      accessibleName={count > 0 ? `${tab.label}, ${count} waiting on you` : undefined}
     >
       {tab.label}
       {count > 0 ? (
@@ -345,7 +339,7 @@ function SurfaceTab({ tab, count, on, onShow }: SurfaceTabProps): JSX.Element {
           {count}
         </span>
       ) : null}
-    </button>
+    </Tab>
   )
 }
 

@@ -51,7 +51,7 @@ describe('stopSupervisionRuntime', () => {
       {
         sessionId: 'run-1',
         featureDir: '/orders/WO-1',
-        transcriptPath: '/missing/transcript.jsonl',
+        activity: [],
         startedAt: 0,
         isWaiting: true,
       },

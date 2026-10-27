@@ -7,6 +7,8 @@ import type { EnvironmentFacts, LoopFacts, ReadinessInput } from '../../src/forg
 import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { currentIntake } from '../../src/forge/intake-outcome.js'
+import { intakeAt } from '../../src/forge/intake-state.js'
 import type { IntakeOutcome } from '../../src/forge/intake-outcome.js'
 
 type RedTeamFinding = WorkOrder['redTeam'][number]
@@ -1183,8 +1185,7 @@ describe('readiness — the base branch row', () => {
   describe('failing', failingTests)
   describe('failingEdgesTests', failingEdgesTests)
   describe('a check that stopped', stoppedCheckTests)
-  describe('a bug fix', aBugFixTests)
-  describe('aBugFixEdgesTests', aBugFixEdgesTests)
+  describe('tests failing on the base', testsFailingOnBaseTests)
   describe('handing off anyway', handingOffAnywayTests)
   describe('questionsStillShowTests', questionsStillShowTests)
 })
@@ -1308,61 +1309,8 @@ function stoppedCheckTests() {
   })
 }
 
-function aBugFixTests() {
-  it('starts from failing tests, so only they failing passes the row', () => {
-    const result = environmentOf(
-      { baseline: testsFailOnBase, waivedAt: null },
-      { shape: { name: 'bugfix', yours: false } }
-    )
-    expect(rowOf(result)).toMatchObject({
-      state: 'passed',
-      detail: 'Tests fail on main, which is where a bug fix starts. It builds.',
-    })
-    expect(result.canHandOff).toBe(true)
-  })
-
-  it('says nothing of a build that did not pass', () => {
-    const baseline = provenBaseline({
-      state: 'failing',
-      steps: [baseStep('Tests', { result: 'fail', exitCode: 1 })],
-    })
-    const result = environmentOf(
-      { baseline, waivedAt: null },
-      { shape: { name: 'bugfix', yours: false } }
-    )
-    expect(rowOf(result)).toMatchObject({
-      state: 'passed',
-      detail: 'Tests fail on main, which is where a bug fix starts.',
-    })
-  })
-}
-
-function aBugFixEdgesTests() {
-  it('finds the test step by its rung, not by its label', () => {
-    const baseline = provenBaseline({
-      state: 'failing',
-      steps: [baseStep('Unit', { rung: 'L1', result: 'fail', exitCode: 1 })],
-    })
-    const result = environmentOf(
-      { baseline, waivedAt: null },
-      { shape: { name: 'bugfix', yours: false } }
-    )
-    expect(rowOf(result)?.state).toBe('passed')
-  })
-
-  it('still fails when the build is broken as well', () => {
-    const baseline = provenBaseline({
-      state: 'failing',
-      steps: [...testsFailOnBase.steps, baseStep('Lint', { result: 'fail', exitCode: 1 })],
-    })
-    const result = environmentOf(
-      { baseline, waivedAt: null },
-      { shape: { name: 'bugfix', yours: false } }
-    )
-    expect(rowOf(result)?.state).toBe('failing')
-  })
-
-  it('is no exception for any other shape', () => {
+function testsFailingOnBaseTests() {
+  it('is a failing row, because no shape starts from a failing test', () => {
     expect(rowOf(environmentOf({ baseline: testsFailOnBase, waivedAt: null }))?.state).toBe(
       'failing'
     )
@@ -1434,12 +1382,6 @@ const passesCases: [string, EnvironmentFacts, string | null, boolean][] = [
   ['failing but waived', { baseline: failing, waivedAt: T2 }, null, true],
   ['never checked but waived', { baseline: null, waivedAt: T2 }, null, true],
   [
-    'only tests failing on a bug fix',
-    { baseline: testsFailOnBase, waivedAt: null },
-    'bugfix',
-    true,
-  ],
-  [
     'nothing measurable on a research order, which runs no code',
     { baseline: nothingMeasurable, waivedAt: null },
     'research',
@@ -1498,5 +1440,27 @@ describe('readiness — the Checks step', () => {
   it('does not hold the later steps back while checks wait', () => {
     const steps = readiness(baseInput({ checks: { waiting: 2 } })).steps
     expect(steps.find((s) => s.id === 'shape')?.state).not.toBe('not-yet')
+  })
+})
+
+describe('an intake turn that ran out its deadline', () => {
+  it('reads as failed and offers to draft again', () => {
+    const started = {
+      at: T1,
+      orderId: 'WO-1',
+      actor: 'role:architect',
+      action: 'converge.started',
+      subject: 'sess-1',
+      reason: 'draft',
+      evidence: [],
+    }
+    const intake = currentIntake(
+      [started],
+      intakeAt('drafting', new Date('2026-09-09T19:00:00Z')),
+      { now: Date.parse('2026-09-09T20:00:00Z'), isLive: () => false }
+    )
+    const result = readiness(baseInput({ intake }))
+    expect(result.strip.tone).toBe('bad')
+    expect(result.strip.actions).toContain('start-over')
   })
 })

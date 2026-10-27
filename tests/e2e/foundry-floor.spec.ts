@@ -264,9 +264,10 @@ function metricTiles(): Promise<Record<string, string>> {
     handle,
     `(function () {
     var out = {}
-    document.querySelectorAll('.fdry-metrics-tile').forEach(function (tile) {
-      var label = tile.querySelector('.fdry-metrics-tile__label')
-      out[(label && label.textContent) || ''] = tile.textContent.replace(label ? label.textContent : '', '').trim()
+    document.querySelectorAll('.tmui-metric-card').forEach(function (card) {
+      var question = card.querySelector('.tmui-metric-card__question')
+      var value = card.querySelector('.tmui-metric-card__value')
+      out[(question && question.textContent.trim()) || ''] = value ? value.textContent.trim() : ''
     })
     return out
   })()`

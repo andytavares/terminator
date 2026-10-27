@@ -1,24 +1,27 @@
 import { useCallback, useState } from 'react'
-import { usePolling } from '@terminator/extension-ui'
-import { invoke } from '@terminator/extension-sdk/renderer'
+import { foundryInvoke } from './foundry-invoke.js'
 import type { Signal } from '../sensors/types.js'
-import { readSignals, type SensorRow, type SignalsRead } from '../components/signals-read.js'
+import { readSignals, type SensorRow } from '../components/signals-read.js'
+import { useFoundryQuery } from './foundry-query.js'
 
 // The sensors' signals as the Inbox and the factory's front door both show
 // them, and promoting one into a draft order from either.
 
-// The signals and the sensors that raised them, read every `pollMs` while visible:
-// sensors record signals on their own tick and tell nobody.
-export function useSignalFeed(pollMs: number) {
-  const [signals, setSignals] = useState<Signal[]>([])
-  const [sensors, setSensors] = useState<SensorRow[]>([])
-  const showSignals = useCallback((read: SignalsRead): void => {
-    setSignals(read.signals)
-    setSensors(read.sensors)
-  }, [])
-  const refreshSignals = useCallback(() => readSignals().then(showSignals), [showSignals])
-  usePolling(readSignals, showSignals, pollMs)
-  return { signals, sensors, refreshSignals }
+const NO_SIGNALS: Signal[] = []
+const NO_SENSORS: SensorRow[] = []
+
+// The signals and the sensors that raised them: one query, shared by every view of it,
+// read again when Foundry announces `signals` (the sensor tick and every signal write do).
+export function useSignalFeed() {
+  const { data, refetch } = useFoundryQuery({ key: ['signals'], kinds: ['signals'] }, readSignals)
+  const refreshSignals = useCallback(async (): Promise<void> => {
+    await refetch()
+  }, [refetch])
+  return {
+    signals: data?.signals ?? NO_SIGNALS,
+    sensors: data?.sensors ?? NO_SENSORS,
+    refreshSignals,
+  }
 }
 
 /** Promoting a signal: which one is open, the repository typed for it, and what it said. */
@@ -36,14 +39,8 @@ const NO_PROMOTION: Promotion = {
   promoted: null,
 }
 
-async function requestPromotion(
-  id: string,
-  repoPath: string
-): Promise<{ order?: { id: string }; error?: string }> {
-  return (await invoke('foundry:signals.promote', { id, repoPaths: [repoPath] })) as {
-    order?: { id: string }
-    error?: string
-  }
+function requestPromotion(id: string, repoPath: string) {
+  return foundryInvoke('foundry:signals.promote', { id, repoPaths: [repoPath] })
 }
 
 // Promoting a signal into a draft: opened with the sensor's repository as the
@@ -64,7 +61,7 @@ export function usePromotion(sensors: readonly SensorRow[], refreshSignals: () =
   const confirmPromote = async (id: string) => {
     patchPromotion({ signalProblem: null })
     const result = await requestPromotion(id, state.repoDraft)
-    if (result.error !== undefined) {
+    if ('error' in result) {
       patchPromotion({ signalProblem: result.error })
       return
     }

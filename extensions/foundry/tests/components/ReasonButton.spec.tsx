@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { ReasonButton } from '../../src/components/ReasonButton.js'
 
 // Every Forge control that can be unavailable uses this. With a reason it stays
-// focusable (aria-disabled, not disabled), links the reason via aria-describedby,
+// focusable (aria-disabled, not disabled), titles the control with the reason,
 // and shows it inline on click instead of firing the action.
 
 describe('ReasonButton', () => {
@@ -22,12 +22,12 @@ function withAndWithoutAReasonTests() {
     const button = screen.getByRole('button', { name: 'Redraft' }) as HTMLButtonElement
     expect(button.hasAttribute('aria-disabled')).toBe(false)
     expect(button.disabled).toBe(false)
-    expect(screen.queryByRole('tooltip')).toBeNull()
+    expect(button.hasAttribute('title')).toBe(false)
     await user.click(button)
     expect(onClick).toHaveBeenCalledTimes(1)
   })
 
-  it('with a reason marks aria-disabled, describes it, and stays focusable', () => {
+  it('with a reason marks aria-disabled, titles it with the reason, and stays focusable', () => {
     render(
       <ReasonButton reason="The red team is reviewing the plan." onClick={vi.fn()}>
         Redraft
@@ -36,11 +36,7 @@ function withAndWithoutAReasonTests() {
     const button = screen.getByRole('button', { name: 'Redraft' }) as HTMLButtonElement
     expect(button.getAttribute('aria-disabled')).toBe('true')
     expect(button.disabled).toBe(false)
-    const describedBy = button.getAttribute('aria-describedby')
-    expect(describedBy).toBeTruthy()
-    const tip = screen.getByRole('tooltip')
-    expect(tip.getAttribute('id')).toBe(describedBy)
-    expect(tip.textContent).toBe('The red team is reviewing the plan.')
+    expect(button.getAttribute('title')).toBe('The red team is reviewing the plan.')
   })
 }
 

@@ -10,9 +10,8 @@ import type {
 } from '../runtime/supervised-runner.js'
 import { agentTitle } from '../runtime/agent-title.js'
 import { decideTool } from '../runtime/tool-decision.js'
-import { modeFor } from '../runtime/permission-mode.js'
-import { denyRules } from '../runtime/deny-rules.js'
-import { isProbedCommand } from '../runtime/agent-policy.js'
+import { roleSettings } from '../runtime/role-settings.js'
+import { probedCommands } from '../runtime/agent-policy.js'
 import { runtime, strandedAgents } from '../runtime/runtime-state.js'
 import { notePending, noteResolved } from '../runtime/held-calls.js'
 import { readOnlyTools, autonomyFor, letAutoModeDecide, modelForTier } from '../state/settings.js'
@@ -101,8 +100,7 @@ function startOptions(launch: NodeLaunch, turn: NodeTurn): StartSupervisedRunOpt
     model: modelForTier(context.api, input.modelTier),
     effort: input.effort ?? undefined,
     addDirs: addDirsFor(input),
-    mode: permissionModeOf(launch),
-    denyRules: denyRules({ skillsMount: input.skillsMount, mayUseTool: input.mayUseTool }),
+    ...settingsOf(launch),
     autoDecide: toolDecisionFor(launch),
     onPending: (pending) => onPending(context, pending),
     onResolved: (requestId, outcome) => recordResolution(context, turn, { requestId, outcome }),
@@ -122,42 +120,37 @@ function addDirsFor(input: NodeInput): string[] | undefined {
   return dirs.length === 0 ? undefined : dirs
 }
 
-/** `auto` only for a role free to write anywhere in its checkout; see `modeFor`. */
-function permissionModeOf({ context, input }: NodeLaunch): StartSupervisedRunOptions['mode'] {
-  const { api } = context
-  return modeFor({
+/** The role's permission mode and Claude settings; see `roleSettings`. */
+function settingsOf({
+  context,
+  input,
+  checkout,
+}: NodeLaunch): Pick<StartSupervisedRunOptions, 'mode' | 'settings'> {
+  const { api, order } = context
+  const { permissionMode, settings } = roleSettings({
     readOnly: input.readOnly,
     docsOnly: input.docsOnly === true,
     restrictedWrites: input.outputPath != null || input.outputsDir != null,
     autonomy: autonomyFor(api),
     letModeDecide: letAutoModeDecide(api),
+    outputPath: input.outputPath ?? null,
+    outputsDir: input.outputsDir ?? null,
+    skillsMount: input.skillsMount,
+    mayUseTool: input.mayUseTool,
+    probedCommands: probedCommands(order),
+    readOnlyTools: readOnlyTools(api, checkout.origin),
   })
+  return { mode: permissionMode, settings }
 }
 
-// The tool policy's own decision, composed and tested in `runtime/tool-decision.ts`: the
-// whole-role read-only gate, then the role's declared write paths, so a writer that
-// strays from them is refused rather than reminded.
-function toolDecisionFor({
-  context,
-  input,
-  checkout,
-}: NodeLaunch): StartSupervisedRunOptions['autoDecide'] {
-  const { api, order } = context
+// What Claude's settings leave to Foundry, decided in `runtime/tool-decision.ts`.
+function toolDecisionFor({ context, input }: NodeLaunch): StartSupervisedRunOptions['autoDecide'] {
   return (tool, toolInput) =>
     decideTool({
       tool,
       input: toolInput,
-      readOnly: input.readOnly,
-      role: input.role,
-      mayUseTool: input.mayUseTool,
-      docsOnly: input.docsOnly,
-      isProbed: (name, given) => isProbedCommand(order, name, given),
-      readOnlyTools: readOnlyTools(api, checkout.origin),
-      autonomy: autonomyFor(api),
-      worktreePath: checkout.path,
-      outputPath: input.outputPath ?? null,
+      autonomy: autonomyFor(context.api),
       outputsDir: input.outputsDir ?? null,
-      skillsMount: input.skillsMount,
     })
 }
 
@@ -175,11 +168,7 @@ function onPending(context: RunContext, pending: PendingCall): void {
   // prompt somebody answered for it.
   strandedAgents.delete(pending.sessionId)
   announceLive(context.order.id)
-  notePending(
-    context.api,
-    { ...pending, featureDir: context.featureDir },
-    { id: context.order.id, root: context.root }
-  )
+  notePending(context.api, { ...pending, featureDir: context.featureDir })
 }
 
 function recordResolution(

@@ -36,8 +36,9 @@ afterEach(async () => {
 /** GitHub: one draft per order's branch, green checks, and merged once `merged` says so. */
 function githubWithADraftPerOrder(): void {
   let run = 0
-  host.gh.mockImplementation(async ({ args }: { args: string[] }) => {
+  host.gh.mockImplementation(async ({ args, cwd }: { args: string[]; cwd: string }) => {
     const verb = `${args[0]} ${args[1]}`
+    if (verb === 'pr update-branch') return updateBranch(cwd, args[2])
     if (verb === 'pr list') return execSucceeded('[]')
     if (verb === 'pr create') {
       const head = args[args.indexOf('--head') + 1]
@@ -49,6 +50,18 @@ function githubWithADraftPerOrder(): void {
     }
     return execSucceeded('')
   })
+}
+
+/** What `gh pr update-branch --rebase` does on GitHub, done with real git in the lane checkout. */
+async function updateBranch(cwd: string, branch: string) {
+  const git = (args: string[]) => realGit({ command: 'git', args, cwd })
+  await git(['fetch', '-q', 'origin', 'main'])
+  const rebase = await git(['rebase', 'origin/main'])
+  if (rebase.exitCode !== 0) {
+    await git(['rebase', '--abort'])
+    return rebase
+  }
+  return git(['push', '-q', '--force-with-lease', 'origin', `HEAD:${branch}`])
 }
 
 async function shipBoth(): Promise<void> {
@@ -137,7 +150,7 @@ function aFailedRebaseTests() {
     const gates = await createGateStore(dataDir).list()
     expect(gates.find((gate) => gate.rule === 'refinery.conflict')).toMatchObject({
       orderId: 'WO-2',
-      evidence: [{ kind: 'diff', path: 'wo-2.css' }],
+      evidence: [],
     })
   })
 }

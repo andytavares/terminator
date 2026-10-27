@@ -50,6 +50,27 @@ describe('stopping the sensor tick', () => {
     releaseRead()
     await expect(stopped).resolves.toBeUndefined()
   })
+})
+
+describe('overlapping sensor ticks', () => {
+  it('skips a tick while the previous one is still running', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    const { dataDir, host, releaseRead } = tickOverHeldTracker()
+    await createSignalStore(dataDir).setSensorState('tracker-query', {
+      enabled: true,
+      repoPath: '/repos/app',
+      lastRunAt: null,
+    })
+
+    await vi.advanceTimersByTimeAsync(60_000)
+    await eventually(() => expect(host.issues.listMine).toHaveBeenCalledTimes(1))
+    await vi.advanceTimersByTimeAsync(60_000)
+    await vi.advanceTimersByTimeAsync(60_000)
+    releaseRead()
+    await stopSensorTick()
+
+    expect(host.issues.listMine).toHaveBeenCalledTimes(1)
+  })
 
   it('has run nothing, once it settles, while every sensor is off', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })

@@ -1,9 +1,11 @@
-import * as fs from 'node:fs'
-import * as path from 'node:path'
-import { orderDir } from '../data-root.js'
 import { brief } from '../line/brief.js'
 import { compileOrder } from '../order/compile.js'
-import { parseProposal, applyProposal, PROPOSAL_FILE, ProposalRejected } from '../order/proposal.js'
+import {
+  parseProposal,
+  applyProposal,
+  proposalJsonSchema,
+  ProposalRejected,
+} from '../order/proposal.js'
 import { resolveFindings, settleFindings } from './red-team.js'
 import { decideConfidentQuestions, dismissConfidentFindings } from './autonomy.js'
 import { EVIDENCE_KINDS, LANE_ROLES, RISK_TRIGGERS } from '../order/schema.js'
@@ -21,16 +23,14 @@ import type { ResolveSources } from '../recipe/resolve.js'
 //
 // It runs read-only. Intake changes no code, so the architect gets no write
 // list and the `PreToolUse` hook refuses its edits; the one thing it writes is
-// a proposal, through a file, which is validated before any of it reaches the
-// order. An agent that could write the order directly could set `status` and
+// a proposal, as Claude's structured output, which is validated before any of
+// it reaches the order. An agent that could write the order directly could set `status` and
 // agree its own work.
 
-/** What the architect is told to produce, and where to put it. */
-function outputContract(file: string, order: WorkOrder): string {
+/** What the architect is told about its answer; the JSON Schema itself travels as the output format. */
+function outputContract(order: WorkOrder): string {
   return [
-    ...contractHead(file),
-    ...exampleIntentAndUnits(),
-    ...exampleLanesAndRest(order),
+    ...contractHead(order),
     ...verifyKinds(),
     ...interfaceFlag(),
     ...closedLabels(),
@@ -41,88 +41,23 @@ function outputContract(file: string, order: WorkOrder): string {
   ].join('\n')
 }
 
-/** Where the proposal goes, and what it may hold. */
-function contractHead(file: string): string[] {
+/** Where the answer goes, and how partial it may be. */
+function contractHead(order: WorkOrder): string[] {
+  const branch = order.plan.lanes.find((l) => l.branch !== '')?.branch ?? ''
   return [
     '',
     '---',
     '',
-    '## What to write, and where',
+    '## How to answer',
     '',
-    `Write a single JSON object to \`${file}\`. Nothing else you do counts.`,
-    '',
-    'It may contain only these keys, and every one of them is optional — omit',
-    'what you are not changing rather than restating it. Inside `intent`, `risk`',
-    'and `plan` the same holds key by key, but a list you send replaces that list',
-    'whole — send every unit, not just the new one:',
-    '',
-  ]
-}
-
-/** The example proposal, down to its units. */
-function exampleIntentAndUnits(): string[] {
-  return [
-    '```json',
-    '{',
-    '  "intent":   { "problem": "…", "outcome": "…", "nonGoals": ["…"] },',
-    '  "acceptance": [',
-    '    {',
-    '      "id": "AC-1",',
-    '      "statement": "a statement that can be false",',
-    '      "priority": "P0 | P1 | P2",',
-    '      "verify": { "kind": "test", "command": "…", "assert": "exit_code == 0" },',
-    '      "unverifiable": null',
-    '    }',
-    '  ],',
-    '  "risk":     { "grade": "P0|P1|P2|P3", "triggers": [], "blastRadius": ["src/"], "criticalPaths": [] },',
-    ...exampleUnits(),
-  ]
-}
-
-/** The example's plan, down to its one unit. */
-function exampleUnits(): string[] {
-  return [
-    '  "plan": {',
-    '    "units": [',
-    '      {',
-    '        "id": "U-1",',
-    '        "title": "…",',
-    '        "role": "builder",',
-    '        "lane": 1,',
-    '        "dependsOn": [],',
-    '        "satisfies": ["AC-1"],',
-    '        "touches": ["src/…"],',
-    '        "touchesInterface": false,',
-    '        "verify": [{ "kind": "command", "command": "…", "assert": "exit_code == 0" }]',
-    '      }',
-    '    ],',
-  ]
-}
-
-/** The example proposal, from its lanes to its note. */
-function exampleLanesAndRest(order: WorkOrder): string[] {
-  return [
-    '    "lanes": [',
-    `      { "ord": 1, "repo": "…", "branch": ${JSON.stringify(
-      order.plan.lanes.find((l) => l.branch !== '')?.branch ?? ''
-    )}, "role": null, "blocks": [], "blockedBy": [] }`,
-    '    ],',
-    '    "sharedFiles": []',
-    '  },',
-    '  "findings": {',
-    '    "entryPoints": ["src/…"],',
-    '    "conventions": ["what the surrounding code does, in a sentence"],',
-    '    "priorArt": ["commit or file, and what it did"]',
-    '  },',
-    '  "assumptions":   [{ "id": "A-1", "text": "…", "struck": false, "affects": [] }],',
-    '  "openQuestions": [',
-    '    { "id": "Q-1", "text": "…", "why": "…", "options": ["…"], "multiple": false, "recommended": 0, "answer": null, "rank": 1, "confidence": 0.6 }',
-    '  ],',
-    '  "dismissFindings": [{ "id": "RT-…", "reason": "why it does not apply here", "confidence": 0.95 }],',
-    '  "resolveFindings": [{ "id": "RT-…", "how": "what you changed so it no longer holds, in one line" }],',
-    '  "note": "what you changed, in one line"',
-    '}',
-    '```',
+    'Your answer is the structured output: the proposal, in the JSON Schema you',
+    'were given. Nothing else you do counts. Every key is optional — omit what you',
+    'are not changing rather than restating it. Inside `intent`, `risk` and `plan`',
+    'the same holds key by key. In `acceptance` and `plan.units`, send only the',
+    'items you add or change: an item with a known `id` replaces that item, and a',
+    'new `id` adds one; to drop one, name its `id` in `remove.acceptance` or',
+    '`remove.units`. Every other list you send replaces that list whole.',
+    ...(branch === '' ? [] : [`The lane branch to keep is ${JSON.stringify(branch)}.`]),
     '',
   ]
 }
@@ -295,10 +230,8 @@ function amendment(order: WorkOrder): string[] {
     'assumptions and resolves findings between turns, and what you can see is',
     'after all of that. It is the record; your memory of the last turn is not.',
     '',
-    'There is no proposal file left to read: the one you wrote last turn was',
-    'consumed when it was applied. So do not go looking for it, and do not',
-    'reconstruct from `order.json` or from the ledger anything already printed',
-    'above. Read the repository only for what the order does not tell you.',
+    'Do not reconstruct from `order.json` or from the ledger anything already',
+    'printed above. Read the repository only for what the order does not tell you.',
     '',
     'Change what the failing checks and the operator name, and leave the rest',
     'alone. Send only the keys you changed — every key is optional, and one',
@@ -317,8 +250,8 @@ export interface ConvergeInput {
 
 export interface ConvergeBrief {
   readonly prompt: string
-  /** The file the agent writes, absolute. Read back and validated. */
-  readonly proposalPath: string
+  /** The JSON Schema of the agent's answer, which Claude holds it to. */
+  readonly outputSchema: object
   readonly role: Role
   /** Where the agent runs. Intake reads the repository; it changes nothing. */
   readonly cwd: string
@@ -366,7 +299,6 @@ export function convergeBrief(input: ConvergeInput): ConvergeBrief {
   const resolved = resolveRole('architect', input.sources)
   if (!resolved.ok) throw new NoArchitectError(resolved.reason)
 
-  const proposalPath = path.join(orderDir(input.root, input.order.id), PROPOSAL_FILE)
   const body = brief({
     order: input.order,
     role: resolved.resolved.value,
@@ -380,13 +312,8 @@ export function convergeBrief(input: ConvergeInput): ConvergeBrief {
       : ['', '---', '', '## What the operator just said', '', input.message.trim()]
 
   return {
-    prompt: [
-      body,
-      ...amendment(input.order),
-      ...typed,
-      outputContract(proposalPath, input.order),
-    ].join('\n'),
-    proposalPath,
+    prompt: [body, ...amendment(input.order), ...typed, outputContract(input.order)].join('\n'),
+    outputSchema: proposalJsonSchema(),
     role: resolved.resolved.value,
     // The repository itself, not a worktree: intake reads and changes nothing,
     // and cutting a checkout for it would be creating a branch for a plan that
@@ -395,10 +322,14 @@ export function convergeBrief(input: ConvergeInput): ConvergeBrief {
   }
 }
 
-/** What the architect wrote, merged into the order and its findings settled, or why not. */
-function mergeProposal(order: WorkOrder, raw: string, at: string): ConvergeResult {
+/** What the architect answered, merged into the order and its findings settled, or why not. */
+export function applyArchitectAnswer(
+  order: WorkOrder,
+  answer: unknown,
+  at: string
+): ConvergeResult {
   try {
-    const proposal = parseProposal(JSON.parse(raw))
+    const proposal = parseProposal(answer)
     const applied = dismissConfidentFindings(
       applyProposal(order, proposal, at),
       proposal.dismissFindings ?? []
@@ -422,29 +353,3 @@ function mergeProposal(order: WorkOrder, raw: string, at: string): ConvergeResul
 export type ConvergeResult =
   | { ok: true; order: WorkOrder; note: string }
   | { ok: false; reason: string }
-
-/**
- * Read back what the agent proposed and merge it, or refuse it.
- *
- * The file is removed once read, whatever happened: a stale proposal from a
- * previous turn read as this turn's answer is the failure mode that makes a
- * redraft look like it worked.
- */
-export function readProposal(order: WorkOrder, proposalPath: string, at: string): ConvergeResult {
-  let raw: string
-  try {
-    raw = fs.readFileSync(proposalPath, 'utf8')
-  } catch {
-    return { ok: false, reason: 'the architect wrote no proposal' }
-  }
-
-  try {
-    return mergeProposal(order, raw, at)
-  } finally {
-    try {
-      fs.unlinkSync(proposalPath)
-    } catch {
-      // Already gone, or never there. Either way there is nothing to clear.
-    }
-  }
-}

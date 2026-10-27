@@ -11,6 +11,10 @@ function mergeOne(existing: Signal, items: readonly SensedItem[], now: string): 
   const evidence = [...existing.evidence, ...newEvidence]
   const occurrences = evidence.length
 
+  if (existing.status === 'resolved') {
+    return { ...existing, evidence, occurrences, lastSeen: now, status: 'open' }
+  }
+
   if (existing.status === 'dismissed') {
     const threshold = Math.ceil((existing.dismissedAt ?? 0) * 1.5)
     if (occurrences >= threshold) {
@@ -34,6 +38,8 @@ export interface Sweep {
   readonly items: readonly SensedItem[]
   readonly now: string
   readonly newId: () => string
+  /** Keys whose cause is gone; an open signal under one is closed. */
+  readonly resolvedKeys?: readonly string[]
 }
 
 type SensorOf = { id: string; severity: Severity }
@@ -41,7 +47,11 @@ type SensorOf = { id: string; severity: Severity }
 export function mergeSensed(existing: readonly Signal[], sensor: SensorOf, sweep: Sweep): Signal[] {
   const byKey = groupByKey(sweep.items)
   const ours = (signal: Signal): boolean => signal.sensorId === sensor.id
+  const resolved = new Set(sweep.resolvedKeys ?? [])
   const merged = existing.map((signal) => {
+    if (ours(signal) && signal.status === 'open' && resolved.has(signal.key)) {
+      return { ...signal, status: 'resolved' as const }
+    }
     const group = ours(signal) ? byKey.get(signal.key) : undefined
     return group === undefined ? signal : mergeOne(signal, group, sweep.now)
   })

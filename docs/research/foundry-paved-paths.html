@@ -1,0 +1,1574 @@
+<title>Foundry on Paved Paths</title>
+<meta name="claude:viewport-fit-sides" content="cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+/>
+<style>
+  /* Layout: one reading column, wide tables scroll in place; verdicts are chips so the inventory scans. */
+  :root {
+    --bg: #f6f7f8;
+    --surface: #ffffff;
+    --fg: #1b2129;
+    --muted: #5b6573;
+    --rule: #d9dee4;
+    --accent: #0f6e78;
+    --accent-soft: #e2f1f2;
+    --replace: #8a5a00;
+    --replace-bg: #fbf0d9;
+    --delete: #a12f2f;
+    --delete-bg: #f9e2e0;
+    --keep: #24683a;
+    --keep-bg: #e1f1e5;
+    --code-bg: #eef1f4;
+    --display: 'Newsreader', Georgia, 'Times New Roman', serif;
+    --body: 'Public Sans', -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --bg: #12161b;
+      --surface: #1a2027;
+      --fg: #e3e8ee;
+      --muted: #9aa5b1;
+      --rule: #2d353f;
+      --accent: #5cc3cc;
+      --accent-soft: #163236;
+      --replace: #f0c46a;
+      --replace-bg: #3a2e14;
+      --delete: #f19a92;
+      --delete-bg: #3d1d1b;
+      --keep: #8fd6a2;
+      --keep-bg: #18321f;
+      --code-bg: #222a33;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme='dark'] {
+    --bg: #12161b;
+    --surface: #1a2027;
+    --fg: #e3e8ee;
+    --muted: #9aa5b1;
+    --rule: #2d353f;
+    --accent: #5cc3cc;
+    --accent-soft: #163236;
+    --replace: #f0c46a;
+    --replace-bg: #3a2e14;
+    --delete: #f19a92;
+    --delete-bg: #3d1d1b;
+    --keep: #8fd6a2;
+    --keep-bg: #18321f;
+    --code-bg: #222a33;
+    color-scheme: dark;
+  }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 400 15.5px/1.6 var(--body);
+  }
+  .page {
+    max-width: 880px;
+    margin: 0 auto;
+    padding-block: 40px 80px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  header {
+    display: grid;
+    gap: 10px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 8px;
+  }
+  .eyebrow {
+    font: 500 12px/1 var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  h1 {
+    font: 600 42px/1.1 var(--display);
+    margin: 0;
+    text-wrap: balance;
+  }
+  .lede {
+    color: var(--muted);
+    font-size: 17px;
+    margin: 0;
+    max-width: 62ch;
+  }
+  .meta {
+    font: 400 12.5px/1.5 var(--mono);
+    color: var(--muted);
+  }
+  h2 {
+    font: 600 27px/1.2 var(--display);
+    margin: 48px 0 12px;
+    text-wrap: balance;
+  }
+  h3 {
+    font: 600 16px/1.3 var(--body);
+    margin: 28px 0 8px;
+  }
+  p,
+  li {
+    max-width: 68ch;
+  }
+  ul,
+  ol {
+    padding-left: 22px;
+    display: grid;
+    gap: 4px;
+  }
+  code {
+    font: 400 13px/1.4 var(--mono);
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    overflow-wrap: anywhere;
+  }
+  a {
+    color: var(--accent);
+    text-underline-offset: 2px;
+  }
+  a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .scroll {
+    overflow-x: auto;
+    margin: 12px 0;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13.5px;
+  }
+  th,
+  td {
+    text-align: left;
+    vertical-align: top;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--rule);
+  }
+  th {
+    font: 500 11.5px/1.3 var(--mono);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg);
+  }
+  tr:last-child td {
+    border-bottom: 0;
+  }
+  td.num {
+    font-variant-numeric: tabular-nums;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    white-space: nowrap;
+  }
+  .chip {
+    display: inline-block;
+    font: 500 11px/1 var(--mono);
+    letter-spacing: 0.05em;
+    padding: 4px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .chip.replace {
+    color: var(--replace);
+    background: var(--replace-bg);
+  }
+  .chip.delete {
+    color: var(--delete);
+    background: var(--delete-bg);
+  }
+  .chip.keep {
+    color: var(--keep);
+    background: var(--keep-bg);
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 14px;
+    display: grid;
+    gap: 4px;
+  }
+  .stat b {
+    font: 600 26px/1 var(--display);
+    font-variant-numeric: tabular-nums;
+  }
+  .stat span {
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 12px 16px;
+    border-radius: 0 6px 6px 0;
+    margin: 16px 0;
+  }
+  .callout p {
+    margin: 0;
+  }
+  .cmd {
+    font: 400 12px/1.5 var(--mono);
+    color: var(--muted);
+  }
+  pre.mermaid {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 12px;
+    overflow-x: auto;
+  }
+  .option {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 4px 18px 12px;
+    margin: 12px 0;
+  }
+  .option.chosen {
+    border-color: var(--accent);
+  }
+  .phase {
+    display: grid;
+    gap: 0;
+  }
+  details {
+    border-top: 1px solid var(--rule);
+    padding: 10px 0;
+  }
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+  @media (max-width: 520px) {
+    h1 {
+      font-size: 32px;
+    }
+    h2 {
+      font-size: 23px;
+    }
+  }
+</style>
+
+<div class="page">
+  <header>
+    <div class="eyebrow">Design document · Foundry audit</div>
+    <h1>Foundry on Paved Paths</h1>
+    <p class="lede">
+      Foundry rebuilt the agent harness it runs on. This document lists each custom mechanism, the
+      paved path that already does the job, and the order to move over in.
+    </p>
+    <div class="meta">
+      2026-10-27 · base <code>main@45c182c9</code> · scope <code>extensions/foundry</code> +
+      <code>src/main/agents/acp</code>
+    </div>
+  </header>
+
+  <h2>Context and problem</h2>
+  <p>
+    Foundry turns a tracker issue into a draft pull request. The Forge shapes a work order with a
+    scout, an architect and a red team; the Line runs agents in git worktrees, checks their work and
+    opens the PR. It is about 50,000 lines of TypeScript with seven dependencies. Most of those
+    lines rebuild what Claude Code, the Claude Agent SDK, git, GitHub and the app's own SDK already
+    do. The rebuilt parts fail where the originals do not. Today one order sat on "drafting the
+    plan" for over eight minutes although the architect had written the plan in 56 seconds, and the
+    base-branch check opened about 40 macOS crash dialogs. Both failures trace to custom code in the
+    path of a paved one.
+  </p>
+
+  <div class="stats">
+    <div class="stat">
+      <b>49,804</b><span>lines in <code>src/</code>, excluding tests</span>
+    </div>
+    <div class="stat"><b>192 / 612</b><span>Foundry commits that are fixes (31%)</span></div>
+    <div class="stat"><b>51 / 136</b><span>ADRs that mention Foundry</span></div>
+    <div class="stat">
+      <b>~12,000</b><span>lines this plan deletes outright; ~4,300 more are rewritten</span>
+    </div>
+  </div>
+  <p class="cmd">
+    find extensions/foundry/src -name '*.ts*' ! -name '*.test.*' -exec cat {} + | wc -l · git log
+    --oneline -- extensions/foundry | grep -ciE '^[0-9a-f]+ fix' · rg -l -i foundry docs/adr | wc
+    -l. Deleted outright: hall 9,225 + shell policy 1,465 + transcript tailing 415 + stores 399 +
+    recipes 284 + usePushed 109 + restack 69 + ipc register 45 = 12,011. Rewritten, not deleted:
+    intake state 2,474, proposal contract 678, permission bridge 552, baseline 446, waves 135.
+  </p>
+
+  <h2>Goals and non-goals</h2>
+  <h3>Goals</h3>
+  <ul>
+    <li>
+      Every Foundry mechanism either uses a paved path or shows in this document why none fits.
+    </li>
+    <li>
+      The agent boundary (tools, permissions, settings, output) is set by Claude Code configuration,
+      not decided call by call by Foundry code.
+    </li>
+    <li>
+      A plan draft for a small ask finishes in under three minutes, measured from
+      <code>converge.started</code> to <code>order.redrafted</code> in the ledger.
+    </li>
+    <li>No refusal ends a turn. An agent that is refused gets the reason in the same turn.</li>
+    <li>Net deletion: the Foundry source gets smaller with each phase.</li>
+  </ul>
+  <h3>Non-goals</h3>
+  <ul>
+    <li>
+      Replacing Foundry with another product. The survey below found no embeddable tool that does
+      the Forge, the gates and the supervision surface inside Terminator.
+    </li>
+    <li>
+      Changing Foundry rule 1 ("nothing is written into a target repository",
+      <code>extensions/foundry/CLAUDE.md</code>). Several paved paths are rejected for breaking it,
+      and that is stated where it happens.
+    </li>
+    <li>
+      Changing the order model (<code>order/schema.ts</code>). It is already Zod, the paved path.
+    </li>
+  </ul>
+
+  <h2>Current state</h2>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Folder</th>
+          <th>Lines</th>
+          <th>Fix / all commits</th>
+          <th>What it does</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>components/</code></td>
+          <td class="num">10,453</td>
+          <td class="num">55 / 162</td>
+          <td>React views: Forge, Floor, Inbox, Ledger, plus the factory hall components</td>
+        </tr>
+        <tr>
+          <td><code>line/</code></td>
+          <td class="num">9,397</td>
+          <td class="num">59 / 159</td>
+          <td>Run graph, waves, worktrees, checks, PR, CI rounds, refinery</td>
+        </tr>
+        <tr>
+          <td><code>factory/</code></td>
+          <td class="num">6,542</td>
+          <td class="num">12 / 53</td>
+          <td>Animated canvas "hall" scene and its simulator</td>
+        </tr>
+        <tr>
+          <td><code>runtime/</code></td>
+          <td class="num">5,129</td>
+          <td class="num">45 / 117</td>
+          <td>Permission policy, shell splitter, supervision, stall watch, transcript tailing</td>
+        </tr>
+        <tr>
+          <td><code>forge/</code></td>
+          <td class="num">4,803</td>
+          <td class="num">26 / 81</td>
+          <td>Intake, converge loop, red team, readiness</td>
+        </tr>
+        <tr>
+          <td><code>ipc/</code></td>
+          <td class="num">4,173</td>
+          <td class="num">24 / 101</td>
+          <td>Channel registration and handlers</td>
+        </tr>
+        <tr>
+          <td><code>order/</code></td>
+          <td class="num">2,262</td>
+          <td class="num">22 / 65</td>
+          <td>Order schema, store, compile checks, standing</td>
+        </tr>
+        <tr>
+          <td>other 11 folders</td>
+          <td class="num">7,045</td>
+          <td class="num">—</td>
+          <td>
+            verify, gates, recipe, profile, sensors, state, ledger, trackers, home, renderer, types
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="cmd">
+    Per folder: find src/$d -name '*.ts*' ! -name '*.test.*' -exec cat {} + | wc -l; git log
+    --oneline -- src/$d | grep -ciE '^[0-9a-f]+ fix'
+  </p>
+
+  <h3>Today's two failures, traced</h3>
+  <pre class="mermaid">
+sequenceDiagram
+  participant F as Foundry
+  participant A as ACP adapter
+  participant C as Claude (architect)
+  F->>A: start, no tools list, user settings loaded
+  C->>C: writes proposal.json (56 s)
+  C->>A: Bash: python3 -m json.tool proposal.json
+  A->>F: request_permission
+  F->>F: read-only policy refuses
+  F->>A: reject_once, then session/cancel
+  A->>C: "[Request interrupted by user]"
+  F->>A: prompt with the reason
+  Note over A,F: v0.1.169 drops this prompt (fixed in PR #320)
+  Note over F: cancelled turn fires neither onTurnEnd nor onEnd, so proposal.json stays unread
+  F->>F: 8 min later: run.stalled; Forge still says "drafting the plan"
+</pre
+  >
+  <ul>
+    <li>
+      <b>Plan draft.</b> The architect is declared
+      <code>tools: [read, search]</code> (<code>roles/architect.yaml:7</code>), but
+      <code>claudeOptions</code> never passes a tools list
+      (<code>runtime/supervised-runner.ts:408-424</code>), so it has Bash. It used Bash to check its
+      own JSON. Foundry refused, cancelled the turn, and lost the follow-up prompt. A cancelled turn
+      skips <code>turnEnded</code> (<code>supervised-runner.ts:509</code>).
+      <code>collectProposal</code> runs on turn end or session end
+      (<code>forge/intake-turn.ts:216-217</code>), and a cancelled turn is neither: the session
+      stays open, so the finished plan stayed unread on disk until something ends the session.
+      Transcript:
+      <code
+        >~/.claude/projects/-Users-atavares-repos-orders-WO-1027-55c-worktrees-terminator/e0780680-….jsonl</code
+      >.
+    </li>
+    <li>
+      <b>Crash dialogs.</b> The base-branch check ran <code>npm run test:e2e</code> without the
+      one-time Electron install that CI does (<code>.github/workflows/ci.yml:390</code>). Five
+      Playwright workers unpacked Electron over each other. The fix (PR #321) is in the repository;
+      the lesson is that running script names out of their CI context loses setup.
+    </li>
+  </ul>
+
+  <h3>Plan-draft time across every recorded order</h3>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Order</th>
+          <th>Each architect turn</th>
+          <th>Seed to agreed</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>WO-0907-3c1</code></td>
+          <td class="num">541 s refused (enum), 133 s, 144 s</td>
+          <td class="num">691.7 min</td>
+        </tr>
+        <tr>
+          <td><code>WO-0909-30a</code></td>
+          <td class="num">501 s, 121 s</td>
+          <td class="num">19.5 min</td>
+        </tr>
+        <tr>
+          <td><code>WO-1006-6b5</code></td>
+          <td class="num">45 s, 62 s</td>
+          <td class="num">13.8 min</td>
+        </tr>
+        <tr>
+          <td><code>WO-1008-58d</code></td>
+          <td class="num">71 s, 34 s, 35 s</td>
+          <td class="num">3.7 min</td>
+        </tr>
+        <tr>
+          <td><code>WO-1014-8ea</code></td>
+          <td class="num">81 s</td>
+          <td class="num">2.1 min</td>
+        </tr>
+        <tr>
+          <td><code>WO-1014-e51</code></td>
+          <td class="num">120 s</td>
+          <td class="num">2.6 min</td>
+        </tr>
+        <tr>
+          <td><code>WO-1027-55c</code></td>
+          <td class="num">plan written in 56 s, never collected</td>
+          <td class="num">—</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="cmd">
+    python3 scratchpad/converge_timing.py over /Users/atavares/repos/orders/*/ledger.jsonl:
+    converge.started to the next order.redrafted, converge.refused or order.cancelled. A good turn
+    takes 34–144 s. The time goes to refusals, follow-up turns and lost turns, not to drafting.
+  </p>
+
+  <h2>Inventory: each mechanism against its paved path</h2>
+  <p>
+    Each row cites the doc that shows the paved path does the job.
+    <span class="chip replace">REPLACE</span> means move to the paved path,
+    <span class="chip delete">DELETE</span> means nothing should do this job, and
+    <span class="chip keep">KEEP</span> carries the reason no paved path fits.
+  </p>
+
+  <h3>Agent boundary (runtime/)</h3>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Mechanism</th>
+          <th>Lines · fixes</th>
+          <th>Paved path</th>
+          <th>Verdict</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            Shell policy: <code>shell-split.ts</code>, <code>read-only-policy.ts</code>,
+            <code>autonomy-policy.ts</code>, <code>tool-decision.ts</code>
+          </td>
+          <td class="num">1,465 · 24</td>
+          <td>
+            Claude Code permission rules apply "when any subcommand matches them, including a
+            command nested inside a subshell, a command substitution, or a control-flow body";
+            built-in read-only set; <code>dontAsk</code> "auto-denies every call that would
+            otherwise prompt"; OS sandbox limits writes to the working and added directories (<a
+              href="https://code.claude.com/docs/en/permissions"
+              >permissions</a
+            >, <a href="https://code.claude.com/docs/en/sandboxing">sandboxing</a>)
+          </td>
+          <td><span class="chip replace">REPLACE</span></td>
+        </tr>
+        <tr>
+          <td>Role <code>tools:</code> in <code>roles/*.yaml</code>, never passed</td>
+          <td class="num">222 · 10</td>
+          <td>
+            SDK <code>tools</code> / <code>disallowedTools</code>, "Array of allowed tool names" (<a
+              href="https://code.claude.com/docs/en/agent-sdk/subagents"
+              >subagents</a
+            >)
+          </td>
+          <td><span class="chip replace">REPLACE</span></td>
+        </tr>
+        <tr>
+          <td>
+            Refuse, cancel, resend reason: <code>permission-bridge.ts</code>,
+            <code>tellWhyRefused</code>, resend counters in <code>agent-service.ts</code>
+          </td>
+          <td class="num">392 + ~60 · 12</td>
+          <td>
+            <code>PreToolUse</code> hook deny "blocks the tool call, and shows Claude the reason"
+            (<a href="https://code.claude.com/docs/en/hooks">hooks</a>). ADR 130 confirmed such a
+            hook fires under ACP. The adapter's own reject does not interrupt
+            (<code>claude-agent-acp/dist/permissions/effects.js:19</code>)
+          </td>
+          <td><span class="chip replace">REPLACE</span></td>
+        </tr>
+        <tr>
+          <td>Five-minute hold (<code>DEFAULT_ASK_AFTER_MS</code>)</td>
+          <td class="num">in bridge</td>
+          <td><code>dontAsk</code> refuses at once; a real ask stays a real ask in the Inbox</td>
+          <td><span class="chip delete">DELETE</span></td>
+        </tr>
+        <tr>
+          <td>
+            Question handling (<code>questionSummary</code>, <code>held-calls.ts:49-66</code>)
+          </td>
+          <td class="num">~90</td>
+          <td>
+            Dead: the core starts agents with
+            <code>clientCapabilities: {}</code> (<code>agent-service.ts:346</code>), so the adapter
+            disallows <code>AskUserQuestion</code>
+          </td>
+          <td><span class="chip delete">DELETE</span></td>
+        </tr>
+        <tr>
+          <td>Inherited operator setup</td>
+          <td class="num">—</td>
+          <td>
+            The adapter loads <code>settingSources: ["user","project","local"]</code> by default
+            (<code>acp-agent.js:7320</code>), so agents get the operator's CLAUDE.md, hooks and MCP
+            tools. Pass <code>settingSources: ['project']</code>
+          </td>
+          <td><span class="chip replace">REPLACE</span></td>
+        </tr>
+        <tr>
+          <td>
+            Transcript tailing: <code>transcript-tailer.ts</code>,
+            <code>transcript-excerpt.ts</code>, <code>end-session.ts</code>
+          </td>
+          <td class="num">415 · 8</td>
+          <td>
+            ACP <code>tool_call</code> / <code>tool_call_update</code> events, already exposed as
+            <code>api.agents.onUpdate</code> (<a
+              href="https://agentclientprotocol.com/protocol/tool-calls"
+              >ACP tool calls</a
+            >); <code>api.agents.onEnd</code>
+          </td>
+          <td><span class="chip replace">REPLACE</span></td>
+        </tr>
+        <tr>
+          <td>Stall rule <code>evaluate-stall.ts</code></td>
+          <td class="num">117 · 3</td>
+          <td>None: Claude Code's idle notification fires only after a turn ends</td>
+          <td><span class="chip keep">KEEP</span> feed it <code>onUpdate</code></td>
+        </tr>
+        <tr>
+          <td><code>permission-mode.ts</code>, <code>deny-rules.ts</code></td>
+          <td class="num">71 · 1</td>
+          <td>Already the paved path (modes, <code>disallowedTools</code>)</td>
+          <td><span class="chip keep">KEEP</span> extend</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Forge and order</h3>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Mechanism</th>
+          <th>Lines · fixes</th>
+          <th>Paved path</th>
+          <th>Verdict</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            Proposal file plus about 200 lines of schema prose in the prompt:
+            <code>forge/converge.ts</code>, <code>order/proposal.ts</code>,
+            <code>retryForRefusal</code>
+          </td>
+          <td class="num">678 · 14</td>
+          <td>
+            SDK structured outputs: "The result message will contain validated data in
+            <code>structured_output</code>", with built-in retries; schema from
+            <code>z.toJSONSchema</code> (<a
+              href="https://code.claude.com/docs/en/agent-sdk/structured-outputs"
+              >structured outputs</a
+            >, Context7 <code>/colinhacks/zod</code>)
+          </td>
+          <td><span class="chip replace">REPLACE</span></td>
+        </tr>
+        <tr>
+          <td>
+            Intake state rebuilt from ledger strings: <code>intake-outcome.ts</code>,
+            <code>forge-loop.ts</code>, <code>review-loop.ts</code>, inputs of
+            <code>readiness.ts</code>
+          </td>
+          <td class="num">2,474 · 26</td>
+          <td>
+            An explicit state on the order with a deadline. XState v5 <code>after</code> transitions
+            and persisted snapshots do this (Context7 <code>/statelyai/docs</code>). A plain
+            <code>intake.state</code> field with a deadline is the smaller first step
+          </td>
+          <td><span class="chip replace">REPLACE</span></td>
+        </tr>
+        <tr>
+          <td>
+            List-replace merge in
+            <code>applyProposal</code> (<code>order/proposal.ts:206-215</code>)
+          </td>
+          <td class="num">10</td>
+          <td>Merge by <code>id</code>, or require the whole document through structured output</td>
+          <td><span class="chip replace">REPLACE</span></td>
+        </tr>
+        <tr>
+          <td>
+            Recipes <code>bugfix</code>, <code>refactor</code>, <code>speckit</code>,
+            <code>direct</code>
+          </td>
+          <td class="num">284</td>
+          <td>
+            Unused: across 10 orders, 4 <code>standard</code>, 1 <code>research</code>, 1
+            <code>direct</code> (cancelled), 4 none (<code>jq -r .recipe orders/*/order.json</code
+            >). Also delete the leftover <code>SPECIFY_FEATURE</code> env
+            (<code>supervised-runner.ts:417</code>)
+          </td>
+          <td><span class="chip delete">DELETE</span></td>
+        </tr>
+        <tr>
+          <td>
+            <code>order/schema.ts</code>, <code>store.ts</code>, <code>standing.ts</code>,
+            <code>compile.ts</code>, red-team loop, recipe parser
+          </td>
+          <td class="num">~2,100</td>
+          <td>
+            Already Zod and js-yaml. The compile check and red team are Anthropic's
+            evaluator-optimizer pattern (<a
+              href="https://www.anthropic.com/engineering/building-effective-agents"
+              >Building effective agents</a
+            >)
+          </td>
+          <td><span class="chip keep">KEEP</span> domain</td>
+        </tr>
+        <tr>
+          <td>Gates (<code>src/gates/</code>)</td>
+          <td class="num">723 · 12</td>
+          <td>GitHub environment reviewers gate Actions jobs, not local agent runs</td>
+          <td><span class="chip keep">KEEP</span> product logic</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Line</h3>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Mechanism</th>
+          <th>Lines · fixes</th>
+          <th>Paved path</th>
+          <th>Verdict</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Restack (<code>line/restack.ts</code>)</td>
+          <td class="num">69 · 1</td>
+          <td>
+            <code>gh pr update-branch --rebase</code>: "Update PR branch by rebasing on top of
+            latest base branch" (<a href="https://cli.github.com/manual/gh_pr_update-branch"
+              >gh manual</a
+            >)
+          </td>
+          <td><span class="chip replace">REPLACE</span></td>
+        </tr>
+        <tr>
+          <td>
+            Worktree prune safety (<code>worktree.ts:456</code>, <code>teardown.ts:104</code>)
+          </td>
+          <td class="num">in 634 · 7</td>
+          <td>
+            <code>git worktree add --lock</code>: "keep the worktree locked after creation … without
+            a race condition" (<a href="https://git-scm.com/docs/git-worktree">git-worktree</a>)
+          </td>
+          <td><span class="chip replace">REPLACE</span></td>
+        </tr>
+        <tr>
+          <td>Wave barrier (<code>execution-waves.ts:113</code>)</td>
+          <td class="num">135</td>
+          <td>
+            Start a node when a slot frees, the p-queue model (Context7
+            <code>/sindresorhus/p-queue</code>). No new dependency needed
+          </td>
+          <td><span class="chip replace">REPLACE</span></td>
+        </tr>
+        <tr>
+          <td>Base-branch proof (<code>line/baseline.ts</code>)</td>
+          <td class="num">446 · 3</td>
+          <td>
+            The base commit's own CI result: <code>gh run list --commit &lt;sha&gt;</code> or
+            <code>GET /commits/{ref}/check-runs</code> (<a
+              href="https://docs.github.com/en/rest/commits/statuses"
+              >REST</a
+            >). Run locally only what CI did not measure, through the repository's aggregate script
+            when it has one
+          </td>
+          <td><span class="chip replace">REPLACE</span> CI first</td>
+        </tr>
+        <tr>
+          <td>
+            CI workflow parsing by regex (<code>profile/hints.ts</code>
+            <code>runLineMatching</code>)
+          </td>
+          <td class="num">in 296 · 2</td>
+          <td>
+            <code>yaml.load</code> from js-yaml, already a dependency (Context7
+            <code>/nodeca/js-yaml</code>)
+          </td>
+          <td><span class="chip replace">REPLACE</span></td>
+        </tr>
+        <tr>
+          <td>Linear status write-back (<code>trackers/write-back.ts</code> transitions)</td>
+          <td class="num">part of 326</td>
+          <td>
+            Linear's Git integration moves status from the PR and branch name. Orders already use
+            Linear's <code>branchName</code> (PR #197). The GitHub page wording is [UNVERIFIED]; the
+            GitLab page was quoted
+          </td>
+          <td><span class="chip replace">REPLACE</span></td>
+        </tr>
+        <tr>
+          <td>Worktrees per lane, lane checks, ladder, CI rounds, PR body, resume</td>
+          <td class="num">~4,500</td>
+          <td>
+            Claude Code <code>--worktree</code> writes into
+            <code>&lt;repo&gt;/.claude/worktrees</code> (rule 1) and gives one worktree per session.
+            <code>gh pr checks --watch</code> cannot be combined with <code>--json</code>.
+            <code>claude-code-action</code> needs a workflow file in the target repository. Resume
+            already uses ACP <code>loadSession</code>
+          </td>
+          <td><span class="chip keep">KEEP</span></td>
+        </tr>
+        <tr>
+          <td>Pass cache, verdict, data root</td>
+          <td class="num">323</td>
+          <td>
+            Turborepo caching needs <code>turbo.json</code> in the target repository (rule 1).
+            Verdict is the domain rule "no unevidenced pass"
+          </td>
+          <td><span class="chip keep">KEEP</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>State and UI</h3>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Mechanism</th>
+          <th>Lines · fixes</th>
+          <th>Paved path</th>
+          <th>Verdict</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            Factory hall: <code>src/factory/</code> (except <code>metrics.ts</code>,
+            <code>format.ts</code>) and <code>components/factory/</code>
+          </td>
+          <td class="num">9,225 · 20 since 09-25</td>
+          <td>
+            The Floor list view already answers "what is my order doing" from the same channels. The
+            hall adds only replay
+          </td>
+          <td><span class="chip delete">DELETE</span></td>
+        </tr>
+        <tr>
+          <td>
+            In-memory index and JSONL stores: <code>state/foundry-index.ts</code>,
+            <code>disk-source.ts</code>, <code>live-index.ts</code>, <code>ledger/append.ts</code>,
+            <code>signals.jsonl</code>
+          </td>
+          <td class="num">399</td>
+          <td>
+            The SDK's <code>api.db</code> (<code>ExtensionDB</code>,
+            <code>packages/extension-sdk/types/api.d.ts:40</code>) on <code>node:sqlite</code>, used
+            by notepad and task-vault. Transactions remove the torn-line bug
+          </td>
+          <td><span class="chip replace">REPLACE</span></td>
+        </tr>
+        <tr>
+          <td>Local UI primitives (tabs, tiles, chips, pills, empty states, tooltip)</td>
+          <td class="num">part of 4,223 CSS</td>
+          <td>
+            <code>packages/extension-ui</code> <code>Tabs</code>, <code>MetricCard</code>,
+            <code>Chip</code>, <code>StatusDot</code>, <code>EmptyState</code>,
+            <code>Popover</code>. Constitution XIII requires the design system's component
+          </td>
+          <td><span class="chip replace">REPLACE</span></td>
+        </tr>
+        <tr>
+          <td>
+            <code>reg()</code> and dispose lists (<code>ipc/register.ts</code>,
+            <code>channel.ts</code>)
+          </td>
+          <td class="num">45</td>
+          <td>
+            SDK
+            <code>createIpcRegistrar</code> (<code>packages/extension-sdk/src/index.ts:73</code>)
+          </td>
+          <td><span class="chip replace">REPLACE</span></td>
+        </tr>
+        <tr>
+          <td>
+            Untyped responses: 56 casts over 75 <code>invoke</code> calls (<code
+              >rg -o '\) as [A-Z{]'</code
+            >
+            and <code>rg -o 'invoke(&lt;[^&gt;]*&gt;)?\('</code> over <code>components</code>,
+            <code>renderer</code>)
+          </td>
+          <td class="num">—</td>
+          <td>
+            A type-only channel map over the existing <code>defineChannel</code> (ADR 096).
+            electron-trpc is rejected: it needs the core preload (Principle II)
+          </td>
+          <td><span class="chip replace">REPLACE</span></td>
+        </tr>
+        <tr>
+          <td><code>usePushed</code> reader and two 4-second signal polls</td>
+          <td class="num">109</td>
+          <td>
+            TanStack Query <code>useQuery</code> plus <code>invalidateQueries</code> (Context7
+            <code>/tanstack/query</code>). It is a new dependency, so it needs approval. Without it,
+            keep <code>usePushed</code>, add error handling, and push signals through
+            <code>announce</code>
+          </td>
+          <td><span class="chip replace">REPLACE</span> if approved</td>
+        </tr>
+        <tr>
+          <td>
+            Unheard broadcasts <code>foundry:palette-goto</code>, <code>foundry:stall-fired</code>
+          </td>
+          <td class="num">—</td>
+          <td>
+            No listener in the repository (<code>rg palette-goto</code>,
+            <code>rg stall-fired</code>)
+          </td>
+          <td><span class="chip delete">DELETE</span> or wire</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>The rest of Foundry: audited, kept</h3>
+  <p>
+    Each row was checked against a paved path. It stays because the paved path breaks rule 1, needs
+    a server or public endpoint, or does not exist.
+  </p>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Area</th>
+          <th>Lines</th>
+          <th>Paved path checked</th>
+          <th>Verdict</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>verify/</code> ladder, pass cache, verdict, inspection triggers</td>
+          <td class="num">915</td>
+          <td>
+            A GitHub Actions <code>needs:</code> graph orders checks only after a push; Turborepo
+            caching needs <code>turbo.json</code> in the repository. Fix inside: drop the duplicate
+            pass map in <code>ladder.ts:258</code>, and have <code>gradeRisk</code> return typed
+            triggers instead of the regex over prose in <code>inspection-triggers.ts:17-23</code>
+          </td>
+          <td><span class="chip keep">KEEP</span></td>
+        </tr>
+        <tr>
+          <td><code>rules/*.yaml</code> and <code>verify/rules.ts</code></td>
+          <td class="num">220</td>
+          <td>
+            ESLint, Danger and semgrep need config in the target repository, and these rules are
+            prose for agents, not mechanical checks. Write YAML with <code>yaml.dump</code> instead
+            of string joins (<code>rules.ts:111-124</code>)
+          </td>
+          <td><span class="chip keep">KEEP</span></td>
+        </tr>
+        <tr>
+          <td><code>sensors/</code></td>
+          <td class="num">744</td>
+          <td>
+            Webhooks need a public endpoint; a scheduled Action writes into the repository. Polling
+            with conditional requests is GitHub's own advice ("a 304 … does not count against your
+            primary rate limit",
+            <a
+              href="https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api"
+              >REST best practices</a
+            >). Signals move to <code>api.db</code> in phase 4
+          </td>
+          <td><span class="chip keep">KEEP</span> polling</td>
+        </tr>
+        <tr>
+          <td><code>recipe/</code> parser and resolver</td>
+          <td class="num">1,079</td>
+          <td>
+            Already js-yaml plus Zod. The lane fan-out (<code>plan.units[role=builder] by lane</code
+            >) has no library equivalent
+          </td>
+          <td><span class="chip keep">KEEP</span></td>
+        </tr>
+        <tr>
+          <td><code>profile/</code> sources and hints</td>
+          <td class="num">664</td>
+          <td>
+            No cross-ecosystem tool maps "lint" to a command; the hints are data, not code. The
+            regex workflow parsing is replaced in phase 3
+          </td>
+          <td><span class="chip keep">KEEP</span></td>
+        </tr>
+        <tr>
+          <td><code>trackers/</code> read side, <code>home/</code></td>
+          <td class="num">755</td>
+          <td>
+            Already the Linear SDK and <code>gh</code>. <code>home/publish.ts:57-84</code> repeats
+            the single-flight reader in <code>use-pushed.ts:31-61</code>; share one
+          </td>
+          <td><span class="chip keep">KEEP</span></td>
+        </tr>
+        <tr>
+          <td><code>ipc/</code> handlers</td>
+          <td class="num">4,128</td>
+          <td>
+            Domain logic behind one <code>defineChannel</code> spec per channel (ADR 096), which is
+            the SDK's pattern. Only the registration and typing change
+          </td>
+          <td><span class="chip keep">KEEP</span></td>
+        </tr>
+        <tr>
+          <td><code>components/</code> outside the hall</td>
+          <td class="num">~7,600</td>
+          <td>
+            Forge, Floor, Inbox and Ledger are product views. Their primitives and data fetching
+            move to <code>extension-ui</code> and the typed channel map
+          </td>
+          <td><span class="chip keep">KEEP</span> views</td>
+        </tr>
+        <tr>
+          <td>
+            <code>runtime/</code> supervision, run registry, <code>claude-launch.ts</code>,
+            <code>jsonl-log.ts</code>, <code>feed/</code>, <code>review/</code>, palette
+          </td>
+          <td class="num">~2,300</td>
+          <td>
+            Supervision over Terminator's tabs has no embeddable equivalent.
+            <code>claude-launch.ts</code> <code>transcriptPathFor</code> goes with transcript
+            tailing. <code>JsonlLog</code> declares <code>rewrite</code> twice
+            (<code>jsonl-log.ts:28-31</code>)
+          </td>
+          <td><span class="chip keep">KEEP</span></td>
+        </tr>
+        <tr>
+          <td><code>line/</code> scheduler, integrate, brief, rung output, CI rounds</td>
+          <td class="num">~2,900</td>
+          <td>
+            Already <code>gh</code> and <code>git</code>. CI rounds already poll
+            <code>gh pr checks --json</code>, which is right: <code>--watch</code> cannot be
+            combined with <code>--json</code>. About 600 lines of <code>integrate.ts</code> are PR
+            text
+          </td>
+          <td><span class="chip keep">KEEP</span></td>
+        </tr>
+        <tr>
+          <td>
+            Top-level files: <code>index.ts</code>, <code>background.ts</code>,
+            <code>host-calls.ts</code>, <code>data-root.ts</code>, <code>storage-folder.ts</code>,
+            <code>remote-access.ts</code>, <code>workspace-root.ts</code>
+          </td>
+          <td class="num">411</td>
+          <td>
+            Wiring on the SDK. <code>storage-folder.ts</code> already uses
+            <code>moveFromUserData</code>
+          </td>
+          <td><span class="chip keep">KEEP</span></td>
+        </tr>
+        <tr>
+          <td>Order budgets (<code>order/schema.ts:182-188</code>)</td>
+          <td class="num">—</td>
+          <td>
+            The agent count and wall clock are product rules. A token ceiling has an SDK equivalent
+            (<code>--max-budget-usd</code>); see open questions
+          </td>
+          <td><span class="chip keep">KEEP</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="cmd">
+    Lines: find src/$d -name '*.ts*' ! -name '*.test.*' -exec cat {} + | wc -l. Not read line by
+    line: <code>readiness.ts</code>, <code>checks-view.ts</code>, <code>intake-source.ts</code>,
+    <code>feed/</code>, <code>review/</code>, the settings files and the
+    <code>skills/ci-fix</code> asset.
+  </p>
+
+  <h2>Options considered</h2>
+  <div class="option">
+    <h3>A. Rebuild the Line as Claude Code workflow scripts</h3>
+    <p>
+      Claude Code workflows give <code>agent()</code>, <code>parallel()</code>,
+      <code>pipeline()</code>, per-agent schemas and deterministic resume (<a
+        href="https://code.claude.com/docs/en/workflows"
+        >workflows</a
+      >).
+    </p>
+    <ul>
+      <li>For: deletes the scheduler, waves and resume code, and replay comes for free.</li>
+      <li>
+        Against: no mid-run user input, so gates cannot sit inside a run. Agents do not run in
+        Terminator's visible tabs, and the concurrency cap is 16.
+      </li>
+    </ul>
+  </div>
+  <div class="option">
+    <h3>B. Adopt an existing app and retire Foundry</h3>
+    <p>
+      Vibe Kanban (Apache-2.0), Nimbalyst (MIT, Electron), Conductor (proprietary) and the Copilot
+      coding agent all run agents in worktrees and open PRs.
+    </p>
+    <ul>
+      <li>For: the most code deleted.</li>
+      <li>
+        Against: they are apps, not libraries Terminator can embed. None has the Forge, risk-priced
+        gates or a three-valued base check. The Copilot agent runs in GitHub's cloud.
+      </li>
+    </ul>
+  </div>
+  <div class="option chosen">
+    <h3>C. Keep Foundry's domain, move every mechanism under it onto the paved path (chosen)</h3>
+    <p>
+      Foundry keeps the order model, the gates, the standing derivation and the supervision surface.
+      Everything between Foundry and the agent becomes Claude Code configuration. Everything between
+      Foundry and git or GitHub becomes the native command.
+    </p>
+    <ul>
+      <li>
+        For: it fixes both of today's failures at their cause, ships phase by phase, and each phase
+        is a net deletion.
+      </li>
+      <li>
+        Against: Foundry stays a large extension. The policy move changes what FR-029 and FR-050
+        enforce, so it needs one real run before the old code goes.
+      </li>
+    </ul>
+  </div>
+
+  <h2>Decision</h2>
+  <p>
+    Option C. Its rule: <b>isolate, then trust.</b> Every tool in the survey runs the agent inside a
+    boundary (a worktree plus the OS sandbox, a container, or a VM) and lets the harness's own
+    permission engine decide each call. A person is asked only at irreversible edges: push, PR,
+    merge and network. Foundry instead reads every shell command itself, on the host, and refuses by
+    cancelling the turn. That is the source of most of the 45 runtime fixes and of today's lost
+    plan. Option A stays open for the run graph once workflows accept mid-run input.
+  </p>
+
+  <h2>Design</h2>
+  <pre class="mermaid">
+flowchart LR
+  R[roles/*.yaml] --> G[roleSettings: generate settings per role]
+  G --> O[claudeOptions]
+  O -->|tools, permissions, sandbox, settingSources, outputFormat| A[ACP adapter / Agent SDK]
+  A -->|PreToolUse hook deny + reason| C[Claude]
+  A -->|structured_output| P[order proposal]
+  A -->|onUpdate / onEnd| S[stall rule + Floor]
+</pre
+  >
+
+  <h3>Phase 1: the agent boundary (fixes today's plan-draft hang)</h3>
+  <ol>
+    <li>
+      <b>Pass the role's tools.</b> In <code>runtime/supervised-runner.ts</code>
+      <code>claudeOptions</code>, add <code>tools</code> from the role (<code>read</code> →
+      <code>Read</code>, <code>Grep</code>, <code>Glob</code>; <code>search</code> →
+      <code>WebSearch</code>, <code>WebFetch</code>). The architect also gets <code>Write</code> for
+      its one output path until step 4 removes that need.
+    </li>
+    <li>
+      <b>Stop inheriting the operator.</b> Add <code>settingSources: ['project']</code> to
+      <code>claudeOptions</code>.
+    </li>
+    <li>
+      <b>Generate permissions per role.</b> Add <code>runtime/role-settings.ts</code>: a pure
+      function from role and autonomy to a <code>settings</code> object with
+      <code>permissions.allow/ask/deny</code>, <code>sandbox.enabled</code> and
+      <code>permissionMode</code> (<code>dontAsk</code> for read-only roles and
+      <code>lights-out</code>). Move <code>deny-rules.ts</code> into <code>permissions.deny</code>.
+      Keep one <code>PreToolUse</code> command hook for the Artifact path rule, which no rule
+      specifier expresses.
+    </li>
+    <li>
+      <b>Use structured output for proposals.</b> Pass
+      <code>outputFormat: { type: 'json_schema', schema: z.toJSONSchema(ProposalSchema) }</code>
+      through <code>_meta.claudeCode.options</code> (the adapter reads it at
+      <code>acp-agent.js:358</code>). Read the result from the final message. Delete
+      <code>outputContract</code>, <code>retryForRefusal</code> and the proposal-file round trip in
+      <code>forge/intake-turn.ts</code>.
+    </li>
+    <li>
+      <b>Collect on every turn end.</b> Until step 4 lands, <code>collectProposal</code> also runs
+      on a cancelled turn, so a written plan is not left waiting for the session to end.
+    </li>
+    <li>
+      <b>Delete</b> <code>shell-split.ts</code>, <code>read-only-policy.ts</code>,
+      <code>autonomy-policy.ts</code>, most of <code>tool-decision.ts</code>, the five-minute hold,
+      <code>tellWhyRefused</code>, the question branch and the resend counters in
+      <code>src/main/agents/acp/agent-service.ts</code>. An operator's typed answer goes out as a
+      normal prompt after <code>end_turn</code>.
+    </li>
+  </ol>
+
+  <h3>Phase 2: Forge state</h3>
+  <ol>
+    <li>
+      Store <code>intake.state</code> (<code>drafting | reviewing | fixing | ready | failed</code>)
+      and a <code>deadline</code> on the order (<code>order/schema.ts</code>).
+      <code>readiness.ts</code> reads it instead of replaying ledger action strings in
+      <code>intake-outcome.ts</code>. A passed deadline or a <code>run.stalled</code> becomes
+      <code>failed</code> with a named next move.
+    </li>
+    <li>
+      Merge <code>acceptance</code> and <code>plan.units</code> by <code>id</code> in
+      <code>applyProposal</code>.
+    </li>
+    <li>
+      Delete the <code>bugfix</code>, <code>refactor</code>, <code>speckit</code> and
+      <code>direct</code> recipes, their tests, and the <code>SPECIFY_FEATURE</code> env.
+    </li>
+  </ol>
+
+  <h3>Phase 3: Line on git and GitHub</h3>
+  <ol>
+    <li>
+      <code>git worktree add --lock</code> in <code>line/worktree.ts</code>. Delete both
+      <code>git worktree prune</code> calls. Cut lanes and the baseline from
+      <code>origin/&lt;base&gt;</code> after one <code>git fetch</code>. Never <code>-B</code> or
+      <code>branch -D</code> a branch Foundry did not create.
+    </li>
+    <li>
+      Replace <code>line/restack.ts</code> with
+      <code>gh pr update-branch --rebase &lt;url&gt;</code>. Record <code>restackedFor</code> on
+      conflict, so the refinery stops re-raising a decided gate every 60 s.
+    </li>
+    <li>
+      Change the wave barrier in <code>execution-waves.ts</code> to start a ready node when a slot
+      frees.
+    </li>
+    <li>
+      Pass explicit timeouts on <code>gh pr checks</code>, <code>gh run view --log-failed</code> and
+      <code>git fetch</code> (<code>line/ci.ts:66,153</code>, <code>restack.ts:20</code>). The core
+      default is 10 s (<code>src/main/extensions/api.ts:597</code>).
+    </li>
+    <li>
+      Base-branch proof: read the base commit's CI conclusion first (nearest ancestor with a run
+      when HEAD is <code>[skip ci]</code>). Run locally only what CI did not measure, and prefer the
+      repository's aggregate script. Parse workflows with <code>yaml.load</code>, and skip
+      <code>${{ }}</code> steps.
+    </li>
+    <li>
+      Map the Format check to a check script (<code>format:check</code>), never a writer. Today
+      <code>hints/node.yaml:13</code> maps it to the script <code>format</code>, which in this
+      repository is <code>prettier --write .</code> (<code>package.json:42</code>). It always passes
+      and rewrites lane files, although <code>format:check</code> exists at
+      <code>package.json:43</code>.
+    </li>
+  </ol>
+
+  <h3>Phase 4: state and UI</h3>
+  <ol>
+    <li>
+      Move orders, gates, graphs, ledger and signals into <code>api.db</code> tables keyed by
+      <code>(data_root, order_id)</code>. Each store writes in a transaction and then calls
+      <code>announce</code>. Delete <code>foundry-index.ts</code> caching and the JSONL appenders.
+    </li>
+    <li>
+      Delete the factory hall, <code>timeline-store</code>, the <code>run.timeline</code> and
+      <code>run.activity</code> channels, and the <code>terminator.foundry.view</code> setting. Move
+      the status tiles to the Ledger.
+    </li>
+    <li>
+      Swap local primitives for <code>extension-ui</code> components. Move
+      <code>ConfirmButton</code> into <code>extension-ui</code>.
+    </li>
+    <li>
+      Use <code>createIpcRegistrar</code>, and export a typed <code>FoundryApi</code> channel map
+      that removes the 56 casts.
+    </li>
+    <li>
+      Transcript tailing is replaced by <code>api.agents.onUpdate</code> and <code>onEnd</code>. Add
+      <code>openAsks</code> to the SDK's <code>AgentsAPI</code>, then delete
+      <code>pending-permissions.ts</code>.
+    </li>
+  </ol>
+
+  <h2>What stays custom, and why</h2>
+  <ul>
+    <li>
+      <b>Order model, compile checks, standing.</b> Zod and a pure function; no library holds "whose
+      move is it" across three stores.
+    </li>
+    <li>
+      <b>Risk-priced gates.</b> Existing tools offer fixed autonomy tiers (Factory
+      <code>--auto low|medium|high</code>,
+      <a href="https://docs.factory.com/cli/droid-exec/overview">droid exec</a>). Pricing a gate per
+      change is product logic.
+    </li>
+    <li>
+      <b>Repository profile with a "not measured" result.</b> No tool keeps three outcomes for a
+      check, and rule 1 rules out per-repo config.
+    </li>
+    <li>
+      <b>Lane worktrees under the data root, the ladder, CI rounds, PR text.</b> Each paved option
+      writes into the target repository or needs a pushed commit.
+    </li>
+    <li>
+      <b>Cross-order file-overlap queue.</b> A merge queue serialises at merge time only. Keep it
+      small.
+    </li>
+  </ul>
+
+  <h2>Testing and verification</h2>
+  <ul>
+    <li>
+      Each bug in the list below gets a failing test first, in
+      <code>extensions/foundry/tests/</code>, before its fix.
+    </li>
+    <li>
+      <code>role-settings.ts</code> gets table tests. Each role and autonomy pair maps to the
+      expected settings, including the bypass cases found in this audit: <code>git -C . push</code>,
+      <code>sed -i … src/</code> from a docs-only role, and
+      <code>git -c core.fsmonitor=… status</code>.
+    </li>
+    <li>
+      One live run per phase, using the "Drive Foundry live" setup (temporary repository plus a
+      seeded <code>.foundry/orders</code>). Phase 1 passes when a small order's plan draft takes
+      under 3 minutes, measured with <code>python3 converge_timing.py</code> on its ledger.
+    </li>
+    <li>
+      Every phase: <code>npm run ci:local</code> exits 0 before push. Report the line delta with
+      <code
+        >find extensions/foundry/src -name '*.ts*' ! -name '*.test.*' -exec cat {} + | wc -l</code
+      >.
+    </li>
+  </ul>
+
+  <h2>Bugs found by the audit</h2>
+  <p>
+    Read from the code unless marked. The runtime rows were run through the real functions with
+    <code>npx tsx</code>.
+  </p>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Bug</th>
+          <th>Where</th>
+          <th>Phase</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="num">1</td>
+          <td>A cancelled turn leaves a written plan unread until the session ends</td>
+          <td><code>forge/intake-turn.ts:216-217</code>, <code>supervised-runner.ts:509</code></td>
+          <td class="num">1</td>
+        </tr>
+        <tr>
+          <td class="num">2</td>
+          <td>Role tools never passed; read-only roles have Bash</td>
+          <td><code>supervised-runner.ts:408</code></td>
+          <td class="num">1</td>
+        </tr>
+        <tr>
+          <td class="num">3</td>
+          <td>
+            Destructive commands pass at <code>standard</code>: <code>(rm -rf src)</code>,
+            <code>bash -c "rm -rf src"</code>, <code>git checkout -- .</code>,
+            <code>mv src ~/gone</code> (tsx)
+          </td>
+          <td><code>autonomy-policy.ts:127,219</code></td>
+          <td class="num">1</td>
+        </tr>
+        <tr>
+          <td class="num">4</td>
+          <td>
+            A docs-only role edits code through <code>sed -i</code> or <code>&gt;</code> (tsx)
+          </td>
+          <td><code>tool-decision.ts:216</code></td>
+          <td class="num">1</td>
+        </tr>
+        <tr>
+          <td class="num">5</td>
+          <td>
+            Read-only roles run programs through <code>git -c</code>;
+            <code>git -C . push</code> passes the ship rule (tsx)
+          </td>
+          <td><code>read-only-policy.ts:269</code>, <code>tool-decision.ts:137</code></td>
+          <td class="num">1</td>
+        </tr>
+        <tr>
+          <td class="num">6</td>
+          <td>One refusal cancels every other open ask in the session</td>
+          <td><code>agent-service.ts:291,491</code></td>
+          <td class="num">1</td>
+        </tr>
+        <tr>
+          <td class="num">7</td>
+          <td>Agents load the operator's CLAUDE.md, hooks and MCP tools</td>
+          <td><code>acp-agent.js:7320</code> default</td>
+          <td class="num">1</td>
+        </tr>
+        <tr>
+          <td class="num">8</td>
+          <td>"Drafting the plan" shows forever; no deadline, <code>run.stalled</code> ignored</td>
+          <td><code>forge/intake-outcome.ts:84</code></td>
+          <td class="num">2</td>
+        </tr>
+        <tr>
+          <td class="num">9</td>
+          <td>List replace drops acceptance criteria; 3 turns spent restoring them</td>
+          <td><code>order/proposal.ts:211</code></td>
+          <td class="num">2</td>
+        </tr>
+        <tr>
+          <td class="num">10</td>
+          <td>
+            <code>git worktree prune</code> drops other lanes; <code>add -B</code> then resets their
+            branch
+          </td>
+          <td><code>worktree.ts:456</code>, <code>teardown.ts:104</code></td>
+          <td class="num">3</td>
+        </tr>
+        <tr>
+          <td class="num">11</td>
+          <td>
+            <code>-B</code> and <code>branch -D</code> act on the operator's own same-named branch
+          </td>
+          <td><code>worktree.ts:52,219</code>, <code>teardown.ts:109</code></td>
+          <td class="num">3</td>
+        </tr>
+        <tr>
+          <td class="num">12</td>
+          <td>Lanes are cut from local <code>main</code>, which can be behind origin</td>
+          <td><code>worktree.ts:210</code></td>
+          <td class="num">3</td>
+        </tr>
+        <tr>
+          <td class="num">13</td>
+          <td>10 s default timeout turns slow CI reads into "not measured"</td>
+          <td><code>ci.ts:66,153</code></td>
+          <td class="num">3</td>
+        </tr>
+        <tr>
+          <td class="num">14</td>
+          <td>Refinery conflict loops every 60 s and reopens a decided gate</td>
+          <td><code>refinery-tick.ts:120</code>, <code>gates/store.ts:85</code></td>
+          <td class="num">3</td>
+        </tr>
+        <tr>
+          <td class="num">15</td>
+          <td>The wave barrier holds a finished lane until the slowest lane ends</td>
+          <td><code>execution-waves.ts:113</code></td>
+          <td class="num">3</td>
+        </tr>
+        <tr>
+          <td class="num">16</td>
+          <td>
+            The Format check runs the <code>format</code> script, a writer in this repository (<code
+              >prettier --write .</code
+            >): it always passes and rewrites lane files
+          </td>
+          <td><code>hints/node.yaml:13</code>, <code>package.json:42</code></td>
+          <td class="num">3</td>
+        </tr>
+        <tr>
+          <td class="num">17</td>
+          <td>CI workflow regex copies <code>${{ matrix.shard }}</code> into a shell command</td>
+          <td><code>profile/hints.ts</code></td>
+          <td class="num">3</td>
+        </tr>
+        <tr>
+          <td class="num">18</td>
+          <td>A torn JSONL line also loses the next entry</td>
+          <td><code>ledger/append.ts:51</code>, <code>sensors/store.ts:116</code></td>
+          <td class="num">4</td>
+        </tr>
+        <tr>
+          <td class="num">19</td>
+          <td>"CI red on main" signal never clears; tracker signals merge distinct issues</td>
+          <td><code>sensors/collect.ts:99,160</code></td>
+          <td class="num">4</td>
+        </tr>
+        <tr>
+          <td class="num">20</td>
+          <td>A channel error leaves a view stale with an unhandled rejection</td>
+          <td><code>renderer/use-pushed.ts:38</code></td>
+          <td class="num">4</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Risks and mitigations</h2>
+  <ul>
+    <li>
+      <b>The policy move changes what is enforced (FR-029, FR-050).</b> Mitigation: write the bypass
+      cases above as tests against the generated settings, run one live order, and only then delete
+      the old policy.
+    </li>
+    <li>
+      <b>Structured output through ACP is unproven.</b> The adapter accepts
+      <code>outputFormat</code> but does not forward <code>structured_output</code> to the client.
+      Mitigation: a spike that reads it from the final transcript result, and step 5 of phase 1 as
+      the fallback.
+    </li>
+    <li>
+      <b>The sandbox can block legitimate network use</b> (installs, <code>gh</code>). Mitigation: a
+      per-role host allowlist in the generated settings.
+    </li>
+    <li>
+      <b>Deleting the hall removes run replay.</b> Mitigation: the ledger keeps every event. Replay
+      can return as a list view if someone asks for it.
+    </li>
+    <li>
+      <b>Moving records to <code>api.db</code> changes the e2e harness</b>, which writes records by
+      hand (<code>restartFoundry</code>). Mitigation: seed through the stores.
+    </li>
+  </ul>
+
+  <h2>Open questions</h2>
+  <ul>
+    <li>
+      Does a <code>PermissionRequest</code> hook behave the same under the ACP adapter as under the
+      SDK? ADR 130 confirmed only <code>PreToolUse</code>.
+    </li>
+    <li>
+      What message does Claude get from a <code>dontAsk</code> refusal, and is it enough without a
+      hook?
+    </li>
+    <li>
+      Does <code>additionalDirectories</code> load mounted skills? The docs say only
+      <code>--add-dir</code> does (<code>supervised-runner.ts:414</code>). If not, the
+      <code>ci-fix</code> skill never loads; the SDK <code>plugins</code> option is the replacement.
+    </li>
+    <li>
+      Should <code>budgets.tokens</code> be enforced through the SDK's <code>maxBudgetUsd</code> /
+      <code>--max-budget-usd</code> (<a href="https://code.claude.com/docs/en/headless">headless</a
+      >) per agent? The schema keeps it nullable on purpose (<code>order/schema.ts:185-187</code>).
+    </li>
+    <li>Is TanStack Query approved as a new dependency (Constitution IV)?</li>
+    <li>
+      Is merge queue available on this repository's plan? That decides how much of the refinery can
+      go.
+    </li>
+    <li>
+      Why was the installed app still v0.1.169 when v0.1.170 had been released for more than nine
+      hours?
+    </li>
+  </ul>
+
+  <h2>Alternatives rejected</h2>
+  <ul>
+    <li>
+      <b>Spec Kit as the Forge:</b> writes <code>specs/</code> into the target repository and
+      produces markdown, not a typed order.
+    </li>
+    <li>
+      <b>Claude Code <code>--worktree</code> for lanes:</b> creates
+      <code>&lt;repo&gt;/.claude/worktrees</code> and one worktree per session.
+    </li>
+    <li>
+      <b>claude-code-action and <code>/autofix-pr</code> for CI rounds:</b> need a workflow file or
+      the GitHub App on the target repository.
+    </li>
+    <li>
+      <b>Temporal, Inngest, Restate:</b> each needs a server process; copy their journal-and-replay
+      pattern instead.
+    </li>
+    <li><b>Agent teams:</b> experimental, no worktrees, not available through the SDK.</li>
+    <li><b>electron-trpc:</b> needs a hook in the core preload, which extensions cannot touch.</li>
+    <li>
+      <b>A shell parser library in place of <code>shell-split.ts</code>:</b> Claude Code already
+      parses the command; a second parser repeats the job.
+    </li>
+  </ul>
+</div>

@@ -11,7 +11,7 @@ import type { RunNode } from './run-graph.js'
 import type { GateRuleId } from '../gates/rules.js'
 import { isGateRule } from './execution-parts.js'
 import type { Execution } from './execution.js'
-import { launchNode } from './execution-launch.js'
+import { launchNode, type Launched } from './execution-launch.js'
 import { settleNode } from './execution-settle.js'
 
 // Runs everything that can run, a wave at a time: the agent budget is the whole
@@ -106,16 +106,9 @@ async function holdForShipping(run: Execution, gate: RunNode): Promise<void> {
   )
 }
 
-/** Starts what may start, waits for it, and settles each node. False when the budget stopped it. */
+/** Starts what may start, settles each node as it ends, and starts what that frees. False when the budget stopped it. */
 async function runWave(run: Execution): Promise<boolean> {
-  const started = startReady(run.current, run.order.budgets, run.deps.now())
-  await run.advance(started.graph)
-  const wave = Promise.all(
-    started.started
-      .map((id) => run.current.nodes.find((n) => n.id === id))
-      .filter((n): n is RunNode => n !== undefined && n.kind !== 'gate')
-      .map((node) => launchNode(run, node))
-  )
+  const wave = drainWave(run).then(() => [])
   const waved = await run.waveOrBreach(wave)
   if ('breach' in waved) {
     const { breach } = waved
@@ -130,6 +123,49 @@ async function runWave(run: Execution): Promise<boolean> {
     // more. The budget is part of what was agreed, not a preference.
     return false
   }
-  for (const launched of waved.results) await settleNode(run, launched)
   return true
+}
+
+// A slot freed by one node goes to the next ready one at once, not when the whole
+// wave ends. Settlements run one at a time: each reads and rewrites the graph. One
+// that throws does not stop the others; the first error fails the run after them.
+async function drainWave(run: Execution): Promise<void> {
+  const flights: Promise<void>[] = []
+  const failures: unknown[] = []
+  let turn: Promise<void> = Promise.resolve()
+  const settleInTurn = (launched: Launched): Promise<void> => {
+    const mine = turn.then(async () => {
+      await settleNode(run, launched)
+      if (await canRefill(run)) await launchReady()
+    })
+    turn = mine.catch(() => undefined)
+    return mine.catch((error: unknown) => void failures.push(error))
+  }
+  const launchReady = async (): Promise<void> => {
+    const started = startReady(run.current, run.order.budgets, run.deps.now())
+    await run.advance(started.graph)
+    for (const id of started.started) {
+      const node = nodeById(run.current, id)
+      if (node === undefined || node.kind === 'gate') continue
+      flights.push(
+        launchNode(run, node).then(settleInTurn, (error: unknown) => void failures.push(error))
+      )
+    }
+  }
+  await launchReady()
+  for (let next = 0; next < flights.length; next++) await flights[next]
+  if (failures.length > 0) throw failures[0]
+}
+
+// Joins pass on the spot. Work is offered only when no gate stands ready: a gate
+// stops the run, and the loop in `runWaves` handles it once the agents in flight end.
+async function canRefill(run: Execution): Promise<boolean> {
+  for (;;) {
+    // A breach stops new agents even when its gate is silenced and the run is not halted.
+    if (run.halted || (await run.currentBreach()) !== null) return false
+    const ready = readyNodes(run.current, run.order.budgets)
+    const join = ready.find((node) => node.kind === 'join')
+    if (join === undefined) return ready.length > 0 && !ready.some((n) => n.kind === 'gate')
+    await run.advance(markPassed(run.current, join.id, run.deps.now()))
+  }
 }

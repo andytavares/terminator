@@ -6,13 +6,14 @@ import type { FactoryMetrics } from '../factory/metrics.js'
 import { formatDuration } from '../factory/format.js'
 import { Button, Markdown, Tab, TabList, TabPanel, TabsRoot } from '@terminator/extension-ui'
 import { openInBrowser } from '@terminator/extension-sdk/renderer'
-import { usePushed, ANY_RECORD } from '../renderer/use-pushed.js'
+import { useFoundryQuery, ANY_RECORD } from '../renderer/foundry-query.js'
 import { MetricsTiles, WindowToggle } from './MetricsTiles.js'
 import { rungLevelInWords } from '../verify/ladder.js'
 import type { Rung } from '../verify/ladder.js'
 import { rungInWords } from '../recipe/rung.js'
 import type { Rung as ResolveRung } from '../recipe/rung.js'
-import { invoke } from '@terminator/extension-sdk/renderer'
+import { foundryInvoke } from '../renderer/foundry-invoke.js'
+import type { FoundryApi } from '../ipc/foundry-api.js'
 
 // The record: every decision, by whom or by what rule, and why.
 //
@@ -21,31 +22,11 @@ import { invoke } from '@terminator/extension-sdk/renderer'
 // get accepted without being read, and a rule accepted without being read is
 // worse than no rule.
 
-interface LedgerView {
-  entries: LedgerEntry[]
-  total: number
-  actors: string[]
-  actions: string[]
-  orders: string[]
-}
+type LedgerView = FoundryApi['foundry:ledger.query']['answer']
 
-interface AcceptedRule {
-  id: string
-  asserts: string
-  rung: string
-  origin: string
-}
+type RulesView = FoundryApi['foundry:rules.inForce']['answer']
 
-interface AvailableSkill {
-  id: string
-  rung: string
-}
-
-interface RulesView {
-  rules: AcceptedRule[]
-  declined: { id: string; reason: string; asserts?: string | null }[]
-  skills: AvailableSkill[]
-}
+type AcceptedRule = RulesView['rules'][number]
 
 const PAGE = 200
 
@@ -63,35 +44,20 @@ function whenRead<T>(show: (value: T) => void): (value: T | null) => void {
   }
 }
 
-async function readRulesView(): Promise<RulesView | null> {
-  const next = (await invoke('foundry:rules.inForce', {})) as Partial<RulesView> & {
-    error?: string
-  }
-  if (next.error !== undefined) return null
-  // Normalised on arrival rather than guarded at every read: a reply missing
-  // an array is the same thing to this panel as an empty one.
+// Normalised on arrival rather than guarded at every read: a reply missing an array is the
+// same thing to this panel as an empty one.
+async function readRulesView(): Promise<RulesView> {
+  const next = await foundryInvoke('foundry:rules.inForce')
   return { rules: next.rules ?? [], declined: next.declined ?? [], skills: next.skills ?? [] }
 }
 
-async function readLedger(
-  orderId: string,
-  actor: string,
-  action: string
-): Promise<LedgerView | null> {
-  const next = (await invoke('foundry:ledger.query', {
+function readLedger(orderId: string, actor: string, action: string): Promise<LedgerView> {
+  return foundryInvoke('foundry:ledger.query', {
     orderId: orderId === '' ? undefined : orderId,
     actor: actor === '' ? undefined : actor,
     action: action === '' ? undefined : action,
     limit: PAGE,
-  })) as LedgerView | { error: string }
-  return 'error' in next ? null : next
-}
-
-async function readMetrics(window: '30d' | 'all'): Promise<FactoryMetrics | null> {
-  const next = (await invoke('foundry:factory.metrics', { window })) as
-    | FactoryMetrics
-    | { error: string }
-  return 'error' in next ? null : next
+  })
 }
 
 /** `operator`, `rule:budget.exceeded`, `role:verifier` — the kind, for the eye. */
@@ -166,19 +132,14 @@ function RecordTab({ entries, view, rules, proposals }: RecordTabProps) {
 
 /** The record as filtered, kept current: Foundry says when it grows, and for which order. */
 function useLedgerEntries() {
-  const [view, setView] = useState<LedgerView | null>(null)
   const [orderId, setOrderId] = useState('')
   const [actor, setActor] = useState('')
   const [action, setAction] = useState('')
-  const readEntries = useCallback(
-    () => readLedger(orderId, actor, action),
-    [orderId, actor, action]
+  const { data } = useFoundryQuery(
+    { key: ['ledger', orderId, actor, action], kinds: ['ledger'] },
+    () => readLedger(orderId, actor, action)
   )
-  const showEntries = useCallback((next: LedgerView | null) => {
-    if (next !== null) setView(next)
-  }, [])
-  usePushed(readEntries, showEntries, { kinds: ['ledger'] })
-  return { view, orderId, setOrderId, actor, setActor, action, setAction }
+  return { view: data ?? null, orderId, setOrderId, actor, setActor, action, setAction }
 }
 
 function useRules() {
@@ -194,16 +155,14 @@ function useRules() {
 // that fetches before it is looked at goes stale unnoticed.
 function useFactoryMetrics(tab: LedgerTab): FactoryViewProps {
   const [metricsWindow, setMetricsWindow] = useState<'30d' | 'all'>('30d')
-  const [metrics, setMetrics] = useState<FactoryMetrics | null>(null)
-  const readShownMetrics = useCallback(
-    () => (tab === 'factory' ? readMetrics(metricsWindow) : Promise.resolve(null)),
-    [tab, metricsWindow]
+  const { data } = useFoundryQuery(
+    { key: ['metrics', tab, metricsWindow], kinds: tab === 'factory' ? ANY_RECORD : [] },
+    () =>
+      tab === 'factory'
+        ? foundryInvoke('foundry:factory.metrics', { window: metricsWindow })
+        : Promise.resolve(null)
   )
-  const showMetrics = useCallback((next: FactoryMetrics | null) => {
-    if (next !== null) setMetrics(next)
-  }, [])
-  usePushed(readShownMetrics, showMetrics, { kinds: tab === 'factory' ? ANY_RECORD : [] })
-  return { metrics, metricsWindow, onWindow: setMetricsWindow }
+  return { metrics: data ?? null, metricsWindow, onWindow: setMetricsWindow }
 }
 
 /** Proposed rules, asked for by the operator, and what accepting, declining or removing one said. */
@@ -211,7 +170,7 @@ function useProposals(refreshRules: () => Promise<void>) {
   const [proposals, setProposals] = useState<Proposal[] | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const ask = useCallback(async () => {
-    const next = (await invoke('foundry:rules.propose', {})) as { proposals?: Proposal[] }
+    const next = await foundryInvoke('foundry:rules.propose', {})
     setProposals(next.proposals ?? [])
     setNote(null)
   }, [])
@@ -238,10 +197,10 @@ function useProposals(refreshRules: () => Promise<void>) {
 
 /** Accepts or declines a proposal; the refusal, or null when it took. */
 async function sendProposalDecision(proposal: Proposal, accept: boolean): Promise<string | null> {
-  const result = (await invoke('foundry:rules.decide', {
+  const result = await foundryInvoke('foundry:rules.decide', {
     proposalId: proposal.id,
     accept,
-  })) as { error?: string; rule?: string }
+  })
   return result.error ?? null
 }
 
@@ -250,9 +209,7 @@ async function sendProposalDecision(proposal: Proposal, accept: boolean): Promis
 function useRemoveRule(setNote: (note: string | null) => void, refreshRules: () => Promise<void>) {
   return useCallback(
     async (rule: AcceptedRule) => {
-      const result = (await invoke('foundry:rules.remove', { ruleId: rule.id })) as {
-        error?: string
-      }
+      const result = await foundryInvoke('foundry:rules.remove', { ruleId: rule.id })
       if (result.error !== undefined) {
         setNote(result.error)
         return

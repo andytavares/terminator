@@ -36,10 +36,8 @@ function recipe(file: string): Recipe {
 }
 
 describe('built-in recipes', () => {
-  describe('six shapes', sixShapesTests)
+  describe('three shapes', threeShapesTests)
   describe('steps and roles', stepsAndRolesTests)
-  describe('bugfix', bugfixTests)
-  describe('refactor and speckit', refactorAndSpeckitTests)
   describe('requirements', requirementsTests)
   describe('fresh verification', freshVerificationTests)
   describe('lanes', builtInsLanesTests)
@@ -47,16 +45,9 @@ describe('built-in recipes', () => {
   describe('the inspector', theInspectorTests)
 })
 
-function sixShapesTests() {
-  it('ships six shapes: five that change the repository and one whose product is a document', () => {
-    expect(recipeFiles.sort()).toEqual([
-      'bugfix.yaml',
-      'direct.yaml',
-      'refactor.yaml',
-      'research.yaml',
-      'speckit.yaml',
-      'standard.yaml',
-    ])
+function threeShapesTests() {
+  it('ships three shapes: two that change the repository and one whose product is a document', () => {
+    expect(recipeFiles.sort()).toEqual(['direct.yaml', 'research.yaml', 'standard.yaml'])
   })
 
   it.each(recipeFiles)('%s parses', (file) => {
@@ -86,66 +77,16 @@ function stepsAndRolesTests() {
   })
 }
 
-function bugfixTests() {
-  it('holds a bug reproduction to failing before the fix exists', () => {
-    const reproduce = recipe('bugfix.yaml').steps.find((s) => s.id === 'reproduce')
-    expect(reproduce?.expect).toEqual({ suite_exit_code: '!= 0' })
-  })
-
-  it('and to passing afterwards — the pair is the proof', () => {
-    const flip = recipe('bugfix.yaml').steps.find((s) => s.id === 'flip')
-    expect(flip?.expect).toEqual({ exit_code: '== 0' })
-    // The lint pass sits between fix and flip; flip waits on it, not on fix
-    // directly, but a skipped lint still settles for its dependants.
-    expect(flip?.after).toContain('lint')
-  })
-}
-
-function refactorAndSpeckitTests() {
-  it('makes a refactor characterise the behaviour before changing it', () => {
-    const steps = recipe('refactor.yaml').steps
-    expect(steps.find((s) => s.id === 'characterise')?.expect).toEqual({ tests_added: '>= 1' })
-    expect(steps.find((s) => s.id === 'baseline')?.after).toContain('characterise')
-    expect(steps.find((s) => s.id === 'change')?.after).toContain('baseline')
-  })
-
-  it('keeps the whole ten-stage pipeline in the speckit recipe', () => {
-    const ids = recipe('speckit.yaml').steps.map((s) => s.id)
-    for (const phase of [
-      'constitution',
-      'specify',
-      'clarify',
-      'plan',
-      'checklist',
-      'tasks',
-      'analyze',
-      'implement',
-    ]) {
-      expect(ids).toContain(phase)
-    }
-  })
-}
-
 function requirementsTests() {
-  it('offers the speckit recipe only where the toolkit is installed', () => {
-    expect(recipe('speckit.yaml').requires).toEqual([{ kind: 'path_exists', value: '.specify' }])
-  })
-
-  it('asks nothing of a repository for every shape but speckit, which a verifier backs where no test command is found', () => {
-    for (const file of [
-      'direct.yaml',
-      'standard.yaml',
-      'research.yaml',
-      'bugfix.yaml',
-      'refactor.yaml',
-    ]) {
+  it('asks nothing of a repository for any shape', () => {
+    for (const file of recipeFiles) {
       expect(recipe(file).requires).toEqual([])
     }
   })
 }
 
 function freshVerificationTests() {
-  it.each(['direct.yaml', 'bugfix.yaml', 'standard.yaml', 'refactor.yaml', 'speckit.yaml'])(
+  it.each(['direct.yaml', 'standard.yaml'])(
     '%s verifies with a fresh context, never a resumed one',
     (file) => {
       expect(recipe(file).steps.find((s) => s.id === 'verify')?.context).toBe('fresh')
@@ -155,12 +96,9 @@ function freshVerificationTests() {
   // One verifier, not one per unit. A fresh context is what makes verification
   // independent; a fresh context *per unit* buys nothing on top of that and
   // doubled the session count of every order that ever ran.
-  it.each(['direct.yaml', 'bugfix.yaml', 'standard.yaml', 'refactor.yaml', 'speckit.yaml'])(
-    '%s verifies once, not once per unit',
-    (file) => {
-      expect(recipe(file).steps.find((s) => s.id === 'verify')?.kind).toBe('agent')
-    }
-  )
+  it.each(['direct.yaml', 'standard.yaml'])('%s verifies once, not once per unit', (file) => {
+    expect(recipe(file).steps.find((s) => s.id === 'verify')?.kind).toBe('agent')
+  })
 
   // The Forge's converge *is* the architect, and the plan it produced is what
   // the compile gate agreed. A `plan` step after agreement re-runs it over an
@@ -220,7 +158,7 @@ function theDirectShapeTests() {
 }
 
 function theInspectorTests() {
-  it.each(['direct.yaml', 'bugfix.yaml', 'standard.yaml', 'speckit.yaml'])(
+  it.each(['direct.yaml', 'standard.yaml'])(
     '%s runs the inspector only on a risk trigger',
     (file) => {
       expect(recipe(file).steps.find((s) => s.id === 'inspect')?.when).toBe(
@@ -550,9 +488,6 @@ describe('the effort each built-in shape asks for', () => {
   it.each([
     ['direct.yaml', 'medium'],
     ['standard.yaml', 'high'],
-    ['bugfix.yaml', 'high'],
-    ['refactor.yaml', 'high'],
-    ['speckit.yaml', 'high'],
     ['research.yaml', 'medium'],
   ])('%s runs at %s', (file, effort) => {
     expect(recipe(file).effort).toBe(effort)
@@ -572,7 +507,6 @@ function runningLintTests() {
   it.each([
     ['direct.yaml', 'build'],
     ['standard.yaml', 'build'],
-    ['bugfix.yaml', 'fix'],
   ])('%s runs lint after %s, only when the repository has a lint command', (file, buildStep) => {
     const lint = recipe(file).steps.find((s) => s.id === 'lint')
     expect(lint?.kind).toBe('run')
@@ -584,7 +518,6 @@ function runningLintTests() {
   it.each([
     ['direct.yaml', 'build'],
     ['standard.yaml', 'build'],
-    ['bugfix.yaml', 'fix'],
   ])('%s sends a failing lint back to %s', (file, buildStep) => {
     const lint = recipe(file).steps.find((s) => s.id === 'lint')
     expect(lint?.onFail).toEqual({ rework: buildStep, max: 1 })
@@ -592,46 +525,30 @@ function runningLintTests() {
 }
 
 function waitingOnLintTests() {
-  it.each(['direct.yaml', 'standard.yaml', 'bugfix.yaml'])(
+  it.each(['direct.yaml', 'standard.yaml'])(
     '%s waits its next step on lint rather than the build it followed',
     (file) => {
       const nextId: Record<string, string> = {
         'direct.yaml': 'check',
         'standard.yaml': 'verify',
-        'bugfix.yaml': 'flip',
       }
       const step = recipe(file).steps.find((s) => s.id === nextId[file])
       expect(step?.after).toContain('lint')
     }
   )
-
-  // refactor is not one of the five: its shape already runs the suite twice
-  // around the change, and there is no separate build step for lint to sit
-  // beside — `unchanged` still gets onFail below.
-  it('does not add a lint step to refactor', () => {
-    expect(recipe('refactor.yaml').steps.find((s) => s.id === 'lint')).toBeUndefined()
-  })
 }
 
 function builtInsReworkingTests() {
   // The test run steps that follow a build gain a rework target of their
   // own, so a failing suite sends the same builder back rather than holding
   // the whole order for an operator.
-  it.each([
-    ['direct.yaml', 'check', 'build'],
-    ['bugfix.yaml', 'flip', 'fix'],
-    ['refactor.yaml', 'unchanged', 'change'],
-  ])('%s reworks %s back to %s on failure', (file, stepId, buildStep) => {
-    const step = recipe(file).steps.find((s) => s.id === stepId)
-    expect(step?.onFail).toEqual({ rework: buildStep, max: 1 })
-  })
-
-  // baseline runs before any change exists, so there is nothing upstream of
-  // it to send work back to.
-  it('leaves refactor baseline without a rework target', () => {
-    const baseline = recipe('refactor.yaml').steps.find((s) => s.id === 'baseline')
-    expect(baseline?.onFail).toBeUndefined()
-  })
+  it.each([['direct.yaml', 'check', 'build']])(
+    '%s reworks %s back to %s on failure',
+    (file, stepId, buildStep) => {
+      const step = recipe(file).steps.find((s) => s.id === stepId)
+      expect(step?.onFail).toEqual({ rework: buildStep, max: 1 })
+    }
+  )
 }
 
 // CI is watched on the draft a `ready-for-review` gate opens: every shape

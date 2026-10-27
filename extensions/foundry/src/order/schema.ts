@@ -326,6 +326,18 @@ const ProvenanceSchema = z.object({
   amendments: z.array(z.string()).default([]),
 })
 
+/** What the Forge's intake is doing now; a running state carries the time it gives up. */
+const INTAKE_STATES = ['drafting', 'reviewing', 'fixing', 'ready', 'failed'] as const
+
+const IntakeSchema = z.object({
+  state: z.enum(INTAKE_STATES),
+  since: nonEmpty,
+  deadline: z.string().nullable(),
+  reason: z.string().optional(),
+})
+
+export type OrderIntake = z.infer<typeof IntakeSchema>
+
 /**
  * Where an author put the document it was asked for.
  *
@@ -368,6 +380,7 @@ export const WorkOrderSchema = z.object({
   openQuestions: z.array(OpenQuestionSchema).default([]),
   redTeam: z.array(RedTeamFindingSchema).default([]),
   provenance: ProvenanceSchema,
+  intake: IntakeSchema.optional(),
   document: DocumentHandBackSchema.nullable().default(null),
   createdAt: nonEmpty,
   agreedAt: z.string().nullable().default(null),

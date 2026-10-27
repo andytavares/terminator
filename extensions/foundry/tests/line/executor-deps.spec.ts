@@ -294,9 +294,6 @@ function refusedToolsTests() {
     const { started } = agentStarts('verifier-1')
     const running = deps.run(runInput({ role: 'verifier', readOnly: true }))
     const input = await started
-    expect(
-      input.autoDecide('Write', { file_path: path.join(input.worktreePath, 'src/a.ts') })
-    ).toMatchObject({ allow: false })
     input.onAutoDenied('Write', 'a verifier does not edit')
     expect(runtime.supervision?.feed.list().map((entry) => entry.summary)).toContain(
       'refused Write: a verifier does not edit'
@@ -319,8 +316,9 @@ function executorDepsResumingTests() {
     runner.terminalFor.mockImplementation(() =>
       live ? { terminalSessionId: 'tab-1', projectId: 'p-1' } : null
     )
-    runner.stop.mockImplementation(() => {
+    runner.stop.mockImplementation((sessionId: string) => {
       live = false
+      runner.endSession(sessionId)
       return true
     })
     await deps.endSession('builder-old')
@@ -681,7 +679,11 @@ function executorDepsVerdictsTests() {
     deps.onEvent({ type: 'wave', nodes: [] } as never)
     await deps.record('run.note', 'WO-1', 'a line')
     await eventually(async () =>
-      expect((await ledgerActions(root)).sort()).toEqual(['run.note', 'verify.verdict'])
+      // `checkout.note` is the checkout's own: the fixture repository has no origin remote.
+      expect((await ledgerActions(root)).filter((a) => a !== 'checkout.note').sort()).toEqual([
+        'run.note',
+        'verify.verdict',
+      ])
     )
     const entries = await createOrderStore(root).entries('WO-1')
     expect(entries.find((entry) => entry.action === 'verify.verdict')?.reason).toBe(

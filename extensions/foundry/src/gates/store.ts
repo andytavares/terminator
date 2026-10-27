@@ -104,6 +104,12 @@ export function createGateStore(root: string, index?: FoundryIndex): GateStore {
   }
 }
 
+/** Saves a gate unless one with its id is already decided: `save` replaces by id. */
+export async function raiseUnlessDecided(store: GateStore, gate: Gate): Promise<void> {
+  if ((await store.get(gate.id))?.decision != null) return
+  await store.save(gate)
+}
+
 /**
  * A decision taken before the work it gates, asked once per order.
  *

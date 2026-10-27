@@ -738,3 +738,38 @@
   text-overflow: ellipsis;
   pointer-events: none;
 }
+
+/* ── Confirm button, armed ──────────────────────────────────────────────── */
+
+.tmui-confirm {
+  display: flex;
+  flex: 1 1 320px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--tm-border);
+  border-radius: 6px;
+}
+
+.tmui-confirm__warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--tm-text-secondary);
+}
+
+.tmui-confirm__warning svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+}
+
+.tmui-confirm__actions {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}

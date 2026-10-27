@@ -104,7 +104,7 @@ const checkRowKey = (target: CheckTarget): string =>
     ? `${target.kind}:${target.name}`
     : target.kind
 
-const partOf = (target: CheckTarget): string | null =>
+const partOf = (target: CheckTarget): RemovablePart | null =>
   target.kind === 'additional' ? null : target.kind === 'check' ? target.name : target.kind
 
 function rowOf(input: RowInput, profile: ProfileFacts, base: string): CheckRowView {
@@ -221,12 +221,15 @@ export function interfaceTouched(order: WorkOrder, interfaceGlobs: readonly stri
   )
 }
 
+/** A part of the profile whose command can be taken away. */
+type RemovablePart = CheckName | 'prepare' | 'pictures'
+
 /** What a save sends: the parts of the profile that change; the rest is left as it is. */
 export interface SaveChange {
   readonly checks?: Partial<Record<CheckName, string | null>>
   readonly prepare?: string | null
   readonly pictures?: string | null
-  readonly remove?: readonly string[]
+  readonly remove?: readonly RemovablePart[]
   readonly additional?: readonly NewCheck[]
 }
 

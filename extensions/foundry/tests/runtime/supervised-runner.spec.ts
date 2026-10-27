@@ -12,6 +12,7 @@ import type {
   AgentPermissionAsk,
   AgentPermissionSettled,
   AgentsAPI,
+  AgentUpdate,
   AgentTurnEnd,
   ExtensionAPI,
   StartAgentInput,
@@ -43,6 +44,8 @@ let startsAs: { sessionId: string } | null
 let askListeners: Array<(ask: AgentPermissionAsk) => void>
 let settledListeners: Array<(settled: AgentPermissionSettled) => void>
 let detachedAsks: number
+let updateListeners: Array<(update: AgentUpdate) => void>
+let detachedUpdates: number
 let answers: Array<{ sessionId: string; requestId: string; optionId: string | null }>
 
 function exitWith(exit: { exitCode: number | null }): void {
@@ -54,6 +57,16 @@ function scriptOf(input: { args: string[] }): string {
   const match = /'([^']+)'$/.exec(input.args[input.args.length - 1])
   if (match === null) throw new Error(`no script in ${input.args.join(' ')}`)
   return match[1]
+}
+
+function recordUpdateListener(_sessionId: string, listener: (update: AgentUpdate) => void) {
+  updateListeners.push(listener)
+  return () => void (detachedUpdates += 1)
+}
+
+function recordEndListener(_sessionId: string, listener: (exitCode: number | null) => void) {
+  endListeners.push(listener)
+  return () => void (detachedEnd += 1)
 }
 
 function fakeAgents(): AgentsAPI {
@@ -69,6 +82,7 @@ function fakeAgents(): AgentsAPI {
       askListeners.push(listener)
       return () => void (detachedAsks += 1)
     },
+    onUpdate: recordUpdateListener,
     onPermissionSettled: (_sessionId, listener) => {
       settledListeners.push(listener)
       return () => undefined
@@ -78,12 +92,7 @@ function fakeAgents(): AgentsAPI {
       return true
     },
     close: async (sessionId) => void agentsClosed.push(sessionId),
-    onEnd: (_sessionId, listener) => {
-      endListeners.push(listener)
-      return () => {
-        detachedEnd += 1
-      }
-    },
+    onEnd: recordEndListener,
   })
 }
 
@@ -168,12 +177,18 @@ beforeEach(() => {
   askListeners = []
   settledListeners = []
   detachedAsks = 0
+  updateListeners = []
+  detachedUpdates = 0
   answers = []
 })
 
 afterEach(() => {
   rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
 })
+
+function settingsDenying(...deny: string[]) {
+  return { permissions: { allow: ['Read'], ask: ['Artifact'], deny } }
+}
 
 /** The options the runner handed Claude: model, env and the rest. */
 function claudeOptions(): Record<string, unknown> {
@@ -221,14 +236,13 @@ function writeTranscript(count: number): void {
 describe('the supervised runner over ACP', () => {
   beforeEach(() => {
     vi.stubEnv('HOME', join(dir, 'home'))
+    return () => vi.unstubAllEnvs()
   })
-  afterEach(() => vi.unstubAllEnvs())
-
   describe('starting a run', startingARunTests)
   describe('the options Claude gets', claudeOptionsTests)
-  describe('the deny rules', denyRuleTests)
+  describe('the settings Claude gets', claudeSettingsTests)
   describe('mode and resume', modeAndResumeTests)
-  describe('tracking the run', trackingTests)
+  describe('tracking the run', () => (trackingTests(), heldCallsTests()))
   describe('nothing started', nothingStartedTests)
   describe('a tool call the agent may not make on its own', toolCallTests)
   describe('the operator answers', answeringTests)
@@ -273,13 +287,6 @@ function startingARunTests() {
   })
 }
 
-function denyRuleTests() {
-  it('gives Claude the deny rules, which hold in auto mode too', async () => {
-    await runner().start({ ...start, denyRules: ['Bash(git push *)'] })
-    expect(claudeOptions().disallowedTools).toEqual(['Bash(git push *)'])
-  })
-}
-
 function claudeOptionsTests() {
   it('gives Claude its model, effort, skill folders and environment', async () => {
     await runner().start({
@@ -293,14 +300,98 @@ function claudeOptionsTests() {
       effort: 'high',
       additionalDirectories: ['/order/skills/build'],
       env: {
-        SPECIFY_FEATURE: '021-thing',
-        SPECIFY_FEATURE_DIRECTORY: 'specs/021-thing',
         CLAUDE_CODE_FORCE_SESSION_PERSISTENCE: '1',
         FOUNDRY_RUN: '1',
         CLAUDE_CODE_ARTIFACT_AUTO_OPEN: '0',
       },
     })
     expect(claudeOptions().settings).toBeUndefined()
+  })
+}
+
+/** The update Claude's adapter sends when the agent answers in the requested JSON schema. */
+const structuredUpdate = (rawInput: unknown, status?: string): AgentUpdate => ({
+  sessionUpdate: 'tool_call_update',
+  toolCallId: 'answer-1',
+  rawInput,
+  ...(status === undefined ? {} : { status }),
+  _meta: { claudeCode: { toolName: 'StructuredOutput' } },
+})
+
+describe('a streamed structured answer', () => {
+  const outputSchema = { type: 'object', properties: { note: { type: 'string' } } }
+
+  // Measured live: the adapter streams the answer, `{}` first, then a growing object,
+  // then a `completed` update with no input.
+  it('hands over only the finished answer, once', async () => {
+    const answers: unknown[] = []
+    await runner().start({ ...start, outputSchema, onStructuredOutput: (a) => answers.push(a) })
+    updateListeners[0](structuredUpdate({}))
+    updateListeners[0](structuredUpdate({ note: 'do' }))
+    updateListeners[0](structuredUpdate({ note: 'done' }))
+    updateListeners[0](structuredUpdate(null))
+    expect(answers).toEqual([])
+    updateListeners[0](structuredUpdate(null, 'completed'))
+    expect(answers).toEqual([{ note: 'done' }])
+  })
+})
+
+describe('the structured answer', () => {
+  const outputSchema = { type: 'object', properties: { note: { type: 'string' } } }
+
+  it('asks Claude to answer in the schema', async () => {
+    await runner().start({ ...start, outputSchema, onStructuredOutput: () => undefined })
+    expect(claudeOptions().outputFormat).toEqual({ type: 'json_schema', schema: outputSchema })
+  })
+
+  it('leaves the output format out without a schema', async () => {
+    await runner().start(start)
+    expect(claudeOptions()).not.toHaveProperty('outputFormat')
+  })
+
+  it('hands the starter the answer, and ignores every other update', async () => {
+    const answers: unknown[] = []
+    await runner().start({ ...start, outputSchema, onStructuredOutput: (a) => answers.push(a) })
+    updateListeners[0]({ sessionUpdate: 'agent_message_chunk' })
+    updateListeners[0]({
+      sessionUpdate: 'tool_call_update',
+      rawInput: { command: 'ls' },
+      _meta: { claudeCode: { toolName: 'Bash' } },
+    })
+    updateListeners[0](structuredUpdate({ note: 'done' }))
+    updateListeners[0](structuredUpdate(null, 'completed'))
+    expect(answers).toEqual([{ note: 'done' }])
+  })
+
+  it('stops listening when the run ends', async () => {
+    await runner().start({ ...start, outputSchema, onStructuredOutput: () => undefined })
+    endListeners[0](0)
+    // The answer listener and the run's tool-call tracker.
+    expect(detachedUpdates).toBe(2)
+  })
+})
+
+function claudeSettingsTests() {
+  it('gives Claude the deny rules, which hold in auto mode too', async () => {
+    await runner().start({ ...start, settings: settingsDenying('Bash(git push *)') })
+    expect(claudeOptions().disallowedTools).toEqual(['Bash(git push *)'])
+  })
+
+  it('loads only the project’s settings, never the operator’s CLAUDE.md, hooks or connectors', async () => {
+    await runner().start(start)
+    expect(claudeOptions().settingSources).toEqual(['project'])
+  })
+
+  it('names no Spec Kit feature in the environment', async () => {
+    await runner().start(start)
+    const env = claudeOptions().env as Record<string, string>
+    expect(Object.keys(env).filter((name) => name.startsWith('SPECIFY_'))).toEqual([])
+  })
+
+  it('hands Claude the role’s settings', async () => {
+    const settings = settingsDenying('Bash(git -C * push*)')
+    await runner().start({ ...start, settings })
+    expect(claudeOptions().settings).toEqual(settings)
   })
 
   it('leaves the model and effort off when none was chosen, so the operator config wins', async () => {
@@ -311,7 +402,7 @@ function claudeOptionsTests() {
 }
 
 function modeAndResumeTests() {
-  it.each(['auto', 'default'] as const)(
+  it.each(['auto', 'default', 'acceptEdits', 'dontAsk'] as const)(
     'starts the agent in the %s mode it was given',
     async (mode) => {
       await runner().start({ ...start, mode })
@@ -428,21 +519,24 @@ function answeringTests() {
     await call.arrived
     r.resolve('acp-1', call.seen[0].requestId, { allow: false, answer: 'use the staging host' })
     await eventually(() => expect(answers.map((a) => a.optionId)).toEqual(['reject-once']))
+    expect(prompts.map((p) => p.text)).toEqual(['/speckit-implement'])
+    endTurn('/speckit-implement')
     await eventually(() => expect(prompts.at(-1)?.text).toBe('use the staging host'))
+    expect(cancelled).toEqual([])
   })
 }
 
 function plainDenyTests() {
-  it('cancels the turn and tells the agent it was refused, so one turn ends after it reads why', async () => {
+  it('rejects without cancelling the turn or sending a prompt', async () => {
     const call = held()
     const r = runner()
     await r.start({ ...start, onPending: call.onPending })
     raise()
     await call.arrived
     r.resolve('acp-1', call.seen[0].requestId, { allow: false })
-    await eventually(() => expect(prompts.at(-1)?.text).toBe('Denied by the operator'))
-    expect(answers.map((a) => a.optionId)).toEqual(['reject-once'])
-    expect(cancelled).toEqual(['acp-1'])
+    await eventually(() => expect(answers.map((a) => a.optionId)).toEqual(['reject-once']))
+    expect(cancelled).toEqual([])
+    expect(prompts.map((p) => p.text)).toEqual(['/speckit-implement'])
   })
 }
 
@@ -501,7 +595,7 @@ function ladderTests() {
     expect(seen).toEqual([])
   })
 
-  it('refuses with the reject option and says so when the ladder refuses', async () => {
+  it('refuses with the reject option, never cancelling the turn, when the policy refuses', async () => {
     const refused: string[] = []
     await runner().start({
       ...start,
@@ -511,9 +605,8 @@ function ladderTests() {
     raise()
     await eventually(() => expect(answers.map((a) => a.optionId)).toEqual(['reject-once']))
     expect(refused).toEqual(['Bash: outside the checkout'])
-    // The reason reaches the agent, as it did in the tool result before ACP.
-    await eventually(() => expect(prompts.at(-1)?.text).toBe('outside the checkout'))
-    expect(cancelled).toEqual(['acp-1'])
+    expect(cancelled).toEqual([])
+    expect(prompts.map((p) => p.text)).toEqual(['/speckit-implement'])
   })
 }
 
@@ -544,6 +637,34 @@ function endWithAsksTests() {
     expect(r.watchable()[0].isWaiting).toBe(true)
     r.resolve('acp-1', call.seen[0].requestId, { allow: true })
     expect(r.watchable()[0].isWaiting).toBe(false)
+  })
+}
+
+function heldCallsTests() {
+  it('stays blocked while one of two held calls is still open', async () => {
+    const seen: PendingPermission[] = []
+    const r = runner()
+    await r.start({ ...start, onPending: (p) => seen.push(p) })
+    raise(askOf({ requestId: 'req-1' }))
+    raise(askOf({ requestId: 'req-2' }))
+    await eventually(() => expect(seen).toHaveLength(2))
+    r.resolve('acp-1', seen[0].requestId, { allow: true })
+    expect(r.watchable()[0].isWaiting).toBe(true)
+    r.resolve('acp-1', seen[1].requestId, { allow: true })
+    expect(r.watchable()[0].isWaiting).toBe(false)
+  })
+
+  it('hands the stall watcher the tool calls seen in the agent’s updates', async () => {
+    const r = runner()
+    await r.start(start)
+    for (const listener of updateListeners) {
+      listener({
+        sessionUpdate: 'tool_call',
+        toolCallId: 't1',
+        _meta: { claudeCode: { toolName: 'Read' } },
+      })
+    }
+    expect(r.watchable()[0].activity).toMatchObject([{ kind: 'tool_started', callId: 't1' }])
   })
 }
 

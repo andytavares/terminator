@@ -1,23 +1,20 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Plus, CheckCircle2, AlertCircle, Loader } from 'lucide-react'
-import { Button, SegmentedControl } from '@terminator/extension-ui'
+import { Button, ConfirmButton, SegmentedControl } from '@terminator/extension-ui'
 import { GateAnswers } from './GateCard.js'
 import { OrderLinks } from './OrderLinks.js'
 import { DocumentChip } from './DocumentChip.js'
-import type { DocumentLink } from '../line/document-kind.js'
 import { ciLabel } from '../line/ci-label.js'
-import type { CiState } from '../line/ci-state.js'
-import type { Gate, GateOption } from '../gates/rules.js'
-import { usePushed, ANY_RECORD } from '../renderer/use-pushed.js'
+import { useFoundryQuery, ANY_RECORD } from '../renderer/foundry-query.js'
 import { Forge } from './Forge.js'
 import { Floor } from './Floor.js'
-import { ConfirmButton } from './ConfirmButton.js'
 import type { Standing } from '../order/standing.js'
 import { statusInWords } from '../order/render.js'
 import type { OrderStatus } from '../order/schema.js'
 import { gradeInWords } from '../runtime/review/risk-grade.js'
 import type { RiskGrade } from '../runtime/review/risk-grade.js'
-import { invoke } from '@terminator/extension-sdk/renderer'
+import { foundryInvoke, refusalOf } from '../renderer/foundry-invoke.js'
+import type { FoundryApi } from '../ipc/foundry-api.js'
 
 // The way into the Forge: what orders exist, and a way to seed another.
 //
@@ -38,54 +35,17 @@ interface Team {
   readonly name: string
 }
 
-interface OrderRow {
-  readonly id: string
-  readonly title: string
-  readonly status: string
-  readonly risk: string
-  readonly failures: number
-  readonly source: { kind: string; tracker: string | null; key: string | null; url?: string | null }
-  /** The pull requests this order opened. */
-  readonly pulls?: readonly { readonly number: number; readonly url: string }[]
-  /** The document the author handed back, when it lives outside the checkout. */
-  readonly document?: DocumentLink | null
-  /** Where CI stands, with how many of the checks have finished. */
-  readonly ci?:
-    | (Pick<CiState, 'status' | 'round' | 'max' | 'reason'> & {
-        readonly checks: { readonly done: number; readonly total: number }
-      })
-    | null
-  /** The open gate this row can answer itself, when the move is yours. */
-  readonly gate?: {
-    readonly id: string
-    readonly options: readonly GateOption[]
-    readonly breach: Gate['breach']
-  } | null
-  /** Questions this order is waiting on an answer to. */
-  readonly openQuestions?: number
-  /**
-   * Where this order actually stands.
-   *
-   * Optional because the list is polled and a host part way through an upgrade
-   * can answer without one. Absent, the row says nothing rather than guessing
-   * — guessing is what it used to do.
-   */
-  readonly standing?: Standing
-}
+type OrderRow = FoundryApi['foundry:order.list']['answer']['orders'][number]
 
-interface TicketsRead {
-  connected?: { tracker: string; account: string }[]
-  issues?: Ticket[]
-  error?: string
-}
+type TicketsRead = FoundryApi['foundry:issues.mine']['answer']
 
 async function readOrderRows(): Promise<OrderRow[]> {
-  const r = (await invoke('foundry:order.list')) as { orders?: OrderRow[] }
+  const r = await foundryInvoke('foundry:order.list')
   return r.orders ?? []
 }
 
 async function readTickets(search: string): Promise<TicketsRead> {
-  return (await invoke('foundry:issues.mine', { term: search })) as TicketsRead
+  return await foundryInvoke('foundry:issues.mine', { term: search })
 }
 
 export interface OrdersProps {
@@ -179,10 +139,20 @@ function useFrom(focusIdeaSignal: number | undefined) {
   return [from, setFrom] as const
 }
 
+const NO_ROWS: OrderRow[] = []
+
 /** The orders, kept current, and answering a row's gate from where it stands. */
 function useOrderRows(setProblem: (problem: string | null) => void) {
-  const [rows, setRows] = useState<OrderRow[]>([])
-  const refresh = useCallback(() => readOrderRows().then(setRows), [])
+  // The counts on these rows go stale the moment a question is answered in
+  // another window or a run raises one, and this list is where the tab's
+  // badge sends you — so it is read again when Foundry says any of that changed.
+  const { data, refetch } = useFoundryQuery(
+    { key: ['order-rows'], kinds: ANY_RECORD },
+    readOrderRows
+  )
+  const refresh = useCallback(async (): Promise<void> => {
+    await refetch()
+  }, [refetch])
   // The same channel the inbox answers with: the row is not a second queue, it
   // is the gate that holds this order put where you are already looking.
   const [answering, setAnswering] = useState<string | null>(null)
@@ -190,11 +160,8 @@ function useOrderRows(setProblem: (problem: string | null) => void) {
     async (gateId: string, option: string) => {
       setAnswering(gateId)
       try {
-        const r = (await invoke('foundry:inbox.decide', { gateId, option })) as {
-          error?: string
-          actionError?: string
-        }
-        setProblem(r.error ?? r.actionError ?? null)
+        const r = await foundryInvoke('foundry:inbox.decide', { gateId, option })
+        setProblem(refusalOf(r))
         await refresh()
       } finally {
         setAnswering(null)
@@ -202,11 +169,7 @@ function useOrderRows(setProblem: (problem: string | null) => void) {
     },
     [refresh, setProblem]
   )
-  // The counts on these rows go stale the moment a question is answered in
-  // another window or a run raises one, and this list is where the tab's
-  // badge sends you — so it is read again when Foundry says any of that changed.
-  usePushed(readOrderRows, setRows, { kinds: ANY_RECORD })
-  return { rows, refresh, answering, answer }
+  return { rows: data ?? NO_ROWS, refresh, answering, answer }
 }
 
 /** Your tickets, listed; refreshed when the picker opens and on search, not per keystroke. */
@@ -216,7 +179,7 @@ function useTickets(from: 'typed' | 'tracker', setProblem: (problem: string | nu
   const [connected, setConnected] = useState<string[] | null>(null)
   const showTickets = useCallback(
     (r: TicketsRead): void => {
-      if (r.error !== undefined) {
+      if ('error' in r) {
         setProblem(r.error)
         return
       }
@@ -250,13 +213,18 @@ function useIdeaFocus(focusIdeaSignal: number | undefined, from: 'typed' | 'trac
   return ideaInputRef
 }
 
-type OrderCreated = { order?: OrderRow; existing?: { id: string }; error?: string }
+type OrderSource = FoundryApi['foundry:order.create']['payload']['source']
 
-async function createOrderAt(
-  repoRoot: string,
-  source: Record<string, unknown>
-): Promise<OrderCreated> {
-  return (await invoke('foundry:order.create', { source, repoPaths: [repoRoot] })) as OrderCreated
+function createOrderAt(repoRoot: string, source: OrderSource) {
+  return foundryInvoke('foundry:order.create', { source, repoPaths: [repoRoot] })
+}
+
+/** The order a create answered with, or the one that already existed for the ticket. */
+function openedId(answer: object): string | null {
+  const opened = 'order' in answer ? answer.order : 'existing' in answer ? answer.existing : null
+  return opened && typeof opened === 'object' && 'id' in opened && typeof opened.id === 'string'
+    ? opened.id
+    : null
 }
 
 /** Marks the surface busy and clears what it last said while `work` runs. */
@@ -281,16 +249,16 @@ function useSeeding(shared: Shared) {
   const [offer, setOffer] = useState<{ teams: Team[] } | null>(null)
   const [teamId, setTeamId] = useState('')
   const createOrder = useCallback(
-    async (source: Record<string, unknown>) => {
+    async (source: OrderSource) => {
       if (repoRoot === null) return
       const r = await createOrderAt(repoRoot, source)
-      if (r.error !== undefined) {
+      if ('error' in r) {
         setProblem(r.error)
         return
       }
       setIdea('')
       await refresh()
-      setOpen(r.order?.id ?? r.existing?.id ?? null)
+      setOpen(openedId(r))
     },
     [repoRoot, refresh, setProblem, setOpen]
   )
@@ -304,7 +272,7 @@ function useSeeding(shared: Shared) {
 interface SeedSteps {
   readonly shared: Shared
   readonly idea: string
-  readonly createOrder: (source: Record<string, unknown>) => Promise<void>
+  readonly createOrder: (source: OrderSource) => Promise<void>
   readonly setOffer: (offer: { teams: Team[] } | null) => void
 }
 
@@ -321,7 +289,7 @@ function useSeed({
     await whileBusy(shared, async () => {
       // Asked before the order exists, because its project and branch are
       // named after the ticket. No offer means no question.
-      const r = (await invoke('foundry:ticket.offer')) as { offer?: { teams: Team[] } | null }
+      const r = await foundryInvoke('foundry:ticket.offer')
       if (r.offer) {
         setOffer(r.offer)
         setTeamId(r.offer.teams[0]?.id ?? '')
@@ -348,8 +316,8 @@ function useAnswerOffer({
           return
         }
         const r = await createTicket(idea, teamId)
-        if (r.key === undefined) {
-          shared.setProblem(r.error ?? 'Linear did not create the ticket.')
+        if ('error' in r) {
+          shared.setProblem(r.error)
           return
         }
         setOffer(null)
@@ -359,14 +327,8 @@ function useAnswerOffer({
   )
 }
 
-async function createTicket(
-  idea: string,
-  teamId: string
-): Promise<{ key?: string; error?: string }> {
-  return (await invoke('foundry:ticket.create', { idea, teamId })) as {
-    key?: string
-    error?: string
-  }
+function createTicket(idea: string, teamId: string) {
+  return foundryInvoke('foundry:ticket.create', { idea, teamId })
 }
 
 function useSeedFromTicket(shared: Shared) {
@@ -377,16 +339,16 @@ function useSeedFromTicket(shared: Shared) {
       await whileBusy(shared, async () => {
         const r = await createOrderAt(repoRoot, {
           kind: 'tracker',
-          tracker: ticket.tracker,
+          tracker: ticket.tracker === 'jira' ? 'jira' : 'linear',
           key: ticket.key,
         })
-        if (r.error !== undefined) {
+        if ('error' in r) {
           setProblem(r.error)
           return
         }
         await refresh()
         // An order already made from this ticket is an answer, not a failure.
-        setOpen(r.order?.id ?? r.existing?.id ?? null)
+        setOpen(openedId(r))
       })
     },
     [shared]
@@ -504,6 +466,7 @@ function DeleteOrder({
     <ConfirmButton
       label="Delete this order"
       confirmLabel="Delete it and everything it made"
+      className="fdry-discard"
       warning={`This removes ${open} entirely — its records and ledger, its run graph and gates, its checkout and its branch. Nothing about it can be read back afterwards.`}
       disabled={busy}
       onConfirm={onConfirm}
@@ -515,19 +478,17 @@ function DeleteOrder({
 type Ending = (orderId: string) => Promise<string | null>
 
 const discard: Ending = async (orderId) => {
-  const r = (await invoke('foundry:order.cancel', { id: orderId })) as { error?: string }
-  return r.error ?? null
+  const r = await foundryInvoke('foundry:order.cancel', { id: orderId })
+  return 'error' in r ? r.error : null
 }
 
 const remove: Ending = async (orderId) => {
-  const r = (await invoke('foundry:order.delete', { id: orderId })) as {
-    error?: string
-    failed?: string[]
-  }
+  const r = await foundryInvoke('foundry:order.delete', { id: orderId })
   // A partial teardown is said out loud rather than reported
   // as success: a branch git would not delete is a branch
   // still there, and the operator is the one who can act on it.
-  return r.error ?? (r.failed?.length ? r.failed.join('; ') : null)
+  if (r.error !== undefined) return r.error
+  return r.failed?.length ? r.failed.join('; ') : null
 }
 
 function useEndOrder(open: string, { setBusy, setProblem, setOpen, refresh }: Shared) {

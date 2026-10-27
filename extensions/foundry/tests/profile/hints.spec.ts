@@ -100,3 +100,49 @@ describe('formatting files in the shipped hints', () => {
     expect(evaluateHints(rust, hints).paths.formatting).toEqual(['rustfmt.toml', '.rustfmt.toml'])
   })
 })
+
+describe('format check from a node repository', () => {
+  const { hints } = loadHints(defaultHintsDir())
+  const evaluate = (scripts: Record<string, string>, extra: Record<string, string> = {}) => {
+    const repo = temporaryDirectory('foundry-hint-repo')
+    write(repo, 'package.json', JSON.stringify({ scripts }))
+    for (const [file, body] of Object.entries(extra)) write(repo, file, body)
+    return evaluateHints(repo, hints).checks.format
+  }
+
+  it('never maps a writer script named format to the Format check', () => {
+    expect(evaluate({ format: 'prettier --write .' })).toBeNull()
+  })
+
+  it('uses a check script, and falls back to the prettier tool when only a writer exists', () => {
+    expect(
+      evaluate({ format: 'prettier --write .', 'format:check': 'prettier --check .' })
+    ).toMatchObject({
+      command: 'npm run format:check',
+    })
+    expect(evaluate({ format: 'prettier --write .' }, { '.prettierrc': '{}' })).toMatchObject({
+      command: 'npx prettier --check .',
+    })
+  })
+})
+
+describe('evaluateHints on CI workflows', () => {
+  const { hints } = loadHints(defaultHintsDir())
+  const commandFrom = (workflow: string) => {
+    const repo = temporaryDirectory('foundry-hint-repo')
+    write(repo, '.github/workflows/ci.yml', workflow)
+    return evaluateHints(repo, hints).checks.test?.command ?? null
+  }
+
+  it('skips a command that holds a GitHub expression', () => {
+    const workflow =
+      'jobs:\n  t:\n    steps:\n      - run: npm test -- --shard=${{ matrix.shard }}\n'
+    expect(commandFrom(workflow)).toBeNull()
+  })
+
+  it('reads a command from a multi-line run block', () => {
+    const workflow =
+      'jobs:\n  t:\n    steps:\n      - run: |\n          npm ci\n          npm test\n'
+    expect(commandFrom(workflow)).toBe('npm test')
+  })
+})

@@ -45,7 +45,7 @@ export interface Signal {
   readonly severity: Severity
   readonly firstSeen: string
   readonly lastSeen: string
-  readonly status: 'open' | 'promoted' | 'dismissed'
+  readonly status: 'open' | 'promoted' | 'dismissed' | 'resolved'
   /** Occurrences when it was dismissed; it reopens once it grows by half again. */
   readonly dismissedAt: number | null
   readonly orderId: string | null
