@@ -1,0 +1,37 @@
+tests/unit/scripts/stability.spec.ts
+  s_567c3310a5db4e::t_b28353ea711677 43
+scripts/ci-plan.mjs
+  s_567c3310a5db4e::t_b28353ea711677 16
+scripts/stability.mjs
+  s_567c3310a5db4e::t_b28353ea711677 16-18
+tests/unit/scripts/ci-e2e-local.spec.ts
+  s_567c3310a5db4e::t_c3512b5ddf6fd3 57,60
+.github/workflows/ci.yml
+  s_567c3310a5db4e::t_b28353ea711677 222,224
+scripts/ci-e2e-local.mjs
+  s_567c3310a5db4e::t_b28353ea711677 159-160,169,171
+docs/CONTRIBUTING.md
+  s_567c3310a5db4e::t_17b281f06d9a8c 77
+tests/unit/scripts/ci-plan.spec.ts
+  s_567c3310a5db4e::t_087fcbe1857e61 216-218
+.specify/memory/constitution.md
+  s_567c3310a5db4e::t_17b281f06d9a8c 9-12,346-347,370-371
+docs/adr/132-ci-finishes-in-five-minutes.md
+  s_567c3310a5db4e::t_17b281f06d9a8c 7,31-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6ba02ada729e4d23ef19b14e400050029efbc9ef",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
