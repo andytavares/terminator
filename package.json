@@ -68,7 +68,7 @@
     "@agentclientprotocol/claude-agent-acp": "0.89.1",
     "@agentclientprotocol/sdk": "1.8.0",
     "@electric-sql/pglite": "0.2.17",
-    "@linear/sdk": "91.0.0",
+    "@linear/sdk": "97.1.0",
     "@terminator/extension-sdk": "5.2.0",
     "@terminator/extension-ui": "1.0.0",
     "@xterm/addon-fit": "0.11.0",
