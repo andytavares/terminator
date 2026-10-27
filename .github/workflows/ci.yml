@@ -445,8 +445,6 @@ jobs:
   # `Start` runs the build and its warning check on every run.
   e2e:
     name: E2E (${{ matrix.shard }}/3)
-    needs: select
-    if: needs.select.outputs.run_e2e == 'true'
     runs-on: macos-26
     strategy:
       # Every shard runs to the end, so one run reports every failing spec rather than the first.
@@ -468,8 +466,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Each shard selects for itself, the same way the Select job does (scripts/test-select.mjs),
+      # so it starts with the other jobs instead of after Select. With nothing selected it stops here.
+      - name: Select tests
+        id: select
+        env:
+          TEST_ALL: "${{ contains(github.event.pull_request.labels.*.name, 'test: all') && '1' || '' }}"
+        run: node scripts/test-select.mjs --github-output >> "$GITHUB_OUTPUT"
+
       - name: Build cache key
         id: source
+        if: steps.select.outputs.run_e2e == 'true'
         run: |
           echo "hash=$(git ls-tree -r HEAD | grep -v -E $'\t'"(tests|docs|specs)/|/tests/" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
@@ -477,6 +484,7 @@ jobs:
       # each extension's bundle and its renderer's dist/.
       - name: Restore the build
         id: build-cache
+        if: steps.select.outputs.run_e2e == 'true'
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
@@ -486,7 +494,7 @@ jobs:
           key: build-${{ runner.os }}-${{ steps.source.outputs.hash }}
 
       - name: Build
-        if: steps.build-cache.outputs.cache-hit != 'true'
+        if: steps.select.outputs.run_e2e == 'true' && steps.build-cache.outputs.cache-hit != 'true'
         run: npm run build
 
       # The Electron binary on macOS arm64 can have an invalid code signature
@@ -494,6 +502,7 @@ jobs:
       # failures. Force-extract the binary (install.js is idempotent) and
       # ad-hoc re-sign it before launching the suite.
       - name: Re-sign Electron (macOS arm64 code-signature workaround)
+        if: steps.select.outputs.run_e2e == 'true'
         run: |
           node node_modules/electron/install.js
           codesign --force --deep --sign - node_modules/electron/dist/Electron.app
@@ -501,14 +510,17 @@ jobs:
       # This user's processes against the per-user limit, before and after each
       # E2E step: what a step leaves running is still there in the next one.
       - name: Process census (before the suite)
+        if: steps.select.outputs.run_e2e == 'true'
         run: scripts/process-census.sh "before the suite"
 
       # No retries: a test that fails once fails the build. Shards are split by
-      # recorded duration (scripts/e2e-shard.mjs), not Playwright's test count.
+      # recorded duration (scripts/e2e-shard.mjs), not Playwright's test count, two apps
+      # per shard (it prints --workers=2).
       - name: Run E2E suite
+        if: steps.select.outputs.run_e2e == 'true'
         env:
-          MODE: ${{ needs.select.outputs.e2e_mode }}
-          SPECS: ${{ needs.select.outputs.e2e_specs }}
+          MODE: ${{ steps.select.outputs.e2e_mode }}
+          SPECS: ${{ steps.select.outputs.e2e_specs }}
           PLAYWRIGHT_BLOB_OUTPUT_NAME: report-${{ matrix.shard }}.zip
           PLAYWRIGHT_JUNIT_OUTPUT_NAME: junit/e2e-${{ matrix.shard }}.xml
         run: |
@@ -521,7 +533,7 @@ jobs:
           # git-integration-contrast.spec.ts and git-integration-stacking.spec.ts
           # render the extension views in it, and design-system-fields.spec.ts renders the shared field styles.
           case "$ARGS" in *remote-control.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts* | *design-system-fields.spec.ts*) npx playwright install chromium ;; esac
-          npx playwright test "${shard[@]}" --workers=2 --grep-invert @quarantine --reporter=blob,dot,junit
+          npx playwright test "${shard[@]}" --grep-invert @quarantine --reporter=blob,dot,junit
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -534,6 +546,7 @@ jobs:
 
       # The changed e2e specs, five runs each, this shard's part of them (ADR 124).
       - name: Changed e2e specs, 5 runs, this shard's part
+        if: steps.select.outputs.run_e2e == 'true'
         run: node scripts/stability.mjs --e2e --part ${{ matrix.shard }}/3
 
       - name: Process census (after the suite)

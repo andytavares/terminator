@@ -9,6 +9,8 @@ import {
   units,
   pack,
   timingsFromReport,
+  shardPlan,
+  APPS_PER_SHARD,
 } from '../../../scripts/e2e-shard.mjs'
 
 const START = Date.parse('2026-09-27T19:43:39.000Z')
@@ -53,23 +55,33 @@ const REPORT = {
   ],
 }
 
+const REPORT_TESTS = [
+  {
+    file: 'session-home.spec.ts',
+    line: 40,
+    key: 'session-home.spec.ts › the app opens on Home',
+    ended: START + 8000,
+    worker: 0,
+  },
+  {
+    file: 'session-home.spec.ts',
+    line: 90,
+    key: 'session-home.spec.ts › the Ledger › fits its surface',
+    ended: START + 19000,
+    worker: 0,
+  },
+  {
+    file: 'terminal.spec.ts',
+    line: 10,
+    key: 'terminal.spec.ts › types',
+    ended: null,
+    worker: 0,
+  },
+]
+
 describe('testsFromReport', () => {
   it('keys each test by its file and describe titles, and reads when it ended', () => {
-    expect(testsFromReport(REPORT)).toEqual([
-      {
-        file: 'session-home.spec.ts',
-        line: 40,
-        key: 'session-home.spec.ts › the app opens on Home',
-        ended: START + 8000,
-      },
-      {
-        file: 'session-home.spec.ts',
-        line: 90,
-        key: 'session-home.spec.ts › the Ledger › fits its surface',
-        ended: START + 19000,
-      },
-      { file: 'terminal.spec.ts', line: 10, key: 'terminal.spec.ts › types', ended: null },
-    ])
+    expect(testsFromReport(REPORT)).toEqual(REPORT_TESTS)
   })
 
   it('charges each test the time since the previous one ended, hooks included', () => {
@@ -78,6 +90,64 @@ describe('testsFromReport', () => {
       'session-home.spec.ts › the app opens on Home': 8,
       'session-home.spec.ts › the Ledger › fits its surface': 11,
     })
+  })
+})
+
+const ranOn = (worker: number, startsAfterMs: number, ms: number) => ({
+  results: [
+    {
+      startTime: new Date(START + startsAfterMs).toISOString(),
+      duration: ms,
+      parallelIndex: worker,
+    },
+  ],
+})
+const spec = (title: string, test: ReturnType<typeof ranOn>) => ({
+  title,
+  file: 'w.spec.ts',
+  line: 1,
+  tests: [test],
+})
+const TWO_WORKERS = {
+  stats: REPORT.stats,
+  suites: [
+    {
+      title: 'w.spec.ts',
+      file: 'w.spec.ts',
+      specs: [
+        spec('long on worker 0', ranOn(0, 1000, 20000)),
+        spec('short on worker 1', ranOn(1, 1000, 4000)),
+        spec('next on worker 1', ranOn(1, 6000, 3000)),
+      ],
+    },
+  ],
+}
+
+describe('timings from a shard that ran two apps at once', () => {
+  it("charges each test the time since its own worker's previous test ended", () => {
+    expect(timingsFromReport(TWO_WORKERS)).toEqual({
+      'w.spec.ts › long on worker 0': 21,
+      'w.spec.ts › short on worker 1': 5,
+      'w.spec.ts › next on worker 1': 4,
+    })
+  })
+})
+
+describe('a shard runs two apps at once', () => {
+  const unitsOf = (seconds: number[]) =>
+    seconds.map((cost, index) => ({ args: [`tests/e2e/u${index}.spec.ts`], seconds: cost }))
+
+  it('gets two lanes of the plan, and asks Playwright for as many workers', () => {
+    expect(APPS_PER_SHARD).toBe(2)
+    const plan = unitsOf([40, 30, 20, 10, 10, 10])
+    const shards = [1, 2, 3].map((shard) => shardPlan(plan, shard, 3))
+    for (const args of shards) expect(args.at(-1)).toBe('--workers=2')
+    const placed = shards.flatMap((args) => args.slice(0, -1)).sort()
+    expect(placed).toEqual(plan.map((unit) => unit.args[0]).sort())
+  })
+
+  it('gives a shard with nothing to run no arguments at all', () => {
+    expect(shardPlan(unitsOf([5]), 3, 3)).toEqual([])
   })
 })
 

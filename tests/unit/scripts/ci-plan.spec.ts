@@ -228,6 +228,14 @@ describe('the Stability shards (ADR 124)', () => {
   })
 })
 
+describe('the e2e job', () => {
+  it('starts with the other jobs and selects its own tests, so it never waits for Select', () => {
+    expect(workflow.jobs.e2e.needs).toBeUndefined()
+    const select = stepsOf('e2e').find((step) => step.id === 'select')
+    expect(String(select?.run)).toContain('node scripts/test-select.mjs --github-output')
+  })
+})
+
 describe('the e2e job and the nightly sweep (ADR 124)', () => {
   const sweep = readWorkflow(resolve(REPO_ROOT, '.github/workflows/stability-sweep.yml'))
 
