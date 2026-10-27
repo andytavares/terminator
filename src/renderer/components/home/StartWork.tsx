@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Bot, GitBranch, Plus } from 'lucide-react'
-import { Button, Chip, Kbd, ModalShell } from '@terminator/extension-ui'
+import { Button, Chip, Kbd, ModalShell, Tab, TabList, TabsRoot } from '@terminator/extension-ui'
 import { WorkspacePicker } from './WorkspacePicker'
 import { AcrossRepos } from './AcrossRepos'
 import { RunAsChoices } from './RunAsChoices'
@@ -232,31 +232,26 @@ function SearchRow({ view, actions }: PartProps): JSX.Element {
 function TabRow({ view, actions }: PartProps): JSX.Element {
   const ticketKey = view.selected?.kind === 'ticket' ? view.selected.issue.key : null
   return (
-    <div className="start-work__tabs" role="tablist">
-      {TABS.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          role="tab"
-          tabIndex={-1}
-          aria-selected={view.tab === tab.id}
-          onClick={() => actions.setTab(tab.id)}
-        >
-          {tab.label}
-        </button>
-      ))}
-      {view.tab !== 'scratch' && view.tab !== 'across' && (
-        <WorkspacePicker
-          current={view.repo}
-          reason={view.repoReason}
-          ticketKey={ticketKey}
-          open={view.picking}
-          onToggle={actions.togglePicker}
-          onPick={actions.pickRepo}
-          onClose={() => actions.dismiss()}
-        />
-      )}
-    </div>
+    <TabsRoot selectedId={view.tab} onSelect={actions.setTab}>
+      <TabList label="Start work from" className="start-work__tabs">
+        {TABS.map((tab) => (
+          <Tab key={tab.id} id={tab.id}>
+            {tab.label}
+          </Tab>
+        ))}
+        {view.tab !== 'scratch' && view.tab !== 'across' && (
+          <WorkspacePicker
+            current={view.repo}
+            reason={view.repoReason}
+            ticketKey={ticketKey}
+            open={view.picking}
+            onToggle={actions.togglePicker}
+            onPick={actions.pickRepo}
+            onClose={() => actions.dismiss()}
+          />
+        )}
+      </TabList>
+    </TabsRoot>
   )
 }
 

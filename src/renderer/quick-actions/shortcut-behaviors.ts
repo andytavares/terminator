@@ -4,7 +4,6 @@ import type { TerminalPlace } from '../terminal/session-controller'
 import { useExtensionRegistry } from '../extensions/registry'
 import { dispatchNotification } from '../lib/notifications'
 import { agentStateOf } from '../sidebar/agent-state'
-import { isBrokenOut } from '../stores/breakout.store'
 
 /** Leaves whatever global/workspace/project tab is showing, the way every
  * "go to session" path must (see navigate-to-session.ts's revealSession). */
@@ -173,39 +172,4 @@ export function splitPane(
         key: 'splitPaneFailed',
       })
     )
-}
-
-export interface ClosePaneDeps {
-  getPaneLayout(projectId: string): unknown
-  getFocusedSession(projectId: string): string | null | undefined
-  closeSplitLeaf(projectId: string, sessionId: string): void
-  closeSession(sessionId: string): Promise<unknown>
-  getActiveSessionForProject(projectId: string): string | null | undefined
-}
-
-export function closeFocusedPane(effectiveProjectId: string | null, deps: ClosePaneDeps): void {
-  if (!effectiveProjectId) return
-  const {
-    getPaneLayout,
-    getFocusedSession,
-    closeSplitLeaf,
-    closeSession,
-    getActiveSessionForProject,
-  } = deps
-  const layout = getPaneLayout(effectiveProjectId)
-  const focusedId = getFocusedSession(effectiveProjectId)
-  if (layout && focusedId) {
-    closeSplitLeaf(effectiveProjectId, focusedId)
-    closeSession(focusedId).catch(() =>
-      dispatchNotification({
-        type: 'error',
-        title: 'Close terminal failed',
-        message: 'Could not close terminal',
-        key: 'closeTerminalFailed',
-      })
-    )
-  } else {
-    const activeId = getActiveSessionForProject(effectiveProjectId)
-    if (activeId && !isBrokenOut(activeId)) void closeSession(activeId)
-  }
 }

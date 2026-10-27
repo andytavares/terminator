@@ -12,6 +12,7 @@ import {
 } from '../../terminal/tab-drag'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { AlertBadge } from '../AlertBadge'
+import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
 import { MoveSessionDialog } from '../sidebar/MoveSessionDialog'
 import type { ProjectTabRegistration } from '../../extensions/registry'
 import { qualifiedBranchLabel } from '../../sidebar/branch-display'
@@ -465,125 +466,77 @@ function TabMenus({ menus, factsById, onScratchDeactivate, ...rest }: TabMenusPr
 /** The context menu for the tab it was opened on; each choice closes it first. */
 function TabCtxMenu({ menus, editing, factsById, sessions }: TabMenusProps): JSX.Element {
   const { x, y, sessionId } = menus.ctxMenu!
-  const facts = factsById.get(sessionId)
   const close = () => menus.setCtxMenu(null)
   const then = (act: () => void) => () => {
     close()
     act()
   }
-  const actions: TabMenuActions = {
-    onRename: then(() =>
-      editing.rename.start(sessionId, sessions.find((s) => s.id === sessionId)?.tabTitle ?? '')
-    ),
-    onNote: then(() => editing.note.start(sessionId, facts?.description ?? '')),
-    onMove: then(() => menus.setMoveDialogSessionId(sessionId)),
-    onAddToTask: then(() => addBranchToTask(sessions.find((s) => s.id === sessionId))),
-    onLinkIssue: then(() => menus.setLinkSessionId(sessionId)),
-    onRemoveLink: then(
+  const facts = factsById.get(sessionId)
+  const session = sessions.find((s) => s.id === sessionId)
+  const items = tabMenuItems({ sessionId, session, facts, menus, editing, then })
+  return <ContextMenu {...{ x, y, items }} onDismiss={close} />
+}
+
+interface TabMenuItemsInput extends IssueItemsInput {
+  session: TerminalSession | undefined
+  editing: TabEditing
+}
+
+function tabMenuItems(input: TabMenuItemsInput): ContextMenuItem[] {
+  const { sessionId, session, facts, menus, editing, then } = input
+  return [
+    {
+      label: 'Rename',
+      onSelect: then(() => editing.rename.start(sessionId, session?.tabTitle ?? '')),
+    },
+    {
+      label: facts?.description ? 'Edit description…' : 'Add description…',
+      onSelect: then(() => editing.note.start(sessionId, facts?.description ?? '')),
+    },
+    {
+      label: 'Move to branch…',
+      separatorBefore: true,
+      onSelect: then(() => menus.setMoveDialogSessionId(sessionId)),
+    },
+    { label: 'Add to task…', onSelect: then(() => addBranchToTask(session)) },
+    ...issueItems(input),
+    {
+      label: 'Close tab',
+      danger: true,
+      separatorBefore: true,
+      onSelect: then(() => void useSessionStore.getState().closeSession(sessionId)),
+    },
+  ]
+}
+
+interface IssueItemsInput {
+  facts: SessionFacts | undefined
+  sessionId: string
+  menus: ReturnType<typeof useTabMenus>
+  then: (act: () => void) => () => void
+}
+
+/** Link or change the session's ticket, and remove the link when it has one. */
+function issueItems({ facts, sessionId, menus, then }: IssueItemsInput): ContextMenuItem[] {
+  const hasLink = ownLinkKey(facts) !== null
+  const link: ContextMenuItem = {
+    label: hasLink ? 'Change linked issue…' : 'Link issue…',
+    separatorBefore: true,
+    onSelect: then(() => menus.setLinkSessionId(sessionId)),
+  }
+  if (!hasLink) return [link]
+  const remove: ContextMenuItem = {
+    label: 'Remove session link',
+    danger: true,
+    onSelect: then(
       () => facts && void useSessionRecordsStore.getState().setLink(facts.snapshot, null)
     ),
-    onCloseTab: then(() => void useSessionStore.getState().closeSession(sessionId)),
   }
-  return (
-    <SessionTabCtxMenu
-      {...{ x, y, actions }}
-      hasNote={!!facts?.description}
-      ownLinkKey={ownLinkKey(facts)}
-      onClose={close}
-    />
-  )
+  return [link, remove]
 }
 
 /** Opens the Add to task picker for the branch a tab's terminal is on. */
 function addBranchToTask(session: TerminalSession | undefined): void {
   const lane = laneOfBranch(session?.projectId)
   if (lane) openAddToTask(lane)
-}
-
-interface TabMenuActions {
-  onRename: () => void
-  onNote: () => void
-  onMove: () => void
-  onAddToTask: () => void
-  onLinkIssue: () => void
-  onRemoveLink: () => void
-  onCloseTab: () => void
-}
-
-interface SessionTabCtxMenuProps {
-  x: number
-  y: number
-  hasNote: boolean
-  /** This session's own linked ticket key, or null when it has none. */
-  ownLinkKey: string | null
-  actions: TabMenuActions
-  onClose: () => void
-}
-
-function SessionTabCtxMenu({
-  x,
-  y,
-  hasNote,
-  ownLinkKey,
-  actions,
-  onClose,
-}: SessionTabCtxMenuProps) {
-  React.useEffect(() => {
-    const close = (): void => onClose()
-    window.addEventListener('click', close)
-    return () => window.removeEventListener('click', close)
-  }, [onClose])
-
-  return (
-    <div className="ctx-menu" style={{ left: x, top: y }} onClick={(e) => e.stopPropagation()}>
-      <MenuItem label="Rename" onSelect={actions.onRename} />
-      <MenuItem
-        label={hasNote ? 'Edit description…' : 'Add description…'}
-        onSelect={actions.onNote}
-      />
-      <div className="ctx-menu__separator" />
-      <MenuItem label="Move to branch…" onSelect={actions.onMove} />
-      <MenuItem label="Add to task…" onSelect={actions.onAddToTask} />
-      <div className="ctx-menu__separator" />
-      <IssueItems ownLinkKey={ownLinkKey} actions={actions} />
-      <div className="ctx-menu__separator" />
-      <MenuItem label="Close tab" danger onSelect={actions.onCloseTab} />
-    </div>
-  )
-}
-
-function IssueItems({
-  ownLinkKey,
-  actions,
-}: Pick<SessionTabCtxMenuProps, 'ownLinkKey' | 'actions'>) {
-  return (
-    <>
-      <MenuItem
-        label={ownLinkKey === null ? 'Link issue…' : 'Change linked issue…'}
-        onSelect={actions.onLinkIssue}
-      />
-      {ownLinkKey !== null && (
-        <MenuItem label="Remove session link" danger onSelect={actions.onRemoveLink} />
-      )}
-    </>
-  )
-}
-
-function MenuItem({
-  label,
-  danger,
-  onSelect,
-}: {
-  label: string
-  danger?: boolean
-  onSelect: () => void
-}) {
-  return (
-    <button
-      className={`ctx-menu__item${danger ? ' ctx-menu__item--danger' : ''}`}
-      onClick={onSelect}
-    >
-      {label}
-    </button>
-  )
 }

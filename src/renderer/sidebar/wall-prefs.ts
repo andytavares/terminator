@@ -1,3 +1,5 @@
+import { readStoredJson, writeStoredJson } from '../home/local-storage'
+
 // How the operator has arranged the Monitor wall. Persisted per machine in
 // localStorage — the one side effect here, isolated to load/save.
 
@@ -16,15 +18,8 @@ export const WALL_PREFS_KEY = 'terminator.wall.prefs'
 /** @internal */
 export const DEFAULT_WALL_PREFS: WallPrefs = { size: 'm', pinNeeds: true, thenBy: 'state' }
 
-export function loadWallPrefs(): WallPrefs {
-  let raw: unknown
-  try {
-    const stored = localStorage.getItem(WALL_PREFS_KEY)
-    raw = stored === null ? null : JSON.parse(stored)
-  } catch {
-    return DEFAULT_WALL_PREFS
-  }
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return DEFAULT_WALL_PREFS
+function wallPrefsFrom(raw: unknown): WallPrefs | null {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null
   const p = raw as Record<string, unknown>
   const d = DEFAULT_WALL_PREFS
   return {
@@ -36,11 +31,11 @@ export function loadWallPrefs(): WallPrefs {
   }
 }
 
+export function loadWallPrefs(): WallPrefs {
+  return readStoredJson(WALL_PREFS_KEY, DEFAULT_WALL_PREFS, wallPrefsFrom)
+}
+
 /** A preference is not worth an exception. */
 export function saveWallPrefs(prefs: WallPrefs): void {
-  try {
-    localStorage.setItem(WALL_PREFS_KEY, JSON.stringify(prefs))
-  } catch {
-    /* storage refused; the arrangement lasts until reload */
-  }
+  writeStoredJson(WALL_PREFS_KEY, prefs)
 }

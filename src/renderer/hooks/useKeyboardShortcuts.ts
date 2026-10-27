@@ -13,12 +13,10 @@ import {
   clearTerminal,
   newTerminalTab,
   splitPane,
-  closeFocusedPane,
   switchToWorkspace,
 } from '../quick-actions/shortcut-behaviors'
 
 interface Options {
-  onOpenSettings?: () => void
   onToggleLog?: () => void
   onOpenCommandPalette?: () => void
   onToggleOverview?: () => void
@@ -73,11 +71,6 @@ function terminalDeps(c: ShortcutContext) {
 
 // Checked before the extensions' own shortcuts, so no extension can take them.
 const APP_KEYS: CoreKey[] = [
-  {
-    test: (e, at) => at.isMeta && e.key === ',',
-    actionId: 'core.open-settings',
-    run: (c) => c.options.onOpenSettings?.(),
-  },
   // Cmd+P: open command palette
   { test: (e, at) => at.isMeta && e.key === 'p', run: (c) => c.options.onOpenCommandPalette?.() },
   {
@@ -165,12 +158,6 @@ const TERMINAL_KEYS: CoreKey[] = [
     test: (e, at) => at.isMeta && e.shiftKey && e.key === 'd',
     actionId: 'core.split-horizontal',
     run: (c) => splitPane(effectiveProjectOf(c), 'horizontal', terminalDeps(c)),
-  },
-  // Cmd+W: close focused split pane (or active tab if not in split mode)
-  {
-    test: (e, at) => at.isMeta && e.key === 'w',
-    actionId: 'core.close-tab',
-    run: (c) => closeFocusedPane(effectiveProjectOf(c), useSessionStore.getState()),
   },
 ]
 

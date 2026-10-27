@@ -177,7 +177,6 @@ interface ShortcutInput {
 function useShellShortcuts({ windows, palette, launch, note, scratchActive }: ShortcutInput) {
   useKeyboardShortcuts({
     onEditSessionNote: () => note.editNote(activeSessionOfActiveBranch()),
-    onOpenSettings: windows.openSettings,
     onToggleLog: windows.toggleLog,
     onOpenCommandPalette: palette.open,
     onToggleOverview: toggleOverview,

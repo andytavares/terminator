@@ -536,12 +536,6 @@ describe('App — records the welcome as seen once a project is opened', () => {
     expect(mainSettings.getGlobalSettings().ui.hasSeenWelcome).toBe(true)
   })
 
-  it('opens SettingsPanel via onOpenSettings keyboard shortcut callback', async () => {
-    render(<App />)
-    act(() => shortcuts.callbacks.onOpenSettings?.())
-    await screen.findByTestId('settings-panel')
-  })
-
   it('opens LogWindow via onToggleLog keyboard shortcut callback', async () => {
     render(<App />)
     expect(screen.queryByTestId('log-window')).toBeNull()

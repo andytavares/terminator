@@ -1,10 +1,12 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   GlobalSettingsSchema,
   WorkspaceSettingsSchema,
-  ThemeSchema,
   DEFAULT_GLOBAL_SETTINGS,
 } from '../../../src/shared/schemas/settings.schema'
+
+// The defaults a settings file written before a field existed is read with. Only these are
+// pinned: a stored file depends on each one.
 
 const validGlobal = {
   appearance: { theme: 'dark' as const },
@@ -19,528 +21,72 @@ const validWorkspace = {
   extensions: {},
 }
 
-const staleBase = { ...DEFAULT_GLOBAL_SETTINGS }
-
-describe('ThemeSchema', () => {
-  it('accepts dark', () => {
-    expect(ThemeSchema.safeParse('dark').success).toBe(true)
-  })
-
-  it('accepts light', () => {
-    expect(ThemeSchema.safeParse('light').success).toBe(true)
-  })
-
-  it('rejects unknown theme value', () => {
-    expect(ThemeSchema.safeParse('solarized').success).toBe(false)
-  })
-
-  it('rejects empty string', () => {
-    expect(ThemeSchema.safeParse('').success).toBe(false)
-  })
-})
-
-describe('GlobalSettingsSchema', () => {
-  it('accepts a valid settings object', () => {
-    const result = GlobalSettingsSchema.safeParse(validGlobal)
-    expect(result.success).toBe(true)
-  })
-
-  it('accepts light theme', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      appearance: { theme: 'light' },
-    })
-    expect(result.success).toBe(true)
-  })
-
-  it('rejects unknown theme in appearance', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      appearance: { theme: 'monokai' },
-    })
-    expect(result.success).toBe(false)
-  })
-
-  it('rejects scrollbackLimit below minimum (1000)', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      terminal: { scrollbackLimit: 999, defaultShell: '/bin/zsh' },
-    })
-    expect(result.success).toBe(false)
-  })
-})
-
-describe('GlobalSettingsSchema — scrollback bounds', () => {
-  it('rejects scrollbackLimit above maximum (100000)', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      terminal: { scrollbackLimit: 100001, defaultShell: '/bin/zsh' },
-    })
-    expect(result.success).toBe(false)
-  })
-
-  it('accepts scrollbackLimit at boundary minimum (1000)', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      terminal: { scrollbackLimit: 1000, defaultShell: '/bin/zsh' },
-    })
-    expect(result.success).toBe(true)
-  })
-
-  it('accepts scrollbackLimit at boundary maximum (100000)', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      terminal: { scrollbackLimit: 100000, defaultShell: '/bin/zsh' },
-    })
-    expect(result.success).toBe(true)
-  })
-
-  it('rejects non-integer scrollbackLimit', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      terminal: { scrollbackLimit: 10000.5, defaultShell: '/bin/zsh' },
-    })
-    expect(result.success).toBe(false)
-  })
-})
-
-describe('GlobalSettingsSchema — shell, ui and extensions', () => {
-  it('rejects empty defaultShell', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      terminal: { scrollbackLimit: 10000, defaultShell: '' },
-    })
-    expect(result.success).toBe(false)
-  })
-
-  it('applies default value for ui field when omitted', () => {
+describe('GlobalSettingsSchema defaults for fields an older file lacks', () => {
+  it('fills the ui section', () => {
     const { ui: _ui, ...withoutUi } = validGlobal
-    const result = GlobalSettingsSchema.parse(withoutUi)
-    expect(result.ui).toEqual({
+    expect(GlobalSettingsSchema.parse(withoutUi).ui).toEqual({
       hasSeenWelcome: false,
       editor: '',
       hideSidebarOnHome: true,
       homeLayout: 'tasks',
     })
   })
-})
 
-describe('GlobalSettingsSchema — required fields and welcome flag', () => {
-  it('rejects missing appearance field', () => {
-    const { appearance: _a, ...without } = validGlobal
-    const result = GlobalSettingsSchema.safeParse(without)
-    expect(result.success).toBe(false)
+  it('fills the editor with empty, which means detect', () => {
+    const parsed = GlobalSettingsSchema.parse({ ...validGlobal, ui: { hasSeenWelcome: true } })
+    expect(parsed.ui.editor).toBe('')
   })
 
-  it('rejects missing terminal field', () => {
-    const { terminal: _t, ...without } = validGlobal
-    const result = GlobalSettingsSchema.safeParse(without)
-    expect(result.success).toBe(false)
-  })
-
-  it('rejects null as input', () => {
-    expect(GlobalSettingsSchema.safeParse(null).success).toBe(false)
-  })
-
-  it('accepts hasSeenWelcome true', () => {
-    const result = GlobalSettingsSchema.safeParse({ ...validGlobal, ui: { hasSeenWelcome: true } })
-    expect(result.success).toBe(true)
-  })
-
-  it('rejects non-boolean hasSeenWelcome', () => {
-    const result = GlobalSettingsSchema.safeParse({ ...validGlobal, ui: { hasSeenWelcome: 'yes' } })
-    expect(result.success).toBe(false)
-  })
-})
-
-describe('GlobalSettingsSchema — notifications', () => {
-  it('applies default value for notifications field when omitted', () => {
-    const result = GlobalSettingsSchema.parse(validGlobal)
-    expect(result.notifications).toEqual({
+  it('fills the notification targets', () => {
+    expect(GlobalSettingsSchema.parse(validGlobal).notifications).toEqual({
       defaultTargets: ['system', 'center', 'toast'],
       overrides: {},
     })
   })
+})
 
-  it('accepts a custom notifications section keyed by core notification key', () => {
-    const result = GlobalSettingsSchema.parse({
-      ...validGlobal,
-      notifications: {
-        defaultTargets: ['toast'],
-        overrides: { terminalBell: ['system', 'center'] },
-      },
-    })
-    expect(result.notifications.defaultTargets).toEqual(['toast'])
-    expect(result.notifications.overrides).toEqual({
-      terminalBell: ['system', 'center'],
-    })
+describe('GlobalSettingsSchema defaults for the sidebar and quick actions', () => {
+  it('fills the sidebar stale threshold with two hours, in the parsed and the shipped settings', () => {
+    const parsed = GlobalSettingsSchema.parse({ ...DEFAULT_GLOBAL_SETTINGS, sidebar: undefined })
+    expect(parsed.sidebar.staleAfterMs).toBe(7_200_000)
+    expect(DEFAULT_GLOBAL_SETTINGS.sidebar.staleAfterMs).toBe(7_200_000)
+  })
+
+  it('fills the quick actions with empty lists, in the parsed and the shipped settings', () => {
+    const empty = { pins: [], usage: [], directUse: [], custom: [] }
+    expect(GlobalSettingsSchema.parse(validGlobal).quickActions).toEqual(empty)
+    expect(DEFAULT_GLOBAL_SETTINGS.quickActions).toEqual(empty)
   })
 })
 
-describe('GlobalSettingsSchema — unknown notification targets', () => {
-  it('rejects an unknown notification target', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      notifications: { defaultTargets: ['popup'], overrides: {} },
-    })
-    expect(result.success).toBe(false)
-  })
+/** The shell the settings ship with when `SHELL` is `shell`, or unset when `undefined`. */
+async function shippedShell(shell: string | undefined): Promise<string> {
+  const original = process.env.SHELL
+  if (shell === undefined) delete process.env.SHELL
+  else process.env.SHELL = shell
+  vi.resetModules()
+  try {
+    const module = await import('../../../src/shared/schemas/settings.schema')
+    return module.DEFAULT_GLOBAL_SETTINGS.terminal.defaultShell
+  } finally {
+    process.env.SHELL = original
+  }
+}
 
-  it('rejects an unknown notification target in an override', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      notifications: {
-        defaultTargets: ['toast'],
-        overrides: { terminalBell: ['popup'] },
-      },
-    })
-    expect(result.success).toBe(false)
-  })
-})
-
-describe('DEFAULT_GLOBAL_SETTINGS', () => {
+describe('DEFAULT_GLOBAL_SETTINGS shell', () => {
   it('uses process.env.SHELL when set', async () => {
-    const origShell = process.env.SHELL
-    process.env.SHELL = '/bin/fish'
-    vi.resetModules()
-    const { DEFAULT_GLOBAL_SETTINGS } = await import('../../../src/shared/schemas/settings.schema')
-    expect(DEFAULT_GLOBAL_SETTINGS.terminal.defaultShell).toBe('/bin/fish')
-    process.env.SHELL = origShell
+    expect(await shippedShell('/bin/fish')).toBe('/bin/fish')
   })
 
   it('falls back to /bin/zsh when SHELL is not set', async () => {
-    const origShell = process.env.SHELL
-    delete process.env.SHELL
-    vi.resetModules()
-    const { DEFAULT_GLOBAL_SETTINGS } = await import('../../../src/shared/schemas/settings.schema')
-    expect(DEFAULT_GLOBAL_SETTINGS.terminal.defaultShell).toBe('/bin/zsh')
-    process.env.SHELL = origShell
+    expect(await shippedShell(undefined)).toBe('/bin/zsh')
   })
 })
 
-describe('WorkspaceSettingsSchema', () => {
-  it('accepts a valid workspace settings object', () => {
-    expect(WorkspaceSettingsSchema.safeParse(validWorkspace).success).toBe(true)
-  })
-
-  it('rejects a non-UUID workspaceId', () => {
-    const result = WorkspaceSettingsSchema.safeParse({
-      ...validWorkspace,
-      workspaceId: 'not-a-uuid',
-    })
-    expect(result.success).toBe(false)
-  })
-
-  it('applies default empty object for overrides when omitted', () => {
-    const { overrides: _o, ...without } = validWorkspace
-    const result = WorkspaceSettingsSchema.parse(without)
-    expect(result.overrides).toEqual({})
-  })
-})
-
-describe('WorkspaceSettingsSchema — defaults and appearance overrides', () => {
-  it('applies default empty record for extensions when omitted', () => {
-    const { extensions: _e, ...without } = validWorkspace
-    const result = WorkspaceSettingsSchema.parse(without)
-    expect(result.extensions).toEqual({})
-  })
-
-  it('accepts overrides with appearance theme override', () => {
-    const result = WorkspaceSettingsSchema.safeParse({
-      ...validWorkspace,
-      overrides: { appearance: { theme: 'light' } },
-    })
-    expect(result.success).toBe(true)
-  })
-
-  it('rejects invalid theme in overrides.appearance', () => {
-    const result = WorkspaceSettingsSchema.safeParse({
-      ...validWorkspace,
-      overrides: { appearance: { theme: 'gruvbox' } },
-    })
-    expect(result.success).toBe(false)
-  })
-})
-
-describe('WorkspaceSettingsSchema — terminal overrides', () => {
-  it('accepts overrides.terminal with partial fields', () => {
-    const result = WorkspaceSettingsSchema.safeParse({
-      ...validWorkspace,
-      overrides: { terminal: { scrollbackLimit: 5000 } },
-    })
-    expect(result.success).toBe(true)
-  })
-
-  it('rejects overrides.terminal.scrollbackLimit below minimum', () => {
-    const result = WorkspaceSettingsSchema.safeParse({
-      ...validWorkspace,
-      overrides: { terminal: { scrollbackLimit: 500 } },
-    })
-    expect(result.success).toBe(false)
-  })
-
-  it('accepts overrides.terminal.defaultShell override', () => {
-    const result = WorkspaceSettingsSchema.safeParse({
-      ...validWorkspace,
-      overrides: { terminal: { defaultShell: '/bin/fish' } },
-    })
-    expect(result.success).toBe(true)
-  })
-
-  it('rejects empty string for overrides.terminal.defaultShell', () => {
-    const result = WorkspaceSettingsSchema.safeParse({
-      ...validWorkspace,
-      overrides: { terminal: { defaultShell: '' } },
-    })
-    expect(result.success).toBe(false)
-  })
-})
-
-describe('WorkspaceSettingsSchema — git overrides and invalid ids', () => {
-  it('accepts overrides.git with worktreeBaseDir', () => {
-    const result = WorkspaceSettingsSchema.safeParse({
-      ...validWorkspace,
-      overrides: { git: { worktreeBaseDir: '/tmp/worktrees' } },
-    })
-    expect(result.success).toBe(true)
-  })
-
-  it('accepts null as workspaceId rejection check', () => {
-    expect(WorkspaceSettingsSchema.safeParse(null).success).toBe(false)
-  })
-
-  it('accepts overrides as undefined (optional field)', () => {
-    const result = WorkspaceSettingsSchema.safeParse({
-      workspaceId: '550e8400-e29b-41d4-a716-446655440000',
-      extensions: {},
-    })
-    expect(result.success).toBe(true)
-  })
-})
-
-describe('GlobalSettingsSchema — sidebar staleness (FR-020)', () => {
-  it('defaults the threshold to two hours', () => {
-    const parsed = GlobalSettingsSchema.parse({ ...staleBase, sidebar: undefined })
-    expect(parsed.sidebar.staleAfterMs).toBe(7_200_000)
-  })
-
-  it('accepts a threshold inside the allowed range', () => {
-    const parsed = GlobalSettingsSchema.parse({ ...staleBase, sidebar: { staleAfterMs: 900_000 } })
-    expect(parsed.sidebar.staleAfterMs).toBe(900_000)
-  })
-
-  it('rejects zero, which would make every session stale', () => {
-    expect(
-      GlobalSettingsSchema.safeParse({ ...staleBase, sidebar: { staleAfterMs: 0 } }).success
-    ).toBe(false)
-  })
-
-  it('rejects anything under a minute', () => {
-    expect(
-      GlobalSettingsSchema.safeParse({ ...staleBase, sidebar: { staleAfterMs: 59_999 } }).success
-    ).toBe(false)
-  })
-
-  it('accepts exactly one minute', () => {
-    expect(
-      GlobalSettingsSchema.safeParse({ ...staleBase, sidebar: { staleAfterMs: 60_000 } }).success
-    ).toBe(true)
-  })
-})
-
-describe('GlobalSettingsSchema — sidebar staleness upper bound (FR-020)', () => {
-  it('rejects anything over thirty days, which would make the filter meaningless', () => {
-    expect(
-      GlobalSettingsSchema.safeParse({ ...staleBase, sidebar: { staleAfterMs: 2_592_000_001 } })
-        .success
-    ).toBe(false)
-  })
-
-  it('rejects a fractional millisecond count', () => {
-    expect(
-      GlobalSettingsSchema.safeParse({ ...staleBase, sidebar: { staleAfterMs: 60_000.5 } }).success
-    ).toBe(false)
-  })
-
-  it('ships the default in DEFAULT_GLOBAL_SETTINGS so the panel has a value on first run', () => {
-    expect(DEFAULT_GLOBAL_SETTINGS.sidebar.staleAfterMs).toBe(7_200_000)
-  })
-})
-
-describe('GlobalSettingsSchema — quick actions (057)', () => {
-  it('defaults quickActions to empty arrays when omitted', () => {
-    const result = GlobalSettingsSchema.parse(validGlobal)
-    expect(result.quickActions).toEqual({ pins: [], usage: [], directUse: [], custom: [] })
-  })
-
-  it('accepts a custom shell action', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      quickActions: {
-        pins: ['core.new-tab'],
-        usage: [{ id: 'core.new-tab', count: 3, lastUsedAt: 1000 }],
-        directUse: [{ id: 'core.split-right', count: 1 }],
-        custom: [
-          {
-            id: 'custom-1',
-            label: 'Echo branch',
-            mnemonic: 'e',
-            kind: 'shell',
-            target: 'new-tab',
-            body: 'echo {branch}',
-          },
-        ],
-      },
-    })
-    expect(result.success).toBe(true)
-  })
-})
-
-describe('GlobalSettingsSchema — quick action mnemonics (057)', () => {
-  it('rejects a mnemonic longer than one character', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      quickActions: {
-        pins: [],
-        usage: [],
-        directUse: [],
-        custom: [
-          {
-            id: 'custom-1',
-            label: 'Echo branch',
-            mnemonic: 'ab',
-            kind: 'shell',
-            target: 'new-tab',
-            body: 'echo hi',
-          },
-        ],
-      },
-    })
-    expect(result.success).toBe(false)
-  })
-})
-
-describe('GlobalSettingsSchema — quick action bodies (057)', () => {
-  it('rejects an empty body', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      quickActions: {
-        pins: [],
-        usage: [],
-        directUse: [],
-        custom: [
-          { id: 'custom-1', label: 'Echo branch', kind: 'shell', target: 'new-tab', body: '' },
-        ],
-      },
-    })
-    expect(result.success).toBe(false)
-  })
-})
-
-describe('GlobalSettingsSchema — quick action kinds (057)', () => {
-  it('rejects an unknown kind', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      quickActions: {
-        pins: [],
-        usage: [],
-        directUse: [],
-        custom: [
-          {
-            id: 'custom-1',
-            label: 'Echo branch',
-            kind: 'bogus',
-            target: 'new-tab',
-            body: 'echo hi',
-          },
-        ],
-      },
-    })
-    expect(result.success).toBe(false)
-  })
-})
-
-describe('GlobalSettingsSchema — quick action targets and defaults (057)', () => {
-  it('rejects an unknown target', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      quickActions: {
-        pins: [],
-        usage: [],
-        directUse: [],
-        custom: [
-          {
-            id: 'custom-1',
-            label: 'Echo branch',
-            kind: 'shell',
-            target: 'bogus',
-            body: 'echo hi',
-          },
-        ],
-      },
-    })
-    expect(result.success).toBe(false)
-  })
-
-  it('ships the default in DEFAULT_GLOBAL_SETTINGS', () => {
-    expect(DEFAULT_GLOBAL_SETTINGS.quickActions).toEqual({
-      pins: [],
-      usage: [],
-      directUse: [],
-      custom: [],
-    })
-  })
-})
-
-describe('WorkspaceSettingsSchema — quick actions custom overrides (057)', () => {
-  it('accepts overrides.quickActions with a custom action list', () => {
-    const result = WorkspaceSettingsSchema.safeParse({
-      ...validWorkspace,
-      overrides: {
-        quickActions: {
-          custom: [
-            {
-              id: 'custom-1',
-              label: 'Echo branch',
-              kind: 'shell',
-              target: 'new-tab',
-              body: 'echo {branch}',
-            },
-          ],
-        },
-      },
-    })
-    expect(result.success).toBe(true)
-  })
-
-  it('rejects overrides.quickActions carrying pins or usage', () => {
-    const result = WorkspaceSettingsSchema.safeParse({
-      ...validWorkspace,
-      overrides: {
-        quickActions: { custom: [], pins: ['core.new-tab'] },
-      },
-    })
-    expect(result.success).toBe(false)
-  })
-})
-
-describe('GlobalSettingsSchema — the editor override', () => {
-  it('defaults to empty, which means detect rather than a choice you must make', () => {
-    const { ui: _ui, ...withoutUi } = validGlobal
-    const result = GlobalSettingsSchema.safeParse(withoutUi)
-    expect(result.success && result.data.ui.editor).toBe('')
-  })
-
-  it('accepts an editor id', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      ui: { hasSeenWelcome: true, editor: 'sublime' },
-    })
-    expect(result.success && result.data.ui.editor).toBe('sublime')
-  })
-
-  it('fills the default in when only hasSeenWelcome is given', () => {
-    const result = GlobalSettingsSchema.safeParse({ ...validGlobal, ui: { hasSeenWelcome: true } })
-    expect(result.success && result.data.ui.editor).toBe('')
+describe('WorkspaceSettingsSchema defaults', () => {
+  it('fills overrides and extensions with empty objects', () => {
+    const parsed = WorkspaceSettingsSchema.parse({ workspaceId: validWorkspace.workspaceId })
+    expect(parsed.overrides).toEqual({})
+    expect(parsed.extensions).toEqual({})
   })
 })

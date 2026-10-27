@@ -7,11 +7,8 @@ import {
   cycleTab,
   clearTerminal,
   splitPane,
-  closeFocusedPane,
-  type ClosePaneDeps,
 } from '../../../../src/renderer/quick-actions/shortcut-behaviors'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
-import { useBreakoutStore } from '../../../../src/renderer/stores/breakout.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import type { TerminalSession } from '../../../../src/shared/types/index'
@@ -205,57 +202,5 @@ describe('splitPane', () => {
         expect.objectContaining({ message: 'no pty' })
       )
     )
-  })
-})
-
-function deps(overrides: Partial<ClosePaneDeps> = {}): ClosePaneDeps {
-  return {
-    getPaneLayout: () => null,
-    getFocusedSession: () => null,
-    closeSplitLeaf: vi.fn(),
-    closeSession: vi.fn(() => Promise.resolve()),
-    getActiveSessionForProject: () => null,
-    ...overrides,
-  }
-}
-
-describe('closeFocusedPane', () => {
-  it('closes the focused leaf of a split and reports a failed close', async () => {
-    const d = deps({
-      getPaneLayout: () => ({}),
-      getFocusedSession: () => 's2',
-      closeSession: vi.fn(() => Promise.reject(new Error('x'))),
-    })
-    closeFocusedPane('p1', d)
-    expect(d.closeSplitLeaf).toHaveBeenCalledWith('p1', 's2')
-    await eventually(() =>
-      expect(createNotification).toHaveBeenCalledWith(
-        expect.objectContaining({ key: 'closeTerminalFailed' })
-      )
-    )
-  })
-
-  it('closes the active tab when there is no split', () => {
-    const d = deps({ getActiveSessionForProject: () => 's1' })
-    closeFocusedPane('p1', d)
-    expect(d.closeSession).toHaveBeenCalledWith('s1')
-    expect(d.closeSplitLeaf).not.toHaveBeenCalled()
-  })
-
-  it('closes nothing when no tab is active', () => {
-    const d = deps()
-    closeFocusedPane('p1', d)
-    closeFocusedPane(null, d)
-    expect(d.closeSession).not.toHaveBeenCalled()
-  })
-})
-
-describe('closeFocusedPane — a tab in its own window', () => {
-  it('closes nothing when the active tab is in its own window', () => {
-    useBreakoutStore.getState().add('s1', {} as Window)
-    const d = deps({ getActiveSessionForProject: () => 's1' })
-    closeFocusedPane('p1', d)
-    useBreakoutStore.getState().remove('s1')
-    expect(d.closeSession).not.toHaveBeenCalled()
   })
 })

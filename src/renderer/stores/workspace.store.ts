@@ -1,5 +1,6 @@
 import { create, type StoreApi } from 'zustand'
 import type { Workspace, Project } from '../../shared/types/index'
+import { readStoredJson, writeStoredJson } from '../home/local-storage'
 import { useSessionStore } from './session.store'
 import { useToastStore } from './toast.store'
 
@@ -42,24 +43,13 @@ const COLLAPSED_KEY = 'terminator.project.collapsed'
 
 /** The ids saved under `key`; none when nothing is saved or what is there is corrupt. */
 function loadIds(key: string): Set<string> {
-  try {
-    const raw = localStorage.getItem(key)
-    if (raw) {
-      const parsed = JSON.parse(raw) as unknown
-      if (Array.isArray(parsed)) return new Set(parsed as string[])
-    }
-  } catch {
-    // corrupted localStorage — return empty set (all collapsed)
-  }
-  return new Set()
+  return readStoredJson(key, new Set<string>(), (value) =>
+    Array.isArray(value) ? new Set(value as string[]) : null
+  )
 }
 
 function saveIds(key: string, ids: Set<string>): void {
-  try {
-    localStorage.setItem(key, JSON.stringify([...ids]))
-  } catch {
-    // ignore write failures (private browsing, storage full)
-  }
+  writeStoredJson(key, [...ids])
 }
 
 /** `ids` with `id` added when it was absent, removed when it was present. */

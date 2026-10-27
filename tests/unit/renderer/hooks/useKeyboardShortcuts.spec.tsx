@@ -79,17 +79,16 @@ function pressKey(
   key: string,
   options: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean } = {}
 ) {
-  const event = new KeyboardEvent('keydown', { key, bubbles: true, ...options })
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...options })
   window.dispatchEvent(event)
   return event
 }
 
 describe('useKeyboardShortcuts', () => {
-  it('calls onOpenSettings when Cmd+, is pressed', () => {
-    const onOpenSettings = vi.fn()
-    renderHook(() => useKeyboardShortcuts({ onOpenSettings }))
-    pressKey(',', { metaKey: true })
-    expect(onOpenSettings).toHaveBeenCalled()
+  it('leaves Cmd+, to the Open Settings menu accelerator', () => {
+    // The menu consumes the key before the renderer sees it (App.spec: menu:open-settings).
+    renderHook(() => useKeyboardShortcuts())
+    expect(pressKey(',', { metaKey: true }).defaultPrevented).toBe(false)
   })
 
   it('calls onToggleLog when Cmd+Shift+L is pressed', () => {
@@ -253,11 +252,11 @@ describe('useKeyboardShortcuts — calls onNewScratch when Cmd+Shift+T is presse
   })
 
   it('removes keydown listener on unmount', () => {
-    const onOpenSettings = vi.fn()
-    const { unmount } = renderHook(() => useKeyboardShortcuts({ onOpenSettings }))
+    const onToggleLog = vi.fn()
+    const { unmount } = renderHook(() => useKeyboardShortcuts({ onToggleLog }))
     unmount()
-    pressKey(',', { metaKey: true })
-    expect(onOpenSettings).not.toHaveBeenCalled()
+    pressKey('l', { metaKey: true, shiftKey: true })
+    expect(onToggleLog).not.toHaveBeenCalled()
   })
 })
 
@@ -331,38 +330,14 @@ describe('useKeyboardShortcuts — Cmd+D splits vertically when activeProjectId 
   })
 })
 
-describe('useKeyboardShortcuts — Cmd+W closes focused split pane when in split mode', () => {
-  it('Cmd+W closes focused split pane when in split mode', async () => {
+describe('useKeyboardShortcuts — Cmd+W', () => {
+  it('leaves Cmd+W to the Close Tab menu accelerator', () => {
+    // The menu consumes the key before the renderer sees it (App.spec: menu:close-tab).
     setup({ activeProjectId: 'proj-1' })
-    withTabs('proj-1', ['ses-root', 'ses-focused'], 'ses-root')
-    sessionState().activateSplit('proj-1', {
-      targetId: 'ses-root',
-      newId: 'ses-focused',
-      direction: 'vertical',
-    })
-    sessionState().setFocusedSession('proj-1', 'ses-focused')
-    renderHook(() => useKeyboardShortcuts())
-    pressKey('w', { metaKey: true })
-    expect(JSON.stringify(sessionState().getPaneLayout('proj-1'))).not.toContain('ses-focused')
-    await waitFor(() => expect(sessionState().sessions.has('ses-focused')).toBe(false))
-    expect(sessionState().sessions.has('ses-root')).toBe(true)
-  })
-
-  it('Cmd+W closes active tab when not in split mode', async () => {
-    setup({ activeProjectId: 'proj-1' })
-    withTabs('proj-1', ['ses-other', 'ses-active'], 'ses-active')
-    renderHook(() => useKeyboardShortcuts())
-    pressKey('w', { metaKey: true })
-    await waitFor(() => expect(sessionState().sessions.has('ses-active')).toBe(false))
-    expect(sessionState().sessions.has('ses-other')).toBe(true)
-  })
-})
-
-describe('useKeyboardShortcuts — Cmd+W closes focused split pane when in split mode — Cmd+W does nothing when no activeProjectId', () => {
-  it('Cmd+W does nothing when no activeProjectId', () => {
     withTabs('proj-1', ['ses-active'], 'ses-active')
     renderHook(() => useKeyboardShortcuts())
-    pressKey('w', { metaKey: true })
+    const event = pressKey('w', { metaKey: true })
+    expect(event.defaultPrevented).toBe(false)
     expect(sessionState().sessions.has('ses-active')).toBe(true)
   })
 })
@@ -412,14 +387,7 @@ describe('useKeyboardShortcuts — scratch mode — scratchProjectId overrides a
   })
 })
 
-describe('useKeyboardShortcuts — scratch mode — scratchProjectId overrides activeProjectId — Cmd+W closes scratch tab when scratchProjectId is set', () => {
-  it('Cmd+W closes scratch tab when scratchProjectId is set', async () => {
-    withTabs(SCRATCH_PROJECT_ID, ['scratch-ses-1'], 'scratch-ses-1')
-    renderHook(() => useKeyboardShortcuts(scratch))
-    pressKey('w', { metaKey: true })
-    await waitFor(() => expect(sessionState().sessions.has('scratch-ses-1')).toBe(false))
-  })
-
+describe('useKeyboardShortcuts — scratch mode — Cmd+ArrowRight', () => {
   it('Cmd+ArrowRight cycles scratch tabs when scratchProjectId is set', () => {
     withTabs(SCRATCH_PROJECT_ID, ['ss1', 'ss2'], 'ss1')
     renderHook(() => useKeyboardShortcuts(scratch))

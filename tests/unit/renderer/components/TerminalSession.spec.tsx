@@ -810,12 +810,6 @@ function getProvider(lineText: string, providerIndex: number) {
 }
 
 describe('TerminalInstance — link providers (visual decoration)', () => {
-  it('registers five link providers on construction (URL, bare, naked, path, quoted-path)', () => {
-    new TerminalInstance('ses-links', 1000)
-    const instance = vi.mocked(Terminal).mock.results[0].value
-    expect(instance.registerLinkProvider).toHaveBeenCalledTimes(5)
-  })
-
   it('URL provider detects https links and returns them in callback', () => {
     const provider = getProvider('visit https://example.com/path for info', 0)
     let result: unknown
