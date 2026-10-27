@@ -1,6 +1,6 @@
 # ADR 123: Tests run once, sealed, and only the ones a change can reach
 
-**Status**: Accepted, amended by ADR 124
+**Status**: Accepted, amended by ADR 124 and ADR 131
 
 **Date**: 2026-10-22
 
