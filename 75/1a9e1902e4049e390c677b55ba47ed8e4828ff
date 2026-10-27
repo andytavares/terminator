@@ -1,0 +1,43 @@
+extensions/foundry/src/gates/rules.ts
+  s_a9e8c58b3eee1f::t_f240af2a68a6ab 53
+extensions/foundry/src/runtime/review/risk-grader.ts
+  s_a9e8c58b3eee1f::t_32a0f7d6a43ca3 25
+extensions/foundry/src/forge/intake-state.ts
+  s_a9e8c58b3eee1f::t_f240af2a68a6ab 5
+extensions/foundry/src/components/factory/FactorySite.tsx
+  s_a9e8c58b3eee1f::t_c2c0818d8f4e95 202
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_a9e8c58b3eee1f::t_32a0f7d6a43ca3 17
+packages/extension-ui/src/ConfirmButton.tsx
+  s_a9e8c58b3eee1f::t_db364c4ed9aa9c 6-8
+extensions/foundry/src/components/Ledger.tsx
+  s_a9e8c58b3eee1f::t_32a0f7d6a43ca3 160-163
+extensions/foundry/src/order/schema.ts
+  s_a9e8c58b3eee1f::t_f240af2a68a6ab 330
+extensions/foundry/src/runtime/tool-activity.ts
+  s_a9e8c58b3eee1f::t_6bdff22370aac1 17,24,37
+extensions/foundry/src/runtime/tool-decision.ts
+  s_a9e8c58b3eee1f::t_db364c4ed9aa9c 4-6
+extensions/foundry/src/ipc/forge-channels.ts
+  s_a9e8c58b3eee1f::t_f240af2a68a6ab 661
+extensions/foundry/src/runtime/role-settings.ts
+  s_a9e8c58b3eee1f::t_db364c4ed9aa9c 103-104
+extensions/foundry/src/forge/intake-outcome.ts
+  s_a9e8c58b3eee1f::t_1c403c6cd86bb3 222-224
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "751a9e1902e4049e390c677b55ba47ed8e4828ff",
+  "prompts": {},
+  "sessions": {
+    "s_a9e8c58b3eee1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d394bc6c-c9ea-4893-9fc9-841878efee61",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
