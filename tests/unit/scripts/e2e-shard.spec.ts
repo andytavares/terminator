@@ -133,15 +133,15 @@ describe('timings from a shard that ran two apps at once', () => {
   })
 })
 
-describe('a shard runs two apps at once', () => {
+describe('a shard runs one app at a time', () => {
   const unitsOf = (seconds: number[]) =>
     seconds.map((cost, index) => ({ args: [`tests/e2e/u${index}.spec.ts`], seconds: cost }))
 
-  it('gets two lanes of the plan, and asks Playwright for as many workers', () => {
-    expect(APPS_PER_SHARD).toBe(2)
+  it('gets its lanes of the plan, and asks Playwright for as many workers', () => {
+    expect(APPS_PER_SHARD).toBe(1)
     const plan = unitsOf([40, 30, 20, 10, 10, 10])
     const shards = [1, 2, 3].map((shard) => shardPlan(plan, shard, 3))
-    for (const args of shards) expect(args.at(-1)).toBe('--workers=2')
+    for (const args of shards) expect(args.at(-1)).toBe('--workers=1')
     const placed = shards.flatMap((args) => args.slice(0, -1)).sort()
     expect(placed).toEqual(plan.map((unit) => unit.args[0]).sort())
   })

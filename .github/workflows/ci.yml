@@ -514,8 +514,8 @@ jobs:
         run: scripts/process-census.sh "before the suite"
 
       # No retries: a test that fails once fails the build. Shards are split by
-      # recorded duration (scripts/e2e-shard.mjs), not Playwright's test count, two apps
-      # per shard (it prints --workers=2).
+      # recorded duration (scripts/e2e-shard.mjs), not Playwright's test count, one app
+      # per shard (it prints --workers=1).
       - name: Run E2E suite
         if: steps.select.outputs.run_e2e == 'true'
         env:
