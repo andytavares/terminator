@@ -1,0 +1,40 @@
+src/main/agents/acp/agent-service-instance.ts
+  s_a2b14672418562::t_6152151c5dd84e 6
+tests/unit/config/asar-unpack.spec.ts
+  s_a2b14672418562::t_cc7e977e3ba0d1 15-16,25
+  s_a2b14672418562::t_e36293a515e99e 1-14,17-24,26-42
+src/main/agents/acp/agent-connection.ts
+  s_a2b14672418562::t_6152151c5dd84e 8,15,57-59,61
+tests/unit/agents/acp/agent-registry.spec.ts
+  s_a2b14672418562::t_76183d50f16b3d 2,43-47,50-53
+electron-builder.cjs
+  s_a2b14672418562::t_32b21b45e9f0ee 53-55
+src/main/agents/acp/agent-service.ts
+  s_a2b14672418562::t_6152151c5dd84e 324
+docs/adr/130-agents-the-app-drives-run-over-acp.md
+  s_a2b14672418562::t_7231e80bb15274 15-26
+tests/live/acp-claude.spec.ts
+  s_a2b14672418562::t_6152151c5dd84e 7
+docs/CONTRIBUTING.md
+  s_a2b14672418562::t_7231e80bb15274 50-51
+src/main/agents/acp/agent-registry.ts
+  s_a2b14672418562::t_7231e80bb15274 39
+  s_a2b14672418562::t_32b21b45e9f0ee 23-29,38
+  s_a2b14672418562::t_958de33e9b9c8a 40-41,45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cd106129f2c6183b8f9f0f77e88218aee3e3f613",
+  "prompts": {},
+  "sessions": {
+    "s_a2b14672418562": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f608f22-8ee1-482f-8985-9aea9d05d65f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
