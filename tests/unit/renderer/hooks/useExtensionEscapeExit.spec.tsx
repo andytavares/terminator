@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useExtensionEscapeExit } from '../../../../src/renderer/hooks/useExtensionEscapeExit'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
-import { useModalStore } from '../../../../src/renderer/stores/modal.store'
 import { DOUBLE_ESCAPE_WINDOW_MS } from '../../../../src/shared/double-escape'
 import { installElectronApi } from '../../../support/electron-api'
 
@@ -30,7 +29,7 @@ beforeEach(() => {
   exitEventHandler = null
 
   useExtensionRegistry.setState({ exitExtensionToTerminal: mockExit })
-  useModalStore.setState({ depth: 0 })
+  document.querySelectorAll('dialog').forEach((dialog) => dialog.remove())
   installElectronApi({
     extensionEvents: {
       onExtensionExitToTerminal: (handler) => {
@@ -117,13 +116,26 @@ describe('useExtensionEscapeExit — host renderer Escape handling — leaves Es
 
     expect(mockExit).not.toHaveBeenCalled()
   })
+})
 
+describe('useExtensionEscapeExit — host renderer Escape handling — stands down for open surfaces', () => {
   it('does not exit while a core modal is open', () => {
-    useModalStore.setState({ depth: 1 })
+    document.body.appendChild(Object.assign(document.createElement('dialog'), { open: true }))
     renderHook(() => useExtensionEscapeExit())
     pressEscape()
     pressEscape()
     expect(mockExit).not.toHaveBeenCalled()
+  })
+
+  it('does not exit while a popover is open', () => {
+    const popover = document.body.appendChild(document.createElement('div'))
+    popover.setAttribute('popover', 'auto')
+    popover.showPopover()
+    renderHook(() => useExtensionEscapeExit())
+    pressEscape()
+    pressEscape()
+    expect(mockExit).not.toHaveBeenCalled()
+    popover.remove()
   })
 
   it('ignores keys other than Escape', () => {

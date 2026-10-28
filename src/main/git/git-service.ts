@@ -158,6 +158,8 @@ export async function listWorktrees(dirPath: string): Promise<WorktreeInfo[]> {
         branch: branchLine ? branchLine.slice('branch refs/heads/'.length) : 'HEAD',
         isMain: i === 0,
         head: headLine ? headLine.slice('HEAD '.length) : '',
+        detached: lines.includes('detached'),
+        prunable: lines.some((l) => l.startsWith('prunable ')),
       })
     }
   }

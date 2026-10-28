@@ -15,14 +15,12 @@ vi.mock('../../src/components/DailyLog', () => ({ DailyLog: stubComponent('daily
 vi.mock('../../src/components/CalendarDrawer', () => ({
   CalendarDrawer: stubComponent('calendar'),
 }))
-vi.mock('../../src/components/KanbanBoard', () => ({ KanbanBoard: stubComponent('kanban') }))
 vi.mock('../../src/components/InboxView', () => ({ InboxView: stubComponent('inbox') }))
 vi.mock('../../src/components/ProjectsBrowser', () => ({
   ProjectsBrowser: stubComponent('projects'),
 }))
 vi.mock('../../src/components/AreasView', () => ({ AreasView: stubComponent('areas') }))
 vi.mock('../../src/components/ArchiveView', () => ({ ArchiveView: stubComponent('archive') }))
-vi.mock('../../src/components/WeeklyReview', () => ({ WeeklyReview: stubComponent('review') }))
 vi.mock('../../src/components/DatabaseAdmin', () => ({ DatabaseAdmin: stubComponent('admin') }))
 vi.mock('../../src/components/TaskDetailPanel', () => ({
   TaskDetailPanel: stubComponent('detail'),
@@ -58,10 +56,7 @@ beforeEach(() => {
   })
   bridge.responses['task-vault:vault:get-inbox'] = { tasks: [task('i1', 'idea')] }
   bridge.responses['task-vault:vault:list-someday'] = { tasks: [task('s1', 'Someday thing')] }
-  bridge.responses['task-vault:kanban:list-contexts'] = { contexts: ['home', 'desk'] }
-  bridge.responses['task-vault:kanban:get-config'] = {
-    lanes: [{ id: 'l', label: 'L', taskStatuses: [] }],
-  }
+  bridge.responses['task-vault:vault:list-contexts'] = { contexts: ['home', 'desk'] }
   bridge.responses['task-vault:pop-pending-navigation'] = null
   useVaultNavStore.setState({
     activeView: 'daily',
@@ -71,7 +66,7 @@ beforeEach(() => {
     showCaptureModal: false,
   })
   useVaultDataStore.setState({ todayLog: null, isLoading: false, error: null })
-  useVaultFilterStore.setState({ viewMode: 'list', selectedContexts: [] })
+  useVaultFilterStore.setState({ selectedContexts: [] })
 })
 
 afterEach(() => cleanup())
@@ -96,10 +91,9 @@ describe('TaskVaultView import', importTests)
 describe('CaptureModal', captureTests)
 
 function viewLoadingTests() {
-  it('loads today, the inbox count, contexts, someday tasks and lanes', async () => {
+  it('loads today, the inbox count, contexts, and someday tasks', async () => {
     await renderVaultView()
     expect(useVaultDataStore.getState().inboxCount).toBe(1)
-    expect(useVaultDataStore.getState().kanbanLanes).toHaveLength(1)
     expect(seen.daily.isToday).toBe(true)
     expect(screen.getByTestId('calendar')).toBeTruthy()
   })
@@ -125,7 +119,6 @@ function viewSwitchTests() {
       ['Projects', 'projects'],
       ['Areas', 'areas'],
       ['History', 'archive'],
-      ['Weekly review', 'review'],
     ]) {
       fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${label}`) }))
       expect(screen.getByTestId(id)).toBeTruthy()
@@ -196,15 +189,12 @@ function daySelectionTests() {
 }
 
 function navigationTests() {
-  it('opens a task it is told to navigate to, and an explicit view', async () => {
+  it('opens a task it is told to navigate to, and a day', async () => {
     await renderVaultView()
     await act(async () => bridge.push('task-vault:navigate', { taskId: 't2' }))
     await eventually(() => expect(seen.detail?.taskText).toBe('Read'))
     expect(useVaultNavStore.getState().pendingTaskId).toBeNull()
-    await act(async () =>
-      bridge.push('task-vault:navigate', { date: '2026-02-02', view: 'review' })
-    )
-    expect(useVaultNavStore.getState().activeView).toBe('review')
+    await act(async () => bridge.push('task-vault:navigate', { date: '2026-02-02' }))
     expect(bridge.calls('task-vault:vault:get-daily')).toContainEqual({ date: '2026-02-02' })
   })
 
@@ -227,7 +217,6 @@ function pendingNavigationTests() {
     bridge.responses['task-vault:pop-pending-navigation'] = {
       date: '2026-03-03',
       taskId: 't1',
-      view: 'daily',
     }
     await renderVaultView()
     await eventually(() =>
@@ -252,14 +241,6 @@ function pendingNavigationTests() {
 }
 
 function toolbarTests() {
-  it('switches between list and board views', async () => {
-    await renderVaultView()
-    fireEvent.click(screen.getByRole('button', { name: 'Board view' }))
-    expect(screen.getByTestId('kanban')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'List view' }))
-    expect(screen.getByTestId('daily')).toBeTruthy()
-  })
-
   it('filters by contexts and labels the filter by what is chosen', async () => {
     await renderVaultView()
     const filter = screen.getByRole('button', { name: 'Filter by context' })
@@ -273,7 +254,7 @@ function toolbarTests() {
   })
 
   it('hides the calendar, and says when there are no contexts', async () => {
-    bridge.responses['task-vault:kanban:list-contexts'] = { contexts: [] }
+    bridge.responses['task-vault:vault:list-contexts'] = { contexts: [] }
     await renderVaultView()
     fireEvent.click(screen.getByRole('button', { name: 'Calendar' }))
     expect(screen.queryByTestId('calendar')).toBeNull()

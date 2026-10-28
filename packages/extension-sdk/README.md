@@ -3,7 +3,7 @@
 The Extension API every Terminator extension is written against, and the helpers they share.
 `types/api.d.ts` declares the API; the core implements it in `src/main/extensions/api.ts` and the
 compiler checks the two agree ([ADR 094](../../docs/adr/094-extensions-follow-the-vs-code-model.md)).
-The version is `5.1.0`; `CHANGELOG.md` lists each version's changes and how to migrate.
+The version is `6.0.0`; `CHANGELOG.md` lists each version's changes and how to migrate.
 
 This README is a map of the package. How to write an extension (the manifest, the backend, the
 view, the build and every API namespace) is in the
@@ -15,22 +15,21 @@ An extension imports only this package, `@terminator/extension-ui` and the npm p
 own `package.json`. `npm run lint` rejects anything else, including core source and other
 extensions ([What an extension may import](../../docs/EXTENSION-DEVELOPMENT.md#what-an-extension-may-import)).
 
-| Entry                                      | Source                | What it holds                                                                                                                                                                                                          |
-| ------------------------------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@terminator/extension-sdk`                | `src/index.ts`        | The types in `types/api.d.ts`, `types/issues.d.ts`, `types/github.d.ts` and `types/extensions.d.ts`; `ChannelSpec`, `defineChannel`, `dispatchChannel`, `noPayload`, `createIpcRegistrar`, `validationError`, `plural` |
-| `@terminator/extension-sdk/renderer`       | `src/renderer.tsx`    | `invoke<T>(channel, payload = {})`, `mountExtension(<App />)` and `openInBrowser(url)`, for an extension's view                                                                                                        |
-| `@terminator/extension-sdk/node`           | `src/node.ts`         | `writeJsonAtomic(path, value)`, `shellQuote(value)`                                                                                                                                                                    |
-| `@terminator/extension-sdk/types/renderer` | `types/renderer.d.ts` | `ElectronAPI`, the `window.electronAPI` an extension view receives (`tsconfig.extension.json` loads it)                                                                                                                |
+| Entry                                      | Source                | What it holds                                                                                                                                                                                 |
+| ------------------------------------------ | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@terminator/extension-sdk`                | `src/index.ts`        | The types in `types/api.d.ts`, `types/issues.d.ts` and `types/github.d.ts`; `ChannelSpec`, `defineChannel`, `dispatchChannel`, `noPayload`, `createIpcRegistrar`, `validationError`, `plural` |
+| `@terminator/extension-sdk/renderer`       | `src/renderer.tsx`    | `invoke<T>(channel, payload = {})`, `mountExtension(<App />)` and `openInBrowser(url)`, for an extension's view                                                                               |
+| `@terminator/extension-sdk/node`           | `src/node.ts`         | `writeJsonAtomic(path, value)`, `shellQuote(value)`                                                                                                                                           |
+| `@terminator/extension-sdk/types/renderer` | `types/renderer.d.ts` | `ElectronAPI`, the `window.electronAPI` an extension view receives (`tsconfig.extension.json` loads it)                                                                                       |
 
 The declaration files:
 
-| File                    | Declares                                                                                                                                            |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `types/api.d.ts`        | `ExtensionAPI`, the object passed to `activate`, and its types: `Disposable`, `ExtensionDB`, `PtyManagerAPI`, `ShellExecOptions`, `ShellExecResult` |
-| `types/github.d.ts`     | `GithubAPI` (`api.github`) and its request and pull-request types                                                                                   |
-| `types/issues.d.ts`     | The issue-tracker types behind `api.issues`, such as `TrackerId`, `Issue` and `IssueSummary`                                                        |
-| `types/extensions.d.ts` | The built-in extensions' APIs: `TaskVaultAPI` and `BuiltInExtensionExports`, which types `api.extensions.get`                                       |
-| `types/renderer.d.ts`   | `ElectronAPI`, the view's `window.electronAPI`                                                                                                      |
+| File                  | Declares                                                                                                                                            |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `types/api.d.ts`      | `ExtensionAPI`, the object passed to `activate`, and its types: `Disposable`, `ExtensionDB`, `PtyManagerAPI`, `ShellExecOptions`, `ShellExecResult` |
+| `types/github.d.ts`   | `GithubAPI` (`api.github`) and its request and pull-request types                                                                                   |
+| `types/issues.d.ts`   | The issue-tracker types behind `api.issues`, such as `TrackerId`, `Issue` and `IssueSummary`                                                        |
+| `types/renderer.d.ts` | `ElectronAPI`, the view's `window.electronAPI`                                                                                                      |
 
 Source-only TypeScript, with `react`, `react-dom` and `zod` as peer dependencies. It is a
 workspace package: an extension under `extensions/` declares it in its own `package.json` at the
@@ -46,9 +45,7 @@ pushes, a callback is called by id, and `electron` cannot be imported (use `api.
 [Where your backend runs](../../docs/EXTENSION-DEVELOPMENT.md#where-your-backend-runs).
 
 The manifest's `main` is the backend: a CommonJS file exporting `activate(api)` and optionally
-`deactivate()`. What `activate` returns is the extension's API for other extensions, which a
-consumer that lists the provider in `extensionDependencies` reads with `api.extensions.get(id)`
-([Another extension's API](../../docs/EXTENSION-DEVELOPMENT.md#another-extensions-api)).
+`deactivate()`. An extension offers nothing to another extension: what `activate` returns is not read.
 
 ## A minimal extension
 

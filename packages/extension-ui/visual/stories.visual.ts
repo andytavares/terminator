@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test, expect } from '@playwright/test'
+import { openStory } from './open-story'
 
 interface IndexEntry {
   id: string
@@ -21,13 +22,8 @@ const stories = Object.values(index.entries).filter((entry) => entry.type === 's
 
 for (const { id } of stories) {
   test(id, async ({ page }) => {
-    await page.goto(`/iframe.html?id=${id}&viewMode=story`)
     // A story with a play function is pictured after it has played.
-    await page.waitForFunction(() => {
-      const preview = (window as { __STORYBOOK_PREVIEW__?: { currentRender?: { phase?: string } } })
-        .__STORYBOOK_PREVIEW__
-      return ['completed', 'finished'].includes(preview?.currentRender?.phase ?? '')
-    })
+    await openStory(page, id)
     await page.evaluate(() => document.fonts.ready)
     await expect(page).toHaveScreenshot(`${id}.png`)
   })

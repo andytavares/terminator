@@ -74,13 +74,11 @@ The window comes first; everything slow happens beside it. `app.whenReady()` in 
 1. Starts the login-shell PATH probe (macOS only; a login shell takes hundreds of milliseconds) without waiting for it.
 2. Opens the database (synchronous `node:sqlite`), registers the `ext://` protocol and the IPC handlers.
 3. Starts the extension host process (`startExtensionHostProcess`), builds the menu and creates the window.
-4. Calls `ExtensionHost.start({ bundledDirectory, beforeActivation, afterActivation })` (`src/main/extensions/extension-host.ts`).
+4. Calls `ExtensionHost.start({ bundledDirectory, beforeActivation })` (`src/main/extensions/extension-host.ts`).
 
-`start` registers every extension synchronously (the stored enabled ones, and any bundled one not yet in the store), so `extension:list` is complete as soon as the renderer can ask. It then activates them concurrently once `beforeActivation` (the PATH probe, which extension code that spawns tools needs) has resolved. An extension that lists others in its manifest's `extensionDependencies` waits for their activation first; a dependency cycle fails every extension in it. Activation is isolated per extension: a throwing `activate` marks that extension `error` and nothing else. The one table two extensions share (`settings`) is created with `CREATE TABLE IF NOT EXISTS`, so activation order does not matter for it.
+`start` registers every extension synchronously (the stored enabled ones, and any bundled one not yet in the store), so `extension:list` is complete as soon as the renderer can ask. It then activates them concurrently once `beforeActivation` (the PATH probe, which extension code that spawns tools needs) has resolved. Activation is isolated per extension: a throwing `activate` marks that extension `error` and nothing else. The one table two extensions share (`settings`) is created with `CREATE TABLE IF NOT EXISTS`, so activation order does not matter for it.
 
-`afterActivation` runs once every extension has activated. It is where the legacy PGlite import (`src/main/db/legacy-pglite-import.ts`) runs, because it copies into tables the extensions create in `activate`.
-
-An extension frame is given its port by `extension:open-frame-port`, which first awaits `ExtensionHost.whenActivated(extensionId)`: the extension's own activation, and the import when one is pending. A frame therefore never talks to a backend that is not there yet, and one slow extension delays only its own frame.
+An extension frame is given its port by `extension:open-frame-port`, which first awaits `ExtensionHost.whenActivated(extensionId)`, the extension's own activation. A frame therefore never talks to a backend that is not there yet, and one slow extension delays only its own frame.
 
 Because the PATH probe runs beside the window, a child process started from a core IPC handler in the first moments after launch can still see the app's own PATH on macOS. Extension code is not affected (it waits on `beforeActivation`).
 
@@ -129,7 +127,7 @@ Values the core holds cross as promises, except `settings.get`, `workspace.list`
 
 A reload is a `deactivate` then an `activate` message. The host drops the deactivated backend's entry point, and every module under its extension directory, from `require.cache` ([Node docs](https://nodejs.org/api/modules.html#requirecache)), so the next `activate` runs the code on disk; so does a backend whose `activate` threw. Modules outside the directory, such as another extension's, stay cached.
 
-When the extension host exits unasked the app stays up: it is started again once (`HOST_RESTARTS`) and its backends activated again, each after the extensions it declares in `extensionDependencies`, as at startup, so a consumer's `api.extensions.get` returns its provider's new exports. A backend whose dependency fails to come back fails too. A second exit marks them all failed, and Settings → Extensions shows them as `error` with the reason as the status's tooltip. The failure is not stored, so the next launch tries again. Whenever what `listExtensions` returns changes (an install, a toggle, an uninstall, a failed activation, the host losing a backend or one coming back), `ExtensionHost` broadcasts `extension:list-changed`; Settings → Extensions (`extension.onListChanged`) reads the list and the settings schemas again, so it shows the change while it is open. The event is remote like `extension:list`, since the remote `/app/` shows the same panel.
+When the extension host exits unasked the app stays up: it is started again once (`HOST_RESTARTS`) and its backends activated again. A second exit marks them all failed, and Settings → Extensions shows them as `error` with the reason as the status's tooltip. The failure is not stored, so the next launch tries again. Whenever what `listExtensions` returns changes (an install, a toggle, an uninstall, a failed activation, the host losing a backend or one coming back), `ExtensionHost` broadcasts `extension:list-changed`; Settings → Extensions (`extension.onListChanged`) reads the list and the settings schemas again, so it shows the change while it is open. The event is remote like `extension:list`, since the remote `/app/` shows the same panel.
 
 ### Loading an extension
 
@@ -137,9 +135,8 @@ Every directory under `extensions/` with a `manifest.json` is a bundled extensio
 
 1. Reads `manifest.json` and validates it with `ExtensionManifestSchema` (`src/shared/schemas/extension.schema.ts`).
 2. Checks `minAppVersion` against the app version (`isVersionCompatible`); an incompatible extension is marked `error`.
-3. Waits for the extensions it lists in `extensionDependencies`; a missing, disabled or failed dependency fails it with a message naming the dependency.
-4. Creates the extension's `ExtensionAPI` in main (`createExtensionAPI` in `api.ts`) and asks the extension host to `require()` the manifest's `main`, a CommonJS file ([ADR-008](adr/008-extension-commonjs-compilation.md)), and call `activate` with the host-side API, whose calls run on main's.
-5. Records what `activate` registered, so unloading disposes all of it. A throwing `activate` marks the extension `error`; the app and the other extensions are unaffected.
+3. Creates the extension's `ExtensionAPI` in main (`createExtensionAPI` in `api.ts`) and asks the extension host to `require()` the manifest's `main`, a CommonJS file ([ADR-008](adr/008-extension-commonjs-compilation.md)), and call `activate` with the host-side API, whose calls run on main's.
+4. Records what `activate` registered, so unloading disposes all of it. A throwing `activate` marks the extension `error`; the app and the other extensions are unaffected.
 
 The renderer learns the enabled extensions from `extension:list` and turns each manifest's `contributes` into tabs, panels and commands (`initExtensions` in `src/renderer/extensions/loader.ts`), registered in the renderer's extension registry (`src/renderer/extensions/registry.ts`). That registry is internal to the core: an extension contributes surfaces only through its manifest.
 
@@ -236,7 +233,7 @@ A click in the sidebar dismisses the same way, and there core surfaces go too: `
 
 The core and every extension are built from one design system, `packages/extension-ui` (`@terminator/extension-ui`), published outward: the core consumes it the way an extension does ([ADR 098](adr/098-one-design-system-documented-in-storybook.md), extending [ADR-039](adr/039-one-ui-layer-published-outward.md); Constitution XIII). It is a source-only workspace package: `main`, `module` and `types` point at `src/index.ts`, and `react`, `react-dom` and `lucide-react` are peer dependencies, so there is no build step and no second copy of React.
 
-**Components.** `src/index.ts` exports `ModalShell`, `Dialog`, `ConfirmDialog`, `Popover`, `ToastRegion` / `Toast`, `EmptyState`, `Button`, `IconButton`, `Tabs`, `SegmentedControl`, `Markdown`, `RelativeTime`, `usePolling`, `useDismissible`, the layer scale and the modal-depth registry. The core's own dialogs, toast region and empty states use them (`src/renderer/components/ConfirmDialog.tsx` wraps the shared `ConfirmDialog`).
+**Components.** `src/index.ts` exports `ModalShell`, `Dialog`, `ConfirmDialog`, `Popover`, `ToastRegion` / `Toast`, `EmptyState`, `Button`, `IconButton`, `Tabs`, `SegmentedControl`, `Markdown`, `RelativeTime`, `Menu`, `usePolling`, `useCloseOnOutsidePress` and the layer scale. The core's own dialogs, toast region and empty states use them (`src/renderer/components/ConfirmDialog.tsx` wraps the shared `ConfirmDialog`).
 
 **Storybook.** `packages/extension-ui/stories/` documents each component in both themes (`npm run storybook`). The stories run as tests through the Vitest add-on (`npm run test:stories`), and Playwright screenshot tests guard them (`npm run test:visual`, `packages/extension-ui/playwright.visual.config.ts`).
 
@@ -263,7 +260,7 @@ A raw `z-index` number in an extension is a lint error.
 
 **Modal surfaces** are not on that scale. Each is a `ModalShell` (`src/ModalShell.tsx`, [ADR 110](adr/110-modal-surfaces-use-the-native-dialog-element.md)): a native `<dialog>` opened with `showModal()` while it is mounted, so the browser keeps focus inside, makes the page behind inert, paints the shell above every z-index and returns focus on close. Every modal is centred in its window on both axes; the shell states the placement `!important`, so no caller moves one, and `expectCentredInWindow` (`tests/e2e/modal-centre.ts`) measures it in each spec that opens a modal. `Dialog` is the shell with a title, body and actions. Settings and Quick Actions in the core, Notepad's search and quick create, and Task Vault's block, recurrence and query-confirmation dialogs are the shell with their own content. The shell dismisses on the dialog's `cancel` event (Escape, a phone's back gesture) and on a press on the backdrop. `ToastRegion` renders inside the shell opened last (`src/modal-stack.ts`), because everything outside an open modal dialog is inert. An extension frame is page content, so a core modal's backdrop dims it instead of hiding it.
 
-**Modal depth is per document.** `contextIsolation: true` gives an extension page and its preload different `window` objects, so `ModalShell` reports its depth across the bridge with `electronAPI.ui.setModalDepth`; that is how the double-Escape exit stands down while a dialog is open. Among surfaces that are not modal (`Popover`, `useDismissible`), Escape is answered by the one opened last (`isInnermost` in `useDismissible.ts`), which prevents the key's default so a shell around it stays open.
+**Open surfaces are read from the DOM.** Whether a modal dialog or a popover is open is `document.querySelector('dialog:modal, :popover-open')` (`isSurfaceOpen` in `src/shared/double-escape.ts`), asked of the document the key was pressed in: the core window, or an extension frame (`src/extension-frame/frame-shim.ts`). That is how the double-Escape exit stands down; nothing counts or reports. `Popover` is a native `popover="auto"`, so the browser answers Escape on the one opened last, closes it on a click outside and returns focus.
 
 **Contrast** is verified by rendering, not by reading the stylesheet: `tests/e2e/extension-smoke.spec.ts` walks every visible text node in each extension view, in both themes, resolves the real composited backdrop through the translucent layers above it, and asserts WCAG AA. `color-mix` and layered alpha only resolve in a browser.
 
@@ -288,7 +285,6 @@ The main window keeps its state in [Zustand](https://github.com/pmndrs/zustand) 
 | `toast.store.ts`               | the transient toast queue                                                                                                             | `addToast`, `removeToast`                                                                                      |
 | `log.store.ts`                 | the log window's entries                                                                                                              | `addEntry`, `clear`                                                                                            |
 | `metrics.store.ts`             | system CPU, memory and network; per-session process metrics                                                                           | `enableGlobalMetrics`, `disableGlobalMetrics`, `startPolling`, `stopPolling`                                   |
-| `modal.store.ts`               | how many core modals are open (`useModalEffect`), which hides extension views                                                         | `push`, `pop`                                                                                                  |
 | `terminal-open-error.store.ts` | the error and retry count when a project's terminal fails to open                                                                     | `setError`, `clearError`, `retry`                                                                              |
 
 Beside them, `src/renderer/extensions/registry.ts` (`useExtensionRegistry`) holds what the extensions contributed: sidebar panels, global, workspace and project tabs, window views, commands, keyboard shortcuts, the active tab of each kind, and the Quick Actions groups.
@@ -383,7 +379,7 @@ A manifest can declare `contributes.commands[]` (`{ id, label, description?, sho
 
 ### Reaching the panel from an extension's own view
 
-The leader is `CmdOrCtrl+P`: `⌘P` on macOS, `Ctrl+P` elsewhere, decided in one place, `isQuickActionsLeader` (`src/shared/quick-actions-leader.ts`). A focused terminal hands it on: xterm turns `Ctrl+P` into `^P` for the shell and stops the event, so `TerminalInstance`'s custom key handler returns `false` for the leader, and the keydown reaches the window listener in `useKeyboardShortcuts.ts`. An extension's UI is a frame with its own document; the host window's `⌘P` keydown listener never sees a keystroke that originated there. The frame shim (`src/extension-frame/frame-shim.ts`) listens for it (`isQuickActionsLeader`), calls `preventDefault()` and posts `quick-actions-open` over the port, and main sends `quick-actions:open`, which `App.tsx` handles the same way as the in-window shortcut. The panel's own Escape closes only the panel — it claims Escape through the `useModalEffect` "modal depth" signal the double-Escape-exit detector already reads, so closing the panel is never counted as the first half of a double-Escape extension exit. The panel also moves DOM focus into itself on mount (a plain `tabIndex={-1}` container), because leaving focus on whatever was focused before `⌘P` — most often a terminal — meant xterm's own capture-phase Escape handler (attached directly to its textarea) could consume Escape and stop it from ever bubbling to the panel's own window-level listener.
+The leader is `CmdOrCtrl+P`: `⌘P` on macOS, `Ctrl+P` elsewhere, decided in one place, `isQuickActionsLeader` (`src/shared/quick-actions-leader.ts`). A focused terminal hands it on: xterm turns `Ctrl+P` into `^P` for the shell and stops the event, so `TerminalInstance`'s custom key handler returns `false` for the leader, and the keydown reaches the window listener in `useKeyboardShortcuts.ts`. An extension's UI is a frame with its own document; the host window's `⌘P` keydown listener never sees a keystroke that originated there. The frame shim (`src/extension-frame/frame-shim.ts`) listens for it (`isQuickActionsLeader`), calls `preventDefault()` and posts `quick-actions-open` over the port, and main sends `quick-actions:open`, which `App.tsx` handles the same way as the in-window shortcut. The panel's own Escape closes only the panel — it claims Escape by being a modal `<dialog>`, which the double-Escape-exit detector reads from the DOM, so closing the panel is never counted as the first half of a double-Escape extension exit. The panel also moves DOM focus into itself on mount (a plain `tabIndex={-1}` container), because leaving focus on whatever was focused before `⌘P` — most often a terminal — meant xterm's own capture-phase Escape handler (attached directly to its textarea) could consume Escape and stop it from ever bubbling to the panel's own window-level listener.
 
 ### Persistence
 
@@ -502,8 +498,8 @@ Two core global tabs draw every session from one view model. `useSessionFacts` b
 
 - **The home feed contract** (ADR 117). An extension calls `api.home.publish(feed)` with `asks`, `facets`, `measures` and `focus`; `src/shared/schemas/home-feed.schema.ts` validates it at the boundary, `src/main/home/home-feed.ts` keeps one feed per extension id and pushes the merged feed (each item tagged with its `source`) over `home:feed-changed`, and `useHomeFeedStore` holds it in the renderer. `home:feed-action` carries a press on an ask's action back to the extension that published it. These channels are core-only and `remote: 'omit'`. Core never names an extension's channel; Git Integration, Foundry and Task Vault are three publishers of the same shape.
 - **Core asks.** `useDeskModel` joins the feed with asks core raises from `SessionFacts` (`home/core-asks.ts`): a session in `awaiting-input` becomes an `answer` ask carrying its numbered `choices`, and an agent that went idle while unattended becomes a `finished` ask. `home/desk-order.ts` puts them in one order and applies `home/dismissals.ts` (done and snooze, which wakes early on new activity).
-- **Agent questions come from Claude Code's hooks.** Beside its `SessionStart` entry, core adds `Notification` and `Stop` entries to `~/.claude/settings.json` (`agents/agent-ask-hook.ts`, matched by script name like the capture hook). The script writes each event to its own `userData/agent-sessions/asks/<microseconds>-<pid>.json`, so a Stop that lands before a Notification was read does not replace it; `agents/ask-watcher.ts` claims each file by rename, oldest first, keeps the ask per terminal and announces it over `agent-ask:*`; `shell/agent-attention.ts` mirrors it onto the session (`agentAsk`), and `BellAndBusySource` reads an ask as `awaiting-input` before the bell or a choice prompt on screen. An agent that is not Claude Code still raises asks through the bell and `parseChoicePrompt`. These entries live in the operator's user-level Claude settings, so Claude Code runs them for every session on the machine; the command is prefixed `[ -n "$TERMINATOR_SESSION_ID" ]`, so outside a Terminator terminal it returns at once, exit 0, without starting Electron.
-- **A turn is marked by two more hooks.** `agent-ask-hook.ts` also registers `UserPromptSubmit` and `Stop`. The script writes the event for the terminal, `agents/agent-turns.ts` keeps whether each terminal is mid-turn and announces changes, and `BellAndBusySource` reads a terminal in a turn as `working` and one between turns as `idle`, whatever its output. Only a terminal that never reported a turn is read from its output. An ask that comes from a bell or a numbered choice carries `askInferred`, so the task list draws it hollow.
+- **Agent questions come from Claude Code's hooks.** One script, `agents/claude-hook.ts`, serves `SessionStart`, `Notification`, `UserPromptSubmit`, `Stop` and `StopFailure` entries in `~/.claude/settings.json`. The entries are matched by script name, and the names of the three earlier scripts collapse into them. The script writes each event to its own `userData/agent-sessions/asks/<microseconds>-<pid>.json`, so a Stop that lands before a Notification was read does not replace it; `agents/ask-watcher.ts` claims each file by rename, oldest first, keeps the ask per terminal and announces it over `agent-ask:*`; `shell/agent-attention.ts` mirrors it onto the session (`agentAsk`), and `BellAndBusySource` reads an ask as `awaiting-input` before the bell or a choice prompt on screen. An agent that is not Claude Code still raises asks through the bell and `parseChoicePrompt`. These entries live in the operator's user-level Claude settings, so Claude Code runs them for every session on the machine; the command is prefixed `[ -n "$TERMINATOR_SESSION_ID" ]`, so outside a Terminator terminal it returns at once, exit 0, without starting Electron.
+- **A turn is marked by two more hooks.** `claude-hook.ts` also registers `UserPromptSubmit` and `Stop`. The script writes the event for the terminal, `agents/agent-turns.ts` keeps whether each terminal is mid-turn and announces changes, and `BellAndBusySource` reads a terminal in a turn as `working` and one between turns as `idle`, whatever its output. Only a terminal that never reported a turn is read from its output. An ask that comes from a bell or a numbered choice carries `askInferred`, so the task list draws it hollow.
 - **Answering in place** is `AnswerInPlace` (`components/home/AnswerInPlace.tsx`): the terminal's last screen as text, the choices, a reply field and Open terminal. Pressing `1`–`9` calls `answerChoice`, which re-reads the screen and sends the digit only while `samePrompt` still holds; a reply goes through `terminal.input` with a carriage return. Single-letter keys (`use-desk-keys.ts`) act only while focus is inside Home and never in a field or an `.xterm`.
 - **Attention log.** `shell/agent-attention.ts` reports each settled state change of any session (after `SETTLE_MS`) to `attention:record`; `src/main/home/attention-log.ts` keeps the working and awaiting-input intervals, mirrored atomically to `userData/attention-log.json`, closes what the last run left open at the saved time, and prunes to 90 days (`ATTENTION_RETENTION_MS`). `attention:measures` and `attention:intervals` answer Home's "waited on you" line and the Insights cards from it.
 - **Work threads.** `home/work-threads.ts` is pure: it joins session facts, extension `facets` and tickets on one string key per piece of work (a stored task's lane, else the ticket, else `repoRoot#branch`, else the session), and derives the state ([ADR 127](adr/127-a-task-is-the-unit-of-work.md)), the now line and the pull request chip. There is no stage. `useWorkThreads` supplies the inputs; `TaskList` groups them by state (Quiet and Done fold), repo or not at all. Archived tasks are left out and listed in the footer. `ThreadDrawer` is the shared `Drawer` (a modal shell, so Escape and focus return are the shell's).
@@ -533,7 +529,7 @@ Every way of opening a session — Home, the wall, the sidebar, a tab, Quick Act
 
 A terminal dies with the app; the conversation that ran in it does not. Claude Code keeps a transcript per conversation and resumes one by id, so Terminator captures that id and offers to bring the conversation back. ADR 055.
 
-- **Capture is a hook in the operator's own Claude settings.** At startup `installCaptureScript` writes `agent-session-hook.cjs` beside the profile (ADR 026's pattern: a loose script survives development and vanishes from a packaged bundle) and `installUserHook` merges one `SessionStart` entry into `~/.claude/settings.json`. The entry is matched by script _name_, so re-installing from a packaged app, a development run or a test profile replaces it rather than stacking copies, and its command is guarded with `test -f <script> … || true` so an entry whose script has gone does nothing instead of failing before every agent session on the machine. Removing the feature is removing that block; the user guide says so.
+- **Capture is a hook in the operator's own Claude settings.** At startup `installHookScript` writes `claude-hook.cjs` beside the profile (ADR 026's pattern: a loose script survives development and vanishes from a packaged bundle) and `installUserHooks` merges one entry per event into `~/.claude/settings.json`. The entry is matched by script _name_, so re-installing from a packaged app, a development run or a test profile replaces it rather than stacking copies, and its command is guarded with `test -f <script> … || true` so an entry whose script has gone does nothing instead of failing before every agent session on the machine. Removing the feature is removing that block; the user guide says so.
 - **The terminal is named by the environment.** `terminal:create` exports `TERMINATOR_SESSION_ID` into the PTY. The hook runs beneath the agent, reads `session_id`, `transcript_path` and `cwd` from its stdin payload, and writes `userData/agent-sessions/<terminal id>.json`. This is exact where matching on folder or time is a guess, and it captures a `claude` the operator typed themselves. A conversation in a terminal outside Terminator names no terminal and is ignored.
 - **The watcher folds reports into records.** `agent-session-watcher.ts` watches that directory with `fs.watch` ([ADR-005](adr/005-native-fswatcher-over-chokidar.md)) and reads it once at startup, for reports written while the application was closed. Each report is claimed by renaming it, parsed with the pure `parseHookReport`, passed to `setAgent` with the snapshot `makeSnapshotFor` builds from the PTY registry and the workspace store, and deleted, so it is handled once however many events announce it. A report for a terminal the registry cannot place is deleted too. There is no timer: a report whose event the platform drops stays on disk until the next start.
 - **Resumability is read at answer time, never cached.** `session-records:list` stats the transcript for every record, because the file belongs to the agent and can be deleted at any moment; `useSessionFacts` asks again whenever a surface that draws Resume appears.
@@ -558,7 +554,7 @@ The sidebar has a `div.unified-sidebar__resize-handle` on its right edge. `mouse
 
 ## Issue tracker integrations
 
-One core-owned service reaches Linear and Jira; nothing else in the application holds a tracker
+One core-owned service reaches Linear; nothing else in the application holds a tracker
 credential or contacts a tracker. See [ADR-029](adr/029-core-issue-tracker-service.md).
 
 ```
@@ -566,10 +562,9 @@ credential or contacts a tracker. See [ADR-029](adr/029-core-issue-tracker-servi
    (settings, sidebar,         │  src/main/integrations/                │
     dialogs, drawer)           │    tracker-store    creds (safeStorage)│
                                │    issue-service    cache, single-     │──▶ Linear (@linear/sdk)
-  extensions ──api.issues────▶ │                     flight, backoff    │──▶ Jira (REST v3)
+  extensions ──api.issues────▶ │                     flight, backoff    │
    (foundry,                   │    providers/       one per tracker    │
-    git-integration)           │    adf-to-markdown  Jira ADF → md      │
-                               └────────────────────────────────────────┘
+    git-integration)           └────────────────────────────────────────┘
 ```
 
 **The credential boundary.** Secrets live in `integrations.json`, each value encrypted with
@@ -579,14 +574,13 @@ account it proved to belong to, never the secret itself. `integrations:connect` 
 `integrations:disconnect` are the only two core channels deliberately **omitted** from the remote
 bridge — an authenticated LAN client still has no business writing the operator's API keys.
 
-**One issue shape.** Both trackers produce the same `Issue`, identified by the pair
-(`tracker`, `key`) because two trackers may both use `TAV-42`. Descriptions and comments are
-always markdown: Jira's Atlassian Document Format is converted inside its provider, so exactly one
-renderer and one sanitisation policy exist downstream.
+**One issue shape.** A provider produces an `Issue`, identified by the pair (`tracker`, `key`).
+Descriptions and comments are always markdown, so exactly one renderer and one sanitisation
+policy exist downstream.
 
 **Policy lives in the facade.** Providers are stateless functions over a credential. The 5-minute
 TTL cache, single-flight, cross-tracker merge and rate-limit backoff are all in `issue-service.ts`,
-so both trackers behave identically and a third would too. A failing or unconnected tracker is
+so every tracker behaves the same way. A failing or unconnected tracker is
 reported in `failures` rather than silently dropped — an incomplete list must never read as an
 empty one.
 
@@ -599,13 +593,13 @@ operator asked for, Linear only (ADR-061).
 changes run through one queue, so two at once (a field's blur and a Disconnect click) both land.
 
 **End to end against stubs.** `tests/e2e/issue-trackers.spec.ts` drives every `integrations:*`
-channel against stub Linear and Jira at their real addresses: the app runs with
+channel against a stub Linear at its real address: the app runs with
 `NODE_USE_ENV_PROXY=1`, `HTTPS_PROXY` naming a local proxy and `NODE_EXTRA_CA_CERTS` naming a CA made
 for the run, so Node's fetch tunnels to `tests/e2e/tracker-stub.ts`, which answers TLS itself and
 refuses every other host. Verification stays on. The CA and the leaf certificate are made with
 `openssl x509 -req -extfile` and an explicit extension list, so no openssl.cnf default can add a
 second copy of an extension. macOS ships LibreSSL's config, Linux ships OpenSSL's. The leaf's
-SANs name both hosts, it has `extendedKeyUsage=serverAuth`, and its key identifiers link it to the CA.
+SAN names the host, it has `extendedKeyUsage=serverAuth`, and its key identifiers link it to the CA.
 The stub records every CONNECT and TLS error, and the spec prints them when a tracker fails to
 connect. `close()` destroys the open tunnels, so a failed test cannot hold up `afterAll`.
 
@@ -733,14 +727,14 @@ The task-vault extension (`extensions/task-vault/`) implements a GTD+BuJo+PARA p
 - **clock.ts** — the backend's clock: `zonedNow()` (a `Temporal.ZonedDateTime` in the machine's time zone), `today()` and `daysAgo(days)` (`YYYY-MM-DD`). The backend computes dates with `Temporal`; the view, which also runs in the phone's browser, stays on `Date` (`src/utils/local-date.ts`) and is type-checked without the `Temporal` types ([ADR 108](adr/108-temporal-in-extension-backends-not-in-views.md)).
 - **ensure-next-occurrence.ts** — `ensureNextOccurrence(db, taskId)`: idempotent function that checks whether a future `status='open'` instance already exists and inserts one if not. `backfillRecurringTasks(db)`: called at extension startup to handle days the app was closed.
 - **tags.ts** — Utilities for extracting and normalising `@context`, `+project`, `#area`, and `due:` inline tags from task text.
-- **types.ts** — `TaskStatus`, `IndexedTask`, `IndexedProject`, `KanbanConfig`, and other shared TypeScript types used by both the IPC layer and renderer components.
+- **types.ts** — `TaskStatus`, `IndexedTask`, `IndexedProject`, and other shared TypeScript types used by both the IPC layer and renderer components.
 
 #### IPC Layer (`src/ipc/`)
 
 - **vault.ipc.ts** — All vault CRUD handlers. Core task handlers: `capture`, `get-today`, `get-daily`, `add-task`, `add-subtask`, `edit-task`, `delete-task`, `complete-task`, `cancel-task`, `restore-task`, `reopen-task`, `migrate-task`, `block-task`, `unblock-task`, `reorder-tasks`. Recurrence handlers: `set-recurrence`, `clear-recurrence`. View/query handlers: `query`, `process-inbox-item`, `get-inbox`, `list-areas`, `archive-area`, `delete-area`, `create-area`, `list-archive`, `list-someday`, `someday-to-today`, `get-calendar-month`. Detail handlers: `get-task-detail`, `save-task-detail`. Bulk I/O: `export-json`, `import-json`. All handlers validate with Zod; stale IDs return `{ error: 'STALE_ID' }`.
-- **projects.ipc.ts** — project list, update-project-status, and weekly-review payload handler.
+- **projects.ipc.ts** — project list, and update-project-status handlers.
 - **links.ipc.ts** — bidirectional link handlers (create/remove/get-for-terminator-target).
-- **kanban.ipc.ts**, **weekly-review.ipc.ts**, **admin.ipc.ts** — the board, the weekly review, and database administration (the SQL console), which stays local-only.
+- **admin.ipc.ts** — database administration (the SQL console), which stays local-only.
 - **register.ts** — the registrar every file uses: each channel declares its schema, and `handleRemote` opts a channel in to the remote client.
 
 #### Recurring Task Engine
@@ -801,7 +795,7 @@ Channels are named `terminator.notepad:<name>` and register through `notepadChan
 
 Notes and diagrams are stored in the shared SQLite database at `<userData>/app.sqlite`, reached only through `api.db`. `applyNotepadSchema` (`src/db/db.ts`) creates every table and index with `IF NOT EXISTS`, so running it on each launch changes nothing that already exists; the database is created from this schema, which is why there are no column migrations. The import of the old better-sqlite3 `notepad.db` / `vault.db` files through `sql.js` is removed ([ADR 099](adr/099-node-sqlite-replaces-pglite.md)).
 
-**Search** uses `LIKE` rather than an FTS5 table (`src/ipc/search.ipc.ts`). SQLite's `LIKE` folds case for ASCII letters only, so a search for `é` does not match `É`. Tag filters are applied in the same query with `EXISTS` subqueries, and results are returned in `updated_at DESC` order. See [ADR-019](adr/019-ilike-search-over-fts5.md) for the trade-off; its `pg_trgm` upgrade path was PGlite-specific and no longer applies.
+**Search** matches the text in JavaScript, not with an FTS5 table (`src/ipc/search.ipc.ts`). SQLite's `LIKE` folds case for ASCII letters only, so the JavaScript match is what makes `é` match `É`. Tag filters are applied in the SQL query with `EXISTS` subqueries, and results are returned in `updated_at DESC` order. See [ADR-019](adr/019-ilike-search-over-fts5.md) for the trade-off; its `pg_trgm` upgrade path was PGlite-specific and no longer applies.
 
 #### Data flow
 
@@ -1456,6 +1450,7 @@ layout and the belts through small state classes (`HallBuilder`, `BeltRouter`).
 - [ADR-131: agents' permissions are Claude Code settings](adr/131-agents-permissions-are-claude-code-settings.md) — each role's mode and rules come from `runtime/role-settings.ts`; supersedes ADR-049 and ADR-077.
 - [ADR-056: a file count is not a budget](adr/056-a-file-count-is-not-a-budget.md) — budgets are agents and minutes; the files budget and the `budgets` check are gone.
 - [ADR-132: CI finishes in five minutes](adr/132-ci-finishes-in-five-minutes.md) — at most five macOS jobs per run, nothing waits on E2E, quarantined tests run nightly, and `ci:local` runs its jobs at once.
+- [ADR-133: paved-path cleanup](adr/133-paved-path-cleanup.md) — `codecov/patch` is the one outside gate, the seed is Vitest's, the database console is an exception to Principle II, and Jira is removed.
 - [ADR-070: E2E is deterministic and selective](adr/070-e2e-is-deterministic-and-selective.md) — no retries, flakes fixed at their cause, and a PR runs only the specs its diff selects.
 - [ADR-072: a review reads definitions before their callers](adr/072-a-review-reads-definitions-before-callers.md) — tree-sitter orders a PR's files so a function comes before the code that calls it.
 - [ADR-073: the review agent reads, and never writes](adr/073-the-review-agent-reads-and-never-writes.md) — headless `claude -p` with Read, Grep and Glob only, in a worktree at the PR head; findings stay private until posted.

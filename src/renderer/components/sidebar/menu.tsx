@@ -1,40 +1,5 @@
-import React, { useEffect, useRef, useState, type ReactNode } from 'react'
-import { closeAllContextMenus } from '../ContextMenu'
-import { useMenuPlacement } from '../use-menu-placement'
-
-/** One drop-down menu's state: open or not, where its panel sits, and closing on any click
- * outside it or when another context menu opens. */
-function useMenu() {
-  const [open, setOpen] = useState(false)
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const placement = useMenuPlacement(open, buttonRef, panelRef)
-
-  useEffect(() => {
-    if (!open) return
-    const closeDropdown = (): void => setOpen(false)
-    window.addEventListener('click', closeDropdown)
-    window.addEventListener('close-context-menus', closeDropdown)
-    return () => {
-      window.removeEventListener('click', closeDropdown)
-      window.removeEventListener('close-context-menus', closeDropdown)
-    }
-  }, [open])
-
-  const toggleDropdown = (): void => {
-    closeAllContextMenus()
-    setOpen((v) => !v)
-  }
-
-  return {
-    open,
-    close: () => setOpen(false),
-    toggle: toggleDropdown,
-    buttonRef,
-    panelRef,
-    placement,
-  }
-}
+import React, { useState, type ReactNode } from 'react'
+import { Menu } from '@terminator/extension-ui'
 
 interface MenuButtonProps {
   /** Shown beside the icon, and the button's name unless `ariaLabel` says otherwise. */
@@ -55,28 +20,27 @@ interface DropdownMenuProps extends MenuButtonProps {
   children: (close: () => void) => ReactNode
 }
 
-/** A sidebar-style drop-down: its button, and its panel placed against the viewport. */
+/** A sidebar-style drop-down: its button, and its menu opened under it. */
 export function DropdownMenu({
   variant,
   panelLabel,
   children,
   ...button
 }: DropdownMenuProps): JSX.Element {
-  const { open, close, toggle, buttonRef, panelRef, placement } = useMenu()
+  const [open, setOpen] = useState(false)
+  const close = (): void => setOpen(false)
   const suffix = variant ? ` ${variant}` : ''
   return (
     <div className={`sidebar-menu${suffix}`} onClick={(e) => e.stopPropagation()}>
-      <MenuButton {...button} control={{ open, toggle, buttonRef }} />
+      <MenuButton {...button} control={{ open, toggle: () => setOpen((v) => !v) }} />
       {open && (
-        <div
-          ref={panelRef}
+        <Menu
           className={`sidebar-menu__panel${variant ? ` ${variant}__panel` : ''}`}
-          role="menu"
-          aria-label={panelLabel}
-          style={placement}
+          label={panelLabel ?? button.ariaLabel ?? button.label}
+          onDismiss={close}
         >
           {children(close)}
-        </div>
+        </Menu>
       )}
     </div>
   )
@@ -85,7 +49,6 @@ export function DropdownMenu({
 interface MenuControl {
   open: boolean
   toggle: () => void
-  buttonRef: React.RefObject<HTMLButtonElement>
 }
 
 function MenuButton({
@@ -94,14 +57,14 @@ function MenuButton({
   ariaLabel = label,
   on = false,
   badge,
-  control: { open, toggle, buttonRef },
+  control: { open, toggle },
 }: MenuButtonProps & { control: MenuControl }): JSX.Element {
   const marked = on === 'when-open' ? open : on
   return (
     <button
-      ref={buttonRef}
       type="button"
       className={`sidebar-menu__button${marked ? ' sidebar-menu__button--on' : ''}`}
+      aria-haspopup="menu"
       aria-expanded={open}
       aria-label={ariaLabel}
       onClick={toggle}

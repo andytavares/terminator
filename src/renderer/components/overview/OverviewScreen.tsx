@@ -1,6 +1,7 @@
 import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
+import { SegmentedControl } from '@terminator/extension-ui'
 import { WallTile } from './WallTile'
 import { useWorkThreads } from '../home/useWorkThreads'
 import { useIssueTitles, useSessionFacts } from '../session/useSessionFacts'
@@ -213,21 +214,17 @@ function WallArrangement({ prefs, update }: Pick<WallBarProps, 'prefs' | 'update
 
 function SizeChoices({ prefs, update }: Pick<WallBarProps, 'prefs' | 'update'>): JSX.Element {
   return (
-    <div className="wall__sizes" role="radiogroup" aria-label="Tile size">
-      {SIZES.map((size) => (
-        <button
-          key={size.value}
-          type="button"
-          role="radio"
-          aria-label={size.label}
-          aria-checked={prefs.size === size.value}
-          className="wall__size"
-          onClick={() => update({ size: size.value })}
-        >
-          {size.short}
-        </button>
-      ))}
-    </div>
+    <SegmentedControl
+      label="Tile size"
+      size="sm"
+      value={prefs.size}
+      onChange={(size) => update({ size })}
+      options={SIZES.map((size) => ({
+        value: size.value,
+        label: size.short,
+        accessibleName: size.label,
+      }))}
+    />
   )
 }
 

@@ -7,6 +7,7 @@ import {
   planFor,
   readWorkflow,
   SKIPPED_JOBS,
+  withoutUnitWork,
 } from '../../../scripts/ci-plan.mjs'
 
 const REPO_ROOT = resolve(__dirname, '../../..')
@@ -325,5 +326,20 @@ describe('a workflow it does not understand', () => {
   it('refuses a condition it cannot decide', () => {
     const unknown = oneStep({ name: 'Maybe', if: "github.ref == 'refs/heads/main'", run: 'true' })
     expect(() => planFor(unknown)).toThrow(/check.*Maybe/)
+  })
+})
+
+// CI skips the unit job when no unit spec is selected, and the Test job's merge and uploads with it.
+describe('a selection with no unit spec', () => {
+  it('drops the unit job and the steps of the Test job that need its blobs', () => {
+    const kept = withoutUnitWork(plan)
+    expect(kept.some((step) => step.job === 'unit')).toBe(false)
+    expect(kept.filter((step) => step.job === 'test').map((step) => step.name)).toEqual(['Verdict'])
+  })
+
+  it('keeps every other job whole', () => {
+    const others = (steps: typeof plan) =>
+      steps.filter((step) => !['unit', 'test'].includes(step.job))
+    expect(others(withoutUnitWork(plan))).toEqual(others(plan))
   })
 })

@@ -2,33 +2,28 @@ import { describe, it, expect } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import {
-  parseWorktreePorcelain,
   parseRefListing,
   parseReflogOldest,
   isAgentRow,
   inventoryRows,
   loadLocalInventory,
   type InventoryShell,
+  type WorktreeEntry,
 } from '../../src/git/local-inventory'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 
-const PORCELAIN = `worktree /repo
-HEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-branch refs/heads/main
-
-worktree /repo/.claude/worktrees/agent-x
-HEAD bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-branch refs/heads/worktree-agent-x
-
-worktree /repo/.worktrees/detached
-HEAD cccccccccccccccccccccccccccccccccccccccc
-detached
-
-worktree /gone/old-worktree
-HEAD dddddddddddddddddddddddddddddddddddddddd
-branch refs/heads/feature-old
-prunable gitdir file points to non-existent location
-`
+/** What the core's worktree list answers for the fixture checkout. */
+const WORKTREES: WorktreeEntry[] = [
+  { path: '/repo', branch: 'main', detached: false, prunable: false },
+  {
+    path: '/repo/.claude/worktrees/agent-x',
+    branch: 'worktree-agent-x',
+    detached: false,
+    prunable: false,
+  },
+  { path: '/repo/.worktrees/detached', branch: null, detached: true, prunable: false },
+  { path: '/gone/old-worktree', branch: 'feature-old', detached: false, prunable: true },
+]
 
 // Five NUL-separated fields per branch, records newline-separated, as
 // `git for-each-ref refs/heads --format=...` prints them.
@@ -44,22 +39,6 @@ const REF_LISTING = [
 
 /** A worktree without a `.git` file: nothing to read. */
 const readFileOrNull = async () => null
-
-describe('parseWorktreePorcelain', () => {
-  it('parses branches, detached heads and prunable entries', () => {
-    expect(parseWorktreePorcelain(PORCELAIN)).toEqual([
-      { path: '/repo', branch: 'main', detached: false, prunable: false },
-      {
-        path: '/repo/.claude/worktrees/agent-x',
-        branch: 'worktree-agent-x',
-        detached: false,
-        prunable: false,
-      },
-      { path: '/repo/.worktrees/detached', branch: null, detached: true, prunable: false },
-      { path: '/gone/old-worktree', branch: 'feature-old', detached: false, prunable: true },
-    ])
-  })
-})
 
 const PARSED_REFS = [
   {
@@ -123,7 +102,7 @@ describe('isAgentRow', () => {
 /** The facts inventoryRows assembles in these tests. */
 const ROW_INPUT = {
   repoRoot: '/repo',
-  porcelain: PORCELAIN,
+  worktrees: WORKTREES,
   refListing: REF_LISTING,
   defaultBranch: 'main',
   mergedBranches: ['main', 'feature-merged'],
@@ -216,12 +195,12 @@ function fakeShell(fake: FakeGit): InventoryShell {
     return { birthtimeMs: times.birthtimeMs, mtimeMs: times.mtimeMs }
   }
   const listProjects = async () => fake.projects ?? []
-  return { exec, stat, readFile: readFileOrNull, listProjects }
+  const listWorktrees = async () => WORKTREES
+  return { exec, listWorktrees, stat, readFile: readFileOrNull, listProjects }
 }
 
 /** The git answers of a checkout with the fixture's branches. */
 const INVENTORY_ANSWERS = {
-  'worktree list --porcelain': PORCELAIN,
   'for-each-ref': REF_LISTING,
   'symbolic-ref --short refs/remotes/origin/HEAD': 'origin/main',
   'branch --merged main': '  main\n  feature-merged\n',
@@ -270,8 +249,26 @@ async function statOrNull(path: string): Promise<{ birthtimeMs: number; mtimeMs:
   return times ? { birthtimeMs: times.birthtimeMs, mtimeMs: times.mtimeMs } : null
 }
 
+/** The worktrees as the core lists them, read from real git's own list. */
+async function realWorktrees(repoRoot: string): Promise<WorktreeEntry[]> {
+  return gitSync(repoRoot, ['worktree', 'list', '--porcelain'])
+    .trim()
+    .split('\n\n')
+    .map((block) => {
+      const lines = block.split('\n')
+      const branch = lines.find((l) => l.startsWith('branch '))
+      return {
+        path: lines[0].slice('worktree '.length),
+        branch: branch ? branch.slice('branch refs/heads/'.length) : null,
+        detached: lines.includes('detached'),
+        prunable: false,
+      }
+    })
+}
+
 const realGitShell = (): InventoryShell => ({
   exec: async (cwd, args) => gitSync(cwd, args),
+  listWorktrees: realWorktrees,
   stat: statOrNull,
   readFile: readFileOrNull,
   listProjects: async () => [],

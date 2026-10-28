@@ -80,6 +80,13 @@ async function fetchPrSources(ctx: GithubContext, at: PrAt, pull: string): Promi
   }
 }
 
+/** The file diffs of this PR read these patches instead of asking GitHub for the files again. */
+function rememberPatches(ctx: GithubContext, at: PrAt, sources: PrSources): void {
+  const { meta, files } = sources
+  const patches = new Map(files.map((f) => [filePathOf(f), f.patch ? String(f.patch) : undefined]))
+  ctx.prPatches.set(`${at.repoRoot}#${at.prNumber}`, { headSHA: asText(meta.headRefOid), patches })
+}
+
 function filePathOf(f: RawRecord): string {
   return String(f.filename ?? f.path ?? '')
 }
@@ -208,6 +215,7 @@ async function prDetail(ctx: GithubContext, at: PrAt): Promise<{ pr: PrReviewDet
   const repoPath = `repos/${owner}/${repo}`
   const sources = await fetchPrSources(ctx, at, `${repoPath}/pulls/${at.prNumber}`)
   const { meta, files } = sources
+  rememberPatches(ctx, at, sources)
   const chapters = await chaptersFor(at.repoRoot, files)
   const issueRefs = await issueRefsOf(ctx, meta)
   const dryViolations = dryViolationsIn(files)

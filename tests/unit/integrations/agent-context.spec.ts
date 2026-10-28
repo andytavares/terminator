@@ -73,8 +73,7 @@ describe('buildAgentContext — composition', () => {
 })
 
 describe('buildAgentContext — provenance and size', () => {
-  it('says which tracker it came from — two trackers can share a key', () => {
-    expect(agentContextFor(issue({ tracker: 'jira' })).markdown).toContain('Jira')
+  it('says which tracker it came from', () => {
     expect(agentContextFor(issue()).markdown).toContain('Linear')
   })
 

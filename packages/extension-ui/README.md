@@ -43,8 +43,9 @@ should define a colour.
 
 **Fields** — no component: every `input`, `textarea` and `select` is the themed field from `controls.css` at one element's weight, so any class refines it. A field inside a box that draws the edge sets `border: none; padding: 0; outline: none` and the box takes `:focus-within`.
 
-**Behaviour** — `usePolling(read, show, intervalMs)`, `everyWhileVisible(tick, intervalMs)`, `useDismissible`,
-the modal-depth registry and the layer scale (`LAYERS`, `layerValue`).
+**Behaviour** — `usePolling(read, show, intervalMs)`, `everyWhileVisible(tick, intervalMs)`, `useCloseOnOutsidePress` (for a list that cannot be a `Popover`: a combobox, whose field sits outside it) and the layer scale (`LAYERS`, `layerValue`).
+
+**Popover and Menu** — `Popover` is a native `popover="auto"` element placed by CSS anchor positioning under the element it is rendered inside (`align="end"` lines it up with the right edge; `at={{ x, y }}` opens it at a point). The browser closes it on Escape or a click outside and returns focus. `Menu` is a `Popover` with `role="menu"`; its `MenuItem`s (any child with a `menuitem*` role) move with the arrow keys, Home and End. Whether a modal dialog or a popover is open is `document.querySelector('dialog:modal, :popover-open')`: no component counts anything.
 
 ## Modal surfaces
 
@@ -72,7 +73,7 @@ inside the shell.
 - A caller with its own Escape (Quick Actions) handles the keydown and prevents
   its default; the shell is then not asked to close.
 - What opens from inside a shell must be inside it, because everything outside is
-  inert. `Popover` and `useDismissible` panels render in place; `ToastRegion`
+  inert. `Popover` and `Menu` render in place; `ToastRegion`
   moves itself; a surface you portal to `document.body` must portal to
   `trigger.closest('dialog') ?? document.body` instead.
 - A shell's entrance animation is opacity only: the shell refuses `transform`,

@@ -43,33 +43,27 @@ function fakeProvider(id: TrackerId, over: Partial<TrackerProvider> = {}): Track
 
 interface Harness {
   linear: TrackerProvider
-  jira: TrackerProvider
   connected: Set<TrackerId>
   now: { value: number }
 }
 
 function build(over: Partial<Harness> = {}) {
   const linear = over.linear ?? fakeProvider('linear')
-  const jira = over.jira ?? fakeProvider('jira')
-  const connected = over.connected ?? new Set<TrackerId>(['linear', 'jira'])
+  const connected = over.connected ?? new Set<TrackerId>(['linear'])
   const now = over.now ?? { value: 1_000_000 }
   const sleep = vi.fn().mockResolvedValue(undefined)
 
   const service = createIssueService({
-    providers: { linear, jira },
+    providers: { linear },
     getCredential: async (tracker) =>
-      connected.has(tracker)
-        ? tracker === 'linear'
-          ? { tracker: 'linear', apiKey: 'k' }
-          : { tracker: 'jira', site: 's', email: 'e@x.c', apiToken: 't' }
-        : null,
+      connected.has(tracker) ? { tracker: 'linear', apiKey: 'k' } : null,
     getMine: async () => ({ kind: 'assignee', email: null }),
     onTrackerError: () => {},
     now: () => now.value,
     ttlMs: 5 * 60 * 1000,
     sleep,
   })
-  return { service, linear, jira, connected, now, sleep }
+  return { service, linear, connected, now, sleep }
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -98,15 +92,7 @@ describe('issue-service — cache', () => {
   })
 })
 
-describe('issue-service — cache keys and invalidation on comment', () => {
-  it('caches per tracker, so the same key in both is two entries', async () => {
-    const { service, linear, jira } = build()
-    await service.get('linear', 'TAV-42')
-    await service.get('jira', 'TAV-42')
-    expect(linear.get).toHaveBeenCalledTimes(1)
-    expect(jira.get).toHaveBeenCalledTimes(1)
-  })
-
+describe('issue-service — invalidation on comment', () => {
   it('drops the cached copy when the issue is commented on', async () => {
     const { service, linear } = build()
     await service.get('linear', 'TAV-42')
@@ -115,7 +101,6 @@ describe('issue-service — cache keys and invalidation on comment', () => {
     expect(linear.get).toHaveBeenCalledTimes(2)
   })
 })
-
 describe('issue-service — single flight (SC-008)', () => {
   it('collapses concurrent gets for the same issue into one request', async () => {
     let resolve: ((value: Issue) => void) | undefined
@@ -159,56 +144,35 @@ describe('issue-service — single flight after a failure', () => {
   })
 })
 
-describe('issue-service — listMine across trackers', () => {
-  it('merges results from every connected tracker', async () => {
+describe('issue-service — listMine', () => {
+  it('lists the issues of every connected tracker', async () => {
     const { service } = build()
     const result = await service.listMine()
-    expect(result.issues.map((i) => i.tracker).sort()).toEqual(['jira', 'linear'])
+    expect(result.issues.map((i) => i.tracker)).toEqual(['linear'])
     expect(result.failures).toEqual([])
   })
 
   it('reports a failing tracker without failing the call', async () => {
-    const jira = fakeProvider('jira', {
+    const linear = fakeProvider('linear', {
       listMine: vi.fn().mockRejectedValue(new TrackerError('auth-failed', 'revoked')),
     })
-    const { service } = build({ jira })
+    const { service } = build({ linear })
     const result = await service.listMine()
 
-    expect(result.issues.map((i) => i.tracker)).toEqual(['linear'])
-    expect(result.failures).toEqual([{ tracker: 'jira', error: 'auth-failed' }])
-  })
-})
-
-describe('issue-service — listMine when trackers are missing', () => {
-  it('does not call a tracker that is not connected, and says so', async () => {
-    const { service, jira } = build({ connected: new Set<TrackerId>(['linear']) })
-    const result = await service.listMine()
-
-    expect(jira.listMine).not.toHaveBeenCalled()
-    expect(result.issues.map((i) => i.tracker)).toEqual(['linear'])
-    // Reported rather than silently omitted: "Jira is not connected" is the
-    // difference between an incomplete list and an empty one (FR-032), and
-    // only the caller knows whether it is worth showing.
-    expect(result.failures).toEqual([{ tracker: 'jira', error: 'not-connected' }])
-  })
-
-  it('reports not-connected when nothing is connected — not an empty result (FR-032)', async () => {
-    const { service } = build({ connected: new Set<TrackerId>() })
-    const result = await service.listMine()
     expect(result.issues).toEqual([])
-    expect(result.failures).toEqual([
-      { tracker: 'linear', error: 'not-connected' },
-      { tracker: 'jira', error: 'not-connected' },
-    ])
-  })
-
-  it('can be narrowed to one tracker', async () => {
-    const { service, jira } = build()
-    await service.listMine({ tracker: 'linear' })
-    expect(jira.listMine).not.toHaveBeenCalled()
+    expect(result.failures).toEqual([{ tracker: 'linear', error: 'auth-failed' }])
   })
 })
 
+describe('issue-service — listMine when no tracker is connected', () => {
+  it('reports not-connected when nothing is connected — not an empty result (FR-032)', async () => {
+    const { service, linear } = build({ connected: new Set<TrackerId>() })
+    const result = await service.listMine()
+    expect(linear.listMine).not.toHaveBeenCalled()
+    expect(result.issues).toEqual([])
+    expect(result.failures).toEqual([{ tracker: 'linear', error: 'not-connected' }])
+  })
+})
 describe('issue-service — listMine limit', () => {
   it('asks for every open issue (the 250 cap) when no limit is passed', async () => {
     const { service, linear } = build()
@@ -247,14 +211,7 @@ describe('issue-service — search', () => {
   })
 })
 
-describe('issue-service — search across trackers', () => {
-  it('keeps the same key from both trackers as two results', async () => {
-    // TAV-42 can exist in Linear and in Jira. They are different issues.
-    const { service } = build()
-    const result = await service.search('TAV-42')
-    expect(result.issues.map((i) => i.tracker).sort()).toEqual(['jira', 'linear'])
-  })
-
+describe('issue-service — search by text', () => {
   it('falls back to text search when the term is not a key', async () => {
     const { service, linear } = build()
     await service.search('sidebar')
@@ -264,20 +221,13 @@ describe('issue-service — search across trackers', () => {
 })
 
 describe('issue-service — search edge cases', () => {
-  it('asks only the named tracker when narrowed to one', async () => {
-    const { service, linear, jira } = build()
-    await service.search('sidebar', { tracker: 'jira' })
-    expect(linear.search).not.toHaveBeenCalled()
-    expect(jira.search).toHaveBeenCalledWith(expect.anything(), 'sidebar', expect.any(Number))
-  })
-
   it('returns the text results unchanged when no tracker has the exact key', async () => {
-    const linear = fakeProvider('linear', {
-      search: vi.fn().mockResolvedValue([summary('linear', 'TAV-9')]),
-      get: vi.fn().mockResolvedValue(null),
+    const { service } = build({
+      linear: fakeProvider('linear', {
+        get: vi.fn().mockResolvedValue(null),
+        search: vi.fn().mockResolvedValue([summary('linear', 'TAV-9')]),
+      }),
     })
-    const jira = fakeProvider('jira', { get: vi.fn().mockResolvedValue(null) })
-    const { service } = build({ linear, jira })
     const result = await service.search('TAV-42')
     expect(result.issues.map((i) => i.key)).toEqual(['TAV-9'])
   })
@@ -293,7 +243,7 @@ describe('issue-service — waiting without an injected sleep', () => {
       .mockRejectedValueOnce(new TrackerError('rate-limited', 'slow down', { retryAfterMs: 2000 }))
       .mockResolvedValue(issue('linear', 'TAV-42'))
     const service = createIssueService({
-      providers: { linear: fakeProvider('linear', { get }), jira: fakeProvider('jira') },
+      providers: { linear: fakeProvider('linear', { get }) },
       getCredential: async () => ({ tracker: 'linear', apiKey: 'k' }),
       getMine: async () => ({ kind: 'assignee', email: null }),
       onTrackerError: () => {},
@@ -368,28 +318,21 @@ describe('issue-service — not connected', () => {
 
 describe('issue-service — invalidate', () => {
   it('drops every cached copy when no tracker is named', async () => {
-    const { service, linear, jira } = build()
+    const { service, linear } = build()
     await service.get('linear', 'TAV-42')
-    await service.get('jira', 'TAV-42')
     service.invalidate()
     await service.get('linear', 'TAV-42')
-    await service.get('jira', 'TAV-42')
     expect(linear.get).toHaveBeenCalledTimes(2)
-    expect(jira.get).toHaveBeenCalledTimes(2)
   })
 
-  it('drops only the named tracker, leaving the other cached', async () => {
-    const { service, linear, jira } = build()
+  it('drops the named tracker', async () => {
+    const { service, linear } = build()
     await service.get('linear', 'TAV-42')
-    await service.get('jira', 'TAV-42')
     service.invalidate('linear')
     await service.get('linear', 'TAV-42')
-    await service.get('jira', 'TAV-42')
     expect(linear.get).toHaveBeenCalledTimes(2)
-    expect(jira.get).toHaveBeenCalledTimes(1)
   })
 })
-
 describe('issue-service — error reporting to settings', () => {
   it('reports an auth failure so it can be shown against the connection', async () => {
     const onTrackerError = vi.fn()
@@ -397,7 +340,7 @@ describe('issue-service — error reporting to settings', () => {
       get: vi.fn().mockRejectedValue(new TrackerError('auth-failed', 'revoked')),
     })
     const service = createIssueService({
-      providers: { linear, jira: fakeProvider('jira') },
+      providers: { linear },
       getCredential: async () => ({ tracker: 'linear', apiKey: 'k' }),
       getMine: async () => ({ kind: 'assignee', email: null }),
       onTrackerError,
@@ -410,7 +353,7 @@ describe('issue-service — error reporting to settings', () => {
   it('clears the reported error once a call succeeds', async () => {
     const onTrackerError = vi.fn()
     const service = createIssueService({
-      providers: { linear: fakeProvider('linear'), jira: fakeProvider('jira') },
+      providers: { linear: fakeProvider('linear') },
       getCredential: async () => ({ tracker: 'linear', apiKey: 'k' }),
       getMine: async () => ({ kind: 'assignee', email: null }),
       onTrackerError,

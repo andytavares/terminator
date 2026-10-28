@@ -1,5 +1,4 @@
 import React, { useLayoutEffect, useRef } from 'react'
-import { createModalDepthRegistry } from './modal-depth'
 import { enterModalStack } from './modal-stack'
 import './extension-ui.css'
 
@@ -52,12 +51,10 @@ function OpensTheDialog(): JSX.Element {
   useLayoutEffect(() => {
     const dialog = markRef.current?.closest('dialog')
     if (!dialog) return
-    const releaseDepth = createModalDepthRegistry(window).release()
     const leaveStack = enterModalStack(dialog)
     dialog.showModal()
     return () => {
       leaveStack()
-      releaseDepth()
       dialog.close()
     }
   }, [])

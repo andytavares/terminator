@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { IconButton, useDismissible } from '@terminator/extension-ui'
+import { IconButton, useCloseOnOutsidePress } from '@terminator/extension-ui'
 import { X } from 'lucide-react'
 import type { IndexedProject } from '../vault/types'
 
@@ -229,13 +229,13 @@ function useFileToPicker(props: PickerProps) {
   return { query, setQuery, loading, options, highlighted, setHighlighted, select, onKeyDown }
 }
 
-/** Picks where to file a task. useDismissible adds what Escape in the field did not cover: a click
- *  outside, and focus returning to whatever opened it. */
+/** Picks where to file a task. Escape in the field closes it; useCloseOnOutsidePress adds a click
+ *  outside. */
 export function FileToPicker(props: PickerProps): React.JSX.Element {
   const picker = useFileToPicker(props)
   const inputRef = useRef<HTMLInputElement>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
-  useDismissible({ ref: surfaceRef, onDismiss: props.onClose, manageFocus: false })
+  useCloseOnOutsidePress(surfaceRef, props.onClose, true)
   useEffect(() => inputRef.current?.focus(), [])
   return (
     <div className="file-to-picker" ref={surfaceRef} data-tmui-surface="">

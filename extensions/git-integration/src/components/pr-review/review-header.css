@@ -142,9 +142,6 @@
 }
 
 .rh-popover {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
   min-width: 220px;
   max-width: 340px;
   background: var(--tm-bg-elevated);

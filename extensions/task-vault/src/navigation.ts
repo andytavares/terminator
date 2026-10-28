@@ -1,6 +1,11 @@
-import type { ExtensionAPI, VaultDestination } from '@terminator/extension-sdk'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
 
-export type { VaultDestination }
+/** Where `openInVault` takes the operator. Every field is optional. */
+export interface VaultDestination {
+  /** A day in the daily log, `YYYY-MM-DD`. */
+  date?: string
+  taskId?: string
+}
 
 // Taking someone to a task, from wherever they asked.
 //
@@ -34,13 +39,7 @@ let pending: VaultDestination | null = null
 export function openInVault(api: ExtensionAPI, destination: VaultDestination = {}): void {
   api.window.focusSelf()
   api.window.broadcast('extension:activate-global-tab', GLOBAL_TAB_ID)
-  if (
-    destination.date === undefined &&
-    destination.taskId === undefined &&
-    destination.view === undefined
-  ) {
-    return
-  }
+  if (destination.date === undefined && destination.taskId === undefined) return
   pending = { ...destination }
   api.window.broadcast('task-vault:navigate', { ...destination })
 }

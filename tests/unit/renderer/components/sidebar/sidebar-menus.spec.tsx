@@ -13,16 +13,16 @@ const VIEW: SessionView = {
   filters: {},
 }
 
-// The sidebar clips its overflow, so a panel positioned inside it is cut off at
-// the sidebar's right edge; it must be placed against the viewport instead.
+// The sidebar clips its overflow, so a panel drawn inside it is cut off at the sidebar's right
+// edge; a popover is in the top layer, which no ancestor clips.
 describe('sidebar menus', () => {
-  it('Display opens a viewport-fixed panel', () => {
+  it('Display opens its panel in the top layer', () => {
     render(<DisplayMenu view={VIEW} onChangeView={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Display' }))
-    expect(screen.getByRole('menu').style.position).toBe('fixed')
+    expect(screen.getByRole('menu').matches(':popover-open')).toBe(true)
   })
 
-  it('Filter opens a viewport-fixed panel', () => {
+  it('Filter opens its panel in the top layer', () => {
     render(
       <FilterMenu
         views={[VIEW]}
@@ -36,7 +36,7 @@ describe('sidebar menus', () => {
       />
     )
     fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
-    expect(screen.getByRole('menu').style.position).toBe('fixed')
+    expect(screen.getByRole('menu').matches(':popover-open')).toBe(true)
   })
 })
 

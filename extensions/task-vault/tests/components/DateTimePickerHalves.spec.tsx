@@ -106,18 +106,16 @@ function monthsMonthsTests() {
 }
 
 function monthsClosingTests() {
-  it('closes with Done or the trigger, and opens above the trigger when space is short', () => {
+  it('closes with Done or the trigger, and on Escape', () => {
     renderOpen({ mode: 'date' })
     fireEvent.click(screen.getByText('Done'))
     expect(popover()).toBeNull()
-    vi.spyOn(trigger(), 'getBoundingClientRect').mockReturnValue({
-      top: 700,
-      bottom: 720,
-      left: 10,
-    } as DOMRect)
     fireEvent.click(trigger())
-    expect((popover() as HTMLElement).style.top).toBe(`${700 - 360 - 4}px`)
+    expect(popover()).not.toBeNull()
     fireEvent.click(trigger())
+    expect(popover()).toBeNull()
+    fireEvent.click(trigger())
+    fireEvent.keyDown(document, { key: 'Escape' })
     expect(popover()).toBeNull()
   })
 }

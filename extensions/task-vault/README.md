@@ -8,7 +8,6 @@ GTD+BuJo+PARA daily productivity system backed by the shared SQLite database.
 - **Quick Capture** — OS-level global hotkey opens floating overlay from any app
 - **Projects Browser** — list projects with stale detection
 - **Inbox Processing** — GTD clarify flow for inbox items
-- **Weekly Review** — full review payload including stale projects and completed tasks. Every review is persisted: each promote, archive, backlog, delete, keep, project status change, and inbox decision is recorded against the review, alongside the reflection answers. Past reviews are browsable from the review's **History** button and exportable as Markdown
 - **Recurring Tasks** — set daily/weekly/biweekly/monthly recurrence on any task; the engine automatically ensures exactly one future open instance exists at all times
 
 ## Areas: archive and restore
@@ -17,7 +16,7 @@ Archiving an area archives its projects and cancels its unfinished tasks, subtas
 
 ## Stale tasks
 
-An open task left on Today rolls over each day; `today_since` records when it first landed there. Once it has rolled over for `terminator.task-vault.staleThresholdDays` days (Settings → Task Vault → **Stale Task Threshold (days)**, 7 by default, 1–365), Today marks it stale and the weekly review's Stale step lists it (`src/stale-threshold.ts`). `task-vault:settings:set-stale-threshold` writes the same setting for a remote client. Versions before this kept the threshold in the `settings` table as `stale_days_threshold`; activation moves that value into the setting once and deletes the row. A project's staleness is separate: it is stale when it has no open next action.
+An open task left on Today rolls over each day; `today_since` records when it first landed there. Once it has rolled over for `terminator.task-vault.staleThresholdDays` days (Settings → Task Vault → **Stale Task Threshold (days)**, 7 by default, 1–365), Today marks it stale (`src/stale-threshold.ts`). `task-vault:settings:set-stale-threshold` writes the same setting for a remote client. Versions before this kept the threshold in the `settings` table as `stale_days_threshold`; activation moves that value into the setting once and deletes the row. A project's staleness is separate: it is stale when it has no open next action.
 
 ## Export and import
 

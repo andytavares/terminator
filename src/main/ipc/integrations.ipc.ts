@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import type { BrowserWindow } from 'electron'
 import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { registerInvokeTable } from './invoke-table.js'
@@ -18,7 +17,6 @@ import {
 } from '../../shared/schemas/integrations.schema.js'
 import type { TrackerId } from '../../shared/types/index.js'
 import { getIssueService, resetIssueService } from '../integrations/index.js'
-import { createJiraProvider } from '../integrations/providers/jira.provider.js'
 import { createLinearProvider } from '../integrations/providers/linear.provider.js'
 import type { StoredCredential } from '../integrations/providers/provider.js'
 import {
@@ -46,22 +44,8 @@ function fail(error: unknown): { error: string; message: string } {
 
 const VALIDATION = { error: 'failed', message: 'Invalid payload' }
 
-/** The providers used to prove a credential before it is stored. */
-const verifiers = {
-  linear: createLinearProvider(),
-  jira: createJiraProvider(),
-}
-
-function credentialOf(input: z.infer<typeof ConnectInputSchema>): StoredCredential {
-  return input.tracker === 'linear'
-    ? { tracker: 'linear', apiKey: input.apiKey }
-    : {
-        tracker: 'jira',
-        site: input.site,
-        email: input.email,
-        apiToken: input.apiToken,
-      }
-}
+/** The provider used to prove a credential before it is stored. */
+const verifier = createLinearProvider()
 
 /**
  * How this layer reaches the window. Injected rather than imported so the
@@ -103,17 +87,13 @@ const connectionChannels: ChannelSpec[] = [
     schema: ConnectInputSchema,
     invalid: VALIDATION,
     run: async (input) => {
-      const cred = credentialOf(input)
+      const cred: StoredCredential = { tracker: 'linear', apiKey: input.apiKey }
       // Verified before it is stored, so a bad paste fails here rather than
       // three screens later as an empty issue list.
-      const account = await verifiers[input.tracker].verify(cred)
+      const account = await verifier.verify(cred)
       await setCredential(cred)
       await setAccount(input.tracker, { name: account.name, email: account.email })
-      if (input.tracker === 'linear') {
-        await setMine('linear', { kind: 'assignee', email: input.email ?? null })
-      } else {
-        await setMine('jira', { kind: 'query', jql: input.jql })
-      }
+      await setMine('linear', { kind: 'assignee', email: input.email ?? null })
       // The service holds a client built from the old credential.
       resetIssueService()
       const connections = await listConnections()

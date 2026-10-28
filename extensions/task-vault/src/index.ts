@@ -5,16 +5,13 @@ import type {
   ExtensionDB,
   Disposable,
   SettingDefinition,
-  TaskVaultAPI,
 } from '@terminator/extension-sdk'
 import { DEFAULT_CAPTURE_HOTKEY } from './constants.js'
 import { registerVaultIpcHandlers } from './ipc/vault.ipc.js'
 import { registerProjectsIpcHandlers } from './ipc/projects.ipc.js'
 import { registerLinksIpcHandlers } from './ipc/links.ipc.js'
-import { registerKanbanIpcHandlers } from './ipc/kanban.ipc.js'
 import { errorResult } from './ipc/register.js'
 import { registerAdminIpcHandlers } from './ipc/admin.ipc.js'
-import { registerWeeklyReviewIpcHandlers } from './ipc/weekly-review.ipc.js'
 import { applyTaskVaultSchema } from './vault/db.js'
 import {
   migrateStoredStaleThreshold,
@@ -28,7 +25,6 @@ import {
   setSchedulerTick,
 } from './notifications/task-scheduler.js'
 import { openInVault, popPendingNavigation } from './navigation.js'
-import { zonedNow } from './vault/clock.js'
 import { startHomePublisher, type HomePublisher } from './home/publisher.js'
 import { OPEN_COMMAND } from './home/feed.js'
 
@@ -38,7 +34,6 @@ import { OPEN_COMMAND } from './home/feed.js'
 const NOTIFICATION_KEYS: { key: string; label: string }[] = [
   { key: 'schemaInitFailed', label: 'Database schema failed to initialize' },
   { key: 'globalShortcutTaken', label: 'Global capture shortcut unavailable' },
-  { key: 'weeklyReviewReady', label: 'Weekly review ready' },
   { key: 'taskCompleted', label: 'Task completed' },
   { key: 'taskMigrated', label: 'Task migrated' },
   { key: 'taskArchived', label: 'Task archived (cancelled)' },
@@ -85,17 +80,10 @@ const BASE_SETTINGS: Record<string, SettingDefinition> = {
   [STALE_THRESHOLD_KEY]: {
     type: 'number',
     label: 'Stale Task Threshold (days)',
-    description:
-      'Days a task can roll over on Today before it is marked stale and listed in the weekly review',
+    description: 'Days a task can roll over on Today before it is marked stale',
     default: STALE_THRESHOLD.default,
     min: STALE_THRESHOLD.min,
     max: STALE_THRESHOLD.max,
-  },
-  'terminator.task-vault.weeklyReviewDay': {
-    type: 'string',
-    label: 'Weekly Review Day',
-    description: 'Day of the week for weekly review reminder (0=Sun, 6=Sat)',
-    default: '0',
   },
   'terminator.task-vault.contexts': {
     type: 'string',
@@ -186,9 +174,7 @@ const FEATURE_IPC = [
   registerVaultIpcHandlers,
   registerProjectsIpcHandlers,
   registerLinksIpcHandlers,
-  registerKanbanIpcHandlers,
   registerAdminIpcHandlers,
-  registerWeeklyReviewIpcHandlers,
 ]
 
 function registerFeatureIpc(api: ExtensionAPI, db: ExtensionDB): void {
@@ -291,26 +277,21 @@ function registerCaptureCommand(api: ExtensionAPI): void {
   )
 }
 
-/** The command a Home item runs to open the vault, on a task or on the weekly review. */
+/** The command a Home item runs to open the vault, on a task. */
 function registerOpenCommand(api: ExtensionAPI): void {
   disposables.push(
     api.commands.register(
       {
         id: OPEN_COMMAND,
         label: 'Open Task Vault',
-        description: 'Open the vault on a task or on the weekly review',
+        description: 'Open the vault on a task',
         args: z.object({
           taskId: z.string().optional(),
-          view: z.enum(['daily', 'review']).optional(),
         }),
       },
       (_context, args) => openInVault(api, args ?? {})
     )
   )
-}
-
-function weeklyReviewDay(api: ExtensionAPI): number {
-  return parseInt(api.settings.get<string>('terminator.task-vault.weeklyReviewDay') ?? '0', 10)
 }
 
 /** Publishes to Home now and whenever the vault says its index changed. */
@@ -324,8 +305,8 @@ function startHome(api: ExtensionAPI, db: ExtensionDB): HomePublisher {
   return home
 }
 
-/** Activates task-vault; returns what other extensions may use, through extensionDependencies (ADR 094). */
-export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
+/** Activates task-vault. */
+export async function activate(api: ExtensionAPI): Promise<void> {
   _api = api
   const db: ExtensionDB = api.db
   const home = startHome(api, db)
@@ -343,46 +324,10 @@ export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
   home.schedule()
   registerNavigation(ownIpc, api)
   addCalendarMenuItem(api)
-  scheduleWeeklyReviewNudge(api)
   registerPendingCapture(ownIpc)
   await registerCaptureShortcut(api)
   registerCaptureCommand(api)
   registerOpenCommand(api)
-  return {
-    open: (destination) => openInVault(api, destination),
-    openCapture: () => openCaptureOverlay(api),
-  }
-}
-
-let reviewNudgeTimer: ReturnType<typeof setTimeout> | null = null
-
-function clearReviewNudgeTimer(): void {
-  if (reviewNudgeTimer === null) return
-  clearTimeout(reviewNudgeTimer)
-  reviewNudgeTimer = null
-}
-
-function nudgeWeeklyReview(api: ExtensionAPI): void {
-  // A notification rather than a toast: a toast is transient and has nothing
-  // to click, so "open Task Vault to start" was an instruction to go and do
-  // the navigation yourself. This one is the link.
-  api.notifications.createNotification({
-    type: 'info',
-    title: 'Weekly review is ready',
-    key: 'weeklyReviewReady',
-    onClick: () => openInVault(api, { view: 'review' }),
-  })
-}
-
-/** Checks daily whether today is the review day; the setting is read at each check, so a change applies. */
-function scheduleWeeklyReviewNudge(api: ExtensionAPI): void {
-  clearReviewNudgeTimer()
-  const now = zonedNow()
-  // Temporal counts Sunday as 7; the setting counts it as 0.
-  if (now.dayOfWeek % 7 === weeklyReviewDay(api)) nudgeWeeklyReview(api)
-  // The same time tomorrow, not 24 hours on: when the clocks change, 24 hours can step over a date.
-  const untilTomorrow = now.add({ days: 1 }).epochMilliseconds - now.epochMilliseconds
-  reviewNudgeTimer = setTimeout(() => scheduleWeeklyReviewNudge(api), untilTomorrow)
 }
 
 function openCaptureOverlay(api: ExtensionAPI): void {
@@ -408,7 +353,6 @@ export async function deactivate(): Promise<void> {
   _schedulerStarted = false
   _pendingCapture = false
   clearPendingCaptureTimer()
-  clearReviewNudgeTimer()
   for (const d of disposables) {
     d.dispose()
   }

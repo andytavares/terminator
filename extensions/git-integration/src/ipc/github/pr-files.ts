@@ -41,8 +41,17 @@ function fetchPullRef(repoRoot: string, prNumber: number): Promise<string> {
   ])
 }
 
+/** The patch the PR detail fetch returned, when it is for the head the caller last saw. */
+function rememberedPatch(ctx: GithubContext, file: PrFile): { patch?: string } | null {
+  const remembered = ctx.prPatches.get(`${file.repoRoot}#${file.prNumber}`)
+  if (!remembered || (file.headSHA && remembered.headSHA !== file.headSHA)) return null
+  return { patch: remembered.patches.get(file.path) }
+}
+
 /** No checkout: GitHub's own per-file patch is the diff. */
 async function remoteFileDiff(ctx: GithubContext, file: PrFile): Promise<FileDiff> {
+  const remembered = rememberedPatch(ctx, file)
+  if (remembered) return parsePrFileDiff(remembered.patch ?? '', file.path)
   const filesRaw = await ctx.api(file.repoRoot, {
     path: `repos/{owner}/{repo}/pulls/${file.prNumber}/files`,
     paginate: true,

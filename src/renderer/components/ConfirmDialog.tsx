@@ -1,6 +1,5 @@
 import { ConfirmDialog as SharedConfirmDialog } from '@terminator/extension-ui'
 import '@terminator/extension-ui/styles.css'
-import { useModalEffect } from '../stores/modal.store'
 
 interface ConfirmDialogProps {
   title: string
@@ -22,11 +21,8 @@ interface ConfirmDialogProps {
  *
  * The implementation now lives in `@terminator/extension-ui`, where the
  * extensions can have it legitimately. This wrapper stays because it keeps the
- * core's own callers unchanged, and because `useModalEffect` is core-side state:
- * it suppresses the extension WebContentsViews while a host dialog is open,
- * which an extension-side dialog has no business doing.
+ * core's own callers unchanged.
  */
 export function ConfirmDialog(props: ConfirmDialogProps) {
-  useModalEffect()
   return <SharedConfirmDialog {...props} />
 }

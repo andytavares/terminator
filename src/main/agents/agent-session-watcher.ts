@@ -3,7 +3,7 @@ import * as path from 'node:path'
 import type { AgentConversation, SessionSnapshot } from '../../shared/types/index.js'
 import { parseHookReport } from '../../shared/agent-sessions/report.js'
 import { setAgent } from '../sessions/session-record-store.js'
-import { reportDirectory } from './agent-session-hook.js'
+import { reportDirectory } from './claude-hook.js'
 import { makeLogger } from '../logger.js'
 
 // Folding what the capture hook writes into the session records.

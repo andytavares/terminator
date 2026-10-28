@@ -347,8 +347,7 @@ async function allAssigned(client: LinearLike, email: string | null, limit: numb
 
 function listMine(client: LinearLike, mine: MineSelector, limit: number): Promise<IssueSummary[]> {
   return run(async () => {
-    const email = mine.kind === 'assignee' ? mine.email : null
-    return Promise.all((await allAssigned(client, email, limit)).map(toSummary))
+    return Promise.all((await allAssigned(client, mine.email, limit)).map(toSummary))
   })
 }
 

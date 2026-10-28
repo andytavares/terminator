@@ -240,21 +240,6 @@ function storedSession(pausedAt: string | null) {
   }
 }
 
-/** PR 42 as gh lists it. */
-const ghPr42 = {
-  number: 42,
-  title: 'Test',
-  author: { login: 'alice', avatarUrl: '' },
-  createdAt: '2025-01-01T00:00:00Z',
-  headRefName: 'feat/test',
-  baseRefName: 'main',
-  isDraft: false,
-  statusCheckRollup: [],
-  files: [],
-  additions: 0,
-  deletions: 0,
-}
-
 /** A promise and the function that resolves it, for answers the test releases in order. */
 function deferred() {
   let resolve!: (v: unknown) => void
@@ -329,11 +314,6 @@ afterEach(() => {
 })
 
 describe('useLoadPrQueue', () => {
-  it('returns a function', () => {
-    const { result } = renderHook(() => useLoadPrQueue('/repo'))
-    expect(typeof result.current).toBe('function')
-  })
-
   it('does nothing when repoRoot is null', async () => {
     const { result } = renderHook(() => useLoadPrQueue(null))
     await load(result.current)
@@ -345,7 +325,6 @@ describe('useLoadPrQueue', () => {
     const { result } = renderHook(() => useLoadPrQueue('/repo'))
     await load(result.current)
     expect(mockListOpenPrs).toHaveBeenCalledWith('/repo', expect.any(Object))
-    expect(mockSetQueue).toHaveBeenCalled()
   })
 })
 
@@ -369,16 +348,6 @@ describe('useLoadPrQueue — sets queue error when listOpenPrs returns error', (
     const { result } = renderHook(() => useLoadPrQueue('/repo'))
     await load(result.current)
     expect(mockSetQueueError).toHaveBeenCalledWith(expect.stringContaining('crash'))
-  })
-})
-
-describe('useLoadPrQueue — appends to queue when append option is true', () => {
-  it('appends to queue when append option is true', async () => {
-    mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: false, nextCursor: undefined })
-    const { result } = renderHook(() => useLoadPrQueue('/repo'))
-    await load(result.current, { append: true })
-    expect(mockAppendQueue).toHaveBeenCalled()
-    expect(mockSetQueue).not.toHaveBeenCalled()
   })
 })
 
@@ -417,24 +386,6 @@ describe('useLoadPrQueue — keeps all orphans when pruneActiveReviews throws', 
       throw new Error('bridge disconnected')
     })
     expect(queuedPrs().find((p) => p.number === 66)).toBeDefined()
-  })
-})
-
-describe('useLoadPrQueue — sets hasMorePrs and nextCursor from response', () => {
-  it('sets hasMorePrs and nextCursor from response', async () => {
-    mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: true, nextCursor: 'cursor-abc' })
-    const { result } = renderHook(() => useLoadPrQueue('/repo'))
-    await load(result.current)
-    expect(mockSetHasMorePrs).toHaveBeenCalledWith(true)
-    expect(mockSetNextPrCursor).toHaveBeenCalledWith('cursor-abc')
-  })
-
-  it('uses setLoadingMorePrs when appending', async () => {
-    mockListOpenPrs.mockResolvedValue({ prs: [], hasMore: false, nextCursor: undefined })
-    const { result } = renderHook(() => useLoadPrQueue('/repo'))
-    await load(result.current, { append: true })
-    expect(mockSetLoadingMorePrs).toHaveBeenCalledWith(true)
-    expect(mockSetLoadingMorePrs).toHaveBeenCalledWith(false)
   })
 })
 
@@ -501,11 +452,6 @@ describe('useLoadPrQueue — TAV-7: discards a stale currentUser response for a 
 })
 
 describe('useLoadPrDetail', () => {
-  it('returns a function', () => {
-    const { result } = renderHook(() => useLoadPrDetail('/repo'))
-    expect(typeof result.current).toBe('function')
-  })
-
   it('does nothing when repoRoot is null', async () => {
     const { result } = renderHook(() => useLoadPrDetail(null))
     await load(result.current, 1, vi.fn())
@@ -550,11 +496,6 @@ describe('useLoadPrDetail — does not crash on exception', () => {
 })
 
 describe('useLoadInlineComments', () => {
-  it('returns a function', () => {
-    const { result } = renderHook(() => useLoadInlineComments('/repo'))
-    expect(typeof result.current).toBe('function')
-  })
-
   it('does nothing when repoRoot is null', async () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
@@ -583,7 +524,6 @@ describe('useLoadInlineComments — calls prInlineComments and sets threads when
     const { result } = renderHook(() => useLoadInlineComments('/repo'))
     await load(result.current)
     expect(mockPrInlineComments).toHaveBeenCalledWith('/repo', 42)
-    expect(mockSetThreads).toHaveBeenCalled()
   })
 })
 
@@ -621,11 +561,6 @@ describe('useLoadInlineComments — marks a thread resolved when its first comme
 })
 
 describe('useFetchFileMetrics', () => {
-  it('returns a function', () => {
-    const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    expect(typeof result.current).toBe('function')
-  })
-
   it('does nothing when repoRoot is null', async () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...vi.mocked(usePrReviewStore)(),
@@ -650,8 +585,6 @@ describe('useFetchFileMetrics — fetches file metrics and updates risk scores f
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
     await load(result.current)
     expect(mockFileMetrics).toHaveBeenCalledWith('/repo', 'src/foo.ts')
-    expect(mockUpdateFileRiskScores).toHaveBeenCalled()
-    expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
   })
 })
 
@@ -725,19 +658,6 @@ describe('useLoadPrQueue — NOT_AUTHENTICATED branch — passes cursor and sear
   })
 })
 
-describe('useLoadPrQueue — NOT_AUTHENTICATED branch — mergeSessionStatuses: session with pausedAt=null is in-progress', () => {
-  it('mergeSessionStatuses: session with pausedAt=null is in-progress', async () => {
-    // in-progress (not paused)
-    mockSessionsForRepoAPI.mockResolvedValue({ sessions: [storedSession(null)] })
-    mockListOpenPrs.mockResolvedValue({ prs: [ghPr42], hasMore: false })
-    await loadQueueVia()
-    // Should call sessionsForRepo to merge statuses
-    expect(mockSessionsForRepoAPI).toHaveBeenCalledWith('/repo')
-    // Queue should be set (with merged session status)
-    expect(mockSetQueue).toHaveBeenCalled()
-  })
-})
-
 describe('useLoadPrQueue — NOT_AUTHENTICATED branch — mergeSessionStatuses: session with pausedAt set marks PR as paused', () => {
   it('mergeSessionStatuses: session with pausedAt set marks PR as paused', async () => {
     mockSessionsForRepoAPI.mockResolvedValue({ sessions: [storedSession('2026-01-01T00:00:00Z')] })
@@ -745,34 +665,6 @@ describe('useLoadPrQueue — NOT_AUTHENTICATED branch — mergeSessionStatuses: 
     mockListOpenPrs.mockResolvedValue({ prs: [pr42], hasMore: false })
     await loadQueueVia()
     expect(queuedPrs().find((p) => p.number === 42)?.sessionStatus).toBe('paused')
-  })
-})
-
-describe('useLoadPrQueue — NOT_AUTHENTICATED branch — mergeSessionStatuses: falls back to original prs on error', () => {
-  it('mergeSessionStatuses: falls back to original prs on error', async () => {
-    mockSessionsForRepoAPI.mockRejectedValue(new Error('IPC error'))
-
-    const prData = {
-      number: 42,
-      title: 'Test',
-      author: { login: 'alice', avatarUrl: '' },
-      createdAt: '2025-01-01T00:00:00Z',
-      headRefName: 'feat/test',
-      baseRefName: 'main',
-      isDraft: false,
-      statusCheckRollup: [],
-      files: [],
-      additions: 0,
-      deletions: 0,
-    }
-
-    mockListOpenPrs.mockResolvedValue({ prs: [prData], hasMore: false })
-
-    const { result } = renderHook(() => useLoadPrQueue('/repo'))
-    await load(result.current)
-
-    // Should still set queue (with original prs, fallback on error)
-    expect(mockSetQueue).toHaveBeenCalled()
   })
 })
 

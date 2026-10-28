@@ -7,11 +7,10 @@ const store = {
   loadDate: vi.fn(),
   loadToday: vi.fn(),
   calendarRefreshKey: 0,
-  kanbanLanes: [{ id: 'l', label: 'Done', taskStatuses: ['done'], dotColor: '#00ff00' }],
 }
 vi.mock('../../src/stores/vault.store', () => ({ useVaultStore: () => store }))
 
-import { CalendarDrawer, statusDotStyle } from '../../src/components/CalendarDrawer'
+import { CalendarDrawer, statusDotClass } from '../../src/components/CalendarDrawer'
 
 let bridge: ReturnType<typeof installVaultBridge>
 
@@ -67,14 +66,14 @@ function monthTests() {
     )
   })
 
-  it('marks overdue days and colours dots by lane', async () => {
+  it('marks overdue days and colours dots by status', async () => {
     render(<CalendarDrawer />)
     const late = await screen.findByRole('button', { name: '2026-01-10 · 1 of 2 still open' })
     expect(late.className).toContain('cal-drawer__cell--overdue')
     const done = screen.getByRole('button', { name: '2026-01-20 · 1 done' })
-    expect((done.querySelector('.cal-dot') as HTMLElement).style.background).toBe('rgb(0, 255, 0)')
-    expect(statusDotStyle('blocked', [])).toEqual({ className: 'cal-dot cal-dot--blocked' })
-    expect(statusDotStyle('odd', [])).toEqual({ className: 'cal-dot cal-dot--open' })
+    expect(done.querySelector('.cal-dot')?.className).toBe('cal-dot cal-dot--done')
+    expect(statusDotClass('blocked')).toBe('cal-dot cal-dot--blocked')
+    expect(statusDotClass('odd')).toBe('cal-dot cal-dot--open')
   })
 }
 

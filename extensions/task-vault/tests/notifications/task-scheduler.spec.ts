@@ -1,62 +1,17 @@
-import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
 import { isPending, unfinishedWork } from '../../../../tests/support/pending'
 import { partialFake } from '../../../../tests/support/fakes'
+import { createVaultDb, seedTask, selectTaskRow } from '../support/vault-db'
+import {
+  setSchedulerTick,
+  triggerSchedulerTick,
+  startTaskScheduler,
+  broadcast,
+  bindBroadcast,
+} from '../../src/notifications/task-scheduler.js'
 
-// ── Mocks ────────────────────────────────────────────────────────────────────
-
-// ── DB mock factory ──────────────────────────────────────────────────────────
-
-/**
- * Routes db.query calls by SQL content:
- *   - auto-dismiss due: SQL contains "status IN ('done','cancelled','migrated')"
- *   - auto-dismiss blocked: SQL contains "status != 'blocked'"
- *   - blocked tasks: SQL contains "status='blocked'"
- *   - due tasks: all others
- */
-type QueryMock = Mock<() => Promise<unknown>>
-
-/** Picks the mock that answers a query, by what its SQL selects. */
-function queryRouter(
-  mocks: Record<'mockAll' | 'mockBlockedAll' | 'mockAutoDismissAll', QueryMock>
-) {
-  return (sql: string) => {
-    if (
-      sql.includes("status IN ('done','cancelled','migrated')") ||
-      sql.includes("status != 'blocked'")
-    ) {
-      return mocks.mockAutoDismissAll()
-    }
-    if (sql.includes("status='blocked'")) return mocks.mockBlockedAll()
-    return mocks.mockAll()
-  }
-}
-
-function createMockDb() {
-  const mockAll = vi.fn<() => Promise<unknown>>().mockResolvedValue([])
-  const mockBlockedAll = vi.fn<() => Promise<unknown>>().mockResolvedValue([])
-  const mockAutoDismissAll = vi.fn<() => Promise<unknown>>().mockResolvedValue([])
-  const mockRun = vi.fn().mockResolvedValue(undefined)
-  const route = queryRouter({ mockAll, mockBlockedAll, mockAutoDismissAll })
-  const db: ExtensionDB = {
-    query: vi.fn().mockImplementation(async (sql: string) => route(sql)),
-    get: vi.fn().mockResolvedValue(undefined),
-    run: mockRun,
-    exec: vi.fn().mockResolvedValue(undefined),
-    transaction: vi.fn(),
-  }
-
-  return {
-    db,
-    mockAll,
-    mockBlockedAll,
-    mockAutoDismissAll,
-    mockRun,
-    mockQuery: db.query as ReturnType<typeof vi.fn>,
-  }
-}
-
-type MockDb = ReturnType<typeof createMockDb>
+// The scheduler runs against a real vault database, so its WHERE clauses run for real.
 
 /** An API whose settings answer `alertTime` for every key. */
 function makeApi(alertTime?: string) {
@@ -70,42 +25,49 @@ function makeApi(alertTime?: string) {
   })
 }
 
-// ── Re-import after mocks ─────────────────────────────────────────────────────
+const created = (api: ExtensionAPI) => vi.mocked(api.notifications.createNotification).mock.calls
+const ofType = (api: ExtensionAPI, type: string) =>
+  created(api).filter(([notification]) => notification.type === type)
 
-import {
-  setSchedulerTick,
-  triggerSchedulerTick,
-  startTaskScheduler,
-  broadcast,
-  bindBroadcast,
-} from '../../src/notifications/task-scheduler.js'
+type Created = Parameters<ExtensionAPI['notifications']['createNotification']>[0]
+const firstNotification = (api: ExtensionAPI) => created(api)[0][0] as Created
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function blockedRow(overrides: Record<string, unknown> = {}) {
-  return {
+/** A task blocked at `at`, to be checked in every `interval`. */
+function seedBlocked(db: ExtensionDB, blocked: { at: string; interval: string }) {
+  return seedTask(db, {
     id: 'b1',
     text: 'Blocked task',
-    updated_at: new Date(Date.now() - 2 * 3_600_000).toISOString(), // 2 hours ago
-    metadata: JSON.stringify({ blocked_check_interval: '1-hour' }),
-    source_ref: null,
-    ...overrides,
-  }
+    status: 'blocked',
+    updatedAt: new Date(blocked.at).toISOString(),
+    metadata: JSON.stringify({ blocked_check_interval: blocked.interval }),
+  })
 }
 
-let mock: MockDb
+function trackDisposals(api: ExtensionAPI) {
+  const dispose = vi.fn()
+  vi.mocked(api.notifications.createNotification).mockReturnValue({ dispose })
+  return dispose
+}
 
-beforeEach(() => {
-  vi.clearAllMocks()
-  mock = createMockDb()
-  vi.useFakeTimers()
+let db: ExtensionDB
+
+beforeEach(async () => {
+  vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+  db = await createVaultDb()
 })
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.unstubAllEnvs()
 })
 
-// ── setSchedulerTick / triggerSchedulerTick ──────────────────────────────────
+/** Runs the startup pass, then `ticks` more passes, and stops the scheduler. */
+async function runScheduler(api: ExtensionAPI, ticks = 0): Promise<void> {
+  const scheduler = startTaskScheduler(api, db)
+  await scheduler.startupPromise
+  for (let i = 0; i < ticks; i++) await scheduler.tickAsync()
+  await scheduler.dispose()
+}
 
 describe('setSchedulerTick / triggerSchedulerTick', () => {
   it('triggerSchedulerTick calls the registered tick function', () => {
@@ -115,201 +77,134 @@ describe('setSchedulerTick / triggerSchedulerTick', () => {
     expect(fn).toHaveBeenCalledTimes(1)
   })
 
-  it('triggerSchedulerTick is a no-op before setSchedulerTick is called', async () => {
-    vi.resetModules()
-    const fresh = await import('../../src/notifications/task-scheduler.js')
-    expect(() => fresh.triggerSchedulerTick()).not.toThrow()
-  })
-})
-
-// ── startTaskScheduler ────────────────────────────────────────────────────────
-
-describe('startTaskScheduler — dispose', () => {
-  it('returns dispose function that clears the interval', async () => {
-    vi.spyOn(global, 'setInterval')
-    const api = makeApi()
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    expect(setInterval).toHaveBeenCalled()
-    await scheduler.dispose()
-  })
-
-  it('returns a tick function', async () => {
-    const api = makeApi()
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    expect(typeof scheduler.tick).toBe('function')
-    await scheduler.dispose()
-  })
+  it(
+    'triggerSchedulerTick is a no-op before setSchedulerTick is called',
+    triggerschedulertickIsANoOpBeforeSetschedulertick
+  )
 })
 
 describe('startTaskScheduler — stopping', () => {
-  it('settles once a tick in flight has finished', async () => {
-    const query = unfinishedWork()
-    let queryAnswered = false
-    mock.mockAll.mockImplementation(async () => {
-      await query.done
-      queryAnswered = true
-      return []
-    })
-    const scheduler = startTaskScheduler(makeApi(), mock.db)
+  it('runs an interval until it is disposed', runsAnIntervalUntilItIsDisposed)
 
-    const disposed = scheduler.dispose()
-    expect(await isPending(disposed)).toBe(true)
-    query.finish()
-    await disposed
-
-    expect(queryAnswered).toBe(true)
-  })
+  it('settles once a tick in flight has finished', settlesOnceATickInFlightHas)
 })
 
-describe('startTaskScheduler — due tasks', startTaskSchedulerDueTasksTests)
-describe('startTaskScheduler — auto-dismiss', startTaskSchedulerAutoDismissTests)
-describe('startTaskScheduler — blocked tasks', startTaskSchedulerBlockedTasksTests)
+describe('startTaskScheduler — due tasks', () => {
+  it(
+    'warns about a task due today once the alert time has passed, and only once',
+    warnsAboutATaskDueTodayOnce
+  )
 
-/** Runs one startup pass with a single due task; returns the api and the notification it raised. */
-async function notifyOneDueTask() {
-  vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+  it('warns on startup even before the alert time', warnsOnStartupEvenBeforeTheAlert)
+
+  it('stays quiet on a later tick before the alert time', staysQuietOnALaterTickBefore)
+
+  it('reports an overdue task as an error', reportsAnOverdueTaskAsAnError)
+
+  it(
+    'leaves out tasks that are not open, not yet due, subtasks or without a due date',
+    leavesOutTasksThatAreNotOpen
+  )
+
+  it(
+    'does not write anything into the task: the dedup is in memory',
+    doesNotWriteAnythingIntoTheTask
+  )
+
+  it('announces a task again on the next day', announcesATaskAgainOnTheNext)
+
+  it('swallows a database failure and raises nothing', swallowsADatabaseFailureAndRaisesNothing)
+})
+
+describe("startTaskScheduler — a task's own notify time", () => {
+  it('warns once the time of day in recurrence_notify_at is reached', warnsOnceTheTimeOfDayIn)
+
+  it(
+    'waits for recurrence_notify_at on a later tick, whatever the global alert time says',
+    waitsForRecurrenceNotifyAtOnA
+  )
+
+  it(
+    'uses the global alert time when the task has none, and inserts no task row',
+    usesTheGlobalAlertTimeWhenThe
+  )
+})
+
+describe('clicking a notification', () => {
+  it('takes you to the due task, through the window and the vault tab', takesYouToTheDueTaskThrough)
+
+  it('takes you to the blocked task, on the day it was blocked', takesYouToTheBlockedTaskOn)
+})
+
+describe('startTaskScheduler — blocked tasks', () => {
+  beforeEach(() => vi.setSystemTime(new Date('2026-05-26T10:00:00')))
+
+  it(
+    'checks in once the interval has elapsed, with the reason as the message',
+    checksInOnceTheIntervalHasElapsed
+  )
+
+  it('waits while the interval has not elapsed', waitsWhileTheIntervalHasNotElapsed)
+
+  it(
+    'skips a task with unreadable metadata or no check interval',
+    skipsATaskWithUnreadableMetadataOr
+  )
+
+  it('checks in on a custom date that has passed', checksInOnACustomDateThat)
+
+  it(
+    'raises nothing for a blocked time that is not a date, and still checks the others',
+    raisesNothingForABlockedTimeThat
+  )
+})
+
+describe('startTaskScheduler — dismissing', () => {
+  beforeEach(() => vi.setSystemTime(new Date('2026-05-26T10:00:00')))
+
+  it(
+    'dismisses a due notification when the task is done, and leaves it when it is open',
+    dismissesADueNotificationWhenTheTask
+  )
+
+  it(
+    'dismisses a blocked notification when the task is unblocked',
+    dismissesABlockedNotificationWhenTheTask
+  )
+})
+
+/** How many check-ins one startup pass raises for a task blocked at `blockedAt`, looked at `now`. */
+async function checkInsRaised(interval: string, blockedAt: string, now: string): Promise<number> {
+  vi.setSystemTime(new Date(now))
   const api = makeApi('09:00')
-  const createNotification = vi.spyOn(api.notifications, 'createNotification')
-  mock.mockAll.mockResolvedValueOnce([{ id: 't-action', text: 'Action task', metadata: '{}' }])
-  const scheduler = startTaskScheduler(api, mock.db)
+  const freshDb = await createVaultDb()
+  await seedBlocked(freshDb, { at: blockedAt, interval: interval })
+  const scheduler = startTaskScheduler(api, freshDb)
   await scheduler.startupPromise
   await scheduler.dispose()
-  const call = createNotification.mock.calls[0]?.[0] as {
-    actions?: unknown[]
-    onClick?: () => void
-  }
-  return { api, call }
+  return created(api).length
 }
 
-/** Opening the task is what clicking the row does, through the calendar's path: the window, then
- *  the vault's tab. The "Open Vault" action this replaced broadcast `task-vault:navigate-task`,
- *  a channel nothing listened on, before the view that would hear it existed. */
-describe('clicking a due-task notification', () => {
-  it('takes you to the task rather than offering a button that did not', async () => {
-    const { api, call } = await notifyOneDueTask()
-    expect(call?.actions).toBeUndefined()
-    expect(call?.onClick).toBeTypeOf('function')
-    call.onClick?.()
-    expect(api.window.focusSelf).toHaveBeenCalled()
-    expect(api.window.broadcast).toHaveBeenCalledWith(
-      'extension:activate-global-tab',
-      'terminator.task-vault'
-    )
-    expect(api.window.broadcast).toHaveBeenCalledWith(
-      'task-vault:navigate',
-      expect.objectContaining({ taskId: 't-action' })
-    )
-  })
-})
+describe('a blocked task checked in after days, weeks or months', () => {
+  it(
+    'comes due at the same time of day when the clocks went forward in between',
+    comesDueAtTheSameTimeOf
+  )
 
-// ── per-task recurrence_notify_at column ──────────────────────────────────────
+  it(
+    'comes due at the same time of day when the clocks went back in between',
+    comesDueAtTheSameTimeOfX
+  )
 
-function dueTaskRow(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 'r1',
-    text: 'Recurring task',
-    due_date: '2026-05-26',
-    project_id: null,
-    context: null,
-    area_id: null,
-    recurrence_notify_at: null,
-    metadata: '{}',
-    ...overrides,
-  }
-}
+  it('counts a month as the calendar counts it, not as 30 days', countsAMonthAsTheCalendarCounts)
 
-describe(
-  'startTaskScheduler — per-task recurrence_notify_at',
-  startTaskSchedulerPerTaskRecurrenceNotifyTests
-)
-
-// ── scheduler does NOT spawn recurrences ───────────────────────────────────────
-
-function recurringRow(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 'rec-1',
-    text: 'Daily standup',
-    due_date: '2026-05-26',
-    project_id: null,
-    context: null,
-    area_id: null,
-    recurrence_rule: 'daily',
-    recurrence_notify_at: null,
-    metadata: '{}',
-    ...overrides,
-  }
-}
-
-describe(
-  'startTaskScheduler — scheduler never inserts task rows',
-  startTaskSchedulerSchedulerNeverInsertsTaskTests
-)
-
-// ── action handler navigation ── notificationManager (src/main/notifications) wires the OS
-// bubble's click to actions[0].handler(), the same handler tested here.
-
-describe('startTaskScheduler — action handler navigation', () => {
-  it('takes you to the blocked task, on the day it was blocked', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-
-    const api = makeApi('09:00')
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-
-    mock.mockBlockedAll.mockResolvedValue([
-      blockedRow({
-        id: 'b-inapp',
-        source_ref: '2026-05-21',
-        metadata: JSON.stringify({ blocked_check_interval: '1-hour' }),
-      }),
-    ])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.dispose()
-
-    const call = createNotification.mock.calls[0]?.[0] as { onClick?: () => void }
-    expect(call?.onClick).toBeTypeOf('function')
-    call.onClick?.()
-    expect(api.window.broadcast).toHaveBeenCalledWith(
-      'task-vault:navigate',
-      expect.objectContaining({ taskId: 'b-inapp', date: '2026-05-21' })
-    )
-  })
-})
-
-// ── midnight dedup reset ──────────────────────────────────────────────────────
-
-describe('startTaskScheduler — midnight dedup reset', () => {
-  it('clears due-task dedup set at midnight and re-fires on next day tick', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-    const api = makeApi('09:00')
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-    const dueRow = {
-      id: 't-mid',
-      text: 'Midnight task',
-      due_date: '2026-05-26',
-      metadata: '{}',
-      recurrence_notify_at: null,
-    }
-    mock.mockAll.mockResolvedValue([dueRow])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    // Advance past midnight → dedup set clears → fires again
-    vi.setSystemTime(new Date('2026-05-27T10:00:00'))
-    await scheduler.tickAsync()
-    await scheduler.dispose()
-
-    expect(createNotification.mock.calls.length).toBeGreaterThanOrEqual(2)
-  })
+  it('still counts hours as hours across a clock change', stillCountsHoursAsHoursAcrossA)
 })
 
 describe('telling every window something changed', () => {
-  // Still the vault's push channel: the IPC handlers announce index moves on it; notifications
-  // navigate instead. The backend runs in the extension host (ADR 094), which has no windows,
-  // so the window broadcast bound at activation is the only way out.
+  // Still the vault's push channel: the IPC handlers announce index moves on it. The backend
+  // runs in the extension host (ADR 094), which has no windows, so the window broadcast bound at
+  // activation is the only way out.
   it('sends through the broadcast activate bound', () => {
     const send = vi.fn()
     bindBroadcast(send)
@@ -319,578 +214,372 @@ describe('telling every window something changed', () => {
 })
 
 describe('running a pass on demand', () => {
-  it('exposes a tick, so a write can refresh what is due without waiting an hour', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-    const api = makeApi('09:00')
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    expect(() => scheduler.tick()).not.toThrow()
-    await scheduler.tickAsync()
-    await scheduler.dispose()
-  })
+  it('exposes a tick, so a write can refresh what is due without waiting', exposesATickSoAWriteCan)
 })
 
-function startTaskSchedulerDueTasksTests() {
-  describe('alert time', startTaskSchedulerDueTasksAlertTimeTests)
-  describe('before the alert', startTaskSchedulerDueTasksBeforeAlertTests)
-  describe('overdue', startTaskSchedulerDueTasksOverdueTests)
-  describe('dedup in a day', startTaskSchedulerDueTasksDedupDayTests)
-  describe('dedup in a session', startTaskSchedulerDueTasksDedupSessionTests)
-  describe('no metadata writes', startTaskSchedulerDueTasksNoMetadataWritesTests)
+async function triggerschedulertickIsANoOpBeforeSetschedulertick() {
+  vi.resetModules()
+  const fresh = await import('../../src/notifications/task-scheduler.js')
+  expect(() => fresh.triggerSchedulerTick()).not.toThrow()
 }
 
-function startTaskSchedulerDueTasksAlertTimeTests() {
-  describe('past the alert', startTaskSchedulerDueTasksAlertTimePastTheAlertTests)
-  describe('at startup', startTaskSchedulerDueTasksAlertTimeAtStartupTests)
+async function runsAnIntervalUntilItIsDisposed() {
+  const scheduler = startTaskScheduler(makeApi(), db)
+  await scheduler.startupPromise
+  expect(vi.getTimerCount()).toBe(1)
+  await scheduler.dispose()
+  expect(vi.getTimerCount()).toBe(0)
 }
 
-function startTaskSchedulerDueTasksAlertTimePastTheAlertTests() {
-  it('fires a warning notification for a due open task past alert time', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+async function settlesOnceATickInFlightHas() {
+  const query = unfinishedWork()
+  let queryAnswered = false
+  const slowDb: ExtensionDB = {
+    ...db,
+    query: async (sql, params) => {
+      await query.done
+      queryAnswered = true
+      return db.query(sql, params)
+    },
+  }
+  const scheduler = startTaskScheduler(makeApi(), slowDb)
 
-    const api = makeApi('09:00')
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
+  const disposed = scheduler.dispose()
+  expect(await isPending(disposed)).toBe(true)
+  query.finish()
+  await disposed
 
-    mock.mockAll.mockResolvedValue([
-      { id: 't1', text: 'Finish report', due_date: '2026-05-26', metadata: '{}' },
-    ])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    // Second tick to confirm dedup
-    await scheduler.tickAsync()
-    await scheduler.dispose()
-
-    expect(createNotification).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'warning',
-        title: expect.stringContaining('Finish report'),
-      })
-    )
-  })
+  expect(queryAnswered).toBe(true)
 }
 
-function startTaskSchedulerDueTasksAlertTimeAtStartupTests() {
-  it('fires notification on startup even before configured alert time', async () => {
-    vi.setSystemTime(new Date('2026-05-26T07:00:00'))
-
-    const api = makeApi('09:00')
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-
-    mock.mockAll.mockResolvedValueOnce([
-      { id: 't1', text: 'Early task', due_date: '2026-05-26', metadata: '{}' },
-    ])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.dispose()
-
-    expect(createNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ title: expect.stringContaining('Early task') })
-    )
-  })
-}
-
-function startTaskSchedulerDueTasksBeforeAlertTests() {
-  it('does not fire notification on a non-startup tick when current time is before alert time', async () => {
-    vi.setSystemTime(new Date('2026-05-26T08:00:00'))
-
-    const api = makeApi('09:00')
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-
-    // Startup tick sees no tasks; subsequent tick sees a new task before alert time
-    mock.mockAll
-      .mockResolvedValueOnce([]) // startup: due tasks empty
-      .mockResolvedValueOnce([
-        { id: 't2', text: 'New task', due_date: '2026-05-26', metadata: '{}' },
-      ]) // 2nd tick: due
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.tickAsync() // non-startup tick — should not fire (before alert time)
-    await scheduler.dispose()
-
-    expect(createNotification).not.toHaveBeenCalled()
-  })
-}
-
-function startTaskSchedulerDueTasksOverdueTests() {
-  it('fires error notification for overdue tasks (past due date)', async () => {
-    vi.setSystemTime(new Date('2026-05-26T07:00:00'))
-
-    const api = makeApi('09:00')
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-
-    mock.mockAll.mockResolvedValueOnce([
-      { id: 'od1', text: 'Overdue task', due_date: '2026-05-25', metadata: '{}' },
-    ])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.dispose()
-
-    expect(createNotification).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'error',
-        title: 'Overdue: Overdue task',
-      })
-    )
-  })
-}
-
-function startTaskSchedulerDueTasksDedupDayTests() {
-  it('deduplicates due task notifications within the same day (in-memory)', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-
-    const api = makeApi('09:00')
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-
-    mock.mockAll.mockResolvedValue([{ id: 'dup', text: 'Dup task', metadata: '{}' }])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.tickAsync() // second tick
-    await scheduler.dispose()
-
-    // Should only fire once despite two ticks (in-memory dedup set)
-    const warningCalls = createNotification.mock.calls.filter(
-      (c) => (c[0] as { type: string }).type === 'warning'
-    )
-    expect(warningCalls).toHaveLength(1)
-  })
-}
-
-function startTaskSchedulerDueTasksDedupSessionTests() {
-  it('skips notification for tasks already notified in the same session (in-session dedup)', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-
-    const api = makeApi('09:00')
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-    const row = {
-      id: 'already',
-      text: 'Already notified',
-      due_date: '2026-05-26',
-      recurrence_notify_at: null,
-      metadata: '{}',
-    }
-    // Startup tick → notifies, second tick → skip (in-session dedup)
-    mock.mockAll
-      .mockResolvedValueOnce([row]) // startup
-      .mockResolvedValueOnce([row]) // second tick
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.tickAsync() // second tick
-    await scheduler.dispose()
-
-    const warningCalls = createNotification.mock.calls.filter(
-      (c) => (c[0] as { type: string }).type === 'warning'
-    )
-    expect(warningCalls).toHaveLength(1)
-  })
-}
-
-function startTaskSchedulerDueTasksNoMetadataWritesTests() {
-  it('does not write notification_notified_date to task metadata (dedup is in-session only)', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-
-    const api = makeApi('09:00')
-
-    mock.mockAll.mockResolvedValueOnce([
-      {
-        id: 'persist',
-        text: 'Persist me',
-        due_date: '2026-05-26',
-        recurrence_notify_at: null,
-        metadata: '{}',
-      },
-    ])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.dispose()
-
-    // The scheduler must NOT write notification_notified_date to metadata
-    const updateCalls = mock.mockRun.mock.calls.filter((args) => {
-      const metaArg = args[0] as string
-      return typeof metaArg === 'string' && metaArg.includes('notification_notified_date')
-    })
-    expect(updateCalls).toHaveLength(0)
-  })
-}
-
-function startTaskSchedulerBlockedTasksTests() {
-  describe('elapsed', startTaskSchedulerBlockedTasksElapsedTests)
-  describe('not elapsed', startTaskSchedulerBlockedTasksNotElapsedTests)
-  describe('bad metadata', startTaskSchedulerBlockedTasksBadMetadataTests)
-  describe('custom dates', startTaskSchedulerBlockedTasksCustomDatesTests)
-}
-
-function startTaskSchedulerBlockedTasksElapsedTests() {
-  it('fires an info notification when blocked interval has elapsed', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-
-    const api = makeApi('09:00')
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-
-    mock.mockBlockedAll.mockResolvedValue([blockedRow()])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.dispose()
-
-    expect(createNotification).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'info',
-        title: expect.stringContaining('Blocked task'),
-      })
-    )
-  })
-}
-
-function startTaskSchedulerBlockedTasksNotElapsedTests() {
-  it('skips blocked task when interval has not yet elapsed', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-
-    const api = makeApi('09:00')
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-
-    // updated_at = 30 minutes ago, interval = 1-hour → not elapsed
-    const row = blockedRow({
-      updated_at: new Date(Date.now() - 30 * 60_000).toISOString(),
-      metadata: JSON.stringify({ blocked_check_interval: '1-hour' }),
-    })
-    mock.mockBlockedAll.mockResolvedValue([row])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.dispose()
-
-    const infoCalls = createNotification.mock.calls.filter(
-      (c) => (c[0] as { type: string }).type === 'info'
-    )
-    expect(infoCalls).toHaveLength(0)
-  })
-}
-
-function startTaskSchedulerBlockedTasksBadMetadataTests() {
-  describe(
-    'handles invalid metadata',
-    startTaskSchedulerBlockedTasksBadMetadataHandlesInvalidMetadataTests
-  )
-  describe('skips blocked task', startTaskSchedulerBlockedTasksBadMetadataSkipsBlockedTaskTests)
-}
-
-function startTaskSchedulerBlockedTasksBadMetadataHandlesInvalidMetadataTests() {
-  it('handles invalid metadata JSON gracefully', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-
-    const api = makeApi('09:00')
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-
-    mock.mockBlockedAll.mockResolvedValue([blockedRow({ metadata: 'NOT_JSON' })])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.dispose()
-
-    expect(createNotification).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'info' }))
-  })
-}
-
-function startTaskSchedulerBlockedTasksBadMetadataSkipsBlockedTaskTests() {
-  it('skips blocked task with no check interval in metadata', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-
-    const api = makeApi('09:00')
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-
-    mock.mockBlockedAll.mockResolvedValue([
-      blockedRow({ metadata: JSON.stringify({ blocked_reason: 'waiting' }) }),
-    ])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.dispose()
-
-    expect(createNotification).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'info' }))
-  })
-}
-
-function startTaskSchedulerBlockedTasksCustomDatesTests() {
-  describe('handles custom iso', startTaskSchedulerBlockedTasksCustomDatesHandlesCustomIsoTests)
-  describe(
-    'skips notification when',
-    startTaskSchedulerBlockedTasksCustomDatesSkipsNotificationWhenTests
-  )
-}
-
-function startTaskSchedulerBlockedTasksCustomDatesHandlesCustomIsoTests() {
-  it('handles custom ISO datetime interval that has passed', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-
-    const api = makeApi('09:00')
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-    const targetTime = new Date(Date.now() - 60_000).toISOString()
-    mock.mockBlockedAll.mockResolvedValue([
-      blockedRow({
-        updated_at: new Date(Date.now() - 2 * 3_600_000).toISOString(),
-        metadata: JSON.stringify({ blocked_check_interval: targetTime }),
-      }),
-    ])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.dispose()
-
-    expect(createNotification).toHaveBeenCalledWith(expect.objectContaining({ type: 'info' }))
-  })
-}
-
-function startTaskSchedulerBlockedTasksCustomDatesSkipsNotificationWhenTests() {
-  it('skips notification when db.query throws', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-
-    const api = makeApi('09:00')
-
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-    mock.mockQuery.mockRejectedValueOnce(new Error('DB not ready'))
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.dispose()
-    expect(createNotification).not.toHaveBeenCalled()
-  })
-}
-
-function startTaskSchedulerPerTaskRecurrenceNotifyTests() {
-  describe('reached', startTaskSchedulerPerTaskRecurrenceNotifyReachedTests)
-  describe('not reached', startTaskSchedulerPerTaskRecurrenceNotifyNotReachedTests)
-}
-
-function startTaskSchedulerPerTaskRecurrenceNotifyReachedTests() {
-  it('fires notification when current time >= recurrence_notify_at column value', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-
-    const api = makeApi('09:00')
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-    const row = dueTaskRow({ recurrence_notify_at: '10:00' })
-    mock.mockAll.mockResolvedValueOnce([row])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.dispose()
-
-    expect(createNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'warning', title: expect.stringContaining('Recurring task') })
-    )
-  })
-}
-
-function startTaskSchedulerPerTaskRecurrenceNotifyNotReachedTests() {
-  describe(
-    'suppresses notification on',
-    startTaskSchedulerPerTaskRecurrenceNotifyNotReachedSuppressesNotificationOnTests
-  )
-  describe('falls back to', startTaskSchedulerPerTaskRecurrenceNotifyNotReachedFallsBackToTests)
-}
-
-function startTaskSchedulerPerTaskRecurrenceNotifyNotReachedSuppressesNotificationOnTests() {
-  it('suppresses notification on non-startup tick when current time < recurrence_notify_at', async () => {
-    vi.setSystemTime(new Date('2026-05-26T08:00:00'))
-
-    const api = makeApi('07:00') // global alert is past
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-    const row = dueTaskRow({ recurrence_notify_at: '09:00' })
-    // Startup sees empty; second tick sees the row
-    mock.mockAll
-      .mockResolvedValueOnce([]) // startup
-      .mockResolvedValueOnce([row]) // second tick
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.tickAsync() // non-startup tick
-    await scheduler.dispose()
-
-    expect(createNotification).not.toHaveBeenCalled()
-  })
-}
-
-function startTaskSchedulerPerTaskRecurrenceNotifyNotReachedFallsBackToTests() {
-  it('falls back to global alert time when task has no recurrence_time', async () => {
-    vi.setSystemTime(new Date('2026-05-26T09:30:00'))
-
-    const api = makeApi('09:00')
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-    const row = dueTaskRow({ metadata: '{}' })
-    mock.mockAll.mockResolvedValueOnce([row])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.dispose()
-
-    expect(createNotification).toHaveBeenCalled()
-  })
-}
-
-function startTaskSchedulerSchedulerNeverInsertsTaskTests() {
-  describe('no inserts', startTaskSchedulerSchedulerNeverInsertsTaskNoInsertsTests)
-  describe('notify column', startTaskSchedulerSchedulerNeverInsertsTaskNotifyColumnTests)
-}
-
-function startTaskSchedulerSchedulerNeverInsertsTaskNoInsertsTests() {
-  it('fires a notification for a recurring task but does NOT insert a new task row', async () => {
-    vi.setSystemTime(new Date('2026-05-26T09:30:00'))
-    const api = makeApi('09:00')
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-
-    mock.mockAll.mockResolvedValueOnce([recurringRow()])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.dispose()
-
-    // Notification fired
-    expect(createNotification).toHaveBeenCalled()
-
-    // No INSERT queries from the scheduler
-    const insertCalls = mock.mockQuery.mock.calls.filter(
-      ([sql]) => typeof sql === 'string' && sql.toUpperCase().startsWith('INSERT')
-    )
-    expect(insertCalls).toHaveLength(0)
-  })
-}
-
-function startTaskSchedulerSchedulerNeverInsertsTaskNotifyColumnTests() {
-  it('uses recurrence_notify_at column (not meta.recurrence_time) for alert time', async () => {
-    vi.setSystemTime(new Date('2026-05-26T08:30:00'))
-    const api = makeApi('08:00') // global alert is past
-    const createNotification = vi.spyOn(api.notifications, 'createNotification')
-
-    // recurrence_notify_at = 10:00 — at 08:30 on a non-startup tick, should NOT fire
-    const row = recurringRow({ recurrence_notify_at: '10:00' })
-    mock.mockAll
-      .mockResolvedValueOnce([]) // startup
-      .mockResolvedValueOnce([row]) // second tick
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.tickAsync() // non-startup tick
-    await scheduler.dispose()
-
-    expect(createNotification).not.toHaveBeenCalled()
-  })
-}
-
-function startTaskSchedulerAutoDismissTests() {
-  describe('finished tasks', startTaskSchedulerAutoDismissFinishedTasksTests)
-  describe('unblocked tasks', startTaskSchedulerAutoDismissUnblockedTasksTests)
-}
-
-function startTaskSchedulerAutoDismissFinishedTasksTests() {
-  it('dismisses due notification when task transitions to done', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-
-    const api = makeApi('09:00')
-    const disposeMock = vi.fn()
-    vi.spyOn(api.notifications, 'createNotification').mockReturnValue({ dispose: disposeMock })
-
-    // Startup: due task fires notification → dueTaskNotifs has 'done-task'
-    mock.mockAll.mockResolvedValueOnce([
-      { id: 'done-task', text: 'Will be done', due_date: '2026-05-26', metadata: '{}' },
-    ])
-
-    // Second tick auto-dismiss due query finds task resolved
-    mock.mockAutoDismissAll.mockResolvedValueOnce([{ id: 'done-task' }])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.tickAsync() // second tick — auto-dismiss fires
-    await scheduler.dispose()
-
-    expect(disposeMock).toHaveBeenCalledTimes(1)
-  })
-}
-
-function startTaskSchedulerAutoDismissUnblockedTasksTests() {
-  it('dismisses blocked notification when task becomes unblocked', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-
-    const api = makeApi('09:00')
-    const disposeMock = vi.fn()
-    vi.spyOn(api.notifications, 'createNotification').mockReturnValue({ dispose: disposeMock })
-
-    // Startup: no due tasks, one blocked task → notification created
-    mock.mockBlockedAll.mockResolvedValueOnce([blockedRow()])
-
-    // Second tick auto-dismiss blocked finds task unblocked
-    mock.mockAutoDismissAll.mockResolvedValueOnce([{ id: 'b1' }])
-
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.tickAsync() // second tick — auto-dismiss fires
-    await scheduler.dispose()
-
-    expect(disposeMock).toHaveBeenCalledTimes(1)
-  })
-}
-
-/** How many check-ins one startup pass raises for a task blocked at `blockedAt`, looked at `now`. */
-async function checkInsRaised(interval: string, blockedAt: string, now: string): Promise<number> {
-  vi.setSystemTime(new Date(now))
+async function warnsAboutATaskDueTodayOnce() {
+  vi.setSystemTime(new Date('2026-05-26T10:00:00'))
   const api = makeApi('09:00')
-  mock.mockBlockedAll.mockResolvedValue([
-    blockedRow({
-      updated_at: new Date(blockedAt).toISOString(),
-      metadata: JSON.stringify({ blocked_check_interval: interval }),
-    }),
+  await seedTask(db, { id: 't1', text: 'Finish report', dueDate: '2026-05-26' })
+
+  await runScheduler(api, 1)
+
+  expect(created(api)).toEqual([
+    [expect.objectContaining({ type: 'warning', title: 'Due today: Finish report' })],
   ])
-  const scheduler = startTaskScheduler(api, mock.db)
+}
+
+async function warnsOnStartupEvenBeforeTheAlert() {
+  vi.setSystemTime(new Date('2026-05-26T07:00:00'))
+  const api = makeApi('09:00')
+  await seedTask(db, { id: 't1', text: 'Early task', dueDate: '2026-05-26' })
+
+  await runScheduler(api)
+
+  expect(ofType(api, 'warning')).toHaveLength(1)
+}
+
+async function staysQuietOnALaterTickBefore() {
+  vi.setSystemTime(new Date('2026-05-26T08:00:00'))
+  const api = makeApi('09:00')
+  const scheduler = startTaskScheduler(api, db)
+  await scheduler.startupPromise
+  await seedTask(db, { id: 't2', text: 'New task', dueDate: '2026-05-26' })
+  await scheduler.tickAsync()
+  await scheduler.dispose()
+
+  expect(created(api)).toEqual([])
+}
+
+async function reportsAnOverdueTaskAsAnError() {
+  vi.setSystemTime(new Date('2026-05-26T07:00:00'))
+  const api = makeApi('09:00')
+  await seedTask(db, { id: 'od1', text: 'Overdue task', dueDate: '2026-05-25' })
+
+  await runScheduler(api)
+
+  expect(created(api)).toEqual([
+    [expect.objectContaining({ type: 'error', title: 'Overdue: Overdue task' })],
+  ])
+}
+
+async function leavesOutTasksThatAreNotOpen() {
+  vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+  const api = makeApi('09:00')
+  await seedTask(db, { id: 'parent', text: 'Parent' })
+  await seedTask(db, { id: 'done', status: 'done', dueDate: '2026-05-26' })
+  await seedTask(db, { id: 'later', dueDate: '2026-05-27' })
+  await seedTask(db, { id: 'none' })
+  await seedTask(db, { id: 'sub', parentId: 'parent', dueDate: '2026-05-26' })
+
+  await runScheduler(api)
+
+  expect(created(api)).toEqual([])
+}
+
+async function doesNotWriteAnythingIntoTheTask() {
+  vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+  await seedTask(db, { id: 'persist', dueDate: '2026-05-26' })
+  const before = await selectTaskRow(db, 'persist')
+
+  await runScheduler(makeApi('09:00'), 1)
+
+  expect(await selectTaskRow(db, 'persist')).toEqual(before)
+}
+
+async function announcesATaskAgainOnTheNext() {
+  vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+  const api = makeApi('09:00')
+  await seedTask(db, { id: 't-mid', text: 'Midnight task', dueDate: '2026-05-26' })
+  const scheduler = startTaskScheduler(api, db)
+  await scheduler.startupPromise
+  vi.setSystemTime(new Date('2026-05-27T10:00:00'))
+  await scheduler.tickAsync()
+  await scheduler.dispose()
+
+  expect(created(api).map(([notification]) => notification.type)).toEqual(['warning', 'error'])
+}
+
+async function swallowsADatabaseFailureAndRaisesNothing() {
+  vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+  const api = makeApi('09:00')
+  await seedTask(db, { id: 't1', dueDate: '2026-05-26' })
+  const failing: ExtensionDB = { ...db, query: () => Promise.reject(new Error('DB not ready')) }
+
+  const scheduler = startTaskScheduler(api, failing)
   await scheduler.startupPromise
   await scheduler.dispose()
-  return vi.mocked(api.notifications.createNotification).mock.calls.length
+
+  expect(created(api)).toEqual([])
 }
 
-describe('a blocked task checked in after days, weeks or months', () => {
-  afterEach(() => vi.unstubAllEnvs())
+async function warnsOnceTheTimeOfDayIn() {
+  vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+  const api = makeApi('09:00')
+  await seedTask(db, {
+    id: 'r1',
+    text: 'Recurring task',
+    dueDate: '2026-05-26',
+    recurrenceNotifyAt: '10:00',
+  })
+  const scheduler = startTaskScheduler(api, db)
+  await scheduler.startupPromise
+  await scheduler.tickAsync()
+  await scheduler.dispose()
 
-  it('comes due at the same time of day when the clocks went forward in between', async () => {
-    vi.stubEnv('TZ', 'America/New_York')
-    // Blocked Saturday 10:00; the clocks go forward on Sunday at 02:00.
-    expect(await checkInsRaised('1-day', '2026-03-07T10:00:00', '2026-03-08T09:59:00')).toBe(0)
-    expect(await checkInsRaised('1-day', '2026-03-07T10:00:00', '2026-03-08T10:01:00')).toBe(1)
+  expect(ofType(api, 'warning')).toHaveLength(1)
+}
+
+async function waitsForRecurrenceNotifyAtOnA() {
+  vi.setSystemTime(new Date('2026-05-26T08:30:00'))
+  const api = makeApi('07:00')
+  const scheduler = startTaskScheduler(api, db)
+  await scheduler.startupPromise
+  await seedTask(db, {
+    id: 'r1',
+    text: 'Daily standup',
+    dueDate: '2026-05-26',
+    recurrenceRule: 'daily',
+    recurrenceNotifyAt: '10:00',
+  })
+  await scheduler.tickAsync()
+  await scheduler.dispose()
+
+  expect(created(api)).toEqual([])
+}
+
+async function usesTheGlobalAlertTimeWhenThe() {
+  vi.setSystemTime(new Date('2026-05-26T09:30:00'))
+  const api = makeApi('09:00')
+  await seedTask(db, {
+    id: 'rec-1',
+    text: 'Daily standup',
+    dueDate: '2026-05-26',
+    recurrenceRule: 'daily',
+  })
+  const scheduler = startTaskScheduler(api, db)
+  await scheduler.startupPromise
+  await scheduler.tickAsync()
+  await scheduler.dispose()
+
+  expect(ofType(api, 'warning')).toHaveLength(1)
+  expect(await db.query(`SELECT id FROM tasks`)).toEqual([{ id: 'rec-1' }])
+}
+
+async function takesYouToTheDueTaskThrough() {
+  vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+  const api = makeApi('09:00')
+  await seedTask(db, { id: 't-action', dueDate: '2026-05-26', sourceRef: '2026-05-26' })
+
+  await runScheduler(api)
+  const notification = firstNotification(api)
+
+  expect(notification.actions).toBeUndefined()
+  notification.onClick?.()
+  expect(api.window.focusSelf).toHaveBeenCalled()
+  expect(api.window.broadcast).toHaveBeenCalledWith(
+    'extension:activate-global-tab',
+    'terminator.task-vault'
+  )
+  expect(api.window.broadcast).toHaveBeenCalledWith(
+    'task-vault:navigate',
+    expect.objectContaining({ taskId: 't-action' })
+  )
+}
+
+async function takesYouToTheBlockedTaskOn() {
+  vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+  const api = makeApi('09:00')
+  await seedTask(db, {
+    id: 'b-inapp',
+    status: 'blocked',
+    sourceRef: '2026-05-21',
+    updatedAt: new Date('2026-05-26T08:00:00').toISOString(),
+    metadata: JSON.stringify({ blocked_check_interval: '1-hour' }),
   })
 
-  it('comes due at the same time of day when the clocks went back in between', async () => {
-    vi.stubEnv('TZ', 'America/New_York')
-    // Blocked Saturday 10:00; the clocks go back on Sunday at 02:00.
-    expect(await checkInsRaised('1-week', '2026-10-31T10:00:00', '2026-11-07T09:30:00')).toBe(0)
-    expect(await checkInsRaised('1-week', '2026-10-31T10:00:00', '2026-11-07T10:01:00')).toBe(1)
+  await runScheduler(api)
+  firstNotification(api).onClick?.()
+
+  expect(api.window.broadcast).toHaveBeenCalledWith(
+    'task-vault:navigate',
+    expect.objectContaining({ taskId: 'b-inapp', date: '2026-05-21' })
+  )
+}
+
+async function checksInOnceTheIntervalHasElapsed() {
+  const api = makeApi('09:00')
+  await seedTask(db, {
+    id: 'b1',
+    text: 'Blocked task',
+    status: 'blocked',
+    updatedAt: new Date('2026-05-26T08:00:00').toISOString(),
+    metadata: JSON.stringify({ blocked_check_interval: '1-hour', blocked_reason: 'waiting' }),
   })
 
-  it('counts a month as the calendar counts it, not as 30 days', async () => {
-    expect(await checkInsRaised('1-month', '2026-02-10T12:00:00', '2026-03-10T11:59:00')).toBe(0)
-    expect(await checkInsRaised('1-month', '2026-02-10T12:00:00', '2026-03-10T12:01:00')).toBe(1)
-    expect(await checkInsRaised('1-month', '2026-07-10T12:00:00', '2026-08-09T12:01:00')).toBe(0)
+  await runScheduler(api)
+
+  expect(created(api)).toEqual([
+    [
+      expect.objectContaining({
+        type: 'info',
+        title: 'Check in: Blocked task',
+        message: 'waiting',
+      }),
+    ],
+  ])
+}
+
+async function waitsWhileTheIntervalHasNotElapsed() {
+  const api = makeApi('09:00')
+  await seedBlocked(db, { at: '2026-05-26T09:30:00', interval: '1-hour' })
+
+  await runScheduler(api)
+
+  expect(created(api)).toEqual([])
+}
+
+async function skipsATaskWithUnreadableMetadataOr() {
+  const api = makeApi('09:00')
+  await seedTask(db, { id: 'bad', status: 'blocked', metadata: 'NOT_JSON' })
+  await seedTask(db, {
+    id: 'none',
+    status: 'blocked',
+    metadata: JSON.stringify({ blocked_reason: 'waiting' }),
   })
 
-  it('still counts hours as hours across a clock change', async () => {
-    vi.stubEnv('TZ', 'America/New_York')
-    // 01:30 EST plus four hours is 06:30 EDT: the hour from 02:00 to 03:00 does not exist.
-    expect(await checkInsRaised('4-hour', '2026-03-08T01:30:00', '2026-03-08T06:29:00')).toBe(0)
-    expect(await checkInsRaised('4-hour', '2026-03-08T01:30:00', '2026-03-08T06:31:00')).toBe(1)
-  })
-})
+  await runScheduler(api)
 
-describe('a blocked task whose blocked time is not a date', () => {
-  it('raises nothing, and the other blocked tasks are still checked', async () => {
-    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
-    const api = makeApi('09:00')
-    mock.mockBlockedAll.mockResolvedValue([blockedRow({ updated_at: 'yesterday' }), blockedRow()])
-    const scheduler = startTaskScheduler(api, mock.db)
-    await scheduler.startupPromise
-    await scheduler.dispose()
+  expect(created(api)).toEqual([])
+}
 
-    expect(vi.mocked(api.notifications.createNotification)).toHaveBeenCalledTimes(1)
+async function checksInOnACustomDateThat() {
+  const api = makeApi('09:00')
+  await seedBlocked(db, {
+    at: '2026-05-26T08:00:00',
+    interval: new Date('2026-05-26T09:59:00').toISOString(),
   })
-})
+
+  await runScheduler(api)
+
+  expect(ofType(api, 'info')).toHaveLength(1)
+}
+
+async function raisesNothingForABlockedTimeThat() {
+  const api = makeApi('09:00')
+  await seedTask(db, {
+    id: 'yesterday',
+    status: 'blocked',
+    updatedAt: 'yesterday',
+    metadata: JSON.stringify({ blocked_check_interval: '1-hour' }),
+  })
+  await seedBlocked(db, { at: '2026-05-26T08:00:00', interval: '1-hour' })
+
+  await runScheduler(api)
+
+  expect(created(api)).toHaveLength(1)
+}
+
+async function dismissesADueNotificationWhenTheTask() {
+  const api = makeApi('09:00')
+  const dispose = trackDisposals(api)
+  await seedTask(db, { id: 'done-task', dueDate: '2026-05-26' })
+  await seedTask(db, { id: 'open-task', dueDate: '2026-05-26' })
+  const scheduler = startTaskScheduler(api, db)
+  await scheduler.startupPromise
+
+  await db.run(`UPDATE tasks SET status = 'done' WHERE id = 'done-task'`)
+  await scheduler.tickAsync()
+  await scheduler.dispose()
+
+  expect(dispose).toHaveBeenCalledTimes(1)
+}
+
+async function dismissesABlockedNotificationWhenTheTask() {
+  const api = makeApi('09:00')
+  const dispose = trackDisposals(api)
+  await seedBlocked(db, { at: '2026-05-26T08:00:00', interval: '1-hour' })
+  const scheduler = startTaskScheduler(api, db)
+  await scheduler.startupPromise
+
+  await db.run(`UPDATE tasks SET status = 'open' WHERE id = 'b1'`)
+  await scheduler.tickAsync()
+  await scheduler.dispose()
+
+  expect(dispose).toHaveBeenCalledTimes(1)
+}
+
+async function comesDueAtTheSameTimeOf() {
+  vi.stubEnv('TZ', 'America/New_York')
+  // Blocked Saturday 10:00; the clocks go forward on Sunday at 02:00.
+  expect(await checkInsRaised('1-day', '2026-03-07T10:00:00', '2026-03-08T09:59:00')).toBe(0)
+  expect(await checkInsRaised('1-day', '2026-03-07T10:00:00', '2026-03-08T10:01:00')).toBe(1)
+}
+
+async function comesDueAtTheSameTimeOfX() {
+  vi.stubEnv('TZ', 'America/New_York')
+  // Blocked Saturday 10:00; the clocks go back on Sunday at 02:00.
+  expect(await checkInsRaised('1-week', '2026-10-31T10:00:00', '2026-11-07T09:30:00')).toBe(0)
+  expect(await checkInsRaised('1-week', '2026-10-31T10:00:00', '2026-11-07T10:01:00')).toBe(1)
+}
+
+async function countsAMonthAsTheCalendarCounts() {
+  expect(await checkInsRaised('1-month', '2026-02-10T12:00:00', '2026-03-10T11:59:00')).toBe(0)
+  expect(await checkInsRaised('1-month', '2026-02-10T12:00:00', '2026-03-10T12:01:00')).toBe(1)
+  expect(await checkInsRaised('1-month', '2026-07-10T12:00:00', '2026-08-09T12:01:00')).toBe(0)
+}
+
+async function stillCountsHoursAsHoursAcrossA() {
+  vi.stubEnv('TZ', 'America/New_York')
+  // 01:30 EST plus four hours is 06:30 EDT: the hour from 02:00 to 03:00 does not exist.
+  expect(await checkInsRaised('4-hour', '2026-03-08T01:30:00', '2026-03-08T06:29:00')).toBe(0)
+  expect(await checkInsRaised('4-hour', '2026-03-08T01:30:00', '2026-03-08T06:31:00')).toBe(1)
+}
+
+async function exposesATickSoAWriteCan() {
+  vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+  const api = makeApi('09:00')
+  const scheduler = startTaskScheduler(api, db)
+  await scheduler.startupPromise
+  await seedTask(db, { id: 'late', text: 'Added later', dueDate: '2026-05-26' })
+
+  await scheduler.tickAsync()
+  await scheduler.dispose()
+
+  expect(firstNotification(api).title).toBe('Due today: Added later')
+}

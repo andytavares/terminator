@@ -1,9 +1,9 @@
+import { isSurfaceOpen } from '@shared/double-escape'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { LinkIssueDialog } from '../../../../src/renderer/components/integrations/LinkIssueDialog'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
-import { useModalStore } from '../../../../src/renderer/stores/modal.store'
 import { issueSummaryOf, trackerConnectionOf } from '../../../support/renderer-stores'
 import { pressOutside } from '../../../support/modal'
 
@@ -28,7 +28,6 @@ beforeEach(() => {
     linkIssue,
     loadConnections,
   })
-  useModalStore.setState(useModalStore.getInitialState(), true)
 })
 
 afterEach(() => vi.useRealTimers())
@@ -49,13 +48,8 @@ describe('LinkIssueDialog — opening', () => {
   })
 
   it('shows which tracker each issue came from', async () => {
-    listMine.mockResolvedValue({
-      issues: [issueSummaryOf(), issueSummaryOf({ tracker: 'jira', key: 'TAV-7', id: 'id-2' })],
-      failures: [],
-    })
     open()
-    await screen.findByText('Jira')
-    expect(screen.getByText('Linear')).toBeTruthy()
+    expect(await screen.findByText('Linear')).toBeTruthy()
   })
 
   it('shows each issue state by name', async () => {
@@ -74,20 +68,20 @@ describe('LinkIssueDialog — partial failures', () => {
   it('shows what arrived and names the tracker that did not', async () => {
     listMine.mockResolvedValue({
       issues: [issueSummaryOf()],
-      failures: [{ tracker: 'jira', error: 'auth-failed' }],
+      failures: [{ tracker: 'linear', error: 'auth-failed' }],
     })
     open()
 
     expect(await screen.findByText('TAV-42')).toBeTruthy()
     const status = await screen.findByRole('status')
-    expect(status.textContent).toContain('Jira')
+    expect(status.textContent).toContain('Linear')
     expect(status.textContent).toContain('credential rejected')
   })
 
   it('names an unconnected tracker without hiding the other one', async () => {
     listMine.mockResolvedValue({
       issues: [issueSummaryOf()],
-      failures: [{ tracker: 'jira', error: 'not-connected' }],
+      failures: [{ tracker: 'linear', error: 'not-connected' }],
     })
     open()
     const status = await screen.findByRole('status')
@@ -218,9 +212,9 @@ describe('LinkIssueDialog — dismissal', () => {
   it('counts as an open modal until it closes', async () => {
     const { unmount } = open()
     await screen.findByText('TAV-42')
-    expect(useModalStore.getState().depth).toBe(1)
+    expect(isSurfaceOpen(document)).toBe(true)
     unmount()
-    expect(useModalStore.getState().depth).toBe(0)
+    expect(isSurfaceOpen(document)).toBe(false)
   })
 
   it('closes on Cancel', async () => {
@@ -262,9 +256,9 @@ describe('LinkIssueDialog — shortcuts and odd failures', () => {
   it('names a failure it has no words for by its code', async () => {
     listMine.mockResolvedValue({
       issues: [issueSummaryOf()],
-      failures: [{ tracker: 'jira', error: 'brand-new-error' }],
+      failures: [{ tracker: 'linear', error: 'brand-new-error' }],
     })
     open()
-    expect((await screen.findByRole('status')).textContent).toBe('Jira brand-new-error')
+    expect((await screen.findByRole('status')).textContent).toBe('Linear brand-new-error')
   })
 })

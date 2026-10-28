@@ -70,7 +70,8 @@ function reportTests() {
 // A word in each block, and the node its language's parser makes of it.
 const LANGUAGES = [
   { lang: 'js', code: 'const answer = 42', word: 'answer', node: 'VariableDefinition' },
-  { lang: 'go', code: 'func main() {}', word: 'func', node: 'keyword' },
+  { lang: 'python', code: 'def greet(): pass', word: 'greet', node: 'VariableName' },
+  { lang: 'go', code: 'func main() {}', word: 'func', node: 'FunctionDecl' },
   { lang: 'sh', code: 'echo hi', word: 'echo', node: 'variableName.standard' },
 ]
 

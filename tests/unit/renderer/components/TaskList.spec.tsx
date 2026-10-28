@@ -221,7 +221,7 @@ describe('TaskList — done and archived', () => {
     render(<TaskList />)
     expect(groupHeadings()).toContain('Needs you · 1')
     fireEvent.contextMenu(rowNamed('Staging 429s'))
-    fireEvent.click(screen.getByRole('button', { name: 'Mark done' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Mark done' }))
     await waitFor(() => expect(groupHeadings()).toContain('Done · 1'))
     expect(groupHeadings()).not.toContain('Needs you · 1')
     expect(screen.queryByRole('button', { name: 'Staging 429s' })).toBeNull()

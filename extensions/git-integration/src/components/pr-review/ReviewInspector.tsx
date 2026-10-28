@@ -1,13 +1,6 @@
-import React, { useRef } from 'react'
+import React, { useEffect } from 'react'
 import { X } from 'lucide-react'
-import {
-  IconButton,
-  Tab,
-  TabList,
-  TabPanel,
-  TabsRoot,
-  useDismissible,
-} from '@terminator/extension-ui'
+import { IconButton, Tab, TabList, TabPanel, TabsRoot } from '@terminator/extension-ui'
 import type { RiskScore } from '../../schemas/pr-review.schema'
 import { WhyThisFile } from './WhyThisFile'
 import './review-inspector.css'
@@ -69,17 +62,20 @@ function FilePanel({ file }: { file: InspectorFile }) {
 }
 
 export function ReviewInspector(props: ReviewInspectorProps) {
-  const rootRef = useRef<HTMLDivElement>(null)
   // The drawer sits over the diff, so a click on the diff must not close it: Escape and the X do.
-  useDismissible({
-    ref: rootRef,
-    onDismiss: props.onClose,
-    manageFocus: false,
-    closeOnOutsideClick: false,
-  })
+  const { onClose } = props
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent): void => {
+      // A popover or dialog open over the drawer takes the key first.
+      if (event.key === 'Escape' && !document.querySelector('dialog:modal, :popover-open'))
+        onClose()
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [onClose])
   return (
     <TabsRoot selectedId={resolveTab(props)} onSelect={props.onTabChange}>
-      <div className="ri-root" ref={rootRef}>
+      <div className="ri-root">
         <InspectorTabs inspector={props} />
         {props.agentAvailable && (
           <TabPanel id="agent" className="ri-panel">

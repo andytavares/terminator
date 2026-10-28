@@ -14,14 +14,10 @@ vi.mock('electron', () => ({
 
 const providers = vi.hoisted(() => ({
   linear: { id: 'linear', get: vi.fn().mockResolvedValue(null) },
-  jira: { id: 'jira', get: vi.fn().mockResolvedValue(null) },
 }))
 
 vi.mock('../../../src/main/integrations/providers/linear.provider', () => ({
   createLinearProvider: vi.fn(() => providers.linear),
-}))
-vi.mock('../../../src/main/integrations/providers/jira.provider', () => ({
-  createJiraProvider: vi.fn(() => providers.jira),
 }))
 
 // The service records each call's outcome with a write nobody awaits
@@ -42,12 +38,6 @@ vi.mock('../../../src/main/integrations/tracker-store', async (importOriginal) =
 afterEach(() => Promise.all(lastErrorWrites.splice(0)))
 
 const LINEAR = { tracker: 'linear', apiKey: 'k' } as const
-const JIRA = {
-  tracker: 'jira',
-  site: 'acme.atlassian.net',
-  email: 'a@acme.dev',
-  apiToken: 't',
-} as const
 
 let trackers: typeof import('../../../src/main/integrations/tracker-store')
 
@@ -61,7 +51,6 @@ beforeEach(async () => {
   userData = makeTempDir('integrations-index-')
   trackers = await import('../../../src/main/integrations/tracker-store')
   await trackers.setCredential(LINEAR)
-  await trackers.setCredential(JIRA)
 })
 
 describe('integrations composition root', () => {
@@ -77,13 +66,11 @@ describe('integrations composition root', () => {
     expect(mod.getIssueService()).not.toBe(first)
   })
 
-  it('wires both providers in', async () => {
+  it('wires the Linear provider in', async () => {
     const mod = await load()
     const service = mod.getIssueService()
     await service.get('linear', 'TAV-1')
-    await service.get('jira', 'TAV-1')
     expect(providers.linear.get).toHaveBeenCalledWith(LINEAR, 'TAV-1')
-    expect(providers.jira.get).toHaveBeenCalledWith(JIRA, 'TAV-1')
   })
 })
 

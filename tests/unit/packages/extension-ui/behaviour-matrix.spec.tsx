@@ -1,11 +1,10 @@
-import React, { useRef } from 'react'
+import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { Dialog } from '../../../../packages/extension-ui/src/Dialog'
 import { ConfirmDialog } from '../../../../packages/extension-ui/src/ConfirmDialog'
 import { Popover } from '../../../../packages/extension-ui/src/Popover'
-import { useDismissible } from '../../../../packages/extension-ui/src/useDismissible'
-import { getModalDepth } from '../../../../packages/extension-ui/src/modal-depth'
+import { isSurfaceOpen } from '../../../../src/shared/double-escape'
 import { pressOutside } from '../../../support/modal'
 
 /**
@@ -17,10 +16,6 @@ import { pressOutside } from '../../../support/modal'
  * outside. The claim after this feature is that every surface passes, and that
  * claim rests on every surface using one of these primitives — so this asserts
  * the five checks against the primitives themselves, once each.
- *
- * The surfaces that keep their own markup (a composer, a search palette, a
- * drawer) go through `useDismissible`, which is checked here too — that is the
- * whole of what they inherit.
  */
 
 const CHECKS = [
@@ -74,17 +69,17 @@ describe('behaviour matrix: Dialog', () => {
   })
 })
 
-describe('behaviour matrix: Dialog — counts toward the modal depth the exit gesture reads', () => {
-  it('counts toward the modal depth the exit gesture reads', () => {
-    expect(getModalDepth(window)).toBe(0)
+describe('behaviour matrix: Dialog — is open for the exit gesture to read', () => {
+  it('is open for the exit gesture to read', () => {
+    expect(isSurfaceOpen(document)).toBe(false)
     const { unmount } = render(
       <Dialog title="X" onDismiss={vi.fn()} actions={[]}>
         <p>body</p>
       </Dialog>
     )
-    expect(getModalDepth(window)).toBe(1)
+    expect(isSurfaceOpen(document)).toBe(true)
     unmount()
-    expect(getModalDepth(window)).toBe(0)
+    expect(isSurfaceOpen(document)).toBe(false)
   })
 })
 
@@ -143,58 +138,11 @@ describe('behaviour matrix: Popover', () => {
   })
 
   it(`${CHECKS[4]}, and is not announced as modal`, () => {
-    vi.useFakeTimers()
-    try {
-      const onDismiss = vi.fn()
-      const { container } = render(<PopoverHarness onDismiss={onDismiss} />)
-      const surface = container.querySelector('[data-tmui-surface]') as HTMLElement
-      expect(surface.getAttribute('aria-modal')).toBeNull()
-      // The outside-click listener binds a tick late on purpose: the click that
-      // opened the surface is still propagating when it mounts.
-      act(() => {
-        vi.advanceTimersByTime(0)
-      })
-      fireEvent.mouseDown(document.body)
-      expect(onDismiss).toHaveBeenCalled()
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-})
-
-/**
- * What a surface keeping its own markup inherits. Notepad's composer, its
- * search palette and its edit dialog all take this route.
- */
-describe('behaviour matrix: useDismissible', () => {
-  function Custom({ onDismiss }: { onDismiss: () => void }) {
-    const ref = useRef<HTMLDivElement>(null)
-    useDismissible({ ref, onDismiss })
-    return (
-      <div ref={ref} data-tmui-surface="" role="dialog" aria-modal="true" aria-label="Custom">
-        <button>Inside</button>
-      </div>
-    )
-  }
-
-  it(CHECKS[0], () => {
     const onDismiss = vi.fn()
-    render(<Custom onDismiss={onDismiss} />)
-    fireEvent.keyDown(document, { key: 'Escape' })
+    const { container } = render(<PopoverHarness onDismiss={onDismiss} />)
+    const surface = container.querySelector('[data-tmui-surface]') as HTMLElement
+    expect(surface.getAttribute('aria-modal')).toBeNull()
+    fireEvent.click(document.body)
     expect(onDismiss).toHaveBeenCalled()
-  })
-
-  it(CHECKS[3], () => {
-    const onDismiss = vi.fn()
-    render(<Custom onDismiss={onDismiss} />)
-    expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
-  })
-
-  it('counts toward modal depth — the guard the three Notepad surfaces lacked', () => {
-    const onDismiss = vi.fn()
-    const { unmount } = render(<Custom onDismiss={onDismiss} />)
-    expect(getModalDepth(window)).toBe(1)
-    unmount()
-    expect(getModalDepth(window)).toBe(0)
   })
 })

@@ -17,11 +17,7 @@ vi.mock('../src/ipc/projects.ipc.js', () => ({
   registerProjectsIpcHandlers: vi.fn(() => vi.fn()),
 }))
 vi.mock('../src/ipc/links.ipc.js', () => ({ registerLinksIpcHandlers: vi.fn(() => vi.fn()) }))
-vi.mock('../src/ipc/kanban.ipc.js', () => ({ registerKanbanIpcHandlers: vi.fn(() => vi.fn()) }))
 vi.mock('../src/ipc/admin.ipc.js', () => ({ registerAdminIpcHandlers: vi.fn(() => vi.fn()) }))
-vi.mock('../src/ipc/weekly-review.ipc.js', () => ({
-  registerWeeklyReviewIpcHandlers: vi.fn(() => vi.fn()),
-}))
 vi.mock('../src/notifications/task-scheduler.js', () => ({
   startTaskScheduler: vi.fn(() => ({ dispose: vi.fn(), tick: vi.fn() })),
   setSchedulerTick: vi.fn(),
@@ -98,14 +94,14 @@ describe('task-vault re-initialize', () => {
     await db.run(
       `INSERT INTO tasks (id, text, status, source, created_at, updated_at) VALUES ('t1', 'Call', 'open', 'inbox', 'now', 'now')`
     )
-    await db.exec('DROP TABLE weekly_review_actions')
+    await db.exec('DROP TABLE area_archive_changes')
 
     expect(await handlers.get('task-vault:db.reinit')!()).toEqual({ data: { ok: true } })
 
     const tables = await db.query<{ name: string }>(
       `SELECT name FROM sqlite_master WHERE type='table'`
     )
-    expect(tables.map((t) => t.name)).toContain('weekly_review_actions')
+    expect(tables.map((t) => t.name)).toContain('area_archive_changes')
     expect(await db.query(`SELECT id FROM tasks`)).toEqual([{ id: 't1' }])
   })
 })

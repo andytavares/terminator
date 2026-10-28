@@ -1,7 +1,7 @@
 import { spawn, execSync, type ChildProcess } from 'child_process'
 import { rmSync, writeFileSync } from 'fs'
 import { createServer } from 'net'
-import { networkInterfaces, tmpdir } from 'os'
+import { tmpdir } from 'os'
 import { join } from 'path'
 
 // Packaged Electron apps launch without the user's shell, so Homebrew paths are absent.
@@ -14,25 +14,6 @@ const EXTENDED_ENV = {
 
 const POLL_INTERVAL_MS = 500
 const MAX_POLLS = 60
-
-export function generateCaddyfile(port: number): string {
-  const ifaces = networkInterfaces()
-  let hostname = 'localhost'
-  for (const iface of Object.values(ifaces)) {
-    for (const addr of iface ?? []) {
-      if ((addr.family === 'IPv4' || (addr.family as unknown) === 4) && !addr.internal) {
-        hostname = addr.address
-        break
-      }
-    }
-    if (hostname !== 'localhost') break
-  }
-  return `${hostname} {
-  reverse_proxy localhost:${port}
-  tls internal
-}
-`
-}
 
 /** A port nothing listens on now, from the OS. */
 function freePort(): Promise<number> {

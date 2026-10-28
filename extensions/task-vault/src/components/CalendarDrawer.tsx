@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { useVaultStore } from '../stores/vault.store'
 import { dayLoadLabel, isOverdue, shortDay, weekOf } from '../state/calendar-load'
-import type { KanbanLane, Task } from '../vault/types'
+import type { Task } from '../vault/types'
+import { localDate, monthNameOf, weekdayName } from '../utils/local-date'
 import { IconButton } from '@terminator/extension-ui'
 
 type DayData = { date: string; status: string; count: number }
@@ -16,7 +17,6 @@ interface CellProps {
   rows: DayData[]
   todayStr: string
   selected: boolean
-  lanes: KanbanLane[]
   onPick: (dateStr: string) => void
 }
 
@@ -26,7 +26,6 @@ interface GridProps {
   dayMap: DayMap
   todayStr: string
   day: SelectedDay
-  lanes: KanbanLane[]
 }
 
 const STATUS_DOT_CLASS: Record<string, string> = {
@@ -42,36 +41,10 @@ const STATUS_DOT_CLASS: Record<string, string> = {
 const DOT_ORDER = ['open', 'in-progress', 'in-review', 'blocked', 'done', 'migrated', 'cancelled']
 
 /** @internal */
-export function statusDotStyle(
-  status: string,
-  lanes: KanbanLane[]
-): { className: string; style?: React.CSSProperties } {
-  const lane = lanes.find((l) => l.dotColor && l.taskStatuses.includes(status as never))
-  if (lane?.dotColor) return { className: 'cal-dot', style: { background: lane.dotColor } }
-  return { className: `cal-dot ${STATUS_DOT_CLASS[status] ?? 'cal-dot--open'}` }
+export function statusDotClass(status: string): string {
+  return `cal-dot ${STATUS_DOT_CLASS[status] ?? 'cal-dot--open'}`
 }
-const WEEKDAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
-const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-]
-
-const pad = (n: number) => String(n).padStart(2, '0')
-
-function getTodayStr(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
+const WEEKDAY_LABELS = [0, 1, 2, 3, 4, 5, 6].map((day) => weekdayName(day, 'short').slice(0, 2))
 
 /** A daily log's tasks, or null when the channel answered without any. */
 async function fetchDayTasks(date: string): Promise<Task[] | null> {
@@ -183,7 +156,7 @@ function monthCells(year: number, month: number): (string | null)[] {
   const daysInMonth = new Date(year, month, 0).getDate()
   const cells: (string | null)[] = [
     ...Array<null>(firstDay).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => `${year}-${pad(month)}-${pad(i + 1)}`),
+    ...Array.from({ length: daysInMonth }, (_, i) => localDate(new Date(year, month - 1, i + 1))),
   ]
   while (cells.length % 7 !== 0) cells.push(null)
   return cells
@@ -202,14 +175,13 @@ function cellClass(props: CellProps): string {
     .join(' ')
 }
 
-function DayDots({ rows, lanes }: { rows: DayData[]; lanes: KanbanLane[] }) {
+function DayDots({ rows }: { rows: DayData[] }) {
   const dots = DOT_ORDER.filter((s) => rows.some((r) => r.status === s))
   return (
     <span className="cal-drawer__dots">
-      {dots.slice(0, 3).map((s) => {
-        const { className, style } = statusDotStyle(s, lanes)
-        return <span key={s} className={className} style={style} />
-      })}
+      {dots.slice(0, 3).map((s) => (
+        <span key={s} className={statusDotClass(s)} />
+      ))}
     </span>
   )
 }
@@ -226,7 +198,7 @@ function DayCell(props: CellProps): React.JSX.Element {
       title={label}
     >
       <span className="cal-drawer__day-num">{parseInt(dateStr.slice(8))}</span>
-      {rows.length > 0 && <DayDots rows={rows} lanes={props.lanes} />}
+      {rows.length > 0 && <DayDots rows={rows} />}
     </button>
   )
 }
@@ -239,7 +211,6 @@ function GridCell(props: Omit<GridProps, 'year' | 'month'> & { dateStr: string }
       rows={props.dayMap.get(dateStr) ?? []}
       todayStr={props.todayStr}
       selected={dateStr === day.selectedDate}
-      lanes={props.lanes}
       onPick={(d) => void day.pick(d)}
     />
   )
@@ -328,8 +299,8 @@ function DayPanel(props: { day: SelectedDay; dayMap: DayMap; todayStr: string })
 }
 
 export function CalendarDrawer(): React.JSX.Element {
-  const { calendarRefreshKey, kanbanLanes } = useVaultStore()
-  const todayStr = getTodayStr()
+  const { calendarRefreshKey } = useVaultStore()
+  const todayStr = localDate()
   const m = useMonth(calendarRefreshKey)
   const day = useSelectedDay(todayStr)
   useEffect(() => {
@@ -342,14 +313,11 @@ export function CalendarDrawer(): React.JSX.Element {
         <div className="cal-drawer__month-nav">
           <IconButton icon={ChevronLeft} label="Previous month" size="sm" onClick={m.prev} />
           <span className="cal-drawer__month-label">
-            {MONTH_NAMES[m.month - 1]} {m.year}
+            {monthNameOf(m.month - 1)} {m.year}
           </span>
           <IconButton icon={ChevronRight} label="Next month" size="sm" onClick={m.next} />
         </div>
-        <MonthGrid
-          {...{ year: m.year, month: m.month, dayMap: m.dayMap, todayStr, day }}
-          lanes={kanbanLanes}
-        />
+        <MonthGrid {...{ year: m.year, month: m.month, dayMap: m.dayMap, todayStr, day }} />
         <DayPanel day={day} dayMap={m.dayMap} todayStr={todayStr} />
       </div>
     </div>

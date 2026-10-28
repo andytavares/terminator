@@ -1013,15 +1013,15 @@ describe('enrichIssueRefs (FR-030) — renders exactly as today when the tracker
   })
 })
 
-describe('enrichIssueRefs (FR-030) — enriches Jira references through the same path', () => {
-  it('enriches Jira references through the same path', async () => {
+describe('enrichIssueRefs (FR-030) — Jira references', () => {
+  it('leaves a Jira reference as found without asking a tracker', async () => {
     const { enrichIssueRefs } = await import('../../src/github/pr-review-service')
     const issues = {
       get: vi.fn().mockResolvedValue({ title: 'Move Jira over', state: { name: 'Done' } }),
     }
 
     await enrichIssueRefs([{ type: 'jira' as const, ref: 'TAV-7' }], issues)
-    expect(issues.get).toHaveBeenCalledWith('jira', 'TAV-7')
+    expect(issues.get).not.toHaveBeenCalled()
   })
 })
 
@@ -1044,6 +1044,18 @@ const flat = (raw: string) =>
   parsePrFileDiff(raw, 'x').hunks.flatMap((h) =>
     h.lines.map((l) => [l.type, l.content, l.oldLineNumber, l.newLineNumber])
   )
+
+describe('parsePrFileDiff — patch content that looks like a file header', () => {
+  it('counts a removed `--- x` line and an added `+++i;` line as content, not headers', () => {
+    const raw = `${head}@@ -1,3 +1,3 @@\n a\n--- x\n+++i;\n z\n`
+    expect(flat(raw)).toEqual([
+      ['context', 'a', 1, 1],
+      ['remove', '-- x', 2, null],
+      ['add', '++i;', null, 2],
+      ['context', 'z', 3, 3],
+    ])
+  })
+})
 
 describe('parsePrFileDiff', () => {
   it('drops the "No newline at end of file" marker and the trailing empty element', () => {

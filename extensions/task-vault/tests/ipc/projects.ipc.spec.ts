@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { ExtensionDB } from '@terminator/extension-sdk'
-import { localDate } from '../../src/utils/local-date'
 import {
   createIpcHarness,
   createVaultDb,
@@ -9,7 +8,6 @@ import {
   seedTask,
   selectTaskRow,
 } from '../support/vault-db'
-import { restoreLocalClock, setLocalClock } from '../support/clock'
 
 vi.mock('../../src/notifications/task-scheduler.js', () => ({
   broadcast: vi.fn(),
@@ -44,22 +42,6 @@ const projectNamesIn = (result: unknown) =>
 
 describe('task-vault:projects:list', taskVaultProjectsListTests)
 
-type Review = {
-  inboxItems: { id: string }[]
-  activeProjects: { name: string }[]
-  staleProjects: { name: string }[]
-  somedayProjects: { name: string }[]
-  somedayTasks: { id: string }[]
-  completedLastWeek: { id: string }[]
-  staleTasks: { id: string }[]
-  staleDaysThreshold: number
-  lastReviewDate: string | null
-}
-
-const weeklyReviewVia = () => harness.invoke('task-vault:projects:weekly-review') as Promise<Review>
-const sortedIds = (rows: { id: string }[]) => rows.map((row) => row.id).sort()
-
-describe('task-vault:projects:weekly-review', taskVaultProjectsWeeklyReviewTests)
 describe('task-vault:projects:update-status', taskVaultProjectsUpdateStatusTests)
 describe('task-vault:projects:create', taskVaultProjectsCreateTests)
 describe('task-vault:projects:delete', taskVaultProjectsDeleteTests)
@@ -200,113 +182,6 @@ function taskVaultProjectsListCountsAreasTests() {
     }
 
     expect(result.projects[0].area).toBe('Work')
-  })
-}
-
-function taskVaultProjectsWeeklyReviewTests() {
-  describe('inbox and projects', taskVaultProjectsWeeklyReviewInboxProjectsTests)
-  describe('someday and completed', taskVaultProjectsWeeklyReviewSomedayCompletedTests)
-  describe('stale tasks', taskVaultProjectsWeeklyReviewStaleTasksTests)
-  describe('threshold and last review', taskVaultProjectsWeeklyReviewThresholdLastReviewTests)
-}
-
-function taskVaultProjectsWeeklyReviewInboxProjectsTests() {
-  it('returns the open inbox items only', async () => {
-    await seedTask(db, { id: 'inbox-1', source: 'inbox' })
-    await seedTask(db, { id: 'inbox-done', source: 'inbox', status: 'done' })
-    await seedTask(db, { id: 'daily-1', source: 'daily', sourceRef: localDate() })
-
-    expect(sortedIds((await weeklyReviewVia()).inboxItems)).toEqual(['inbox-1'])
-  })
-
-  it('returns active projects and flags those with no open task as stale', async () => {
-    await seedProject(db, 'p1', 'Busy')
-    await seedProject(db, 'p2', 'Idle')
-    await seedTask(db, { id: 't1', projectId: 'p1' })
-
-    const result = await weeklyReviewVia()
-
-    expect(result.activeProjects.map((project) => project.name).sort()).toEqual(['Busy', 'Idle'])
-    expect(result.staleProjects.map((project) => project.name)).toEqual(['Idle'])
-  })
-}
-
-function taskVaultProjectsWeeklyReviewSomedayCompletedTests() {
-  it('returns someday projects and top-level someday tasks without their subtasks', async () => {
-    await seedProject(db, 'p1', { name: 'Beta', status: 'someday' })
-    await seedTask(db, { id: 'someday-1', source: 'someday' })
-    await seedTask(db, { id: 'someday-child', source: 'someday', parentId: 'someday-1' })
-
-    const result = await weeklyReviewVia()
-
-    expect(result.somedayProjects.map((project) => project.name)).toEqual(['Beta'])
-    expect(sortedIds(result.somedayTasks)).toEqual(['someday-1'])
-  })
-
-  it('returns tasks completed within the last seven days', async () => {
-    const recent = new Date(Date.now() - 2 * 86400000).toISOString()
-    const old = new Date(Date.now() - 20 * 86400000).toISOString()
-    await seedTask(db, { id: 'recent', status: 'done', updatedAt: recent })
-    await seedTask(db, { id: 'old', status: 'done', updatedAt: old })
-    await seedTask(db, { id: 'open', updatedAt: recent })
-
-    expect(sortedIds((await weeklyReviewVia()).completedLastWeek)).toEqual(['recent'])
-  })
-
-  describe('in a week the clocks changed', () => {
-    afterEach(restoreLocalClock)
-
-    it('goes back seven days on the wall clock, not 168 hours', async () => {
-      // Tuesday 10:00 in New York, two days after the clocks went forward.
-      setLocalClock('America/New_York', '2026-03-10T14:00:00.000Z')
-      await seedTask(db, { id: 'at-0930', status: 'done', updatedAt: '2026-03-03T14:30:00.000Z' })
-      await seedTask(db, { id: 'at-1030', status: 'done', updatedAt: '2026-03-03T15:30:00.000Z' })
-
-      expect(sortedIds((await weeklyReviewVia()).completedLastWeek)).toEqual(['at-1030'])
-    })
-  })
-}
-
-function taskVaultProjectsWeeklyReviewStaleTasksTests() {
-  it('returns daily tasks that have been on today for longer than the stale threshold', async () => {
-    harness.settings.set('terminator.task-vault.staleThresholdDays', 3)
-    const localDateDaysBack = (days: number) => localDate(new Date(Date.now() - days * 86400000))
-    await seedTask(db, {
-      id: 'stale',
-      source: 'daily',
-      sourceRef: localDateDaysBack(0),
-      todaySince: localDateDaysBack(5),
-    })
-    await seedTask(db, {
-      id: 'fresh',
-      source: 'daily',
-      sourceRef: localDateDaysBack(0),
-      todaySince: localDateDaysBack(1),
-    })
-
-    const result = await weeklyReviewVia()
-
-    expect(result.staleDaysThreshold).toBe(3)
-    expect(sortedIds(result.staleTasks)).toEqual(['stale'])
-  })
-}
-
-function taskVaultProjectsWeeklyReviewThresholdLastReviewTests() {
-  it('uses a threshold of seven days when none is stored', async () => {
-    expect((await weeklyReviewVia()).staleDaysThreshold).toBe(7)
-  })
-
-  it('has no lastReviewDate until a review is completed, then the latest completion', async () => {
-    expect((await weeklyReviewVia()).lastReviewDate).toBeNull()
-
-    await db.run(
-      `INSERT INTO weekly_reviews (id, started_at, completed_at, status) VALUES
-         ('r1', '2026-01-01T09:00:00.000Z', '2026-01-01T10:00:00.000Z', 'completed'),
-         ('r2', '2026-01-08T09:00:00.000Z', '2026-01-08T10:00:00.000Z', 'completed'),
-         ('r3', '2026-01-15T09:00:00.000Z', NULL, 'in_progress')`
-    )
-
-    expect((await weeklyReviewVia()).lastReviewDate).toBe('2026-01-08T10:00:00.000Z')
   })
 }
 

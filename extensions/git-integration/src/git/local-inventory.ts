@@ -1,7 +1,7 @@
 import { isAbsolute, join } from 'node:path'
 
 // The Worktrees tab's data: one row per local branch, plus one per detached
-// worktree, from `git worktree list --porcelain` and `git for-each-ref`.
+// worktree, from the core's worktree list and `git for-each-ref`.
 
 export interface LocalInventoryRow {
   branch: string | null
@@ -27,6 +27,7 @@ export interface LocalInventoryRow {
 /** The shell local-inventory runs against; the backend binds it to runGit and fs. */
 export interface InventoryShell {
   exec(cwd: string, args: string[]): Promise<string>
+  listWorktrees(repoRoot: string): Promise<WorktreeEntry[]>
   stat(path: string): Promise<{ birthtimeMs: number; mtimeMs: number } | null>
   readFile(path: string): Promise<string | null>
   listProjects(): Promise<Array<{ id: string; name: string; worktreePath?: string }>>
@@ -37,24 +38,6 @@ export interface WorktreeEntry {
   branch: string | null
   detached: boolean
   prunable: boolean
-}
-
-/** Parses `git worktree list --porcelain`: blocks separated by blank lines. */
-export function parseWorktreePorcelain(text: string): WorktreeEntry[] {
-  return text
-    .trim()
-    .split('\n\n')
-    .filter((block) => block !== '')
-    .map((block) => {
-      const lines = block.split('\n')
-      const branchLine = lines.find((l) => l.startsWith('branch '))
-      return {
-        path: lines[0].replace(/^worktree /, ''),
-        branch: branchLine ? branchLine.replace('branch refs/heads/', '') : null,
-        detached: lines.includes('detached'),
-        prunable: lines.some((l) => l.startsWith('prunable ')),
-      }
-    })
 }
 
 /** @internal */
@@ -119,7 +102,7 @@ function aheadBehind(track: string): { ahead: number; behind: number } {
 /** The raw facts the rows are assembled from; gathered by loadLocalInventory. @internal */
 export interface InventoryFacts {
   repoRoot: string
-  porcelain: string
+  worktrees: WorktreeEntry[]
   refListing: string
   defaultBranch: string
   mergedBranches: string[]
@@ -193,7 +176,7 @@ function rowForDetached(entry: WorktreeEntry, facts: InventoryFacts): LocalInven
 
 /** Assembles the rows from the facts the git reads produced. @internal */
 export function inventoryRows(facts: InventoryFacts): LocalInventoryRow[] {
-  const worktrees = parseWorktreePorcelain(facts.porcelain)
+  const { worktrees } = facts
   const prunablePaths = new Set(worktrees.filter((w) => w.prunable).map((w) => w.path))
   const rows = parseRefListing(facts.refListing).map((ref) => {
     const row = rowForBranch(ref, facts)
@@ -277,12 +260,11 @@ export async function loadLocalInventory(
   repoRoot: string,
   shell: InventoryShell
 ): Promise<LocalInventoryRow[]> {
-  const [porcelain, defaultBranch] = await Promise.all([
-    shell.exec(repoRoot, ['worktree', 'list', '--porcelain']),
+  const [worktrees, defaultBranch] = await Promise.all([
+    shell.listWorktrees(repoRoot),
     defaultBranchOf(shell, repoRoot),
   ])
   const branchFacts = await readBranchFacts(repoRoot, shell, defaultBranch)
-  const worktrees = parseWorktreePorcelain(porcelain)
   const [times, reflogOldest, projects] = await Promise.all([
     statTimesOf(shell, worktrees),
     reflogOldestOf(
@@ -294,7 +276,7 @@ export async function loadLocalInventory(
   ])
   return inventoryRows({
     repoRoot,
-    porcelain,
+    worktrees,
     defaultBranch,
     ...branchFacts,
     ...times,

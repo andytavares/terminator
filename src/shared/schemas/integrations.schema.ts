@@ -4,36 +4,24 @@ import { z } from 'zod'
 // shared schemas so the main process, the renderer and the remote shim all
 // validate against one definition.
 
-export const TrackerIdSchema = z.enum(['linear', 'jira'])
+export const TrackerIdSchema = z.enum(['linear'])
 
 // Emails are `min(1)`, not `.email()`, deliberately. The credential is proved
 // against the tracker before anything is stored, so a wrong address fails at
 // `connect` with the tracker's own message — which is more useful than a regex
 // that also rejects legitimate addresses (short TLDs, plus-addressing, IDN).
-const MineSelectorSchema = z.union([
-  z.object({ kind: z.literal('assignee'), email: z.string().min(1).nullable() }),
-  z.object({ kind: z.literal('query'), jql: z.string().min(1) }),
-])
+const MineSelectorSchema = z.object({
+  kind: z.literal('assignee'),
+  email: z.string().min(1).nullable(),
+})
 
 export const StatusInputSchema = z.object({ tracker: TrackerIdSchema.optional() })
 
-// Discriminated rather than one loose object: a Jira credential is four fields
-// and a Linear one is a key, and accepting either shape for either tracker
-// means storing a credential that cannot possibly work.
-export const ConnectInputSchema = z.discriminatedUnion('tracker', [
-  z.object({
-    tracker: z.literal('linear'),
-    apiKey: z.string().min(1),
-    email: z.string().min(1).nullable().optional(),
-  }),
-  z.object({
-    tracker: z.literal('jira'),
-    site: z.string().min(1),
-    email: z.string().min(1),
-    apiToken: z.string().min(1),
-    jql: z.string().min(1),
-  }),
-])
+export const ConnectInputSchema = z.object({
+  tracker: z.literal('linear'),
+  apiKey: z.string().min(1),
+  email: z.string().min(1).nullable().optional(),
+})
 
 export const DisconnectInputSchema = z.object({ tracker: TrackerIdSchema })
 

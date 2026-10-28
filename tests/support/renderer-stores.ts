@@ -75,7 +75,6 @@ export function trackerConnectionOf(overrides: Partial<TrackerConnection> = {}):
     tracker: 'linear',
     connected: true,
     account: { name: 'Andrew', email: 'a@b.co' },
-    site: null,
     mine: { kind: 'assignee', email: null },
     lastError: null,
     ...overrides,

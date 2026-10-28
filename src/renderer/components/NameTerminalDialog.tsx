@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { Dialog } from '@terminator/extension-ui'
-import { useModalEffect } from '../stores/modal.store'
 
 interface Props {
   defaultName: string
@@ -9,7 +8,6 @@ interface Props {
 }
 
 export function NameTerminalDialog({ defaultName, onConfirm, onCancel }: Props) {
-  useModalEffect()
   const inputRef = useRef<HTMLInputElement>(null)
   const [name, setName] = useState('')
 

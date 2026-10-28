@@ -162,7 +162,7 @@ export function ViewMenu({ sinceNote }: ViewMenuProps) {
         <ChevronDown aria-hidden="true" className="tm-icon-sm" />
       </Button>
       {open && (
-        <Popover label="View" onDismiss={() => setOpen(false)} className="vm-popover">
+        <Popover label="View" align="end" onDismiss={() => setOpen(false)} className="vm-popover">
           <ViewMenuGroups v={v} />
           <FormattingSwitch v={v} />
           {sinceNote && <div className="vm-since">{sinceNote}</div>}

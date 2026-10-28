@@ -72,6 +72,9 @@ function setupGitWorkspace(): void {
   })
 }
 
+/** A worktree git still has a checkout for. */
+const NOT_DETACHED = { detached: false, prunable: false }
+
 describe('CreateProjectDialog', () => {
   it('renders dialog title', () => {
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
@@ -524,7 +527,7 @@ const ISSUE = issueSummaryOf({
   branchName: 'andrew/tav-42-unify-linear',
 })
 
-const JIRA_ISSUE = issueSummaryOf({ ...ISSUE, tracker: 'jira', key: 'TAV-7', branchName: null })
+const UNSUGGESTED_ISSUE = issueSummaryOf({ ...ISSUE, key: 'TAV-7', branchName: null })
 
 const listMine = vi.fn()
 
@@ -534,7 +537,6 @@ const LINEAR = {
   tracker: 'linear' as const,
   connected: true,
   account: null,
-  site: null,
   mine: { kind: 'assignee' as const, email: null },
   lastError: null,
 }
@@ -596,8 +598,8 @@ describe('CreateProjectDialog — from an issue', () => {
     expect(screen.queryByPlaceholderText('My branch')).toBeNull()
   })
 
-  it('derives a branch when the tracker has no suggestion (Jira)', async () => {
-    await openWithIssues(true, [JIRA_ISSUE])
+  it('derives a branch when the issue has no suggested branch', async () => {
+    await openWithIssues(true, [UNSUGGESTED_ISSUE])
     fireEvent.focus(screen.getByPlaceholderText(/Search, or type an issue key/))
     fireEvent.click(await screen.findByText('TAV-7'))
 
@@ -947,7 +949,15 @@ describe('CreateProjectDialog — the worktree branch list', () => {
       })),
     })
     gitApi.listWorktrees.mockResolvedValue({
-      worktrees: [{ path: '/wt/taken', branch: 'taken', isMain: false, head: 'abc123' }],
+      worktrees: [
+        {
+          path: '/wt/taken',
+          branch: 'taken',
+          isMain: false,
+          head: 'abc123',
+          ...NOT_DETACHED,
+        },
+      ],
     })
     await openWorktreeMode()
     fireEvent.click(screen.getByText('+ New branch…'))

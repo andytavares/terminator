@@ -56,6 +56,10 @@ export interface WorktreeInfo {
   branch: string
   isMain: boolean
   head: string
+  /** Checked out at a commit, with no branch. `branch` reads 'HEAD'. */
+  detached: boolean
+  /** Git would remove its record with `git worktree prune`: the folder is gone. */
+  prunable: boolean
 }
 
 type SessionStatus = 'active' | 'backgrounded' | 'closed'

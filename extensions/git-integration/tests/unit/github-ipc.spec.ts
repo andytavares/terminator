@@ -517,90 +517,31 @@ describe('github:pr-review-detail — maps SUCCESS conclusion to pass state', ()
   })
 })
 
-describe('github:pr-review-detail — maps FAILURE conclusion to fail state', () => {
+describe('github:pr-review-detail — maps a check conclusion to a state', () => {
   const handlers = freshHandlers()
 
-  it('maps FAILURE conclusion to fail state', async () => {
-    mockPrDetail({ ...PR_META, statusCheckRollup: [{ name: 'lint', conclusion: 'FAILURE' }] })
+  it.each([
+    ['FAILURE', 'fail'],
+    ['TIMED_OUT', 'fail'],
+    ['ACTION_REQUIRED', 'fail'],
+    ['ERROR', 'fail'],
+    ['IN_PROGRESS', 'pending'],
+    ['QUEUED', 'pending'],
+    ['PENDING', 'pending'],
+    ['WAITING', 'pending'],
+    ['SKIPPED', 'skipped'],
+    ['NEUTRAL', 'skipped'],
+    ['CANCELLED', 'skipped'],
+    ['SOMETHING_NEW', 'unknown'],
+  ])('maps %s to %s', async (conclusion, state) => {
+    mockPrDetail({ ...PR_META, statusCheckRollup: [{ name: 'check', conclusion }] })
 
     const result = (await handlers['github:pr-review-detail']({
       repoRoot: '/repo',
       prNumber: 6,
     })) as { pr: { statusChecks: Array<{ state: string }> } }
 
-    expect(result.pr.statusChecks[0].state).toBe('fail')
-  })
-})
-
-describe('github:pr-review-detail — maps TIMED_OUT and ACTION_REQUIRED conclusions to fail', () => {
-  const handlers = freshHandlers()
-
-  it('maps TIMED_OUT and ACTION_REQUIRED conclusions to fail', async () => {
-    for (const conclusion of ['TIMED_OUT', 'ACTION_REQUIRED', 'ERROR']) {
-      Object.assign(handlers, captureHandlers()) // the owner lookup is cached per registration
-      mockPrDetail({ ...PR_META, statusCheckRollup: [{ name: 'check', conclusion }] })
-
-      const result = (await handlers['github:pr-review-detail']({
-        repoRoot: '/repo',
-        prNumber: 6,
-      })) as { pr: { statusChecks: Array<{ state: string }> } }
-
-      expect(result.pr.statusChecks[0].state).toBe('fail')
-    }
-  })
-})
-
-describe('github:pr-review-detail — maps IN_PROGRESS and QUEUED to pending state', () => {
-  const handlers = freshHandlers()
-
-  it('maps IN_PROGRESS and QUEUED to pending state', async () => {
-    for (const conclusion of ['IN_PROGRESS', 'QUEUED', 'PENDING', 'WAITING']) {
-      Object.assign(handlers, captureHandlers()) // the owner lookup is cached per registration
-      mockPrDetail({ ...PR_META, statusCheckRollup: [{ name: 'check', conclusion }] })
-
-      const result = (await handlers['github:pr-review-detail']({
-        repoRoot: '/repo',
-        prNumber: 6,
-      })) as { pr: { statusChecks: Array<{ state: string }> } }
-
-      expect(result.pr.statusChecks[0].state).toBe('pending')
-    }
-  })
-})
-
-describe('github:pr-review-detail — maps SKIPPED, NEUTRAL, CANCELLED to skipped state', () => {
-  const handlers = freshHandlers()
-
-  it('maps SKIPPED, NEUTRAL, CANCELLED to skipped state', async () => {
-    for (const conclusion of ['SKIPPED', 'NEUTRAL', 'CANCELLED']) {
-      Object.assign(handlers, captureHandlers()) // the owner lookup is cached per registration
-      mockPrDetail({ ...PR_META, statusCheckRollup: [{ name: 'check', conclusion }] })
-
-      const result = (await handlers['github:pr-review-detail']({
-        repoRoot: '/repo',
-        prNumber: 6,
-      })) as { pr: { statusChecks: Array<{ state: string }> } }
-
-      expect(result.pr.statusChecks[0].state).toBe('skipped')
-    }
-  })
-})
-
-describe('github:pr-review-detail — maps unknown conclusion string to unknown state', () => {
-  const handlers = freshHandlers()
-
-  it('maps unknown conclusion string to unknown state', async () => {
-    mockPrDetail({
-      ...PR_META,
-      statusCheckRollup: [{ name: 'check', conclusion: 'SOMETHING_NEW' }],
-    })
-
-    const result = (await handlers['github:pr-review-detail']({
-      repoRoot: '/repo',
-      prNumber: 6,
-    })) as { pr: { statusChecks: Array<{ state: string }> } }
-
-    expect(result.pr.statusChecks[0].state).toBe('unknown')
+    expect(result.pr.statusChecks[0].state).toBe(state)
   })
 })
 
@@ -645,44 +586,6 @@ describe('github:pr-review-detail — preserves multiple checks with mixed state
     expect(result.pr.statusChecks.find((c) => c.name === 'build')?.state).toBe('pass')
     expect(result.pr.statusChecks.find((c) => c.name === 'lint')?.state).toBe('fail')
     expect(result.pr.statusChecks.find((c) => c.name === 'deploy')?.state).toBe('pending')
-  })
-})
-
-describe('github:pr-review-detail — maps mergeStateStatus BEHIND to behind', () => {
-  const handlers = freshHandlers()
-
-  it('maps mergeStateStatus BEHIND to behind', async () => {
-    mockPrDetail({ ...PR_META, mergeStateStatus: 'BEHIND' })
-    mockGitFailure('not found')
-    const result = (await handlers['github:pr-review-detail']({
-      repoRoot: '/repo',
-      prNumber: 6,
-    })) as { pr: { mergeStateStatus: string } }
-    expect(result.pr.mergeStateStatus).toBe('behind')
-  })
-
-  it('maps mergeStateStatus DIRTY to dirty', async () => {
-    mockPrDetail({ ...PR_META, mergeStateStatus: 'DIRTY' })
-    mockGitFailure('not found')
-    const result = (await handlers['github:pr-review-detail']({
-      repoRoot: '/repo',
-      prNumber: 6,
-    })) as { pr: { mergeStateStatus: string } }
-    expect(result.pr.mergeStateStatus).toBe('dirty')
-  })
-})
-
-describe('github:pr-review-detail — maps mergeStateStatus CLEAN to clean', () => {
-  const handlers = freshHandlers()
-
-  it('maps mergeStateStatus CLEAN to clean', async () => {
-    mockPrDetail({ ...PR_META, mergeStateStatus: 'CLEAN' })
-    mockGitFailure('not found')
-    const result = (await handlers['github:pr-review-detail']({
-      repoRoot: '/repo',
-      prNumber: 6,
-    })) as { pr: { mergeStateStatus: string } }
-    expect(result.pr.mergeStateStatus).toBe('clean')
   })
 })
 
@@ -841,37 +744,26 @@ describe('github:pr-review-detail — lintStatus is unknown for a lint check wit
   })
 })
 
-describe('github:pr-review-detail — maps mergeStateStatus CONFLICTING to dirty', () => {
+describe('github:pr-review-detail — maps mergeStateStatus', () => {
   const handlers = freshHandlers()
 
-  it('maps mergeStateStatus CONFLICTING to dirty', async () => {
+  it.each([
+    ['BEHIND', 'behind'],
+    ['DIRTY', 'dirty'],
+    ['CONFLICTING', 'dirty'],
+    ['CLEAN', 'clean'],
+    ['TOTALLY_UNKNOWN_STATE', 'unknown'],
+  ])('maps %s to %s', async (mergeStateStatus, expected) => {
     mockPrDetail({
       ...PR_META,
-      mergeStateStatus: 'CONFLICTING',
+      mergeStateStatus,
       statusCheckRollup: [{ name: 'ci', conclusion: 'SUCCESS' }],
     })
     const result = (await handlers['github:pr-review-detail']({
       repoRoot: '/repo',
       prNumber: 6,
     })) as { pr: { mergeStateStatus: string } }
-    expect(result.pr.mergeStateStatus).toBe('dirty')
-  })
-})
-
-describe('github:pr-review-detail — maps unknown mergeStateStatus to unknown', () => {
-  const handlers = freshHandlers()
-
-  it('maps unknown mergeStateStatus to unknown', async () => {
-    mockPrDetail({
-      ...PR_META,
-      mergeStateStatus: 'TOTALLY_UNKNOWN_STATE',
-      statusCheckRollup: [{ name: 'ci', conclusion: 'SUCCESS' }],
-    })
-    const result = (await handlers['github:pr-review-detail']({
-      repoRoot: '/repo',
-      prNumber: 6,
-    })) as { pr: { mergeStateStatus: string } }
-    expect(result.pr.mergeStateStatus).toBe('unknown')
+    expect(result.pr.mergeStateStatus).toBe(expected)
   })
 })
 
@@ -2925,6 +2817,34 @@ describe('gh: pseudo-root (uncloned repo) — builds owner/repo API paths for a 
       toSha: 'bbb222',
     })
     expect(mockExecFile.mock.calls[0][1]).toContain('repos/acme/widgets/compare/aaa111...bbb222')
+  })
+})
+
+describe('github:pr-file-diff reuses the patches the PR detail fetch returned', () => {
+  const handlers = freshHandlers()
+
+  it('asks GitHub for the changed files once across the detail and a file diff', async () => {
+    const files = [
+      { filename: 'src/a.ts', additions: 1, deletions: 1, patch: '@@ -1 +1 @@\n-a\n+b' },
+    ]
+    mockExecFile.mockImplementation(
+      stubAnswering(({ args }) => {
+        if (args.some((arg) => arg.endsWith('/pulls/6/files'))) return JSON.stringify(files)
+        if (args.some((arg) => arg.endsWith('/pulls/6/reviews'))) return '[]'
+        return JSON.stringify({ ...PR_META, number: 6 })
+      })
+    )
+    await handlers['github:pr-review-detail']({ repoRoot: 'gh:acme/widgets', prNumber: 6 })
+    const result = (await handlers['github:pr-file-diff']({
+      repoRoot: 'gh:acme/widgets',
+      prNumber: 6,
+      path: 'src/a.ts',
+    })) as { diff: { hunks: Array<{ lines: Array<{ type: string }> }> } }
+    const filesCalls = mockExecFile.mock.calls.filter((call) =>
+      (call[1] as string[]).some((arg) => arg.endsWith('/pulls/6/files'))
+    )
+    expect(filesCalls).toHaveLength(1)
+    expect(result.diff.hunks[0].lines.map((l) => l.type)).toEqual(['remove', 'add'])
   })
 })
 

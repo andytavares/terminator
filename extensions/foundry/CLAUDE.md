@@ -150,7 +150,7 @@ Verification commands (`npm test`, `pytest`, …) do **not** run through `api.sh
 
 ### The one core capability this feature added
 
-`ExtensionAPI.issues` gained `states()`, `transition(intent)` and `supportsTransitions()` in v2.3.0 (ADR-041). That is a **generic** capability — core learned that an extension may move an issue's workflow position; it learned nothing about Foundry. The provider methods are optional and only Linear implements them; Jira reports the capability as unsupported. See `specs/037-foundry-software-factory/contracts/extension-api-issues.md`.
+`ExtensionAPI.issues` gained `states()`, `transition(intent)` and `supportsTransitions()` in v2.3.0 (ADR-041). That is a **generic** capability — core learned that an extension may move an issue's workflow position; it learned nothing about Foundry. The provider methods are optional and only Linear implements them. See `specs/037-foundry-software-factory/contracts/extension-api-issues.md`.
 
 ## NPM Dependencies
 

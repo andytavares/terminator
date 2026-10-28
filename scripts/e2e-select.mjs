@@ -105,6 +105,7 @@ export const CORE_SPECS = [
   'home-tasks.spec.ts',
   'issue-trackers.spec.ts',
   'live-preview-spacing.spec.ts',
+  'menus-keyboard.spec.ts',
   'monitor-wall.spec.ts',
   'resume-session.spec.ts',
   'session-home.spec.ts',
@@ -112,6 +113,7 @@ export const CORE_SPECS = [
   'settings.spec.ts',
   'sidebar-marks-the-shown-session.spec.ts',
   'sidebar-sorting.spec.ts',
+  'start-work-run-as-keyboard.spec.ts',
   'terminal-breakout.spec.ts',
 ]
 

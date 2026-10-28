@@ -111,9 +111,7 @@
 }
 
 .rs-pop {
-  position: absolute;
-  top: calc(100% + var(--tm-space-1));
-  left: var(--tm-space-2);
+  left: calc(anchor(left) + var(--tm-space-2));
   width: 340px;
   max-width: calc(100vw - 32px);
   background: var(--tm-bg-elevated);

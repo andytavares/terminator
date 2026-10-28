@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { CalendarDays, ChevronDown, Download, Kanban, List, Settings, Upload } from 'lucide-react'
+import { CalendarDays, ChevronDown, Download, Settings, Upload } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import {
   Button,
@@ -9,25 +9,22 @@ import {
   TabList,
   TabPanel,
   TabsRoot,
-  useDismissible,
+  Popover,
 } from '@terminator/extension-ui'
 import './task-vault.css'
 import { notify } from '../utils/notify'
 import { useVaultStore } from '../stores/vault.store'
 import type { VaultView } from '../stores/vault.store'
 import { useVaultDataStore } from '../stores/vault-data.store'
-import type { KanbanLane } from '../vault/types'
 import { useVaultNavStore } from '../stores/vault-nav.store'
 import { VaultSidebar } from './VaultSidebar'
 import { DailyLog } from './DailyLog'
 import { ProjectsBrowser } from './ProjectsBrowser'
-import { WeeklyReview } from './WeeklyReview'
 import { InboxView } from './InboxView'
 import { AreasView } from './AreasView'
 import { ArchiveView } from './ArchiveView'
 import { CalendarDrawer } from './CalendarDrawer'
 import { SmartTaskInput } from './SmartTaskInput'
-import { KanbanBoard } from './KanbanBoard'
 import { TaskDetailPanel } from './TaskDetailPanel'
 import { DatabaseAdmin } from './DatabaseAdmin'
 import { invokeVault, makeTaskNavHandler } from './daily-log-format'
@@ -36,7 +33,6 @@ import { localDate } from '../utils/local-date'
 interface NavigationTarget {
   date?: string
   taskId?: string
-  view?: 'daily' | 'review'
 }
 
 interface Selected {
@@ -308,9 +304,7 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
 
 async function fetchContexts(): Promise<string[] | null> {
   try {
-    const result = await window.electronAPI.extensionBridge.invoke(
-      'task-vault:kanban:list-contexts'
-    )
+    const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:list-contexts')
     if (result && typeof result === 'object' && 'contexts' in result) {
       return (result as { contexts: string[] }).contexts
     }
@@ -327,8 +321,7 @@ function reloadViewedDay(): void {
   else void useVaultDataStore.getState().loadToday()
 }
 
-/** Opens the day (or today), then the task, then an explicit view: after the task, because
- *  navigating to a task puts you on the daily log. */
+/** Opens the day (or today), then the task. */
 function followNavigation(target: NavigationTarget): void {
   const nav = useVaultNavStore.getState()
   const data = useVaultDataStore.getState()
@@ -336,7 +329,6 @@ function followNavigation(target: NavigationTarget): void {
   if (target.date) void data.loadDate(target.date)
   else void data.loadToday()
   if (target.taskId) nav.navigateToTask(target.taskId, target.date)
-  if (target.view) nav.setView(target.view)
 }
 
 /** Calendar navigation arrives on `task-vault:navigate`; one sent before this view existed is
@@ -374,18 +366,7 @@ function useVisibilityReset(): void {
   }, [])
 }
 
-async function loadKanbanLanes(): Promise<void> {
-  try {
-    const result = await window.electronAPI.extensionBridge.invoke('task-vault:kanban:get-config')
-    if (result && typeof result === 'object' && !('error' in result)) {
-      useVaultDataStore.getState().setKanbanLanes((result as { lanes: KanbanLane[] }).lanes)
-    }
-  } catch {
-    // non-critical
-  }
-}
-
-/** Loads the day, inbox count, contexts, backlog and lanes, and reloads on vault pushes. */
+/** Loads the day, inbox count, contexts and backlog, and reloads on vault pushes. */
 function useVaultData(setContexts: (contexts: string[]) => void): void {
   useEffect(() => {
     const data = useVaultDataStore.getState()
@@ -394,7 +375,6 @@ function useVaultData(setContexts: (contexts: string[]) => void): void {
     void data.refreshInboxCount()
     loadContexts()
     void data.loadSomeday()
-    void loadKanbanLanes()
     const on = window.electronAPI.extensionBridge.on
     const unsubs = [
       on('task-vault:push:index-updated', () => {
@@ -538,7 +518,7 @@ function ContextFilterHeader(): React.JSX.Element {
 function ContextOptions({ availableContexts }: { availableContexts: string[] }): React.JSX.Element {
   const { selectedContexts, toggleContext } = useVaultStore()
   return (
-    <div className="tv-context-filter__dropdown">
+    <>
       <ContextFilterHeader />
       {availableContexts.length === 0 && (
         <span className="tv-context-filter__empty">No contexts found</span>
@@ -554,7 +534,7 @@ function ContextOptions({ availableContexts }: { availableContexts: string[] }):
           <span>{`+${ctx}`}</span>
         </label>
       ))}
-    </div>
+    </>
   )
 }
 
@@ -562,15 +542,8 @@ function ContextOptions({ availableContexts }: { availableContexts: string[] }):
 function ContextFilter({ availableContexts }: { availableContexts: string[] }): React.JSX.Element {
   const { selectedContexts } = useVaultStore()
   const [open, setOpen] = useState(false)
-  const contextMenuRef = useRef<HTMLDivElement>(null)
-  useDismissible({
-    ref: contextMenuRef,
-    onDismiss: () => setOpen(false),
-    manageFocus: false,
-    enabled: open,
-  })
   return (
-    <div className="tv-context-filter" ref={contextMenuRef}>
+    <div className="tv-context-filter">
       <Button
         aria-label="Filter by context"
         variant={selectedContexts.length > 0 ? 'secondary' : 'ghost'}
@@ -581,28 +554,17 @@ function ContextFilter({ availableContexts }: { availableContexts: string[] }): 
         {filterLabel(selectedContexts)}
         <ChevronDown className="tm-icon-sm" />
       </Button>
-      {open && <ContextOptions availableContexts={availableContexts} />}
+      {open && (
+        <Popover
+          label="Filter by context"
+          align="end"
+          className="tv-context-filter__dropdown"
+          onDismiss={() => setOpen(false)}
+        >
+          <ContextOptions availableContexts={availableContexts} />
+        </Popover>
+      )}
     </div>
-  )
-}
-
-function ViewModeToggles(): React.JSX.Element {
-  const { viewMode, setViewMode } = useVaultStore()
-  return (
-    <>
-      <IconButton
-        icon={List}
-        label="List view"
-        pressed={viewMode === 'list'}
-        onClick={() => setViewMode('list')}
-      />
-      <IconButton
-        icon={Kanban}
-        label="Board view"
-        pressed={viewMode === 'kanban'}
-        onClick={() => setViewMode('kanban')}
-      />
-    </>
   )
 }
 
@@ -614,7 +576,6 @@ function VaultToolbar(props: ToolbarProps): React.JSX.Element {
     <div className="task-vault-view__toolbar-row">
       <div className="task-vault-view__toolbar">
         <div className="task-vault-view__toolbar-right">
-          <ViewModeToggles />
           <ContextFilter availableContexts={props.availableContexts} />
           {activeView === 'daily' && (
             <IconButton
@@ -690,7 +651,6 @@ const OTHER_VIEWS: Partial<Record<VaultView, () => React.JSX.Element>> = {
   projects: ProjectsBrowser,
   areas: AreasView,
   archive: ArchiveView,
-  review: WeeklyReview,
 }
 
 function DetailPane({ selection }: DailyProps): React.JSX.Element | null {
@@ -720,7 +680,6 @@ function MainPanel({ selection, showCalendar }: DailyProps & { showCalendar: boo
 }
 
 export function TaskVaultView(): React.JSX.Element {
-  const { viewMode, activeView } = useVaultStore()
   const [showDataTools, setShowDataTools] = useState(false)
   const [showCalendar, setShowCalendar] = useState(true)
   const [availableContexts, setAvailableContexts] = useState<string[]>([])
@@ -739,11 +698,7 @@ export function TaskVaultView(): React.JSX.Element {
           onToggleCalendar={() => setShowCalendar((v) => !v)}
           onDataTools={() => setShowDataTools(true)}
         />
-        {viewMode === 'kanban' && activeView !== 'review' ? (
-          <KanbanBoard />
-        ) : (
-          <MainPanel selection={selection} showCalendar={showCalendar} />
-        )}
+        <MainPanel selection={selection} showCalendar={showCalendar} />
       </div>
     </div>
   )

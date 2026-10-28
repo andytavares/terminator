@@ -104,7 +104,7 @@ function registerToggleView(api: ExtensionAPI): void {
 }
 
 interface TicketArgs {
-  readonly tracker: 'linear' | 'jira'
+  readonly tracker: 'linear'
   readonly key: string
   readonly repoRoot: string
 }
@@ -112,7 +112,7 @@ interface TicketArgs {
 /** The ticket Home's Start work launcher passed, when it passed one. */
 function ticketOf(args: unknown): TicketArgs | null {
   const { tracker, key, repoRoot } = (args ?? {}) as Record<string, unknown>
-  const knownTracker = tracker === 'linear' || tracker === 'jira'
+  const knownTracker = tracker === 'linear'
   if (!knownTracker || typeof key !== 'string' || typeof repoRoot !== 'string') return null
   return { tracker, key, repoRoot }
 }

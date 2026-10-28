@@ -64,7 +64,7 @@ describe('api.issues — delegation', () => {
   })
 
   it('answers listMine, search and get with what the one service answered', async () => {
-    const mine = { issues: [], failures: [{ tracker: 'jira', error: 'not-connected' }] }
+    const mine = { issues: [], failures: [{ tracker: 'linear', error: 'not-connected' }] }
     const found = { issues: [], failures: [] }
     service.listMine.mockResolvedValue(mine)
     service.search.mockResolvedValue(found)
@@ -73,11 +73,11 @@ describe('api.issues — delegation', () => {
 
     await expect(api.issues.listMine({ tracker: 'linear' })).resolves.toBe(mine)
     await expect(api.issues.search('sidebar', { limit: 5 })).resolves.toBe(found)
-    await expect(api.issues.get('jira', 'TAV-7', { refresh: true })).resolves.toBeNull()
+    await expect(api.issues.get('linear', 'TAV-7', { refresh: true })).resolves.toBeNull()
 
     expect(service.listMine).toHaveBeenCalledWith({ tracker: 'linear' })
     expect(service.search).toHaveBeenCalledWith('sidebar', { limit: 5 })
-    expect(service.get).toHaveBeenCalledWith('jira', 'TAV-7', { refresh: true })
+    expect(service.get).toHaveBeenCalledWith('linear', 'TAV-7', { refresh: true })
   })
 
   it('rejects a failed comment rather than swallowing it (FR-034a)', async () => {
@@ -115,7 +115,7 @@ describe('api.issues — workflow moves (v2.3.0)', () => {
   it('answers whether a tracker supports moves at all, without calling one', async () => {
     service.supportsTransitions.mockReturnValue(false)
     const api = await makeApi()
-    expect(api.issues.supportsTransitions('jira')).toBe(false)
+    expect(api.issues.supportsTransitions('linear')).toBe(false)
     expect(service.transition).not.toHaveBeenCalled()
   })
 })
@@ -148,7 +148,7 @@ describe('api.issues — creating an issue (v2.5.0)', () => {
   it('answers whether a tracker can create at all, without calling one', async () => {
     service.supportsCreate.mockReturnValue(false)
     const api = await makeApi()
-    expect(api.issues.supportsCreate('jira')).toBe(false)
+    expect(api.issues.supportsCreate('linear')).toBe(false)
     expect(service.create).not.toHaveBeenCalled()
   })
 })
@@ -220,13 +220,13 @@ describe('api.workspace.addProject — attaching to an existing project', () => 
       workspaceId: 'w1',
       name: 'n',
       worktreePath: '/wt/a',
-      issue: { tracker: 'jira', key: 'TAV-7' },
+      issue: { tracker: 'linear', key: 'TAV-7' },
     })
 
     expect(result?.id).toBe('p-existing')
     expect(store.setLink).toHaveBeenCalledWith({
       projectId: 'p-existing',
-      tracker: 'jira',
+      tracker: 'linear',
       key: 'TAV-7',
     })
   })

@@ -5,7 +5,6 @@ import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
 import { SCRATCH_PROJECT_ID, type Project, type Workspace } from '../../../shared/types/index'
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
-import { useModalEffect } from '../../stores/modal.store'
 import './dialog-fields.css'
 import './MoveSessionDialog.css'
 import { branchLabel } from '../../sidebar/branch-display'
@@ -21,7 +20,6 @@ type SubView = null | { type: 'new-project'; workspaceId: string } | { type: 'ne
 type MoveTo = (targetProjectId: string, targetWorkspaceId: string) => Promise<void>
 
 export function MoveSessionDialog({ sessionId, onClose, onMoved }: Props): JSX.Element {
-  useModalEffect()
   useLoadAllProjects()
   const { currentProjectId, moveSessionTo } = useMoveSession(sessionId, onClose, onMoved)
   const branch = useNewBranch(moveSessionTo)

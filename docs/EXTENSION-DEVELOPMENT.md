@@ -76,17 +76,16 @@ task-vault/
 }
 ```
 
-| Field                   | Required | Description                                                                                                        |
-| ----------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
-| `id`                    | Yes      | Reverse-domain id (`^[a-z0-9]+(\.[a-z0-9-]+)+$`), such as `com.acme.git-tools`                                     |
-| `name`                  | Yes      | Shown in Settings → Extensions                                                                                     |
-| `version`               | Yes      | `X.Y.Z`                                                                                                            |
-| `description`           | Yes      | Shown in Settings → Extensions                                                                                     |
-| `main`                  | Yes      | The backend entry, CommonJS, relative to the extension directory                                                   |
-| `renderer`              | No       | The view document, relative to the extension directory. Without it the extension has no view.                      |
-| `minAppVersion`         | Yes      | The oldest app version it runs on. An older app marks the extension `error` and does not load it.                  |
-| `contributes`           | No       | The surfaces and commands below                                                                                    |
-| `extensionDependencies` | No       | Ids of extensions whose `activate` exports this one reads (see [Another extension's API](#another-extensions-api)) |
+| Field           | Required | Description                                                                                       |
+| --------------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `id`            | Yes      | Reverse-domain id (`^[a-z0-9]+(\.[a-z0-9-]+)+$`), such as `com.acme.git-tools`                    |
+| `name`          | Yes      | Shown in Settings → Extensions                                                                    |
+| `version`       | Yes      | `X.Y.Z`                                                                                           |
+| `description`   | Yes      | Shown in Settings → Extensions                                                                    |
+| `main`          | Yes      | The backend entry, CommonJS, relative to the extension directory                                  |
+| `renderer`      | No       | The view document, relative to the extension directory. Without it the extension has no view.     |
+| `minAppVersion` | Yes      | The oldest app version it runs on. An older app marks the extension `error` and does not load it. |
+| `contributes`   | No       | The surfaces and commands below                                                                   |
 
 ### `contributes`
 
@@ -157,9 +156,7 @@ Every backend runs in the **extension host**, one Electron [`utilityProcess`](ht
 - Every backend shares the host's memory. Import a large dependency the first time you need it (`await import(...)`), not at the top of your entry: Remote Control loads fastify only when its server starts, and git-integration loads electron-store only when a store is first read ([measurements](research/perf/2026-10-12-extension-host.md)).
 
 If the extension host crashes, the app stays up. It is restarted once and every backend activated
-again in the same order as at startup: an extension after those in its `extensionDependencies`, so
-`api.extensions.get` hands it the provider's new exports (keep nothing from the old ones). If a
-provider does not come back, its dependants fail with it. If the host crashes again, the
+again. If the host crashes again, the
 extensions show as `error` in Settings → Extensions, with the reason on hover, until the next
 launch. The panel shows such a change while it is open: it reads the list again each time main
 broadcasts `extension:list-changed`.
@@ -174,30 +171,12 @@ requires the entry point again. Packages from outside that directory stay loaded
 
 An extension imports only `@terminator/extension-sdk`, the design system `@terminator/extension-ui`, npm packages declared in its own `package.json`, and its own files. Core source (`src/**`), another extension and any other workspace package are off limits. `eslint.config.mjs` enforces it: `npm run lint` fails on a relative import that leaves the extension's directory or on any other `@terminator/*` package.
 
-| Entry                                      | What it holds                                                                                                                                                                                       |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@terminator/extension-sdk`                | `ExtensionAPI` and its types, `ExtensionDB`, the issue-tracker and GitHub types, `defineChannel`, `dispatchChannel`, `noPayload`, `createIpcRegistrar`, `validationError`, `plural`, `TaskVaultAPI` |
-| `@terminator/extension-sdk/renderer`       | `invoke<T>(channel, payload = {})` for your own channels, `mountExtension(<App />)`, which renders into `#app`, and `openInBrowser(url)`                                                            |
-| `@terminator/extension-sdk/node`           | `writeJsonAtomic(path, value)`: JSON through a temporary file and a rename, so a reader never sees half a file; `shellQuote(value)`                                                                 |
-| `@terminator/extension-sdk/types/renderer` | The `window.electronAPI` a view receives. `tsconfig.extension.json` loads it.                                                                                                                       |
-
-### Another extension's API
-
-An extension's API is the value its `activate` returns. A consumer lists the provider in its manifest's `extensionDependencies` and reads that object with `api.extensions.get(id)`, the way VS Code's [`extensionDependencies`](https://code.visualstudio.com/api/references/extension-manifest) and `exports` work:
-
-```jsonc
-// manifest.json
-{ "id": "com.example.planner", "extensionDependencies": ["terminator.task-vault"] }
-```
-
-```typescript
-export function activate(api: ExtensionAPI): void {
-  const vault = api.extensions.get('terminator.task-vault') // typed as TaskVaultAPI
-  vault.open({ view: 'review' })
-}
-```
-
-The host activates a provider before the extensions that depend on it. A dependency that is not installed, is disabled, failed to activate, or is part of a cycle fails the consumer's activation with a message naming it, and `get` throws for an id the manifest does not declare (`src/main/extensions/extension-host.ts`). The built-in providers' APIs are declared in the SDK (`types/extensions.d.ts`), so neither side imports the other; any other provider is read as `get<T>(id)`. A provider reloaded while its dependants run is not handed to them again: reload the dependants too.
+| Entry                                      | What it holds                                                                                                                                                                       |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@terminator/extension-sdk`                | `ExtensionAPI` and its types, `ExtensionDB`, the issue-tracker and GitHub types, `defineChannel`, `dispatchChannel`, `noPayload`, `createIpcRegistrar`, `validationError`, `plural` |
+| `@terminator/extension-sdk/renderer`       | `invoke<T>(channel, payload = {})` for your own channels, `mountExtension(<App />)`, which renders into `#app`, and `openInBrowser(url)`                                            |
+| `@terminator/extension-sdk/node`           | `writeJsonAtomic(path, value)`: JSON through a temporary file and a rename, so a reader never sees half a file; `shellQuote(value)`                                                 |
+| `@terminator/extension-sdk/types/renderer` | The `window.electronAPI` a view receives. `tsconfig.extension.json` loads it.                                                                                                       |
 
 ### Dependencies
 
@@ -373,7 +352,7 @@ await window.electronAPI.fs.watchStop()
 ### Keys the core handles in your view
 
 - **`⌘P` / `Ctrl+P`** opens the core's Quick Actions panel even while focus is in your view: the host watches `before-input-event` on every view (`isQuickActionsOpenShortcut`).
-- **`Esc` twice within 500 ms** leaves your extension and returns the operator to their terminal ([ADR 026](adr/026-double-escape-extension-exit.md)). The listener in the core's frame script is passive and bubble-phase, so your own single-`Esc` handlers run as normal. It stands down inside a text field and while a dialog is open; the design system's `ModalShell` (and so `Dialog`) reports open dialogs over `electronAPI.ui.setModalDepth`. Do not write a modal of your own: give `ModalShell` your content. Do not stop `Esc` propagation at the window level, or the gesture stops working in your view.
+- **`Esc` twice within 500 ms** leaves your extension and returns the operator to their terminal ([ADR 026](adr/026-double-escape-extension-exit.md)). The listener in the core's frame script is passive and bubble-phase, so your own single-`Esc` handlers run as normal. It stands down inside a text field and while a modal `<dialog>` or a popover is open in your view; it reads `document.querySelector('dialog:modal, :popover-open')`, so `ModalShell` (and so `Dialog`), `Popover` and `Menu` need no reporting. Do not write a modal of your own: give `ModalShell` your content. Do not stop `Esc` propagation at the window level, or the gesture stops working in your view.
 
 ### Testing your view end to end
 
@@ -428,7 +407,8 @@ An action with `submit: true` makes the dialog a form: Enter in a field runs tha
 | `Markdown`                                       | Sanitised Markdown; links open through your `onOpenLink`         |
 | `RelativeTime`, `formatRelativeTime`             | "5 minutes ago"; nothing for a time that does not parse          |
 | `usePolling`, `everyWhileVisible`                | Read now and on an interval; tick only while the view is visible |
-| `useDismissible`                                 | Outside-click, Escape and focus restore for your own surface     |
+| `Popover`, `Menu`, `MenuItem`                    | A native popover under its anchor; a menu with arrow keys        |
+| `useCloseOnOutsidePress`                         | Outside-click for a list that cannot be a `Popover`              |
 | `LAYERS`, `layerValue`                           | Stacking by name                                                 |
 
 `packages/extension-ui/src/index.ts` is the complete export list.
@@ -597,10 +577,6 @@ An `issue` is attached best-effort: if the link cannot be written the project is
 
 `deleteProject(projectId)` removes a project and tells the sidebar; every terminal in it is closed (`src/main/terminal/project-sessions.ts`). Remove the project when you remove its worktree.
 
-### `api.extensions`
-
-`get(id)` returns another extension's `activate` exports. See [Another extension's API](#another-extensions-api).
-
 ### `api.shell`
 
 `exec(options)` runs `git` or `gh`, never through a shell, and resolves for every outcome: read `exitCode`.
@@ -677,7 +653,7 @@ A failure rejects with a `GithubCommandError`: `message` is gh's own line, `stdo
 
 ### `api.issues`
 
-Linear and Jira are connected once, by the operator, in Settings → Integrations. An extension never holds a tracker credential and never contacts a tracker itself ([ADR 029](adr/029-core-issue-tracker-service.md)).
+Linear is connected once, by the operator, in Settings → Integrations. An extension never holds a tracker credential and never contacts a tracker itself ([ADR 029](adr/029-core-issue-tracker-service.md)).
 
 ```typescript
 const { issues, failures } = await api.issues.listMine({ limit: 25 })
@@ -707,7 +683,7 @@ if (api.issues.supportsTransitions('linear')) {
 }
 ```
 
-The intent is `started`, `in_review` or `done`; the tracker decides which of its states that means. Only Linear implements it: `supportsTransitions('jira')` is `false`, and `states` / `transition` reject with the kind `unsupported`. Retry a failure; record an unsupported capability once and stop asking. Never emulate a move the tracker cannot make.
+The intent is `started`, `in_review` or `done`; the tracker decides which of its states that means. A tracker that cannot move an issue answers `supportsTransitions` with `false`, and `states` / `transition` reject with the kind `unsupported`. Retry a failure; record an unsupported capability once and stop asking. Never emulate a move the tracker cannot make.
 
 **Creating an issue** ([ADR 061](adr/061-one-project-per-order.md)), only on the operator's explicit word:
 
@@ -722,7 +698,7 @@ if (api.issues.supportsCreate('linear')) {
 }
 ```
 
-Only Linear implements it; `teams` / `create` reject with `unsupported` for Jira. The types (`Issue`, `IssueListResult`, `TrackerConnection`, `TrackerId`, …) are exported from `@terminator/extension-sdk`; do not re-declare them.
+`teams` / `create` reject with `unsupported` for a tracker that does not implement them. The types (`Issue`, `IssueListResult`, `TrackerConnection`, `TrackerId`, …) are exported from `@terminator/extension-sdk`; do not re-declare them.
 
 ### `api.notifications`
 
@@ -837,10 +813,6 @@ Name channels `<your prefix>:<name>` so they do not collide with the core's or a
 **Remote access.** A channel is reachable only from the desktop app unless it is registered with `{ remoteAccessible: true }`; the remote-control bridge rejects every other channel. Opt in only the channels your view calls for ordinary use. Keep a channel local if it reads or writes a path the caller chooses, runs a command or arbitrary SQL, opens a native dialog or window, or administers the database: a remote client holds a password, not the desktop session, and the schema is the only check on what it sends. Foundry and git-integration keep their opted-in channels in one list each (`src/remote-access.ts`), and a spec in each extension asserts the list exactly.
 
 `invokeChannel(channel, payload)` and `sendChannel(channel, payload)` call a registered handler from the backend; `onWindowEvent(channel, handler)` subscribes to the events the core pushes to the main window; `isRemoteAccessible(channel)` resolves whether the bridge admits a channel. Never use Electron's `ipcMain` directly.
-
-### `api.terminal`
-
-`onSessionCreate(handler)` receives `{ id, projectId, tabTitle, type }` for each new terminal; `onSessionClose(handler)` receives its id.
 
 ### `api.pty`
 

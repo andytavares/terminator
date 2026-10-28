@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import {
-  computeRiskScore,
-  detectComplexityHotspots,
-  computeFileCyclomaticDelta,
-} from '../../src/github/pr-review-service'
+import { computeRiskScore } from '../../src/github/pr-review-service'
 import type { FileMetrics } from '../../src/schemas/pr-review.schema'
-import type { FileDiff } from '../../src/schemas/git.schema'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -21,29 +16,6 @@ const baseMetrics = (overrides: Partial<FileMetrics> = {}): FileMetrics => ({
   topImporters: ['src/app.ts', 'src/index.ts'],
   importerCount: 2,
   ...overrides,
-})
-
-const makeDiff = (hunks: Array<{ adds: string[]; removes: string[] }>): FileDiff => ({
-  path: 'src/auth.ts',
-  isBinary: false,
-  truncated: false,
-  hunks: hunks.map((h, i) => ({
-    header: `@@ -${i * 10 + 1},10 +${i * 10 + 1},10 @@`,
-    lines: [
-      ...h.removes.map((content) => ({
-        type: 'remove' as const,
-        content,
-        oldLineNumber: 1,
-        newLineNumber: null,
-      })),
-      ...h.adds.map((content) => ({
-        type: 'add' as const,
-        content,
-        oldLineNumber: null,
-        newLineNumber: 1,
-      })),
-    ],
-  })),
 })
 
 // ─── computeRiskScore ─────────────────────────────────────────────────────────
@@ -149,83 +121,6 @@ describe('computeRiskScore() — composite is between 0 and 100', () => {
     const scoreL = computeRiskScore(low, both)
     expect(scoreH.composite).toBe(90)
     expect(scoreL.composite).toBe(0)
-  })
-})
-
-// ─── detectComplexityHotspots ─────────────────────────────────────────────────
-
-describe('detectComplexityHotspots()', () => {
-  it('returns empty array for empty diff', () => {
-    const diff = makeDiff([])
-    expect(detectComplexityHotspots(diff)).toEqual([])
-  })
-
-  it('does not flag a hunk with fewer than 5 added decision points', () => {
-    const diff = makeDiff([
-      {
-        adds: ['if (a) {', 'for (let i=0;i<n;i++) {'], // 2 decision points
-        removes: [],
-      },
-    ])
-    expect(detectComplexityHotspots(diff)).toHaveLength(0)
-  })
-})
-
-describe('detectComplexityHotspots() — flags a hunk with 5 or more added decision points', () => {
-  it('flags a hunk with 5 or more added decision points', () => {
-    const diff = makeDiff([
-      {
-        adds: [
-          'if (a) {',
-          'if (b) {',
-          'for (let i=0;i<n;i++) {',
-          'while (c) {',
-          'if (d || e) {', // || counts as decision point too
-        ],
-        removes: [],
-      },
-    ])
-    const hotspots = detectComplexityHotspots(diff)
-    expect(hotspots).toHaveLength(1)
-    expect(hotspots[0].hunkIndex).toBe(0)
-    expect(hotspots[0].complexityDelta).toBeGreaterThanOrEqual(5)
-  })
-
-  it('subtracts removed decision points from added ones', () => {
-    // 6 added, 5 removed → delta 1 → should NOT be flagged
-    const addLines = ['if(a){', 'if(b){', 'for(;;){', 'while(x){', 'if(c){', 'switch(d){']
-    const removeLines = ['if(a){', 'if(b){', 'for(;;){', 'while(x){', 'if(c){']
-    const diff = makeDiff([{ adds: addLines, removes: removeLines }])
-    expect(detectComplexityHotspots(diff)).toHaveLength(0)
-  })
-})
-
-describe('detectComplexityHotspots() — annotation message includes the delta count', () => {
-  it('annotation message includes the delta count', () => {
-    const diff = makeDiff([
-      {
-        adds: ['if(a){', 'if(b){', 'for(;;){', 'while(x){', 'if(c&&d){', 'if(e||f){'],
-        removes: [],
-      },
-    ])
-    const hotspots = detectComplexityHotspots(diff)
-    expect(hotspots[0].message).toContain('cyclomatic delta')
-  })
-})
-
-// ─── computeFileCyclomaticDelta ───────────────────────────────────────────────
-
-describe('computeFileCyclomaticDelta()', () => {
-  it('returns 0 for an empty diff', () => {
-    expect(computeFileCyclomaticDelta(makeDiff([]))).toBe(0)
-  })
-
-  it('sums deltas across all hunks', () => {
-    const diff = makeDiff([
-      { adds: ['if(a){', 'if(b){'], removes: [] }, // +2
-      { adds: ['while(x){', 'for(;;){'], removes: ['if(z){'] }, // +2-1=+1
-    ])
-    expect(computeFileCyclomaticDelta(diff)).toBe(3)
   })
 })
 

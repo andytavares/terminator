@@ -25,10 +25,6 @@ await window.electronAPI.extensionBridge.invoke('task-vault:vault:list-areas', p
 - **Never** import from other extensions (`extensions/git-integration/...`, `extensions/foundry/...`)
 - **Never** hardcode the extension ID (`terminator.task-vault`) in core app files
 
-## The API task-vault offers other extensions
-
-`activate` returns a `TaskVaultAPI` (`open(destination?)`, `openCapture()`), declared in the SDK (`packages/extension-sdk/types/extensions.d.ts`) so a consumer types it without importing this extension (ADR 094). A consumer lists `terminator.task-vault` in its manifest's `extensionDependencies` and calls `api.extensions.get('terminator.task-vault')`. Change the SDK declaration and the return value together; keep it small: it is a public API.
-
 ## NPM Dependencies
 
 Add deps to `extensions/task-vault/package.json` only. npm workspaces hoist them automatically.
@@ -41,7 +37,7 @@ When showing a terminal selector, list sessions with `window.electronAPI.termina
 
 The backend (what `src/index.ts` imports and the view does not) computes dates with `Temporal`; the view (what `src/renderer/main.tsx` imports) must not use it, because it also runs in the phone's browser and iPhone Safari has no `Temporal` (ADR 108). `tsconfig.view.json` fails `npm run typecheck` on a use in any file the view reaches, so a module both sides import stays on `Date` or is split.
 
-- Read the clock through `src/vault/clock.ts` (`zonedNow()`, `today()`, `daysAgo()`): it reads `Date.now()`, which the specs' fake timers control; `Temporal.Now` they do not (Vitest 4.1.11).
+- Read the clock through `src/vault/clock.ts` (`zonedNow()`, `today()`): it reads `Date.now()`, which the specs' fake timers control; `Temporal.Now` they do not (Vitest 4.1.11).
 - `Temporal` is for sums and comparisons. Format what a person reads with `Intl`. Stored and sent values keep their format: `YYYY-MM-DD` dates, `toISOString()` instants.
 - Vitest runs on Node 24 with `--harmony-temporal`, an earlier draft than Electron's: no `Temporal.Now.timeZoneId()` and no `timeZoneId` property. Check a method on both before using it (the ADR lists what was measured).
 

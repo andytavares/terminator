@@ -5,7 +5,6 @@ import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useTerminalOpenErrorStore } from '../../../../src/renderer/stores/terminal-open-error.store'
 import { TerminalPane } from '../../../../src/renderer/components/terminal/TerminalPane'
 import { useBreakoutStore } from '../../../../src/renderer/stores/breakout.store'
-import { useModalStore } from '../../../../src/renderer/stores/modal.store'
 import { seedStore } from '../../../support/renderer-stores'
 import type { PaneNode } from '../../../../src/shared/types/index'
 import { installElectronApi } from '../../../support/electron-api'
@@ -36,7 +35,7 @@ function fileAt(path: string): File {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  useModalStore.setState({ depth: 0 })
+  document.querySelectorAll('dialog').forEach((dialog) => dialog.remove())
   seedStore(useSessionStore, {
     getSessionsForProject: mockGetSessions,
     getActiveSessionForProject: mockGetActive,
@@ -372,10 +371,18 @@ describe('TerminalPane — focusRequest — sets the focused leaf and focuses it
   })
 })
 
+/** A modal dialog, open: `:modal` matches it in a browser; the test DOM reads it as `[open]`. */
+function openModal(): HTMLDialogElement {
+  const dialog = document.createElement('dialog')
+  dialog.setAttribute('open', '')
+  document.body.appendChild(dialog)
+  return dialog
+}
+
 describe('TerminalPane — focusRequest — does not focus while a modal is open', () => {
   it('does not focus while a modal is open', () => {
     withRaf()
-    useModalStore.setState({ depth: 1 })
+    openModal()
     const mockFocus = vi.fn()
     mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
     mockGetActive.mockReturnValue('ses-1')
@@ -400,7 +407,7 @@ describe('TerminalPane — focusRequest — does not take focus from a modal tha
     seedWithFocusRequest({ sessionId: 'ses-1', nonce: 1 })
     render(<TerminalPane projectId="proj-1" />)
     mockFocus.mockClear()
-    useModalStore.setState({ depth: 1 })
+    openModal()
     frame?.(0)
     expect(mockFocus).not.toHaveBeenCalled()
   })
@@ -409,25 +416,25 @@ describe('TerminalPane — focusRequest — does not take focus from a modal tha
 describe('TerminalPane — focusRequest — does not take focus again when a modal closes after the request was met', () => {
   // A modal closing is not a request to focus: an action run from Quick
   // Actions (Edit session note) has just put focus where it wants it.
-  it('does not take focus again when a modal closes after the request was met', () => {
+  it('does not take focus again when a modal closes after the request was met', async () => {
     withRaf()
     const mockFocus = vi.fn()
     seedFocusRequest(mockFocus)
     render(<TerminalPane projectId="proj-1" />)
     expect(mockFocus).toHaveBeenCalledTimes(1)
-    act(() => useModalStore.setState({ depth: 1 }))
-    act(() => useModalStore.setState({ depth: 0 }))
+    const dialog = await act(async () => openModal())
+    await act(async () => dialog.remove())
     expect(mockFocus).toHaveBeenCalledTimes(1)
   })
 
-  it('meets a request made while a modal was open once the modal closes', () => {
+  it('meets a request made while a modal was open once the modal closes', async () => {
     withRaf()
-    useModalStore.setState({ depth: 1 })
+    const dialog = openModal()
     const mockFocus = vi.fn()
     seedFocusRequest(mockFocus)
     render(<TerminalPane projectId="proj-1" />)
     expect(mockFocus).not.toHaveBeenCalled()
-    act(() => useModalStore.setState({ depth: 0 }))
+    await act(async () => dialog.remove())
     expect(mockFocus).toHaveBeenCalledTimes(1)
   })
 })

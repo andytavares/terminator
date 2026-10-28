@@ -9,7 +9,6 @@ export function hostSnapshot(overrides: Partial<HostSnapshot> = {}): HostSnapsho
     workspaces: { workspaces: [], projects: {} },
     trackers: {
       linear: { transitions: true, create: true },
-      jira: { transitions: true, create: false },
     },
     ...overrides,
   }

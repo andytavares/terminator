@@ -21,12 +21,16 @@ function recordingShell(options: FakeShellOptions) {
   const shell: RemoveShell = {
     exec: async (cwd, args) => {
       calls.push({ cwd, args })
-      if (args[0] === 'worktree' && args[1] === 'list')
-        return `worktree ${options.mainWorktree ?? '/repo'}\nbranch refs/heads/main\n`
       if (args[0] === 'rev-parse') return options.currentBranch ?? 'main'
       const failure = options.failOn?.(args)
       if (failure) throw new Error(failure)
       return ''
+    },
+    listWorktrees: async () => {
+      calls.push({ cwd: '', args: ['worktree', 'list'] })
+      return [
+        { path: options.mainWorktree ?? '/repo', branch: 'main', detached: false, prunable: false },
+      ]
     },
     listProjects: async () => options.projects ?? [],
     listSessions: async () => options.sessions ?? [],
@@ -68,7 +72,7 @@ describe('removeLocalItems — removal', () => {
       removalItem('stale', null, true),
     ])
     expect(gitArgs(calls)).toEqual([
-      'worktree list --porcelain',
+      'worktree list',
       'rev-parse --abbrev-ref HEAD',
       'worktree remove /repo/.worktrees/feature',
       'branch -d feature',

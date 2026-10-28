@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useExtensionRegistry } from '../extensions/registry'
+import { readStoredJson, writeStoredJson } from '../home/local-storage'
 import type { SurfaceRegistration } from '../quick-actions/surface-actions'
 
 // The extension panels beside the terminal and every surface an extension
@@ -19,19 +20,16 @@ function ensureOpen(id: string): void {
 export function usePanelPersistence(openPanels: Set<string>): void {
   const panelsRestored = useRef(false)
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(OPEN_PANELS_KEY)
-      if (saved) (JSON.parse(saved) as string[]).forEach(ensureOpen)
-    } catch {
-      // ignore malformed data
-    }
+    readStoredJson<string[]>(OPEN_PANELS_KEY, [], (value) =>
+      Array.isArray(value) ? (value as string[]) : null
+    ).forEach(ensureOpen)
     panelsRestored.current = true
   }, [])
 
   // Skip localStorage until the restore has run, but always tell main.
   useEffect(() => {
     if (panelsRestored.current) {
-      localStorage.setItem(OPEN_PANELS_KEY, JSON.stringify(Array.from(openPanels)))
+      writeStoredJson(OPEN_PANELS_KEY, Array.from(openPanels))
     }
     for (const panelId of useExtensionRegistry.getState().sidebarPanels.keys()) {
       window.electronAPI.extensionEvents?.notifyPanelState?.(panelId, openPanels.has(panelId))

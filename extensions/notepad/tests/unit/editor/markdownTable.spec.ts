@@ -3,37 +3,9 @@ import {
   ALERT_KINDS,
   ALERT_LABELS,
   parseAlertMarker,
-  parseDelimiterRow,
   parseInlineSpans,
   parseTable,
-  splitTableRow,
 } from '../../../src/editor/markdownTable'
-
-const texts = (line: string) => splitTableRow(line).map((c) => c.text)
-
-describe('splitTableRow', splitTableRowTests)
-
-describe('parseDelimiterRow', () => {
-  it('returns null alignment for a plain delimiter row', () => {
-    expect(parseDelimiterRow('| --- | --- |')).toEqual([null, null])
-  })
-
-  it('reads left, center, and right alignment', () => {
-    expect(parseDelimiterRow('| :--- | :---: | ---: |')).toEqual(['left', 'center', 'right'])
-  })
-
-  it('accepts a single dash per column', () => {
-    expect(parseDelimiterRow('|-|-|')).toEqual([null, null])
-  })
-
-  it('rejects a row that is not a delimiter row', () => {
-    expect(parseDelimiterRow('| a | b |')).toBeNull()
-  })
-
-  it('rejects a row where only some cells are delimiters', () => {
-    expect(parseDelimiterRow('| --- | oops |')).toBeNull()
-  })
-})
 
 const table = ['| Name | Count |', '| --- | ---: |', '| apples | 3 |', '| pears | 12 |'].join('\n')
 const rowTexts = (source: string) => parseTable(source)?.rows.map((row) => row.map((c) => c.text))
@@ -42,62 +14,12 @@ describe('parseTable', parseTableTests)
 describe('parseInlineSpans', parseInlineSpansTests)
 describe('parseAlertMarker', parseAlertMarkerTests)
 
-function splitTableRowTests() {
-  describe('splitting', splitTableRowSplittingTests)
-  describe('offsets', splitTableRowOffsetsTests)
-}
-
-function splitTableRowSplittingTests() {
-  it('splits a fenced row into cells', () => {
-    expect(texts('| a | b | c |')).toEqual(['a', 'b', 'c'])
-  })
-
-  it('splits an unfenced row', () => {
-    expect(texts('a | b | c')).toEqual(['a', 'b', 'c'])
-  })
-
-  it('trims surrounding whitespace from each cell', () => {
-    expect(texts('|   padded   |  cells |')).toEqual(['padded', 'cells'])
-  })
-
-  it('keeps empty interior cells so columns stay aligned', () => {
-    expect(texts('| a |  | c |')).toEqual(['a', '', 'c'])
-  })
-
-  it('does not split on an escaped pipe', () => {
-    expect(texts('| a \\| b | c |')).toEqual(['a \\| b', 'c'])
-  })
-
-  it('handles a single-column row', () => {
-    expect(texts('| only |')).toEqual(['only'])
-  })
-}
-
-function splitTableRowOffsetsTests() {
-  // Offsets are what let a click on a rendered cell put the caret in the right
-  // place in the source.
-  it('reports where each cell text starts', () => {
-    const line = '| a | b |'
-    const cells = splitTableRow(line)
-    expect(cells.map((c) => c.offset)).toEqual([line.indexOf('a'), line.indexOf('b')])
-  })
-
-  it('points past the padding, at the first visible character', () => {
-    const line = '|    spaced    |'
-    expect(splitTableRow(line)[0].offset).toBe(line.indexOf('s'))
-  })
-
-  it('reports an offset for an empty cell', () => {
-    const cells = splitTableRow('| a |  | c |')
-    expect(cells[1].offset).toBeGreaterThan(cells[0].offset)
-    expect(cells[1].offset).toBeLessThan(cells[2].offset)
-  })
-}
-
 function parseTableTests() {
   describe('parsing', parseTableParsingTests)
   describe('rows', parseTableRowsTests)
   describe('offsets', parseTableOffsetsTests)
+  describe('cells', parseTableCellsTests)
+  describe('alignment', parseTableAlignmentTests)
   describe('rejecting', parseTableRejectingTests)
 }
 
@@ -148,14 +70,49 @@ function parseTableOffsetsTests() {
     expect(parsed?.rows[0][1].offset).toBe(source.length)
   })
 
-  it('keeps offsets correct when a blank line precedes a row', () => {
-    const source = '| A |\n| --- |\n| x |\n\n| y |'
-    const parsed = parseTable(source)
-    expect(parsed?.rows[1][0].offset).toBe(source.lastIndexOf('y'))
+  it('ends the table at a blank line, as GFM does', () => {
+    expect(rowTexts('| A |\n| --- |\n| x |\n\n| y |')).toEqual([['x']])
+  })
+}
+
+const headerTexts = (source: string) => parseTable(source)?.header.map((c) => c.text)
+
+function parseTableCellsTests() {
+  it('splits an unfenced row', () => {
+    expect(headerTexts('a | b | c\n-|-|-')).toEqual(['a', 'b', 'c'])
+  })
+
+  it('keeps empty interior cells so columns stay aligned', () => {
+    expect(rowTexts('| A | B | C |\n| --- | --- | --- |\n| a |  | c |')).toEqual([['a', '', 'c']])
+  })
+
+  it('does not split on an escaped pipe', () => {
+    expect(rowTexts('| A | B |\n| --- | --- |\n| a \\| b | c |')).toEqual([['a \\| b', 'c']])
+  })
+
+  it('points an empty cell between its neighbours', () => {
+    const source = '| A | B | C |\n| --- | --- | --- |\n| a |  | c |'
+    const [a, empty, c] = parseTable(source)!.rows[0]
+    expect(empty.offset).toBeGreaterThan(a.offset)
+    expect(empty.offset).toBeLessThan(c.offset)
+  })
+}
+
+function parseTableAlignmentTests() {
+  it('reads left, center, and right alignment', () => {
+    expect(parseTable('| A | B | C |\n| :--- | :---: | ---: |')?.align).toEqual([
+      'left',
+      'center',
+      'right',
+    ])
   })
 }
 
 function parseTableRejectingTests() {
+  it('returns null when the delimiter row has fewer columns than the header', () => {
+    expect(parseTable('| A | B |\n| --- |\n| x | y |')).toBeNull()
+  })
+
   it('returns null without a delimiter row', () => {
     expect(parseTable('| A | B |\n| x | y |')).toBeNull()
   })

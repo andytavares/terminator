@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { ArrowLeft, Sparkles, TriangleAlert, MoreHorizontal, X } from 'lucide-react'
-import { Button, IconButton, Popover } from '@terminator/extension-ui'
+import { Button, IconButton, Menu, Popover } from '@terminator/extension-ui'
 import { StatusChecksBar } from './StatusChecksBar'
 import type { StatusCheck } from '../../schemas/pr-review.schema'
 import { plural } from '@terminator/extension-sdk'
@@ -80,7 +80,12 @@ function PillPopover(props: {
         {props.pill}
       </button>
       {open && (
-        <Popover label={props.label} className="rh-popover" onDismiss={() => setOpen(false)}>
+        <Popover
+          label={props.label}
+          align="end"
+          className="rh-popover"
+          onDismiss={() => setOpen(false)}
+        >
           {props.children}
         </Popover>
       )}
@@ -244,13 +249,16 @@ function MoreMenu({ header }: { header: ReviewHeaderProps }) {
         onClick={() => setMenuOpen((v) => !v)}
       />
       {menuOpen && (
-        <Popover label="Review actions" className="rh-popover" onDismiss={closeHeaderMenu}>
-          <div role="menu" className="rh-menu">
-            {menuItems(header).map((item) => (
-              <HeaderMenuItem key={item.label} {...item} close={closeHeaderMenu} />
-            ))}
-          </div>
-        </Popover>
+        <Menu
+          label="Review actions"
+          align="end"
+          className="rh-popover rh-menu"
+          onDismiss={closeHeaderMenu}
+        >
+          {menuItems(header).map((item) => (
+            <HeaderMenuItem key={item.label} {...item} close={closeHeaderMenu} />
+          ))}
+        </Menu>
       )}
     </div>
   )

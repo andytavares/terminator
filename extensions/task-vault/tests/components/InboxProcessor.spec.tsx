@@ -96,9 +96,9 @@ function fileToPickerKeyboardTests() {
 
 const ITEMS = [task('i1', 'buy stamps', { project: 'Home', area: 'Life' }), task('i2', 'idea')]
 
-function renderProcessor(reviewId: string | null = null) {
+function renderProcessor() {
   const onDone = vi.fn()
-  render(<InboxProcessor items={ITEMS} onDone={onDone} reviewId={reviewId} />)
+  render(<InboxProcessor items={ITEMS} onDone={onDone} />)
   return onDone
 }
 
@@ -109,7 +109,7 @@ function inboxProcessorTests() {
 
 function inboxProcessorClarifyingTests() {
   it('walks each item through the clarify questions', async () => {
-    renderProcessor('r1')
+    renderProcessor()
     expect(screen.getByText('1 of 2')).toBeTruthy()
     expect(screen.getByText('@Home')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Yes' }))
@@ -121,7 +121,6 @@ function inboxProcessorClarifyingTests() {
       destination: undefined,
       newProjectName: undefined,
     })
-    expect(bridge.calls('task-vault:review:log')[0]).toMatchObject({ detail: 'do-now' })
   })
 }
 
@@ -161,8 +160,8 @@ function inboxProcessorFilingTests() {
 }
 
 function inboxProcessorFilingExistingDestinationsTests() {
-  it('files to a chosen destination and logs where it went', async () => {
-    renderProcessor('r1')
+  it('files to a chosen destination', async () => {
+    renderProcessor()
     await openDestination()
     fireEvent.change(screen.getByPlaceholderText('Search or create project / area…'), {
       target: { value: 'gar' },
@@ -172,9 +171,6 @@ function inboxProcessorFilingExistingDestinationsTests() {
     expect(bridge.calls('task-vault:vault:process-inbox-item')[0]).toMatchObject({
       action: 'file',
       destination: 'projects/Garden.md',
-    })
-    expect(bridge.calls('task-vault:review:log')[0]).toMatchObject({
-      detail: 'file → projects/Garden.md',
     })
   })
 }

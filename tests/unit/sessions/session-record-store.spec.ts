@@ -100,7 +100,7 @@ describe('session-record-store — loading entries', () => {
 
 describe('session-record-store — loading fields and retention', () => {
   it('reads a stored link, and gives a record with no tab title an empty one', async () => {
-    const link = { tracker: 'jira', key: 'TAV-7' }
+    const link = { tracker: 'linear', key: 'TAV-7' }
     const { tabTitle: _tabTitle, ...stored } = { ...SNAP, description: null, link }
     fs.writeFileSync(FILE(), JSON.stringify([{ ...stored, updatedAt: SNAP.startedAt }]))
     const store = await load()

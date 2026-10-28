@@ -8,6 +8,7 @@ import { registerTerminalRoutes } from '../../src/server/routes/terminal.routes'
 import { WsTicketStore } from '../../src/server/ws-ticket-store'
 import { WsSubscriberManager } from '../../src/server/ws-subscriber-manager'
 import { ConnectedDeviceRegistry } from '../../src/server/connected-devices'
+import { HEARTBEAT_INTERVAL_MS } from '../../src/server/heartbeat'
 import { createFakePtyManager, type FakePtyManager } from './helpers/fake-pty-manager'
 import { eventually } from '../../../../tests/support/eventually'
 
@@ -157,6 +158,15 @@ let baseUrl: string
 async function ticketFor(sessionId: string): Promise<string> {
   const res = await app.inject({ method: 'POST', url: `/api/terminals/${sessionId}/ws-ticket` })
   return JSON.parse(res.body).ticket
+}
+
+function connectWithoutPong(sessionId: string, ticket: string): Promise<WebSocket> {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(`${baseUrl}/ws/terminals/${sessionId}?ticket=${ticket}`)
+    ws.pong = () => {} // never answers the server's pings
+    ws.on('open', () => resolve(ws))
+    ws.on('error', reject)
+  })
 }
 
 function connect(sessionId: string, ticket?: string): Promise<WebSocket> {
@@ -377,6 +387,7 @@ function terminalSocketTests() {
   describe('grace-period teardown of an app session', terminalSocketAppTeardownTests)
   describe('reconnecting in time', terminalSocketReconnectTests)
   describe('connected devices', terminalSocketDeviceTests)
+  describe('heartbeat', terminalSocketHeartbeatTests)
   describe('route cleanup', terminalSocketCleanupTests)
   describe('native PTY exit', terminalSocketPtyExitTests)
 }
@@ -532,6 +543,26 @@ function terminalSocketDeviceTests() {
     expect(deviceRegistry.disconnect(device.id)).toBe(true)
     expect(await wsClosed).toBe(4004)
     await eventually(() => expect(deviceRegistry.count()).toBe(0))
+  })
+}
+
+function terminalSocketHeartbeatTests() {
+  it('terminates a client that stops answering pings and frees its viewer slot', async () => {
+    const sessionId = await createSession()
+    // Faked before connecting, so the heartbeat's interval lands on the fake clock.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    try {
+      const ws = await connectWithoutPong(sessionId, await ticketFor(sessionId))
+      const wsClosed = new Promise<void>((resolve) => ws.on('close', () => resolve()))
+      await eventually(() => expect(subscriberManager.getCount(sessionId)).toBe(1))
+      // Interval 1 pings, interval 2 finds no pong and terminates.
+      await vi.advanceTimersByTimeAsync(2 * HEARTBEAT_INTERVAL_MS)
+      await wsClosed
+      await eventually(() => expect(subscriberManager.getCount(sessionId)).toBe(0))
+      await eventually(() => expect(deviceRegistry.count()).toBe(0))
+    } finally {
+      vi.useRealTimers()
+    }
   })
 }
 

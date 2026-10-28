@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { Button, Dialog } from '@terminator/extension-ui'
 import type { Workspace } from '../../../shared/types/index'
-import { useModalEffect } from '../../stores/modal.store'
 import { WORKSPACE_PRESET_COLORS as PRESET_COLORS } from './workspace-colors'
 import './dialog-fields.css'
 
@@ -86,7 +85,6 @@ export function WorkspaceDialog({
   onClose,
   ...fields
 }: WorkspaceDialogProps): JSX.Element {
-  useModalEffect()
   const submit = {
     label: submitLabel,
     tone: 'primary' as const,

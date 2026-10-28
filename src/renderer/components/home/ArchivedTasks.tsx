@@ -38,6 +38,7 @@ export function ArchivedTasks(): JSX.Element {
         <Popover
           label="Archived tasks"
           onDismiss={() => setOpen(false)}
+          align="end"
           className="archived-tasks__panel"
         >
           {kept.length === 0 ? (

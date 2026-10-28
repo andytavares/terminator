@@ -12,9 +12,9 @@ const projectLink: IssueLink = {
 
 describe('resolveWorkItem', () => {
   it("prefers the session's own link over its project's", () => {
-    expect(resolveWorkItem({ tracker: 'jira', key: 'NW-88' }, projectLink)).toEqual({
+    expect(resolveWorkItem({ tracker: 'linear', key: 'NW-88' }, projectLink)).toEqual({
       source: 'session',
-      ref: { tracker: 'jira', key: 'NW-88' },
+      ref: { tracker: 'linear', key: 'NW-88' },
     })
   })
 

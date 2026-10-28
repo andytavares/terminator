@@ -1,5 +1,5 @@
 import React from 'react'
-import { highlightBlock, langFromBlockId } from '../../utils/syntax'
+import { extensionOfBlock, highlight } from '../../utils/syntax'
 
 interface Props {
   resolvedText: string | null
@@ -8,8 +8,8 @@ interface Props {
 }
 
 export function ResultPreviewStrip({ resolvedText, blockId, isExistingResolution }: Props) {
-  const lang = blockId ? langFromBlockId(blockId) : undefined
-  const html = resolvedText !== null ? highlightBlock(resolvedText, lang) : null
+  const lang = blockId ? extensionOfBlock(blockId) : undefined
+  const html = resolvedText !== null ? highlight(resolvedText, lang) : null
 
   return (
     <div className="result-preview-strip">

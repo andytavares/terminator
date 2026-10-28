@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Dialog } from '@terminator/extension-ui'
-import { useModalEffect } from '../stores/modal.store'
 import './AboutDialog.css'
 
 interface AppInfo {
@@ -50,7 +49,6 @@ function InfoRow({ label, value }: { label: string; value: string | undefined })
 }
 
 export function AboutDialog({ onClose }: Props) {
-  useModalEffect()
   const { info, dbStatus } = useAppInfo()
 
   return (

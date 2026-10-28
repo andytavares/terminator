@@ -46,8 +46,6 @@ const CROSSING_MEMBERS: ReadonlySet<string> = new Set([
   'ipc.sendChannel',
   'ipc.onWindowEvent',
   'ipc.isRemoteAccessible',
-  'terminal.onSessionCreate',
-  'terminal.onSessionClose',
   'pty.spawnSession',
   'pty.openTerminal',
   'pty.runInTerminal',

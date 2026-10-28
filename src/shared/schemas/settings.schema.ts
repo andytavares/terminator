@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { defaultGlobalSettings } from '../settings-defaults'
 
 /** @internal */
-export const ThemeSchema = z.enum(['dark', 'light'])
+const ThemeSchema = z.enum(['dark', 'light'])
 const NotificationTargetSchema = z.enum(['system', 'center', 'toast'])
 const CustomActionKindSchema = z.enum(['shell', 'prompt'])
 const CustomActionTargetSchema = z.enum(['focused', 'new-tab', 'agent'])

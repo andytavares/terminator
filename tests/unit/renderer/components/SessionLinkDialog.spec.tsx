@@ -1,3 +1,4 @@
+import { isSurfaceOpen } from '@shared/double-escape'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
@@ -29,7 +30,6 @@ import { SessionLinkDialog } from '../../../../src/renderer/components/session/S
 import { fact } from '../sidebar/fixtures/facts'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
-import { useModalStore } from '../../../../src/renderer/stores/modal.store'
 import {
   issueSummaryOf,
   sessionRecordOf,
@@ -57,7 +57,6 @@ beforeEach(() => {
     connections: [trackerConnectionOf()],
   })
   useSessionRecordsStore.setState(useSessionRecordsStore.getInitialState(), true)
-  useModalStore.setState(useModalStore.getInitialState(), true)
 })
 
 describe('SessionLinkDialog', () => {
@@ -122,7 +121,7 @@ describe('SessionLinkDialog — says where to connect a tracker when none is', (
     useIntegrationsStore.setState({ connections: [] })
     render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
     expect(screen.getByRole('alert').textContent).toBe(
-      'No issue tracker is connected. Connect Linear or Jira in Settings → Integrations.'
+      'No issue tracker is connected. Connect Linear in Settings → Integrations.'
     )
     expect(screen.queryByRole('button', { name: 'pick NW-88' })).toBeNull()
   })
@@ -160,9 +159,9 @@ describe('SessionLinkDialog — keeps its keys from reaching the row or tile beh
 
   it('counts as an open modal until it closes', () => {
     const { unmount } = render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
-    expect(useModalStore.getState().depth).toBe(1)
+    expect(isSurfaceOpen(document)).toBe(true)
     unmount()
-    expect(useModalStore.getState().depth).toBe(0)
+    expect(isSurfaceOpen(document)).toBe(false)
   })
 
   it('closes on Escape, wherever the focus is', () => {

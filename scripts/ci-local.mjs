@@ -9,7 +9,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { installIfLockChanged } from './ci-install.mjs'
-import { artifactPaths, planFor, readWorkflow, SKIPPED_JOBS } from './ci-plan.mjs'
+import { artifactPaths, planFor, readWorkflow, SKIPPED_JOBS, withoutUnitWork } from './ci-plan.mjs'
 import { spawnToSink, startLinux } from './ci-linux.mjs'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -49,6 +49,20 @@ async function runStep(step, { checkout, linux }, write) {
  * once here, and what CI hands between jobs as artifacts are all that stay. */
 export function cleanArguments(keep) {
   return ['clean', '-fdxq', ...['node_modules', ...keep].flatMap((path) => ['-e', path])]
+}
+
+/** Whether the select step's output (`name=value` lines) has CI run the unit job. */
+export const unitSelected = (output) => /^run_unit=true$/m.test(output)
+
+/** What CI's select job decides, asked of the same command, in the checkout under test. */
+function unitSelectedIn(checkout, { all }) {
+  const env = checkEnvironmentOf(all ? { TEST_ALL: '1' } : {})
+  const output = execFileSync('node', ['scripts/test-select.mjs', '--github-output'], {
+    cwd: checkout,
+    env,
+    encoding: 'utf8',
+  })
+  return unitSelected(output)
 }
 
 /** The two checkouts of one commit: the Mac lane's, and the Linux lane's, so the lanes share no files. */
@@ -156,7 +170,9 @@ async function runChecks(checkouts, { all }) {
       linux: { checkout: checkouts.linux, linux },
     }
     const durations = new Map()
-    const jobs = jobsOf(planFor(workflow, { all }), workflow)
+    const planned = planFor(workflow, { all })
+    const steps = unitSelectedIn(checkouts.mac, { all }) ? planned : withoutUnitWork(planned)
+    const jobs = jobsOf(steps, workflow)
     const exclusive = oneAtATime()
     const run = (job) => runJob(job, context, durations)
     const outcomes = await runScheduled(jobs, (job) =>

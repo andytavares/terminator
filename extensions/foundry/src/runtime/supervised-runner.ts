@@ -55,7 +55,7 @@ export interface StartSupervisedRunOptions {
   /** What the tab is called: the agent, as a person names it ("Red team"). */
   title: string
   /** The order's ticket, linked to the project (ADR-061). */
-  issue?: { tracker: 'linear' | 'jira'; key: string }
+  issue?: { tracker: 'linear'; key: string }
   /** What to tell the agent: a `/speckit-*` command, or a reply to it. */
   prompt: string
   phase: StepLabel
@@ -126,7 +126,7 @@ export interface RunCommandOptions {
   /** The branch the worktree is on — names the project. */
   branch: string
   /** The order's ticket, linked to the project (ADR-061). */
-  issue?: { tracker: 'linear' | 'jira'; key: string }
+  issue?: { tracker: 'linear'; key: string }
   /** What the tab is called: the check being run. */
   title: string
   command: string

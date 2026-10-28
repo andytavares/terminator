@@ -1,10 +1,6 @@
 import type { Node } from 'web-tree-sitter'
-import {
-  classifyHunk,
-  classifyTier,
-  computeFileCyclomaticDelta,
-  COVERAGE_CHECK_NAMES,
-} from '../github/pr-review-service'
+import { classifyHunk, classifyTier, COVERAGE_CHECK_NAMES } from '../github/pr-review-service'
+import type { ComplexityHotspot } from '../github/pr-review-service'
 import {
   analyseLines,
   analyseSnippet,
@@ -47,14 +43,9 @@ function linesOf(
 
 // ─── Complexity ─────────────────────────────────────────────────────────────────
 
-// Code in a language with no bundled grammar gets the keyword count; configuration
-// and prose (YAML, JSON, Markdown) have no branches worth counting.
-const UNPARSED_CODE_RE = /\.(kt|kts|swift|scala|c|m|mm|dart|lua|ex|exs|clj|hs|groovy|tf)$/
-
 interface FileComplexity {
   delta: number
   functions: FunctionComplexity[]
-  method: 'tree-sitter' | 'keywords'
 }
 
 function branchDeltaByFunction(head: SnippetFunction[], base: SnippetFunction[]) {
@@ -74,7 +65,10 @@ function branchDeltaByFunction(head: SnippetFunction[], base: SnippetFunction[])
   return { total, grown }
 }
 
-async function parsedComplexity({ path, diff }: ParsedPrFile): Promise<FileComplexity | null> {
+async function parsedComplexity({
+  path,
+  diff,
+}: Pick<ParsedPrFile, 'path' | 'diff'>): Promise<FileComplexity | null> {
   const headLines = diff.hunks.flatMap((h) => h.lines.filter((l) => l.type !== 'remove'))
   const baseLines = diff.hunks.flatMap((h) => h.lines.filter((l) => l.type !== 'add'))
   const head = await analyseLines(path, headLines)
@@ -89,22 +83,32 @@ async function parsedComplexity({ path, diff }: ParsedPrFile): Promise<FileCompl
     line: fileLineOf(fn.line),
     branchDelta: delta,
   }))
-  return { delta: total, functions, method: 'tree-sitter' }
-}
-
-function keywordComplexity({ path, diff }: ParsedPrFile): FileComplexity {
-  const delta = computeFileCyclomaticDelta(diff)
-  const name = path.split('/').pop() ?? path
-  const functions = delta > 0 ? [{ path, name, line: null, branchDelta: delta }] : []
-  return { delta, functions, method: 'keywords' }
+  return { delta: total, functions }
 }
 
 async function fileComplexity(file: ParsedPrFile): Promise<FileComplexity | null> {
   if (!file.patch || !file.path) return null
-  const parsed = await parsedComplexity(file)
-  if (parsed) return parsed
-  if (!UNPARSED_CODE_RE.test(file.path)) return null
-  return keywordComplexity(file)
+  return parsedComplexity(file)
+}
+
+const HOTSPOT_BRANCHES = 5
+
+/** A file's branch delta and its hotspot hunks; null when no grammar parses the file. */
+export async function measureDiffComplexity(
+  path: string,
+  diff: FileDiff
+): Promise<{ delta: number; hotspots: ComplexityHotspot[] } | null> {
+  const whole = await parsedComplexity({ path, diff })
+  if (!whole) return null
+  const hotspots: ComplexityHotspot[] = []
+  for (const [hunkIndex, hunk] of diff.hunks.entries()) {
+    const part = await parsedComplexity({ path, diff: { ...diff, hunks: [hunk] } })
+    const delta = part?.delta ?? 0
+    if (delta < HOTSPOT_BRANCHES) continue
+    const message = `Complexity hotspot — this block adds ${delta} branches.`
+    hotspots.push({ hunkIndex, complexityDelta: delta, message })
+  }
+  return { delta: whole.delta, hotspots }
 }
 
 async function computeComplexity(files: ParsedPrFile[]): Promise<PrInsights['complexity']> {
@@ -115,12 +119,8 @@ async function computeComplexity(files: ParsedPrFile[]): Promise<PrInsights['com
   }
   const functions = measured.flatMap((m) => m.functions)
   functions.sort((a, b) => b.branchDelta - a.branchDelta)
-  const anyGrammar = measured.some((m) => m.method === 'tree-sitter')
-  const anyFallback = measured.some((m) => m.method === 'keywords')
-  const source =
-    anyGrammar || !anyFallback ? 'tree-sitter · hunk base vs head' : 'keyword count · approximate'
   const branchDelta = measured.reduce((sum, m) => sum + m.delta, 0)
-  return { branchDelta, functions, source }
+  return { branchDelta, functions, source: 'tree-sitter · hunk base vs head' }
 }
 
 // ─── Coverage ───────────────────────────────────────────────────────────────────

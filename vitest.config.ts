@@ -3,7 +3,6 @@ import { availableParallelism, totalmem } from 'node:os'
 import { resolve } from 'path'
 import { HANG_BOUND_MS, WAIT_BOUND_MS } from './tests/support/bounds'
 import { unitWorkers } from './tests/support/workers'
-import { testSeed } from './tests/support/test-seed'
 
 // Tests that require a DOM. vitest 4 removed `environmentMatchGlobs`, so the
 // node/jsdom split is expressed as two projects instead.
@@ -63,8 +62,8 @@ export default defineConfig({
     maxWorkers: unitWorkers({ cores: availableParallelism(), memory: totalmem() }),
     // A spy, a stubbed variable or a stubbed global does not outlive its test.
     // Files and the tests inside them run in a new random order every run (ADR 123): a test that
-    // needs another to have run first fails on some run. tests/global-setup.ts prints the seed.
-    sequence: { shuffle: { files: true, tests: true }, seed: testSeed() },
+    // needs another to have run first fails on some run. Vitest prints the seed; rerun with --sequence.seed.
+    sequence: { shuffle: { files: true, tests: true } },
     restoreMocks: true,
     unstubEnvs: true,
     unstubGlobals: true,

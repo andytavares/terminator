@@ -109,6 +109,16 @@ async function openAcrossRepos(onClose = vi.fn()) {
 const startButton = (name: RegExp) => screen.getByRole('button', { name })
 const repoRow = (name: string) => screen.getByRole('listitem', { name })
 
+/** A worktree git still has a checkout for. */
+const NOT_DETACHED = { detached: false, prunable: false }
+const ELSEWHERE_WORKTREE = {
+  path: '/elsewhere',
+  branch: 'rate-limits',
+  isMain: false,
+  head: 'abc',
+  ...NOT_DETACHED,
+}
+
 describe('Start work, Across repos — the branch name', () => {
   it('suggests a branch name from the title', async () => {
     render(<StartWork onClose={vi.fn()} />)
@@ -156,10 +166,7 @@ describe('Start work, Across repos — all repos start', () => {
 describe('Start work, Across repos — a repo that cannot take the branch', () => {
   it('names the repo whose branch is checked out elsewhere and starts nothing', async () => {
     git.listWorktrees.mockImplementation(async (path) => ({
-      worktrees:
-        path === '/repos/api-gateway'
-          ? [{ path: '/elsewhere', branch: 'rate-limits', isMain: false, head: 'abc' }]
-          : [],
+      worktrees: path === '/repos/api-gateway' ? [ELSEWHERE_WORKTREE] : [],
     }))
     const onClose = await openAcrossRepos()
     fireEvent.click(startButton(/Start 3 lanes/))

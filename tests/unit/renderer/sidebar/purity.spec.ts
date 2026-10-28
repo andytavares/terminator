@@ -36,9 +36,11 @@ describe('the sidebar pure layer imports nothing but types', () => {
    * identifiers like SCRATCH_PROJECT_ID alongside the types. Neither can make
    * a function non-deterministic. Everything else is banned, and the React,
    * store and clock rules below are asserted separately so this relaxation
-   * cannot quietly widen them.
+   * cannot quietly widen them. The stored-JSON helper is the same kind of leaf: it holds no
+   * React, store or clock, and these modules already read and write localStorage themselves.
    */
   const TYPE_GRAPH = '../../shared/types/index'
+  const STORED_JSON = '../home/local-storage'
 
   it.each(modules)('%s imports no runtime module outside the type graph', (file) => {
     const imports = [...code(file).matchAll(/^\s*import\s+([\s\S]*?)from\s+'([^']+)'/gm)]
@@ -46,7 +48,7 @@ describe('the sidebar pure layer imports nothing but types', () => {
       const isTypeOnly = /^\s*type\b/.test(clause)
       if (isTypeOnly) continue
       expect(
-        specifier.startsWith('./') || specifier === TYPE_GRAPH,
+        specifier.startsWith('./') || specifier === TYPE_GRAPH || specifier === STORED_JSON,
         `${file} value-imports '${specifier}' from outside the pure layer`
       ).toBe(true)
     }

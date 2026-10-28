@@ -14,7 +14,6 @@ import type {
   OpenTerminalTabInput,
   ProjectSnapshot,
   RegisterHandlerOptions,
-  SessionSnapshot,
   SettingScope,
   ShellExecOptions,
   ToastType,
@@ -124,8 +123,6 @@ interface Registry {
   panelMenuItemIds: Map<string, string>
   commandContributions: Map<string, CommandContribution>
   commandHandlers: Map<string, (ctx: CommandContext, args?: unknown) => void | Promise<void>>
-  sessionCreateHandlers: Set<(session: Readonly<SessionSnapshot>) => void>
-  sessionCloseHandlers: Set<(sessionId: string) => void>
 }
 
 // Internal to this module (and its tests). Other modules use the registry
@@ -140,8 +137,6 @@ export const globalRegistry: Registry = {
   panelMenuItemIds: new Map(),
   commandContributions: new Map(),
   commandHandlers: new Map(),
-  sessionCreateHandlers: new Set(),
-  sessionCloseHandlers: new Set(),
 }
 
 // Resolves an extension's own per-notification-key delivery-target settings
@@ -580,15 +575,6 @@ function workspaceApi(context: ApiContext): ExtensionAPI['workspace'] {
   }
 }
 
-// Exports live with the backends: the extension host answers this (host-runtime.ts).
-function extensionsApi(): ExtensionAPI['extensions'] {
-  return {
-    get(dependencyId: string): never {
-      throw new Error(`"${dependencyId}" exports are only reachable in the extension host`)
-    },
-  }
-}
-
 function shellApi({ execInScope }: ApiContext): ExtensionAPI['shell'] {
   return {
     // One implementation for both overloads; the encoding decides which output type it is.
@@ -773,19 +759,6 @@ function ipcBridgeApi({
     sendChannel(channel: string, payload: unknown): void {
       const handler = deps?.bridge?.sendRegistry.get(channel)
       if (handler) handler(null as never, payload)
-    },
-  }
-}
-
-function terminalApi({ disposable }: ApiContext): ExtensionAPI['terminal'] {
-  return {
-    onSessionCreate(handler: (session: Readonly<SessionSnapshot>) => void): Disposable {
-      globalRegistry.sessionCreateHandlers.add(handler)
-      return disposable(() => globalRegistry.sessionCreateHandlers.delete(handler))
-    },
-    onSessionClose(handler: (sessionId: string) => void): Disposable {
-      globalRegistry.sessionCloseHandlers.add(handler)
-      return disposable(() => globalRegistry.sessionCloseHandlers.delete(handler))
     },
   }
 }
@@ -977,10 +950,9 @@ function windowApi(context: ApiContext): ExtensionAPI['window'] {
   }
 }
 
-/** The members that run or watch a session: its terminal, its pty and its agent. */
-function sessionMembers(context: ApiContext): Pick<ExtensionAPI, 'terminal' | 'pty' | 'agents'> {
+/** The members that run or watch a session: its pty and its agent. */
+function sessionMembers(context: ApiContext): Pick<ExtensionAPI, 'pty' | 'agents'> {
   return {
-    terminal: terminalApi(context),
     pty: { ...ptyTabsApi(context), ...ptyStreamApi(context), ...ptySessionApi(context) },
     agents: agentsApi(),
   }
@@ -1000,7 +972,6 @@ export function createExtensionAPI(
     settings: settingsApi(context),
     globalShortcut: globalShortcutApi(context),
     workspace: workspaceApi(context),
-    extensions: extensionsApi(),
     shell: shellApi(context),
     github: createGithubApi(context.execInScope),
     issues: { ...issueReadApi(), ...issueWorkflowApi(), ...issueCreateApi() },

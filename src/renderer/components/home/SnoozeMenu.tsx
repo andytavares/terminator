@@ -1,5 +1,5 @@
 import React from 'react'
-import { Popover } from '@terminator/extension-ui'
+import { Menu, MenuItem } from '@terminator/extension-ui'
 import { snoozeChoices } from './desk-actions'
 
 export interface SnoozeMenuProps {
@@ -12,20 +12,16 @@ export interface SnoozeMenuProps {
 export function SnoozeMenu(props: SnoozeMenuProps): JSX.Element {
   const { now, onPick, onClose } = props
   return (
-    <Popover label="Snooze until" onDismiss={onClose} className="snooze-menu">
-      <div role="menu" aria-label="Snooze until">
-        {snoozeChoices(now).map((choice) => (
-          <button
-            key={choice.label}
-            type="button"
-            role="menuitem"
-            className="snooze-menu__item"
-            onClick={() => onPick(choice.until)}
-          >
-            {choice.label}
-          </button>
-        ))}
-      </div>
-    </Popover>
+    <Menu label="Snooze until" onDismiss={onClose} className="snooze-menu">
+      {snoozeChoices(now).map((choice) => (
+        <MenuItem
+          key={choice.label}
+          className="snooze-menu__item"
+          onSelect={() => onPick(choice.until)}
+        >
+          {choice.label}
+        </MenuItem>
+      ))}
+    </Menu>
   )
 }

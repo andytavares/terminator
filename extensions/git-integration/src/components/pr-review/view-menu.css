@@ -22,9 +22,6 @@
 }
 
 .vm-popover {
-  top: calc(100% + 4px);
-  /* These menus sit at the right end of the file header, so they open leftwards. */
-  right: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;

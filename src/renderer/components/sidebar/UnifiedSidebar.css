@@ -64,31 +64,6 @@
   text-align: center;
 }
 
-.unified-sidebar__bulk-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 10px;
-  font-size: 10px;
-  color: var(--tm-text-secondary);
-  border-top: 1px solid var(--tm-border);
-}
-
-.unified-sidebar__bulk-bar button {
-  border: none;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  padding: 0;
-  text-decoration: underline;
-}
-
-.unified-sidebar__bulk-close {
-  margin-left: auto;
-  color: var(--tm-danger) !important;
-}
-
 /*
  * The issue drawer sits over the right edge of the app, not inside the
  * sidebar: it is about the project, not about the session list, and at 396px

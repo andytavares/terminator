@@ -3,7 +3,6 @@ import type { Disposable, ExtensionAPI } from '../types/api'
 
 export type * from '../types/api'
 export type * from '../types/issues'
-export type * from '../types/extensions'
 export type * from '../types/github'
 export { HOME_MEASURES, SEND_TO_AGENT_ACTION, plural } from './plain'
 

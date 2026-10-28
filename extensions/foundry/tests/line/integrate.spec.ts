@@ -475,11 +475,7 @@ function magicWordTests() {
     })
     expect(prBody(order, { verdicts: [], findings: [] }).split('\n')).toContain('Fixes ENG-7')
   })
-  it('adds no magic word for a Jira issue or a typed order', () => {
-    const jira = refreshTokenOrder({
-      source: { kind: 'tracker', tracker: 'jira', key: 'ENG-7', url: null },
-    })
-    expect(prBody(jira, { verdicts: [], findings: [] })).not.toContain('Fixes ')
+  it('adds no magic word for a typed order', () => {
     expect(prBody(refreshTokenOrder(), { verdicts: [], findings: [] })).not.toContain('Fixes ')
   })
 }

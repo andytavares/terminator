@@ -48,16 +48,13 @@ describe('IssuePicker — choosing', () => {
     await screen.findByText('TAV-42')
     expect(searchIssues).not.toHaveBeenCalled()
   })
+})
 
+describe('IssuePicker — tracker label', () => {
   it('shows which tracker each issue came from', async () => {
-    listMine.mockResolvedValue({
-      issues: [summary(), summary({ tracker: 'jira', key: 'TAV-7', id: 'id-2' })],
-      failures: [],
-    })
     open()
     fireEvent.focus(screen.getByPlaceholderText(/Search/))
-    await screen.findByText('Jira')
-    expect(screen.getByText('Linear')).toBeTruthy()
+    expect(await screen.findByText('Linear')).toBeTruthy()
   })
 })
 
@@ -96,25 +93,25 @@ describe('IssuePicker — choosing — says nothing about a tracker that was sim
   it('says nothing about a tracker that was simply never connected', async () => {
     listMine.mockResolvedValue({
       issues: [summary()],
-      failures: [{ tracker: 'jira', error: 'not-connected' }],
+      failures: [{ tracker: 'linear', error: 'not-connected' }],
     })
     open()
     fireEvent.focus(screen.getByPlaceholderText(/Search/))
     await screen.findByText('TAV-42')
 
-    // "Jira unavailable" for a tracker you never connected is misleading noise.
+    // "Linear unavailable" for a tracker you never connected is misleading noise.
     expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('names a tracker that failed without hiding what arrived', async () => {
     listMine.mockResolvedValue({
       issues: [summary()],
-      failures: [{ tracker: 'jira', error: 'auth-failed' }],
+      failures: [{ tracker: 'linear', error: 'auth-failed' }],
     })
     open()
     fireEvent.focus(screen.getByPlaceholderText(/Search/))
     const status = await screen.findByRole('status')
-    expect(status.textContent).toContain('Jira')
+    expect(status.textContent).toContain('Linear')
     expect(status.textContent).toContain('credential rejected')
     expect(screen.getByText('TAV-42')).toBeTruthy()
   })

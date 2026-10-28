@@ -15,10 +15,10 @@ const PATH_PATTERN = /(?<!\S)((?:~\/|\/(?!\/))[^\s:)>\]'"\\]+(?::\d+(?::\d+)?)?(
 const QUOTED_PATH_PATTERN = /(?:"((?:~\/|\/(?!\/))[^"]+)"|'((?:~\/|\/(?!\/))[^']+)')/g
 
 /** What ⌘-click (Ctrl-click off macOS) on a link opens. */
-export type LinkTarget = { url: string } | { path: string }
+type LinkTarget = { url: string } | { path: string }
 
 /** A link on a row: its first column, its length and what it opens. */
-export interface TerminalLink {
+interface TerminalLink {
   index: number
   length: number
   text: string
@@ -50,38 +50,77 @@ function linksOfKind(text: string, kind: LinkKind): TerminalLink[] {
   })
 }
 
-/** The link under column `col` of a row, or null when the column is plain text. */
-export function linkAt(text: string, col: number): TerminalLink | null {
-  for (const kind of LINK_KINDS) {
-    const hit = linksOfKind(text, kind).find(
-      (link) => col >= link.index && col < link.index + link.length
-    )
-    if (hit) return hit
-  }
-  return null
+/** ⌘ on macOS, where Ctrl-click is a secondary click; Ctrl elsewhere. */
+function modifierHeld(event: MouseEvent | KeyboardEvent): boolean {
+  return navigator.platform.startsWith('Mac') ? event.metaKey : event.ctrlKey
 }
 
-/** Declares one kind of link to xterm, for accessibility tooling only. The underline and the
- * click are the terminal's own, gated on ⌘ (Ctrl off macOS). */
-function linkProvider(terminal: Terminal, kind: LinkKind): ILinkProvider {
+function openTarget(target: LinkTarget): void {
+  if ('url' in target) window.electronAPI.shell.openExternal(target.url).catch(() => {})
+  else window.electronAPI.shell.openPath(target.path).catch(() => {})
+}
+
+/** What the pointer is over and whether ⌘ (Ctrl off macOS) is held. xterm underlines a hovered
+ * link on its own; the link's decorations stay off until the modifier is down. */
+class HoverState {
+  held = false
+  private hovered: ILink | null = null
+
+  hover(link: ILink): void {
+    this.hovered = link
+  }
+
+  unhover(): void {
+    this.hovered = null
+  }
+
+  setHeld(held: boolean): void {
+    this.held = held
+    if (!this.hovered?.decorations) return
+    this.hovered.decorations.underline = held
+    this.hovered.decorations.pointerCursor = held
+  }
+}
+
+function linkProvider(terminal: Terminal, kind: LinkKind, state: HoverState): ILinkProvider {
   return {
-    provideLinks: (bufferLineIndex, callback) => {
-      const line = terminal.buffer.active.getLine(bufferLineIndex)
+    // xterm counts buffer lines from 1.
+    provideLinks: (bufferLineNumber, callback) => {
+      const line = terminal.buffer.active.getLine(bufferLineNumber - 1)
       const found = line ? linksOfKind(line.translateToString(true), kind) : []
-      const links: ILink[] = found.map((link) => ({
-        range: {
-          start: { x: link.index + 1, y: bufferLineIndex + 1 },
-          end: { x: link.index + link.length, y: bufferLineIndex + 1 },
-        },
-        text: link.text,
-        activate: () => {},
-      }))
+      const links: ILink[] = found.map((link) => {
+        const provided: ILink = {
+          range: {
+            start: { x: link.index + 1, y: bufferLineNumber },
+            end: { x: link.index + link.length, y: bufferLineNumber },
+          },
+          text: link.text,
+          decorations: { underline: state.held, pointerCursor: state.held },
+          activate: (event) => modifierHeld(event) && openTarget(link.target),
+          hover: () => state.hover(provided),
+          leave: () => state.unhover(),
+        }
+        return provided
+      })
       callback(links.length ? links : undefined)
     },
   }
 }
 
-/** Registers a provider for each kind of link: URL, www., bare domain, path, quoted path. */
-export function registerLinkProviders(terminal: Terminal): void {
-  for (const kind of LINK_KINDS) terminal.registerLinkProvider(linkProvider(terminal, kind))
+/** Registers a provider for each kind of link: URL, www., bare domain, path, quoted path, and
+ * hears the modifier on `host`, the terminal's element, which moves with it to a breakout window.
+ * Returns what removes the providers and the listeners. */
+export function registerLinkProviders(terminal: Terminal, host: HTMLElement): () => void {
+  const state = new HoverState()
+  const providers = LINK_KINDS.map((kind) =>
+    terminal.registerLinkProvider(linkProvider(terminal, kind, state))
+  )
+  const trackModifier = (event: KeyboardEvent | MouseEvent): void =>
+    state.setHeld(modifierHeld(event))
+  const events = ['keydown', 'keyup', 'mousemove'] as const
+  for (const type of events) host.addEventListener(type, trackModifier)
+  return () => {
+    for (const type of events) host.removeEventListener(type, trackModifier)
+    for (const provider of providers) provider.dispose()
+  }
 }

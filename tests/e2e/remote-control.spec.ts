@@ -20,7 +20,6 @@ const REMOTE_CONTROL_CHANNELS = [
   'remote:update-password',
   'remote:update-max-subscribers',
   'remote:update-ngrok-token',
-  'remote:caddyfile',
   'remote:get-settings',
   'remote:disconnect-device',
   'remote:tunnel-reconnect',
@@ -113,25 +112,6 @@ async function disconnectEndsThatPhone(): Promise<void> {
   await expect(view.getByText(/Nothing connected/)).toBeVisible()
 }
 
-/** What the app put on the system clipboard. */
-function clipboardText(): Promise<string> {
-  return handle.app.evaluate(({ clipboard }) => clipboard.readText())
-}
-
-async function caddyfileProxiesTheRemoteRenderer(): Promise<void> {
-  await handle.app.evaluate(({ clipboard }) => clipboard.writeText('nothing yet'))
-  await openRemoteSettings()
-  await view.getByRole('button', { name: 'Copy Caddyfile' }).click()
-  await expect.poll(clipboardText).toContain(`reverse_proxy localhost:${PORT}`)
-  await expect.poll(() => clipboardText()).toContain('tls internal')
-  // The upstream it names serves the remote renderer's sign-in page.
-  const upstream = /reverse_proxy (\S+)/.exec(await clipboardText())![1]
-  const page = await browser.newPage()
-  await page.goto(`http://${upstream}/`)
-  await expect(page.getByRole('heading', { name: 'Terminator Remote' })).toBeVisible()
-  await page.close()
-}
-
 /** Each channel invoked from the remote renderer's bridge: what came back. */
 function invokeEach(page: Page, channels: string[]): Promise<string[]> {
   return page.evaluate(
@@ -189,10 +169,6 @@ const REMOTE_STEPS: Steps = [
     viewerLimitTurnsTheNextAway,
   ],
   ['Disconnect ends that phone’s connection, and it says so', disconnectEndsThatPhone],
-  [
-    'Copy Caddyfile names the address the remote renderer is served from',
-    caddyfileProxiesTheRemoteRenderer,
-  ],
   [
     "the browser remote renderer shows the desktop's workspace through its bridge, and centres its dialogs",
     browserRendererShowsTheDesktopWorkspace,

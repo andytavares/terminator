@@ -8,71 +8,50 @@ export const ResolutionStrategySchema = z.enum([
   'manual',
 ])
 
-/** @internal */
-export const GitAuthorSchema = z.object({
-  name: z.string().min(1),
-  commitHash: z.string().min(1),
-  timestamp: z.string().min(1),
-})
-
-/** @internal */
-export const ConflictBlockSchema = z.object({
-  blockId: z.string().min(1),
-  index: z.number().int().min(0),
-  oursText: z.string(),
-  theirsText: z.string(),
-  baseText: z.string(),
-  contextBefore: z.array(z.string()),
-  contextAfter: z.array(z.string()),
-  originalConflictText: z.string(),
-  isResolved: z.boolean(),
-  resolvedText: z.string().optional(),
-  strategy: ResolutionStrategySchema.optional(),
-})
-
-/** @internal */
-export const ConflictFileSchema = z.object({
-  filePath: z.string().min(1),
-  conflictCount: z.number().int().min(0),
-  resolvedCount: z.number().int().min(0),
-  blocks: z.array(ConflictBlockSchema),
-  oursAuthor: GitAuthorSchema,
-  theirsAuthor: GitAuthorSchema,
-  conflictDescription: z.string(),
-})
-
-/** @internal */
-export const ConflictSessionSchema = z.object({
-  repoRoot: z.string().min(1),
-  files: z.array(ConflictFileSchema),
-  totalConflicts: z.number().int().min(0),
-  totalResolved: z.number().int().min(0),
-  isRebase: z.boolean(),
-  startedAt: z.string().min(1),
-  oursBranch: z.string().optional(),
-  theirsBranch: z.string().optional(),
-})
-
-/** @internal */
-export const ConflictResolutionSchema = z.object({
-  blockId: z.string().min(1),
-  resolvedText: z.string(),
-  strategy: ResolutionStrategySchema,
-})
-
-/** @internal */
-export const ResolutionDecisionSchema = z.object({
-  blockId: z.string().min(1),
-  resolvedText: z.string(),
-  strategy: ResolutionStrategySchema,
-  originalConflictText: z.string(),
-  decidedAt: z.string().min(1),
-})
-
 export type ResolutionStrategy = z.infer<typeof ResolutionStrategySchema>
-export type GitAuthor = z.infer<typeof GitAuthorSchema>
-export type ConflictBlock = z.infer<typeof ConflictBlockSchema>
-export type ConflictFile = z.infer<typeof ConflictFileSchema>
-export type ConflictSession = z.infer<typeof ConflictSessionSchema>
-export type ConflictResolution = z.infer<typeof ConflictResolutionSchema>
-export type ResolutionDecision = z.infer<typeof ResolutionDecisionSchema>
+export interface GitAuthor {
+  name: string
+  commitHash: string
+  timestamp: string
+}
+export interface ConflictBlock {
+  blockId: string
+  index: number
+  oursText: string
+  theirsText: string
+  baseText: string
+  contextBefore: string[]
+  contextAfter: string[]
+  originalConflictText: string
+  isResolved: boolean
+  resolvedText?: string
+  strategy?: ResolutionStrategy
+}
+export interface ConflictFile {
+  filePath: string
+  conflictCount: number
+  resolvedCount: number
+  blocks: ConflictBlock[]
+  oursAuthor: GitAuthor
+  theirsAuthor: GitAuthor
+  conflictDescription: string
+}
+export interface ConflictSession {
+  repoRoot: string
+  files: ConflictFile[]
+  totalConflicts: number
+  totalResolved: number
+  isRebase: boolean
+  startedAt: string
+  oursBranch?: string
+  theirsBranch?: string
+}
+export interface ConflictResolution {
+  blockId: string
+  resolvedText: string
+  strategy: ResolutionStrategy
+}
+export interface ResolutionDecision extends ConflictResolution {
+  originalConflictText: string
+  decidedAt: string
+}

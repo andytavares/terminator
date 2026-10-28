@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useDismissible } from '@terminator/extension-ui'
+import { useCloseOnOutsidePress } from '@terminator/extension-ui'
 import { DateTimePicker } from './DateTimePicker'
 
 interface SmartTaskInputProps {
@@ -339,15 +339,14 @@ function fieldChangeHandler(onChange: (value: string) => void, t: Triggers) {
 const DEFAULT_PLACEHOLDER = 'Add task… (@project #area +context due:YYYY-MM-DD)'
 
 interface DropdownProps {
-  dropdownRef: React.RefObject<HTMLDivElement>
   t: Triggers
 }
 
-function TriggerDropdown({ dropdownRef, t }: DropdownProps): React.JSX.Element | null {
+function TriggerDropdown({ t }: DropdownProps): React.JSX.Element | null {
   const { active } = t
   if (!active) return null
   return (
-    <div ref={dropdownRef} className="smart-input__dropdown">
+    <div className="smart-input__dropdown">
       {active.type === 'date' ? <DatePane t={t} /> : <SuggestionList t={t} active={active} />}
     </div>
   )
@@ -356,15 +355,11 @@ function TriggerDropdown({ dropdownRef, t }: DropdownProps): React.JSX.Element |
 export function SmartTaskInput(props: SmartTaskInputProps): React.JSX.Element {
   const { value, onChange, className } = props
   const inputRef = useRef<HTMLInputElement>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const t = useTriggers(props, inputRef)
-  useDismissible({
-    ...{ ref: dropdownRef, alsoInside: [inputRef], manageFocus: false },
-    onDismiss: () => t.setActive(null),
-    enabled: t.active !== null,
-  })
+  useCloseOnOutsidePress(containerRef, () => t.setActive(null), t.active !== null)
   return (
-    <div className="smart-input">
+    <div className="smart-input" ref={containerRef}>
       <input
         ref={inputRef}
         type="text"
@@ -376,7 +371,7 @@ export function SmartTaskInput(props: SmartTaskInputProps): React.JSX.Element {
         disabled={props.disabled ?? false}
         autoFocus={props.autoFocus ?? false}
       />
-      <TriggerDropdown dropdownRef={dropdownRef} t={t} />
+      <TriggerDropdown t={t} />
     </div>
   )
 }

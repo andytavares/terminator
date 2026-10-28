@@ -364,7 +364,7 @@ function retriesTests() {
 
   it('does not retry a write the tracker said it cannot do', async () => {
     const transition = vi.fn(async () => {
-      throw Object.assign(new Error('jira cannot be asked to move an issue'), {
+      throw Object.assign(new Error('the tracker cannot be asked to move an issue'), {
         kind: 'unsupported',
       })
     })

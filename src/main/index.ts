@@ -17,11 +17,10 @@ import { registerSettingsHandlers } from './ipc/settings.ipc.js'
 import { registerExtensionHandlers } from './ipc/extension.ipc.js'
 import { registerGitHandlers } from './ipc/git.ipc.js'
 import { registerIntegrationsHandlers } from './ipc/integrations.ipc.js'
-import { migrateLegacyCredentials } from './integrations/tracker-store.js'
 import { loadLinks, registerLinkGarbageCollection } from './integrations/issue-link-store.js'
 import { loadRecords, markClosed, sweepOpenRecords } from './sessions/session-record-store.js'
 import { closeSessionsOfDeletedProjects } from './terminal/project-sessions.js'
-import { installCaptureScript, installUserHook } from './agents/agent-session-hook.js'
+import { installUserHooks } from './agents/claude-hook.js'
 import { startAgentSessionWatcher } from './agents/agent-session-watcher.js'
 import { makeSnapshotFor } from './sessions/session-snapshot.js'
 import { registerSessionRecordsHandlers } from './ipc/session-records.ipc.js'
@@ -34,7 +33,6 @@ import { loadTasks } from './tasks/task-store.js'
 import { registerAttentionHandlers } from './ipc/attention.ipc.js'
 import { loadAttentionLog } from './home/attention-log.js'
 import { startAskWatcher } from './agents/ask-watcher.js'
-import { installAskHooks, installAskScript } from './agents/agent-ask-hook.js'
 import { registerAgentUsageHandlers } from './ipc/agent-usage.ipc.js'
 import { registerThreadSummaryHandler } from './ipc/thread-summary.ipc.js'
 import { registerHomeFeedHandlers } from './ipc/home-feed.ipc.js'
@@ -68,7 +66,6 @@ import { breakoutWindowOpen, sessionOfWindow, watchBreakoutWindows } from './bre
 import { bridgeEventBus } from './remote/bridge-event-bus.js'
 import { ipcInvokeRegistry, ipcSendRegistry } from './remote/ipc-registry.js'
 import { initAppDb, getAppDb, closeAppDb } from './db/index.js'
-import { legacyImportPending, importLegacyDatabase } from './db/legacy-pglite-import.js'
 import {
   createExtensionAPI,
   listNativeViewMenuItems,
@@ -401,10 +398,6 @@ function registerSessionHandlers(): OutputRelay {
 
 /** Issue links, session records and the agent session hook, read and installed in the background. */
 function startIntegrationsAndRecords(): void {
-  // The operator already gave these to the SpecKit Pilot extension; asking
-  // again because the code moved would be the migration failing at the only
-  // thing it exists to do. Best-effort — a failure here never blocks startup.
-  void migrateLegacyCredentials()
   // Links are read once and held in memory; every reader of them is on a hot
   // path (the sidebar draws a badge per project) and none can await a file.
   void loadLinks()
@@ -421,30 +414,15 @@ function startIntegrationsAndRecords(): void {
     )
   // Lets an agent — including one the operator starts by hand — report the
   // conversation it is having, so the session can be resumed later (ADR 055).
-  const sessionHookInstalled = installCaptureScript(join(app.getPath('userData'), 'integrations'))
-    .then((scriptPath) => installUserHook({ execPath: process.execPath, scriptPath }))
-    .catch((error) =>
-      logger.error('could not install the agent session hook', { error: String(error) })
-    )
-  // The Notification, UserPromptSubmit and Stop hooks tell core an agent is asking or mid-turn.
-  // Installed after the session hook finishes: both edit the one settings file.
-  startAskWatcherAndHooks(sessionHookInstalled)
+  // One hook script reports sessions, asks and turns for every Claude Code conversation (ADR 055).
+  // Written at startup rather than shipped beside the bundle (ADR-026); project hooks share it.
+  startAskWatcher()
+  void ensureHookScript()
+    .then((scriptPath) => installUserHooks({ execPath: process.execPath, scriptPath }))
+    .catch((error) => logger.error('could not install the Claude hook', { error: String(error) }))
   void loadAttentionLog().catch((error) =>
     logger.error('could not read the attention log', { error: String(error) })
   )
-  // Written at startup rather than shipped beside the bundle: a loose script
-  // survives development and vanishes from the packaged app (ADR-026).
-  void ensureHookScript()
-}
-
-function startAskWatcherAndHooks(after: Promise<void>): void {
-  startAskWatcher()
-  void after
-    .then(() => installAskScript(join(app.getPath('userData'), 'integrations')))
-    .then((scriptPath) => installAskHooks({ execPath: process.execPath, scriptPath }))
-    .catch((error) =>
-      logger.error('could not install the agent ask hook', { error: String(error) })
-    )
 }
 
 /** Shell, editor, files, logging, notifications, metrics, the database, dialogs and the app. */
@@ -497,18 +475,12 @@ function extensionDeps(terminalRelay: OutputRelay, userData: string): ExtensionA
 }
 
 /** The renderer lists the extensions (complete as soon as start is called) and each extension
- * view waits for its own backend, so none of this holds the window back. The legacy import
- * needs every extension's tables to exist. */
-function startExtensions(
-  loginShellPath: Promise<void>,
-  importLegacy: boolean,
-  userData: string
-): void {
+ * view waits for its own backend, so none of this holds the window back. */
+function startExtensions(loginShellPath: Promise<void>): void {
   extensionHost
     .startAll({
       bundledDirectory: join(__dirname, '../../extensions'),
       beforeActivation: loginShellPath,
-      afterActivation: importLegacy ? () => importLegacyDatabase(userData, getAppDb()) : undefined,
     })
     .then(setupMenu)
     .catch((error) => logger.error('extension startup failed', { error: String(error) }))
@@ -525,7 +497,6 @@ app.whenReady().then(async () => {
     process.platform === 'darwin' ? startAdoptingLoginShellPath() : Promise.resolve()
 
   const userData = app.getPath('userData')
-  const importLegacy = legacyImportPending(userData)
   initAppDb(userData)
   registerExtProtocol()
 
@@ -553,7 +524,7 @@ app.whenReady().then(async () => {
       createWindow()
     }
   })
-  startExtensions(loginShellPath, importLegacy, userData)
+  startExtensions(loginShellPath)
 })
 
 // A rejection in the startup chain above (e.g. database or extension init

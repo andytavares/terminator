@@ -1,5 +1,4 @@
 import type { IncomingMessage } from 'node:http'
-import type { StubAnswer } from './tracker-stub-jira'
 
 // The stub Linear API: the SDK's GraphQL operations answered by name, with the fields its
 // models read, and variables checked against their declared types as Linear's server does
@@ -12,6 +11,11 @@ interface LinearStubIssue {
   state: { name: string; type: 'unstarted' | 'started' | 'completed' }
   assigneeEmail: string | null
   comments: Array<{ author: string; body: string; createdAt: string }>
+}
+
+export interface StubAnswer {
+  status: number
+  body: unknown
 }
 
 export interface LinearState {
@@ -78,7 +82,7 @@ function appendLinearComment(state: LinearState, input: { issueId: string; body:
 
 type Operation = (state: LinearState, variables: Record<string, unknown>) => unknown
 
-const OPERATIONS: Record<string, Operation> = {
+const OPERATION_TABLE: Record<string, Operation> = {
   viewer: (state) => ({ viewer: { id: state.viewer.email, ...state.viewer } }),
   user_assignedIssues: (state, v) => ({
     user: { assignedIssues: issueConnection(state.issues.filter((i) => i.assigneeEmail === v.id)) },
@@ -113,6 +117,9 @@ const OPERATIONS: Record<string, Operation> = {
   createComment: (state, v) =>
     appendLinearComment(state, v.input as { issueId: string; body: string }),
 }
+
+// A Map, so a name such as `constructor` reaches no inherited method.
+const OPERATIONS = new Map(Object.entries(OPERATION_TABLE))
 
 /** A `$name: String!` variable given something other than a string, as GraphQL refuses it. */
 function invalidStringVariable(query: string, variables: Record<string, unknown>): string | null {
@@ -152,8 +159,8 @@ export function answerLinear(
       status: 400,
       body: { errors: [{ message: invalid, extensions: { code: 'GRAPHQL_VALIDATION_FAILED' } }] },
     }
-  const operation = OPERATIONS[name]
-  if (!operation)
+  const operation = OPERATIONS.has(name) ? OPERATIONS.get(name) : undefined
+  if (typeof operation !== 'function')
     return { status: 400, body: { errors: [{ message: `stub Linear has no ${name}` }] } }
   return { status: 200, body: { data: operation(state, variables) } }
 }

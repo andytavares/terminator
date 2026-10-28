@@ -70,7 +70,7 @@ describe('ExtensionHost.load', () => {
 
     expect(result).toMatchObject({ extension: { id: 'com.hosted', status: 'enabled' } })
     expect(backendHost.activated).toEqual([
-      { id: 'com.hosted', entryPoint: join(directory, 'main.js'), directory, dependencies: [] },
+      { id: 'com.hosted', entryPoint: join(directory, 'main.js'), directory },
     ])
     expect(host.apiOf('com.hosted')).toBeDefined()
     expect(host.listAll().map((e) => e.id)).toEqual(['com.hosted'])

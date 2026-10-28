@@ -167,13 +167,15 @@ const dismissPopover = fn()
 export const PopoverInsideTheShell: Story = {
   args: {
     children: (
-      <div style={{ position: 'relative', height: 120 }}>
-        <Button variant="secondary">Branch</Button>
-        <Popover label="Branch actions" onDismiss={dismissPopover}>
-          <Button variant="ghost" size="sm" onClick={dismissPopover}>
-            Rename branch
-          </Button>
-        </Popover>
+      <div style={{ height: 120 }}>
+        <div style={{ display: 'inline-block' }}>
+          <Button variant="secondary">Branch</Button>
+          <Popover label="Branch actions" onDismiss={dismissPopover}>
+            <Button variant="ghost" size="sm" onClick={dismissPopover}>
+              Rename branch
+            </Button>
+          </Popover>
+        </div>
       </div>
     ),
   },

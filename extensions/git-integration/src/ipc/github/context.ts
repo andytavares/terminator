@@ -44,6 +44,8 @@ export interface GithubContext {
   ): Promise<(branch: string, repoPath?: string) => boolean>
   /** Per pull request: the head commit its local pull ref was last fetched at, and its merge base. */
   prDiffBases: Map<string, { headSHA: string; mergeBase: string }>
+  /** Per pull request: each changed file's patch as the last detail fetch returned it. */
+  prPatches: Map<string, { headSHA: string; patches: Map<string, string | undefined> }>
   /** Every repository the viewer can reach, kept until a refresh. */
   accessibleRepos?: Promise<AccessibleRepo[]>
 }
@@ -135,5 +137,6 @@ export function githubContext(access: GithubAccess, options: GithubHandlerOption
         prs.map((pr) => ({ branch: pr.headRefName, repoPath }))
       ),
     prDiffBases: new Map(),
+    prPatches: new Map(),
   }
 }

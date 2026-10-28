@@ -26,7 +26,7 @@ const HomeAskSchema = z.object({
 })
 
 /** @internal */
-export const ThreadFacetSchema = z.object({
+const ThreadFacetSchema = z.object({
   workKey: WorkKeySchema,
   kind: z.enum(['pull-request', 'order', 'task']),
   stage: z.enum(['shaping', 'building', 'in-review', 'merging', 'shipped']),

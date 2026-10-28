@@ -111,7 +111,7 @@ async function linkTerminalOneToEng123(): Promise<void> {
 async function linkFromHome(page: Page): Promise<void> {
   await selectProject(page, 'Surfaces', 'ticket')
   await page.locator('.tab-bar__tab--session').nth(0).click({ button: 'right' })
-  await page.locator('.ctx-menu').getByRole('button', { name: 'Add description…' }).click()
+  await page.locator('.ctx-menu').getByRole('menuitem', { name: 'Add description…' }).click()
   const box = page.getByRole('textbox', { name: 'What is this session doing?' })
   await box.fill('Wiring up the link')
   await box.press('Enter')
@@ -133,7 +133,7 @@ async function linkShowsOnSidebarAndTab(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Home' })).toBeHidden()
   await expect(page.locator('.tab-bar__tab--session').getByText('ENG-123')).toBeVisible()
   await row.click({ button: 'right' })
-  await page.locator('.ctx-menu').getByRole('button', { name: 'Remove session link' }).click()
+  await page.locator('.ctx-menu').getByRole('menuitem', { name: 'Remove session link' }).click()
   await expect(row.getByText('ENG-123')).toHaveCount(0)
   await expect(page.locator('.tab-bar__tab--session').getByText('ENG-123')).toHaveCount(0)
 }

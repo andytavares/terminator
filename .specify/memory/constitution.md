@@ -1,4 +1,24 @@
 <!--
+SYNC IMPACT REPORT (6.0.0)
+==========================
+Version change: 5.0.0 → 6.0.0 (MAJOR: Principles VI and XIV redefined)
+
+Modified principles:
+  - VI: the coverage gate is Codecov `codecov/patch`, at 80% of the changed lines, not a Vitest
+    threshold on the changed files. ADR 095 had made it so; the whole-file Vitest gate produced
+    padding tests.
+  - XIV "Outside services never gate": `codecov/patch` is the one outside service allowed to
+    gate. `npm run ci:local` reports it as not run.
+  - XIV "Random order": the seed is Vitest's own, printed by Vitest and given with
+    `--sequence.seed`. `TEST_SEED` is gone.
+  ADR 133.
+
+Added sections: none
+Removed sections: none
+Templates requiring updates: none
+Follow-up TODOs: none
+-->
+<!--
 SYNC IMPACT REPORT (5.0.0)
 ==========================
 Version change: 4.0.0 → 5.0.0 (MAJOR: Principle XIV's "Only the tests a change can reach" redefined)
@@ -228,10 +248,10 @@ a failing test exists that demands it.
 - Passing tests do not constitute completion. Work MUST be verified against the agreed
   spec and validated manually before being marked done.
 - Test coverage MUST be scoped to behavior, not implementation internals.
-- **Coverage gate: Vitest, on the changed files.** The coverage threshold in
-  `vitest.config.ts` MUST pass for the files the change touches (`--coverage.changed`),
-  in CI and in `npm run ci:local` alike. Codecov reports coverage on the pull request but
-  does not gate it: an outside service never decides a check (Principle XIV).
+- **Coverage gate: Codecov `codecov/patch`.** The pull request MUST have 80% coverage of the
+  lines it adds or modifies, as Codecov measures it from the uploaded reports (ADR 095). It
+  is the one outside service that gates (Principle XIV). Vitest has no coverage threshold,
+  and `npm run ci:local` reports the check as not run.
 - **Tests cover reachable behavior only.** A test MUST exercise a scenario the running
   application can produce and assert what a user or caller observes. A test that only
   asserts a mock was called, restates a constant, tests a copy of production code, or
@@ -336,8 +356,8 @@ code has no value; it is a defect. ADR 123 records the reasoning.
   registered handler, or its position in the run. Each test sets up what it needs and
   undoes what it changed.
 - **Random order, on every run, forever.** Every run of the suite, in CI and locally, MUST
-  shuffle the spec files and the tests inside each file with a new seed, and print it. A
-  failure reproduces with `TEST_SEED=<seed>`. A test that fails in some order MUST be
+  shuffle the spec files and the tests inside each file with a new seed, and print it. The
+  seed is Vitest's own, which it prints; a failure reproduces with `--sequence.seed=<seed>`. A test that fails in some order MUST be
   rewritten to be independent; pinning the order (`sequence.shuffle: false`, `.sequential`,
   a fixed seed) is forbidden.
 - **One run decides.** A check's verdict is its first run. A failing test is never
@@ -370,8 +390,10 @@ code has no value; it is a defect. ADR 123 records the reasoning.
   `npm run ci:local` runs those same commands, except the stability gate's repeats, on the
   commit merged with `origin/main`, never the working tree, and the pre-push hook refuses a commit it has not passed. A CI
   failure after a local pass is a parity defect and is fixed like any other defect.
-- **Outside services never gate.** An advisory database, Codecov, the artifact store or a
-  registry MUST NOT turn a change red that did not touch what they check.
+- **Outside services never gate.** An advisory database, the artifact store or a registry
+  MUST NOT turn a change red that did not touch what they check. The one exception is
+  Codecov's `codecov/patch`, which gates the lines a change adds or modifies (Principle VI).
+  `npm run ci:local` reports it as not run.
 - **Only the tests a change can reach.** `scripts/test-select.mjs` picks the unit,
   integration and end-to-end tests a diff can reach, the same way in CI and locally. A path
   it cannot place runs everything. A push to `main` runs what its change reaches, compared with
@@ -406,4 +428,4 @@ This constitution supersedes all other practices, conventions, and ad-hoc guidan
 - The constitution version and amendment history are the authoritative record of governance
   decisions affecting this project.
 
-**Version**: 5.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-10-27
+**Version**: 6.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-10-27

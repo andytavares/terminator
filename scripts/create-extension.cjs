@@ -129,19 +129,6 @@ function commandStub(name, id) {
 `
 }
 
-/** Subscribes to terminal sessions. */
-function terminalStub(name) {
-  return `  // Subscribe to terminal session events
-  disposables.push(
-    api.terminal.onSessionCreate((session) => {
-      // session: { id, projectId, tabTitle, type }
-      console.log('[${name}] session created:', session.id)
-    })
-  )
-
-`
-}
-
 /** Commented-out stubs: shell commands and an IPC channel. */
 function shellAndIpcStubs(id) {
   return `  // ── More of the API (uncomment to use) ───────────────────────────────────
@@ -222,7 +209,6 @@ function generateIndex(name, id) {
     indexHeader(name),
     settingsStub(name, id),
     commandStub(name, id),
-    terminalStub(name),
     shellAndIpcStubs(id),
     shortcutWorkspaceWindowStubs(name, id),
     notificationStub(name),

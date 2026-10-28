@@ -16,10 +16,13 @@ interface HookEntry {
 }
 
 /** True when the entry runs a command containing `marker`. */
-export function runsCommandContaining(entry: unknown, marker: string): boolean {
+export function runsCommandContaining(entry: unknown, marker: string | string[]): boolean {
+  const markers = Array.isArray(marker) ? marker : [marker]
   const hooks = (entry as HookEntry | null)?.hooks
   if (!Array.isArray(hooks)) return false
-  return hooks.some((h) => typeof h?.command === 'string' && h.command.includes(marker))
+  return hooks.some(
+    (h) => typeof h?.command === 'string' && markers.some((m) => h.command?.includes(m))
+  )
 }
 
 /** Null when the file does not exist; throws when it exists and cannot be parsed. */
@@ -52,7 +55,7 @@ export async function writeClaudeSettings(
 export async function putHook(
   file: string,
   event: string,
-  ours: { marker: string; command: string }
+  ours: { marker: string | string[]; command: string }
 ): Promise<void> {
   const settings = (await readClaudeSettings(file)) ?? {}
   const hooks = settings.hooks ?? {}
@@ -66,6 +69,10 @@ export async function putHook(
 }
 
 /** Every SessionStart entry `marker` identifies goes, then one comes back with `command`. */
-export function putSessionStartHook(file: string, marker: string, command: string): Promise<void> {
+export function putSessionStartHook(
+  file: string,
+  marker: string | string[],
+  command: string
+): Promise<void> {
   return putHook(file, 'SessionStart', { marker, command })
 }

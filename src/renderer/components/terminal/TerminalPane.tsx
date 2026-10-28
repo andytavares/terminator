@@ -2,7 +2,8 @@ import { useShallow } from 'zustand/react/shallow'
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { useBreakoutStore } from '../../stores/breakout.store'
 import { useSessionStore } from '../../stores/session.store'
-import { useModalStore } from '../../stores/modal.store'
+import { useSurfaceOpen } from '../../hooks/useSurfaceOpen'
+import { isSurfaceOpen } from '../../../shared/double-escape'
 import { Button } from '@terminator/extension-ui'
 import { useTerminalOpenErrorStore } from '../../stores/terminal-open-error.store'
 import type { PaneNode } from '@shared/types/index'
@@ -116,7 +117,7 @@ function useFocusRequests(
   projectId: string,
   { focusRequest, layout, activeSessionId }: PaneState
 ): void {
-  const modalOpen = useModalStore((s) => s.depth > 0)
+  const modalOpen = useSurfaceOpen()
   const metNonce = useRef<number | null>(null)
   useEffect(() => {
     if (!focusRequest || modalOpen || metNonce.current === focusRequest.nonce) return
@@ -127,7 +128,7 @@ function useFocusRequests(
     // A modal can open between this effect and the frame (⌘P right after
     // Settings closes); focusing the terminal then would steal its keys.
     requestAnimationFrame(() => {
-      if (useModalStore.getState().depth > 0) return
+      if (isSurfaceOpen(document)) return
       metNonce.current = nonce
       instanceOf(sessionId)?.terminal.focus()
     })

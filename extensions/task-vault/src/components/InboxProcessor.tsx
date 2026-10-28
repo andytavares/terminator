@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import type { IndexedTask } from '../vault/types'
 import { FileToPicker } from './FileToPicker'
 import { useVaultStore } from '../stores/vault.store'
-import { logReviewAction } from '../utils/review-log'
 import { Button } from '@terminator/extension-ui'
 
 type InboxStep = 'actionable' | 'two-minute' | 'destination'
@@ -10,8 +9,6 @@ type InboxStep = 'actionable' | 'two-minute' | 'destination'
 interface InboxProcessorProps {
   items: IndexedTask[]
   onDone: () => void
-  /** Set when running inside a weekly review, so each decision is recorded. */
-  reviewId?: string | null
 }
 
 /** Where an item goes: an action, and for filing, a destination or a new project. */
@@ -27,18 +24,6 @@ function failed(result: unknown): boolean {
   return (result as { error: string }).error !== 'STALE_ID'
 }
 
-function logDecision(reviewId: string | null, item: IndexedTask, decision: Decision): void {
-  const { action, dest } = decision
-  logReviewAction(reviewId, {
-    step: 2,
-    action: 'inbox-processed',
-    entityType: 'task',
-    entityId: item.id,
-    entityLabel: item.text,
-    detail: dest ? `${action} → ${dest}` : action,
-  })
-}
-
 function submitDecision(item: IndexedTask, decision: Decision): Promise<unknown> {
   return window.electronAPI.extensionBridge.invoke('task-vault:vault:process-inbox-item', {
     taskId: item.id,
@@ -50,7 +35,7 @@ function submitDecision(item: IndexedTask, decision: Decision): Promise<unknown>
 
 /** Steps through the items one decision at a time; returns the current item and `decide`. */
 function useInboxQueue(props: InboxProcessorProps) {
-  const { items, onDone, reviewId = null } = props
+  const { items, onDone } = props
   // The list it was opened with: the inbox reloads as each item is filed, and
   // walking the shrinking list by index would skip the item after each one.
   const [queue] = useState(items)
@@ -72,7 +57,6 @@ function useInboxQueue(props: InboxProcessorProps) {
     setIsProcessing(true)
     try {
       if (failed(await submitDecision(current, decision))) return setIsProcessing(false)
-      logDecision(reviewId, current, decision)
       await refreshInboxCount()
       advanceToNext()
     } catch {

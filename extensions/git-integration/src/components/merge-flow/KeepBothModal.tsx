@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { ArrowDown, TriangleAlert } from 'lucide-react'
 import { Dialog, RelativeTime, SegmentedControl } from '@terminator/extension-ui'
 import type { ConflictBlock, GitAuthor } from '../../schemas/merge-flow.schema'
-import { highlightBlock, langFromBlockId } from '../../utils/syntax'
+import { extensionOfBlock, highlight } from '../../utils/syntax'
 import { plural } from '@terminator/extension-sdk'
 import { choose } from '../text'
 
@@ -66,7 +66,7 @@ function CodePreview(props: { code: string; lang?: string; startLine?: number })
   const lines = props.code.split('\n')
   const shown = lines.slice(0, PREVIEW_LINES)
   const overflow = lines.length - PREVIEW_LINES
-  const html = highlightBlock(shown.join('\n'), props.lang)
+  const html = highlight(shown.join('\n'), props.lang)
   return (
     <div className="keep-both-modal__code-preview">
       <pre className="keep-both-modal__code-pre hljs">
@@ -215,7 +215,7 @@ function MergedPreview(props: { preview: string; lang: string | undefined }) {
         <NumberedCode
           lineCount={lineCount}
           startLine={1}
-          html={highlightBlock(props.preview, props.lang)}
+          html={highlight(props.preview, props.lang)}
         />
       </pre>
     </div>
@@ -291,7 +291,7 @@ export function KeepBothModal(props: Props) {
   const { block, onCancel } = props
   const [order, setOrder] = useState<Order>('ours-first')
   const drag = useBlockDrag(setOrder)
-  const lang = langFromBlockId(block.blockId)
+  const lang = extensionOfBlock(block.blockId)
   const [first, second] = orderedSides(props, order)
   const preview = `${first.text}\n${second.text}`
   const showDuplicateWarning = useDuplicateWarning(block)

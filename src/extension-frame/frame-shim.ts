@@ -153,7 +153,7 @@ function applyFrameTheme(theme: 'dark' | 'light'): void {
 function createFrameShim(): FrameShim {
   const link = createFrameLink()
   const keydown = createFrameKeydown(link.post)
-  installFrameApi(link, keydown.noteModalDepth)
+  installFrameApi(link)
   reportContentHeight()
   return {
     receiveWindowMessage(event: MessageEvent): void {
@@ -168,14 +168,13 @@ function createFrameShim(): FrameShim {
 
 /** window.electronAPI in the frame: the frame-mode manifest surface over the
  * link's transport, with the frame's own locals. */
-function installFrameApi(link: FrameLink, noteModalDepth: (depth: number) => void): void {
+function installFrameApi(link: FrameLink): void {
   const transport: ApiTransport = {
     invoke: link.invoke,
     send: (channel, payload) => link.post({ type: 'send', channel, payload }),
     subscribe: link.subscribe,
   }
   const locals = {
-    'ui.setModalDepth': noteModalDepth,
     'extensionBridge.invoke': (channel: string, payload?: unknown) => link.invoke(channel, payload),
     'extensionBridge.on': (channel: string, handler: (data: unknown) => void) =>
       link.subscribe(channel, (args) => handler(args[0])),
@@ -191,13 +190,7 @@ function installFrameApi(link: FrameLink, noteModalDepth: (depth: number) => voi
 function createFrameKeydown(post: (message: FrameRequest) => void) {
   const escapeDetector = createDoubleEscapeDetector()
   const mac = navigator.platform.startsWith('Mac')
-  // Reported through ui.setModalDepth whenever a dialog opens or closes, so the
-  // Escape gesture knows something else has claimed the key.
-  let modalDepth = 0
   return {
-    noteModalDepth(depth: number): void {
-      modalDepth = Number.isFinite(depth) && depth > 0 ? Math.floor(depth) : 0
-    },
     handle(event: KeyboardEvent): void {
       if (isQuickActionsLeader(keyPressOf(event), mac)) {
         event.preventDefault()
@@ -211,7 +204,7 @@ function createFrameKeydown(post: (message: FrameRequest) => void) {
         return
       }
       if (event.key !== 'Escape') return
-      if (shouldSuppressExitGesture(escapeContextFromTarget(event.target, modalDepth))) {
+      if (shouldSuppressExitGesture(escapeContextFromTarget(event.target, document))) {
         escapeDetector.reset()
         return
       }

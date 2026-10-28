@@ -125,10 +125,12 @@ describe('linear provider — search', () => {
     await expect(provider.search(CRED, 'sidebar', 15)).resolves.toEqual([])
   })
 
-  it("reads a query-shaped selector as the viewer's own issues", async () => {
+  it("lists the viewer's own issues when no assignee email is given", async () => {
     const assignedIssues = vi.fn().mockResolvedValue({ nodes: [makeIssue()] })
     const provider = providerWith({ viewer: Promise.resolve({ ...VIEWER, assignedIssues }) })
-    await expect(provider.listMine(CRED, { kind: 'query', jql: 'x' }, 5)).resolves.toHaveLength(1)
+    await expect(
+      provider.listMine(CRED, { kind: 'assignee', email: null }, 5)
+    ).resolves.toHaveLength(1)
     expect(assignedIssues).toHaveBeenCalledTimes(1)
   })
 })
@@ -224,9 +226,9 @@ describe('linear provider — comment', () => {
 describe('linear provider — credential guard', () => {
   it('refuses a credential belonging to another tracker', async () => {
     const provider = providerWith({})
-    await expect(
-      provider.verify({ tracker: 'jira', site: 's', email: 'e@x.c', apiToken: 't' })
-    ).rejects.toBeInstanceOf(TrackerError)
+    await expect(provider.verify({ tracker: 'jira', apiKey: 'k' } as never)).rejects.toBeInstanceOf(
+      TrackerError
+    )
   })
 })
 

@@ -43,7 +43,7 @@ export interface IssueLike {
 export interface SeedDeps {
   readonly now: () => string
   readonly newId: () => string
-  readonly readIssue?: (tracker: 'linear' | 'jira', key: string) => Promise<IssueLike | null>
+  readonly readIssue?: (tracker: 'linear', key: string) => Promise<IssueLike | null>
   /**
    * What was already decided about these files (FR-077).
    *
@@ -61,7 +61,7 @@ export interface SeedDeps {
 
 export type SeedInput =
   | { kind: 'typed'; text: string; repoPaths: readonly string[] }
-  | { kind: 'tracker'; tracker: 'linear' | 'jira'; key: string; repoPaths: readonly string[] }
+  | { kind: 'tracker'; tracker: 'linear'; key: string; repoPaths: readonly string[] }
   | { kind: 'signal'; signalId: string; repoPaths: readonly string[] }
 
 export type SeedResult = { order: WorkOrder; unavailableChecks: CheckName[] } | { error: string }

@@ -1,6 +1,7 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { contextFilePath } from './agent-context.js'
+import { HOOK_MARKERS, reportDirectory } from '../agents/claude-hook.js'
 import { shellQuote } from '@terminator/extension-sdk/node'
 import { sessionContextDirectory } from './session-context.js'
 import {
@@ -24,68 +25,6 @@ import {
 // get the same context — and a launch flag only ever covers sessions this
 // application starts.
 
-/**
- * The script the runtime executes.
- *
- * Carried as source and written to disk at startup rather than shipped as a
- * loose asset — the bundler emits one file per entry point, and a stray script
- * beside it survives development and vanishes from the packaged app. The same
- * reasoning, and the same shape, as the supervised-run hook in ADR-026.
- *
- * Its whole authority is: read one file, print, exit 0. No credential, no
- * network, no knowledge of trackers.
- * @internal
- */
-export const HOOK_SCRIPT = `// Written by Terminator. Do not edit: it is overwritten on every start.
-const fs = require('fs')
-const path = require('path')
-
-const [contextFile, sessionContextDir] = process.argv.slice(2)
-const terminal = process.env.TERMINATOR_SESSION_ID
-
-// Anything at all wrong — no file, unreadable, malformed — exits quietly. A
-// session with no issue context is a session; a session that will not start is
-// a regression.
-try {
-  // The session's own link wins over the project's: if this terminal has a
-  // session context file, the user-level hook already printed it, and
-  // printing the project's on top would give the agent two contexts.
-  if (terminal && sessionContextDir && fs.existsSync(path.join(sessionContextDir, terminal + '.json'))) {
-    process.exit(0)
-  }
-
-  const raw = fs.readFileSync(contextFile, 'utf8')
-  const context = JSON.parse(raw)
-  if (context && typeof context.markdown === 'string' && context.markdown.length > 0) {
-    process.stdout.write(
-      JSON.stringify({
-        hookSpecificOutput: {
-          // Required. Without it the runtime ignores the whole object, and it
-          // does so silently — see ADR-026.
-          hookEventName: 'SessionStart',
-          additionalContext: context.markdown,
-          sessionTitle: typeof context.key === 'string' ? context.key : undefined,
-        },
-      })
-    )
-  }
-} catch {
-  // Intentionally silent.
-}
-
-process.exit(0)
-`
-
-const SCRIPT_NAME = 'session-start-hook.cjs'
-
-/** Write the hook script and return its absolute path. */
-export async function installHookScript(directory: string): Promise<string> {
-  await fs.mkdir(directory, { recursive: true })
-  const target = path.join(directory, SCRIPT_NAME)
-  await fs.writeFile(target, HOOK_SCRIPT, 'utf8')
-  return target
-}
-
 // ── The owned block in the project's settings ────────────────────────────────
 
 export interface HookCommandOptions {
@@ -108,8 +47,9 @@ export function hookCommand(options: HookCommandOptions): string {
     'ELECTRON_RUN_AS_NODE=1',
     shellQuote(options.execPath),
     shellQuote(options.hookScriptPath),
-    shellQuote(contextFilePath(options.projectId)),
+    shellQuote(reportDirectory()),
     shellQuote(sessionContextDirectory()),
+    shellQuote(contextFilePath(options.projectId)),
   ].join(' ')
 }
 
@@ -130,7 +70,7 @@ export async function installProjectHook(
 ): Promise<void> {
   await putSessionStartHook(
     localSettingsPath(projectDir),
-    options.hookScriptPath,
+    [options.hookScriptPath, ...HOOK_MARKERS],
     hookCommand(options)
   )
 }
@@ -148,7 +88,9 @@ export async function removeProjectHook(projectDir: string, hookScriptPath: stri
 
   const hooks = settings.hooks
   const sessionStart = Array.isArray(hooks?.SessionStart) ? hooks.SessionStart : []
-  const remaining = sessionStart.filter((entry) => !runsCommandContaining(entry, hookScriptPath))
+  const remaining = sessionStart.filter(
+    (entry) => !runsCommandContaining(entry, [hookScriptPath, ...HOOK_MARKERS])
+  )
   if (remaining.length === sessionStart.length && sessionStart.length > 0) return
 
   const nextHooks: Record<string, unknown> = { ...hooks }

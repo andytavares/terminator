@@ -4,7 +4,6 @@ import { ModalShell } from '@terminator/extension-ui'
 import type { QuickAction, QuickActionGroup } from '../quick-actions/types'
 import { searchActions } from '../quick-actions/search'
 import { orderGroups } from '../quick-actions/rank'
-import { useModalEffect } from '../stores/modal.store'
 import { handleQuickActionKey, type KeyContext } from './quick-action-keys'
 import './QuickActions.css'
 
@@ -45,7 +44,6 @@ function chord(group: QuickActionGroup, action: QuickAction): string {
 }
 
 export function QuickActions(props: QuickActionsProps): JSX.Element {
-  useModalEffect()
   const panel = usePanelState(props)
   const { inputRef, panelRef } = usePanelFocus(panel.mode)
   const rows = usePanelRows(props, panel)

@@ -8,7 +8,6 @@ import { zonedNow } from '../vault/clock.js'
 import type { IndexedTask } from '../vault/types.js'
 
 const DEBOUNCE_MS = 500
-const REVIEW_DAY_KEY = 'terminator.task-vault.weeklyReviewDay'
 
 type Row = Record<string, unknown>
 
@@ -28,25 +27,13 @@ async function homeTasks(db: ExtensionDB, today: string): Promise<IndexedTask[]>
   return rows.map(rowToTask)
 }
 
-async function reviewStartedToday(db: ExtensionDB, startOfDay: string): Promise<boolean> {
-  const row = await db.get<{ id: string }>(`SELECT id FROM weekly_reviews WHERE started_at >= ?`, [
-    startOfDay,
-  ])
-  return Boolean(row)
-}
-
 async function publishVaultFeed(api: ExtensionAPI, db: ExtensionDB): Promise<void> {
   const now = zonedNow()
   const today = now.toPlainDate().toString()
-  const reviewStarted = await reviewStartedToday(db, now.startOfDay().toInstant().toString())
   api.home.publish(
     buildHomeFeed({
       tasks: await homeTasks(db, today),
       today,
-      reviewDay: parseInt(api.settings.get<string>(REVIEW_DAY_KEY) ?? '0', 10),
-      // Temporal counts Sunday as 7; the setting counts it as 0.
-      weekday: now.dayOfWeek % 7,
-      reviewStarted,
     })
   )
 }
@@ -64,7 +51,6 @@ async function runVaultHomeAction(
   const taskId = taskIdOf(itemId)
   if (actionId === 'done' && taskId) await completeTask({ api, db }, { taskId })
   else if (actionId === 'open' && taskId) openInVault(api, { taskId })
-  else if (actionId === 'start-review') openInVault(api, { view: 'review' })
 }
 
 /** Keeps Task Vault's Home feed current: on change (debounced) and when the date rolls over. */

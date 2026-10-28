@@ -1,7 +1,7 @@
 import type React from 'react'
 import type { IndexedTask } from '../vault/types'
 import { useVaultNavStore } from '../stores/vault-nav.store'
-import { localDate } from '../utils/local-date'
+import { localDate, weekdayName } from '../utils/local-date'
 
 export type EndType = 'none' | 'on_date' | 'after_count'
 
@@ -41,15 +41,9 @@ export const INTERVAL_LABELS: Record<string, string> = Object.fromEntries(
   QUICK_INTERVALS.map(({ value, label }) => [value, label])
 )
 
-export const WEEKDAY_LABELS: { value: number; short: string }[] = [
-  { value: 1, short: 'Mon' },
-  { value: 2, short: 'Tue' },
-  { value: 3, short: 'Wed' },
-  { value: 4, short: 'Thu' },
-  { value: 5, short: 'Fri' },
-  { value: 6, short: 'Sat' },
-  { value: 0, short: 'Sun' },
-]
+export const WEEKDAY_LABELS: { value: number; short: string }[] = [1, 2, 3, 4, 5, 6, 0].map(
+  (value) => ({ value, short: weekdayName(value, 'short') })
+)
 
 export const RECURRENCE_INTERVALS: { value: string; label: string }[] = [
   { value: 'daily', label: 'Daily' },

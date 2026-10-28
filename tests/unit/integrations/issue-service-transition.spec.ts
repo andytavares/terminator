@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createIssueService } from '../../../src/main/integrations/issue-service'
-import { createJiraProvider } from '../../../src/main/integrations/providers/jira.provider'
 import type {
   TrackerProvider,
   TrackerStateOption,
@@ -49,9 +48,10 @@ function fakeProvider(id: TrackerId, over: Partial<TrackerProvider> = {}): Track
   } as TrackerProvider
 }
 
-function build(
-  over: { linear?: TrackerProvider; jira?: TrackerProvider; mineEmail?: string } = {}
-) {
+/** A provider that implements none of the optional operations. */
+const bareLinear = () => fakeProvider('linear')
+
+function build(over: { linear?: TrackerProvider; mineEmail?: string } = {}) {
   const linear =
     over.linear ??
     fakeProvider('linear', {
@@ -60,19 +60,14 @@ function build(
       teams: vi.fn().mockResolvedValue([{ id: 't1', key: 'TAV', name: 'Team' }]),
       create: vi.fn().mockResolvedValue(issue('linear', 'TAV-7')),
     })
-  // Jira omits both, exactly as the shipped provider does.
-  const jira = over.jira ?? fakeProvider('jira')
   const service = createIssueService({
-    providers: { linear, jira },
-    getCredential: async (tracker) =>
-      tracker === 'linear'
-        ? { tracker: 'linear', apiKey: 'k' }
-        : { tracker: 'jira', site: 's', email: 'e@x.c', apiToken: 't' },
+    providers: { linear },
+    getCredential: async () => ({ tracker: 'linear', apiKey: 'k' }),
     getMine: async () => ({ kind: 'assignee', email: over.mineEmail ?? null }),
     onTrackerError: () => {},
     now: () => 1_000_000,
   })
-  return { service, linear, jira }
+  return { service, linear }
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -83,19 +78,14 @@ describe('supportsTransitions', () => {
   })
 
   it('is false for one that omits it', () => {
-    expect(build().service.supportsTransitions('jira')).toBe(false)
-  })
-
-  it('is false for the Jira provider the application actually ships', () => {
-    const { service } = build({ jira: createJiraProvider() })
-    expect(service.supportsTransitions('jira')).toBe(false)
+    expect(build({ linear: bareLinear() }).service.supportsTransitions('linear')).toBe(false)
   })
 
   it('answers without a credential, because it is a fact about the provider', () => {
     const getCredential = vi.fn(async () => null)
     const linear = fakeProvider('linear', { states: vi.fn(), transition: vi.fn() })
     const service = createIssueService({
-      providers: { linear, jira: fakeProvider('jira') },
+      providers: { linear },
       getCredential,
       getMine: async () => ({ kind: 'assignee', email: null }),
       onTrackerError: () => {},
@@ -113,8 +103,8 @@ describe('states', () => {
   })
 
   it('rejects with unsupported — not a generic failure — where the provider omits it', async () => {
-    const { service } = build()
-    await expect(service.states('jira', 'TAV-42')).rejects.toMatchObject({ kind: 'unsupported' })
+    const { service } = build({ linear: bareLinear() })
+    await expect(service.states('linear', 'TAV-42')).rejects.toMatchObject({ kind: 'unsupported' })
   })
 })
 
@@ -131,15 +121,15 @@ describe('transition', () => {
   })
 
   it('rejects with unsupported where the provider omits it', async () => {
-    const { service } = build()
-    await expect(service.transition('jira', 'TAV-42', 'done')).rejects.toMatchObject({
+    const { service } = build({ linear: bareLinear() })
+    await expect(service.transition('linear', 'TAV-42', 'done')).rejects.toMatchObject({
       kind: 'unsupported',
     })
   })
 
   it('names the tracker in the unsupported message, so the record is readable', async () => {
-    const { service } = build()
-    await expect(service.transition('jira', 'TAV-42', 'done')).rejects.toThrow(/jira/)
+    const { service } = build({ linear: bareLinear() })
+    await expect(service.transition('linear', 'TAV-42', 'done')).rejects.toThrow(/linear/)
   })
 })
 
@@ -173,19 +163,10 @@ describe('transition and the cache', () => {
   })
 })
 
-describe('the Jira provider is untouched by this feature', () => {
-  it('omits both optional methods', () => {
-    const jira = createJiraProvider() as TrackerProvider
-    expect(jira.states).toBeUndefined()
-    expect(jira.transition).toBeUndefined()
-  })
-})
-
 describe('create (ADR-061)', () => {
-  it('is supported where the provider implements it, and not for Jira', () => {
-    const { service } = build()
-    expect(service.supportsCreate('linear')).toBe(true)
-    expect(service.supportsCreate('jira')).toBe(false)
+  it('is supported where the provider implements it, and not where it omits it', () => {
+    expect(build().service.supportsCreate('linear')).toBe(true)
+    expect(build({ linear: bareLinear() }).service.supportsCreate('linear')).toBe(false)
   })
 
   it('delegates the input with the resolved credential and returns the issue', async () => {
@@ -225,10 +206,10 @@ describe('create caching', () => {
   })
 
   it('rejects with unsupported where the provider omits it', async () => {
-    const { service } = build()
+    const { service } = build({ linear: bareLinear() })
     await expect(
-      service.create('jira', { teamId: 't', title: 'x', description: '' })
+      service.create('linear', { teamId: 't', title: 'x', description: '' })
     ).rejects.toMatchObject({ kind: 'unsupported' })
-    await expect(service.teams('jira')).rejects.toMatchObject({ kind: 'unsupported' })
+    await expect(service.teams('linear')).rejects.toMatchObject({ kind: 'unsupported' })
   })
 })

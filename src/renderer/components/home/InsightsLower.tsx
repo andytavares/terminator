@@ -1,6 +1,6 @@
 import React from 'react'
 import { HOME_MEASURES } from '@terminator/extension-sdk/plain'
-import { Clock, GitPullRequest, ListTodo, X } from 'lucide-react'
+import { Clock, GitPullRequest, X } from 'lucide-react'
 import { Button, IconButton, MetricCard } from '@terminator/extension-ui'
 import type { AgentUsage } from '../../../shared/agents/agent-usage'
 import type { AttentionMeasures } from '../../../shared/home/attention-measures'
@@ -14,7 +14,7 @@ import {
   measureReading,
   type InsightsWindow,
 } from '../../home/insights'
-import { openAsk, runAskAction } from './desk-actions'
+import { openAsk } from './desk-actions'
 import { windowQualifier } from './InsightsCards'
 
 // The lower half of Insights: where the time went, how agent time was spent, when the work
@@ -130,7 +130,6 @@ export function ShipSections(): JSX.Element | null {
 }
 
 interface LookingBackProps {
-  asks: readonly Sourced<HomeAsk>[]
   longestWaitMinutes: number
   oldestReview: { ask: Sourced<HomeAsk>; ageMs: number } | null
 }
@@ -177,29 +176,6 @@ const dismissAsk = (ask: Sourced<HomeAsk>) => ({
   run: () => useDismissalsStore.getState().markDone(ask.id),
 })
 
-/** The weekly review a task extension offers: a task ask whose primary action is Start review. */
-function weeklyReviewAsk(asks: readonly Sourced<HomeAsk>[]): Sourced<HomeAsk> | null {
-  return (
-    asks.find((a) => a.kind === 'task' && a.actions.some((x) => x.id === 'start-review')) ?? null
-  )
-}
-
-function WeeklyReviewRow({ review }: { review: Sourced<HomeAsk> }): JSX.Element {
-  return (
-    <LookBackRow
-      icon={<ListTodo aria-hidden="true" />}
-      title={review.title}
-      detail={review.detail}
-      action={{
-        label: 'Start',
-        primary: true,
-        run: () => void runAskAction(review, 'start-review'),
-      }}
-      dismiss={dismissAsk(review)}
-    />
-  )
-}
-
 function OldestReviewRow({ oldest }: { oldest: NonNullable<LookingBackProps['oldestReview']> }) {
   return (
     <LookBackRow
@@ -213,12 +189,10 @@ function OldestReviewRow({ oldest }: { oldest: NonNullable<LookingBackProps['old
 }
 
 export function LookingBackCard(props: LookingBackProps): JSX.Element {
-  const { asks, longestWaitMinutes, oldestReview } = props
-  const review = weeklyReviewAsk(asks)
-  const nothing = !review && longestWaitMinutes <= 0 && !oldestReview
+  const { longestWaitMinutes, oldestReview } = props
+  const nothing = longestWaitMinutes <= 0 && !oldestReview
   return (
     <MetricCard question="Looking back" value="">
-      {review && <WeeklyReviewRow review={review} />}
       {longestWaitMinutes > 0 && (
         <LookBackRow
           icon={<Clock aria-hidden="true" />}

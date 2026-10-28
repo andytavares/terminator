@@ -339,7 +339,7 @@ function useSeedFromTicket(shared: Shared) {
       await whileBusy(shared, async () => {
         const r = await createOrderAt(repoRoot, {
           kind: 'tracker',
-          tracker: ticket.tracker === 'jira' ? 'jira' : 'linear',
+          tracker: 'linear',
           key: ticket.key,
         })
         if ('error' in r) {
@@ -685,8 +685,8 @@ function TicketList({
 function NoTracker() {
   return (
     <p className="fdry-note">
-      No tracker is connected. Connect Linear or Jira in the application&rsquo;s settings and your
-      tickets will be listed here.
+      No tracker is connected. Connect Linear in the application&rsquo;s settings and your tickets
+      will be listed here.
     </p>
   )
 }

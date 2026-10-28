@@ -1,10 +1,9 @@
 import React, { useMemo, useState, useRef } from 'react'
-import hljs from '../utils/hljs'
 import { Button, SegmentedControl } from '@terminator/extension-ui'
 import type { FileDiff, DiffLine, DiffHunk } from '../schemas/git.schema'
 import { choose } from './text'
 import { useSplitDrag } from '../hooks/useSplitDrag'
-import { escapeHtml } from '../utils/syntax'
+import { extensionOf, highlight } from '../utils/syntax'
 
 type ViewMode = 'unified' | 'split'
 
@@ -12,63 +11,6 @@ interface FileDiffViewProps {
   diff: FileDiff | null
   isStale?: boolean
   onRefresh?: () => void
-}
-
-// ── Language detection ────────────────────────────────────────────────────────
-
-const LANGUAGES: Record<string, string> = {
-  ts: 'typescript',
-  tsx: 'typescript',
-  js: 'javascript',
-  jsx: 'javascript',
-  mjs: 'javascript',
-  cjs: 'javascript',
-  py: 'python',
-  rs: 'rust',
-  go: 'go',
-  java: 'java',
-  kt: 'kotlin',
-  swift: 'swift',
-  c: 'c',
-  h: 'c',
-  cpp: 'cpp',
-  cc: 'cpp',
-  cxx: 'cpp',
-  hpp: 'cpp',
-  cs: 'csharp',
-  rb: 'ruby',
-  php: 'php',
-  css: 'css',
-  scss: 'scss',
-  less: 'less',
-  html: 'xml',
-  htm: 'xml',
-  xml: 'xml',
-  svg: 'xml',
-  json: 'json',
-  yaml: 'yaml',
-  yml: 'yaml',
-  toml: 'toml',
-  md: 'markdown',
-  sh: 'bash',
-  bash: 'bash',
-  zsh: 'bash',
-  sql: 'sql',
-}
-
-export function detectLanguage(path: string): string | undefined {
-  const ext = path.split('.').pop()?.toLowerCase()
-  if (!ext) return undefined
-  return LANGUAGES[ext]
-}
-
-export function highlight(content: string, lang: string | undefined): string {
-  if (!lang) return escapeHtml(content)
-  try {
-    return hljs.highlight(content, { language: lang, ignoreIllegals: true }).value
-  } catch {
-    return escapeHtml(content)
-  }
 }
 
 // ── Unified view ──────────────────────────────────────────────────────────────
@@ -323,7 +265,7 @@ interface ViewState {
 function FileDiffBody({ diff, view }: { diff: FileDiff; view: ViewState }) {
   const { splitLeftPct, scrollRef, onDividerMouseDown } = view.divider
   const { viewMode } = view
-  const lang = detectLanguage(diff.path)
+  const lang = extensionOf(diff.path)
   const splitStyle = { '--split-left': `${splitLeftPct}%` } as React.CSSProperties
   return (
     <div

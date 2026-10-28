@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import type { IssueListResult, TrackerId } from '../../../shared/types/index'
 
-export const TRACKER_LABELS: Record<TrackerId, string> = { linear: 'Linear', jira: 'Jira' }
+export const TRACKER_LABELS: Record<TrackerId, string> = { linear: 'Linear' }
 
 export const ERROR_TEXT: Record<string, string> = {
   'not-connected': 'not connected',

@@ -246,19 +246,18 @@ Open Settings with **`Cmd+,`** or via **View → Open Settings**.
 | **Interface**      | Theme (dark/light), show CPU/Memory/Network bar, hide the branch tree on Home |
 | **Terminal**       | Default shell, scrollback limit                                               |
 | **Agents**         | Default agent and your own ACP agents — see below                             |
-| **Integrations**   | Connect Linear and Jira — see below                                           |
+| **Integrations**   | Connect Linear — see below                                                    |
 | **Extensions**     | Enable/disable individual extensions                                          |
 | **Remote Control** | Enable local server, port, ngrok tunnel, session password                     |
 
 ### Integrations — connecting an issue tracker
 
 **Settings → Integrations** is the only place Terminator asks for a tracker credential, and every
-part of the app reads that one connection. Linear and Jira can both be connected, independently.
+part of the app reads that one connection.
 
 | Tracker    | What you provide                                                                                       |
 | ---------- | ------------------------------------------------------------------------------------------------------ |
 | **Linear** | API key. Optionally an email, to list someone else's assigned issues instead of the key's own account. |
-| **Jira**   | Site (`your-team.atlassian.net`), account email, API token, and a JQL query defining "my issues".      |
 
 **The credential is checked before it is kept.** Terminator calls the tracker with it first, so a
 mistyped key is rejected there and then, with the tracker's own message, rather than turning up
@@ -271,11 +270,7 @@ _which account_ the credential proved to belong to. The connect and disconnect a
 the only two settings deliberately unavailable over Remote Control: an authenticated browser on
 your LAN still has no business writing your API keys.
 
-**Already used SpecKit Pilot?** Your Linear and Jira credentials move across automatically the
-first time you launch a build with this feature. You will not be asked for them again, and the
-extension's old credential file is renamed `.bak` rather than deleted.
-
-**Disconnecting** destroys that tracker's credential and leaves the other one alone. Anything you
+**Disconnecting** destroys the credential. Anything you
 had linked to a branch stays linked — it is your association, not the tracker's — and starts
 working again as soon as you reconnect.
 
@@ -289,7 +284,7 @@ Themes switch immediately across the entire app — no restart required. Termina
 
 ## 10. Issue Tracking
 
-Terminator attaches a **Linear or Jira issue to a branch**, so the thing you are working on is on
+Terminator attaches a **Linear issue to a branch**, so the thing you are working on is on
 screen — and so every agent session you start there already knows it.
 
 Connect a tracker first: [Settings → Integrations](#9-settings).
@@ -330,8 +325,7 @@ tracker**, or **Unlink**.
 ### Reading an issue
 
 Click the issue key on a branch to open it. Description and comments are **rendered** — headings,
-lists, task lists, tables, code blocks, links and emphasis all appear as formatted text, the same
-whether the issue came from Linear or from Jira.
+lists, task lists, tables, code blocks, links and emphasis all appear as formatted text.
 
 Issue text is treated as untrusted: embedded HTML never runs, images are not loaded (a remote image
 in a ticket is a tracking pixel aimed at whoever opens it), and links open in your browser rather
@@ -445,7 +439,7 @@ The **Needs you** queue lists everything waiting on you, from Terminator and fro
 
 Open an ask (click it, or press `Enter`) and it expands. You see the agent's last screen as text, its numbered answers as buttons and a field to **Reply in your own words**. Press **1**–**9** to pick that answer, **R** to reply, **T** to open the terminal and `Esc` to close. A numbered answer is typed into the terminal as if you had typed the number, after Terminator reads the screen again and checks the question is still the same; nothing is sent if you answered it in the terminal first. **E** marks an ask done and **H** snoozes it until an hour from now, this afternoon or tomorrow; a snoozed ask wakes early if the work moves.
 
-Claude Code reports through its hooks. On start Terminator adds `Notification`, `UserPromptSubmit` and `Stop` entries, beside the `SessionStart` entry, to your own `~/.claude/settings.json`. Each runs a small script that records which terminal is asking, or that a turn started or ended, and writes nothing else. `UserPromptSubmit` and `Stop` are what make a thinking agent read **Running** even while it prints nothing. To remove them, delete the entries under `hooks.Notification`, `hooks.UserPromptSubmit` and `hooks.Stop` whose command mentions `agent-ask-hook.cjs` after quitting Terminator. A terminal that is not Claude Code still asks by ringing the bell or leaving a numbered choice on screen, and reads Running from its output.
+Claude Code reports through its hooks. On start Terminator adds `SessionStart`, `Notification`, `UserPromptSubmit`, `Stop` and `StopFailure` entries to your own `~/.claude/settings.json`. Each runs one small script, `claude-hook.cjs`, that records which terminal is asking, or that a turn started or ended, and writes nothing else. `UserPromptSubmit` and `Stop` are what make a thinking agent read **Running** even while it prints nothing. To remove them, delete the entries under `hooks.SessionStart`, `hooks.Notification`, `hooks.UserPromptSubmit`, `hooks.Stop` and `hooks.StopFailure` whose command mentions `claude-hook.cjs` after quitting Terminator. A terminal that is not Claude Code still asks by ringing the bell or leaving a numbered choice on screen, and reads Running from its output.
 
 #### Opening a task
 
@@ -534,7 +528,7 @@ To keep the earlier layout, set **Settings → Interface → Home layout** to **
 - **How often does it pass first time?** The share of Foundry orders whose checks passed on the first try. It is hidden when Foundry publishes nothing.
 - **How am I spending agent time?** Agent hours, how many agents ran at once, the share that finished without asking you, and Foundry orders shipped. Below them, **Tokens** and **Estimated cost** come from the agents' own conversation files. The cost is an estimate from public prices, and says **partial** when a model had no price.
 - **When do I ship?** A view an extension adds to Insights; Git integration's contribution heatmap lives here. **Show contributions on Insights** in Git Integration's settings switches it off.
-- **Looking back** gathers the weekly review (when Task Vault offers it), the longest wait on you, and the oldest review you owe.
+- **Looking back** gathers the longest wait on you and the oldest review you owe.
 
 A card with no number to show says why instead of showing a made-up one. Terminator keeps 90 days of how agents waited, so **Year** shows at most that much of it.
 
@@ -556,7 +550,7 @@ A session with no ticket can say what it is for. Right-click its tab and choose 
 
 ### Linking a session to a ticket
 
-A session shows its branch's linked ticket by default. Right-click a session's tab or its tile and choose **Link issue…** to pin a different Linear or Jira ticket to that one session, which matters when two terminals on one branch serve different tickets. **Remove session link** hands the session back to its branch's ticket; the branch's own link is never changed from here. With no tracker connected, the dialog tells you to connect one in **Settings → Integrations**. The ticket an agent is briefed with at start-up still comes from the branch (see [What your agent sessions are told](#what-your-agent-sessions-are-told)).
+A session shows its branch's linked ticket by default. Right-click a session's tab or its tile and choose **Link issue…** to pin a different Linear ticket to that one session, which matters when two terminals on one branch serve different tickets. **Remove session link** hands the session back to its branch's ticket; the branch's own link is never changed from here. With no tracker connected, the dialog tells you to connect one in **Settings → Integrations**. The ticket an agent is briefed with at start-up still comes from the branch (see [What your agent sessions are told](#what-your-agent-sessions-are-told)).
 
 ### The Overview wall
 
@@ -590,7 +584,7 @@ Resume appears only where it can work:
 - Only once the conversation has been seen. Terminator learns it from Claude Code itself, so it appears a second or two after the agent starts — including a `claude` you typed yourself.
 - If the conversation's transcript has been deleted (agent tabs of agents that keep no transcript always offer Resume), or the record came from another machine, the session says **Conversation no longer available** in place of the button.
 
-**How Terminator learns the conversation.** On first launch it adds one `SessionStart` entry to your own `~/.claude/settings.json`. The entry runs a small script that records which conversation is running in which Terminator terminal, and writes nothing else. To turn the feature off, open that file and delete the entry under `hooks.SessionStart` whose command mentions `agent-session-hook.cjs`, then restart Claude Code sessions. Terminator will add it again the next time it starts, so remove it after quitting Terminator if you want it to stay gone. Nothing else in the file is touched, and a settings file Terminator cannot parse is never overwritten.
+**How Terminator learns the conversation.** On first launch it adds a `SessionStart` entry (with the others described under Home) to your own `~/.claude/settings.json`. The entry runs a small script that records which conversation is running in which Terminator terminal, and writes nothing else. To turn the feature off, open that file and delete the entry under `hooks.SessionStart` whose command mentions `claude-hook.cjs`, then restart Claude Code sessions. Terminator will add it again the next time it starts, so remove it after quitting Terminator if you want it to stay gone. Nothing else in the file is touched, and a settings file Terminator cannot parse is never overwritten.
 
 ---
 
@@ -661,7 +655,7 @@ Terminator ships five built-in extensions:
 | **Git Integration** | Git tab for staging/committing, PR creation, MergeFlow conflict resolver, Code Reviews tab |
 | **Foundry**         | A software factory: an idea becomes a work order that compiles, then a draft pull request  |
 | **Notepad**         | Markdown notes, live preview, diagrams, tags, folders, full-text search                    |
-| **Task Vault**      | GTD+BuJo+PARA productivity vault with kanban, recurring tasks, weekly review               |
+| **Task Vault**      | GTD+BuJo+PARA productivity vault with recurring tasks                                      |
 | **Remote Control**  | Local HTTP/WebSocket server + optional ngrok tunnel for browser-based terminal access      |
 
 ---
@@ -773,7 +767,7 @@ Features:
 ![Foundry](screenshots/08-foundry-tab.png)
 
 Foundry is a **software factory**. You give it an idea — typed in, or a Linear
-or Jira issue — and it converges that into a **work order** you can read and
+issue — and it converges that into a **work order** you can read and
 argue with. When the order compiles, it is handed to an orchestration that does
 the work, manages the agents, checks the result and opens a draft pull request.
 
@@ -1222,14 +1216,13 @@ Click the **calendar icon** in the sidebar header icon row, or press **`Cmd+Shif
 
 ### Sidebar sections
 
-| Section           | Contents                                                   |
-| ----------------- | ---------------------------------------------------------- |
-| **Today**         | Daily log for the current date, mini calendar on the right |
-| **Inbox**         | Quick-captured items awaiting triage                       |
-| **Projects**      | Named project containers for related tasks                 |
-| **Areas**         | Ongoing responsibilities (PARA areas of focus)             |
-| **History**       | Past daily logs                                            |
-| **Weekly review** | 6-step guided weekly review                                |
+| Section      | Contents                                                   |
+| ------------ | ---------------------------------------------------------- |
+| **Today**    | Daily log for the current date, mini calendar on the right |
+| **Inbox**    | Quick-captured items awaiting triage                       |
+| **Projects** | Named project containers for related tasks                 |
+| **Areas**    | Ongoing responsibilities (PARA areas of focus)             |
+| **History**  | Past daily logs                                            |
 
 ### Today
 
@@ -1240,19 +1233,11 @@ than leaving a blank column.
 The calendar on the right marks each day by what is on it, and hovering a day says it in words
 (`3 tasks, 1 overdue`), so a busy day and an overdue one are not the same dot.
 
-### Weekly review
-
-The six steps are named as you go — **Get clear**, **Inbox**, **Projects**, **Stale**, **Someday**,
-**Reflect** — instead of counting "Step 3 of 6" without saying what step 3 is.
+### Stale tasks
 
 An open task left on Today rolls over to the next day. Once it has rolled over for **Stale Task
-Threshold (days)** (Settings → Extensions → Task Vault, 7 by default), Today marks it **stale** and
-the review's **Stale** step lists it. A project is stale for a different reason: it has no open
-next action.
-
-On **Weekly Review Day** (0 = Sunday … 6 = Saturday, Sunday by default) a notification says the
-review is ready; clicking it opens the review. The day is checked each day, so a new choice
-applies from the next check.
+Threshold (days)** (Settings → Extensions → Task Vault, 7 by default), Today marks it **stale**. A
+project is stale for a different reason: it has no open next action.
 
 ### Quick capture
 
@@ -1271,24 +1256,9 @@ Press `Enter` to save or `Esc` to dismiss.
 - **Ghost subtask row** — a faint `· + Add subtask…` row at the bottom of each open task expands inline on click.
 - **Bidirectional links** — link vault items to specific terminal sessions.
 
-### Kanban view
-
-Click the **grid icon** in the Task Vault toolbar to switch to kanban view:
-
-- Tasks displayed as cards in configurable lane columns.
-- Drag cards between lanes to change their status.
-- **Swimlanes** — group tasks by project or area.
-- **Lanes editor** — add, rename, reorder, and remove lanes. Default lanes: Todo / In Progress / In Review / Done.
-- Cards display a markdown-rendered description preview (capped at 2 lines).
-- Lane config and view mode persist across restarts.
-
 ### Context filter
 
 Click the **Context filter** button (always visible in the toolbar) to open a multiselect dropdown and filter all views by one or more `+context` tags.
-
-### Calendar feed integration
-
-During the Weekly Review, optionally connect an ICS calendar feed to surface scheduled events alongside your task review.
 
 ---
 

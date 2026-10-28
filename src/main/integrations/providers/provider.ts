@@ -13,22 +13,20 @@ import type {
 } from '@terminator/extension-sdk'
 export type { NewIssueInput, TrackerStateOption, TrackerTeam, TransitionIntent }
 
-// One interface, two implementations.
+// One interface, one implementation.
 //
 // The facade above owns caching, single-flight and the error taxonomy; a
 // provider owns exactly one tracker's wire protocol and nothing else. This is
-// the boundary that keeps ADF, JQL and Linear's GraphQL out of every other
-// file in the application.
+// the boundary that keeps Linear's GraphQL out of every other file in the
+// application.
 
 /** Credentials as stored. Only a provider ever sees these. */
-export type StoredCredential =
-  | { tracker: 'linear'; apiKey: string }
-  | { tracker: 'jira'; site: string; email: string; apiToken: string }
-
-export interface VerifiedAccount extends TrackerAccount {
-  /** Jira only — the site the credential belongs to. */
-  site?: string
+export interface StoredCredential {
+  tracker: 'linear'
+  apiKey: string
 }
+
+export type VerifiedAccount = TrackerAccount
 
 /**
  * Every provider holds these:

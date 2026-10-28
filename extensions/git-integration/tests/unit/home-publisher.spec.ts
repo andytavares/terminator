@@ -7,7 +7,7 @@ import { buildContributionCalendar } from '../../src/review/contribution-calenda
 import { dashboardPrFixture } from './support/dashboard-pr'
 import { eventually } from '../../../../tests/support/eventually'
 
-const issue = (key: string, tracker: 'linear' | 'jira' = 'linear') => ({ key, tracker })
+const issue = (key: string) => ({ key, tracker: 'linear' as const })
 
 function setupPublisher(myIssues: Array<ReturnType<typeof issue>> = []) {
   const published: HomeFeed[] = []

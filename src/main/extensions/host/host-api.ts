@@ -30,7 +30,6 @@ export interface HostContext {
   callbacks: CallbackRegistry
   channels: Map<string, ChannelSpec>
   commands: Map<string, HostCommand>
-  exportsOf: (dependencyId: string) => unknown
   report: (error: unknown) => void
 }
 
@@ -299,7 +298,7 @@ function globalShortcutFor(main: MainCalls): ExtensionAPI['globalShortcut'] {
   }
 }
 
-type ForwardedMember = 'dialog' | 'shell' | 'notifications' | 'home' | 'nativeMenu' | 'terminal'
+type ForwardedMember = 'dialog' | 'shell' | 'notifications' | 'home' | 'nativeMenu'
 
 /** The members that are each one call or registration in main, with nothing kept here. */
 function forwardedMembersFor(main: MainCalls): Pick<ExtensionAPI, ForwardedMember> {
@@ -320,10 +319,6 @@ function forwardedMembersFor(main: MainCalls): Pick<ExtensionAPI, ForwardedMembe
       onAction: (handler) => main.hold('home.onAction', handler),
     },
     nativeMenu: { addViewMenuItem: (item) => main.hold('nativeMenu.addViewMenuItem', item) },
-    terminal: {
-      onSessionCreate: (handler) => main.hold('terminal.onSessionCreate', handler),
-      onSessionClose: (handler) => main.hold('terminal.onSessionClose', handler),
-    },
   }
 }
 
@@ -336,7 +331,6 @@ export function createHostExtensionAPI(context: HostContext): ExtensionAPI {
     ...forwardedMembersFor(main),
     db: context.db,
     paths: extensionPaths(context.snapshot.paths, context.extensionId),
-    extensions: { get: (dependencyId: string) => context.exportsOf(dependencyId) as never },
     log: logFor(main),
     settings: settingsFor(context, main),
     globalShortcut: globalShortcutFor(main),

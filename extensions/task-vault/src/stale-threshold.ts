@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
 
-/** Days a task may roll over on Today before it is marked stale and offered in the weekly review. */
+/** Days a task may roll over on Today before it is marked stale. */
 export const STALE_THRESHOLD_KEY = 'terminator.task-vault.staleThresholdDays'
 
 export const STALE_THRESHOLD = { default: 7, min: 1, max: 365 } as const

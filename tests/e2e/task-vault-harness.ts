@@ -36,7 +36,7 @@ export async function openVault(handle: AppHandle): Promise<ExtensionView> {
   return vault
 }
 
-/** Clicks a section in the vault's own sidebar: Today, Inbox, Projects, Areas, History or Weekly review. */
+/** Clicks a section in the vault's own sidebar: Today, Inbox, Projects, Areas or History. */
 export async function goToSection(vault: ExtensionView, section: string): Promise<void> {
   await vault.locator('.vault-sidebar').getByRole('button', { name: section, exact: true }).click()
 }

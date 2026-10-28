@@ -1,10 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import hljs from '../../src/utils/hljs'
-import { detectLanguage } from '../../src/components/FileDiffView'
-import { langFromBlockId } from '../../src/utils/syntax'
+import { extensionOf, extensionOfBlock, highlight } from '../../src/utils/syntax'
 
-// Every extension the diff view and the review blocks recognise, so a mapping
-// to a language outside the bundled set fails here instead of rendering plain.
+// Every extension the diff view and the merge blocks used to map by hand, run through the real
+// highlight.js: an extension outside the bundled set fails here instead of rendering plain.
 const FILES = [
   'a.ts',
   'a.tsx',
@@ -48,23 +47,34 @@ const FILES = [
   'Dockerfile',
 ]
 
-describe('the bundled highlight.js languages', () => {
-  it('cover every language the diff view maps a file to', () => {
-    const unknown = FILES.map(detectLanguage).filter(
-      (lang): lang is string => lang !== undefined && hljs.getLanguage(lang) === undefined
-    )
-    expect(unknown).toEqual([])
+describe('highlight()', () => {
+  it.each(FILES)('has a language for %s', (file) => {
+    expect(hljs.getLanguage(extensionOf(file) ?? '')).toBeDefined()
   })
 
-  it('cover every language a review block maps a file to', () => {
-    const mapped = FILES.map((file) => langFromBlockId(`${file}#0`))
-    expect(mapped.filter((lang) => lang !== undefined).length).toBeGreaterThan(20)
-    expect(mapped.filter((lang) => lang !== undefined && !hljs.getLanguage(lang))).toEqual([])
+  it.each([
+    ['a.ts', 'const x = 1', 'hljs-keyword'],
+    ['a.py', 'def f(): pass', 'hljs-keyword'],
+    ['a.json', '{"a": 1}', 'hljs-attr'],
+    ['a.htm', '<a href="b">c</a>', 'hljs-tag'],
+    ['Dockerfile', 'FROM node:22', 'hljs-keyword'],
+  ])('colours %s', (file, code, token) => {
+    expect(highlight(code, extensionOf(file))).toContain(token)
   })
 
-  it('highlights a Dockerfile, which the common set leaves out', () => {
-    expect(hljs.highlight('FROM node:22\nRUN npm ci', { language: 'dockerfile' }).value).toContain(
-      'hljs-keyword'
-    )
+  it('escapes the text when the extension has no language', () => {
+    expect(highlight('<b>&', 'nosuchext')).toBe('&lt;b&gt;&amp;')
+    expect(highlight('<b>', undefined)).toBe('&lt;b&gt;')
+  })
+})
+
+describe('extensionOf()', () => {
+  it('takes the last extension of the file name, lower-cased', () => {
+    expect(extensionOf('src/App.TSX')).toBe('tsx')
+    expect(extensionOf('v1.2/Dockerfile')).toBe('dockerfile')
+  })
+
+  it('reads the file of a merge block id', () => {
+    expect(extensionOfBlock('src/foo.ts#3')).toBe('ts')
   })
 })

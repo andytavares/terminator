@@ -19,9 +19,6 @@ function input(overrides: Partial<HomeFeedInput> = {}): HomeFeedInput {
   return {
     tasks: [],
     today: '2026-10-18',
-    reviewDay: 3,
-    weekday: 0,
-    reviewStarted: false,
     ...overrides,
   }
 }
@@ -73,25 +70,6 @@ describe('Home asks for tasks that are not waiting', () => {
     )
 
     expect(asks).toEqual([])
-  })
-})
-
-describe('Home ask for the weekly review', () => {
-  it('asks only on the review day', () => {
-    expect(buildHomeFeed(input({ weekday: 2 })).asks).toEqual([])
-    expect(buildHomeFeed(input({ weekday: 3 })).asks).toEqual([
-      expect.objectContaining({
-        id: 'weekly-review',
-        kind: 'task',
-        title: 'Weekly review is ready',
-        actions: [{ id: 'start-review', label: 'Start', primary: true }],
-        open: { command: 'task-vault:open', args: { view: 'review' } },
-      }),
-    ])
-  })
-
-  it('is gone once the review has been started', () => {
-    expect(buildHomeFeed(input({ weekday: 3, reviewStarted: true })).asks).toEqual([])
   })
 })
 

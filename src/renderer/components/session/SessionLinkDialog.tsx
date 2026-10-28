@@ -3,7 +3,6 @@ import { Dialog, type DialogAction } from '@terminator/extension-ui'
 import { IssuePicker } from '../integrations/IssuePicker'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
-import { useModalEffect } from '../../stores/modal.store'
 import type { SessionFacts } from '../../sidebar/session-facts'
 import type { IssueSummary } from '../../../shared/types/index'
 
@@ -19,7 +18,6 @@ interface Props {
  * hands the session back to the branch's ticket (FR-012).
  */
 export function SessionLinkDialog({ facts, onClose }: Props): JSX.Element {
-  useModalEffect()
   const connected = useIntegrationsStore((s) => s.isAnyConnected())
   const [selected, setSelected] = useState<IssueSummary | null>(null)
   const { busy, error, write } = useLinkWrite(facts, onClose)
@@ -114,7 +112,7 @@ function PickerOrNotice({ connected, selected, onSelect }: PickerProps): JSX.Ele
   if (!connected) {
     return (
       <p className="tmui-dialog__description" role="alert">
-        No issue tracker is connected. Connect Linear or Jira in Settings → Integrations.
+        No issue tracker is connected. Connect Linear in Settings → Integrations.
       </p>
     )
   }

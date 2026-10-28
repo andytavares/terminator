@@ -1,5 +1,30 @@
 # Changelog — @terminator/extension-sdk
 
+## 6.0.0
+
+Major: four APIs are removed, and a tracker is no longer one of two.
+
+### Changed (breaking)
+
+- `TrackerId` is `'linear'`; Jira is removed. `MineSelector` is `{ kind: 'assignee'; email }` (the
+  `query` kind was Jira's JQL). `TrackerConnection` has no `site`. `WorkKey` takes a `TrackerId`.
+  Migrate: stop passing `'jira'`; a stored Jira link or credential is ignored on read.
+- `ExtensionAPI['terminal']` is removed: `onSessionCreate` and `onSessionClose` never fired for an
+  extension. Migrate: watch `api.pty` or `api.workspace` instead.
+- `api.extensions.get`, the manifest's `extensionDependencies`, `TaskVaultAPI`, `VaultDestination`
+  and `BuiltInExtensionExports` (`types/extensions.d.ts`) are removed. The host no longer orders
+  activation by dependency, and what `activate` returns is not read. Migrate: share state through
+  `api.ipc` channels, or keep each extension self-contained.
+- `SessionSnapshot` is removed with `api.terminal`.
+- `window.electronAPI.ui.setModalDepth` is removed from the view declaration, and with it the
+  `ui` namespace. The double-Escape exit now asks the view's own document whether a modal dialog
+  or a popover is open. Migrate: stop calling it; a `<dialog>` opened with `showModal()` and a
+  `popover` element count without being reported.
+
+### Added
+
+- The view's `listWorktrees` entries carry `detached` and `prunable`.
+
 ## 5.2.0
 
 ### Added

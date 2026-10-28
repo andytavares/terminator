@@ -62,8 +62,11 @@ export type { TimeInput } from './relative-time'
 
 export { usePolling, everyWhileVisible } from './usePolling'
 
-export { Popover, keepOnScreen } from './Popover'
+export { Popover } from './Popover'
 export type { PopoverProps } from './Popover'
+
+export { Menu, MenuItem } from './Menu'
+export type { MenuItemProps, MenuProps } from './Menu'
 
 export { ConfirmDialog } from './ConfirmDialog'
 export type { ConfirmDialogProps } from './ConfirmDialog'
@@ -88,8 +91,4 @@ export type { IconButtonProps, IconButtonSize } from './IconButton'
 export { LAYERS, LAYER_NAMES, layerCssDeclarations, layerCssVar, layerValue } from './layers'
 export type { LayerName } from './layers'
 
-export { createModalDepthRegistry, getModalDepth, MODAL_DEPTH_KEY } from './modal-depth'
-export type { ModalDepthHost, ModalDepthRegistry } from './modal-depth'
-
-export { useDismissible } from './useDismissible'
-export type { DismissibleOptions } from './useDismissible'
+export { useCloseOnOutsidePress } from './useCloseOnOutsidePress'

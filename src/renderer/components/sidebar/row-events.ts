@@ -1,6 +1,5 @@
 import type React from 'react'
 import { useState } from 'react'
-import { closeAllContextMenus } from '../ContextMenu'
 
 // Event handling the sidebar's rows share: a row is a button-like element with
 // controls inside it, and a context menu of its own.
@@ -22,13 +21,12 @@ export function clickOnly(run: () => void) {
   }
 }
 
-/** A row's context menu: where it is open, if it is. Opening it closes any other menu first. */
+/** A row's context menu: where it is open, if it is. Opening it closes any other menu. */
 export function useRowMenu() {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const openRowMenu = (e: React.MouseEvent): void => {
     e.preventDefault()
     e.stopPropagation()
-    closeAllContextMenus()
     setMenu({ x: e.clientX, y: e.clientY })
   }
   return { menu, openMenu: openRowMenu, closeMenu: () => setMenu(null) }

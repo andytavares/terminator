@@ -53,10 +53,10 @@ describe('issue-link-store — several links', () => {
   it('keeps links for different projects apart', async () => {
     const store = await load()
     await store.setLink({ projectId: P1, tracker: 'linear', key: 'TAV-42', injectContext: true })
-    await store.setLink({ projectId: P2, tracker: 'jira', key: 'TAV-7', injectContext: false })
+    await store.setLink({ projectId: P2, tracker: 'linear', key: 'TAV-7', injectContext: false })
 
     expect(store.getLink(P1)?.key).toBe('TAV-42')
-    expect(store.getLink(P2)?.tracker).toBe('jira')
+    expect(store.getLink(P2)?.key).toBe('TAV-7')
   })
 
   it('lets two projects share one issue', async () => {
@@ -68,24 +68,15 @@ describe('issue-link-store — several links', () => {
     expect(store.getLink(P1)?.injectContext).toBe(true)
     expect(store.getLink(P2)?.injectContext).toBe(false)
   })
-
-  it('distinguishes the same key in two trackers', async () => {
-    const store = await load()
-    await store.setLink({ projectId: P1, tracker: 'linear', key: 'TAV-42', injectContext: true })
-    await store.setLink({ projectId: P2, tracker: 'jira', key: 'TAV-42', injectContext: true })
-
-    expect(store.getLink(P1)?.tracker).toBe('linear')
-    expect(store.getLink(P2)?.tracker).toBe('jira')
-  })
 })
 
 describe('issue-link-store — one issue per project (FR-033)', () => {
   it('replaces rather than accumulating', async () => {
     const store = await load()
     await store.setLink({ projectId: P1, tracker: 'linear', key: 'TAV-42', injectContext: true })
-    await store.setLink({ projectId: P1, tracker: 'jira', key: 'TAV-7', injectContext: false })
+    await store.setLink({ projectId: P1, tracker: 'linear', key: 'TAV-7', injectContext: false })
 
-    expect(store.getLink(P1)).toMatchObject({ tracker: 'jira', key: 'TAV-7' })
+    expect(store.getLink(P1)).toMatchObject({ tracker: 'linear', key: 'TAV-7' })
     expect(storedLinks().filter((link) => link.projectId === P1)).toHaveLength(1)
   })
 

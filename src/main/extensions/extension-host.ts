@@ -30,8 +30,6 @@ interface StartOptions {
   bundledDirectory: string
   /** Work extensions need before activating, such as the login-shell PATH. */
   beforeActivation: Promise<void>
-  /** Work that needs every extension's tables to exist, such as the legacy database import. */
-  afterActivation?: () => Promise<void>
 }
 
 type RegisterResult =
@@ -87,14 +85,7 @@ function withCurrentManifest(record: ExtensionRecord): ExtensionRecord {
   return { ...toRecord(manifest.data, record.directoryPath), status, installedAt, errorMessage }
 }
 
-/** Read from the manifest, not the stored record: a bundled extension stays registered across
- * updates, so its record can predate the field. */
-function declaredDependencies(record: ExtensionRecord): string[] {
-  const manifest = readManifest(record.directoryPath)
-  return 'data' in manifest ? (manifest.data.extensionDependencies ?? []) : []
-}
-
-/** The manifest's `contributes.shellRoots`, read like `extensionDependencies` (ADR 102). */
+/** The manifest's `contributes.shellRoots`, read from the manifest, not the stored record, since a bundled extension stays registered across updates (ADR 102). */
 function declaredShellRoots(record: ExtensionRecord): string[] {
   const manifest = readManifest(record.directoryPath)
   return 'data' in manifest ? (manifest.data.contributes?.shellRoots ?? []) : []
@@ -106,20 +97,6 @@ export interface BackendHost {
   deactivate(extensionId: string): Promise<void>
 }
 
-/** The dependency path from `id` back to itself, or null when `id` is in no cycle. */
-function cycleThrough(id: string, dependenciesOf: (id: string) => string[]): string[] | null {
-  const extendPath = (path: string[]): string[] | null => {
-    for (const dependency of dependenciesOf(path[path.length - 1])) {
-      if (dependency === id) return [...path, dependency]
-      if (path.includes(dependency)) continue
-      const cycle = extendPath([...path, dependency])
-      if (cycle) return cycle
-    }
-    return null
-  }
-  return extendPath([id])
-}
-
 function toExtension(record: ExtensionRecord): Extension {
   const { directoryPath: _dp, ...extension } = record
   return extension
@@ -129,7 +106,6 @@ export class ExtensionHost {
   /** Each active backend's registrations in main, by extension id. */
   private loaded = new Map<string, Disposable[]>()
   private activations = new Map<string, Promise<void>>()
-  private afterActivation: Promise<void> = Promise.resolve()
   private deps: ExtensionAPIDeps = {}
   /** The main-side API of each backend in the extension host, which its calls run on. */
   private readonly hostedApis = new Map<string, ExtensionAPI>()
@@ -330,26 +306,18 @@ export class ExtensionHost {
         .map((record) => ({ record, isNew: false })),
       ...this.registerBundled(options.bundledDirectory).map((record) => ({ record, isNew: true })),
     ]
-    const dependencies = new Map(
-      registered.map(({ record }) => [record.id, declaredDependencies(record)])
-    )
-    const dependenciesOf = (id: string) => dependencies.get(id) ?? []
     for (const { record, isNew } of registered) {
-      const cycle = cycleThrough(record.id, dependenciesOf)
-      const activation = cycle
-        ? this.failAtStartup(record, isNew, `Extension dependency cycle: ${cycle.join(' -> ')}`)
-        : this.activateAtStartup(record, isNew, options.beforeActivation)
-      this.activations.set(record.id, activation)
+      this.activations.set(
+        record.id,
+        this.activateAtStartup(record, isNew, options.beforeActivation)
+      )
     }
-    const allActivated = Promise.all(this.activations.values())
-    if (options.afterActivation) this.afterActivation = allActivated.then(options.afterActivation)
-    await Promise.all([allActivated, this.afterActivation])
+    await Promise.all(this.activations.values())
   }
 
-  /** Resolves once the extension's backend is up and any startup data import is done. */
+  /** Resolves once the extension's backend is up. */
   async whenActivated(id: string): Promise<void> {
     await this.activations.get(id)
-    await this.afterActivation
   }
 
   private registerBundled(bundledDir: string): ExtensionRecord[] {
@@ -390,8 +358,6 @@ export class ExtensionHost {
     beforeActivation: Promise<void>
   ): Promise<void> {
     await beforeActivation
-    // Every activation is in the map by now: startAll() fills it before anything awaits.
-    await Promise.all(declaredDependencies(record).map((id) => this.activations.get(id)))
     const result = await this.activateBackend(record)
     if ('error' in result) await this.failAtStartup(record, isNew, result.message)
   }
@@ -402,30 +368,15 @@ export class ExtensionHost {
     if (isNew) this.recordActivationFailure(record, message)
   }
 
-  /** Why a declared dependency is not active, or null when every one is. */
-  private inactiveDependency(record: ExtensionRecord): string | null {
-    for (const id of declaredDependencies(record)) {
-      if (this.loaded.has(id)) continue
-      const stored = store.get('extensions').find((e) => e.id === id)
-      if (!stored) return `Missing extension dependency "${id}"`
-      if (stored.status === 'disabled') return `Extension dependency "${id}" is disabled`
-      return `Extension dependency "${id}" failed to activate`
-    }
-    return null
-  }
-
   private async activateBackend(
     record: ExtensionRecord
   ): Promise<{ ok: true } | { error: string; message: string }> {
-    const inactive = this.inactiveDependency(record)
-    if (inactive) return { error: 'DEPENDENCY_ERROR', message: inactive }
     const deps = { ...this.deps, shellRootSettings: declaredShellRoots(record) }
     const api = createExtensionAPI(record.id, deps, record.rendererUrl)
     this.hostedApis.set(record.id, api)
     try {
-      const dependencies = declaredDependencies(record)
       const { id, entryPoint, directoryPath: directory } = record
-      await this.backends.activate({ id, entryPoint, directory, dependencies })
+      await this.backends.activate({ id, entryPoint, directory })
     } catch (e) {
       this.hostedApis.delete(record.id)
       this.disposeAll(getApiDisposables(api))

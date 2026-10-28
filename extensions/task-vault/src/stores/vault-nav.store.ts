@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type VaultView = 'daily' | 'inbox' | 'projects' | 'areas' | 'archive' | 'review'
+export type VaultView = 'daily' | 'inbox' | 'projects' | 'areas' | 'archive'
 
 interface VaultNavStore {
   activeView: VaultView

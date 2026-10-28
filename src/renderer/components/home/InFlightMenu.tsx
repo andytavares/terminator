@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Ellipsis } from 'lucide-react'
 import { IconButton } from '@terminator/extension-ui'
-import { ContextMenu, closeAllContextMenus, type ContextMenuItem } from '../ContextMenu'
+import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
 import { afterClosing } from '../sidebar/row-events'
 import { useDismissedThreads } from './dismissed-threads'
 import { leadSessionOf, toggleArchived } from './thread-actions'
@@ -171,13 +171,12 @@ function MenuDialogs({
   return <></>
 }
 
-/** Where the row's menu is open, if it is. Opening closes any other menu first. */
+/** Where the row's menu is open, if it is. Opening closes any other menu. */
 export function useWorkMenu() {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const openWorkMenu = (e: React.MouseEvent): void => {
     e.preventDefault()
     e.stopPropagation()
-    closeAllContextMenus()
     setMenu({ x: e.clientX, y: e.clientY })
   }
   return { menu, openWorkMenu, closeWorkMenu: () => setMenu(null) }

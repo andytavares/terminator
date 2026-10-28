@@ -12,9 +12,10 @@ import {
   runQuickActionFromPanel,
   readTerminalRows,
 } from './helpers'
-import { connectJira, startJiraStub, type JiraStub } from './jira-stub'
 import { allowCredentialsWithoutKeychain, recordShellOpens, shellOpens } from './main-stubs'
 import { runInVisibleTerminal } from './session-views'
+import { startTrackerStub, type TrackerStub } from './tracker-stub'
+import type { LinearState } from './tracker-stub-linear'
 
 // Every core Quick Action the rest of the suite never runs, run the way an
 // operator finds one: ⌘P, `/`, its name, its row. Each step asserts what the
@@ -183,7 +184,7 @@ async function navigationQuickActions(page: Page): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Issue actions, against a local Jira.
+// Issue actions, against a local Linear.
 // ---------------------------------------------------------------------------
 
 async function linkIssueAttachesToBranch(page: Page): Promise<void> {
@@ -210,9 +211,43 @@ async function copyIssueKeyFillsClipboard({ page, app }: AppHandle): Promise<voi
   await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('OPS-1')
 }
 
-async function openInJiraOpensBrowser({ page, app }: AppHandle, stub: JiraStub): Promise<void> {
-  await runQuickActionFromPanel(page, 'Open OPS-1 in Jira')
-  await expect.poll(() => shellOpens(app)).toContain(`https://${stub.site}/browse/OPS-1`)
+async function openInLinearOpensBrowser({ page, app }: AppHandle): Promise<void> {
+  await runQuickActionFromPanel(page, 'Open OPS-1 in Linear')
+  await expect.poll(() => shellOpens(app)).toContain('https://linear.app/acme/issue/OPS-1')
+}
+
+const LINEAR_API_KEY = 'lin_api_e2e'
+
+/** The tracker's own state: two issues, neither assigned to the operator. */
+function linearState(): LinearState {
+  const issue = (identifier: string, title: string, description: string) => ({
+    identifier,
+    title,
+    description,
+    state: { name: 'Todo', type: 'unstarted' as const },
+    assigneeEmail: null,
+    comments: [],
+  })
+  return {
+    apiKey: LINEAR_API_KEY,
+    viewer: { name: 'E2E Operator', email: 'operator@example.com' },
+    issues: [
+      issue('OPS-1', 'Fix the login page', 'It breaks.'),
+      issue('OPS-2', 'Ship the audit log', 'Audit.'),
+    ],
+    operations: [],
+  }
+}
+
+/** Connects Linear through Settings → Integrations, against the stub. */
+async function connectLinear(page: Page): Promise<void> {
+  await openSettingsSection(page, 'Integrations')
+  await page.locator('#linear-api-key').fill(LINEAR_API_KEY)
+  await page.getByRole('button', { name: 'Connect Linear' }).click()
+  await expect(page.locator('.integrations__tracker', { hasText: 'Linear' })).toContainText(
+    'Connected as operator@example.com'
+  )
+  await closeSettingsPanel(page)
 }
 
 async function changeLinkedIssuePinsSession(page: Page): Promise<void> {
@@ -227,32 +262,29 @@ async function changeLinkedIssuePinsSession(page: Page): Promise<void> {
   await expect(projectGroup(page, 'login-fix')).toContainText('OPS-1')
 }
 
-async function issueActions(handle: AppHandle, stub: JiraStub): Promise<void> {
+async function issueActions(handle: AppHandle): Promise<void> {
   const { page } = handle
   await createWorkspace(page, 'Tracked', e2eTempDir('issue-'))
   await addAndSelectProject(page, 'Tracked', 'login-fix')
-  await connectJira(page, stub)
+  await connectLinear(page)
   await test.step('Link issue to branch attaches a searched issue to the branch', () =>
     linkIssueAttachesToBranch(page))
   await test.step('View opens the linked issue in the drawer', () => viewOpensIssueDrawer(page))
   await test.step('Copy issue key puts the key on the clipboard', () =>
     copyIssueKeyFillsClipboard(handle))
-  await test.step('Open in Jira hands the issue URL to the browser', () =>
-    openInJiraOpensBrowser(handle, stub))
+  await test.step('Open in Linear hands the issue URL to the browser', () =>
+    openInLinearOpensBrowser(handle))
   await test.step('Change linked issue pins a different issue to the focused session only', () =>
     changeLinkedIssuePinsSession(page))
 }
 
 test.describe('core quick actions', () => {
   let handle: AppHandle
-  let stub: JiraStub
+  let stub: TrackerStub
 
   test.beforeAll(async () => {
-    stub = await startJiraStub([
-      { key: 'OPS-1', summary: 'Fix the login page', description: 'It breaks.', status: 'To Do' },
-      { key: 'OPS-2', summary: 'Ship the audit log', description: 'Audit.', status: 'In Progress' },
-    ])
-    handle = await launchApp(undefined, { NODE_EXTRA_CA_CERTS: stub.caPath })
+    stub = await startTrackerStub(linearState())
+    handle = await launchApp(undefined, stub.env)
     await allowCredentialsWithoutKeychain(handle.app)
     await recordShellOpens(handle.app)
   })
@@ -270,6 +302,6 @@ test.describe('core quick actions', () => {
     await terminalActions(page)
     await sessionActions(page)
     await navigationQuickActions(page)
-    await issueActions(handle, stub)
+    await issueActions(handle)
   })
 })

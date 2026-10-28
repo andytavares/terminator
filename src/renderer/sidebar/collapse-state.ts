@@ -1,3 +1,4 @@
+import { readStoredJson, writeStoredJson } from '../home/local-storage'
 import type { GroupKey } from './view-model'
 
 /**
@@ -31,28 +32,21 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((v) => typeof v === 'string')
 }
 
-export function loadCollapseState(): CollapseState {
-  try {
-    const raw = localStorage.getItem(COLLAPSE_STORAGE_KEY)
-    if (!raw) return {}
-    const parsed: unknown = JSON.parse(raw)
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {}
-    const state: CollapseState = {}
-    for (const [mode, keys] of Object.entries(parsed)) {
-      if (isStringArray(keys)) state[mode as CollapseNamespace] = keys
-    }
-    return state
-  } catch {
-    return {}
+function collapseStateFrom(parsed: unknown): CollapseState | null {
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null
+  const state: CollapseState = {}
+  for (const [mode, keys] of Object.entries(parsed)) {
+    if (isStringArray(keys)) state[mode as CollapseNamespace] = keys
   }
+  return state
+}
+
+export function loadCollapseState(): CollapseState {
+  return readStoredJson<CollapseState>(COLLAPSE_STORAGE_KEY, {}, collapseStateFrom)
 }
 
 export function saveCollapseState(state: CollapseState): void {
-  try {
-    localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(state))
-  } catch {
-    // ignore write failures (private browsing, storage full)
-  }
+  writeStoredJson(COLLAPSE_STORAGE_KEY, state)
 }
 
 export function isCollapsed(
