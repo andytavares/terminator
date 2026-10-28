@@ -431,6 +431,8 @@
    at no specificity, so a caller's own class decides any of it. */
 :where(.tmui-anchored) {
   position: fixed;
+  /* The element showPopover({ source }) named: Chromium 152 resolves anchor() only with auto. */
+  position-anchor: auto;
   inset: auto;
   margin: 0;
   top: calc(anchor(bottom) + var(--tm-space-1, 4px));

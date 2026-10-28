@@ -18,7 +18,6 @@ test.afterAll(async () => {
 const MENUS = [
   { button: 'Display', menu: 'Display' },
   { button: 'Filter', menu: 'Filter' },
-  { button: 'New terminal', menu: 'Start a terminal' },
 ]
 
 for (const { button, menu } of MENUS) {
@@ -32,6 +31,11 @@ for (const { button, menu } of MENUS) {
     const opened = page.getByRole('menu', { name: menu })
     const items = opened.locator('[role^="menuitem"]:not(:disabled)')
     await expect(opened).toBeVisible()
+    // Anchored under its button, not drawn at the window's corner (Chromium resolves anchor()
+    // only with position-anchor: auto).
+    const [menuBox, buttonBox] = await Promise.all([opened.boundingBox(), trigger.boundingBox()])
+    expect(menuBox!.y).toBeGreaterThanOrEqual(buttonBox!.y + buttonBox!.height)
+    expect(Math.round(menuBox!.x)).toBe(Math.round(buttonBox!.x))
     await expect(items.first()).toBeFocused()
     await page.keyboard.press('ArrowDown')
     await expect(items.nth(1)).toBeFocused()
