@@ -1,16 +1,8 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
+import { openStory } from './open-story'
 
 // What a popover and a menu leave to the browser, driven with real input: a story's play function
 // sends scripted events, which no browser answers with light dismiss or a focus return.
-
-async function openStory(page: Page, id: string): Promise<void> {
-  await page.goto(`/iframe.html?id=${id}&viewMode=story`)
-  await page.waitForFunction(() => {
-    const preview = (window as { __STORYBOOK_PREVIEW__?: { currentRender?: { phase?: string } } })
-      .__STORYBOOK_PREVIEW__
-    return ['completed', 'finished'].includes(preview?.currentRender?.phase ?? '')
-  })
-}
 
 test('Escape closes a popover, as light dismiss', async ({ page }) => {
   await openStory(page, 'components-popover--default')
