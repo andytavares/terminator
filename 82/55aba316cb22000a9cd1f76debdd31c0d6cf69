@@ -1,0 +1,22 @@
+packages/extension-ui/src/Popover.tsx
+  s_567c3310a5db4e::t_cde3bfd612e49b 91-98
+tests/unit/packages/extension-ui/popover.spec.tsx
+  s_567c3310a5db4e::t_37c51259d8dfaa 150-171,174,176-177
+  s_567c3310a5db4e::t_95361ae8e5f82a 172-173,175
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8255aba316cb22000a9cd1f76debdd31c0d6cf69",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
