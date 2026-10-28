@@ -82,7 +82,7 @@ function appendLinearComment(state: LinearState, input: { issueId: string; body:
 
 type Operation = (state: LinearState, variables: Record<string, unknown>) => unknown
 
-const OPERATIONS: Record<string, Operation> = {
+const OPERATION_TABLE: Record<string, Operation> = {
   viewer: (state) => ({ viewer: { id: state.viewer.email, ...state.viewer } }),
   user_assignedIssues: (state, v) => ({
     user: { assignedIssues: issueConnection(state.issues.filter((i) => i.assigneeEmail === v.id)) },
@@ -117,6 +117,9 @@ const OPERATIONS: Record<string, Operation> = {
   createComment: (state, v) =>
     appendLinearComment(state, v.input as { issueId: string; body: string }),
 }
+
+// A Map, so a name such as `constructor` reaches no inherited method.
+const OPERATIONS = new Map(Object.entries(OPERATION_TABLE))
 
 /** A `$name: String!` variable given something other than a string, as GraphQL refuses it. */
 function invalidStringVariable(query: string, variables: Record<string, unknown>): string | null {
@@ -156,7 +159,7 @@ export function answerLinear(
       status: 400,
       body: { errors: [{ message: invalid, extensions: { code: 'GRAPHQL_VALIDATION_FAILED' } }] },
     }
-  const operation = OPERATIONS[name]
+  const operation = OPERATIONS.get(name)
   if (!operation)
     return { status: 400, body: { errors: [{ message: `stub Linear has no ${name}` }] } }
   return { status: 200, body: { data: operation(state, variables) } }
