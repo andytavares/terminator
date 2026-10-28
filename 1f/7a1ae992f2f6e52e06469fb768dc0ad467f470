@@ -1,0 +1,21 @@
+scripts/CLAUDE.md
+  s_567c3310a5db4e::t_ceed5967a6dd71 14
+tests/unit/scripts/create-extension.spec.js
+  s_567c3310a5db4e::t_2cd1137f8588de 109-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1f7a1ae992f2f6e52e06469fb768dc0ad467f470",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
