@@ -159,8 +159,8 @@ export function answerLinear(
       status: 400,
       body: { errors: [{ message: invalid, extensions: { code: 'GRAPHQL_VALIDATION_FAILED' } }] },
     }
-  const operation = OPERATIONS.get(name)
-  if (!operation)
+  const operation = OPERATIONS.has(name) ? OPERATIONS.get(name) : undefined
+  if (typeof operation !== 'function')
     return { status: 400, body: { errors: [{ message: `stub Linear has no ${name}` }] } }
   return { status: 200, body: { data: operation(state, variables) } }
 }
