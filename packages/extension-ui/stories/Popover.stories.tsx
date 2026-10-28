@@ -24,9 +24,11 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <div style={{ position: 'relative', height: 200 }}>
-        <Button variant="secondary">Branch</Button>
-        <Story />
+      <div style={{ height: 200 }}>
+        <div style={{ display: 'inline-block' }}>
+          <Button variant="secondary">Branch</Button>
+          <Story />
+        </div>
       </div>
     ),
   ],
