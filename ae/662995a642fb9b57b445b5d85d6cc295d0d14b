@@ -1,0 +1,23 @@
+packages/extension-ui/stories/ModalShell.stories.tsx
+  s_567c3310a5db4e::t_de40e8015d5de2 170-178
+packages/extension-ui/stories/Popover.stories.tsx
+  s_567c3310a5db4e::t_886bc9aac559d7 27-31
+packages/extension-ui/stories/Menu.stories.tsx
+  s_567c3310a5db4e::t_de40e8015d5de2 26-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ae662995a642fb9b57b445b5d85d6cc295d0d14b",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
