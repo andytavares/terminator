@@ -1,0 +1,25 @@
+packages/extension-ui/visual/stories.visual.ts
+  s_567c3310a5db4e::t_70c5b1bad10668 5,26
+packages/extension-ui/visual/popover.visual.ts
+  s_567c3310a5db4e::t_70c5b1bad10668 1-2
+packages/extension-ui/src/extension-ui.css
+  s_567c3310a5db4e::t_70c5b1bad10668 379,382
+packages/extension-ui/visual/open-story.ts
+  s_567c3310a5db4e::t_70c5b1bad10668 1-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3e30b75e00d476741c3ce9751a7fc3844f3e3ad1",
+  "prompts": {},
+  "sessions": {
+    "s_567c3310a5db4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6495aadc-9420-4653-a7f6-8eb94ed060e9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
