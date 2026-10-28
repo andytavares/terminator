@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { localDate, monthName, weekdayName } from '../../src/utils/local-date'
+import { localDate, monthNameOf, weekdayName } from '../../src/utils/local-date'
 
 describe('localDate', () => {
   it('formats a date as YYYY-MM-DD', () => {
@@ -11,9 +11,9 @@ describe('localDate', () => {
   })
 })
 
-describe('monthName', () => {
+describe('monthNameOf', () => {
   it('names months from 0 for January to 11 for December', () => {
-    expect([0, 5, 11].map(monthName)).toEqual(['January', 'June', 'December'])
+    expect([0, 5, 11].map(monthNameOf)).toEqual(['January', 'June', 'December'])
   })
 })
 

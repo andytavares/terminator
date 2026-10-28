@@ -4,7 +4,7 @@ export function localDate(d: Date = new Date()): string {
 }
 
 /** The English name of a month, 0 for January. */
-export function monthName(month: number): string {
+export function monthNameOf(month: number): string {
   return new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(2000, month, 1))
 }
 

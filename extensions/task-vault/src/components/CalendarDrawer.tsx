@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { useVaultStore } from '../stores/vault.store'
 import { dayLoadLabel, isOverdue, shortDay, weekOf } from '../state/calendar-load'
 import type { Task } from '../vault/types'
-import { localDate, monthName, weekdayName } from '../utils/local-date'
+import { localDate, monthNameOf, weekdayName } from '../utils/local-date'
 import { IconButton } from '@terminator/extension-ui'
 
 type DayData = { date: string; status: string; count: number }
@@ -313,7 +313,7 @@ export function CalendarDrawer(): React.JSX.Element {
         <div className="cal-drawer__month-nav">
           <IconButton icon={ChevronLeft} label="Previous month" size="sm" onClick={m.prev} />
           <span className="cal-drawer__month-label">
-            {monthName(m.month - 1)} {m.year}
+            {monthNameOf(m.month - 1)} {m.year}
           </span>
           <IconButton icon={ChevronRight} label="Next month" size="sm" onClick={m.next} />
         </div>

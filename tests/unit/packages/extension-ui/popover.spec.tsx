@@ -4,9 +4,8 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { Popover } from '../../../../packages/extension-ui/src/Popover'
 import { isSurfaceOpen } from '../../../../src/shared/double-escape'
 
-// A picker, a dropdown, a detail panel. The audit scored these against aria-modal and a focus trap
-// and called them failing; both would be defects here, because the view behind a popover stays
-// live (research R10). Placement, the top layer and light dismiss are a browser's: the stories in
+// aria-modal and a focus trap would be defects here: the view behind a popover stays live (research
+// R10). Placement, the top layer and light dismiss are a browser's: the stories in
 // packages/extension-ui/stories/Popover.stories.tsx prove those in Chromium.
 
 function renderPopover(onDismiss = vi.fn()) {

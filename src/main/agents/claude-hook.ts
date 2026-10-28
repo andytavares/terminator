@@ -6,17 +6,15 @@ import { shellQuote } from '@terminator/extension-sdk/node'
 import { putHook } from '../integrations/claude-settings.js'
 import { sessionContextDirectory } from '../integrations/session-context.js'
 
-// How the app learns what Claude Code does in a terminal tab, including one the operator typed by hand.
-//
-// ONE script and ONE set of entries in the operator's own Claude settings
-// (payloads: https://code.claude.com/docs/en/hooks). The script reads the event name from stdin:
-//   SessionStart                          -> agent-sessions/<terminal>.json (the conversation's id,
-//                                            transcript and folder), plus the linked issue as context
-//   Notification, UserPromptSubmit,
-//   Stop, StopFailure                     -> agent-sessions/asks/<microseconds>-<pid>.json
-// A file drop, not an `http` hook: the app runs no local server a hook could reach.
-// A project's own `.claude/settings.local.json` runs the same script with a third argument, the
-// project's context file (see integrations/session-hook.ts).
+// One script and one set of entries in the operator's Claude settings, for every terminal tab,
+// including one typed by hand (payloads: https://code.claude.com/docs/en/hooks).
+
+// The script reads the event name from stdin. SessionStart writes agent-sessions/<terminal>.json
+// (conversation id, transcript, folder) and the linked issue as context; Notification,
+// UserPromptSubmit, Stop and StopFailure write agent-sessions/asks/<microseconds>-<pid>.json.
+
+// A file drop, not an `http` hook: the app runs no local server a hook could reach. A project's
+// `.claude/settings.local.json` runs it with a third argument, the context file (session-hook.ts).
 
 const SCRIPT_NAME = 'claude-hook.cjs'
 // Scripts of earlier versions. Their entries are collapsed into ours and the files removed.
@@ -35,13 +33,9 @@ const EVENTS = ['SessionStart', 'Notification', 'UserPromptSubmit', 'Stop', 'Sto
 /** Every name an entry of ours can carry, current and legacy. */
 export const HOOK_MARKERS = [SCRIPT_NAME, ...LEGACY_SCRIPT_NAMES]
 
-/**
- * The script the agent executes. Carried as source and written at startup (ADR-026): a loose
- * script beside the bundle survives development and vanishes from the packaged app.
- * It is silent on any error: it runs before every agent session in every folder, and a hook that
- * fails loudly would break sessions that have nothing to do with this application.
- * @internal
- */
+/** The agent's script, written at startup (ADR-026): a loose file beside the bundle vanishes when
+ * packaged. Silent on any error: it runs before every session, and a loud one breaks unrelated ones.
+ * @internal */
 export const HOOK_SCRIPT = `// Written by Terminator. Do not edit: it is overwritten on every start.
 const fs = require('fs')
 const path = require('path')

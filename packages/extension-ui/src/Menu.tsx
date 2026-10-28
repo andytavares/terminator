@@ -21,11 +21,8 @@ function moveBetweenItems(event: React.KeyboardEvent<HTMLDivElement>): void {
   target.focus()
 }
 
-/**
- * A list of actions on a popover: Escape or a click outside closes it, focus returns to the
- * control that opened it, and the arrow keys move between its `MenuItem`s (or any child with a
- * `menuitem*` role). Opens on its first item.
- */
+/** A list of actions on a popover: Escape or an outside click closes it and focus returns. Arrow
+ * keys move between its `MenuItem`s (or any child with a `menuitem*` role); opens on the first. */
 export function Menu({ className, children, ...popover }: MenuProps): JSX.Element {
   return (
     <Popover

@@ -47,10 +47,7 @@ export function parseTable(source: string): ParsedTable | null {
   }
 }
 
-/**
- * The cells of one row. Lezer emits no TableCell for an empty cell, so each cell is the gap
- * between two pipes, and an empty gap is an empty cell just after its pipe.
- */
+/** The cells of one row. Lezer emits no TableCell for an empty cell: each cell is the gap between two pipes. */
 function rowCells(row: SyntaxNode, source: string): TableCell[] {
   const pipes = row.getChildren('TableDelimiter')
   const textNodes = row.getChildren('TableCell')

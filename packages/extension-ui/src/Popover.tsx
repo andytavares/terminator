@@ -24,32 +24,19 @@ export interface PopoverProps {
   onKeyDown?: React.KeyboardEventHandler<HTMLDivElement>
 }
 
-/**
- * A surface anchored to a control — a picker, a dropdown, a detail panel.
- *
- * It is a native `popover="auto"` element: it sits in the top layer, so no ancestor clips it, and
- * the browser closes it on Escape or a click outside, and gives focus back to what had it. The
- * element it is rendered inside is its anchor: CSS anchor positioning places it under that element
- * and flips it at a window edge.
- *
- * Deliberately *not* a Dialog: the view behind a popover stays live, so it claims no `aria-modal`
- * and traps no focus. See research R10.
- */
+const SURFACE_ATTRIBUTES = { popover: 'auto', 'data-tmui-surface': '' } as const
+
+/** A surface anchored to its parent element: a picker, a dropdown, a detail panel. A native popover
+ * in the top layer: the browser closes it on Escape or an outside click and returns focus. Not a
+ * Dialog: the view behind stays live, so no `aria-modal`, no focus trap (research R10). */
 export function Popover(props: PopoverProps): JSX.Element {
   const { label, children, className, align = 'start', at, role = 'group', onKeyDown } = props
   const ref = useShownPopover(props.onDismiss, at)
-  const classes = [
-    'tmui-anchored',
-    role === 'group' && 'tmui-popover',
-    align === 'end' && 'tmui-anchored--end',
-    className,
-  ]
   return (
     <div
       ref={ref}
-      popover="auto"
-      data-tmui-surface=""
-      className={classes.filter(Boolean).join(' ')}
+      {...SURFACE_ATTRIBUTES}
+      className={popoverClasses(role, align, className)}
       style={at ? { left: at.x, top: at.y, right: 'auto' } : undefined}
       role={role}
       tabIndex={-1}
@@ -59,6 +46,11 @@ export function Popover(props: PopoverProps): JSX.Element {
       {children}
     </div>
   )
+}
+
+function popoverClasses(role: string, align: string, className?: string): string {
+  const classes = ['tmui-anchored', role === 'group' && 'tmui-popover']
+  return [...classes, align === 'end' && 'tmui-anchored--end', className].filter(Boolean).join(' ')
 }
 
 /** Shows the surface on mount, keeps it on screen when it opens at a point, and reports the
@@ -98,15 +90,11 @@ if (typeof document !== 'undefined') {
   document.addEventListener('pointercancel', note(false), true)
 }
 
-/**
- * Shows the surface as a popover and tells `onDismiss` when the browser closes it; returns the undo.
- *
- * A context menu opens while the button that asked for it is still down (macOS sends `contextmenu`
- * on the press), and the browser takes that button's release for a click outside and closes the
- * menu at once. So a surface asked for mid-press waits for the release.
- */
+/** Shows the surface as a popover, tells `onDismiss` when the browser closes it; returns the undo.
+ * macOS sends `contextmenu` on the press and the browser takes the release for an outside click,
+ * so a surface asked for mid-press waits for the release. */
 function openAsPopover(surface: HTMLElement, anchored: boolean, onDismiss: () => void): () => void {
-  const onToggle = (event: Event): void => {
+  const closeOnToggle = (event: Event): void => {
     if ((event as ToggleEvent).newState === 'closed') onDismiss()
   }
   const show = (): void => {
@@ -117,7 +105,7 @@ function openAsPopover(surface: HTMLElement, anchored: boolean, onDismiss: () =>
       ;(surface.querySelector<HTMLElement>(FOCUSABLE) ?? surface).focus()
     }
   }
-  surface.addEventListener('toggle', onToggle)
+  surface.addEventListener('toggle', closeOnToggle)
   let timer: ReturnType<typeof setTimeout> | undefined
   const showAfterRelease = (): void => {
     timer = setTimeout(show, 0)
@@ -128,7 +116,7 @@ function openAsPopover(surface: HTMLElement, anchored: boolean, onDismiss: () =>
   return () => {
     document.removeEventListener('pointerup', showAfterRelease)
     clearTimeout(timer)
-    surface.removeEventListener('toggle', onToggle)
+    surface.removeEventListener('toggle', closeOnToggle)
     // Closed here, while it is still in the document, so focus goes back to what had it.
     if (surface.matches(':popover-open')) surface.hidePopover()
   }

@@ -18,29 +18,31 @@ let repo: string
 let credentialStore = false
 const BRANCH = 'main'
 
+type LinearIssue = LinearState['issues'][number]
+
+const ADAS_ISSUE: LinearIssue = {
+  identifier: 'ENG-12',
+  title: 'Sidebar crashes on resize',
+  description: 'Dragging the divider past 600px throws.',
+  state: { name: 'In Progress', type: 'started' },
+  assigneeEmail: 'ada@acme.dev',
+  comments: [],
+}
+const GRACES_ISSUE: LinearIssue = {
+  identifier: 'ENG-40',
+  title: 'Add dark mode to the drawer',
+  description: '',
+  state: { name: 'Todo', type: 'unstarted' },
+  assigneeEmail: 'grace@acme.dev',
+  comments: [],
+}
+
 /** Linear's state: Ada's API key, and one issue of hers beside one of Grace's. */
 function linearState(): LinearState {
   return {
     apiKey: 'lin_api_e2e',
     viewer: { name: 'Ada Lovelace', email: 'ada@acme.dev' },
-    issues: [
-      {
-        identifier: 'ENG-12',
-        title: 'Sidebar crashes on resize',
-        description: 'Dragging the divider past 600px throws.',
-        state: { name: 'In Progress', type: 'started' },
-        assigneeEmail: 'ada@acme.dev',
-        comments: [],
-      },
-      {
-        identifier: 'ENG-40',
-        title: 'Add dark mode to the drawer',
-        description: '',
-        state: { name: 'Todo', type: 'unstarted' },
-        assigneeEmail: 'grace@acme.dev',
-        comments: [],
-      },
-    ],
+    issues: [ADAS_ISSUE, GRACES_ISSUE],
     operations: [],
   }
 }

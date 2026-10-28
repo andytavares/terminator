@@ -1,12 +1,7 @@
 import { useEffect, type RefObject } from 'react'
 
-/**
- * Calls `onPress` for a press outside `ref`, while `enabled`.
- *
- * For a list that cannot be a `Popover`: the field that drives it sits outside the list, so the
- * browser's own light dismiss would take every press on that field for a click away. Anything that
- * can be a Popover should be one.
- */
+/** Calls `onPress` for a press outside `ref`, while `enabled`. For a list that cannot be a `Popover`:
+ * its field sits outside it, so light dismiss would read each press there as a click away. */
 export function useCloseOnOutsidePress(
   ref: RefObject<HTMLElement | null>,
   onPress: () => void,

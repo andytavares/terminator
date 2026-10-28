@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Button, IconButton, Popover } from '@terminator/extension-ui'
 import { Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
-import { localDate, monthName, weekdayName } from '../utils/local-date'
+import { localDate, monthNameOf, weekdayName } from '../utils/local-date'
 
 export interface DateTimePickerProps {
   mode: 'date' | 'time' | 'datetime'
@@ -404,7 +404,7 @@ function CalendarPane({ picker, props }: PaneProps): React.JSX.Element {
       <div className="dtp__cal-header">
         <IconButton icon={ChevronLeft} label="Previous month" size="sm" onClick={prev} />
         <span className="dtp__cal-month-label">
-          {monthName(displayMonth)} {displayYear}
+          {monthNameOf(displayMonth)} {displayYear}
         </span>
         <IconButton icon={ChevronRight} label="Next month" size="sm" onClick={next} />
       </div>

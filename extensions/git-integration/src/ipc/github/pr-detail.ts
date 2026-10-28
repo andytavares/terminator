@@ -81,7 +81,8 @@ async function fetchPrSources(ctx: GithubContext, at: PrAt, pull: string): Promi
 }
 
 /** The file diffs of this PR read these patches instead of asking GitHub for the files again. */
-function rememberPatches(ctx: GithubContext, at: PrAt, { meta, files }: PrSources): void {
+function rememberPatches(ctx: GithubContext, at: PrAt, sources: PrSources): void {
+  const { meta, files } = sources
   const patches = new Map(files.map((f) => [filePathOf(f), f.patch ? String(f.patch) : undefined]))
   ctx.prPatches.set(`${at.repoRoot}#${at.prNumber}`, { headSHA: asText(meta.headRefOid), patches })
 }

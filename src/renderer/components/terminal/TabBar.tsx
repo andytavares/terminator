@@ -500,13 +500,17 @@ function tabMenuItems(input: TabMenuItemsInput): ContextMenuItem[] {
     },
     { label: 'Add to task…', onSelect: then(() => addBranchToTask(session)) },
     ...issueItems(input),
-    {
-      label: 'Close tab',
-      danger: true,
-      separatorBefore: true,
-      onSelect: then(() => void useSessionStore.getState().closeSession(sessionId)),
-    },
+    closeItem(sessionId, then),
   ]
+}
+
+function closeItem(sessionId: string, then: IssueItemsInput['then']): ContextMenuItem {
+  return {
+    label: 'Close tab',
+    danger: true,
+    separatorBefore: true,
+    onSelect: then(() => void useSessionStore.getState().closeSession(sessionId)),
+  }
 }
 
 interface IssueItemsInput {
@@ -517,7 +521,8 @@ interface IssueItemsInput {
 }
 
 /** Link or change the session's ticket, and remove the link when it has one. */
-function issueItems({ facts, sessionId, menus, then }: IssueItemsInput): ContextMenuItem[] {
+function issueItems(input: IssueItemsInput): ContextMenuItem[] {
+  const { facts, sessionId, menus, then } = input
   const hasLink = ownLinkKey(facts) !== null
   const link: ContextMenuItem = {
     label: hasLink ? 'Change linked issue…' : 'Link issue…',

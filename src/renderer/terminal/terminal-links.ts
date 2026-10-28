@@ -70,7 +70,7 @@ class HoverState {
     this.hovered = link
   }
 
-  leave(): void {
+  unhover(): void {
     this.hovered = null
   }
 
@@ -98,7 +98,7 @@ function linkProvider(terminal: Terminal, kind: LinkKind, state: HoverState): IL
           decorations: { underline: state.held, pointerCursor: state.held },
           activate: (event) => modifierHeld(event) && openTarget(link.target),
           hover: () => state.hover(provided),
-          leave: () => state.leave(),
+          leave: () => state.unhover(),
         }
         return provided
       })
@@ -115,11 +115,12 @@ export function registerLinkProviders(terminal: Terminal, host: HTMLElement): ()
   const providers = LINK_KINDS.map((kind) =>
     terminal.registerLinkProvider(linkProvider(terminal, kind, state))
   )
-  const track = (event: KeyboardEvent | MouseEvent): void => state.setHeld(modifierHeld(event))
+  const trackModifier = (event: KeyboardEvent | MouseEvent): void =>
+    state.setHeld(modifierHeld(event))
   const events = ['keydown', 'keyup', 'mousemove'] as const
-  for (const type of events) host.addEventListener(type, track)
+  for (const type of events) host.addEventListener(type, trackModifier)
   return () => {
-    for (const type of events) host.removeEventListener(type, track)
+    for (const type of events) host.removeEventListener(type, trackModifier)
     for (const provider of providers) provider.dispose()
   }
 }

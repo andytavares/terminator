@@ -100,10 +100,8 @@ function viewsFrom(parsed: unknown): SessionView[] {
   const builtIns = BUILT_IN_VIEWS.map((v) => {
     const patch = overrides[v.id]
     if (!isRecord(patch)) return v
-    // A preference written before the grouping options narrowed can name a
-    // key that no longer exists. Falling back to the built-in's own default
-    // is the same degradation this function already applies to corrupt
-    // storage — one stale preference must not empty the sidebar.
+    // A preference written before the grouping options narrowed can name a key that no longer
+    // exists: fall back to the built-in's default, so one stale preference cannot empty the sidebar.
     const merged = { ...v, ...patch, id: v.id, builtIn: true } as SessionView
     if (!VALID_GROUP_KEYS.has(merged.groupBy)) merged.groupBy = v.groupBy
     if (!VALID_SORT_KEYS.has(merged.sortBy)) merged.sortBy = v.sortBy

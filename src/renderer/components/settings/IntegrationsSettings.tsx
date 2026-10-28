@@ -21,7 +21,7 @@ function statusText(connection: TrackerConnection | undefined): string {
   return `Connected as ${who}`
 }
 
-function StatusDot({ connection }: { connection: TrackerConnection | undefined }): JSX.Element {
+function ConnectionDot({ connection }: { connection: TrackerConnection | undefined }): JSX.Element {
   // Shape and text carry the state; the dot only reinforces it, so this stays
   // readable in greyscale (WCAG 1.4.1).
   const state =
@@ -206,7 +206,7 @@ function TrackerRow({ tracker }: { tracker: TrackerId }): JSX.Element {
   return (
     <div className="integrations__tracker">
       <div className="integrations__header">
-        <StatusDot connection={connection} />
+        <ConnectionDot connection={connection} />
         <span className="integrations__name">{TRACKER_LABELS[tracker]}</span>
         <span className="integrations__status">{statusText(connection)}</span>
         {connected && <Check className="integrations__check" />}
