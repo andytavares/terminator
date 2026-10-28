@@ -3,6 +3,10 @@ name: Test Notarization
 on:
   workflow_dispatch:
 
+# It signs and notarizes with its own secrets and writes nothing to the repository.
+permissions:
+  contents: read
+
 jobs:
   notarize-test:
     name: Test signing & notarization
