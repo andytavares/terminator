@@ -147,3 +147,31 @@ describe('Popover opened at a point', () => {
     expect(surface.style.marginTop).toBe('')
   })
 })
+
+// A press the window never saw released (a drag let go outside it) must not leave every later
+// surface waiting for a release that will not come.
+describe('Popover after a press whose release was missed', () => {
+  it('opens at once from a context menu sent with no button held', () => {
+    fireEvent.pointerDown(document.body)
+    fireEvent.contextMenu(document.body, { buttons: 0 })
+    renderPopover()
+    expect(screen.getByRole('group').matches(':popover-open')).toBe(true)
+  })
+
+  it('opens at once after a click, which only comes once the button is up', () => {
+    fireEvent.pointerDown(document.body)
+    fireEvent.click(document.body)
+    renderPopover()
+    expect(screen.getByRole('group').matches(':popover-open')).toBe(true)
+  })
+
+  it('still waits for the release when a context menu comes mid-press, as on macOS', () => {
+    fireEvent.pointerDown(document.body)
+    fireEvent.contextMenu(document.body, { buttons: 2 })
+    renderPopover()
+    const surface = screen.getByRole('group', { hidden: true })
+    expect(surface.matches(':popover-open')).toBe(false)
+    fireEvent.pointerUp(document.body)
+    return expect.poll(() => surface.matches(':popover-open')).toBe(true)
+  })
+})

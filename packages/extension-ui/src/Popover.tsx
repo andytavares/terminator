@@ -88,6 +88,14 @@ if (typeof document !== 'undefined') {
   document.addEventListener('pointerdown', note(true), true)
   document.addEventListener('pointerup', note(false), true)
   document.addEventListener('pointercancel', note(false), true)
+  // A release the window never saw (let go outside it) would leave this stuck: a click proves the
+  // button is up, and a context menu says in `buttons` whether one is held.
+  document.addEventListener('click', note(false), true)
+  document.addEventListener(
+    'contextmenu',
+    (event) => void (pointerIsDown = event.buttons !== 0),
+    true
+  )
 }
 
 /** Shows the surface as a popover, tells `onDismiss` when the browser closes it; returns the undo.
