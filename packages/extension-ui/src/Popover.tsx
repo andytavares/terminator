@@ -75,6 +75,7 @@ function useShownPopover(onDismiss: () => void, at: PopoverProps['at']) {
     const surface = ref.current
     return surface ? openAsPopover(surface, anchored, () => dismissRef.current()) : undefined
   }, [anchored])
+  // Measured on every render with a point: an item that changes while open can widen the menu.
   useLayoutEffect(() => keepOnScreen(at ? ref.current : null), [at])
   return ref
 }

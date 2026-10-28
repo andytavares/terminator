@@ -107,15 +107,19 @@ function linkProvider(terminal: Terminal, kind: LinkKind, state: HoverState): IL
   }
 }
 
-/** Registers a provider for each kind of link: URL, www., bare domain, path, quoted path.
- * Returns what stops the modifier-key listeners. */
-export function registerLinkProviders(terminal: Terminal): () => void {
+/** Registers a provider for each kind of link: URL, www., bare domain, path, quoted path, and
+ * hears the modifier on `host`, the terminal's element, which moves with it to a breakout window.
+ * Returns what removes the providers and the listeners. */
+export function registerLinkProviders(terminal: Terminal, host: HTMLElement): () => void {
   const state = new HoverState()
-  for (const kind of LINK_KINDS) terminal.registerLinkProvider(linkProvider(terminal, kind, state))
+  const providers = LINK_KINDS.map((kind) =>
+    terminal.registerLinkProvider(linkProvider(terminal, kind, state))
+  )
   const track = (event: KeyboardEvent | MouseEvent): void => state.setHeld(modifierHeld(event))
   const events = ['keydown', 'keyup', 'mousemove'] as const
-  for (const type of events) document.addEventListener(type, track)
+  for (const type of events) host.addEventListener(type, track)
   return () => {
-    for (const type of events) document.removeEventListener(type, track)
+    for (const type of events) host.removeEventListener(type, track)
+    for (const provider of providers) provider.dispose()
   }
 }

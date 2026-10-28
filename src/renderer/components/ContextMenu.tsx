@@ -27,7 +27,15 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps): JSX.E
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >
-      <Menu label="Actions" className="ctx-menu" at={{ x, y }} onDismiss={onDismiss}>
+      {/* Keyed by the point: a right-click elsewhere while it is open must reopen it there, not
+          leave the shown popover for the browser to light-dismiss on that click's release. */}
+      <Menu
+        key={`${x},${y}`}
+        label="Actions"
+        className="ctx-menu"
+        at={{ x, y }}
+        onDismiss={onDismiss}
+      >
         <MenuItems items={items} />
       </Menu>
     </div>,

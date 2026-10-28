@@ -57,6 +57,22 @@ describe('Menu — keys', () => {
   })
 })
 
+describe('Menu — keys from outside the items', () => {
+  it('moves up to the last item when focus is on no item', async () => {
+    render(
+      <Menu label="Actions" onDismiss={vi.fn()}>
+        <input aria-label="Filter" />
+        <button role="menuitem">One</button>
+        <button role="menuitem">Two</button>
+        <button role="menuitem">Three</button>
+      </Menu>
+    )
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Filter' }))
+    await userEvent.setup().keyboard('{ArrowUp}')
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Three' }))
+  })
+})
+
 describe('Menu — activation and dismissal', () => {
   it('activates the focused item with Enter and with Space', async () => {
     const { onSelect } = renderMenu()

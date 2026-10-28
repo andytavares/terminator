@@ -151,7 +151,7 @@ export class TerminalInstance {
 
     this.terminal.attachCustomKeyEventHandler((e) => handleCustomKey(this.terminal, e))
     this.wireToPty(sessionId)
-    this.stopLinkTracking = registerTerminalLinkProviders(this.terminal)
+    this.stopLinkTracking = registerTerminalLinkProviders(this.terminal, this.element)
     this.outputUnsubscribe = this.subscribeToOutput(sessionId)
 
     // Subscribed first, then attached: what the process printed before this terminal was on screen

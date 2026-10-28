@@ -12,7 +12,7 @@ function moveBetweenItems(event: React.KeyboardEvent<HTMLDivElement>): void {
   const at = items.indexOf(document.activeElement as HTMLElement)
   const target = {
     ArrowDown: items[(at + 1) % items.length],
-    ArrowUp: items[(at - 1 + items.length) % items.length],
+    ArrowUp: items[at < 0 ? items.length - 1 : (at - 1 + items.length) % items.length],
     Home: items[0],
     End: items[items.length - 1],
   }[event.key]

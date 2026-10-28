@@ -25,6 +25,9 @@ const LEGACY_SCRIPT_NAMES = [
   'agent-session-hook.cjs',
   'session-start-hook.cjs',
 ]
+// session-start-hook.cjs stays on disk: a linked project's settings.local.json runs it, unguarded,
+// until that project's link next syncs and moves the entry to SCRIPT_NAME.
+const REMOVABLE_SCRIPT_NAMES = ['agent-ask-hook.cjs', 'agent-session-hook.cjs']
 const REPORT_DIR_NAME = 'agent-sessions'
 const ASKS_DIR_NAME = 'asks'
 const EVENTS = ['SessionStart', 'Notification', 'UserPromptSubmit', 'Stop', 'StopFailure']
@@ -156,7 +159,7 @@ export async function installHookScript(directory: string): Promise<string> {
   const target = path.join(directory, SCRIPT_NAME)
   await fs.writeFile(target, HOOK_SCRIPT, 'utf8')
   await Promise.all(
-    LEGACY_SCRIPT_NAMES.map((name) => fs.rm(path.join(directory, name), { force: true }))
+    REMOVABLE_SCRIPT_NAMES.map((name) => fs.rm(path.join(directory, name), { force: true }))
   )
   return target
 }

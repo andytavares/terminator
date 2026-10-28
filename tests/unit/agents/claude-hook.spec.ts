@@ -535,11 +535,11 @@ describe('installing the hooks — the three scripts of earlier versions', () =>
 })
 
 describe('installing the hook script', () => {
-  it('removes the scripts of earlier versions from the integrations folder', async () => {
+  it('removes the scripts of earlier versions, but keeps the one project settings still run', async () => {
     for (const name of ['agent-ask-hook.cjs', 'agent-session-hook.cjs', 'session-start-hook.cjs'])
       fs.writeFileSync(path.join(userData, name), '')
     const mod = await load()
     await mod.installHookScript(userData)
-    expect(fs.readdirSync(userData)).toEqual(['claude-hook.cjs'])
+    expect(fs.readdirSync(userData).sort()).toEqual(['claude-hook.cjs', 'session-start-hook.cjs'])
   })
 })

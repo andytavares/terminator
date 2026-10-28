@@ -937,8 +937,12 @@ interface ProvidedLink {
 }
 
 /** A terminal whose buffer rows (0-based) read `lines`; xterm's providers are asked 1-based. */
+/** The host element of the terminal a test made last: the keys go where the terminal is. */
+let linkHost: HTMLElement = document.body
+
 function terminalWithLines(lines: Record<number, string>) {
   const instance = new TerminalInstance('ses-link', 1000)
+  linkHost = instance.element
   const termMock = vi.mocked(Terminal).mock.results.at(-1)!.value
   Object.defineProperty(termMock, 'buffer', {
     value: {
@@ -973,7 +977,7 @@ function cmdClick(line: string, col: number, init: MouseEventInit = { metaKey: t
 }
 
 const press = (type: 'keydown' | 'keyup', key: string, init: KeyboardEventInit = {}) =>
-  document.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true, ...init }))
+  linkHost.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true, ...init }))
 
 describe('TerminalInstance — links — the provider order and rows', () => {
   it('asks for the 1-based line xterm passes: row 5 of the buffer is line 6', () => {
@@ -1021,6 +1025,14 @@ describe('TerminalInstance — links — hover decorations follow the modifier k
     expect(link.decorations).toEqual({ underline: true, pointerCursor: true })
     press('keyup', 'Meta')
     expect(link.decorations).toEqual({ underline: false, pointerCursor: false })
+  })
+
+  it('hears cmd in a breakout window, whose document is not the main one', () => {
+    const link = hoveredLink({})
+    document.implementation.createHTMLDocument('breakout').body.appendChild(linkHost)
+    press('keydown', 'Meta', { metaKey: true })
+    expect(link.decorations).toEqual({ underline: true, pointerCursor: true })
+    press('keyup', 'Meta')
   })
 
   it('underlines a link found while cmd is already held', () => {

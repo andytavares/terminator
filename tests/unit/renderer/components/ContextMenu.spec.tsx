@@ -168,3 +168,15 @@ describe('ContextMenu — keys stay in the menu', () => {
     expect(rowKeyDown).not.toHaveBeenCalled()
   })
 })
+
+describe('ContextMenu — moving', () => {
+  it('reopens, rather than stays, when it moves to a new point', () => {
+    const { rerender } = render(<ContextMenu x={12} y={34} items={items} onDismiss={onDismiss} />)
+    const first = document.querySelector('.ctx-menu')
+    rerender(<ContextMenu x={56} y={78} items={items} onDismiss={onDismiss} />)
+    const moved = document.querySelector('.ctx-menu') as HTMLElement
+    expect(moved).not.toBe(first)
+    expect(moved.style.left).toBe('56px')
+    expect(onDismiss).not.toHaveBeenCalled()
+  })
+})
