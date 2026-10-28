@@ -106,6 +106,15 @@ describe('generateIndex()', () => {
   })
 })
 
+describe('generateIndex() — only the SDK 6.0.0 surface', () => {
+  it('calls none of the APIs SDK 6.0.0 removed, so a new extension activates', () => {
+    const index = generateIndex('my-ext', 'terminator.my-ext')
+    for (const removed of ['api.terminal', 'api.extensions', 'api.ui', 'setModalDepth']) {
+      expect(index).not.toContain(removed)
+    }
+  })
+})
+
 describe('generateIndex() — commands, API members, imports and stubs', () => {
   it('registers a command and shows a toast', () => {
     const index = generateIndex('my-ext', 'com.example.my-ext')
