@@ -94,12 +94,14 @@ jobs:
         env:
           PYTHON: ${{ steps.python.outputs.python-path }}
 
+      # The app always; each extension changed since the last release tag too.
       - name: Bump patch version
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           npm version patch --no-git-tag-version
-          git add package.json package-lock.json
+          node scripts/bump-extension-versions.mjs
+          git add package.json package-lock.json extensions/*/package.json extensions/*/manifest.json
           git commit -m "chore: bump version [skip ci]"
           git push
 
