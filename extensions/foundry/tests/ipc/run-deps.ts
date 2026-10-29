@@ -13,5 +13,6 @@ export function idleRunSeams(): Omit<RunDeps, 'store' | 'dataRoot' | 'sources' |
     strandedSessions: () => [],
     activityFor: () => [],
     queueEntries: async () => [],
+    recordUse: () => undefined,
   }
 }

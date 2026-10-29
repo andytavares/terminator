@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
+import { RecordShown } from '../renderer/RecordShown.js'
 import { ScrollText, Sparkles, Check, X, Trash2 } from 'lucide-react'
 import type { LedgerEntry } from '../ledger/append.js'
 import type { Proposal } from '../ledger/curator.js'
@@ -80,6 +81,7 @@ export function Ledger(): JSX.Element {
 
   return (
     <div className="fdry-shell">
+      <RecordShown feature="ledger" />
       <TabsRoot selectedId={tab} onSelect={setTab}>
         <TabList label="Record or Factory" className="fdry-ledger-tabs">
           <Tab id="record">Record</Tab>

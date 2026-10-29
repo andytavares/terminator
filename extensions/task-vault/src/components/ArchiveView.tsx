@@ -10,7 +10,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type { IndexedTask, IndexedProject } from '../vault/types'
-import { useIndexReload } from './vault-hooks'
+import { useIndexReload, useRecordUsageOnMount } from './vault-hooks'
 import {
   Button,
   IconButton,
@@ -308,6 +308,7 @@ function ArchiveHeader(props: { days: number; onChange: (days: number) => void }
 }
 
 export function ArchiveView(): React.JSX.Element {
+  useRecordUsageOnMount('view-archive')
   const { data, isLoading, error, days, changeWindow, actions } = useArchive()
   const [tab, setTab] = useState<ArchiveTab>('tasks')
   if (isLoading) return <div className="archive-view__loading">Loading archive…</div>

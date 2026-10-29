@@ -20,7 +20,7 @@ import {
 import type { IndexedProject, IndexedTask } from '../vault/types'
 import { useVaultStore } from '../stores/vault.store'
 import { SmartTaskInput } from './SmartTaskInput'
-import { useIndexReload } from './vault-hooks'
+import { useIndexReload, useRecordUsageOnMount } from './vault-hooks'
 import { RenameRow, TaskTextEditor, useTaskTextDraft } from './inline-edits'
 import { SessionOptions, useTerminalSessions } from './terminal-sessions'
 import { countLabel } from '../utils/count-label'
@@ -1039,6 +1039,7 @@ function BrowserHeader({ list, onNew }: { list: ProjectList; onNew: () => void }
 }
 
 export function ProjectsBrowser(): React.JSX.Element {
+  useRecordUsageOnMount('view-projects')
   const browser = useBrowser()
   const { list } = browser
   const [showCreateForm, setShowCreateForm] = useState(false)

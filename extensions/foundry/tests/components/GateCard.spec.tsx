@@ -9,6 +9,7 @@ import { raiseGate } from '../../src/gates/rules.js'
 // six gates that each print a paragraph is a queue nobody reads.
 
 let openExternal: ReturnType<typeof vi.fn>
+const recordUsage = vi.fn()
 
 function gate(over: Partial<Parameters<typeof raiseGate>[0]> = {}) {
   return raiseGate({
@@ -27,7 +28,10 @@ function gate(over: Partial<Parameters<typeof raiseGate>[0]> = {}) {
 
 beforeEach(() => {
   openExternal = vi.fn(async () => ({ ok: true }))
-  Object.assign(window, { electronAPI: { shell: { openExternal } } })
+  recordUsage.mockClear()
+  Object.assign(window, {
+    electronAPI: { shell: { openExternal }, usage: { record: recordUsage } },
+  })
 })
 
 describe('a gate collapsed to one line', () => {
@@ -82,6 +86,15 @@ function answeringTests() {
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
     expect(onDecide).toHaveBeenCalledWith('approve')
     expect(screen.queryByText(/session\.ts/)).toBeNull()
+  })
+
+  it('counts a decision, and counts nothing for a click on a disabled answer', () => {
+    const { rerender } = render(<GateCard gate={gate()} busy onDecide={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    expect(recordUsage).not.toHaveBeenCalled()
+    rerender(<GateCard gate={gate()} onDecide={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Send back' }))
+    expect(recordUsage).toHaveBeenCalledExactlyOnceWith('gate-decide')
   })
 
   it('disables every answer while one is being sent', () => {

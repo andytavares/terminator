@@ -7,6 +7,7 @@ import { RemoteControlSettings } from '../../../src/components/RemoteControlSett
 // current one. It sets a new one, or generates one and shows it once.
 
 const invoke = vi.fn()
+const record = vi.fn()
 
 function settingsReply(hasPassword: boolean) {
   return { enabled: false, port: 7681, maxSubscribers: 5, ngrokAuthToken: '', hasPassword }
@@ -22,8 +23,9 @@ function answerInvokes(hasPassword: boolean, updatePassword: unknown = { ok: tru
 
 beforeEach(() => {
   invoke.mockReset()
+  record.mockClear()
   Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { on: () => () => {}, invoke } },
+    value: { extensionBridge: { on: () => () => {}, invoke }, usage: { record } },
     configurable: true,
     writable: true,
   })
@@ -65,6 +67,7 @@ function settingsPasswordSetTests() {
     )
     await waitFor(() => expect((field as HTMLInputElement).value).toBe(''))
     expect(screen.queryByText('chosen-secret')).toBeNull()
+    expect(record).toHaveBeenCalledWith('password-set')
   })
 }
 

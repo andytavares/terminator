@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Play, RefreshCw, Trash2 } from 'lucide-react'
+import { useRecordUsageOnMount } from './vault-hooks'
 import { invoke } from '@terminator/extension-sdk/renderer'
 import { Button, IconButton, ModalShell } from '@terminator/extension-ui'
 import { countLabel } from '../utils/count-label'
@@ -431,6 +432,7 @@ function QueryConfirmDialog({ admin }: AdminProps): React.JSX.Element | null {
 }
 
 export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Element {
+  useRecordUsageOnMount('db-admin')
   const admin = useAdmin(onWrite)
   return (
     <div className="db-admin">

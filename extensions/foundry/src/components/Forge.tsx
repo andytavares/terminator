@@ -1,6 +1,6 @@
 import { Button, Chip, Markdown, StatusDot } from '@terminator/extension-ui'
 import type { ChipTone } from '@terminator/extension-ui'
-import { openInBrowser } from '@terminator/extension-sdk/renderer'
+import { openInBrowser, recordUsage } from '@terminator/extension-sdk/renderer'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Check,
@@ -549,6 +549,7 @@ function useConverge(orderId: string, { setView, setProblem, busyWith }: Shown) 
     (turn: { message?: string; settle?: Settle }) =>
       busyWith(async () => {
         const next = await foundryInvoke('foundry:order.converge', { id: orderId, ...turn })
+        recordUsage('forge-turn', 'error' in next ? { failed: true } : {})
         if ('order' in next) setView(next)
         if ('error' in next) setProblem(next.error)
       }),

@@ -27,6 +27,7 @@ const ORDER = draftOrder({
 function bridge(handlers: Record<string, unknown>): void {
   Object.assign(window, {
     electronAPI: {
+      usage: { record: vi.fn() },
       extensionBridge: {
         invoke: vi.fn(async (channel: string) => handlers[channel] ?? {}),
         on: vi.fn(() => vi.fn()),

@@ -43,12 +43,14 @@ function orderWithUnit(unit: Partial<WorkOrder['plan']['units'][number]> = {}): 
 window.HTMLElement.prototype.scrollIntoView = vi.fn()
 
 let invoke: ReturnType<typeof vi.fn>
+const recordUsage = vi.fn()
 let bus = createChangeBus()
 let proveReply: unknown
 let tailReply: unknown
 /** What the ledger says the operator decided; the environment channel records into it. */
 let decisions: { continueUnmeasured: boolean; declinePictures: boolean }
 beforeEach(() => {
+  recordUsage.mockClear()
   bus = createChangeBus()
   tailReply = { tail: 'checking 214 files\nall files formatted' }
   decisions = { continueUnmeasured: false, declinePictures: false }
@@ -84,7 +86,7 @@ function mount(
     return CONVERGING.has(channel) ? answer() : {}
   })
   Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke, on: bus.on } },
+    value: { extensionBridge: { invoke, on: bus.on }, usage: { record: recordUsage } },
     configurable: true,
     writable: true,
   })
@@ -160,6 +162,7 @@ describe('Use it anyway and Remove', () => {
         { repoPath: '/repos/app', checks: { format: './glyph fmt --check' } },
       ])
     )
+    expect(recordUsage).toHaveBeenCalledExactlyOnceWith('profile-edit', {})
   })
 
   it('clears a command the operator set', async () => {

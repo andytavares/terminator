@@ -44,6 +44,7 @@ function mount(props: MountProps = {}) {
   invoke = vi.fn(async (channel: string) => (channel in replies ? replies[channel]() : {}))
   Object.assign(window, {
     electronAPI: {
+      usage: { record: vi.fn() },
       extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
       shell: { openExternal },
     },
@@ -62,7 +63,7 @@ function mountLive(read: () => unknown) {
   }
   invoke = vi.fn(async (channel: string) => (channel in replies ? replies[channel]() : {}))
   Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke, on: bus.on } },
+    value: { extensionBridge: { invoke, on: bus.on }, usage: { record: vi.fn() } },
     configurable: true,
     writable: true,
   })
@@ -168,6 +169,7 @@ function replayable(frames: unknown[], ci?: unknown[]) {
   })
   Object.assign(window, {
     electronAPI: {
+      usage: { record: vi.fn() },
       extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
     },
   })
@@ -581,6 +583,7 @@ function theSiteAndFailuresTests() {
     })
     Object.assign(window, {
       electronAPI: {
+        usage: { record: vi.fn() },
         extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
       },
     })

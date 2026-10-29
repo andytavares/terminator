@@ -3,6 +3,7 @@ import { Button } from '@terminator/extension-ui'
 import { useGitStore } from '../stores/git.store'
 import type { GitFileStatus, GitStatus } from '../schemas/git.schema'
 import { gitAPI } from '../api/git'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 /**
  * File status, in words.
@@ -99,8 +100,10 @@ interface StagingTarget {
 /** Stage or unstage paths, then let the view drop its cached diffs and refresh the status. */
 async function applyStaging(target: StagingTarget, paths: string[], stage: boolean): Promise<void> {
   if (paths.length === 0) return
-  if (stage) await gitAPI.stage(target.repoRoot, paths)
-  else await gitAPI.unstage(target.repoRoot, paths)
+  if (stage) {
+    await gitAPI.stage(target.repoRoot, paths)
+    recordUsage('stage')
+  } else await gitAPI.unstage(target.repoRoot, paths)
   // Bust the diff cache so the next click on a file fetches a fresh diff.
   target.onStagingChange?.()
   await refreshStatus(target.repoRoot, target.setStatus)

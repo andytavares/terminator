@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { IconButton, useCloseOnOutsidePress } from '@terminator/extension-ui'
 import { X } from 'lucide-react'
 import type { IndexedProject } from '../vault/types'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 interface AreaData {
   filePath: string
@@ -216,6 +217,7 @@ function useFileToPicker(props: PickerProps) {
   const { highlighted, setHighlighted } = useHighlight(query)
   const options = matchingOptions({ baseOptions, query, canCreate: Boolean(onSelectNew) })
   function select(opt: DestOption) {
+    recordUsage('file-to')
     if (isCreate(opt)) onSelectNew?.(baseKind(opt), opt.createName!)
     else onSelect(opt.filePath)
   }

@@ -179,7 +179,11 @@ function serverDeps({ api, credentials }: RemoteControlContext) {
 // sockets, so it is the authority; polling would add latency and a second
 // source of truth for state it already holds.
 function publishDevices(api: ExtensionAPI, server: RemoteServerHandle): void {
+  // The SDK offers a backend only 'app' counting, so a client connecting is counted here.
+  let knownIds = new Set<string>()
   server.devices.onChange((devices) => {
+    for (const device of devices) if (!knownIds.has(device.id)) api.usage.record('client-connect')
+    knownIds = new Set(devices.map((device) => device.id))
     api.window.broadcast('remote:devices', { devices })
   })
   api.window.broadcast('remote:devices', { devices: server.devices.list() })
@@ -203,6 +207,7 @@ async function connectTunnel(api: ExtensionAPI, port: number): Promise<void> {
     const publicUrl = await startTunnel(api, port, authToken)
     broadcastListening(api, port, { publicUrl, ngrokInstalled: true, ngrokError: null })
   } catch (err) {
+    api.usage.record('tunnel-open', { failed: true })
     currentPublicUrl = null
     const ngrokError = authToken
       ? String(err)
@@ -218,6 +223,7 @@ async function startTunnel(
   authToken: string | undefined
 ): Promise<string> {
   const publicUrl = await ngrokManager.start(port, authToken)
+  api.usage.record('tunnel-open')
   currentPublicUrl = publicUrl
   ngrokManager.setOnCrash(() => {
     currentPublicUrl = null

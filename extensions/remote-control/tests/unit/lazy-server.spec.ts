@@ -35,6 +35,7 @@ function fakeHostApi() {
     },
     ipc: { registerHandler: (spec: ChannelSpec) => specs.push(spec) },
     window: { broadcast: vi.fn() },
+    usage: { record: vi.fn() },
     paths: { app: '/app', globalStorage: '/user-data/extensions/terminator.remote-control' },
     pty: {},
     workspace: { list: () => [], listProjects: () => [] },

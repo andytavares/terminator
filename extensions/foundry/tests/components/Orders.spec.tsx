@@ -9,7 +9,10 @@ import { Orders } from '../../src/components/Orders.js'
 // is spent. Without it the number sends you to a list of identical rows and
 // you open them one at a time to find out which two it meant.
 
+let recordUsage = vi.fn()
+
 function mount(orders: unknown[], props: Record<string, unknown> = {}) {
+  recordUsage = vi.fn()
   const bus = createChangeBus()
   const invoke = vi.fn(async (channel: string) => {
     if (channel === 'foundry:order.list') return { orders }
@@ -18,6 +21,7 @@ function mount(orders: unknown[], props: Record<string, unknown> = {}) {
   const openExternal = vi.fn(async () => ({ ok: true as const }))
   Object.assign(window, {
     electronAPI: {
+      usage: { record: recordUsage },
       extensionBridge: { invoke, on: bus.on },
       shell: { openExternal },
     },
@@ -64,6 +68,12 @@ function standingsTests() {
   it('says where each order stands, in the standing own words', async () => {
     mount([row({ standing: standing({ label: '2 to answer', turn: 'you' }) })])
     await screen.findByText('2 to answer')
+  })
+
+  it('counts the screen once when it is shown', async () => {
+    mount([row()])
+    await screen.findByText('Refuse an expired refresh token')
+    expect(recordUsage).toHaveBeenCalledExactlyOnceWith('orders')
   })
 
   it('marks the rows whose move is yours, and only those', async () => {
@@ -156,6 +166,7 @@ function mountWith(offer: unknown, created: unknown = { key: 'TAV-16' }) {
   })
   Object.assign(window, {
     electronAPI: {
+      usage: { record: vi.fn() },
       extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
     },
   })
@@ -268,6 +279,7 @@ describe('opening an order that has a run', () => {
     )
     Object.assign(window, {
       electronAPI: {
+        usage: { record: vi.fn() },
         extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
       },
     })
@@ -333,6 +345,7 @@ function mountWithTickets(orders: unknown[]) {
   })
   Object.assign(window, {
     electronAPI: {
+      usage: { record: vi.fn() },
       extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
       shell: { openExternal: vi.fn() },
     },

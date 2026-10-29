@@ -61,6 +61,13 @@ async function renderBrowser() {
   await screen.findByText('Launch', { selector: '.projects-browser__name' })
 }
 
+describe('ProjectsBrowser usage', () => {
+  it('counts one view of the projects as it opens', async () => {
+    await renderBrowser()
+    expect(bridge.recordUsage.mock.calls).toEqual([['view-projects']])
+  })
+})
+
 describe('ProjectsBrowser list', projectListTests)
 describe('ProjectsBrowser creating', projectCreateTests)
 describe('ProjectsBrowser renaming and deadlines', renameTests)

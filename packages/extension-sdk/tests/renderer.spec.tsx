@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act } from 'react'
-import { invoke, mountExtension, openInBrowser } from '@terminator/extension-sdk/renderer'
+import {
+  invoke,
+  mountExtension,
+  openInBrowser,
+  recordUsage,
+} from '@terminator/extension-sdk/renderer'
 import type { ElectronAPI } from '../types/renderer'
 
 describe('invoke', () => {
@@ -72,5 +77,22 @@ describe('openInBrowser', () => {
 
     process.off('unhandledRejection', unhandled)
     expect(unhandled).not.toHaveBeenCalled()
+  })
+})
+
+describe('recordUsage', () => {
+  it("hands the id and its outcome to the view's usage API", () => {
+    const record = vi.fn()
+    const usage: ElectronAPI['usage'] = { record }
+    Object.defineProperty(window, 'electronAPI', {
+      value: { usage },
+      configurable: true,
+      writable: true,
+    })
+
+    recordUsage('export')
+    recordUsage('export', { failed: true })
+
+    expect(record.mock.calls).toEqual([['export'], ['export', { failed: true }]])
   })
 })

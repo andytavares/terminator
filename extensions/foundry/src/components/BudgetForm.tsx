@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@terminator/extension-ui'
 import type { BudgetBreach } from '../line/scheduler.js'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 // A budget is a whole number or no limit. Used to set an order's budgets in the
 // Forge and to raise the one a run stopped at.
@@ -66,6 +67,14 @@ function useDrafts(rows: readonly BudgetRow[]) {
   return { drafts, update, valid }
 }
 
+function submitBudgets(
+  onSubmit: BudgetFormProps['onSubmit'],
+  values: Record<string, number | null>
+) {
+  recordUsage('budget-edit')
+  onSubmit(values)
+}
+
 export function BudgetForm({
   rows,
   submitLabel,
@@ -80,7 +89,7 @@ export function BudgetForm({
       className="fdry-budgets"
       onSubmit={(event) => {
         event.preventDefault()
-        if (valid) onSubmit(valuesOf(rows, drafts))
+        if (valid) submitBudgets(onSubmit, valuesOf(rows, drafts))
       }}
     >
       {rows.map((row) => (

@@ -166,6 +166,7 @@ function linkTests() {
     expect(bridge.calls('task-vault:links:create')).toEqual([
       { taskId: 't1', targetId: 'sess-aaaaaaaa1' },
     ])
+    expect(bridge.recordUsage).toHaveBeenCalledWith('session-link')
     expect(screen.queryByRole('combobox')).toBeNull()
     expect(buttonNamed('Jump to linked terminal')).toBeTruthy()
   })
@@ -185,6 +186,7 @@ function linkTestsPart2() {
         'terminalLinkSaveFailed'
       )
     )
+    expect(bridge.recordUsage).toHaveBeenCalledWith('session-link', { failed: true })
     expect(screen.queryByRole('combobox')).toBeNull()
     expect(buttonNamed('Link to terminal session')).toBeTruthy()
   })

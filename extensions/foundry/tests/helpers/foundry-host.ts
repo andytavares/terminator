@@ -94,6 +94,8 @@ export interface FoundryHost {
   readonly homeActionHandlers: Array<(itemId: string, actionId: string) => Promise<void>>
   readonly showToast: ReturnType<typeof vi.fn>
   readonly createNotification: ReturnType<typeof vi.fn>
+  /** Every `api.usage.record` call. */
+  readonly recordUsage: ReturnType<typeof vi.fn>
   /** Palette and menu commands by id, so a spec can run one. */
   readonly commands: Map<string, () => void>
   /** Every `gh` call goes here; git runs for real. */
@@ -149,6 +151,7 @@ function hostParts() {
     homePublish: vi.fn(),
     homeActionHandlers: [] as Array<(itemId: string, actionId: string) => Promise<void>>,
     showToast: vi.fn(),
+    recordUsage: vi.fn(),
     createNotification: vi.fn(() => ({ dispose: vi.fn() })),
     issues: noIssues(),
     remoteChannels: [] as string[],
@@ -213,6 +216,7 @@ function foundryHostApi({ dataDir, globalStorage, handlers, parts }: HostApiInpu
     settings: hostSettings(dataDir, parts.settings),
     workspace: hostWorkspace(parts.workspaces),
     issues: parts.issues,
+    usage: { record: parts.recordUsage },
     paths: hostPaths(globalStorage),
   })
 }

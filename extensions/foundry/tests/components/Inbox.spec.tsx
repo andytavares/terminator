@@ -93,7 +93,10 @@ function inboxReplies(
   }
 }
 
+let recordUsage = vi.fn()
+
 function mount(over: Record<string, unknown> = {}) {
+  recordUsage = vi.fn()
   bus = createChangeBus()
   const replies = inboxReplies(over)
   invoke = vi.fn(async (channel: string, payload?: unknown) =>
@@ -101,6 +104,7 @@ function mount(over: Record<string, unknown> = {}) {
   )
   Object.assign(window, {
     electronAPI: {
+      usage: { record: recordUsage },
       extensionBridge: { invoke, on: bus.on },
       shell: { openExternal },
     },
@@ -119,6 +123,12 @@ describe('an order waiting on you with no gate', () => {
       detail: 'Every check passes. Read the plan and hand it off in the Forge to start the run.',
     },
   ]
+
+  it('counts the Inbox once when it is shown', async () => {
+    mount({ waiting })
+    await screen.findByText('Ready to hand off')
+    expect(recordUsage).toHaveBeenCalledExactlyOnceWith('inbox')
+  })
 
   it('names the order and exactly why it is waiting', async () => {
     mount({ waiting })

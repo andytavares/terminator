@@ -1,4 +1,5 @@
 import type React from 'react'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 /** The tags with `raw` added as a tag (lower case, spaces as dashes), unless blank or present. */
 export function withTag(tags: string[], raw: string): string[] {
@@ -18,6 +19,7 @@ export interface TagField {
 export function tagEditing(field: TagField) {
   const { tags, updateTags, tagInput, setTagInput } = field
   function addTag(raw: string) {
+    if (raw.trim()) recordUsage('tag')
     updateTags((prev) => withTag(prev, raw))
     setTagInput('')
   }

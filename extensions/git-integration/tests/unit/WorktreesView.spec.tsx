@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { WorktreesView } from '../../src/components/worktrees/WorktreesView'
 import type { LocalInventoryRow } from '../../src/git/local-inventory'
 
+const mockRecordUsage = vi.fn()
 const mockInvoke = vi.fn()
 const mockListSessions = vi.fn()
 
@@ -73,6 +74,7 @@ beforeEach(() => {
     value: {
       extensionBridge: { invoke: mockInvoke, on: () => () => {} },
       terminal: { listSessions: mockListSessions },
+      usage: { record: mockRecordUsage },
     },
     configurable: true,
     writable: true,
@@ -235,6 +237,7 @@ describe('WorktreesView — confirming a removal', () => {
         ],
       })
     )
+    expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('worktree-remove', {})
   })
 })
 
@@ -270,6 +273,7 @@ describe('WorktreesView — a failed removal', () => {
     )
     expect(await screen.findByText('branch is checked out')).toBeDefined()
     expect(screen.getByText('feature-merged')).toBeDefined()
+    expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('worktree-remove', { failed: true })
   })
 })
 

@@ -18,6 +18,7 @@ import {
 } from '../forge/checks-view.js'
 import { leadRepo } from '../order/lead-repo.js'
 import { foundryKey, foundryQueries, useFoundryQuery } from '../renderer/foundry-query.js'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 // The Checks step's state. The profile is read once and again when Foundry says a
 // profile changed; the renderer never polls it.
@@ -147,7 +148,9 @@ function useProfileMoves(
         additional: change.additional && [...change.additional],
       })
       show(answer)
-      return errorOf(answer)
+      const error = errorOf(answer)
+      recordUsage('profile-edit', error === null ? {} : { failed: true })
+      return error
     },
     [repoPath, show]
   )

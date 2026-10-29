@@ -1,9 +1,10 @@
-import React, { useMemo, useState, useRef } from 'react'
+import React, { useEffect, useMemo, useState, useRef } from 'react'
 import { Button, SegmentedControl } from '@terminator/extension-ui'
 import type { FileDiff, DiffLine, DiffHunk } from '../schemas/git.schema'
 import { choose } from './text'
 import { useSplitDrag } from '../hooks/useSplitDrag'
 import { extensionOf, highlight } from '../utils/syntax'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 type ViewMode = 'unified' | 'split'
 
@@ -297,6 +298,10 @@ export function FileDiffView(props: FileDiffViewProps): JSX.Element {
   // The layout and divider position outlive the file shown, so they stay as files change.
   const [viewMode, setViewMode] = useState<ViewMode>('unified')
   const divider = useDiffDivider()
+  const shownPath = diff?.path
+  useEffect(() => {
+    if (shownPath) recordUsage('diff-open')
+  }, [shownPath])
   if (!diff) {
     return (
       <div className="file-diff-view file-diff-view--empty">Select a file to view its diff.</div>

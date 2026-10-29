@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Button } from '@terminator/extension-ui'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 interface PasswordFieldProps {
   hasPassword: boolean
@@ -32,7 +33,10 @@ interface PasswordUpdate {
 function updatePassword(password: string): Promise<PasswordUpdate> {
   return window.electronAPI.extensionBridge
     .invoke('remote:update-password', { password })
-    .then((result) => (result ?? {}) as PasswordUpdate)
+    .then((result) => {
+      recordUsage('password-set')
+      return (result ?? {}) as PasswordUpdate
+    })
 }
 
 /** Only a hash is kept, so there is nothing to reveal: a chosen password is known to whoever

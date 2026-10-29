@@ -13,7 +13,10 @@
       "view": "main"
     },
     "quickActions": {
-      "group": { "mnemonic": "f", "label": "Foundry" }
+      "group": {
+        "mnemonic": "f",
+        "label": "Foundry"
+      }
     },
     "startWorkOptions": [
       {
@@ -23,6 +26,56 @@
         "command": "new-order"
       }
     ],
-    "shellRoots": ["terminator.foundry.dataDir"]
+    "shellRoots": ["terminator.foundry.dataDir"],
+    "usage": [
+      {
+        "id": "forge-turn",
+        "label": "Send a Forge turn"
+      },
+      {
+        "id": "floor",
+        "label": "Factory floor"
+      },
+      {
+        "id": "gate-decide",
+        "label": "Decide a gate"
+      },
+      {
+        "id": "inbox",
+        "label": "Inbox"
+      },
+      {
+        "id": "ledger",
+        "label": "Ledger"
+      },
+      {
+        "id": "orders",
+        "label": "Orders"
+      },
+      {
+        "id": "budget-edit",
+        "label": "Edit budgets"
+      },
+      {
+        "id": "profile-edit",
+        "label": "Edit a repository's checks"
+      },
+      {
+        "id": "run-start",
+        "label": "Start a run"
+      },
+      {
+        "id": "run-resume",
+        "label": "Resume a run"
+      },
+      {
+        "id": "ship",
+        "label": "Order opened its pull request"
+      },
+      {
+        "id": "go-to-run",
+        "label": "Go to a run"
+      }
+    ]
   }
 }

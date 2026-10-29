@@ -23,3 +23,17 @@ export function openInBrowser(url: string): Promise<void> {
     () => {}
   )
 }
+
+/** The view's `usage` member (types/renderer.d.ts). Named here, not imported: importing that
+ * file declares its window type, which would replace the core's where both are compiled. */
+interface UsageWindow {
+  electronAPI: { usage: { record(feature: string, outcome?: { failed?: boolean }): void } }
+}
+
+/** Counts one use of `feature`, an id from this extension's `contributes.usage`; the core adds the
+ * extension id. Since 6.1.0. */
+export function recordUsage(feature: string, outcome?: { failed?: boolean }): void {
+  const { usage } = (window as unknown as UsageWindow).electronAPI
+  if (outcome) usage.record(feature, outcome)
+  else usage.record(feature)
+}

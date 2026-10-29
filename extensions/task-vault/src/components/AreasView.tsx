@@ -15,7 +15,7 @@ import type { IndexedTask } from '../vault/types'
 import { SmartTaskInput, invalidateSmartInputCache } from './SmartTaskInput'
 import { useVaultStore } from '../stores/vault.store'
 import { Button, IconButton } from '@terminator/extension-ui'
-import { useIndexReload } from './vault-hooks'
+import { useIndexReload, useRecordUsageOnMount } from './vault-hooks'
 import { RenameRow, TaskTextEditor, useTaskTextDraft } from './inline-edits'
 import { invokeVault } from './daily-log-format'
 
@@ -381,6 +381,7 @@ function AreaList(props: ListProps): React.JSX.Element {
 }
 
 export function AreasView(): React.JSX.Element {
+  useRecordUsageOnMount('view-areas')
   const list = useAreaList()
   const { navToProject, selectedAreaName } = useVaultStore()
   const { selectedArea, setSelectedArea } = useSelectedArea(list.areas, selectedAreaName)

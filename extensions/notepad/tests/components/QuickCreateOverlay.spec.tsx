@@ -5,11 +5,13 @@ import { render, fireEvent, screen, cleanup, waitFor } from '@testing-library/re
 const mockInvoke = vi.fn().mockResolvedValue({
   data: { id: 'n1', title: 'Test', createdAt: '2026-01-01T00:00:00Z' },
 })
+const mockRecord = vi.fn()
 
 Object.defineProperty(window, 'electronAPI', {
   value: {
     extensionBridge: { invoke: mockInvoke },
     extension: { getSettingsValues: vi.fn().mockResolvedValue({ values: {} }) },
+    usage: { record: mockRecord },
   },
   writable: true,
   configurable: true,
@@ -21,6 +23,7 @@ import { useNotesStore } from '../../src/stores/notes.store'
 afterEach(() => {
   cleanup()
   mockInvoke.mockClear()
+  mockRecord.mockClear()
   useNotesStore.setState({ showQuickCreate: false })
 })
 
@@ -120,6 +123,7 @@ describe('QuickCreateOverlay saving a note', () => {
       { title: 'Plan', body: '', tags: ['big-idea'] },
     ])
     expect(invokedWith('terminator.notepad:notes.list')).toEqual([{ includeArchived: true }])
+    expect(mockRecord).toHaveBeenCalledWith('note-create')
   })
 
   it('stays open and can save again when creating fails', async () => {
@@ -136,6 +140,18 @@ describe('QuickCreateOverlay saving a note', () => {
   })
 })
 
+describe('QuickCreateOverlay usage', () => {
+  it('counts a tag added with Enter, not an empty one', () => {
+    openWithKind('Note')
+    const tagInput = screen.getByPlaceholderText('# add tag…')
+    fireEvent.keyDown(tagInput, { key: 'Enter' })
+    expect(mockRecord).not.toHaveBeenCalled()
+    fireEvent.change(tagInput, { target: { value: 'idea' } })
+    fireEvent.keyDown(tagInput, { key: 'Enter' })
+    expect(mockRecord).toHaveBeenCalledWith('tag')
+  })
+})
+
 describe('QuickCreateOverlay saving a diagram or folder', () => {
   it('creates an untitled diagram, refreshes the list and selects it', async () => {
     mockInvoke.mockImplementation(async (channel: string) =>
@@ -148,6 +164,7 @@ describe('QuickCreateOverlay saving a diagram or folder', () => {
       { title: 'Untitled diagram', tags: [] },
     ])
     expect(useNotesStore.getState().selectedDiagramId).toBe('d1')
+    expect(mockRecord).toHaveBeenCalledWith('diagram-create')
   })
 
   it('creates a named folder, and does nothing for a folder without a name', async () => {

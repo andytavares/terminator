@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { RecordShown } from '../renderer/RecordShown.js'
 import { ArrowLeft, Plus, CheckCircle2, AlertCircle, Loader } from 'lucide-react'
 import { Button, ConfirmButton, SegmentedControl } from '@terminator/extension-ui'
 import { GateAnswers } from './GateCard.js'
@@ -76,10 +77,16 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
   const shared: Shared = { repoRoot, busy, setBusy, setProblem, setOpen, refresh }
   const seeding = useSeeding(shared)
 
-  if (open !== null) return <OpenOrder {...{ open, rows, started, setStarted, shared }} />
   const list = { rows, answering, onOpen: setOpen, onAnswer: answer }
   return (
-    <OrderIndex {...{ from, setFrom, seeding, tickets, ideaInputRef, shared, problem, list }} />
+    <>
+      <RecordShown feature="orders" />
+      {open !== null ? (
+        <OpenOrder {...{ open, rows, started, setStarted, shared }} />
+      ) : (
+        <OrderIndex {...{ from, setFrom, seeding, tickets, ideaInputRef, shared, problem, list }} />
+      )}
+    </>
   )
 }
 

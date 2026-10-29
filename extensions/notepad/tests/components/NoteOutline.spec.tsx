@@ -4,6 +4,13 @@ import React from 'react'
 import { useEditorStore } from '../../src/stores/editor.store'
 import { NoteOutline } from '../../src/components/NoteOutline'
 
+const mockRecord = vi.fn()
+Object.defineProperty(window, 'electronAPI', {
+  value: { usage: { record: mockRecord } },
+  writable: true,
+  configurable: true,
+})
+
 const BODY = ['# Title', 'intro', '## Setup', '### Install', '## Usage'].join('\n')
 
 function setBody(body: string) {
@@ -21,6 +28,7 @@ describe('NoteOutline', noteOutlineTests)
 function noteOutlineTests() {
   beforeEach(() => {
     cleanup()
+    mockRecord.mockClear()
     setBody('')
   })
 
@@ -52,6 +60,13 @@ function noteOutlineListingHeadingsTests() {
 }
 
 function noteOutlineSelectingTests() {
+  it('counts a click on a heading as one use of the outline', () => {
+    setBody(BODY)
+    render(<NoteOutline onSelect={vi.fn()} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Setup' }))
+    expect(mockRecord).toHaveBeenCalledWith('outline')
+  })
+
   it('reports the heading offset when one is clicked', () => {
     setBody(BODY)
     const onSelect = vi.fn()

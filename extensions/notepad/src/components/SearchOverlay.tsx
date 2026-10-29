@@ -4,6 +4,7 @@ import { ModalShell, RelativeTime } from '@terminator/extension-ui'
 import { Search, X } from 'lucide-react'
 import type { SearchResult } from '../db/types'
 import { useNotesStore } from '../stores/notes.store'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 interface SearchOverlayProps {
   onClose: () => void
@@ -107,8 +108,10 @@ function useNoteSearch(query: string, tagFilter: string | null) {
     try {
       setResults(await queryNotes(q, filter))
       setSelectedIdx(0)
+      if (q.trim()) recordUsage('search')
     } catch (err) {
       console.error('[notepad] search failed', err)
+      recordUsage('search', { failed: true })
       setResults([])
     } finally {
       setIsSearching(false)

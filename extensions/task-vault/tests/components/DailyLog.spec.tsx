@@ -40,6 +40,13 @@ beforeEach(() => {
 
 afterEach(() => cleanup())
 
+describe('DailyLog usage', () => {
+  it('counts one view of the daily log, not each re-render', () => {
+    renderLog()
+    expect(bridge.recordUsage.mock.calls).toEqual([['view-daily-log']])
+  })
+})
+
 describe('DailyLog heading', headingTests)
 describe('DailyLog progress and sections', sectionTests)
 describe('DailyLog progress and sections, continued', sectionTestsPart2)

@@ -52,6 +52,7 @@ function createRuns(context: ActivationContext, standingSources: LiveStandingSou
     strandedSessions: liveStrandedSessions,
     activityFor: transcriptActivity,
     queueEntries: queueEntriesOf(dataRoot),
+    recordUse: (feature) => context.api.usage.record(feature),
   })
 }
 

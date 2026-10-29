@@ -8,6 +8,8 @@ Minor: additive.
 
 - `api.usage.record(feature, outcome?)` and the view's `window.electronAPI.usage.record` count one
   use of an id from the manifest's new `contributes.usage` list. The core adds the extension id.
+- `recordUsage(feature, outcome?)` in `@terminator/extension-sdk/renderer`: the view's call, typed
+  by the view's own API.
 - `CommandContribution.usage`: the `contributes.usage` id a command counts under, for a command
   whose id holds data.
 

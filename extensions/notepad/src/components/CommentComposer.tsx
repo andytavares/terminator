@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { Button } from '@terminator/extension-ui'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 interface CommentAnchorData {
   noteId: string
@@ -55,7 +56,10 @@ function useCommentDraft({ anchor, onCreated }: CommentComposerProps) {
     setSubmitting(true)
     try {
       const id = await createAnchoredComment(anchor, body.trim())
-      if (id) onCreated(id)
+      if (id) {
+        recordUsage('comment')
+        onCreated(id)
+      }
     } finally {
       setSubmitting(false)
     }

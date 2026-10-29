@@ -28,6 +28,8 @@ beforeEach(() => {
     git: { listBranches: mockListBranches },
     fs: { readFile: mockReadFile },
   })
+  // The view-only usage call the dialog makes; the core's window type does not list it.
+  Object.assign(window.electronAPI, { usage: { record: vi.fn() } })
   mockListBranches.mockResolvedValue({
     branches: [
       { name: 'main', isCurrent: false, isRemote: false },

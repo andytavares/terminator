@@ -3,9 +3,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 
 const mockInvoke = vi.fn().mockResolvedValue({ data: { id: 'c-new' } })
+const mockRecord = vi.fn()
 
 Object.defineProperty(window, 'electronAPI', {
-  value: { extensionBridge: { invoke: mockInvoke } },
+  value: { extensionBridge: { invoke: mockInvoke }, usage: { record: mockRecord } },
   writable: true,
   configurable: true,
 })
@@ -27,6 +28,7 @@ describe('CommentComposer', commentComposerTests)
 function commentComposerTests() {
   beforeEach(() => {
     mockInvoke.mockClear()
+    mockRecord.mockClear()
   })
 
   describe('editing', commentComposerEditingTests)
@@ -66,6 +68,13 @@ function commentComposerSubmittingTests() {
       )
     })
     expect(onCreated).toHaveBeenCalled()
+  })
+
+  it('counts a created comment as one use of the comment feature', async () => {
+    render(<CommentComposer anchor={baseAnchor} onClose={vi.fn()} onCreated={vi.fn()} />)
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'My comment' } })
+    fireEvent.click(screen.getByRole('button', { name: /add comment/i }))
+    await waitFor(() => expect(mockRecord).toHaveBeenCalledWith('comment'))
   })
 }
 

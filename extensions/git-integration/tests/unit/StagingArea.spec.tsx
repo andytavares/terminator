@@ -26,6 +26,7 @@ const mockUnstage = vi.fn()
 const mockStatus = vi.fn()
 const mockSetStatus = vi.fn()
 const mockInvoke = vi.fn()
+const mockRecordUsage = vi.fn()
 
 const makeFile = (status: Status, staged: boolean, path?: string): GitFileStatus => ({
   path: path ?? `test.${status}.ts`,
@@ -81,7 +82,7 @@ beforeEach(() => {
     return Promise.resolve({})
   })
   Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke: mockInvoke } },
+    value: { extensionBridge: { invoke: mockInvoke }, usage: { record: mockRecordUsage } },
     writable: true,
     configurable: true,
   })
@@ -210,6 +211,7 @@ describe('StagingArea — interactions — calls git.stage and refreshes when un
       expect(mockStage).toHaveBeenCalledWith({ repoRoot: '/repo', paths: ['src/a.ts'] })
     )
     expect(mockStatus).toHaveBeenCalled()
+    expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('stage')
   })
 })
 

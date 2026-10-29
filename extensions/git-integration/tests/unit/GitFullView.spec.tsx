@@ -92,6 +92,8 @@ function setupStore(overrides: Partial<GitState> = {}) {
   }
 }
 
+const mockRecordUsage = vi.fn()
+
 beforeEach(() => {
   vi.clearAllMocks()
   channelHandlers.clear()
@@ -111,6 +113,7 @@ beforeEach(() => {
   Object.assign(globalThis, {
     electronAPI: {
       extensionBridge: { invoke: mockInvoke, on: mockOn },
+      usage: { record: mockRecordUsage },
     },
   })
 })
@@ -192,6 +195,7 @@ describe('GitFullView — calls commit when Commit is clicked with staged files 
         noVerify: false,
       })
     )
+    expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('commit', {})
   })
 })
 
@@ -207,6 +211,7 @@ describe('GitFullView — shows commit error message when commit returns error',
     expect(
       await screen.findByText('Nothing staged to commit. Stage at least one file first.')
     ).toBeTruthy()
+    expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('commit', { failed: true })
   })
 })
 

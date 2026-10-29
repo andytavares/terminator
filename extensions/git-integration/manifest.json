@@ -37,6 +37,36 @@
     "insightsSection": {
       "label": "Contributions",
       "view": "home"
-    }
+    },
+    "usage": [
+      {
+        "id": "stage",
+        "label": "Stage a file"
+      },
+      {
+        "id": "commit",
+        "label": "Commit"
+      },
+      {
+        "id": "pr-create",
+        "label": "Open a pull request"
+      },
+      {
+        "id": "diff-open",
+        "label": "Open a file diff"
+      },
+      {
+        "id": "merge",
+        "label": "Finish a merge"
+      },
+      {
+        "id": "worktree-remove",
+        "label": "Remove a worktree or branch"
+      },
+      {
+        "id": "review-comment",
+        "label": "Post a review comment"
+      }
+    ]
   }
 }

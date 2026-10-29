@@ -1404,3 +1404,24 @@ function documentOnTheFloorTests() {
     expect(await observedDocument(null)).toBeNull()
   })
 }
+
+describe('counting runs', () => {
+  it('counts a started run, and counts nothing for a refused one', async () => {
+    const recordUse = vi.fn()
+    await store.save(order({ status: 'draft' }))
+    await createRunChannels(runDeps({ recordUse })).start({ id: 'WO-1' })
+    expect(recordUse).not.toHaveBeenCalled()
+    await store.save(order())
+    await createRunChannels(runDeps({ recordUse })).start({ id: 'WO-1' })
+    expect(recordUse).toHaveBeenCalledExactlyOnceWith('run-start')
+  })
+
+  it('counts a resumed run', async () => {
+    const recordUse = vi.fn()
+    const channels = await startedRunChannels({ isLive: nothingLive, recordUse })
+    withRunning()
+    recordUse.mockClear()
+    await channels.resume({ id: 'WO-1' })
+    expect(recordUse).toHaveBeenCalledExactlyOnceWith('run-resume')
+  })
+})

@@ -913,8 +913,9 @@ section), commands and native menu items are counted for you. Count anything els
 
 2. Record a use. `id` must match `^[a-z0-9][a-z0-9-]{0,59}$`. An undeclared id is dropped and logged.
    - Backend: `api.usage.record('export')`, or `api.usage.record('export', { failed: true })`.
-   - View: `window.electronAPI.usage.record('export')`. The core takes the extension id from the
-     frame, so a view cannot count under another extension.
+   - View: `recordUsage('export')` from `@terminator/extension-sdk/renderer`, which calls the
+     view's `window.electronAPI.usage.record`. The core takes the extension id from the frame, so
+     a view cannot count under another extension.
 3. A command whose id holds data (`open-run-42`) counts under one id instead: set
    `usage: 'go-to-run'` on its `CommandContribution` and declare `go-to-run` in the manifest.
    The command is then not listed itself. Since 6.1.0.

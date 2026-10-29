@@ -32,6 +32,13 @@ async function openArchiveTab(name: RegExp) {
   fireEvent.click(await screen.findByRole('tab', { name }))
 }
 
+describe('ArchiveView usage', () => {
+  it('counts one view of the archive as it opens', async () => {
+    await openArchiveTab(/projects/i)
+    expect(bridge.recordUsage.mock.calls).toEqual([['view-archive']])
+  })
+})
+
 describe('ArchiveView tasks', archiveTasksTests)
 describe('ArchiveView projects and areas', archiveProjectsAndAreasTests)
 describe('ArchiveView loading', archiveLoadingTests)

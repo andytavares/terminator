@@ -173,6 +173,7 @@ function shipDepsFor(tail: RunTail): IntegrateDeps {
     // The ticket moves to In Review when the draft opens, not when the CI
     // watch that follows it ends.
     onDraftOpened: async (pulls) => {
+      api.usage.record('ship')
       await writeBack(
         order,
         { event: 'draft_opened', pulls: pulls.map((pull) => ({ repo: pull.repo, url: pull.url })) },

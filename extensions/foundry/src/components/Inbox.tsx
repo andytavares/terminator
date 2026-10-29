@@ -1,4 +1,5 @@
 import { GateCard } from './GateCard.js'
+import { RecordShown } from '../renderer/RecordShown.js'
 import { ruleInWords } from '../gates/rules.js'
 import React, { useCallback, useState } from 'react'
 import {
@@ -99,6 +100,7 @@ export function Inbox({
 
   return (
     <section className="fdry-inbox" aria-label="Waiting on you">
+      <RecordShown feature="inbox" />
       {answers.problem !== null ? <p className="fdry-problem">{answers.problem}</p> : null}
       <WaitingOrders waiting={waiting} onOpenOrder={onOpenOrder} />
       <GateQueue gates={view.gates} busy={answers.busy} onAnswer={answers.answer} />

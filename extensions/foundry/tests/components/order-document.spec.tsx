@@ -25,6 +25,7 @@ const bus = createChangeBus()
 function install(invoke: (channel: string) => unknown): void {
   Object.assign(window, {
     electronAPI: {
+      usage: { record: vi.fn() },
       extensionBridge: { invoke: vi.fn(async (c: string) => invoke(c)), on: bus.on },
       shell: { openExternal, openPath },
       extension: { runCommand: vi.fn(), hasCommand: vi.fn(async () => true) },

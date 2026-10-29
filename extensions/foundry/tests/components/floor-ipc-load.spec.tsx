@@ -41,6 +41,7 @@ function mountOpenFloor(): ReturnType<typeof vi.fn> {
   })
   Object.assign(window, {
     electronAPI: {
+      usage: { record: vi.fn() },
       extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
       shell: { openExternal: vi.fn() },
       extension: { runCommand: vi.fn(), hasCommand: vi.fn(async () => false) },

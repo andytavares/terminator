@@ -14,6 +14,7 @@ import type { FileDiff, PullRequest } from '../schemas/git.schema'
 import { gitAPI, type CommitResult } from '../api/git'
 import { MergeFlowView } from './merge-flow/MergeFlowView'
 import { choose } from './text'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 interface Props {
   repoRoot: string | null
@@ -231,6 +232,7 @@ function commitStarted(r: CommitRunner): boolean {
 
 /** Shows a failed commit's error, or clears the box after a successful one; true on success. */
 function applyCommitResult(c: CommitControls, result: CommitResult): boolean {
+  recordUsage('commit', 'error' in result ? { failed: true } : {})
   if ('error' in result) {
     c.runner.errors.show(result)
     return false
