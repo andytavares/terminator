@@ -1,4 +1,4 @@
-import yaml from 'js-yaml'
+import { dump, load } from 'js-yaml'
 
 // Reading the YAML block at the top of an exported note.
 //
@@ -44,9 +44,9 @@ export function parseFrontMatter(input: string): FrontMatter {
 /** The YAML header's fields, or none when it is malformed or not a mapping. */
 function parseYamlMapping(text: string): Record<string, unknown> {
   try {
-    // js-yaml 4's `load` is the safe schema; on 3 it resolves `!!js/function`, so
-    // an imported note could run code on being read. Hence the ^4 pin.
-    const parsed = yaml.load(text)
+    // js-yaml 3's `load` resolved `!!js/function`, so an imported note could run code
+    // on being read; 4 and later build no functions.
+    const parsed = load(text)
     // A YAML document can be a string, a number or null; only a mapping has fields.
     if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
       return parsed as Record<string, unknown>
@@ -66,6 +66,6 @@ function parseYamlMapping(text: string): Record<string, unknown> {
  * which is the entire reason these are exported as markdown.
  */
 export function stringifyFrontMatter(body: string, data: Record<string, unknown>): string {
-  const header = yaml.dump(data, { lineWidth: -1 }).trimEnd()
+  const header = dump(data, { lineWidth: -1 }).trimEnd()
   return `---\n${header}\n---\n${body}`
 }

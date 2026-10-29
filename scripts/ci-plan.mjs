@@ -3,7 +3,7 @@
 // the job and step, rather than being guessed at.
 
 import { readFileSync } from 'node:fs'
-import yaml from 'js-yaml'
+import { load } from 'js-yaml'
 
 /** Jobs ci:local does not run as ci.yml writes them, and why. */
 export const SKIPPED_JOBS = {
@@ -46,7 +46,7 @@ const SETUP = /^npm ci\b/
 
 /** @returns {Workflow} */
 export function readWorkflow(path) {
-  return yaml.load(readFileSync(path, 'utf8'))
+  return load(readFileSync(path, 'utf8'))
 }
 
 function resolveScript(script, where, expressions) {
