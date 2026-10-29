@@ -1,0 +1,108 @@
+tests/unit/main/extensions/api.spec.ts
+  s_3ade4fb4c9f2cf::t_eb59593737459f 221
+  s_3ade4fb4c9f2cf::t_2c62933da67552 186-188,197-199,229-234
+extensions/remote-control/package.json
+  s_3ade4fb4c9f2cf::t_088973129063ad 12
+src/extension-frame/frame-shim.ts
+  s_3ade4fb4c9f2cf::t_8c13ac4a07c7e7 178-179
+src/shared/types/index.ts
+  s_3ade4fb4c9f2cf::t_7219298864d7af 153-154
+src/shared/schemas/extension.schema.ts
+  s_3ade4fb4c9f2cf::t_553bb67abd09a4 21-25
+  s_3ade4fb4c9f2cf::t_7219298864d7af 55-56,72,85
+extensions/git-integration/package.json
+  s_3ade4fb4c9f2cf::t_088973129063ad 16
+extensions/foundry/package.json
+  s_3ade4fb4c9f2cf::t_088973129063ad 11
+src/main/extensions/extension-usage.ts
+  s_3ade4fb4c9f2cf::t_84d506cb4a9b54 48-53
+  s_3ade4fb4c9f2cf::t_7219298864d7af 1-47
+packages/extension-sdk/types/api.d.ts
+  s_3ade4fb4c9f2cf::t_8c13ac4a07c7e7 117-119,599-603
+extensions/task-vault/package.json
+  s_3ade4fb4c9f2cf::t_088973129063ad 10
+src/main/index.ts
+  s_3ade4fb4c9f2cf::t_8c13ac4a07c7e7 63,95-96
+src/shared/electron-api/manifest.ts
+  s_3ade4fb4c9f2cf::t_449660c17890ec 920-926
+  s_3ade4fb4c9f2cf::t_8c13ac4a07c7e7 919,1034-1042
+tests/unit/renderer/components/extension-surfaces.spec.tsx
+  s_3ade4fb4c9f2cf::t_53cad79725ca18 252
+src/main/extensions/frame-bridge.ts
+  s_3ade4fb4c9f2cf::t_8c13ac4a07c7e7 36,129-130
+tests/unit/main/extensions/frame-bridge.spec.ts
+  s_3ade4fb4c9f2cf::t_cbfefb731cd8d0 109
+  s_3ade4fb4c9f2cf::t_5b17ce13868212 120,338-353
+  s_3ade4fb4c9f2cf::t_a527d25ee5d3e0 354-355
+src/main/extensions/api.ts
+  s_3ade4fb4c9f2cf::t_eb59593737459f 246
+  s_3ade4fb4c9f2cf::t_84d506cb4a9b54 31,327-328,972-973
+  s_3ade4fb4c9f2cf::t_553bb67abd09a4 32,250-264,706-712,717-723,739-740,1017
+  s_3ade4fb4c9f2cf::t_4109c5d87184f4 248-249,265
+src/main/ipc/extension.ipc.ts
+  s_3ade4fb4c9f2cf::t_2c62933da67552 91,93-94
+  s_3ade4fb4c9f2cf::t_eb59593737459f 13,180
+  s_3ade4fb4c9f2cf::t_8c13ac4a07c7e7 87,90,92,176-179
+docs/EXTENSION-DEVELOPMENT.md
+  s_3ade4fb4c9f2cf::t_009f93b1dd0806 903-921
+src/main/extensions/extension-host.ts
+  s_3ade4fb4c9f2cf::t_553bb67abd09a4 1,381
+  s_3ade4fb4c9f2cf::t_84d506cb4a9b54 375-379
+tests/unit/main/extensions/window-view-usage.spec.ts
+  s_3ade4fb4c9f2cf::t_b88e2cae02da6e 1-25
+tests/unit/shared/schemas/extension.schema.spec.ts
+  s_3ade4fb4c9f2cf::t_34105a465fdc4a 92-93,97-99
+  s_3ade4fb4c9f2cf::t_c38e850a77ecf3 81-91,94-96,100-101
+extensions/notepad/package.json
+  s_3ade4fb4c9f2cf::t_088973129063ad 21
+src/shared/frame-wire.ts
+  s_3ade4fb4c9f2cf::t_8c13ac4a07c7e7 13
+src/main/extensions/host/host-api.ts
+  s_3ade4fb4c9f2cf::t_8c13ac4a07c7e7 301,321
+package.json
+  s_3ade4fb4c9f2cf::t_088973129063ad 70
+tests/unit/extension-frame/frame-shim.spec.ts
+  s_3ade4fb4c9f2cf::t_5b17ce13868212 257-264
+packages/extension-sdk/types/renderer.d.ts
+  s_3ade4fb4c9f2cf::t_8c13ac4a07c7e7 206-210
+src/shared/electron-api/__tests__/build-api.spec.ts
+  s_3ade4fb4c9f2cf::t_33545d5b548b2d 120-126
+  s_3ade4fb4c9f2cf::t_5b17ce13868212 355,427
+  s_3ade4fb4c9f2cf::t_0686c985ca7212 119,127-128
+packages/extension-sdk/CHANGELOG.md
+  s_3ade4fb4c9f2cf::t_8c13ac4a07c7e7 3-13
+src/main/extensions/host/api-server.ts
+  s_3ade4fb4c9f2cf::t_8c13ac4a07c7e7 44
+tests/unit/main/extensions/usage-capture.spec.ts
+  s_3ade4fb4c9f2cf::t_424a49df8308e3 1-74,76,78-79,81-92,94-97,99,101-105,107-112,114-136
+  s_3ade4fb4c9f2cf::t_5b27244e603953 98,100
+  s_3ade4fb4c9f2cf::t_cbf8a6c17ecf3c 75,77
+  s_3ade4fb4c9f2cf::t_eb59593737459f 80,93,106,113
+tests/unit/main/ipc/extension.ipc.spec.ts
+  s_3ade4fb4c9f2cf::t_34105a465fdc4a 95-98
+  s_3ade4fb4c9f2cf::t_5b17ce13868212 91-94,99-101,103
+  s_3ade4fb4c9f2cf::t_7123b02fcb0663 56-59,70-71,87,102
+  s_3ade4fb4c9f2cf::t_e1331252144cec 104
+packages/extension-sdk/package.json
+  s_3ade4fb4c9f2cf::t_088973129063ad 3
+package-lock.json
+  s_3ade4fb4c9f2cf::t_96b4c88a486ae2 19,80,102,130,147,165,18687
+tests/unit/extensions/extension-host-usage.spec.ts
+  s_3ade4fb4c9f2cf::t_ab70c3372df10a 1-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "57f88255299fd9a99ad05319402bb32049fcd8f7",
+  "prompts": {},
+  "sessions": {
+    "s_3ade4fb4c9f2cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8126b621-5a83-4f60-ab34-46b32eaf83b1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
