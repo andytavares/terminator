@@ -917,6 +917,14 @@ export const ELECTRON_API_MANIFEST = [
     toHandlerArgs: () => [],
   }),
   method({
+    path: 'extensionEvents.onMenuOpenUsage',
+    kind: 'event',
+    channel: 'menu:open-usage',
+    signature: signature<(handler: () => void) => Unsubscribe>(),
+    toHandlerArgs: () => [],
+    remote: 'omit',
+  }),
+  method({
     path: 'extensionEvents.onMenuOpenTaskSwitcher',
     kind: 'event',
     channel: 'menu:open-task-switcher',
@@ -1021,6 +1029,15 @@ export const ELECTRON_API_MANIFEST = [
     signature: signature<(handler: (sessionId: string) => void) => Unsubscribe>(),
     toHandlerArgs: (args) => [(args[0] as { sessionId: string }).sessionId],
     remote: 'omit',
+  }),
+
+  // The frame counts a use; main prefixes the extension id from the frame's own port, so a
+  // view cannot count under another extension. Frame-only: the app renderer uses usage.recordUse.
+  method({
+    path: 'usage.record',
+    kind: 'local',
+    signature: signature<(feature: string, outcome?: { failed?: boolean }) => void>(),
+    extensionView: 'only',
   }),
 
   // ── extensionBridge ───────────────────────────────────────────────────────

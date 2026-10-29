@@ -10,6 +10,7 @@ export type FrameRequest =
   | { type: 'request-exit' }
   | { type: 'quick-actions-open' }
   | { type: 'settings-open' }
+  | { type: 'usage'; feature: string; failed?: boolean }
 
 /** What main sends a frame. */
 export type FrameReply =

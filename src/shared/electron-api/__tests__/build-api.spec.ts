@@ -116,6 +116,16 @@ describe('buildElectronApi — native mode events', () => {
   })
 })
 
+describe('buildElectronApi — the Usage menu event', () => {
+  it('delivers menu:open-usage to onMenuOpenUsage with no args', () => {
+    const { t, api } = nativeBridge()
+    const handler = vi.fn()
+    api.extensionEvents.onMenuOpenUsage(handler)
+    t.push('menu:open-usage')
+    expect(handler).toHaveBeenCalledWith()
+  })
+})
+
 const WIRE_CASES = [
   {
     path: 'terminal.attach',
@@ -342,6 +352,7 @@ describe('buildElectronApi — the manifest is the whole surface', () => {
 })
 
 const FRAME_LOCALS = {
+  'usage.record': vi.fn(),
   'extensionBridge.invoke': vi.fn(),
   'extensionBridge.on': vi.fn(),
 }
@@ -413,6 +424,7 @@ const FRAME_API_PATHS = [
   'terminal.listSessions',
   'terminal.onProcessExit',
   'terminal.resize',
+  'usage.record',
   'workspace.create',
   'workspace.delete',
   'workspace.getActive',

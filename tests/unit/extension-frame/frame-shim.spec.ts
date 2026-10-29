@@ -254,6 +254,14 @@ describe('frame-shim app shortcuts', () => {
   })
 })
 
+describe('frame-shim usage', () => {
+  it('posts electronAPI.usage.record as a usage message', async () => {
+    const { port } = await connectedFrame()
+    frameApi().usage.record('export', { failed: true })
+    expect(port.posted).toContainEqual({ type: 'usage', feature: 'export', failed: true })
+  })
+})
+
 /** Records what a fit=content shim observes and posts to its parent window. */
 function createFitContentSpies() {
   const spies: {

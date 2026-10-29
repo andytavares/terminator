@@ -28,6 +28,8 @@ import type { PtyManager } from '../terminal/pty-manager.js'
 import type { OutputRelay } from '../terminal/output-relay.js'
 import { matchesBranchPattern } from '../git/branch-exclude.js'
 import { branchExcludePatternsFor } from '../git/branch-exclude-settings.js'
+import { declareUsage, recordUsage, windowViewUsageId } from './extension-usage.js'
+import type { Via } from '../../shared/schemas/usage.schema.js'
 
 /** Outcome of running a command by id: `reason` is 'not-registered' or 'invalid-args: …'. */
 export type CommandRunResult = { ok: true } | { ok: false; reason: string }
@@ -241,10 +243,26 @@ export function isExtensionCommandRegistered(key: string): boolean {
 export async function executeExtensionCommand(
   key: string,
   ctx: CommandContext,
-  args?: unknown
+  { args, via = 'app' }: { args?: unknown; via?: Via } = {}
 ): Promise<CommandRunResult> {
-  const handler = globalRegistry.commandHandlers.get(key)
-  if (!handler) return { ok: false, reason: 'not-registered' }
+  if (!globalRegistry.commandHandlers.has(key)) return { ok: false, reason: 'not-registered' }
+  const result = await runCommandHandler(key, ctx, args)
+  recordUsage({ feature: commandUsageId(key), via, failed: !result.ok })
+  return result
+}
+
+/** A command counts under the manifest `usage` id its contribution names, else under its own key. */
+function commandUsageId(key: string): string {
+  const usage = globalRegistry.commandContributions.get(key)?.usage
+  return usage === undefined ? key : `${key.slice(0, key.indexOf('.command.'))}.${usage}`
+}
+
+async function runCommandHandler(
+  key: string,
+  ctx: CommandContext,
+  args: unknown
+): Promise<CommandRunResult> {
+  const handler = globalRegistry.commandHandlers.get(key)!
   let validated: unknown
   const schema = globalRegistry.commandContributions.get(key)?.args
   if (schema) {
@@ -306,6 +324,8 @@ export interface ExtensionAPIDeps {
   paths?: AppPaths
   /** The manifest's `contributes.shellRoots`: settings naming directories git and gh may run in. */
   shellRootSettings?: readonly string[]
+  /** The manifest's `contributes.windowViews` ids, so an opened window counts as a use. */
+  windowViewIds?: readonly string[]
 }
 
 const ptyStreams = new WeakMap<PtyManager, BatchedPtyStream>()
@@ -683,11 +703,24 @@ function homeApi({ extensionId, disposable }: ApiContext): ExtensionAPI['home'] 
   }
 }
 
+function usageApi({ extensionId }: ApiContext): ExtensionAPI['usage'] {
+  return {
+    record: (feature, outcome) =>
+      recordUsage({ feature: `${extensionId}.${feature}`, via: 'app', failed: outcome?.failed }),
+  }
+}
+
 function nativeMenuApi({ extensionId, disposable }: ApiContext): ExtensionAPI['nativeMenu'] {
   return {
     addViewMenuItem(item: NativeMenuItemContribution): Disposable {
       const key = `${extensionId}.nativemenu.${item.id}`
-      globalRegistry.nativeMenuItems.set(key, item)
+      const feature = `${extensionId}.menu.${item.id}`
+      declareUsage([{ id: feature, label: item.label, kind: 'action', source: extensionId }])
+      const onClick = () => {
+        recordUsage({ feature, via: 'menu' })
+        item.onClick()
+      }
+      globalRegistry.nativeMenuItems.set(key, { ...item, onClick })
       rebuildViewMenu()
       return disposable(() => {
         globalRegistry.nativeMenuItems.delete(key)
@@ -703,6 +736,8 @@ function commandsApi({ extensionId, deps, disposable }: ApiContext): ExtensionAP
   return {
     register(command: CommandContribution, handler): Disposable {
       const key = `${extensionId}.command.${command.id}`
+      if (command.usage === undefined)
+        declareUsage([{ id: key, label: command.label, kind: 'command', source: extensionId }])
       globalRegistry.commandContributions.set(key, command)
       globalRegistry.commandHandlers.set(key, handler as CommandHandler)
       // Quick Actions re-reads the list: a backend that activates after the
@@ -934,6 +969,8 @@ function windowApi(context: ApiContext): ExtensionAPI['window'] {
   return {
     openAuxiliary(view: string, params?: Record<string, string>): void {
       openAuxiliaryWindow(view, params, context.rendererUrl)
+      const windowView = windowViewUsageId(view, deps?.windowViewIds ?? [])
+      if (windowView) recordUsage({ feature: `${extensionId}.${windowView}`, via: 'shown' })
     },
     broadcast(channel: string, data: unknown): void {
       broadcastToAllWindows(context, channel, data)
@@ -977,6 +1014,7 @@ export function createExtensionAPI(
     issues: { ...issueReadApi(), ...issueWorkflowApi(), ...issueCreateApi() },
     notifications: notificationsApi(context),
     home: homeApi(context),
+    usage: usageApi(context),
     nativeMenu: nativeMenuApi(context),
     commands: commandsApi(context),
     ipc: { ...ipcRegistrationApi(context), ...ipcBridgeApi(context) },

@@ -175,6 +175,8 @@ function installFrameApi(link: FrameLink): void {
     subscribe: link.subscribe,
   }
   const locals = {
+    'usage.record': (feature: string, outcome?: { failed?: boolean }) =>
+      link.post({ type: 'usage', feature, failed: outcome?.failed }),
     'extensionBridge.invoke': (channel: string, payload?: unknown) => link.invoke(channel, payload),
     'extensionBridge.on': (channel: string, handler: (data: unknown) => void) =>
       link.subscribe(channel, (args) => handler(args[0])),

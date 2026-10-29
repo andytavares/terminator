@@ -106,6 +106,7 @@ function makeCallbacks() {
     onExitRequest: vi.fn(),
     onQuickActionsOpen: vi.fn(),
     onSettingsOpen: vi.fn(),
+    onUsage: vi.fn(),
   }
 }
 
@@ -116,6 +117,7 @@ function makeBridge(callbacks: ReturnType<typeof makeCallbacks>): FrameBridge {
     onExitRequest: callbacks.onExitRequest,
     onQuickActionsOpen: callbacks.onQuickActionsOpen,
     onSettingsOpen: callbacks.onSettingsOpen,
+    onUsage: callbacks.onUsage,
   })
 }
 
@@ -330,6 +332,24 @@ describe('FrameBridge — exit and quick actions', () => {
     await frame.settled()
     expect(rig.spies().onSettingsOpen).toHaveBeenCalled()
     expect(rig.spies().onQuickActionsOpen).not.toHaveBeenCalled()
+  })
+})
+
+describe('FrameBridge — usage', () => {
+  const rig = useBridge()
+
+  it('reports a usage message under the frame extension id', async () => {
+    const frame = rig.open('ext.a', 'main')
+    frame.post({ type: 'usage', feature: 'export', failed: true })
+    await frame.settled()
+    expect(rig.spies().onUsage).toHaveBeenCalledWith('ext.a', 'export', true)
+  })
+
+  it('ignores an extension id forged in the payload', async () => {
+    const frame = rig.open('ext.a', 'main')
+    frame.post({ type: 'usage', feature: 'export', extensionId: 'ext.b' })
+    await frame.settled()
+    expect(rig.spies().onUsage).toHaveBeenCalledWith('ext.a', 'export', undefined)
   })
 })
 

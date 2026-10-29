@@ -78,3 +78,24 @@ describe('ExtensionContributesSchema — Insights section', () => {
     expect(result.success).toBe(false)
   })
 })
+
+describe('ExtensionContributesSchema — usage', () => {
+  it('keeps a usage item', () => {
+    const result = ExtensionContributesSchema.parse({
+      usage: [{ id: 'go-to-run', label: 'Go to run' }],
+    })
+    expect(result.usage).toEqual([{ id: 'go-to-run', label: 'Go to run' }])
+  })
+
+  it.each(['Go', '-go', 'go to', 'a'.repeat(61), ''])('rejects the usage id %j', (id) => {
+    expect(ExtensionContributesSchema.safeParse({ usage: [{ id, label: 'x' }] }).success).toBe(
+      false
+    )
+  })
+
+  it('rejects an empty label', () => {
+    expect(ExtensionContributesSchema.safeParse({ usage: [{ id: 'go', label: '' }] }).success).toBe(
+      false
+    )
+  })
+})

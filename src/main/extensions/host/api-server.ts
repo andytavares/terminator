@@ -41,6 +41,7 @@ const CROSSING_MEMBERS: ReadonlySet<string> = new Set([
   'notifications.createNotification',
   'home.publish',
   'home.onAction',
+  'usage.record',
   'nativeMenu.addViewMenuItem',
   'ipc.invokeChannel',
   'ipc.sendChannel',

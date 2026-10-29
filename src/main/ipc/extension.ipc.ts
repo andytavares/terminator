@@ -10,6 +10,7 @@ import {
   isExtensionCommandRegistered,
 } from '../extensions/api.js'
 import type { CommandContext } from '@terminator/extension-sdk'
+import { ViaSchema, type Via } from '../../shared/schemas/usage.schema.js'
 import {
   getAllExtensionSettings,
   setExtensionSetting,
@@ -83,14 +84,14 @@ const commandChannels: ChannelSpec[] = [
       key: z.string().min(1),
       args: z.unknown().optional(),
       ctx: CommandContextSchema.optional(),
+      via: ViaSchema.default('palette'),
     }),
     invalid,
-    run: ({ key, args, ctx }) =>
-      executeExtensionCommand(
-        key,
-        ctx ?? { projectId: null, sessionId: null, repoRoot: null },
-        args
-      ),
+    run: ({ key, args, ctx, via }) =>
+      executeExtensionCommand(key, ctx ?? { projectId: null, sessionId: null, repoRoot: null }, {
+        args,
+        via,
+      }),
   }),
   defineChannel({
     channel: 'extension:has-command',
@@ -172,8 +173,11 @@ export function registerExtensionHandlers(
 
   onChannel(
     'extension:execute-command',
-    (_event, { key, ctx, args }: { key: string; ctx: CommandContext; args?: unknown }) => {
-      void executeExtensionCommand(key, ctx, args)
+    (
+      _event,
+      { key, ctx, args, via }: { key: string; ctx: CommandContext; args?: unknown; via?: Via }
+    ) => {
+      void executeExtensionCommand(key, ctx, { args, via: via ?? 'app' })
     }
   )
 }

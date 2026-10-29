@@ -53,7 +53,10 @@ describe('extension:execute-command', () => {
 
     listener({}, { key: 'ext.command.push', ctx })
 
-    expect(mockExecuteExtensionCommand).toHaveBeenCalledWith('ext.command.push', ctx, undefined)
+    expect(mockExecuteExtensionCommand).toHaveBeenCalledWith('ext.command.push', ctx, {
+      args: undefined,
+      via: 'app',
+    })
   })
 
   it('forwards the args when the caller gave some', async () => {
@@ -64,7 +67,8 @@ describe('extension:execute-command', () => {
     listener({}, { key: 'ext.command.new-order', ctx, args: { key: 'TAV-33' } })
 
     expect(mockExecuteExtensionCommand).toHaveBeenCalledWith('ext.command.new-order', ctx, {
-      key: 'TAV-33',
+      args: { key: 'TAV-33' },
+      via: 'app',
     })
   })
 })
@@ -80,8 +84,22 @@ describe('extension:run-command', () => {
     expect(mockExecuteExtensionCommand).toHaveBeenCalledWith(
       'ext.command.open',
       { projectId: null, sessionId: null, repoRoot: null },
-      { n: 1 }
+      { args: { n: 1 }, via: 'palette' }
     )
     expect(result).toEqual({ ok: false, reason: 'not-registered' })
+  })
+
+  it('counts the run under the via the caller names', async () => {
+    mockExecuteExtensionCommand.mockResolvedValue({ ok: true })
+    registerExtensionHandlers(makeExtensionHost(), broadcast)
+    await handleHandlers.get('extension:run-command')!(
+      {},
+      { key: 'ext.command.open', via: 'click' }
+    )
+    expect(mockExecuteExtensionCommand).toHaveBeenCalledWith(
+      'ext.command.open',
+      expect.anything(),
+      { args: undefined, via: 'click' }
+    )
   })
 })

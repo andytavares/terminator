@@ -249,6 +249,7 @@ describe('the extension API surface is unchanged', () => {
       'shellRoots',
       'sidebarPanel',
       'startWorkOptions',
+      'usage',
       'windowViews',
       'workspaceTab',
     ])

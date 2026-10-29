@@ -900,6 +900,25 @@ An ask (`onPermission`) carries `toolCallId` and `toolCallMeta`, the `_meta` of 
 
 ---
 
+## Reporting usage
+
+The Usage screen counts every use of every feature. Surfaces (window views and the Insights
+section), commands and native menu items are counted for you. Count anything else yourself:
+
+1. Declare it in the manifest. The core prefixes the extension id.
+
+   ```json
+   "contributes": { "usage": [{ "id": "export", "label": "Export a note" }] }
+   ```
+
+2. Record a use. `id` must match `^[a-z0-9][a-z0-9-]{0,59}$`. An undeclared id is dropped and logged.
+   - Backend: `api.usage.record('export')`, or `api.usage.record('export', { failed: true })`.
+   - View: `window.electronAPI.usage.record('export')`. The core takes the extension id from the
+     frame, so a view cannot count under another extension.
+3. A command whose id holds data (`open-run-42`) counts under one id instead: set
+   `usage: 'go-to-run'` on its `CommandContribution` and declare `go-to-run` in the manifest.
+   The command is then not listed itself. Since 6.1.0.
+
 ## Disposables
 
 Every registration returns a `Disposable`. `dispose()` undoes it. Registrations you do not dispose in `deactivate` are disposed when the extension is unloaded.

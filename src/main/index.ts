@@ -60,6 +60,7 @@ import {
 import { onWorkspacesChanged } from './storage/workspace-store.js'
 import { createExtProtocolHandler } from './extensions/ext-protocol.js'
 import { EXTENSION_BASE_CSS } from '@terminator/extension-ui/extension-base-css'
+import { recordUsage } from './extensions/extension-usage.js'
 import { FrameBridge, registerFramePortChannel } from './extensions/frame-bridge.js'
 import { routeExtensionExitRequest, type ExtensionSurface } from './extensions/extension-exit.js'
 import { flushLogs, logger } from './logger.js'
@@ -91,6 +92,8 @@ const frameBridge = new FrameBridge({
   onExitRequest: (surface) => exitExtensionSurface(surface),
   onQuickActionsOpen: () => mainWindow?.webContents.send('quick-actions:open'),
   onSettingsOpen: () => mainWindow?.webContents.send('menu:open-settings'),
+  onUsage: (extensionId, feature, failed) =>
+    recordUsage({ feature: `${extensionId}.${feature}`, via: 'click', failed }),
 })
 const ptyManager = new PtyManager()
 // Reads core state the way an extension's API does, for the extension host's snapshot.

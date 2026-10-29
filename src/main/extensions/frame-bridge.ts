@@ -33,6 +33,7 @@ export interface FrameBridgeDeps {
   onExitRequest(surface: ExtensionSurface): void
   onQuickActionsOpen(): void
   onSettingsOpen(): void
+  onUsage(extensionId: string, feature: string, failed: boolean | undefined): void
 }
 
 interface Frame {
@@ -125,6 +126,8 @@ export class FrameBridge {
     if (message.type === 'subscribe') return void frame.subscriptions.add(message.channel)
     if (message.type === 'request-exit') return this.deps.onExitRequest(frame.surface)
     if (message.type === 'settings-open') return this.deps.onSettingsOpen()
+    if (message.type === 'usage')
+      return this.deps.onUsage(frame.surface.extensionId, message.feature, message.failed)
     this.deps.onQuickActionsOpen()
   }
 
