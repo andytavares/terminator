@@ -35,6 +35,8 @@ import { notePending, noteResolved } from '../runtime/held-calls.js'
 import { shellExecOf } from '../host-calls.js'
 import type { CommandProposal } from '../profile/command-proposal.js'
 import { inBackground } from '../background.js'
+import { NOT_STARTED } from './intake-outcome.js'
+import { NO_START_REASON } from '../runtime/start-failure.js'
 
 /** One architect turn: the order, what it is told, and who hears how it ended. */
 export interface ArchitectTurn {
@@ -58,7 +60,7 @@ interface ArchitectLaunch {
   readonly checkout: Checkout
   readonly memory: SessionMemory
   readonly answer: (started: ConvergeStarted) => void
-  readonly progress: { done: boolean; architectSession: string | null }
+  readonly progress: { done: boolean; architectSession: string | null; startFailure: string | null }
 }
 
 /** Where the architect works: its brief, its order's directory, and the lane checkout. */
@@ -92,7 +94,11 @@ export async function convergeOnce(
       answered = true
       resolve(started)
     }
-    const progress: ArchitectLaunch['progress'] = { done: false, architectSession: null }
+    const progress: ArchitectLaunch['progress'] = {
+      done: false,
+      architectSession: null,
+      startFailure: null,
+    }
     launchArchitect({ api, turn, runner, ...place, memory, answer: answerOnce, progress })
   })
 }
@@ -167,9 +173,9 @@ function launchArchitect(launch: ArchitectLaunch): void {
   inBackground(
     launch.runner
       .start(architectStartOptions(launch))
-      .then((run) => {
+      .then(async (run) => {
         if (run === null) {
-          architectEnded(launch, null)
+          await architectNotStarted(launch)
           return
         }
         memory.remember(run.sessionId)
@@ -213,13 +219,50 @@ function architectStartOptions(launch: ArchitectLaunch): StartSupervisedRunOptio
     ...heldCallNotes(api, featureDir),
     onAutoDenied: (tool, reason) =>
       postRefusal(intakeSessions.get(order.id) ?? order.id, { tool, reason }),
-    onRegistered: (run) => {
-      launch.progress.architectSession = run.sessionId
-      launch.memory.remember(run.sessionId)
-      launch.answer({ ok: true, sessionId: run.sessionId })
-    },
+    onRegistered: (run) => architectRegistered(launch, run.sessionId),
+    onStartFailed: (reason) => void (launch.progress.startFailure = reason),
     onEnd: (exitCode) => architectEnded(launch, exitCode),
   }
+}
+
+function architectRegistered(launch: ArchitectLaunch, sessionId: string): void {
+  launch.progress.architectSession = sessionId
+  launch.memory.remember(sessionId)
+  launch.answer({ ok: true, sessionId })
+}
+
+/** The one ledger line for an agent that could not start; nothing retries it. */
+function recordNotStarted(
+  store: OrderStore,
+  { orderId, roleId, reason }: { orderId: string; roleId: string; reason: string }
+): Promise<void> {
+  return store.record({
+    at: new Date().toISOString(),
+    orderId,
+    actor: `role:${roleId}`,
+    action: NOT_STARTED,
+    subject: orderId,
+    reason,
+    evidence: [],
+  })
+}
+
+// Its own outcome, not a refused proposal: there was no proposal, and a retry would
+// hit the same start failure. The start answer carries it; no turn outcome follows.
+async function architectNotStarted(launch: ArchitectLaunch): Promise<void> {
+  const { turn, progress } = launch
+  const { order } = turn
+  if (progress.done || deletedOrders.has(order.id)) return
+  progress.done = true
+  intakeSessions.delete(order.id)
+  announceLive(order.id)
+  const reason = progress.startFailure ?? NO_START_REASON
+  await recordNotStarted(orderStoreAt(turn.root), {
+    orderId: order.id,
+    roleId: 'architect',
+    reason,
+  })
+  launch.answer({ ok: false, notStarted: true, reason })
 }
 
 // One conversation per order, so a follow-up does not re-read the repository; the
@@ -267,7 +310,8 @@ function readOnlyTurn(
   return {
     mode: permissionMode,
     settings,
-    autoDecide: (tool, input) => decideTool({ tool, input, autonomy, outputsDir: null }),
+    autoDecide: (tool, input) =>
+      decideTool({ tool, input, autonomy, outputsDir: null, readOnly: true }),
   }
 }
 
@@ -345,6 +389,8 @@ export interface ReadOnlyRound {
   readonly round?: number
   /** Called once the round's session exists, before its turn ends; absent if unneeded. */
   readonly onStarted?: (sessionId: string) => void
+  /** The role could not start; absent, `onFinished(null)` ends the round instead. */
+  readonly onNotStarted?: (reason: string) => Promise<void>
   /** Overrides the role's own tier, for a round the operator asked to keep light. */
   readonly model?: string
 }
@@ -358,8 +404,20 @@ interface RoundLaunch {
   readonly featureDir: string
   readonly outputPath: string
   readonly checkout: Checkout
-  readonly progress: { done: boolean; announced: boolean; roundSession: string | null }
+  readonly progress: {
+    done: boolean
+    announced: boolean
+    roundSession: string | null
+    startFailure: string | null
+  }
 }
+
+const freshRoundProgress = (): RoundLaunch['progress'] => ({
+  done: false,
+  announced: false,
+  roundSession: null,
+  startFailure: null,
+})
 
 // One read-only Forge round before agreement (the red team's attack or the scout's
 // reading): the architect's mechanism, a lane-checkout session writing one file back.
@@ -386,7 +444,7 @@ export async function readOnlyRound(input: ReadOnlyRound): Promise<void> {
     await refuseRound(input, store, reasonOf(error))
     return
   }
-  const progress: RoundLaunch['progress'] = { done: false, announced: false, roundSession: null }
+  const progress = freshRoundProgress()
   const role = resolved.resolved.value
   const outputPath = rungOutputPath(featureDir, input.nodeId)
   startRound({ input, runner, store, role, featureDir, outputPath, checkout, progress })
@@ -438,7 +496,7 @@ function startRound(launch: RoundLaunch): void {
       .start(roundStartOptions(launch))
       .then((run) => {
         if (run === null) {
-          inBackground(collectRound(launch, true))
+          inBackground(roundNotStarted(launch))
           return
         }
         announceRound(launch, run.sessionId)
@@ -474,6 +532,7 @@ function roundStartOptions(launch: RoundLaunch): StartSupervisedRunOptions {
       launch.progress.roundSession = run.sessionId
       announceRound(launch, run.sessionId)
     },
+    onStartFailed: (reason) => void (launch.progress.startFailure = reason),
     onTurnEnd: () => inBackground(collectRound(launch, false)),
     onEnd: () => inBackground(collectRound(launch, true)),
   }
@@ -483,6 +542,15 @@ function roundStartOptions(launch: RoundLaunch): StartSupervisedRunOptions {
 // Nobody awaits it, so a failure to write the profile must not become an unhandled rejection.
 function proposeCommands(input: ReadOnlyRound, commands: readonly CommandProposal[]): void {
   if (commands.length > 0) void input.onCommands?.(input.order.id, commands).catch(() => undefined)
+}
+
+async function roundNotStarted(launch: RoundLaunch): Promise<void> {
+  const { input, store, progress } = launch
+  if (progress.done || deletedOrders.has(input.order.id)) return
+  progress.done = true
+  const reason = progress.startFailure ?? NO_START_REASON
+  await recordNotStarted(store, { orderId: input.order.id, roleId: input.roleId, reason })
+  await (input.onNotStarted?.(reason) ?? input.onFinished(null))
 }
 
 async function collectRound(launch: RoundLaunch, deadline: boolean): Promise<void> {

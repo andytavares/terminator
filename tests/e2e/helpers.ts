@@ -37,7 +37,7 @@ export interface AppHandle {
  * everything in one place after every worker has exited, and `closeApp`
  * never has to delete anything itself.
  */
-export function e2eRunRoot(): string {
+function e2eRunRoot(): string {
   const root = process.env.TERMINATOR_E2E_RUN_ROOT
   if (!root) {
     throw new Error(

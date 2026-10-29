@@ -31,6 +31,33 @@ function entry(over: Partial<LedgerEntry> & Pick<LedgerEntry, 'action'>): Ledger
   }
 }
 
+describe('a start that failed', () => {
+  const notStarted = (actor: string) =>
+    entry({ action: 'agent.not-started', actor, reason: 'Mode dontAsk is not available' })
+
+  it('reads as not-started, with who and why', () => {
+    expect(lastIntake([notStarted('role:architect')])).toEqual({
+      kind: 'not-started',
+      at: '2026-09-09T19:30:00Z',
+      actor: 'architect',
+      reason: 'Mode dontAsk is not available',
+    })
+    expect(lastIntake([notStarted('role:red-team')])).toMatchObject({ actor: 'red team' })
+  })
+
+  it('is not a refusal, so the order list does not say the plan was refused', () => {
+    expect(intakeRefusal([notStarted('role:architect')])).toBeNull()
+  })
+
+  it('leaves a running architect running when only the scout beside it did not start', () => {
+    const out = lastIntake([
+      entry({ action: 'converge.started', subject: 'sess-1', reason: 'draft' }),
+      notStarted('role:scout'),
+    ])
+    expect(out.kind).toBe('running')
+  })
+})
+
 describe('lastIntake', () => {
   describe('not started and running', notStartedAndRunningTests)
   describe('the fix turn', theFixTurnTests)

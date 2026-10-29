@@ -90,6 +90,8 @@ export interface StandingInput {
    * this" about an order nothing had touched for an hour.
    */
   readonly intakeRefused: string | null
+  /** The role whose last intake turn could not start, and Claude's reason. Draft orders only. */
+  readonly intakeNotStarted?: { readonly actor: string; readonly reason: string } | null
   /**
    * Why the run last stopped on an error or refused to ship, when it did.
    * Running orders only.
@@ -236,6 +238,7 @@ const draftingRule: Rule = (input, { counts }) => {
     ...over,
   })
   return (
+    notStartedDraft(input, shaping) ??
     refusedDraft(input, shaping) ??
     questionedDraft(input, shaping) ??
     (input.shaping ? beingShaped(input, shaping) : idleDraft(input, shaping))
@@ -243,6 +246,18 @@ const draftingRule: Rule = (input, { counts }) => {
 }
 
 type Shaping = (over: Omit<Standing, 'kind' | 'done' | 'total' | 'gateId'>) => Standing
+
+// A role that never ran left the order as it was; the move is the Forge's Try again.
+function notStartedDraft(input: StandingInput, shaping: Shaping): Standing | null {
+  if (!input.intakeNotStarted) return null
+  const { actor, reason } = input.intakeNotStarted
+  return shaping({
+    turn: 'you',
+    label: 'could not start',
+    headline: `Claude could not start the ${actor}`,
+    detail: `Claude said: "${reason}". Open it in the Forge and press Try again.`,
+  })
+}
 
 // Ahead of the open questions, because a refused turn is why they are open: answers
 // are not picked up until intake runs again.
@@ -498,6 +513,10 @@ export interface StandingSources {
   readonly strandedFor?: (orderId: string) => number
   /** Why this order's last intake turn was refused, when it was. */
   readonly intakeRefusedFor?: (orderId: string) => Promise<string | null>
+  /** The role whose last intake turn could not start, and why. */
+  readonly intakeNotStartedFor?: (
+    orderId: string
+  ) => Promise<{ actor: string; reason: string } | null>
   /** Why this order's run last stopped on an error or refused to ship. */
   readonly runFailureFor?: (orderId: string) => Promise<string | null>
   /** Where this order's run left its document, when it ended on one. */
@@ -558,10 +577,11 @@ function heldCounts(
 async function draftFacts(
   order: WorkOrder,
   sources: StandingSources
-): Promise<Pick<StandingInput, 'intakeRefused' | 'shaping' | 'blocker'>> {
+): Promise<Pick<StandingInput, 'intakeRefused' | 'intakeNotStarted' | 'shaping' | 'blocker'>> {
   if (order.status !== 'draft') return { intakeRefused: null, shaping: false, blocker: null }
   return {
     intakeRefused: (await sources.intakeRefusedFor?.(order.id)) ?? null,
+    intakeNotStarted: (await sources.intakeNotStartedFor?.(order.id)) ?? null,
     shaping: (await sources.shapingFor?.(order.id)) ?? true,
     blocker: sources.blockerFor?.(order) ?? null,
   }

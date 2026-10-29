@@ -84,6 +84,7 @@ describe('standingOf', () => {
   describe('between steps and drafts', betweenStepsAndDraftsTests)
   describe('draft questions', draftQuestionsTests)
   describe('refused intake', refusedIntakeTests)
+  describe('a role that could not start', notStartedIntakeTests)
   describe('draft checks', draftChecksTests)
   describe('unnamed blockers', unnamedBlockersTests)
   describe('draft wording', draftWordingTests)
@@ -355,6 +356,25 @@ function draftQuestionsTests() {
     const standing = standingOf(input({ status: 'draft', graph: null, failures: 3 }))
     expect(standing.turn).toBe('foundry')
     expect(standing.detail).toContain('3')
+  })
+}
+
+function notStartedIntakeTests() {
+  // TAV-20: the red team could not start on a plan that passes every check; the
+  // list said "Ready to hand off" while the Forge locked hand-off.
+  it('says Claude could not start the role, not ready to hand off, after a failed start', () => {
+    const standing = standingOf(
+      input({
+        status: 'draft',
+        graph: null,
+        shaping: false,
+        intakeNotStarted: { actor: 'red team', reason: 'Mode dontAsk is not available' },
+      })
+    )
+    expect(standing.turn).toBe('you')
+    expect(standing.label).toBe('could not start')
+    expect(standing.headline).toBe('Claude could not start the red team')
+    expect(standing.detail).toContain('Mode dontAsk is not available')
   })
 }
 

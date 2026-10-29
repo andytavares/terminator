@@ -51,6 +51,8 @@ interface AgentCalls {
   ): Promise<SetSessionConfigOptionResponse>
   prompt(params: PromptRequest): Promise<PromptResponse>
   cancel(params: CancelNotification): Promise<void>
+  /** Aborts when the connection closes, which can come before the process's exit is seen. */
+  readonly signal?: AbortSignal
 }
 
 /** A started agent process: its ACP calls, and how to learn of and force its end. @internal */
@@ -58,6 +60,8 @@ export interface AgentLink {
   agent: AgentCalls
   onExit(listener: (exitCode: number | null) => void): void
   kill(): void
+  /** The last of what the process wrote to stderr: where an agent says why it failed. */
+  stderrTail(): string
 }
 
 export interface AgentServiceDeps {
@@ -165,6 +169,27 @@ function disposer<T>(listeners: Set<(value: T) => void>, listener: (value: T) =>
 function textOf(update: AgentUpdate): string {
   const content = update.content as { text?: unknown } | undefined
   return typeof content?.text === 'string' ? content.text : ''
+}
+
+/** Why an agent did not start: its own `data.details` when it gave one, else the message. */
+class StartFailure extends Error {
+  constructor(
+    cause: unknown,
+    readonly stderr: string
+  ) {
+    const details = (cause as { data?: { details?: unknown } } | null)?.data?.details
+    super(typeof details === 'string' ? details : errorMessage(cause), { cause })
+  }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function logStartFailure(error: unknown): string {
+  const stderr = error instanceof StartFailure ? error.stderr : ''
+  logger.error('agent did not start', { error: String(error), reason: errorMessage(error), stderr })
+  return errorMessage(error)
 }
 
 const UNAVAILABLE_MESSAGE = 'The agent could not start. Check that it is installed and signed in.'
@@ -389,7 +414,7 @@ class AcpAgentService implements AgentService {
       session.ended = true
       this.sessions.delete(session.id)
       link.kill()
-      throw error
+      throw new StartFailure(error, link.stderrTail())
     }
   }
 
@@ -424,7 +449,7 @@ class AcpAgentService implements AgentService {
         configOptions: session.configOptions,
       }
     } catch (error) {
-      logger.error('agent did not start', { error: String(error) })
+      input.onStartFailed?.(logStartFailure(error))
       return null
     }
   }
@@ -465,9 +490,14 @@ class AcpAgentService implements AgentService {
   }
 
   private promptFailed(session: Session, error: unknown): void {
+    // A prompt still open when its session ended fails with the connection; the end reports it.
+    if (session.ended || session.link.agent.signal?.aborted) {
+      logger.info('agent prompt ended with its session', { error: String(error) })
+      return
+    }
     logger.error('agent prompt failed', { error: String(error) })
     // A one-shot session has no tab to show it in, and its reply is read as the answer.
-    if (!session.ended && !session.unattended) this.publishUpdate(session, failureNotice())
+    if (!session.unattended) this.publishUpdate(session, failureNotice())
   }
 
   private async send(session: Session, text: string): Promise<string> {
@@ -546,7 +576,7 @@ class AcpAgentService implements AgentService {
     try {
       session = await this.open(startInput, true)
     } catch (error) {
-      logger.error('agent did not start', { error: String(error) })
+      logStartFailure(error)
       return { error: 'AGENT_UNAVAILABLE', message: UNAVAILABLE_MESSAGE }
     }
     const reply = collectReply(session)

@@ -1,6 +1,6 @@
 {
   "name": "@terminator/extension-notepad",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Markdown Notepad extension for Terminator",
   "scripts": {
@@ -18,7 +18,7 @@
     "@excalidraw/excalidraw": "0.18.1",
     "@lezer/common": "1.5.3",
     "@lezer/markdown": "1.8.0",
-    "@terminator/extension-sdk": "6.1.0",
+    "@terminator/extension-sdk": "6.2.0",
     "@terminator/extension-ui": "1.0.0",
     "js-yaml": "5.4.3",
     "lucide-react": "1.21.0",

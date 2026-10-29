@@ -1051,6 +1051,16 @@ an order whose red-team round finds nothing blocking hands itself off, and the
 status strip says so in advance. Afterwards it says **Handed off automatically
 at 13:07:53**, and the ledger records that Foundry agreed it, not you.
 
+If Claude cannot start an agent, the status strip says **"Claude could not start
+the architect."** (or the red team, or the scout) and quotes what Claude said.
+Nothing on the order changes. **Try again** asks again: the architect drafts
+again, and a red team that could not start gets its round; **Copy the error**
+copies Claude's words. The canary (`npm run canary`) and `npm run test:live`
+start every role against the real Claude, so a start failure that is Foundry's
+own shows there before a release. Until a plan exists, **Next: Red team** is locked with **Waits
+for a plan**, and the coverage check reads **Waits for a plan** instead of
+**Failing**.
+
 In the list of orders, a row that is waiting on an answer says **"N waiting on
 you"** where the others say what is blocking them — so the count on the Forge
 tab tells you which order to open.

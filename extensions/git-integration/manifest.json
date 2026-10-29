@@ -1,7 +1,7 @@
 {
   "id": "terminator.git-integration",
   "name": "Git Integration",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Git & GitHub integration: staging, commit, and PR creation via gh CLI.",
   "main": "src/index.js",
   "renderer": "dist/index.html",

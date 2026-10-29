@@ -8,6 +8,14 @@ import type { AgentsSettings } from '../../../shared/schemas/settings.schema.js'
 import { CLAUDE_AGENT_ID, resolveAgent } from './agent-registry.js'
 import type { AgentServiceDeps } from './agent-service.js'
 
+const STDERR_LIMIT = 16 * 1024
+
+/** The last `limit` characters of `text`.
+ * @internal */
+export function keepTail(text: string, limit: number): string {
+  return text.length > limit ? text.slice(-limit) : text
+}
+
 /** A `connect` for the agent service: starts the agent's process and speaks ACP over its
  * stdin and stdout. */
 export function createConnector(settings: () => AgentsSettings): AgentServiceDeps['connect'] {
@@ -16,9 +24,15 @@ export function createConnector(settings: () => AgentsSettings): AgentServiceDep
     if (!launch) throw new Error(`There is no agent named "${agentId}"`)
     const child = spawn(launch.command, launch.args, {
       env: launch.env,
-      stdio: ['pipe', 'pipe', 'ignore'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     })
     child.stdin.on('error', () => undefined) // The exit event reports a process that is gone.
+    let stderr = ''
+    child.stderr.setEncoding('utf8')
+    child.stderr.on(
+      'data',
+      (chunk: string) => void (stderr = keepTail(stderr + chunk, STDERR_LIMIT))
+    )
     const exited = exitOf(child)
     const stream = ndJsonStream(
       Writable.toWeb(child.stdin),
@@ -28,6 +42,7 @@ export function createConnector(settings: () => AgentsSettings): AgentServiceDep
       agent: new ClientSideConnection(() => client, stream),
       onExit: (listener) => void exited.then(listener),
       kill: () => void child.kill(),
+      stderrTail: () => stderr,
     }
   }
 }

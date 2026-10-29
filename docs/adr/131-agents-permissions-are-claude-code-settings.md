@@ -27,3 +27,7 @@ Claude Code already applies permission rules to every subcommand, subshell, comm
 - A policy refusal's reason no longer reaches the agent as text; the agent sees Claude Code's refusal. An operator's typed answer is still sent, as a prompt after the turn ends.
 - With `letAutoModeDecide` off, a free writer runs in `acceptEdits`, so a state-changing shell command it runs is an ask for the operator.
 - `tests/runtime/role-settings.spec.ts` holds the rules each role gets. A role's rules change there, with a test.
+
+## Amendment, 2026-10-29
+
+The Claude ACP adapter (`@agentclientprotocol/claude-agent-acp` 0.89.1 through 0.99.1) does not offer `dontAsk` as a session mode: `setSessionMode('dontAsk')` fails with "Mode dontAsk is not available in this session", so every read-only, docs-only and restricted-write role failed to start. These roles now run in `default`, and `runtime/tool-decision.ts` refuses every ask they raise (`refusesUnlistedCalls`), which keeps the decision above: what no rule allows is refused at once and nothing waits. `tests/unit/agents/acp/adapter-contract.spec.ts` checks every mode Foundry asks for against the installed adapter. ADR 135 records how a failed start now carries its reason.

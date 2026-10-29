@@ -143,6 +143,8 @@ async function runPrepare(
 ): Promise<void> {
   const runner = runtime.supervisedRunner
   const logPath = path.join(context.featureDir, 'runs', `prepare-lane-${lane}.log`)
+  // An install empties the folder it installs into; through a borrowed link that is the origin's.
+  await unlinkBorrowedDependencies(checkout, { exec: context.exec, root: context.root })
   const exitCode =
     runner === null
       ? null

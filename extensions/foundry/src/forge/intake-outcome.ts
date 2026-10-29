@@ -31,6 +31,8 @@ const STARTED = 'converge.started'
 const FOLLOWED_UP = 'converge.followed_up'
 const REFUSED = 'converge.refused'
 const REDRAFTED = 'order.redrafted'
+/** An agent that could not start; its reason is the agent's own. Never retried. */
+export const NOT_STARTED = 'agent.not-started'
 
 // The review loop's own lines (see `src/forge/review-loop.ts`). None of them
 // widen the union above: a round in progress is a turn running, the same as
@@ -74,6 +76,13 @@ export type IntakeOutcome =
   | { readonly kind: 'redrafted'; readonly at: string; readonly note: string }
   /** It finished and nothing moved, because the proposal was not accepted. */
   | { readonly kind: 'refused'; readonly at: string; readonly reason: string }
+  /** Claude could not start the agent, so there was no proposal to refuse. */
+  | {
+      readonly kind: 'not-started'
+      readonly at: string
+      readonly actor: 'architect' | 'red team' | 'scout'
+      readonly reason: string
+    }
 
 type Running = Extract<IntakeOutcome, { kind: 'running' }>
 
@@ -112,12 +121,21 @@ const readRefusal: IntakeReader = (entry) => ({
   at: entry.at,
   reason: entry.reason,
 })
+const ROLE_OF_ACTOR = { 'role:red-team': 'red team', 'role:scout': 'scout' } as const
+
+const readNotStarted: IntakeReader = (entry) => ({
+  kind: 'not-started',
+  at: entry.at,
+  actor: ROLE_OF_ACTOR[entry.actor as keyof typeof ROLE_OF_ACTOR] ?? 'architect',
+  reason: entry.reason,
+})
 const redrafted: IntakeReader = (entry) => ({ kind: 'redrafted', at: entry.at, note: entry.reason })
 
 /** What each ledger action says about the last intake turn. */
 const INTAKE_READERS: Record<string, IntakeReader> = {
   [REFUSED]: readRefusal,
   [REDRAFTED]: redrafted,
+  [NOT_STARTED]: readNotStarted,
   // A fix turn the review loop started names its own round in the reason it
   // records: `red team round 2 fix`. Every other start is the operator's,
   // whether typed just now or the very first draft.
@@ -167,6 +185,9 @@ const INTAKE_READERS: Record<string, IntakeReader> = {
   [REVIEW_ROUND]: redrafted,
 }
 
+const scoutNotStarted = (entry: LedgerEntry): boolean =>
+  entry.action === NOT_STARTED && entry.actor === 'role:scout'
+
 /**
  * Read the last intake turn out of an order's ledger.
  *
@@ -179,7 +200,8 @@ export function lastIntake(entries: readonly LedgerEntry[]): IntakeOutcome {
   let scoutEnded = false
   for (let i = entries.length - 1; i >= 0; i -= 1) {
     const entry = entries[i]
-    if (SCOUT_ENDS.includes(entry.action)) scoutEnded = true
+    // The scout beside the architect that did not start ends like one that was refused.
+    if (SCOUT_ENDS.includes(entry.action) || scoutNotStarted(entry)) scoutEnded = true
     else if (entry.action === SCOUT_STARTED && scoutEnded) scoutEnded = false
     else if (Object.hasOwn(INTAKE_READERS, entry.action)) {
       return INTAKE_READERS[entry.action](entry, entries, i)
@@ -245,6 +267,14 @@ export function currentIntake(
 export function intakeRefusal(entries: readonly LedgerEntry[]): string | null {
   const last = lastIntake(entries)
   return last.kind === 'refused' ? last.reason : null
+}
+
+/** The role whose last turn could not start, and Claude's reason, or null. */
+export function intakeNotStarted(
+  entries: readonly LedgerEntry[]
+): { actor: string; reason: string } | null {
+  const last = lastIntake(entries)
+  return last.kind === 'not-started' ? { actor: last.actor, reason: last.reason } : null
 }
 
 const REVIEW_HELD = 'review.held'

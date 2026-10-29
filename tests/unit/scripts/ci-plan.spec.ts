@@ -223,7 +223,7 @@ describe('the Stability shards (ADR 124)', () => {
     const verdict = workflow.jobs.stability
     expect(verdict.name).toBe('Stability')
     expect(verdict.needs).toEqual(['select', 'stability-shard'])
-    expect(verdict.if).toBe('always()')
+    expect(verdict.if).toBe("${{ !startsWith(github.head_ref, 'canary/') && (always()) }}")
   })
 })
 
@@ -257,7 +257,7 @@ describe('the e2e job and the nightly sweep (ADR 124)', () => {
 
   it('reports an e2e report only when a shard failed', () => {
     expect(workflow.jobs['e2e-report'].if).toBe(
-      "${{ !cancelled() && needs.e2e.result == 'failure' }}"
+      "${{ !startsWith(github.head_ref, 'canary/') && (!cancelled() && needs.e2e.result == 'failure') }}"
     )
   })
 

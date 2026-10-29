@@ -156,7 +156,8 @@ async function convergeWithFollowUps(forge: Forge, ask: ArchitectAsk): Promise<C
         await forge.deciding.during(order.id, () => afterArchitectTurn(forge, ask, outcome))
       },
     })
-    await ask.recordStart?.(started)
+    if (!started.ok && started.notStarted) sayNotStarted(forge.api, order, started.reason)
+    else await ask.recordStart?.(started)
     await setIntake(forge.dataRoot(), order.id, startedIntake(ask, started))
     return started
   } finally {
@@ -249,6 +250,14 @@ async function afterRefusedProposal(
     return
   }
   sayPlanRefused(forge.api, order)
+}
+
+function sayNotStarted(api: ExtensionAPI, order: WorkOrder, reason: string): void {
+  api.notifications.showToast(
+    'warning',
+    `${order.title}: Claude could not start the architect: ${reason}`,
+    `foundry.converge.not-started.${order.id}`
+  )
 }
 
 // Said once, out loud: a refusal changes nothing, so nothing the operator is looking
@@ -347,11 +356,27 @@ async function startReviewRound(forge: Forge, review: Review): Promise<void> {
     prompt: (role) => reviewPromptFor(api, { ...review, root }, { role, attacked }),
     startedAction: 'review.started',
     startedReason: `round ${round}`,
-    onFinished: (updated, anotherPass) =>
-      forge.deciding.during(order.id, () =>
-        afterRound(forge, { ...review, root }, { updated, anotherPass })
-      ),
+    ...reviewEnds(forge, { ...review, root }),
   })
+}
+
+/** How a red-team round ends: with its findings, or because Claude could not start it. */
+function reviewEnds(
+  forge: Forge,
+  review: ReviewAt
+): Pick<Parameters<typeof readOnlyRound>[0], 'onFinished' | 'onNotStarted'> {
+  const { root, order } = review
+  return {
+    onFinished: (updated, anotherPass) =>
+      forge.deciding.during(order.id, () => afterRound(forge, review, { updated, anotherPass })),
+    onNotStarted: (reason) =>
+      forge.deciding.during(order.id, () =>
+        setIntake(root, order.id, {
+          state: 'failed',
+          reason: `Claude could not start the red team: ${reason}`,
+        })
+      ),
+  }
 }
 
 // A refusal was already recorded by readOnlyRound, where the standing reads it; the

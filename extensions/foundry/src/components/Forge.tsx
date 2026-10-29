@@ -15,6 +15,7 @@ import {
   Lock,
   Info,
   List,
+  Clock,
 } from 'lucide-react'
 import { isBlocking } from '../order/schema.js'
 import type { WorkOrder } from '../order/schema.js'
@@ -281,6 +282,7 @@ function RowIcon({ state }: { readonly state: Row['state'] }): React.JSX.Element
   if (state === 'passed') return <Check aria-hidden="true" />
   if (state === 'in-progress') return <LoaderCircle aria-hidden="true" className="fdry-spin" />
   if (state === 'needs-you') return <AlertCircle aria-hidden="true" />
+  if (state === 'waiting') return <Clock aria-hidden="true" />
   return <X aria-hidden="true" />
 }
 
@@ -289,6 +291,7 @@ const ROW_PILL: Record<Row['state'], { readonly label: string; readonly tone: Ch
   'in-progress': { label: 'In progress', tone: 'neutral' },
   'needs-you': { label: 'Needs you', tone: 'waiting' },
   failing: { label: 'Failing', tone: 'bad' },
+  waiting: { label: 'Waits for a plan', tone: 'neutral' },
 }
 
 function StripIconGlyph({ icon }: { readonly icon: StripIcon }): React.JSX.Element {
@@ -552,6 +555,9 @@ function useOrderEdits(orderId: string, { setView, setProblem, setMoved, busyWit
   return { setBudgets, turn }
 }
 
+const startFailed = (answer: object): boolean =>
+  'intake' in answer && (answer.intake as IntakeOutcome).kind === 'not-started'
+
 /** One converge turn: a message from the operator, or a settle of the plan. */
 function useConverge(orderId: string, { setView, setProblem, busyWith }: Shown) {
   const sendConverge = useCallback(
@@ -560,7 +566,8 @@ function useConverge(orderId: string, { setView, setProblem, busyWith }: Shown) 
         const next = await foundryInvoke('foundry:order.converge', { id: orderId, ...turn })
         recordUsage('forge-turn', 'error' in next ? { failed: true } : {})
         if ('order' in next) setView(next)
-        if ('error' in next) setProblem(next.error)
+        // A start Claude refused is on the strip; an error line would say it twice.
+        if ('error' in next && !startFailed(next)) setProblem(next.error)
       }),
     [orderId, busyWith, setView, setProblem]
   )
@@ -628,6 +635,10 @@ function useOrderMoves(orderId: string, { shown, shapes }: Pick<HandOffDeps, 'sh
     },
     [orderId, refresh, setBusy]
   )
+  const resumeLoop = useCallback(async () => {
+    await foundryInvoke('foundry:order.resume', { id: orderId })
+    await refresh()
+  }, [orderId, refresh])
   const pickRecipe = useCallback(
     async (recipe: string | null) => {
       await foundryInvoke('foundry:order.recipe', { id: orderId, recipe })
@@ -635,7 +646,7 @@ function useOrderMoves(orderId: string, { shown, shapes }: Pick<HandOffDeps, 'sh
     },
     [orderId, refresh, refreshRecipes]
   )
-  return { holdOrder, pickRecipe }
+  return { holdOrder, pickRecipe, resumeLoop }
 }
 
 interface HandOffDeps {
@@ -891,6 +902,16 @@ const STRIP_MOVES: Record<StripAction, (forge: ForgeModel) => void> = {
     if (forge.intake.kind === 'refused') void forge.converge(refusedRetry(forge.intake.reason))
   },
   'start-over': (forge) => void forge.converge(),
+  // Only an architect that could not start needs a new draft; any other role picks the loop up.
+  'try-again': (forge) => {
+    const architect = forge.intake.kind === 'not-started' && forge.intake.actor === 'architect'
+    void (architect ? forge.converge() : forge.resumeLoop())
+  },
+  'copy-error': (forge) => {
+    if (forge.intake.kind === 'not-started') {
+      void navigator.clipboard.writeText(forge.intake.reason).catch(() => undefined)
+    }
+  },
   'open-run': (forge) => forge.onStarted?.(forge.orderId),
   draft: (forge) => void forge.converge(),
 }
@@ -902,6 +923,8 @@ function stripLabels(intake: IntakeOutcome): Record<StripAction, string> {
     watch: intake.kind === 'running' ? `Watch the ${intake.actor}` : 'Watch',
     'tell-architect': 'Tell the architect what was wrong',
     'start-over': 'Start the turn over',
+    'try-again': 'Try again',
+    'copy-error': 'Copy the error',
     'open-run': 'Open the run',
     draft: 'Draft the plan',
   }
@@ -1009,7 +1032,7 @@ function StripActions({ forge }: ForgeProp) {
       {forge.r.strip.actions.map((action) => (
         <Button
           key={action}
-          variant={action === 'tell-architect' ? 'primary' : 'secondary'}
+          variant={action === 'tell-architect' || action === 'try-again' ? 'primary' : 'secondary'}
           icon={action === 'hold' ? Pause : action === 'watch' ? Terminal : undefined}
           onClick={() => STRIP_MOVES[action](forge)}
         >
@@ -1204,7 +1227,7 @@ function CheckRow({ forge, row }: ForgeProp & { readonly row: Row }) {
 // What the operator can do about a row: one the machine is closing shows only the
 // "Asked" marker; a failing or needs-you row offers its moves.
 function RowMoves({ forge, row }: ForgeProp & { readonly row: Row }) {
-  if (row.state === 'passed') return null
+  if (row.state === 'passed' || row.state === 'waiting') return null
   if (row.id === 'turn') return <TurnMoves forge={forge} row={row} />
   if (row.id === 'environment') return <EnvironmentMoves forge={forge} row={row} />
   const remedies = CHECK_REMEDIES[row.id]
@@ -2096,11 +2119,18 @@ function FooterMove({ forge }: ForgeProp) {
       </ReasonButton>
     )
   }
-  if (next === undefined) return null
+  return next === undefined ? null : <NextButton forge={forge} next={next} />
+}
+
+function NextButton({ forge, next }: ForgeProp & { readonly next: StepView }) {
   return (
-    <Button variant="primary" onClick={() => openStep(forge, next.id)}>
+    <ReasonButton
+      variant="primary"
+      reason={next.id === 'redTeam' ? forge.r.locks.redTeam : null}
+      onClick={() => openStep(forge, next.id)}
+    >
       Next: {STEP_LABELS[next.id]}
-    </Button>
+    </ReasonButton>
   )
 }
 

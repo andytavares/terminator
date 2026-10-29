@@ -139,6 +139,8 @@ describe('readiness — holder and strip', () => {
   describe('shipped and cancelled', shippedAndCancelledTests)
   describe('handed off by you', handedOffByYouTests)
   describe('intake refused', intakeRefusedTests)
+  describe('intake not started', intakeNotStartedTests)
+  describe('an order with no plan', anOrderWithNoPlanTests)
   describe('a malformed plan', aMalformedPlanTests)
   describe('an unreadable plan', anUnreadablePlanTests)
   describe('the scout', theScoutTests)
@@ -240,6 +242,75 @@ function intakeRefusedTests() {
     )
     expect(result.strip.detail).toBe('Why: Invalid enum value.')
     expect(result.strip.actions).toEqual(['tell-architect', 'start-over'])
+  })
+}
+
+const NOT_STARTED_REASON = 'Mode dontAsk is not available in this session'
+
+function notStartedInput(orderOver: Partial<WorkOrder> = {}): ReadinessInput {
+  return baseInput(
+    { intake: { kind: 'not-started', at: T1, actor: 'architect', reason: NOT_STARTED_REASON } },
+    orderOver
+  )
+}
+
+function intakeNotStartedTests() {
+  it("is one strip: Claude's reason, a fault that is not the order's, and two moves", () => {
+    const { holder, strip } = readiness(notStartedInput())
+    expect(holder).toBe('you')
+    expect(strip.tone).toBe('bad')
+    expect(strip.headline).toBe('Claude could not start the architect.')
+    expect(strip.detail).toBe(`Claude said: "${NOT_STARTED_REASON}". Nothing on the order changed.`)
+    expect(strip.actions).toEqual(['try-again', 'copy-error'])
+  })
+
+  it('names the red team when the red team could not start', () => {
+    const result = readiness(
+      baseInput({ intake: { kind: 'not-started', at: T1, actor: 'red team', reason: 'x' } })
+    )
+    expect(result.strip.headline).toBe('Claude could not start the red team.')
+  })
+
+  it('says "Could not start" on the plan step and locks hand-off', () => {
+    const result = readiness(notStartedInput())
+    const plan = result.steps.find((each) => each.id === 'plan')
+    expect(plan).toMatchObject({ state: 'bad', word: 'Could not start' })
+    expect(result.canHandOff).toBe(false)
+    expect(result.locks.handOff).toContain(NOT_STARTED_REASON)
+  })
+
+  it('fails the turn row with the start failure, not a refusal', () => {
+    const turn = readiness(notStartedInput()).rows[6]
+    expect(turn.state).toBe('failing')
+    expect(turn.detail).toBe('Claude could not start the architect, so no turn ran.')
+  })
+}
+
+function anOrderWithNoPlanTests() {
+  const noPlan = (): Partial<WorkOrder> => ({
+    plan: { ...wo0928Order().plan, units: [] },
+  })
+
+  it('locks the move to the red team with "Waits for a plan"', () => {
+    expect(readiness(baseInput({}, noPlan())).locks.redTeam).toBe('Waits for a plan')
+  })
+
+  it('does not lock it once a plan exists', () => {
+    expect(readiness(baseInput()).locks.redTeam).toBeNull()
+  })
+
+  it('reads the coverage check as waiting, not failing', () => {
+    const coverage = readiness(baseInput({}, noPlan())).rows.find((row) => row.id === 'coverage')
+    expect(coverage).toMatchObject({ state: 'waiting', detail: 'Waits for a plan' })
+  })
+
+  it('still reads coverage as failing when units exist and do not cover the criteria', () => {
+    const order = wo0928Order()
+    const uncovered = {
+      plan: { ...order.plan, units: [{ ...order.plan.units[0], satisfies: [] }] },
+    }
+    const coverage = readiness(baseInput({}, uncovered)).rows.find((row) => row.id === 'coverage')
+    expect(coverage?.state).toBe('failing')
   })
 }
 
