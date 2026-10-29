@@ -21,7 +21,7 @@ function dockIfOverMainWindow(sessionId: string) {
   }
 }
 
-function BreakoutTab({ session }: { session: TerminalSession }): JSX.Element {
+function BreakoutTab({ session }: { session: TerminalSession }): React.JSX.Element {
   return (
     <div
       role="tab"
@@ -37,7 +37,7 @@ function BreakoutTab({ session }: { session: TerminalSession }): JSX.Element {
   )
 }
 
-function BreakoutHeader({ session }: { session: TerminalSession }): JSX.Element {
+function BreakoutHeader({ session }: { session: TerminalSession }): React.JSX.Element {
   const place = usePlaceOf(session.projectId)
   return (
     <div className="breakout-window__header">
@@ -57,7 +57,7 @@ function BreakoutHeader({ session }: { session: TerminalSession }): JSX.Element 
   )
 }
 
-function BreakoutWindowView({ sessionId }: { sessionId: string }): JSX.Element | null {
+function BreakoutWindowView({ sessionId }: { sessionId: string }): React.JSX.Element | null {
   const session = useSessionStore((s) => s.sessions.get(sessionId))
   const containerRef = useRef<HTMLDivElement>(null)
   useMountedTerminal(containerRef, sessionId)
@@ -75,7 +75,7 @@ function BreakoutWindowView({ sessionId }: { sessionId: string }): JSX.Element |
 }
 
 /** Each terminal's own window, and the drop on the main window that brings one back. */
-export function BreakoutWindows(): JSX.Element {
+export function BreakoutWindows(): React.JSX.Element {
   const windows = useBreakoutStore((s) => s.windows)
   return (
     <>

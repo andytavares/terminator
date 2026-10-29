@@ -61,7 +61,7 @@ export function useSidebarWidth() {
 }
 
 interface ResizeTarget {
-  sidebarRef: RefObject<HTMLDivElement>
+  sidebarRef: RefObject<HTMLDivElement | null>
   widthRef: { readonly current: number }
   commit: (width: number) => void
 }

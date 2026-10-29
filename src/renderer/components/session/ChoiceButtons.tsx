@@ -10,7 +10,7 @@ interface Props {
 }
 
 /** A waiting agent's numbered choices, answerable without opening its terminal. */
-export function ChoiceButtons({ prompt, onAnswer }: Props): JSX.Element {
+export function ChoiceButtons({ prompt, onAnswer }: Props): React.JSX.Element {
   return (
     <div
       role="group"

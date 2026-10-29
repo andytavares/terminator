@@ -17,7 +17,7 @@ interface DragState {
 
 /** The left column's share of a split diff in percent, kept between 20 and 80 and measured against
  *  `containerRef`'s width, and the divider's mousedown that starts dragging it. */
-export function useSplitDrag(containerRef: RefObject<HTMLElement>): {
+export function useSplitDrag(containerRef: RefObject<HTMLElement | null>): {
   splitLeftPct: number
   onDividerMouseDown: (e: React.MouseEvent) => void
 } {

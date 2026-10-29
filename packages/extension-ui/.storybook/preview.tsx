@@ -9,7 +9,13 @@ type Theme = 'dark' | 'light'
 
 /** Stamps the theme on the document the way the app does for an extension view: dark is the
  * default and carries no attribute, light sets `data-theme`. */
-function ThemeFrame({ theme, children }: { theme: Theme; children: React.ReactNode }): JSX.Element {
+function ThemeFrame({
+  theme,
+  children,
+}: {
+  theme: Theme
+  children: React.ReactNode
+}): React.JSX.Element {
   useLayoutEffect(() => {
     const root = document.documentElement
     if (theme === 'light') root.setAttribute('data-theme', 'light')

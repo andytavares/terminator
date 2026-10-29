@@ -29,7 +29,7 @@ export interface FilterMenuProps {
  * caused the filtering says the same thing without a band of chrome, and puts
  * the way out in the same place as the way in.
  */
-export function FilterMenu(props: FilterMenuProps): JSX.Element {
+export function FilterMenu(props: FilterMenuProps): React.JSX.Element {
   const hidden = Math.max(0, props.total - props.shown)
   return (
     <DropdownMenu
@@ -60,7 +60,7 @@ function ViewChoices({
   onSelectView,
   counts,
   close,
-}: FilterMenuProps & Closing): JSX.Element {
+}: FilterMenuProps & Closing): React.JSX.Element {
   return (
     <>
       {views.map((view) => (
@@ -89,7 +89,7 @@ function HideStaleItem({
   activeViewId,
   onChangeView,
   hideStaleUnavailable,
-}: FilterMenuProps): JSX.Element {
+}: FilterMenuProps): React.JSX.Element {
   const active = views.find((v) => v.id === activeViewId) ?? views[0]
   const on = active?.filters.hideStale === true
   return (
@@ -111,7 +111,12 @@ function HideStaleItem({
 }
 
 /** The way out of the filtering, saying how much it hides. */
-function ShowAllItem({ shown, total, onShowAll, close }: FilterMenuProps & Closing): JSX.Element {
+function ShowAllItem({
+  shown,
+  total,
+  onShowAll,
+  close,
+}: FilterMenuProps & Closing): React.JSX.Element {
   return (
     <>
       <div className="sidebar-menu__separator" />

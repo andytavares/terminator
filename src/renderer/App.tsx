@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { type JSX, useCallback, useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { UnifiedSidebar } from './components/sidebar/UnifiedSidebar'
 import { AppBand } from './components/sidebar/AppBand'

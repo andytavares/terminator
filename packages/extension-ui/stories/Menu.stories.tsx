@@ -96,7 +96,7 @@ export const AtAPoint: Story = {
 export const DefaultLight = inLight(Default)
 export const AtAPointLight = inLight(AtAPoint)
 
-function ContextRow(): JSX.Element {
+function ContextRow(): React.JSX.Element {
   const [at, setAt] = React.useState<{ x: number; y: number } | null>(null)
   return (
     <div

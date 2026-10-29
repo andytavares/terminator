@@ -29,7 +29,7 @@ const NEEDS_YOU_INFERRED = (
   </>
 )
 
-const SHAPES: Record<Exclude<TaskState, 'needs-you'>, JSX.Element> = {
+const SHAPES: Record<Exclude<TaskState, 'needs-you'>, React.JSX.Element> = {
   running: (
     <>
       <circle cx="8" cy="8" r="7" {...STROKE} strokeWidth="1.4" opacity=".35" />
@@ -53,13 +53,13 @@ const SHAPES: Record<Exclude<TaskState, 'needs-you'>, JSX.Element> = {
   ),
 }
 
-function shapeOf(state: TaskState, inferred: boolean): JSX.Element {
+function shapeOf(state: TaskState, inferred: boolean): React.JSX.Element {
   if (state !== 'needs-you') return SHAPES[state]
   return inferred ? NEEDS_YOU_INFERRED : NEEDS_YOU
 }
 
 /** A task's state as a glyph with its own shape, so the five read apart without colour. */
-export function StateGlyph({ state, inferred = false }: StateGlyphProps): JSX.Element {
+export function StateGlyph({ state, inferred = false }: StateGlyphProps): React.JSX.Element {
   const hollow = state === 'needs-you' && inferred
   return (
     <svg

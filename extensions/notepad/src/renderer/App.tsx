@@ -5,7 +5,7 @@ import { DiagramWindowView } from '../components/DiagramWindowView'
 import { QuickCreateOverlay } from '../components/QuickCreateOverlay'
 import { useNotesStore } from '../stores/notes.store'
 
-export function App(): JSX.Element {
+export function App(): React.JSX.Element {
   const view = new URLSearchParams(window.location.search).get('view')
   useQuickCreateRequests()
   return (
@@ -39,7 +39,7 @@ function useQuickCreateRequests(): void {
 }
 
 /** The window's own view: a note, a diagram, or the notepad panel. */
-function WindowContent({ view }: { view: string | null }): JSX.Element {
+function WindowContent({ view }: { view: string | null }): React.JSX.Element {
   if (view === 'note') return <NoteWindowView />
   if (view === 'diagram') return <DiagramWindowView />
   return <NotepadView />

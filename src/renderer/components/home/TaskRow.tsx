@@ -37,7 +37,7 @@ function LaneChip({ lane, label, taskState }: LaneChipProps) {
 }
 
 /** Today's focus: pressing it stores the task if it is only a branch, then flips its focus. */
-function FocusStar({ thread }: { thread: WorkThread }): JSX.Element | null {
+function FocusStar({ thread }: { thread: WorkThread }): React.JSX.Element | null {
   if (!canStoreTask(thread)) return null
   return (
     <button
@@ -60,7 +60,7 @@ interface TitleProps {
   rename: CellsProps['rename']
 }
 
-function TaskTitle({ thread, rename }: TitleProps): JSX.Element {
+function TaskTitle({ thread, rename }: TitleProps): React.JSX.Element {
   return (
     <div className="task-row__title">
       <FocusStar thread={thread} />
@@ -92,7 +92,7 @@ type CellsInput = Pick<CellsProps, 'thread' | 'now'> & {
 }
 
 /** The row's cells: state, title, repos, what is happening now, last activity, and the menu. */
-function TaskRowCells({ thread, now, controls }: CellsInput): JSX.Element {
+function TaskRowCells({ thread, now, controls }: CellsInput): React.JSX.Element {
   const { rename, workMenu } = controls
   const labels = laneLabels(thread.lanes)
   return (
@@ -137,7 +137,7 @@ function taskRowClass(selected: boolean, dropTarget: boolean): string {
 }
 
 /** One task on Home; pressing it, or Enter, opens its drawer. Drop another row on it to merge. */
-export function TaskRow({ thread, now, selected }: TaskRowProps): JSX.Element {
+export function TaskRow({ thread, now, selected }: TaskRowProps): React.JSX.Element {
   const openThread = useDeskSelection((s) => s.openThread)
   const workMenu = useWorkMenu()
   const rename = useTaskRename(thread)

@@ -14,7 +14,7 @@ interface TaskGroupListProps {
 }
 
 /** Each live task with its lanes, then the branches in no task under their repos. */
-export function TaskGroupList({ groups, ctx }: TaskGroupListProps): JSX.Element {
+export function TaskGroupList({ groups, ctx }: TaskGroupListProps): React.JSX.Element {
   const tasks = useTaskStore((s) => s.tasks)
   const { sections, rest } = useMemo(() => groupByTask(groups, tasks), [groups, tasks])
   const { allThreads } = useWorkThreads()
@@ -57,7 +57,7 @@ interface TaskSectionViewProps {
 }
 
 /** A task's header with its state glyph and, unless it is folded, its lanes as branch rows beneath. */
-function TaskSectionView({ section, thread, ctx }: TaskSectionViewProps): JSX.Element {
+function TaskSectionView({ section, thread, ctx }: TaskSectionViewProps): React.JSX.Element {
   const { task, lanes } = section
   const key = `task:${task.id}`
   return (

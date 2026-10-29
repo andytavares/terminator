@@ -36,7 +36,7 @@ function switchLane(projectId: string): void {
 }
 
 /** The task's name and a button per repo it spans, when the visible branch is in such a task. */
-export function LaneSwitcher({ projectId }: { projectId: string }): JSX.Element | null {
+export function LaneSwitcher({ projectId }: { projectId: string }): React.JSX.Element | null {
   const tasks = useTaskStore((s) => s.tasks)
   const { workspaces, projects } = useWorkspaceStore(
     useShallow((s) => ({ workspaces: s.workspaces, projects: s.projectsByWorkspaceId }))

@@ -21,7 +21,7 @@ export interface MainAreaActions {
 
 /** The area beside the sidebar: an app-level tab, a repo's tab, or the terminal (with any
  * extension panels open beside it). */
-export function MainArea(actions: MainAreaActions): JSX.Element {
+export function MainArea(actions: MainAreaActions): React.JSX.Element {
   const { GlobalTab, WorkspaceTab, anySurfaceTab } = useActiveSurfaceTabs()
   const { repoRoot } = useActiveScope()
   return (
@@ -87,7 +87,7 @@ function SidebarPanels({ repoRoot }: { repoRoot: string | null }) {
 }
 
 /** Scratch, the active branch, or the welcome or "pick something" empty state. */
-function ProjectArea(actions: MainAreaActions): JSX.Element {
+function ProjectArea(actions: MainAreaActions): React.JSX.Element {
   const { scratchActive, activeProjectId } = useWorkspaceStore(
     useShallow((s) => ({ scratchActive: s.scratchActive, activeProjectId: s.activeProjectId }))
   )
@@ -138,7 +138,7 @@ function BranchArea({ projectId, ...actions }: MainAreaActions & { projectId: st
 }
 
 /** The welcome until the operator has opened a branch, then a prompt to pick one. */
-function NothingOpen({ onOpenQuickActions, onOpenSettings }: MainAreaActions): JSX.Element {
+function NothingOpen({ onOpenQuickActions, onOpenSettings }: MainAreaActions): React.JSX.Element {
   const globalSettings = useSettingsStore((s) => s.globalSettings)
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
   const quickActions = { label: 'Quick actions', shortcut: '⌘P', onSelect: onOpenQuickActions }

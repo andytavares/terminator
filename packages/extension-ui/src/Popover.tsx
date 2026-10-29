@@ -1,14 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef } from 'react'
 import './extension-ui.css'
 
-declare module 'react' {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- a merge repeats the parameter
-  interface HTMLAttributes<T> {
-    /** The native Popover API: a surface in the top layer that the browser dismisses. */
-    popover?: 'auto' | 'manual' | ''
-  }
-}
-
 export interface PopoverProps {
   /** Names the surface for assistive technology. */
   label: string
@@ -29,7 +21,7 @@ const SURFACE_ATTRIBUTES = { popover: 'auto', 'data-tmui-surface': '' } as const
 /** A surface anchored to its parent element: a picker, a dropdown, a detail panel. A native popover
  * in the top layer: the browser closes it on Escape or an outside click and returns focus. Not a
  * Dialog: the view behind stays live, so no `aria-modal`, no focus trap (research R10). */
-export function Popover(props: PopoverProps): JSX.Element {
+export function Popover(props: PopoverProps): React.JSX.Element {
   const { label, children, className, align = 'start', at, role = 'group', onKeyDown } = props
   const ref = useShownPopover(props.onDismiss, at)
   return (

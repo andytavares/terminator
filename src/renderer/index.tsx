@@ -18,7 +18,7 @@ installIconTooltips()
 
 const view = new URLSearchParams(window.location.search).get('view')
 
-function Root(): JSX.Element {
+function Root(): React.JSX.Element {
   const theme = useSettingsStore((s) => s.resolvedTheme)
   React.useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)

@@ -10,7 +10,7 @@ export function QuietDesk({
   desk,
 }: {
   desk: Pick<DeskState, 'counts' | 'doneToday'>
-}): JSX.Element {
+}): React.JSX.Element {
   const working = desk.counts.agentsWorking
   return (
     <div className="quiet">

@@ -26,7 +26,7 @@ export function Button({
   type = 'button',
   children,
   ...rest
-}: ButtonProps): JSX.Element {
+}: ButtonProps): React.JSX.Element {
   const classes = ['tmui-button', `tmui-button--${variant}`, `tmui-button--${size}`, className]
   return (
     <button type={type} className={classes.filter(Boolean).join(' ')} {...rest}>

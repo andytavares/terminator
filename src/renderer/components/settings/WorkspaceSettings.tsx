@@ -18,7 +18,7 @@ interface Props {
   workspaceId: string
 }
 
-export function WorkspaceSettings({ workspaceId }: Props): JSX.Element {
+export function WorkspaceSettings({ workspaceId }: Props): React.JSX.Element {
   const globalSettings = useSettingsStore((s) => s.globalSettings)
   const overrides = useSettingsStore((s) => s.workspaceSettings.get(workspaceId)?.overrides)
   const loadSettings = useSettingsStore((s) => s.loadSettings)
@@ -62,7 +62,7 @@ interface WorkspaceFieldsProps {
   own: ReturnType<typeof ownSettings>
 }
 
-function WorkspaceFields({ field, own }: WorkspaceFieldsProps): JSX.Element {
+function WorkspaceFields({ field, own }: WorkspaceFieldsProps): React.JSX.Element {
   return (
     <>
       <ThemeField {...field} overridden={own.theme} />
@@ -110,7 +110,7 @@ interface FieldProps {
   overridden?: boolean
 }
 
-function ThemeField({ workspaceId, effective, overridden }: FieldProps): JSX.Element {
+function ThemeField({ workspaceId, effective, overridden }: FieldProps): React.JSX.Element {
   const updateWorkspaceTheme = useSettingsStore((s) => s.updateWorkspaceTheme)
   return (
     <div className="settings-section__field">
@@ -135,7 +135,7 @@ function ThemeField({ workspaceId, effective, overridden }: FieldProps): JSX.Ele
   )
 }
 
-function ScrollbackField({ workspaceId, effective }: FieldProps): JSX.Element {
+function ScrollbackField({ workspaceId, effective }: FieldProps): React.JSX.Element {
   const updateWorkspaceScrollback = useSettingsStore((s) => s.updateWorkspaceScrollback)
   return (
     <div className="settings-section__field">
@@ -166,7 +166,7 @@ function ScrollbackField({ workspaceId, effective }: FieldProps): JSX.Element {
 }
 
 /** The shell this workspace's terminals open in; empty keeps the global one. */
-function DefaultShellField({ workspaceId, effective, overridden }: FieldProps): JSX.Element {
+function DefaultShellField({ workspaceId, effective, overridden }: FieldProps): React.JSX.Element {
   const update = useSettingsStore((s) => s.updateWorkspaceDefaultShell)
   return (
     <div className="settings-section__field">
@@ -187,7 +187,7 @@ function DefaultShellField({ workspaceId, effective, overridden }: FieldProps): 
   )
 }
 
-function WorktreeDirField({ workspaceId, effective, overridden }: FieldProps): JSX.Element {
+function WorktreeDirField({ workspaceId, effective, overridden }: FieldProps): React.JSX.Element {
   const update = useSettingsStore((s) => s.updateWorkspaceWorktreeBaseDir)
   return (
     <div className="settings-section__field">
@@ -208,7 +208,7 @@ function WorktreeDirField({ workspaceId, effective, overridden }: FieldProps): J
   )
 }
 
-function BranchExcludeField({ workspaceId, effective, overridden }: FieldProps): JSX.Element {
+function BranchExcludeField({ workspaceId, effective, overridden }: FieldProps): React.JSX.Element {
   const update = useSettingsStore((s) => s.updateWorkspaceBranchExcludePatterns)
   const text = effective.branchExcludePatterns.join('\n')
   return (

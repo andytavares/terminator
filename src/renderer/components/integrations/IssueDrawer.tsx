@@ -25,7 +25,11 @@ export interface IssueDrawerProps {
   onClose: () => void
 }
 
-export function IssueDrawer({ projectId, projectName, onClose }: IssueDrawerProps): JSX.Element {
+export function IssueDrawer({
+  projectId,
+  projectName,
+  onClose,
+}: IssueDrawerProps): React.JSX.Element {
   const { link, issue } = useIntegrationsStore(
     useShallow((s) => ({ link: s.linkFor(projectId), issue: s.issueFor(projectId) }))
   )
@@ -154,7 +158,13 @@ interface HeaderProps {
 }
 
 /** The key and state with Refresh, Open and Close; then the title and tags, or why there are none. */
-function DrawerHeader({ link, issue, projectName, onClose, actions }: HeaderProps): JSX.Element {
+function DrawerHeader({
+  link,
+  issue,
+  projectName,
+  onClose,
+  actions,
+}: HeaderProps): React.JSX.Element {
   return (
     <header className="issue-drawer__top">
       <div className="issue-drawer__key-row">
@@ -243,7 +253,7 @@ function ContextSection({ link, context, projectName, actions }: ContextSectionP
   )
 }
 
-function ContextCounter({ chars }: { chars: number }): JSX.Element {
+function ContextCounter({ chars }: { chars: number }): React.JSX.Element {
   const warn = chars / CONTEXT_LIMIT >= CONTEXT_WARN_AT ? ' issue-drawer__counter--warn' : ''
   return (
     <span className={`issue-drawer__counter${warn}`}>
@@ -259,7 +269,7 @@ interface CommentSectionProps {
 }
 
 /** The comment box, any failure, Post comment and Unlink. */
-function CommentSection({ link, actions, onUnlink }: CommentSectionProps): JSX.Element {
+function CommentSection({ link, actions, onUnlink }: CommentSectionProps): React.JSX.Element {
   const { busy, error, commentText } = actions
   return (
     <section className="issue-drawer__section">

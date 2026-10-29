@@ -20,7 +20,7 @@ interface ContextMenuProps {
 
 /** Drawn in the document body, so the row it opened from does not receive its clicks. The native
  * popover closes it on Escape or a click outside, and closes any other menu that was open. */
-export function ContextMenu(props: ContextMenuProps): JSX.Element {
+export function ContextMenu(props: ContextMenuProps): React.JSX.Element {
   const { x, y, items, onDismiss } = props
   return createPortal(
     <div
@@ -44,7 +44,7 @@ export function ContextMenu(props: ContextMenuProps): JSX.Element {
   )
 }
 
-function MenuItems({ items }: { items: ContextMenuItem[] }): JSX.Element {
+function MenuItems({ items }: { items: ContextMenuItem[] }): React.JSX.Element {
   return (
     <>
       {items.map((item) => (

@@ -39,7 +39,7 @@ export interface ShellOverlayState {
 }
 
 /** What draws over the shell: dialogs, windows, the palette, toasts and extension overlays. */
-export function ShellOverlays(state: ShellOverlayState): JSX.Element {
+export function ShellOverlays(state: ShellOverlayState): React.JSX.Element {
   return (
     <>
       <NotificationPanel />
@@ -71,7 +71,7 @@ export function ShellOverlays(state: ShellOverlayState): JSX.Element {
 }
 
 /** The dialogs that start work or add a branch to a task, closed until something opens them. */
-function WorkDialogs(): JSX.Element {
+function WorkDialogs(): React.JSX.Element {
   return (
     <>
       <StartWorkHost />
@@ -82,7 +82,7 @@ function WorkDialogs(): JSX.Element {
 }
 
 /** Whatever extensions draw over the whole window. */
-function ExtensionOverlays(): JSX.Element {
+function ExtensionOverlays(): React.JSX.Element {
   const overlays = useExtensionRegistry((s) => s.overlays)
   return (
     <>

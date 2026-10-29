@@ -235,7 +235,7 @@ function CloneActions({ pr, ctx }: { pr: DashboardPR; ctx: RowContext }) {
   )
 }
 
-function DashboardRow({ cfg, ctx }: { cfg: RowConfig; ctx: RowContext }): JSX.Element {
+function DashboardRow({ cfg, ctx }: { cfg: RowConfig; ctx: RowContext }): React.JSX.Element {
   const { pr } = cfg
   const session = hasStartedSession(pr)
   return (
@@ -669,7 +669,7 @@ function useDashboard() {
   return { dash, settings, groups, ctx, pickerOpen, setPickerOpen, handleSaved }
 }
 
-export function ReviewDashboard(): JSX.Element {
+export function ReviewDashboard(): React.JSX.Element {
   const d = useDashboard()
   const [activeTab, setActiveTab] = useState<Tab>('needs')
   const { dash } = d

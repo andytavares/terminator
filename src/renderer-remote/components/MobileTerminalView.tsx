@@ -110,7 +110,7 @@ interface MobileTerminal {
 
 /** Mounts xterm in the container, fitted to it, wired to the socket, and opens the socket. */
 function useMobileTerminal(
-  containerRef: React.RefObject<HTMLDivElement>,
+  containerRef: React.RefObject<HTMLDivElement | null>,
   { sessionId, openWs, send, close, termRef }: MobileTerminal
 ): void {
   useEffect(() => {
@@ -155,7 +155,7 @@ function ConnectionStatusBanner({
 }: {
   status: ConnectionStatus
   retry: () => void
-}): JSX.Element | null {
+}): React.JSX.Element | null {
   if (status === 'reconnecting') {
     return <div className="mobile-terminal-status">Reconnecting…</div>
   }

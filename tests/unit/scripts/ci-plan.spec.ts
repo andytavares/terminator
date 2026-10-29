@@ -95,7 +95,7 @@ describe('where ci:local runs a step', () => {
 describe('what one job hands the next', () => {
   it('is only what CI uploads as an artifact', () => {
     expect(artifactPaths(workflow)).toEqual(
-      expect.arrayContaining(['.vitest-reports', 'blob-report', 'test-results'])
+      expect.arrayContaining(['.vitest/blob', 'blob-report', 'test-results'])
     )
     expect(artifactPaths(workflow)).not.toContain('storybook-static')
   })

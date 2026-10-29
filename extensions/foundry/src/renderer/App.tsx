@@ -256,7 +256,7 @@ function useChrome(): Chrome {
   return { ...surfaces, repoRoot, focusIdeaSignal, forge }
 }
 
-export function App(): JSX.Element {
+export function App(): React.JSX.Element {
   const chrome = useChrome()
   const waiting = useAttention()
   const { showing, forge } = chrome
@@ -283,7 +283,7 @@ export function App(): JSX.Element {
   )
 }
 
-function ShownSurface({ chrome }: { chrome: Chrome }): JSX.Element {
+function ShownSurface({ chrome }: { chrome: Chrome }): React.JSX.Element {
   if (chrome.showing === null) return <FoundrySettingsPanel onBack={chrome.closeSettings} />
   if (chrome.showing === 'ledger') return <Ledger />
   return (
@@ -302,7 +302,7 @@ interface SurfaceTabsProps {
   readonly onShow: (surface: Surface) => void
 }
 
-function SurfaceTabs({ showing, waiting, onShow }: SurfaceTabsProps): JSX.Element {
+function SurfaceTabs({ showing, waiting, onShow }: SurfaceTabsProps): React.JSX.Element {
   // Settings covers the surfaces, so while it is open none of them is selected.
   return (
     <TabsRoot selectedId={showing ?? ''} onSelect={(id) => onShow(id as Surface)}>
@@ -325,7 +325,7 @@ interface SurfaceTabProps {
   readonly count: number
 }
 
-function SurfaceTab({ tab, count }: SurfaceTabProps): JSX.Element {
+function SurfaceTab({ tab, count }: SurfaceTabProps): React.JSX.Element {
   // The count is in the accessible name, not only in a badge: "Forge 2" tells a
   // screen reader nothing about what the two are.
   return (
@@ -349,7 +349,7 @@ function ForgeViewToggle({
 }: {
   view: ForgeViewKind
   onChoose: (next: ForgeViewKind) => void
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <div className="fdry-view-toggle" role="group" aria-label="Forge view">
       <IconButton
@@ -368,7 +368,7 @@ function ForgeViewToggle({
   )
 }
 
-function FoundrySettingsPanel({ onBack }: { onBack: () => void }): JSX.Element {
+function FoundrySettingsPanel({ onBack }: { onBack: () => void }): React.JSX.Element {
   return (
     <div className="sk-settings-wrap">
       <Button variant="ghost" icon={ArrowLeft} onClick={onBack}>
@@ -386,7 +386,7 @@ interface ForgeSurfaceProps {
 }
 
 /** The queue of what is waiting, over the orders drawn as a list or as halls. */
-function ForgeSurface({ forge, repoRoot, focusIdeaSignal }: ForgeSurfaceProps): JSX.Element {
+function ForgeSurface({ forge, repoRoot, focusIdeaSignal }: ForgeSurfaceProps): React.JSX.Element {
   return (
     <>
       <Inbox onOpenOrder={forge.openInList} />
@@ -400,7 +400,7 @@ function ForgeSurface({ forge, repoRoot, focusIdeaSignal }: ForgeSurfaceProps): 
 }
 
 /** The orders, drawn as a list, as the site of every hall, or as one hall. */
-function OrdersView({ forge, repoRoot, focusIdeaSignal }: ForgeSurfaceProps): JSX.Element {
+function OrdersView({ forge, repoRoot, focusIdeaSignal }: ForgeSurfaceProps): React.JSX.Element {
   const { hall } = forge
   if (forge.view === 'list') {
     return (

@@ -20,7 +20,7 @@ import './AddToTaskDialog.css'
 const REFUSED = 'The task could not be changed. Try again.'
 
 /** The picker for one lane, mounted once for the whole app; closed until `openAddToTask`. */
-export function AddToTaskDialog(): JSX.Element | null {
+export function AddToTaskDialog(): React.JSX.Element | null {
   const lane = useAddToTaskStore((s) => s.lane)
   const close = useAddToTaskStore((s) => s.close)
   if (lane === null) return null
@@ -48,7 +48,7 @@ interface PickerProps {
   onClose: () => void
 }
 
-function TaskPicker({ lane, onClose }: PickerProps): JSX.Element {
+function TaskPicker({ lane, onClose }: PickerProps): React.JSX.Element {
   const state = usePickerState()
   const tasks = useTaskStore((s) => s.tasks)
   const suggested = sameNameCards(useLaneCards(), lane).map((c) => c.lane)
@@ -95,7 +95,7 @@ interface OpenTasksProps {
   onPick: (task: Task) => void
 }
 
-function OpenTasks({ tasks, lane, onPick }: OpenTasksProps): JSX.Element {
+function OpenTasks({ tasks, lane, onPick }: OpenTasksProps): React.JSX.Element {
   return (
     <>
       <h3 className="add-to-task__group">Open tasks</h3>
@@ -118,7 +118,7 @@ function OpenTasks({ tasks, lane, onPick }: OpenTasksProps): JSX.Element {
   )
 }
 
-function NewTask({ lane, onPick }: { lane: TaskLane; onPick: () => void }): JSX.Element {
+function NewTask({ lane, onPick }: { lane: TaskLane; onPick: () => void }): React.JSX.Element {
   const named = useWorkspaceStore((s) => s.workspaces.find((w) => w.folderPath === lane.repoRoot))
   const repoName = named?.name ?? lane.repoRoot.split('/').pop()
   return (
@@ -138,7 +138,7 @@ interface SuggestionProps {
 }
 
 /** An offer only: the other branches join the task once this is ticked and a task is chosen. */
-function Suggestion({ count, branch, state }: SuggestionProps): JSX.Element | null {
+function Suggestion({ count, branch, state }: SuggestionProps): React.JSX.Element | null {
   if (count === 0) return null
   return (
     <div className="add-to-task__suggestion">

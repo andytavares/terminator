@@ -153,7 +153,7 @@ function MenuDialogs({
   confirmingRemoval,
   closeLink,
   closeRemoval,
-}: MenuDialogsProps): JSX.Element {
+}: MenuDialogsProps): React.JSX.Element {
   const lead = leadSessionOf(thread)
   if (linking && lead) return <SessionLinkDialog facts={lead} onClose={closeLink} />
   if (confirmingRemoval && lead) {
@@ -197,7 +197,7 @@ function useMenuDialogs() {
 }
 
 /** The ⋯ button that opens the work menu without opening the drawer. */
-function WorkMenuButton({ onOpen }: { onOpen: (e: React.MouseEvent) => void }): JSX.Element {
+function WorkMenuButton({ onOpen }: { onOpen: (e: React.MouseEvent) => void }): React.JSX.Element {
   return (
     <IconButton
       icon={Ellipsis}
@@ -211,7 +211,11 @@ function WorkMenuButton({ onOpen }: { onOpen: (e: React.MouseEvent) => void }): 
 
 /** The row's ⋯ button and menu, with the link and worktree-removal dialogs. The row opens the
  *  menu on right-click; this layer ignores pointer hits itself, so a left click reaches the row. */
-export function InFlightMenu({ thread, onStartRename, workMenu }: InFlightMenuProps): JSX.Element {
+export function InFlightMenu({
+  thread,
+  onStartRename,
+  workMenu,
+}: InFlightMenuProps): React.JSX.Element {
   const { menu, openWorkMenu, closeWorkMenu } = workMenu
   const dialogs = useMenuDialogs()
   const items = buildItems(thread, {

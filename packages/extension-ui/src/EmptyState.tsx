@@ -27,7 +27,7 @@ export function EmptyState({
   description,
   actions,
   hint,
-}: EmptyStateProps): JSX.Element {
+}: EmptyStateProps): React.JSX.Element {
   return (
     <div className="tmui-empty">
       {Icon && (

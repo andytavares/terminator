@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { MessageSquarePlus, Pencil } from 'lucide-react'
 import { Button } from '@terminator/extension-ui'
-import type { ExcalidrawInitialDataState } from '@excalidraw/excalidraw/types/types'
+import type { ExcalidrawInitialDataState } from '@excalidraw/excalidraw/types'
 import type { DiagramComment } from '../db/types'
 import { useNotesStore } from '../stores/notes.store'
 import {
@@ -15,7 +15,11 @@ import { useLatest } from './useLatest'
 
 // Lazy-load Excalidraw so it doesn't bloat the main bundle
 const ExcalidrawComponent = lazy(async () => {
-  const mod = await import('@excalidraw/excalidraw')
+  // Since 0.18 the canvas styles ship as a separate stylesheet.
+  const [mod] = await Promise.all([
+    import('@excalidraw/excalidraw'),
+    import('@excalidraw/excalidraw/index.css'),
+  ])
   return { default: mod.Excalidraw }
 })
 
@@ -527,7 +531,7 @@ function DiagramCanvas(props: DiagramCanvasProps): React.JSX.Element {
 
 /** Turns a click on the canvas into a pin to comment on, in scene coordinates. */
 function usePinPlacement(
-  containerRef: React.RefObject<HTMLDivElement>,
+  containerRef: React.RefObject<HTMLDivElement | null>,
   appState: AppState | null,
   commenting: DiagramCommentControls
 ) {

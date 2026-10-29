@@ -7,7 +7,7 @@ vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
 
 import { useFieldChangeCounter } from '../../../../src/renderer/usage/use-field-change-counter'
 
-function Section(): JSX.Element {
+function Section(): React.JSX.Element {
   const countChange = useFieldChangeCounter('core.settings.change.global')
   return (
     <div onChange={countChange}>

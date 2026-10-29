@@ -7,7 +7,7 @@ import { usePlan } from './usePlan'
 import { usePlanSheet } from './plan-sheet'
 
 /** One line instead of a panel: hidden once today's plan is started or skipped. */
-export function PlanStrip({ now }: { now: number }): JSX.Element | null {
+export function PlanStrip({ now }: { now: number }): React.JSX.Element | null {
   const dismissedOn = useFocusStore((s) => s.planDismissedOn)
   const dismissPlan = useFocusStore((s) => s.dismissPlan)
   const carried = usePlan(now).carried.length

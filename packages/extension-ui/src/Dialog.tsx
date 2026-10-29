@@ -54,7 +54,7 @@ const PANEL_CLASS = {
 
 /** One dialog for the whole product: the modal shell with a title, a body and one to three
  * actions. It renders in the caller's own React tree (ADR 038), over the view it was opened from. */
-export function Dialog(props: DialogProps): JSX.Element {
+export function Dialog(props: DialogProps): React.JSX.Element {
   const { dismissible = true, size = 'default', actions, onDismiss } = props
   const titleId = useId()
   return (
@@ -77,7 +77,7 @@ interface DialogFormProps {
 }
 
 /** A `<form>` when one action submits, so Enter in a field runs it; else the content as it is. */
-function DialogForm({ submitting, children }: DialogFormProps): JSX.Element {
+function DialogForm({ submitting, children }: DialogFormProps): React.JSX.Element {
   if (!submitting) return <>{children}</>
   return (
     <form
@@ -94,7 +94,7 @@ function DialogForm({ submitting, children }: DialogFormProps): JSX.Element {
 
 /** The close control comes last, so the dialog opens on its first field or, with none, on its
  * first action: the safe one, never the close. */
-function DialogContent(props: DialogProps & { titleId: string }): JSX.Element {
+function DialogContent(props: DialogProps & { titleId: string }): React.JSX.Element {
   const { children, onDismiss } = props
   return (
     <>
@@ -122,7 +122,7 @@ function DialogContent(props: DialogProps & { titleId: string }): JSX.Element {
 
 const TONE_VARIANT = { default: 'secondary', primary: 'primary', danger: 'danger' } as const
 
-export function DialogActionButton({ action }: { action: DialogAction }): JSX.Element {
+export function DialogActionButton({ action }: { action: DialogAction }): React.JSX.Element {
   return (
     <Button
       variant={TONE_VARIANT[action.tone ?? 'default']}

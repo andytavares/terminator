@@ -38,7 +38,7 @@ vi.mock('../../../../src/renderer/components/session/session-actions', () => ({
 }))
 
 const linkStub = vi.hoisted(() => {
-  function FakeLinkDialog({ onClose }: { facts: unknown; onClose: () => void }): JSX.Element {
+  function FakeLinkDialog({ onClose }: { facts: unknown; onClose: () => void }): React.JSX.Element {
     return (
       <div role="dialog" aria-label="Link a work item">
         <button onClick={onClose}>Close link dialog</button>

@@ -11,7 +11,7 @@ import './Tasks.css'
 const isKeptAside = (thread: WorkThread): boolean =>
   thread.archived || (thread.state === 'done' && thread.taskId !== null)
 
-function ArchivedRow({ thread }: { thread: WorkThread }): JSX.Element {
+function ArchivedRow({ thread }: { thread: WorkThread }): React.JSX.Element {
   const [verb, undo] = thread.archived
     ? ['Restore', () => toggleArchived(thread)]
     : ['Undo done', () => void toggleDone(thread)]
@@ -47,7 +47,7 @@ function ArchivedPanel({ kept, onDismiss }: { kept: WorkThread[]; onDismiss: () 
 }
 
 /** The Home footer's "Archived tasks (N)" button and the list it opens. */
-export function ArchivedTasks(): JSX.Element {
+export function ArchivedTasks(): React.JSX.Element {
   const { threads } = useWorkThreads()
   const [open, setOpen] = useState(false)
   const kept = threads.filter(isKeptAside)

@@ -4,7 +4,7 @@ import { render, fireEvent } from '@testing-library/react'
 import { useDismissSurfaceOnClick } from '../../../../src/renderer/hooks/useDismissSurfaceOnClick'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 
-function Harness(): JSX.Element {
+function Harness(): React.JSX.Element {
   const handlers = useDismissSurfaceOnClick()
   const registry = useExtensionRegistry.getState()
   return (

@@ -46,7 +46,7 @@ function AskBand({
   )
 }
 
-function ToolCall({ tool }: { tool: ToolEntry }): JSX.Element {
+function ToolCall({ tool }: { tool: ToolEntry }): React.JSX.Element {
   return (
     <div className="agent-tool">
       <div className="agent-tool__head">
@@ -64,7 +64,7 @@ function ToolCall({ tool }: { tool: ToolEntry }): JSX.Element {
   )
 }
 
-function PlanList({ plan }: { plan: NonNullable<Transcript['plan']> }): JSX.Element {
+function PlanList({ plan }: { plan: NonNullable<Transcript['plan']> }): React.JSX.Element {
   return (
     <ul className="agent-plan" aria-label="Plan">
       {plan.map((item, i) => (
@@ -76,7 +76,7 @@ function PlanList({ plan }: { plan: NonNullable<Transcript['plan']> }): JSX.Elem
   )
 }
 
-function TranscriptLog({ transcript }: { transcript: Transcript }): JSX.Element {
+function TranscriptLog({ transcript }: { transcript: Transcript }): React.JSX.Element {
   return (
     <div role="log" aria-live="polite" aria-label="Agent transcript" className="agent-view__log">
       {transcript.entries.map((entry, i) =>
@@ -106,7 +106,7 @@ function sendOnEnter(e: React.KeyboardEvent, send: () => void): void {
   send()
 }
 
-function Composer({ sessionId, disabled, running }: ComposerProps): JSX.Element {
+function Composer({ sessionId, disabled, running }: ComposerProps): React.JSX.Element {
   const [draft, setDraft] = useState('')
   const send = (): void => {
     const text = draft.trim()
@@ -134,7 +134,7 @@ function Composer({ sessionId, disabled, running }: ComposerProps): JSX.Element 
   )
 }
 
-export function AgentView({ sessionId }: { sessionId: string }): JSX.Element {
+export function AgentView({ sessionId }: { sessionId: string }): React.JSX.Element {
   const { transcript, asks, exited } = useAgentTranscript(sessionId)
   const running = useSessionStore((s) => s.sessions.get(sessionId)?.agentTurn === true)
   useEffect(() => recordUse('core.agent.view', 'shown'), [sessionId])

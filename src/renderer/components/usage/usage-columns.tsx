@@ -27,17 +27,23 @@ const STATE_TONE: Record<UsageState, ChipTone> = {
   'extension-off': 'neutral',
 }
 
-export function StateChip({ state, period }: { state: UsageState; period: Period }): JSX.Element {
+export function StateChip({
+  state,
+  period,
+}: {
+  state: UsageState
+  period: Period
+}): React.JSX.Element {
   return <Chip tone={STATE_TONE[state]}>{stateLabel(state, period)}</Chip>
 }
 
-function Reached({ row }: { row: StatedRow['row'] }): JSX.Element {
+function Reached({ row }: { row: StatedRow['row'] }): React.JSX.Element {
   const shares = viaShares(row.byVia)
   if (shares.length > 0) return <ShareBar label={`How ${row.label} was reached`} shares={shares} />
   return <span className="usage__dim">{row.byVia.shown ? VIA.shown.label : '—'}</span>
 }
 
-function LastUsed({ row }: { row: StatedRow['row'] }): JSX.Element {
+function LastUsed({ row }: { row: StatedRow['row'] }): React.JSX.Element {
   return row.lastUsedAt ? (
     <RelativeTime value={row.lastUsedAt} />
   ) : (

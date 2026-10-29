@@ -113,7 +113,7 @@ interface RepoSectionProps {
 }
 
 /** One repo's header and, unless it is collapsed, its branches. */
-function RepoSection({ group, drag, ctx }: RepoSectionProps): JSX.Element {
+function RepoSection({ group, drag, ctx }: RepoSectionProps): React.JSX.Element {
   const workspace = ctx.data.workspaceById.get(group.workspaceId)
   const collapsed = ctx.collapse.isCollapsed(ctx.groupBy, group.workspaceId)
   const active = useWorkspaceStore((s) => s.activeWorkspaceId === group.workspaceId)
@@ -171,7 +171,7 @@ interface BranchListProps {
 
 /** One repo's branches, drag-reorderable. A component rather than a loop in the parent because
  * each repo needs its own drag state and a hook cannot be called per iteration. */
-function BranchList({ rows, workspace, onReorder, ctx }: BranchListProps): JSX.Element {
+function BranchList({ rows, workspace, onReorder, ctx }: BranchListProps): React.JSX.Element {
   const { dragOverIndex, getItemProps } = useDragReorder(rows, (reordered) =>
     onReorder?.(reordered)
   )
@@ -198,7 +198,7 @@ interface BranchEntryProps {
 }
 
 /** A branch's row and, once expanded, the terminals under it. */
-export function BranchEntry({ row, workspace, drag, ctx }: BranchEntryProps): JSX.Element {
+export function BranchEntry({ row, workspace, drag, ctx }: BranchEntryProps): React.JSX.Element {
   const { projectId } = row
   const expanded = ctx.collapse.terminalsExpanded(projectId)
   const listed = expanded ? listedSessionIds(row.terminals) : []
@@ -299,9 +299,9 @@ interface TerminalEntriesProps {
   ctx: RowContext
 }
 
-function TerminalEntries({ projectId, terminals, ctx }: TerminalEntriesProps): JSX.Element {
+function TerminalEntries({ projectId, terminals, ctx }: TerminalEntriesProps): React.JSX.Element {
   const shown = useShownInMain()?.sessionId ?? null
-  const entry = (terminal: BranchTerminal, nested: boolean): JSX.Element => (
+  const entry = (terminal: BranchTerminal, nested: boolean): React.JSX.Element => (
     <TerminalRow
       key={terminal.sessionId}
       terminal={terminal}

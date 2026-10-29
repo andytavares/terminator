@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { type JSX, useEffect, useState } from 'react'
 import { dispatchNotification } from '../../lib/notifications'
 import { recordUse } from '../../usage/record'
 import {

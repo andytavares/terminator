@@ -42,7 +42,7 @@ function workLabel(workKey: WorkKey | null): string {
 }
 
 /** Everything waiting on the operator, one row each, with its main action inline. */
-export function YourMove(props: YourMoveProps): JSX.Element | null {
+export function YourMove(props: YourMoveProps): React.JSX.Element | null {
   const { desk, cursor, handlers } = props
   if (desk.asks.length === 0) return null
   return (
@@ -62,7 +62,7 @@ export function YourMove(props: YourMoveProps): JSX.Element | null {
   )
 }
 
-export function KeyHints({ expanded }: { expanded: boolean }): JSX.Element {
+export function KeyHints({ expanded }: { expanded: boolean }): React.JSX.Element {
   if (expanded) {
     return (
       <span className="move__hint">
@@ -102,7 +102,7 @@ export interface AskRowProps {
   handlers: AskHandlers
 }
 
-export function AskRow(props: AskRowProps): JSX.Element {
+export function AskRow(props: AskRowProps): React.JSX.Element {
   const { ask, now, cursor, handlers } = props
   const expanded = cursor.expandedId === ask.id
   // A click on a button inside the row is that button's, not the row's.
@@ -130,7 +130,7 @@ export function AskRow(props: AskRowProps): JSX.Element {
 }
 
 /** What opens under the row: the answer in place, and the snooze menu. */
-function AskExtras(props: AskRowProps): JSX.Element {
+function AskExtras(props: AskRowProps): React.JSX.Element {
   const { ask, now, cursor, handlers } = props
   return (
     <>
@@ -149,7 +149,7 @@ function AskExtras(props: AskRowProps): JSX.Element {
 }
 
 /** The kind's icon, where the ask comes from, and what it says. */
-function AskSummary({ ask, glyphs }: { ask: DeskAsk; glyphs?: boolean }): JSX.Element {
+function AskSummary({ ask, glyphs }: { ask: DeskAsk; glyphs?: boolean }): React.JSX.Element {
   const Icon = KIND_ICONS[ask.kind]
   const guessed = glyphs === true && ask.inferred === true
   return (
@@ -171,7 +171,10 @@ function AskSummary({ ask, glyphs }: { ask: DeskAsk; glyphs?: boolean }): JSX.El
 
 const CHOICE_ACTION = /^choice-(\d+)$/
 
-function AskRowActions({ ask, handlers }: Pick<AskRowProps, 'ask' | 'handlers'>): JSX.Element {
+function AskRowActions({
+  ask,
+  handlers,
+}: Pick<AskRowProps, 'ask' | 'handlers'>): React.JSX.Element {
   return (
     <span className="mi__actions">
       {ask.actions.map((action) => {

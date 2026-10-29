@@ -11,7 +11,7 @@ export interface ChipProps {
 }
 
 /** A small pill stating a fact: "3 files", "Checks passing". */
-export function Chip({ tone = 'neutral', icon, children }: ChipProps): JSX.Element {
+export function Chip({ tone = 'neutral', icon, children }: ChipProps): React.JSX.Element {
   return (
     <span className={`tmui-chip tmui-chip--${tone}`}>
       {icon}

@@ -13,7 +13,7 @@ export function SortSelect({
 }: {
   value: SortMode
   onChange: (mode: SortMode) => void
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <select
       className="rd-sort"

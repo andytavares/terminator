@@ -25,7 +25,7 @@ function getSearchParam(key: string): string | null {
   return new URLSearchParams(window.location.search).get(key)
 }
 
-export function App(): JSX.Element {
+export function App(): React.JSX.Element {
   return (
     <Suspense fallback={null}>
       <ViewForPage />
@@ -33,7 +33,7 @@ export function App(): JSX.Element {
   )
 }
 
-function ViewForPage(): JSX.Element {
+function ViewForPage(): React.JSX.Element {
   const view = getSearchParam('view')
   const [repoRoot, setRepoRoot] = useState<string | null>(getSearchParam('repoRoot') || null)
 

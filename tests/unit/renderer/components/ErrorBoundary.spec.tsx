@@ -15,14 +15,14 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function ThrowingChild({ shouldThrow }: { shouldThrow: boolean }): JSX.Element {
+function ThrowingChild({ shouldThrow }: { shouldThrow: boolean }): React.JSX.Element {
   if (shouldThrow) throw new Error('Test render error')
   return <div>Content renders fine</div>
 }
 
 /** Throws until the test says the fault is gone. */
 const fault = { present: true }
-function FlakyChild(): JSX.Element {
+function FlakyChild(): React.JSX.Element {
   return <ThrowingChild shouldThrow={fault.present} />
 }
 

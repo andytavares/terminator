@@ -28,7 +28,7 @@ function openDrawer(thread: WorkThread): void {
 }
 
 /** The switcher while it is open; it draws nothing otherwise. */
-export function TaskSwitcher(): JSX.Element | null {
+export function TaskSwitcher(): React.JSX.Element | null {
   const open = useTaskSwitcher((s) => s.open)
   return open ? <SwitcherDialog /> : null
 }
@@ -69,7 +69,7 @@ function useSwitcher() {
 
 type Switcher = ReturnType<typeof useSwitcher>
 
-function SwitcherField({ switcher }: { switcher: Switcher }): JSX.Element {
+function SwitcherField({ switcher }: { switcher: Switcher }): React.JSX.Element {
   return (
     <input
       autoFocus
@@ -86,7 +86,7 @@ function SwitcherField({ switcher }: { switcher: Switcher }): JSX.Element {
   )
 }
 
-function SwitcherDialog(): JSX.Element {
+function SwitcherDialog(): React.JSX.Element {
   const switcher = useSwitcher()
   return (
     <ModalShell
@@ -115,7 +115,7 @@ interface ChoicesProps {
   onChoose: (thread: WorkThread) => void
 }
 
-function Choices({ groups, chosenKey, onChoose }: ChoicesProps): JSX.Element {
+function Choices({ groups, chosenKey, onChoose }: ChoicesProps): React.JSX.Element {
   return (
     <div id="task-switcher-list" role="listbox" aria-label="Tasks" className="task-switcher__list">
       {groups.length === 0 && <div className="task-switcher__empty">No tasks match</div>}
@@ -142,7 +142,7 @@ interface ChoiceProps {
   onChoose: (thread: WorkThread) => void
 }
 
-function Choice({ thread, chosen, onChoose }: ChoiceProps): JSX.Element {
+function Choice({ thread, chosen, onChoose }: ChoiceProps): React.JSX.Element {
   return (
     <div
       role="option"

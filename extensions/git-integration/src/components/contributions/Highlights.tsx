@@ -50,7 +50,11 @@ function weekdayTile(calendar: ContributionsCalendar | null): TileSpec {
 }
 
 /** The four highlights under the heatmap: streaks, most active month and weekday. */
-export function Highlights({ calendar }: { calendar: ContributionsCalendar | null }): JSX.Element {
+export function Highlights({
+  calendar,
+}: {
+  calendar: ContributionsCalendar | null
+}): React.JSX.Element {
   const tiles = [
     streakTile('Current streak', calendar?.currentStreak ?? null),
     streakTile('Longest streak', calendar?.longestStreak ?? null),

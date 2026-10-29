@@ -1,5 +1,5 @@
 import { useShallow } from 'zustand/react/shallow'
-import { useEffect, useState } from 'react'
+import { type JSX, useEffect, useState } from 'react'
 import { Dialog, type DialogAction } from '@terminator/extension-ui'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'

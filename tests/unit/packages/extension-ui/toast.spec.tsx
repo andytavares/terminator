@@ -107,7 +107,7 @@ describe('ToastRegion', () => {
   })
 })
 
-function AppWithToast({ modals }: { modals: string[] }): JSX.Element {
+function AppWithToast({ modals }: { modals: string[] }): React.JSX.Element {
   return (
     <>
       {modals.map((label) => (

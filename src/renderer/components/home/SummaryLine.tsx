@@ -52,7 +52,7 @@ function useWaitedOnYouToday(now: number): number | null {
 }
 
 /** One line of counts, each a filter when pressed, and today's focus and waiting at the right. */
-export function SummaryLine(props: SummaryLineProps): JSX.Element {
+export function SummaryLine(props: SummaryLineProps): React.JSX.Element {
   const { desk } = props
   const filter = useDeskFilter((s) => s.count)
   const setCount = useDeskFilter((s) => s.setCount)
@@ -77,7 +77,7 @@ export function SummaryLine(props: SummaryLineProps): JSX.Element {
   )
 }
 
-function FocusProgress({ desk }: Pick<SummaryLineProps, 'desk'>): JSX.Element | null {
+function FocusProgress({ desk }: Pick<SummaryLineProps, 'desk'>): React.JSX.Element | null {
   const days = useFocusStore((s) => s.days)
   const candidates = useHomeFeedStore((s) => s.focus)
   const items = days[localDateKey(desk.now)] ?? []
@@ -94,7 +94,7 @@ function FocusProgress({ desk }: Pick<SummaryLineProps, 'desk'>): JSX.Element | 
   )
 }
 
-function WaitedOnYou({ now }: { now: number }): JSX.Element | null {
+function WaitedOnYou({ now }: { now: number }): React.JSX.Element | null {
   const minutes = useWaitedOnYouToday(now)
   if (minutes === null || Math.round(minutes) === 0) return null
   return (

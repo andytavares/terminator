@@ -20,7 +20,7 @@ function useCreatedPullRequest(): PullRequest | null {
 
 /** The pull request Open PR just created: a notification, and a link under the commit box that
  *  opens it on GitHub. */
-export function PrCreatedNotice(): JSX.Element | null {
+export function PrCreatedNotice(): React.JSX.Element | null {
   const created = useCreatedPullRequest()
   if (!created) return null
   return (

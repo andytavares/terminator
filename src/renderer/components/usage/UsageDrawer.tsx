@@ -22,7 +22,13 @@ interface UsageDrawerProps {
   onDismiss: () => void
 }
 
-function DailyBars({ daily, label }: { daily: readonly number[]; label: string }): JSX.Element {
+function DailyBars({
+  daily,
+  label,
+}: {
+  daily: readonly number[]
+  label: string
+}): React.JSX.Element {
   const highest = Math.max(1, ...daily)
   return (
     <div className="usage-drawer__bars" role="img" aria-label={label}>
@@ -55,7 +61,7 @@ function controlReading({ row }: StatedRow): string {
   return row.usesInPeriod === 0 ? 'Not used' : String(row.usesInPeriod)
 }
 
-function Facts({ entry, period }: Pick<UsageDrawerProps, 'entry' | 'period'>): JSX.Element {
+function Facts({ entry, period }: Pick<UsageDrawerProps, 'entry' | 'period'>): React.JSX.Element {
   const { row, state } = entry
   return (
     <dl className="usage-drawer__facts">
@@ -77,7 +83,13 @@ function Facts({ entry, period }: Pick<UsageDrawerProps, 'entry' | 'period'>): J
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }): JSX.Element {
+function Section({
+  title,
+  children,
+}: {
+  title: string
+  children: React.ReactNode
+}): React.JSX.Element {
   return (
     <section className="usage-drawer__section">
       <h3 className="usage-drawer__heading">{title}</h3>
@@ -86,7 +98,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function ReachedRows({ row }: { row: StatedRow['row'] }): JSX.Element {
+function ReachedRows({ row }: { row: StatedRow['row'] }): React.JSX.Element {
   return (
     <ul className="usage-drawer__rows">
       {viaShares(row.byVia).map((share) => (
@@ -105,7 +117,7 @@ function ReachedRows({ row }: { row: StatedRow['row'] }): JSX.Element {
   )
 }
 
-function InsideRows({ controls }: { controls: readonly StatedRow[] }): JSX.Element {
+function InsideRows({ controls }: { controls: readonly StatedRow[] }): React.JSX.Element {
   return (
     <ul className="usage-drawer__rows">
       {controls.map((control) => (
@@ -133,7 +145,7 @@ function DrawerHead({ title, sub, onClose }: { title: string; sub: string; onClo
   )
 }
 
-export function UsageDrawer(props: UsageDrawerProps): JSX.Element {
+export function UsageDrawer(props: UsageDrawerProps): React.JSX.Element {
   const { entry, rows, period, extensions, onDismiss } = props
   const { row } = entry
   const inside = controlsInside(entry, rows)

@@ -44,7 +44,7 @@ function ownKey(terminal: BranchTerminal): string | null {
  * the same column, so scanning for what needs you is still one column top to
  * bottom rather than a search across three kinds of row.
  */
-export function TerminalRow(props: TerminalRowProps): JSX.Element {
+export function TerminalRow(props: TerminalRowProps): React.JSX.Element {
   const { terminal, nested = false, selected, onSelect, onClose, onLinkIssue } = props
   const { menu, closeMenu, openMenu } = useLinkMenu(onLinkIssue !== undefined)
   const key = ownKey(terminal)
@@ -107,7 +107,7 @@ interface ContentProps {
 }
 
 /** The terminal's state, or a window icon when it lives in a window of its own. */
-function TerminalGutter({ terminal }: { terminal: BranchTerminal }): JSX.Element {
+function TerminalGutter({ terminal }: { terminal: BranchTerminal }): React.JSX.Element {
   const isBrokenOut = useBreakoutStore((s) => s.windows.has(terminal.sessionId))
   return (
     <span className="terminal-row__gutter">
@@ -123,7 +123,7 @@ function TerminalGutter({ terminal }: { terminal: BranchTerminal }): JSX.Element
 }
 
 /** State chip, name, own link key, unseen bells, and the close button. */
-function TerminalRowContent({ terminal, linkKey, onClose }: ContentProps): JSX.Element {
+function TerminalRowContent({ terminal, linkKey, onClose }: ContentProps): React.JSX.Element {
   return (
     <>
       <TerminalGutter terminal={terminal} />

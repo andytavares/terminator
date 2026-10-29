@@ -27,7 +27,7 @@ interface GroupCheckboxProps {
   onToggle: () => void
 }
 
-function GroupCheckbox(props: GroupCheckboxProps): JSX.Element {
+function GroupCheckbox(props: GroupCheckboxProps): React.JSX.Element {
   const { selected, total } = props
   const ref = useRef<HTMLInputElement>(null)
   useEffect(() => {
@@ -260,7 +260,7 @@ function LoadError(props: { error: string; onRetry: () => void }) {
   )
 }
 
-export function RepoPicker({ initial, onClose, onSaved }: Props): JSX.Element {
+export function RepoPicker({ initial, onClose, onSaved }: Props): React.JSX.Element {
   const { loaded, load } = useAccessibleRepos()
   const sel = useRepoSelection(initial, onSaved)
   const repos = useMemo(() => reposOf(loaded), [loaded])

@@ -27,7 +27,7 @@ export function AppBand({
   unreadNotifications = 0,
   onBellClick,
   onOpenQuickActions,
-}: AppBandProps): JSX.Element | null {
+}: AppBandProps): React.JSX.Element | null {
   const tabs = globalTabs.filter((t) => !t.hidden)
   if (tabs.length === 0 && onBellClick === undefined && onOpenQuickActions === undefined)
     return null
@@ -71,7 +71,13 @@ function entryLabel(tab: GlobalTabRegistration): string {
   return (tab.badge ?? 0) > 0 && tab.badgeLabel ? `${tab.label}, ${tab.badgeLabel}` : tab.label
 }
 
-function BellEntry({ unread, onClick }: { unread: number; onClick: () => void }): JSX.Element {
+function BellEntry({
+  unread,
+  onClick,
+}: {
+  unread: number
+  onClick: () => void
+}): React.JSX.Element {
   return (
     <Entry
       label={`Notifications${unread > 0 ? ` (${unread} unread)` : ''}`}
@@ -94,7 +100,7 @@ function Entry({
   active?: boolean
   badge?: number
   onClick: () => void
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <button
       className={`app-band__entry${active ? ' app-band__entry--active' : ''}`}

@@ -82,7 +82,7 @@ export function Inbox({
   onOpenOrder,
 }: {
   onOpenOrder?: (orderId: string) => void
-} = {}): JSX.Element | null {
+} = {}): React.JSX.Element | null {
   const { view, refreshList } = useInbox()
   const signals = useSignals()
   const answers = useAnswers(refreshList, signals.refreshSignals)
@@ -259,7 +259,8 @@ function GateLead({ rule }: { readonly rule: GateRuleId }) {
 
 function SignalsSection({ signals: model }: { readonly signals: Signals }) {
   const { signals, signalProblem, promoted } = model
-  if (signals.length === 0) return null
+  // A promotion note outlives the signal it promoted, which the refresh removes.
+  if (signals.length === 0 && promoted === null) return null
   return (
     <section className="fdry-signals" aria-label="From the factory's sensors">
       <h2 className="fdry-panel-h">From the factory&rsquo;s sensors</h2>

@@ -69,7 +69,7 @@ function useIssueByKey(tracker: TrackerId, issueKey: string): IssueRead {
   return { outcome, issueKey, refresh }
 }
 
-export function IssueDetails({ tracker, issueKey, onClose }: IssueDetailsProps): JSX.Element {
+export function IssueDetails({ tracker, issueKey, onClose }: IssueDetailsProps): React.JSX.Element {
   const read = useIssueByKey(tracker, issueKey)
   const issue = read.outcome.loading ? null : read.outcome.issue
   return (
@@ -81,7 +81,7 @@ export function IssueDetails({ tracker, issueKey, onClose }: IssueDetailsProps):
 }
 
 /** The description and comments, once the issue has arrived. */
-function DetailsBody({ issue }: { issue: Issue | null }): JSX.Element {
+function DetailsBody({ issue }: { issue: Issue | null }): React.JSX.Element {
   if (issue === null) return <></>
   return (
     <>
@@ -98,7 +98,7 @@ interface DetailsHeaderProps {
 }
 
 /** `<KEY> · <tracker>` with an Esc hint, then the title and its buttons, or why there are none. */
-function DetailsHeader({ tracker, read, onClose }: DetailsHeaderProps): JSX.Element {
+function DetailsHeader({ tracker, read, onClose }: DetailsHeaderProps): React.JSX.Element {
   const label = TRACKER_LABELS[tracker]
   const issue = read.outcome.loading ? null : read.outcome.issue
   return (
@@ -120,7 +120,7 @@ function DetailsHeader({ tracker, read, onClose }: DetailsHeaderProps): JSX.Elem
   )
 }
 
-function KeyRow({ label, read }: { label: string; read: IssueRead }): JSX.Element {
+function KeyRow({ label, read }: { label: string; read: IssueRead }): React.JSX.Element {
   return (
     <div className="issue-drawer__key-row">
       <span className="issue-drawer__key">

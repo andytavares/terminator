@@ -23,7 +23,7 @@ export function MetricCard({
   unit,
   sub,
   children,
-}: MetricCardProps): JSX.Element {
+}: MetricCardProps): React.JSX.Element {
   return (
     <div className="tmui-metric-card">
       <div className="tmui-metric-card__question">

@@ -26,7 +26,7 @@ export function DropdownMenu({
   panelLabel,
   children,
   ...button
-}: DropdownMenuProps): JSX.Element {
+}: DropdownMenuProps): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const close = (): void => setOpen(false)
   const suffix = variant ? ` ${variant}` : ''
@@ -58,7 +58,7 @@ function MenuButton({
   on = false,
   badge,
   control: { open, toggle },
-}: MenuButtonProps & { control: MenuControl }): JSX.Element {
+}: MenuButtonProps & { control: MenuControl }): React.JSX.Element {
   const marked = on === 'when-open' ? open : on
   return (
     <button
@@ -88,7 +88,7 @@ export function RadioChoices<K extends string>({
   choices,
   current,
   onPick,
-}: RadioChoicesProps<K>): JSX.Element {
+}: RadioChoicesProps<K>): React.JSX.Element {
   return (
     <>
       {choices.map(([key, label]) => (
@@ -113,7 +113,7 @@ export function MenuChoice({
   onSelect,
   kind = 'radio',
   children,
-}: MenuChoiceProps): JSX.Element {
+}: MenuChoiceProps): React.JSX.Element {
   return (
     <button
       type="button"

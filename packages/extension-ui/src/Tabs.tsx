@@ -37,7 +37,7 @@ export function TabsRoot<Id extends string = string>({
   selectedId,
   onSelect,
   children,
-}: TabsRootProps<Id>): JSX.Element {
+}: TabsRootProps<Id>): React.JSX.Element {
   const baseId = useId()
   const [shownPanelId, setShownPanelId] = useState<string | null>(null)
   // Every id that comes back is one the caller gave a Tab, so it is an Id.
@@ -102,7 +102,7 @@ export function TabList({
   orientation = 'horizontal',
   className,
   children,
-}: TabListProps): JSX.Element {
+}: TabListProps): React.JSX.Element {
   const { onSelect } = useTabsContext('TabList')
   const moveFocusByKey = (event: React.KeyboardEvent<HTMLDivElement>): void =>
     moveTabFocus(event, { orientation, onSelect })
@@ -133,7 +133,13 @@ export interface TabProps {
   children: React.ReactNode
 }
 
-export function Tab({ id, disabled, accessibleName, className, children }: TabProps): JSX.Element {
+export function Tab({
+  id,
+  disabled,
+  accessibleName,
+  className,
+  children,
+}: TabProps): React.JSX.Element {
   const { baseId, selectedId, onSelect, shownPanelId } = useTabsContext('Tab')
   const selected = id === selectedId
   const classes = ['tmui-tabs__tab', className].filter(Boolean).join(' ')
@@ -164,7 +170,7 @@ export interface TabPanelProps {
   children: React.ReactNode
 }
 
-export function TabPanel({ id, className, children }: TabPanelProps): JSX.Element | null {
+export function TabPanel({ id, className, children }: TabPanelProps): React.JSX.Element | null {
   const { baseId, selectedId, setShownPanelId } = useTabsContext('TabPanel')
   const shown = id === selectedId
   useLayoutEffect(() => {
@@ -205,7 +211,7 @@ export interface TabsProps {
 }
 
 /** A tab list directly over its panel. For any other layout, use the parts. */
-export function Tabs({ label, tabs, selectedId, onSelect }: TabsProps): JSX.Element {
+export function Tabs({ label, tabs, selectedId, onSelect }: TabsProps): React.JSX.Element {
   return (
     <TabsRoot selectedId={selectedId} onSelect={onSelect}>
       <div className="tmui-tabs">

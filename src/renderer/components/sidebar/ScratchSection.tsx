@@ -1,3 +1,4 @@
+import type { JSX } from 'react'
 import type { TerminalSession } from '../../../shared/types/index'
 import { sessionIssueKeys, type BranchRow as BranchRowData } from '../../sidebar/branch-rows'
 import type { WorkItem } from '../../sidebar/work-item'

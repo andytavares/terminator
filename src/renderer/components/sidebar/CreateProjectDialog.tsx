@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { type JSX, useState, useEffect, useCallback } from 'react'
 import { Dialog, type DialogAction } from '@terminator/extension-ui'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSettingsStore } from '../../stores/settings.store'

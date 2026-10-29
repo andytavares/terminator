@@ -38,7 +38,7 @@ export function IconButton({
   size = 'md',
   className,
   ...rest
-}: IconButtonProps): JSX.Element {
+}: IconButtonProps): React.JSX.Element {
   const classes = ['tmui-icon-button', size === 'sm' && 'tmui-icon-button--sm', className]
   return (
     <button

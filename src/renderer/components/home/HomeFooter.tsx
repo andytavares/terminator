@@ -18,7 +18,7 @@ function weekSentence(shipped: number | null, week: WeekMeasures | null): string
 }
 
 /** The week in one line, the way to Insights, and the archived tasks. */
-export function HomeFooter(): JSX.Element {
+export function HomeFooter(): React.JSX.Element {
   const shipped = useHomeFeedStore((s) => s.measures.find((m) => m.id === HOME_MEASURES.shipped))
   const week = useWeekMeasures()
   const show = useHomeView((s) => s.show)

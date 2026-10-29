@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import './Login.css'
 import { forgetLegacyToken } from './api/remote-client'
 
-export function App(): JSX.Element {
+export function App(): React.JSX.Element {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -37,7 +37,7 @@ function PasswordInput({
 }: {
   value: string
   onChange: (value: string) => void
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <input
       className="login__input"
@@ -50,7 +50,7 @@ function PasswordInput({
   )
 }
 
-function LoginButton({ loading }: { loading: boolean }): JSX.Element {
+function LoginButton({ loading }: { loading: boolean }): React.JSX.Element {
   return (
     <button className="login__btn" type="submit" disabled={loading}>
       {loading ? 'Connecting…' : 'Connect'}

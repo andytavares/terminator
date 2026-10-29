@@ -164,7 +164,7 @@ async function submit({ view, onClose, setError }: SubmitInput): Promise<void> {
 }
 
 /** The launcher: pick a ticket, a prompt or a branch, choose how to run it, press Enter. */
-export function StartWork({ onClose }: { onClose: () => void }): JSX.Element {
+export function StartWork({ onClose }: { onClose: () => void }): React.JSX.Element {
   const launcher = useLauncher(onClose)
   const { view, actions } = launcher
   return (
@@ -178,7 +178,7 @@ export function StartWork({ onClose }: { onClose: () => void }): JSX.Element {
   )
 }
 
-function LauncherBody(launcher: Launcher): JSX.Element {
+function LauncherBody(launcher: Launcher): React.JSX.Element {
   return (
     <>
       <div className="start-work__body">
@@ -215,7 +215,7 @@ const PLACEHOLDERS: Record<LauncherTab, string> = {
   scratch: 'Nothing to type for a scratch terminal',
 }
 
-function SearchRow({ view, actions }: PartProps): JSX.Element {
+function SearchRow({ view, actions }: PartProps): React.JSX.Element {
   return (
     <div className="start-work__input">
       <Plus aria-hidden="true" />
@@ -232,7 +232,7 @@ function SearchRow({ view, actions }: PartProps): JSX.Element {
   )
 }
 
-function TabRow({ view, actions }: PartProps): JSX.Element {
+function TabRow({ view, actions }: PartProps): React.JSX.Element {
   const ticketKey = view.selected?.kind === 'ticket' ? view.selected.issue.key : null
   return (
     <TabsRoot selectedId={view.tab} onSelect={actions.setTab}>
@@ -263,7 +263,7 @@ const HINTS: Partial<Record<LauncherTab, string>> = {
   scratch: 'A terminal that belongs to no branch. Enter opens it.',
 }
 
-function ChoiceList({ view, actions, selectedIndex }: Launcher): JSX.Element {
+function ChoiceList({ view, actions, selectedIndex }: Launcher): React.JSX.Element {
   const hint = HINTS[view.tab]
   return (
     <div className="start-work__list" role="listbox" aria-label="Choices">
@@ -274,7 +274,7 @@ function ChoiceList({ view, actions, selectedIndex }: Launcher): JSX.Element {
   )
 }
 
-function TicketRows({ view, actions, selectedIndex }: Launcher): JSX.Element {
+function TicketRows({ view, actions, selectedIndex }: Launcher): React.JSX.Element {
   const typed = view.query.trim()
   const promptIndex = rowsBefore(view.groups, view.groups.length)
   return (
@@ -313,7 +313,7 @@ interface TicketRowProps {
   onSelect: () => void
 }
 
-function TicketRow({ issue, selected, onSelect }: TicketRowProps): JSX.Element {
+function TicketRow({ issue, selected, onSelect }: TicketRowProps): React.JSX.Element {
   return (
     <div role="option" aria-selected={selected} className="start-work__row" onClick={onSelect}>
       <span aria-hidden="true" />
@@ -332,7 +332,7 @@ interface PromptRowProps {
   onSelect: () => void
 }
 
-function PromptRow({ text, selected, onSelect }: PromptRowProps): JSX.Element {
+function PromptRow({ text, selected, onSelect }: PromptRowProps): React.JSX.Element {
   return (
     <>
       <h3 className="start-work__group">Or start from what you typed</h3>
@@ -346,7 +346,7 @@ function PromptRow({ text, selected, onSelect }: PromptRowProps): JSX.Element {
   )
 }
 
-function BranchRows({ view, actions, selectedIndex }: Launcher): JSX.Element {
+function BranchRows({ view, actions, selectedIndex }: Launcher): React.JSX.Element {
   return (
     <>
       {view.rows.map((row, i) => (
@@ -367,7 +367,7 @@ function BranchRows({ view, actions, selectedIndex }: Launcher): JSX.Element {
   )
 }
 
-function RunAsPanel({ view, actions }: Launcher): JSX.Element {
+function RunAsPanel({ view, actions }: Launcher): React.JSX.Element {
   if (view.tab === 'scratch') return <div className="start-work__side" />
   return (
     <div className="start-work__side">
@@ -379,7 +379,7 @@ function RunAsPanel({ view, actions }: Launcher): JSX.Element {
   )
 }
 
-function AgentPicker({ view, actions }: PartProps): JSX.Element | null {
+function AgentPicker({ view, actions }: PartProps): React.JSX.Element | null {
   const { agents, defaultId } = view.choices
   if (agents.length < 2 || view.runAs !== 'agent') return null
   return (
@@ -410,7 +410,7 @@ function summaryOf(view: Launcher['view']): { branch: string; worktree: string }
   return { branch: view.git.base ?? '', worktree: 'the repo folder' }
 }
 
-function Summary({ view }: PartProps): JSX.Element {
+function Summary({ view }: PartProps): React.JSX.Element {
   const { branch, worktree } = summaryOf(view)
   return (
     <dl className="start-work__summary" role="group" aria-label="Where it runs">
@@ -430,7 +430,7 @@ function startLabel(view: Launcher['view']): string {
   return 'Start'
 }
 
-function Footer({ view, actions }: Launcher): JSX.Element {
+function Footer({ view, actions }: Launcher): React.JSX.Element {
   return (
     <div className="start-work__footer">
       <span>

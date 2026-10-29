@@ -58,7 +58,7 @@ interface ViewRequest {
 }
 
 interface PendingRequestTargets {
-  commitMessageRef: React.RefObject<HTMLTextAreaElement>
+  commitMessageRef: React.RefObject<HTMLTextAreaElement | null>
   openPrDialog: () => void
 }
 
@@ -424,7 +424,7 @@ function CommitButtons({ flow, onOpenPr }: { flow: CommitFlow; onOpenPr: () => v
 
 interface CommitSectionProps {
   repoRoot: string | null
-  commitMessageRef: React.RefObject<HTMLTextAreaElement>
+  commitMessageRef: React.RefObject<HTMLTextAreaElement | null>
   flow: CommitFlow
   stagedCount: number
   onOpenPr: () => void
@@ -460,7 +460,7 @@ function CommitSection(props: CommitSectionProps) {
 
 interface ChangesPaneProps {
   repoRoot: string
-  commitMessageRef: React.RefObject<HTMLTextAreaElement>
+  commitMessageRef: React.RefObject<HTMLTextAreaElement | null>
   width: number
   flow: CommitFlow
   pr: PrDialogState
@@ -536,7 +536,7 @@ function emptyNotice(repoRoot: string | null, disabled: boolean): string | null 
   return disabled ? 'Git Integration is off for this workspace.' : null
 }
 
-export function GitFullView({ repoRoot }: Props): JSX.Element {
+export function GitFullView({ repoRoot }: Props): React.JSX.Element {
   const g = useGitFullView(repoRoot)
   const notice = emptyNotice(repoRoot, g.disabled)
   if (notice !== null || !repoRoot) {

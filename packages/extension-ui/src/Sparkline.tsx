@@ -44,7 +44,7 @@ export function Sparkline({
   tone = 'accent',
   size = 'md',
   label,
-}: SparklineProps): JSX.Element | null {
+}: SparklineProps): React.JSX.Element | null {
   if (values.length === 0) return null
   const points = sparklinePoints(values, size)
   const line = points

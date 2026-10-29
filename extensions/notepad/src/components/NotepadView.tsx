@@ -458,7 +458,10 @@ function PanelToggleButtons({ toggles }: { toggles: PanelToggles }): React.JSX.E
 }
 
 /** Shows "View comment" over the hovered anchor; going to a comment flashes its card. */
-function useAnchorHover(session: NoteSession, editorWrapRef: React.RefObject<HTMLDivElement>) {
+function useAnchorHover(
+  session: NoteSession,
+  editorWrapRef: React.RefObject<HTMLDivElement | null>
+) {
   const { hover, setActiveCommentId } = session
 
   function handleEditorMouseOver(e: React.MouseEvent<HTMLDivElement>) {

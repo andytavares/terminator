@@ -192,7 +192,7 @@ function useIssueComment(props: Props, loadIssueComments: (prNumber: number) => 
 }
 
 type IssueCommentBox = ReturnType<typeof useIssueComment>['box']
-type ComposerRef = React.RefObject<HTMLTextAreaElement>
+type ComposerRef = React.RefObject<HTMLTextAreaElement | null>
 
 function focusAtEnd(box: HTMLTextAreaElement | null): void {
   box?.focus()

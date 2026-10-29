@@ -62,14 +62,14 @@ function PaneBody({
   containerRef,
 }: {
   sessionId: string
-  containerRef: React.RefObject<HTMLDivElement>
-}): JSX.Element {
+  containerRef: React.RefObject<HTMLDivElement | null>
+}): React.JSX.Element {
   const isAgent = useSessionStore((s) => s.sessions.get(sessionId)?.surface === 'agent')
   if (isAgent) return <AgentView sessionId={sessionId} />
   return <div ref={containerRef} className="leaf-pane__container" />
 }
 
-export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
+export function LeafPane({ sessionId, projectId }: Props): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const isFocused = useSessionStore((s) => s.getFocusedSession(projectId) === sessionId)
   const tabTitle = useSessionStore((s) => s.sessions.get(sessionId)?.tabTitle ?? sessionId)

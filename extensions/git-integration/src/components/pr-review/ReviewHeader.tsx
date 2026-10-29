@@ -301,7 +301,7 @@ function SubmitButton(props: { draftCount: number; onSubmit: () => void }) {
 
 /** One 44px row holding everything that is not the diff, in place of the old top bar, checks band,
  *  progress track and large-PR banner (design: docs/research/review-screen-declutter.md). */
-export function ReviewHeader(props: ReviewHeaderProps): JSX.Element {
+export function ReviewHeader(props: ReviewHeaderProps): React.JSX.Element {
   return (
     <div className="rh-row">
       {props.onShowOverview && (

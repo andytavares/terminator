@@ -70,7 +70,7 @@ function actorKind(actor: string): string {
 
 type LedgerTab = 'record' | 'factory'
 
-export function Ledger(): JSX.Element {
+export function Ledger(): React.JSX.Element {
   const [tab, setTab] = useState<LedgerTab>('record')
   const entries = useLedgerEntries()
   const { rules, refreshRules } = useRules()
@@ -495,7 +495,7 @@ interface FactoryViewProps {
 }
 
 /** The Factory tab: the 30-day tiles, and the per-order table they roll up. */
-function FactoryView({ metrics, metricsWindow, onWindow }: FactoryViewProps): JSX.Element {
+function FactoryView({ metrics, metricsWindow, onWindow }: FactoryViewProps): React.JSX.Element {
   if (metrics === null) return <div className="fdry-empty">Loading the factory’s numbers…</div>
 
   return (

@@ -12,7 +12,7 @@ export interface StatusDotProps {
   pulse?: boolean
 }
 
-export function StatusDot({ tone, label, pulse = false }: StatusDotProps): JSX.Element {
+export function StatusDot({ tone, label, pulse = false }: StatusDotProps): React.JSX.Element {
   const classes = ['tmui-status-dot', `tmui-status-dot--${tone}`, pulse && 'tmui-status-dot--pulse']
   return (
     <span

@@ -7,7 +7,7 @@ import '../sidebar/SidebarMenu.css'
 import './InFlight.css'
 
 /** The Group: menu above a list of work; the choice is kept in the Desk's selection store. */
-export function DeskGroupMenu(): JSX.Element {
+export function DeskGroupMenu(): React.JSX.Element {
   const groupBy = useDeskSelection((s) => s.groupBy)
   const setGroupBy = useDeskSelection((s) => s.setGroupBy)
   const current = DESK_GROUP_OPTIONS.find(([value]) => value === groupBy)?.[1]

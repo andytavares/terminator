@@ -43,7 +43,7 @@ function chord(group: QuickActionGroup, action: QuickAction): string {
   return `${group.mnemonic} ${action.mnemonic ?? ''}`.trim()
 }
 
-export function QuickActions(props: QuickActionsProps): JSX.Element {
+export function QuickActions(props: QuickActionsProps): React.JSX.Element {
   const panel = usePanelState(props)
   const { inputRef, panelRef } = usePanelFocus(panel.mode)
   const rows = usePanelRows(props, panel)
@@ -226,7 +226,7 @@ function pinnedRow(action: QuickAction, groupById: Map<string, QuickActionGroup>
 
 /** Keeps the highlighted row scrolled into view. */
 function useHighlightInView(
-  panelRef: React.RefObject<HTMLDivElement>,
+  panelRef: React.RefObject<HTMLDivElement | null>,
   highlight: number,
   visible: Row[]
 ): void {
@@ -264,10 +264,10 @@ interface PanelPartProps extends QuickActionsProps {
   rows: PanelRows
 }
 
-type HeaderProps = PanelPartProps & { inputRef: React.RefObject<HTMLInputElement> }
+type HeaderProps = PanelPartProps & { inputRef: React.RefObject<HTMLInputElement | null> }
 
 /** The search box while searching; else where you are, and the context chip at the top. */
-function PanelHeader({ panel, rows, contextLabel, inputRef }: HeaderProps): JSX.Element {
+function PanelHeader({ panel, rows, contextLabel, inputRef }: HeaderProps): React.JSX.Element {
   if (panel.mode === 'search') {
     return <SearchBox panel={panel} results={rows.searchRows} inputRef={inputRef} />
   }
@@ -292,10 +292,10 @@ function PanelHeader({ panel, rows, contextLabel, inputRef }: HeaderProps): JSX.
 interface SearchBoxProps {
   panel: PanelState
   results: Row[]
-  inputRef: React.RefObject<HTMLInputElement>
+  inputRef: React.RefObject<HTMLInputElement | null>
 }
 
-function SearchBox({ panel, results, inputRef }: SearchBoxProps): JSX.Element {
+function SearchBox({ panel, results, inputRef }: SearchBoxProps): React.JSX.Element {
   return (
     <div className="qa-top">
       <div className="qa-search">
@@ -320,7 +320,7 @@ function SearchBox({ panel, results, inputRef }: SearchBoxProps): JSX.Element {
 }
 
 /** The top level's sections, a group's actions, or the search results. */
-function PanelBody(props: PanelPartProps): JSX.Element {
+function PanelBody(props: PanelPartProps): React.JSX.Element {
   const { panel, rows } = props
   const rowProps = { panel, pins: props.pins, onTogglePin: props.onTogglePin }
   return (
@@ -393,7 +393,7 @@ interface RowListProps {
   onTogglePin: (id: string) => void
 }
 
-function RowList({ rows, offset, panel, pins, onTogglePin }: RowListProps): JSX.Element {
+function RowList({ rows, offset, panel, pins, onTogglePin }: RowListProps): React.JSX.Element {
   return (
     <>
       {rows.map((row, i) => {
@@ -421,7 +421,7 @@ function RowList({ rows, offset, panel, pins, onTogglePin }: RowListProps): JSX.
 
 /** Always rendered, empty for an action with no mnemonic: `.qa-row` is a 3-column grid (`24px
  * 1fr auto`), and without it the label landed in the 24px key column, clipped to a letter. */
-function KeyLabel({ keyLabel }: { keyLabel: string }): JSX.Element {
+function KeyLabel({ keyLabel }: { keyLabel: string }): React.JSX.Element {
   if (!keyLabel) return <span className="qa-key qa-key--empty" aria-hidden="true" />
   return <span className={`qa-key${keyLabel.length > 1 ? ' qa-key--wide' : ''}`}>{keyLabel}</span>
 }
@@ -456,7 +456,7 @@ function RowItem({ selected, onHover, onActivate, className = '', children, id }
 
 type ItemProps<R> = Omit<RowItemProps, 'children' | 'id' | 'className'> & { row: R }
 
-function GroupRowItem({ row, ...item }: ItemProps<GroupRow>): JSX.Element {
+function GroupRowItem({ row, ...item }: ItemProps<GroupRow>): React.JSX.Element {
   return (
     <RowItem id={row.id} {...item}>
       <KeyLabel keyLabel={row.group.mnemonic} />
@@ -475,7 +475,7 @@ interface ActionItemProps extends ItemProps<ActionRow> {
   onTogglePin: (id: string) => void
 }
 
-function ActionRowItem({ row, pinned, onTogglePin, ...item }: ActionItemProps): JSX.Element {
+function ActionRowItem({ row, pinned, onTogglePin, ...item }: ActionItemProps): React.JSX.Element {
   const { action } = row
   return (
     <RowItem id={row.id} className={action.disabledReason ? ' qa-row--disabled' : ''} {...item}>
@@ -500,7 +500,7 @@ interface ActionRowEndProps {
 }
 
 /** The pin mark, the shortcut, and the pin toggle, which leaves the row alone. */
-function ActionRowEnd({ action, pinned, onTogglePin }: ActionRowEndProps): JSX.Element {
+function ActionRowEnd({ action, pinned, onTogglePin }: ActionRowEndProps): React.JSX.Element {
   return (
     <span className="qa-row__end">
       {pinned && (

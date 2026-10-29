@@ -67,7 +67,7 @@ interface RowProps {
   values: { own: unknown; global: unknown }
 }
 
-function WorkspaceSettingRow({ workspaceId, setting, values }: RowProps): JSX.Element {
+function WorkspaceSettingRow({ workspaceId, setting, values }: RowProps): React.JSX.Element {
   const update = useSettingsStore((s) => s.updateWorkspaceExtensionSetting)
   // The row keeps what was typed; a new generation redraws it with the global value.
   const [generation, setGeneration] = useState(0)

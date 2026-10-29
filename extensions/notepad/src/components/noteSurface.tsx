@@ -18,7 +18,7 @@ import { layoutCommentCards, reloadComments, visibleAnchors } from './noteCommen
 import type { Comment } from '../db/types'
 
 export type ViewRef = React.MutableRefObject<EditorView | null>
-type PanelRef = React.RefObject<HTMLDivElement>
+type PanelRef = React.RefObject<HTMLDivElement | null>
 
 interface CardLayoutOptions {
   /** The open note; nothing is laid out while there is none. */

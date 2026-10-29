@@ -58,7 +58,7 @@ function useUsageData(start: string | null): {
   return { report, extensions }
 }
 
-function PathLegend(): JSX.Element {
+function PathLegend(): React.JSX.Element {
   return (
     <ul className="usage__legend" aria-label="Paths">
       {(['click', 'palette', 'shortcut', 'menu'] as const).map((via) => (
@@ -78,7 +78,7 @@ interface StateChipsProps {
   onChoose: (state: UsageState | null) => void
 }
 
-function StateChips({ rows, period, chosen, onChoose }: StateChipsProps): JSX.Element {
+function StateChips({ rows, period, chosen, onChoose }: StateChipsProps): React.JSX.Element {
   const choices: [UsageState | null, string, number][] = [
     [null, 'All', rows.length],
     ...STATE_ORDER.map((state): [UsageState, string, number] => [
@@ -130,7 +130,7 @@ interface UsageBodyProps {
 }
 
 /** The cards, state chips and the table, for the rows of one part. */
-function UsageBody({ rows, extensions, period, start }: UsageBodyProps): JSX.Element {
+function UsageBody({ rows, extensions, period, start }: UsageBodyProps): React.JSX.Element {
   const [state, setState] = useState<UsageState | null>(null)
   const [opened, setOpened] = useState<StatedRow | null>(null)
   const shown = rows.filter((entry) => state === null || entry.state === state)
@@ -169,7 +169,7 @@ interface PartMenuProps {
 }
 
 /** All parts, Core, and each extension that has a feature. */
-function PartMenu({ rows, extensions, part, onPick }: PartMenuProps): JSX.Element {
+function PartMenu({ rows, extensions, part, onPick }: PartMenuProps): React.JSX.Element {
   const sources = [...new Set(rows.map((entry) => entry.row.source))]
   const choices: [string, string][] = [
     [ALL_PARTS, 'All parts'],
@@ -205,7 +205,12 @@ interface UsageHeaderProps {
   menu: React.ReactNode
 }
 
-function UsageHeader({ countingSince, period, onPeriod, menu }: UsageHeaderProps): JSX.Element {
+function UsageHeader({
+  countingSince,
+  period,
+  onPeriod,
+  menu,
+}: UsageHeaderProps): React.JSX.Element {
   return (
     <div className="wall__bar">
       <h2 className="wall__title">Usage</h2>
@@ -224,7 +229,7 @@ function UsageHeader({ countingSince, period, onPeriod, menu }: UsageHeaderProps
   )
 }
 
-function NothingCounted(): JSX.Element {
+function NothingCounted(): React.JSX.Element {
   return (
     <EmptyState
       icon={ChartLine}
@@ -241,7 +246,7 @@ function NothingCounted(): JSX.Element {
 }
 
 /** How much each feature of the app is used: a summary, then every feature by part of the app. */
-export function UsageScreen(): JSX.Element {
+export function UsageScreen(): React.JSX.Element {
   const [period, setPeriod] = useState<Period>('30')
   const [part, setPart] = useState(ALL_PARTS)
   // Read on every render, not memoized: a screen left open past midnight moves to the new day.

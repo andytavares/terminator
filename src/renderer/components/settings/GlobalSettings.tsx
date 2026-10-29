@@ -43,7 +43,7 @@ const CORE_NOTIFICATION_KEYS: Array<{ key: string; label: string }> = [
   { key: 'extensionSettingAction', label: 'Extension setting action result' },
 ]
 
-export function GlobalSettings(): JSX.Element {
+export function GlobalSettings(): React.JSX.Element {
   const settings = useSettingsStore((s) => s.globalSettings)
   const countChange = useFieldChangeCounter('core.settings.change.global')
   if (!settings) return <div>Loading...</div>
@@ -70,7 +70,7 @@ export function GlobalSettings(): JSX.Element {
 
 type Settings = GlobalSettingsValue
 
-function SectionTitle({ children }: { children: React.ReactNode }): JSX.Element {
+function SectionTitle({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
     <h3 className="settings-section__title" style={{ marginTop: 20 }}>
       {children}
@@ -78,7 +78,11 @@ function SectionTitle({ children }: { children: React.ReactNode }): JSX.Element 
   )
 }
 
-function GlobalThemeField({ theme }: { theme: Settings['appearance']['theme'] }): JSX.Element {
+function GlobalThemeField({
+  theme,
+}: {
+  theme: Settings['appearance']['theme']
+}): React.JSX.Element {
   const updateGlobalTheme = useSettingsStore((s) => s.updateGlobalTheme)
   return (
     <div className="settings-section__field">
@@ -91,7 +95,7 @@ function GlobalThemeField({ theme }: { theme: Settings['appearance']['theme'] })
 }
 
 /** Scrollback, the default shell, and whether a new terminal asks for a name. */
-function TerminalFields({ settings }: { settings: Settings }): JSX.Element {
+function TerminalFields({ settings }: { settings: Settings }): React.JSX.Element {
   const updateScrollbackLimit = useSettingsStore((s) => s.updateScrollbackLimit)
   return (
     <>
@@ -115,7 +119,7 @@ function TerminalFields({ settings }: { settings: Settings }): JSX.Element {
   )
 }
 
-function GlobalDefaultShellField({ shell }: { shell: string }): JSX.Element {
+function GlobalDefaultShellField({ shell }: { shell: string }): React.JSX.Element {
   return (
     <div className="settings-section__field">
       <label className="settings-section__label">Default Shell</label>
@@ -132,7 +136,7 @@ function GlobalDefaultShellField({ shell }: { shell: string }): JSX.Element {
   )
 }
 
-function PromptForNameField({ checked }: { checked: boolean }): JSX.Element {
+function PromptForNameField({ checked }: { checked: boolean }): React.JSX.Element {
   const updatePromptForName = useSettingsStore((s) => s.updatePromptForName)
   return (
     <div className="settings-section__field">
@@ -153,7 +157,7 @@ function PromptForNameField({ checked }: { checked: boolean }): JSX.Element {
 }
 
 /** The metrics bar, and how long a quiet session waits before it reads as stale. */
-function InterfaceFields({ settings }: { settings: Settings }): JSX.Element {
+function InterfaceFields({ settings }: { settings: Settings }): React.JSX.Element {
   const updateShowMetricsBar = useSettingsStore((s) => s.updateShowMetricsBar)
   return (
     <>
@@ -179,7 +183,7 @@ function InterfaceFields({ settings }: { settings: Settings }): JSX.Element {
 
 const HIDE_SIDEBAR_LABEL = 'Hide the branch tree on Home'
 
-function HideSidebarOnHomeField({ hide }: { hide: boolean }): JSX.Element {
+function HideSidebarOnHomeField({ hide }: { hide: boolean }): React.JSX.Element {
   const updateHideSidebarOnHome = useSettingsStore((s) => s.updateHideSidebarOnHome)
   return (
     <div className="settings-section__field">
@@ -196,7 +200,7 @@ function HideSidebarOnHomeField({ hide }: { hide: boolean }): JSX.Element {
   )
 }
 
-function HomeLayoutField({ layout }: { layout: HomeLayout }): JSX.Element {
+function HomeLayoutField({ layout }: { layout: HomeLayout }): React.JSX.Element {
   const updateHomeLayout = useSettingsStore((s) => s.updateHomeLayout)
   return (
     <div className="settings-section__field">
@@ -222,7 +226,7 @@ function HomeLayoutField({ layout }: { layout: HomeLayout }): JSX.Element {
   )
 }
 
-function StaleAfterField({ staleAfterMs }: { staleAfterMs: number }): JSX.Element {
+function StaleAfterField({ staleAfterMs }: { staleAfterMs: number }): React.JSX.Element {
   return (
     <div className="settings-section__field">
       <label className="settings-section__label" htmlFor="stale-after-minutes">
@@ -252,7 +256,7 @@ function StaleAfterField({ staleAfterMs }: { staleAfterMs: number }): JSX.Elemen
 }
 
 /** Where worktrees go, and which branches every branch list leaves out. */
-function GitFields({ settings }: { settings: Settings }): JSX.Element {
+function GitFields({ settings }: { settings: Settings }): React.JSX.Element {
   const updateWorktreeBaseDir = useSettingsStore((s) => s.updateWorktreeBaseDir)
   return (
     <>
@@ -275,7 +279,7 @@ function GitFields({ settings }: { settings: Settings }): JSX.Element {
   )
 }
 
-function BranchExcludeField({ patterns }: { patterns: string[] }): JSX.Element {
+function BranchExcludeField({ patterns }: { patterns: string[] }): React.JSX.Element {
   const updateBranchExcludePatterns = useSettingsStore((s) => s.updateBranchExcludePatterns)
   return (
     <div className="settings-section__field">
@@ -310,7 +314,7 @@ interface TargetChecksProps {
 }
 
 /** One checkbox per delivery target; each toggles its target in `checked`. */
-function TargetChecks({ checked, onChange }: TargetChecksProps): JSX.Element {
+function TargetChecks({ checked, onChange }: TargetChecksProps): React.JSX.Element {
   return (
     <div className="settings-section__radio-group">
       {NOTIFICATION_TARGETS.map(({ value, label }) => (
@@ -327,7 +331,7 @@ function TargetChecks({ checked, onChange }: TargetChecksProps): JSX.Element {
   )
 }
 
-function DefaultTargetsField({ settings }: { settings: Settings }): JSX.Element {
+function DefaultTargetsField({ settings }: { settings: Settings }): React.JSX.Element {
   const update = useSettingsStore((s) => s.updateNotificationDefaultTargets)
   return (
     <div className="settings-section__field">
@@ -345,7 +349,7 @@ function DefaultTargetsField({ settings }: { settings: Settings }): JSX.Element 
 }
 
 /** Each core notification's own targets; none checked means the defaults. */
-function OverridesField({ settings }: { settings: Settings }): JSX.Element {
+function OverridesField({ settings }: { settings: Settings }): React.JSX.Element {
   const update = useSettingsStore((s) => s.updateNotificationOverride)
   return (
     <div className="settings-section__field">

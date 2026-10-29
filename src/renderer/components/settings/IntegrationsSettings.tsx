@@ -22,7 +22,11 @@ function statusText(connection: TrackerConnection | undefined): string {
   return `Connected as ${who}`
 }
 
-function ConnectionDot({ connection }: { connection: TrackerConnection | undefined }): JSX.Element {
+function ConnectionDot({
+  connection,
+}: {
+  connection: TrackerConnection | undefined
+}): React.JSX.Element {
   // Shape and text carry the state; the dot only reinforces it, so this stays
   // readable in greyscale (WCAG 1.4.1).
   const state =
@@ -93,7 +97,7 @@ interface ConnectButtonProps {
   onConnect: () => Promise<void>
 }
 
-function ConnectButton({ label, busy, ready, onConnect }: ConnectButtonProps): JSX.Element {
+function ConnectButton({ label, busy, ready, onConnect }: ConnectButtonProps): React.JSX.Element {
   return (
     <button className="ext-btn" disabled={busy || !ready} onClick={() => void onConnect()}>
       {busy ? 'Verifying…' : label}
@@ -120,7 +124,7 @@ function useLinearForm() {
   return { ...state, apiKey, typeKey, email, setEmail, submit }
 }
 
-function LinearForm(): JSX.Element {
+function LinearForm(): React.JSX.Element {
   const form = useLinearForm()
   return (
     <div className="integrations__form">
@@ -155,7 +159,7 @@ function mineText(connection: TrackerConnection | undefined): string {
   return connection?.mine.email ?? ''
 }
 
-function ConnectedPanel({ tracker }: { tracker: TrackerId }): JSX.Element {
+function ConnectedPanel({ tracker }: { tracker: TrackerId }): React.JSX.Element {
   const connection = useIntegrationsStore((s) => s.connectionFor(tracker))
   const [mineValue, setMineValue] = useState(() => mineText(connection))
 
@@ -185,7 +189,7 @@ function saveMine(tracker: TrackerId, connection: TrackerConnection | undefined,
     .setMine(tracker, { kind: 'assignee', email: text.trim() || null })
 }
 
-function ConnectedActions({ tracker }: { tracker: TrackerId }): JSX.Element {
+function ConnectedActions({ tracker }: { tracker: TrackerId }): React.JSX.Element {
   const store = useIntegrationsStore.getState
   return (
     <div className="integrations__actions">
@@ -201,7 +205,7 @@ function ConnectedActions({ tracker }: { tracker: TrackerId }): JSX.Element {
   )
 }
 
-function TrackerRow({ tracker }: { tracker: TrackerId }): JSX.Element {
+function TrackerRow({ tracker }: { tracker: TrackerId }): React.JSX.Element {
   const connection = useIntegrationsStore((s) => s.connectionFor(tracker))
   const connected = connection?.connected === true
 
@@ -218,7 +222,7 @@ function TrackerRow({ tracker }: { tracker: TrackerId }): JSX.Element {
   )
 }
 
-export function IntegrationsSettings(): JSX.Element {
+export function IntegrationsSettings(): React.JSX.Element {
   const { loadConnections, subscribe } = useIntegrationsStore(
     useShallow((s) => ({ loadConnections: s.loadConnections, subscribe: s.subscribe }))
   )

@@ -4,7 +4,7 @@ import { render, screen, act } from '@testing-library/react'
 import { useSurfaceOpen } from '../../../../src/renderer/hooks/useSurfaceOpen'
 import { eventually } from '../../../support/eventually'
 
-function Pane({ name }: { name: string }): JSX.Element {
+function Pane({ name }: { name: string }): React.JSX.Element {
   return <output aria-label={name}>{useSurfaceOpen() ? 'surface open' : 'nothing open'}</output>
 }
 

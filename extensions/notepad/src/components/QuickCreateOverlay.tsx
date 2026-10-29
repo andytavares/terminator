@@ -25,7 +25,7 @@ type CreateKind = 'note' | 'diagram' | 'folder'
 interface TagChipBarProps {
   tags: string[]
   tagInput: string
-  tagInputRef: React.RefObject<HTMLInputElement>
+  tagInputRef: React.RefObject<HTMLInputElement | null>
   onTagInput: (val: string) => void
   onAddTag: (val: string) => void
   onRemoveTag: (tag: string) => void

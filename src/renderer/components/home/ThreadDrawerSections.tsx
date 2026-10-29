@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { type JSX, useState } from 'react'
 import { CircleCheck, CircleX, Clock } from 'lucide-react'
 import { Button, StatusDot, type StatusTone } from '@terminator/extension-ui'
 import { SESSION_ACTIONS } from '../session/session-actions'

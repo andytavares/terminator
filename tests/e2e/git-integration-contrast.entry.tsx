@@ -335,7 +335,7 @@ window.electronAPI = electronApiOf({
   extension: { onSettingsChanged: () => () => {} },
 })
 
-function PrRail(): JSX.Element {
+function PrRail(): React.JSX.Element {
   usePrReviewStore.setState({
     viewedFiles: new Set(['src/main/session/session-types.ts', 'package-lock.json']),
     currentChapterId: 'ch-1',
@@ -364,7 +364,7 @@ function PrRail(): JSX.Element {
   )
 }
 
-function GitView(): JSX.Element {
+function GitView(): React.JSX.Element {
   useGitStore.setState({
     selectedFile: 'src/renderer/App.tsx',
     diffCache: new Map([['src/renderer/App.tsx', diff as never]]),
@@ -404,7 +404,7 @@ function pausedPr(): never {
   } as never
 }
 
-function PausedQueue(): JSX.Element {
+function PausedQueue(): React.JSX.Element {
   usePrReviewStore.setState({ prQueue: [pausedPr()] })
   return (
     <div style={{ height: 400, width: 1100, display: 'flex' }}>
@@ -418,7 +418,7 @@ function PausedQueue(): JSX.Element {
   )
 }
 
-const surfaces: Record<string, () => JSX.Element> = {
+const surfaces: Record<string, () => React.JSX.Element> = {
   'review-footer': () => (
     <ReviewFooter
       previousFileName="math.ts"

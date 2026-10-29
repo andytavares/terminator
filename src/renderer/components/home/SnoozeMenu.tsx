@@ -10,7 +10,7 @@ export interface SnoozeMenuProps {
 }
 
 /** How long to put an ask off: an hour, this afternoon, or tomorrow morning. */
-export function SnoozeMenu(props: SnoozeMenuProps): JSX.Element {
+export function SnoozeMenu(props: SnoozeMenuProps): React.JSX.Element {
   const { now, onPick, onClose } = props
   return (
     <Menu label="Snooze until" onDismiss={onClose} className="snooze-menu">

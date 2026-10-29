@@ -54,7 +54,7 @@ const countingOpen =
     open(sessionId)
   }
 
-export function WallTile(props: Props): JSX.Element {
+export function WallTile(props: Props): React.JSX.Element {
   const { facts, placement } = props
   const onOpen = countingOpen(props.onOpen)
   const location = locationOf(facts)
@@ -101,7 +101,7 @@ interface TileMenuProps {
 }
 
 /** The tile's right-click menu: Add to task… for the branch its terminal is on. */
-function TileMenu({ at, lane, onClose }: TileMenuProps): JSX.Element {
+function TileMenu({ at, lane, onClose }: TileMenuProps): React.JSX.Element {
   const addToTask = {
     label: 'Add to task…',
     onSelect: afterClosing(onClose, () => openAddToTask(lane)),
@@ -132,7 +132,7 @@ function TileCap({
   )
 }
 
-function OpenButton({ name, onOpen }: { name: string; onOpen: () => void }): JSX.Element {
+function OpenButton({ name, onOpen }: { name: string; onOpen: () => void }): React.JSX.Element {
   return (
     <IconButton
       icon={SquareArrowOutUpRight}

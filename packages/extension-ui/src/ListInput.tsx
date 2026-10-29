@@ -35,7 +35,7 @@ export function ListInput({
   placeholder,
   rows = 4,
   className,
-}: ListInputProps): JSX.Element {
+}: ListInputProps): React.JSX.Element {
   const [text, setText] = useState(value.join('\n'))
   const [shown, setShown] = useState(value)
   // A list changed from outside replaces the text, unless the text already says it.

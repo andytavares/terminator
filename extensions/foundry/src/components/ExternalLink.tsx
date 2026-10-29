@@ -12,7 +12,7 @@ export function ExternalLink({
   readonly href: string
   readonly children: React.ReactNode
   readonly className?: string
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <a
       href={href}

@@ -165,7 +165,7 @@ function useEditNoteRequest(
   }
 }
 
-export function TabBar(props: Props): JSX.Element {
+export function TabBar(props: Props): React.JSX.Element {
   const { projectId, onNewTab } = props
   const tabs = useBranchTabs(projectId)
   const factsById: FactsById = new Map(useSessionFacts().map((f) => [f.sessionId, f]))
@@ -197,7 +197,11 @@ export function TabBar(props: Props): JSX.Element {
 }
 
 /** Terminal, then the tabs extensions contribute to a branch. */
-function PrimaryTabs({ activeProjectTabId, projectTabs, onSelectProjectTab }: Props): JSX.Element {
+function PrimaryTabs({
+  activeProjectTabId,
+  projectTabs,
+  onSelectProjectTab,
+}: Props): React.JSX.Element {
   return (
     <div className="tab-bar tab-bar--primary">
       <div
@@ -260,7 +264,7 @@ function dropSessionTab(projectId: string, all: TerminalSession[], drawn: Termin
 
 /** The branch's terminals, in their order, which a drag rearranges. One in its own window has no
  * tab here, and gets its place back when it docks. */
-function SessionTabs(props: SessionTabsProps): JSX.Element {
+function SessionTabs(props: SessionTabsProps): React.JSX.Element {
   const windows = useBreakoutStore((s) => s.windows)
   const all = props.tabs.sessions
   const sessions = all.filter((s) => !windows.has(s.id))
@@ -282,7 +286,7 @@ function SessionTabs(props: SessionTabsProps): JSX.Element {
 
 /** Tabs are scoped to one branch, and switching branches silently swapped the whole row. Say
  * whose terminals these are. */
-function ScopeLabel({ projectId }: { projectId: string }): JSX.Element | null {
+function ScopeLabel({ projectId }: { projectId: string }): React.JSX.Element | null {
   const scopeLabel = useScopeLabel(projectId)
   if (!scopeLabel) return null
   return (
@@ -304,7 +308,7 @@ function useSessionTabClass(sessionId: string, isActive: boolean): string {
   return `tab-bar__tab tab-bar__tab--session${isActive ? ' tab-bar__tab--active' : ''}${dragged ? ' tab-bar__tab--dragging' : ''}${landing ? ' tab-bar__tab--dnd-over' : ''}`
 }
 
-function SessionTab(props: SessionTabProps): JSX.Element {
+function SessionTab(props: SessionTabProps): React.JSX.Element {
   const { projectId, session, editing } = props
   const isActive = session.id === props.tabs.activeId
   const isRenaming = editing.rename.id === session.id
@@ -336,7 +340,7 @@ function SessionTab(props: SessionTabProps): JSX.Element {
   )
 }
 
-export function TabStateIcon({ session }: { session: TerminalSession }): JSX.Element {
+export function TabStateIcon({ session }: { session: TerminalSession }): React.JSX.Element {
   const state = agentStateOf(session)
   const status = statusPresentationForState(state)
   const Icon = STATUS_ICON[status.icon]
@@ -348,7 +352,7 @@ export function TabStateIcon({ session }: { session: TerminalSession }): JSX.Ele
 }
 
 /** The tab's name and its own ticket key, or the editor open on it. */
-function TabLabel({ session, editing, factsById }: SessionTabProps): JSX.Element {
+function TabLabel({ session, editing, factsById }: SessionTabProps): React.JSX.Element {
   if (editing.note.id === session.id) {
     return <NoteInput sessionId={session.id} note={editing.note} />
   }
@@ -469,7 +473,7 @@ function TabMenus({ menus, factsById, onScratchDeactivate, ...rest }: TabMenusPr
 }
 
 /** The context menu for the tab it was opened on; each choice closes it first. */
-function TabCtxMenu({ menus, editing, factsById, sessions }: TabMenusProps): JSX.Element {
+function TabCtxMenu({ menus, editing, factsById, sessions }: TabMenusProps): React.JSX.Element {
   const { x, y, sessionId } = menus.ctxMenu!
   const close = () => menus.setCtxMenu(null)
   const then = (act: () => void) => () => {

@@ -40,7 +40,7 @@ interface UnifiedSidebarProps {
   initialViewId?: string
 }
 
-export function UnifiedSidebar(props: UnifiedSidebarProps): JSX.Element {
+export function UnifiedSidebar(props: UnifiedSidebarProps): React.JSX.Element {
   const { width, sidebarRef, onResizeMouseDown, onResizeDoubleClick } = useSidebarWidth()
   const { data, views, rows, dialogs, links, ctx } = useUnifiedSidebar(props)
   const dismissSurfaceHandlers = useDismissSurfaceOnClick()
@@ -79,7 +79,7 @@ interface ListBodyProps {
 }
 
 /** The repos, the scratch section, and what to say when there is nothing to list. */
-function SidebarListBody({ props, rows, ctx, searchQuery }: ListBodyProps): JSX.Element {
+function SidebarListBody({ props, rows, ctx, searchQuery }: ListBodyProps): React.JSX.Element {
   const { groups, scratch } = rows
   return (
     <div className="unified-sidebar__list">
@@ -113,7 +113,7 @@ interface ResizeHandleProps {
   onDoubleClick: () => void
 }
 
-function ResizeHandle({ onMouseDown, onDoubleClick }: ResizeHandleProps): JSX.Element {
+function ResizeHandle({ onMouseDown, onDoubleClick }: ResizeHandleProps): React.JSX.Element {
   return (
     <div
       className="unified-sidebar__resize-handle"
@@ -153,7 +153,7 @@ interface ControlsProps {
 }
 
 /** Search, then the Filter and Display menus, in the header. */
-function SidebarControls({ views, rows, onAddWorkspace }: ControlsProps): JSX.Element {
+function SidebarControls({ views, rows, onAddWorkspace }: ControlsProps): React.JSX.Element {
   const { view, searchQuery, setSearchQuery, changeActiveView } = views
   return (
     <SidebarHeader

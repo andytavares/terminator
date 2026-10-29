@@ -7,7 +7,7 @@ export function AlertBadge({
 }: {
   count: number
   className?: string
-}): JSX.Element | null {
+}): React.JSX.Element | null {
   if (count <= 0) return null
   return (
     <span

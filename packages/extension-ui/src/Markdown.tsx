@@ -92,7 +92,7 @@ function markdownComponents({ onOpenLink, renderCode, fetchesNothing }: Markdown
 /** The one Markdown renderer: react-markdown with GitHub-flavoured Markdown, and raw HTML parsed
  * then sanitised. A body can come from a pull request or an agent, and this view can run shell
  * commands, so nothing here sets inner HTML. */
-export function Markdown(props: MarkdownProps): JSX.Element {
+export function Markdown(props: MarkdownProps): React.JSX.Element {
   const { children, className, inline, fetchesNothing } = props
   const [rehypePlugins, setRehypePlugins] = useState(htmlPlugins)
   useEffect(() => {

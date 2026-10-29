@@ -6,7 +6,7 @@ import { WorktreesView } from './WorktreesView'
 type GitTab = 'reviews' | 'worktrees'
 
 /** The workspace's Git tab: the review queue, and the local worktrees and branches. */
-export function WorkspaceGitView(props: { repoRoot: string | null }): JSX.Element {
+export function WorkspaceGitView(props: { repoRoot: string | null }): React.JSX.Element {
   const [tab, setTab] = useState<GitTab>('reviews')
   return (
     <Tabs

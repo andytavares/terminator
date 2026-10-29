@@ -6,7 +6,7 @@ interface SidebarSearchProps {
   query: string
   onChange: (value: string) => void
   onClear: () => void
-  inputRef?: React.RefObject<HTMLInputElement>
+  inputRef?: React.RefObject<HTMLInputElement | null>
 }
 
 /** The first character of a search counts as one use; the rest of the typing does not. */
@@ -20,7 +20,7 @@ export function SidebarSearch({
   onChange,
   onClear,
   inputRef,
-}: SidebarSearchProps): JSX.Element {
+}: SidebarSearchProps): React.JSX.Element {
   const internalRef = useRef<HTMLInputElement>(null)
   const ref = inputRef ?? internalRef
 

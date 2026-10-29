@@ -48,7 +48,7 @@ type StatusAnswer = GitStatus | { error: string }
 
 const CONFLICT_HINT = 'Resolve conflicts before staging'
 
-function FileItem(props: FileItemProps): JSX.Element {
+function FileItem(props: FileItemProps): React.JSX.Element {
   const { file, onToggle } = props
   const isConflicted = file.status === 'conflicted'
   const selected = (props.isSelected && ' staging-area__file-row--selected') || ''
@@ -190,7 +190,7 @@ interface StagingSectionsProps {
   item: SectionItem
 }
 
-function StagingSections({ files, setStaged, item }: StagingSectionsProps): JSX.Element {
+function StagingSections({ files, setStaged, item }: StagingSectionsProps): React.JSX.Element {
   const staged = files.filter((f) => f.staged)
   const unstaged = files.filter((f) => !f.staged)
   const stageable = unstaged.filter((f) => f.status !== 'conflicted').map((f) => f.path)
@@ -212,7 +212,7 @@ function StagingSections({ files, setStaged, item }: StagingSectionsProps): JSX.
   )
 }
 
-export function StagingArea(props: StagingAreaProps): JSX.Element {
+export function StagingArea(props: StagingAreaProps): React.JSX.Element {
   const status = useGitStore((s) => s.status)
   const selectedFile = useGitStore((s) => s.selectedFile)
   const setStaged = useStaging(props.repoRoot, props.onStagingChange)

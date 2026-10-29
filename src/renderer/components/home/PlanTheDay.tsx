@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { type JSX, useEffect } from 'react'
 import { Check, ChevronDown, ChevronRight, Clock, Sun } from 'lucide-react'
 import { Button, Checkbox, Kbd } from '@terminator/extension-ui'
 import { useFocusStore } from '../../home/focus-store'

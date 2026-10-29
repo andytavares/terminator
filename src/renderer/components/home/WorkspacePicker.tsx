@@ -27,12 +27,12 @@ function suggestionNote({
   return null
 }
 
-const Swatch = ({ color }: { color: string }): JSX.Element => (
+const Swatch = ({ color }: { color: string }): React.JSX.Element => (
   <span className="workspace-picker__swatch" style={{ background: color }} aria-hidden="true" />
 )
 
 /** Where the work goes: the workspace, shown at the end of the tab row, changed in a popover. */
-export function WorkspacePicker(props: WorkspacePickerProps): JSX.Element {
+export function WorkspacePicker(props: WorkspacePickerProps): React.JSX.Element {
   const { open, onClose } = props
   return (
     <div className="workspace-picker">
@@ -51,7 +51,7 @@ export function WorkspacePicker(props: WorkspacePickerProps): JSX.Element {
   )
 }
 
-function PickerButton({ current, open, onToggle }: WorkspacePickerProps): JSX.Element {
+function PickerButton({ current, open, onToggle }: WorkspacePickerProps): React.JSX.Element {
   return (
     <button
       type="button"
@@ -94,7 +94,7 @@ function choiceKeyHandler({ shown, at, setCursor, onPick }: ChoiceKeys) {
   }
 }
 
-function WorkspaceChoices(props: WorkspacePickerProps): JSX.Element {
+function WorkspaceChoices(props: WorkspacePickerProps): React.JSX.Element {
   const { onPick } = props
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const [filter, setFilter] = useState('')

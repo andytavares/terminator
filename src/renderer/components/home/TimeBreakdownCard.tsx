@@ -53,7 +53,7 @@ function TicketBar({ ticket, measured }: { ticket: TicketTime; measured: readonl
   )
 }
 
-function Legend({ measured }: { measured: readonly TimeSegment[] }): JSX.Element {
+function Legend({ measured }: { measured: readonly TimeSegment[] }): React.JSX.Element {
   return (
     <ul className="ins__legend" aria-label="Legend">
       {measured.map((segment) => (
@@ -71,7 +71,10 @@ interface TimeBreakdownCardProps {
   breakdown: TimeBreakdown
 }
 
-export function TimeBreakdownCard({ chosen, breakdown }: TimeBreakdownCardProps): JSX.Element {
+export function TimeBreakdownCard({
+  chosen,
+  breakdown,
+}: TimeBreakdownCardProps): React.JSX.Element {
   const question = 'Where did the time go?'
   const qualifier = `· tickets merged ${windowQualifier(chosen)}, start to merge`
   const { tickets, measured } = breakdown

@@ -44,7 +44,7 @@ function rememberHeight(surface: Surface, height: number): void {
 
 /** The height the frame's own page last reported; other windows' messages do not count. */
 function useReportedHeight(
-  iframeRef: React.RefObject<HTMLIFrameElement>,
+  iframeRef: React.RefObject<HTMLIFrameElement | null>,
   enabled: boolean
 ): number | null {
   const [height, setHeight] = useState<number | null>(null)
@@ -79,7 +79,7 @@ function useSettled(reported: number | null, enabled: boolean): boolean {
 
 /** A fit=content frame's height: the remembered one until its page settles. Null otherwise. */
 export function useFitContentHeight(
-  iframeRef: React.RefObject<HTMLIFrameElement>,
+  iframeRef: React.RefObject<HTMLIFrameElement | null>,
   surface: Surface,
   enabled: boolean
 ): number | null {

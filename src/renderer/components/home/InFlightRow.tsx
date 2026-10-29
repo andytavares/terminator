@@ -32,7 +32,7 @@ export function RenameField({
   thread,
   onRename,
   onCancelRename,
-}: Omit<WorkCellProps, 'renaming'>): JSX.Element {
+}: Omit<WorkCellProps, 'renaming'>): React.JSX.Element {
   return (
     <input
       className="desk-tr__rename"
@@ -60,7 +60,12 @@ function detailLineOf(thread: WorkThread): string {
   return [threadPlaceOf(thread), thread.nowLine].filter((line) => line !== '').join(' · ')
 }
 
-function WorkCell({ thread, renaming, onRename, onCancelRename }: WorkCellProps): JSX.Element {
+function WorkCell({
+  thread,
+  renaming,
+  onRename,
+  onCancelRename,
+}: WorkCellProps): React.JSX.Element {
   const detail = detailLineOf(thread)
   return (
     <div className="desk-tr__work">
@@ -85,7 +90,7 @@ function WorkCell({ thread, renaming, onRename, onCancelRename }: WorkCellProps)
   )
 }
 
-function AgentsCell({ thread }: { thread: WorkThread }): JSX.Element {
+function AgentsCell({ thread }: { thread: WorkThread }): React.JSX.Element {
   const live = thread.sessions.filter((s) => s.state === 'working' || s.state === 'awaiting-input')
   return (
     <div className="desk-tr__agents">
@@ -101,7 +106,7 @@ function AgentsCell({ thread }: { thread: WorkThread }): JSX.Element {
   )
 }
 
-function PullRequestCell({ thread }: { thread: WorkThread }): JSX.Element {
+function PullRequestCell({ thread }: { thread: WorkThread }): React.JSX.Element {
   const chip = thread.prChip
   if (!chip) return <Chip>{isOrder(thread) ? 'none yet' : 'no pull request'}</Chip>
   const icon = { bad: <CircleX aria-hidden="true" />, good: <CircleCheck aria-hidden="true" /> }
@@ -134,7 +139,7 @@ interface RowCellsProps {
 }
 
 /** The row's cells and its menu: work, state, agents, pull request, age. */
-function RowCells({ thread, now, rename, workMenu }: RowCellsProps): JSX.Element {
+function RowCells({ thread, now, rename, workMenu }: RowCellsProps): React.JSX.Element {
   return (
     <>
       <WorkCell
@@ -155,7 +160,7 @@ function RowCells({ thread, now, rename, workMenu }: RowCellsProps): JSX.Element
 }
 
 /** One piece of work on the Desk; pressing it, or Enter, opens its drawer. */
-export function InFlightRow({ thread, now, selected }: InFlightRowProps): JSX.Element {
+export function InFlightRow({ thread, now, selected }: InFlightRowProps): React.JSX.Element {
   const openThread = useDeskSelection((s) => s.openThread)
   const rename = useTitleRename(thread)
   const workMenu = useWorkMenu()

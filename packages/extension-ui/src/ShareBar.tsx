@@ -17,7 +17,7 @@ export interface ShareBarProps {
 }
 
 /** One horizontal bar split into labeled parts: how a total divides. */
-export function ShareBar({ label, shares }: ShareBarProps): JSX.Element | null {
+export function ShareBar({ label, shares }: ShareBarProps): React.JSX.Element | null {
   const parts = shares.filter((share) => share.value > 0)
   const total = parts.reduce((sum, share) => sum + share.value, 0)
   if (total === 0) return null

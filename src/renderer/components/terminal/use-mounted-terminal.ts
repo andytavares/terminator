@@ -4,7 +4,7 @@ import { useSessionStore } from '../../stores/session.store'
 
 /** Puts the session's xterm in the container while the component is mounted. */
 export function useMountedTerminal(
-  containerRef: React.RefObject<HTMLDivElement>,
+  containerRef: React.RefObject<HTMLDivElement | null>,
   sessionId: string
 ): void {
   useLayoutEffect(() => {

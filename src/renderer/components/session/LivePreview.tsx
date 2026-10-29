@@ -13,7 +13,7 @@ interface Props {
 
 /** What stands in for the preview of a terminal that lives in its own window: pulling its element
  * out of that window would blank it, so this shows the last line it printed and a way to it. */
-function InOwnWindow({ sessionId, className }: Props): JSX.Element {
+function InOwnWindow({ sessionId, className }: Props): React.JSX.Element {
   const latestLine = useSessionStore((s) => s.sessions.get(sessionId)?.latestLine)
   return (
     <div className={`live-preview-window${className ? ` ${className}` : ''}`}>
@@ -30,7 +30,7 @@ function InOwnWindow({ sessionId, className }: Props): JSX.Element {
 }
 
 /** A session's live terminal in a box, or where to find it when it has a window of its own. */
-export function LivePreview({ sessionId, className }: Props): JSX.Element {
+export function LivePreview({ sessionId, className }: Props): React.JSX.Element {
   const isBrokenOut = useBreakoutStore((s) => s.windows.has(sessionId))
   return isBrokenOut ? (
     <InOwnWindow sessionId={sessionId} className={className} />
@@ -46,7 +46,7 @@ export function LivePreview({ sessionId, className }: Props): JSX.Element {
  * must never be re-parented or remounted while the session is the same: doing
  * so tears the live terminal out. Only `sessionId` re-runs the effect.
  */
-function MountedPreview({ sessionId, className }: Props): JSX.Element {
+function MountedPreview({ sessionId, className }: Props): React.JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
   const getTerminalInstance = useSessionStore((s) => s.getTerminalInstance)
 

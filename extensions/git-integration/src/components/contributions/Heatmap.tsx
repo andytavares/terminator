@@ -14,7 +14,10 @@ const DAY_FORMAT = new Intl.DateTimeFormat('en-US', {
 const MONTH_FORMAT = new Intl.DateTimeFormat('en-US', { month: 'short' })
 
 /** The 53-week calendar: month labels above, Mon/Wed/Fri at the left, future days not drawn. */
-export function Heatmap(props: { weeks: ContributionsDay[][] | null; total: number }): JSX.Element {
+export function Heatmap(props: {
+  weeks: ContributionsDay[][] | null
+  total: number
+}): React.JSX.Element {
   return (
     <div>
       <div className="ct-map-head">
@@ -27,7 +30,7 @@ export function Heatmap(props: { weeks: ContributionsDay[][] | null; total: numb
   )
 }
 
-function HeatmapGrid(props: { weeks: ContributionsDay[][]; total: number }): JSX.Element {
+function HeatmapGrid(props: { weeks: ContributionsDay[][]; total: number }): React.JSX.Element {
   return (
     <div
       className="ct-heatmap"
@@ -49,7 +52,7 @@ function HeatmapGrid(props: { weeks: ContributionsDay[][]; total: number }): JSX
   )
 }
 
-function Legend(): JSX.Element {
+function Legend(): React.JSX.Element {
   return (
     <span className="ct-legend">
       Less
@@ -61,7 +64,7 @@ function Legend(): JSX.Element {
   )
 }
 
-function WeekdayColumn(): JSX.Element {
+function WeekdayColumn(): React.JSX.Element {
   return (
     <div className="ct-weekdays" aria-hidden="true">
       {WEEKDAY_LABELS.map((label, row) => (
@@ -72,7 +75,7 @@ function WeekdayColumn(): JSX.Element {
 }
 
 /** One month name above the first column that starts in it, one week's pitch per column. */
-function MonthRow({ weeks }: { weeks: ContributionsDay[][] }): JSX.Element {
+function MonthRow({ weeks }: { weeks: ContributionsDay[][] }): React.JSX.Element {
   return (
     <div className="ct-months" aria-hidden="true">
       {monthLabels(weeks).map((month) => (
@@ -85,7 +88,7 @@ function MonthRow({ weeks }: { weeks: ContributionsDay[][] }): JSX.Element {
 }
 
 /** A week column; the first row's month joins the label row above when it changes. */
-function WeekColumn(props: { week: ContributionsDay[] }): JSX.Element {
+function WeekColumn(props: { week: ContributionsDay[] }): React.JSX.Element {
   return (
     <div className="ct-week">
       {props.week.map((day) => (

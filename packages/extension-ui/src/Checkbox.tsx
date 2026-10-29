@@ -10,7 +10,7 @@ export interface CheckboxProps {
   onChange?: (checked: boolean) => void
 }
 
-export function Checkbox({ checked, label, onChange }: CheckboxProps): JSX.Element {
+export function Checkbox({ checked, label, onChange }: CheckboxProps): React.JSX.Element {
   const tick = checked ? <Check strokeWidth={3} aria-hidden="true" /> : null
   if (!onChange) {
     return (

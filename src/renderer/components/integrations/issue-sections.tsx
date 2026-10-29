@@ -21,7 +21,11 @@ interface IssueTagsProps {
 }
 
 /** State, assignee, branch and labels as chips, then when the issue last moved. */
-export function IssueTags({ issue, tracker, showState = false }: IssueTagsProps): JSX.Element {
+export function IssueTags({
+  issue,
+  tracker,
+  showState = false,
+}: IssueTagsProps): React.JSX.Element {
   return (
     <div className="issue-drawer__meta">
       {showState && <span className="issue-drawer__tag">{issue.state.name}</span>}
@@ -46,7 +50,7 @@ export function IssueTags({ issue, tracker, showState = false }: IssueTagsProps)
   )
 }
 
-export function IssueDescriptionSection({ issue }: { issue: Issue }): JSX.Element {
+export function IssueDescriptionSection({ issue }: { issue: Issue }): React.JSX.Element {
   return (
     <section className="issue-drawer__section">
       {issue.description.trim().length > 0 ? (
@@ -60,7 +64,7 @@ export function IssueDescriptionSection({ issue }: { issue: Issue }): JSX.Elemen
   )
 }
 
-export function CommentsSection({ issue }: { issue: Issue }): JSX.Element {
+export function CommentsSection({ issue }: { issue: Issue }): React.JSX.Element {
   return (
     <section className="issue-drawer__section">
       <h3 className="issue-drawer__heading">

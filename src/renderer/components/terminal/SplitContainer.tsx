@@ -40,7 +40,7 @@ function trackDividerDrag(
 
 /** Dragging the divider moves it, reporting the new ratio for this split. */
 function useDividerDrag(
-  containerRef: React.RefObject<HTMLDivElement>,
+  containerRef: React.RefObject<HTMLDivElement | null>,
   { splitId, direction, onRatioChange }: Pick<Props, 'splitId' | 'direction' | 'onRatioChange'>
 ): (e: React.MouseEvent) => void {
   const isVertical = direction === 'vertical'
@@ -61,7 +61,7 @@ export function SplitContainer({
   ratio,
   onRatioChange,
   children,
-}: Props): JSX.Element {
+}: Props): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const handleDividerMouseDown = useDividerDrag(containerRef, { splitId, direction, onRatioChange })
 

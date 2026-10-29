@@ -17,7 +17,7 @@ const LEVEL_LABEL: Record<LogLevel, string> = {
 }
 
 /** Escape anywhere in the window closes the log. */
-export function LogWindow({ onClose }: Props): JSX.Element {
+export function LogWindow({ onClose }: Props): React.JSX.Element {
   const { entries, clear } = useLogStore(
     useShallow((s) => ({ entries: s.entries, clear: s.clear }))
   )

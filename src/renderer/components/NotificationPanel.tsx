@@ -7,7 +7,7 @@ import { useNotificationStore, type Notification } from '../stores/notification.
 import { recordUse } from '../usage/record'
 import './NotificationPanel.css'
 
-function TypeIcon({ type }: { type: string }): JSX.Element {
+function TypeIcon({ type }: { type: string }): React.JSX.Element {
   const props = { size: 13, className: 'notif-item__type-icon' }
   switch (type) {
     case 'success':
@@ -73,7 +73,7 @@ function NotificationItem({
 }: {
   notification: Notification
   onNavigate: () => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { canOpen, handleClick, handleDismiss, handleAction } = useNotificationActions(
     notification,
     onNavigate
@@ -98,7 +98,7 @@ function NotificationBody({
 }: {
   notification: Notification
   onAction: (e: React.MouseEvent, actionId: string) => Promise<void>
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <div className="notif-item__body">
       <div className="notif-item__title">{notification.title}</div>
@@ -124,7 +124,7 @@ function NotificationActions({
 }: {
   actions: NonNullable<Notification['actions']>
   onAction: (e: React.MouseEvent, actionId: string) => Promise<void>
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <div className="notif-item__actions">
       {actions.map((action) => (
@@ -140,7 +140,7 @@ function NotificationActions({
   )
 }
 
-function NotificationPanelInner(): JSX.Element {
+function NotificationPanelInner(): React.JSX.Element {
   const { closePanel, notifications, markAllRead, clearAll } = useNotificationStore(
     useShallow((s) => ({
       closePanel: s.closePanel,
@@ -196,7 +196,7 @@ function NotificationList({
 }: {
   notifications: Notification[]
   onNavigate: () => void
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <div className="notif-panel__list">
       {notifications.length === 0 ? (
@@ -213,7 +213,7 @@ function NotificationList({
   )
 }
 
-export function NotificationPanel(): JSX.Element | null {
+export function NotificationPanel(): React.JSX.Element | null {
   const panelOpen = useNotificationStore((s) => s.panelOpen)
   if (!panelOpen) return null
   return <NotificationPanelInner />

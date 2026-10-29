@@ -75,7 +75,7 @@ function swapTerminal(
 
 /** Single-pane mode: mounts the active terminal in the container, unmounting the one before. */
 function useSinglePaneMount(
-  containerRef: React.RefObject<HTMLDivElement>,
+  containerRef: React.RefObject<HTMLDivElement | null>,
   activeSessionId: string | null,
   layout: PaneNode | null
 ): void {
@@ -150,7 +150,7 @@ function useRefocusActive(activeSessionId: string | null): () => void {
   return refocusActive
 }
 
-export function TerminalPane({ projectId }: Props): JSX.Element {
+export function TerminalPane({ projectId }: Props): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const pane = usePaneState(projectId)
   const { activeSessionId, layout, shownSessionId } = pane
@@ -177,7 +177,7 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
 }
 
 /** No tab yet: a prompt to open one, or why the last one would not open. */
-function EmptyTerminalPane({ projectId }: Props): JSX.Element {
+function EmptyTerminalPane({ projectId }: Props): React.JSX.Element {
   const openError = useTerminalOpenErrorStore((s) => s.errors[projectId])
   const retryOpen = useTerminalOpenErrorStore((s) => s.retry)
   return (
@@ -199,7 +199,7 @@ function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
 }
 
 interface SingleTerminalProps {
-  containerRef: React.RefObject<HTMLDivElement>
+  containerRef: React.RefObject<HTMLDivElement | null>
   activeSessionId: string | null
   refocusActive: () => void
 }
@@ -251,7 +251,7 @@ function renderNode(
   node: PaneNode,
   projectId: string,
   onRatioChange: (splitId: string, ratio: number) => void
-): JSX.Element {
+): React.JSX.Element {
   if (node.type === 'leaf') {
     return <LeafPane key={node.sessionId} sessionId={node.sessionId} projectId={projectId} />
   }

@@ -119,7 +119,7 @@ interface GridProps {
   readonly onOpen: (order: FactoryOrderRow) => void
 }
 
-function HallGrid({ rows, onOpen }: GridProps): JSX.Element {
+function HallGrid({ rows, onOpen }: GridProps): React.JSX.Element {
   return (
     <div className="fdry-hall-grid">
       {rows.map((row) => (
@@ -212,7 +212,7 @@ function useDock() {
 
 type Dock = ReturnType<typeof useDock>
 
-export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {
+export function FactorySite({ onOpen }: FactorySiteProps): React.JSX.Element {
   const { rows, window_, setWindow, metrics } = useSiteRecords()
   const dock = useDock()
   return (

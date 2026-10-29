@@ -28,7 +28,7 @@ playwright-report/
 # Forge install-time rollback snapshots — not product code
 .forge-backups/
 *.tsbuildinfo
-.vitest-reports/
+.vitest/
 storybook-static/
 
 # CI test-result files (ci.yml JUnit, stability-sweep.yml reports)

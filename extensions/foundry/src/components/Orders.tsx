@@ -65,7 +65,7 @@ export interface OrdersProps {
   readonly openOrderId?: string | null
 }
 
-export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps): JSX.Element {
+export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps): React.JSX.Element {
   const [open, setOpen] = useOpenOrder(openOrderId)
   const [from, setFrom] = useFrom(focusIdeaSignal)
   const [busy, setBusy] = useState(false)

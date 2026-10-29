@@ -23,7 +23,7 @@ function moveBetweenItems(event: React.KeyboardEvent<HTMLDivElement>): void {
 
 /** A list of actions on a popover: Escape or an outside click closes it and focus returns. Arrow
  * keys move between its `MenuItem`s (or any child with a `menuitem*` role); opens on the first. */
-export function Menu({ className, children, ...popover }: MenuProps): JSX.Element {
+export function Menu({ className, children, ...popover }: MenuProps): React.JSX.Element {
   return (
     <Popover
       {...popover}
@@ -44,7 +44,12 @@ export interface MenuItemProps {
   children: React.ReactNode
 }
 
-export function MenuItem({ onSelect, danger, className, children }: MenuItemProps): JSX.Element {
+export function MenuItem({
+  onSelect,
+  danger,
+  className,
+  children,
+}: MenuItemProps): React.JSX.Element {
   const classes = ['tmui-menu__item', danger && 'tmui-menu__item--danger', className]
   return (
     <button

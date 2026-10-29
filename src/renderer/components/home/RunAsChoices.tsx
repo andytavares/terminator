@@ -10,7 +10,7 @@ interface RunAsChoicesProps {
 }
 
 /** The "Run it as" radio group: Claude agent, Terminal only, and each extension's option. */
-export function RunAsChoices({ options, runAs, onPick }: RunAsChoicesProps): JSX.Element {
+export function RunAsChoices({ options, runAs, onPick }: RunAsChoicesProps): React.JSX.Element {
   return (
     <SegmentedControl
       label="Run it as"

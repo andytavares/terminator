@@ -22,7 +22,11 @@ function pulseCounts(desk: Pick<DeskState, 'asks' | 'threads'>): Record<TaskStat
 }
 
 /** The five states as counts, the empty ones left out; each count narrows Home to its state. */
-export function PulseLine({ desk }: { desk: Pick<DeskState, 'asks' | 'threads'> }): JSX.Element {
+export function PulseLine({
+  desk,
+}: {
+  desk: Pick<DeskState, 'asks' | 'threads'>
+}): React.JSX.Element {
   const pressed = useDeskFilter((s) => s.taskState)
   const setTaskState = useDeskFilter((s) => s.setTaskState)
   const counts = pulseCounts(desk)

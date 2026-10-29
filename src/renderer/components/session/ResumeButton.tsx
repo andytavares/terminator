@@ -17,7 +17,7 @@ interface Props {
  * so instead, because an operator who remembers working here needs to know it
  * cannot be picked up — an absent button says nothing at all.
  */
-export function ResumeButton({ facts, onResume }: Props): JSX.Element | null {
+export function ResumeButton({ facts, onResume }: Props): React.JSX.Element | null {
   if (planResume(facts) !== null) {
     return (
       <button
