@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Dialog } from '@terminator/extension-ui'
+import type { Extension } from '../../shared/types/index'
 import { recordUse } from '../usage/record'
 import './AboutDialog.css'
 
@@ -35,6 +36,18 @@ function useAppInfo(): { info: AppInfo | null; dbStatus: DbStatus | null } {
   return { info, dbStatus }
 }
 
+/** The installed extensions; none when the list cannot be read. */
+function useExtensions(): Extension[] {
+  const [extensions, setExtensions] = useState<Extension[]>([])
+  useEffect(() => {
+    window.electronAPI.extension
+      .list()
+      .then((result) => setExtensions(result.extensions))
+      .catch(() => {})
+  }, [])
+  return extensions
+}
+
 function dbStatusText(dbStatus: DbStatus | null): string {
   if (dbStatus === null) return '—'
   return dbStatus.ok ? 'OK' : `Error — ${dbStatus.message ?? 'unknown'}`
@@ -51,6 +64,7 @@ function InfoRow({ label, value }: { label: string; value: string | undefined })
 
 export function AboutDialog({ onClose }: Props) {
   const { info, dbStatus } = useAppInfo()
+  const extensions = useExtensions()
   useEffect(() => recordUse('core.about', 'shown'), [])
 
   return (
@@ -73,6 +87,21 @@ export function AboutDialog({ onClose }: Props) {
           <InfoRow label="Platform" value={info?.platform} />
           <InfoRow label="DB" value={dbStatusText(dbStatus)} />
         </dl>
+
+        {extensions.length > 0 && (
+          <>
+            <h3 className="about-dialog__section">Extensions</h3>
+            <dl className="about-dialog__info">
+              {extensions.map((extension) => (
+                <InfoRow
+                  key={extension.id}
+                  label={extension.name}
+                  value={`v${extension.version}`}
+                />
+              ))}
+            </dl>
+          </>
+        )}
       </div>
     </Dialog>
   )

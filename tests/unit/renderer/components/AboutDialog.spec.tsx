@@ -8,12 +8,18 @@ import { pressOutside } from '../../../support/modal'
 
 const mockGetInfo = vi.fn<ElectronAPI['app']['getInfo']>()
 const mockDbHealth = vi.fn<ElectronAPI['db']['health']>()
+const mockExtensionList = vi.fn<ElectronAPI['extension']['list']>()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  installElectronApi({ app: { getInfo: mockGetInfo }, db: { health: mockDbHealth } })
+  installElectronApi({
+    app: { getInfo: mockGetInfo },
+    db: { health: mockDbHealth },
+    extension: { list: mockExtensionList },
+  })
 
   mockDbHealth.mockResolvedValue({ ok: true })
+  mockExtensionList.mockResolvedValue({ extensions: [] })
   mockGetInfo.mockResolvedValue({
     appName: 'Terminator',
     version: '1.2.3',
@@ -58,6 +64,34 @@ describe('AboutDialog', () => {
     await screen.findByRole('dialog')
     pressOutside(screen.getByRole('dialog'))
     expect(onClose).toHaveBeenCalled()
+  })
+})
+
+describe('AboutDialog — extension versions', () => {
+  const extension = (name: string, version: string) => ({
+    id: `terminator.${name.toLowerCase()}`,
+    name,
+    version,
+    description: '',
+    entryPoint: 'src/index.js',
+    status: 'enabled' as const,
+    installedAt: '2026-10-29T12:00:00.000Z',
+  })
+
+  it('lists each installed extension with its version', async () => {
+    mockExtensionList.mockResolvedValue({
+      extensions: [extension('Foundry', '0.1.4'), extension('Notepad', '0.1.0')],
+    })
+    render(<AboutDialog onClose={vi.fn()} />)
+    expect((await screen.findByText('Foundry')).nextElementSibling!.textContent).toBe('v0.1.4')
+    expect(screen.getByText('Notepad').nextElementSibling!.textContent).toBe('v0.1.0')
+  })
+
+  it('shows no extensions section when the list cannot be read', async () => {
+    mockExtensionList.mockRejectedValue(new Error('IPC gone'))
+    render(<AboutDialog onClose={vi.fn()} />)
+    await screen.findByText('OK')
+    expect(screen.queryByText('Extensions')).toBeNull()
   })
 })
 
