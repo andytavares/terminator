@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Dialog } from '@terminator/extension-ui'
+import type { Extension } from '../../shared/types/index'
 import { recordUse } from '../usage/record'
 import './AboutDialog.css'
 
@@ -35,6 +36,18 @@ function useAppInfo(): { info: AppInfo | null; dbStatus: DbStatus | null } {
   return { info, dbStatus }
 }
 
+/** The installed extensions; none when the list cannot be read. */
+function useExtensions(): Extension[] {
+  const [extensions, setExtensions] = useState<Extension[]>([])
+  useEffect(() => {
+    window.electronAPI.extension
+      .list()
+      .then((result) => setExtensions(result.extensions))
+      .catch(() => {})
+  }, [])
+  return extensions
+}
+
 function dbStatusText(dbStatus: DbStatus | null): string {
   if (dbStatus === null) return '—'
   return dbStatus.ok ? 'OK' : `Error — ${dbStatus.message ?? 'unknown'}`
@@ -46,6 +59,22 @@ function InfoRow({ label, value }: { label: string; value: string | undefined })
       <dt>{label}</dt>
       <dd>{value ?? '—'}</dd>
     </div>
+  )
+}
+
+/** Each installed extension's version, so a release's extension bumps are visible. */
+function ExtensionVersions() {
+  const extensions = useExtensions()
+  if (extensions.length === 0) return null
+  return (
+    <>
+      <h3 className="about-dialog__section">Extensions</h3>
+      <dl className="about-dialog__info">
+        {extensions.map((extension) => (
+          <InfoRow key={extension.id} label={extension.name} value={`v${extension.version}`} />
+        ))}
+      </dl>
+    </>
   )
 }
 
@@ -73,6 +102,8 @@ export function AboutDialog({ onClose }: Props) {
           <InfoRow label="Platform" value={info?.platform} />
           <InfoRow label="DB" value={dbStatusText(dbStatus)} />
         </dl>
+
+        <ExtensionVersions />
       </div>
     </Dialog>
   )
