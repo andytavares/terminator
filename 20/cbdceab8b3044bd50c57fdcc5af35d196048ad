@@ -1,0 +1,20 @@
+scripts/foundry-canary.mjs
+  s_5be9416d40ccd9::t_df6db09c262cf7 283-285
+  s_5be9416d40ccd9::t_1881de39161183 336-344,411-412
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "20cbdceab8b3044bd50c57fdcc5af35d196048ad",
+  "prompts": {},
+  "sessions": {
+    "s_5be9416d40ccd9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc1b6749-e669-4e1d-905d-6d8e2937d16b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
