@@ -413,6 +413,39 @@ describe('proveEnvironment checkout', () => {
   })
 })
 
+// An install empties the folder it installs into. Through a borrowed link that folder is the
+// origin's own: TAV-20's base check emptied the operator's node_modules this way.
+describe("proveEnvironment and the origin's installed dependencies", () => {
+  it('prepares a checkout that holds no link into the origin, so the origin keeps its install', async () => {
+    fs.writeFileSync(path.join(repo, '.gitignore'), 'node_modules\n')
+    await gitAt(repo, 'add', '-A')
+    await gitAt(repo, 'commit', '-q', '-m', 'ignore installs')
+    fs.mkdirSync(path.join(repo, 'node_modules', 'left-pad'), { recursive: true })
+    const order = orderOn(repo)
+    const environment = { ...order.context.environment, prepare: 'npm ci', share: ['node_modules'] }
+    const linkedAtPrepare: boolean[] = []
+    const installs: BaselineDeps['runCommand'] = async ({ command, worktreePath }) => {
+      if (command !== 'npm ci') return 0
+      const installed = path.join(worktreePath, 'node_modules')
+      linkedAtPrepare.push(
+        fs.lstatSync(installed, { throwIfNoEntry: false })?.isSymbolicLink() ?? false
+      )
+      if (fs.existsSync(installed)) {
+        for (const entry of fs.readdirSync(installed))
+          fs.rmSync(path.join(installed, entry), { recursive: true })
+      }
+      return 0
+    }
+    const h = harness()
+    await proveEnvironment(
+      { ...order, context: { ...order.context, environment } },
+      { ...h.deps, runCommand: installs }
+    )
+    expect(linkedAtPrepare).toEqual([false])
+    expect(fs.existsSync(path.join(repo, 'node_modules', 'left-pad'))).toBe(true)
+  })
+})
+
 describe('proveEnvironment when nothing could be measured', () => {
   it('is failing, not proven, when every step did not run', async () => {
     const h = harness({ exitFor: () => null })

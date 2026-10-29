@@ -158,6 +158,10 @@ interface Pass {
 async function runSteps(proof: Proof, checkout: Checkout, steps: LadderStep[]): Promise<Pass> {
   const pass: Pass = { steps: [], logs: {} }
   for (const step of steps) {
+    // An install empties the folder it installs into; through a borrowed link that is the origin's.
+    if (step.name === PREPARE_STEP) {
+      await unlinkBorrowedDependencies(checkout, { exec: proof.deps.exec, root: proof.deps.root })
+    }
     const logPath = logPathFor(proof, step.name)
     const outcome = await climb([step], (ran) =>
       runOnBase(proof, checkout, {

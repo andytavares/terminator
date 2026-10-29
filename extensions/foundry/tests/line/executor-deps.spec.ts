@@ -465,6 +465,28 @@ describe('preparing a lane checkout', () => {
   })
 })
 
+describe("preparing a lane checkout and the origin's installed dependencies", () => {
+  it('prepares a checkout that holds no link into the origin', async () => {
+    fs.writeFileSync(path.join(repo, '.gitignore'), 'node_modules\n')
+    await gitAt(repo, 'add', '-A')
+    await gitAt(repo, 'commit', '-q', '-m', 'ignore installs')
+    fs.mkdirSync(path.join(repo, 'node_modules', 'left-pad'), { recursive: true })
+    const linkedAtPrepare: boolean[] = []
+    runner.runCommand.mockImplementation(async (...args: unknown[]) => {
+      const { worktreePath } = args[0] as { worktreePath: string }
+      const installed = path.join(worktreePath, 'node_modules')
+      linkedAtPrepare.push(
+        fs.lstatSync(installed, { throwIfNoEntry: false })?.isSymbolicLink() ?? false
+      )
+      return 0
+    })
+    const environment = { ...order.context.environment, prepare: 'npm ci', share: ['node_modules'] }
+    const sharing = { ...order, context: { ...order.context, environment } }
+    await buildExecutorDeps(host.api, { root, order: sharing, recipe, graph })
+    expect(linkedAtPrepare).toEqual([false])
+  })
+})
+
 describe('a checkout that could not be prepared', () => {
   it('records the exit code of a prepare that failed, and measures no check in that lane', async () => {
     runner.runCommand.mockResolvedValueOnce(2)
