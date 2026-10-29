@@ -28,6 +28,8 @@ export interface StartedRun {
   readonly sessionId: string
   /** Null when the run produced no exit status — "not measured", not a failure. */
   readonly exitCode: number | null
+  /** Why the agent could not start, in its own words. Set only when it never ran. */
+  readonly notStarted?: string
   /**
    * Where this node's own turn starts in the lane's transcript, in bytes.
    *

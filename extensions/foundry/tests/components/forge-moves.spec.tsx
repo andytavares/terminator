@@ -187,6 +187,91 @@ describe('a refused turn, from the row that failed', () => {
   })
 })
 
+const NOT_STARTED = {
+  kind: 'not-started',
+  at: '2026-09-09T19:33:21Z',
+  actor: 'architect',
+  reason: 'Mode dontAsk is not available in this session',
+}
+
+/** A draft with criteria and no units: nothing was ever drafted. */
+function orderWithNoPlan(): WorkOrder {
+  const order = compilableOrder()
+  return { ...order, plan: { ...order.plan, units: [] } }
+}
+
+describe('an agent Claude could not start', () => {
+  it('shows one message, with Try again and Copy the error and nothing about a refusal', async () => {
+    mountForgeOver(orderWithNoPlan(), { extra: { intake: NOT_STARTED } })
+    const shown = await strip()
+    expect(within(shown).getByText('Claude could not start the architect.')).toBeTruthy()
+    expect(shown.textContent).toContain('Claude said: "Mode dontAsk is not available')
+    expect(within(shown).getByRole('button', { name: 'Try again' })).toBeTruthy()
+    expect(within(shown).getByRole('button', { name: 'Copy the error' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Tell the architect what was wrong' })).toBeNull()
+    expect(document.body.textContent).not.toMatch(/was refused|ended before it started/)
+  })
+})
+
+describe('the moves out of an agent Claude could not start', () => {
+  it('asks again with the same request from Try again, with no error line in the footer', async () => {
+    const order = orderWithNoPlan()
+    mountForgeOver(order, {
+      extra: { intake: NOT_STARTED },
+      answers: {
+        'foundry:order.converge': () => ({
+          order,
+          compile: compileOrder(order),
+          environment: PROVEN_ENVIRONMENT,
+          intake: NOT_STARTED,
+          error: 'Claude did not say why.',
+        }),
+      },
+    })
+    fireEvent.click(await within(await strip()).findByRole('button', { name: 'Try again' }))
+    await waitFor(() =>
+      expect(payloadsSentOn(invoke, 'foundry:order.converge')).toEqual([{ id: 'WO-1' }])
+    )
+    expect(document.querySelector('.fdry-problem')).toBeNull()
+  })
+
+  it("copies Claude's reason from Copy the error", async () => {
+    const writeText = vi.fn(async () => undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    mountForgeOver(orderWithNoPlan(), { extra: { intake: NOT_STARTED } })
+    fireEvent.click(await within(await strip()).findByRole('button', { name: 'Copy the error' }))
+    expect(writeText).toHaveBeenCalledWith(NOT_STARTED.reason)
+  })
+})
+
+describe('Try again after a red team that could not start', () => {
+  it('picks the loop up from Try again when the red team could not start, with no new draft', async () => {
+    const order = orderWithNoPlan()
+    mountForgeOver(order, {
+      extra: { intake: { ...NOT_STARTED, actor: 'red team' } },
+      answers: {
+        'foundry:order.resume': () => ({ order, compile: compileOrder(order) }),
+      },
+    })
+    fireEvent.click(await within(await strip()).findByRole('button', { name: 'Try again' }))
+    await waitFor(() =>
+      expect(payloadsSentOn(invoke, 'foundry:order.resume')).toEqual([{ id: 'WO-1' }])
+    )
+    expect(payloadsSentOn(invoke, 'foundry:order.converge')).toEqual([])
+  })
+})
+
+describe('an order with no plan yet', () => {
+  it('locks Next: Red team and reads coverage as waiting', async () => {
+    mountForgeOver(orderWithNoPlan(), { extra: { intake: NOT_STARTED } })
+    const next = await screen.findByRole('button', { name: /Next: Red team/ })
+    expect(next.getAttribute('aria-disabled')).toBe('true')
+    expect(document.body.textContent).toContain('Waits for a plan')
+    await openForgeStep('Hand off')
+    expect(screen.queryByRole('button', { name: 'Ask for the gap to be closed' })).toBeNull()
+  })
+})
+
 /** Hands the order off, with compile answering `committed` to the agreeing call. */
 async function handOffWith(committed: unknown) {
   const shown = compilableOrder()

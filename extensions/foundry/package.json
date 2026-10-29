@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "5.104.2",
-    "@terminator/extension-sdk": "6.1.0",
+    "@terminator/extension-sdk": "6.2.0",
     "@terminator/extension-ui": "1.0.0",
     "js-yaml": "5.4.3",
     "lucide-react": "1.21.0",

@@ -2769,6 +2769,7 @@ describe('a failed check pushes back on the builder', () => {
   describe('command steps', commandStepsTests)
   describe('reworking', executorReworkingTests)
   describe('used-up reworks', usedUpReworksTests)
+  describe('an agent that could not start', agentThatCouldNotStartTests)
   describe('unknown commands', unknownCommandsTests)
   describe('slash commands stay with agents', slashCommandsStayWithAgentsTests)
 })
@@ -2822,6 +2823,24 @@ function executorReworkingTests() {
     const buildCalls = buildRuns.mock.calls.filter((c) => c[0].node.id === 'build')
     expect(buildCalls).toHaveLength(2)
     expect(buildCalls[1][0].prompt).toContain('unexpected token at line 4')
+  })
+}
+
+function agentThatCouldNotStartTests() {
+  it('fails the node with the agent’s reason instead of "without a status"', async () => {
+    const o = order([unit('U-1')])
+    const outcome = await execute(
+      planOf(o),
+      deps(async (i) => ({
+        sessionId: `s-${i.node.id}`,
+        exitCode: null,
+        notStarted: 'Mode dontAsk is not available',
+      }))
+    )
+    const failed = outcome.graph.nodes.find((n) => n.id === 'build:U-1')
+    expect(failed?.failReason).toBe(
+      'Claude could not start the builder: Mode dontAsk is not available'
+    )
   })
 }
 

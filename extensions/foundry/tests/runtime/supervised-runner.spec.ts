@@ -73,6 +73,7 @@ function fakeAgents(): AgentsAPI {
   return partialFake<AgentsAPI>({
     start: async (input) => {
       agentStarts.push(input)
+      if (startsAs === null) input.onStartFailed?.('Mode dontAsk is not available in this session')
       return startsAs === null ? null : { ...startsAs, agentId: 'claude', configOptions: [] }
     },
     prompt: (sessionId, text) =>
@@ -402,7 +403,7 @@ function claudeSettingsTests() {
 }
 
 function modeAndResumeTests() {
-  it.each(['auto', 'default', 'acceptEdits', 'dontAsk'] as const)(
+  it.each(['auto', 'default', 'acceptEdits'] as const)(
     'starts the agent in the %s mode it was given',
     async (mode) => {
       await runner().start({ ...start, mode })
@@ -454,6 +455,20 @@ function nothingStartedTests() {
     projectId = null
     await expect(runner().start(start)).resolves.toBeNull()
     expect(agentStarts).toEqual([])
+  })
+
+  it('hands the caller the reason the agent gave for not starting', async () => {
+    startsAs = null
+    const reasons: string[] = []
+    await runner().start({ ...start, onStartFailed: (reason) => reasons.push(reason) })
+    expect(reasons).toEqual(['Mode dontAsk is not available in this session'])
+  })
+
+  it('says why when the worktree cannot be made a project', async () => {
+    projectId = null
+    const reasons: string[] = []
+    await runner().start({ ...start, onStartFailed: (reason) => reasons.push(reason) })
+    expect(reasons).toEqual([expect.stringContaining('tab could not be opened')])
   })
 
   it('starts no run when the agent has no tab to show — an unseen agent is the old failure', async () => {

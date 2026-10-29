@@ -137,6 +137,7 @@ export const CompilePayload = z.object({
 
 const RecipePayload = z.object({ id: z.string(), recipe: z.string().nullable() })
 const HoldPayload = z.object({ id: z.string(), held: z.boolean() })
+const OrderIdOnly = z.object({ id: z.string() })
 const EnvironmentPayload = z.object({
   id: z.string(),
   move: z.enum(['check', 'waive', 'continue-unmeasured', 'decline-pictures']),
@@ -260,6 +261,8 @@ export interface ForgeChannels {
   recipe(payload: z.infer<typeof RecipePayload>): ReturnType<typeof recipe>
   /** Hold the loop for the operator, or release it. */
   hold(payload: z.infer<typeof HoldPayload>): ReturnType<typeof hold>
+  /** Pick the loop up where it stopped, without recording a hold or a release. */
+  resume(payload: z.infer<typeof OrderIdOnly>): ReturnType<typeof resume>
   /** Check the base branch again, or hand off without it. */
   environment(payload: z.infer<typeof EnvironmentPayload>): ReturnType<typeof environment>
 }
@@ -338,6 +341,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     cancel: (payload) => cancel(deps, payload),
     recipe: (payload) => recipe(deps, payload),
     hold: (payload) => hold(deps, payload),
+    resume: (payload) => resume(deps, payload),
     environment: (payload) => environment(deps, payload),
   }
 }
@@ -975,6 +979,15 @@ async function recipe(deps: ForgeDeps, payload: z.infer<typeof RecipePayload>) {
   return view(next)
 }
 
+// Picks the loop up where it stopped, e.g. a red-team round that could not start: the
+// same next step a release takes, with no hold to record.
+async function resume(deps: ForgeDeps, payload: z.infer<typeof OrderIdOnly>) {
+  const order = await deps.store.load(payload.id)
+  if (order === null) return { error: `No order ${payload.id}.` }
+  deps.onReleased(order)
+  return view(order)
+}
+
 // Hold the loop for the operator, or release it. This only records the decision;
 // what release resumes is `deps.onReleased`'s job, in the loop.
 async function hold(deps: ForgeDeps, payload: z.infer<typeof HoldPayload>) {
@@ -1047,6 +1060,7 @@ export function forgeChannelSpecs(forge: ForgeChannels): ChannelSpec[] {
     foundryChannel('foundry:order.cancel', CancelPayload, forge.cancel),
     foundryChannel('foundry:order.recipe', RecipePayload, forge.recipe),
     foundryChannel('foundry:order.hold', HoldPayload, forge.hold),
+    foundryChannel('foundry:order.resume', OrderIdOnly, forge.resume),
     foundryChannel('foundry:forge.environment', EnvironmentPayload, forge.environment),
   ]
 }

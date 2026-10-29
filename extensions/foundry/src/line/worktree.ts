@@ -152,7 +152,7 @@ async function worktreeState(
   const record = listed.stdout
     .split(/\r?\n\r?\n/)
     .map((block) => block.split(/\r?\n/))
-    .find((lines) => lines.includes(`worktree ${target}`))
+    .find((lines) => lines.includes(`worktree ${resolvedPath(target)}`))
   if (record === undefined) return 'absent'
   const gone = record.some((line) => line.startsWith('prunable')) || !isDirectoryAt(target)
   return gone ? 'stale' : 'present'
@@ -352,6 +352,16 @@ async function lendFolder(checkout: Checkout, place: string, deps: CheckoutDeps)
     // best effort — nothing else to do if this fails too
   }
   return false
+}
+
+// git lists a worktree with symlinks resolved (macOS `/var` is `/private/var`); the target
+// itself may not exist yet, so the nearest existing ancestor is resolved.
+function resolvedPath(target: string): string {
+  try {
+    return fs.realpathSync(target)
+  } catch {
+    return path.join(resolvedPath(path.dirname(target)), path.basename(target))
+  }
 }
 
 function isDirectoryAt(target: string): boolean {

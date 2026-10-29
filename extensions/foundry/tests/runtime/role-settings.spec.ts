@@ -49,10 +49,10 @@ const askOf = (facts: RoleFacts) => roleSettings(facts).settings.permissions.ask
 
 describe('the permission mode of a role', () => {
   it.each(['escorted', 'standard', 'lights-out'] as const)(
-    'is dontAsk for read-only, documentation-only and restricted roles at %s',
+    'is default, never dontAsk, for read-only, documentation-only and restricted roles at %s',
     (autonomy) => {
       for (const facts of [readOnly, docsOnly, restricted]) {
-        expect(roleSettings({ ...facts, autonomy }).permissionMode).toBe('dontAsk')
+        expect(roleSettings({ ...facts, autonomy }).permissionMode).toBe('default')
       }
     }
   )

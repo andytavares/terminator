@@ -4,9 +4,10 @@ import type { ModeFacts } from './permission-mode.js'
 
 // A role's permissions as Claude Code settings (https://code.claude.com/docs/en/permissions):
 // Claude reads every subcommand, subshell and control-flow body, so Foundry reads none.
-// Precedence is deny, then ask, then allow; `dontAsk` turns every ask into a refusal.
+// Precedence is deny, then ask, then allow. The ACP adapter offers no `dontAsk` mode, so a
+// role that never waits runs in `default` and `decideTool` refuses its asks.
 
-export type ClaudePermissionMode = 'auto' | 'default' | 'acceptEdits' | 'dontAsk'
+export type ClaudePermissionMode = 'auto' | 'default' | 'acceptEdits'
 
 export interface RoleFacts extends ModeFacts {
   readonly outputPath: string | null
@@ -72,17 +73,23 @@ const FILE_WRITE_TOOLS = ['Edit', 'MultiEdit', 'Write', 'NotebookEdit']
 
 const SANDBOX_DOMAINS = ['github.com', 'api.github.com', '*.githubusercontent.com']
 
-const isFreeWriter = (facts: ModeFacts): boolean =>
-  !facts.readOnly && !facts.docsOnly && !facts.restrictedWrites
+const isFreeWriter = (
+  facts: Pick<ModeFacts, 'readOnly' | 'docsOnly' | 'restrictedWrites'>
+): boolean => !facts.readOnly && !facts.docsOnly && !facts.restrictedWrites
 
 /** `//` starts an absolute path in a rule. */
 const absolute = (target: string): string => `/${target}`
 
 const writeRules = (target: string): string[] => [`Write(${target})`, `Edit(${target})`]
 
+/** A role that is no free writer and publishes nothing: its unlisted calls are refused, not asked. */
+export const refusesUnlistedCalls = (
+  facts: Pick<RoleFacts, 'readOnly' | 'docsOnly' | 'restrictedWrites' | 'outputsDir'>
+): boolean => !isFreeWriter(facts) && facts.outputsDir === null
+
 function modeOf(facts: RoleFacts): ClaudePermissionMode {
-  // A role that publishes a document needs its Artifact ask to reach Foundry, which dontAsk refuses.
-  if (!isFreeWriter(facts)) return facts.outputsDir === null ? 'dontAsk' : 'default'
+  // A role that publishes a document needs its Artifact ask to reach Foundry.
+  if (!isFreeWriter(facts)) return 'default'
   const mode = modeFor(facts)
   return mode === 'default' && facts.autonomy !== 'escorted' ? 'acceptEdits' : mode
 }

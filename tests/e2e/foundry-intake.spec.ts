@@ -297,8 +297,8 @@ async function expectReadOnlyLaunch(): Promise<void> {
   await expect.poll(() => supervisedLaunch(handle)).not.toBeNull()
   const launched = supervisedLaunch(handle)!
   expect(launched.mode).not.toBe('bypassPermissions')
-  // Read-only: Claude refuses whatever its allow rules do not name, so nothing waits (ADR 131).
-  expect(launched.mode).toBe('dontAsk')
+  // The adapter has no dontAsk mode; Foundry refuses what the allow rules leave open, so nothing waits.
+  expect(launched.mode).toBe('default')
   // And it does not carry the parent Claude Code session in with it.
   expect(launched.inherited).toBe(false)
 }

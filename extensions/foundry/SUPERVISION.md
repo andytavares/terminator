@@ -658,7 +658,7 @@ every subcommand, subshell and control-flow body:
 | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | Pushing, changing a pull request, editing the skills mount, a tool the role file leaves out           | `deny`: never, in every mode                                                   |
 | `rm -rf`, `sudo`, `git reset --hard`, `git checkout --`, `git restore`, `git clean`, `git stash drop` | `ask`: the operator decides; refused at `lights-out` (FR-050)                  |
-| Every call from a read-only, docs-only or restricted-write role                                       | `dontAsk`: only what an `allow` rule names runs                                |
+| Every call from a read-only, docs-only or restricted-write role                                       | `default`; Foundry refuses every ask: only what an `allow` rule names runs     |
 | Every call from a free writer                                                                         | `auto`, or `acceptEdits` with `letAutoModeDecide` off; `default` at `escorted` |
 
 A refusal answers the ask with the agent's reject option. It never cancels the

@@ -1947,6 +1947,25 @@ describe('foundry:order.hold', () => {
   })
 })
 
+describe('foundry:order.resume', () => {
+  it('picks the loop up with onReleased, and records no hold or release', async () => {
+    const seed = await drafted()
+    const onReleased = vi.fn()
+    const c = createForgeChannels(forgeDeps({ onReleased }))
+    const before = (await store.entries(seed.order.id)).length
+
+    await c.resume({ id: seed.order.id })
+
+    expect(onReleased).toHaveBeenCalledTimes(1)
+    expect(await store.entries(seed.order.id)).toHaveLength(before)
+  })
+
+  it('errors on an unknown order', async () => {
+    const r = (await channels().resume({ id: 'WO-nope' })) as { error?: string }
+    expect(r.error).toBe('No order WO-nope.')
+  })
+})
+
 describe('the base branch check', () => {
   describe('starting and reading', startingAndReadingTests)
   describe('readingTests', readingTests)

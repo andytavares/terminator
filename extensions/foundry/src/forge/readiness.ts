@@ -103,6 +103,8 @@ export type StripAction =
   | 'watch'
   | 'tell-architect'
   | 'start-over'
+  | 'try-again'
+  | 'copy-error'
   | 'open-run'
   | 'draft'
 
@@ -114,7 +116,7 @@ interface Strip {
   readonly actions: readonly StripAction[]
 }
 
-type RowState = 'passed' | 'in-progress' | 'needs-you' | 'failing'
+type RowState = 'passed' | 'in-progress' | 'needs-you' | 'failing' | 'waiting'
 
 /** One row of "Ready to hand off?": the five checks and whether anyone is changing the plan. */
 export interface Row {
@@ -165,6 +167,8 @@ export interface Readiness {
     readonly handOff: string | null
     readonly redraft: string | null
     readonly message: string | null
+    /** Why the move on to the red team is locked: there is no plan for it to review. */
+    readonly redTeam: string | null
   }
   /** The bottom bar's line on the Hand off step; null when ready or handed off. */
   readonly handOffWhy: string | null
@@ -365,6 +369,22 @@ const intakeRefused: StripRule = ({ input }) => {
   }
 }
 
+/** 2b. Claude could not start an agent: one message, one fault, a retry. */
+const intakeNotStarted: StripRule = ({ input }) => {
+  const { intake } = input
+  if (intake.kind !== 'not-started') return null
+  return {
+    holder: 'you',
+    strip: {
+      tone: 'bad',
+      icon: 'alert',
+      headline: `Claude could not start the ${intake.actor}.`,
+      detail: `Claude said: "${intake.reason}". Nothing on the order changed.`,
+      actions: ['try-again', 'copy-error'],
+    },
+  }
+}
+
 type RunningIntake = Extract<IntakeOutcome, { kind: 'running' }>
 
 /** 3. Intake running. */
@@ -544,6 +564,7 @@ const compileFailing: StripRule = ({ input }) => {
 const STRIP_RULES: readonly StripRule[] = [
   handedOff,
   intakeRefused,
+  intakeNotStarted,
   intakeRunning,
   heldForOperator,
   findingsToDecide,
@@ -654,7 +675,15 @@ function checkRow(id: CheckId, input: ReadinessInput): Row {
     if (openWorkOf({ order, intake, loop }).rule5Applies)
       return { id, label: ROW_LABELS[id], state: 'needs-you', detail: failure.detail }
   }
-  return { id, label: ROW_LABELS[id], state: 'failing', detail: failure.detail }
+  return unmetRow(id, order, failure.detail)
+}
+
+/** An unmet check; coverage with no plan has nothing to fail yet, so it waits. */
+function unmetRow(id: CheckId, order: WorkOrder, detail: string): Row {
+  if (id === 'coverage' && order.plan.units.length === 0) {
+    return { id, label: ROW_LABELS[id], state: 'waiting', detail: NO_PLAN_REASON }
+  }
+  return { id, label: ROW_LABELS[id], state: 'failing', detail }
 }
 
 function stepNames(steps: readonly StepOutcome[], result: StepOutcome['result']): string[] {
@@ -750,6 +779,16 @@ function environmentRow(input: ReadinessInput): Row {
   return environmentRowOf(input.environment ?? NO_ENVIRONMENT, input.shape.name, input.clock)
 }
 
+function failedTurnDetail(intake: IntakeOutcome): string | null {
+  if (intake.kind === 'refused') {
+    return 'The last turn ended in a refusal, so the plan is not the one the architect meant to write.'
+  }
+  if (intake.kind === 'not-started') {
+    return `Claude could not start the ${intake.actor}, so no turn ran.`
+  }
+  return null
+}
+
 function turnRow(input: ReadinessInput): Row {
   const { intake, turnEndedAt, clock } = input
   const label = ROW_LABELS.turn
@@ -764,15 +803,8 @@ function turnRow(input: ReadinessInput): Row {
     }
     return { id: 'turn', label, state: 'in-progress', detail }
   }
-  if (intake.kind === 'refused') {
-    return {
-      id: 'turn',
-      label,
-      state: 'failing',
-      detail:
-        'The last turn ended in a refusal, so the plan is not the one the architect meant to write.',
-    }
-  }
+  const failure = failedTurnDetail(intake)
+  if (failure !== null) return { id: 'turn', label, state: 'failing', detail: failure }
   const detail =
     turnEndedAt !== null ? `The last turn ended at ${clock(turnEndedAt)}.` : 'No turn has run yet.'
   return { id: 'turn', label, state: 'passed', detail }
@@ -846,6 +878,7 @@ function intentStep({ input: { order } }: StepContext): BaseStep {
 function planStep(context: StepContext): BaseStep {
   const { order, intake } = context.input
   if (intake.kind === 'refused') return { state: 'bad', mark: 'x', word: 'Last redraft refused' }
+  if (intake.kind === 'not-started') return { state: 'bad', mark: 'x', word: 'Could not start' }
   const revising =
     intake.kind === 'running' &&
     intake.actor === 'architect' &&
@@ -929,6 +962,9 @@ function handOffStep({ input: { intake }, canHandOff, holder }: StepContext): Ba
   }
   if (intake.kind === 'refused') {
     return { state: 'bad', mark: 'number', word: 'Blocked by the refusal' }
+  }
+  if (intake.kind === 'not-started') {
+    return { state: 'bad', mark: 'number', word: 'Blocked by the failed start' }
   }
   if (holder === 'you') return { state: 'you', mark: 'number', word: 'Waiting on you' }
   return { state: 'not-yet', mark: 'number', word: 'Waiting' }
@@ -1124,6 +1160,11 @@ const refusedLock: LockRule = ({ input: { intake } }) => {
   return `The architect's last plan was refused: ${intake.reason}. Nothing changed.`
 }
 
+const notStartedLock: LockRule = ({ input: { intake } }) => {
+  if (intake.kind !== 'not-started') return undefined
+  return `Claude could not start the ${intake.actor}: ${intake.reason}. Nothing changed.`
+}
+
 const heldLock: LockRule = ({ input: { loop, compile, clock } }) => {
   if (loop.heldAt === null) return undefined
   if (compile.ok) return null
@@ -1159,6 +1200,7 @@ const LOCK_RULES: readonly LockRule[] = [
   handedOffLock,
   runningLock,
   refusedLock,
+  notStartedLock,
   heldLock,
   environmentLock,
 ]
@@ -1193,6 +1235,12 @@ function buildHandOffWhy(
   return handOffLockText
 }
 
+const NO_PLAN_REASON = 'Waits for a plan'
+
+function noPlanReason(order: WorkOrder): string | null {
+  return order.plan.units.length === 0 ? NO_PLAN_REASON : null
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────
 
 function buildSummary(order: WorkOrder, shape: ReadinessInput['shape']): string {
@@ -1206,17 +1254,24 @@ function buildSummary(order: WorkOrder, shape: ReadinessInput['shape']): string 
 
 // ── Entry point ──────────────────────────────────────────────────────────
 
-export function readiness(input: ReadinessInput): Readiness {
-  const { order, compile, intake, loop } = input
-  const { holder, strip } = deriveHolderAndStrip(input)
+const STOPPED_TURNS: readonly IntakeOutcome['kind'][] = ['running', 'refused', 'not-started']
 
-  const canHandOff =
+function handsOffCleanly(input: ReadinessInput): boolean {
+  const { order, compile, intake, loop } = input
+  return (
     order.status === 'draft' &&
     compile.ok &&
-    intake.kind !== 'running' &&
-    intake.kind !== 'refused' &&
+    !STOPPED_TURNS.includes(intake.kind) &&
     loop.heldAt === null &&
     environmentRow(input).state === 'passed'
+  )
+}
+
+export function readiness(input: ReadinessInput): Readiness {
+  const { order } = input
+  const { holder, strip } = deriveHolderAndStrip(input)
+
+  const canHandOff = handsOffCleanly(input)
 
   const rows = buildRows(input)
   const steps = buildSteps(input, canHandOff, holder)
@@ -1235,7 +1290,7 @@ export function readiness(input: ReadinessInput): Readiness {
     findings,
     canHandOff,
     runState: pillOf(order.status, input.turn),
-    locks: { handOff, redraft, message: redraft },
+    locks: { handOff, redraft, message: redraft, redTeam: noPlanReason(order) },
     handOffWhy,
   }
 }
