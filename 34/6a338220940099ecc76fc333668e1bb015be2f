@@ -1,0 +1,21 @@
+src/main/agents/acp/agent-connection.ts
+  s_5be9416d40ccd9::t_9d59e2553efb6c 13-14
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_5be9416d40ccd9::t_9d59e2553efb6c 466-467
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "346a338220940099ecc76fc333668e1bb015be2f",
+  "prompts": {},
+  "sessions": {
+    "s_5be9416d40ccd9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc1b6749-e669-4e1d-905d-6d8e2937d16b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
