@@ -643,7 +643,7 @@ function readingTheTranscriptTests() {
     vi.useFakeTimers()
     try {
       fireEvent.click(station)
-      await vi.advanceTimersByTimeAsync(0)
+      await act(() => vi.advanceTimersByTimeAsync(0))
 
       const reads = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:run-transcript')
       expect(reads().length).toBe(1)
@@ -651,14 +651,14 @@ function readingTheTranscriptTests() {
       expect(screen.getByRole('log', { name: 'Transcript' }).textContent).toContain('first')
 
       lines.push(line('second', 2))
-      await vi.advanceTimersByTimeAsync(2000)
+      await act(() => vi.advanceTimersByTimeAsync(2000))
       expect(reads().length).toBe(2)
       expect(screen.getByRole('log', { name: 'Transcript' }).textContent).toContain('second')
 
       fireEvent.click(screen.getByRole('button', { name: 'Close monitor' }))
-      await vi.advanceTimersByTimeAsync(300)
+      await act(() => vi.advanceTimersByTimeAsync(300))
       expect(screen.queryByRole('log', { name: 'Transcript' })).toBeNull()
-      await vi.advanceTimersByTimeAsync(6000)
+      await act(() => vi.advanceTimersByTimeAsync(6000))
       expect(reads().length).toBe(2)
     } finally {
       vi.useRealTimers()
