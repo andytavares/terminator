@@ -1,0 +1,92 @@
+docs/ARCHITECTURE.md
+  s_5be9416d40ccd9::t_117889cab53cee 1170-1172
+  s_5be9416d40ccd9::t_8a21802de420f5 1466
+  s_5be9416d40ccd9::t_2ecf4124344513 493,537
+scripts/foundry-canary.mjs
+  s_5be9416d40ccd9::t_978151df8fea2b 365,376-386,388-391,427-428,434-437,439
+  s_5be9416d40ccd9::t_fd02823aff7faa 15
+  s_5be9416d40ccd9::t_c2c379d5bf7b98 414,416
+  s_5be9416d40ccd9::t_422b045ee657f7 1-7,8-14,16-20,23-36,40-118,132,140-364,366-375,392-413,415,417-426,429,440-447,450-484
+  s_5be9416d40ccd9::t_d12fcab4754844 387
+  s_5be9416d40ccd9::t_63b2117a7f34ee 21-22,430-433
+  s_5be9416d40ccd9::t_0ea2786c81fa07 119-120,122-131,133-139,438,448-449
+  s_5be9416d40ccd9::t_35d6b5d3c87eb6 37-39
+  s_5be9416d40ccd9::t_098b159c99e738 121
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_5be9416d40ccd9::t_e5d30f7c6e37d9 70,73-92
+  s_5be9416d40ccd9::t_53484a30fb051e 93
+  s_5be9416d40ccd9::t_f57694840a1947 1972-1990
+.github/workflows/ci.yml
+  s_5be9416d40ccd9::t_60bd38c51bf209 26-27,87-88,110-111,135-136,171-172,199-200,249-250,306-307,336-337,353-354,422-423,466-467,608-609,623-624
+docs/adr/136-a-real-order-runs-before-foundry-changes-ship.md
+  s_5be9416d40ccd9::t_8a21802de420f5 1-33
+extensions/foundry/src/ipc/forge-channels.ts
+  s_5be9416d40ccd9::t_90b6abe5c0adbe 68-69,369-378,396-397
+  s_5be9416d40ccd9::t_5d355deb313f55 49-52,543-544
+  s_5be9416d40ccd9::t_b727d4ba74746a 269-270
+  s_5be9416d40ccd9::t_81919f1a1f7460 145,349,1000-1008,1081
+tests/unit/scripts/foundry-canary.spec.ts
+  s_5be9416d40ccd9::t_422b045ee657f7 38-40,78-85,96-97,100-101,103-112
+  s_5be9416d40ccd9::t_d12fcab4754844 1-5,7-19,23,25-32,35-37,41,45-77,86-95,98-99,102,113-115
+  s_5be9416d40ccd9::t_978151df8fea2b 20-22,24,42-44
+  s_5be9416d40ccd9::t_615ee7860db7d1 6,116-125
+  s_5be9416d40ccd9::t_8970f5214c35e2 33-34
+  s_5be9416d40ccd9::t_bbdb4fcb056369 126
+.github/workflows/fill-pr-description.yml
+  s_5be9416d40ccd9::t_cdd622b65d6a92 16-18
+docs/CONTRIBUTING.md
+  s_5be9416d40ccd9::t_2ecf4124344513 148
+  s_5be9416d40ccd9::t_8ac0b43a5935d7 91
+  s_5be9416d40ccd9::t_8a21802de420f5 83-85,87-88,90,92
+  s_5be9416d40ccd9::t_d10c6034ed63bb 86,89
+scripts/ci-local.mjs
+  s_5be9416d40ccd9::t_c2c379d5bf7b98 12-16,240-247,253-258,261-274
+  s_5be9416d40ccd9::t_c495326758335e 248-252
+extensions/foundry/tests/forge/intake-turn-ends.spec.ts
+  s_5be9416d40ccd9::t_f1fc65eb9e9dd6 232-234
+extensions/foundry/src/forge/readiness.ts
+  s_5be9416d40ccd9::t_236594d5d7a0dd 382
+extensions/foundry/src/order/order-standing-sources.ts
+  s_5be9416d40ccd9::t_adceb0320a0fe7 2,21
+extensions/foundry/tests/components/forge-moves.spec.tsx
+  s_5be9416d40ccd9::t_a6fb4775557893 247
+  s_5be9416d40ccd9::t_c14c9cd1764e59 248-260
+  s_5be9416d40ccd9::t_3e1f67ca6b70d9 261-263
+extensions/foundry/src/order/standing.ts
+  s_5be9416d40ccd9::t_adceb0320a0fe7 93-94,241,250-261,516-519,580,584
+extensions/foundry/tests/line/node-session.spec.ts
+  s_5be9416d40ccd9::t_5363ecda7cec2e 48-50,52-54
+extensions/foundry/src/components/Forge.tsx
+  s_5be9416d40ccd9::t_b727d4ba74746a 638-641,649,905-909
+extensions/foundry/tests/order/standing.spec.ts
+  s_5be9416d40ccd9::t_155e911579478d 87,362-380
+extensions/foundry/src/line/node-session.ts
+  s_5be9416d40ccd9::t_ed1909c3bb3102 133-140,149,169
+  s_5be9416d40ccd9::t_5363ecda7cec2e 74
+docs/user-guide/USER-GUIDE.md
+  s_5be9416d40ccd9::t_236594d5d7a0dd 1056-1060
+extensions/foundry/src/ipc/foundry-api.ts
+  s_5be9416d40ccd9::t_81919f1a1f7460 79
+extensions/foundry/src/forge/intake-outcome.ts
+  s_5be9416d40ccd9::t_adceb0320a0fe7 272-279
+extensions/foundry/tests/forge/readiness.spec.ts
+  s_5be9416d40ccd9::t_6dfb4c50b9274d 263
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_5be9416d40ccd9::t_61dda3691661f6 93-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3eaddc4c3f52330f1dd2bbe52491d1fe8825c574",
+  "prompts": {},
+  "sessions": {
+    "s_5be9416d40ccd9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc1b6749-e669-4e1d-905d-6d8e2937d16b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
