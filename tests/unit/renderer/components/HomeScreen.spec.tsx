@@ -480,3 +480,42 @@ describe('HomeScreen — Plan today', () => {
     expect(screen.queryByText('SINCE YOU LEFT')).toBeNull()
   })
 })
+
+// Home loads lazily, so it can mount after the person has already reached for a menu.
+function focusedOutside(attributes: Record<string, string>): HTMLElement {
+  const button = Object.assign(document.createElement('button'), { textContent: 'Display' })
+  for (const [name, value] of Object.entries(attributes)) button.setAttribute(name, value)
+  document.body.append(button)
+  button.focus()
+  return button
+}
+
+describe('focus when Home mounts', () => {
+  it('takes focus from a plain button, so its keys work at once', () => {
+    const button = focusedOutside({})
+    render(<HomeScreen />)
+    expect(document.activeElement).toBe(home())
+    button.remove()
+  })
+
+  it('leaves focus on a menu button', () => {
+    const trigger = focusedOutside({ 'aria-haspopup': 'menu' })
+    render(<HomeScreen />)
+    expect(document.activeElement).toBe(trigger)
+    trigger.remove()
+  })
+})
+
+describe('focus when Home mounts inside a popover', () => {
+  it('leaves focus inside an open popover', () => {
+    const surface = document.createElement('div')
+    surface.setAttribute('popover', 'auto')
+    document.body.append(surface)
+    const item = document.createElement('button')
+    surface.append(item)
+    item.focus()
+    render(<HomeScreen />)
+    expect(document.activeElement).toBe(item)
+    surface.remove()
+  })
+})

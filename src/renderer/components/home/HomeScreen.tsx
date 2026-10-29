@@ -25,6 +25,13 @@ export interface HomeScreenProps {
   onOpenQuickActions?: () => void
 }
 
+/** Home loads lazily, so it can mount while someone works a menu; taking focus then would close
+ * their place in it. Anywhere else, Home takes focus so its single-letter keys work at once. */
+function takeFocusUnlessInAMenu(root: HTMLElement | null): void {
+  if (document.activeElement?.closest('[aria-haspopup], [popover]')) return
+  root?.focus({ preventScroll: true })
+}
+
 /**
  * The launch view: what waits on you, what is in flight, and today.
  *
@@ -39,7 +46,7 @@ export function HomeScreen(_props: HomeScreenProps = {}): React.JSX.Element {
   const onKeyDown = useRootKeys(controller, searchRef)
   useOpenRequestedResume()
 
-  useEffect(() => rootRef.current?.focus({ preventScroll: true }), [])
+  useEffect(() => takeFocusUnlessInAMenu(rootRef.current), [])
 
   return (
     <section className="desk" aria-label="Home" tabIndex={-1} ref={rootRef} onKeyDown={onKeyDown}>
