@@ -1,0 +1,49 @@
+tests/unit/agents/acp/adapter-contract.spec.ts
+  s_5be9416d40ccd9::t_02876ca4099a01 39
+  s_5be9416d40ccd9::t_0da0ba6d25cc29 1-38,40-43
+tests/e2e/fixtures/acp-stub-agent.mjs
+  s_5be9416d40ccd9::t_60205880c317ce 86-116,133
+  s_5be9416d40ccd9::t_da58e327d2469d 5-10,13,15-17,49-50,66,71,129-132,134-135,137-138,144-145,150
+  s_5be9416d40ccd9::t_c662d861cd3e62 11-12,121-123
+  s_5be9416d40ccd9::t_0da0ba6d25cc29 19-25,27-30,76-79
+  s_5be9416d40ccd9::t_dacd4e7b19c710 117-120,124-128,136
+tests/unit/renderer/sidebar/choice-prompt.spec.ts
+  s_5be9416d40ccd9::t_2ecf4124344513 6-7
+tests/e2e/fixtures/stub-proposal.json
+  s_5be9416d40ccd9::t_4af41a9f326038 6,12-41,43
+  s_5be9416d40ccd9::t_00df5eaf535658 1-5,7-11,42,44-47
+playwright.config.ts
+  s_5be9416d40ccd9::t_2ecf4124344513 18-19
+tests/e2e/resume-session.spec.ts
+  s_5be9416d40ccd9::t_2ecf4124344513 19
+tests/unit/scripts/e2e-select.spec.ts
+  s_5be9416d40ccd9::t_2ecf4124344513 30
+tests/e2e/foundry-end-to-end.spec.ts
+  s_5be9416d40ccd9::t_15987310b0acff 55
+  s_5be9416d40ccd9::t_4af41a9f326038 56-58,64-66
+  s_5be9416d40ccd9::t_55f6dc667306a7 2,26-27
+  s_5be9416d40ccd9::t_c662d861cd3e62 33
+  s_5be9416d40ccd9::t_cceec52dfbfd3a 1,4-25,32,34-54,59,61-63,67-68
+  s_5be9416d40ccd9::t_be81bc2909aac3 60
+  s_5be9416d40ccd9::t_e8134280437c39 3,28-31
+tests/e2e/helpers.ts
+  s_5be9416d40ccd9::t_d3191773f9b0bb 40
+tests/live/foundry-roles.spec.ts
+  s_5be9416d40ccd9::t_527f6bdbaf22dd 2,4-14,16-19,21-35,37-75,78-89,92-96,98-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c1910b90ad0d57169948f9ad1b7e5845ed2ad8b3",
+  "prompts": {},
+  "sessions": {
+    "s_5be9416d40ccd9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc1b6749-e669-4e1d-905d-6d8e2937d16b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
