@@ -53,7 +53,7 @@ function identityColumns(period: Period): DataTableColumn<StatedRow>[] {
       sortValue: ({ row }) => row.label,
       render: ({ row }) => (
         <>
-          <span className="usage__name">{row.label}</span>
+          <span className="usage__name">{row.label}</span>{' '}
           <span className="usage__id">{row.id}</span>
         </>
       ),

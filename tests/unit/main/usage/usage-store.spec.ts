@@ -119,11 +119,10 @@ describe('declare', () => {
   it('keeps firstDeclared and updates the label on a second declare', async () => {
     const store = openStore()
     await store.declare([notes])
-    const first = clock.toISOString()
     clock = new Date(2026, 10, 2, 9, 0, 0)
     await store.declare([{ ...notes, label: 'Notebook' }])
     const row = await rowOf(store, 'ext.notes')
-    expect([row.firstDeclared, row.label]).toEqual([first, 'Notebook'])
+    expect([row.firstDeclared, row.label]).toEqual(['2026-10-28', 'Notebook'])
   })
 })
 
@@ -163,10 +162,10 @@ describe('report — declared and counting since', () => {
     expect(declared).toEqual({ 'core.search': true, 'ext.notes': false })
   })
 
-  it('says since when counting began, and null for an empty store', async () => {
+  it('says on which local day counting began, and null for an empty store', async () => {
     const store = openStore()
     expect((await store.report(null)).countingSince).toBeNull()
     await store.declare([notes])
-    expect((await store.report(null)).countingSince).toBe(clock.toISOString())
+    expect((await store.report(null)).countingSince).toBe('2026-10-28')
   })
 })

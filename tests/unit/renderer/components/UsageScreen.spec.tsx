@@ -115,9 +115,9 @@ describe('UsageScreen', () => {
     await shown()
     const core = screen.getAllByRole('row').filter((r) => /core\./.test(r.textContent ?? ''))
     expect(core.map((r) => within(r).getAllByRole('cell')[0].textContent)).toEqual([
-      'Homecore.home',
-      'Start workcore.start-work',
-      'Overviewcore.overview',
+      'Home core.home',
+      'Start work core.start-work',
+      'Overview core.overview',
     ])
     expect(within(core[2]).getByText('Not used in 30 days')).toBeTruthy()
     expect(

@@ -118,7 +118,7 @@ class SqliteUsageStore implements UsageStore {
 
   async declare(features: FeatureDeclaration[]): Promise<void> {
     await this.ready
-    const at = this.deps.now().toISOString()
+    const at = localDay(this.deps.now())
     await this.db.transaction(async (tx) => {
       for (const f of features) {
         await tx.run(
