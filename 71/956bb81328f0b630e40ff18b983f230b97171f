@@ -1,0 +1,25 @@
+src/main/agents/acp/agent-service.ts
+  s_5be9416d40ccd9::t_f69cd880840039 54-55,494
+tests/unit/agents/acp/fake-agent.ts
+  s_5be9416d40ccd9::t_38a3dbdac4d01b 23-24,104,113-117
+tests/unit/agents/acp/agent-service.spec.ts
+  s_5be9416d40ccd9::t_668242791a01e3 367
+  s_5be9416d40ccd9::t_38a3dbdac4d01b 368-381
+  s_5be9416d40ccd9::t_99424ae25befa5 382-384
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "71956bb81328f0b630e40ff18b983f230b97171f",
+  "prompts": {},
+  "sessions": {
+    "s_5be9416d40ccd9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc1b6749-e669-4e1d-905d-6d8e2937d16b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
