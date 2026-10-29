@@ -1,0 +1,51 @@
+docs/ARCHITECTURE.md
+  s_5be9416d40ccd9::t_117889cab53cee 1170-1172
+  s_5be9416d40ccd9::t_8a21802de420f5 1466
+  s_5be9416d40ccd9::t_2ecf4124344513 493,537
+scripts/foundry-canary.mjs
+  s_5be9416d40ccd9::t_978151df8fea2b 349,360-370,372-375,411-412,414-420,426-430
+  s_5be9416d40ccd9::t_fd02823aff7faa 16
+  s_5be9416d40ccd9::t_c2c379d5bf7b98 398,400
+  s_5be9416d40ccd9::t_422b045ee657f7 1-15,17-21,24-348,350-359,376-397,399,401-410,413,421,431-474
+  s_5be9416d40ccd9::t_d12fcab4754844 371
+  s_5be9416d40ccd9::t_63b2117a7f34ee 22-23,422-425
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_5be9416d40ccd9::t_e5d30f7c6e37d9 70,73-92
+  s_5be9416d40ccd9::t_53484a30fb051e 93
+.github/workflows/ci.yml
+  s_5be9416d40ccd9::t_60bd38c51bf209 26-27,87-88,110-111,135-136,171-172,199-200,249-250,306-307,336-337,353-354,422-423,466-467,608-609,623-624
+docs/adr/136-a-real-order-runs-before-foundry-changes-ship.md
+  s_5be9416d40ccd9::t_8a21802de420f5 1-33
+extensions/foundry/src/ipc/forge-channels.ts
+  s_5be9416d40ccd9::t_90b6abe5c0adbe 68-69,365-374,392-393
+  s_5be9416d40ccd9::t_5d355deb313f55 49-52,539-540
+tests/unit/scripts/foundry-canary.spec.ts
+  s_5be9416d40ccd9::t_422b045ee657f7 35-37,75-82,93-94,97-98,100-109
+  s_5be9416d40ccd9::t_d12fcab4754844 1-18,22,24-34,38,42-74,83-92,95-96,99,110-112
+  s_5be9416d40ccd9::t_978151df8fea2b 19-21,23,39-41
+.github/workflows/fill-pr-description.yml
+  s_5be9416d40ccd9::t_cdd622b65d6a92 16-18
+docs/CONTRIBUTING.md
+  s_5be9416d40ccd9::t_2ecf4124344513 148
+  s_5be9416d40ccd9::t_8ac0b43a5935d7 91
+  s_5be9416d40ccd9::t_8a21802de420f5 83-90,92
+scripts/ci-local.mjs
+  s_5be9416d40ccd9::t_c2c379d5bf7b98 12-16,240-247,253-258,261-274
+  s_5be9416d40ccd9::t_c495326758335e 248-252
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dbbde8d4725cb336b4e7850551af3f4edf97f300",
+  "prompts": {},
+  "sessions": {
+    "s_5be9416d40ccd9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc1b6749-e669-4e1d-905d-6d8e2937d16b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
