@@ -1,0 +1,33 @@
+.specify/memory/constitution.md
+  s_e19acf012761f8::t_054082aa3714e6 2,4,7-10,396-397,427
+docs/ARCHITECTURE.md
+  s_e19acf012761f8::t_054082aa3714e6 90
+  s_e19acf012761f8::t_324651f8e250eb 1465
+.github/workflows/ci.yml
+  s_e19acf012761f8::t_b80012305accd6 14-15,630-775
+scripts/ci-plan.mjs
+  s_e19acf012761f8::t_b80012305accd6 17-18
+docs/CONTRIBUTING.md
+  s_e19acf012761f8::t_054082aa3714e6 50,54,96
+tests/unit/scripts/ci-plan.spec.ts
+  s_e19acf012761f8::t_59f9abc14cfda5 23,346-379
+  s_e19acf012761f8::t_cdccf96faa8fc9 380
+docs/adr/134-ci-releases-each-merge.md
+  s_e19acf012761f8::t_054082aa3714e6 1-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b47ce623977ff109fad47ce94fa2881940ef4514",
+  "prompts": {},
+  "sessions": {
+    "s_e19acf012761f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5777cf17-ab8d-4b2f-9a64-a811a8ccd1d1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
