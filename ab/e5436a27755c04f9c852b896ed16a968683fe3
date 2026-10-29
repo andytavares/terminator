@@ -1,0 +1,255 @@
+tests/unit/ipc/editor.ipc.spec.ts
+  s_3ade4fb4c9f2cf::t_ef0643357dd904 4-5,11-13,40,87-93
+  s_3ade4fb4c9f2cf::t_951c75ee007343 94-95
+src/renderer/components/settings/GlobalSettings.tsx
+  s_3ade4fb4c9f2cf::t_8b98118b589c4a 15,48
+  s_3ade4fb4c9f2cf::t_b2442982008f2e 14,210-213
+  s_3ade4fb4c9f2cf::t_6a320c7af516c1 52
+tests/unit/renderer/components/IssuePicker.spec.tsx
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 38-40
+tests/unit/renderer/components/TodayRail.spec.tsx
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 58-59,61
+  s_3ade4fb4c9f2cf::t_b747d8956b5bc8 60
+src/renderer/components/session/ChoiceButtons.tsx
+  s_3ade4fb4c9f2cf::t_a5455739280e2e 3,29-32
+src/renderer/components/home/insights-window.ts
+  s_3ade4fb4c9f2cf::t_98266d99919293 2,11,13-16
+src/renderer/components/sidebar/CreateWorkspaceDialog.tsx
+  s_3ade4fb4c9f2cf::t_28f747af9b9338 68-69
+  s_3ade4fb4c9f2cf::t_fc9648218c8faf 4
+src/renderer/components/sidebar/CreateProjectDialog.tsx
+  s_3ade4fb4c9f2cf::t_fc9648218c8faf 8,79-82
+src/renderer/components/settings/ExtensionsSection.tsx
+  s_3ade4fb4c9f2cf::t_b2442982008f2e 3,40,67,79-81,96,116
+src/renderer/components/sidebar/FilterMenu.tsx
+  s_3ade4fb4c9f2cf::t_7ace16c8cca27d 5,71,102-105,123
+tests/unit/shared/usage/core-features.spec.ts
+  s_3ade4fb4c9f2cf::t_2206adc0306aef 1-7,9-16
+  s_3ade4fb4c9f2cf::t_ef0643357dd904 8
+src/renderer/components/settings/QuickActionsSettings.tsx
+  s_3ade4fb4c9f2cf::t_b2442982008f2e 3,135
+src/renderer/components/QuickActionsHost.tsx
+  s_3ade4fb4c9f2cf::t_84d506cb4a9b54 207-221,223-225
+  s_3ade4fb4c9f2cf::t_c5ceaf1ad049e2 251-266,287-295,306
+  s_3ade4fb4c9f2cf::t_396400dac3279d 32,203-206,222,226-228,272-274
+  s_3ade4fb4c9f2cf::t_33ff0b2ba6e789 267
+tests/unit/renderer/components/WorkspaceSettings.spec.tsx
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 58-60
+tests/unit/renderer/components/StartWorkAcrossRepos.spec.tsx
+  s_3ade4fb4c9f2cf::t_5b862a9a461b3b 122-124
+src/renderer/components/home/PlanTheDay.tsx
+  s_3ade4fb4c9f2cf::t_98266d99919293 8,91
+src/renderer/components/NameTerminalDialog.tsx
+  s_3ade4fb4c9f2cf::t_56bd9d1232396c 11
+  s_3ade4fb4c9f2cf::t_bc0ec467e15461 3
+  s_3ade4fb4c9f2cf::t_8584aee8481342 24,31
+  s_3ade4fb4c9f2cf::t_28f747af9b9338 12-15
+tests/unit/renderer/agent/AgentView.spec.tsx
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 74-76
+src/renderer/components/tasks/AddToTaskDialog.tsx
+  s_3ade4fb4c9f2cf::t_e5f56aa2b4d688 6,57
+src/renderer/components/home/SnoozeMenu.tsx
+  s_3ade4fb4c9f2cf::t_98266d99919293 4,21-24
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_3ade4fb4c9f2cf::t_1c3056198aea09 78-80
+src/renderer/components/home/home-view.ts
+  s_3ade4fb4c9f2cf::t_98266d99919293 2,8-14
+src/renderer/components/sidebar/MoveSessionDialog.tsx
+  s_3ade4fb4c9f2cf::t_7ace16c8cca27d 6,89
+src/renderer/components/sidebar/SidebarSearch.tsx
+  s_3ade4fb4c9f2cf::t_7ace16c8cca27d 2
+  s_3ade4fb4c9f2cf::t_28f747af9b9338 12-17,36
+tests/unit/renderer/usage/use-field-change-counter.spec.tsx
+  s_3ade4fb4c9f2cf::t_6a320c7af516c1 1-45
+src/renderer/components/AboutDialog.tsx
+  s_3ade4fb4c9f2cf::t_d1ac5020df6453 3,54
+src/renderer/components/ErrorBoundary.tsx
+  s_3ade4fb4c9f2cf::t_d1ac5020df6453 3,26
+tests/unit/renderer/components/StartWork.spec.tsx
+  s_3ade4fb4c9f2cf::t_5b862a9a461b3b 180-182
+src/renderer/components/settings/WorkspaceSettings.tsx
+  s_3ade4fb4c9f2cf::t_8b98118b589c4a 9,25
+  s_3ade4fb4c9f2cf::t_6a320c7af516c1 37
+tests/unit/renderer/components/ThreadDrawer.spec.tsx
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 68-70
+tests/unit/renderer/components/feature-usage-records.spec.tsx
+  s_3ade4fb4c9f2cf::t_56bd9d1232396c 74,76,108,110
+  s_3ade4fb4c9f2cf::t_916c945b4c7201 16
+  s_3ade4fb4c9f2cf::t_1b45909a5286fb 128
+  s_3ade4fb4c9f2cf::t_2206adc0306aef 1-15,17-26,28-55,57,59-73,75,77-93,95,97-107,109,111-127,129-134
+  s_3ade4fb4c9f2cf::t_82a5d132b7738f 27,56,58,94,96
+tests/unit/renderer/components/SidebarSearch.spec.tsx
+  s_3ade4fb4c9f2cf::t_1c3056198aea09 10-12,24
+tests/unit/renderer/components/ChoiceButtons.spec.tsx
+  s_3ade4fb4c9f2cf::t_b747d8956b5bc8 2,17
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 15-16
+  s_3ade4fb4c9f2cf::t_0ec56c1badbb90 18
+src/renderer/components/home/StartWork.tsx
+  s_3ade4fb4c9f2cf::t_0b651875e7250a 161
+  s_3ade4fb4c9f2cf::t_98266d99919293 9,160,162-163
+src/renderer/components/settings/ThemeChoices.tsx
+  s_3ade4fb4c9f2cf::t_82a5d132b7738f 17-21,24-25
+  s_3ade4fb4c9f2cf::t_b2442982008f2e 2,22-23
+tests/unit/renderer/components/CreateWorkspaceDialog.spec.tsx
+  s_3ade4fb4c9f2cf::t_1c3056198aea09 56-58,230
+src/renderer/App.tsx
+  s_3ade4fb4c9f2cf::t_a0491f03a3fa35 41,76
+src/renderer/components/task-switcher/TaskSwitcher.tsx
+  s_3ade4fb4c9f2cf::t_e5f56aa2b4d688 7,50
+tests/unit/renderer/shell/main-events-usage.spec.tsx
+  s_3ade4fb4c9f2cf::t_4ea6416391fab4 2-4
+  s_3ade4fb4c9f2cf::t_c5ceaf1ad049e2 17
+  s_3ade4fb4c9f2cf::t_2d39653bbde987 1,5-16,18-58
+src/renderer/components/sidebar/DisplayMenu.tsx
+  s_3ade4fb4c9f2cf::t_7ace16c8cca27d 5,38
+src/renderer/components/settings/SettingsPanel.tsx
+  s_3ade4fb4c9f2cf::t_b2442982008f2e 1,8,21-26
+src/renderer/components/overview/WallTile.tsx
+  s_3ade4fb4c9f2cf::t_28f747af9b9338 50-52,54,56,58-59
+  s_3ade4fb4c9f2cf::t_87a907b705c6a3 13,53,55,79
+tests/unit/renderer/components/home/HomeTasksLayout.spec.tsx
+  s_3ade4fb4c9f2cf::t_1c3056198aea09 103-105
+tests/unit/renderer/components/TaskSwitcher.spec.tsx
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 68-70
+tests/unit/renderer/usage/track-surfaces.spec.tsx
+  s_3ade4fb4c9f2cf::t_606d0ec9323bda 111,113
+  s_3ade4fb4c9f2cf::t_c5ceaf1ad049e2 13-14
+  s_3ade4fb4c9f2cf::t_66098d18628f65 1,5-12,15-63,65,67-95,97,99-110,112,114-139
+  s_3ade4fb4c9f2cf::t_c8c2e033de4aac 64,66,96,98
+  s_3ade4fb4c9f2cf::t_4ea6416391fab4 2-4
+tests/unit/renderer/components/WallTile.spec.tsx
+  s_3ade4fb4c9f2cf::t_1c3056198aea09 46-47,49,91
+  s_3ade4fb4c9f2cf::t_b747d8956b5bc8 48
+tests/unit/renderer/usage/active-time.spec.ts
+  s_3ade4fb4c9f2cf::t_c5ceaf1ad049e2 2,7,14,26-28,44,46,63
+  s_3ade4fb4c9f2cf::t_c87fe6b58b53b3 1,3-6,8-13,15-25,29-43,45,47-62,64-75
+src/renderer/components/settings/IntegrationsSettings.tsx
+  s_3ade4fb4c9f2cf::t_386b352af83c45 5,44
+src/renderer/components/integrations/IssuePicker.tsx
+  s_3ade4fb4c9f2cf::t_386b352af83c45 3,60
+src/renderer/components/sidebar/EditWorkspaceDialog.tsx
+  s_3ade4fb4c9f2cf::t_28f747af9b9338 12-16,57
+  s_3ade4fb4c9f2cf::t_fc9648218c8faf 4
+tests/unit/renderer/components/NameTerminalDialog.spec.tsx
+  s_3ade4fb4c9f2cf::t_1c3056198aea09 24-25,27
+  s_3ade4fb4c9f2cf::t_b747d8956b5bc8 26
+src/renderer/components/NotificationPanel.tsx
+  s_3ade4fb4c9f2cf::t_d1ac5020df6453 2,7,44,58,153
+tests/unit/renderer/components/ResumeButton.spec.tsx
+  s_3ade4fb4c9f2cf::t_b747d8956b5bc8 2,22
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 20-21
+  s_3ade4fb4c9f2cf::t_c03bb2d9a03d22 23
+tests/unit/ErrorBoundary.spec.tsx
+  s_3ade4fb4c9f2cf::t_b747d8956b5bc8 2,13
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 11-12
+  s_3ade4fb4c9f2cf::t_d338bad1986703 14
+src/renderer/components/home/RunAsChoices.tsx
+  s_3ade4fb4c9f2cf::t_98266d99919293 3,19-25
+tests/unit/renderer/components/AboutDialog.spec.tsx
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 28-30
+src/renderer/components/sidebar/BranchSelect.tsx
+  s_3ade4fb4c9f2cf::t_fc9648218c8faf 3
+  s_3ade4fb4c9f2cf::t_ef0643357dd904 170-173
+src/main/app-updater.ts
+  s_3ade4fb4c9f2cf::t_d1ac5020df6453 7,40,74
+tests/unit/renderer/components/RunAsChoices.spec.tsx
+  s_3ade4fb4c9f2cf::t_b747d8956b5bc8 3,21
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 19-20
+  s_3ade4fb4c9f2cf::t_02ca32242e0889 22
+tests/unit/renderer/components/sidebar/sidebar-menus.spec.tsx
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 18-19,21
+  s_3ade4fb4c9f2cf::t_b747d8956b5bc8 2,20
+src/renderer/components/home/ThreadDrawer.tsx
+  s_3ade4fb4c9f2cf::t_72440a6d908853 7,121-124
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 210-212
+tests/unit/renderer/components/NotificationPanel.spec.tsx
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 50-52
+src/renderer/components/home/AnswerInPlace.tsx
+  s_3ade4fb4c9f2cf::t_98266d99919293 5,27-33,45-51
+tests/unit/renderer/components/QuickActionsHost.spec.tsx
+  s_3ade4fb4c9f2cf::t_4ea6416391fab4 3-5
+  s_3ade4fb4c9f2cf::t_84d506cb4a9b54 7-10,201,213,260,269-294
+  s_3ade4fb4c9f2cf::t_834b0c93e0e14f 203-212
+  s_3ade4fb4c9f2cf::t_c8c2e033de4aac 191-193,214-248
+  s_3ade4fb4c9f2cf::t_c5ceaf1ad049e2 54
+  s_3ade4fb4c9f2cf::t_e04a06454cbb7b 21,80,190,194-200,202,249-259,261-268
+src/renderer/components/terminal/dropped-paths.ts
+  s_3ade4fb4c9f2cf::t_a5455739280e2e 2,9,14-15
+tests/setup.ts
+  s_3ade4fb4c9f2cf::t_4ea6416391fab4 39-41
+src/renderer/usage/use-field-change-counter.ts
+  s_3ade4fb4c9f2cf::t_3b0a406c5b9f02 1,6,9
+  s_3ade4fb4c9f2cf::t_0b651875e7250a 2-5,7-8,10-16
+src/shared/usage/core-features.ts
+  s_3ade4fb4c9f2cf::t_82a5d132b7738f 22-33,43-48,52-63,68-91,93-98,101-111,118
+  s_3ade4fb4c9f2cf::t_6a320c7af516c1 112-113
+  s_3ade4fb4c9f2cf::t_0b651875e7250a 114-117
+  s_3ade4fb4c9f2cf::t_bca241c2074f04 11-21,34-42,49-51,64-67,92,99-100
+tests/unit/renderer/components/EditWorkspaceDialog.spec.tsx
+  s_3ade4fb4c9f2cf::t_1c3056198aea09 37-39,157
+tests/unit/main/app-updater.spec.ts
+  s_3ade4fb4c9f2cf::t_56bd9d1232396c 116-121
+  s_3ade4fb4c9f2cf::t_ef0643357dd904 46-47,69
+  s_3ade4fb4c9f2cf::t_9fa855e29cb2df 122-124
+tests/unit/renderer/components/tasks/AddToTaskDialog.spec.tsx
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 85-87
+tests/unit/renderer/components/BranchSelect.spec.tsx
+  s_3ade4fb4c9f2cf::t_1c3056198aea09 13-14,16,83
+  s_3ade4fb4c9f2cf::t_b747d8956b5bc8 2,15
+tests/unit/renderer/components/Insights.spec.tsx
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 96-98
+src/renderer/components/terminal/LaneSwitcher.tsx
+  s_3ade4fb4c9f2cf::t_bc0ec467e15461 10
+  s_3ade4fb4c9f2cf::t_28f747af9b9338 33-37,58
+tests/unit/renderer/components/HomeScreen.spec.tsx
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 132-134
+tests/unit/renderer/components/MoveSessionDialog.spec.tsx
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 92-94
+src/renderer/components/agent/AgentView.tsx
+  s_3ade4fb4c9f2cf::t_a5455739280e2e 1,8,140
+src/renderer/components/session/ResumeButton.tsx
+  s_3ade4fb4c9f2cf::t_a5455739280e2e 4,29-31
+src/renderer/components/home/DeskSearch.tsx
+  s_3ade4fb4c9f2cf::t_98266d99919293 13,32
+src/renderer/usage/track-surfaces.ts
+  s_3ade4fb4c9f2cf::t_c5ceaf1ad049e2 1,5,77-78,89,91-94,101,103-104,106-109,125-132
+  s_3ade4fb4c9f2cf::t_e3fb0eca68385c 2-4,6-76,79-88,90,95-100,102,105,110-124,133
+src/renderer/components/home/ArchivedTasks.tsx
+  s_3ade4fb4c9f2cf::t_ef0643357dd904 28-29,36-48,66
+  s_3ade4fb4c9f2cf::t_82a5d132b7738f 30-35,56-59,62-63
+  s_3ade4fb4c9f2cf::t_98266d99919293 6,60-61
+tests/unit/renderer/components/IntegrationsSettings.spec.tsx
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 46-48
+src/renderer/usage/active-time.ts
+  s_3ade4fb4c9f2cf::t_c87fe6b58b53b3 1-12,19-20,26-27,29,31,33-37,40-41,65-66
+  s_3ade4fb4c9f2cf::t_c5ceaf1ad049e2 13-18,21-25,28,30,32,38-39,42-64
+tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 57-59
+tests/unit/renderer/components/PlanTheDay.spec.tsx
+  s_3ade4fb4c9f2cf::t_b747d8956b5bc8 89
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 87-88,90
+src/main/ipc/editor.ipc.ts
+  s_3ade4fb4c9f2cf::t_82a5d132b7738f 32-33
+  s_3ade4fb4c9f2cf::t_d1ac5020df6453 6,30-31,34-35
+tests/unit/renderer/components/GlobalSettings.spec.tsx
+  s_3ade4fb4c9f2cf::t_9df324b1c6eddd 66-68
+src/renderer/shell/main-events.ts
+  s_3ade4fb4c9f2cf::t_2e398533435844 15-16,27-29,44,57,63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "abe5436a27755c04f9c852b896ed16a968683fe3",
+  "prompts": {},
+  "sessions": {
+    "s_3ade4fb4c9f2cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8126b621-5a83-4f60-ab34-46b32eaf83b1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
