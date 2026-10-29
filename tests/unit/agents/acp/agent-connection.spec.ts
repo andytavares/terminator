@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Client } from '@agentclientprotocol/sdk'
-import { createConnector } from '../../../../src/main/agents/acp/agent-connection'
+import { createConnector, keepTail } from '../../../../src/main/agents/acp/agent-connection'
 import { partialFake } from '../../../support/fakes'
 
 const missing = {
@@ -15,5 +15,15 @@ describe('an agent command that cannot start', () => {
     const exitOf = () => new Promise((resolve) => link.onExit(resolve))
     expect(await exitOf()).toBeNull()
     expect(await exitOf()).toBeNull()
+  })
+})
+
+describe('keepTail', () => {
+  it('keeps the whole text when it fits', () => {
+    expect(keepTail('abc', 5)).toBe('abc')
+  })
+
+  it('keeps only the last characters when it does not', () => {
+    expect(keepTail('abcdef', 4)).toBe('cdef')
   })
 })

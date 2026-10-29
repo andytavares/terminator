@@ -1,5 +1,5 @@
 import { surfacedQuestions } from '../forge/interview.js'
-import { intakeRefusal } from '../forge/intake-outcome.js'
+import { intakeNotStarted, intakeRefusal } from '../forge/intake-outcome.js'
 import { runDocumentReady, runFailure } from '../line/run-outcome.js'
 import { compileOrder } from './compile.js'
 import type { StandingSources } from './standing.js'
@@ -18,6 +18,7 @@ export function orderStandingSources(store: OrderStore): StandingSources {
     failuresFor: (order) => compileOrder(order).failures.length,
     blockerFor: (order) => compileOrder(order).failures[0]?.detail ?? null,
     intakeRefusedFor: async (orderId) => intakeRefusal(await store.entries(orderId)),
+    intakeNotStartedFor: async (orderId) => intakeNotStarted(await store.entries(orderId)),
     runFailureFor: async (orderId) => runFailure(await store.entries(orderId)),
     documentReadyFor: async (orderId) => runDocumentReady(await store.entries(orderId)),
   }

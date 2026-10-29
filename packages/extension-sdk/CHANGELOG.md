@@ -1,5 +1,14 @@
 # Changelog — @terminator/extension-sdk
 
+## 6.2.0
+
+Minor: additive.
+
+### Added
+
+- `StartAgentInput.onStartFailed(reason)`: called with the agent's own reason (its error details,
+  else its message) when `api.agents.start` could not start the session. `start` still resolves null.
+
 ## 6.1.0
 
 Minor: additive.

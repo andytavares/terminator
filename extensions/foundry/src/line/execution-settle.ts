@@ -40,6 +40,11 @@ export async function settleNode(run: Execution, launched: Launched): Promise<vo
   // A no-op when the run already reported its session. Kept for the caller
   // that reports none — every ladder rung, and every test stub.
   await run.noteStarted(ran.node.id, ran.result.sessionId)
+  // A rework would hit the same start failure, so it goes straight to failed.
+  if (ran.result.notStarted !== undefined) {
+    await failNode(run, ran, NOTHING_SHORT)
+    return
+  }
   const handedBack = await collectRung(run, ran)
   // Who produced the work on this unit, so the party checking it can be held
   // against them rather than against itself.
@@ -268,7 +273,17 @@ async function failNode(run: Execution, ran: Ran, short: Shortfall): Promise<voi
   run.halted = stops || run.halted
 }
 
-function failReason({ result, command, logPath }: Ran, short: Shortfall): string {
+/** Why the agent never ran, in the operator's words, or null when it did. */
+function notStartedReason({ result, roleId, node }: Ran): string | null {
+  return result.notStarted === undefined
+    ? null
+    : `Claude could not start the ${roleId ?? node.stepId}: ${result.notStarted}`
+}
+
+function failReason(ran: Ran, short: Shortfall): string {
+  const { result, command, logPath } = ran
+  const notStarted = notStartedReason(ran)
+  if (notStarted !== null) return notStarted
   if (short.refusal) return refusedReason(short.refusal)
   if (short.madeNoChange) return 'made no change to the checkout'
   if (short.unmet.length > 0) return `did not meet what it promised: ${short.unmet.join('; ')}`

@@ -67,7 +67,29 @@ afterEach(() => {
 describe('foundry:order.create', () => {
   describe('the draft', theDraftTests)
   describe('the ledger and the same issue', theLedgerAndTheSameIssueTests)
+  describe('a canary order', theCanaryTests)
 })
+
+function theCanaryTests() {
+  it('works on a canary/<id> branch, so a leftover is found by its name', async () => {
+    const r = (await channels().create({
+      source: { kind: 'typed', text: 'x' },
+      repoPaths: [repo],
+      canary: true,
+    })) as OrderView
+    const expected = `canary/${r.order.id.toLowerCase()}`
+    expect(r.order.source.branch).toBe(expected)
+    expect(r.order.plan.lanes[0]?.branch).toBe(expected)
+  })
+
+  it('keeps the usual branch for an order that is not a canary', async () => {
+    const r = (await channels().create({
+      source: { kind: 'typed', text: 'x' },
+      repoPaths: [repo],
+    })) as OrderView
+    expect(r.order.source.branch ?? null).toBeNull()
+  })
+}
 
 async function seeded(): Promise<WorkOrder> {
   const r = (await channels().create({
@@ -1943,6 +1965,25 @@ describe('foundry:order.hold', () => {
   it('errors on an unknown order', async () => {
     const c = channels()
     const r = (await c.hold({ id: 'WO-nope', held: true })) as { error?: string }
+    expect(r.error).toBe('No order WO-nope.')
+  })
+})
+
+describe('foundry:order.resume', () => {
+  it('picks the loop up with onReleased, and records no hold or release', async () => {
+    const seed = await drafted()
+    const onReleased = vi.fn()
+    const c = createForgeChannels(forgeDeps({ onReleased }))
+    const before = (await store.entries(seed.order.id)).length
+
+    await c.resume({ id: seed.order.id })
+
+    expect(onReleased).toHaveBeenCalledTimes(1)
+    expect(await store.entries(seed.order.id)).toHaveLength(before)
+  })
+
+  it('errors on an unknown order', async () => {
+    const r = (await channels().resume({ id: 'WO-nope' })) as { error?: string }
     expect(r.error).toBe('No order WO-nope.')
   })
 })

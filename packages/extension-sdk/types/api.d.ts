@@ -271,6 +271,9 @@ export interface StartAgentInput {
   mode?: string
   /** Shows the session as a tab of this project. Absent: no tab. */
   tab?: { projectId: string; title: string }
+  /** Called with the agent's own reason when the session could not start; `start` still
+   * resolves null. Since 6.2.0. */
+  onStartFailed?: (reason: string) => void
 }
 
 export interface AgentStarted {

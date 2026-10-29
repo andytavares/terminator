@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { PromptResponse } from '@agentclientprotocol/sdk'
+import { RequestError, type PromptResponse } from '@agentclientprotocol/sdk'
 import type {
   AgentPermissionAsk,
   AgentPermissionSettled,
@@ -19,9 +19,8 @@ import { fakeConnector, SESSION_ID, type FakeAgent } from './fake-agent'
 
 const turns = vi.hoisted(() => ({ setTurn: vi.fn(), clearTurn: vi.fn() }))
 const asks = vi.hoisted(() => ({ raiseAsk: vi.fn(), clearAsk: vi.fn() }))
-vi.mock('../../../../src/main/logger', () => ({
-  makeLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
-}))
+const log = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }))
+vi.mock('../../../../src/main/logger', () => ({ makeLogger: () => log }))
 vi.mock('../../../../src/main/agents/agent-turns', () => turns)
 vi.mock('../../../../src/main/agents/ask-watcher', () => asks)
 
@@ -156,6 +155,41 @@ describe('start — recording a tab', () => {
   it('returns null when the agent cannot start', async () => {
     const service = serviceWith(() => Promise.reject(new Error('no such file')))
     expect(await service.start({ cwd: '/work' })).toBeNull()
+  })
+})
+
+describe('a start that fails', () => {
+  const details = 'Mode dontAsk is not available in this session'
+
+  async function startFailing(failures: Parameters<typeof fakeConnector>[0], mode?: string) {
+    const fakes = fakeConnector(failures)
+    const onStartFailed = vi.fn()
+    const result = await serviceWith(fakes.connect).start({ cwd: '/work', mode, onStartFailed })
+    return { result, onStartFailed }
+  }
+
+  it('tells onStartFailed the details the agent gave when session/new fails', async () => {
+    const { result, onStartFailed } = await startFailing({
+      newSession: new RequestError(-32603, 'Internal error', { details }),
+    })
+    expect(result).toBeNull()
+    expect(onStartFailed.mock.calls).toEqual([[details]])
+  })
+
+  it('tells onStartFailed the details the agent gave when the mode is refused', async () => {
+    const { result, onStartFailed } = await startFailing(
+      { setSessionMode: new RequestError(-32603, 'Internal error', { details }) },
+      'dontAsk'
+    )
+    expect(result).toBeNull()
+    expect(onStartFailed.mock.calls).toEqual([[details]])
+  })
+
+  it('tells onStartFailed the message when the error carries no data', async () => {
+    const { onStartFailed } = await startFailing({
+      newSession: new RequestError(-32603, 'Internal error'),
+    })
+    expect(onStartFailed.mock.calls).toEqual([['Internal error']])
   })
 })
 
@@ -296,6 +330,55 @@ describe('prompt', () => {
     const { service, agent, sessionId } = await started()
     agent.onPrompt = () => Promise.reject(new Error('boom'))
     expect(await service.prompt(sessionId, 'hello')).toEqual({ stopReason: 'error' })
+  })
+})
+
+describe('a prompt that fails because its session was closed', () => {
+  // Foundry closes a role once it has answered; the prompt still open then fails with the
+  // connection, which the session's end already reports.
+  it('is not logged as an error', async () => {
+    const { service, agent, sessionId } = await started()
+    let fail: (error: Error) => void = () => undefined
+    const inFlight = new Promise<void>((sent) => {
+      agent.onPrompt = () =>
+        new Promise((_resolve, reject) => {
+          fail = reject
+          sent()
+        })
+    })
+    log.error.mockClear()
+    const turn = service.prompt(sessionId, 'hello')
+    await inFlight
+    await service.close(sessionId)
+    fail(new Error('ACP connection closed'))
+    expect(await turn).toEqual({ stopReason: 'error' })
+    expect(log.error).not.toHaveBeenCalled()
+  })
+
+  it('is still an error while the session is open', async () => {
+    const { service, agent, sessionId } = await started()
+    agent.onPrompt = () => Promise.reject(new Error('boom'))
+    log.error.mockClear()
+    await service.prompt(sessionId, 'hello')
+    expect(log.error).toHaveBeenCalledWith('agent prompt failed', expect.anything())
+  })
+})
+
+describe('a prompt whose connection closed first', () => {
+  it('is not logged as an error when the connection closed before the exit was seen', async () => {
+    const { service, agent, sessionId } = await started()
+    const inFlight = new Promise<void>((sent) => {
+      agent.onPrompt = () => {
+        sent()
+        return new Promise(() => undefined)
+      }
+    })
+    log.error.mockClear()
+    const turn = service.prompt(sessionId, 'hello')
+    await inFlight
+    agent.disconnect()
+    expect(await turn).toEqual({ stopReason: 'error' })
+    expect(log.error).not.toHaveBeenCalled()
   })
 })
 
@@ -521,6 +604,7 @@ describe('an agent that never answers', () => {
       agent: partialFake<AgentLink['agent']>({ initialize: () => new Promise(() => undefined) }),
       onExit: () => undefined,
       kill: vi.fn(),
+      stderrTail: () => '',
     }
     const service = serviceWith(async () => link)
     expect(await service.runOnce({ cwd: '/w', prompt: 'x' })).toMatchObject({
@@ -598,6 +682,7 @@ describe('an agent that never answers the mode', () => {
       }),
       onExit: () => undefined,
       kill: vi.fn(),
+      stderrTail: () => '',
     }
     const service = serviceWith(async () => link)
     expect(await service.start({ cwd: '/w', mode: 'default' })).toBeNull()
@@ -611,6 +696,7 @@ describe('an agent that exits before its session opens', () => {
       agent: partialFake<AgentLink['agent']>({ initialize: () => new Promise(() => undefined) }),
       onExit: (listener: (code: number | null) => void) => listener(127),
       kill: vi.fn(),
+      stderrTail: () => '',
     }
     const service = createAgentService({
       ...partialFake<AgentServiceDeps>({}),

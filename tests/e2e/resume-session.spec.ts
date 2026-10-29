@@ -16,7 +16,7 @@ import { expectTerminalFocused, openHome, openOverview } from './session-views'
 // Resume against the running app. A conversation is reported exactly as the
 // capture hook reports one — a file in the profile's agent-sessions directory —
 // so the whole path from report to control is exercised without running an
-// agent. Pressing Resume against a real agent is tests/e2e/live/resume-live.spec.ts.
+// agent.
 // Resume is on the Overview wall's tiles and in the Desk's work-thread drawer, which lists the
 // ended sessions of the work it opens.
 

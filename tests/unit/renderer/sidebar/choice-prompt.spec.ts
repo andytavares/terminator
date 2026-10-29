@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseChoicePrompt, samePrompt } from '../../../../src/renderer/sidebar/choice-prompt'
 
-// Captured from Claude Code 2.1.273 running in the app's own terminal
-// (tests/e2e/live/choice-prompt.spec.ts), blank rows below it included.
+// Captured from Claude Code 2.1.273 running in the app's own terminal,
+// blank rows below it included.
 const LIVE = readFileSync(join(__dirname, 'fixtures/claude-prompt-1.txt'), 'utf8').split('\n')
 
 const screen = (...lines: string[]): string[] => [...lines, '', '', '']

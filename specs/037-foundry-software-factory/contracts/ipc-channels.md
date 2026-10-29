@@ -90,6 +90,26 @@ turn, or hand-off.
 
 ---
 
+## `foundry:order.resume`
+
+Pick the Forge's loop up where it stopped, with no hold to record. The Forge's
+**Try again** sends it when a red-team round could not start.
+
+**Payload**:
+
+```typescript
+{
+  id: string
+}
+```
+
+**Reply**: the order view, or `{ error }`.
+
+**Ledger**: nothing of its own. It takes the same next step as a release: the
+next review round, a follow-up turn, or hand-off.
+
+---
+
 ## `foundry:forge.environment`
 
 Check the base branch again, or skip the check. Only a draft order can do either; any other answers `{ error: 'Only a draft order can check its base branch again.' }`.
