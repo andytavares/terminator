@@ -115,6 +115,7 @@ export const CORE_SPECS = [
   'sidebar-sorting.spec.ts',
   'start-work-run-as-keyboard.spec.ts',
   'terminal-breakout.spec.ts',
+  'usage.spec.ts',
 ]
 
 const SPEC_FILE_RE = /^tests\/e2e\/([^/]+\.spec\.ts)$/

@@ -31,6 +31,53 @@
         "description": "Open the vault on a task"
       }
     ],
-    "quickActions": { "group": { "mnemonic": "v", "label": "Task Vault" } }
+    "quickActions": {
+      "group": {
+        "mnemonic": "v",
+        "label": "Task Vault"
+      }
+    },
+    "usage": [
+      {
+        "id": "task-create",
+        "label": "Create a task"
+      },
+      {
+        "id": "inbox-process",
+        "label": "Process an inbox item"
+      },
+      {
+        "id": "task-complete",
+        "label": "Complete a task"
+      },
+      {
+        "id": "view-daily-log",
+        "label": "Open the daily log"
+      },
+      {
+        "id": "view-areas",
+        "label": "Open areas"
+      },
+      {
+        "id": "view-projects",
+        "label": "Open projects"
+      },
+      {
+        "id": "view-archive",
+        "label": "Open the archive"
+      },
+      {
+        "id": "file-to",
+        "label": "File to a project or area"
+      },
+      {
+        "id": "session-link",
+        "label": "Link a task to a session"
+      },
+      {
+        "id": "db-admin",
+        "label": "Open database admin"
+      }
+    ]
   }
 }

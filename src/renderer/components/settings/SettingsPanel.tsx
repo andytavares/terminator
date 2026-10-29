@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { ModalShell } from '@terminator/extension-ui'
 import { GlobalSettings } from './GlobalSettings'
 import { IntegrationsSettings } from './IntegrationsSettings'
 import { WorkspaceSettings } from './WorkspaceSettings'
 import { ExtensionsSection } from './ExtensionsSection'
 import { useWorkspaceStore } from '../../stores/workspace.store'
+import { recordUse } from '../../usage/record'
 import '@terminator/extension-ui/settings-fields.css'
 import './SettingsPanel.css'
 
@@ -17,6 +18,12 @@ interface Props {
 export function SettingsPanel({ onClose }: Props): JSX.Element {
   const [section, setSection] = useState<Section>('global')
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
+  useEffect(() => {
+    const label = SECTIONS.find((s) => s.section === section)?.label ?? section
+    recordUse(`core.settings.${section}`, 'shown', {
+      declare: { label: `Settings: ${label}`, kind: 'control', source: 'core' },
+    })
+  }, [section])
 
   return (
     <ModalShell label="Settings" className="settings-panel" onDismiss={onClose}>

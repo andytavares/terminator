@@ -5,6 +5,7 @@ import React from 'react'
 const mockMergeCommit = vi.fn()
 const mockClearSession = vi.fn()
 const mockNotify = vi.fn()
+const mockRecordUsage = vi.fn()
 
 vi.mock('../../src/api/merge-flow', () => ({
   mergeFlowAPI: {
@@ -59,6 +60,7 @@ const baseSession = {
 beforeEach(() => {
   vi.clearAllMocks()
   mockClearSession.mockResolvedValue({ success: true })
+  Object.assign(globalThis, { electronAPI: { usage: { record: mockRecordUsage } } })
   mockStoreState = {
     session: baseSession,
     clearSession: mockStoreClearSession,
@@ -108,6 +110,7 @@ describe('CompletionScreen — calls mergeCommit on commit button click', () => 
     await waitFor(() => {
       expect(onExit).toHaveBeenCalledOnce()
     })
+    expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('merge', {})
   })
 })
 
@@ -126,6 +129,7 @@ describe('CompletionScreen — shows error toast and stays on screen if commit f
       })
     })
     expect(onExit).not.toHaveBeenCalled()
+    expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('merge', { failed: true })
   })
 
   it('returns null when session is null', () => {

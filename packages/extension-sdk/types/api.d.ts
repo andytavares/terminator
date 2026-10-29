@@ -114,6 +114,9 @@ export interface CommandContribution {
   /** Shape of the `args` another surface may pass when it runs this command (v2.7.0, ADR-083). A
    * command without one never receives args. */
   args?: ZodTypeAny
+  /** The `contributes.usage` id this command counts under, for a command whose id holds data.
+   * Since 6.1.0. */
+  usage?: string
 }
 
 /** Core-owned focus context, passed outbound to a command's handler. */
@@ -593,6 +596,11 @@ export interface ExtensionAPI {
   }
   /** Publish what Home should show; core draws it (ADR 117). */
   home: HomeApi
+  usage: {
+    /** Counts one use of an id from this extension's `contributes.usage`. The core adds the
+     * extension id; an undeclared id is dropped and logged. Since 6.1.0. */
+    record(feature: string, outcome?: { failed?: boolean }): void
+  }
   nativeMenu: {
     addViewMenuItem(item: NativeMenuItemContribution): Disposable
   }

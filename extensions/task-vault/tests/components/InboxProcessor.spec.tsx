@@ -56,6 +56,7 @@ function fileToPickerTests() {
     const handlers = renderPicker('gar')
     fireEvent.mouseDown(await screen.findByText('Garden'))
     expect(handlers.onSelect).toHaveBeenCalledWith('projects/Garden.md')
+    expect(bridge.recordUsage.mock.calls).toEqual([['file-to']])
     fireEvent.mouseDown(screen.getByText('Create area "gar"'))
     expect(handlers.onSelectNew).toHaveBeenCalledWith('area', 'gar')
   })
@@ -115,6 +116,7 @@ function inboxProcessorClarifyingTests() {
     fireEvent.click(screen.getByRole('button', { name: 'Yes' }))
     fireEvent.click(screen.getByRole('button', { name: 'Do now — Today' }))
     await screen.findByText('2 of 2')
+    expect(bridge.recordUsage.mock.calls).toEqual([['inbox-process']])
     expect(bridge.calls('task-vault:vault:process-inbox-item')[0]).toEqual({
       taskId: 'i1',
       action: 'do-now',
@@ -131,6 +133,9 @@ function inboxProcessorFinishingTests() {
     fireEvent.click(screen.getByRole('button', { name: 'Trash it' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:process-inbox-item')).toHaveLength(1)
+    )
+    await eventually(() =>
+      expect(bridge.recordUsage).toHaveBeenCalledWith('inbox-process', { failed: true })
     )
     await act(async () => undefined)
     expect(screen.getByText('1 of 2')).toBeTruthy()

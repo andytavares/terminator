@@ -61,6 +61,7 @@ const optionTexts = () =>
 describe('SmartTaskInput suggestions', suggestionTests)
 describe('SmartTaskInput choosing', optionChoosingTests)
 describe('SmartTaskInput keyboard', keyboardTests)
+describe('SmartTaskInput blank submit', emptySubmitTests)
 describe('SmartTaskInput dates', dateTests)
 
 function suggestionTests() {
@@ -190,9 +191,18 @@ function keyboardEscapeAndEnterTests() {
     expect(document.querySelector('.smart-input__dropdown')).toBeNull()
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(spies.onSubmit).toHaveBeenCalledTimes(1)
+    expect(bridge.recordUsage.mock.calls).toEqual([['task-create']])
     typeInto(input, 'x +zz')
     fireEvent.keyDown(input, { key: 'Escape' })
     expect(spies.onCancel).not.toHaveBeenCalled()
+  })
+}
+
+function emptySubmitTests() {
+  it('does not count a submit of blank text', async () => {
+    const { input } = await renderSmartInput()
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(bridge.recordUsage).not.toHaveBeenCalled()
   })
 }
 

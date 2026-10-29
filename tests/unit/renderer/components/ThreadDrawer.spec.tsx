@@ -65,6 +65,9 @@ const OPEN_SESSION = {
   workItem: ticket('TAV-20'),
 }
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('ThreadDrawer terminal section', () => {
   it("shows the lead agent session's live terminal and opens it on click", () => {
     const agent = {

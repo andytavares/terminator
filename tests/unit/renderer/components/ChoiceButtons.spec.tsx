@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { ChoiceButtons } from '../../../../src/renderer/components/session/ChoiceButtons'
 
@@ -11,6 +11,10 @@ const prompt = {
     { number: 3, label: 'No' },
   ],
 }
+
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+beforeEach(() => recordUse.mockClear())
 
 describe('ChoiceButtons', () => {
   it('draws one button per option, in order, grouped under the question', () => {

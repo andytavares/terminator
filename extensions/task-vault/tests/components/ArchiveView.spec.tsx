@@ -5,7 +5,10 @@ import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 const mockInvoke = vi.fn()
 
 Object.defineProperty(window, 'electronAPI', {
-  value: { extensionBridge: { invoke: mockInvoke, on: vi.fn(() => () => {}) } },
+  value: {
+    extensionBridge: { invoke: mockInvoke, on: vi.fn(() => () => {}) },
+    usage: { record: vi.fn() },
+  },
   writable: true,
   configurable: true,
 })

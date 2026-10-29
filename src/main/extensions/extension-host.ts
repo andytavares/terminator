@@ -1,3 +1,4 @@
+import { declareUsage, manifestUsageFeatures } from './extension-usage.js'
 import { join } from 'path'
 import { readdirSync, existsSync, readFileSync } from 'fs'
 import { app } from 'electron'
@@ -371,8 +372,13 @@ export class ExtensionHost {
   private async activateBackend(
     record: ExtensionRecord
   ): Promise<{ ok: true } | { error: string; message: string }> {
-    const deps = { ...this.deps, shellRootSettings: declaredShellRoots(record) }
+    const deps = {
+      ...this.deps,
+      shellRootSettings: declaredShellRoots(record),
+      windowViewIds: record.contributes?.windowViews?.map((windowView) => windowView.id) ?? [],
+    }
     const api = createExtensionAPI(record.id, deps, record.rendererUrl)
+    declareUsage(manifestUsageFeatures(record.id, record.contributes))
     this.hostedApis.set(record.id, api)
     try {
       const { id, entryPoint, directoryPath: directory } = record

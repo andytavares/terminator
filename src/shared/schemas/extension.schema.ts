@@ -18,6 +18,11 @@ const StartWorkOptionSchema = z.object({
   command: z.string().min(1),
 })
 
+const UsageItemSchema = z.object({
+  id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,59}$/),
+  label: z.string().min(1).max(120),
+})
+
 const QuickActionsGroupSchema = z.object({
   mnemonic: z.string().length(1).optional(),
   label: z.string().min(1),
@@ -47,6 +52,8 @@ export const ExtensionContributesSchema = z
     quickActions: z.object({ group: QuickActionsGroupSchema.optional() }).optional(),
     /** Ways to run work from Home's Start work launcher, listed after Claude agent and Terminal only. */
     startWorkOptions: z.array(StartWorkOptionSchema).optional(),
+    /** Controls and actions the extension counts with `api.usage.record` (ADR 134). */
+    usage: z.array(UsageItemSchema).optional(),
     /** The extension's own folder settings whose directories its git and gh may run in (ADR 102). */
     shellRoots: z.array(z.string().min(1)).optional(),
   })
@@ -62,6 +69,7 @@ export const ExtensionContributesSchema = z
       commands,
       quickActions,
       startWorkOptions,
+      usage,
       shellRoots,
     } = data
     return {
@@ -74,6 +82,7 @@ export const ExtensionContributesSchema = z
       commands,
       quickActions,
       startWorkOptions,
+      usage,
       shellRoots,
     }
   })

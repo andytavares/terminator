@@ -8,7 +8,12 @@
 // does nothing.
 import { buildElectronApi, type ApiTransport } from '../shared/electron-api/build-api.js'
 import type { FrameElectronAPI } from '../shared/electron-api/api-type.js'
-import { FRAME_PORT_MESSAGE, type FrameReply, type FrameRequest } from '../shared/frame-wire.js'
+import {
+  FRAME_ACTIVITY_MESSAGE,
+  FRAME_PORT_MESSAGE,
+  type FrameReply,
+  type FrameRequest,
+} from '../shared/frame-wire.js'
 import {
   createDoubleEscapeDetector,
   escapeContextFromTarget,
@@ -34,6 +39,8 @@ if (window.top !== window) {
     const holder = { current: null as unknown as FrameShim }
     frameWindow.addEventListener('message', (event) => holder.current?.receiveWindowMessage(event))
     frameWindow.addEventListener('keydown', (event) => holder.current?.receiveKeydown(event))
+    frameWindow.addEventListener('keydown', reportActivity, true)
+    frameWindow.addEventListener('pointerdown', reportActivity, true)
     frameWindow.__frameShim = holder
   }
   frameWindow.__frameShim.current = createFrameShim()
@@ -175,6 +182,8 @@ function installFrameApi(link: FrameLink): void {
     subscribe: link.subscribe,
   }
   const locals = {
+    'usage.record': (feature: string, outcome?: { failed?: boolean }) =>
+      link.post({ type: 'usage', feature, failed: outcome?.failed }),
     'extensionBridge.invoke': (channel: string, payload?: unknown) => link.invoke(channel, payload),
     'extensionBridge.on': (channel: string, handler: (data: unknown) => void) =>
       link.subscribe(channel, (args) => handler(args[0])),
@@ -219,6 +228,10 @@ function createFrameKeydown(post: (message: FrameRequest) => void) {
 // accepts the message by its source window, so the target only keeps the number from other pages.
 function parentOrigin(): string {
   return document.referrer ? new URL(document.referrer).origin : '*'
+}
+
+function reportActivity(): void {
+  window.parent.postMessage({ type: FRAME_ACTIVITY_MESSAGE }, parentOrigin())
 }
 
 function reportContentHeight(): void {

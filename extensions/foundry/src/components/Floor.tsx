@@ -1,4 +1,5 @@
 import { GateCard } from './GateCard.js'
+import { RecordShown } from '../renderer/RecordShown.js'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   Terminal,
@@ -512,6 +513,7 @@ interface PageProps {
 function FloorPage({ floor, view }: PageProps) {
   return (
     <div className="fdry-shell">
+      <RecordShown feature="floor" />
       <OrderHeading view={view} />
       <FloorLinks view={view} reviewable={floor.reviewable} review={floor.review} />
       <RefineryQueue view={view} />

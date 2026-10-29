@@ -16,7 +16,7 @@ An end-to-end reference for every feature and extension in Terminator — an ext
 8. [Quick Actions](#8-quick-actions)
 9. [Settings](#9-settings)
 10. [Issue Tracking](#10-issue-tracking)
-11. [Home and the Overview Wall](#11-home-and-the-overview-wall)
+11. [Home, the Overview Wall and Usage](#11-home-the-overview-wall-and-usage)
 12. [Notification Center & Activity Indicators](#12-notification-center--activity-indicators)
 13. [Keyboard Shortcuts](#13-keyboard-shortcuts)
 14. [Extensions Overview](#14-extensions-overview)
@@ -185,17 +185,17 @@ Press **`Cmd+P`** from anywhere — a terminal, Home, Overview, or any extension
 
 At the top level, each row is a group or a direct action, and its box shows the letter that reaches it:
 
-| Key                 | Opens                                                                                                   |
-| ------------------- | ------------------------------------------------------------------------------------------------------- |
-| `t`                 | **Terminal…** — new tab, split right/down, close, clear, new scratch terminal, edit note, prev/next tab |
-| `s`                 | **Sessions…** — jump to any open session, searchable                                                    |
-| `w`                 | **Workspace…** — switch workspace, cycle, link/view/open the linked issue                               |
-| `x`                 | **Custom…** — your own shell and prompt actions (below)                                                 |
-| `g`                 | **Git** — commit, push, pull, create PR, open Git, open Code Reviews                                    |
-| `n`                 | **Notes** — new note, open Notes                                                                        |
-| `v`                 | **Task Vault** — capture to inbox, open Task Vault, open the calendar                                   |
-| `f`                 | **Foundry** — new work order, open Foundry, jump to the run that needs you                              |
-| `h` `o` `a` `b` `,` | Home, Overview, next session waiting on you, toggle sidebar, Settings — direct, one press               |
+| Key                     | Opens                                                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- |
+| `t`                     | **Terminal…** — new tab, split right/down, close, clear, new scratch terminal, edit note, prev/next tab |
+| `s`                     | **Sessions…** — jump to any open session, searchable                                                    |
+| `w`                     | **Workspace…** — switch workspace, cycle, link/view/open the linked issue                               |
+| `x`                     | **Custom…** — your own shell and prompt actions (below)                                                 |
+| `g`                     | **Git** — commit, push, pull, create PR, open Git, open Code Reviews                                    |
+| `n`                     | **Notes** — new note, open Notes                                                                        |
+| `v`                     | **Task Vault** — capture to inbox, open Task Vault, open the calendar                                   |
+| `f`                     | **Foundry** — new work order, open Foundry, jump to the run that needs you                              |
+| `h` `o` `u` `a` `b` `,` | Home, Overview, Usage, next session waiting on you, toggle sidebar, Settings — direct, one press        |
 
 A letter acts immediately: `g` then `p` pushes the focused branch, with no `Enter` needed. `Backspace` steps back up a level. An action you can't run right now (no repository focused, no linked issue, …) still shows — dimmed, with the reason in place of its description — rather than disappearing; pressing it shows the reason at the bottom of the panel instead of running.
 
@@ -398,7 +398,7 @@ only thing it can write is a comment, and only in two places:
 
 ---
 
-## 11. Home and the Overview Wall
+## 11. Home, the Overview Wall and Usage
 
 ### Home, the Tasks layout
 
@@ -585,6 +585,31 @@ Resume appears only where it can work:
 - If the conversation's transcript has been deleted (agent tabs of agents that keep no transcript always offer Resume), or the record came from another machine, the session says **Conversation no longer available** in place of the button.
 
 **How Terminator learns the conversation.** On first launch it adds a `SessionStart` entry (with the others described under Home) to your own `~/.claude/settings.json`. The entry runs a small script that records which conversation is running in which Terminator terminal, and writes nothing else. To turn the feature off, open that file and delete the entry under `hooks.SessionStart` whose command mentions `claude-hook.cjs`, then restart Claude Code sessions. Terminator will add it again the next time it starts, so remove it after quitting Terminator if you want it to stay gone. Nothing else in the file is touched, and a settings file Terminator cannot parse is never overwritten.
+
+### Usage
+
+**Usage** shows how much you use each feature of Terminator. It has no icon in the sidebar. Open it with **Window → Usage**, or press `Cmd+P` and then `u`.
+
+Terminator counts uses on this Mac only, in a local file, and sends nothing out. The header says **Counted on this Mac since** the first day it counted.
+
+- **Period.** **7 days**, **30 days**, **90 days** or **All time** sets the range for every number. The default is 30 days.
+- **Part.** The **All parts** menu narrows the screen to Core or to one extension.
+- **Cards.** **Features used** counts the features used in the period, out of the features that exist now. **Not used** counts features used before the period but not inside it. **Never used** counts features never used since Terminator first saw them, and says how many more are new. **Active time** adds up the time you spent on screens and panels, with the three largest.
+- **Table.** One group per part, Core first, then extensions by name. Each group says how many of its features were used and how many uses it had. Press a column header to sort. The default is **Uses**, highest first. **How it was reached** shows the path of each use: click, palette, shortcut or menu. **Failures** counts uses that failed.
+- **Drawer.** Press a row to see the facts for that feature, a bar for each day, and how it was reached. A screen also lists the controls inside it, so you can see which parts of a screen nobody uses. `Esc` closes the drawer.
+
+The state of a feature is a fact about the period, not a verdict:
+
+| State                   | Meaning                                                                                 |
+| ----------------------- | --------------------------------------------------------------------------------------- |
+| **Used**                | One use or more inside the period.                                                      |
+| **Not used in 30 days** | Used before the period, none inside it.                                                 |
+| **Never used**          | No use since Terminator first saw the feature.                                          |
+| **New**                 | Seen for the first time inside the period and not used yet, so a zero is not a verdict. |
+| **Gone**                | An earlier version had the feature. This version does not.                              |
+| **Extension off**       | The feature belongs to an extension that is installed and turned off.                   |
+
+A state follows this order: Gone, Extension off, New, Never used, Not used in the period, Used. The chips above the table show how many features are in each state; press one to narrow the table. Before anything is counted, the screen says **Nothing counted yet**.
 
 ---
 

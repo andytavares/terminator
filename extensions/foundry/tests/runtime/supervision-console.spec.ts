@@ -376,6 +376,10 @@ describe('the palette', () => {
       startPaletteRefresh(host.api)
       const go = host.commands.get('run.waiting-1')
       expect(go).toBeDefined()
+      const contributed = vi
+        .mocked(host.api.commands.register)
+        .mock.calls.find(([contribution]) => contribution.id === 'run.waiting-1')?.[0]
+      expect(contributed?.usage).toBe('go-to-run')
       go?.()
       expect(host.broadcast).toHaveBeenCalledWith('foundry:palette-goto', {
         kind: 'run',

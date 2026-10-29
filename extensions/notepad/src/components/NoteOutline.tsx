@@ -3,6 +3,7 @@ import { PanelRightClose } from 'lucide-react'
 import { IconButton } from '@terminator/extension-ui'
 import { useEditorStore } from '../stores/editor.store'
 import { parseOutline, type OutlineHeading } from '../editor/outline'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 interface NoteOutlineProps {
   /** Called with the heading's document offset when one is clicked. */
@@ -55,7 +56,10 @@ function OutlineItems({ headings, onSelect }: OutlineItemsProps): React.JSX.Elem
           className="notepad-outline__item"
           style={{ ['--outline-depth' as string]: heading.level - topLevel }}
           title={heading.text}
-          onClick={() => onSelect(heading.from)}
+          onClick={() => {
+            recordUsage('outline')
+            onSelect(heading.from)
+          }}
         >
           {heading.text}
         </button>

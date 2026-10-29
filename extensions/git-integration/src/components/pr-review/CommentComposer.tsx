@@ -4,6 +4,7 @@ import { RichContent } from './RichContent'
 import { githubAPI } from '../../api/github'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { choose } from '../text'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 interface NewCommentProps {
   repoRoot: string
@@ -77,8 +78,10 @@ function useComposer(props: Props) {
     setError(null)
     try {
       await sendReply(replyProps, body)
+      recordUsage('review-comment')
       replyProps.onSubmitted()
     } catch (e) {
+      recordUsage('review-comment', { failed: true })
       setError(String(e))
     } finally {
       setSubmitting(false)

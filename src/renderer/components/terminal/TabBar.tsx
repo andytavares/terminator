@@ -28,6 +28,7 @@ import { DESCRIPTION_MAX_LENGTH } from '../../../shared/session-description'
 import { moved } from '../../hooks/useDragReorder'
 import type { SessionFacts } from '../../sidebar/session-facts'
 import type { TerminalSession } from '../../../shared/types/index'
+import { recordUse } from '../../usage/record'
 
 /**
  * Past this many terminals the row scrolls, and it says so. Overflow being
@@ -242,7 +243,11 @@ function dropSessionTab(projectId: string, all: TerminalSession[], drawn: Termin
   return (sessionId: string) =>
     (point: ScreenPoint, overSessionId: string | null): void => {
       if (overSessionId === null) {
-        if (!isOverTerminatorWindow(point)) breakOut(sessionId, point)
+        if (isOverTerminatorWindow(point)) return
+        breakOut(sessionId, point)
+        recordUse('core.break-out', 'click', {
+          declare: { label: 'Break out to window', kind: 'action', source: 'core' },
+        })
         return
       }
       const from = drawn.findIndex((s) => s.id === sessionId)

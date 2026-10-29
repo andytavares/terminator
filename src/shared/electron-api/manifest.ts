@@ -87,6 +87,13 @@ import type { HomeFeedActionInputSchema, MergedHomeFeed } from '../schemas/home-
 import type { AgentAsk } from '../agent-sessions/ask'
 import type { AttentionInterval, AttentionMeasures } from '../home/attention-measures'
 import type { MeasuresInputSchema, RecordStateInputSchema } from '../schemas/attention.schema'
+import type {
+  UsageDeclareInputSchema,
+  UsageRecordInputSchema,
+  UsageReportInputSchema,
+  Via,
+} from '../schemas/usage.schema'
+import type { UsageReport } from '../usage/usage-types'
 
 type RemoteBehavior = 'same' | 'omit' | 'stub'
 
@@ -727,8 +734,14 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.executeCommand',
     kind: 'send',
     channel: 'extension:execute-command',
-    signature: signature<(key: string, ctx: CommandContext, args?: unknown) => void>(),
-    toPayload: (key, ctx, args) => ({ key, ctx, args }),
+    // `via` rides on the context and is split off, so a handler never sees it.
+    signature:
+      signature<(key: string, ctx: CommandContext & { via?: Via }, args?: unknown) => void>(),
+    toPayload: (key, context, args) => {
+      if (!context) return { key, ctx: context, args }
+      const { via, ...ctx } = context
+      return { key, ctx, args, via }
+    },
     extensionView: 'shared',
   }),
   // Run another extension's command by full id, e.g.
@@ -911,6 +924,14 @@ export const ELECTRON_API_MANIFEST = [
     toHandlerArgs: () => [],
   }),
   method({
+    path: 'extensionEvents.onMenuOpenUsage',
+    kind: 'event',
+    channel: 'menu:open-usage',
+    signature: signature<(handler: () => void) => Unsubscribe>(),
+    toHandlerArgs: () => [],
+    remote: 'omit',
+  }),
+  method({
     path: 'extensionEvents.onMenuOpenTaskSwitcher',
     kind: 'event',
     channel: 'menu:open-task-switcher',
@@ -1015,6 +1036,15 @@ export const ELECTRON_API_MANIFEST = [
     signature: signature<(handler: (sessionId: string) => void) => Unsubscribe>(),
     toHandlerArgs: (args) => [(args[0] as { sessionId: string }).sessionId],
     remote: 'omit',
+  }),
+
+  // The frame counts a use; main prefixes the extension id from the frame's own port, so a
+  // view cannot count under another extension. Frame-only: the app renderer uses usage.recordUse.
+  method({
+    path: 'usage.record',
+    kind: 'local',
+    signature: signature<(feature: string, outcome?: { failed?: boolean }) => void>(),
+    extensionView: 'only',
   }),
 
   // ── extensionBridge ───────────────────────────────────────────────────────
@@ -1500,6 +1530,45 @@ export const ELECTRON_API_MANIFEST = [
         (input: z.input<typeof MeasuresInputSchema>) => Promise<{ data: AttentionInterval[] }>
       >(),
     remote: 'omit',
+  }),
+
+  // ── usage counts (every use of every feature on this Mac; core only) ──────
+  // Stubbed remotely: a browser renders the same App, which counts, but counts only this Mac.
+  method({
+    path: 'usage.recordUse',
+    kind: 'invoke',
+    channel: 'usage:record',
+    signature:
+      signature<
+        (
+          input: z.input<typeof UsageRecordInputSchema>
+        ) => Promise<{ data: true } | { error: string; message: string }>
+      >(),
+    remote: 'stub',
+  }),
+  method({
+    path: 'usage.declare',
+    kind: 'invoke',
+    channel: 'usage:declare',
+    signature:
+      signature<
+        (
+          input: z.input<typeof UsageDeclareInputSchema>
+        ) => Promise<{ data: true } | { error: string; message: string }>
+      >(),
+    remote: 'stub',
+  }),
+  method({
+    path: 'usage.report',
+    kind: 'invoke',
+    channel: 'usage:report',
+    signature:
+      signature<
+        (
+          input: z.input<typeof UsageReportInputSchema>
+        ) => Promise<{ data: UsageReport } | { error: string; message: string }>
+      >(),
+    remote: 'stub',
   }),
 
   // ── home feed (what extensions publish for Home to draw; core only) ───────

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useCloseOnOutsidePress } from '@terminator/extension-ui'
 import { DateTimePicker } from './DateTimePicker'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 interface SmartTaskInputProps {
   value: string
@@ -232,7 +233,10 @@ function handleFieldKey(e: React.KeyboardEvent, props: SmartTaskInputProps, t: T
   } else if (e.key === 'Enter') {
     e.preventDefault()
     if (t.active) t.setActive(null)
-    else props.onSubmit()
+    else {
+      if (props.value.trim()) recordUsage('task-create')
+      props.onSubmit()
+    }
   }
 }
 

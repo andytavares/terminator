@@ -38,7 +38,7 @@ beforeEach(() => {
     return {}
   })
   Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke, on: bus.on } },
+    value: { extensionBridge: { invoke, on: bus.on }, usage: { record: vi.fn() } },
     configurable: true,
     writable: true,
   })

@@ -1,5 +1,6 @@
 import React from 'react'
 import type { ChoicePrompt } from '../../../shared/types/index'
+import { recordUse } from '../../usage/record'
 import './ResumeButton.css'
 import './ChoiceButtons.css'
 
@@ -25,7 +26,10 @@ export function ChoiceButtons({ prompt, onAnswer }: Props): JSX.Element {
           aria-label={`${option.number}. ${option.label}`}
           title={option.label}
           className={`choice-buttons__option${i === 0 ? ' choice-buttons__option--first' : ''}`}
-          onClick={() => onAnswer(option.number)}
+          onClick={() => {
+            recordUse('core.agent.answer-ask')
+            onAnswer(option.number)
+          }}
         >
           <span className="choice-buttons__number">{option.number}</span>
           <span className="choice-buttons__label">{option.label}</span>

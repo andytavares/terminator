@@ -6,6 +6,7 @@ import { AcrossRepos } from './AcrossRepos'
 import { RunAsChoices } from './RunAsChoices'
 import { agentLabel, useAgentChoices } from './agent-choices'
 import { startScratchSession } from '../../terminal/start-session'
+import { recordUse } from '../../usage/record'
 import {
   branchOf,
   cycleRunAs,
@@ -156,8 +157,10 @@ async function submit({ view, onClose, setError }: SubmitInput): Promise<void> {
   const request = requestFor(view, view.repo)
   if (request === null) return
   const message = await startWork(request)
-  if (message === null) onClose()
-  else setError(message)
+  if (message === null) {
+    recordUse('core.start-work.launch')
+    onClose()
+  } else setError(message)
 }
 
 /** The launcher: pick a ticket, a prompt or a branch, choose how to run it, press Enter. */

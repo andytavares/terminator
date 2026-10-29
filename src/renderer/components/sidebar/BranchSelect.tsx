@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { RefreshCw } from 'lucide-react'
+import { recordUse } from '../../usage/record'
 import type { Branch } from '../../../shared/types/index'
 import './dialog-fields.css'
 import './BranchSelect.css'
@@ -166,7 +167,10 @@ function BranchItem({ branch, active, onClick }: BranchItemProps): JSX.Element {
     <button
       type="button"
       className={`branch-select__item${active ? ' branch-select__item--active' : ''}`}
-      onClick={onClick}
+      onClick={() => {
+        recordUse('core.sidebar.branch-switch')
+        onClick()
+      }}
     >
       {branch.isCurrent && <span className="branch-select__check">✓</span>}
       <span className="branch-select__item-name">{branch.name}</span>

@@ -7,6 +7,7 @@ import { notificationsAPI } from '../../api/notifications'
 import type { ConflictFile, ConflictSession } from '../../schemas/merge-flow.schema'
 import { plural } from '@terminator/extension-sdk'
 import { choose, splitPath } from '../text'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 interface Props {
   repoRoot: string
@@ -127,7 +128,9 @@ function useMergeCommit(props: Props, session: ConflictSession | null) {
     if (!session) return
     setIsCommitting(true)
     try {
-      if (!(await commitMerge(props.repoRoot, session, commitMessage))) return
+      const merged = await commitMerge(props.repoRoot, session, commitMessage)
+      recordUsage('merge', merged ? {} : { failed: true })
+      if (!merged) return
       clearSession()
       props.onExit()
     } catch (e) {

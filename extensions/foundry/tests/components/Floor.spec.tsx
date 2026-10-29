@@ -93,7 +93,10 @@ function floorReplies(view: Record<string, unknown>, live: Record<string, unknow
   return replies
 }
 
+let recordUsage = vi.fn()
+
 function mount(view: Record<string, unknown>, live: Record<string, unknown> = {}) {
+  recordUsage = vi.fn()
   bus = createChangeBus()
   const replies = floorReplies(view, live)
   invoke = vi.fn(async (channel: string) =>
@@ -101,6 +104,7 @@ function mount(view: Record<string, unknown>, live: Record<string, unknown> = {}
   )
   Object.assign(window, {
     electronAPI: {
+      usage: { record: recordUsage },
       extensionBridge: { invoke, on: bus.on },
       shell: { openExternal },
       extension: { runCommand, hasCommand },
@@ -141,6 +145,11 @@ describe('the refinery queue', () => {
 })
 
 function thePositionTests() {
+  it('counts the Floor once when it is shown', async () => {
+    mount(reply({}))
+    await waitFor(() => expect(recordUsage).toHaveBeenCalledExactlyOnceWith('floor'))
+  })
+
   it('says the position and what it is behind, with the shared-file count', async () => {
     mount(
       reply({

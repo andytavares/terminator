@@ -177,6 +177,9 @@ const DEV_WORKTREE = {
   ...NOT_DETACHED,
 }
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('StartWork — my tickets', () => {
   it('groups tickets by state type, in progress first, and names each group', async () => {
     await open()

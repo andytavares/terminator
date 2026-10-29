@@ -21,8 +21,8 @@ function makeDeps(overrides: Partial<CoreActionDeps> = {}): CoreActionDeps {
   }
 }
 
-/** A fake for every handler an action can run. */
-function coreActionHandlers() {
+/** Fakes for the handlers that act on terminals, sessions and workspaces. */
+function sessionHandlers() {
   return {
     onNewTab: vi.fn(),
     onSplit: vi.fn(),
@@ -38,6 +38,13 @@ function coreActionHandlers() {
     onResume: vi.fn(),
     onSwitchWorkspace: vi.fn(),
     onCycleWorkspace: vi.fn(),
+  }
+}
+
+/** A fake for every handler an action can run. */
+function coreActionHandlers() {
+  return {
+    ...sessionHandlers(),
     onLinkIssue: vi.fn(),
     onLinkIssueBranch: vi.fn(),
     onViewIssue: vi.fn(),
@@ -47,6 +54,7 @@ function coreActionHandlers() {
     onTaskSwitcher: vi.fn(),
     onStartWork: vi.fn(),
     onOverview: vi.fn(),
+    onUsage: vi.fn(),
     onToggleSidebar: vi.fn(),
     onOpenSettings: vi.fn(),
     onToggleLog: vi.fn(),
@@ -235,6 +243,7 @@ const HANDLED_BY: [string, keyof CoreActionDeps, unknown[]][] = [
   ['core.switch-task', 'onTaskSwitcher', []],
   ['core.start-work', 'onStartWork', []],
   ['core.toggle-overview', 'onOverview', []],
+  ['core.open-usage', 'onUsage', []],
   ['core.next-waiting-top', 'onNextWaiting', []],
   ['core.toggle-sidebar', 'onToggleSidebar', []],
   ['core.open-settings', 'onOpenSettings', []],

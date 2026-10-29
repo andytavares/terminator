@@ -108,6 +108,8 @@ function failingBaseline(commit: string): Baseline {
   }
 }
 
+beforeEach(() => host.recordUsage.mockClear())
+
 describe('an agreed order whose checks pass', () => {
   it('opens a draft, watches CI to green, asks whether it is ready, and is shipped', async () => {
     githubWithOneDraft(() => checks('pass'))
@@ -117,6 +119,13 @@ describe('an agreed order whose checks pass', () => {
       expect.arrayContaining(['run.complete', 'ship.draft_opened'])
     )
     expect(await gateIdFor('ready-for-review')).toBeTruthy()
+  })
+
+  it('counts the run starting and the order opening its pull request', async () => {
+    githubWithOneDraft(() => checks('pass'))
+    await startOrderRun(agreedLineOrder(repo))
+    await untilShipped()
+    expect(host.recordUsage.mock.calls).toEqual([['run-start'], ['ship']])
   })
 })
 

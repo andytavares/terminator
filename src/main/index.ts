@@ -31,6 +31,9 @@ import { disposeAgentService, startAgentService } from './agents/acp/agent-servi
 import { registerTaskHandlers } from './ipc/task.ipc.js'
 import { loadTasks } from './tasks/task-store.js'
 import { registerAttentionHandlers } from './ipc/attention.ipc.js'
+import { registerUsageHandlers } from './ipc/usage.ipc.js'
+import { initUsageStore, getUsageStore, closeUsageStore } from './usage/usage-store.js'
+import { CORE_FEATURES } from '../shared/usage/core-features.js'
 import { loadAttentionLog } from './home/attention-log.js'
 import { startAskWatcher } from './agents/ask-watcher.js'
 import { registerAgentUsageHandlers } from './ipc/agent-usage.ipc.js'
@@ -57,6 +60,7 @@ import {
 import { onWorkspacesChanged } from './storage/workspace-store.js'
 import { createExtProtocolHandler } from './extensions/ext-protocol.js'
 import { EXTENSION_BASE_CSS } from '@terminator/extension-ui/extension-base-css'
+import { recordUsage } from './extensions/extension-usage.js'
 import { FrameBridge, registerFramePortChannel } from './extensions/frame-bridge.js'
 import { routeExtensionExitRequest, type ExtensionSurface } from './extensions/extension-exit.js'
 import { flushLogs, logger } from './logger.js'
@@ -88,6 +92,8 @@ const frameBridge = new FrameBridge({
   onExitRequest: (surface) => exitExtensionSurface(surface),
   onQuickActionsOpen: () => mainWindow?.webContents.send('quick-actions:open'),
   onSettingsOpen: () => mainWindow?.webContents.send('menu:open-settings'),
+  onUsage: (extensionId, feature, failed) =>
+    recordUsage({ feature: `${extensionId}.${feature}`, via: 'click', failed }),
 })
 const ptyManager = new PtyManager()
 // Reads core state the way an extension's API does, for the extension host's snapshot.
@@ -390,6 +396,7 @@ function registerSessionHandlers(): OutputRelay {
   registerAgentsHandlers()
   registerTaskHandlers(() => mainWindow)
   registerAttentionHandlers()
+  registerUsageHandlers()
   registerAgentUsageHandlers()
   registerThreadSummaryHandler()
   registerHomeFeedHandlers(() => mainWindow)
@@ -489,6 +496,17 @@ function startExtensions(loginShellPath: Promise<void>): void {
 enterBackgroundMode()
 exposeReadinessToTests()
 
+/** Counting must never stop the app starting: a usage.sqlite that cannot open is logged. */
+async function startUsageCounting(userData: string): Promise<void> {
+  try {
+    initUsageStore(userData)
+    await getUsageStore().declare(CORE_FEATURES)
+    await getUsageStore().recordUse({ feature: 'core.app.launch', via: 'app' })
+  } catch (error) {
+    logger.warn(`usage counting is off: ${String(error)}`)
+  }
+}
+
 app.whenReady().then(async () => {
   logger.info('App ready', { version: app.getVersion() })
   // Slow (a login shell starts) and only extensions need its result, so it runs
@@ -498,6 +516,7 @@ app.whenReady().then(async () => {
 
   const userData = app.getPath('userData')
   initAppDb(userData)
+  await startUsageCounting(userData)
   registerExtProtocol()
 
   const terminalRelay = registerSessionHandlers()
@@ -550,6 +569,7 @@ app.on('before-quit', async (event) => {
   await disposeAgentService()
   await ptyManager.killAll()
   closeAppDb()
+  closeUsageStore()
   // Last, so what the steps above logged reaches the file before the process ends.
   await flushLogs()
   app.exit(0)

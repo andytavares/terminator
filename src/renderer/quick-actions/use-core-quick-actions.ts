@@ -172,6 +172,7 @@ function nextWaiting(c: CoreContext): void {
 }
 
 const showHome = (): void => useExtensionRegistry.getState().setActiveGlobalTab('core.home')
+const showUsage = (): void => useExtensionRegistry.getState().setActiveGlobalTab('core.usage')
 
 /** Home, with the drawer of the latest resumable conversation open when there is one. */
 function showResumable(): void {
@@ -223,9 +224,10 @@ function issueHandlers(c: CoreContext): Handlers<'onLinkIssue' | 'onCopyIssueKey
 
 function shellHandlers(
   shell: ShellCommands
-): Handlers<'onOverview' | 'onToggleSidebar' | 'onOpenSettings' | 'onToggleLog'> {
+): Handlers<'onOverview' | 'onUsage' | 'onToggleSidebar' | 'onOpenSettings' | 'onToggleLog'> {
   return {
     onOverview: shell.onToggleOverview,
+    onUsage: showUsage,
     onToggleSidebar: shell.onToggleSidebar,
     onOpenSettings: shell.onOpenSettings,
     onToggleLog: shell.onToggleLog,

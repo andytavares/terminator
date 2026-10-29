@@ -7,6 +7,9 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('SidebarSearch', () => {
   it('renders a text input element', () => {
     render(<SidebarSearch query="" onChange={vi.fn()} onClear={vi.fn()} />)
@@ -18,6 +21,7 @@ describe('SidebarSearch', () => {
     render(<SidebarSearch query="" onChange={onChange} onClear={vi.fn()} />)
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'api' } })
     expect(onChange).toHaveBeenCalledWith('api')
+    expect(recordUse).toHaveBeenCalledWith('core.sidebar.search')
   })
 
   it('calls onClear on Escape keydown', () => {

@@ -43,6 +43,9 @@ beforeEach(() => {
   useIntegrationsStore.setState({ connections: [], connectError: {}, loading: false })
 })
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('IntegrationsSettings — rendering', () => {
   it('lists the tracker whether or not it is connected', async () => {
     await renderWith([connection()])

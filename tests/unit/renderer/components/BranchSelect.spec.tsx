@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { BranchSelect } from '../../../../src/renderer/components/sidebar/BranchSelect'
 import type { Branch } from '../../../../src/shared/types/index'
@@ -9,6 +9,10 @@ const branches: Branch[] = [
   { name: 'feature/a', isCurrent: false, isRemote: false },
   { name: 'feature/b', isCurrent: false, isRemote: false },
 ]
+
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+beforeEach(() => recordUse.mockClear())
 
 describe('BranchSelect', () => {
   it('renders the current value in the trigger', () => {
@@ -76,6 +80,7 @@ describe('BranchSelect — shows no matching branches message when filter has no
     fireEvent.click(screen.getByRole('button', { name: /main/i }))
     fireEvent.click(screen.getByText('feature/a'))
     expect(onChange).toHaveBeenCalledWith('feature/a')
+    expect(recordUse).toHaveBeenCalledWith('core.sidebar.branch-switch')
     expect(screen.queryByPlaceholderText('Search branches…')).toBeNull()
   })
 

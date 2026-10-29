@@ -42,6 +42,9 @@ const REMOTE_LOCALS = {
   'fs.onChanged': () => () => {},
   'extensionBridge.invoke': vi.fn(),
   'extensionBridge.on': vi.fn(),
+  'usage.recordUse': () => Promise.resolve({ data: true }),
+  'usage.declare': () => Promise.resolve({ data: true }),
+  'usage.report': () => Promise.resolve({ data: { countingSince: null, features: [] } }),
 }
 
 function nativeBridge() {
@@ -112,6 +115,16 @@ describe('buildElectronApi — native mode events', () => {
     api.extensionEvents.onMenuOpenHome(handler)
     t.push('menu:open-home')
     expect(handler).toHaveBeenCalledTimes(1)
+    expect(handler).toHaveBeenCalledWith()
+  })
+})
+
+describe('buildElectronApi — the Usage menu event', () => {
+  it('delivers menu:open-usage to onMenuOpenUsage with no args', () => {
+    const { t, api } = nativeBridge()
+    const handler = vi.fn()
+    api.extensionEvents.onMenuOpenUsage(handler)
+    t.push('menu:open-usage')
     expect(handler).toHaveBeenCalledWith()
   })
 })
@@ -342,6 +355,7 @@ describe('buildElectronApi — the manifest is the whole surface', () => {
 })
 
 const FRAME_LOCALS = {
+  'usage.record': vi.fn(),
   'extensionBridge.invoke': vi.fn(),
   'extensionBridge.on': vi.fn(),
 }
@@ -413,6 +427,7 @@ const FRAME_API_PATHS = [
   'terminal.listSessions',
   'terminal.onProcessExit',
   'terminal.resize',
+  'usage.record',
   'workspace.create',
   'workspace.delete',
   'workspace.getActive',

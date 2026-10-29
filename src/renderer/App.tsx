@@ -38,6 +38,7 @@ import { MainArea } from './shell/MainArea'
 import { useShownInMain } from './components/sidebar/useShownInMain'
 import { useSidebarVisibility } from './shell/useSidebarVisibility'
 import { ShellOverlays } from './shell/ShellOverlays'
+import { useTrackSurfaces } from './usage/track-surfaces'
 
 export function App(): JSX.Element {
   const { windows, palette, launch, note, quickActions } = useShellParts()
@@ -72,6 +73,7 @@ function useShellParts() {
   const note = useNoteEditing()
   const scratchActive = useWorkspaceStore((s) => s.scratchActive)
   useShellShortcuts({ windows, palette, launch, note, scratchActive })
+  useTrackSurfaces()
   const surfaces = useSurfaces()
   const showSurface = useShowSurface()
   useShellEffects({ windows, palette, surfaces, showSurface })

@@ -4,6 +4,7 @@ import { Button, Drawer, Kbd } from '@terminator/extension-ui'
 import { SESSION_ACTIONS } from '../session/session-actions'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useNow } from '../session/useNow'
+import { recordUse } from '../../usage/record'
 import { useDeskSelection } from './desk-selection'
 import { useWorkThreads } from './useWorkThreads'
 import { pullRequestOf, stateCaption } from './thread-format'
@@ -117,6 +118,10 @@ export function ThreadDrawer(): JSX.Element | null {
   const now = useNow(MINUTE_MS)
   const thread = threads.find((t) => t.key === openKey)
   useReturnFocusToRow(thread?.key)
+  const openedKey = thread?.key
+  useEffect(() => {
+    if (openedKey !== undefined) recordUse('core.home.thread-drawer', 'click')
+  }, [openedKey])
   if (!thread) return null
   return (
     <Drawer label={thread.title} onDismiss={closeThread}>

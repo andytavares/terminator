@@ -93,6 +93,9 @@ beforeEach(() => {
 const card = (question: string): HTMLElement =>
   screen.getByText(question, { exact: false }).closest('.tmui-metric-card') as HTMLElement
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('Insights: the cards', () => {
   it('shows the shipped count for the week, cut from the weekly points, against last week', async () => {
     render(<Insights />)

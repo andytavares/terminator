@@ -1,6 +1,7 @@
 import { useShallow } from 'zustand/react/shallow'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { WORKSPACE_PRESET_COLORS as PRESET_COLORS } from './workspace-colors'
+import { recordUse } from '../../usage/record'
 import { WorkspaceDialog, showSaveError, useWorkspaceForm } from './workspace-form'
 
 interface Props {
@@ -64,7 +65,8 @@ function useCreateWorkspace(onClose: () => void) {
  * with no branches would keep its name from the retry the message asks for. */
 async function addCheckoutOrUndo(workspaceId: string, folderPath: string): Promise<string | null> {
   const failure = await addCheckout(workspaceId, folderPath)
-  if (failure !== null) await useWorkspaceStore.getState().deleteWorkspace(workspaceId)
+  if (failure === null) recordUse('core.sidebar.workspace-create')
+  else await useWorkspaceStore.getState().deleteWorkspace(workspaceId)
   return failure
 }
 

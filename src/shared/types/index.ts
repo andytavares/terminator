@@ -150,6 +150,8 @@ interface ExtensionContributes {
   quickActions?: { group?: { mnemonic?: string; label: string } }
   /** Ways to run work from the Start work launcher; `command` is one of the extension's command ids. */
   startWorkOptions?: Array<{ id: string; label: string; description: string; command: string }>
+  /** Controls and actions the extension counts under its id (SDK 6.1.0). */
+  usage?: Array<{ id: string; label: string }>
   /** Keys of the extension's own folder settings whose directories its git and gh may run in. */
   shellRoots?: string[]
 }

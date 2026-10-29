@@ -6,6 +6,7 @@ import { usePrReviewStore } from '../../stores/pr-review.store'
 import type { DraftComment } from '../../schemas/pr-review.schema'
 import { choose } from '../text'
 import './review-submit.css'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 interface Props {
   repoRoot: string
@@ -102,10 +103,12 @@ function useReviewSubmit(props: Props) {
     setError(null)
     try {
       await sendReview(sub)
+      recordUsage('review-comment')
       if (drafts.length > 0) clearDrafts({ repoRoot, prNumber, headSHA })
       if (event === 'APPROVE' && props.onApproved) return props.onApproved()
       setSubmitted(true)
     } catch (e) {
+      recordUsage('review-comment', { failed: true })
       setError(String(e).replace(/^Error:\s*/, ''))
     } finally {
       setSubmitting(false)

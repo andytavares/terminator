@@ -207,6 +207,9 @@ const branchRows = (c: HTMLElement) => Array.from(c.querySelectorAll('.branch-ro
 const branchNames = (c: HTMLElement) =>
   branchRows(c).map((r) => r.querySelector('.branch-row__name')!.textContent)
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('UnifiedSidebar — the list is branches, not terminals (US1)', () => {
   it('lists one row per branch and no terminals at all', () => {
     const { container } = renderSidebar()

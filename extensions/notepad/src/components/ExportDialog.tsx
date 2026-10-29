@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react'
 import { Button, Dialog } from '@terminator/extension-ui'
 import { useNotesStore } from '../stores/notes.store'
 import type { NoteListItem } from '../db/types'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 type ExportScope = 'all' | 'note'
 type CommentFormat = 'sidecar' | 'inline' | 'both'
@@ -163,6 +164,7 @@ function useExportRun(options: ExportOptions, noteId: string | undefined) {
     setRunning(true)
     try {
       setExportResult(await runExport(options, noteId))
+      recordUsage('export')
     } finally {
       setRunning(false)
     }

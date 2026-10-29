@@ -4,6 +4,7 @@ import type { PullRequest } from '../schemas/git.schema'
 import { RichContent } from './pr-review/RichContent'
 import { githubAPI } from '../api/github'
 import { choose } from './text'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 interface Branch {
   name: string
@@ -204,9 +205,11 @@ function usePrCreate(props: PrDialogProps, form: PrForm) {
     setError(null)
     try {
       const result = await ghPrCreate(draftOf(props, form), setCreatingStatus)
+      recordUsage('pr-create', 'error' in result ? { failed: true } : {})
       if ('error' in result) setError(result.error)
       else props.onCreated(result.pr)
     } catch (err) {
+      recordUsage('pr-create', { failed: true })
       setError(String(err))
     } finally {
       setIsCreating(false)

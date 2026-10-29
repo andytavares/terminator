@@ -62,6 +62,7 @@ export function buildWindowMenu(
         accelerator: 'CmdOrCtrl+Shift+H',
         click: () => send('menu:open-home'),
       },
+      { label: 'Usage', click: () => send('menu:open-usage') },
       {
         label: 'Switch Task…',
         accelerator: 'CmdOrCtrl+J',

@@ -65,6 +65,9 @@ beforeEach(() => {
 const options = () =>
   screen.getAllByRole('option').map((o) => within(o).getByText(/^[A-Z]/).textContent)
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('TaskSwitcher — what it lists', () => {
   it('lists tasks grouped in state order, needs you first, leaving archived ones out', () => {
     render(<TaskSwitcher />)

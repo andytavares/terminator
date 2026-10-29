@@ -6,6 +6,7 @@ import { OFF, reduceStatus, tunnelDropped, type RemoteStatus } from '../state/st
 import type { ConnectedDevice } from '../server/connected-devices'
 import { RemoteControlSettings } from './RemoteControlSettings'
 import './remote-control-view.css'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 type StatusUpdate = React.Dispatch<React.SetStateAction<RemoteStatus>>
 
@@ -106,7 +107,13 @@ function StatusBand(props: { status: RemoteStatus; setStatus: StatusUpdate }): R
       setBusy(true)
       if (next) setStatus((p) => (p.kind === 'off' ? { kind: 'starting', port: 7681 } : p))
       try {
-        await window.electronAPI.extensionBridge.invoke('remote:toggle', { enabled: next })
+        const result = await window.electronAPI.extensionBridge.invoke('remote:toggle', {
+          enabled: next,
+        })
+        if (next) {
+          const refused = !!(result as { error?: string } | null)?.error
+          recordUsage('server-start', refused ? { failed: true } : undefined)
+        }
       } finally {
         setBusy(false)
       }

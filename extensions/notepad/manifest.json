@@ -13,18 +13,59 @@
       "view": "main"
     },
     "windowViews": [
-      { "id": "notepad-note", "view": "note" },
-      { "id": "notepad-diagram", "view": "diagram" }
+      {
+        "id": "notepad-note",
+        "view": "note"
+      },
+      {
+        "id": "notepad-diagram",
+        "view": "diagram"
+      }
     ],
     "commands": [
       {
         "id": "notepad:quick-create",
         "label": "New note",
         "description": "Open quick-create overlay",
-        "shortcut": "⌘⇧N",
+        "shortcut": "\u2318\u21e7N",
         "mnemonic": "n"
       }
     ],
-    "quickActions": { "group": { "mnemonic": "n", "label": "Notes" } }
+    "quickActions": {
+      "group": {
+        "mnemonic": "n",
+        "label": "Notes"
+      }
+    },
+    "usage": [
+      {
+        "id": "note-create",
+        "label": "Create note"
+      },
+      {
+        "id": "search",
+        "label": "Search notes"
+      },
+      {
+        "id": "comment",
+        "label": "Add comment"
+      },
+      {
+        "id": "tag",
+        "label": "Add tag"
+      },
+      {
+        "id": "export",
+        "label": "Export notes"
+      },
+      {
+        "id": "outline",
+        "label": "Use outline"
+      },
+      {
+        "id": "diagram-create",
+        "label": "Create diagram"
+      }
+    ]
   }
 }

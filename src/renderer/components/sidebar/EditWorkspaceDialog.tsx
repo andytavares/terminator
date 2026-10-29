@@ -1,11 +1,17 @@
 import { useShallow } from 'zustand/react/shallow'
 import type { Workspace } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
+import { recordUse } from '../../usage/record'
 import { WorkspaceDialog, showSaveError, useWorkspaceForm } from './workspace-form'
 
 interface Props {
   workspace: Workspace
   onClose: () => void
+}
+
+function closeAfterSave(onClose: () => void): void {
+  recordUse('core.sidebar.workspace-edit')
+  onClose()
 }
 
 export function EditWorkspaceDialog({ workspace, onClose }: Props): JSX.Element {
@@ -48,7 +54,7 @@ function useEditWorkspace(workspace: Workspace, onClose: () => void) {
       color,
       tags: form.tagList(),
     })
-    if (!showSaveError(form, result, 'Failed to update workspace')) onClose()
+    if (!showSaveError(form, result, 'Failed to update workspace')) closeAfterSave(onClose)
   }
 
   return { form, save: submitWorkspaceEdit }

@@ -10,6 +10,7 @@ vi.mock('../../src/components/pr-review/RichContent', () => ({
 }))
 
 const mockPrCommentReply = vi.fn()
+const mockRecordUsage = vi.fn()
 
 vi.mock('../../src/api/github', () => ({
   githubAPI: {
@@ -26,6 +27,7 @@ vi.mock('../../src/stores/pr-review.store', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  Object.assign(globalThis, { electronAPI: { usage: { record: mockRecordUsage } } })
 })
 
 const newCommentProps = {
@@ -161,6 +163,7 @@ describe('CommentComposer (reply)', () => {
     )
     expect(mockAddDraft).not.toHaveBeenCalled()
     expect(onSubmitted).toHaveBeenCalled()
+    expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('review-comment')
   })
 })
 
@@ -171,5 +174,6 @@ describe('CommentComposer (reply) — shows error when reply submission returns 
     fireEvent.change(screen.getByPlaceholderText(/Leave a comment/), { target: { value: 'Hi' } })
     fireEvent.click(screen.getByText('Reply'))
     await screen.findByText(/FORBIDDEN/)
+    expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('review-comment', { failed: true })
   })
 })

@@ -1,5 +1,6 @@
 import React from 'react'
 import { SegmentedControl } from '@terminator/extension-ui'
+import { recordUse } from '../../usage/record'
 import type { RunAs, RunAsOption } from './start-work'
 
 interface RunAsChoicesProps {
@@ -15,7 +16,13 @@ export function RunAsChoices({ options, runAs, onPick }: RunAsChoicesProps): JSX
       label="Run it as"
       className="start-work__options"
       value={runAs}
-      onChange={onPick}
+      onChange={(value) => {
+        const option = options.find((candidate) => candidate.value === value)
+        recordUse(`core.start-work.option.${value}`, 'click', {
+          declare: { label: `Run as ${option?.label ?? value}`, kind: 'control', source: 'core' },
+        })
+        onPick(value)
+      }}
       options={options.map((option) => ({
         value: option.value,
         accessibleName: option.label,

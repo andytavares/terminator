@@ -53,6 +53,7 @@ export interface CoreActionDeps {
   onTaskSwitcher(): void
   onStartWork(): void
   onOverview(): void
+  onUsage(): void
   onToggleSidebar(): void
   onOpenSettings(): void
   onToggleLog(): void
@@ -296,6 +297,13 @@ const TOP_ACTIONS: CoreActionSpec[] = [
     mnemonic: 'o',
     shortcut: '⌘⇧E',
     run: (d) => d.onOverview(),
+  },
+  {
+    id: 'core.open-usage',
+    label: 'Usage',
+    group: 'top',
+    mnemonic: 'u',
+    run: (d) => d.onUsage(),
   },
   {
     id: 'core.next-waiting-top',

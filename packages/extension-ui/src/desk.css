@@ -235,3 +235,96 @@ button.tmui-checkbox {
   width: 10px;
   height: 10px;
 }
+
+.tmui-share-bar {
+  display: inline-flex;
+  width: 90px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--tm-track);
+  vertical-align: middle;
+}
+.tmui-share-bar__part {
+  display: block;
+  height: 100%;
+}
+.tmui-share-bar__part--accent {
+  background: var(--tm-accent);
+}
+.tmui-share-bar__part--info {
+  background: var(--tm-syntax-literal);
+}
+.tmui-share-bar__part--good {
+  background: var(--tm-success);
+}
+.tmui-share-bar__part--warning {
+  background: var(--tm-warning);
+}
+.tmui-share-bar__part--neutral {
+  background: var(--tm-idle);
+}
+
+.tmui-data-table {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--tm-border);
+  border-collapse: collapse;
+  border-radius: var(--tm-radius-md);
+  background: var(--tm-bg-surface);
+  font-size: 12px;
+}
+.tmui-data-table th,
+.tmui-data-table td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--tm-border);
+  text-align: start;
+  white-space: nowrap;
+}
+.tmui-data-table__head {
+  border-bottom-color: var(--tm-border-strong);
+  background: var(--tm-bg-card);
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.tmui-data-table__sort {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.tmui-data-table__arrow {
+  margin-inline-start: 4px;
+  color: var(--tm-accent-text);
+}
+.tmui-data-table__group th {
+  padding: 6px 12px;
+  background: var(--tm-bg-card);
+  color: var(--tm-text-secondary);
+  font-size: 11.5px;
+  font-weight: 400;
+}
+.tmui-data-table__row[tabindex] {
+  cursor: pointer;
+}
+.tmui-data-table__row:hover td {
+  background: var(--tm-bg-card-hover);
+}
+.tmui-data-table__row--selected td {
+  background: var(--tm-accent-dim);
+}
+.tmui-data-table__row:focus-visible {
+  outline: 2px solid var(--tm-accent);
+  outline-offset: -2px;
+}
+.tmui-data-table .tmui-data-table__cell--end {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}

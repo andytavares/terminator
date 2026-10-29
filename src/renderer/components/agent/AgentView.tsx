@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Square } from 'lucide-react'
 import { Button } from '@terminator/extension-ui'
 import type { AgentPermissionAsk } from '@terminator/extension-sdk'
 import { useSessionStore } from '../../stores/session.store'
 import { inputSummary, type ToolEntry, type Transcript, type Usage } from './fold-updates'
 import { useAgentTranscript } from './use-agent-transcript'
+import { recordUse } from '../../usage/record'
 import './AgentView.css'
 
 /** Context used as a percentage, and the cost when the agent reports one. */
@@ -136,6 +137,7 @@ function Composer({ sessionId, disabled, running }: ComposerProps): JSX.Element 
 export function AgentView({ sessionId }: { sessionId: string }): JSX.Element {
   const { transcript, asks, exited } = useAgentTranscript(sessionId)
   const running = useSessionStore((s) => s.sessions.get(sessionId)?.agentTurn === true)
+  useEffect(() => recordUse('core.agent.view', 'shown'), [sessionId])
   const answer = (requestId: string, optionId: string): void =>
     void window.electronAPI.agents.answer({ sessionId, requestId, optionId })
   return (

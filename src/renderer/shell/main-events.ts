@@ -12,6 +12,8 @@ import { isExtensionViewShown } from '../stores/shown-extension-views.store'
 import { dispatchNotification } from '../lib/notifications'
 import { recordDirectUse } from '../quick-actions/usage'
 import { findSurface, type SurfaceRegistration } from '../quick-actions/surface-actions'
+import { recordUse } from '../usage/record'
+import type { Via } from '../../shared/schemas/usage.schema'
 import { adoptTerminalSession } from '../terminal/session-controller'
 import { revealSession } from '../terminal/navigate-to-session'
 import { useTaskSwitcher } from '../components/task-switcher/task-switcher.store'
@@ -22,8 +24,9 @@ import { switchLane } from '../terminal/switch-lane'
 // and what extensions ask the shell to do.
 
 /** Counts a use of a core shortcut, so the palette stops hinting at it once the operator knows
- * it. Writes only when the count changed. */
-export function recordDirectShortcut(actionId: string): void {
+ * it. Writes only when the count changed. Every press also counts as a use of the feature. */
+export function recordDirectShortcut(actionId: string, via: Via = 'shortcut'): void {
+  recordUse(actionId, via)
   const current = useSettingsStore.getState().globalSettings?.quickActions?.directUse ?? []
   const directUse = recordDirectUse(current, actionId)
   if (directUse !== current) void useSettingsStore.getState().updateQuickActions({ directUse })
@@ -38,7 +41,7 @@ export interface MenuHandlers {
 
 /** Closes the active terminal of whatever is showing, scratch or the active branch. */
 function closeActiveTab(): void {
-  recordDirectShortcut('core.close-tab')
+  recordDirectShortcut('core.close-tab', 'menu')
   const { scratchActive, activeProjectId } = useWorkspaceStore.getState()
   const projectId = scratchActive ? SCRATCH_PROJECT_ID : activeProjectId
   const sessionId = useSessionStore.getState().projectViews.get(projectId ?? '')?.activeSessionId
@@ -51,13 +54,13 @@ function closeActiveTab(): void {
 type MenuEvents = typeof window.electronAPI.extensionEvents
 type Unsubscribe = (() => void) | undefined
 
-/** Wraps a menu action so it also counts as a direct use of that shortcut. */
+/** Wraps a menu action so it also counts as a direct use of that shortcut, via the menu. */
 function countedShortcut<Args extends unknown[]>(
   actionId: string,
   run: (...args: Args) => void
 ): (...args: Args) => void {
   return (...args) => {
-    recordDirectShortcut(actionId)
+    recordDirectShortcut(actionId, 'menu')
     run(...args)
   }
 }

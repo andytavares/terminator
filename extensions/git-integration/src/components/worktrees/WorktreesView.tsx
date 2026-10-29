@@ -13,6 +13,7 @@ import { gitAPI } from '../../api/git'
 import type { LocalInventoryRow } from '../../git/local-inventory'
 import type { RemoveItem, RemoveResult } from '../../git/remove-local'
 import './worktrees.css'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 interface SessionInfo {
   sessionId: string
@@ -224,12 +225,19 @@ function failuresByRow(results: RemoveResult[]): Map<string, string> {
   )
 }
 
+/** Removes the rows, counts the use (failed when none went), and returns each row's result. */
+async function removeAndCount(repoRoot: string, rows: ViewRow[]): Promise<RemoveResult[]> {
+  const answer = await gitAPI.removeLocal(repoRoot, rows.map(toRemoveItem))
+  const results = answer.results ?? []
+  recordUsage('worktree-remove', results.some((r) => r.ok) ? {} : { failed: true })
+  return results
+}
+
 function RemoveDialog(props: RemoveDialogProps): JSX.Element {
   const [removing, setRemoving] = useState(false)
   const confirm = async (): Promise<void> => {
     setRemoving(true)
-    const answer = await gitAPI.removeLocal(props.repoRoot, props.rows.map(toRemoveItem))
-    props.onDone(answer.results ?? [])
+    props.onDone(await removeAndCount(props.repoRoot, props.rows))
   }
   return (
     <Dialog

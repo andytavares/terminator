@@ -3,6 +3,7 @@ import { defineChannel } from '@terminator/extension-sdk'
 import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { detectEditor, openInEditor } from '../editor/open-in-editor.js'
 import { getGlobalSettings } from '../storage/settings-store.js'
+import { recordUsage } from '../extensions/extension-usage.js'
 
 /**
  * Opening a folder in the user's editor.
@@ -26,7 +27,11 @@ export function registerEditorHandlers(): void {
       channel: 'editor:open',
       schema: z.object({ folderPath: z.string().min(1) }),
       invalid: { error: 'VALIDATION_ERROR' },
-      run: ({ folderPath }) => openInEditor(folderPath, configuredEditorId()),
+      run: async ({ folderPath }) => {
+        const result = await openInEditor(folderPath, configuredEditorId())
+        if ('ok' in result) recordUsage({ feature: 'core.editor.open', via: 'click' })
+        return result
+      },
     }),
   ])
 }

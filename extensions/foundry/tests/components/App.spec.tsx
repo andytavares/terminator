@@ -127,6 +127,7 @@ beforeEach(() => {
   for (const key of Object.keys(everyHandler)) delete everyHandler[key]
   Object.assign(window, {
     electronAPI: {
+      usage: { record: vi.fn() },
       extensionBridge: {
         on: vi.fn((event: string, handler: (data: unknown) => void) => {
           bridgeHandlers[event] = handler

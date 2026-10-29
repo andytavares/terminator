@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, act, fireEvent } from '@testing-library/react'
+import { render, screen, act, fireEvent, waitFor } from '@testing-library/react'
 import { RemoteControlView } from '../../../src/components/RemoteControlView'
 
 const qrValues = vi.hoisted(() => [] as string[])
@@ -17,6 +17,7 @@ vi.mock('qrcode.react', () => ({
 
 const handlers = new Map<string, (data: unknown) => void>()
 const invoke = vi.fn()
+const record = vi.fn()
 
 function emit(channel: string, data: unknown): void {
   act(() => {
@@ -35,6 +36,7 @@ beforeEach(() => {
   qrValues.length = 0
   handlers.clear()
   invoke.mockReset()
+  record.mockClear()
   invoke.mockResolvedValue(SETTINGS)
   Object.defineProperty(window, 'electronAPI', {
     value: {
@@ -45,6 +47,7 @@ beforeEach(() => {
         },
         invoke,
       },
+      usage: { record },
     },
     configurable: true,
     writable: true,
@@ -70,6 +73,7 @@ function remoteViewTests() {
   remoteViewFailureTests()
   describe('a tunnel that failed', remoteViewTunnelTests)
   describe('configuration and control', remoteViewControlTests)
+  describe('usage', remoteViewUsageTests)
 }
 
 function remoteViewBandTests() {
@@ -235,6 +239,26 @@ function remoteViewControlTests() {
     await screen.findByText('Off')
     fireEvent.click(await screen.findByRole('button', { name: 'Turn on' }))
     expect(invoke).toHaveBeenCalledWith('remote:toggle', { enabled: true })
+  })
+}
+
+function remoteViewUsageTests() {
+  it('counts a start', async () => {
+    invoke.mockImplementation(async (channel: string) =>
+      channel === 'remote:toggle' ? { ok: true } : SETTINGS
+    )
+    render(<RemoteControlView />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Turn on' }))
+    await waitFor(() => expect(record).toHaveBeenCalledWith('server-start'))
+  })
+
+  it('counts a start the server refused as failed', async () => {
+    invoke.mockImplementation(async (channel: string) =>
+      channel === 'remote:toggle' ? { error: 'PASSWORD_REQUIRED' } : SETTINGS
+    )
+    render(<RemoteControlView />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Turn on' }))
+    await waitFor(() => expect(record).toHaveBeenCalledWith('server-start', { failed: true }))
   })
 }
 

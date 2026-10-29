@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import React from 'react'
 import { ErrorBoundary } from '../../src/renderer/components/ErrorBoundary'
 
@@ -7,6 +7,10 @@ function ThrowOnRender({ shouldThrow }: { shouldThrow: boolean }) {
   if (shouldThrow) throw new Error('Test render error')
   return <div>all good</div>
 }
+
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../src/renderer/usage/record', () => ({ recordUse }))
+beforeEach(() => recordUse.mockClear())
 
 describe('ErrorBoundary', () => {
   it('renders children when no error occurs', () => {

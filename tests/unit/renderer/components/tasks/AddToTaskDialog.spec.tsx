@@ -82,6 +82,9 @@ const lanesOf = (title: string) =>
   useTaskStore.getState().tasks.find((t) => t.title === title)?.lanes
 const suggestion = () => screen.getByRole('checkbox', { name: /Add them too/ })
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('Add to task — which tasks it lists', () => {
   it('lists open tasks only, not finished or archived ones', () => {
     expect(screen.getByRole('button', { name: /Rate limits across services/ })).toBeTruthy()

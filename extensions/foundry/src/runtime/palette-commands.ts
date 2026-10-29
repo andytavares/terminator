@@ -60,6 +60,7 @@ function refreshPalette(api: ExtensionAPI): void {
         description: entry.description,
         category: entry.category,
         mnemonic: urgent ? 'w' : undefined,
+        usage: 'go-to-run',
       },
       () => gotoRun(api, entry.kind, entry.sessionId)
     )

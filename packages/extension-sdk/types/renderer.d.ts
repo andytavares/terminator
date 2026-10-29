@@ -203,6 +203,11 @@ export interface ElectronAPI {
   logger: {
     write(level: string, namespace: string, message: string): void
   }
+  usage: {
+    /** Counts one use of an id from this extension's `contributes.usage`. The core adds the
+     * extension id; an undeclared id is dropped and logged. Since 6.1.0. */
+    record(feature: string, outcome?: { failed?: boolean }): void
+  }
   extensionBridge: {
     invoke(channel: string, payload?: unknown): Promise<unknown>
     on(channel: string, handler: (data: unknown) => void): () => void

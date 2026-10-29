@@ -8,6 +8,8 @@ import { BudgetForm } from '../../src/components/BudgetForm.js'
 
 function setup(over: Partial<Parameters<typeof BudgetForm>[0]> = {}) {
   const onSubmit = vi.fn()
+  const recordUsage = vi.fn()
+  Object.assign(window, { electronAPI: { usage: { record: recordUsage } } })
   render(
     <BudgetForm
       rows={[
@@ -19,7 +21,7 @@ function setup(over: Partial<Parameters<typeof BudgetForm>[0]> = {}) {
       {...over}
     />
   )
-  return { onSubmit, user: userEvent.setup() }
+  return { onSubmit, recordUsage, user: userEvent.setup() }
 }
 
 describe('BudgetForm', () => {
@@ -42,12 +44,13 @@ function showingAndSubmittingTests() {
   })
 
   it('submits every row, a number or null', async () => {
-    const { onSubmit, user } = setup()
+    const { onSubmit, recordUsage, user } = setup()
     const agents = screen.getByRole('spinbutton', { name: 'Agents at once' })
     await user.clear(agents)
     await user.type(agents, '5')
     await user.click(screen.getByRole('button', { name: 'Save budgets' }))
     expect(onSubmit).toHaveBeenCalledWith({ agents: 5, wallClockMinutes: null })
+    expect(recordUsage).toHaveBeenCalledExactlyOnceWith('budget-edit')
   })
 }
 

@@ -21,6 +21,10 @@ beforeEach(() => {
   onCancel = vi.fn()
 })
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+beforeEach(() => recordUse.mockClear())
+
 describe('NameTerminalDialog', () => {
   it('renders the dialog title', () => {
     renderDialog()

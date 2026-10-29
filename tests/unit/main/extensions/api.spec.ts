@@ -183,7 +183,9 @@ describe('executeExtensionCommand with args', () => {
   it('hands the validated args to the handler', async () => {
     const { handler, key } = registerReview()
 
-    const result = await executeExtensionCommand(key, noCtx, { repoRoot: '/r', number: 7 })
+    const result = await executeExtensionCommand(key, noCtx, {
+      args: { repoRoot: '/r', number: 7 },
+    })
 
     expect(result).toEqual({ ok: true })
     expect(handler).toHaveBeenCalledWith(noCtx, { repoRoot: '/r', number: 7 })
@@ -192,7 +194,9 @@ describe('executeExtensionCommand with args', () => {
   it('rejects invalid args with a reason and never runs the handler', async () => {
     const { handler, key } = registerReview()
 
-    const result = await executeExtensionCommand(key, noCtx, { repoRoot: '/r', number: 'seven' })
+    const result = await executeExtensionCommand(key, noCtx, {
+      args: { repoRoot: '/r', number: 'seven' },
+    })
 
     expect(result).toMatchObject({ ok: false, reason: expect.stringMatching(/^invalid-args: /) })
     expect(handler).not.toHaveBeenCalled()
@@ -214,7 +218,7 @@ describe('executeExtensionCommand with args — no schema and unknown commands',
     const handler = vi.fn()
     api.commands.register({ id: 'plain', label: 'Plain' }, handler)
 
-    await executeExtensionCommand('test.ext.command.plain', noCtx, { sneaky: true })
+    await executeExtensionCommand('test.ext.command.plain', noCtx, { args: { sneaky: true } })
 
     expect(handler).toHaveBeenCalledWith(noCtx)
   })
@@ -222,10 +226,12 @@ describe('executeExtensionCommand with args — no schema and unknown commands',
   it('reports not-registered for an unknown command and after dispose', async () => {
     const { key } = registerReview()
     expect(isExtensionCommandRegistered(key)).toBe(true)
-    await expect(executeExtensionCommand('nobody.command.x', noCtx, {})).resolves.toEqual({
-      ok: false,
-      reason: 'not-registered',
-    })
+    await expect(executeExtensionCommand('nobody.command.x', noCtx, { args: {} })).resolves.toEqual(
+      {
+        ok: false,
+        reason: 'not-registered',
+      }
+    )
 
     const api = createExtensionAPI('test.ext')
     api.commands.register({ id: 'gone', label: 'Gone' }, vi.fn()).dispose()

@@ -55,6 +55,9 @@ beforeEach(() => {
   })
 })
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('WorkspaceSettings', () => {
   it('shows loading when globalSettings is null', () => {
     seedStore(useSettingsStore, {

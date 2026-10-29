@@ -3,6 +3,7 @@ import type { IndexedTask } from '../vault/types'
 import { FileToPicker } from './FileToPicker'
 import { useVaultStore } from '../stores/vault.store'
 import { Button } from '@terminator/extension-ui'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 type InboxStep = 'actionable' | 'two-minute' | 'destination'
 
@@ -22,6 +23,10 @@ interface Decision {
 function failed(result: unknown): boolean {
   if (!result || typeof result !== 'object' || !('error' in result)) return false
   return (result as { error: string }).error !== 'STALE_ID'
+}
+
+function recordInboxProcess(rejected: boolean): void {
+  recordUsage('inbox-process', rejected ? { failed: true } : undefined)
 }
 
 function submitDecision(item: IndexedTask, decision: Decision): Promise<unknown> {
@@ -56,10 +61,13 @@ function useInboxQueue(props: InboxProcessorProps) {
     if (!current || isProcessing) return
     setIsProcessing(true)
     try {
-      if (failed(await submitDecision(current, decision))) return setIsProcessing(false)
+      const rejected = failed(await submitDecision(current, decision))
+      recordInboxProcess(rejected)
+      if (rejected) return setIsProcessing(false)
       await refreshInboxCount()
       advanceToNext()
     } catch {
+      recordInboxProcess(true)
       setIsProcessing(false)
     }
   }

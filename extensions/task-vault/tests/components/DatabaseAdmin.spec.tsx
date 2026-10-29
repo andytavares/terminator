@@ -57,6 +57,14 @@ function typeSql(sql: string) {
   })
 }
 
+describe('DatabaseAdmin usage', () => {
+  it('counts one view of the admin as it opens', async () => {
+    renderAdmin()
+    await screen.findByTitle('Browse tasks')
+    expect(bridge.recordUsage.mock.calls).toEqual([['db-admin']])
+  })
+})
+
 describe('DatabaseAdmin tables', tablesTests)
 describe('DatabaseAdmin queries', queryTests)
 describe('DatabaseAdmin confirmations', confirmTests)

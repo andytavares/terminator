@@ -24,6 +24,7 @@ afterEach(() => {
 
 describe('DailyLog task row: completing and selecting', selectTests)
 describe('DailyLog task row: completing and selecting, continued', selectTestsPart2)
+describe('DailyLog task row: usage', completeUsageTests)
 describe('DailyLog task row: editing', editTests)
 describe('DailyLog task row: editing, continued', editTestsPart2)
 describe('DailyLog task row: open task actions', openActionTests)
@@ -33,6 +34,14 @@ describe('DailyLog task row: blocked and finished tasks', finishedTests)
 describe('DailyLog task row: blocked and finished tasks, continued', finishedTestsPart2)
 describe('DailyLog task row: tags', metaTests)
 describe('DailyLog task row: tags, continued', metaTestsPart2)
+
+function completeUsageTests() {
+  it('counts a completed task', async () => {
+    renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
+    fireEvent.click(screen.getByTitle('Complete task'))
+    await eventually(() => expect(bridge.recordUsage).toHaveBeenCalledWith('task-complete'))
+  })
+}
 
 function selectTests() {
   it('completes an open task from its checkbox', () => {

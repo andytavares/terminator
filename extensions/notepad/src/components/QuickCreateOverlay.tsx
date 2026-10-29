@@ -7,6 +7,7 @@ import { noteTitle } from '../db/note-title'
 import type { DiagramListItem } from '../db/types'
 import { Button, ModalShell, SegmentedControl } from '@terminator/extension-ui'
 import { tagEditing, withTag } from './tagEditing'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 function toFilenameSlug(title: string): string {
   return (
@@ -99,6 +100,7 @@ interface NewNote {
 
 async function createNoteAndRelist(note: NewNote): Promise<void> {
   await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.create', note)
+  recordUsage('note-create')
   const { setNotes } = useNotesStore.getState()
   await listInto('terminator.notepad:notes.list', { includeArchived: true }, setNotes)
 }
@@ -108,6 +110,7 @@ async function createDiagramAndOpen(diagram: Omit<NewNote, 'body'>): Promise<voi
     'terminator.notepad:diagrams.create',
     diagram
   )
+  recordUsage('diagram-create')
   const created = (createResult as { data?: { id: string } }).data
   const { setDiagrams, setSelectedDiagram } = useNotesStore.getState()
   const data = await listInto<DiagramListItem>(

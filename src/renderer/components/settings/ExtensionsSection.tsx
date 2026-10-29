@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { dispatchNotification } from '../../lib/notifications'
+import { recordUse } from '../../usage/record'
 import {
   ActionSettingRow,
   ExtensionSettingRow,
@@ -36,6 +37,7 @@ function useExtensionListing() {
   }, [])
   async function saveSetting(key: string, value: unknown): Promise<void> {
     await window.electronAPI.extension.updateSetting(key, value)
+    recordUse('core.settings.change.extensions')
     setValues((prev) => ({ ...prev, [key]: value }))
   }
   return { extensions, setExtensions, schemas, values, saveSetting }
@@ -62,6 +64,7 @@ async function installExtension(setExtensions: SetExtensions): Promise<void> {
   }
   // The list main announced may already hold it.
   const installed = result.extension
+  recordUse('core.extensions.install')
   setExtensions((prev) => [...prev.filter((e) => e.id !== installed.id), installed])
   notifyInfo({
     title: 'Extension installed',
@@ -73,7 +76,9 @@ async function installExtension(setExtensions: SetExtensions): Promise<void> {
 /** Enables or disables, then reloads the window so the change takes. */
 async function toggleExtension(id: string, currentStatus: string): Promise<void> {
   const result = await window.electronAPI.extension.toggle(id, currentStatus !== 'enabled')
-  if ('extension' in result) window.location.reload()
+  if (!('extension' in result)) return
+  recordUse('core.extensions.toggle')
+  window.location.reload()
 }
 
 const replacing = (updated: Extension) => (prev: Extension[]) =>
@@ -88,6 +93,7 @@ async function reloadExtension(id: string, setExtensions: SetExtensions): Promis
       key: 'extensionReloadFailed',
     })
   }
+  recordUse('core.extensions.reload')
   setExtensions(replacing(result.extension))
   notifyInfo({
     title: 'Extension reloaded',
@@ -107,6 +113,7 @@ async function uninstallExtension(ext: Extension, setExtensions: SetExtensions):
       key: 'extensionUninstallFailed',
     })
   }
+  recordUse('core.extensions.uninstall')
   setExtensions((prev) => prev.filter((e) => e.id !== ext.id))
   notifyInfo({
     title: 'Extension uninstalled',

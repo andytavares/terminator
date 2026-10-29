@@ -71,6 +71,7 @@ function mount(over: Record<string, unknown> = {}) {
   )
   Object.assign(window, {
     electronAPI: {
+      usage: { record: vi.fn() },
       extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
     },
   })

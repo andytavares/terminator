@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ResumeButton } from '../../../../src/renderer/components/session/ResumeButton'
 import { fact } from '../sidebar/fixtures/facts'
@@ -16,6 +16,10 @@ const conversation: AgentConversation = {
 
 const exited = (patch = {}) =>
   fact({ name: 'claude', state: 'exited', agent: conversation, resumable: true, ...patch })
+
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+beforeEach(() => recordUse.mockClear())
 
 describe('ResumeButton', () => {
   it('offers to resume a stopped conversation, naming the session', () => {

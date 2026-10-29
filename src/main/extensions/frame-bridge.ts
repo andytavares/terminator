@@ -33,6 +33,7 @@ export interface FrameBridgeDeps {
   onExitRequest(surface: ExtensionSurface): void
   onQuickActionsOpen(): void
   onSettingsOpen(): void
+  onUsage(extensionId: string, feature: string, failed: boolean | undefined): void
 }
 
 interface Frame {
@@ -125,6 +126,8 @@ export class FrameBridge {
     if (message.type === 'subscribe') return void frame.subscriptions.add(message.channel)
     if (message.type === 'request-exit') return this.deps.onExitRequest(frame.surface)
     if (message.type === 'settings-open') return this.deps.onSettingsOpen()
+    if (message.type === 'usage')
+      return this.deps.onUsage(frame.surface.extensionId, message.feature, message.failed)
     this.deps.onQuickActionsOpen()
   }
 
@@ -132,7 +135,9 @@ export class FrameBridge {
     frame: Frame,
     message: Extract<FrameRequest, { type: 'invoke' }>
   ): Promise<void> {
-    const entry = this.deps.invokeRegistry.get(message.channel)
+    const entry = isCoreOnly(message.channel)
+      ? undefined
+      : this.deps.invokeRegistry.get(message.channel)
     if (!entry) {
       const error = `No handler for "${message.channel}"`
       frame.port.postMessage({ type: 'error', id: message.id, error })
@@ -147,9 +152,13 @@ export class FrameBridge {
   }
 
   private dispatchSend(frame: Frame, message: Extract<FrameRequest, { type: 'send' }>): void {
+    if (isCoreOnly(message.channel)) return
     this.deps.sendRegistry.get(message.channel)?.({ frame: frame.caller } as never, message.payload)
   }
 }
+
+/** The usage counts belong to core: a view cannot read or write them. */
+const isCoreOnly = (channel: string): boolean => channel.startsWith('usage:')
 
 const FramePortRequestSchema = z.object({
   extensionId: z.string().min(1),

@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { DisplayMenu } from '../../../../../src/renderer/components/sidebar/DisplayMenu'
 import { FilterMenu } from '../../../../../src/renderer/components/sidebar/FilterMenu'
@@ -15,6 +15,10 @@ const VIEW: SessionView = {
 
 // The sidebar clips its overflow, so a panel drawn inside it is cut off at the sidebar's right
 // edge; a popover is in the top layer, which no ancestor clips.
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../../src/renderer/usage/record', () => ({ recordUse }))
+beforeEach(() => recordUse.mockClear())
+
 describe('sidebar menus', () => {
   it('Display opens its panel in the top layer', () => {
     render(<DisplayMenu view={VIEW} onChangeView={vi.fn()} />)

@@ -11,6 +11,24 @@
       "label": "Remote Control",
       "icon": "wifi",
       "view": "main"
-    }
+    },
+    "usage": [
+      {
+        "id": "server-start",
+        "label": "Start the server"
+      },
+      {
+        "id": "tunnel-open",
+        "label": "Open the tunnel"
+      },
+      {
+        "id": "client-connect",
+        "label": "Connect a browser"
+      },
+      {
+        "id": "password-set",
+        "label": "Set the password"
+      }
+    ]
   }
 }

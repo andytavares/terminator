@@ -5,6 +5,7 @@ import { useFocusStore } from '../../home/focus-store'
 import { FOCUS_LIMIT, localDateKey, type FocusItem } from '../../home/focus'
 import { reviewLoadShare, type PlanRow } from '../../home/plan-the-day'
 import { useNow } from '../session/useNow'
+import { recordUse } from '../../usage/record'
 import { usePlan } from './usePlan'
 import { TicketsColumn } from './TicketsColumn'
 import './PlanTheDay.css'
@@ -87,6 +88,7 @@ function PlanBand({ now }: { now: number }): JSX.Element {
   const dismissPlan = useFocusStore((s) => s.dismissPlan)
   const collapsed = useFocusStore((s) => s.planCollapsed)
   const close = (): void => dismissPlan(Date.now())
+  useEffect(() => recordUse('core.home.plan-the-day', 'shown'), [])
   useStartTheDayShortcut(close)
   return (
     <section className="plan" aria-label="Plan today">

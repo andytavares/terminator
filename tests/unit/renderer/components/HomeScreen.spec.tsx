@@ -129,6 +129,9 @@ beforeEach(() => {
 const home = () => screen.getByRole('region', { name: 'Home' })
 const askRows = () => within(screen.getByRole('list')).getAllByRole('listitem')
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('HomeScreen — the Quiet desk', () => {
   it('hides the band and says nothing needs you when no ask is waiting', () => {
     render(<HomeScreen />)

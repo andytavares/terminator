@@ -9,6 +9,7 @@ const mockBroadcast = vi.hoisted(() => vi.fn())
 const mockSettingsGet = vi.hoisted(() => vi.fn())
 const mockSettingsSet = vi.hoisted(() => vi.fn<(key: string, value: unknown) => void>())
 const mockIpcRegisterHandler = vi.hoisted(() => vi.fn<RegisterChannel>())
+const mockUsageRecord = vi.hoisted(() => vi.fn())
 const mockNgrokIsInstalled = vi.hoisted(() => vi.fn(() => false))
 
 vi.mock('../../src/server/remote-server', () => ({
@@ -48,6 +49,7 @@ function makeApi() {
       isRemoteAccessible: vi.fn().mockResolvedValue(false),
     },
     window: { broadcast: mockBroadcast },
+    usage: { record: mockUsageRecord },
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     paths: { app: '/app', globalStorage: '/user-data/extensions/terminator.remote-control' },
     pty: {},
@@ -172,6 +174,7 @@ function extensionIndexTests() {
   describe('remote:tunnel-reconnect', tunnelReconnectTests)
   describe('the settings a start reads', startSettingsTests)
   describe('deactivate', deactivateTests)
+  describe('usage', usageTests)
 }
 
 function deactivateTests() {
@@ -196,6 +199,39 @@ function deactivateTests() {
     await deactivate()
 
     expect(mockNgrokStop).toHaveBeenCalled()
+  })
+}
+
+function usageTests() {
+  it('counts an opened tunnel', async () => {
+    mockNgrokIsInstalled.mockReturnValue(true)
+    const toggleHandler = await setupAndGetToggleHandler(makeServerHandle())
+    await toggleHandler({ enabled: true })
+    await queueDrained()
+    expect(mockUsageRecord).toHaveBeenCalledWith('tunnel-open')
+  })
+
+  it('counts a tunnel that failed to open as failed', async () => {
+    mockNgrokIsInstalled.mockReturnValue(true)
+    mockNgrokStart.mockRejectedValueOnce(new Error('no tunnel'))
+    const toggleHandler = await setupAndGetToggleHandler(makeServerHandle())
+    await toggleHandler({ enabled: true })
+    await queueDrained()
+    expect(mockUsageRecord).toHaveBeenCalledWith('tunnel-open', { failed: true })
+  })
+
+  it('counts each browser that connects once, not the others already connected', async () => {
+    const serverHandle = makeServerHandle()
+    const toggleHandler = await setupAndGetToggleHandler(serverHandle)
+    await toggleHandler({ enabled: true })
+    await queueDrained()
+    const [onChange] = serverHandle.devices.onChange.mock.calls[0] as unknown as [
+      (devices: { id: string }[]) => void,
+    ]
+    onChange([{ id: 'phone' }])
+    onChange([{ id: 'phone' }, { id: 'laptop' }])
+    onChange([{ id: 'laptop' }])
+    expect(mockUsageRecord.mock.calls).toEqual([['client-connect'], ['client-connect']])
   })
 }
 

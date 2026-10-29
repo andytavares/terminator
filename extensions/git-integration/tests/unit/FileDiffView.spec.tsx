@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, beforeAll, expect, vi } from 'vitest'
+import { describe, it, beforeAll, beforeEach, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { FileDiff } from '../../src/schemas/git.schema'
 
@@ -26,6 +26,13 @@ async function renderDiff(
   const { FileDiffView } = await import('../../src/components/FileDiffView')
   return render(<FileDiffView diff={props.diff ?? makeDiff()} {...props} />)
 }
+
+const mockRecordUsage = vi.fn()
+
+beforeEach(() => {
+  mockRecordUsage.mockClear()
+  Object.assign(globalThis, { electronAPI: { usage: { record: mockRecordUsage } } })
+})
 
 // The first import compiles the component tree, which on a loaded machine takes longer
 // than one test's 5 s; load it once here so every test times only its own work.
@@ -182,5 +189,22 @@ describe('FileDiffView — moves split position on mousemove while dragging', ()
     fireEvent.mouseMove(window, { clientX: 450 })
     fireEvent.mouseUp(window)
     expect(scrollEl.style.getPropertyValue('--split-left')).toBe('56.25%')
+  })
+})
+
+describe('FileDiffView usage', () => {
+  it('counts a diff once when it is opened, and again for another file', async () => {
+    const { rerender } = await renderDiff()
+    const { FileDiffView } = await import('../../src/components/FileDiffView')
+    rerender(<FileDiffView diff={makeDiff()} isStale />)
+    expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('diff-open')
+    rerender(<FileDiffView diff={makeDiff({ path: 'src/bar.ts' })} />)
+    expect(mockRecordUsage).toHaveBeenCalledTimes(2)
+  })
+
+  it('counts nothing while no file is selected', async () => {
+    const { FileDiffView } = await import('../../src/components/FileDiffView')
+    render(<FileDiffView diff={null} />)
+    expect(mockRecordUsage).not.toHaveBeenCalled()
   })
 })

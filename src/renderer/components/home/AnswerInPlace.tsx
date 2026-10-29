@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { Clock, SquareTerminal } from 'lucide-react'
 import { Button, Kbd } from '@terminator/extension-ui'
 import { terminalExcerpt } from './desk-actions'
+import { recordUse } from '../../usage/record'
 import type { AskHandlers, DeskCursor } from './use-desk-controller'
 import type { DeskAsk } from '../../home/core-asks'
 
@@ -23,7 +24,13 @@ export function AnswerInPlace(props: AnswerInPlaceProps): JSX.Element {
       <div className="answer__side">
         <div className="answer__label">Answer</div>
         <ChoiceList ask={ask} handlers={handlers} />
-        <ReplyField replying={cursor.replying} onSend={(text) => handlers.replyToAsk(ask, text)} />
+        <ReplyField
+          replying={cursor.replying}
+          onSend={(text) => {
+            recordUse('core.home.answer')
+            handlers.replyToAsk(ask, text)
+          }}
+        />
         <GhostActions ask={ask} handlers={handlers} />
       </div>
     </div>
@@ -35,7 +42,13 @@ function ChoiceList(props: Pick<AnswerInPlaceProps, 'ask' | 'handlers'>): JSX.El
   return (
     <>
       {(ask.choices ?? []).map((choice) => (
-        <Button key={choice.number} onClick={() => handlers.act(ask, `choice-${choice.number}`)}>
+        <Button
+          key={choice.number}
+          onClick={() => {
+            recordUse('core.home.answer')
+            handlers.act(ask, `choice-${choice.number}`)
+          }}
+        >
           <Kbd>{choice.number}</Kbd>
           {choice.label}
         </Button>

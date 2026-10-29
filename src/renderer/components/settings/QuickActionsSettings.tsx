@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useSettingsStore } from '../../stores/settings.store'
+import { recordUse } from '../../usage/record'
 import type { CustomAction, CustomActionKind, CustomActionTarget } from '../../../shared/types'
 import './QuickActionsSettings.css'
 
@@ -131,6 +132,7 @@ function useActionDraft(custom: CustomAction[], save: (list: CustomAction[]) => 
     if (err) return setError(err)
     const action = actionFrom(current)
     save(current.id ? custom.map((a) => (a.id === current.id ? action : a)) : [...custom, action])
+    if (!current.id) recordUse('core.quick-actions.custom-create')
     openDraft(null)
   }
   return {

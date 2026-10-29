@@ -1,12 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { corruptStoreFile } from '../../support/stores'
 
-const { mockHandle, detectEditor, openInEditor } = vi.hoisted(() => ({
+const { mockHandle, detectEditor, openInEditor, recordUse } = vi.hoisted(() => ({
+  recordUse: vi.fn(() => Promise.resolve()),
   mockHandle: vi.fn(),
   detectEditor: vi.fn(),
   openInEditor: vi.fn(),
 }))
 
+vi.mock('../../../src/main/usage/usage-store.js', () => ({
+  getUsageStore: () => ({ recordUse }),
+}))
 vi.mock('electron', () => ({ ipcMain: { handle: mockHandle } }))
 vi.mock('electron-store', async () =>
   (await import('../../support/stores')).inMemoryElectronStore()
@@ -33,6 +37,7 @@ function chooseEditor(editor: string): void {
 }
 
 beforeEach(() => {
+  recordUse.mockReset()
   detectEditor.mockReset().mockResolvedValue({ id: 'cursor', name: 'Cursor' })
   openInEditor.mockReset().mockResolvedValue({ ok: true, editor: 'Cursor' })
   corruptStoreFile(null)
@@ -77,6 +82,15 @@ describe('editor:open', () => {
     const result = await handlerFor('editor:open')({}, { folderPath: '/repos/app' })
     expect(openInEditor).toHaveBeenCalledWith('/repos/app', undefined)
     expect(result).toEqual({ ok: true, editor: 'Cursor' })
+  })
+
+  it('counts an opened folder, and a failed launch not at all', async () => {
+    await handlerFor('editor:open')({}, { folderPath: '/repos/app' })
+    expect(recordUse).toHaveBeenCalledWith({ feature: 'core.editor.open', via: 'click' })
+    recordUse.mockClear()
+    openInEditor.mockResolvedValue({ error: 'NO_EDITOR_FOUND' })
+    await handlerFor('editor:open')({}, { folderPath: '/repos/app' })
+    expect(recordUse).not.toHaveBeenCalled()
   })
 
   it('uses the configured editor when one is set', async () => {

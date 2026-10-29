@@ -3,6 +3,7 @@ import { Checkbox, ModalShell } from '@terminator/extension-ui'
 import { plural } from '@terminator/extension-sdk/plain'
 import { useTaskStore } from '../../stores/task.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
+import { recordUse } from '../../usage/record'
 import { useAddToTaskStore } from './add-to-task'
 import {
   addLanesToTask,
@@ -53,7 +54,7 @@ function TaskPicker({ lane, onClose }: PickerProps): JSX.Element {
   const suggested = sameNameCards(useLaneCards(), lane).map((c) => c.lane)
   const lanes = state.alsoSuggested ? [lane, ...suggested] : [lane]
   const finish = async (done: Promise<boolean>): Promise<void> =>
-    (await done) ? onClose() : state.setError(REFUSED)
+    (await done) ? (recordUse('core.tasks.add'), onClose()) : state.setError(REFUSED)
   return (
     <ModalShell label="Add to task" placement="top" onDismiss={onClose}>
       <div className="add-to-task">

@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react'
+import { useRecordUsageOnMount } from './vault-hooks'
 import { Button, EmptyState, IconButton } from '@terminator/extension-ui'
 import { ChevronDown, ChevronLeft, ChevronRight, CornerUpLeft, X } from 'lucide-react'
 import type { DailyLog as DailyLogData, IndexedTask } from '../vault/types'
@@ -414,6 +415,7 @@ function DayTasks({ parts, list }: PartsProps): React.JSX.Element {
 }
 
 export function DailyLog(props: DailyLogProps): React.JSX.Element {
+  useRecordUsageOnMount('view-daily-log')
   const day = withDefaults(props)
   const parts = partitionDay(day)
   const list = { day, drag: useTaskDrag(parts.active, day.onRefresh) }

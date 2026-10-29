@@ -5,11 +5,13 @@ import { useNotesStore } from '../../src/stores/notes.store'
 import type { NoteListItem } from '../../src/db/types'
 
 const mockInvoke = vi.fn()
+const mockRecord = vi.fn()
 const mockSettings = vi.fn().mockResolvedValue({ values: {} })
 Object.defineProperty(window, 'electronAPI', {
   value: {
     extensionBridge: { invoke: mockInvoke },
     extension: { getSettingsValues: mockSettings },
+    usage: { record: mockRecord },
   },
   writable: true,
   configurable: true,
@@ -35,6 +37,7 @@ describe('ExportDialog settings', exportDialogSettingsTests)
 function exportDialogTests() {
   beforeEach(() => {
     mockInvoke.mockClear()
+    mockRecord.mockClear()
     useNotesStore.setState({
       notes: [],
       selectedNoteId: null,
@@ -157,6 +160,13 @@ function exportDialogExportButtonTests() {
 }
 
 function exportDialogRunningTests() {
+  it('counts a finished export as one use of the export feature', async () => {
+    mockInvoke.mockResolvedValueOnce({ data: { exported: 1 } })
+    render(<ExportDialog onClose={vi.fn()} />)
+    fireEvent.click(screen.getByText('Export 0 notes'))
+    await waitFor(() => expect(mockRecord).toHaveBeenCalledWith('export'))
+  })
+
   it('Export button calls export.run IPC', async () => {
     mockInvoke.mockResolvedValueOnce({ data: { exported: 1 } })
     render(<ExportDialog onClose={vi.fn()} />)

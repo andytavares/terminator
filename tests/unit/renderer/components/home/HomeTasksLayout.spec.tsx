@@ -100,6 +100,9 @@ beforeEach(() => {
 
 const home = () => screen.getByRole('region', { name: 'Home' })
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('Home — the layout setting', () => {
   it('draws Needs you above Tasks and no In flight region in the Tasks layout', () => {
     state.facts = [asking()]

@@ -1,9 +1,10 @@
 import { useShallow } from 'zustand/react/shallow'
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Bell, Info, CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
 import { RelativeTime } from '@terminator/extension-ui'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 import { useNotificationStore, type Notification } from '../stores/notification.store'
+import { recordUse } from '../usage/record'
 import './NotificationPanel.css'
 
 function TypeIcon({ type }: { type: string }): JSX.Element {
@@ -40,6 +41,7 @@ function useNotificationActions(notification: Notification, onNavigate: () => vo
 
   function handleClick(): void {
     if (!canOpen) return
+    recordUse('core.notifications.click')
     markRead(notification.id)
     onNavigate()
     if (notification.onClick) return notification.onClick()
@@ -53,6 +55,7 @@ function useNotificationActions(notification: Notification, onNavigate: () => vo
 
   async function handleAction(e: React.MouseEvent, actionId: string): Promise<void> {
     e.stopPropagation()
+    recordUse('core.notifications.action')
     // Acting on it settles it: approve a phase and the request to approve that
     // phase should not still be sitting in the list. Dropped whatever main
     // says — either it fired and main forgot the record, or the same decision
@@ -147,6 +150,7 @@ function NotificationPanelInner(): JSX.Element {
     }))
   )
   useCloseOnEscape(closePanel)
+  useEffect(() => recordUse('core.notifications.open'), [])
 
   return (
     <>

@@ -1,5 +1,5 @@
 import { PROVEN_ENVIRONMENT, provenBaseline } from '../helpers/environment.js'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import React from 'react'
 import { createChangeBus } from '../helpers/change-bus.js'
@@ -18,6 +18,10 @@ window.HTMLElement.prototype.scrollIntoView = vi.fn()
 
 type Answer = (payload: Record<string, unknown>) => unknown
 let invoke = vi.fn()
+const recordUsage = vi.fn()
+const usageStub = { usage: { record: recordUsage } }
+
+beforeEach(() => recordUsage.mockClear())
 
 /** One criterion, proved by the test command. */
 const CRITERION: WorkOrder['acceptance'][number] = {
@@ -95,7 +99,7 @@ function mountForgeOver(
     return {}
   })
   Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke, on: createChangeBus().on } },
+    value: { extensionBridge: { invoke, on: createChangeBus().on }, ...usageStub },
     configurable: true,
     writable: true,
   })
@@ -150,6 +154,7 @@ describe('redrafting a plan there is', () => {
     await waitFor(() =>
       expect(payloadsSentOn(invoke, 'foundry:order.converge')).toEqual([{ id: 'WO-1' }])
     )
+    expect(recordUsage).toHaveBeenCalledExactlyOnceWith('forge-turn', {})
   })
 })
 

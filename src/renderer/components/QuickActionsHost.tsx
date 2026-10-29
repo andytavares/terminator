@@ -29,6 +29,7 @@ import { useWorkspaceStore } from '../stores/workspace.store'
 import { useToastStore } from '../stores/toast.store'
 import { useExtensionCommandsStore } from '../stores/extension-commands.store'
 import { useExtensionRegistry } from '../extensions/registry'
+import { recordUse } from '../usage/record'
 import { useTerminalSession } from '../hooks/useTerminalSession'
 import { agentStateOf } from '../sidebar/agent-state'
 
@@ -98,7 +99,8 @@ function useExtensionQuickActions(
         groups,
         {
           ctx,
-          execute: (key, context) => void window.electronAPI.extension.executeCommand(key, context),
+          execute: (key, context) =>
+            void window.electronAPI.extension.executeCommand(key, { ...context, via: 'palette' }),
         }
       ),
     [registered, declared, groups, ctx, commands]
@@ -199,6 +201,31 @@ async function openProjectTab(
   return id as string
 }
 
+const CORE_DECLARATION = { kind: 'action', source: 'core' } as const
+
+// Ids that carry the operator's data (a session, a workspace, a custom action's name) count
+// under one fixed id, so none of that data reaches the usage store.
+const FIXED_PALETTE_FEATURES: Array<[prefix: string, feature: string, label: string]> = [
+  ['custom:', 'core.custom-action', 'Custom action'],
+  ['session:', 'core.go-to-session', 'Go to session'],
+  ['core.switch-workspace-', 'core.switch-workspace', 'Switch workspace'],
+]
+
+/** The feature a palette run counts under; null for extension commands, which main counts.
+ * @internal */
+export function paletteFeature(action: Pick<QuickAction, 'id' | 'label'>): [string, string] | null {
+  if (action.id.startsWith('ext:')) return null
+  const fixed = FIXED_PALETTE_FEATURES.find(([prefix]) => action.id.startsWith(prefix))
+  return fixed ? [fixed[1], fixed[2]] : [action.id, action.label]
+}
+
+function recordPaletteRun(action: QuickAction, failed?: boolean): void {
+  const counted = paletteFeature(action)
+  if (!counted) return
+  const [feature, label] = counted
+  recordUse(feature, 'palette', { failed, declare: { label, ...CORE_DECLARATION } })
+}
+
 /** Records the run, offers the shortcut hint, then runs the action and reports a failure. */
 function dispatchQuickAction(
   action: QuickAction,
@@ -221,20 +248,30 @@ function dispatchQuickAction(
   if (shouldShowHint(action, settings.directUse)) {
     addToast({ type: 'info', message: `Next time: ${action.shortcut}` })
   }
-  // `action.run()` can throw synchronously (most core actions are sync) or
-  // return a rejected promise (custom/extension actions). Only wrapping the
-  // call in an async function catches both.
-  void (async () => {
-    try {
-      await action.run()
-    } catch (error: unknown) {
-      addToast({ type: 'error', message: error instanceof Error ? error.message : 'Action failed' })
-    }
-  })()
+  void runAndReport(action, addToast)
+}
+
+/** Runs the action and reports how it ended. `action.run()` can throw synchronously (most core
+ * actions are sync) or return a rejected promise (custom/extension actions); only an async
+ * function catches both. */
+async function runAndReport(
+  action: QuickAction,
+  addToast: (toast: { type: 'info' | 'error'; message: string }) => void
+): Promise<void> {
+  try {
+    await action.run()
+    recordPaletteRun(action)
+  } catch (error: unknown) {
+    recordPaletteRun(action, true)
+    addToast({ type: 'error', message: error instanceof Error ? error.message : 'Action failed' })
+  }
 }
 
 function toggleQuickActionPin(id: string): void {
   const settings = useSettingsStore.getState().globalSettings?.quickActions
+  recordUse('core.quick-actions.pin', 'click', {
+    declare: { label: 'Pin a quick action', kind: 'control', source: 'core' },
+  })
   void useSettingsStore.getState().updateQuickActions({ pins: togglePin(settings?.pins ?? [], id) })
 }
 
@@ -247,6 +284,15 @@ function contextLabelFor(
   return target.focusedSession ? `in terminal · ${target.focusedSession.tabTitle}` : undefined
 }
 
+/** The palette is mounted only while it is open, so mounting is opening. */
+function useRecordPaletteOpen(): void {
+  useEffect(() => {
+    recordUse('core.quick-actions.open', 'palette', {
+      declare: { label: 'Open Quick Actions', kind: 'control', source: 'core' },
+    })
+  }, [])
+}
+
 /** The palette and everything it offers, mounted only while it is open: the actions read every
  * session, so building them is work the closed palette should not cost the rest of the app. */
 export function QuickActionsHost(props: QuickActionsHostProps): JSX.Element {
@@ -257,6 +303,7 @@ export function QuickActionsHost(props: QuickActionsHostProps): JSX.Element {
   const actions = usePaletteActions({ target, groups, surfaceOwner, props })
   const { pinned, recent, pins } = useFirstScreen(actions, props.openedAt)
   const { onClose } = props
+  useRecordPaletteOpen()
   const handleRun = useCallback(
     (action: QuickAction) => {
       onClose()

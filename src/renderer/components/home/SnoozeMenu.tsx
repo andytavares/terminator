@@ -1,6 +1,7 @@
 import React from 'react'
 import { Menu, MenuItem } from '@terminator/extension-ui'
 import { snoozeChoices } from './desk-actions'
+import { recordUse } from '../../usage/record'
 
 export interface SnoozeMenuProps {
   now: number
@@ -17,7 +18,10 @@ export function SnoozeMenu(props: SnoozeMenuProps): JSX.Element {
         <MenuItem
           key={choice.label}
           className="snooze-menu__item"
-          onSelect={() => onPick(choice.until)}
+          onSelect={() => {
+            recordUse('core.home.snooze')
+            onPick(choice.until)
+          }}
         >
           {choice.label}
         </MenuItem>

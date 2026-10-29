@@ -119,6 +119,9 @@ const ELSEWHERE_WORKTREE = {
   ...NOT_DETACHED,
 }
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('Start work, Across repos — the branch name', () => {
   it('suggests a branch name from the title', async () => {
     render(<StartWork onClose={vi.fn()} />)

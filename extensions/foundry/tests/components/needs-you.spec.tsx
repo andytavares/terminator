@@ -79,6 +79,7 @@ function mountForge(questions: OpenQuestion[]) {
   })
   Object.assign(window, {
     electronAPI: {
+      usage: { record: vi.fn() },
       extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
     },
   })
@@ -146,6 +147,7 @@ function mountForgeWithOrder(over: Partial<WorkOrder>) {
   })
   Object.assign(window, {
     electronAPI: {
+      usage: { record: vi.fn() },
       extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
     },
   })
@@ -245,6 +247,7 @@ function mountFloor(pending: unknown[]) {
   })
   Object.assign(window, {
     electronAPI: {
+      usage: { record: vi.fn() },
       extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
     },
   })
@@ -293,6 +296,7 @@ function mountApp(attention: { inbox: number; forge: number }) {
   })
   Object.assign(window, {
     electronAPI: {
+      usage: { record: vi.fn() },
       extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
       workspace: { list: vi.fn().mockResolvedValue({ workspaces: [] }) },
       project: { create: vi.fn() },

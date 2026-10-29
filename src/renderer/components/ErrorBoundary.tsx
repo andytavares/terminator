@@ -1,5 +1,6 @@
 import React from 'react'
 import { makeRendererLogger } from '../logger'
+import { recordUse } from '../usage/record'
 
 const log = makeRendererLogger('error-boundary')
 
@@ -22,6 +23,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
+    recordUse('core.app.render-error', 'app', { failed: true })
     log.error(`Unhandled render error: ${error.message}`, info.componentStack)
   }
 

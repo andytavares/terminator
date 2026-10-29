@@ -57,6 +57,8 @@ vi.mock('../../../../src/renderer/components/sidebar/MoveSessionDialog', () => (
 
 const breakOut = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/terminal/breakout', () => ({ breakOut }))
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
 
 const mockCloseSession = vi.fn()
 const mockSetActive = vi.fn()
@@ -889,6 +891,16 @@ describe('TabBar — dragging a tab out', () => {
     renderTabBar()
     dragTab(document.querySelectorAll('.tab-bar__tab--session')[0], null, OUTSIDE_WINDOW)
     expect(breakOut).toHaveBeenCalledWith('ses-1', OUTSIDE_WINDOW)
+  })
+
+  it('counts a drag out as a break-out, and a drop inside the window as nothing', () => {
+    recordUse.mockClear()
+    renderTabBar()
+    const tab = document.querySelectorAll('.tab-bar__tab--session')[0]
+    dragTab(tab, null, { x: 600, y: 500 })
+    expect(recordUse).not.toHaveBeenCalled()
+    dragTab(tab, null, OUTSIDE_WINDOW)
+    expect(recordUse).toHaveBeenCalledWith('core.break-out', 'click', expect.anything())
   })
 
   it('stays put when let go inside the window but not on a tab', () => {

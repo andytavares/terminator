@@ -130,6 +130,8 @@ export interface RunDeps {
    * queue.
    */
   readonly queueEntries: () => Promise<readonly QueueEntry[]>
+  /** Counts one use of a feature declared in the manifest's `contributes.usage`. */
+  readonly recordUse: (feature: string) => void
   /** The in-memory index over this root's records; absent, every read parses the files. */
   readonly index?: (root: string) => FoundryIndex
 }
@@ -415,6 +417,7 @@ async function start(deps: RunDeps, payload: z.infer<typeof StartPayload>) {
   // Not awaited: a run outlives the call that started it. Failures reach the ledger
   // and the graph, where a surface reads them.
   recordFailureOf(deps, running, deps.execute(running, recipe, graph))
+  deps.recordUse('run-start')
 
   return { graph, order: running, started: true }
 }
@@ -645,6 +648,7 @@ async function resume(deps: RunDeps, payload: z.infer<typeof ObservePayload>) {
   // `runFailure` would read a resumed run that succeeds as `stopped`.
   await recordLine(deps, order.id, { action: 'run.resumed', reason: 'picked up by the operator' })
   recordFailureOf(deps, order, deps.execute(order, resolved.resolved.value, retried))
+  deps.recordUse('run-resume')
   return { graph: retried, reclaimed: taken.reclaimed, started: true }
 }
 

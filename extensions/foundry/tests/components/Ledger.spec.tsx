@@ -94,12 +94,16 @@ function ledgerReplies(over: Record<string, unknown>): Record<string, () => unkn
   }
 }
 
+let recordUsage = vi.fn()
+
 function mount(over: Record<string, unknown> = {}) {
+  recordUsage = vi.fn()
   bus = createChangeBus()
   const replies = ledgerReplies(over)
   invoke = vi.fn(async (channel: string) => (channel in replies ? replies[channel]() : {}))
   Object.assign(window, {
     electronAPI: {
+      usage: { record: recordUsage },
       extensionBridge: { invoke, on: bus.on },
     },
   })
@@ -143,6 +147,12 @@ describe('reading the record', () => {
 })
 
 function whoDecidedTests() {
+  it('counts the Ledger once when it is shown', async () => {
+    mount()
+    await screen.findByText('G-1')
+    expect(recordUsage).toHaveBeenCalledExactlyOnceWith('ledger')
+  })
+
   it('shows who decided, what, about what and why', async () => {
     mount()
     await screen.findByText('G-1')

@@ -83,6 +83,14 @@ async function openWorkArea() {
   await screen.findByRole('button', { name: 'Rename area' })
 }
 
+describe('AreasView usage', () => {
+  it('counts one view of the areas as it opens', async () => {
+    render(<AreasView />)
+    await screen.findByText('Work')
+    expect(bridge.recordUsage.mock.calls).toEqual([['view-areas']])
+  })
+})
+
 describe('AreasView list', areaListTests)
 describe('AreasView creating and archiving', areaCreateTests)
 describe('AreaDetail tasks', detailTaskTests)

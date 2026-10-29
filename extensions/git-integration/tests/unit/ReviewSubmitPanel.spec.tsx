@@ -5,6 +5,7 @@ import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import { ReviewSubmitPanel } from '../../src/components/pr-review/ReviewSubmitPanel'
 
 const mockPrReviewSubmit = vi.fn()
+const mockRecordUsage = vi.fn()
 
 vi.mock('../../src/api/github', () => ({
   githubAPI: {
@@ -14,6 +15,7 @@ vi.mock('../../src/api/github', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  Object.assign(globalThis, { electronAPI: { usage: { record: mockRecordUsage } } })
   usePrReviewStore.setState({ drafts: [] })
 })
 
@@ -83,6 +85,7 @@ describe('ReviewSubmitPanel — calls onClose when Cancel is clicked', () => {
     const submitBtn = screen.getByRole('button', { name: 'Submit approval' })
     fireEvent.click(submitBtn)
     await screen.findByText('Review submitted successfully.')
+    expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('review-comment')
   })
 
   it('hands back to the caller once an approval lands', async () => {
@@ -139,6 +142,7 @@ describe('ReviewSubmitPanel — shows error when submission fails', () => {
     const submitBtn = screen.getByRole('button', { name: 'Submit approval' })
     fireEvent.click(submitBtn)
     await screen.findByText(/UNAUTHORIZED/)
+    expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('review-comment', { failed: true })
     expect(screen.getByText(/UNAUTHORIZED/)).toBeTruthy()
   })
 })

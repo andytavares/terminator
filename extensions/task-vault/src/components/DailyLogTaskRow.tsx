@@ -36,6 +36,7 @@ import {
   recurrenceTitle,
 } from './daily-log-format'
 import type { RecurrenceDraft } from './daily-log-format'
+import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 /** The drag handlers a reorderable row carries. */
 export interface DragHandlers {
@@ -229,8 +230,10 @@ function useTerminalLink(task: IndexedTask, onRefresh: () => Promise<void>) {
     setLinking(false)
     if (result && typeof result === 'object' && 'error' in result) {
       const { error } = result as { error: string }
+      recordUsage('session-link', { failed: true })
       return notify('error', `Could not save terminal link: ${error}`, 'terminalLinkSaveFailed')
     }
+    recordUsage('session-link')
     session.markLinked(choice.sessionId)
     await onRefresh()
   }
@@ -300,6 +303,11 @@ function textClass(status: TaskStatus): string {
   return 'daily-log__task-text'
 }
 
+async function completeTask(onComplete: (id: string) => Promise<void>, id: string): Promise<void> {
+  await onComplete(id)
+  recordUsage('task-complete')
+}
+
 function TaskMarker({ row }: RowProps): React.JSX.Element {
   if (!row.isOpen) {
     return (
@@ -311,7 +319,7 @@ function TaskMarker({ row }: RowProps): React.JSX.Element {
   return (
     <button
       className="daily-log__task-checkbox"
-      onClick={() => void row.props.onComplete(row.task.id)}
+      onClick={() => void completeTask(row.props.onComplete, row.task.id)}
       title="Complete task"
     >
       <StatusIcon status={row.task.status} />

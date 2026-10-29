@@ -40,6 +40,18 @@ describe('buildWindowMenu', () => {
   })
 })
 
+describe('buildWindowMenu — Usage', () => {
+  it('lists Usage right after Home, with no shortcut', () => {
+    const { submenu, send } = items()
+    const labels = submenu.map((i) => i.label)
+    const usage = submenu[labels.indexOf('Home') + 1]
+    expect(usage.label).toBe('Usage')
+    expect(usage.accelerator).toBeUndefined()
+    ;(usage.click as () => void)()
+    expect(send).toHaveBeenCalledWith('menu:open-usage')
+  })
+})
+
 describe('buildWindowMenu — lanes', () => {
   it('switches to lane 1–9 of the visible task on Ctrl+1–9', () => {
     const { submenu, send } = items()

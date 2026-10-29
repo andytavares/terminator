@@ -254,6 +254,14 @@ describe('frame-shim app shortcuts', () => {
   })
 })
 
+describe('frame-shim usage', () => {
+  it('posts electronAPI.usage.record as a usage message', async () => {
+    const { port } = await connectedFrame()
+    frameApi().usage.record('export', { failed: true })
+    expect(port.posted).toContainEqual({ type: 'usage', feature: 'export', failed: true })
+  })
+})
+
 /** Records what a fit=content shim observes and posts to its parent window. */
 function createFitContentSpies() {
   const spies: {
@@ -295,6 +303,8 @@ async function loadShimAt(url: string, referrer = 'http://localhost:5173/home'):
 
 /** Undoes what a fit=content shim set on the shared document, and the spies. */
 function resetFitContent(): void {
+  // loadShimAt set the referrer on the document itself; deleting it brings back happy-dom's own.
+  Reflect.deleteProperty(document, 'referrer')
   document.documentElement.removeAttribute('style')
   document.body.removeAttribute('style')
   vi.unstubAllGlobals()
@@ -364,5 +374,21 @@ describe('frame-shim fit=content without a referrer', () => {
     expect(spies.parentPosts).toEqual([
       { message: { type: 'terminator:frame-height', height: expect.any(Number) }, origin: '*' },
     ])
+  })
+})
+
+describe('frame-shim reports input to the window', () => {
+  afterEach(resetFitContent)
+
+  it('posts an activity message to the parent on a key press and a pointer press', async () => {
+    const spies = createFitContentSpies()
+    await loadShimAt('ext://com.test.ext/index.html?view=main')
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
+    window.dispatchEvent(new Event('pointerdown'))
+    const activity = {
+      message: { type: 'terminator:frame-activity' },
+      origin: 'http://localhost:5173',
+    }
+    expect(spies.parentPosts).toEqual([activity, activity])
   })
 })

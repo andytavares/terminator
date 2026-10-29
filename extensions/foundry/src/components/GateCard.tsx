@@ -6,7 +6,7 @@ import { gradeInWords } from '../runtime/review/risk-grade.js'
 import { GateEvidence } from './GateEvidence.js'
 import { RaiseBudgetForm } from './BudgetForm.js'
 import { Button, IconButton, Markdown } from '@terminator/extension-ui'
-import { openInBrowser } from '@terminator/extension-sdk/renderer'
+import { openInBrowser, recordUsage } from '@terminator/extension-sdk/renderer'
 import { OrderLinks } from './OrderLinks.js'
 
 // One gate, one line.
@@ -82,11 +82,10 @@ export function GateCard(props: GateCardProps): JSX.Element {
   const { gate, busy = false, onDecide, className } = props
   const [open, setOpen] = useState(false)
   const [raising, setRaising] = useState(false)
-
   const decide = (option: string, limit?: number | null): void => {
     setRaising(false)
-    if (limit === undefined) onDecide(option)
-    else onDecide(option, limit)
+    recordUsage('gate-decide')
+    onDecide(option, ...(limit === undefined ? [] : [limit]))
   }
 
   return (
