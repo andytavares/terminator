@@ -1,11 +1,11 @@
 import { z } from 'zod'
 
-export const FeatureIdSchema = z.string().regex(/^[a-z0-9][a-z0-9.:-]{0,119}$/)
+const FeatureIdSchema = z.string().regex(/^[a-z0-9][a-z0-9.:-]{0,119}$/)
 
 export const ViaSchema = z.enum(['click', 'palette', 'shortcut', 'menu', 'remote', 'app', 'shown'])
 export type Via = z.infer<typeof ViaSchema>
 
-export const FeatureKindSchema = z.enum(['surface', 'action', 'command', 'control'])
+const FeatureKindSchema = z.enum(['surface', 'action', 'command', 'control'])
 export type FeatureKind = z.infer<typeof FeatureKindSchema>
 
 /** `source` is 'core' or an extension id. */

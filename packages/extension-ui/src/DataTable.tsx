@@ -40,8 +40,7 @@ function compareValues(a: number | string, b: number | string): number {
   return typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b))
 }
 
-/** @internal */
-export function sortRows<Row>(
+function sortRows<Row>(
   rows: readonly Row[],
   column: DataTableColumn<Row> | undefined,
   direction: DataTableSort['direction']

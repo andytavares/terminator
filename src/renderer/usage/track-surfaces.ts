@@ -12,7 +12,7 @@ type Slot = 'global-tab' | 'workspace-tab' | 'project-tab' | 'sidebar-panel'
 type Registry = ReturnType<typeof useExtensionRegistry.getState>
 
 /** A core surface is its own feature; an extension's is its registration id plus the slot it fills. */
-export function surfaceFeatureId(registrationId: string, slot: Slot): string {
+function surfaceFeatureId(registrationId: string, slot: Slot): string {
   return registrationId.startsWith('core.') ? registrationId : `${registrationId}.${slot}`
 }
 
