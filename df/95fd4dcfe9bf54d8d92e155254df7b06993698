@@ -1,0 +1,24 @@
+scripts/bump-extension-versions.mjs
+  s_e19acf012761f8::t_7504f87aa409a8 1-40
+.github/workflows/release.yml
+  s_e19acf012761f8::t_7c987f2d434cf3 97
+  s_e19acf012761f8::t_544edc605fc875 103-104
+tests/unit/scripts/bump-extension-versions.spec.ts
+  s_e19acf012761f8::t_969753254b1c68 1-26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "df95fd4dcfe9bf54d8d92e155254df7b06993698",
+  "prompts": {},
+  "sessions": {
+    "s_e19acf012761f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5777cf17-ab8d-4b2f-9a64-a811a8ccd1d1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
