@@ -1,0 +1,25 @@
+src/renderer/components/settings/ExtensionsSection.tsx
+  s_e19acf012761f8::t_e742fbdace5cf6 1,145,194,230,273
+extensions/git-integration/src/components/pr-review/DiffSize.tsx
+  s_e19acf012761f8::t_e742fbdace5cf6 1,11,36,78,108
+src/renderer/components/home/PlanTheDay.tsx
+  s_e19acf012761f8::t_e742fbdace5cf6 1,16,38,69,86,111,113,127,142,161,190
+src/renderer/components/home/ThreadDrawerSections.tsx
+  s_e19acf012761f8::t_e742fbdace5cf6 1,22,37,67,115,146,169,191,203
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f50140ae58a4aa110d7c8097fe600533089d1fd6",
+  "prompts": {},
+  "sessions": {
+    "s_e19acf012761f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5777cf17-ab8d-4b2f-9a64-a811a8ccd1d1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
