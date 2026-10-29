@@ -19,6 +19,8 @@ export interface ToolRequest {
    * publishes it. Null for every other node.
    */
   readonly outputsDir: string | null
+  /** A role that only reads: it never waits on a person, so an unlisted call is refused. */
+  readonly readOnly: boolean
 }
 
 /** The path a tool call names, whichever field it used to name it. */
@@ -79,6 +81,12 @@ function publishDocumentRule(request: ToolRequest): PolicyDecision | undefined {
 export function decideTool(request: ToolRequest): PolicyDecision | null {
   const published = publishDocumentRule(request)
   if (published !== undefined) return published
+  if (request.readOnly) {
+    return {
+      allow: false,
+      reason: 'This role only reads. Use Read, Grep, Glob or the git and gh commands it allows.',
+    }
+  }
   if (request.autonomy !== 'lights-out') return null
   return {
     allow: false,

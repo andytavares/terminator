@@ -15,12 +15,8 @@ const SHARED_MACHINE_RESOURCES = [
   '**/remote-control.spec.ts',
 ]
 
-// Run only on purpose: `tools/` rewrites committed screenshots (E2E_TOOLS=1), and `live/` drives
-// real agents against a real remote, at a cost and not deterministic (E2E_LIVE=1).
-const NOT_IN_THE_SUITE = [
-  ...(process.env.E2E_TOOLS === '1' ? [] : ['**/tools/**']),
-  ...(process.env.E2E_LIVE === '1' ? [] : ['**/live/**']),
-]
+// Run only on purpose: `tools/` rewrites committed screenshots (E2E_TOOLS=1).
+const NOT_IN_THE_SUITE = [...(process.env.E2E_TOOLS === '1' ? [] : ['**/tools/**'])]
 
 export default defineConfig({
   testDir: './tests/e2e',

@@ -91,6 +91,8 @@ export interface StartSupervisedRunOptions {
   outputSchema?: object
   /** The agent's answer in `outputSchema`, as Claude validated it. Needs `outputSchema`. */
   onStructuredOutput?: (answer: unknown) => void
+  /** The agent could not start; `start` then resolves null. The reason is the agent's own words. */
+  onStartFailed?: (reason: string) => void
   /** The agent stopped responding and is waiting. Not an ending. */
   onTurnEnd?: (turns: number) => void
   /**
@@ -347,20 +349,36 @@ function end(context: RunnerContext, sessionId: string, clean: boolean): void {
   if (clean) void context.api.agents.close(sessionId).catch(() => undefined)
 }
 
+/** The worktree as a project and the agent in a tab of it, or null with `onStartFailed` told why. */
+async function openAgentTab(
+  context: RunnerContext,
+  start: StartSupervisedRunOptions
+): Promise<{ sessionId: string; project: { id: string } } | null> {
+  // The worktree becomes a project, so the agent has a tab to live in and the
+  // operator can find it in the sidebar rather than only in a card.
+  const project = await addWorktreeProject(context.api, start)
+  if (project === null) {
+    start.onStartFailed?.(
+      "The agent's tab could not be opened: the worktree was not added as a project."
+    )
+    return null
+  }
+  const started = await context.api.agents.start({
+    ...agentStartInput(start, project.id),
+    onStartFailed: start.onStartFailed,
+  })
+  return started === null ? null : { sessionId: started.sessionId, project }
+}
+
 async function startSupervisedRun(
   context: RunnerContext,
   start: StartSupervisedRunOptions
 ): Promise<SupervisedRun | null> {
-  // The worktree becomes a project, so the agent has a tab to live in and the
-  // operator can find it in the sidebar rather than only in a card.
-  const project = await addWorktreeProject(context.api, start)
-  if (project === null) return null
-
-  const started = await context.api.agents.start(agentStartInput(start, project.id))
+  const tab = await openAgentTab(context, start)
   // No tab, no run. Said out loud rather than starting an agent nobody can see.
-  if (started === null) return null
+  if (tab === null) return null
 
-  const { sessionId } = started
+  const { sessionId, project } = tab
   // A box shared with the record, so `continueRun` can move an ask to another phase
   // without a new session; the closures exist before the record does.
   const phase: Running['phase'] = { current: { id: start.phase, ...start } }
@@ -445,8 +463,12 @@ function claudeOptions(start: StartSupervisedRunOptions): object {
   }
 }
 
-/** What `api.agents.start` is given for one run. */
-function agentStartInput(start: StartSupervisedRunOptions, projectId: string): StartAgentInput {
+/** What `api.agents.start` is given for one run; exported for the live role check.
+ * @internal */
+export function agentStartInput(
+  start: StartSupervisedRunOptions,
+  projectId: string
+): StartAgentInput {
   return {
     // Claude, whatever the default agent is: its tool names and ask options are what Foundry's policy knows.
     agentId: 'claude',

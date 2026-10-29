@@ -76,6 +76,7 @@ export type FoundryApi = {
   'foundry:order.cancel': Handler<ForgeChannels['cancel']>
   'foundry:order.recipe': Handler<ForgeChannels['recipe']>
   'foundry:order.hold': Handler<ForgeChannels['hold']>
+  'foundry:order.resume': Handler<ForgeChannels['resume']>
   'foundry:order.delete': Answers<typeof OrderIdPayload, typeof removeOrder>
   'foundry:forge.environment': Handler<ForgeChannels['environment']>
   // The channel's `onError` answers `{ error }` when the tracker read throws.

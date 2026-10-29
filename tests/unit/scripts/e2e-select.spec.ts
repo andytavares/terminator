@@ -27,7 +27,7 @@ function realSpecs() {
       .filter(Boolean)
       .map((f) => f.replace(/^tests\/e2e\//, ''))
       // git's pathspec glob lets `*` cross directories; tests/e2e/tools/**
-      // and tests/e2e/live/** are not part of the E2E suite.
+      // is not part of the E2E suite.
       .filter((f) => !f.includes('/'))
       .sort()
   )

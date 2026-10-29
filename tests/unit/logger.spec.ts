@@ -46,6 +46,31 @@ function useFreshLogger(): void {
   })
 }
 
+describe('logger: where it writes', () => {
+  useFreshLogger()
+  afterEach(() => {
+    delete process.env.TERMINATOR_LOG_DIR
+  })
+
+  it('writes into the app logs folder by default', async () => {
+    const { makeLogger } = await import('../../src/main/logger')
+    makeLogger('ns').info('x')
+    expect(mockCreateWriteStream).toHaveBeenCalledWith('/tmp/testlogs/terminator.log', {
+      flags: 'a',
+    })
+  })
+
+  // The canary's app logs on its own, so another app writing the shared log is not its error.
+  it('writes into TERMINATOR_LOG_DIR when it is set', async () => {
+    process.env.TERMINATOR_LOG_DIR = '/tmp/canary-logs'
+    const { makeLogger } = await import('../../src/main/logger')
+    makeLogger('ns').info('x')
+    expect(mockCreateWriteStream).toHaveBeenCalledWith('/tmp/canary-logs/terminator.log', {
+      flags: 'a',
+    })
+  })
+})
+
 describe('logger (src/main/logger.ts)', () => {
   useFreshLogger()
 

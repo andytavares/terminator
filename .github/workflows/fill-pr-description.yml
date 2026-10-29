@@ -13,7 +13,9 @@ jobs:
   fill-description:
     name: Generate description with Claude
     runs-on: ubuntu-latest
-    if: github.event.action == 'opened' || github.event.label.name == 'fill-description'
+    if: >-
+      !startsWith(github.head_ref, 'canary/') &&
+      (github.event.action == 'opened' || github.event.label.name == 'fill-description')
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

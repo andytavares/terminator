@@ -13,6 +13,7 @@ function request(over: Partial<ToolRequest> = {}): ToolRequest {
     input: { command: 'rm -rf build' },
     autonomy: 'standard',
     outputsDir: null,
+    readOnly: false,
     ...over,
   }
 }
@@ -26,6 +27,24 @@ const publishing = (over: Partial<ToolRequest> = {}) =>
       ...over,
     })
   )
+
+describe('a call a read-only role asks for', () => {
+  it('is refused at escorted, with the tools the role can use', () => {
+    const decision = decideTool(
+      request({ autonomy: 'escorted', readOnly: true, input: { command: 'npm install' } })
+    )
+    expect(decision?.allow).toBe(false)
+    expect(decision?.reason).toContain('This role only reads')
+  })
+
+  it('still goes to the operator at escorted when the role is not read-only', () => {
+    expect(decideTool(request({ autonomy: 'escorted', readOnly: false }))).toBeNull()
+  })
+
+  it('still lets the order own document through', () => {
+    expect(publishing({ readOnly: true })?.allow).toBe(true)
+  })
+})
 
 describe('a call the settings left open', () => {
   it.each(['escorted', 'standard'] as const)('goes to the operator at %s', (autonomy) => {

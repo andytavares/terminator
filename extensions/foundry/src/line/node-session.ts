@@ -10,12 +10,13 @@ import type {
 } from '../runtime/supervised-runner.js'
 import { agentTitle } from '../runtime/agent-title.js'
 import { decideTool } from '../runtime/tool-decision.js'
-import { roleSettings } from '../runtime/role-settings.js'
+import { refusesUnlistedCalls, roleSettings } from '../runtime/role-settings.js'
 import { probedCommands } from '../runtime/agent-policy.js'
 import { runtime, strandedAgents } from '../runtime/runtime-state.js'
 import { notePending, noteResolved } from '../runtime/held-calls.js'
 import { readOnlyTools, autonomyFor, letAutoModeDecide, modelForTier } from '../state/settings.js'
 import { announceLive } from '../state/live-index.js'
+import { NO_START_REASON } from '../runtime/start-failure.js'
 
 type NodeInput = Parameters<ExecutorDeps['run']>[0]
 
@@ -26,7 +27,9 @@ interface NodeTurn {
   // after the first resumes that conversation, so without the mark a rung
   // reads an earlier node's tool calls as its own.
   transcriptFrom: number
-  readonly finish: (exitCode: number | null) => void
+  readonly finish: (exitCode: number | null, notStarted?: string) => void
+  /** The agent's own reason for not starting, once it gives one. */
+  startFailure: string | null
 }
 
 /** Where one node runs: the run, the node, and the lane checkout it runs in. */
@@ -63,7 +66,7 @@ function startNode(
     .start(startOptions(launch, turn))
     .then((run) => {
       if (run === null) {
-        turn.finish(null)
+        turn.finish(null, turn.startFailure ?? NO_START_REASON)
         return
       }
       registerStartedRun(launch, turn, run)
@@ -76,10 +79,16 @@ function openTurn(nodeId: string, resolve: (run: StartedRun) => void): NodeTurn 
   const turn: NodeTurn = {
     sessionId: `${nodeId}-unstarted`,
     transcriptFrom: 0,
-    finish: (exitCode) => {
+    startFailure: null,
+    finish: (exitCode, notStarted) => {
       if (settled) return
       settled = true
-      resolve({ sessionId: turn.sessionId, exitCode, transcriptFrom: turn.transcriptFrom })
+      resolve({
+        sessionId: turn.sessionId,
+        exitCode,
+        transcriptFrom: turn.transcriptFrom,
+        ...(notStarted === undefined ? {} : { notStarted }),
+      })
     },
   }
   return turn
@@ -108,6 +117,7 @@ function startOptions(launch: NodeLaunch, turn: NodeTurn): StartSupervisedRunOpt
     // exactly like one that has gone quiet, and reading its transcript
     // was the only way to tell them apart.
     onAutoDenied: (tool, reason) => postToConsole(turn.sessionId, `refused ${tool}: ${reason}`),
+    onStartFailed: (reason) => void (turn.startFailure = reason),
     onRegistered: (run) => adoptRegisteredRun(input, turn, run),
     onEnd: (exitCode) => archiveEndedSession(turn, exitCode),
     onTurnEnd: (turns) => finishNodeTurn(turn, turns),
@@ -120,6 +130,14 @@ function addDirsFor(input: NodeInput): string[] | undefined {
   return dirs.length === 0 ? undefined : dirs
 }
 
+/** What the node may write: the facts both its settings and its fallback decision read. */
+const writeFactsOf = (input: NodeInput) => ({
+  readOnly: input.readOnly,
+  docsOnly: input.docsOnly === true,
+  restrictedWrites: input.outputPath != null || input.outputsDir != null,
+  outputsDir: input.outputsDir ?? null,
+})
+
 /** The role's permission mode and Claude settings; see `roleSettings`. */
 function settingsOf({
   context,
@@ -128,13 +146,10 @@ function settingsOf({
 }: NodeLaunch): Pick<StartSupervisedRunOptions, 'mode' | 'settings'> {
   const { api, order } = context
   const { permissionMode, settings } = roleSettings({
-    readOnly: input.readOnly,
-    docsOnly: input.docsOnly === true,
-    restrictedWrites: input.outputPath != null || input.outputsDir != null,
+    ...writeFactsOf(input),
     autonomy: autonomyFor(api),
     letModeDecide: letAutoModeDecide(api),
     outputPath: input.outputPath ?? null,
-    outputsDir: input.outputsDir ?? null,
     skillsMount: input.skillsMount,
     mayUseTool: input.mayUseTool,
     probedCommands: probedCommands(order),
@@ -151,6 +166,7 @@ function toolDecisionFor({ context, input }: NodeLaunch): StartSupervisedRunOpti
       input: toolInput,
       autonomy: autonomyFor(context.api),
       outputsDir: input.outputsDir ?? null,
+      readOnly: refusesUnlistedCalls(writeFactsOf(input)),
     })
 }
 

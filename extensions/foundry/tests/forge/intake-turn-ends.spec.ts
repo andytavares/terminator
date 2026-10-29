@@ -20,7 +20,8 @@ import { createOrderStore } from '../../src/order/store.js'
 import { orderDir } from '../../src/data-root.js'
 import { rungOutputPath } from '../../src/line/rung-output.js'
 import { convergeOrder, readyDraft } from '../helpers/forge-turns.js'
-import { ledgerActions, untilLedgerHas } from '../helpers/order-ledger.js'
+import { ledgerActions, orderLedger, untilLedgerHas } from '../helpers/order-ledger.js'
+import { lastIntake } from '../../src/forge/intake-outcome.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 import { writeFileWithDirs } from '../helpers/files.js'
 
@@ -54,7 +55,7 @@ beforeEach(async () => {
 })
 
 interface TurnInput {
-  phase: 'architect' | 'red-team'
+  phase: 'architect' | 'red-team' | 'scout'
   onRegistered: (run: { sessionId: string; transcriptFrom: number }) => void
   onTurnEnd?: () => void
   onStructuredOutput?: (answer: unknown) => void
@@ -80,16 +81,43 @@ async function untilRefusalIsSaid(): Promise<void> {
   await untilToastShown(host, REFUSED)
 }
 
+const DONT_ASK = 'Mode dontAsk is not available in this session'
+
+/** A runner whose agent refuses to start, as the core reports it: the reason, then null. */
+const refusesToStart = (reason?: string) =>
+  (async (input: { onStartFailed?: (reason: string) => void }) => {
+    if (reason !== undefined) input.onStartFailed?.(reason)
+    return null
+  }) as never
+
 describe('an architect whose session never started', () => {
-  it('says it ended before it started, when the runner hands back no session', async () => {
-    theRunner.start.mockResolvedValue(null)
-    expect((await convergeOrder(host, dataDir, readyDraft(repo))).error).toBe(
-      'The architect ended before it started.'
-    )
-    await untilLedgerHas(dataDir, 'converge.refused', 'The architect could not be started.')
-    await untilRefusalIsSaid()
+  it('writes one not-started line with the agent’s reason, and never retries', async () => {
+    theRunner.start.mockImplementation(refusesToStart(DONT_ASK))
+    expect((await convergeOrder(host, dataDir, readyDraft(repo))).error).toBe(DONT_ASK)
+    await untilLedgerHas(dataDir, 'agent.not-started', DONT_ASK)
+    await untilToastShown(host, `Make it red: Claude could not start the architect: ${DONT_ASK}`)
+    await settleFoundryWork()
+    const entries = await orderLedger(dataDir)
+    expect(entries.filter((entry) => entry.action === 'agent.not-started')).toHaveLength(1)
+    expect(entries.map((entry) => entry.action)).not.toContain('converge.refused')
+    expect(theRunner.start).toHaveBeenCalledTimes(1)
+    expect(lastIntake(entries)).toMatchObject({
+      kind: 'not-started',
+      actor: 'architect',
+      reason: DONT_ASK,
+    })
   })
 
+  it('says Claude gave no reason, when the runner hands back no session and no reason', async () => {
+    theRunner.start.mockImplementation(refusesToStart())
+    expect((await convergeOrder(host, dataDir, readyDraft(repo))).error).toBe(
+      'Claude did not say why.'
+    )
+    await untilLedgerHas(dataDir, 'agent.not-started', 'Claude did not say why.')
+  })
+})
+
+describe('an architect whose start threw', () => {
   it('says it could not be started, when the runner fails with something not an error', async () => {
     theRunner.start.mockRejectedValue('no pty')
     expect((await convergeOrder(host, dataDir, readyDraft(repo))).error).toBe(
@@ -196,13 +224,38 @@ function redTeamWriting(output: unknown, before?: (input: TurnInput) => void): T
   }
 }
 
+describe('a scout that never started', () => {
+  it('is not-started with the agent’s reason, not "wrote nothing"', async () => {
+    theRunner.start.mockImplementation((async (
+      input: TurnInput & { onStartFailed: (r: string) => void }
+    ) => {
+      // Neither starts: an architect left running would end at teardown and be retried into the next test.
+      input.onStartFailed(input.phase === 'scout' ? DONT_ASK : 'the architect is not under test')
+      return null
+    }) as never)
+    const noEntryPoints = readyDraft(repo)
+    await convergeOrder(host, dataDir, {
+      ...noEntryPoints,
+      context: { ...noEntryPoints.context, entryPoints: [] },
+    })
+    const line = await untilLedgerHas(dataDir, 'agent.not-started', DONT_ASK)
+    expect(line.actor).toBe('role:scout')
+    expect(await ledgerActions(dataDir)).not.toContain('scout.refused')
+  })
+})
+
 describe('a red team round that never started', () => {
-  it('is refused as having written nothing, when the runner hands back no session', async () => {
-    theRunner.start.mockImplementation(turns(async () => null))
-    await convergeOrder(host, dataDir, readyDraft(repo))
-    expect((await untilLedgerHas(dataDir, 'red-team.refused')).reason).toBe(
-      'the red-team wrote nothing'
+  it('is not-started with the agent’s reason, when the runner hands back no session', async () => {
+    theRunner.start.mockImplementation(
+      turns(async (input) => {
+        ;(input as unknown as { onStartFailed: (reason: string) => void }).onStartFailed(DONT_ASK)
+        return null
+      })
     )
+    await convergeOrder(host, dataDir, readyDraft(repo))
+    const line = await untilLedgerHas(dataDir, 'agent.not-started', DONT_ASK)
+    expect(line.actor).toBe('role:red-team')
+    expect(await ledgerActions(dataDir)).not.toContain('red-team.refused')
   })
 
   it('is refused with the runner’s own reason, when the runner fails', async () => {

@@ -121,6 +121,7 @@ function worktreeFallbacksTests() {
 describe('preparing a checkout', () => {
   describe('adding', worktreeAddingTests)
   describe('reusing', worktreeReusingTests)
+  describe('reusing through a symlink', worktreeSymlinkTests)
   describe('failures', worktreeFailuresTests)
   describe('concurrent callers', concurrentCallersTests)
   describe('retrying', worktreeRetryingTests)
@@ -220,6 +221,26 @@ function worktreeReusingTests() {
     const d = deps()
     await ensureCheckout(order(), 1, d)
     expect(calls(d.exec)[0].args).toEqual(['worktree', 'list', '--porcelain'])
+  })
+}
+
+function worktreeSymlinkTests() {
+  it('reuses it when the data root is reached through a symlink, which git lists resolved', async () => {
+    const real = tmpDir('foundry-reuse-real-')
+    const root = path.join(tmpDir('foundry-reuse-link-'), 'root')
+    fs.symlinkSync(real, root)
+    const target = path.join(root, 'orders', 'WO-1', 'worktrees', 'app')
+    fs.mkdirSync(target, { recursive: true })
+    const listedAs = fs.realpathSync(target)
+    const exec = vi.fn(async (options: { args: string[] }) =>
+      options.args[1] === 'list'
+        ? { exitCode: 0, stdout: `worktree ${listedAs}\nHEAD abc\n`, stderr: '', timedOut: false }
+        : { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+    )
+    const checkout = await ensureCheckout(order(), 1, deps({ exec: exec as never, root }))
+
+    expect(checkout.created).toBe(false)
+    expect(calls(exec).some((c) => c.args[1] === 'add')).toBe(false)
   })
 }
 

@@ -46,7 +46,10 @@ export type ConvergeOutcome =
   | { ok: false; reason: string }
 
 /** Whether the architect is now running, or why it is not. */
-export type ConvergeStarted = { ok: true; sessionId: string } | { ok: false; reason: string }
+export type ConvergeStarted =
+  | { ok: true; sessionId: string }
+  // `notStarted`: Claude could not start the agent, and `reason` is the agent's own.
+  | { ok: false; reason: string; notStarted?: true }
 
 // The Forge's three channels.
 //
@@ -62,6 +65,8 @@ const CreatePayload = z.object({
     key: z.string().optional(),
   }),
   repoPaths: z.array(z.string()),
+  /** The local canary run (scripts/foundry-canary.mjs): only the branch name changes. */
+  canary: z.boolean().optional(),
 })
 
 const CancelPayload = z.object({
@@ -137,6 +142,7 @@ export const CompilePayload = z.object({
 
 const RecipePayload = z.object({ id: z.string(), recipe: z.string().nullable() })
 const HoldPayload = z.object({ id: z.string(), held: z.boolean() })
+const OrderIdOnly = z.object({ id: z.string() })
 const EnvironmentPayload = z.object({
   id: z.string(),
   move: z.enum(['check', 'waive', 'continue-unmeasured', 'decline-pictures']),
@@ -260,6 +266,8 @@ export interface ForgeChannels {
   recipe(payload: z.infer<typeof RecipePayload>): ReturnType<typeof recipe>
   /** Hold the loop for the operator, or release it. */
   hold(payload: z.infer<typeof HoldPayload>): ReturnType<typeof hold>
+  /** Pick the loop up where it stopped, without recording a hold or a release. */
+  resume(payload: z.infer<typeof OrderIdOnly>): ReturnType<typeof resume>
   /** Check the base branch again, or hand off without it. */
   environment(payload: z.infer<typeof EnvironmentPayload>): ReturnType<typeof environment>
 }
@@ -338,6 +346,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     cancel: (payload) => cancel(deps, payload),
     recipe: (payload) => recipe(deps, payload),
     hold: (payload) => hold(deps, payload),
+    resume: (payload) => resume(deps, payload),
     environment: (payload) => environment(deps, payload),
   }
 }
@@ -357,6 +366,16 @@ function seedInput({ source, repoPaths }: CreateInput): SeedInput {
   return { kind: 'typed', text: source.text ?? '', repoPaths }
 }
 
+/** The order on `canary/<id>`, the name the canary's sweep finds a leftover by. */
+function onCanaryBranch(order: WorkOrder): WorkOrder {
+  const branch = `canary/${order.id.toLowerCase()}`
+  return {
+    ...order,
+    source: { ...order.source, branch },
+    plan: { ...order.plan, lanes: order.plan.lanes.map((lane) => ({ ...lane, branch })) },
+  }
+}
+
 async function create(deps: ForgeDeps, payload: CreateInput) {
   const seeded = await seedOrder(seedInput(payload), {
     now: deps.now,
@@ -374,7 +393,8 @@ async function create(deps: ForgeDeps, payload: CreateInput) {
   // The adversarial pass runs on the first draft, not only at the end: a
   // finding the operator sees now is cheaper than one that reopens an order
   // they thought was settled.
-  const attacked = applyFindings(configured(deps, seeded.order, payload.repoPaths), deps.now())
+  const named = payload.canary === true ? onCanaryBranch(seeded.order) : seeded.order
+  const attacked = applyFindings(configured(deps, named, payload.repoPaths), deps.now())
   await deps.store.save(attacked)
   await deps.store.record({
     at: deps.now(),
@@ -520,6 +540,8 @@ function recordArchitectStart(
   { order, message }: { order: WorkOrder; message: string | undefined },
   started: ConvergeStarted
 ): Promise<void> {
+  // A start that failed was written once, by the turn itself.
+  if (!started.ok && started.notStarted) return Promise.resolve()
   return deps.store.record({
     at: deps.now(),
     orderId: order.id,
@@ -975,6 +997,15 @@ async function recipe(deps: ForgeDeps, payload: z.infer<typeof RecipePayload>) {
   return view(next)
 }
 
+// Picks the loop up where it stopped, e.g. a red-team round that could not start: the
+// same next step a release takes, with no hold to record.
+async function resume(deps: ForgeDeps, payload: z.infer<typeof OrderIdOnly>) {
+  const order = await deps.store.load(payload.id)
+  if (order === null) return { error: `No order ${payload.id}.` }
+  deps.onReleased(order)
+  return view(order)
+}
+
 // Hold the loop for the operator, or release it. This only records the decision;
 // what release resumes is `deps.onReleased`'s job, in the loop.
 async function hold(deps: ForgeDeps, payload: z.infer<typeof HoldPayload>) {
@@ -1047,6 +1078,7 @@ export function forgeChannelSpecs(forge: ForgeChannels): ChannelSpec[] {
     foundryChannel('foundry:order.cancel', CancelPayload, forge.cancel),
     foundryChannel('foundry:order.recipe', RecipePayload, forge.recipe),
     foundryChannel('foundry:order.hold', HoldPayload, forge.hold),
+    foundryChannel('foundry:order.resume', OrderIdOnly, forge.resume),
     foundryChannel('foundry:forge.environment', EnvironmentPayload, forge.environment),
   ]
 }
