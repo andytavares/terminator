@@ -7,6 +7,7 @@ import { agentStateOf } from '../../sidebar/agent-state'
 import { laneSwitchOf } from '../../sidebar/task-groups'
 import { revealBranch } from '../../terminal/reveal-branch'
 import { StateGlyph } from '../home/StateGlyph'
+import { recordUse } from '../../usage/record'
 import './LaneSwitcher.css'
 
 /** The branches with a terminal that is asking, so a lane can say so without being on screen. */
@@ -29,6 +30,11 @@ function laneKeyHint(i: number): string | undefined {
   return `${navigator.platform.startsWith('Mac') ? '⌃' : 'Alt+'}${i + 1}`
 }
 
+function switchLane(projectId: string): void {
+  recordUse('core.terminal.switch-lane')
+  revealBranch(projectId)
+}
+
 /** The task's name and a button per repo it spans, when the visible branch is in such a task. */
 export function LaneSwitcher({ projectId }: { projectId: string }): JSX.Element | null {
   const tasks = useTaskStore((s) => s.tasks)
@@ -49,7 +55,7 @@ export function LaneSwitcher({ projectId }: { projectId: string }): JSX.Element 
           aria-pressed={i === switcher.current}
           title={laneKeyHint(i)}
           disabled={lane.projectId === null}
-          onClick={() => lane.projectId !== null && revealBranch(lane.projectId)}
+          onClick={() => lane.projectId !== null && switchLane(lane.projectId)}
         >
           {lane.label}
           {lane.projectId !== null && asking.has(lane.projectId) && (

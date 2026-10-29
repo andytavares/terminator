@@ -2,6 +2,7 @@ import React from 'react'
 import { ListFilter } from 'lucide-react'
 import type { SessionView } from '../../sidebar/view-model'
 import { DropdownMenu, MenuChoice } from './menu'
+import { recordUse } from '../../usage/record'
 import './SidebarMenu.css'
 
 export interface FilterMenuProps {
@@ -67,6 +68,7 @@ function ViewChoices({
           key={view.id}
           checked={view.id === activeViewId}
           onSelect={() => {
+            recordUse('core.sidebar.filter')
             onSelectView(view.id)
             close()
           }}
@@ -97,7 +99,10 @@ function HideStaleItem({
       aria-checked={on}
       className="sidebar-menu__item"
       disabled={hideStaleUnavailable}
-      onClick={() => onChangeView({ filters: { ...active.filters, hideStale: !on } })}
+      onClick={() => {
+        recordUse('core.sidebar.filter')
+        onChangeView({ filters: { ...active.filters, hideStale: !on } })
+      }}
     >
       <span>Hide stale</span>
       {on && <span className="sidebar-menu__tick">✓</span>}
@@ -115,6 +120,7 @@ function ShowAllItem({ shown, total, onShowAll, close }: FilterMenuProps & Closi
         role="menuitem"
         className="sidebar-menu__item sidebar-menu__item--note"
         onClick={() => {
+          recordUse('core.sidebar.filter')
           onShowAll()
           close()
         }}

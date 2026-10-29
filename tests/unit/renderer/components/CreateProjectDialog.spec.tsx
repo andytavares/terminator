@@ -75,6 +75,9 @@ function setupGitWorkspace(): void {
 /** A worktree git still has a checkout for. */
 const NOT_DETACHED = { detached: false, prunable: false }
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('CreateProjectDialog', () => {
   it('renders dialog title', () => {
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)

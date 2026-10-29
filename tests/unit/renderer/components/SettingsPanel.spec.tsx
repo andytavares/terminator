@@ -54,6 +54,9 @@ beforeEach(() => {
   installElectronApi(api)
 })
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('SettingsPanel', () => {
   // Opened as a native modal dialog, it takes focus from the terminal: tests/e2e/settings.spec.ts.
   it('is a modal shell named Settings', () => {

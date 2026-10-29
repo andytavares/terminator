@@ -4,6 +4,7 @@ import electronUpdater from 'electron-updater'
 import { runsInBackground } from './background-mode'
 import { logger } from './logger'
 import { notificationManager } from './notifications/notification-manager'
+import { getUsageStore } from './usage/usage-store'
 
 /** Releases come about once a day and the app stays open for days. */
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
@@ -36,6 +37,7 @@ export function startAppUpdates(revealApp: () => void): void {
 function announceUpdate(version: string, revealApp: () => void): void {
   if (version === announcedVersion) return
   announcedVersion = version
+  void getUsageStore().recordUse({ feature: 'core.app.update', via: 'app' })
   notificationManager.create({
     key: 'updateReady',
     type: 'info',
@@ -69,6 +71,7 @@ export async function checkForUpdatesNow(): Promise<void> {
     announcedVersion = result.updateInfo.version
     // A download that fails after the check found an update rejects here.
     await result.downloadPromise
+    void getUsageStore().recordUse({ feature: 'core.app.update', via: 'app' })
     await offerRestart(result.updateInfo.version)
   } catch {
     await dialog.showMessageBox({

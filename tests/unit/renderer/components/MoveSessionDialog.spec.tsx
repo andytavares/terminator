@@ -89,6 +89,9 @@ beforeEach(() => {
   setupMocks()
 })
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('MoveSessionDialog', () => {
   it('renders workspace and project options', () => {
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)

@@ -4,6 +4,7 @@ import '@terminator/extension-ui/styles.css'
 import { useExtensionRegistry } from '../../extensions/registry'
 import { groupThreads, type ThreadGroup, type WorkThread } from '../../home/work-threads'
 import { revealBranch } from '../../terminal/reveal-branch'
+import { recordUse } from '../../usage/record'
 import { useWorkThreads } from '../home/useWorkThreads'
 import { filterThreads } from '../home/desk-groups'
 import { useDeskSelection } from '../home/desk-selection'
@@ -46,6 +47,7 @@ function useSwitcher() {
   const hide = useTaskSwitcher((s) => s.hide)
   const choose = (thread: WorkThread | undefined, detail: boolean): void => {
     if (!thread) return
+    recordUse('core.task-switcher.choose')
     hide()
     if (detail) openDrawer(thread)
     else openLane(thread)

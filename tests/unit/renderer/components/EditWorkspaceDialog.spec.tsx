@@ -34,6 +34,9 @@ beforeEach(() => {
   useWorkspaceStore.setState({ ...useWorkspaceStore.getInitialState(), workspaces: [ws] })
 })
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('EditWorkspaceDialog', () => {
   it('renders with workspace name pre-filled', () => {
     render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
@@ -151,6 +154,7 @@ describe('EditWorkspaceDialog — closes after successful save', () => {
     render(<EditWorkspaceDialog workspace={ws} onClose={onClose} />)
     fireEvent.click(screen.getByText('Save'))
     await eventually(() => expect(onClose).toHaveBeenCalled())
+    expect(recordUse).toHaveBeenCalledWith('core.sidebar.workspace-edit')
   })
 
   it('does not call updateWorkspace when submitted with an empty name', async () => {

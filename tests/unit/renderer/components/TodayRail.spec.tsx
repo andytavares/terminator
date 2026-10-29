@@ -55,6 +55,10 @@ beforeEach(() => {
 const pickToday = (items: object[]) =>
   useFocusStore.setState({ days: { [localDateKey(Date.now())]: items as never } })
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+beforeEach(() => recordUse.mockClear())
+
 describe("Today's focus", () => {
   it('ticks an item by itself when the work it points at shipped, and lets the operator tick the rest', () => {
     pickToday([

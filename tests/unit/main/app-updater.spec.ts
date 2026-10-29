@@ -43,6 +43,8 @@ vi.mock('electron-updater', () => ({
     },
   },
 }))
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../src/main/usage/usage-store', () => ({ getUsageStore: () => ({ recordUse }) }))
 vi.mock('electron-store', async () =>
   (await import('../../support/stores')).inMemoryElectronStore()
 )
@@ -64,6 +66,7 @@ const reveal = (): void => {
 }
 
 beforeEach(async () => {
+  recordUse.mockClear()
   vi.resetModules()
   vi.useFakeTimers()
   electron.app.isPackaged = true
@@ -107,6 +110,15 @@ describe('startAppUpdates', () => {
     fake.emit('error', new Error('net::ERR_INTERNET_DISCONNECTED'))
     await vi.advanceTimersByTimeAsync(0)
     expect(notificationManager.list()).toEqual([])
+  })
+})
+
+describe('feature usage', () => {
+  it('counts an update once per version, though every later check downloads it again', () => {
+    startAppUpdates(reveal)
+    fake.emit('update-downloaded', { version: '0.1.170' })
+    fake.emit('update-downloaded', { version: '0.1.170' })
+    expect(recordUse.mock.calls).toEqual([[{ feature: 'core.app.update', via: 'app' }]])
   })
 })
 

@@ -25,6 +25,9 @@ beforeEach(() => {
   })
 })
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('AboutDialog', () => {
   it('renders the dialog with app name and version after loading', async () => {
     render(<AboutDialog onClose={vi.fn()} />)

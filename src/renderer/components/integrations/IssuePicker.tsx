@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Search, X } from 'lucide-react'
+import { recordUse } from '../../usage/record'
 import { ERROR_TEXT, TRACKER_LABELS, useIssueSearch } from './use-issue-search'
 import type { IssueSummary } from '../../../shared/types/index'
 import './issue-search.css'
@@ -56,6 +57,7 @@ function useIssuePicker(onSelect: (issue: IssueSummary) => void, onClear: () => 
       setTerm('')
     },
     search: (next: string): void => {
+      if (term === '' && next !== '') recordUse('core.issues.search')
       setTerm(next)
       setOpen(true)
     },

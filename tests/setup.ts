@@ -36,6 +36,9 @@ configure({ asyncUtilTimeout: WAIT_BOUND_MS })
 
 vi.mock('*.css', () => ({}))
 vi.mock('*.module.css', () => ({ default: {} }))
+// Components count their uses over IPC, which most specs do not install. A spec that checks a
+// count mocks this module itself, or unmocks it to check the IPC payload.
+vi.mock('../src/renderer/usage/record', () => ({ recordUse: vi.fn(), declareFeatures: vi.fn() }))
 
 // JSDOM does not fully implement the Selection API; patch it to prevent React DOM
 // from crashing with "Right-hand side of 'instanceof' is not an object" when

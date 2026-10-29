@@ -2,6 +2,7 @@ import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useState } from 'react'
 import { Check, Link2, RefreshCw, X } from 'lucide-react'
 import { useIntegrationsStore } from '../../stores/integrations.store'
+import { recordUse } from '../../usage/record'
 import type { TrackerConnection, TrackerId } from '../../../shared/types/index'
 import './IntegrationsSettings.css'
 
@@ -40,6 +41,7 @@ function useConnect(tracker: TrackerId) {
     setBusy(true)
     const ok = await useIntegrationsStore.getState().connect(input)
     setBusy(false)
+    if (ok) recordUse('core.issues.connect')
     return ok
   }
   const clearError = (): void => useIntegrationsStore.getState().clearConnectError(tracker)

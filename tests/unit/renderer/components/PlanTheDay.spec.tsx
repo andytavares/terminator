@@ -84,6 +84,10 @@ afterEach(() => vi.useRealTimers())
 
 const band = () => screen.getByRole('region', { name: 'Plan today' })
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+beforeEach(() => recordUse.mockClear())
+
 describe('PlanTheDay: when it shows', () => {
   it('shows on the first view of a day, with what yesterday held and what waits', () => {
     desk.asks = [

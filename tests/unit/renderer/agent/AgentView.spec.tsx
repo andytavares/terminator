@@ -71,6 +71,9 @@ beforeEach(() => {
   })
 })
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('AgentView transcript', () => {
   it('shows the history, then a live update, in a polite log', async () => {
     await mountView()

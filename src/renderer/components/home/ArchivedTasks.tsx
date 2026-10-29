@@ -3,6 +3,7 @@ import { Button, Popover } from '@terminator/extension-ui'
 import { useWorkThreads } from './useWorkThreads'
 import { toggleArchived } from './thread-actions'
 import { toggleDone } from './task-actions'
+import { recordUse } from '../../usage/record'
 import type { WorkThread } from '../../home/work-threads'
 import './Tasks.css'
 
@@ -24,6 +25,27 @@ function ArchivedRow({ thread }: { thread: WorkThread }): JSX.Element {
   )
 }
 
+function ArchivedPanel({ kept, onDismiss }: { kept: WorkThread[]; onDismiss: () => void }) {
+  return (
+    <Popover
+      label="Archived tasks"
+      onDismiss={onDismiss}
+      align="end"
+      className="archived-tasks__panel"
+    >
+      {kept.length === 0 ? (
+        <p className="archived-tasks__empty">No archived or finished tasks.</p>
+      ) : (
+        <ul className="archived-tasks__list">
+          {kept.map((thread) => (
+            <ArchivedRow key={thread.key} thread={thread} />
+          ))}
+        </ul>
+      )}
+    </Popover>
+  )
+}
+
 /** The Home footer's "Archived tasks (N)" button and the list it opens. */
 export function ArchivedTasks(): JSX.Element {
   const { threads } = useWorkThreads()
@@ -31,27 +53,17 @@ export function ArchivedTasks(): JSX.Element {
   const kept = threads.filter(isKeptAside)
   return (
     <span className="archived-tasks">
-      <Button size="sm" variant="ghost" onClick={() => setOpen(!open)}>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() => {
+          if (!open) recordUse('core.home.archived')
+          setOpen(!open)
+        }}
+      >
         {`Archived tasks (${kept.length})`}
       </Button>
-      {open && (
-        <Popover
-          label="Archived tasks"
-          onDismiss={() => setOpen(false)}
-          align="end"
-          className="archived-tasks__panel"
-        >
-          {kept.length === 0 ? (
-            <p className="archived-tasks__empty">No archived or finished tasks.</p>
-          ) : (
-            <ul className="archived-tasks__list">
-              {kept.map((thread) => (
-                <ArchivedRow key={thread.key} thread={thread} />
-              ))}
-            </ul>
-          )}
-        </Popover>
-      )}
+      {open && <ArchivedPanel kept={kept} onDismiss={() => setOpen(false)} />}
     </span>
   )
 }

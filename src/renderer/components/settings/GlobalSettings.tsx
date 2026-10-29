@@ -11,6 +11,8 @@ import { QuickActionsSettings } from './QuickActionsSettings'
 import '@terminator/extension-ui/settings-fields.css'
 import './SettingsPanel.css'
 import { ThemeChoices } from './ThemeChoices'
+import { recordUse } from '../../usage/record'
+import { useFieldChangeCounter } from '../../usage/use-field-change-counter'
 
 const NOTIFICATION_TARGETS: Array<{ value: NotificationTarget; label: string }> = [
   { value: 'system', label: 'System' },
@@ -43,10 +45,11 @@ const CORE_NOTIFICATION_KEYS: Array<{ key: string; label: string }> = [
 
 export function GlobalSettings(): JSX.Element {
   const settings = useSettingsStore((s) => s.globalSettings)
+  const countChange = useFieldChangeCounter('core.settings.change.global')
   if (!settings) return <div>Loading...</div>
   return (
     <>
-      <div className="settings-section">
+      <div className="settings-section" onChange={countChange}>
         <h3 className="settings-section__title">Appearance</h3>
         <GlobalThemeField theme={settings.appearance.theme} />
         <SectionTitle>Terminal</SectionTitle>
@@ -204,7 +207,10 @@ function HomeLayoutField({ layout }: { layout: HomeLayout }): JSX.Element {
         id="home-layout"
         className="settings-section__input"
         value={layout}
-        onChange={(e) => void updateHomeLayout(e.target.value as HomeLayout)}
+        onChange={(e) => {
+          if (e.target.value === 'tasks') recordUse('core.home.layout.tasks')
+          void updateHomeLayout(e.target.value as HomeLayout)
+        }}
       >
         <option value="classic">Classic</option>
         <option value="tasks">Tasks</option>

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { recordUse } from '../../usage/record'
 import type { InsightsWindow } from '../../home/insights'
 
 interface InsightsWindowState {
@@ -7,7 +8,10 @@ interface InsightsWindowState {
 }
 
 /** The time window Insights reads, chosen in Home's header. */
-export const useInsightsWindow = create<InsightsWindowState>((set) => ({
+export const useInsightsWindow = create<InsightsWindowState>((set, get) => ({
   chosen: 'week',
-  choose: (chosen) => set({ chosen }),
+  choose: (chosen) => {
+    if (get().chosen !== chosen) recordUse('core.home.insights-window')
+    set({ chosen })
+  },
 }))

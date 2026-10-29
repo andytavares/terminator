@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Dialog } from '@terminator/extension-ui'
+import { recordUse } from '../usage/record'
 import './AboutDialog.css'
 
 interface AppInfo {
@@ -50,6 +51,7 @@ function InfoRow({ label, value }: { label: string; value: string | undefined })
 
 export function AboutDialog({ onClose }: Props) {
   const { info, dbStatus } = useAppInfo()
+  useEffect(() => recordUse('core.about', 'shown'), [])
 
   return (
     <Dialog

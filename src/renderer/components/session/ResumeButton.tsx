@@ -1,6 +1,7 @@
 import React from 'react'
 import { RotateCcw } from 'lucide-react'
 import { planResume } from '../../sidebar/resume'
+import { recordUse } from '../../usage/record'
 import type { SessionFacts } from '../../sidebar/session-facts'
 import './ResumeButton.css'
 
@@ -25,6 +26,9 @@ export function ResumeButton({ facts, onResume }: Props): JSX.Element | null {
         aria-label={`Resume ${facts.name}`}
         onClick={(e) => {
           e.stopPropagation()
+          recordUse('core.resume', 'click', {
+            declare: { label: 'Resume a session', kind: 'action', source: 'core' },
+          })
           onResume(facts)
         }}
         onKeyDown={(e) => e.stopPropagation()}

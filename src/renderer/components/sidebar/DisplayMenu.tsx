@@ -2,6 +2,7 @@ import React from 'react'
 import { SlidersHorizontal } from 'lucide-react'
 import type { GroupKey, SessionView, SortKey } from '../../sidebar/view-model'
 import { DropdownMenu, RadioChoices } from './menu'
+import { recordUse } from '../../usage/record'
 import './SidebarMenu.css'
 
 /**
@@ -34,6 +35,7 @@ export function DisplayMenu({ view, onChangeView }: DisplayMenuProps): JSX.Eleme
     <DropdownMenu label="Display" icon={<SlidersHorizontal aria-hidden="true" />}>
       {(close) => {
         const pickView = (patch: Partial<SessionView>): void => {
+          recordUse('core.sidebar.display')
           onChangeView(patch)
           close()
         }

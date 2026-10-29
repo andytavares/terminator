@@ -10,6 +10,7 @@ import { useWorkThreads } from './useWorkThreads'
 import { useSessionFacts } from '../session/useSessionFacts'
 import './DeskSearch.css'
 import { revealSession } from '../../terminal/navigate-to-session'
+import { recordUse } from '../../usage/record'
 
 /** Does what picking the hit means: open the thread, show the session, or start work on the ticket. */
 function openHit(hit: SearchHit): void {
@@ -28,6 +29,7 @@ export const DeskSearch = forwardRef<HTMLInputElement>(function DeskSearch(_prop
     tickets: useMyTickets(),
   })
   const pick = (hit: SearchHit | null): void => {
+    recordUse('core.home.search')
     if (hit) openHit(hit)
     else useStartWorkStore.getState().openLauncher(text.trim())
     useDeskFilter.getState().clear()

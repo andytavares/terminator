@@ -43,6 +43,10 @@ beforeEach(() => {
   }
 })
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+beforeEach(() => recordUse.mockClear())
+
 describe('WallTile', () => {
   it('is named by where the session lives and what it is', () => {
     render(<WallTile {...props} />)
@@ -84,6 +88,7 @@ describe('WallTile — names a session with no project', () => {
     fireEvent.click(screen.getByTestId('preview-s1'))
     fireEvent.keyDown(screen.getByRole('article'), { key: 'Enter' })
     expect(props.onOpen).toHaveBeenCalledTimes(3)
+    expect(recordUse.mock.calls).toEqual(Array(3).fill(['core.overview.open-tile']))
     expect(props.onOpen).toHaveBeenCalledWith('s1')
   })
 

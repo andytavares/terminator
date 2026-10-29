@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Dialog, type DialogAction } from '@terminator/extension-ui'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
+import { recordUse } from '../../usage/record'
 import { SCRATCH_PROJECT_ID, type Project, type Workspace } from '../../../shared/types/index'
 import { CreateWorkspaceDialog } from './CreateWorkspaceDialog'
 import './dialog-fields.css'
@@ -85,6 +86,7 @@ function useMoveSession(sessionId: string, onClose: () => void, onMoved: Props['
   const moveSessionTo: MoveTo = async (targetProjectId, targetWorkspaceId) => {
     if (targetProjectId === currentProjectId) return onClose()
     useSessionStore.getState().moveSession(sessionId, targetProjectId)
+    recordUse('core.sidebar.move-session')
     if (currentProjectId) await deleteIfEmpty(currentProjectId)
     const workspaces = useWorkspaceStore.getState()
     workspaces.setActiveWorkspace(targetWorkspaceId)

@@ -63,6 +63,9 @@ beforeEach(() => {
   })
 })
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('GlobalSettings — Home layout', () => {
   it('offers Classic and Tasks, shows the saved one, and saves a change', () => {
     render(<GlobalSettings />)

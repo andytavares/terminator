@@ -1,4 +1,5 @@
 import React, { useRef } from 'react'
+import { recordUse } from '../../usage/record'
 import './SidebarSearch.css'
 
 interface SidebarSearchProps {
@@ -6,6 +7,12 @@ interface SidebarSearchProps {
   onChange: (value: string) => void
   onClear: () => void
   inputRef?: React.RefObject<HTMLInputElement>
+}
+
+/** The first character of a search counts as one use; the rest of the typing does not. */
+function typeInto(query: string, value: string, onChange: (value: string) => void): void {
+  if (query === '') recordUse('core.sidebar.search')
+  onChange(value)
 }
 
 export function SidebarSearch({
@@ -26,7 +33,7 @@ export function SidebarSearch({
         className="sidebar-search__input"
         value={query}
         placeholder="Search…"
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => typeInto(query, e.target.value, onChange)}
         onKeyDown={(e) => {
           if (e.key === 'Escape') onClear()
         }}

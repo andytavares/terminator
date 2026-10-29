@@ -53,6 +53,9 @@ beforeEach(() => {
   useWorkspaceStore.setState({ ...useWorkspaceStore.getInitialState(), workspaces: [] })
 })
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('CreateWorkspaceDialog', () => {
   it('renders dialog with title and form fields', () => {
     render(<CreateWorkspaceDialog onClose={vi.fn()} />)
@@ -224,6 +227,7 @@ describe('CreateWorkspaceDialog — auto-creates a branch project when the chose
     })
     fireEvent.click(screen.getByText('Create'))
     await eventually(() => expect(onClose).toHaveBeenCalled())
+    expect(recordUse).toHaveBeenCalledWith('core.sidebar.workspace-create')
     expect(useWorkspaceStore.getState().projectsByWorkspaceId.get(REPO_WORKSPACE)).toEqual([
       expect.objectContaining({
         name: 'develop',

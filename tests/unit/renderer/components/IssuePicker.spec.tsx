@@ -35,6 +35,9 @@ function open(props: Partial<React.ComponentProps<typeof IssuePicker>> = {}) {
   return render(<IssuePicker selected={null} onSelect={vi.fn()} onClear={vi.fn()} {...props} />)
 }
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('IssuePicker — choosing', () => {
   it('shows nothing until it is focused', () => {
     open()

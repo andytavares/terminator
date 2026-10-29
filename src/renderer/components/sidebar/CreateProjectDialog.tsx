@@ -5,6 +5,7 @@ import { useSettingsStore } from '../../stores/settings.store'
 import type { Branch, IssueSummary, Project, WorktreeInfo } from '../../../shared/types/index'
 import { BranchSelect } from './BranchSelect'
 import { useIntegrationsStore } from '../../stores/integrations.store'
+import { recordUse } from '../../usage/record'
 import { IssuePicker } from '../integrations/IssuePicker'
 import { branchFromIssue } from '../../../shared/integrations/branch-from-issue'
 import {
@@ -75,7 +76,10 @@ function useCreateProjectForm(workspaceId: string, onClose: () => void) {
     if (busy) return
     setBusy(true)
     try {
-      if (await create({ target, repo, fields })) onClose()
+      if (await create({ target, repo, fields })) {
+        recordUse('core.sidebar.project-create')
+        onClose()
+      }
     } finally {
       setBusy(false)
     }

@@ -10,6 +10,7 @@ import { useIssue } from '../session/useSessionFacts'
 import { ContextMenu } from '../ContextMenu'
 import { afterClosing, useRowMenu } from '../sidebar/row-events'
 import { laneOfBranch, openAddToTask } from '../tasks/add-to-task'
+import { recordUse } from '../../usage/record'
 import { formatRelativeTime } from '../../sidebar/relative-time'
 import type { SessionActions, SessionFacts } from '../../sidebar/session-facts'
 import type { WallPlacement } from '../../sidebar/wall-order'
@@ -46,8 +47,16 @@ function locationOf(facts: SessionFacts): string {
  * re-parents a tile, because the live preview inside it is the session's one
  * xterm element and would be torn out.
  */
+const countingOpen =
+  (open: Props['onOpen']): Props['onOpen'] =>
+  (sessionId) => {
+    recordUse('core.overview.open-tile')
+    open(sessionId)
+  }
+
 export function WallTile(props: Props): JSX.Element {
-  const { facts, placement, onOpen } = props
+  const { facts, placement } = props
+  const onOpen = countingOpen(props.onOpen)
   const location = locationOf(facts)
   const { menu, lane, openTileMenu, closeMenu } = useTileMenu(facts.projectId)
   return (
@@ -67,7 +76,7 @@ export function WallTile(props: Props): JSX.Element {
         if (e.key === 'Enter' && e.target === e.currentTarget) onOpen(facts.sessionId)
       }}
     >
-      <TileCap {...props} location={location} />
+      <TileCap {...props} onOpen={onOpen} location={location} />
       <LivePreview sessionId={facts.sessionId} className="wall-tile__preview" />
       <TileFoot {...props} />
       {menu && lane && <TileMenu at={menu} lane={lane} onClose={closeMenu} />}

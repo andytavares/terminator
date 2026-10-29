@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React, { useState } from 'react'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RunAsChoices } from '../../../../src/renderer/components/home/RunAsChoices'
@@ -15,6 +15,10 @@ function Harness(): JSX.Element {
   const [runAs, setRunAs] = useState<RunAs>('agent')
   return <RunAsChoices options={options} runAs={runAs} onPick={setRunAs} />
 }
+
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+beforeEach(() => recordUse.mockClear())
 
 describe('RunAsChoices keyboard', () => {
   it('chooses Run as with the arrow keys alone', async () => {

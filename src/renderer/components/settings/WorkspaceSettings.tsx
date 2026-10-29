@@ -6,6 +6,7 @@ import '@terminator/extension-ui/settings-fields.css'
 import './SettingsPanel.css'
 import { ThemeChoices } from './ThemeChoices'
 import { parsePatterns, PATTERNS_PLACEHOLDER } from './patterns'
+import { useFieldChangeCounter } from '../../usage/use-field-change-counter'
 import { UseGlobalButton } from './UseGlobalButton'
 import { WorkspaceExtensionSettings } from './WorkspaceExtensionSettings'
 import type {
@@ -21,6 +22,7 @@ export function WorkspaceSettings({ workspaceId }: Props): JSX.Element {
   const globalSettings = useSettingsStore((s) => s.globalSettings)
   const overrides = useSettingsStore((s) => s.workspaceSettings.get(workspaceId)?.overrides)
   const loadSettings = useSettingsStore((s) => s.loadSettings)
+  const countChange = useFieldChangeCounter('core.settings.change.workspace')
   const name = useWorkspaceStore((s) => s.workspaces.find((w) => w.id === workspaceId)?.name)
 
   useEffect(() => {
@@ -32,7 +34,7 @@ export function WorkspaceSettings({ workspaceId }: Props): JSX.Element {
 
   return (
     <>
-      <div className="settings-section">
+      <div className="settings-section" onChange={countChange}>
         <h3 className="settings-section__title">Settings for: {name ?? workspaceId}</h3>
         <p className="settings-section__desc">Override global defaults for this workspace.</p>
         <WorkspaceFields field={field} own={ownSettings(overrides)} />

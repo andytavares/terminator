@@ -47,6 +47,9 @@ function setUpNotificationPanel(): void {
   })
 }
 
+const recordUse = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
 describe('NotificationPanel', () => {
   setUpNotificationPanel()
 
