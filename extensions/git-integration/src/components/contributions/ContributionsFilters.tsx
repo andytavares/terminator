@@ -172,13 +172,13 @@ function RepositoryOptions(props: {
   return (
     <>
       {props.repos.length >= REPO_FILTER_MIN && <RepoSearch value={filter} onChange={setFilter} />}
-      <RepoOption
+      <PickerOption
         label="All repositories"
         chosen={props.repo === null}
         onChoose={() => chooseOne(null)}
       />
       {shown.map((repo) => (
-        <RepoOption
+        <PickerOption
           key={repo}
           label={repo}
           chosen={props.repo === repo}
@@ -209,22 +209,4 @@ function chooseRepo(
 ): void {
   props.onRepo(repo)
   props.close()
-}
-
-function RepoOption(props: {
-  label: string
-  chosen: boolean
-  onChoose: () => void
-}): React.JSX.Element {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={props.chosen}
-      className="ct-option"
-      onClick={props.onChoose}
-    >
-      {props.label}
-    </button>
-  )
 }
