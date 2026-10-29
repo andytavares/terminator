@@ -1,17 +1,13 @@
 <!--
-SYNC IMPACT REPORT (6.0.0)
+SYNC IMPACT REPORT (7.0.0)
 ==========================
-Version change: 5.0.0 → 6.0.0 (MAJOR: Principles VI and XIV redefined)
+Version change: 6.0.0 → 7.0.0 (MAJOR: Principle XIV's "Only the tests a change can reach" redefined)
 
 Modified principles:
-  - VI: the coverage gate is Codecov `codecov/patch`, at 80% of the changed lines, not a Vitest
-    threshold on the changed files. ADR 095 had made it so; the whole-file Vitest gate produced
-    padding tests.
-  - XIV "Outside services never gate": `codecov/patch` is the one outside service allowed to
-    gate. `npm run ci:local` reports it as not run.
-  - XIV "Random order": the seed is Vitest's own, printed by Vitest and given with
-    `--sequence.seed`. `TEST_SEED` is gone.
-  ADR 133.
+  - XIV: the release no longer runs every test. It is the last job of CI on a push to `main`
+    and runs after the checks that push ran, which are the tests its change reaches. The
+    nightly sweep still runs everything. Approved by the maintainer on 2026-10-29, so one
+    pipeline tests and releases each merge. ADR 134.
 
 Added sections: none
 Removed sections: none
@@ -397,8 +393,8 @@ code has no value; it is a defect. ADR 123 records the reasoning.
 - **Only the tests a change can reach.** `scripts/test-select.mjs` picks the unit,
   integration and end-to-end tests a diff can reach, the same way in CI and locally. A path
   it cannot place runs everything. A push to `main` runs what its change reaches, compared with
-  the commit `main` was at before. The pull request label `test: all`, `--all` locally, the
-  nightly sweep and the release run everything.
+  the commit `main` was at before, and a push that passes them is released. The pull request
+  label `test: all`, `--all` locally and the nightly sweep run everything.
 - **Enforced, not trusted.** `eslint.config.mjs` rejects sleeps, ticks, time limits and
   promises left unawaited in specs. These rules MUST NOT be disabled, suppressed or
   loosened.
@@ -428,4 +424,4 @@ This constitution supersedes all other practices, conventions, and ad-hoc guidan
 - The constitution version and amendment history are the authoritative record of governance
   decisions affecting this project.
 
-**Version**: 6.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-10-27
+**Version**: 7.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-10-29
