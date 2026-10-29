@@ -1,7 +1,7 @@
 {
   "id": "terminator.notepad",
   "name": "Notepad",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Markdown notepad with live preview, margin comments, tags, and full-text search.",
   "main": "src/index.js",
   "renderer": "dist/index.html",
