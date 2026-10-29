@@ -218,6 +218,15 @@ describe('FrameBridge — invoke failures', () => {
     expect(reply.type).toBe('error')
   })
 
+  it('replies error for a usage: channel even when a handler is registered', async () => {
+    const handler = vi.fn()
+    stubInvoke('usage:report', handler as never)
+    const frame = rig.open('ext.a', 'main')
+    const reply = await invokeFrame(frame, 'usage:report', { from: null })
+    expect(reply.type).toBe('error')
+    expect(handler).not.toHaveBeenCalled()
+  })
+
   it('replies error when the handler throws', async () => {
     stubInvoke('boom', (() => {
       throw new Error('kaput')
@@ -238,6 +247,15 @@ describe('FrameBridge — send', () => {
     const frame = rig.open('ext.a', 'main')
     frame.post({ type: 'send', channel: 'terminal:input', payload: 'ls' })
     await eventually(() => expect(send).toHaveBeenCalledWith(expect.anything(), 'ls'))
+  })
+
+  it('drops a send to a usage: channel', async () => {
+    const send = vi.fn()
+    rig.spies().sendRegistry.set('usage:record', send)
+    const frame = rig.open('ext.a', 'main')
+    frame.post({ type: 'send', channel: 'usage:record', payload: {} })
+    await frame.settled()
+    expect(send).not.toHaveBeenCalled()
   })
 
   it('a frame ViewCaller.send reaches only that frame', async () => {

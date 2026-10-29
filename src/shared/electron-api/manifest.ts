@@ -87,6 +87,12 @@ import type { HomeFeedActionInputSchema, MergedHomeFeed } from '../schemas/home-
 import type { AgentAsk } from '../agent-sessions/ask'
 import type { AttentionInterval, AttentionMeasures } from '../home/attention-measures'
 import type { MeasuresInputSchema, RecordStateInputSchema } from '../schemas/attention.schema'
+import type {
+  UsageDeclareInputSchema,
+  UsageRecordInputSchema,
+  UsageReportInputSchema,
+} from '../schemas/usage.schema'
+import type { UsageReport } from '../usage/usage-types'
 
 type RemoteBehavior = 'same' | 'omit' | 'stub'
 
@@ -1498,6 +1504,42 @@ export const ELECTRON_API_MANIFEST = [
     signature:
       signature<
         (input: z.input<typeof MeasuresInputSchema>) => Promise<{ data: AttentionInterval[] }>
+      >(),
+    remote: 'omit',
+  }),
+
+  // ── usage counts (every use of every feature on this Mac; core only) ──────
+  method({
+    path: 'usage.recordUse',
+    kind: 'invoke',
+    channel: 'usage:record',
+    signature:
+      signature<
+        (
+          input: z.input<typeof UsageRecordInputSchema>
+        ) => Promise<{ data: true } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'usage.declare',
+    kind: 'invoke',
+    channel: 'usage:declare',
+    signature:
+      signature<
+        (
+          input: z.input<typeof UsageDeclareInputSchema>
+        ) => Promise<{ data: true } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'usage.report',
+    kind: 'invoke',
+    channel: 'usage:report',
+    signature:
+      signature<
+        (input: z.input<typeof UsageReportInputSchema>) => Promise<{ data: UsageReport }>
       >(),
     remote: 'omit',
   }),
