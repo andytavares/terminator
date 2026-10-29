@@ -275,7 +275,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unit-blob-${{ matrix.shard }}
-          path: .vitest-reports/
+          path: .vitest/blob/
           include-hidden-files: true
           retention-days: 1
 
@@ -354,7 +354,7 @@ jobs:
         if: needs.unit.result == 'success'
         with:
           pattern: unit-blob-*
-          path: .vitest-reports
+          path: .vitest/blob
           merge-multiple: true
 
       - name: Merge reports and write coverage
