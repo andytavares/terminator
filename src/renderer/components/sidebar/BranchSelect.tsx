@@ -16,7 +16,7 @@ interface Props {
   refreshing?: boolean
 }
 
-export function BranchSelect(props: Props): JSX.Element {
+export function BranchSelect(props: Props): React.JSX.Element {
   const { value, newBranchLabel, isNewSelected, onRefresh, refreshing } = props
   const { open, setOpen, containerRef } = useDropdown()
 
@@ -55,7 +55,7 @@ function useDropdown() {
 function RefreshButton({
   onRefresh,
   refreshing,
-}: Required<Pick<Props, 'onRefresh'>> & Pick<Props, 'refreshing'>): JSX.Element {
+}: Required<Pick<Props, 'onRefresh'>> & Pick<Props, 'refreshing'>): React.JSX.Element {
   return (
     <button
       type="button"
@@ -74,7 +74,7 @@ type DropdownProps = Props & { close: () => void }
 
 /** The search box and the list it narrows. Mounted only while open, so the search starts empty
  * every time. */
-function BranchDropdown(props: DropdownProps): JSX.Element {
+function BranchDropdown(props: DropdownProps): React.JSX.Element {
   const [filter, setFilter] = useState('')
   const filterRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
@@ -104,7 +104,7 @@ function BranchList({
   filter,
   close,
   ...choice
-}: DropdownProps & { filter: string }): JSX.Element {
+}: DropdownProps & { filter: string }): React.JSX.Element {
   const filtered = branches.filter((b) => b.name.toLowerCase().includes(filter.toLowerCase()))
   const choosing = (run: () => void) => () => {
     run()
@@ -142,7 +142,7 @@ function NewBranchItem({
   onNewBranch,
   isNewSelected,
   choosing,
-}: NewBranchItemProps): JSX.Element | null {
+}: NewBranchItemProps): React.JSX.Element | null {
   if (!newBranchLabel || !onNewBranch) return null
   return (
     <button
@@ -162,7 +162,7 @@ interface BranchItemProps {
 }
 
 /** One branch, ticked when it is the checked-out one. */
-function BranchItem({ branch, active, onClick }: BranchItemProps): JSX.Element {
+function BranchItem({ branch, active, onClick }: BranchItemProps): React.JSX.Element {
   return (
     <button
       type="button"

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { type JSX, useCallback, useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { QuickActions } from './QuickActions'
 import type { ActionContext, QuickAction, QuickActionGroup } from '../quick-actions/types'

@@ -55,7 +55,7 @@ export interface RepoHeaderProps {
  * Everything else appears on hover, in space that is already reserved, so
  * revealing it never moves what was already on the row (FR-031).
  */
-export function RepoHeader(props: RepoHeaderProps): JSX.Element {
+export function RepoHeader(props: RepoHeaderProps): React.JSX.Element {
   const { group, collapsed, onToggleCollapse, dragProps } = props
   const { menu, openMenu, closeMenu } = useRowMenu()
 
@@ -92,7 +92,7 @@ function repoHeaderClass({ selected, dragOver }: RepoHeaderProps): string {
 }
 
 /** Chevron, swatch, name, the collapsed waiting marker, hover actions, then the count. */
-function RepoHeaderContent(props: RepoHeaderProps): JSX.Element {
+function RepoHeaderContent(props: RepoHeaderProps): React.JSX.Element {
   const { group, collapsed, pathLabel, leading } = props
   return (
     <>
@@ -122,7 +122,7 @@ function RepoHeaderContent(props: RepoHeaderProps): JSX.Element {
 }
 
 /** The repo's extension buttons and New branch, revealed on hover in reserved space. */
-function RepoHoverActions(props: RepoHeaderProps): JSX.Element {
+function RepoHoverActions(props: RepoHeaderProps): React.JSX.Element {
   const { group, onAddBranch, workspaceTabs = [], activeWorkspaceTabId } = props
   return (
     <span className="repo-header__hover">
@@ -156,7 +156,7 @@ interface WorkspaceTabButtonProps {
 }
 
 /** One extension's repo button: its icon, else its label's first letter. */
-function WorkspaceTabButton({ tab, on, onSelect }: WorkspaceTabButtonProps): JSX.Element {
+function WorkspaceTabButton({ tab, on, onSelect }: WorkspaceTabButtonProps): React.JSX.Element {
   return (
     <button
       type="button"

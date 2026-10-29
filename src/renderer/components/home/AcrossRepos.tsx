@@ -78,7 +78,7 @@ const isReady = (fields: Fields): boolean =>
   fields.title.trim() !== '' && fields.branch !== '' && fields.chosen.length > 0
 
 /** Start work's Across repos tab: one title and branch, a checkbox per repo, one task. */
-export function AcrossRepos({ onClose }: { onClose: () => void }): JSX.Element {
+export function AcrossRepos({ onClose }: { onClose: () => void }): React.JSX.Element {
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const fields = useAcrossFields(workspaces)
   const run = useAcrossRun(fields, onClose)
@@ -99,7 +99,7 @@ export function AcrossRepos({ onClose }: { onClose: () => void }): JSX.Element {
   )
 }
 
-function TaskFields({ fields }: { fields: Fields }): JSX.Element {
+function TaskFields({ fields }: { fields: Fields }): React.JSX.Element {
   return (
     <div className="across-repos__fields">
       <label>
@@ -126,7 +126,7 @@ function TaskFields({ fields }: { fields: Fields }): JSX.Element {
   )
 }
 
-function PromptField({ fields }: { fields: Fields }): JSX.Element {
+function PromptField({ fields }: { fields: Fields }): React.JSX.Element {
   return (
     <label>
       First prompt for each agent (optional)
@@ -140,7 +140,7 @@ function PromptField({ fields }: { fields: Fields }): JSX.Element {
   )
 }
 
-function TicketField({ fields }: { fields: Fields }): JSX.Element {
+function TicketField({ fields }: { fields: Fields }): React.JSX.Element {
   const issues = useMyTickets()
   const pick = (key: string): void => {
     const issue = issues.find((i) => i.key === key) ?? null
@@ -173,7 +173,7 @@ interface RepoChoicesProps {
   notes: RepoMessages
 }
 
-function RepoChoices({ workspaces, fields, notes }: RepoChoicesProps): JSX.Element {
+function RepoChoices({ workspaces, fields, notes }: RepoChoicesProps): React.JSX.Element {
   const options = useRunAsOptions(agentLabel(useAgentChoices(), null))
   return (
     <div className="across-repos__repos">
@@ -200,7 +200,7 @@ interface RepoRowProps {
   note: string | undefined
 }
 
-function RepoRow({ workspace, fields, note }: RepoRowProps): JSX.Element {
+function RepoRow({ workspace, fields, note }: RepoRowProps): React.JSX.Element {
   const { base } = useRepoGit(workspace)
   return (
     <li aria-label={workspace.name} className="across-repos__repo">
@@ -222,7 +222,7 @@ interface FooterProps {
   onClose: () => void
 }
 
-function Footer({ fields, run, onClose }: FooterProps): JSX.Element {
+function Footer({ fields, run, onClose }: FooterProps): React.JSX.Element {
   const count = fields.chosen.length
   const ready = isReady(fields)
   return (

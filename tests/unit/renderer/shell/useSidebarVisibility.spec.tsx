@@ -7,7 +7,7 @@ import { useSettingsStore } from '../../../../src/renderer/stores/settings.store
 import { defaultGlobalSettings } from '../../../../src/shared/settings-defaults'
 
 // A stand-in for the shell: the sidebar element is in the DOM or it is not.
-function Shell(): JSX.Element {
+function Shell(): React.JSX.Element {
   const { sidebarVisible, toggleSidebar } = useSidebarVisibility()
   return (
     <div>

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { type JSX, useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useMetricsStore } from '../stores/metrics.store'
 import { useExtensionRegistry } from '../extensions/registry'

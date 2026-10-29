@@ -16,7 +16,7 @@ interface Props {
  * equivalent of, so the branch is named here instead — every repo's branches,
  * and the scratch terminal that belongs to none of them.
  */
-export function NewSessionMenu({ onStartInBranch, onStartScratch }: Props): JSX.Element {
+export function NewSessionMenu({ onStartInBranch, onStartScratch }: Props): React.JSX.Element {
   return (
     <DropdownMenu
       label="New terminal"
@@ -35,7 +35,7 @@ function NewSessionItems({
   onStartInBranch,
   onStartScratch,
   close,
-}: Props & { close: () => void }): JSX.Element {
+}: Props & { close: () => void }): React.JSX.Element {
   const choose = (run: () => void): void => {
     run()
     close()
@@ -58,7 +58,7 @@ function NewSessionItems({
 }
 
 /** Every repo that has branches, as a heading over one item per branch. */
-function BranchItems({ onPick }: { onPick: (projectId: string) => void }): JSX.Element {
+function BranchItems({ onPick }: { onPick: (projectId: string) => void }): React.JSX.Element {
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const projectsByWorkspaceId = useWorkspaceStore((s) => s.projectsByWorkspaceId)
   const repos = workspaces

@@ -19,7 +19,7 @@ interface Props {
  * clear history before the thirty days are up. Neither asks first, as the tab
  * bar and the sidebar do not.
  */
-export function CloseSessionButton({ facts, onClose, onForget }: Props): JSX.Element | null {
+export function CloseSessionButton({ facts, onClose, onForget }: Props): React.JSX.Element | null {
   const forgetting = facts.isClosed
   if (forgetting && onForget === undefined) return null
   const label = forgetting ? `Remove ${facts.name} from the list` : `Close ${facts.name}`

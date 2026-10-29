@@ -356,7 +356,7 @@ function BaseAndDraft({ form }: { form: PrForm }) {
   )
 }
 
-export function PrDialog(props: PrDialogProps): JSX.Element {
+export function PrDialog(props: PrDialogProps): React.JSX.Element {
   const { branch, existingPr } = props
   const form = usePrForm(props)
   const create = usePrCreate(props, form)

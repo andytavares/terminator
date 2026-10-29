@@ -25,7 +25,7 @@ const PROMPT = 'What is this session doing?'
  * field asking for one. The ticket wins because it is the shared record; the
  * description stays visible in the Logbook's detail.
  */
-export function WorkItemCell(props: Props): JSX.Element {
+export function WorkItemCell(props: Props): React.JSX.Element {
   const { workItem, issue, description, readOnly = false } = props
   const draft = useDescriptionDraft(description, props.onSaveDescription)
 
@@ -110,7 +110,7 @@ interface EditorProps {
 }
 
 /** The description field (Enter saves, Escape abandons) and, where possible, Link. */
-function DescriptionEditor({ draft, onLink }: EditorProps): JSX.Element {
+function DescriptionEditor({ draft, onLink }: EditorProps): React.JSX.Element {
   return (
     <span className="work-item work-item--editing" onClick={(e) => e.stopPropagation()}>
       <input
@@ -132,7 +132,7 @@ function DescriptionEditor({ draft, onLink }: EditorProps): JSX.Element {
   )
 }
 
-function LinkIssueButton({ onLink }: { onLink: () => void }): JSX.Element {
+function LinkIssueButton({ onLink }: { onLink: () => void }): React.JSX.Element {
   return (
     <button
       type="button"

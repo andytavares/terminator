@@ -20,7 +20,7 @@ function useWindowTheme(): void {
   }, [resolvedTheme])
 }
 
-export function ExtensionWindowView({ view }: { view: string }): JSX.Element {
+export function ExtensionWindowView({ view }: { view: string }): React.JSX.Element {
   useWindowTheme()
   const params = new URLSearchParams(window.location.search)
   const repoRoot = params.get('repoRoot')

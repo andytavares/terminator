@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react'
+import { type JSX, lazy, Suspense, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import type { Workspace } from '../../../shared/types/index'
 import type { SessionFacts } from '../../sidebar/session-facts'

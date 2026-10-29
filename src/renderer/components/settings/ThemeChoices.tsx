@@ -9,7 +9,7 @@ interface ThemeChoicesProps {
 }
 
 /** The Dark and Light radios of a settings section's theme field. */
-export function ThemeChoices({ checked, onChange }: ThemeChoicesProps): JSX.Element {
+export function ThemeChoices({ checked, onChange }: ThemeChoicesProps): React.JSX.Element {
   return (
     <>
       {(['dark', 'light'] as const).map((t) => (

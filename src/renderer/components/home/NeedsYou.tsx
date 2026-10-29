@@ -19,7 +19,7 @@ function openCursor(desk: NeedsYouProps['desk'], cursor: DeskCursor): DeskCursor
 }
 
 /** One dashed line when nothing asks: status by exception. */
-function NothingNeedsYou({ running }: { running: number }): JSX.Element {
+function NothingNeedsYou({ running }: { running: number }): React.JSX.Element {
   return (
     <div className="quiet">
       <CircleCheck aria-hidden="true" className="quiet__icon" />
@@ -32,7 +32,7 @@ function NothingNeedsYou({ running }: { running: number }): JSX.Element {
 }
 
 /** Everything waiting on the operator, across every task, reported asks before guessed ones. */
-export function NeedsYou({ desk, cursor, handlers }: NeedsYouProps): JSX.Element {
+export function NeedsYou({ desk, cursor, handlers }: NeedsYouProps): React.JSX.Element {
   if (desk.asks.length === 0) return <NothingNeedsYou running={desk.counts.agentsWorking} />
   const shown = openCursor(desk, cursor)
   return (

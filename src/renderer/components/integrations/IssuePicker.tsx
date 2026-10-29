@@ -18,7 +18,7 @@ export interface IssuePickerProps {
   onClear: () => void
 }
 
-export function IssuePicker({ selected, onSelect, onClear }: IssuePickerProps): JSX.Element {
+export function IssuePicker({ selected, onSelect, onClear }: IssuePickerProps): React.JSX.Element {
   const { term, open, setOpen, rootRef, clear, search, pick } = useIssuePicker(onSelect, onClear)
   const { result, loading } = useIssueSearch(term, open, { limit: 25 })
 
@@ -86,7 +86,7 @@ function useDropdown() {
 }
 
 /** An issue's key, title and tracker, as the chosen chip and every row draw them. */
-function IssueCells({ issue }: { issue: IssueSummary }): JSX.Element {
+function IssueCells({ issue }: { issue: IssueSummary }): React.JSX.Element {
   return (
     <>
       <span className="issue-picker__key">{issue.key}</span>
@@ -118,7 +118,7 @@ interface SearchBoxProps {
   onChange: (term: string) => void
 }
 
-function IssueSearchBox({ term, onFocus, onChange }: SearchBoxProps): JSX.Element {
+function IssueSearchBox({ term, onFocus, onChange }: SearchBoxProps): React.JSX.Element {
   return (
     <div className="issue-picker__search">
       <Search />
@@ -140,7 +140,7 @@ interface PickerListProps {
 }
 
 /** What failed, then the issues (or why there are none). */
-function PickerList({ result, loading, onPick }: PickerListProps): JSX.Element {
+function PickerList({ result, loading, onPick }: PickerListProps): React.JSX.Element {
   // A tracker the operator never connected is not a failure worth warning
   // about — it is just absent. Only real failures are named.
   const reportable = result.failures.filter((f) => f.error !== 'not-connected')

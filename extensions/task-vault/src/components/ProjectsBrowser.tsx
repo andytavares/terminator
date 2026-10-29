@@ -228,7 +228,7 @@ function ComboList({ combo }: { combo: Combo }): React.JSX.Element | null {
 }
 
 /** Closes the list on a click outside the combobox. */
-function useCloseOutside(containerRef: React.RefObject<HTMLDivElement>, combo: Combo): void {
+function useCloseOutside(containerRef: React.RefObject<HTMLDivElement | null>, combo: Combo): void {
   useCloseOnOutsidePress(containerRef, () => combo.setOpen(false), combo.open)
 }
 

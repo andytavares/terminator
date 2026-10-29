@@ -30,7 +30,7 @@ export interface HomeScreenProps {
  *
  * Single-letter keys act while focus is inside this section and never in a field or a terminal.
  */
-export function HomeScreen(_props: HomeScreenProps = {}): JSX.Element {
+export function HomeScreen(_props: HomeScreenProps = {}): React.JSX.Element {
   const desk = useShownAsks(useDeskModel())
   const view = useHomeView((s) => s.view)
   const rootRef = useRef<HTMLElement>(null)
@@ -70,7 +70,7 @@ function useRootKeys(
   }
 }
 
-function Body(props: DeskBodyProps): JSX.Element {
+function Body(props: DeskBodyProps): React.JSX.Element {
   return useHomeLayout() === 'tasks' ? <TasksBody {...props} /> : <DeskBody {...props} />
 }
 
@@ -82,7 +82,7 @@ interface DeskBodyProps {
 }
 
 /** Everything under the header on the Desk. A pressed count narrows it to the band or to In flight. */
-function DeskBody(props: DeskBodyProps): JSX.Element {
+function DeskBody(props: DeskBodyProps): React.JSX.Element {
   const { desk, controller } = props
   const filter = useDeskFilter((s) => s.count)
   const showBand = filter === null || filter === 'your-move'
@@ -120,7 +120,7 @@ function useShownAsks(desk: DeskState): DeskState & { searching: boolean } {
 function Band({
   desk,
   controller,
-}: Pick<DeskBodyProps, 'controller'> & { desk: ShownDesk }): JSX.Element | null {
+}: Pick<DeskBodyProps, 'controller'> & { desk: ShownDesk }): React.JSX.Element | null {
   if (desk.asks.length === 0) return desk.searching ? null : <QuietDesk desk={desk} />
   return <YourMove desk={desk} cursor={controller.cursor} handlers={controller.handlers} />
 }

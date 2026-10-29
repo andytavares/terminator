@@ -16,7 +16,7 @@ interface Props {
   system: SystemMetrics | null
 }
 
-export function MetricsBar({ system }: Props): JSX.Element {
+export function MetricsBar({ system }: Props): React.JSX.Element {
   if (!system) return <MetricsPlaceholder />
   const cpuPct = Math.round(system.cpuPercent)
   const memPct = (system.memUsedBytes / system.memTotalBytes) * 100
@@ -46,7 +46,7 @@ function cpuColour(percent: number): string {
 }
 
 /** Each metric's label over a skeleton, until the first sample arrives. */
-function MetricsPlaceholder(): JSX.Element {
+function MetricsPlaceholder(): React.JSX.Element {
   return (
     <div className="metrics-bar">
       {['CPU', 'MEM', 'NET'].map((label) => (
@@ -67,7 +67,7 @@ interface BarMetricProps {
   children: React.ReactNode
 }
 
-function BarMetric({ label, percent, colour, children }: BarMetricProps): JSX.Element {
+function BarMetric({ label, percent, colour, children }: BarMetricProps): React.JSX.Element {
   return (
     <div className="metrics-bar__item">
       <span className="metrics-bar__label">{label}</span>

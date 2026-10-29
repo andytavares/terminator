@@ -5,7 +5,7 @@ import { INSIGHTS_WINDOWS } from '../../home/insights'
 import { useInsightsWindow } from './insights-window'
 
 /** The time window and the repo filter; Home's header shows them in place of search and Start work. */
-export function InsightsBar(): JSX.Element {
+export function InsightsBar(): React.JSX.Element {
   const chosen = useInsightsWindow((s) => s.chosen)
   const onChange = useInsightsWindow((s) => s.choose)
   return (

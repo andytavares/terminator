@@ -5,7 +5,7 @@ import { useStartWorkStore } from './start-work'
 const StartWork = lazy(() => import('./StartWork').then((m) => ({ default: m.StartWork })))
 
 /** Mounts the launcher while ⌘N, Quick actions or the Home button has it open. */
-export function StartWorkHost(): JSX.Element | null {
+export function StartWorkHost(): React.JSX.Element | null {
   const { open, closeLauncher } = useStartWorkStore()
   if (!open) return null
   return (

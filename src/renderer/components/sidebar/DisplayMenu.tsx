@@ -30,7 +30,7 @@ export interface DisplayMenuProps {
 }
 
 /** How the branch list is arranged: grouping and sort, behind one control. */
-export function DisplayMenu({ view, onChangeView }: DisplayMenuProps): JSX.Element {
+export function DisplayMenu({ view, onChangeView }: DisplayMenuProps): React.JSX.Element {
   return (
     <DropdownMenu label="Display" icon={<SlidersHorizontal aria-hidden="true" />}>
       {(close) => {

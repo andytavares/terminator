@@ -231,7 +231,7 @@ function buildSettle(
 
 const TURN_REMEDY_LABEL = 'Tell the architect what was wrong'
 
-function Asked(): JSX.Element {
+function Asked(): React.JSX.Element {
   return (
     <span role="status" aria-label="Asked" className="fdry-asked">
       <LoaderCircle aria-hidden="true" />
@@ -277,7 +277,7 @@ async function attachToSession(sessionId: string): Promise<string | null> {
 }
 
 /** One row's icon, from its state. */
-function RowIcon({ state }: { readonly state: Row['state'] }): JSX.Element {
+function RowIcon({ state }: { readonly state: Row['state'] }): React.JSX.Element {
   if (state === 'passed') return <Check aria-hidden="true" />
   if (state === 'in-progress') return <LoaderCircle aria-hidden="true" className="fdry-spin" />
   if (state === 'needs-you') return <AlertCircle aria-hidden="true" />
@@ -291,7 +291,7 @@ const ROW_PILL: Record<Row['state'], { readonly label: string; readonly tone: Ch
   failing: { label: 'Failing', tone: 'bad' },
 }
 
-function StripIconGlyph({ icon }: { readonly icon: StripIcon }): JSX.Element {
+function StripIconGlyph({ icon }: { readonly icon: StripIcon }): React.JSX.Element {
   if (icon === 'load') return <LoaderCircle aria-hidden="true" className="fdry-spin" />
   if (icon === 'user') return <User aria-hidden="true" />
   if (icon === 'check') return <Check aria-hidden="true" />
@@ -300,7 +300,12 @@ function StripIconGlyph({ icon }: { readonly icon: StripIcon }): JSX.Element {
   return <AlertCircle aria-hidden="true" />
 }
 
-function RailMark({ mark }: { readonly mark: StepMark; readonly position: number }): JSX.Element {
+function RailMark({
+  mark,
+}: {
+  readonly mark: StepMark
+  readonly position: number
+}): React.JSX.Element {
   if (mark === 'check') return <Check aria-hidden="true" />
   if (mark === 'spin') return <LoaderCircle aria-hidden="true" className="fdry-spin" />
   if (mark === 'alert') return <AlertCircle aria-hidden="true" />
@@ -324,7 +329,11 @@ const GROUP_META: Record<FindingGroup, { readonly heading: string; readonly cls:
 }
 
 /** A group's findings, each its text and where it came from. */
-function FindingRows({ findings }: { readonly findings: readonly FindingView[] }): JSX.Element {
+function FindingRows({
+  findings,
+}: {
+  readonly findings: readonly FindingView[]
+}): React.JSX.Element {
   return (
     <>
       {findings.map((finding) => (
@@ -341,7 +350,7 @@ function FindingRows({ findings }: { readonly findings: readonly FindingView[] }
   )
 }
 
-export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element {
+export function Forge({ orderId, onStarted, standing }: ForgeProps): React.JSX.Element {
   const state = useForgeState(orderId, onStarted)
   if (state.view === null) {
     return <div className="fdry-empty">Loading the order…</div>
@@ -1052,7 +1061,7 @@ function stepTitle({ stepView, isDraft, view, order }: ForgeModel): string {
   return `Agreed at ${clockOf(view.agreed?.at ?? order.agreedAt ?? '')} by ${by}`
 }
 
-const STEP_BODIES: Record<StepId, (props: ForgeProp) => JSX.Element> = {
+const STEP_BODIES: Record<StepId, (props: ForgeProp) => React.JSX.Element> = {
   intent: IntentStep,
   plan: PlanStep,
   redTeam: RedTeamStep,
@@ -1167,7 +1176,7 @@ function PlanCheck({ forge, id }: ForgeProp & { readonly id: CheckId }) {
 }
 
 /** The row's state in words; a row in progress also carries the working dot. */
-function RowChip({ state }: { readonly state: Row['state'] }): JSX.Element {
+function RowChip({ state }: { readonly state: Row['state'] }): React.JSX.Element {
   const { label, tone } = ROW_PILL[state]
   return (
     <Chip tone={tone} icon={state === 'in-progress' ? <StatusDot tone="working" /> : undefined}>

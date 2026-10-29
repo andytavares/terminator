@@ -84,7 +84,7 @@ export function WorkspaceDialog({
   onSubmit,
   onClose,
   ...fields
-}: WorkspaceDialogProps): JSX.Element {
+}: WorkspaceDialogProps): React.JSX.Element {
   const submit = {
     label: submitLabel,
     tone: 'primary' as const,
@@ -110,7 +110,7 @@ interface FieldsProps {
 }
 
 /** Name, folder, colour and tags, in the dialog's field styles. */
-function WorkspaceFields({ form, placeholders }: FieldsProps): JSX.Element {
+function WorkspaceFields({ form, placeholders }: FieldsProps): React.JSX.Element {
   return (
     <>
       <NameField form={form} placeholder={placeholders?.name} />
@@ -135,7 +135,7 @@ interface FieldProps {
   placeholder?: string
 }
 
-function NameField({ form, placeholder }: FieldProps): JSX.Element {
+function NameField({ form, placeholder }: FieldProps): React.JSX.Element {
   return (
     <div className="dialog__field">
       <label className="dialog__label">Name *</label>
@@ -155,7 +155,7 @@ function NameField({ form, placeholder }: FieldProps): JSX.Element {
   )
 }
 
-function FolderField({ form, placeholder }: FieldProps): JSX.Element {
+function FolderField({ form, placeholder }: FieldProps): React.JSX.Element {
   const browse = async (): Promise<void> => {
     const result = await window.electronAPI.dialog.openDirectory()
     if ('filePath' in result) form.update({ folderPath: result.filePath })
@@ -176,7 +176,7 @@ function FolderField({ form, placeholder }: FieldProps): JSX.Element {
   )
 }
 
-function ColorField({ form }: { form: WorkspaceForm }): JSX.Element {
+function ColorField({ form }: { form: WorkspaceForm }): React.JSX.Element {
   return (
     <div className="dialog__field">
       <label className="dialog__label">Color</label>

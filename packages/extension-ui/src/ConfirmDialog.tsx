@@ -29,7 +29,7 @@ export function ConfirmDialog({
   danger = false,
   onConfirm,
   onClose,
-}: ConfirmDialogProps): JSX.Element {
+}: ConfirmDialogProps): React.JSX.Element {
   return (
     <Dialog
       title={title}

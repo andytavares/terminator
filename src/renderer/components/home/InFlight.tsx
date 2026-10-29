@@ -15,7 +15,7 @@ import './InFlight.css'
 
 const MINUTE_MS = 60_000
 
-function GroupHeading({ group }: { group: DeskGroup }): JSX.Element {
+function GroupHeading({ group }: { group: DeskGroup }): React.JSX.Element {
   const expanded = useDeskSelection((s) => s.expandedGroupIds.includes(group.id))
   const toggleGroup = useDeskSelection((s) => s.toggleGroup)
   if (!group.collapsible) {
@@ -40,7 +40,7 @@ function GroupHeading({ group }: { group: DeskGroup }): JSX.Element {
   )
 }
 
-function GroupRows({ group, now }: { group: DeskGroup; now: number }): JSX.Element {
+function GroupRows({ group, now }: { group: DeskGroup; now: number }): React.JSX.Element {
   const { selectedKey, threads } = useShownRows(group)
   return (
     <>
@@ -56,7 +56,7 @@ function GroupRows({ group, now }: { group: DeskGroup; now: number }): JSX.Eleme
   )
 }
 
-function InFlightHeader({ count }: { count: number }): JSX.Element {
+function InFlightHeader({ count }: { count: number }): React.JSX.Element {
   return (
     <div className="desk-sec-h">
       <h5>In flight</h5>
@@ -71,7 +71,7 @@ function InFlightHeader({ count }: { count: number }): JSX.Element {
 }
 
 /** The drawer of the thread that is open; its code loads the first time one opens. */
-function OpenThreadDrawer(): JSX.Element | null {
+function OpenThreadDrawer(): React.JSX.Element | null {
   const openThreadKey = useDeskSelection((s) => s.openThreadKey)
   if (openThreadKey === null) return null
   return (
@@ -82,7 +82,7 @@ function OpenThreadDrawer(): JSX.Element | null {
 }
 
 /** The Desk's list of work, grouped by whose move it is, with the drawer of the one that is open. */
-export function InFlight(): JSX.Element {
+export function InFlight(): React.JSX.Element {
   const { threads } = useWorkThreads()
   const groupBy = useDeskSelection((s) => s.groupBy)
   const now = useNow(MINUTE_MS)

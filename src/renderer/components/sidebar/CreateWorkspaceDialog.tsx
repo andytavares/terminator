@@ -1,3 +1,4 @@
+import type { JSX } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { WORKSPACE_PRESET_COLORS as PRESET_COLORS } from './workspace-colors'

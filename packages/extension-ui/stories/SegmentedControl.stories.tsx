@@ -24,7 +24,7 @@ function ControlledSegmentedControl({
   options: SegmentedOption<string>[]
   initial: string
   size?: 'sm' | 'md'
-}): JSX.Element {
+}): React.JSX.Element {
   const [value, setValue] = useState(initial)
   return (
     <SegmentedControl

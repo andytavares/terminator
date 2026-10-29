@@ -52,7 +52,7 @@ function LaneDetails({
 }: {
   thread: WorkThread
   lane: ThreadLane
-}): JSX.Element | null {
+}): React.JSX.Element | null {
   const changes = useLaneChanges(thread, lane)
   const parts = [
     laneNowLineOf(thread, lane),
@@ -72,7 +72,7 @@ function LaneDetails({
   )
 }
 
-function LaneRow({ thread, lane }: { thread: WorkThread; lane: ThreadLane }): JSX.Element {
+function LaneRow({ thread, lane }: { thread: WorkThread; lane: ThreadLane }): React.JSX.Element {
   const open = leadSessionOf({ ...thread, sessions: sessionsOfLane(thread, lane) })
   return (
     <li className="task-lane-row" aria-label={`${lane.branch} lane`}>
@@ -97,7 +97,7 @@ function LaneRow({ thread, lane }: { thread: WorkThread; lane: ThreadLane }): JS
 }
 
 /** One row per repo and branch the task touches. */
-export function LanesSection({ thread }: { thread: WorkThread }): JSX.Element | null {
+export function LanesSection({ thread }: { thread: WorkThread }): React.JSX.Element | null {
   if (thread.lanes.length === 0) return null
   return (
     <section className="desk-dr-s">
@@ -133,7 +133,7 @@ interface ActionButtonsProps {
   onLink: (() => void) | null
 }
 
-function TaskActionButtons({ thread, onRename, onLink }: ActionButtonsProps): JSX.Element {
+function TaskActionButtons({ thread, onRename, onLink }: ActionButtonsProps): React.JSX.Element {
   return (
     <div className="desk-dr-h__acts">
       <Button size="sm" onClick={() => openAllLanes(thread)}>
@@ -158,7 +158,7 @@ function TaskActionButtons({ thread, onRename, onLink }: ActionButtonsProps): JS
 }
 
 /** Open all lanes, link a ticket, rename, mark done and archive. */
-export function TaskActions({ thread }: { thread: WorkThread }): JSX.Element {
+export function TaskActions({ thread }: { thread: WorkThread }): React.JSX.Element {
   const [renaming, setRenaming] = useState(false)
   const [linking, setLinking] = useState(false)
   const lead = leadSessionOf(thread)

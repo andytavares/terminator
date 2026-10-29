@@ -37,7 +37,7 @@ export interface MetricsTilesProps {
   readonly metrics: FactoryMetrics
 }
 
-export function MetricsTiles({ metrics }: MetricsTilesProps): JSX.Element {
+export function MetricsTiles({ metrics }: MetricsTilesProps): React.JSX.Element {
   return (
     <div className="fdry-metrics-tiles">
       {metricsTiles(metrics).map(([label, value]) => (
@@ -58,7 +58,7 @@ const WINDOW_OPTIONS = [
 ] as const
 
 /** The 30 days / all time switch, shared wherever a `FactoryMetrics` window is chosen. */
-export function WindowToggle({ value, onChange }: WindowToggleProps): JSX.Element {
+export function WindowToggle({ value, onChange }: WindowToggleProps): React.JSX.Element {
   return (
     <SegmentedControl
       label="Time window"

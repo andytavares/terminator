@@ -29,7 +29,7 @@ function segmentState(index: number, currentIndex: number): SegmentState {
   return index === currentIndex ? 'current' : 'upcoming'
 }
 
-function StageSegment({ name, state }: { name: string; state: SegmentState }): JSX.Element {
+function StageSegment({ name, state }: { name: string; state: SegmentState }): React.JSX.Element {
   return (
     <li
       className="tmui-stage-bar__segment"
@@ -48,7 +48,7 @@ export function StageBar({
   yourMove = false,
   size = 'compact',
   caption,
-}: StageBarProps): JSX.Element {
+}: StageBarProps): React.JSX.Element {
   const currentIndex = WORK_STAGES.findIndex((entry) => entry.stage === stage)
   const classes = [
     'tmui-stage-bar',

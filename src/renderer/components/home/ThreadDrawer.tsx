@@ -24,7 +24,7 @@ import './ThreadDrawer.css'
 const MINUTE_MS = 60_000
 const TRACKER_NAMES: Record<string, string> = { linear: 'Linear' }
 
-function LinkButtons({ thread }: { thread: WorkThread }): JSX.Element {
+function LinkButtons({ thread }: { thread: WorkThread }): React.JSX.Element {
   const pr = pullRequestOf(thread)
   const issue = useIntegrationsStore((s) => s.issuesByKey.get(thread.key))
   return (
@@ -48,7 +48,7 @@ function LinkButtons({ thread }: { thread: WorkThread }): JSX.Element {
   )
 }
 
-function DrawerActions({ thread }: { thread: WorkThread }): JSX.Element {
+function DrawerActions({ thread }: { thread: WorkThread }): React.JSX.Element {
   const lead = leadSessionOf(thread)
   return (
     <div className="desk-dr-h__acts">
@@ -68,7 +68,7 @@ function DrawerActions({ thread }: { thread: WorkThread }): JSX.Element {
   )
 }
 
-function ThreadDrawerHeader({ thread }: { thread: WorkThread }): JSX.Element {
+function ThreadDrawerHeader({ thread }: { thread: WorkThread }): React.JSX.Element {
   return (
     <div className="desk-dr-h">
       <div className="desk-dr-h__top">
@@ -111,7 +111,7 @@ function useReturnFocusToRow(key: string | undefined): void {
 }
 
 /** The open work thread: what it is, what is happening, its agents, pull request and timeline. */
-export function ThreadDrawer(): JSX.Element | null {
+export function ThreadDrawer(): React.JSX.Element | null {
   const openKey = useDeskSelection((s) => s.openThreadKey)
   const closeThread = useDeskSelection((s) => s.closeThread)
   const { threads } = useWorkThreads()

@@ -17,7 +17,7 @@ const MINUTE_MS = 60_000
 const isState = (id: string): id is TaskState => (TASK_STATES as readonly string[]).includes(id)
 
 /** The group's name and count, with Show or Hide when the group folds to one line. */
-function GroupHeading({ group }: { group: DeskGroup }): JSX.Element {
+function GroupHeading({ group }: { group: DeskGroup }): React.JSX.Element {
   const expanded = useDeskSelection((s) => s.expandedGroupIds.includes(group.id))
   const toggleGroup = useDeskSelection((s) => s.toggleGroup)
   return (
@@ -39,7 +39,7 @@ function GroupHeading({ group }: { group: DeskGroup }): JSX.Element {
   )
 }
 
-function GroupRows({ group, now }: { group: DeskGroup; now: number }): JSX.Element {
+function GroupRows({ group, now }: { group: DeskGroup; now: number }): React.JSX.Element {
   const { selectedKey, threads } = useShownRows(group)
   return (
     <>
@@ -51,7 +51,7 @@ function GroupRows({ group, now }: { group: DeskGroup; now: number }): JSX.Eleme
 }
 
 /** The drawer of the task that is open; its code loads the first time one opens. */
-function OpenTaskDrawer(): JSX.Element | null {
+function OpenTaskDrawer(): React.JSX.Element | null {
   const openThreadKey = useDeskSelection((s) => s.openThreadKey)
   if (openThreadKey === null) return null
   return (
@@ -62,7 +62,7 @@ function OpenTaskDrawer(): JSX.Element | null {
 }
 
 /** Home's list of tasks, one row each, grouped by state in the order they are read. */
-export function TaskList(): JSX.Element {
+export function TaskList(): React.JSX.Element {
   const { threads } = useWorkThreads()
   const groupBy = useDeskSelection((s) => s.groupBy)
   const now = useNow(MINUTE_MS)

@@ -47,7 +47,7 @@ const THEN_BY: Array<{ value: WallThenBy; label: string }> = [
  * tile, and both band headings, are direct children of one grid and are placed
  * by CSS `order` — see placeWall for why a tile must never be re-parented.
  */
-export function OverviewScreen(): JSX.Element {
+export function OverviewScreen(): React.JSX.Element {
   const [prefs, update] = useWallPrefs()
   const [text, setText] = useState('')
   const [linking, setLinking] = useState<SessionFacts | null>(null)
@@ -82,7 +82,7 @@ interface WallBodyProps {
 }
 
 /** The tiles, or why there are none and the way out. */
-function WallBody({ open, shown, clearText, grid }: WallBodyProps): JSX.Element {
+function WallBody({ open, shown, clearText, grid }: WallBodyProps): React.JSX.Element {
   return (
     <div className="wall__body">
       {open.length === 0 ? (
@@ -167,7 +167,7 @@ interface WallBarProps {
 }
 
 /** The title and count, New terminal, the arrangement controls and the filter. */
-function WallBar({ openCount, prefs, update, text, setText }: WallBarProps): JSX.Element {
+function WallBar({ openCount, prefs, update, text, setText }: WallBarProps): React.JSX.Element {
   return (
     <div className="wall__bar">
       <h2 className="wall__title">Overview</h2>
@@ -212,7 +212,7 @@ function WallArrangement({ prefs, update }: Pick<WallBarProps, 'prefs' | 'update
   )
 }
 
-function SizeChoices({ prefs, update }: Pick<WallBarProps, 'prefs' | 'update'>): JSX.Element {
+function SizeChoices({ prefs, update }: Pick<WallBarProps, 'prefs' | 'update'>): React.JSX.Element {
   return (
     <SegmentedControl
       label="Tile size"
@@ -228,7 +228,10 @@ function SizeChoices({ prefs, update }: Pick<WallBarProps, 'prefs' | 'update'>):
   )
 }
 
-function ThenBySelect({ prefs, update }: Pick<WallBarProps, 'prefs' | 'update'>): JSX.Element {
+function ThenBySelect({
+  prefs,
+  update,
+}: Pick<WallBarProps, 'prefs' | 'update'>): React.JSX.Element {
   return (
     <label className="wall__select">
       <span>Then by</span>
@@ -253,7 +256,7 @@ interface WallEmptyProps {
   onAction: () => void
 }
 
-function WallEmpty({ message, action, onAction }: WallEmptyProps): JSX.Element {
+function WallEmpty({ message, action, onAction }: WallEmptyProps): React.JSX.Element {
   return (
     <div className="wall__empty">
       <p>{message}</p>
@@ -290,7 +293,7 @@ function plural(count: number, noun: string): string {
 }
 
 /** A task's name over its tiles, with how many repos and terminals they span. */
-function TaskBandHeading({ band }: { band: WallTaskBand }): JSX.Element {
+function TaskBandHeading({ band }: { band: WallTaskBand }): React.JSX.Element {
   return (
     <h3 className="wall__band wall__band--task" style={{ order: band.order }}>
       {band.title}
@@ -302,7 +305,7 @@ function TaskBandHeading({ band }: { band: WallTaskBand }): JSX.Element {
 }
 
 /** The band headings and every tile, as siblings in one grid. */
-function WallGrid({ shown, prefs, processes, onLink }: WallGridProps): JSX.Element {
+function WallGrid({ shown, prefs, processes, onLink }: WallGridProps): React.JSX.Element {
   const tasks = useWallTasks()
   const wall = useMemo(() => placeWall(shown, prefs, tasks), [shown, prefs, tasks])
   const factsById = new Map(shown.map((f) => [f.sessionId, f]))

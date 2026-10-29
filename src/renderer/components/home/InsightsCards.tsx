@@ -30,7 +30,7 @@ interface EmptyCardProps {
   reason: string
 }
 
-export function EmptyCard({ question, qualifier, reason }: EmptyCardProps): JSX.Element {
+export function EmptyCard({ question, qualifier, reason }: EmptyCardProps): React.JSX.Element {
   return <MetricCard question={question} qualifier={qualifier} value="–" sub={reason} />
 }
 
@@ -41,7 +41,7 @@ interface ShippedCardProps {
   chosen: InsightsWindow
 }
 
-export function ShippedCard({ measures, chosen }: ShippedCardProps): JSX.Element {
+export function ShippedCard({ measures, chosen }: ShippedCardProps): React.JSX.Element {
   const question = 'How much shipped?'
   const reading = measureReading(measures, HOME_MEASURES.shipped, chosen)
   if (reading === null) {
@@ -66,7 +66,7 @@ export function ShippedCard({ measures, chosen }: ShippedCardProps): JSX.Element
   )
 }
 
-export function StartToMergeCard({ spread }: { spread: DurationSpread | null }): JSX.Element {
+export function StartToMergeCard({ spread }: { spread: DurationSpread | null }): React.JSX.Element {
   const question = 'How long from start to merge?'
   if (spread === null) {
     return (
@@ -108,7 +108,7 @@ function waitSub({ attention, before }: WaitCardProps & { attention: AttentionMe
   )
 }
 
-export function WaitCard({ attention, before }: WaitCardProps): JSX.Element {
+export function WaitCard({ attention, before }: WaitCardProps): React.JSX.Element {
   const question = 'How long do agents wait on me?'
   if (attention === null || attention.waitsOnYou.count === 0) {
     return (
@@ -138,7 +138,7 @@ export function WaitCard({ attention, before }: WaitCardProps): JSX.Element {
 }
 
 /** The first-pass rate an extension published; no card when none did. */
-export function FirstPassCard({ measures, chosen }: ShippedCardProps): JSX.Element | null {
+export function FirstPassCard({ measures, chosen }: ShippedCardProps): React.JSX.Element | null {
   const measure = measures.find((m) => m.id === HOME_MEASURES.firstPass)
   if (measure === undefined) {
     const reason = 'Nothing measures this yet'

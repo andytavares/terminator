@@ -18,7 +18,13 @@ interface FileDiffViewProps {
 
 const LINE_PREFIX: Record<DiffLine['type'], string> = { add: '+', remove: '-', context: ' ' }
 
-function UnifiedRow({ line, lang }: { line: DiffLine; lang: string | undefined }): JSX.Element {
+function UnifiedRow({
+  line,
+  lang,
+}: {
+  line: DiffLine
+  lang: string | undefined
+}): React.JSX.Element {
   const html = useMemo(() => highlight(line.content, lang), [line.content, lang])
   return (
     <tr className={`diff-line diff-line--${line.type}`}>
@@ -47,7 +53,7 @@ function FileHunkHeader(props: { header: string; colSpan: number }) {
   )
 }
 
-function UnifiedTable({ hunks, lang }: TableProps): JSX.Element {
+function UnifiedTable({ hunks, lang }: TableProps): React.JSX.Element {
   return (
     <table className="diff-table">
       <tbody>
@@ -293,7 +299,7 @@ function LoadedDiff(props: FileDiffViewProps & { diff: FileDiff; view: ViewState
   )
 }
 
-export function FileDiffView(props: FileDiffViewProps): JSX.Element {
+export function FileDiffView(props: FileDiffViewProps): React.JSX.Element {
   const { diff } = props
   // The layout and divider position outlive the file shown, so they stay as files change.
   const [viewMode, setViewMode] = useState<ViewMode>('unified')

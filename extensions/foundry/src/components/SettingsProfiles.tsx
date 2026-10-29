@@ -86,7 +86,7 @@ function ProfileItem({ summary, forget }: ItemProps) {
 }
 
 /** The settings section listing every repository profile, with Show and Forget. */
-export function RepositoryChecks(): JSX.Element {
+export function RepositoryChecks(): React.JSX.Element {
   const { profiles, loaded, forget } = useProfiles()
   return (
     <>

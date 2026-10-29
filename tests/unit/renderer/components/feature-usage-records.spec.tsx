@@ -109,7 +109,7 @@ describe('feature usage: failures and Home views', () => {
 
 describe('feature usage: failures', () => {
   it('counts a screen that failed to draw as a failure', () => {
-    const Thrower = (): JSX.Element => {
+    const Thrower = (): React.JSX.Element => {
       throw new Error('boom')
     }
     vi.spyOn(console, 'error').mockImplementation(() => {})

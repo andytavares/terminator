@@ -178,7 +178,7 @@ export interface FloorProps {
   readonly orderId: string
 }
 
-export function Floor({ orderId }: FloorProps): JSX.Element {
+export function Floor({ orderId }: FloorProps): React.JSX.Element {
   const floor = useFloor(orderId)
   const { view, problem } = floor
   if (problem !== null && view === null) return <p className="fdry-note">{problem}</p>
@@ -1434,7 +1434,7 @@ function BlockedPanel({ view }: { readonly view: FloorView }) {
 }
 
 /** The moves on a finished order's document: open it, open the local copy, copy the link. */
-function DocumentActions({ document }: { readonly document: DocumentLink }): JSX.Element {
+function DocumentActions({ document }: { readonly document: DocumentLink }): React.JSX.Element {
   return (
     <div className="fdry-doc-actions">
       <Button variant="primary" icon={Sparkles} onClick={() => openDocument(document)}>

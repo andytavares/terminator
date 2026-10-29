@@ -26,7 +26,7 @@ interface KpiProps {
   detail: string
 }
 
-function Kpi({ label, value, detail }: KpiProps): JSX.Element {
+function Kpi({ label, value, detail }: KpiProps): React.JSX.Element {
   return (
     <div className="ins__kpi">
       <small>{label}</small>
@@ -56,7 +56,7 @@ function OrdersShipped({ measures, chosen }: Pick<AgentTimeProps, 'measures' | '
   return <Kpi label={published.question} value={String(shipped.value)} detail={detail ?? ''} />
 }
 
-function UsageLine({ usage }: { usage: AgentUsage | null }): JSX.Element {
+function UsageLine({ usage }: { usage: AgentUsage | null }): React.JSX.Element {
   if (usage === null) return <div className="ins__note">Tokens and cost could not be read.</div>
   const { tokens, costUsd, costIsPartial } = usage.totals
   const note = costIsPartial ? 'estimate, partial: some models have no price' : 'estimate'
@@ -68,7 +68,7 @@ function UsageLine({ usage }: { usage: AgentUsage | null }): JSX.Element {
   )
 }
 
-function AgentKpis(props: AgentTimeProps): JSX.Element {
+function AgentKpis(props: AgentTimeProps): React.JSX.Element {
   const { attention, usage } = props
   const sessions = usage?.sessions.length
   const ratio = (r: number): string => `${Math.round(r * 100)}%`
@@ -94,7 +94,7 @@ function AgentKpis(props: AgentTimeProps): JSX.Element {
   )
 }
 
-export function AgentTimeCard(props: AgentTimeProps): JSX.Element {
+export function AgentTimeCard(props: AgentTimeProps): React.JSX.Element {
   return (
     <MetricCard
       question="How am I spending agent time?"
@@ -108,7 +108,7 @@ export function AgentTimeCard(props: AgentTimeProps): JSX.Element {
 }
 
 /** The section each extension drew for Insights, under the question it answers. */
-export function ShipSections(): JSX.Element | null {
+export function ShipSections(): React.JSX.Element | null {
   const sections = useExtensionRegistry((s) => s.insightsSections)
   if (sections.size === 0) return null
   return (
@@ -135,7 +135,7 @@ interface LookingBackProps {
 }
 
 interface LookBackRowProps {
-  icon: JSX.Element
+  icon: React.JSX.Element
   title: string
   detail: string
   action?: { label: string; primary: boolean; run: () => void }
@@ -143,7 +143,7 @@ interface LookBackRowProps {
   dismiss?: { label: string; run: () => void }
 }
 
-function LookBackRow(props: LookBackRowProps): JSX.Element {
+function LookBackRow(props: LookBackRowProps): React.JSX.Element {
   const { icon, title, detail, action, dismiss } = props
   return (
     <div className="ins__lr">
@@ -188,7 +188,7 @@ function OldestReviewRow({ oldest }: { oldest: NonNullable<LookingBackProps['old
   )
 }
 
-export function LookingBackCard(props: LookingBackProps): JSX.Element {
+export function LookingBackCard(props: LookingBackProps): React.JSX.Element {
   const { longestWaitMinutes, oldestReview } = props
   const nothing = longestWaitMinutes <= 0 && !oldestReview
   return (

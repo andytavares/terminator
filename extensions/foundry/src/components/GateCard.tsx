@@ -55,7 +55,7 @@ export function GateAnswers({
   busy = false,
   onDecide,
   onRaise,
-}: GateAnswersProps): JSX.Element {
+}: GateAnswersProps): React.JSX.Element {
   return (
     <div className="fdry-gate-actions">
       {gate.options.map((option, index) => {
@@ -78,7 +78,7 @@ export function GateAnswers({
   )
 }
 
-export function GateCard(props: GateCardProps): JSX.Element {
+export function GateCard(props: GateCardProps): React.JSX.Element {
   const { gate, busy = false, onDecide, className } = props
   const [open, setOpen] = useState(false)
   const [raising, setRaising] = useState(false)

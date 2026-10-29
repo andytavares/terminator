@@ -431,7 +431,7 @@ function QueryConfirmDialog({ admin }: AdminProps): React.JSX.Element | null {
   )
 }
 
-export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): JSX.Element {
+export function DatabaseAdmin({ onWrite }: { onWrite?: () => void }): React.JSX.Element {
   useRecordUsageOnMount('db-admin')
   const admin = useAdmin(onWrite)
   return (

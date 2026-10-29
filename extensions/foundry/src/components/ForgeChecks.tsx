@@ -44,7 +44,7 @@ const PILL: Record<CheckState, ChipTone> = {
   notNeeded: 'neutral',
 }
 
-function RowGlyph({ row }: { readonly row: CheckRowView }): JSX.Element {
+function RowGlyph({ row }: { readonly row: CheckRowView }): React.JSX.Element {
   if (row.state === 'passed') return <Check aria-hidden="true" />
   if (row.state === 'failing') return <X aria-hidden="true" />
   if (row.target.kind === 'prepare') return <Package aria-hidden="true" />
@@ -466,7 +466,7 @@ function ChecksList({ checks, actions }: ChecksProps) {
   )
 }
 
-export function ChecksStep({ checks, actions }: ChecksProps): JSX.Element {
+export function ChecksStep({ checks, actions }: ChecksProps): React.JSX.Element {
   if (checks.profile === null) return <p className="fdry-note">Reading the repository…</p>
   if (nothingFound(checks.rows) && !checks.decided.includes('unmeasured')) {
     return <NothingFound checks={checks} actions={actions} />
@@ -556,7 +556,7 @@ function PicturesRow({ checks, actions }: ChecksProps) {
 }
 
 /** The hand-off's account of the checks: how many were proven, and the pictures question. */
-export function HandOffChecks({ checks, actions }: ChecksProps): JSX.Element | null {
+export function HandOffChecks({ checks, actions }: ChecksProps): React.JSX.Element | null {
   const { profile, interfaceChanged, decided } = checks
   if (profile === null) return null
   const askPictures =

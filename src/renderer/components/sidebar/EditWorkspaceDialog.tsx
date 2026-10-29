@@ -1,3 +1,4 @@
+import type { JSX } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import type { Workspace } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'

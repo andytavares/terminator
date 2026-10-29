@@ -13,7 +13,7 @@ function useBreakoutTabOverMainWindow(): string | null {
   return brokenOut && overMainWindow ? sessionId : null
 }
 
-function ReturnPrompt({ sessionId }: { sessionId: string }): JSX.Element | null {
+function ReturnPrompt({ sessionId }: { sessionId: string }): React.JSX.Element | null {
   const session = useSessionStore((s) => s.sessions.get(sessionId))
   const place = usePlaceOf(session?.projectId ?? '')
   if (!session) return null
@@ -36,7 +36,7 @@ function ReturnPrompt({ sessionId }: { sessionId: string }): JSX.Element | null 
 
 /** Over the whole main window while a terminal's tab is dragged in from its own window; letting
  * go docks it (BreakoutWindowView's drop does that). */
-export function BreakoutDropZone(): JSX.Element | null {
+export function BreakoutDropZone(): React.JSX.Element | null {
   const sessionId = useBreakoutTabOverMainWindow()
   return sessionId === null ? null : <ReturnPrompt sessionId={sessionId} />
 }

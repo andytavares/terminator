@@ -13,7 +13,7 @@ const OPTIONS: SegmentedOption<string>[] = [
   { value: 'link', label: 'Link' },
 ]
 
-function SegmentedHarness({ initial = 'note' }: { initial?: string }): JSX.Element {
+function SegmentedHarness({ initial = 'note' }: { initial?: string }): React.JSX.Element {
   const [value, setValue] = useState(initial)
   return <SegmentedControl label="Kind" options={OPTIONS} value={value} onChange={setValue} />
 }

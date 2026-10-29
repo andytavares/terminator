@@ -15,7 +15,7 @@ interface Props {
   onClose: () => void
 }
 
-export function SettingsPanel({ onClose }: Props): JSX.Element {
+export function SettingsPanel({ onClose }: Props): React.JSX.Element {
   const [section, setSection] = useState<Section>('global')
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
   useEffect(() => {
@@ -55,7 +55,7 @@ interface NavProps {
   hasWorkspace: boolean
 }
 
-function SettingsNav({ section, onSelect, hasWorkspace }: NavProps): JSX.Element {
+function SettingsNav({ section, onSelect, hasWorkspace }: NavProps): React.JSX.Element {
   const offered = SECTIONS.filter((s) => s.section !== 'workspace' || hasWorkspace)
   return (
     <nav className="settings-panel__nav">

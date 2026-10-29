@@ -8,7 +8,7 @@ interface DiffSizeProps {
   fileCount: number
 }
 
-function DiffSize(props: DiffSizeProps): JSX.Element {
+function DiffSize(props: DiffSizeProps): React.JSX.Element {
   const { fileCount } = props
   return (
     <span className="rd-num rd-size">
@@ -33,7 +33,7 @@ function toneClass(part: MetaPart): string | undefined {
 }
 
 /** The second line of a row: only the states that need attention, joined by dots. */
-function RowMeta({ parts }: { parts: (MetaPart | null | false)[] }): JSX.Element {
+function RowMeta({ parts }: { parts: (MetaPart | null | false)[] }): React.JSX.Element {
   const shown = parts.filter((p): p is MetaPart => Boolean(p))
   return (
     <small>
@@ -75,7 +75,14 @@ interface PrRowProps {
 }
 
 /** One pull request in a list: number and title, what needs attention, size, actions. */
-export function PrRow({ pr, meta, action, onOpen, testId, children }: PrRowProps): JSX.Element {
+export function PrRow({
+  pr,
+  meta,
+  action,
+  onOpen,
+  testId,
+  children,
+}: PrRowProps): React.JSX.Element {
   return (
     <div
       className="rd-row rd-row--clickable"
@@ -105,7 +112,7 @@ export function PrRow({ pr, meta, action, onOpen, testId, children }: PrRowProps
 }
 
 /** The row's own button. It opens the pull request without the click reaching the row. */
-function RowAction({ action, onOpen }: Pick<PrRowProps, 'action' | 'onOpen'>): JSX.Element {
+function RowAction({ action, onOpen }: Pick<PrRowProps, 'action' | 'onOpen'>): React.JSX.Element {
   return (
     <Button
       size="sm"

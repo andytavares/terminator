@@ -109,7 +109,7 @@ async function runSettingAction(def: SettingPropDef): Promise<void> {
 }
 
 /** A button that runs an extension's action, after its confirmation if it has one. */
-export function ActionSettingRow({ def }: { def: SettingPropDef }): JSX.Element {
+export function ActionSettingRow({ def }: { def: SettingPropDef }): React.JSX.Element {
   const [busy, setBusy] = useState(false)
 
   async function runAction(): Promise<void> {
@@ -213,7 +213,7 @@ interface ControlProps {
 }
 
 /** A switch, a segmented choice, a folder picker, a list box, or a text or number box. */
-function SettingControl({ def, text, edit }: ControlProps): JSX.Element {
+function SettingControl({ def, text, edit }: ControlProps): React.JSX.Element {
   if (def.type === 'boolean') {
     return (
       <button
@@ -234,13 +234,13 @@ function SettingControl({ def, text, edit }: ControlProps): JSX.Element {
 }
 
 /** A list, one item per line; the row keeps it as those lines. */
-function ListControl({ def, text, edit }: ControlProps): JSX.Element {
+function ListControl({ def, text, edit }: ControlProps): React.JSX.Element {
   const save = (items: string[]) => edit(items.join('\n'))
   return <ListInput label={def.label} value={listItems(text)} onChange={save} />
 }
 
 /** A text box, masked for a secret, or a number box within the setting's bounds. */
-function TextControl({ def, text, edit }: ControlProps): JSX.Element {
+function TextControl({ def, text, edit }: ControlProps): React.JSX.Element {
   return (
     <input
       className="extension-setting-row__input"
@@ -269,7 +269,7 @@ function EnumChoice({ options, text, edit }: Omit<ControlProps, 'def'> & { optio
   )
 }
 
-function FolderButton({ edit }: Pick<ControlProps, 'edit'>): JSX.Element {
+function FolderButton({ edit }: Pick<ControlProps, 'edit'>): React.JSX.Element {
   async function pick(): Promise<void> {
     const result = await window.electronAPI.dialog.openDirectory()
     if ('cancelled' in result) return

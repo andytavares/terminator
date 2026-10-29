@@ -31,7 +31,7 @@ function problemWith(draft: Draft, custom: CustomAgent[]): string | null {
   return id === BUILT_IN_ID || custom.some((a) => a.id === id) ? 'That id is already used' : null
 }
 
-export function AgentsSettings(): JSX.Element {
+export function AgentsSettings(): React.JSX.Element {
   const agents = useSettingsStore((s) => s.globalSettings?.agents)
   const update = useSettingsStore((s) => s.updateAgents)
   if (!agents) return <></>
@@ -52,7 +52,7 @@ export function AgentsSettings(): JSX.Element {
 function DefaultAgentField(props: {
   agents: AgentsValue
   onPick: (id: string) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { agents, onPick } = props
   return (
     <div className="settings-section__field">
@@ -81,7 +81,7 @@ interface AgentListProps {
   update: (patch: Partial<AgentsValue>) => void
 }
 
-function AgentList({ agents, update }: AgentListProps): JSX.Element | null {
+function AgentList({ agents, update }: AgentListProps): React.JSX.Element | null {
   if (agents.custom.length === 0) return null
   const remove = (id: string): void =>
     update({
@@ -113,7 +113,7 @@ function trySave(draft: Draft, custom: CustomAgent[], onSave: (c: CustomAgent[])
 function AgentForm(props: {
   custom: CustomAgent[]
   onSave: (custom: CustomAgent[]) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [error, setError] = useState<string | null>(null)
   if (draft === null) {
@@ -143,7 +143,7 @@ const FIELDS: Array<{ key: keyof Draft; label: string }> = [
   { key: 'commandLine', label: 'Command line' },
 ]
 
-function DraftFields(props: { draft: Draft; onChange: (draft: Draft) => void }): JSX.Element {
+function DraftFields(props: { draft: Draft; onChange: (draft: Draft) => void }): React.JSX.Element {
   return (
     <>
       {FIELDS.map(({ key, label }) => (

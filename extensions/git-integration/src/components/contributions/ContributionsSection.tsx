@@ -83,7 +83,7 @@ function useContributions(): Contributions {
 }
 
 /** The Home Contributions section: period stats, the year heatmap and the highlights. */
-export function ContributionsSection(): JSX.Element {
+export function ContributionsSection(): React.JSX.Element {
   const { state, period, repo, setPeriod, setRepo, refresh } = useContributions()
   return (
     <div
@@ -112,7 +112,7 @@ export function ContributionsSection(): JSX.Element {
   )
 }
 
-function SectionBody(props: { state: ContributionsState; onRetry: () => void }): JSX.Element {
+function SectionBody(props: { state: ContributionsState; onRetry: () => void }): React.JSX.Element {
   const { reply, loading, error } = props.state
   if (error) return <ErrorRow error={error} onRetry={props.onRetry} />
   return (
@@ -123,7 +123,7 @@ function SectionBody(props: { state: ContributionsState; onRetry: () => void }):
   )
 }
 
-function StatsBody({ reply }: { reply: ContributionsReply | null }): JSX.Element {
+function StatsBody({ reply }: { reply: ContributionsReply | null }): React.JSX.Element {
   return (
     <>
       <PeriodStats period={reply ? reply.period : null} previous={reply ? reply.previous : null} />
@@ -136,7 +136,7 @@ function StatsBody({ reply }: { reply: ContributionsReply | null }): JSX.Element
   )
 }
 
-function ErrorRow(props: { error: string; onRetry: () => void }): JSX.Element {
+function ErrorRow(props: { error: string; onRetry: () => void }): React.JSX.Element {
   return (
     <div className="ct-error" role="alert">
       <span>{props.error}</span>

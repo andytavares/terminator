@@ -23,7 +23,7 @@ export interface ModalShellProps {
 /** The modal behaviour with no content of its own: a native `<dialog>`, open as a modal for as
  * long as it is mounted (ADR 110). Focus opens on the first control inside, or on the field
  * that asks for it with `autoFocus`, and returns to whatever had it. */
-export function ModalShell(props: ModalShellProps): JSX.Element {
+export function ModalShell(props: ModalShellProps): React.JSX.Element {
   const { dismissible = true, placement = 'center' } = props
   const className = [props.className, placement === 'top' && 'tmui-modal--top']
     .filter(Boolean)
@@ -45,7 +45,7 @@ export function ModalShell(props: ModalShellProps): JSX.Element {
 /** Opens the dialog around it, and closes it on unmount. It comes before the content because
  * React runs a first child's layout effect before it focuses an `autoFocus` field further on,
  * and a field in a dialog not yet open cannot take focus. */
-function OpensTheDialog(): JSX.Element {
+function OpensTheDialog(): React.JSX.Element {
   const markRef = useRef<HTMLTemplateElement>(null)
   // A layout effect: close() hands focus back only while the element is still in the document.
   useLayoutEffect(() => {

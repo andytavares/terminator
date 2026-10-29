@@ -44,7 +44,7 @@ function useTicketTimeInput({ chosen, data, feed }: RowProps): TicketTimeInput {
   )
 }
 
-function QuestionsRow(props: RowProps): JSX.Element {
+function QuestionsRow(props: RowProps): React.JSX.Element {
   const { chosen, data, feed } = props
   const spread = startToMerge(useTicketTimeInput(props))
   return (
@@ -57,7 +57,7 @@ function QuestionsRow(props: RowProps): JSX.Element {
   )
 }
 
-function TimeRow(props: RowProps): JSX.Element {
+function TimeRow(props: RowProps): React.JSX.Element {
   const { chosen, data, feed } = props
   const { attention, usage } = data
   const breakdown = timeBreakdown(useTicketTimeInput(props))
@@ -69,7 +69,7 @@ function TimeRow(props: RowProps): JSX.Element {
   )
 }
 
-function LookingBackRow({ data, feed }: Pick<RowProps, 'data' | 'feed'>): JSX.Element {
+function LookingBackRow({ data, feed }: Pick<RowProps, 'data' | 'feed'>): React.JSX.Element {
   const now = useNow()
   const entries = useDismissalsStore((state) => state.entries)
   const open = feed.asks.filter((ask) => !isHidden(ask, entries, now))
@@ -86,7 +86,7 @@ function LookingBackRow({ data, feed }: Pick<RowProps, 'data' | 'feed'>): JSX.El
 }
 
 /** The second view of Home: each card is titled by the question it answers. */
-export function Insights(): JSX.Element {
+export function Insights(): React.JSX.Element {
   const chosen = useInsightsWindow((s) => s.chosen)
   const data = useInsightsData(chosen)
   const feed = useFeedForInsights()

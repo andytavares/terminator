@@ -17,7 +17,7 @@ export function StateChip({
 }: {
   state: AgentState
   compact?: boolean
-}): JSX.Element {
+}): React.JSX.Element {
   const Icon = STATUS_ICON[ICON_FOR_STATE[state]]
   const label = statusPresentationForState(state).label
   return (

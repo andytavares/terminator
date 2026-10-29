@@ -82,7 +82,7 @@ export function Inbox({
   onOpenOrder,
 }: {
   onOpenOrder?: (orderId: string) => void
-} = {}): JSX.Element | null {
+} = {}): React.JSX.Element | null {
   const { view, refreshList } = useInbox()
   const signals = useSignals()
   const answers = useAnswers(refreshList, signals.refreshSignals)

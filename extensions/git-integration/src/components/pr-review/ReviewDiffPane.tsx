@@ -73,9 +73,9 @@ interface ContextParts {
   actions: PaneContext['actions']
 }
 
-type ScrollRef = React.RefObject<HTMLDivElement>
+type ScrollRef = React.RefObject<HTMLDivElement | null>
 
-type ListRef = React.RefObject<VirtualDiffListHandle>
+type ListRef = React.RefObject<VirtualDiffListHandle | null>
 
 type PaneState = ReturnType<typeof useReviewDiffPane>
 
@@ -205,7 +205,7 @@ function peekFirstDefinition(
 function useNavigation(
   w: Wiring,
   usesWithDef: ReturnType<typeof useUsesWithDefinition>,
-  listRef: React.RefObject<VirtualDiffListHandle>
+  listRef: React.RefObject<VirtualDiffListHandle | null>
 ) {
   const { props, ui, view } = w
   const goToPath = useGoToPath(props.pr, w.store)

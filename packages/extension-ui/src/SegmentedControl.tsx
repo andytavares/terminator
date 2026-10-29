@@ -76,7 +76,7 @@ export function SegmentedControl<Value extends string>({
   onChange,
   size = 'md',
   className,
-}: SegmentedControlProps<Value>): JSX.Element {
+}: SegmentedControlProps<Value>): React.JSX.Element {
   const classes = ['tmui-segmented', `tmui-segmented--${size}`, className]
   const focusable = focusableValue(options, value)
   return (
@@ -112,7 +112,7 @@ function SegmentedOptionButton<Value extends string>({
   checked,
   focusable,
   onChange,
-}: SegmentedOptionButtonProps<Value>): JSX.Element {
+}: SegmentedOptionButtonProps<Value>): React.JSX.Element {
   return (
     <button
       type="button"

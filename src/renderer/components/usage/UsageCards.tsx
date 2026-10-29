@@ -40,7 +40,7 @@ function topActive(rows: readonly StatedRow[]): string {
     .join(' · ')
 }
 
-function FeaturesUsedCard({ rows, period }: CardProps): JSX.Element {
+function FeaturesUsedCard({ rows, period }: CardProps): React.JSX.Element {
   const current = rows.filter(isCurrent)
   return (
     <MetricCard
@@ -57,7 +57,7 @@ function FeaturesUsedCard({ rows, period }: CardProps): JSX.Element {
   )
 }
 
-function ActiveTimeCard({ rows, period }: CardProps): JSX.Element {
+function ActiveTimeCard({ rows, period }: CardProps): React.JSX.Element {
   const active = activeCardValue(rows.reduce((sum, { row }) => sum + row.activeMs, 0))
   return (
     <MetricCard
@@ -70,7 +70,7 @@ function ActiveTimeCard({ rows, period }: CardProps): JSX.Element {
   )
 }
 
-export function UsageCards(props: UsageCardsProps): JSX.Element {
+export function UsageCards(props: UsageCardsProps): React.JSX.Element {
   const { rows, period, start } = props
   const fresh = countOf(rows, 'new')
   return (

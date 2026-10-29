@@ -53,7 +53,7 @@ function draftOfAction(a: CustomAction): Draft {
   }
 }
 
-export function QuickActionsSettings(props: Props): JSX.Element {
+export function QuickActionsSettings(props: Props): React.JSX.Element {
   const { custom, save } = useCustomActions(props)
   const form = useActionDraft(custom, save)
   return (
@@ -154,7 +154,7 @@ interface ActionListProps {
   onRemove: (id: string) => void
 }
 
-function ActionList({ custom, onEdit, onRemove }: ActionListProps): JSX.Element {
+function ActionList({ custom, onEdit, onRemove }: ActionListProps): React.JSX.Element {
   return (
     <ul className="qa-settings-list">
       {custom.map((a) => (
@@ -181,7 +181,7 @@ function ActionList({ custom, onEdit, onRemove }: ActionListProps): JSX.Element 
 }
 
 /** Label, key, kind and target, and the body, then Save and Cancel. */
-function ActionForm({ form, draft }: { form: ActionDraft; draft: Draft }): JSX.Element {
+function ActionForm({ form, draft }: { form: ActionDraft; draft: Draft }): React.JSX.Element {
   const { update } = form
   return (
     <div className="qa-settings-form">
@@ -249,7 +249,7 @@ interface TextFieldProps {
   onChange: (value: string) => void
 }
 
-function TextField({ id, label, value, maxLength, onChange }: TextFieldProps): JSX.Element {
+function TextField({ id, label, value, maxLength, onChange }: TextFieldProps): React.JSX.Element {
   return (
     <div className="settings-section__field">
       <label className="settings-section__label" htmlFor={id}>
@@ -301,7 +301,7 @@ function SelectField<Value extends string>({
   value,
   options,
   onChange,
-}: SelectFieldProps<Value>): JSX.Element {
+}: SelectFieldProps<Value>): React.JSX.Element {
   return (
     <div className="settings-section__field">
       <label className="settings-section__label" htmlFor={id}>

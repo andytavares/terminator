@@ -13,7 +13,7 @@ interface KpiProps {
   tone?: 'up' | 'down'
 }
 
-function WeekKpi(props: KpiProps): JSX.Element {
+function WeekKpi(props: KpiProps): React.JSX.Element {
   const { label, value, note, tone } = props
   return (
     <div className="desk-kpi">
@@ -70,7 +70,7 @@ function attentionKpis(week: WeekMeasures): KpiProps[] {
 const HEAT_CELLS = 36
 const HEAT_MAX = 4
 
-function HeatStrip({ days }: { days: readonly number[] }): JSX.Element {
+function HeatStrip({ days }: { days: readonly number[] }): React.JSX.Element {
   return (
     <div className="desk-heat" aria-hidden="true">
       {days.slice(-HEAT_CELLS).map((level, index) => (
@@ -95,7 +95,7 @@ function weekKpis(measures: readonly HomeMeasure[], week: WeekMeasures | null): 
 }
 
 /** The week against the one before it: four numbers, a heat strip, and the way to Insights. */
-export function WeekCard(): JSX.Element {
+export function WeekCard(): React.JSX.Element {
   const measures = useHomeFeedStore((s) => s.measures)
   const show = useHomeView((s) => s.show)
   const week = useWeekMeasures()

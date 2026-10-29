@@ -11,7 +11,7 @@ export interface OrderLinksProps {
   readonly source?: { readonly key: string; readonly url: string } | null
 }
 
-export function OrderLinks({ pulls = [], source = null }: OrderLinksProps): JSX.Element {
+export function OrderLinks({ pulls = [], source = null }: OrderLinksProps): React.JSX.Element {
   return (
     <>
       {pulls.map((pull) => (

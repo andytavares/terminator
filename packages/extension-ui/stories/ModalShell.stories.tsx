@@ -114,7 +114,7 @@ export const PressInsideKeepsItOpen: Story = {
   },
 }
 
-function OpenedFromAButton(): JSX.Element {
+function OpenedFromAButton(): React.JSX.Element {
   const [open, setOpen] = useState(false)
   return (
     <>
@@ -186,7 +186,7 @@ export const PopoverInsideTheShell: Story = {
   },
 }
 
-function ShellInAShell(): JSX.Element {
+function ShellInAShell(): React.JSX.Element {
   const [inner, setInner] = useState(true)
   return (
     <ModalShell label="Settings" className="story-surface" onDismiss={() => {}}>

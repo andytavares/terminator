@@ -20,7 +20,7 @@ export interface PushedToastsProps {
 
 /** Draws the extension's own notifications that go to a toast. While its view is on screen the
  * core leaves these to it, since the core's toast would sit under the view. */
-export function PushedToasts({ source, subscribe }: PushedToastsProps): JSX.Element | null {
+export function PushedToasts({ source, subscribe }: PushedToastsProps): React.JSX.Element | null {
   const [useStore] = useState(createToastStore)
   const { toasts, removeToast } = useStore()
   useEffect(

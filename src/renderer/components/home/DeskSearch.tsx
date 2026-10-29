@@ -71,7 +71,7 @@ interface DeskSearchResultsProps {
   onPick: (hit: SearchHit | null) => void
 }
 
-function DeskSearchResults(props: DeskSearchResultsProps): JSX.Element {
+function DeskSearchResults(props: DeskSearchResultsProps): React.JSX.Element {
   const { text, hits, onPick } = props
   return (
     <ul className="hd__results" role="listbox" aria-label="Search results">

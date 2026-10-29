@@ -12,7 +12,13 @@ const TABS: TabItem[] = [
   { id: 'history', label: 'History', panel: <p>Three commits.</p> },
 ]
 
-function ControlledTabs({ tabs, initial }: { tabs: TabItem[]; initial: string }): JSX.Element {
+function ControlledTabs({
+  tabs,
+  initial,
+}: {
+  tabs: TabItem[]
+  initial: string
+}): React.JSX.Element {
   const [selectedId, setSelectedId] = useState(initial)
   return (
     <Tabs
@@ -63,7 +69,7 @@ export const ArrowKeysMoveSelection: Story = {
 }
 
 /** The parts: the list shares a toolbar row, a notice sits between it and the panel. */
-function InToolbar({ initial }: { initial: string }): JSX.Element {
+function InToolbar({ initial }: { initial: string }): React.JSX.Element {
   const [selectedId, setSelectedId] = useState(initial)
   return (
     <TabsRoot selectedId={selectedId} onSelect={setSelectedId}>
@@ -90,7 +96,7 @@ function InToolbar({ initial }: { initial: string }): JSX.Element {
   )
 }
 
-function Vertical(): JSX.Element {
+function Vertical(): React.JSX.Element {
   const [selectedId, setSelectedId] = useState('setup')
   return (
     <TabsRoot selectedId={selectedId} onSelect={setSelectedId}>

@@ -24,7 +24,7 @@ function changeOf(
 export function PeriodStats(props: {
   period: ContributionCounts | null
   previous: ContributionCounts | null
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <div className="ct-stats">
       {TILES.map((tile) => (
@@ -43,7 +43,7 @@ function StatTile(props: {
   label: string
   value: number | null
   delta: number | null
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <dl className="ct-stat">
       <dt>{props.label}</dt>
@@ -54,7 +54,7 @@ function StatTile(props: {
 }
 
 /** "+58 vs prev period", green up when higher, red down when lower, flat when equal. */
-function Delta({ delta }: { delta: number | null }): JSX.Element | null {
+function Delta({ delta }: { delta: number | null }): React.JSX.Element | null {
   if (delta === null) return null
   if (delta === 0) return <span className="ct-delta">Same as prev period</span>
   const up = delta > 0

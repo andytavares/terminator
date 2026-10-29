@@ -61,7 +61,7 @@ function VaultToasts(): React.JSX.Element {
   )
 }
 
-export function App(): JSX.Element {
+export function App(): React.JSX.Element {
   const view = new URLSearchParams(window.location.search).get('view')
   useCaptureRequests()
   usePushToasts()

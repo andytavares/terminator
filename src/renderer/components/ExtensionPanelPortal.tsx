@@ -87,7 +87,7 @@ function useShownWhileVisible({ extensionId, viewParam }: Surface, visible: bool
 
 /** Browser clients have no preload, so the host page listens on the same-origin frame. */
 function useDoubleEscapeInFrame(
-  iframeRef: React.RefObject<HTMLIFrameElement>,
+  iframeRef: React.RefObject<HTMLIFrameElement | null>,
   { extensionId, viewParam }: Surface,
   enabled: boolean
 ): void {
@@ -101,7 +101,7 @@ function useDoubleEscapeInFrame(
 
 /** Forwards main's port reply to the frame whose current token it carries. */
 function useFramePortForward(
-  iframeRef: React.RefObject<HTMLIFrameElement>,
+  iframeRef: React.RefObject<HTMLIFrameElement | null>,
   extensionId: Props['extensionId'],
   tokenRef: React.MutableRefObject<string | null>
 ): void {
@@ -121,7 +121,7 @@ function useFramePortForward(
 }
 
 interface FrameHandshake extends Surface {
-  iframeRef: React.RefObject<HTMLIFrameElement>
+  iframeRef: React.RefObject<HTMLIFrameElement | null>
   tokenRef: React.MutableRefObject<string | null>
   onFirstLoad: () => void
 }
@@ -150,7 +150,7 @@ function useFrameHandshake(handshake: FrameHandshake): void {
 /** A reloaded extension's backend is new, so the frame's port to the old one is dead: the frame
  * reloads, and its next load asks main for a port to the new backend. */
 function useReloadOnExtensionReload(
-  iframeRef: React.RefObject<HTMLIFrameElement>,
+  iframeRef: React.RefObject<HTMLIFrameElement | null>,
   extensionId: Props['extensionId'],
   enabled: boolean
 ): void {
@@ -167,7 +167,7 @@ function useReloadOnExtensionReload(
 /** Wires the desktop port handshake: asks main on each frame load, forwards the reply. */
 function useFramePort(
   props: Props,
-  iframeRef: React.RefObject<HTMLIFrameElement>,
+  iframeRef: React.RefObject<HTMLIFrameElement | null>,
   onFirstLoad: () => void
 ): void {
   const tokenRef = useRef<string | null>(null)
@@ -205,7 +205,7 @@ function fitContentStyle(isActive: boolean, height: number | null): React.CSSPro
   }
 }
 
-function LoadingOverlay(): JSX.Element {
+function LoadingOverlay(): React.JSX.Element {
   return (
     <div
       data-testid="extension-loading"
@@ -222,7 +222,7 @@ function LoadingOverlay(): JSX.Element {
   )
 }
 
-function ExtensionFrame(props: Props): JSX.Element {
+function ExtensionFrame(props: Props): React.JSX.Element {
   const { extensionId, viewParam, isActive, fitContent } = props
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [loaded, setLoaded] = useState(false)
@@ -249,6 +249,6 @@ function ExtensionFrame(props: Props): JSX.Element {
   )
 }
 
-export function ExtensionPanelPortal(props: Props): JSX.Element {
+export function ExtensionPanelPortal(props: Props): React.JSX.Element {
   return <ExtensionFrame {...props} />
 }

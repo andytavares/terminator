@@ -233,7 +233,7 @@ async function removeAndCount(repoRoot: string, rows: ViewRow[]): Promise<Remove
   return results
 }
 
-function RemoveDialog(props: RemoveDialogProps): JSX.Element {
+function RemoveDialog(props: RemoveDialogProps): React.JSX.Element {
   const [removing, setRemoving] = useState(false)
   const confirm = async (): Promise<void> => {
     setRemoving(true)
@@ -261,7 +261,7 @@ function RemoveDialog(props: RemoveDialogProps): JSX.Element {
   )
 }
 
-function WorktreeCell(props: CellProps): JSX.Element {
+function WorktreeCell(props: CellProps): React.JSX.Element {
   if (props.row.isMain) return <span className="wt-faint">(main checkout)</span>
   if (props.row.worktreePath === null) return <span className="wt-faint">no worktree</span>
   return (
@@ -269,7 +269,7 @@ function WorktreeCell(props: CellProps): JSX.Element {
   )
 }
 
-function SessionCell(props: { session: SessionInfo | null }): JSX.Element {
+function SessionCell(props: { session: SessionInfo | null }): React.JSX.Element {
   if (!props.session) return <span className="wt-faint">—</span>
   return (
     <span>
@@ -278,12 +278,12 @@ function SessionCell(props: { session: SessionInfo | null }): JSX.Element {
   )
 }
 
-function TimeCell(props: { value: number | null }): JSX.Element {
+function TimeCell(props: { value: number | null }): React.JSX.Element {
   if (props.value === null || props.value === 0) return <span className="wt-faint">—</span>
   return <RelativeTime value={props.value} />
 }
 
-function StateCell(props: { row: ViewRow }): JSX.Element {
+function StateCell(props: { row: ViewRow }): React.JSX.Element {
   const flags = [...lockFlags(props.row), ...gitFlags(props.row)]
   return (
     <span className="wt-flags">
@@ -301,7 +301,7 @@ function StateCell(props: { row: ViewRow }): JSX.Element {
   )
 }
 
-function SelectCell(props: RowProps): JSX.Element {
+function SelectCell(props: RowProps): React.JSX.Element {
   const locked = isLockedRow(props.row)
   const name = props.row.branch ?? '(detached)'
   return (
@@ -324,7 +324,7 @@ function SelectCell(props: RowProps): JSX.Element {
 }
 
 /** The three timestamps of a row. */
-function TimeCells(props: { row: ViewRow }): JSX.Element {
+function TimeCells(props: { row: ViewRow }): React.JSX.Element {
   const cells = [props.row.createdAt, props.row.modifiedAt, props.row.lastCommitAt]
   return (
     <>
@@ -338,7 +338,7 @@ function TimeCells(props: { row: ViewRow }): JSX.Element {
 }
 
 /** The identifying cells: checkbox, branch, worktree and session. */
-function IdentityCells(props: RowProps): JSX.Element {
+function IdentityCells(props: RowProps): React.JSX.Element {
   return (
     <>
       <SelectCell {...props} />
@@ -353,7 +353,7 @@ function IdentityCells(props: RowProps): JSX.Element {
   )
 }
 
-function WorktreeRow(props: RowProps): JSX.Element {
+function WorktreeRow(props: RowProps): React.JSX.Element {
   const rowClass = props.selected ? 'wt-row wt-row--selected' : 'wt-row'
   return (
     <tr className={rowClass}>
@@ -368,7 +368,7 @@ function WorktreeRow(props: RowProps): JSX.Element {
 
 const COLUMNS = ['BRANCH', 'WORKTREE', 'SESSION', 'CREATED', 'MODIFIED', 'LAST COMMIT', 'STATE']
 
-function InventoryTable(props: TableProps): JSX.Element {
+function InventoryTable(props: TableProps): React.JSX.Element {
   return (
     <table className="wt-table">
       <thead>
@@ -399,7 +399,7 @@ function InventoryTable(props: TableProps): JSX.Element {
 }
 
 /** The toolbar: Select stale, Remove selected and Refresh at the right. */
-function Toolbar(props: ToolbarProps): JSX.Element {
+function Toolbar(props: ToolbarProps): React.JSX.Element {
   return (
     <div className="wt-toolbar">
       <span className="wt-toolbar-spacer" />
@@ -454,7 +454,7 @@ function useRemoval(
 }
 
 /** The table, or the empty state when only the main checkout is left. */
-function WorktreesBody(props: BodyProps): JSX.Element {
+function WorktreesBody(props: BodyProps): React.JSX.Element {
   if (props.rows.every((row) => row.isMain))
     return (
       <EmptyState
@@ -469,7 +469,7 @@ function WorktreesBody(props: BodyProps): JSX.Element {
 }
 
 /** The tab once a repository is named: toolbar, table and the removal dialog. */
-function LoadedView(props: LoadedViewProps): JSX.Element {
+function LoadedView(props: LoadedViewProps): React.JSX.Element {
   const { rows, repoRoot, selection, removal, onRefresh } = props
   const selectedRows = rows.filter((row) => selection.selected.has(rowKey(row)))
   const toolbar = {
@@ -496,7 +496,7 @@ function LoadedView(props: LoadedViewProps): JSX.Element {
 }
 
 /** The Worktrees tab: every local branch and worktree, and the cleanup of the stale ones. */
-export function WorktreesView(props: { repoRoot: string | null }): JSX.Element {
+export function WorktreesView(props: { repoRoot: string | null }): React.JSX.Element {
   const { rows, setRows, reload } = useInventoryRows(props.repoRoot)
   const selection = useSelection(rows)
   const removal = useRemoval(setRows, selection.clear, reload)

@@ -19,7 +19,7 @@ export function ContributionsFilters(props: {
   repos: string[]
   onPeriod: (selection: PeriodSelection) => void
   onRepo: (repo: string | null) => void
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <>
       <PeriodPicker period={props.period} onPeriod={props.onPeriod} />
@@ -31,7 +31,7 @@ export function ContributionsFilters(props: {
 function PeriodPicker(props: {
   period: PeriodSelection
   onPeriod: (selection: PeriodSelection) => void
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <PickerMenu label="Period" buttonText={periodLabel(props.period)}>
       {(close) => <PeriodOptions {...props} close={close} />}
@@ -44,7 +44,7 @@ function PickerMenu(props: {
   label: string
   buttonText: string
   children: (close: () => void) => React.ReactNode
-}): JSX.Element {
+}): React.JSX.Element {
   const [open, setOpen] = useState(false)
   return (
     <span className="ct-picker">
@@ -70,7 +70,7 @@ function PeriodOptions(props: {
   period: PeriodSelection
   onPeriod: (selection: PeriodSelection) => void
   close: () => void
-}): JSX.Element {
+}): React.JSX.Element {
   const [customOpen, setCustomOpen] = useState(props.period.kind === 'custom')
   const chosen = props.period.kind === 'preset' ? props.period.preset : null
   return (
@@ -97,7 +97,7 @@ function PickerOption(props: {
   label: string
   chosen: boolean
   onChoose: () => void
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <button
       type="button"
@@ -122,7 +122,7 @@ function choosePreset(
 function CustomDates(props: {
   onPeriod: (selection: PeriodSelection) => void
   close: () => void
-}): JSX.Element {
+}): React.JSX.Element {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [invalid, setInvalid] = useState(false)
@@ -152,7 +152,7 @@ function RepositoryFilter(props: {
   repo: string | null
   repos: string[]
   onRepo: (repo: string | null) => void
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <PickerMenu label="Repository" buttonText={props.repo ?? 'All repositories'}>
       {(close) => <RepositoryOptions {...props} close={close} />}
@@ -165,7 +165,7 @@ function RepositoryOptions(props: {
   repos: string[]
   onRepo: (repo: string | null) => void
   close: () => void
-}): JSX.Element {
+}): React.JSX.Element {
   const [filter, setFilter] = useState('')
   const shown = props.repos.filter((repo) => repo.toLowerCase().includes(filter.toLowerCase()))
   const chooseOne = (repo: string | null) => chooseRepo(props, repo)
@@ -189,7 +189,10 @@ function RepositoryOptions(props: {
   )
 }
 
-function RepoSearch(props: { value: string; onChange: (filter: string) => void }): JSX.Element {
+function RepoSearch(props: {
+  value: string
+  onChange: (filter: string) => void
+}): React.JSX.Element {
   return (
     <input
       aria-label="Filter repositories"
@@ -208,7 +211,11 @@ function chooseRepo(
   props.close()
 }
 
-function RepoOption(props: { label: string; chosen: boolean; onChoose: () => void }): JSX.Element {
+function RepoOption(props: {
+  label: string
+  chosen: boolean
+  onChoose: () => void
+}): React.JSX.Element {
   return (
     <button
       type="button"

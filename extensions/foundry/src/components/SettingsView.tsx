@@ -46,7 +46,7 @@ async function readSensors(): Promise<SensorRow[]> {
   return answer.sensors ?? []
 }
 
-export function SettingsView(): JSX.Element {
+export function SettingsView(): React.JSX.Element {
   const saver = useSaver()
   const models = useModels(saver)
   const ask = useAskModel(saver)

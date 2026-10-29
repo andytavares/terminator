@@ -11,7 +11,7 @@ const options: RunAsOption[] = [
   { value: 'terminal', label: 'Terminal only', hint: 'A shell.' },
 ]
 
-function Harness(): JSX.Element {
+function Harness(): React.JSX.Element {
   const [runAs, setRunAs] = useState<RunAs>('agent')
   return <RunAsChoices options={options} runAs={runAs} onPick={setRunAs} />
 }

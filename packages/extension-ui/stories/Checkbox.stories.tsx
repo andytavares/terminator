@@ -4,7 +4,7 @@ import { expect, userEvent, within } from 'storybook/test'
 import { Checkbox } from '../src/Checkbox'
 import { inLight } from './in-light'
 
-function ControlledCheckbox({ initial }: { initial: boolean }): JSX.Element {
+function ControlledCheckbox({ initial }: { initial: boolean }): React.JSX.Element {
   const [checked, setChecked] = useState(initial)
   return <Checkbox checked={checked} label="Tests pass" onChange={setChecked} />
 }

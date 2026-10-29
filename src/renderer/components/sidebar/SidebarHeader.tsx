@@ -19,7 +19,7 @@ export function SidebarHeader({
   onSearchChange,
   onSearchClear,
   children,
-}: SidebarHeaderProps): JSX.Element {
+}: SidebarHeaderProps): React.JSX.Element {
   return (
     <div className="sidebar-header">
       <div className="sidebar-header__search-row">

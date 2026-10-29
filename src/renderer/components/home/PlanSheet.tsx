@@ -13,7 +13,7 @@ import { useWorkThreads } from './useWorkThreads'
 import './PlanTheDay.css'
 
 /** The three parts, side by side; a part with nothing to show is left out. */
-function PlanSheetBody({ now }: { now: number }): JSX.Element {
+function PlanSheetBody({ now }: { now: number }): React.JSX.Element {
   const plan = usePlan(now)
   const { threads } = useWorkThreads()
   const hasTracker = useIntegrationsStore((s) => s.connections.some((c) => c.connected))
@@ -39,7 +39,7 @@ function PlanSheetBody({ now }: { now: number }): JSX.Element {
 }
 
 /** Plan today as a sheet over Home; Skip today and Start the day both end the day's planning. */
-export function PlanSheet({ now }: { now: number }): JSX.Element {
+export function PlanSheet({ now }: { now: number }): React.JSX.Element {
   const dismissPlan = useFocusStore((s) => s.dismissPlan)
   const hide = usePlanSheet((s) => s.hide)
   const finish = (): void => {

@@ -92,7 +92,7 @@ function useSectionDraft(value: string, onSave: (val: string) => Promise<void>) 
 }
 
 /** Moves focus into the textarea, caret at the end, when editing starts. */
-function useFocusAtEnd(textareaRef: React.RefObject<HTMLTextAreaElement>, d: Draft) {
+function useFocusAtEnd(textareaRef: React.RefObject<HTMLTextAreaElement | null>, d: Draft) {
   useEffect(() => {
     if (d.editing && textareaRef.current) {
       textareaRef.current.focus()

@@ -215,7 +215,7 @@ describe('Insights: nothing made up, measures', () => {
 })
 
 /** Insights as Home draws it: the window control sits in Home's header. */
-function WithHeaderBar(): JSX.Element {
+function WithHeaderBar(): React.JSX.Element {
   return (
     <>
       <InsightsBar />

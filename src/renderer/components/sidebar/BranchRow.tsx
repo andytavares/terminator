@@ -87,7 +87,7 @@ export interface BranchRowProps {
  * what is waiting, not how many terminals it has. "Two waiting" answers the
  * question the row exists for; "three terminals" does not.
  */
-export function BranchRow(props: BranchRowProps): JSX.Element {
+export function BranchRow(props: BranchRowProps): React.JSX.Element {
   const { row, selected, colour, onSelect, dragProps, dragOver = false } = props
   const { menu, openMenu, closeMenu } = useRowMenu()
   const rename = useRename(row.label, props.onRename)
@@ -116,7 +116,7 @@ export function BranchRow(props: BranchRowProps): JSX.Element {
 }
 
 /** Disclosure, state, kind, name (or its editor), key and stats, New terminal, then count or age. */
-function BranchRowContent(props: BranchRowProps & { rename: Rename }): JSX.Element {
+function BranchRowContent(props: BranchRowProps & { rename: Rename }): React.JSX.Element {
   const { row, rename } = props
   return (
     <>
@@ -214,7 +214,7 @@ function useRename(label: string, onRename: BranchRowProps['onRename']) {
 type Rename = ReturnType<typeof useRename>
 
 /** Enter or leaving commits, Escape abandons; its keys and clicks stay out of the row. */
-function RenameInput({ rename }: { rename: Rename }): JSX.Element {
+function RenameInput({ rename }: { rename: Rename }): React.JSX.Element {
   return (
     <input
       className="tmui-inline-edit branch-row__rename"
@@ -235,7 +235,7 @@ function RenameInput({ rename }: { rename: Rename }): JSX.Element {
 /** The disclosure for this branch's terminals. Drawn only when there is something under it, and
  * it takes the click without selecting the branch — expanding to see what is there is not the
  * same act as switching to it. */
-function Disclosure({ row, expanded, onToggleExpanded }: BranchRowProps): JSX.Element {
+function Disclosure({ row, expanded, onToggleExpanded }: BranchRowProps): React.JSX.Element {
   if (!onToggleExpanded || row.terminals.length === 0) {
     return (
       <span className="branch-row__disclosure branch-row__disclosure--empty" aria-hidden="true" />
@@ -264,7 +264,7 @@ function issueKeys(issueKey: string | null | undefined, sessionIssueKeys: string
 }
 
 /** The issue key and the change counts. */
-function BranchMeta(props: BranchRowProps): JSX.Element {
+function BranchMeta(props: BranchRowProps): React.JSX.Element {
   const { changeStats } = props
   const hasStats = changeStats != null && (changeStats.added > 0 || changeStats.removed > 0)
   return (
@@ -303,7 +303,7 @@ function IssueKey({ issueKey, sessionIssueKeys = [], onIssueClick }: BranchRowPr
   )
 }
 
-function AddTerminal({ label, onAdd }: { label: string; onAdd: () => void }): JSX.Element {
+function AddTerminal({ label, onAdd }: { label: string; onAdd: () => void }): React.JSX.Element {
   return (
     <span className="branch-row__hover">
       <button
@@ -321,7 +321,7 @@ function AddTerminal({ label, onAdd }: { label: string; onAdd: () => void }): JS
 
 /** Last on the row, so it sits flush against the right edge and lands in the same column as
  * every other count in the sidebar. Anything that can appear or disappear goes to its left. */
-function CountOrAge({ row, now }: Pick<BranchRowProps, 'row' | 'now'>): JSX.Element {
+function CountOrAge({ row, now }: Pick<BranchRowProps, 'row' | 'now'>): React.JSX.Element {
   if (row.stateCount > 1) return <span className="branch-row__count">{row.stateCount}</span>
   return (
     <span className="branch-row__age">

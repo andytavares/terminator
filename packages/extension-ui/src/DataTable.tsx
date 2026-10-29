@@ -63,7 +63,7 @@ function nextSort(current: DataTableSort | undefined, columnId: string): DataTab
   return { columnId, direction: flips ? 'descending' : 'ascending' }
 }
 
-export function DataTable<Row>(props: DataTableProps<Row>): JSX.Element {
+export function DataTable<Row>(props: DataTableProps<Row>): React.JSX.Element {
   const { label, columns, groups, rowKey, onRowClick, selectedKey } = props
   const [sort, setSort] = useState(props.defaultSort)
   const sortColumn = columns.find((column) => column.id === sort?.columnId)
@@ -95,7 +95,7 @@ interface HeaderRowProps<Row> {
   onSort: (columnId: string) => void
 }
 
-function HeaderRow<Row>({ columns, sort, onSort }: HeaderRowProps<Row>): JSX.Element {
+function HeaderRow<Row>({ columns, sort, onSort }: HeaderRowProps<Row>): React.JSX.Element {
   return (
     <thead>
       <tr>
@@ -127,7 +127,7 @@ function GroupRows<Row>({
   rowKey,
   selectedKey,
   onRowClick,
-}: GroupRowsProps<Row>): JSX.Element {
+}: GroupRowsProps<Row>): React.JSX.Element {
   return (
     <tbody>
       {group.summary !== undefined && (
@@ -156,7 +156,7 @@ interface HeaderCellProps<Row> {
   onSort: () => void
 }
 
-function HeaderCell<Row>({ column, direction, onSort }: HeaderCellProps<Row>): JSX.Element {
+function HeaderCell<Row>({ column, direction, onSort }: HeaderCellProps<Row>): React.JSX.Element {
   const align = column.align === 'end' ? ' tmui-data-table__cell--end' : ''
   if (!column.sortValue) {
     return (
@@ -185,7 +185,7 @@ interface BodyRowProps<Row> {
   onClick: ((row: Row) => void) | undefined
 }
 
-function BodyRow<Row>({ row, columns, selected, onClick }: BodyRowProps<Row>): JSX.Element {
+function BodyRow<Row>({ row, columns, selected, onClick }: BodyRowProps<Row>): React.JSX.Element {
   const classes = ['tmui-data-table__row', selected && 'tmui-data-table__row--selected']
   return (
     <tr

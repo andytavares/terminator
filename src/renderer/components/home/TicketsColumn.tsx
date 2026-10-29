@@ -29,7 +29,10 @@ function useSoleTrackerLabel(): string | null {
   return connected.length === 1 ? TRACKER_LABELS[connected[0].tracker] : null
 }
 
-function TicketSearchBox(props: { term: string; onChange: (term: string) => void }): JSX.Element {
+function TicketSearchBox(props: {
+  term: string
+  onChange: (term: string) => void
+}): React.JSX.Element {
   const trackerLabel = useSoleTrackerLabel()
   return (
     <div className="plan__search">
@@ -66,7 +69,7 @@ function TicketAddButton({
 }: {
   issue: IssueSummary
   disabled: boolean
-}): JSX.Element {
+}): React.JSX.Element {
   const pickFocus = useFocusStore((s) => s.pickFocus)
   return (
     <Button
@@ -81,7 +84,7 @@ function TicketAddButton({
   )
 }
 
-function TicketRow({ issue, disabled, onOpen }: TicketRowProps): JSX.Element {
+function TicketRow({ issue, disabled, onOpen }: TicketRowProps): React.JSX.Element {
   const open = (): void => onOpen({ tracker: issue.tracker, key: issue.key, title: issue.title })
   return (
     <div
@@ -116,7 +119,7 @@ function TicketRows(props: {
   issues: readonly IssueSummary[]
   today: readonly FocusItem[]
   onOpen: (ticket: OpenTicket) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const full = props.today.length >= FOCUS_LIMIT
   return (
     <>
@@ -138,7 +141,7 @@ function TicketList(props: {
   searching: boolean
   today: readonly FocusItem[]
   onOpen: (ticket: OpenTicket) => void
-}): JSX.Element {
+}): React.JSX.Element {
   const { result, loading, searching, today, onOpen } = props
   return (
     <>
@@ -159,7 +162,7 @@ function TicketList(props: {
 }
 
 /** The middle column of Plan today: the operator's tickets, searchable. */
-export function TicketsColumn(): JSX.Element {
+export function TicketsColumn(): React.JSX.Element {
   const [term, setTerm] = useState('')
   const [openTicket, setOpenTicket] = useState<OpenTicket | null>(null)
   const { result, loading } = useIssueSearch(term, true, { limit: 50 })

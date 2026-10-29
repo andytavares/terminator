@@ -49,11 +49,11 @@ interface ChoiceContext {
 
 interface TimeProps {
   picker: Picker
-  timeListRef: React.RefObject<HTMLDivElement>
+  timeListRef: React.RefObject<HTMLDivElement | null>
 }
 
 interface PickerPopoverProps extends PaneProps {
-  timeListRef: React.RefObject<HTMLDivElement>
+  timeListRef: React.RefObject<HTMLDivElement | null>
   onDone: () => void
 }
 

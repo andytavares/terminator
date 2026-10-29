@@ -12,7 +12,7 @@ const GROUPS: Record<string, string[]> = {
   Heatmap: ['heat-0', 'heat-1', 'heat-2', 'heat-3', 'heat-4'],
 }
 
-function Swatch({ name }: { name: string }): JSX.Element {
+function Swatch({ name }: { name: string }): React.JSX.Element {
   return (
     <div style={{ display: 'grid', gap: 4, justifyItems: 'start' }}>
       <div
@@ -29,7 +29,7 @@ function Swatch({ name }: { name: string }): JSX.Element {
   )
 }
 
-function Tokens(): JSX.Element {
+function Tokens(): React.JSX.Element {
   return (
     <div style={{ display: 'grid', gap: 'var(--tm-space-5)' }}>
       {Object.entries(GROUPS).map(([group, names]) => (

@@ -17,7 +17,7 @@ const TABS: TabItem[] = [
   { id: 'history', label: 'History', panel: <p>Commit history</p> },
 ]
 
-function TabsHarness({ initial = 'files' }: { initial?: string }): JSX.Element {
+function TabsHarness({ initial = 'files' }: { initial?: string }): React.JSX.Element {
   const [selectedId, setSelectedId] = useState(initial)
   return (
     <Tabs
@@ -148,7 +148,7 @@ function PartsHarness({
   initial?: string
   orientation?: 'horizontal' | 'vertical'
   withPanels?: boolean
-}): JSX.Element {
+}): React.JSX.Element {
   const [selectedId, setSelectedId] = useState(initial)
   return (
     <TabsRoot selectedId={selectedId} onSelect={setSelectedId}>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { type JSX, useState } from 'react'
 import { Dialog, type DialogAction } from '@terminator/extension-ui'
 import { IssuePicker } from '../integrations/IssuePicker'
 import { useIntegrationsStore } from '../../stores/integrations.store'

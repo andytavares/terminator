@@ -168,7 +168,7 @@ function metaLine(
     .toUpperCase()
 }
 
-export function StationMonitor(props: StationMonitorProps): JSX.Element {
+export function StationMonitor(props: StationMonitorProps): React.JSX.Element {
   const { node, status, facts = null, onClose } = props
   const rootRef = useRef<HTMLElement | null>(null)
   const caseRef = useRef<HTMLCanvasElement | null>(null)

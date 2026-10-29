@@ -13,7 +13,7 @@ import './PlanTheDay.css'
 type Pick = Omit<FocusItem, 'doneByHand'>
 
 /** The first view of each local day, until Start the day or Skip today is pressed. */
-export function PlanTheDay(): JSX.Element | null {
+export function PlanTheDay(): React.JSX.Element | null {
   const now = useNow()
   const dismissedOn = useFocusStore((s) => s.planDismissedOn)
   return dismissedOn === localDateKey(now) ? null : <PlanBand now={now} />
@@ -35,7 +35,7 @@ function PlanActions({
 }: {
   collapsed: boolean
   onClose: () => void
-}): JSX.Element {
+}): React.JSX.Element {
   const togglePlanCollapsed = useFocusStore((s) => s.togglePlanCollapsed)
   return (
     <span className="plan__actions">
@@ -66,7 +66,7 @@ function PlanHead({
   sentence: string
   picked: number
   onClose: () => void
-}): JSX.Element {
+}): React.JSX.Element {
   const collapsed = useFocusStore((s) => s.planCollapsed)
   return (
     <div className="plan__head">
@@ -83,7 +83,7 @@ function PlanHead({
   )
 }
 
-function PlanBand({ now }: { now: number }): JSX.Element {
+function PlanBand({ now }: { now: number }): React.JSX.Element {
   const plan = usePlan(now)
   const dismissPlan = useFocusStore((s) => s.dismissPlan)
   const collapsed = useFocusStore((s) => s.planCollapsed)
@@ -108,9 +108,9 @@ export function ColumnTitle({
   icon,
   children,
 }: {
-  icon: JSX.Element
+  icon: React.JSX.Element
   children: string
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <h3 className="plan__title">
       {icon}
@@ -124,7 +124,7 @@ interface AddProps {
   disabled: boolean
 }
 
-function AddButton({ item, disabled }: AddProps): JSX.Element {
+function AddButton({ item, disabled }: AddProps): React.JSX.Element {
   const pickFocus = useFocusStore((s) => s.pickFocus)
   return (
     <Button
@@ -139,7 +139,13 @@ function AddButton({ item, disabled }: AddProps): JSX.Element {
   )
 }
 
-export function CarriedOverColumn({ rows, full }: { rows: PlanRow[]; full: boolean }): JSX.Element {
+export function CarriedOverColumn({
+  rows,
+  full,
+}: {
+  rows: PlanRow[]
+  full: boolean
+}): React.JSX.Element {
   return (
     <div className="plan__column">
       <ColumnTitle icon={<Clock aria-hidden="true" />}>CARRIED OVER</ColumnTitle>
@@ -158,7 +164,10 @@ export function CarriedOverColumn({ rows, full }: { rows: PlanRow[]; full: boole
   )
 }
 
-export function FocusColumn(props: { today: FocusItem[]; reviewMinutes: number }): JSX.Element {
+export function FocusColumn(props: {
+  today: FocusItem[]
+  reviewMinutes: number
+}): React.JSX.Element {
   const removeFocus = useFocusStore((s) => s.removeFocus)
   const slots = Array.from({ length: FOCUS_LIMIT }, (_, index) => props.today[index])
   return (
@@ -187,7 +196,7 @@ export function FocusColumn(props: { today: FocusItem[]; reviewMinutes: number }
   )
 }
 
-function ReviewLoad({ minutes }: { minutes: number }): JSX.Element {
+function ReviewLoad({ minutes }: { minutes: number }): React.JSX.Element {
   return (
     <div className="plan__load">
       Estimated review time for your queue: {minutes} min

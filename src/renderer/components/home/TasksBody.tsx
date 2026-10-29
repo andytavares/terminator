@@ -25,7 +25,7 @@ function useSheetOpen(): boolean {
 }
 
 /** Home's Tasks layout: the pulse, the plan strip, what needs you, then the tasks in a fixed order. */
-export function TasksBody({ desk, controller }: TasksBodyProps): JSX.Element {
+export function TasksBody({ desk, controller }: TasksBodyProps): React.JSX.Element {
   const pressed = useDeskFilter((s) => s.taskState)
   const sheetOpen = useSheetOpen()
   const showQueue = pressed === null || pressed === 'needs-you'

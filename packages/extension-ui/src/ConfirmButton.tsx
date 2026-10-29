@@ -27,7 +27,7 @@ export function ConfirmButton({
   disabled = false,
   className,
   onConfirm,
-}: ConfirmButtonProps): JSX.Element {
+}: ConfirmButtonProps): React.JSX.Element {
   const [armed, setArmed] = useState(false)
 
   if (!armed) {
@@ -62,7 +62,7 @@ function ArmedConfirm({
   onDisarm,
 }: Required<Omit<ConfirmButtonProps, 'className'>> & {
   readonly onDisarm: () => void
-}): JSX.Element {
+}): React.JSX.Element {
   // Disarmed before the work, not after: the second run of a
   // destructive action is a second decision, and leaving it armed
   // through a slow teardown invites a double click into being one.

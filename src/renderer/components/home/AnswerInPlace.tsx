@@ -13,7 +13,7 @@ export interface AnswerInPlaceProps {
 }
 
 /** The agent's last screen as text, its numbered answers and a reply box, inside the band. */
-export function AnswerInPlace(props: AnswerInPlaceProps): JSX.Element {
+export function AnswerInPlace(props: AnswerInPlaceProps): React.JSX.Element {
   const { ask, cursor, handlers } = props
   const excerpt = useMemo(() => terminalExcerpt(ask.sessionId), [ask.sessionId])
   return (
@@ -37,7 +37,7 @@ export function AnswerInPlace(props: AnswerInPlaceProps): JSX.Element {
   )
 }
 
-function ChoiceList(props: Pick<AnswerInPlaceProps, 'ask' | 'handlers'>): JSX.Element {
+function ChoiceList(props: Pick<AnswerInPlaceProps, 'ask' | 'handlers'>): React.JSX.Element {
   const { ask, handlers } = props
   return (
     <>
@@ -57,7 +57,7 @@ function ChoiceList(props: Pick<AnswerInPlaceProps, 'ask' | 'handlers'>): JSX.El
   )
 }
 
-function GhostActions(props: Pick<AnswerInPlaceProps, 'ask' | 'handlers'>): JSX.Element {
+function GhostActions(props: Pick<AnswerInPlaceProps, 'ask' | 'handlers'>): React.JSX.Element {
   const { ask, handlers } = props
   return (
     <div className="answer__more">
@@ -76,7 +76,10 @@ function GhostActions(props: Pick<AnswerInPlaceProps, 'ask' | 'handlers'>): JSX.
   )
 }
 
-function ReplyField(props: { replying: boolean; onSend: (text: string) => void }): JSX.Element {
+function ReplyField(props: {
+  replying: boolean
+  onSend: (text: string) => void
+}): React.JSX.Element {
   const [text, setText] = useState('')
   return (
     <label className="desk-field">

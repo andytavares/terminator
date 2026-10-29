@@ -9,7 +9,7 @@ import type { Workspace } from '../../../shared/types/index'
 type Offer = 'repo' | 'branch' | null
 
 /** "+ Add a repo" and "Add a branch I already have…" under a stored task's lanes. */
-export function AddLaneControls({ thread }: { thread: WorkThread }): JSX.Element | null {
+export function AddLaneControls({ thread }: { thread: WorkThread }): React.JSX.Element | null {
   const [offer, setOffer] = useState<Offer>(null)
   const [error, setError] = useState<string | null>(null)
   if (thread.taskId === null) return null
@@ -64,7 +64,7 @@ function RepoOffer({ taskId, inTask, branch, onDone }: OfferProps & { branch: st
 }
 
 /** The branch cards of repos the task is not in; choosing one adds it as a lane. */
-function BranchOffer({ taskId, inTask, onDone }: OfferProps): JSX.Element {
+function BranchOffer({ taskId, inTask, onDone }: OfferProps): React.JSX.Element {
   const cards = useLaneCards().filter((c) => !inTask.has(c.lane.repoRoot))
   const add = async (card: LaneCard): Promise<void> =>
     onDone((await addLanesToTask(taskId, [card.lane])) ? null : 'The task could not be changed.')

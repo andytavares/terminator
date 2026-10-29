@@ -20,7 +20,7 @@ interface FocusListProps {
   candidates: readonly HomeFocusCandidate[]
 }
 
-function FocusRows({ items, threads, candidates }: FocusListProps): JSX.Element {
+function FocusRows({ items, threads, candidates }: FocusListProps): React.JSX.Element {
   const toggleDone = useFocusStore((s) => s.toggleDone)
   return (
     <ul className="desk-focus">
@@ -79,7 +79,7 @@ function FocusEditor({ options, picked }: { options: FocusOption[]; picked: Focu
   )
 }
 
-function FocusCard(): JSX.Element {
+function FocusCard(): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const now = useNow(MINUTE_MS)
   const days = useFocusStore((s) => s.days)
@@ -111,7 +111,7 @@ function FocusCard(): JSX.Element {
 }
 
 /** The Desk's right rail: what to finish today, and how the week is going. */
-export function TodayRail(): JSX.Element {
+export function TodayRail(): React.JSX.Element {
   return (
     <aside className="desk-rail" aria-label="Today">
       <FocusCard />

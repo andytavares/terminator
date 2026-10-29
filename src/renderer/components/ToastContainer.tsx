@@ -1,3 +1,4 @@
+import type { JSX } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { ToastRegion } from '@terminator/extension-ui'
 import { useToastStore } from '../stores/toast.store'

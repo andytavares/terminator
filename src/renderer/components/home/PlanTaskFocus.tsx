@@ -18,7 +18,13 @@ function quietDays(thread: WorkThread, now: number): number | null {
 }
 
 /** "quiet 3 days" and an Archive button, for a task quiet long enough to ask about. */
-function ArchiveOffer({ thread, now }: { thread: WorkThread; now: number }): JSX.Element | null {
+function ArchiveOffer({
+  thread,
+  now,
+}: {
+  thread: WorkThread
+  now: number
+}): React.JSX.Element | null {
   const days = quietDays(thread, now)
   if (days === null) return null
   return (
@@ -39,7 +45,13 @@ function ArchiveOffer({ thread, now }: { thread: WorkThread; now: number }): JSX
 const isOpenTask = (thread: WorkThread): boolean => !thread.archived && thread.state !== 'done'
 
 /** Every open task with its star; pressing one stars the task on Home and in ⌘J. */
-function OpenTasks({ threads, now }: { threads: readonly WorkThread[]; now: number }): JSX.Element {
+function OpenTasks({
+  threads,
+  now,
+}: {
+  threads: readonly WorkThread[]
+  now: number
+}): React.JSX.Element {
   return (
     <div className="plan__column">
       <ColumnTitle icon={<ListTodo aria-hidden="true" />}>OPEN TASKS</ColumnTitle>
@@ -64,7 +76,7 @@ function OpenTasks({ threads, now }: { threads: readonly WorkThread[]; now: numb
 }
 
 /** The starred tasks in their slots, up to the limit. */
-function TodaysFocus({ starred }: { starred: readonly WorkThread[] }): JSX.Element {
+function TodaysFocus({ starred }: { starred: readonly WorkThread[] }): React.JSX.Element {
   const slots = Array.from({ length: FOCUS_LIMIT }, (_, index) => starred[index])
   return (
     <div className="plan__column">
@@ -88,7 +100,10 @@ function TodaysFocus({ starred }: { starred: readonly WorkThread[] }): JSX.Eleme
 }
 
 /** The Tasks layout's focus: stars on tasks, not a separate list of items. */
-export function PlanTaskFocus(props: { threads: readonly WorkThread[]; now: number }): JSX.Element {
+export function PlanTaskFocus(props: {
+  threads: readonly WorkThread[]
+  now: number
+}): React.JSX.Element {
   const open = props.threads.filter(isOpenTask)
   return (
     <>
