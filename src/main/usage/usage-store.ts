@@ -206,9 +206,18 @@ export function createUsageStore(db: ExtensionDB, deps: UsageStoreDeps): UsageSt
 let database: DatabaseSync | null = null
 let store: UsageStore | null = null
 
+/** NORMAL syncs the disk at checkpoints, not on every write: in WAL mode the file stays safe from
+ * corruption, and a power cut can lose only the last counts (sqlite.org/pragma.html#pragma_synchronous).
+ * @internal */
+export function openUsageDatabase(file: string): DatabaseSync {
+  const opened = new DatabaseSync(file)
+  opened.exec('PRAGMA journal_mode = WAL')
+  opened.exec('PRAGMA synchronous = NORMAL')
+  return opened
+}
+
 export function initUsageStore(userData: string): void {
-  database = new DatabaseSync(path.join(userData, 'usage.sqlite'))
-  database.exec('PRAGMA journal_mode = WAL')
+  database = openUsageDatabase(path.join(userData, 'usage.sqlite'))
   const log = makeLogger('usage')
   store = createUsageStore(wrapDb(database), {
     now: () => new Date(),
