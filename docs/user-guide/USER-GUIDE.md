@@ -588,7 +588,7 @@ Resume appears only where it can work:
 
 ### Usage
 
-**Usage** shows how much you use each feature of Terminator. It has no icon in the sidebar. Open it with **Window → Usage**, or press `Cmd+P` and then `u`.
+**Usage** shows how much you use each feature of Terminator. Open it from its icon in the sidebar, with **Window → Usage**, or press `Cmd+P` and then `u`. To remove the icon, turn off **Show Usage in the sidebar** in **Settings → Appearance & Terminal**; the menu and `Cmd+P` still open it.
 
 Terminator counts uses on this Mac only, in a local file, and sends nothing out. The header says **Counted on this Mac since** the first day it counted.
 

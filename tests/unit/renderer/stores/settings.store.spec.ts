@@ -26,7 +26,13 @@ const DEFAULT_SETTINGS: GlobalSettings = {
     promptForName: false,
   },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
-  ui: { hasSeenWelcome: false, editor: '', hideSidebarOnHome: true, homeLayout: 'tasks' },
+  ui: {
+    hasSeenWelcome: false,
+    editor: '',
+    hideSidebarOnHome: true,
+    showUsageTab: true,
+    homeLayout: 'tasks',
+  },
   sidebar: { staleAfterMs: 2 * 60 * 60 * 1000 },
   notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },
   quickActions: { pins: [], usage: [], directUse: [], custom: [] },
@@ -290,6 +296,19 @@ describe('useSettingsStore — updateHideSidebarOnHome', () => {
       ui: { hideSidebarOnHome: false },
     })
     expect(useSettingsStore.getState().globalSettings?.ui?.hideSidebarOnHome).toBe(false)
+  })
+})
+
+describe('useSettingsStore — updateShowUsageTab', () => {
+  it('writes ui.showUsageTab and keeps the saved settings', async () => {
+    const updated = { ...DEFAULT_SETTINGS, ui: { hasSeenWelcome: false, showUsageTab: false } }
+    mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+
+    await useSettingsStore.getState().updateShowUsageTab(false)
+    expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+      ui: { showUsageTab: false },
+    })
+    expect(useSettingsStore.getState().globalSettings?.ui?.showUsageTab).toBe(false)
   })
 })
 

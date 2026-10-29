@@ -33,6 +33,7 @@ interface SettingsState {
   markWelcomeSeen: () => Promise<void>
   updateShowMetricsBar: (show: boolean) => Promise<void>
   updateHideSidebarOnHome: (hide: boolean) => Promise<void>
+  updateShowUsageTab: (show: boolean) => Promise<void>
   updateHomeLayout: (layout: HomeLayout) => Promise<void>
   updatePromptForName: (enabled: boolean) => Promise<void>
   updateNotificationDefaultTargets: (targets: NotificationTarget[]) => Promise<void>
@@ -178,6 +179,7 @@ function preferenceSlice(
   | 'markWelcomeSeen'
   | 'updateShowMetricsBar'
   | 'updateHideSidebarOnHome'
+  | 'updateShowUsageTab'
   | 'updateHomeLayout'
   | 'updateNotificationDefaultTargets'
   | 'updateNotificationOverride'
@@ -188,6 +190,7 @@ function preferenceSlice(
     markWelcomeSeen: () => saveGlobal(set, { ui: { hasSeenWelcome: true } }),
     updateShowMetricsBar: (show) => saveGlobal(set, { ui: { showMetricsBar: show } }),
     updateHideSidebarOnHome: (hide) => saveGlobal(set, { ui: { hideSidebarOnHome: hide } }),
+    updateShowUsageTab: (show) => saveGlobal(set, { ui: { showUsageTab: show } }),
     updateHomeLayout: (layout) => saveGlobal(set, { ui: { homeLayout: layout } }),
     updateNotificationDefaultTargets: (targets) =>
       saveGlobal(set, { notifications: { defaultTargets: targets } }),

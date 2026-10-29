@@ -31,6 +31,7 @@ const globalSettings: GlobalSettingsValue = {
     editor: '',
     showMetricsBar: false,
     hideSidebarOnHome: true,
+    showUsageTab: true,
     homeLayout: 'tasks',
   },
   sidebar: { staleAfterMs: 7_200_000 },
@@ -39,6 +40,7 @@ const globalSettings: GlobalSettingsValue = {
 const mockUpdateQuickActions = vi.fn()
 const mockUpdateHideSidebarOnHome = vi.fn()
 const mockUpdateHomeLayout = vi.fn()
+const mockUpdateShowUsageTab = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -51,6 +53,7 @@ beforeEach(() => {
     updateShowMetricsBar: mockUpdateShowMetrics,
     updateHideSidebarOnHome: mockUpdateHideSidebarOnHome,
     updateHomeLayout: mockUpdateHomeLayout,
+    updateShowUsageTab: mockUpdateShowUsageTab,
     updateBranchExcludePatterns: mockUpdateBranchExclude,
     updatePromptForName: mockUpdatePromptForName,
     updateNotificationDefaultTargets: mockUpdateNotificationDefaultTargets,
@@ -65,6 +68,16 @@ beforeEach(() => {
 
 const recordUse = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
+describe('GlobalSettings — Usage in the sidebar', () => {
+  it('is checked by default and saves an off', () => {
+    render(<GlobalSettings />)
+    const checkbox = screen.getByRole('checkbox', { name: 'Show Usage in the sidebar' })
+    expect((checkbox as HTMLInputElement).checked).toBe(true)
+    fireEvent.click(checkbox)
+    expect(mockUpdateShowUsageTab).toHaveBeenCalledWith(false)
+  })
+})
 
 describe('GlobalSettings — Home layout', () => {
   it('offers Classic and Tasks, shows the saved one, and saves a change', () => {
