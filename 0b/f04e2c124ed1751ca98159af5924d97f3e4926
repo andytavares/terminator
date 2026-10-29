@@ -1,0 +1,180 @@
+extensions/foundry/src/runtime/tool-decision.ts
+  s_5be9416d40ccd9::t_02544b5141e5d5 22-23,84-86,88-89
+  s_5be9416d40ccd9::t_7332984b3cd3a2 87
+package-lock.json
+  s_5be9416d40ccd9::t_1a0b6d1f782378 19,80,99,127,144,162,20318
+extensions/foundry/tests/line/node-session.spec.ts
+  s_5be9416d40ccd9::t_52bc1c80a6d300 1
+  s_5be9416d40ccd9::t_fd02823aff7faa 13-18
+  s_5be9416d40ccd9::t_fadd60cbebe210 2-12,19-61
+docs/adr/131-agents-permissions-are-claude-code-settings.md
+  s_5be9416d40ccd9::t_117889cab53cee 30-33
+extensions/foundry/src/runtime/role-settings.ts
+  s_5be9416d40ccd9::t_40bd40393cac91 76-78
+  s_5be9416d40ccd9::t_7332984b3cd3a2 87
+  s_5be9416d40ccd9::t_02544b5141e5d5 7-8,10,85-86,88-89,91-92
+extensions/foundry/package.json
+  s_5be9416d40ccd9::t_766fba6b725ad4 11
+src/main/agents/acp/agent-connection.ts
+  s_5be9416d40ccd9::t_3490922503f5e0 11-17,26,29-34,44
+packages/extension-sdk/types/api.d.ts
+  s_5be9416d40ccd9::t_3490922503f5e0 274-276
+docs/user-guide/USER-GUIDE.md
+  s_5be9416d40ccd9::t_a2648dba371056 1054-1061
+extensions/foundry/tests/line/executor.spec.ts
+  s_5be9416d40ccd9::t_07950b074f49f1 2772,2829,2839,2841,2843
+  s_5be9416d40ccd9::t_34f8a6db9eb44b 2830-2838,2840,2842
+  s_5be9416d40ccd9::t_5106f35a8b001b 2844-2846
+package.json
+  s_5be9416d40ccd9::t_6b1934210277c0 71
+  s_5be9416d40ccd9::t_c2c379d5bf7b98 31
+extensions/remote-control/package.json
+  s_5be9416d40ccd9::t_a99db09ce22744 12
+extensions/task-vault/package.json
+  s_5be9416d40ccd9::t_3e7b40b5ae6c5c 10
+extensions/foundry/src/line/execution-settle.ts
+  s_5be9416d40ccd9::t_435a9eae8ecf76 43-47,276-286
+extensions/foundry/tests/runtime/tool-decision.spec.ts
+  s_5be9416d40ccd9::t_677bac6ff9e406 16,31-47
+  s_5be9416d40ccd9::t_2ecfc30783764b 48
+extensions/foundry/src/runtime/start-failure.ts
+  s_5be9416d40ccd9::t_435a9eae8ecf76 1-2
+tests/unit/agents/acp/fake-agent.ts
+  s_5be9416d40ccd9::t_02876ca4099a01 9-10,12
+  s_5be9416d40ccd9::t_888b3eefe71952 25-26,68-71,80-81,90-93,100,115,124,133
+  s_5be9416d40ccd9::t_0da0ba6d25cc29 73-79
+extensions/foundry/tests/forge/intake-turn-ends.spec.ts
+  s_5be9416d40ccd9::t_025c11e96dc885 118,120,245
+  s_5be9416d40ccd9::t_fd02823aff7faa 58,229-231
+  s_5be9416d40ccd9::t_6c64c88be7a168 23-24,84-92,94-112,114,116,240-241,244,248-253,255-258
+  s_5be9416d40ccd9::t_62a071a7f76721 227-228,235-239,242-243,246
+tests/support/acp-modes.ts
+  s_5be9416d40ccd9::t_0da0ba6d25cc29 1-12
+extensions/foundry/tests/runtime/supervised-runner.spec.ts
+  s_5be9416d40ccd9::t_7332984b3cd3a2 406
+  s_5be9416d40ccd9::t_734d51fab47e81 473
+  s_5be9416d40ccd9::t_0da0ba6d25cc29 76,460-472
+extensions/git-integration/package.json
+  s_5be9416d40ccd9::t_3522b72ca3eba9 16
+extensions/foundry/tests/components/forge-moves.spec.tsx
+  s_5be9416d40ccd9::t_a0a19a32c5028f 217,219-223,226,228-230
+  s_5be9416d40ccd9::t_393cdba6d0728e 238
+  s_5be9416d40ccd9::t_ad43274f57978c 214,216
+  s_5be9416d40ccd9::t_acbeb8cbb1726f 190-201,203,205,218,224-225,227,235,241,243,245,247-249,251
+  s_5be9416d40ccd9::t_01517a0a855edd 202,204,206-213,215,231-234,236-237,239-240,242,244,246,250,252-257
+extensions/notepad/package.json
+  s_5be9416d40ccd9::t_25da66197b72bd 21
+extensions/foundry/src/forge/intake-turn.ts
+  s_5be9416d40ccd9::t_cc4b91ad99a320 222,228-233,415-421,447
+  s_5be9416d40ccd9::t_fa5ffb9cfc916e 267,555
+  s_5be9416d40ccd9::t_5d355deb313f55 38,63,97-101,176,178,223,234-258,265-266,392-393,407-412,499,535,547-550,552-554
+  s_5be9416d40ccd9::t_435a9eae8ecf76 39,259,551
+  s_5be9416d40ccd9::t_7332984b3cd3a2 313-314
+  s_5be9416d40ccd9::t_fd02823aff7faa 260-264
+extensions/foundry/tests/line/worktree.spec.ts
+  s_5be9416d40ccd9::t_64dffb8859ec94 228-243
+  s_5be9416d40ccd9::t_d1817e8ca8469a 124,227
+  s_5be9416d40ccd9::t_d4544663c8a0e8 244-246
+src/main/agents/acp/agent-service.ts
+  s_5be9416d40ccd9::t_3490922503f5e0 61-62,172-192,415,450,572
+extensions/foundry/src/forge/forge-loop.ts
+  s_5be9416d40ccd9::t_5d355deb313f55 159-160,255-262,372,374-377
+  s_5be9416d40ccd9::t_cc4b91ad99a320 359-369,371,379
+extensions/foundry/src/forge/intake-outcome.ts
+  s_5be9416d40ccd9::t_24b0886d0d1a6c 34-35,79-85,124-131,138,188-190,203-204
+packages/extension-sdk/package.json
+  s_5be9416d40ccd9::t_e8be6e380bfa13 3
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_5be9416d40ccd9::t_fd02823aff7faa 361-363
+  s_5be9416d40ccd9::t_52bc1c80a6d300 352-353,356,370-371,373-377,379,381
+  s_5be9416d40ccd9::t_223b72da3b35d3 94-95,360,364-369,467-470
+extensions/foundry/tests/forge/intake-outcome.spec.ts
+  s_5be9416d40ccd9::t_c81d0669ebb176 34-47,50-60
+  s_5be9416d40ccd9::t_393cdba6d0728e 48-49
+extensions/foundry/SUPERVISION.md
+  s_5be9416d40ccd9::t_8e236b0f8ba8fa 661
+extensions/foundry/src/line/node-session.ts
+  s_5be9416d40ccd9::t_435a9eae8ecf76 19,30-32,69,74-76,84-85,88-93,122
+  s_5be9416d40ccd9::t_02544b5141e5d5 13,166-171
+extensions/foundry/CLAUDE.md
+  s_5be9416d40ccd9::t_8e236b0f8ba8fa 31,33
+tests/unit/agents/acp/agent-connection.spec.ts
+  s_5be9416d40ccd9::t_113b959f13928a 3,20-29
+docs/adr/135-a-failed-agent-start-carries-its-reason.md
+  s_5be9416d40ccd9::t_df32d550763665 1-29
+extensions/foundry/tests/runtime/role-settings.spec.ts
+  s_5be9416d40ccd9::t_677bac6ff9e406 52,55
+extensions/foundry/tests/forge/readiness.spec.ts
+  s_5be9416d40ccd9::t_393cdba6d0728e 258,311-313
+  s_5be9416d40ccd9::t_01517a0a855edd 142-143,248-257,259-310,314-317
+  s_5be9416d40ccd9::t_78c96c97447a9c 318
+tests/unit/agents/acp/agent-service.spec.ts
+  s_5be9416d40ccd9::t_6641a8be9406df 2,162-196,559,637,651
+extensions/foundry/src/components/Forge.tsx
+  s_5be9416d40ccd9::t_ec44aff6a2355a 294,901-906,918-919,1027,1222,2119-2123,2125
+  s_5be9416d40ccd9::t_d0c245c88b2c10 569
+  s_5be9416d40ccd9::t_393cdba6d0728e 18
+  s_5be9416d40ccd9::t_8d0a1d62118789 558-560,570,2114-2117
+  s_5be9416d40ccd9::t_6032f9261ed018 285
+extensions/foundry/src/line/worktree.ts
+  s_5be9416d40ccd9::t_8bba5893bb4826 365-366
+  s_5be9416d40ccd9::t_befe434e0fda97 155,357-364
+tests/e2e/foundry-intake.spec.ts
+  s_5be9416d40ccd9::t_02544b5141e5d5 300-301
+packages/extension-sdk/CHANGELOG.md
+  s_5be9416d40ccd9::t_3490922503f5e0 3-11
+extensions/foundry/src/line/executor.ts
+  s_5be9416d40ccd9::t_435a9eae8ecf76 31-32
+extensions/foundry/src/forge/readiness.ts
+  s_5be9416d40ccd9::t_ec44aff6a2355a 106-107,119,170-171,372-387,567,683-685,881,966-968,1163-1167,1203,1238-1241,1293
+  s_5be9416d40ccd9::t_8d0a1d62118789 678-682,686,782-791,806-807,1242,1257,1259-1261,1264,1267-1274
+  s_5be9416d40ccd9::t_b7b1f5059bebca 1243
+tests/unit/agents/acp/adapter-contract.spec.ts
+  s_5be9416d40ccd9::t_02876ca4099a01 39
+  s_5be9416d40ccd9::t_0da0ba6d25cc29 1-38,40-43
+tests/e2e/fixtures/acp-stub-agent.mjs
+  s_5be9416d40ccd9::t_60205880c317ce 86-116,133
+  s_5be9416d40ccd9::t_da58e327d2469d 5-10,13,15-17,49-50,66,71,129-132,134-135,137-138,144-145,150
+  s_5be9416d40ccd9::t_c662d861cd3e62 11-12,121-123
+  s_5be9416d40ccd9::t_0da0ba6d25cc29 19-25,27-30,76-79
+  s_5be9416d40ccd9::t_dacd4e7b19c710 117-120,124-128,136
+tests/unit/renderer/sidebar/choice-prompt.spec.ts
+  s_5be9416d40ccd9::t_2ecf4124344513 6-7
+tests/e2e/fixtures/stub-proposal.json
+  s_5be9416d40ccd9::t_4af41a9f326038 6,12-41,43
+  s_5be9416d40ccd9::t_00df5eaf535658 1-5,7-11,42,44-47
+playwright.config.ts
+  s_5be9416d40ccd9::t_2ecf4124344513 18-19
+tests/e2e/resume-session.spec.ts
+  s_5be9416d40ccd9::t_2ecf4124344513 19
+tests/unit/scripts/e2e-select.spec.ts
+  s_5be9416d40ccd9::t_2ecf4124344513 30
+tests/e2e/foundry-end-to-end.spec.ts
+  s_5be9416d40ccd9::t_15987310b0acff 55
+  s_5be9416d40ccd9::t_4af41a9f326038 56-58,64-66
+  s_5be9416d40ccd9::t_55f6dc667306a7 2,26-27
+  s_5be9416d40ccd9::t_c662d861cd3e62 33
+  s_5be9416d40ccd9::t_cceec52dfbfd3a 1,4-25,32,34-54,59,61-63,67-68
+  s_5be9416d40ccd9::t_be81bc2909aac3 60
+  s_5be9416d40ccd9::t_e8134280437c39 3,28-31
+tests/e2e/helpers.ts
+  s_5be9416d40ccd9::t_d3191773f9b0bb 40
+tests/live/foundry-roles.spec.ts
+  s_5be9416d40ccd9::t_527f6bdbaf22dd 2,4-14,16-19,21-35,37-75,78-89,92-96,98-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0bf04e2c124ed1751ca98159af5924d97f3e4926",
+  "prompts": {},
+  "sessions": {
+    "s_5be9416d40ccd9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc1b6749-e669-4e1d-905d-6d8e2937d16b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
