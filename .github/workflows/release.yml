@@ -1,7 +1,15 @@
 name: Release
 
+# Every merge to main releases; the bump commit's [skip ci] keeps it from releasing itself.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
+
+# One release at a time; merges that land during a run share the next one.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -99,6 +107,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # A merge during the tests moved main; the push needs its tip.
+          git pull --rebase origin main
           npm version patch --no-git-tag-version
           node scripts/bump-extension-versions.mjs
           git add package.json package-lock.json extensions/*/package.json extensions/*/manifest.json
