@@ -1,0 +1,54 @@
+src/shared/schemas/settings.schema.ts
+  s_5be9416d40ccd9::t_5d3d4125ac8cb1 68,81
+docs/user-guide/USER-GUIDE.md
+  s_5be9416d40ccd9::t_778632be24dc61 591
+src/renderer/stores/settings.store.ts
+  s_5be9416d40ccd9::t_0a23a912f28333 36,182,193
+tests/unit/renderer/components/GlobalSettings.spec.tsx
+  s_5be9416d40ccd9::t_e423273b32650f 43,56,72-81
+  s_5be9416d40ccd9::t_e5e44cd049f44e 34
+tests/unit/renderer/stores/settings.store.spec.ts
+  s_5be9416d40ccd9::t_606a289c2f0de8 29-35,301-313
+tests/unit/renderer/shell/useSidebarVisibility.spec.tsx
+  s_bcb87751443cd2::t_68165ca72ff2d1 28-34
+tests/unit/schemas/settings.schema.spec.ts
+  s_5be9416d40ccd9::t_17e769760b079a 31
+tests/unit/renderer/shell/core-tabs.spec.tsx
+  s_5be9416d40ccd9::t_72065c804aed97 5-6,17,28-44,46-48,51-59
+tests/unit/renderer/App.spec.tsx
+  s_5be9416d40ccd9::t_5e88679221475f 1023,1029
+src/shared/settings-defaults.ts
+  s_5be9416d40ccd9::t_ccce6485bb7389 11-17
+src/renderer/components/settings/GlobalSettings.tsx
+  s_5be9416d40ccd9::t_a7e669b5296dae 178,185-203
+docs/ARCHITECTURE.md
+  s_5be9416d40ccd9::t_3f8f47ef934117 562
+src/renderer/shell/core-tabs.tsx
+  s_5be9416d40ccd9::t_07c3e4de8cd5a7 4,54-55,57-58,79-81
+tests/unit/shared/schemas/settings.schema.spec.ts
+  s_5be9416d40ccd9::t_e84a9f5bb02620 48-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "df9e3a935c231d8613d89434311224dfabba8906",
+  "prompts": {},
+  "sessions": {
+    "s_5be9416d40ccd9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc1b6749-e669-4e1d-905d-6d8e2937d16b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_bcb87751443cd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b568ee83-ad51-4a54-9901-52cfcfa5b37f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
