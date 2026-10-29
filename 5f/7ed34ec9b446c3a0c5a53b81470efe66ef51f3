@@ -1,0 +1,23 @@
+packages/extension-sdk/src/renderer.tsx
+  s_3ade4fb4c9f2cf::t_e1c6dded016240 30,37-39
+packages/extension-sdk/tests/renderer.spec.tsx
+  s_3ade4fb4c9f2cf::t_e1c6dded016240 99-112
+docs/EXTENSION-DEVELOPMENT.md
+  s_3ade4fb4c9f2cf::t_88b7b31081076e 918-920
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5f7ed34ec9b446c3a0c5a53b81470efe66ef51f3",
+  "prompts": {},
+  "sessions": {
+    "s_3ade4fb4c9f2cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8126b621-5a83-4f60-ab34-46b32eaf83b1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
