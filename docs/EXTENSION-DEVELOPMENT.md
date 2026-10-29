@@ -76,16 +76,16 @@ task-vault/
 }
 ```
 
-| Field           | Required | Description                                                                                       |
-| --------------- | -------- | ------------------------------------------------------------------------------------------------- |
-| `id`            | Yes      | Reverse-domain id (`^[a-z0-9]+(\.[a-z0-9-]+)+$`), such as `com.acme.git-tools`                    |
-| `name`          | Yes      | Shown in Settings → Extensions                                                                    |
-| `version`       | Yes      | `X.Y.Z`                                                                                           |
-| `description`   | Yes      | Shown in Settings → Extensions                                                                    |
-| `main`          | Yes      | The backend entry, CommonJS, relative to the extension directory                                  |
-| `renderer`      | No       | The view document, relative to the extension directory. Without it the extension has no view.     |
-| `minAppVersion` | Yes      | The oldest app version it runs on. An older app marks the extension `error` and does not load it. |
-| `contributes`   | No       | The surfaces and commands below                                                                   |
+| Field           | Required | Description                                                                                                                                                                                                                                        |
+| --------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`            | Yes      | Reverse-domain id (`^[a-z0-9]+(\.[a-z0-9-]+)+$`), such as `com.acme.git-tools`                                                                                                                                                                     |
+| `name`          | Yes      | Shown in Settings → Extensions                                                                                                                                                                                                                     |
+| `version`       | Yes      | `X.Y.Z`. For the extensions in this repository, each release bumps the patch of every extension changed since the last release (`scripts/bump-extension-versions.mjs`), in `manifest.json` and `package.json`. About shows each installed version. |
+| `description`   | Yes      | Shown in Settings → Extensions                                                                                                                                                                                                                     |
+| `main`          | Yes      | The backend entry, CommonJS, relative to the extension directory                                                                                                                                                                                   |
+| `renderer`      | No       | The view document, relative to the extension directory. Without it the extension has no view.                                                                                                                                                      |
+| `minAppVersion` | Yes      | The oldest app version it runs on. An older app marks the extension `error` and does not load it.                                                                                                                                                  |
+| `contributes`   | No       | The surfaces and commands below                                                                                                                                                                                                                    |
 
 ### `contributes`
 
