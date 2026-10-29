@@ -1,0 +1,282 @@
+extensions/git-integration/tests/unit/ReviewSubmitPanel.spec.tsx
+  s_3ade4fb4c9f2cf::t_a5e818d67da933 8,18,88,145
+extensions/foundry/src/components/Floor.tsx
+  s_3ade4fb4c9f2cf::t_8cbd6ccbe19c4e 2
+  s_3ade4fb4c9f2cf::t_735df3e84e7602 516
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_3ade4fb4c9f2cf::t_6b1781e6f49646 47,66,172,586
+extensions/notepad/tests/unit/usage-ids.spec.ts
+  s_3ade4fb4c9f2cf::t_e80702c3f928fd 22-24
+  s_3ade4fb4c9f2cf::t_e21a2748372282 1-21,25-29
+extensions/foundry/tests/line/execute-run.spec.ts
+  s_3ade4fb4c9f2cf::t_128e652485432c 111-112,123-128
+  s_3ade4fb4c9f2cf::t_abe38f7e219ded 129
+extensions/foundry/src/components/Ledger.tsx
+  s_3ade4fb4c9f2cf::t_8cbd6ccbe19c4e 84
+  s_3ade4fb4c9f2cf::t_735df3e84e7602 2
+extensions/foundry/tests/components/App.spec.tsx
+  s_3ade4fb4c9f2cf::t_ceaef11350bc8d 130
+extensions/remote-control/tests/unit/usage-ids.spec.ts
+  s_3ade4fb4c9f2cf::t_e80702c3f928fd 22-24
+  s_3ade4fb4c9f2cf::t_a29de8971b9b3d 1-21,25-29
+extensions/task-vault/tests/components/AreasView.spec.tsx
+  s_3ade4fb4c9f2cf::t_417a1fa0a071b4 86-93
+extensions/task-vault/tests/components/ProjectsBrowser.spec.tsx
+  s_3ade4fb4c9f2cf::t_417a1fa0a071b4 64-70
+extensions/git-integration/tests/unit/GitFullView.spec.tsx
+  s_3ade4fb4c9f2cf::t_813b072638545a 95-96,116,198,214
+extensions/foundry/tests/components/forge-moves.spec.tsx
+  s_3ade4fb4c9f2cf::t_3dd1e3910f4be3 21,157
+  s_3ade4fb4c9f2cf::t_b0bc29316a6dfa 2
+  s_3ade4fb4c9f2cf::t_bc05d13c942d7f 22-24,102
+extensions/foundry/tests/components/Ledger.spec.tsx
+  s_3ade4fb4c9f2cf::t_d34734d773b7e6 150-155
+  s_3ade4fb4c9f2cf::t_caafb3170ab72c 97-98,100,106
+extensions/task-vault/src/components/InboxProcessor.tsx
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 6,28-29
+  s_3ade4fb4c9f2cf::t_4612f8ef4f19c3 30-31,64-66,70
+extensions/foundry/src/components/BudgetForm.tsx
+  s_3ade4fb4c9f2cf::t_4376fb87cccc33 75-77,92
+  s_3ade4fb4c9f2cf::t_b3806e81285991 70-73
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 4,74
+extensions/task-vault/manifest.json
+  s_3ade4fb4c9f2cf::t_e8f1b7ca063d7c 34-81
+extensions/git-integration/src/components/FileDiffView.tsx
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 7,303
+  s_3ade4fb4c9f2cf::t_7e3b27e5194eeb 301-302,304
+  s_3ade4fb4c9f2cf::t_2458325098d73b 1
+extensions/git-integration/tests/unit/PrDialog.spec.tsx
+  s_3ade4fb4c9f2cf::t_7a60b08d8a47b8 5,8-9,15,18,66-97
+  s_3ade4fb4c9f2cf::t_a3431c0f6e8181 98
+extensions/git-integration/src/components/PrDialog.tsx
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 7,208,212
+extensions/git-integration/tests/unit/CompletionScreen.spec.tsx
+  s_3ade4fb4c9f2cf::t_398eff151b4897 8,63,113,132
+extensions/git-integration/tests/unit/StagingArea.spec.tsx
+  s_3ade4fb4c9f2cf::t_1b12c169b94ecb 29,85,214
+extensions/foundry/tests/ipc/run-deps.ts
+  s_3ade4fb4c9f2cf::t_4d23941d8dbb83 16
+extensions/task-vault/tests/components/DailyLog.spec.tsx
+  s_3ade4fb4c9f2cf::t_417a1fa0a071b4 43-49
+extensions/foundry/tests/components/SettingsProfiles.spec.tsx
+  s_3ade4fb4c9f2cf::t_b2494d79962119 41
+extensions/notepad/src/components/CommentComposer.tsx
+  s_3ade4fb4c9f2cf::t_bbe28070891517 59,61-62
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 3,60
+extensions/foundry/tests/components/BudgetForm.spec.tsx
+  s_3ade4fb4c9f2cf::t_c44dfe4e97b4ec 11-12,24,47,53
+extensions/git-integration/src/components/pr-review/ReviewSubmitPanel.tsx
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 9,106,111
+extensions/foundry/src/components/use-checks.ts
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 21,152
+  s_3ade4fb4c9f2cf::t_735df3e84e7602 151,153
+extensions/notepad/src/components/ExportDialog.tsx
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 5,167
+extensions/task-vault/tests/usage-ids.spec.ts
+  s_3ade4fb4c9f2cf::t_ab7ffaa2b8254d 1-4,6-23,27-31
+  s_3ade4fb4c9f2cf::t_7b67bffd5ab1e5 24
+  s_3ade4fb4c9f2cf::t_ecc7872c3a30be 5,25-26
+extensions/git-integration/src/components/merge-flow/CompletionScreen.tsx
+  s_3ade4fb4c9f2cf::t_7e3b27e5194eeb 131,133
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 10,132
+extensions/notepad/src/components/QuickCreateOverlay.tsx
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 10,103,113
+extensions/task-vault/tests/components/DatabaseAdmin.spec.tsx
+  s_3ade4fb4c9f2cf::t_417a1fa0a071b4 60-67
+extensions/notepad/src/components/NoteOutline.tsx
+  s_3ade4fb4c9f2cf::t_bbe28070891517 59,61-62
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 6,60
+extensions/foundry/src/ipc/run-channels.ts
+  s_3ade4fb4c9f2cf::t_4d23941d8dbb83 133-134,420,651
+extensions/task-vault/src/components/AreasView.tsx
+  s_3ade4fb4c9f2cf::t_e8f1b7ca063d7c 18,384
+extensions/git-integration/src/components/GitFullView.tsx
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 17,235
+extensions/git-integration/src/components/pr-review/CommentComposer.tsx
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 7,81,84
+extensions/git-integration/src/components/StagingArea.tsx
+  s_3ade4fb4c9f2cf::t_7e3b27e5194eeb 103-104,106
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 6,105
+extensions/task-vault/tests/components/SmartTaskInput.spec.tsx
+  s_3ade4fb4c9f2cf::t_417a1fa0a071b4 64,194,201-205
+  s_3ade4fb4c9f2cf::t_739eb4cdab42d9 206-208
+extensions/task-vault/src/components/SmartTaskInput.tsx
+  s_3ade4fb4c9f2cf::t_e8f1b7ca063d7c 236,238-239
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 4,237
+extensions/foundry/tests/unit/usage-manifest.spec.ts
+  s_3ade4fb4c9f2cf::t_1300f898a54fca 1-8,11-35
+  s_3ade4fb4c9f2cf::t_b3806e81285991 9
+  s_3ade4fb4c9f2cf::t_7b67bffd5ab1e5 10
+extensions/notepad/manifest.json
+  s_3ade4fb4c9f2cf::t_0d9cd72b78dad7 16-23,30,34-69
+extensions/task-vault/src/components/FileToPicker.tsx
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 5,220
+extensions/task-vault/tests/components/DailyLogTaskRow.spec.tsx
+  s_3ade4fb4c9f2cf::t_ab7ffaa2b8254d 39
+  s_3ade4fb4c9f2cf::t_417a1fa0a071b4 40-41
+  s_3ade4fb4c9f2cf::t_f17e7f3469a7b9 27,38,42-45
+extensions/foundry/tests/runtime/supervision-console.spec.ts
+  s_3ade4fb4c9f2cf::t_064aa1e13b26ea 379-382
+extensions/remote-control/src/components/RemoteControlView.tsx
+  s_3ade4fb4c9f2cf::t_a4ad6787afa987 110-114,116
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 9,115
+extensions/task-vault/tests/components/ArchiveView.spec.tsx
+  s_3ade4fb4c9f2cf::t_ab7ffaa2b8254d 8-11
+extensions/task-vault/src/components/DatabaseAdmin.tsx
+  s_3ade4fb4c9f2cf::t_e8f1b7ca063d7c 3,435
+extensions/foundry/manifest.json
+  s_3ade4fb4c9f2cf::t_b3806e81285991 29
+  s_3ade4fb4c9f2cf::t_2458325098d73b 16-19,30-79
+extensions/foundry/src/renderer/RecordShown.tsx
+  s_3ade4fb4c9f2cf::t_8cbd6ccbe19c4e 1-9
+extensions/git-integration/tests/unit/FileDiffView.spec.tsx
+  s_3ade4fb4c9f2cf::t_b3806e81285991 194-209
+  s_3ade4fb4c9f2cf::t_a5e818d67da933 2,30-36,210
+extensions/foundry/tests/components/Inbox.spec.tsx
+  s_3ade4fb4c9f2cf::t_caafb3170ab72c 96-97,99,107
+  s_3ade4fb4c9f2cf::t_d34734d773b7e6 127-132
+extensions/foundry/tests/ipc/run-channels.spec.ts
+  s_3ade4fb4c9f2cf::t_b0bc29316a6dfa 1407-1427
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_3ade4fb4c9f2cf::t_caafb3170ab72c 96-97,99,107
+  s_3ade4fb4c9f2cf::t_210e8c4b28432a 150
+  s_3ade4fb4c9f2cf::t_d34734d773b7e6 148-149,151-152
+extensions/foundry/src/ipc/line-registration.ts
+  s_3ade4fb4c9f2cf::t_4d23941d8dbb83 55
+extensions/foundry/src/components/Inbox.tsx
+  s_3ade4fb4c9f2cf::t_8cbd6ccbe19c4e 103
+  s_3ade4fb4c9f2cf::t_735df3e84e7602 2
+extensions/notepad/src/components/tagEditing.ts
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 2,22
+extensions/git-integration/tests/unit/CommentComposer.spec.tsx
+  s_3ade4fb4c9f2cf::t_a5e818d67da933 13,30,166,177
+extensions/foundry/src/components/Orders.tsx
+  s_3ade4fb4c9f2cf::t_735df3e84e7602 2,82-89
+extensions/foundry/src/components/Forge.tsx
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 3,552
+extensions/task-vault/src/components/DailyLog.tsx
+  s_3ade4fb4c9f2cf::t_e8f1b7ca063d7c 2,418
+extensions/task-vault/src/components/ArchiveView.tsx
+  s_3ade4fb4c9f2cf::t_e8f1b7ca063d7c 13,311
+extensions/remote-control/src/index.ts
+  s_3ade4fb4c9f2cf::t_a4ad6787afa987 182-183,185-186,210,226
+extensions/remote-control/src/components/PasswordField.tsx
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 3,37
+  s_3ade4fb4c9f2cf::t_a4ad6787afa987 36,38-39
+extensions/task-vault/tests/components/InboxProcessor.spec.tsx
+  s_3ade4fb4c9f2cf::t_601bf27bd254b6 119
+  s_3ade4fb4c9f2cf::t_417a1fa0a071b4 59,137-138
+  s_3ade4fb4c9f2cf::t_a6b1759ef24354 139
+extensions/task-vault/src/components/ProjectsBrowser.tsx
+  s_3ade4fb4c9f2cf::t_e8f1b7ca063d7c 23,1042
+extensions/task-vault/tests/components/ArchiveViewActions.spec.tsx
+  s_3ade4fb4c9f2cf::t_417a1fa0a071b4 35-41
+extensions/foundry/src/runtime/palette-commands.ts
+  s_3ade4fb4c9f2cf::t_aac2fbc863b498 63
+extensions/git-integration/src/components/worktrees/WorktreesView.tsx
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 16
+  s_3ade4fb4c9f2cf::t_e80702c3f928fd 232
+  s_3ade4fb4c9f2cf::t_314c2c604708c9 228-231,233-235,240
+extensions/foundry/tests/components/floor-ipc-load.spec.tsx
+  s_3ade4fb4c9f2cf::t_ceaef11350bc8d 44
+extensions/remote-control/manifest.json
+  s_3ade4fb4c9f2cf::t_a4ad6787afa987 14-32
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_3ade4fb4c9f2cf::t_3dd1e3910f4be3 97
+extensions/notepad/src/components/SearchOverlay.tsx
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 7,111,114
+extensions/foundry/tests/components/orders-seed-and-end.spec.tsx
+  s_3ade4fb4c9f2cf::t_6b1781e6f49646 22
+extensions/task-vault/src/components/DailyLogTaskRow.tsx
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 39,233,236,308
+  s_3ade4fb4c9f2cf::t_ab7ffaa2b8254d 307
+  s_3ade4fb4c9f2cf::t_e8f1b7ca063d7c 306,309-310,322
+docs/EXTENSION-DEVELOPMENT.md
+  s_3ade4fb4c9f2cf::t_94585de291ec74 916-918
+extensions/git-integration/tests/unit/WorktreesView.spec.tsx
+  s_3ade4fb4c9f2cf::t_ad9c5ac4cd12bd 7,77,240,276
+extensions/foundry/tests/helpers/foundry-host.ts
+  s_3ade4fb4c9f2cf::t_128e652485432c 97-98,154,219
+extensions/task-vault/src/components/vault-hooks.ts
+  s_3ade4fb4c9f2cf::t_e8f1b7ca063d7c 10-13,15-16
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 2,14
+extensions/foundry/src/components/GateCard.tsx
+  s_3ade4fb4c9f2cf::t_e42e4ca7748118 88
+  s_3ade4fb4c9f2cf::t_27cc46f0b04d04 9,87
+extensions/task-vault/tests/components/helpers/bridge.ts
+  s_3ade4fb4c9f2cf::t_c67785717030f6 1,9-14
+extensions/foundry/tests/components/GateCard.spec.tsx
+  s_3ade4fb4c9f2cf::t_b3806e81285991 32-34,98
+  s_3ade4fb4c9f2cf::t_cc9a490daed1f5 12,31,91-97
+  s_3ade4fb4c9f2cf::t_4c7844b993ffd5 99
+extensions/foundry/tests/components/SettingsView.spec.tsx
+  s_3ade4fb4c9f2cf::t_ceaef11350bc8d 74
+extensions/foundry/tests/components/order-frame.spec.tsx
+  s_3ade4fb4c9f2cf::t_ceaef11350bc8d 30
+extensions/foundry/tests/components/ForgeChecks.spec.tsx
+  s_3ade4fb4c9f2cf::t_b2494d79962119 46,89,165
+  s_3ade4fb4c9f2cf::t_e619c752a4f031 53
+packages/extension-sdk/src/renderer.tsx
+  s_3ade4fb4c9f2cf::t_2927680e4c1287 36-38
+  s_3ade4fb4c9f2cf::t_e2ce0047230c88 27-34,39
+  s_3ade4fb4c9f2cf::t_eb6bda8bfecda9 26,35
+packages/extension-sdk/CHANGELOG.md
+  s_3ade4fb4c9f2cf::t_94585de291ec74 11-12
+packages/extension-sdk/tests/renderer.spec.tsx
+  s_3ade4fb4c9f2cf::t_94585de291ec74 3-8,82-96,98
+  s_3ade4fb4c9f2cf::t_2927680e4c1287 97
+tests/unit/extensions/PrDialog.spec.tsx
+  s_3ade4fb4c9f2cf::t_0ab196f262b4de 31-32
+extensions/remote-control/tests/unit/renderer/RemoteControlView.spec.tsx
+  s_3ade4fb4c9f2cf::t_e1d069c31ed902 252
+  s_3ade4fb4c9f2cf::t_701cbd90ff9f6c 3,20,39,50,76,245-251,253-264
+extensions/git-integration/tests/unit/usage-manifest.spec.ts
+  s_3ade4fb4c9f2cf::t_7b67bffd5ab1e5 9
+  s_3ade4fb4c9f2cf::t_1300f898a54fca 1-8,10-26
+extensions/foundry/tests/components/order-document.spec.tsx
+  s_3ade4fb4c9f2cf::t_ceaef11350bc8d 28
+extensions/foundry/src/line/execute-run.ts
+  s_3ade4fb4c9f2cf::t_128e652485432c 176
+extensions/foundry/tests/components/Orders.spec.tsx
+  s_3ade4fb4c9f2cf::t_caafb3170ab72c 12-13,15,24
+  s_3ade4fb4c9f2cf::t_ceaef11350bc8d 169,282,348
+  s_3ade4fb4c9f2cf::t_d34734d773b7e6 73-78
+extensions/git-integration/manifest.json
+  s_3ade4fb4c9f2cf::t_2458325098d73b 40-70
+extensions/foundry/tests/components/needs-you.spec.tsx
+  s_3ade4fb4c9f2cf::t_ceaef11350bc8d 82,150,250,299
+extensions/notepad/tests/components/CommentComposer.spec.tsx
+  s_3ade4fb4c9f2cf::t_93beade3915c4b 6,9,31,72-78
+extensions/notepad/tests/components/ExportDialog.spec.tsx
+  s_3ade4fb4c9f2cf::t_baba2696f09765 8,14,40,163-169
+extensions/notepad/tests/components/NoteOutline.spec.tsx
+  s_3ade4fb4c9f2cf::t_e9c7895db543d5 7-13,31,63-69
+extensions/notepad/tests/components/QuickCreateOverlay.spec.tsx
+  s_3ade4fb4c9f2cf::t_274c5775a14260 8,14,26,126,143-154,167
+extensions/notepad/tests/components/SearchOverlay.spec.tsx
+  s_3ade4fb4c9f2cf::t_d4e6dda2380a53 7,13,26,36,87-116
+extensions/remote-control/tests/unit/extension-index.spec.ts
+  s_3ade4fb4c9f2cf::t_440fadb87c7e7c 12,52,177,205-237
+extensions/remote-control/tests/unit/lazy-server.spec.ts
+  s_3ade4fb4c9f2cf::t_a2398044404ee4 38
+extensions/remote-control/tests/unit/renderer/RemoteControlSettings.spec.tsx
+  s_3ade4fb4c9f2cf::t_52995a6efed0ef 10,26,28,70
+extensions/task-vault/tests/components/DailyLogSubtasks.spec.tsx
+  s_3ade4fb4c9f2cf::t_171c339abd1073 169,189
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2edd068d85c74273c06154fcea4d8343f15ff619",
+  "prompts": {},
+  "sessions": {
+    "s_3ade4fb4c9f2cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8126b621-5a83-4f60-ab34-46b32eaf83b1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
