@@ -1,0 +1,47 @@
+{
+  "intent": {
+    "problem": "The fixture repository has no stub change document.",
+    "outcome": "docs/stub-change.md exists and says what changed.",
+    "nonGoals": []
+  },
+  "acceptance": [
+    {
+      "id": "AC-1",
+      "statement": "docs/stub-change.md exists",
+      "priority": "P1",
+      "verify": {
+        "kind": "command",
+        "command": "test -f docs/stub-change.md",
+        "assert": "exit_code == 0"
+      },
+      "unverifiable": null
+    }
+  ],
+  "risk": {
+    "grade": "P2",
+    "triggers": [],
+    "blastRadius": ["docs/stub-change.md"],
+    "criticalPaths": []
+  },
+  "plan": {
+    "units": [
+      {
+        "id": "U-1",
+        "title": "add the stub change document",
+        "role": "builder",
+        "lane": 1,
+        "dependsOn": [],
+        "satisfies": ["AC-1"],
+        "touches": ["docs/stub-change.md"],
+        "verify": []
+      }
+    ],
+    "lanes": [
+      { "ord": 1, "repo": "@REPO@", "branch": "", "role": null, "blocks": [], "blockedBy": [] }
+    ],
+    "sharedFiles": []
+  },
+  "assumptions": [],
+  "openQuestions": [],
+  "note": "drafted the plan: one unit adds docs/stub-change.md"
+}
