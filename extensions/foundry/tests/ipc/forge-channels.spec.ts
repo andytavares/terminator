@@ -67,7 +67,29 @@ afterEach(() => {
 describe('foundry:order.create', () => {
   describe('the draft', theDraftTests)
   describe('the ledger and the same issue', theLedgerAndTheSameIssueTests)
+  describe('a canary order', theCanaryTests)
 })
+
+function theCanaryTests() {
+  it('works on a canary/<id> branch, so a leftover is found by its name', async () => {
+    const r = (await channels().create({
+      source: { kind: 'typed', text: 'x' },
+      repoPaths: [repo],
+      canary: true,
+    })) as OrderView
+    const expected = `canary/${r.order.id.toLowerCase()}`
+    expect(r.order.source.branch).toBe(expected)
+    expect(r.order.plan.lanes[0]?.branch).toBe(expected)
+  })
+
+  it('keeps the usual branch for an order that is not a canary', async () => {
+    const r = (await channels().create({
+      source: { kind: 'typed', text: 'x' },
+      repoPaths: [repo],
+    })) as OrderView
+    expect(r.order.source.branch ?? null).toBeNull()
+  })
+}
 
 async function seeded(): Promise<WorkOrder> {
   const r = (await channels().create({

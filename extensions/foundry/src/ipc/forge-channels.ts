@@ -46,7 +46,10 @@ export type ConvergeOutcome =
   | { ok: false; reason: string }
 
 /** Whether the architect is now running, or why it is not. */
-export type ConvergeStarted = { ok: true; sessionId: string } | { ok: false; reason: string }
+export type ConvergeStarted =
+  | { ok: true; sessionId: string }
+  // `notStarted`: Claude could not start the agent, and `reason` is the agent's own.
+  | { ok: false; reason: string; notStarted?: true }
 
 // The Forge's three channels.
 //
@@ -62,6 +65,8 @@ const CreatePayload = z.object({
     key: z.string().optional(),
   }),
   repoPaths: z.array(z.string()),
+  /** The local canary run (scripts/foundry-canary.mjs): only the branch name changes. */
+  canary: z.boolean().optional(),
 })
 
 const CancelPayload = z.object({
@@ -361,6 +366,16 @@ function seedInput({ source, repoPaths }: CreateInput): SeedInput {
   return { kind: 'typed', text: source.text ?? '', repoPaths }
 }
 
+/** The order on `canary/<id>`, the name the canary's sweep finds a leftover by. */
+function onCanaryBranch(order: WorkOrder): WorkOrder {
+  const branch = `canary/${order.id.toLowerCase()}`
+  return {
+    ...order,
+    source: { ...order.source, branch },
+    plan: { ...order.plan, lanes: order.plan.lanes.map((lane) => ({ ...lane, branch })) },
+  }
+}
+
 async function create(deps: ForgeDeps, payload: CreateInput) {
   const seeded = await seedOrder(seedInput(payload), {
     now: deps.now,
@@ -378,7 +393,8 @@ async function create(deps: ForgeDeps, payload: CreateInput) {
   // The adversarial pass runs on the first draft, not only at the end: a
   // finding the operator sees now is cheaper than one that reopens an order
   // they thought was settled.
-  const attacked = applyFindings(configured(deps, seeded.order, payload.repoPaths), deps.now())
+  const named = payload.canary === true ? onCanaryBranch(seeded.order) : seeded.order
+  const attacked = applyFindings(configured(deps, named, payload.repoPaths), deps.now())
   await deps.store.save(attacked)
   await deps.store.record({
     at: deps.now(),
@@ -524,6 +540,8 @@ function recordArchitectStart(
   { order, message }: { order: WorkOrder; message: string | undefined },
   started: ConvergeStarted
 ): Promise<void> {
+  // A start that failed was written once, by the turn itself.
+  if (!started.ok && started.notStarted) return Promise.resolve()
   return deps.store.record({
     at: deps.now(),
     orderId: order.id,

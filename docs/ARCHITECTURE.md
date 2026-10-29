@@ -490,7 +490,7 @@ Two core global tabs draw every session from one view model. `useSessionFacts` b
 - **Order follows standing, not output** (ADR 058). `wall-order` ranks by `standingRank` — needs you, running (working and idle together), exited — then start time; the "recent" option sorts by `lastAttendedAt`. Nothing on the wall orders by `lastActivityAt`, which restamps once a second for every printing session. The Desk orders its work threads by whose move it is, then by `lastActivity` (see below).
 - **State colour lives on fills and edges.** `StateChip` (`components/session/`) draws a label on `--state-*-fill` with a `--state-*` edge — amber needs you, green working, neutral otherwise — and its glyph keeps `currentColor` and opacity. `compact` drops the label for the sidebar gutter.
 - **Work items read one way.** `SessionFacts.workItem` (own link, else branch link) feeds Home, the wall, the sidebar terminal row (`BranchTerminal.workItem`) and the tab bar, and a collapsed branch row shows its terminals' own keys after its own (`sessionIssueKeys`: one element, the rest counted as `+N`); every terminal-level Link/Change/Remove opens `SessionLinkDialog`. A session link also writes `userData/integrations/session-context/<sessionId>.json` (`integrations/session-context.ts`), which the user-level SessionStart hook prints for the terminal named by `TERMINATOR_SESSION_ID`; the project hook stays silent for that session.
-- **Answering in place.** `session-controller` reads a terminal's visible rows once per busy → idle transition, stores `latestLine` and `parseChoicePrompt`'s result as view state, and clears the prompt on the next output. `answerChoice` re-reads the screen and types the option's digit only when `samePrompt` still holds. A bare digit answers a Claude Code select prompt, verified live on 2.1.273 (`tests/e2e/live/choice-prompt.spec.ts`).
+- **Answering in place.** `session-controller` reads a terminal's visible rows once per busy → idle transition, stores `latestLine` and `parseChoicePrompt`'s result as view state, and clears the prompt on the next output. `answerChoice` re-reads the screen and types the option's digit only when `samePrompt` still holds. A bare digit answers a Claude Code select prompt, verified live on 2.1.273.
 
 ### The Desk
 
@@ -534,7 +534,7 @@ A terminal dies with the app; the conversation that ran in it does not. Claude C
 - **The watcher folds reports into records.** `agent-session-watcher.ts` watches that directory with `fs.watch` ([ADR-005](adr/005-native-fswatcher-over-chokidar.md)) and reads it once at startup, for reports written while the application was closed. Each report is claimed by renaming it, parsed with the pure `parseHookReport`, passed to `setAgent` with the snapshot `makeSnapshotFor` builds from the PTY registry and the workspace store, and deleted, so it is handled once however many events announce it. A report for a terminal the registry cannot place is deleted too. There is no timer: a report whose event the platform drops stays on disk until the next start.
 - **Resumability is read at answer time, never cached.** `session-records:list` stats the transcript for every record, because the file belongs to the agent and can be deleted at any moment; `useSessionFacts` asks again whenever a surface that draws Resume appears.
 - **Resuming replaces the terminal.** `planResume` (pure) turns the facts into a plan, refusing anything that is not a conversation id rather than escaping it. `resumeSession` opens a terminal on the same branch in the recorded folder with `claude --resume <id>` as its `initialCommand`, calls `session-records:transfer` to move the description, link and conversation onto it, then closes the exited one. One terminal per conversation.
-- **Proved live** on Claude Code 2.1.273 by `tests/e2e/live/resume-live.spec.ts`, which runs a real conversation, ends it, presses Resume, and asks it what it was told.
+- **Proved live** on Claude Code 2.1.273 by hand: a real conversation, ended, Resume pressed, then asked what it was told.
 
 ### Colour propagation
 
@@ -1167,8 +1167,9 @@ a release resumes through `afterRelease` (`src/forge/review-loop.ts`).
   settings from `runtime/role-settings.ts`: a permission mode, `allow`, `ask`
   and `deny` rules that Claude applies to every subcommand, and a sandbox for
   roles that do not write freely. Read-only, docs-only and restricted-write
-  roles run in `dontAsk`, so a call no rule allows is refused at once and
-  nothing waits. Agents start with `settingSources: ['project']`. Foundry
+  roles run in `default` (the Claude ACP adapter offers no `dontAsk`), and
+  `tool-decision.ts` refuses every ask they raise, so a call no rule allows is
+  refused at once and nothing waits. Agents start with `settingSources: ['project']`. Foundry
   decides only the `Artifact` publish path and `lights-out` refusals, and a
   refusal answers the ask without cancelling the turn. ADR 049 and ADR 077
   described the shell reader this replaced.
@@ -1462,6 +1463,7 @@ layout and the belts through small state classes (`HallBuilder`, `BeltRouter`).
 - [ADR-056: a file count is not a budget](adr/056-a-file-count-is-not-a-budget.md) — budgets are agents and minutes; the files budget and the `budgets` check are gone.
 - [ADR-132: CI finishes in five minutes](adr/132-ci-finishes-in-five-minutes.md) — at most five macOS jobs per run, nothing waits on E2E, quarantined tests run nightly, and `ci:local` runs its jobs at once.
 - [ADR-133: paved-path cleanup](adr/133-paved-path-cleanup.md) — `codecov/patch` is the one outside gate, the seed is Vitest's, the database console is an exception to Principle II, and Jira is removed.
+- [ADR-136: a real order runs before Foundry changes ship](adr/136-a-real-order-runs-before-foundry-changes-ship.md) — `npm run canary` runs one real order on this repository; a push that changes Foundry's integration points needs a pass.
 - [ADR-070: E2E is deterministic and selective](adr/070-e2e-is-deterministic-and-selective.md) — no retries, flakes fixed at their cause, and a PR runs only the specs its diff selects.
 - [ADR-072: a review reads definitions before their callers](adr/072-a-review-reads-definitions-before-callers.md) — tree-sitter orders a PR's files so a function comes before the code that calls it.
 - [ADR-073: the review agent reads, and never writes](adr/073-the-review-agent-reads-and-never-writes.md) — headless `claude -p` with Read, Grep and Glob only, in a worktree at the PR head; findings stay private until posted.

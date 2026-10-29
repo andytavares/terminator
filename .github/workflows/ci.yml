@@ -23,6 +23,8 @@ concurrency:
 
 jobs:
   lint:
+    # A canary pull request is the local canary's, not CI's (ADR 136).
+    if: ${{ !startsWith(github.head_ref, 'canary/') }}
     name: Lint
     runs-on: ubuntu-24.04-arm
 
@@ -82,6 +84,8 @@ jobs:
         run: npm run lint:workflows
 
   typecheck:
+    # A canary pull request is the local canary's, not CI's (ADR 136).
+    if: ${{ !startsWith(github.head_ref, 'canary/') }}
     name: Typecheck
     runs-on: ubuntu-24.04-arm
 
@@ -103,6 +107,8 @@ jobs:
         run: npm run typecheck
 
   format:
+    # A canary pull request is the local canary's, not CI's (ADR 136).
+    if: ${{ !startsWith(github.head_ref, 'canary/') }}
     name: Format
     runs-on: ubuntu-24.04-arm
 
@@ -126,6 +132,8 @@ jobs:
   # E2E, the app's start and the story screenshots run on macOS, where Terminator runs; every
   # other job on Ubuntu on ARM, which ci:local runs in a container of the same (ADR 123).
   stories:
+    # A canary pull request is the local canary's, not CI's (ADR 136).
+    if: ${{ !startsWith(github.head_ref, 'canary/') }}
     name: Stories
     runs-on: ubuntu-24.04-arm
 
@@ -160,6 +168,8 @@ jobs:
   # A story with no baseline fails, here and locally alike; the `update-story-baselines` label
   # writes it (.github/workflows/story-baselines.yml).
   story-screenshots:
+    # A canary pull request is the local canary's, not CI's (ADR 136).
+    if: ${{ !startsWith(github.head_ref, 'canary/') }}
     name: Story screenshots
     runs-on: macos-26
 
@@ -186,6 +196,8 @@ jobs:
   # Which tests this change can reach (scripts/test-select.mjs, ADR 123): the same command
   # runs locally. Unit and E2E wait for it and run only what it names, or everything.
   select:
+    # A canary pull request is the local canary's, not CI's (ADR 136).
+    if: ${{ !startsWith(github.head_ref, 'canary/') }}
     name: Select tests
     runs-on: ubuntu-24.04-arm
     outputs:
@@ -234,7 +246,8 @@ jobs:
   unit:
     name: Unit (${{ matrix.shard }}/${{ needs.select.outputs.shard_count }})
     needs: select
-    if: needs.select.outputs.run_unit == 'true'
+    # A canary pull request is the local canary's, not CI's (ADR 136).
+    if: ${{ !startsWith(github.head_ref, 'canary/') && (needs.select.outputs.run_unit == 'true') }}
     runs-on: ubuntu-24.04-arm
     strategy:
       # Every shard runs to the end, so one run reports every failing spec.
@@ -290,6 +303,8 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
 
   stability-shard:
+    # A canary pull request is the local canary's, not CI's (ADR 136).
+    if: ${{ !startsWith(github.head_ref, 'canary/') }}
     name: Stability (${{ matrix.shard }}, ${{ matrix.runs }} runs of part ${{ matrix.part }})
     needs: select
     runs-on: ubuntu-24.04-arm
@@ -318,7 +333,8 @@ jobs:
   stability:
     name: Stability
     needs: [select, stability-shard]
-    if: always()
+    # A canary pull request is the local canary's, not CI's (ADR 136).
+    if: ${{ !startsWith(github.head_ref, 'canary/') && (always()) }}
     runs-on: ubuntu-24.04-arm
 
     steps:
@@ -334,7 +350,8 @@ jobs:
   test:
     name: Test
     needs: [select, unit]
-    if: ${{ !cancelled() }}
+    # A canary pull request is the local canary's, not CI's (ADR 136).
+    if: ${{ !startsWith(github.head_ref, 'canary/') && (!cancelled()) }}
     runs-on: ubuntu-24.04-arm
 
     steps:
@@ -402,6 +419,8 @@ jobs:
   # scripts/smoke-start.mjs checks for App ready, every extension activated, and
   # no error or uncaught exception, then quits the app.
   start:
+    # A canary pull request is the local canary's, not CI's (ADR 136).
+    if: ${{ !startsWith(github.head_ref, 'canary/') }}
     name: Start
     runs-on: macos-26
 
@@ -444,6 +463,8 @@ jobs:
   # covers every tracked file but tests, docs and specs, so a change to only those skips it.
   # `Start` runs the build and its warning check on every run.
   e2e:
+    # A canary pull request is the local canary's, not CI's (ADR 136).
+    if: ${{ !startsWith(github.head_ref, 'canary/') }}
     name: E2E (${{ matrix.shard }}/3)
     runs-on: macos-26
     strategy:
@@ -584,7 +605,8 @@ jobs:
   e2e-result:
     name: E2E result
     needs: [select, e2e]
-    if: always()
+    # A canary pull request is the local canary's, not CI's (ADR 136).
+    if: ${{ !startsWith(github.head_ref, 'canary/') && (always()) }}
     runs-on: ubuntu-24.04-arm
 
     steps:
@@ -598,7 +620,8 @@ jobs:
   e2e-report:
     name: E2E report
     needs: e2e
-    if: ${{ !cancelled() && needs.e2e.result == 'failure' }}
+    # A canary pull request is the local canary's, not CI's (ADR 136).
+    if: ${{ !startsWith(github.head_ref, 'canary/') && (!cancelled() && needs.e2e.result == 'failure') }}
     runs-on: ubuntu-24.04-arm
 
     steps:

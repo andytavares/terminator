@@ -9,6 +9,11 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { installIfLockChanged } from './ci-install.mjs'
+import {
+  canaryRequired,
+  PASS_FILE as CANARY_PASS_FILE,
+  REFUSAL as CANARY_REFUSAL,
+} from './foundry-canary.mjs'
 import { artifactPaths, planFor, readWorkflow, SKIPPED_JOBS, withoutUnitWork } from './ci-plan.mjs'
 import { spawnToSink, startLinux } from './ci-linux.mjs'
 
@@ -232,15 +237,41 @@ const passFile = () =>
   resolve(REPO_ROOT, git(REPO_ROOT, 'rev-parse', '--git-path', 'ci-local-passed'))
 const mainCheckout = () => resolve(REPO_ROOT, git(REPO_ROOT, 'rev-parse', '--git-common-dir'), '..')
 
+/** The pushed lines whose commit changes how Foundry talks to Claude, git, GitHub or Linear. */
+function pushesNeedingCanary(pushed) {
+  return pushed
+    .split('\n')
+    .filter((line) => {
+      const sha = line.trim().split(/\s+/)[1]
+      if (!sha || NO_COMMIT.test(sha)) return false
+      const changed = git(REPO_ROOT, 'diff', '--name-only', 'origin/main', sha).split('\n')
+      const lock = (rev) =>
+        changed.includes('package-lock.json')
+          ? git(REPO_ROOT, 'show', `${rev}:package-lock.json`)
+          : ''
+      return canaryRequired({ changed, lockBefore: lock('origin/main'), lockAfter: lock(sha) })
+    })
+    .join('\n')
+}
+
+const recordedHead = (file) => passedHead(existsSync(file) ? readFileSync(file, 'utf8') : null)
+
 function checkPush() {
   if (!checksPushes(process.env)) return
-  const file = passFile()
-  const passed = passedHead(existsSync(file) ? readFileSync(file, 'utf8') : null)
-  const refused = unverifiedPushes(readFileSync(0, 'utf8'), passed)
-  if (refused.length === 0) return publishInBackground()
-  console.error(`ci:local has not passed on the commit of ${refused.join(', ')}.`)
-  console.error('Run `npm run ci:local`, then push again.')
-  process.exit(1)
+  const pushed = readFileSync(0, 'utf8')
+  const refused = unverifiedPushes(pushed, recordedHead(passFile()))
+  if (refused.length > 0) {
+    console.error(`ci:local has not passed on the commit of ${refused.join(', ')}.`)
+    console.error('Run `npm run ci:local`, then push again.')
+    process.exit(1)
+  }
+  const canaryFile = resolve(REPO_ROOT, git(REPO_ROOT, 'rev-parse', '--git-path', CANARY_PASS_FILE))
+  const unproven = unverifiedPushes(pushesNeedingCanary(pushed), recordedHead(canaryFile))
+  if (unproven.length > 0) {
+    console.error(`${CANARY_REFUSAL} (${unproven.join(', ')})`)
+    process.exit(1)
+  }
+  publishInBackground()
 }
 
 const COMMITTER = ['-c', 'user.name=ci-local', '-c', 'user.email=ci-local@localhost']
