@@ -1,0 +1,26 @@
+src/renderer/usage/active-time.ts
+  s_3ade4fb4c9f2cf::t_f197b56744ba57 1
+  s_3ade4fb4c9f2cf::t_69283086a9aaea 9-10
+src/main/usage/usage-store.ts
+  s_3ade4fb4c9f2cf::t_f197b56744ba57 201
+src/renderer/components/QuickActionsHost.tsx
+  s_3ade4fb4c9f2cf::t_f197b56744ba57 214-215
+src/shared/schemas/usage.schema.ts
+  s_3ade4fb4c9f2cf::t_f197b56744ba57 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "16009f3615b2c4d559fb6bddc051d8737fc5a85a",
+  "prompts": {},
+  "sessions": {
+    "s_3ade4fb4c9f2cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8126b621-5a83-4f60-ab34-46b32eaf83b1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
