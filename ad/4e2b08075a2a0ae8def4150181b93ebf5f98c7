@@ -1,0 +1,75 @@
+tests/unit/extension-frame/frame-shim.spec.ts
+  s_3ade4fb4c9f2cf::t_35d86443a94651 379-394
+  s_3ade4fb4c9f2cf::t_0878dabe26c5da 306-307
+tests/unit/main/ipc/extension.ipc.spec.ts
+  s_3ade4fb4c9f2cf::t_6f9d3d159f10d6 87
+src/renderer-remote/electron-api-shim.ts
+  s_3ade4fb4c9f2cf::t_92401456eaecb2 176-179
+tests/unit/ipc/editor.ipc.spec.ts
+  s_3ade4fb4c9f2cf::t_6f9d3d159f10d6 5
+docs/ARCHITECTURE.md
+  s_3ade4fb4c9f2cf::t_40744c963bfc6b 562
+  s_3ade4fb4c9f2cf::t_a09bb74f5af84a 555-561,563-565
+src/main/usage/usage-store.ts
+  s_3ade4fb4c9f2cf::t_17c202329efd6f 95,103-104,171-179
+src/renderer/components/QuickActionsHost.tsx
+  s_3ade4fb4c9f2cf::t_6f9d3d159f10d6 102
+  s_3ade4fb4c9f2cf::t_33ddc956507a41 103
+src/renderer/components/usage/UsageScreen.tsx
+  s_3ade4fb4c9f2cf::t_705822df613a8c 47-49
+  s_3ade4fb4c9f2cf::t_3adefc57c02ef6 247-248
+tests/unit/renderer/components/QuickActionsHost.spec.tsx
+  s_3ade4fb4c9f2cf::t_33ddc956507a41 140
+src/shared/frame-wire.ts
+  s_3ade4fb4c9f2cf::t_014480d3633a41 37-40
+src/extension-frame/frame-shim.ts
+  s_3ade4fb4c9f2cf::t_014480d3633a41 42-43,233-234
+  s_3ade4fb4c9f2cf::t_6149b4f6491365 11-16
+  s_3ade4fb4c9f2cf::t_9cc50e032eb76a 235-236
+src/renderer/usage/track-surfaces.ts
+  s_3ade4fb4c9f2cf::t_6149b4f6491365 7,104-110,115-121,126,133
+tests/unit/renderer/terminal/agent-tab.spec.tsx
+  s_3ade4fb4c9f2cf::t_c1fcbc670e1a3d 44-46
+  s_3ade4fb4c9f2cf::t_86feea9acfc542 47-54
+  s_3ade4fb4c9f2cf::t_425fd80d1ed98c 55
+scripts/e2e-select.mjs
+  s_3ade4fb4c9f2cf::t_33de1f2f117e71 118
+src/main/index.ts
+  s_3ade4fb4c9f2cf::t_4034a0fd070f69 499,501-507
+src/shared/electron-api/__tests__/build-api.spec.ts
+  s_3ade4fb4c9f2cf::t_a307d0136a852a 45-47
+src/main/ipc/extension.ipc.ts
+  s_3ade4fb4c9f2cf::t_6f9d3d159f10d6 87-88
+src/shared/electron-api/manifest.ts
+  s_3ade4fb4c9f2cf::t_b2e3c410cbae98 94
+  s_3ade4fb4c9f2cf::t_79694bf4b87616 740-744
+  s_3ade4fb4c9f2cf::t_92401456eaecb2 1536,1547,1559,1567-1569,1571
+  s_3ade4fb4c9f2cf::t_33ddc956507a41 737-739
+tests/unit/renderer/components/UsageScreen.spec.tsx
+  s_3ade4fb4c9f2cf::t_dcd6d40c70a120 130-136
+  s_3ade4fb4c9f2cf::t_33ddc956507a41 129
+  s_3ade4fb4c9f2cf::t_5d84f293ca6e7e 137-138
+tests/unit/renderer/usage/track-surfaces.spec.tsx
+  s_3ade4fb4c9f2cf::t_61f5ed95975a7f 140-169,171,173-189
+  s_3ade4fb4c9f2cf::t_ee0756136c70d1 170,172
+src/main/ipc/editor.ipc.ts
+  s_3ade4fb4c9f2cf::t_4034a0fd070f69 6,32
+src/renderer/terminal/agent-tab.ts
+  s_3ade4fb4c9f2cf::t_c3d8e33266fcb1 28,30,33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ad4e2b08075a2a0ae8def4150181b93ebf5f98c7",
+  "prompts": {},
+  "sessions": {
+    "s_3ade4fb4c9f2cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8126b621-5a83-4f60-ab34-46b32eaf83b1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
