@@ -198,6 +198,7 @@ class SqliteUsageStore implements UsageStore {
   }
 }
 
+/** @internal */
 export function createUsageStore(db: ExtensionDB, deps: UsageStoreDeps): UsageStore {
   return new SqliteUsageStore(db, deps)
 }

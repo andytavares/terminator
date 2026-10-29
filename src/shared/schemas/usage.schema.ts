@@ -8,7 +8,7 @@ export type Via = z.infer<typeof ViaSchema>
 const FeatureKindSchema = z.enum(['surface', 'action', 'command', 'control'])
 export type FeatureKind = z.infer<typeof FeatureKindSchema>
 
-/** `source` is 'core' or an extension id. */
+/** `source` is 'core' or an extension id. @internal */
 export const FeatureDeclarationSchema = z.object({
   id: FeatureIdSchema,
   label: z.string().min(1).max(120),

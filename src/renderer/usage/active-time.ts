@@ -1,4 +1,4 @@
-/** Time on a surface stops counting this long after the last keydown or pointerdown. */
+/** Time on a surface stops counting this long after the last keydown or pointerdown. @internal */
 export const IDLE_LIMIT_MS = 5 * 60 * 1000
 
 export interface ActiveSpan {
@@ -6,10 +6,8 @@ export interface ActiveSpan {
   activeMs: number
 }
 
-/**
- * Turns "these ids are on screen", "the window has focus" and "a key or pointer was pressed" into
- * the spans to record. Every call takes its time, so the caller owns the clock.
- */
+/** Turns what is on screen, window focus and input into spans to record. Every call takes its
+ * time, so the caller owns the clock. */
 export class ActiveTimeTracker {
   private ids: string[] = []
   private focused = false

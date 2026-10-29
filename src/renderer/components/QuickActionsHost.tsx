@@ -203,8 +203,6 @@ async function openProjectTab(
 
 const CORE_DECLARATION = { kind: 'action', source: 'core' } as const
 
-/** Counts a palette run. A custom action is named by the operator, so all of them count as one
- * feature; main counts an extension command. */
 // Ids that carry the operator's data (a session, a workspace, a custom action's name) count
 // under one fixed id, so none of that data reaches the usage store.
 const FIXED_PALETTE_FEATURES: Array<[prefix: string, feature: string, label: string]> = [
@@ -213,7 +211,8 @@ const FIXED_PALETTE_FEATURES: Array<[prefix: string, feature: string, label: str
   ['core.switch-workspace-', 'core.switch-workspace', 'Switch workspace'],
 ]
 
-/** The feature a palette run counts under; null for extension commands, which main counts. */
+/** The feature a palette run counts under; null for extension commands, which main counts.
+ * @internal */
 export function paletteFeature(action: Pick<QuickAction, 'id' | 'label'>): [string, string] | null {
   if (action.id.startsWith('ext:')) return null
   const fixed = FIXED_PALETTE_FEATURES.find(([prefix]) => action.id.startsWith(prefix))
