@@ -14,6 +14,8 @@ export const SKIPPED_JOBS = {
   'e2e-report': 'it only merges the e2e reports into one HTML page',
   stability: 'it only reads the results of the stability shards',
   'stability-shard': 'the stability gate runs in CI only (Constitution XIV, ADR 132)',
+  release: 'it publishes a release, on a push to main only (ADR 134)',
+  'release-cleanup': 'it deletes old releases, after a release only',
 }
 
 const TEST_ALL_LABEL =
@@ -40,7 +42,7 @@ const SETUP = /^npm ci\b/
 
 /**
  * @typedef {{ name?: string, run?: string, if?: string, env?: Record<string, string>, uses?: string, with?: Record<string, unknown> }} Step
- * @typedef {{ name?: string, 'runs-on'?: string, if?: string, needs?: string | string[], strategy?: Record<string, unknown>, permissions?: Record<string, string>, steps?: Step[] }} Job
+ * @typedef {{ name?: string, 'runs-on'?: string, if?: string, needs?: string | string[], strategy?: Record<string, unknown>, permissions?: Record<string, string>, concurrency?: Record<string, unknown>, steps?: Step[] }} Job
  * @typedef {{ on?: Record<string, unknown>, jobs: Record<string, Job> }} Workflow
  */
 

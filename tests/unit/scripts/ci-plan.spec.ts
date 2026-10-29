@@ -20,7 +20,7 @@ const stepsOf = (id: string) => (workflow.jobs[id].steps ?? []) as Array<Record<
 const workflowText = readFileSync(resolve(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8')
 
 /** The jobs that run the app or draw as a Mac does, in ci.yml's order. */
-const MAC_JOBS = ['story-screenshots', 'start', 'e2e']
+const MAC_JOBS = ['story-screenshots', 'start', 'e2e', 'release']
 
 /** The jobs ci:local runs, in ci.yml's order. */
 const PLANNED_JOBS = [
@@ -341,5 +341,40 @@ describe('a selection with no unit spec', () => {
     const others = (steps: typeof plan) =>
       steps.filter((step) => !['unit', 'test'].includes(step.job))
     expect(others(withoutUnitWork(plan))).toEqual(others(plan))
+  })
+})
+
+// One pipeline: a push to main that passes every check is released (ADR 134).
+describe('the release', () => {
+  const release = workflow.jobs.release
+  const GATES = [
+    'lint',
+    'typecheck',
+    'format',
+    'stories',
+    'story-screenshots',
+    'test',
+    'stability',
+    'start',
+    'e2e-result',
+  ]
+
+  it('runs on a push to main only, once every check has passed', () => {
+    expect(release.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/main'")
+    expect([release.needs].flat().sort()).toEqual([...GATES].sort())
+  })
+
+  it('runs one at a time and never cancels a release already going', () => {
+    expect(release.concurrency).toEqual({ group: 'release', 'cancel-in-progress': false })
+  })
+
+  it('never runs in ci:local, which would publish a release', () => {
+    expect(SKIPPED_JOBS).toHaveProperty('release')
+    expect(SKIPPED_JOBS).toHaveProperty('release-cleanup')
+    expect(plan.some((step) => step.job.startsWith('release'))).toBe(false)
+  })
+
+  it('leaves no workflow of its own', () => {
+    expect(readdirSync(resolve(REPO_ROOT, '.github/workflows'))).not.toContain('release.yml')
   })
 })
