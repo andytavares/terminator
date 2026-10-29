@@ -126,6 +126,16 @@ describe('UsageScreen', () => {
   })
 })
 
+describe('UsageScreen — store failure', () => {
+  it('keeps the screen drawn when the usage store cannot answer', async () => {
+    report.mockResolvedValue({ error: 'failed', message: 'database is not open' })
+    render(<UsageScreen />)
+    await waitFor(() => expect(report).toHaveBeenCalled())
+    expect(screen.getByRole('heading', { name: 'Usage' })).toBeTruthy()
+    expect(screen.queryByRole('table')).toBeNull()
+  })
+})
+
 describe('UsageScreen — summary', () => {
   it('shows the four summary cards', async () => {
     render(<UsageScreen />)

@@ -84,7 +84,7 @@ describe('extension:run-command', () => {
     expect(mockExecuteExtensionCommand).toHaveBeenCalledWith(
       'ext.command.open',
       { projectId: null, sessionId: null, repoRoot: null },
-      { args: { n: 1 }, via: 'palette' }
+      { args: { n: 1 }, via: 'click' }
     )
     expect(result).toEqual({ ok: false, reason: 'not-registered' })
   })

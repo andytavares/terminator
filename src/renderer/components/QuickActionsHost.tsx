@@ -99,7 +99,8 @@ function useExtensionQuickActions(
         groups,
         {
           ctx,
-          execute: (key, context) => void window.electronAPI.extension.executeCommand(key, context),
+          execute: (key, context) =>
+            void window.electronAPI.extension.executeCommand(key, { ...context, via: 'palette' }),
         }
       ),
     [registered, declared, groups, ctx, commands]

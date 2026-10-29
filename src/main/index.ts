@@ -496,10 +496,15 @@ function startExtensions(loginShellPath: Promise<void>): void {
 enterBackgroundMode()
 exposeReadinessToTests()
 
+/** Counting must never stop the app starting: a usage.sqlite that cannot open is logged. */
 async function startUsageCounting(userData: string): Promise<void> {
-  initUsageStore(userData)
-  await getUsageStore().declare(CORE_FEATURES)
-  await getUsageStore().recordUse({ feature: 'core.app.launch', via: 'app' })
+  try {
+    initUsageStore(userData)
+    await getUsageStore().declare(CORE_FEATURES)
+    await getUsageStore().recordUse({ feature: 'core.app.launch', via: 'app' })
+  } catch (error) {
+    logger.warn(`usage counting is off: ${String(error)}`)
+  }
 }
 
 app.whenReady().then(async () => {

@@ -42,6 +42,9 @@ const REMOTE_LOCALS = {
   'fs.onChanged': () => () => {},
   'extensionBridge.invoke': vi.fn(),
   'extensionBridge.on': vi.fn(),
+  'usage.recordUse': () => Promise.resolve({ data: true }),
+  'usage.declare': () => Promise.resolve({ data: true }),
+  'usage.report': () => Promise.resolve({ data: { countingSince: null, features: [] } }),
 }
 
 function nativeBridge() {

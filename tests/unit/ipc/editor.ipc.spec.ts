@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { corruptStoreFile } from '../../support/stores'
 
 const { mockHandle, detectEditor, openInEditor, recordUse } = vi.hoisted(() => ({
-  recordUse: vi.fn(),
+  recordUse: vi.fn(() => Promise.resolve()),
   mockHandle: vi.fn(),
   detectEditor: vi.fn(),
   openInEditor: vi.fn(),

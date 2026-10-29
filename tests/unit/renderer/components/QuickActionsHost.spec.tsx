@@ -137,7 +137,7 @@ describe('QuickActionsHost — extension commands', () => {
     await waitFor(() =>
       expect(api.executeCommand).toHaveBeenCalledWith(
         'ext:hello',
-        expect.objectContaining({ projectId: 'p1' })
+        expect.objectContaining({ projectId: 'p1', via: 'palette' })
       )
     )
   })

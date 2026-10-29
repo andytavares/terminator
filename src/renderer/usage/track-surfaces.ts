@@ -4,6 +4,7 @@ import { buildCoreActions, type CoreActionDeps } from '../quick-actions/core-act
 import type { FeatureDeclaration } from '../../shared/schemas/usage.schema'
 import { ActiveTimeTracker, type ActiveSpan } from './active-time'
 import { declareFeatures, recordUse } from './record'
+import { FRAME_ACTIVITY_MESSAGE } from '../../shared/frame-wire'
 
 const APP_ACTIVE = 'core.app.active'
 
@@ -100,22 +101,36 @@ function useActiveSurfaces(tracker: ActiveTimeTracker): void {
   }, [activeIds, tracker])
 }
 
-/** Tells the tracker about focus and input, and flushes its time when the window goes away. */
+/** Whether `source` is one of this window's frames: an extension view reporting its input. */
+function isOwnFrame(source: MessageEventSource | null): boolean {
+  return [...document.querySelectorAll('iframe')].some((frame) => frame.contentWindow === source)
+}
+
+/** Tells the tracker about focus and input, and flushes its time when the window goes away.
+ * Focus moving into an extension view blurs this window, yet the window is still in use. */
 function useWindowActivity(tracker: ActiveTimeTracker): void {
   useEffect(() => {
     const onInput = (): void => tracker.input(Date.now())
     const onFocus = (): void => void tracker.setFocused(true, Date.now())
-    const onBlur = (): void => reportSpans(tracker.setFocused(false, Date.now()))
+    const onBlur = (): void => {
+      if (document.activeElement instanceof HTMLIFrameElement) return onInput()
+      reportSpans(tracker.setFocused(false, Date.now()))
+    }
+    const onFrameInput = (event: MessageEvent): void => {
+      if (event.data?.type === FRAME_ACTIVITY_MESSAGE && isOwnFrame(event.source)) onInput()
+    }
     const onLeave = (): void => reportSpans(tracker.flushAll(Date.now()))
     if (document.hasFocus()) onFocus()
     window.addEventListener('keydown', onInput, true)
     window.addEventListener('pointerdown', onInput, true)
+    window.addEventListener('message', onFrameInput)
     window.addEventListener('focus', onFocus)
     window.addEventListener('blur', onBlur)
     window.addEventListener('beforeunload', onLeave)
     return () => {
       window.removeEventListener('keydown', onInput, true)
       window.removeEventListener('pointerdown', onInput, true)
+      window.removeEventListener('message', onFrameInput)
       window.removeEventListener('focus', onFocus)
       window.removeEventListener('blur', onBlur)
       window.removeEventListener('beforeunload', onLeave)

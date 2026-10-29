@@ -41,3 +41,15 @@ describe('startAgentTab — usage', () => {
     expect(recordUse.mock.calls[0][0]).toBe('core.agent.start.my-agent-2')
   })
 })
+
+describe('startAgentTab — usage ids from agent names', () => {
+  beforeEach(() => recordUse.mockClear())
+
+  it('keeps a dotted name apart from a spaced one, and a long name within the label limit', async () => {
+    agentsStartAnswers({ data: { sessionId: 's1' } })
+    await startAgentTab({ ...REQUEST, agentId: 'my.agent' })
+    await startAgentTab({ ...REQUEST, agentId: 'x'.repeat(200) })
+    expect(recordUse.mock.calls[0][0]).toBe('core.agent.start.my.agent')
+    expect(recordUse.mock.calls[1][2].declare.label).toHaveLength(120)
+  })
+})

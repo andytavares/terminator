@@ -173,6 +173,10 @@ forgetLegacyToken()
         'fs.watchStart': () => Promise.resolve({ error: 'WATCH_UNAVAILABLE' }),
         'fs.watchStop': () => Promise.resolve({ ok: true }),
         'fs.onChanged': () => () => {},
+        // Usage counts what is done on this Mac; a browser client counts nothing.
+        'usage.recordUse': () => Promise.resolve({ data: true }),
+        'usage.declare': () => Promise.resolve({ data: true }),
+        'usage.report': () => Promise.resolve({ data: { countingSince: null, features: [] } }),
         // Dynamic passthrough for extension-owned channels.
         'extensionBridge.invoke': (channel: string, payload?: unknown) => invoke(channel, payload),
         'extensionBridge.on': (channel: string, handler: (data: unknown) => void) =>

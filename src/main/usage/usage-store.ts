@@ -92,7 +92,7 @@ function emptyRow(feature: FeatureRecord, declared: boolean, slots: number): Usa
   }
 }
 
-function addDay(row: UsageFeatureRow, day: PeriodDay, range: string[]): void {
+function addDay(row: UsageFeatureRow, day: PeriodDay, slots: ReadonlyMap<string, number>): void {
   row.usesAllTime += day.uses
   if (day.inPeriod) {
     row.usesInPeriod += day.uses
@@ -100,8 +100,8 @@ function addDay(row: UsageFeatureRow, day: PeriodDay, range: string[]): void {
     row.failures += day.failures
     row.byVia[day.via] = (row.byVia[day.via] ?? 0) + day.uses
   }
-  const slot = range.indexOf(day.day)
-  if (slot >= 0) row.daily[slot] += day.uses
+  const slot = slots.get(day.day)
+  if (slot !== undefined) row.daily[slot] += day.uses
 }
 
 class SqliteUsageStore implements UsageStore {
@@ -168,13 +168,15 @@ class SqliteUsageStore implements UsageStore {
     const range = daysBetween(from ?? thirtyDaysAgo, localDay(now))
     const features = await this.db.query<FeatureRecord>('SELECT * FROM feature ORDER BY id')
     const dayRows = await this.db.query<DayRecord>('SELECT * FROM usage_day')
-    const rows = features.map((feature) => {
-      const row = emptyRow(feature, this.declaredHere.has(feature.id), range.length)
-      for (const day of dayRows.filter((d) => d.feature_id === feature.id)) {
-        addDay(row, { ...day, inPeriod: from === null || day.day >= from }, range)
-      }
-      return row
-    })
+    const slots = new Map(range.map((day, index) => [day, index]))
+    const rowsById = new Map(
+      features.map((f) => [f.id, emptyRow(f, this.declaredHere.has(f.id), range.length)])
+    )
+    for (const day of dayRows) {
+      const row = rowsById.get(day.feature_id)
+      if (row) addDay(row, { ...day, inPeriod: from === null || day.day >= from }, slots)
+    }
+    const rows = [...rowsById.values()]
     const firsts = features.map((f) => f.first_declared).sort()
     return { countingSince: firsts[0] ?? null, features: rows }
   }

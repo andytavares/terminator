@@ -84,7 +84,8 @@ const commandChannels: ChannelSpec[] = [
       key: z.string().min(1),
       args: z.unknown().optional(),
       ctx: CommandContextSchema.optional(),
-      via: ViaSchema.default('palette'),
+      // A view runs another extension's command from one of its own controls.
+      via: ViaSchema.default('click'),
     }),
     invalid,
     run: ({ key, args, ctx, via }) =>

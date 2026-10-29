@@ -25,11 +25,12 @@ export async function startAgentTab(request: AgentTabRequest): Promise<AgentStar
 function recordAgentStart(agentId: string | undefined, failed: boolean): void {
   const name = (agentId ?? 'default')
     .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/[^a-z0-9.-]+/g, '-')
     .slice(0, 40)
+  const label = `Start ${agentId ?? 'the default agent'}`.slice(0, 120)
   recordUse(`core.agent.start.${name}`, 'click', {
     failed,
-    declare: { label: `Start ${agentId ?? 'the default agent'}`, kind: 'control', source: 'core' },
+    declare: { label, kind: 'control', source: 'core' },
   })
 }
 

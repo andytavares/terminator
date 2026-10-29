@@ -137,3 +137,53 @@ describe('useTrackSurfaces — idle and unload', () => {
     })
   })
 })
+
+/** An extension view's frame in the window, focused, as the operator works inside it. */
+function focusedFrame(): HTMLIFrameElement {
+  const frame = document.createElement('iframe')
+  document.body.append(frame)
+  frame.focus()
+  return frame
+}
+
+describe('useTrackSurfaces — work inside an extension view', () => {
+  afterEach(() => document.querySelectorAll('iframe').forEach((frame) => frame.remove()))
+
+  it('keeps counting when focus moves into a frame, and on the input the frame reports', () => {
+    registerExtensionTab()
+    renderHook(() => useTrackSurfaces())
+    press()
+    act(() => registry().setActiveGlobalTab('git'))
+    const frame = focusedFrame()
+    act(() => void window.dispatchEvent(new Event('blur')))
+    clockAt(4 * 60_000)
+    const activity = { data: { type: 'terminator:frame-activity' }, source: frame.contentWindow }
+    act(() => void window.dispatchEvent(new MessageEvent('message', activity)))
+    clockAt(8 * 60_000)
+    act(() => registry().setActiveGlobalTab(null))
+    expect(recorded()).toContainEqual({
+      feature: 'git.global-tab',
+      via: 'shown',
+      activeMs: 480_000,
+    })
+  })
+})
+
+describe('useTrackSurfaces — a message that is not a frame of this window', () => {
+  it('ignores an activity message that no frame of this window sent', () => {
+    registerExtensionTab()
+    renderHook(() => useTrackSurfaces())
+    press()
+    act(() => registry().setActiveGlobalTab('git'))
+    clockAt(4 * 60_000)
+    const forged = { data: { type: 'terminator:frame-activity' }, source: window }
+    act(() => void window.dispatchEvent(new MessageEvent('message', forged)))
+    clockAt(20 * 60_000)
+    act(() => registry().setActiveGlobalTab(null))
+    expect(recorded()).toContainEqual({
+      feature: 'git.global-tab',
+      via: 'shown',
+      activeMs: IDLE_LIMIT_MS,
+    })
+  })
+})

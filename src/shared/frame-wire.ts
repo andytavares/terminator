@@ -34,3 +34,7 @@ export interface FramePortRequest {
 
 /** Renderer → frame: the window message that carries the port. Its type is this string. */
 export const FRAME_PORT_MESSAGE = 'terminator:frame-port'
+
+/** Frame → embedding window: the operator pressed a key or the pointer inside the frame. The
+ * window hears none of a frame's input, and counts a view's active time from this. */
+export const FRAME_ACTIVITY_MESSAGE = 'terminator:frame-activity'

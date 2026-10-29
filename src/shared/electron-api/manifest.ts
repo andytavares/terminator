@@ -91,6 +91,7 @@ import type {
   UsageDeclareInputSchema,
   UsageRecordInputSchema,
   UsageReportInputSchema,
+  Via,
 } from '../schemas/usage.schema'
 import type { UsageReport } from '../usage/usage-types'
 
@@ -733,8 +734,14 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.executeCommand',
     kind: 'send',
     channel: 'extension:execute-command',
-    signature: signature<(key: string, ctx: CommandContext, args?: unknown) => void>(),
-    toPayload: (key, ctx, args) => ({ key, ctx, args }),
+    // `via` rides on the context and is split off, so a handler never sees it.
+    signature:
+      signature<(key: string, ctx: CommandContext & { via?: Via }, args?: unknown) => void>(),
+    toPayload: (key, context, args) => {
+      if (!context) return { key, ctx: context, args }
+      const { via, ...ctx } = context
+      return { key, ctx, args, via }
+    },
     extensionView: 'shared',
   }),
   // Run another extension's command by full id, e.g.
@@ -1526,6 +1533,7 @@ export const ELECTRON_API_MANIFEST = [
   }),
 
   // ── usage counts (every use of every feature on this Mac; core only) ──────
+  // Stubbed remotely: a browser renders the same App, which counts, but counts only this Mac.
   method({
     path: 'usage.recordUse',
     kind: 'invoke',
@@ -1536,7 +1544,7 @@ export const ELECTRON_API_MANIFEST = [
           input: z.input<typeof UsageRecordInputSchema>
         ) => Promise<{ data: true } | { error: string; message: string }>
       >(),
-    remote: 'omit',
+    remote: 'stub',
   }),
   method({
     path: 'usage.declare',
@@ -1548,7 +1556,7 @@ export const ELECTRON_API_MANIFEST = [
           input: z.input<typeof UsageDeclareInputSchema>
         ) => Promise<{ data: true } | { error: string; message: string }>
       >(),
-    remote: 'omit',
+    remote: 'stub',
   }),
   method({
     path: 'usage.report',
@@ -1556,9 +1564,11 @@ export const ELECTRON_API_MANIFEST = [
     channel: 'usage:report',
     signature:
       signature<
-        (input: z.input<typeof UsageReportInputSchema>) => Promise<{ data: UsageReport }>
+        (
+          input: z.input<typeof UsageReportInputSchema>
+        ) => Promise<{ data: UsageReport } | { error: string; message: string }>
       >(),
-    remote: 'omit',
+    remote: 'stub',
   }),
 
   // ── home feed (what extensions publish for Home to draw; core only) ───────

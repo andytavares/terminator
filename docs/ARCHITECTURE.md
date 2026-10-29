@@ -552,6 +552,17 @@ The sidebar has a `div.unified-sidebar__resize-handle` on its right edge. `mouse
 
 ---
 
+## Feature usage
+
+ADR 134. The core counts each use of each feature, per local day and path, in `userData/usage.sqlite`, which only the core opens (`src/main/usage/usage-store.ts`). Rows are never deleted.
+
+- **Automatic.** `src/renderer/usage/track-surfaces.ts` counts each tab and panel when shown, with active time while the window is focused and in use. `dispatchQuickAction`, `recordDirectShortcut` and the menu handlers count palette, shortcut and menu runs; `executeExtensionCommand` counts every extension command; `openAuxiliary` counts window views.
+- **Explicit.** A control inside a screen calls `recordUse` (`src/renderer/usage/record.ts`); an extension calls `api.usage.record` or `recordUsage` from `@terminator/extension-sdk/renderer`, and the core prefixes its extension id.
+- **Catalog.** Ids are declared before they count: `src/shared/usage/core-features.ts`, `contributes.usage`, and every registered surface, quick action and command. `usage:record` drops an undeclared id and logs it.
+- **Channels.** `usage:record`, `usage:declare` and `usage:report` are core-only: the remote client gets no-op stubs (`remote: 'stub'`), so a browser counts nothing, and the frame bridge refuses `usage:*` from views. A view reports its input with a `terminator:frame-activity` window message, so time spent inside an extension view counts. The Usage screen (`src/renderer/components/usage/`, hidden global tab `core.usage`) reads `usage:report` and states each feature with `usageState` (`src/shared/usage/usage-state.ts`).
+
+---
+
 ## Issue tracker integrations
 
 One core-owned service reaches Linear; nothing else in the application holds a tracker

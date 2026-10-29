@@ -44,9 +44,9 @@ function useUsageData(start: string | null): {
     void Promise.all([
       window.electronAPI.usage.report({ from: start }),
       window.electronAPI.extension.list(),
-    ]).then(([{ data }, { extensions: installed }]) => {
-      if (!current) return
-      setReport(data)
+    ]).then(([reply, { extensions: installed }]) => {
+      if (!current || !('data' in reply)) return
+      setReport(reply.data)
       setExtensions(
         new Map(installed.map((e) => [e.id, { name: e.name, enabled: e.status !== 'disabled' }]))
       )
@@ -244,7 +244,8 @@ function NothingCounted(): JSX.Element {
 export function UsageScreen(): JSX.Element {
   const [period, setPeriod] = useState<Period>('30')
   const [part, setPart] = useState(ALL_PARTS)
-  const start = useMemo(() => periodStart(period, new Date()), [period])
+  // Read on every render, not memoized: a screen left open past midnight moves to the new day.
+  const start = periodStart(period, new Date())
   const { report, extensions } = useUsageData(start)
   const rows = useMemo(
     () => (report ? statedRows(report, extensions, start) : []),
