@@ -1,0 +1,182 @@
+/* The Usage screen. Chrome (.wall, .wall__bar) comes from screen-chrome.css; the cards and the
+   table from @terminator/extension-ui. */
+.usage__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: var(--tm-space-4);
+  padding: var(--tm-space-4);
+}
+
+.usage__cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.usage__of {
+  color: var(--tm-text-secondary);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.usage__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.usage__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--tm-control-height-sm);
+  padding: 0 9px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 11px;
+  background: transparent;
+  color: var(--tm-text-secondary);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.usage__chip[aria-pressed='true'] {
+  border-color: transparent;
+  background: var(--tm-accent-dim);
+  color: var(--tm-accent-text);
+}
+
+.usage__chip-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.usage__legend {
+  display: flex;
+  gap: 12px;
+  margin: 0 0 0 auto;
+  padding: 0;
+  list-style: none;
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+}
+
+.usage__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.usage__swatch {
+  display: inline-block;
+  width: 10px;
+  height: 6px;
+  border-radius: 3px;
+}
+
+.usage__name {
+  color: var(--tm-text-primary);
+}
+
+.usage__id {
+  margin-inline-start: 6px;
+  color: var(--tm-text-faint);
+  font-family: var(--tm-font-mono);
+  font-size: 11px;
+}
+
+.usage__dim {
+  color: var(--tm-text-muted);
+}
+
+.usage__spark {
+  display: block;
+  width: 90px;
+}
+
+.usage-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-4);
+  padding: var(--tm-space-5);
+  overflow-y: auto;
+}
+
+.usage-drawer__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--tm-space-3);
+}
+
+.usage-drawer__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.usage-drawer__sub {
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+}
+
+.usage-drawer__facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px var(--tm-space-4);
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.usage-drawer__facts dt {
+  color: var(--tm-text-secondary);
+}
+
+.usage-drawer__facts dd {
+  margin: 0;
+}
+
+.usage-drawer__heading {
+  margin: 0 0 var(--tm-space-2);
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.usage-drawer__bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 56px;
+}
+
+.usage-drawer__bar {
+  flex: 1;
+  min-height: 1px;
+  border-radius: 1px;
+  background: var(--tm-accent);
+}
+
+.usage-drawer__rows {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+}
+
+.usage-drawer__rows li {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.usage-drawer__rows li span:last-child {
+  color: var(--tm-text-secondary);
+  font-variant-numeric: tabular-nums;
+}

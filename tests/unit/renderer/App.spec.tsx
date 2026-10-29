@@ -300,6 +300,10 @@ function quietParts() {
       getProcesses: async () => ({ data: [] }),
     },
     git: { currentBranch: async () => ({ branch: 'main' }) },
+    usage: {
+      recordUse: async () => ({ data: true as const }),
+      declare: async () => ({ data: true as const }),
+    },
   }
 }
 
@@ -1016,12 +1020,13 @@ describe('App — shows an open panel when the bridge has no extensionEvents (th
 })
 
 describe('App — Home', () => {
-  it('registers Home as a permanent core tab, ahead of Overview', () => {
+  it('registers Home as a permanent core tab, ahead of Overview and the hidden Usage tab', () => {
     render(<App />)
     const tabs = [...registry().globalTabs.values()]
-    expect(tabs.map((t) => [t.id, t.permanent])).toEqual([
-      ['core.home', true],
-      ['core.overview', true],
+    expect(tabs.map((t) => [t.id, t.permanent ?? false, t.hidden ?? false])).toEqual([
+      ['core.home', true, false],
+      ['core.overview', true, false],
+      ['core.usage', false, true],
     ])
   })
 

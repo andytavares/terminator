@@ -159,6 +159,12 @@ describe('useCoreQuickActions — the global tabs', () => {
     await runCoreAction('core.open-home')
     expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.home')
   })
+
+  it('Usage opens the Usage screen', async () => {
+    useExtensionRegistry.getState().setActiveGlobalTab(null)
+    await runCoreAction('core.open-usage')
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.usage')
+  })
 })
 
 describe('useCoreQuickActions — resume', () => {
