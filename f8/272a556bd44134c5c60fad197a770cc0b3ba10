@@ -1,0 +1,25 @@
+src/renderer/components/AboutDialog.tsx
+  s_e19acf012761f8::t_f460e39908ef13 3,39-50,67,90-104
+tests/unit/renderer/components/AboutDialog.spec.tsx
+  s_e19acf012761f8::t_43ca7da7fd7f3b 11,15-19,22
+  s_e19acf012761f8::t_f9e13ca4ce44f8 70-95
+  s_e19acf012761f8::t_ac92783eb1cbad 96-97
+src/renderer/components/AboutDialog.css
+  s_e19acf012761f8::t_f460e39908ef13 58-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f8272a556bd44134c5c60fad197a770cc0b3ba10",
+  "prompts": {},
+  "sessions": {
+    "s_e19acf012761f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5777cf17-ab8d-4b2f-9a64-a811a8ccd1d1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
