@@ -1,0 +1,19 @@
+scripts/bump-extension-versions.mjs
+  s_e19acf012761f8::t_1e897ff7400227 24-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8e1e3ba143533d4661fff5d88ed409bf10db0703",
+  "prompts": {},
+  "sessions": {
+    "s_e19acf012761f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5777cf17-ab8d-4b2f-9a64-a811a8ccd1d1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
