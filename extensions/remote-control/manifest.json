@@ -1,7 +1,7 @@
 {
   "id": "terminator.remote-control",
   "name": "Remote Control",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Access Terminator terminals from any browser via a local server and ngrok tunnel.",
   "main": "src/index.js",
   "renderer": "dist/index.html",
