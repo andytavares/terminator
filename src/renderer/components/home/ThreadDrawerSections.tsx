@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { type JSX, useState } from 'react'
 import { CircleCheck, CircleX, Clock } from 'lucide-react'
 import { Button, StatusDot, type StatusTone } from '@terminator/extension-ui'
 import { SESSION_ACTIONS } from '../session/session-actions'
@@ -19,13 +19,7 @@ interface SectionProps {
   now: number
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}): React.JSX.Element {
+function Section({ title, children }: { title: string; children: React.ReactNode }): JSX.Element {
   return (
     <section className="desk-dr-s">
       <h6>{title}</h6>
@@ -40,7 +34,7 @@ function terminalName(lead: SessionFacts): string {
 }
 
 /** The lead session's live terminal, opened full size on click. Only for a thread with an open session. */
-export function TerminalSection({ thread }: { thread: WorkThread }): React.JSX.Element | null {
+export function TerminalSection({ thread }: { thread: WorkThread }): JSX.Element | null {
   const lead = leadSessionOf(thread)
   if (!lead) return null
   const open = (): void => SESSION_ACTIONS.onOpen(lead.sessionId)
@@ -70,7 +64,7 @@ export function TerminalSection({ thread }: { thread: WorkThread }): React.JSX.E
 }
 
 /** The model's account of the work, with the operator's own note under it when there is one. */
-export function SummarySection({ thread }: { thread: WorkThread }): React.JSX.Element {
+export function SummarySection({ thread }: { thread: WorkThread }): JSX.Element {
   const { summary, retry } = useThreadSummary(thread)
   const note = thread.sessions.find((s) => s.description)?.description
   return (
@@ -118,9 +112,7 @@ function sessionDetails(s: SessionFacts, props: SectionProps, usage: string | un
   ].filter(Boolean)
 }
 
-function SessionRow(
-  props: SectionProps & { session: SessionFacts; usage?: string }
-): React.JSX.Element {
+function SessionRow(props: SectionProps & { session: SessionFacts; usage?: string }): JSX.Element {
   const { session: s } = props
   const what = s.latestLine || s.description?.split('\n')[0] || s.name
   const canResume = planResume(s) !== null
@@ -151,7 +143,7 @@ function SessionRow(
   )
 }
 
-export function AgentsSection(props: SectionProps): React.JSX.Element {
+export function AgentsSection(props: SectionProps): JSX.Element {
   const { sessions } = props.thread
   const usage = useSessionUsage(sessions.map((s) => s.sessionId))
   return (
@@ -174,7 +166,7 @@ const CHECK_ICON = {
   running: <Clock aria-label="Running" className="desk-lr__icon" />,
 }
 
-function CheckRow({ check, thread }: { check: Check; thread: WorkThread }): React.JSX.Element {
+function CheckRow({ check, thread }: { check: Check; thread: WorkThread }): JSX.Element {
   const sendToAgent = useSendToAgent(thread)
   const [failed, setFailed] = useState(false)
   const send = async (): Promise<void> => setFailed(!(await sendToAgent?.()))
@@ -196,7 +188,7 @@ function CheckRow({ check, thread }: { check: Check; thread: WorkThread }): Reac
   )
 }
 
-export function PullRequestSection({ thread }: { thread: WorkThread }): React.JSX.Element | null {
+export function PullRequestSection({ thread }: { thread: WorkThread }): JSX.Element | null {
   const pr = pullRequestOf(thread)
   if (!pr) return null
   return (
@@ -208,7 +200,7 @@ export function PullRequestSection({ thread }: { thread: WorkThread }): React.JS
   )
 }
 
-export function TimelineSection({ thread, now }: SectionProps): React.JSX.Element {
+export function TimelineSection({ thread, now }: SectionProps): JSX.Element {
   const dismissals = useDismissalsStore((s) => s.entries)
   return (
     <Section title="TIMELINE">

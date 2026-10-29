@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { type JSX, useEffect, useState } from 'react'
 import { dispatchNotification } from '../../lib/notifications'
 import { recordUse } from '../../usage/record'
 import {
@@ -142,7 +142,7 @@ async function upgradeExtension(id: string, setExtensions: SetExtensions): Promi
   })
 }
 
-export function ExtensionsSection(): React.JSX.Element {
+export function ExtensionsSection(): JSX.Element {
   const listing = useExtensionListing()
   const { expanded, toggleExpanded } = useExpandedSettings()
 
@@ -191,12 +191,7 @@ interface EntryProps {
 }
 
 /** One extension: its name, version and status, its actions, and its settings once opened. */
-function ExtensionEntry({
-  ext,
-  listing,
-  expanded,
-  onToggleSettings,
-}: EntryProps): React.JSX.Element {
+function ExtensionEntry({ ext, listing, expanded, onToggleSettings }: EntryProps): JSX.Element {
   const schema = listing.schemas.find((s) => s.extensionId === ext.id)
   return (
     <div className="extension-item-wrapper">
@@ -232,7 +227,7 @@ function ExtensionActions({
   expanded,
   onToggleSettings,
   hasSettings,
-}: EntryProps & { hasSettings: boolean }): React.JSX.Element {
+}: EntryProps & { hasSettings: boolean }): JSX.Element {
   const { setExtensions } = listing
   return (
     <div className="extension-item__actions">
@@ -275,7 +270,7 @@ interface SettingsListProps {
 }
 
 /** The schema's description, a row per setting or action, then its notifications table. */
-function SettingsList({ schema, values, onChange }: SettingsListProps): React.JSX.Element {
+function SettingsList({ schema, values, onChange }: SettingsListProps): JSX.Element {
   const { rows, rest } = partitionNotificationSettings(schema.properties)
   return (
     <div className="extension-settings-panel">
