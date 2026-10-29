@@ -1,0 +1,21 @@
+src/main/usage/usage-store.ts
+  s_3ade4fb4c9f2cf::t_72103ecc9e3534 209-218,220
+tests/unit/main/usage/usage-record.perf.spec.ts
+  s_3ade4fb4c9f2cf::t_72103ecc9e3534 6,8-9,17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "69d44aa109829c53f541a814c0dc2e1c49f6d78b",
+  "prompts": {},
+  "sessions": {
+    "s_3ade4fb4c9f2cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8126b621-5a83-4f60-ab34-46b32eaf83b1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
