@@ -96,3 +96,17 @@ describe('recordUsage', () => {
     expect(record.mock.calls).toEqual([['export'], ['export', { failed: true }]])
   })
 })
+
+describe('recordUsage in a window of its own', () => {
+  it('does nothing, and never throws, where the view API has no usage record', () => {
+    const usage = { recordUse: vi.fn() }
+    Object.defineProperty(window, 'electronAPI', {
+      value: { usage },
+      configurable: true,
+      writable: true,
+    })
+
+    expect(() => recordUsage('review-comment')).not.toThrow()
+    expect(usage.recordUse).not.toHaveBeenCalled()
+  })
+})

@@ -915,7 +915,9 @@ section), commands and native menu items are counted for you. Count anything els
    - Backend: `api.usage.record('export')`, or `api.usage.record('export', { failed: true })`.
    - View: `recordUsage('export')` from `@terminator/extension-sdk/renderer`, which calls the
      view's `window.electronAPI.usage.record`. The core takes the extension id from the frame, so
-     a view cannot count under another extension.
+     a view cannot count under another extension. A window view (`contributes.windowViews`) runs
+     on the app's preload, which has no `record`: there `recordUsage` does nothing, and only the
+     window's opening counts.
 3. A command whose id holds data (`open-run-42`) counts under one id instead: set
    `usage: 'go-to-run'` on its `CommandContribution` and declare `go-to-run` in the manifest.
    The command is then not listed itself. Since 6.1.0.
