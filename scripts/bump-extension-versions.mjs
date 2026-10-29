@@ -21,9 +21,10 @@ function bump(name) {
   })
   const { version } = JSON.parse(readFileSync(join(workspace, 'package.json'), 'utf8'))
   const manifestPath = join(workspace, 'manifest.json')
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-  writeFileSync(manifestPath, `${JSON.stringify({ ...manifest, version }, null, 2)}\n`)
-  console.log(`${manifest.id} ${manifest.version} -> ${version}`)
+  const manifest = readFileSync(manifestPath, 'utf8')
+  // Only the top-level version line changes; a parse and stringify would reformat the rest.
+  writeFileSync(manifestPath, manifest.replace(/("version":\s*")[^"]+"/, `$1${version}"`))
+  console.log(`${name} -> ${version}`)
 }
 
 function main() {
