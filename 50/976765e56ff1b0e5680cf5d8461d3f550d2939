@@ -1,0 +1,25 @@
+extensions/foundry/tests/line/scout-commands.spec.ts
+  s_3b2932418ffe56::t_78be4bac3e6e59 66,68,74-75,77-79,81,86-101
+  s_3b2932418ffe56::t_5dee3d3b96e609 65,67,69-73,76,80,82-85
+extensions/foundry/src/forge/forge-loop.ts
+  s_3b2932418ffe56::t_4d8683cd9fb33b 279-280,282-284
+  s_3b2932418ffe56::t_d34f277bfda917 281,285
+extensions/foundry/src/line/scout-commands.ts
+  s_3b2932418ffe56::t_4d8683cd9fb33b 116-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "50976765e56ff1b0e5680cf5d8461d3f550d2939",
+  "prompts": {},
+  "sessions": {
+    "s_3b2932418ffe56": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea2c55f8-2b5a-46f8-9cf4-d59aab4d031d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
