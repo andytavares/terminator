@@ -1,10 +1,10 @@
 ## What
 
-<!-- One paragraph: what changed and why. Focus on the decision, not the diff. -->
+<!-- One paragraph: what changed and why. Describe the decision, not the diff. -->
 
 ## How to test
 
-<!-- Steps a reviewer can follow to verify the behavior. Be specific about what to look for. -->
+<!-- Steps a reviewer follows to verify the behavior. Name what to look for. -->
 
 1.
 2.
@@ -20,4 +20,4 @@
 
 ## Notes for reviewer
 
-<!-- Anything tricky, a conscious trade-off, or context that isn't obvious from the diff. Delete this section if there's nothing to say. -->
+<!-- Tricky parts, deliberate trade-offs, and context the diff does not show. Delete this section if you have nothing to add. -->
