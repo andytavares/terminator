@@ -11,6 +11,7 @@ import type { ConvergeBrief, ConvergeResult } from './converge.js'
 import type { ConvergeOutcome, ConvergeStarted } from '../ipc/forge-channels.js'
 import type { Role } from '../recipe/parse.js'
 import { collectableWrites, readRungOutput, rungOutputPath } from '../line/rung-output.js'
+import type { CollectResult } from '../line/rung-output.js'
 import { agentTitle } from '../runtime/agent-title.js'
 import { resolveRole } from '../recipe/resolve.js'
 import type { WorkOrder } from '../order/schema.js'
@@ -553,6 +554,21 @@ async function roundNotStarted(launch: RoundLaunch): Promise<void> {
   await (input.onNotStarted?.(reason) ?? input.onFinished(null))
 }
 
+/** A round's output applied to the order and saved; null when the round wrote nothing. @internal */
+export async function saveRoundOutput(
+  store: OrderStore,
+  id: string,
+  read: (current: WorkOrder) => CollectResult | null
+): Promise<CollectResult | null> {
+  // An update, not a load and a save: the architect may be saving its draft right now.
+  const held: { result: CollectResult | null } = { result: null }
+  await store.update(id, (current) => {
+    held.result = read(current)
+    return held.result?.ok === true ? held.result.order : current
+  })
+  return held.result
+}
+
 async function collectRound(launch: RoundLaunch, deadline: boolean): Promise<void> {
   const { input, store, progress, outputPath } = launch
   const { order, roleId } = input
@@ -561,15 +577,16 @@ async function collectRound(launch: RoundLaunch, deadline: boolean): Promise<voi
   progress.done = true
   // Read-only and one turn: once its file is in, the round is over.
   if (!deadline && progress.roundSession !== null) launch.runner.stop(progress.roundSession)
-  const current = (await store.load(order.id)) ?? order
-  const result = readRungOutput({
-    order: current,
-    role: roleId,
-    writes: collectableWrites(launch.role),
-    outputPath,
-    at: new Date().toISOString(),
-    round: input.round,
-  })
+  const result = await saveRoundOutput(store, order.id, (current) =>
+    readRungOutput({
+      order: current,
+      role: roleId,
+      writes: collectableWrites(launch.role),
+      outputPath,
+      at: new Date().toISOString(),
+      round: input.round,
+    })
+  )
   if (result === null) {
     await refuseRound(input, store, `the ${roleId} wrote nothing`)
     return
@@ -578,7 +595,6 @@ async function collectRound(launch: RoundLaunch, deadline: boolean): Promise<voi
     await refuseRound(input, store, result.reason)
     return
   }
-  await store.save(result.order)
   proposeCommands(input, result.commands)
   await input.onFinished(result.order, result.anotherPass)
 }
