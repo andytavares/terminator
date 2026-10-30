@@ -179,8 +179,8 @@ function hazardHatch(paint: Paint, [x, y, w, h]: Box): void {
 }
 
 function drawWhiteboard(paint: Paint, x: number, y: number): void {
-  rect(paint, [x, y, 48, 26], '#d9dde2')
-  bevel(paint, [x, y, 48, 26], { hi: '#f2f4f6', lo: '#8a929c' })
+  rect(paint, [x, y, WHITEBOARD.w, WHITEBOARD.h], '#d9dde2')
+  bevel(paint, [x, y, WHITEBOARD.w, WHITEBOARD.h], { hi: '#f2f4f6', lo: '#8a929c' })
   const strokes: readonly [number, number, number, string][] = [
     [4, 6, 20, '#3c6fb0'],
     [4, 12, 14, '#b04a3c'],
@@ -192,29 +192,72 @@ function drawWhiteboard(paint: Paint, x: number, y: number): void {
 
 const WALL_FIXTURES: ReadonlySet<PropKind> = new Set(['shelves', 'racks', 'statuswall', 'lockers'])
 const VENDING_W = 14
-const VENDING_MARGIN = 2
+/** The whiteboard's size and its top edge on the wall, in art pixels. */
+export const WHITEBOARD = { w: 48, h: 26, y: TILE_PX + 4 } as const
+const EXTINGUISHER_W = 18
+const DECOR_MARGIN = 2
+
+type WallMap = Pick<HallMap, 'width' | 'props'>
+type WallSpan = readonly [left: number, right: number]
+
+const VENDING_PREFERRED = [0.62, 0.5, 0.7, 0.4, 0.78, 0.3, 0.86, 0.2]
+const WHITEBOARD_PREFERRED = [0.08, 0.2, 0.3, 0.4, 0.5, 0.7, 0.78, 0.86]
+
+/** The wall px of every wall fixture, and of whatever else the caller says stands there. */
+function takenSpans(map: WallMap, taken: readonly WallSpan[]): WallSpan[] {
+  const fixtures = map.props
+    .filter((prop) => WALL_FIXTURES.has(prop.kind))
+    .map((prop): WallSpan => [prop.x * TILE_PX, (prop.x + prop.w) * TILE_PX])
+  return [...fixtures, ...taken]
+}
 
 /**
- * Where the baked vending machine stands: the first spot along the wall that
- * clears every wall fixture (a three-tile scoreboard among them), the
- * whiteboard and the extinguisher sign.
- * @internal
+ * The first x along the wall where a `width`-px item clears every wall fixture and every
+ * `taken` span by a margin: a preferred spot first, then any spot left to right. Null when the
+ * wall has no room, and the item is not drawn.
  */
-export function vendingDecorX(map: Pick<HallMap, 'width' | 'props'>): number {
-  const wallPx = map.width * TILE_PX
-  const taken: [number, number][] = [
-    [Math.round(wallPx * 0.08), Math.round(wallPx * 0.08) + 48],
-    [Math.round(wallPx * 0.94), Math.round(wallPx * 0.94) + 18],
-    ...map.props
-      .filter((prop) => WALL_FIXTURES.has(prop.kind))
-      .map((prop): [number, number] => [prop.x * TILE_PX, (prop.x + prop.w) * TILE_PX]),
-  ]
+export function wallDecorX(
+  map: WallMap,
+  want: { width: number; preferred: readonly number[]; taken: readonly WallSpan[] }
+): number | null {
+  const spans = takenSpans(map, want.taken)
   const fits = (x: number): boolean =>
-    taken.every(
-      ([left, right]) => x + VENDING_W + VENDING_MARGIN <= left || x >= right + VENDING_MARGIN
+    x >= TILE_PX &&
+    x + want.width <= (map.width - 1) * TILE_PX &&
+    spans.every(
+      ([left, right]) => x + want.width + DECOR_MARGIN <= left || x >= right + DECOR_MARGIN
     )
-  const preferred = [0.62, 0.5, 0.7, 0.4, 0.78, 0.3, 0.86, 0.2].map((f) => Math.round(wallPx * f))
-  return preferred.find(fits) ?? preferred[0]
+  const wallPx = map.width * TILE_PX
+  const preferred = want.preferred.map((f) => Math.round(wallPx * f))
+  const scanned = Array.from({ length: wallPx }, (_, x) => x)
+  return preferred.find(fits) ?? scanned.find(fits) ?? null
+}
+
+const extinguisherSpan = (map: WallMap): WallSpan => {
+  const x = Math.round(map.width * TILE_PX * 0.94)
+  return [x, x + EXTINGUISHER_W]
+}
+
+/** Where the whiteboard hangs: clear of every wall fixture and the extinguisher sign. */
+export function whiteboardX(map: WallMap): number | null {
+  return wallDecorX(map, {
+    width: WHITEBOARD.w,
+    preferred: WHITEBOARD_PREFERRED,
+    taken: [extinguisherSpan(map)],
+  })
+}
+
+/** Where the vending machine stands: clear of the fixtures, the whiteboard and the sign. */
+export function vendingDecorX(map: WallMap): number | null {
+  const board = whiteboardX(map)
+  return wallDecorX(map, {
+    width: VENDING_W,
+    preferred: VENDING_PREFERRED,
+    taken: [
+      extinguisherSpan(map),
+      ...(board === null ? [] : [[board, board + WHITEBOARD.w] as WallSpan]),
+    ],
+  })
 }
 
 const VENDING_H = 33
@@ -304,8 +347,10 @@ function bakeWalls(map: HallMap, paint: Paint): void {
   // Decorative wall furniture that never functions as a station: a
   // whiteboard, a vending machine and an extinguisher/sign, spread across
   // the wall independent of the interactive fixtures.
-  drawWhiteboard(paint, Math.round(w * 0.08), TILE_PX + 4)
-  drawVendingMachine(paint, vendingDecorX(map), TOP_WALL_ROWS * TILE_PX - VENDING_H)
+  const board = whiteboardX(map)
+  if (board !== null) drawWhiteboard(paint, board, WHITEBOARD.y)
+  const vending = vendingDecorX(map)
+  if (vending !== null) drawVendingMachine(paint, vending, TOP_WALL_ROWS * TILE_PX - VENDING_H)
   drawExtinguisherSign(paint, Math.round(w * 0.94), TILE_PX + 20)
 
   for (let y = TOP_WALL_ROWS; y < map.height - 1; y++) {
