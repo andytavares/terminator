@@ -1,0 +1,28 @@
+extensions/foundry/rules/ui-change-renderings.yaml
+  s_3b2932418ffe56::t_e0f1c741aed038 1-13
+extensions/foundry/tests/line/brief.spec.ts
+  s_3b2932418ffe56::t_e0f1c741aed038 1-2,4-5,679-695
+extensions/foundry/roles/scribe.yaml
+  s_3b2932418ffe56::t_623a8687818f0d 5
+extensions/foundry/roles/author.yaml
+  s_3b2932418ffe56::t_623a8687818f0d 5
+  s_3b2932418ffe56::t_e0f1c741aed038 40-44
+extensions/foundry/roles/architect.yaml
+  s_3b2932418ffe56::t_623a8687818f0d 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b6cc1c0f3997ceccf65bbd100fe81e9239b3a4aa",
+  "prompts": {},
+  "sessions": {
+    "s_3b2932418ffe56": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea2c55f8-2b5a-46f8-9cf4-d59aab4d031d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
