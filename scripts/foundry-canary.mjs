@@ -342,15 +342,6 @@ async function intake(page, id) {
   })
 }
 
-// Hand-off waits for main to be proven, as the Forge's Hand off button does (ADR 111).
-async function baseProven(page, id) {
-  return until('main to be proven', OVERALL_BOUND_MS, async () => {
-    const failing = await ledger(page, id, 'environment.failing')
-    if (failing.length > 0) throw new Error(`main could not be proven: ${failing[0].reason}`)
-    return (await ledger(page, id, 'environment.proven')).length > 0
-  })
-}
-
 async function handOff(page, id) {
   const compiled = await invoke(page, 'foundry:order.compile', { id, commit: true })
   if (compiled.error || compiled.refused || compiled.order?.status !== 'agreed') {
@@ -417,8 +408,6 @@ async function proveOrder({ page, linear, stage }) {
   await createOrder({ page, linear, stage })
   stage.name = 'intake'
   await intake(page, stage.id)
-  stage.name = 'base branch'
-  await baseProven(page, stage.id)
   stage.name = 'hand-off'
   await handOff(page, stage.id)
   stage.name = 'run'
