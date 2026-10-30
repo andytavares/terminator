@@ -1,0 +1,51 @@
+extensions/foundry/src/forge/readiness.ts
+  s_5be9416d40ccd9::t_236594d5d7a0dd 382
+extensions/foundry/src/order/order-standing-sources.ts
+  s_5be9416d40ccd9::t_adceb0320a0fe7 2,21
+extensions/foundry/tests/components/forge-moves.spec.tsx
+  s_5be9416d40ccd9::t_a6fb4775557893 247
+  s_5be9416d40ccd9::t_c14c9cd1764e59 248-260
+  s_5be9416d40ccd9::t_3e1f67ca6b70d9 261-263
+extensions/foundry/src/order/standing.ts
+  s_5be9416d40ccd9::t_adceb0320a0fe7 93-94,241,250-261,516-519,580,584
+extensions/foundry/tests/line/node-session.spec.ts
+  s_5be9416d40ccd9::t_5363ecda7cec2e 48-50,52-54
+extensions/foundry/src/ipc/forge-channels.ts
+  s_5be9416d40ccd9::t_b727d4ba74746a 269-270
+  s_5be9416d40ccd9::t_81919f1a1f7460 145,349,1000-1008,1081
+extensions/foundry/src/components/Forge.tsx
+  s_5be9416d40ccd9::t_b727d4ba74746a 638-641,649,905-909
+extensions/foundry/tests/order/standing.spec.ts
+  s_5be9416d40ccd9::t_155e911579478d 87,362-380
+extensions/foundry/src/line/node-session.ts
+  s_5be9416d40ccd9::t_ed1909c3bb3102 133-140,149,169
+  s_5be9416d40ccd9::t_5363ecda7cec2e 74
+docs/user-guide/USER-GUIDE.md
+  s_5be9416d40ccd9::t_236594d5d7a0dd 1056-1060
+extensions/foundry/src/ipc/foundry-api.ts
+  s_5be9416d40ccd9::t_81919f1a1f7460 79
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_5be9416d40ccd9::t_f57694840a1947 1972-1990
+extensions/foundry/src/forge/intake-outcome.ts
+  s_5be9416d40ccd9::t_adceb0320a0fe7 272-279
+extensions/foundry/tests/forge/readiness.spec.ts
+  s_5be9416d40ccd9::t_6dfb4c50b9274d 263
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_5be9416d40ccd9::t_61dda3691661f6 93-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "21442edaa26cc99f13624e519ec4700db55ae0e0",
+  "prompts": {},
+  "sessions": {
+    "s_5be9416d40ccd9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc1b6749-e669-4e1d-905d-6d8e2937d16b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

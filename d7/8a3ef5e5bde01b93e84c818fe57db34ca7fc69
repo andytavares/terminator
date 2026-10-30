@@ -1,0 +1,21 @@
+scripts/foundry-canary.mjs
+  s_5be9416d40ccd9::t_9d59e2553efb6c 7
+tests/unit/scripts/ci-plan.spec.ts
+  s_5be9416d40ccd9::t_9d59e2553efb6c 226,260
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d78a3ef5e5bde01b93e84c818fe57db34ca7fc69",
+  "prompts": {},
+  "sessions": {
+    "s_5be9416d40ccd9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc1b6749-e669-4e1d-905d-6d8e2937d16b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,283 @@
+extensions/foundry/src/runtime/tool-decision.ts
+  s_5be9416d40ccd9::t_02544b5141e5d5 22-23,84-86,88-89
+  s_5be9416d40ccd9::t_7332984b3cd3a2 87
+package-lock.json
+  s_5be9416d40ccd9::t_1a0b6d1f782378 19,80,99,127,144,162,20318
+extensions/foundry/tests/line/node-session.spec.ts
+  s_5be9416d40ccd9::t_52bc1c80a6d300 1
+  s_5be9416d40ccd9::t_fd02823aff7faa 13-18
+  s_5be9416d40ccd9::t_fadd60cbebe210 2-12,19-47,51,55-63
+  s_5be9416d40ccd9::t_5363ecda7cec2e 48-50,52-54
+docs/adr/131-agents-permissions-are-claude-code-settings.md
+  s_5be9416d40ccd9::t_117889cab53cee 30-33
+extensions/foundry/src/runtime/role-settings.ts
+  s_5be9416d40ccd9::t_40bd40393cac91 76-78
+  s_5be9416d40ccd9::t_7332984b3cd3a2 87
+  s_5be9416d40ccd9::t_02544b5141e5d5 7-8,10,85-86,88-89,91-92
+extensions/foundry/package.json
+  s_5be9416d40ccd9::t_766fba6b725ad4 11
+src/main/agents/acp/agent-connection.ts
+  s_5be9416d40ccd9::t_3490922503f5e0 11-12,15-18,27,30-35,45
+  s_5be9416d40ccd9::t_9d59e2553efb6c 13-14
+packages/extension-sdk/types/api.d.ts
+  s_5be9416d40ccd9::t_3490922503f5e0 274-276
+docs/user-guide/USER-GUIDE.md
+  s_5be9416d40ccd9::t_a2648dba371056 1054-1055,1061-1063
+  s_5be9416d40ccd9::t_236594d5d7a0dd 1056-1060
+extensions/foundry/tests/line/executor.spec.ts
+  s_5be9416d40ccd9::t_07950b074f49f1 2772,2829,2839,2841,2843
+  s_5be9416d40ccd9::t_34f8a6db9eb44b 2830-2838,2840,2842
+  s_5be9416d40ccd9::t_5106f35a8b001b 2844-2846
+package.json
+  s_5be9416d40ccd9::t_6b1934210277c0 71
+  s_5be9416d40ccd9::t_c2c379d5bf7b98 31
+extensions/remote-control/package.json
+  s_5be9416d40ccd9::t_a99db09ce22744 12
+extensions/task-vault/package.json
+  s_5be9416d40ccd9::t_3e7b40b5ae6c5c 10
+extensions/foundry/src/line/execution-settle.ts
+  s_5be9416d40ccd9::t_435a9eae8ecf76 43-47,276-286
+extensions/foundry/tests/runtime/tool-decision.spec.ts
+  s_5be9416d40ccd9::t_677bac6ff9e406 16,31-47
+  s_5be9416d40ccd9::t_2ecfc30783764b 48
+extensions/foundry/src/runtime/start-failure.ts
+  s_5be9416d40ccd9::t_435a9eae8ecf76 1-2
+tests/unit/agents/acp/fake-agent.ts
+  s_5be9416d40ccd9::t_02876ca4099a01 9-10,12
+  s_5be9416d40ccd9::t_888b3eefe71952 27-28,70-73,82-83,92-95,102,122,131,140
+  s_5be9416d40ccd9::t_0da0ba6d25cc29 75-81
+  s_5be9416d40ccd9::t_38a3dbdac4d01b 23-24,104,113-117
+extensions/foundry/tests/forge/intake-turn-ends.spec.ts
+  s_5be9416d40ccd9::t_025c11e96dc885 118,120,245
+  s_5be9416d40ccd9::t_fd02823aff7faa 58,229-231
+  s_5be9416d40ccd9::t_6c64c88be7a168 23-24,84-92,94-112,114,116,240-241,244,248-253,255-258
+  s_5be9416d40ccd9::t_62a071a7f76721 227-228,235-239,242-243,246
+  s_5be9416d40ccd9::t_f1fc65eb9e9dd6 232-234
+tests/support/acp-modes.ts
+  s_5be9416d40ccd9::t_0da0ba6d25cc29 1-12
+extensions/foundry/tests/runtime/supervised-runner.spec.ts
+  s_5be9416d40ccd9::t_7332984b3cd3a2 406
+  s_5be9416d40ccd9::t_734d51fab47e81 473
+  s_5be9416d40ccd9::t_0da0ba6d25cc29 76,460-472
+extensions/git-integration/package.json
+  s_5be9416d40ccd9::t_3522b72ca3eba9 16
+extensions/foundry/tests/components/forge-moves.spec.tsx
+  s_5be9416d40ccd9::t_a0a19a32c5028f 217,219-223,226,228-230
+  s_5be9416d40ccd9::t_393cdba6d0728e 238
+  s_5be9416d40ccd9::t_ad43274f57978c 214,216
+  s_5be9416d40ccd9::t_acbeb8cbb1726f 190-201,203,205,218,224-225,227,235,241,243,245,264-266,268
+  s_5be9416d40ccd9::t_01517a0a855edd 202,204,206-213,215,231-234,236-237,239-240,242,244,246,267,269-274
+  s_5be9416d40ccd9::t_a6fb4775557893 247
+  s_5be9416d40ccd9::t_c14c9cd1764e59 248-260
+  s_5be9416d40ccd9::t_3e1f67ca6b70d9 261-263
+extensions/notepad/package.json
+  s_5be9416d40ccd9::t_25da66197b72bd 21
+extensions/foundry/src/forge/intake-turn.ts
+  s_5be9416d40ccd9::t_cc4b91ad99a320 222,228-233,415-421,447
+  s_5be9416d40ccd9::t_fa5ffb9cfc916e 267,555
+  s_5be9416d40ccd9::t_5d355deb313f55 38,63,97-101,176,178,223,234-258,265-266,392-393,407-412,499,535,547-550,552-554
+  s_5be9416d40ccd9::t_435a9eae8ecf76 39,259,551
+  s_5be9416d40ccd9::t_7332984b3cd3a2 313-314
+  s_5be9416d40ccd9::t_fd02823aff7faa 260-264
+extensions/foundry/tests/line/worktree.spec.ts
+  s_5be9416d40ccd9::t_64dffb8859ec94 228-243
+  s_5be9416d40ccd9::t_d1817e8ca8469a 124,227
+  s_5be9416d40ccd9::t_d4544663c8a0e8 244-246
+src/main/agents/acp/agent-service.ts
+  s_5be9416d40ccd9::t_3490922503f5e0 63-64,174-194,417,452,579
+  s_5be9416d40ccd9::t_ca20cb2557af5f 493,495-497,500
+  s_5be9416d40ccd9::t_f69cd880840039 54-55,494
+extensions/foundry/src/forge/forge-loop.ts
+  s_5be9416d40ccd9::t_5d355deb313f55 159-160,255-262,372,374-377
+  s_5be9416d40ccd9::t_cc4b91ad99a320 359-369,371,379
+extensions/foundry/src/forge/intake-outcome.ts
+  s_5be9416d40ccd9::t_24b0886d0d1a6c 34-35,79-85,124-131,138,188-190,203-204
+  s_5be9416d40ccd9::t_adceb0320a0fe7 272-279
+packages/extension-sdk/package.json
+  s_5be9416d40ccd9::t_e8be6e380bfa13 3
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_5be9416d40ccd9::t_fd02823aff7faa 361-363
+  s_5be9416d40ccd9::t_52bc1c80a6d300 352-353,356,370-371,373-377,379,381
+  s_5be9416d40ccd9::t_223b72da3b35d3 94-95,360,364-369,468-471
+  s_5be9416d40ccd9::t_9d59e2553efb6c 466-467
+extensions/foundry/tests/forge/intake-outcome.spec.ts
+  s_5be9416d40ccd9::t_c81d0669ebb176 34-47,50-60
+  s_5be9416d40ccd9::t_393cdba6d0728e 48-49
+extensions/foundry/SUPERVISION.md
+  s_5be9416d40ccd9::t_8e236b0f8ba8fa 661
+extensions/foundry/src/line/node-session.ts
+  s_5be9416d40ccd9::t_435a9eae8ecf76 19,30-32,69,82-83,86-91,120
+  s_5be9416d40ccd9::t_02544b5141e5d5 13
+  s_5be9416d40ccd9::t_ed1909c3bb3102 133-140,149,169
+  s_5be9416d40ccd9::t_5363ecda7cec2e 74
+extensions/foundry/CLAUDE.md
+  s_5be9416d40ccd9::t_8e236b0f8ba8fa 31,33
+tests/unit/agents/acp/agent-connection.spec.ts
+  s_5be9416d40ccd9::t_113b959f13928a 3,20-29
+docs/adr/135-a-failed-agent-start-carries-its-reason.md
+  s_5be9416d40ccd9::t_df32d550763665 1-29
+extensions/foundry/tests/runtime/role-settings.spec.ts
+  s_5be9416d40ccd9::t_677bac6ff9e406 52,55
+extensions/foundry/tests/forge/readiness.spec.ts
+  s_5be9416d40ccd9::t_393cdba6d0728e 258,309-311
+  s_5be9416d40ccd9::t_01517a0a855edd 142-143,248-257,259-262,264-308,312-315
+  s_5be9416d40ccd9::t_78c96c97447a9c 316
+  s_5be9416d40ccd9::t_6dfb4c50b9274d 263
+tests/unit/agents/acp/agent-service.spec.ts
+  s_5be9416d40ccd9::t_6641a8be9406df 2,161-195,607,685,699
+  s_5be9416d40ccd9::t_b48ff63749c7b4 22-23,336-341,349-350,352-362,364
+  s_5be9416d40ccd9::t_c0d8db5db13ffb 342-348,351,363
+  s_5be9416d40ccd9::t_8a7f5354311110 365-366
+  s_5be9416d40ccd9::t_668242791a01e3 367
+  s_5be9416d40ccd9::t_38a3dbdac4d01b 368-381
+  s_5be9416d40ccd9::t_99424ae25befa5 382-384
+extensions/foundry/src/components/Forge.tsx
+  s_5be9416d40ccd9::t_ec44aff6a2355a 294,910-914,926-927,1035,1230,2127-2131,2133
+  s_5be9416d40ccd9::t_d0c245c88b2c10 569
+  s_5be9416d40ccd9::t_393cdba6d0728e 18
+  s_5be9416d40ccd9::t_8d0a1d62118789 558-560,570,2122-2125
+  s_5be9416d40ccd9::t_6032f9261ed018 285
+  s_5be9416d40ccd9::t_b727d4ba74746a 638-641,649,905-909
+extensions/foundry/src/line/worktree.ts
+  s_5be9416d40ccd9::t_8bba5893bb4826 365-366
+  s_5be9416d40ccd9::t_befe434e0fda97 155,357-364
+tests/e2e/foundry-intake.spec.ts
+  s_5be9416d40ccd9::t_02544b5141e5d5 300-301
+packages/extension-sdk/CHANGELOG.md
+  s_5be9416d40ccd9::t_3490922503f5e0 3-11
+extensions/foundry/src/line/executor.ts
+  s_5be9416d40ccd9::t_435a9eae8ecf76 31-32
+extensions/foundry/src/forge/readiness.ts
+  s_5be9416d40ccd9::t_ec44aff6a2355a 106-107,119,170-171,372-381,383-387,567,683-685,881,966-968,1163-1167,1203,1238-1241,1293
+  s_5be9416d40ccd9::t_8d0a1d62118789 678-682,686,782-791,806-807,1242,1257,1259-1261,1264,1267-1274
+  s_5be9416d40ccd9::t_b7b1f5059bebca 1243
+  s_5be9416d40ccd9::t_236594d5d7a0dd 382
+tests/unit/agents/acp/adapter-contract.spec.ts
+  s_5be9416d40ccd9::t_02876ca4099a01 39
+  s_5be9416d40ccd9::t_0da0ba6d25cc29 1-38,40-43
+tests/e2e/fixtures/acp-stub-agent.mjs
+  s_5be9416d40ccd9::t_60205880c317ce 77-107,124
+  s_5be9416d40ccd9::t_da58e327d2469d 5-7,39-40,57,62,120-123,125-126,128-129,135-136,141
+  s_5be9416d40ccd9::t_c662d861cd3e62 112-114
+  s_5be9416d40ccd9::t_0da0ba6d25cc29 9-15,17-20,67-70
+  s_5be9416d40ccd9::t_dacd4e7b19c710 108-111,115-119,127
+  s_5be9416d40ccd9::t_3fba4486d52b36 1-3
+tests/unit/renderer/sidebar/choice-prompt.spec.ts
+  s_5be9416d40ccd9::t_2ecf4124344513 6-7
+tests/e2e/fixtures/stub-proposal.json
+  s_5be9416d40ccd9::t_4af41a9f326038 6,12-41,43
+  s_5be9416d40ccd9::t_00df5eaf535658 1-5,7-11,42,44-47
+playwright.config.ts
+  s_5be9416d40ccd9::t_2ecf4124344513 18-19
+tests/e2e/resume-session.spec.ts
+  s_5be9416d40ccd9::t_2ecf4124344513 19
+tests/unit/scripts/e2e-select.spec.ts
+  s_5be9416d40ccd9::t_2ecf4124344513 30
+tests/e2e/foundry-end-to-end.spec.ts
+  s_5be9416d40ccd9::t_15987310b0acff 55
+  s_5be9416d40ccd9::t_4af41a9f326038 56-58,64-66
+  s_5be9416d40ccd9::t_55f6dc667306a7 2,26-27
+  s_5be9416d40ccd9::t_c662d861cd3e62 33
+  s_5be9416d40ccd9::t_cceec52dfbfd3a 1,4-25,32,34-54,59,61-63,67-68
+  s_5be9416d40ccd9::t_be81bc2909aac3 60
+  s_5be9416d40ccd9::t_e8134280437c39 3,28-31
+tests/e2e/helpers.ts
+  s_5be9416d40ccd9::t_d3191773f9b0bb 40
+tests/live/foundry-roles.spec.ts
+  s_5be9416d40ccd9::t_527f6bdbaf22dd 2,4-14,19-33,35-73,76-87,90-94,96-125
+  s_5be9416d40ccd9::t_3fba4486d52b36 16-17
+docs/ARCHITECTURE.md
+  s_5be9416d40ccd9::t_117889cab53cee 1170-1172
+  s_5be9416d40ccd9::t_8a21802de420f5 1466
+  s_5be9416d40ccd9::t_2ecf4124344513 493,537
+scripts/foundry-canary.mjs
+  s_5be9416d40ccd9::t_978151df8fea2b 391,402-412,414,416-417,453-454,460-463,465
+  s_5be9416d40ccd9::t_fd02823aff7faa 8
+  s_5be9416d40ccd9::t_c2c379d5bf7b98 442,444
+  s_5be9416d40ccd9::t_422b045ee657f7 1-6,9-10,12-13,16-29,33-48,50-60,62-111,125,133-213,228,230-240,243-257,265-274,276-279,281-285,295-344,354-390,392-396,398-401,418-419,422-441,443,445-452,455,467,470-473,476-485,488-511
+  s_5be9416d40ccd9::t_d12fcab4754844 413
+  s_5be9416d40ccd9::t_63b2117a7f34ee 14-15,456-459
+  s_5be9416d40ccd9::t_0ea2786c81fa07 112-113,115-124,126-132,464,474-475
+  s_5be9416d40ccd9::t_35d6b5d3c87eb6 30-32
+  s_5be9416d40ccd9::t_098b159c99e738 114
+  s_5be9416d40ccd9::t_9d59e2553efb6c 7
+  s_5be9416d40ccd9::t_3fba4486d52b36 49,61
+  s_5be9416d40ccd9::t_429c9f9ab23677 214-227,229,241-242,262-264,275,397,415,468
+  s_5be9416d40ccd9::t_df6db09c262cf7 286-287
+  s_5be9416d40ccd9::t_1881de39161183 345-353,420-421
+  s_5be9416d40ccd9::t_3d0475970b7dce 258-261
+  s_5be9416d40ccd9::t_c255fc07174333 288-294
+  s_5be9416d40ccd9::t_9eee54fa7185bb 11,280,466,469,486-487
+extensions/foundry/tests/ipc/forge-channels.spec.ts
+  s_5be9416d40ccd9::t_e5d30f7c6e37d9 70,73-92
+  s_5be9416d40ccd9::t_53484a30fb051e 93
+  s_5be9416d40ccd9::t_f57694840a1947 1972-1990
+.github/workflows/ci.yml
+  s_5be9416d40ccd9::t_60bd38c51bf209 26-27,87-88,110-111,135-136,171-172,199-200,249-250,306-307,336-337,353-354,422-423,466-467,608-609,623-624
+docs/adr/136-a-real-order-runs-before-foundry-changes-ship.md
+  s_5be9416d40ccd9::t_8a21802de420f5 1-33
+extensions/foundry/src/ipc/forge-channels.ts
+  s_5be9416d40ccd9::t_90b6abe5c0adbe 68-69,369-378,396-397
+  s_5be9416d40ccd9::t_5d355deb313f55 49-52,543-544
+  s_5be9416d40ccd9::t_b727d4ba74746a 269-270
+  s_5be9416d40ccd9::t_81919f1a1f7460 145,349,1000-1008,1081
+tests/unit/scripts/foundry-canary.spec.ts
+  s_5be9416d40ccd9::t_422b045ee657f7 38-40,78-85,96-97,100-101,103-112
+  s_5be9416d40ccd9::t_d12fcab4754844 1-5,8-19,23,25-32,35-37,41,45-50,52-77,86-95,98-99,102,113-115
+  s_5be9416d40ccd9::t_978151df8fea2b 20-22,24,42-44
+  s_5be9416d40ccd9::t_615ee7860db7d1 6,116-125
+  s_5be9416d40ccd9::t_8970f5214c35e2 33-34
+  s_5be9416d40ccd9::t_bbdb4fcb056369 126
+  s_5be9416d40ccd9::t_3fba4486d52b36 7,51
+.github/workflows/fill-pr-description.yml
+  s_5be9416d40ccd9::t_cdd622b65d6a92 16-18
+docs/CONTRIBUTING.md
+  s_5be9416d40ccd9::t_2ecf4124344513 148
+  s_5be9416d40ccd9::t_8ac0b43a5935d7 91
+  s_5be9416d40ccd9::t_8a21802de420f5 83-85,87-88,90,92
+  s_5be9416d40ccd9::t_d10c6034ed63bb 86,89
+scripts/ci-local.mjs
+  s_5be9416d40ccd9::t_c2c379d5bf7b98 12-16,240-247,253-258,261-274
+  s_5be9416d40ccd9::t_c495326758335e 248-252
+extensions/foundry/src/order/order-standing-sources.ts
+  s_5be9416d40ccd9::t_adceb0320a0fe7 2,21
+extensions/foundry/src/order/standing.ts
+  s_5be9416d40ccd9::t_adceb0320a0fe7 93-94,241,250-261,516-519,580,584
+extensions/foundry/tests/order/standing.spec.ts
+  s_5be9416d40ccd9::t_155e911579478d 87,362-380
+extensions/foundry/src/ipc/foundry-api.ts
+  s_5be9416d40ccd9::t_81919f1a1f7460 79
+specs/037-foundry-software-factory/contracts/ipc-channels.md
+  s_5be9416d40ccd9::t_61dda3691661f6 93-112
+tests/unit/scripts/ci-plan.spec.ts
+  s_5be9416d40ccd9::t_9d59e2553efb6c 226,260
+extensions/foundry/src/line/baseline.ts
+  s_5be9416d40ccd9::t_4c607af8e237f1 161-164
+extensions/foundry/tests/line/baseline.spec.ts
+  s_5be9416d40ccd9::t_592b1420770f10 416-448
+extensions/foundry/tests/line/executor-deps.spec.ts
+  s_5be9416d40ccd9::t_157c9a07704ad7 468-474,477-489
+  s_5be9416d40ccd9::t_9a9e64cf5aca62 475-476
+extensions/foundry/src/line/lane-commands.ts
+  s_5be9416d40ccd9::t_157c9a07704ad7 146-147
+src/main/logger.ts
+  s_5be9416d40ccd9::t_c255fc07174333 15-16
+tests/unit/logger.spec.ts
+  s_5be9416d40ccd9::t_30ccc4f1db3e89 49-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "23db5d4a19f08921b6ac0dbc70b21bfbeca2df35",
+  "prompts": {},
+  "sessions": {
+    "s_5be9416d40ccd9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc1b6749-e669-4e1d-905d-6d8e2937d16b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
