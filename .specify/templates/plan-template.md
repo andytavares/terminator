@@ -4,7 +4,7 @@
 
 **Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
 
-**Note**: This template is filled in by the `/speckit-plan` command; its definition describes the execution workflow.
+**Note**: The `/speckit-plan` command fills in this template. Its definition describes the execution workflow.
 
 ## Summary
 
@@ -14,8 +14,7 @@
 
 <!--
   ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
+  for the project. The structure here is advisory. It guides the iteration process.
 -->
 
 **Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]
@@ -38,9 +37,9 @@
 
 ## Constitution Check
 
-_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
+_GATE: Must pass before Phase 0 research. Check again after Phase 1 design._
 
-[Gates determined based on constitution file]
+[Gates from the constitution file]
 
 ## Project Structure
 
@@ -61,7 +60,7 @@ specs/[###-feature]/
 <!--
   ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
   for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
+  real paths (for example, apps/admin, packages/something). The delivered plan must
   not include Option labels.
 -->
 

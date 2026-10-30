@@ -11,12 +11,12 @@
 ## User Scenarios & Testing _(mandatory)_
 
 <!--
-  IMPORTANT: User stories should be PRIORITIZED as user journeys ordered by importance.
-  Each user story/journey must be INDEPENDENTLY TESTABLE - meaning if you implement just ONE of them,
-  you should still have a viable MVP (Minimum Viable Product) that delivers value.
+  IMPORTANT: PRIORITIZE user stories as user journeys, ordered by importance.
+  Each user story/journey must be INDEPENDENTLY TESTABLE. If you implement just ONE of them,
+  you must still have a viable MVP (Minimum Viable Product) that delivers value.
 
-  Assign priorities (P1, P2, P3, etc.) to each story, where P1 is the most critical.
-  Think of each story as a standalone slice of functionality that can be:
+  Assign priorities (P1, P2, P3, and so on) to each story. P1 is the most critical.
+  Treat each story as a standalone slice of functionality that you can:
   - Developed independently
   - Tested independently
   - Deployed independently
@@ -29,7 +29,7 @@
 
 **Why this priority**: [Explain the value and why it has this priority level]
 
-**Independent Test**: [Describe how this can be tested independently - e.g., "Can be fully tested by [specific action] and delivers [specific value]"]
+**Independent Test**: [Describe how to test this independently - for example, "Can be fully tested by [specific action] and delivers [specific value]"]
 
 **Acceptance Scenarios**:
 
@@ -44,7 +44,7 @@
 
 **Why this priority**: [Explain the value and why it has this priority level]
 
-**Independent Test**: [Describe how this can be tested independently]
+**Independent Test**: [Describe how to test this independently]
 
 **Acceptance Scenarios**:
 
@@ -71,8 +71,8 @@
 ### Edge Cases
 
 <!--
-  ACTION REQUIRED: The content in this section represents placeholders.
-  Fill them out with the right edge cases.
+  ACTION REQUIRED: The content in this section is placeholders.
+  Replace them with the right edge cases.
 -->
 
 - What happens when [boundary condition]?
@@ -81,8 +81,8 @@
 ## Requirements _(mandatory)_
 
 <!--
-  ACTION REQUIRED: The content in this section represents placeholders.
-  Fill them out with the right functional requirements.
+  ACTION REQUIRED: The content in this section is placeholders.
+  Replace them with the right functional requirements.
 -->
 
 ### Functional Requirements
@@ -107,7 +107,7 @@ _Example of marking unclear requirements:_
 
 <!--
   ACTION REQUIRED: Define measurable success criteria.
-  These must be technology-agnostic and measurable.
+  They must be technology-agnostic and measurable.
 -->
 
 ### Measurable Outcomes
@@ -120,9 +120,9 @@ _Example of marking unclear requirements:_
 ## Assumptions
 
 <!--
-  ACTION REQUIRED: The content in this section represents placeholders.
-  Fill them out with the right assumptions based on reasonable defaults
-  chosen when the feature description did not specify certain details.
+  ACTION REQUIRED: The content in this section is placeholders.
+  Replace them with the right assumptions. Base them on reasonable defaults
+  that you chose when the feature description did not specify certain details.
 -->
 
 - [Assumption about target users, e.g., "Users have stable internet connectivity"]

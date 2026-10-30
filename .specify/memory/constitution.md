@@ -1,4 +1,15 @@
 <!--
+SYNC IMPACT REPORT (7.0.1)
+==========================
+Version change: 7.0.0 → 7.0.1 (PATCH: prose rewritten to the plain-language writing rules; no rule changed)
+
+Modified principles: none
+Added sections: none
+Removed sections: none
+Templates requiring updates: none
+Follow-up TODOs: none
+-->
+<!--
 SYNC IMPACT REPORT (7.0.0)
 ==========================
 Version change: 6.0.0 → 7.0.0 (MAJOR: Principle XIV's "Only the tests a change can reach" redefined)
@@ -125,27 +136,28 @@ Follow-up TODOs (code and docs that now contradict this version):
 
 ### I. Source Integrity
 
-All development decisions MUST be grounded in official, vendor-published documentation.
-Blogs, Stack Overflow posts, and community tutorials are acceptable for orientation
-only — they MUST NOT be the sole basis for implementation choices.
+All development decisions MUST be based on official, vendor-published documentation.
+Use blogs, Stack Overflow posts, and community tutorials for orientation only.
+They MUST NOT be the sole basis for an implementation choice.
 
-- **MUST** cite official docs when selecting an API, pattern, or behavior.
+- **MUST** cite official docs when you select an API, pattern, or behavior.
 - **MUST** verify behavior against the official specification, not inferred examples.
 - When official docs and community guidance conflict, official docs win.
 
 ### II. Extension Model (NON-NEGOTIABLE)
 
-The core application and each extension are separate programs that meet only through
-the published Extension SDK. The model is VS Code's: the core implements the API,
-extensions run in an extension host process, and an extension reaches another extension
-only through what that extension exports.
+The core application and each extension are separate programs.
+They meet only through the published Extension SDK.
+The model is VS Code's. The core implements the API.
+Extensions run in an extension host process.
+An extension reaches another extension only through what that extension exports.
 
 **The core**
 
-- The core MUST build and run with every extension directory deleted. The core MUST NOT
-  import, require, or reference by path any extension's code.
-- `@terminator/extension-sdk` is the single declaration of the Extension API. The core
-  implements that declaration, and the compiler checks the implementation against it.
+- The core MUST build and run with every extension directory deleted.
+  The core MUST NOT import, require, or reference by path any extension's code.
+- `@terminator/extension-sdk` is the single declaration of the Extension API.
+  The core implements that declaration. The compiler checks the implementation against it.
 
 **What an extension may import**
 
@@ -154,19 +166,19 @@ only through what that extension exports.
 - An extension MUST NOT import core source (`src/**`), another extension's source, or any
   other workspace package. A lint rule enforces this.
 - An extension MUST NOT copy or re-declare types from core internals.
-- Functionality more than one extension needs (a relative time, an atomic file write,
-  running git) MUST be provided once through the SDK: as an API member the core
-  implements, or as a design-system export. It MUST NOT be copied into extensions.
+- When more than one extension needs a function (a relative time, an atomic file write,
+  running git), the SDK MUST provide it once. It is an API member the core
+  implements, or a design-system export. Extensions MUST NOT copy it.
 
 **Runtime**
 
 - Extension backends MUST run in the extension host process, never in the Electron main
   process. An extension's slow or failing code MUST NOT stall terminals or the core.
 - An extension MUST reach the core only through the API object passed to `activate`.
-  Using Electron, `electron-store`, or child processes directly for something the API
-  covers is a defect; if the API does not cover it, the API is extended first.
-- IPC channels introduced for an extension MUST be registered by the extension through
-  the API, never by handler logic in the core. They are local-only unless the extension
+  Use of Electron, `electron-store`, or child processes directly for something the API
+  covers is a defect. If the API does not cover it, extend the API first.
+- An extension MUST register the IPC channels it introduces through the API.
+  Handler logic in the core MUST NOT register them. Channels are local-only unless the extension
   declares a channel remote-accessible.
 - The extension MUST NOT depend on undocumented side-effects of core initialisation
   order, store shape, or runtime globals.
@@ -181,18 +193,19 @@ only through what that extension exports.
 
 **Dependencies**
 
-- All npm packages an extension needs MUST be declared in that extension's own
-  `package.json`. npm workspaces hoist them automatically; Vite resolves them without
+- An extension MUST declare all the npm packages it needs in its own
+  `package.json`. npm workspaces hoist them automatically. Vite resolves them without
   any root-level entry.
 - Adding an extension-only package to the root `package.json` is a defect. The root
   manifest is for the core application only.
 
 **The test**
-Before considering any extension work complete, ask two questions. "If this extension
-directory were deleted, would the core application still build and run without
-modification?" And: "Would every other extension that does not declare it as a
-dependency still build and run?" If either answer is no, the model has been violated and
-MUST be corrected first.
+Before you consider extension work complete, ask two questions.
+"If this extension directory were deleted, would the core application still build and run without
+modification?"
+And: "Would every other extension that does not declare it as a
+dependency still build and run?"
+If either answer is no, the work violates the model, and it MUST be corrected first.
 
 ### IV. Dependency Stewardship
 
@@ -204,31 +217,31 @@ for community health before adoption.
 - When a well-known, battle-tested alternative exists, it MUST be preferred over a
   niche or newer package.
 - All version constraints MUST be pinned to an exact version. Ranges (`^`, `~`, `*`,
-  `latest`) are forbidden in every `package.json`; the only exception is a reference to
+  `latest`) are forbidden in every `package.json`. The only exception is a reference to
   a package inside this repository's own workspaces.
 - **One version per dependency.** A package MUST be declared at exactly one version
   across the root and every workspace `package.json`. One library published under two
   names (`xterm` and `@xterm/xterm`) counts as one package. CI enforces this. npm
   `overrides` MUST NOT be used to force a version, except to apply a security fix,
   with the advisory linked beside it.
-- New dependencies MUST include a brief justification in the PR: community health signal
+- A PR that adds a dependency MUST include a brief justification: a community health signal
   and a link to official documentation.
-- The standard library MUST be used when it fully satisfies the requirement; a third-party
-  package MUST NOT be added if stdlib covers the need.
-- Deprecated packages or packages carrying active CVEs MUST be replaced promptly;
-  they MUST NOT be left in a passing state.
+- The standard library MUST be used when it fully satisfies the requirement. A third-party
+  package MUST NOT be added if the standard library covers the need.
+- Deprecated packages and packages with active CVEs MUST be replaced promptly.
+  They MUST NOT be left in a passing state.
 
 ### V. Code Readability & Minimalism
 
 Code is a liability. The least code that correctly fulfills a requirement is the best code.
 
 - **MUST** prefer readable, obvious code over clever or terse code.
-  If a future reader would need to pause to decode it, rewrite it.
+  If a future reader must pause to decode it, rewrite it.
 - **MUST NOT** add code speculatively. Every line written MUST serve the current requirement.
-- Abstraction MUST be earned: only introduce it when two or more concrete cases demonstrably
-  benefit, and the abstraction boundary is clear. Premature abstraction is treated as a defect.
-- Comments are reserved for non-obvious WHY — not WHAT. Explanatory comments about
-  what the code does are a sign the code should be clearer, not commented.
+- Abstraction MUST be earned. Introduce it only when two or more concrete cases demonstrably
+  benefit and the abstraction boundary is clear. Premature abstraction is a defect.
+- Comments are for the non-obvious WHY, not the WHAT. A comment that explains
+  what the code does shows that the code must be clearer. Make the code clearer; do not comment it.
 
 ### VI. Test-Driven Development (NON-NEGOTIABLE)
 
@@ -240,20 +253,20 @@ a failing test exists that demands it.
   2. Implement the minimum code to make it pass.
   3. Refactor under a green test suite.
 - For bug fixes, the Red → Green → Refactor cycle is mandatory without exception.
-  A bug MUST be reproduced by a failing test before any fix is written.
-- Passing tests do not constitute completion. Work MUST be verified against the agreed
-  spec and validated manually before being marked done.
+  A failing test MUST reproduce a bug before any fix is written.
+- Passing tests do not make work complete. Work MUST be verified against the agreed
+  spec and validated manually before it is marked done.
 - Test coverage MUST be scoped to behavior, not implementation internals.
 - **Coverage gate: Codecov `codecov/patch`.** The pull request MUST have 80% coverage of the
   lines it adds or modifies, as Codecov measures it from the uploaded reports (ADR 095). It
   is the one outside service that gates (Principle XIV). Vitest has no coverage threshold,
   and `npm run ci:local` reports the check as not run.
 - **Tests cover reachable behavior only.** A test MUST exercise a scenario the running
-  application can produce and assert what a user or caller observes. A test that only
-  asserts a mock was called, restates a constant, tests a copy of production code, or
-  can pass without its assertion running is a defect.
-- **Unreachable code is deleted, never tested.** A branch no real caller can reach MUST
-  be removed together with any test that covers it. A dependency that production always
+  application can produce and assert what a user or caller observes. These tests are defects:
+  a test that only asserts a mock was called, restates a constant, tests a copy of production code, or
+  can pass without its assertion running.
+- **Unreachable code is deleted, never tested.** A branch no real caller can reach
+  MUST be removed, together with any test that covers it. A dependency that production always
   supplies MUST be required, not optional.
 
 ### VII. SOLID Design & YAGNI
@@ -262,12 +275,12 @@ Design MUST solve today's problem cleanly. Anticipating future requirements is a
 harmful.
 
 - Follow all five SOLID principles as a baseline design standard.
-- **YAGNI is binding**: features, interfaces, and abstractions not required by the current
-  spec MUST NOT be introduced.
+- **YAGNI is binding**: features, interfaces, and abstractions that the current
+  spec does not require MUST NOT be introduced.
 - The simplest design that correctly implements the spec MUST be chosen over a more
   "extensible" alternative that goes beyond scope.
-- Complexity deviations from the plan MUST be recorded in the plan's Complexity Tracking
-  table with justification.
+- Complexity deviations from the plan MUST be recorded, with justification, in the plan's
+  Complexity Tracking table.
 
 ### VIII. Documentation as First-Class
 
@@ -276,30 +289,30 @@ until its documentation is accurate.
 
 - Docs MUST ship in the same PR as the implementation. No PR is mergeable without
   updated documentation.
-- Documentation MUST be kept accurate as code evolves. Stale docs are treated as bugs.
-- A feature MUST NOT be marked complete until documentation has been reviewed and
-  confirmed to reflect the current implementation.
+- Documentation MUST stay accurate as code evolves. Stale docs are bugs.
+- A feature MUST NOT be marked complete until someone has reviewed the documentation and
+  confirmed that it reflects the current implementation.
 
 ### IX. Architectural Decision Records (ADRs)
 
-Every significant architectural decision MUST be captured in an ADR so future maintainers
-understand the reasoning and tradeoffs, not just the outcome.
+Every significant architectural decision MUST be captured in an ADR. Future maintainers
+then understand the reasoning and tradeoffs, not just the outcome.
 
-- An ADR MUST document: the decision taken, the motivation behind it, and the alternatives
+- An ADR MUST document the decision taken, the motivation behind it, and the alternatives
   considered with their tradeoffs.
 - ADRs MUST be written at the time of the decision, not retroactively.
-- ADRs are immutable records; if a decision is reversed, a new ADR supersedes the old one
-  rather than editing it.
+- ADRs are immutable records. If a decision is reversed, a new ADR supersedes the old one.
+  Do not edit the old one.
 
 ### X. Code Cleanliness (NON-NEGOTIABLE)
 
-Dead code is a defect. Every change must leave the codebase in a cleaner state than it found it.
+Dead code is a defect. Every change must leave the codebase cleaner than it found it.
 
-- **MUST NOT** leave unused imports, unused variables, or unreachable functions. Remove them the moment the code that depended on them is removed or refactored. The linter enforces this — a lint error here means the change is incomplete.
-- **MUST NOT** leave placeholder comments (`// TODO`, `// In a real implementation`, `// For now`) unless attached to a tracked issue reference. Placeholders rot and mislead future readers.
-- **MUST NOT** leave dead exports. If a function, constant, or export is no longer referenced anywhere, delete it.
+- **MUST NOT** leave unused imports, unused variables, or unreachable functions. Remove them the moment the code that depended on them is removed or refactored. The linter enforces this. A lint error here means the change is incomplete.
+- **MUST NOT** leave placeholder comments (`// TODO`, `// In a real implementation`, `// For now`) unless they are attached to a tracked issue reference. Placeholders rot and mislead future readers.
+- **MUST NOT** leave dead exports. If nothing references a function, constant, or export, delete it.
 - **`npm run lint` MUST pass with 0 errors** before any session or PR is considered complete.
-- **Extension compiled output** (`extensions/*/src/index.js`) is a build artifact generated by `scripts/build-extensions.cjs`. It MUST be gitignored and MUST NOT be committed. After changing TypeScript source files under `extensions/*/src/`, always run `npm run build:extensions`. The TypeScript source is the canonical source; the compiled JS must never be edited directly.
+- **Extension compiled output** (`extensions/*/src/index.js`) is a build artifact generated by `scripts/build-extensions.cjs`. It MUST be gitignored and MUST NOT be committed. After you change TypeScript source files under `extensions/*/src/`, always run `npm run build:extensions`. The TypeScript source is the canonical source. Never edit the compiled JS directly.
 
 ### XI. Functional Purity & Immutability
 
@@ -308,7 +321,7 @@ wherever the problem domain allows.
 
 - **MUST** default to immutable data structures and pure functions.
 - Side effects (I/O, mutation, global state) MUST be isolated to the boundaries of the
-  system and explicitly identified. They MUST NOT bleed into domain logic.
+  system and identified explicitly. They MUST NOT bleed into domain logic.
 - A function with a hidden side effect MUST be refactored. If a side effect is truly
   unavoidable, it MUST be documented with an explicit justification.
 
@@ -316,27 +329,27 @@ wherever the problem domain allows.
 
 All icons throughout the application MUST use `lucide-react` components exclusively.
 
-- **MUST** use `lucide-react` for every icon in the UI — no emoji, no unicode symbols, no other icon libraries.
-- Icons MUST be flat and inherit the current text color (`currentColor`). No inline `color` style, no color utility classes on icon elements.
-- Use `opacity` only for state differentiation (e.g., disabled or muted states). Never use color to differentiate icon states.
-- SVG size MUST be controlled via CSS (e.g., `width`/`height` on the icon's container or a CSS selector targeting `svg`), not via the `size` prop, so that all icons remain consistent and layout-controlled.
+- **MUST** use `lucide-react` for every icon in the UI. Do not use emoji, unicode symbols, or other icon libraries.
+- Icons MUST be flat and inherit the current text color (`currentColor`). Do not use an inline `color` style or a color utility class on an icon element.
+- Use `opacity` only to show state (for example, disabled or muted states). Never use color to show icon state.
+- CSS MUST control SVG size (for example, `width`/`height` on the icon's container or a CSS selector that targets `svg`), not the `size` prop. All icons then stay consistent and layout-controlled.
 
 ### XIII. One Design System (NON-NEGOTIABLE)
 
-The core and every extension are built from one design system, so a control looks and
+The core and every extension are built from one design system. A control then looks and
 lines up the same on every screen. The design system package (`packages/extension-ui`
-today) is published outward: the core consumes it exactly as an extension does.
+today) is published outward. The core consumes it exactly as an extension does.
 
 - Design tokens (color, spacing, type, radius, layer) MUST be defined once, in the design
   system, for both themes. The core injects them into its own renderer and into every
   extension view. Neither the core nor an extension may define its own tokens or
   hard-code a value a token covers.
-- A component the design system provides MUST be used; the core and extensions MUST NOT
-  build their own equivalent. A missing component is added to the design system first,
-  then used.
-- Every exported component MUST have Storybook stories covering its states in both
+- The core and extensions MUST use a component that the design system provides.
+  They MUST NOT build their own equivalent. Add a missing component to the design system first,
+  then use it.
+- Every exported component MUST have Storybook stories that cover its states in both
   themes. The stories are the component's documentation and run as tests.
-- Fonts MUST ship with the app; nothing is fetched at runtime to render the UI.
+- Fonts MUST ship with the app. The app fetches nothing at runtime to render the UI.
 - Screenshot tests at the supported window sizes, in both themes, MUST guard the
   layout of every core and extension surface.
 
@@ -345,7 +358,7 @@ today) is published outward: the core consumes it exactly as an extension does.
 A test fails only when the code it covers is wrong. Its result depends on the code and the
 test, and on nothing else: not the order, the machine, the time, the developer's
 environment, an outside service, or another test. A test that fails and passes on the same
-code has no value; it is a defect. ADR 123 records the reasoning.
+code has no value. It is a defect. ADR 123 records the reasoning.
 
 - **No test depends on another.** A test MUST NOT read anything another test did: module
   state, a mock or stub, a timer, an environment variable, a file, a database row, a
@@ -353,39 +366,38 @@ code has no value; it is a defect. ADR 123 records the reasoning.
   undoes what it changed.
 - **Random order, on every run, forever.** Every run of the suite, in CI and locally, MUST
   shuffle the spec files and the tests inside each file with a new seed, and print it. The
-  seed is Vitest's own, which it prints; a failure reproduces with `--sequence.seed=<seed>`. A test that fails in some order MUST be
-  rewritten to be independent; pinning the order (`sequence.shuffle: false`, `.sequential`,
+  seed is Vitest's own, which it prints. A failure reproduces with `--sequence.seed=<seed>`. A test that fails in some order MUST be rewritten so that it is
+  independent. Pinning the order (`sequence.shuffle: false`, `.sequential`,
   a fixed seed) is forbidden.
-- **One run decides.** A check's verdict is its first run. A failing test is never
-  retried or rerun into a pass, in CI, locally, or in Foundry's final check; it is fixed at
-  its cause, or deleted together with the behavior it claimed to cover. Repeats exist only
-  to find flaky tests, never to pass one: in CI, the stability gate runs every spec a change
-  adds or edits up to ten times, shuffled and under load, and any failure fails the check; the
+- **One run decides.** A check's verdict is its first run. Never retry or rerun a failing test into a pass, in CI, locally, or in Foundry's final check. Fix it
+  at its cause, or delete it together with the behavior it claimed to cover. Repeats exist only
+  to find flaky tests, never to pass one. In CI, the stability gate runs every spec a change
+  adds or edits up to ten times, shuffled and under load, and any failure fails the check. The
   nightly sweep runs the whole suite several times on one commit of `main` and opens an
   issue for every test that disagrees with itself. ADR 124.
-- **Quarantine is short, small and visible.** A test the sweep found flaky on `main` may
-  be quarantined: tagged `quarantine` (Vitest) or `@quarantine` (Playwright) and listed in
+- **Quarantine is short, small and visible.** You may quarantine a test that the sweep found flaky on `main`.
+  Tag it `quarantine` (Vitest) or `@quarantine` (Playwright) and list it in
   `tests/quarantine.json` with its issue and an expiry at most 7 days away. It still runs,
-  in a job that does not gate. At most 5 tests are quarantined at once, a test added or
-  edited by a change cannot be, and an expired entry fails Lint until the test is fixed or
+  in a job that does not gate. At most 5 tests are quarantined at once. A change cannot quarantine a test it added or
+  edited. An expired entry fails Lint until the test is fixed or
   deleted. Skipping a test (`skip`, `fixme`, `todo`) is still forbidden.
 - **Signals, never time.** A test waits only on a signal from the code under test: an
   awaited promise, an event, a locator assertion, or `eventually()`
-  (`tests/support/eventually.ts`). It never sleeps and never waits a tick. Work a test
-  starts MUST be awaited; stopping (`dispose`, `stop`, `close`, `deactivate`) returns a
+  (`tests/support/eventually.ts`). It never sleeps and never waits a tick. A test MUST await the work it
+  starts. Stopping (`dispose`, `stop`, `close`, `deactivate`) returns a
   promise that settles when the work it started has ended. The only time limits are the
   hang bounds in `tests/support/bounds.ts` and `playwright.config.ts`, far above any real
-  duration; a spec MUST NOT set its own.
+  duration. A spec MUST NOT set its own.
 - **One sealed environment.** Every test process runs in the environment
   `scripts/test-env.mjs` builds: fixed time zone and locale, a fresh `HOME` and `TMPDIR`,
   the fixture git config, stubs first on `PATH`. Nothing of the developer's environment
-  reaches a test. A spec connects only to loopback; a stub that has no answer fails, it
+  reaches a test. A spec connects only to loopback. A stub that has no answer fails. It
   never falls through to the real tool.
 - **CI and the local check are the same check.** CI runs on macOS, as the product does,
   with the Node in `.nvmrc` and the commands `.github/workflows/ci.yml` lists.
   `npm run ci:local` runs those same commands, except the stability gate's repeats, on the
-  commit merged with `origin/main`, never the working tree, and the pre-push hook refuses a commit it has not passed. A CI
-  failure after a local pass is a parity defect and is fixed like any other defect.
+  commit merged with `origin/main`, never the working tree. The pre-push hook refuses a commit that has not passed it. A CI
+  failure after a local pass is a parity defect. Fix it like any other defect.
 - **Outside services never gate.** An advisory database, the artifact store or a registry
   MUST NOT turn a change red that did not touch what they check. The one exception is
   Codecov's `codecov/patch`, which gates the lines a change adds or modifies (Principle VI).
@@ -393,7 +405,7 @@ code has no value; it is a defect. ADR 123 records the reasoning.
 - **Only the tests a change can reach.** `scripts/test-select.mjs` picks the unit,
   integration and end-to-end tests a diff can reach, the same way in CI and locally. A path
   it cannot place runs everything. A push to `main` runs what its change reaches, compared with
-  the commit `main` was at before, and a push that passes them is released. The pull request
+  the commit `main` was at before. A push that passes them is released. The pull request
   label `test: all`, `--all` locally and the nightly sweep run everything.
 - **Enforced, not trusted.** `eslint.config.mjs` rejects sleeps, ticks, time limits and
   promises left unawaited in specs. These rules MUST NOT be disabled, suppressed or
@@ -409,19 +421,19 @@ Isolation and process discipline prevent environment drift and protect the share
   a ratified specification.
 - All work MUST happen on a feature branch. Direct commits to `main` are forbidden.
 - Complexity deviations from the plan MUST be recorded in the plan's Complexity Tracking
-  table, not silently accepted.
+  table. Do not accept them silently.
 
 ## Governance
 
 This constitution supersedes all other practices, conventions, and ad-hoc guidance.
 
 - All PRs and code reviews MUST verify adherence to these principles before merge approval.
-- Amendments to this constitution require: a documented rationale, a version bump following
+- An amendment to this constitution requires a documented rationale, a version bump that follows
   semantic versioning (MAJOR for removals/redefinitions, MINOR for additions,
   PATCH for clarifications), and an updated `Last Amended` date.
-- Principle violations that cannot be resolved MUST be escalated and recorded — they are
-  never silently accepted.
+- Principle violations that cannot be resolved MUST be escalated and recorded.
+  Never accept them silently.
 - The constitution version and amendment history are the authoritative record of governance
-  decisions affecting this project.
+  decisions that affect this project.
 
-**Version**: 7.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-10-29
+**Version**: 7.0.1 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-10-30

@@ -8,9 +8,9 @@ description: 'Task list template for feature implementation'
 
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
+**Tests**: The examples below include test tasks. Tests are OPTIONAL. Include them only if the feature specification explicitly requests them.
 
-**Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
+**Organization**: Tasks are grouped by user story, so each story can be implemented and tested independently.
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -23,19 +23,19 @@ description: 'Task list template for feature implementation'
 - **Single project**: `src/`, `tests/` at repository root
 - **Web app**: `backend/src/`, `frontend/src/`
 - **Mobile**: `api/src/`, `ios/src/` or `android/src/`
-- Paths shown below assume single project - adjust based on plan.md structure
+- The paths below assume a single project. Adjust them to the plan.md structure
 
 <!--
   ============================================================================
-  IMPORTANT: The tasks below are SAMPLE TASKS for illustration purposes only.
+  IMPORTANT: The tasks below are SAMPLE TASKS for illustration only.
 
-  The /speckit-tasks command MUST replace these with actual tasks based on:
+  The /speckit-tasks command MUST replace these with actual tasks from:
   - User stories from spec.md (with their priorities P1, P2, P3...)
   - Feature requirements from plan.md
   - Entities from data-model.md
   - Endpoints from contracts/
 
-  Tasks MUST be organized by user story so each story can be:
+  Tasks MUST be organized by user story, so each story can be:
   - Implemented independently
   - Tested independently
   - Delivered as an MVP increment
@@ -60,7 +60,7 @@ description: 'Task list template for feature implementation'
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-Examples of foundational tasks (adjust based on your project):
+Examples of foundational tasks (adjust them to your project):
 
 - [ ] T004 Setup database schema and migrations framework
 - [ ] T005 [P] Implement authentication/authorization framework
@@ -95,7 +95,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T016 [US1] Add validation and error handling
 - [ ] T017 [US1] Add logging for user story 1 operations
 
-**Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
+**Checkpoint**: At this point, User Story 1 must be fully functional and testable independently
 
 ---
 
@@ -117,7 +117,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T022 [US2] Implement [endpoint/feature] in src/[location]/[file].py
 - [ ] T023 [US2] Integrate with User Story 1 components (if needed)
 
-**Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
+**Checkpoint**: At this point, User Stories 1 AND 2 must both work independently
 
 ---
 
@@ -138,7 +138,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T027 [US3] Implement [Service] in src/services/[service].py
 - [ ] T028 [US3] Implement [endpoint/feature] in src/[location]/[file].py
 
-**Checkpoint**: All user stories should now be independently functional
+**Checkpoint**: All user stories must now be independently functional
 
 ---
 
@@ -163,18 +163,18 @@ Examples of foundational tasks (adjust based on your project):
 
 ### Phase Dependencies
 
-- **Setup (Phase 1)**: No dependencies - can start immediately
+- **Setup (Phase 1)**: No dependencies - start immediately
 - **Foundational (Phase 2)**: Depends on Setup completion - BLOCKS all user stories
 - **User Stories (Phase 3+)**: All depend on Foundational phase completion
   - User stories can then proceed in parallel (if staffed)
-  - Or sequentially in priority order (P1 → P2 → P3)
+  - Or in sequence by priority (P1 → P2 → P3)
 - **Polish (Final Phase)**: Depends on all desired user stories being complete
 
 ### User Story Dependencies
 
-- **User Story 1 (P1)**: Can start after Foundational (Phase 2) - No dependencies on other stories
-- **User Story 2 (P2)**: Can start after Foundational (Phase 2) - May integrate with US1 but should be independently testable
-- **User Story 3 (P3)**: Can start after Foundational (Phase 2) - May integrate with US1/US2 but should be independently testable
+- **User Story 1 (P1)**: Start after Foundational (Phase 2) - No dependencies on other stories
+- **User Story 2 (P2)**: Start after Foundational (Phase 2) - Can integrate with US1 but must be independently testable
+- **User Story 3 (P3)**: Start after Foundational (Phase 2) - Can integrate with US1/US2 but must be independently testable
 
 ### Within Each User Story
 
@@ -182,7 +182,7 @@ Examples of foundational tasks (adjust based on your project):
 - Models before services
 - Services before endpoints
 - Core implementation before integration
-- Story complete before moving to next priority
+- Complete a story before you move to the next priority
 
 ### Parallel Opportunities
 
@@ -191,7 +191,7 @@ Examples of foundational tasks (adjust based on your project):
 - Once Foundational phase completes, all user stories can start in parallel (if team capacity allows)
 - All tests for a user story marked [P] can run in parallel
 - Models within a story marked [P] can run in parallel
-- Different user stories can be worked on in parallel by different team members
+- Different team members can work on different user stories in parallel
 
 ---
 
@@ -243,9 +243,9 @@ With multiple developers:
 ## Notes
 
 - [P] tasks = different files, no dependencies
-- [Story] label maps task to specific user story for traceability
-- Each user story should be independently completable and testable
-- Verify tests fail before implementing
+- The [Story] label maps a task to a user story for traceability
+- Each user story must be independently completable and testable
+- Verify that tests fail before you implement
 - Commit after each task or logical group
-- Stop at any checkpoint to validate story independently
+- Stop at any checkpoint to validate the story independently
 - Avoid: vague tasks, same file conflicts, cross-story dependencies that break independence

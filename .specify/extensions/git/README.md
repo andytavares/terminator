@@ -1,16 +1,16 @@
 # Git Branching Workflow Extension
 
-Git repository initialization, feature branch creation, numbering (sequential/timestamp), validation, remote detection, and auto-commit for Spec Kit.
+Git repository initialization, feature branch creation, numbering (sequential or timestamp), validation, remote detection, and auto-commit for Spec Kit.
 
 ## Overview
 
-This extension provides Git operations as an optional, self-contained module. It manages:
+This extension provides Git operations as an optional, self-contained module. It handles:
 
 - **Repository initialization** with configurable commit messages
 - **Feature branch creation** with sequential (`001-feature-name`) or timestamp (`20260319-143022-feature-name`) numbering
-- **Branch validation** to ensure branches follow naming conventions
+- **Branch validation** that checks branches follow naming conventions
 - **Git remote detection** for GitHub integration (e.g., issue creation)
-- **Auto-commit** after core commands (configurable per-command with custom messages)
+- **Auto-commit** after core commands (configurable for each command, with custom messages)
 
 ## Commands
 
@@ -47,7 +47,7 @@ This extension provides Git operations as an optional, self-contained module. It
 
 ## Configuration
 
-Configuration is stored in `.specify/extensions/git/git-config.yml`:
+The configuration is in `.specify/extensions/git/git-config.yml`:
 
 ```yaml
 # Branch numbering strategy: "sequential" or "timestamp"
@@ -84,12 +84,12 @@ specify extension enable git
 
 ## Graceful Degradation
 
-When Git is not installed or the directory is not a Git repository:
+When Git is not installed, or the directory is not a Git repository:
 
-- Spec directories are still created under `specs/`
-- Branch creation is skipped with a warning
-- Branch validation is skipped with a warning
-- Remote detection returns empty results
+- The extension still creates spec directories under `specs/`
+- The extension skips branch creation and shows a warning
+- The extension skips branch validation and shows a warning
+- Remote detection returns no results
 
 ## Scripts
 
