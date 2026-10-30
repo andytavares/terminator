@@ -1,0 +1,21 @@
+extensions/foundry/src/factory/art/props.ts
+  s_3b2932418ffe56::t_0594cca79ac76e 218,255
+extensions/foundry/src/ipc/run-channels.ts
+  s_3b2932418ffe56::t_0594cca79ac76e 248,304
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "76fb7d0713774eda2d775d3c7aa1085ed5f381a6",
+  "prompts": {},
+  "sessions": {
+    "s_3b2932418ffe56": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea2c55f8-2b5a-46f8-9cf4-d59aab4d031d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
