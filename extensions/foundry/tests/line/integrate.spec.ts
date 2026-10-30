@@ -17,6 +17,7 @@ import {
   commitAndPushLanes,
 } from '../../src/line/integrate.js'
 import type { IntegrateDeps, ShellExec, ShippedDrafts } from '../../src/line/integrate.js'
+import { FOUNDRY_PUSH } from '../../src/line/integrate.js'
 import { checkoutPath } from '../../src/line/worktree.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -182,7 +183,7 @@ function theBodyAndTheWorktreeTests() {
     const d = deps()
     await shipVerified(d)
     const expected = checkoutPath(root, refreshTokenOrder(), 'app')
-    const pushes = callsTo(d.exec, 'git').filter((call) => call.args[0] === 'push')
+    const pushes = callsTo(d.exec, 'git').filter((call) => call.args.includes('push'))
     expect(pushes).toHaveLength(1)
     expect(pushes[0].cwd).toBe(expected)
     expect(callsTo(d.exec, 'gh', 'create')[0].cwd).toBe(expected)
@@ -202,6 +203,7 @@ function pushingTests() {
     const d = deps()
     await shipVerified(d)
     expect(callsTo(d.exec, 'git')[0].args).toEqual([
+      ...FOUNDRY_PUSH,
       'push',
       '--set-upstream',
       'origin',
@@ -1165,7 +1167,13 @@ function theDerivedBranchTests() {
     const d = deps()
     await shipOrder(withNoHeadBranch(), { verdicts: [verdict()], findings: [] }, d)
     const [push] = callsTo(d.exec, 'git')
-    expect(push.args).toEqual(['push', '--set-upstream', 'origin', `HEAD:${DERIVED}`])
+    expect(push.args).toEqual([
+      ...FOUNDRY_PUSH,
+      'push',
+      '--set-upstream',
+      'origin',
+      `HEAD:${DERIVED}`,
+    ])
   })
 
   it('never asks git to push to nothing', async () => {
@@ -1453,9 +1461,15 @@ function laneOrderTests() {
   it('pushes every lane in lane order, from its checkout path', async () => {
     const d = multiDepsForPush()
     await pushLanes(twoLanesOrder(), d)
-    const pushes = callsTo(d.exec, 'git').filter((call) => call.args[0] === 'push')
+    const pushes = callsTo(d.exec, 'git').filter((call) => call.args.includes('push'))
     expect(pushes).toHaveLength(2)
-    expect(pushes[0].args).toEqual(['push', '--set-upstream', 'origin', 'HEAD:f/wo-1'])
+    expect(pushes[0].args).toEqual([
+      ...FOUNDRY_PUSH,
+      'push',
+      '--set-upstream',
+      'origin',
+      'HEAD:f/wo-1',
+    ])
     expect(pushes[0].cwd).toBe(checkoutPath(root, twoLanesOrder(), 'proto'))
     expect(pushes[1].cwd).toBe(checkoutPath(root, twoLanesOrder(), 'cli'))
   })
@@ -1503,7 +1517,7 @@ function integrateOpeningTests() {
     const again = deps({ onDraftOpened })
     const reopened = await openDrafts(refreshTokenOrder(), { verdicts: [], findings: [] }, again)
     expect(callsTo(again.exec, 'gh', 'create')).toHaveLength(0)
-    expect(callsTo(again.exec, 'git').some((c) => c.args[0] === 'push')).toBe(true)
+    expect(callsTo(again.exec, 'git').some((c) => c.args.includes('push'))).toBe(true)
     expect(reopened.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
     expect(onDraftOpened).toHaveBeenCalledTimes(1)
   })
@@ -1544,11 +1558,11 @@ function committingTests() {
       timedOut: false,
     }))
     expect(await commitAndPushLanes(refreshTokenOrder(), 'final check: format', dirty)).toBe(true)
-    expect(callsTo(dirty.exec, 'git').some((c) => c.args[0] === 'push')).toBe(true)
+    expect(callsTo(dirty.exec, 'git').some((c) => c.args.includes('push'))).toBe(true)
 
     const clean = deps()
     expect(await commitAndPushLanes(refreshTokenOrder(), 'final check: format', clean)).toBe(false)
-    expect(callsTo(clean.exec, 'git').some((c) => c.args[0] === 'push')).toBe(false)
+    expect(callsTo(clean.exec, 'git').some((c) => c.args.includes('push'))).toBe(false)
   })
 }
 

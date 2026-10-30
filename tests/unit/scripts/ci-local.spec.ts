@@ -75,6 +75,14 @@ describe("the pre-push hook runs only on a person's machine", () => {
   it('lets a CI job push its own commit, since CI runs the checks itself', () => {
     expect(checksPushes({ CI: 'true', PATH: '/usr/bin' })).toBe(false)
   })
+
+  it("lets Foundry push an order's branch, since its final check ran and CI runs on the draft", () => {
+    expect(checksPushes({ PATH: '/usr/bin' }, 'true')).toBe(false)
+  })
+
+  it('checks a push whose foundry.push setting is anything but true', () => {
+    expect(checksPushes({ PATH: '/usr/bin' }, '')).toBe(true)
+  })
 })
 
 describe('the pass record names the commit and the main it was merged with', () => {
