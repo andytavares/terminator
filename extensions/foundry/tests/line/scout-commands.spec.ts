@@ -62,6 +62,43 @@ describe('keepScoutCommands', () => {
   })
 })
 
+/** The store, with the architect's draft landing after the scout last read and before it writes. */
+function storeWithADraftLandingMidway(): OrderStore {
+  let landed = false
+  let loads = 0
+  const land = async (id: string): Promise<void> => {
+    if (landed) return
+    landed = true
+    await store.update(id, (o) => ({ ...o, title: 'drafted by the architect' }))
+  }
+  return {
+    ...store,
+    // The scout's reads: its first picks the proposals, a second is the one it would write over.
+    load: async (id) => {
+      const loaded = await store.load(id)
+      loads += 1
+      if (loads === 2) await land(id)
+      return loaded
+    },
+    update: async (id, change) => {
+      await land(id)
+      return store.update(id, change)
+    },
+  }
+}
+
+describe('keepScoutCommands beside a draft written at the same time', () => {
+  it('keeps both the draft and the command', async () => {
+    await keepScoutCommands('WO-1', [lintProposal], {
+      ...keepDeps(),
+      store: storeWithADraftLandingMidway(),
+    })
+    const saved = await store.load('WO-1')
+    expect(saved?.title).toBe('drafted by the architect')
+    expect(saved?.context.toolchain.lint?.command).toBe('make lint')
+  })
+})
+
 describe('keepScoutCommands beside commands already given', () => {
   it('never replaces a command the order already has, and does not run the proposal', async () => {
     const order = await store.load('WO-1')

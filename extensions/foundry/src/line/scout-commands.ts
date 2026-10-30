@@ -113,11 +113,18 @@ async function keep(deps: ScoutCommandDeps, { order, proposal }: Settling): Prom
     ...stored,
     checks: { ...stored.checks, [check]: entry },
   })
-  const current = (await deps.store.load(order.id)) ?? order
-  if (current.context.toolchain[check] === null) {
-    const toolchain = { ...current.context.toolchain, [check]: entry }
-    await deps.store.save({ ...current, context: { ...current.context, toolchain } })
-  }
+  // An update, not a load and a save: the architect may be saving its first draft now.
+  await deps.store.update(order.id, (current) =>
+    current.context.toolchain[check] !== null
+      ? current
+      : {
+          ...current,
+          context: {
+            ...current.context,
+            toolchain: { ...current.context.toolchain, [check]: entry },
+          },
+        }
+  )
   await record(deps, {
     orderId: order.id,
     action: 'scout.command.kept',

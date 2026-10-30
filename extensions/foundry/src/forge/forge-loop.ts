@@ -276,10 +276,13 @@ async function afterRedraft(
 ): Promise<void> {
   const { order } = ask
   const store = orderStoreAt(root)
-  // The scout runs beside a first draft, so it may have stored its
-  // findings while this turn was still writing.
-  const drafted = withScoutContext(outcome.order, await store.load(order.id))
-  await store.save({ ...drafted, intake: intakeAt('ready', new Date()) })
+  // The scout runs beside a first draft, so it may have stored its findings while this
+  // turn was still writing; an update queues behind its write instead of replacing it.
+  const saved = await store.update(order.id, (latest) => ({
+    ...withScoutContext(outcome.order, latest),
+    intake: intakeAt('ready', new Date()),
+  }))
+  const drafted = saved ?? outcome.order
   await recordLoopEntry(root, {
     orderId: order.id,
     actor: 'role:architect',
