@@ -81,16 +81,9 @@
   font-size: 11.5px;
 }
 
-.rs-cell--ok .rs-icon {
-  color: var(--tm-success);
-}
-
-.rs-cell--wait .rs-icon {
-  color: var(--tm-warning);
-}
-
+/* Icons are flat: they take the cell's text colour, and a quiet state is drawn faint. */
 .rs-cell--quiet .rs-icon {
-  color: var(--tm-text-muted);
+  opacity: 0.6;
 }
 
 .rs-cell--quiet .rs-label {
@@ -101,7 +94,6 @@
   background: color-mix(in srgb, var(--tm-danger) 7%, transparent);
 }
 
-.rs-cell--bad .rs-icon,
 .rs-cell--bad .rs-label {
   color: var(--tm-danger);
 }

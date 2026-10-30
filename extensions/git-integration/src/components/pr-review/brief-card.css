@@ -30,7 +30,6 @@
   width: 14px;
   height: 14px;
   flex-shrink: 0;
-  color: var(--tm-agent);
 }
 
 .brief-card__meta {
@@ -120,5 +119,4 @@
   height: 14px;
   flex-shrink: 0;
   margin-top: 2px;
-  color: var(--tm-danger);
 }

@@ -1,5 +1,7 @@
 import React from 'react'
-import { describe, it, expect } from 'vitest'
+import fs from 'node:fs'
+import path from 'node:path'
+import { afterEach, beforeEach, describe, it, expect } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ReadinessStrip } from '../../src/components/pr-review/ReadinessStrip'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
@@ -129,5 +131,61 @@ describe('ReadinessStrip branch actions', () => {
   it('shows a branch error as an alert', () => {
     renderStrip({}, { ...idleBranch, error: 'Could not update the branch' })
     expect(screen.getByRole('alert').textContent).toBe('Could not update the branch')
+  })
+})
+
+const TOKENS = path.resolve(__dirname, '../../../../packages/extension-ui/src/tokens.css')
+
+/** Adds the design tokens and one of the overview's stylesheets to the document, so the icons'
+ *  colours can be computed. */
+function addStylesheet(file: string): () => void {
+  const style = document.createElement('style')
+  const sheet = path.resolve(__dirname, '../../src/components/pr-review', file)
+  style.textContent = [TOKENS, sheet].map((css) => fs.readFileSync(css, 'utf8')).join('\n')
+  document.head.append(style)
+  return () => style.remove()
+}
+
+/** The text of a rule's body in the strip's stylesheet; happy-dom drops color-mix() values. */
+function declared(selector: string): string {
+  const css = fs.readFileSync(path.resolve(__dirname, STRIP_CSS), 'utf8')
+  return css.match(new RegExp(`^${selector.replace('.', '\\.')} \\{([^}]*)\\}`, 'm'))?.[1] ?? ''
+}
+
+const STRIP_CSS = '../../src/components/pr-review/readiness-strip.css'
+
+/** Whether an icon draws in its parent's text colour, the flat-icons rule. */
+function inheritsTextColour(icon: Element): boolean {
+  return getComputedStyle(icon).color === getComputedStyle(icon.parentElement as Element).color
+}
+
+describe('ReadinessStrip — status and flat icons', () => {
+  let removeStylesheet = () => {}
+  beforeEach(() => {
+    removeStylesheet = addStylesheet('readiness-strip.css')
+  })
+  afterEach(() => removeStylesheet())
+
+  it('is named Status for assistive technology', () => {
+    renderStrip()
+    expect(screen.getByRole('group', { name: 'Status' })).toBeTruthy()
+  })
+
+  it("draws every icon in its cell's text colour, the quiet one at 60%", () => {
+    renderStrip({ statusChecks: [], requestedReviewers: ['dee'], mergeStateStatus: 'unknown' })
+    const icons = [...document.querySelectorAll('.rs-icon')]
+    expect(icons.map((icon) => icon.getAttribute('data-tone'))).toEqual(['quiet', 'wait', 'quiet'])
+    expect(icons.filter((icon) => !inheritsTextColour(icon))).toEqual([])
+    expect(icons.map((icon) => getComputedStyle(icon).opacity)).toEqual(['0.6', '', '0.6'])
+  })
+
+  it('keeps the failing cell tinted with a red label, and its icon flat', () => {
+    renderStrip({ statusChecks: [{ name: 'CI', state: 'fail' }], mergeStateStatus: 'clean' })
+    const icon = document.querySelector('.rs-cell--bad .rs-icon') as Element
+    const cell = icon.closest('.rs-cell') as Element
+    expect(inheritsTextColour(icon)).toBe(true)
+    const danger = getComputedStyle(document.documentElement).getPropertyValue('--tm-danger')
+    expect(getComputedStyle(cell.querySelector('.rs-label') as Element).color).toBe(danger.trim())
+    expect(declared('.rs-cell--bad')).toContain('background: color-mix(in srgb, var(--tm-danger)')
   })
 })

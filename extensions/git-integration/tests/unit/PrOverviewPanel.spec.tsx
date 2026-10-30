@@ -17,6 +17,12 @@ vi.mock('../../../../src/renderer/extensions/registry', () => ({
   useExtensionRegistry: () => ({ setActiveProjectTab: mockSetActiveProjectTab }),
 }))
 
+/** The pane width usePaneWidth reports; null is a pane not yet measured, drawn as wide. */
+const pane = vi.hoisted(() => ({ width: null as number | null }))
+vi.mock('../../src/hooks/usePaneWidth', () => ({
+  usePaneWidth: () => ({ paneRef: () => {}, width: pane.width }),
+}))
+
 vi.mock('../../src/hooks/usePrReview', () => ({
   useLoadIssueComments: vi.fn(() => vi.fn()),
 }))
@@ -138,6 +144,7 @@ const basePr: PrReviewDetail = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  pane.width = null
   mockPreparePrWorktree.mockResolvedValue({ hasConflicts: true })
   mockCreateProject.mockResolvedValue({ project: { id: 'proj-conflict' } })
   // Stub window.electronAPI.git.suggestWorktreePath
@@ -183,7 +190,7 @@ function headerActions(): HTMLElement {
 }
 
 function readiness(): HTMLElement {
-  return screen.getByRole('group', { name: 'Readiness' })
+  return screen.getByRole('group', { name: 'Status' })
 }
 
 function openDiscussion() {
@@ -296,17 +303,26 @@ describe('PrOverviewPanel — starting the review', () => {
 })
 
 describe('PrOverviewPanel — the tabs', () => {
-  it('offers Overview and Discussion with its count, and no Insights', () => {
+  it('offers Change and Discussion with its count, and no Insights', () => {
     renderPanel()
     const tabs = screen.getAllByRole('tab')
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['Overview', 'Discussion · 0'])
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Change', 'Discussion · 0'])
+    expect(screen.getByRole('tab', { name: 'Discussion, 0' })).toBe(tabs[1])
     expect(tabs[0].getAttribute('aria-selected')).toBe('true')
     expect(screen.queryByRole('tab', { name: 'Insights' })).toBeNull()
   })
 
-  it('shows the properties rail beside the overview', () => {
+  it('draws the properties rail beside the tab panel, not inside it', () => {
     renderPanel()
-    expect(screen.getByRole('complementary', { name: 'Pull request details' })).toBeTruthy()
+    const rail = screen.getByRole('complementary', { name: 'Pull request details' })
+    expect(screen.getByRole('tabpanel', { name: 'Change' }).contains(rail)).toBe(false)
+  })
+
+  it('keeps the properties rail beside the discussion', () => {
+    renderPanel()
+    openDiscussion()
+    const rail = screen.getByRole('complementary', { name: 'Pull request details' })
+    expect(within(rail).getByRole('heading', { name: 'Signals' })).toBeTruthy()
   })
 
   it('keeps only the selected tab in the document', () => {
@@ -361,9 +377,10 @@ describe('PrOverviewPanel — the description', () => {
     expect(screen.getByText('No description provided.')).toBeTruthy()
   })
 
-  it('shows the whole description until a summary exists', () => {
+  it('clamps the description before any summary exists', () => {
     renderPanel()
-    expect(screen.queryByRole('button', { name: 'Show full description' })).toBeNull()
+    const reading = screen.getByTestId('rich-content').parentElement
+    expect(reading?.classList.contains('pr-overview-reading--clamped')).toBe(true)
   })
 })
 
@@ -392,7 +409,7 @@ describe('PrOverviewPanel — clamping the description', () => {
     expect(screen.queryByRole('button', { name: 'Show full description' })).toBeNull()
   })
 
-  it('clamps the description once a summary is shown, and unclamps on request', async () => {
+  it('offers the full description of a long one, and clamps it again on request', async () => {
     const restore = stubDescriptionHeights(900, 300)
     try {
       await expectClampThenExpand()
@@ -403,11 +420,11 @@ describe('PrOverviewPanel — clamping the description', () => {
 
   async function expectClampThenExpand() {
     renderPanel()
-    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
-    await screen.findByText('A summary.')
     fireEvent.click(await screen.findByRole('button', { name: 'Show full description' }))
-    expect(screen.getByRole('button', { name: 'Show less' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Show full description' })).toBeNull()
+    const reading = screen.getByTestId('rich-content').parentElement
+    expect(reading?.classList.contains('pr-overview-reading--clamped')).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Show less' }))
+    expect(reading?.classList.contains('pr-overview-reading--clamped')).toBe(true)
   }
 })
 
@@ -418,8 +435,27 @@ describe('PrOverviewPanel — the summary and tabs', () => {
     await screen.findByText('A summary.')
     openDiscussion()
     expect(screen.queryByText('A summary.')).toBeNull()
-    fireEvent.click(screen.getByRole('tab', { name: 'Overview' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Change' }))
     expect(screen.getByText('A summary.')).toBeTruthy()
+  })
+
+  it('draws the description summary inside the Change panel', async () => {
+    renderPanel()
+    const change = screen.getByRole('tabpanel', { name: 'Change' })
+    fireEvent.click(within(change).getByRole('button', { name: 'Summarize' }))
+    expect(await within(change).findByText('A summary.')).toBeTruthy()
+  })
+
+  it('draws the discussion summary inside the Discussion panel only', async () => {
+    withComments([bobsComment])
+    renderPanel()
+    openDiscussion()
+    const discussion = screen.getByRole('tabpanel', { name: 'Discussion, 1' })
+    fireEvent.click(within(discussion).getByRole('button', { name: 'Summarize' }))
+    expect(await within(discussion).findByText('A summary.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: 'Change' }))
+    const change = screen.getByRole('tabpanel', { name: 'Change' })
+    expect(within(change).queryByText('A summary.')).toBeNull()
   })
 })
 
@@ -438,7 +474,7 @@ describe('PrOverviewPanel — the discussion composer', () => {
       currentUserLogin: null,
     })
     renderPanel()
-    fireEvent.click(screen.getByRole('tab', { name: 'Discussion · 1' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Discussion, 1' }))
     expect(screen.getByText('Looks off')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Reply' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Summarize' })).toBeTruthy()
@@ -459,7 +495,7 @@ describe('PrOverviewPanel — replying and posting', () => {
       currentUserLogin: null,
     })
     renderPanel()
-    fireEvent.click(screen.getByRole('tab', { name: 'Discussion · 1' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Discussion, 1' }))
     fireEvent.click(screen.getByRole('button', { name: 'Reply' }))
     expect((screen.getByPlaceholderText('Leave a comment…') as HTMLTextAreaElement).value).toBe(
       '> Looks off\n\n'
@@ -540,5 +576,144 @@ describe('PrOverviewPanel — a branch with conflicts', () => {
       headRefName: basePr.headRefName,
       baseRefName: basePr.baseRefName,
     })
+  })
+})
+
+function withComments(issueComments: (typeof bobsComment)[]) {
+  vi.mocked(usePrReviewStore).mockReturnValue({
+    viewedFiles: new Set(),
+    issueComments,
+    currentUserLogin: null,
+  })
+}
+
+const commentsNumbered = (count: number) =>
+  Array.from({ length: count }, (_, index) => ({
+    ...bobsComment,
+    id: index + 1,
+    body: `Comment ${index + 1}`,
+  }))
+
+function shownCommentBodies(): string[] {
+  return screen
+    .queryAllByTestId('rich-content')
+    .map((element) => element.textContent ?? '')
+    .filter((text) => text.startsWith('Comment '))
+}
+
+describe('PrOverviewPanel — the clamp fade', () => {
+  const fades = (element: Element | null) =>
+    element?.classList.contains('pr-overview-reading--overflows')
+
+  it('draws no fade over text that fits', () => {
+    withComments([bobsComment])
+    renderPanel()
+    expect(fades(screen.getByTestId('rich-content').parentElement)).toBe(false)
+    openDiscussion()
+    expect(fades(screen.getByText('Looks off').parentElement)).toBe(false)
+  })
+
+  it('fades text that overflows the clamp, and not once it is opened', async () => {
+    const restore = stubDescriptionHeights(900, 300)
+    try {
+      renderPanel()
+      const reading = screen.getByTestId('rich-content').parentElement
+      expect(fades(reading)).toBe(true)
+      fireEvent.click(screen.getByRole('button', { name: 'Show full description' }))
+      expect(fades(reading)).toBe(false)
+    } finally {
+      restore()
+    }
+  })
+})
+
+describe('PrOverviewPanel — earlier comments', () => {
+  it('shows the last three of five comments, and the rest on request', () => {
+    withComments(commentsNumbered(5))
+    renderPanel()
+    openDiscussion()
+    expect(shownCommentBodies()).toEqual(['Comment 3', 'Comment 4', 'Comment 5'])
+    fireEvent.click(screen.getByRole('button', { name: 'Show 2 earlier comments' }))
+    expect(shownCommentBodies()).toEqual([1, 2, 3, 4, 5].map((n) => `Comment ${n}`))
+    expect(screen.queryByRole('button', { name: /earlier comment/ })).toBeNull()
+  })
+
+  it.each([0, 1, 3])('collapses nothing in a discussion of %i comments', (count) => {
+    withComments(commentsNumbered(count))
+    renderPanel()
+    openDiscussion()
+    expect(shownCommentBodies()).toHaveLength(count)
+    expect(screen.queryByRole('button', { name: /earlier comment/ })).toBeNull()
+  })
+
+  it('names one earlier comment in the singular', () => {
+    withComments(commentsNumbered(4))
+    renderPanel()
+    openDiscussion()
+    expect(screen.getByRole('button', { name: 'Show 1 earlier comment' })).toBeTruthy()
+  })
+})
+
+describe('PrOverviewPanel — clamping a comment', () => {
+  it('clamps each comment body', () => {
+    withComments(commentsNumbered(2))
+    renderPanel()
+    openDiscussion()
+    const bodies = screen.getAllByText(/^Comment \d$/).map((element) => element.parentElement)
+    expect(bodies.every((body) => body?.classList.contains('pr-overview-reading--clamped'))).toBe(
+      true
+    )
+  })
+
+  it('offers the full text of a long comment', () => {
+    const restore = stubDescriptionHeights(900, 160)
+    try {
+      withComments([bobsComment])
+      renderPanel()
+      openDiscussion()
+      fireEvent.click(screen.getByRole('button', { name: 'Show full comment' }))
+      const body = screen.getByText('Looks off').parentElement
+      expect(body?.classList.contains('pr-overview-reading--clamped')).toBe(false)
+    } finally {
+      restore()
+    }
+  })
+})
+
+describe('PrOverviewPanel — a narrow pane', () => {
+  it('moves the properties rail into a third tab', () => {
+    pane.width = 760
+    renderPanel()
+    expect(screen.queryByRole('complementary', { name: 'Pull request details' })).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Properties' }))
+    const panel = screen.getByRole('tabpanel', { name: 'Properties' })
+    expect(within(panel).getByRole('heading', { name: 'Signals' })).toBeTruthy()
+    expect(within(panel).getByRole('heading', { name: 'Details' })).toBeTruthy()
+  })
+
+  it('offers no Properties tab at 900px', () => {
+    pane.width = 900
+    renderPanel()
+    expect(screen.queryByRole('tab', { name: 'Properties' })).toBeNull()
+    expect(screen.getByRole('complementary', { name: 'Pull request details' })).toBeTruthy()
+  })
+})
+
+describe('PrOverviewPanel — a pane that widens', () => {
+  it('goes back to Change when the pane widens on the Properties tab', () => {
+    pane.width = 760
+    const { rerender } = renderPanel()
+    fireEvent.click(screen.getByRole('tab', { name: 'Properties' }))
+    pane.width = 1180
+    rerender(
+      <PrOverviewPanel
+        repoRoot="/repo"
+        pr={basePr}
+        sessionStatus="not-started"
+        onStartReview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByRole('tabpanel', { name: 'Change' })).toBeTruthy()
   })
 })

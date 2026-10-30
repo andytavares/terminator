@@ -159,7 +159,7 @@ function MergeCell({ pr, branch }: { pr: PrReviewDetail; branch: ReadinessBranch
 export function ReadinessStrip({ pr, youAreRequested, branch }: ReadinessStripProps) {
   return (
     <>
-      <div className="rs-strip" role="group" aria-label="Readiness">
+      <div className="rs-strip" role="group" aria-label="Status">
         <ChecksCell pr={pr} />
         <ReviewsCell pr={pr} youAreRequested={youAreRequested} />
         <MergeCell pr={pr} branch={branch} />

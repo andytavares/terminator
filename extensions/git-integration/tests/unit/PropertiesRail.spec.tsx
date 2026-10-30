@@ -1,5 +1,7 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import fs from 'node:fs'
+import path from 'node:path'
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
 import { PropertiesRail } from '../../src/components/pr-review/PropertiesRail'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
@@ -80,5 +82,40 @@ describe('PropertiesRail — linked issues', () => {
     fireEvent.click(rail().getByRole('button', { name: 'Copy branch name' }))
     await waitFor(() => expect(rail().getByText('Copied')).toBeTruthy())
     expect(writeText).toHaveBeenCalledWith('feature/e2e-sharding')
+  })
+})
+
+const TOKENS = path.resolve(__dirname, '../../../../packages/extension-ui/src/tokens.css')
+
+/** Adds the design tokens and one of the overview's stylesheets to the document, so the icons'
+ *  colours can be computed. */
+function addStylesheet(file: string): () => void {
+  const style = document.createElement('style')
+  const sheet = path.resolve(__dirname, '../../src/components/pr-review', file)
+  style.textContent = [TOKENS, sheet].map((css) => fs.readFileSync(css, 'utf8')).join('\n')
+  document.head.append(style)
+  return () => style.remove()
+}
+
+/** Whether an icon draws in its parent's text colour, the flat-icons rule. */
+function inheritsTextColour(icon: Element): boolean {
+  return getComputedStyle(icon).color === getComputedStyle(icon.parentElement as Element).color
+}
+
+describe('PropertiesRail — flat icons', () => {
+  let removeStylesheet = () => {}
+  beforeEach(() => {
+    removeStylesheet = addStylesheet('properties-rail.css')
+  })
+  afterEach(() => removeStylesheet())
+
+  it("draws every signal icon in its row's text colour, a neutral one at 60%", () => {
+    render(<PropertiesRail pr={buildPr()} />)
+    const icons = [...document.querySelectorAll('.pr-rail-signal-icon')]
+    const neutral = icons.filter((icon) => icon.closest('.pr-rail-signal--neutral'))
+    expect(icons.length).toBeGreaterThan(neutral.length)
+    expect(neutral.length).toBeGreaterThan(0)
+    expect(icons.filter((icon) => !inheritsTextColour(icon))).toEqual([])
+    expect(neutral.map((icon) => getComputedStyle(icon).opacity)).toEqual(neutral.map(() => '0.6'))
   })
 })
