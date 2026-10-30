@@ -1,0 +1,19 @@
+extensions/foundry/tests/line/executor-deps.spec.ts
+  s_3b2932418ffe56::t_9a32f44d43ef85 62-71,74-76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "35919d95c6426fb245de3d9a1972316316261b65",
+  "prompts": {},
+  "sessions": {
+    "s_3b2932418ffe56": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea2c55f8-2b5a-46f8-9cf4-d59aab4d031d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
