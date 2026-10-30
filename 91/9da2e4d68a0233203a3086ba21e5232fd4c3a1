@@ -1,0 +1,63 @@
+docs/adr/046-a-refused-turn-is-a-state-not-a-ledger-line.md
+  s_c95e5dc2240fad::t_1b978966aae1ff 9,14,16,20,22,24,28-40,46-49,53-55
+docs/adr/049-an-accidental-question-costs-five-minutes.md
+  s_c95e5dc2240fad::t_f15a4199385c2e 13,15,25,27,29,31,35-41,45,47,49,51,55-71,77-80,84-88
+docs/adr/059-foundry-prompts-fit-opus-5-5.md
+  s_c95e5dc2240fad::t_6c70030dfe23a7 7,13-15,19-20,26,30,32
+docs/adr/058-standing-orders-sessions-reveal-in-one-place.md
+  s_c95e5dc2240fad::t_6c70030dfe23a7 11,13-16,24-25,27,35,38,40,43-45,49-53,58-59
+docs/adr/040-the-work-order-is-the-contract.md
+  s_c95e5dc2240fad::t_ff6397ea3baf54 11-21,25-36,38,40,42,44,50-53,57-59
+docs/adr/057-quick-actions-are-a-leader-panel.md
+  s_c95e5dc2240fad::t_6c70030dfe23a7 7,11,13-18,22,24,26,28,30-36,40-43,47-51
+docs/adr/048-an-amendment-is-not-a-redraft.md
+  s_c95e5dc2240fad::t_1b978966aae1ff 9,11,13,15,23-29,33-52,56-62,66,68,70,72,76,78,80
+docs/adr/045-one-standing-read-by-every-surface.md
+  s_c95e5dc2240fad::t_7a7efa28182473 13,15,25,27,29,31,33,37-58,62-68,72-76
+docs/adr/052-budgets-are-the-operators.md
+  s_c95e5dc2240fad::t_23c26959fd2392 10,12-15,17,21,23-32,36-39,43-45
+docs/adr/060-a-factory-is-a-projection.md
+  s_c95e5dc2240fad::t_ff6397ea3baf54 9,11,13,19-31,36-38,43-46,50-63,65,69,73
+docs/adr/056-a-file-count-is-not-a-budget.md
+  s_c95e5dc2240fad::t_5c0e23fa1a6ccc 13-14,16,22-25,29,34-35
+docs/adr/043-an-agent-proposes-the-order-and-never-writes-it.md
+  s_c95e5dc2240fad::t_7a7efa28182473 9-15,19,21,25-35,41-43,47-49
+docs/adr/044-a-fan-out-parallelises-lanes-not-units.md
+  s_c95e5dc2240fad::t_7a7efa28182473 13,15,24-34,38,40,44-51,55-63,67-75
+docs/adr/051-the-forge-is-walked-in-steps.md
+  s_c95e5dc2240fad::t_23c26959fd2392 12,14-22,26,28-32,36-38,42-44
+docs/adr/055-a-conversation-outlives-its-terminal.md
+  s_c95e5dc2240fad::t_5c0e23fa1a6ccc 11,13,16-17,21-26,30-32,36-40,44-47
+docs/adr/053-a-stopped-run-is-a-state.md
+  s_c95e5dc2240fad::t_23c26959fd2392 13,20,22,26-39,45-47,51-53
+docs/adr/050-effort-is-a-property-of-the-shape.md
+  s_c95e5dc2240fad::t_f15a4199385c2e 12,14,16,20,22-28,30,34-37
+docs/adr/054-overview-is-a-wall-sessions-carry-context.md
+  s_c95e5dc2240fad::t_5c0e23fa1a6ccc 11,17,21-23,25-26,28-30,34-35,38,42-47
+docs/adr/037-repo-colour-is-one-rail.md
+  s_c95e5dc2240fad::t_4b42000432993f 7,11,22,24,26,28,36,40,43,45,47,51,53,55,59,61
+docs/adr/038-dialogs-render-in-the-extension-view.md
+  s_c95e5dc2240fad::t_48b399c6279155 3,9,11,13,15,19-20,24,26,28,30,32,34,38,40,42,44
+docs/adr/039-one-ui-layer-published-outward.md
+  s_c95e5dc2240fad::t_dca93b7f964845 9,20,22,24,26,28,30,34-48,50,54,56,58
+docs/adr/041-an-extension-may-move-an-issue.md
+  s_c95e5dc2240fad::t_05f6df473f65d2 11,16,18,22,24,26,30,40-57,64-65,69-71,75-76
+docs/adr/042-foundry-installs-nothing.md
+  s_c95e5dc2240fad::t_225aaae2b20401 9,11,13,15,17,21-33,39-40,45-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "919da2e4d68a0233203a3086ba21e5232fd4c3a1",
+  "prompts": {},
+  "sessions": {
+    "s_c95e5dc2240fad": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2553a3b-dbdf-4cef-8ed1-b781ffa52630",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
