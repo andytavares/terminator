@@ -30,7 +30,7 @@ const KIND_CHIPS: readonly (readonly [Kind, string])[] = [
 /** `station:<name>` or `kind:<kind>`; null shows everything. */
 type Filter = string | null
 
-const matches = (line: RunLogLine, filter: Filter): boolean =>
+const shownBy = (line: RunLogLine, filter: Filter): boolean =>
   filter === null || filter === `station:${line.station}` || filter === `kind:${line.kind}`
 
 interface FoldedRow {
@@ -91,7 +91,7 @@ export function RunLog(props: RunLogProps): React.JSX.Element {
         </button>
       </header>
       <RunLogChips lines={lines} filter={filter} onFilter={setFilter} />
-      <RunLogList {...props} lines={lines.filter((line) => matches(line, filter))} />
+      <RunLogList {...props} lines={lines.filter((line) => shownBy(line, filter))} />
     </section>
   )
 }

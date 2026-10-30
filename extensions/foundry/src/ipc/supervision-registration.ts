@@ -13,7 +13,7 @@ import {
   SessionStopPayload,
   TranscriptPayload,
 } from './payloads.js'
-import { RunLogPayload, runLog } from './run-log.js'
+import { RunLogPayload, readRunLog } from './run-log.js'
 import { readTranscriptTail } from '../runtime/transcript-excerpt.js'
 
 import { reg } from './register.js'
@@ -157,7 +157,7 @@ function registerRunActions(api: ExtensionAPI): void {
       channel: 'foundry:run-log',
       schema: RunLogPayload,
       invalid: { lines: [] },
-      run: (payload) => runLog(api, payload),
+      run: (payload) => readRunLog(api, payload),
     }),
     // Ends the turn and keeps the session, which is what makes the next message
     // land instead of queueing behind whatever it is part-way through.

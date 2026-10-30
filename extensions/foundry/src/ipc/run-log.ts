@@ -33,7 +33,7 @@ export interface RunLogLine {
 }
 
 /** Everything the order's stations said, decided and ran, oldest first. Reads files only. */
-export async function runLog(
+export async function readRunLog(
   api: ExtensionAPI,
   { orderId, limit = DEFAULT_LINES }: z.infer<typeof RunLogPayload>
 ): Promise<{ lines: RunLogLine[] }> {
