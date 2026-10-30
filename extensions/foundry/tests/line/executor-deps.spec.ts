@@ -59,17 +59,21 @@ function trackShellCalls(api: FoundryHost['api']): void {
   }) as typeof exec
 }
 
-// A measurement runs its git commands one after another, so between two of them no
-// shell call is open: teardown waits on the whole measurement instead.
+/** Holds `call` among the calls teardown waits for, until it settles. */
+function held<T>(call: Promise<T>): Promise<T> {
+  shellCalls.add(call)
+  const forget = () => shellCalls.delete(call)
+  call.then(forget, forget)
+  return call
+}
+
+// A measurement runs its git commands one after another, so between two of them no shell
+// call is open: teardown waits on the whole measurement, at a start and at a turn's end.
 function trackMeasurements(supervision: NonNullable<typeof runtime.supervision>): void {
   const measure = supervision.measure.bind(supervision)
-  supervision.measure = (sessionId) => {
-    const call = measure(sessionId)
-    shellCalls.add(call)
-    const forget = () => shellCalls.delete(call)
-    call.then(forget, forget)
-    return call
-  }
+  const finishTurn = supervision.finishTurn.bind(supervision)
+  supervision.measure = (sessionId) => held(measure(sessionId))
+  supervision.finishTurn = (sessionId, turns, at) => held(finishTurn(sessionId, turns, at))
 }
 
 function agreed(repoPath: string): WorkOrder {
