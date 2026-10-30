@@ -264,10 +264,11 @@ function hallLabelsWallFixturesTests() {
       fixture('lockers', { id: 'd', x: 28, y: 2 }),
     ]
     const x = vendingDecorX(partialFake<HallMap>({ width: 40, props: fixtures }))
+    expect(x).not.toBeNull()
     for (const f of fixtures) {
       const left = f.x * TILE_PX
       const right = (f.x + f.w) * TILE_PX
-      expect(x + 14 <= left || x >= right).toBe(true)
+      expect((x as number) + 14 <= left || (x as number) >= right).toBe(true)
     }
   })
 }

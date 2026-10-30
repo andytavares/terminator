@@ -2,7 +2,7 @@ schemaVersion: 1
 id: author
 modelTier: deep
 allowResume: true
-reads: [order, context, conventions]
+reads: [order, context, conventions, rules]
 # `docs` is the one checkout destination a non-builder may write, which is what
 # lets a document ship as a pull request. `document` is the hand-back: where
 # the document ended up, which is how an answer that belongs outside the
@@ -36,5 +36,10 @@ prompt: |
   Match the length to what the order needs. No filler sections, no restated
   summaries, no section that has nothing in it. Do not describe how you
   worked; the reader wants what you found.
+
+  When the order changes what a person sees or does, follow the
+  ui-change-renderings rule. Build each before and after rendering as HTML and
+  CSS inside the published page, from the real class names and token values.
+  You have no shell, so do not try to take screenshots.
 
   Do not mark your own work complete. Something else checks it.

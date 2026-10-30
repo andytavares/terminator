@@ -7,11 +7,9 @@ import { defaultHintsDir } from '../profile/hints.js'
 import { foundryChannel } from './channel.js'
 import { IssuesMinePayload, OrderIdPayload, TicketCreatePayload } from './payloads.js'
 import { createLiveOrderStore } from '../order/store.js'
-import type { OrderStore } from '../order/store.js'
 import { deleteOrder } from '../line/teardown.js'
 import { projectRemover } from '../line/order-project.js'
 import { baselineDepsFor } from '../line/baseline-deps.js'
-import { proveEnvironment } from '../line/baseline.js'
 import { fileTicket, ticketOffer } from '../forge/ticket-offer.js'
 import { checkCapability, writeBack } from '../trackers/write-back.js'
 
@@ -102,17 +100,7 @@ function createForge(
     readIssue: (tracker, key) => readTrackerIssue(api, tracker, key),
     queueEntries: queueEntriesOf(dataRoot),
     onReleased: loop.onReleased,
-    proveEnvironment: environmentProver(api, dataRoot, store),
   })
-}
-
-/** The base branch check, over the host's shell, its supervised terminals and the order's ledger. */
-function environmentProver(
-  api: ExtensionAPI,
-  dataRoot: ActivationContext['dataRoot'],
-  store: OrderStore
-): NonNullable<ForgeDeps['proveEnvironment']> {
-  return (order) => proveEnvironment(order, baselineDepsFor(api, dataRoot(), store))
 }
 
 async function readTrackerIssue(

@@ -1,6 +1,6 @@
 # ADR 121: A repository profile, proven on the base branch
 
-**Status**: Accepted
+**Status**: Accepted; "Proof on the base" amended by ADR 137
 
 **Date**: 2026-10-21
 

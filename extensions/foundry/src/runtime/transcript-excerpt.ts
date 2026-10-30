@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from 'node:fs'
+import { tailLines } from './transcript-tailer.js'
 
 // The tail of a run's conversation, in the words it was written in.
 //
@@ -97,12 +97,7 @@ export function readTranscriptTail(
 
 /** The transcript's text, or null when there is no file to read. */
 function readTranscriptFile(transcriptPath: string): string | null {
-  try {
-    if (!statSync(transcriptPath).isFile()) return null
-    return readFileSync(transcriptPath, 'utf8')
-  } catch {
-    return null
-  }
+  return tailLines(transcriptPath)?.join('\n') ?? null
 }
 
 /** What one JSONL line said, a line per content block; none for anything but a message. */

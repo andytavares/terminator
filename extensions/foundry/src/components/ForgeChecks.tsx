@@ -21,7 +21,6 @@ import type { ChecksModel, Finished, LogTail, ProveOutcome } from './use-checks.
 // from, and what running it on the base branch did. Every unknown has a move.
 
 export interface ChecksActions {
-  readonly checkAgain: () => void
   readonly askScout: () => void
   readonly openChecks: () => void
 }
@@ -187,17 +186,7 @@ function LogView({ checks, path }: { readonly checks: ChecksModel; readonly path
   )
 }
 
-function LogLine({ checks, log }: { readonly checks: ChecksModel; readonly log: string | null }) {
-  if (log === null) {
-    return (
-      <small>No log was kept for this command. Run every check on main again to make one.</small>
-    )
-  }
-  return <LogView checks={checks} path={log} />
-}
-
 function FailureMoves({ checks, row }: RowProps) {
-  const [shown, setShown] = useState(false)
   const { base } = checks
   return (
     <>
@@ -206,17 +195,11 @@ function FailureMoves({ checks, row }: RowProps) {
         <Button size="sm" onClick={() => checks.edit(row.key)}>
           Edit
         </Button>
-        <Button size="sm" onClick={() => setShown(true)}>
-          Show the log
-        </Button>
         <Button size="sm" onClick={() => void checks.saveCommand(row.target, row.command)}>
           Use it anyway
         </Button>
         <RemoveMove checks={checks} row={row} />
       </div>
-      {shown ? (
-        <LogLine checks={checks} log={row.command === null ? null : checks.logOf(row.command)} />
-      ) : null}
     </>
   )
 }
@@ -440,13 +423,13 @@ function NothingFound({ checks, actions }: ChecksProps) {
   )
 }
 
-function ChecksList({ checks, actions }: ChecksProps) {
+function ChecksList({ checks }: Pick<ChecksProps, 'checks'>) {
   return (
     <>
       <p className="fdry-step-intro">
-        The commands that prove this change, run on <b>{checks.base}</b> before any work starts. A
-        command is used only after it has run there. Edit any row; your command wins over what
-        Foundry found.
+        The commands that prove this change, checked against <b>{checks.base}</b>. Foundry does not
+        run them there on its own; use Prove on a row to try one. Edit any row; your command wins
+        over what Foundry found.
       </p>
       <div className="fdry-checks">
         {checks.rows.map((row) => (
@@ -456,9 +439,6 @@ function ChecksList({ checks, actions }: ChecksProps) {
       <div className="fdry-chk-moves fdry-chk-footer">
         <Button size="sm" onClick={() => checks.edit('new')}>
           Add another check
-        </Button>
-        <Button size="sm" onClick={actions.checkAgain}>
-          Run every check on main again
         </Button>
       </div>
       {checks.editing === 'new' ? <AddCheckForm checks={checks} /> : null}
@@ -471,7 +451,7 @@ export function ChecksStep({ checks, actions }: ChecksProps): React.JSX.Element 
   if (nothingFound(checks.rows) && !checks.decided.includes('unmeasured')) {
     return <NothingFound checks={checks} actions={actions} />
   }
-  return <ChecksList checks={checks} actions={actions} />
+  return <ChecksList checks={checks} />
 }
 
 const namesOf = (rows: readonly CheckRowView[]): string => {

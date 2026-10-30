@@ -29,6 +29,7 @@ export interface GateAsk {
   readonly breach?: BudgetBreach
   readonly evidence?: readonly Evidence[]
   readonly omitOptions?: readonly string[]
+  readonly finalCheck?: boolean
 }
 
 type Breach = NonNullable<ReturnType<typeof budgetBreach>>
@@ -125,10 +126,17 @@ export class Execution {
   async stopAtGate(rule: GateRuleId, ask: GateAsk): Promise<boolean> {
     if (!isLive(rule, this.deps.autonomy)) return false
     const nodeId = ask.nodeId ?? null
-    const approved = this.priorGates.some(
-      (g) => g.rule === rule && g.nodeId === nodeId && g.decision?.option === 'approve'
+    const settled = this.priorGates.some(
+      (g) =>
+        g.rule === rule &&
+        g.nodeId === nodeId &&
+        // A debt settles only the final check; on a stall it would leave a run with no gate.
+        (g.decision?.option === 'approve' ||
+          (g.decision?.option === 'accept_debt' &&
+            g.finalCheck === true &&
+            ask.finalCheck === true))
     )
-    if (approved) return false
+    if (settled) return false
     this.gateSeq += 1
     const gate = this.newGate(rule, { ...ask, nodeId })
     this.gates.push(gate)
@@ -156,6 +164,7 @@ export class Execution {
       breach: ask.breach ?? null,
       evidence: ask.evidence,
       omitOptions: ask.omitOptions,
+      finalCheck: ask.finalCheck,
     })
   }
 

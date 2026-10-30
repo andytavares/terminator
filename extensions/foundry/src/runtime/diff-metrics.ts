@@ -121,6 +121,21 @@ function addedLinesIn(worktreePath: string, relativePath: string): number {
   }
 }
 
+// The fork point, not the base tip: a base that moved on since the lane was cut would
+// otherwise read every newer commit as the lane's change. `origin/<base>` first, where
+// `startPointFor` cuts a lane; then the local base; then the base itself.
+async function diffBaseFor(
+  worktreePath: string,
+  baseBranch: string,
+  run: RunCommand
+): Promise<string> {
+  for (const ref of [`origin/${baseBranch}`, baseBranch]) {
+    const mergeBase = await run('git', ['merge-base', 'HEAD', ref], worktreePath)
+    if (mergeBase.ok && mergeBase.stdout.trim() !== '') return mergeBase.stdout.trim()
+  }
+  return baseBranch
+}
+
 /**
  * Reads which files a working copy changed against its base branch. Returns an
  * empty list when git cannot be read — but note the caller must treat that as
@@ -133,7 +148,11 @@ export async function readChangedFiles(
   run: RunCommand
 ): Promise<string[]> {
   try {
-    const result = await run('git', ['diff', '--numstat', baseBranch], worktreePath)
+    const result = await run(
+      'git',
+      ['diff', '--numstat', await diffBaseFor(worktreePath, baseBranch, run)],
+      worktreePath
+    )
     const tracked = result.ok ? parseChangedFiles(result.stdout) : []
     // A new file is as much a change as an edited one, and risk grading needs
     // its path as much as any other — a new migration is still a migration.
@@ -165,7 +184,11 @@ export async function readDiffSummary(
     // what has been committed, and an agent that edits files and stops — which
     // is most of them — would report having changed nothing at all. Nothing
     // changed means nothing to review, so the review queue could never fill.
-    const result = await run('git', ['diff', '--numstat', baseBranch], worktreePath)
+    const result = await run(
+      'git',
+      ['diff', '--numstat', await diffBaseFor(worktreePath, baseBranch, run)],
+      worktreePath
+    )
     const tracked = result.ok ? parseDiffStat(result.stdout, weighLines) : EMPTY
 
     // Plus the files git has never seen, which `git diff` does not report at

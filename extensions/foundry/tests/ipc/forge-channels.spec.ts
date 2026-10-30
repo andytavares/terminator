@@ -9,8 +9,6 @@ import { dispatchChannel } from '@terminator/extension-sdk'
 import { createForgeChannels, forgeChannelSpecs } from '../../src/ipc/forge-channels.js'
 import type { ForgeDeps } from '../../src/ipc/forge-channels.js'
 import { quietForgeSeams } from './forge-deps.js'
-import { writeBaseline } from '../../src/line/baseline.js'
-import { baseStep, provenBaseline } from '../helpers/environment.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import { writeCiState } from '../../src/line/ci-state.js'
@@ -19,6 +17,8 @@ import type { OrderStore } from '../../src/order/store.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { CompileResult } from '../../src/order/compile.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
+
+import type { CheckDecisions } from '../../src/forge/readiness.js'
 
 let root: string
 let repo: string
@@ -736,7 +736,6 @@ async function agreeable(): Promise<WorkOrder> {
     },
     redTeam: seed.order.redTeam.map((f) => ({ ...f, status: 'resolved' as const })),
   }
-  await writeBaseline(root, done.id, provenBaseline())
   return done
 }
 
@@ -1829,7 +1828,6 @@ async function completeOrder(): Promise<WorkOrder> {
     redTeam: r.order.redTeam.map((f) => ({ ...f, status: 'resolved' as const })),
   }
   await store.save(done)
-  await writeBaseline(root, done.id, provenBaseline())
   return done
 }
 
@@ -1988,99 +1986,68 @@ describe('foundry:order.resume', () => {
   })
 })
 
-describe('the base branch check', () => {
-  describe('starting and reading', startingAndReadingTests)
-  describe('readingTests', readingTests)
-  describe('the moves', theMovesTests)
-  describe('theMoveErrorsTests', theMoveErrorsTests)
-})
-
-function startingAndReadingTests() {
-  it('starts when an order is created, without the channel waiting for it', async () => {
-    let finish: () => void = () => undefined
-    const proveEnvironment = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)))
-    const c = createForgeChannels(forgeDeps({ proveEnvironment }))
-    const made = (await c.create({
+describe('the base branch is assumed to pass (ADR 137)', () => {
+  it('runs nothing on the base while an order is seeded', async () => {
+    const made = (await channels().create({
       source: { kind: 'typed', text: 'x' },
       repoPaths: [repo],
     })) as OrderView
-    expect(proveEnvironment).toHaveBeenCalledTimes(1)
-    expect(proveEnvironment).toHaveBeenCalledWith(expect.objectContaining({ id: made.order.id }))
-    finish()
+    const orderFolder = path.join(root, 'orders', made.order.id)
+    expect(fs.existsSync(path.join(orderFolder, 'baseline.json'))).toBe(false)
+    expect(fs.existsSync(path.join(orderFolder, 'runs'))).toBe(false)
+    const actions = (await store.entries(made.order.id)).map((e) => e.action)
+    expect(actions.filter((action) => action.startsWith('environment.'))).toEqual([])
   })
 
-  it('is read with the other facts: the baseline and when the operator waived it', async () => {
-    const seed = await drafted()
-    await writeBaseline(root, seed.order.id, provenBaseline({ startedAt: '2026-09-01T00:00:00Z' }))
-    const c = channels()
-    await c.environment({ id: seed.order.id, move: 'waive' })
-    const r = (await c.compile(compiling(seed.order.id, false))) as {
-      environment: { baseline: { state: string } | null; waivedAt: string | null }
-    }
-    expect(r.environment.baseline?.state).toBe('proven')
-    expect(r.environment.waivedAt).toBe(NOW)
-  })
-}
-
-function readingTests() {
-  it('has no baseline until one is written', async () => {
+  it('reads the decisions with the other facts', async () => {
     const seed = await drafted()
     const r = (await channels().compile(compiling(seed.order.id, false))) as {
-      environment: unknown
+      decisions: unknown
     }
-    expect(r.environment).toEqual({
-      baseline: null,
-      waivedAt: null,
-      proving: false,
-      decisions: { continueUnmeasured: false, declinePictures: false },
-    })
+    expect(r.decisions).toEqual({ continueUnmeasured: false, declinePictures: false })
+  })
+})
+
+function theMoveErrorsTests() {
+  it('refuses a move that no longer exists, and errors on an unknown order', async () => {
+    const seed = await drafted()
+    for (const move of ['skip', 'check', 'waive']) {
+      expect(
+        await sendThroughSchema('foundry:forge.environment', { id: seed.order.id, move })
+      ).toEqual({ error: 'Malformed request.' })
+    }
+    const r = (await channels().environment({ id: 'WO-nope', move: 'decline-pictures' })) as {
+      error?: string
+    }
+    expect(r.error).toBe('No order WO-nope.')
+  })
+
+  it('refuses a decision on an order that is not a draft', async () => {
+    const order = await completeOrder()
+    await store.save({ ...order, status: 'running' })
+    const r = await channels().environment({ id: order.id, move: 'continue-unmeasured' })
+    expect(r).toEqual({ error: 'Only a draft order can change its check decisions.' })
   })
 }
 
-function theMovesTests() {
-  it('checks again on "check", and answers the view straight away', async () => {
-    const seed = await drafted()
-    const proveEnvironment = vi.fn(async () => undefined)
-    const c = createForgeChannels(forgeDeps({ proveEnvironment }))
-    const r = (await c.environment({ id: seed.order.id, move: 'check' })) as OrderView
-    expect(proveEnvironment).toHaveBeenCalledWith(expect.objectContaining({ id: seed.order.id }))
-    expect(r.order.id).toBe(seed.order.id)
-  })
-
-  it('records "environment.waived" on "waive", and checks nothing', async () => {
-    const seed = await drafted()
-    const proveEnvironment = vi.fn(async () => undefined)
-    const c = createForgeChannels(forgeDeps({ proveEnvironment }))
-    await c.environment({ id: seed.order.id, move: 'waive' })
-    const last = (await store.entries(seed.order.id)).at(-1)
-    expect(last).toMatchObject({
-      actor: 'operator',
-      action: 'environment.waived',
-      subject: seed.order.id,
-    })
-    expect(proveEnvironment).not.toHaveBeenCalled()
-  })
-}
+describe('the decision moves refuse what they cannot do', theMoveErrorsTests)
 
 function theDecisionMovesTests() {
   const decide = async (move: 'continue-unmeasured') => {
     const seed = await drafted()
-    const proveEnvironment = vi.fn(async () => undefined)
-    const c = createForgeChannels(forgeDeps({ proveEnvironment }))
-    const r = (await c.environment({ id: seed.order.id, move })) as {
-      environment: { decisions: Record<string, boolean> }
+    const r = (await channels().environment({ id: seed.order.id, move })) as {
+      decisions: CheckDecisions
     }
-    return { seed, r, proveEnvironment }
+    return { seed, r }
   }
 
   it('records "checks.continue-unmeasured" and answers the decision from the ledger', async () => {
-    const { seed, r, proveEnvironment } = await decide('continue-unmeasured')
+    const { seed, r } = await decide('continue-unmeasured')
     expect((await store.entries(seed.order.id)).at(-1)).toMatchObject({
       actor: 'operator',
       action: 'checks.continue-unmeasured',
     })
-    expect(r.environment.decisions).toEqual({ continueUnmeasured: true, declinePictures: false })
-    expect(proveEnvironment).not.toHaveBeenCalled()
+    expect(r.decisions).toEqual({ continueUnmeasured: true, declinePictures: false })
   })
 }
 
@@ -2089,137 +2056,36 @@ function thePicturesDecisionTests() {
     const seed = await drafted()
     const c = createForgeChannels(forgeDeps({}))
     const r = (await c.environment({ id: seed.order.id, move: 'decline-pictures' })) as {
-      environment: { decisions: Record<string, boolean> }
+      decisions: CheckDecisions
     }
     expect((await store.entries(seed.order.id)).at(-1)).toMatchObject({
       action: 'pictures.declined',
     })
-    expect(r.environment.decisions).toEqual({ continueUnmeasured: false, declinePictures: true })
+    expect(r.decisions).toEqual({ continueUnmeasured: false, declinePictures: true })
     const again = (await channels().compile(compiling(seed.order.id, false))) as {
-      environment: { decisions: Record<string, boolean> }
+      decisions: CheckDecisions
     }
-    expect(again.environment.decisions.declinePictures).toBe(true)
-  })
-}
-
-function theMoveErrorsTests() {
-  it('refuses a move other than check or waive, and errors on an unknown order', async () => {
-    const seed = await drafted()
-    expect(
-      await sendThroughSchema('foundry:forge.environment', { id: seed.order.id, move: 'skip' })
-    ).toEqual({ error: 'Malformed request.' })
-    const r = (await channels().environment({ id: 'WO-nope', move: 'check' })) as {
-      error?: string
-    }
-    expect(r.error).toBe('No order WO-nope.')
+    expect(again.decisions.declinePictures).toBe(true)
   })
 }
 
 describe('the decisions about what cannot be measured', theDecisionMovesTests)
 describe('the decision to ship without pictures', thePicturesDecisionTests)
 
-describe('handing off waits for the base branch check', () => {
-  describe('the manual hand-off', manualHandOffTests)
-  describe('manualHandOffAgreesTests', manualHandOffAgreesTests)
-  describe('the automatic hand-off', automaticHandOffTests)
-  describe('a waiver', waiverTests)
-  describe('the moves on a draft only', draftOnlyMovesTests)
-})
-
-async function handOffReadyOrder(baseline: ReturnType<typeof provenBaseline> | null) {
-  const order = await completeOrder()
-  if (baseline === null) fs.rmSync(path.join(root, 'orders', order.id, 'baseline.json'))
-  else await writeBaseline(root, order.id, baseline)
-  return order
-}
-
-const failingBaseline = provenBaseline({
-  state: 'failing',
-  steps: [baseStep('Lint', { result: 'fail', exitCode: 2, command: 'npm run lint' })],
-})
-
-function manualHandOffTests() {
-  const notAgreed: [string, ReturnType<typeof provenBaseline> | null, string][] = [
-    ['never checked', null, 'Not checked for this order yet.'],
-    [
-      'still checking',
-      provenBaseline({ state: 'checking' }),
-      'The check of main stopped before it finished.',
-    ],
-    ['failing', failingBaseline, 'Lint failed on main with exit code 2: `npm run lint`.'],
-  ]
-  it.each(notAgreed)(
-    'refuses a commit when the base is %s, and saves nothing',
-    async (_n, baseline, why) => {
-      const order = await handOffReadyOrder(baseline)
-      const r = answered(await channels().compile(compiling(order.id, true)))
-      expect(r.refused).toBe(why)
-      expect(r.order.status).toBe('draft')
-      expect((await store.load(order.id))?.status).toBe('draft')
-      expect((await store.entries(order.id)).map((e) => e.action)).not.toContain('order.agreed')
-    }
-  )
-
-  it('agrees when the base is proven', async () => {
-    const order = await handOffReadyOrder(provenBaseline())
+describe('handing off needs no base branch check', () => {
+  it('agrees a complete order that has no baseline.json', async () => {
+    const order = await completeOrder()
+    expect(fs.existsSync(path.join(root, 'orders', order.id, 'baseline.json'))).toBe(false)
     const r = answered(await channels().compile(compiling(order.id, true)))
-    expect(r.refused).toBeUndefined()
     expect(r.order.status).toBe('agreed')
   })
-}
 
-function manualHandOffAgreesTests() {
-  it('still only previews while the base is failing', async () => {
-    const order = await handOffReadyOrder(failingBaseline)
-    const r = answered(await channels().compile(compiling(order.id, false)))
-    expect(r.refused).toBeUndefined()
-  })
-}
-
-function automaticHandOffTests() {
-  it("refuses the Forge's own hand-off too, with the same words", async () => {
-    const order = await handOffReadyOrder(failingBaseline)
+  it("agrees through the Forge's own automatic hand-off too", async () => {
+    const order = await completeOrder()
     const r = answered(await channels().compile({ id: order.id, commit: true, automatic: true }))
-    expect(r.refused).toBe('Lint failed on main with exit code 2: `npm run lint`.')
-    expect((await store.load(order.id))?.status).toBe('draft')
-  })
-}
-
-function waiverTests() {
-  it('agrees a failing base the operator skipped the check for', async () => {
-    const order = await handOffReadyOrder({ ...failingBaseline, startedAt: '2026-09-01T00:00:00Z' })
-    await channels().environment({ id: order.id, move: 'waive' })
-    const r = answered(await channels().compile(compiling(order.id, true)))
     expect(r.order.status).toBe('agreed')
   })
-
-  it('stops counting once a newer check has started', async () => {
-    const order = await handOffReadyOrder({ ...failingBaseline, startedAt: '2026-09-01T00:00:00Z' })
-    await channels().environment({ id: order.id, move: 'waive' })
-    await writeBaseline(root, order.id, { ...failingBaseline, startedAt: '2026-09-07T00:00:00Z' })
-    const r = answered(await channels().compile(compiling(order.id, true)))
-    expect(r.environment.waivedAt).toBeNull()
-    expect(r.refused).toBe('Lint failed on main with exit code 2: `npm run lint`.')
-  })
-}
-
-function draftOnlyMovesTests() {
-  it.each(['check', 'waive'] as const)(
-    'refuses "%s" on an order that is not a draft',
-    async (move) => {
-      const order = await completeOrder()
-      await store.save({ ...order, status: 'running' })
-      const proveEnvironment = vi.fn(async () => undefined)
-      const c = createForgeChannels(forgeDeps({ proveEnvironment }))
-      const r = await c.environment({ id: order.id, move })
-      expect(r).toEqual({ error: 'Only a draft order can check its base branch again.' })
-      expect(proveEnvironment).not.toHaveBeenCalled()
-      expect((await store.entries(order.id)).map((e) => e.action)).not.toContain(
-        'environment.waived'
-      )
-    }
-  )
-}
+})
 
 // An order made by mistake used to stay on the list for good. Discarding marks
 // it rather than deleting it, and refuses one whose agents are still working.

@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react'
 import { foundryInvoke } from '../renderer/foundry-invoke.js'
-import type { Baseline } from '../line/baseline.js'
 import type { WorkOrder } from '../order/schema.js'
 import {
   changeFor,
@@ -57,16 +56,11 @@ export interface ChecksModel {
   readonly saveCommand: (target: CheckTarget, command: string | null) => Promise<string | null>
   readonly addCheck: (check: NewCheck) => Promise<string | null>
   readonly prove: (command: string) => Promise<ProveOutcome>
-  /** Where the base branch check kept the log of a command, if it ran it. */
-  readonly logOf: (command: string) => string | null
 }
 
 interface OrderFacts {
   readonly order: WorkOrder
-  readonly environment?: {
-    readonly baseline: Baseline | null
-    readonly decisions?: { readonly continueUnmeasured: boolean; readonly declinePictures: boolean }
-  }
+  readonly decisions?: { readonly continueUnmeasured: boolean; readonly declinePictures: boolean }
 }
 
 const isProfile = (answer: unknown): answer is ProfileFacts =>
@@ -79,7 +73,7 @@ const errorOf = (answer: unknown): string | null =>
 
 /** What the ledger says the operator decided, as the list the step reads. */
 function decidedFrom(facts: OrderFacts | null): Decision[] {
-  const decisions = facts?.environment?.decisions
+  const decisions = facts?.decisions
   return [
     ...(decisions?.continueUnmeasured ? (['unmeasured'] as const) : []),
     ...(decisions?.declinePictures ? (['noPictures'] as const) : []),
@@ -160,13 +154,6 @@ function useProfileMoves(
 const tailOf = async (path: string): Promise<LogTail> =>
   await foundryInvoke('foundry:log-tail', { path })
 
-function logFinder(baseline: Baseline | null | undefined) {
-  return (command: string): string | null => {
-    const step = baseline?.steps.find((each) => each.command === command)
-    return (step && baseline?.logs[step.name]) || null
-  }
-}
-
 interface Figures {
   readonly base: string
   readonly interfaceChanged: boolean
@@ -210,6 +197,5 @@ export function useChecks(facts: OrderFacts | null, record: (d: Decision) => voi
     decided,
     decide: record,
     ...moves,
-    logOf: logFinder(facts?.environment?.baseline),
   }
 }

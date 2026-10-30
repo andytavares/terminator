@@ -1,4 +1,8 @@
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
+import { createRoleRegistry } from '../../src/line/roles.js'
+import { rulesFor } from '../../src/verify/rules.js'
 import { testCriterion } from '../helpers/order-parts.js'
 import { brief } from '../../src/line/brief.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -672,3 +676,20 @@ function itsPlaceInTheBriefTests() {
     )
   })
 }
+
+describe('a document that changes the interface is told to draw it', () => {
+  const builtInDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+  const sources = { dataRoot: path.join(builtInDir, 'no-data-root'), repoPaths: [], builtInDir }
+  const { rules, problems } = rulesFor(sources, { repoPaths: [], houseDocs: [] })
+
+  it('loads the renderings rule without problems', () => {
+    expect(problems).toEqual([])
+    expect(rules.map((r) => r.id)).toContain('ui-change-renderings')
+  })
+
+  it.each(['author', 'architect', 'scribe'])('puts the rule in the %s brief', (id) => {
+    const real = createRoleRegistry(sources).get(id)
+    const text = brief({ order: order(), role: real, units: [], rules })
+    expect(text).toContain('ui-change-renderings')
+  })
+})

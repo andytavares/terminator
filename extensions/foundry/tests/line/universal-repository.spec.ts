@@ -49,6 +49,8 @@ function runForReal(input: unknown): Promise<number | null> {
     worktreePath: string
     logPath?: string
   }
+  // The real runner makes the log's folder (`teedRunLine`); nothing else makes it first.
+  if (logPath !== undefined) fs.mkdirSync(path.dirname(logPath), { recursive: true })
   return new Promise((resolve) => {
     execFile('/bin/sh', ['-c', command], { cwd: worktreePath }, (error, stdout, stderr) => {
       if (logPath !== undefined) fs.writeFileSync(logPath, stdout + stderr)
@@ -121,15 +123,6 @@ async function createOrder(): Promise<WorkOrder> {
   return created.order
 }
 
-/** The environment is proven on the base branch in the background; its runs are not the order's. */
-async function untilBaseProven(command: string): Promise<void> {
-  await eventually(() =>
-    expect(finished.some((run) => run.command === command && run.where.endsWith('@baseline'))).toBe(
-      true
-    )
-  )
-}
-
 async function runAgreed(created: WorkOrder): Promise<void> {
   const agreed = agreedLineOrder(repo, { id: created.id, context: created.context })
   await orderStoreAt(dataDir).save(agreed)
@@ -167,21 +160,18 @@ describe('a repository with a script and no manifest', () => {
 
   it('ships the draft when the script exits 0', async () => {
     const order = await createOrder()
-    await untilBaseProven('./glyph test')
     await runAgreed(order)
     await eventually(async () => expect(await statusOf(order.id)).toBe('shipped'))
     expect(runsInLanes('./glyph test').map((run) => run.exitCode)).toContain(0)
   })
 })
 
-// A pass on the exact commit is reused by the final check (verify/pass-cache.ts), so the
-// script fails from the recipe's own check on, and its rework fails too.
+// The script fails from the recipe's own check on, and its rework fails too.
 describe('a script that keeps failing after the base passed', () => {
   beforeEach(glyphRepositoryWithOperatorTest)
 
   it('stops at a gate when the script exits 1', async () => {
     const order = await createOrder()
-    await untilBaseProven('./glyph test')
     glyphExits(1)
     await runAgreed(order)
     await eventually(async () => expect(await gateRules()).toContain('verify.repeat-fail'))
@@ -195,7 +185,6 @@ describe('a repository with only a Makefile', () => {
     await commitToMain({ Makefile: 'test:\n\t@echo the suite passed\n' })
     const order = await createOrder()
     expect(order.context.toolchain.test).toMatchObject({ command: 'make test', source: 'hint' })
-    await untilBaseProven('make test')
     await runAgreed(order)
     await eventually(async () => expect(await statusOf(order.id)).toBe('shipped'))
     expect(runsInLanes('make test').map((run) => run.exitCode)).toContain(0)

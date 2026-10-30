@@ -82,6 +82,8 @@ export interface Gate {
   readonly riskGrade: 'P0' | 'P1' | 'P2' | 'P3'
   readonly raisedAt: string
   readonly decision: GateDecision | null
+  /** Raised by the final check over the finished change; only there does a debt settle it. */
+  readonly finalCheck?: boolean
   /**
    * The budget a `budget.exceeded` gate stopped at. Absent on gates written
    * before it was recorded, which is every one raised before ADR 052.
@@ -233,6 +235,7 @@ export interface RaiseInput {
   readonly riskGrade?: Gate['riskGrade']
   readonly deadline?: string | null
   readonly breach?: BudgetBreach | null
+  readonly finalCheck?: boolean
   readonly at: string
   /** Option ids this gate must not offer, for a choice that no longer makes sense here. */
   readonly omitOptions?: readonly string[]
@@ -277,6 +280,7 @@ export function raiseGate(input: RaiseInput): Gate {
     raisedAt: input.at,
     decision: null,
     breach: input.breach ?? null,
+    ...(input.finalCheck === true ? { finalCheck: true } : {}),
   }
 }
 

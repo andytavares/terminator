@@ -30,6 +30,7 @@ describe('the tail of a conversation', () => {
   describe('several blocks', severalBlocksTests)
   describe('string content and empty blocks', stringContentAndEmptyBlocksTests)
   describe('the limit', theLimitTests)
+  describe('a transcript too large to read whole', tooLargeTranscriptTests)
   describe('tool call summaries', toolCallSummariesTests)
   describe('identifying arguments', identifyingArgumentsTests)
   describe('multi-line commands and the tail', multiLineCommandsAndTheTailTests)
@@ -261,5 +262,21 @@ function noTranscriptAndBadTimestampsTests() {
   it('tolerates a timestamp it cannot read', () => {
     write(line({ type: 'user', timestamp: 'whenever', message: { content: 'kept' } }))
     expect(readTranscriptTail(file)[0].at).toBe(0)
+  })
+}
+
+function tooLargeTranscriptTests() {
+  it('reads only the tail of a transcript too large to read whole', () => {
+    const said = (text: string): string =>
+      line({
+        type: 'assistant',
+        timestamp: '2026-07-27T10:00:00Z',
+        message: { content: [{ type: 'text', text }] },
+      })
+    const padding = Array.from({ length: 4000 }, (_, i) => said(`old ${i} ${'x'.repeat(80)}`))
+    write(said('the very first line'), ...padding, said('the last line'))
+    const texts = readTranscriptTail(file, 100_000).map((l) => l.text)
+    expect(texts.at(-1)).toBe('the last line')
+    expect(texts).not.toContain('the very first line')
   })
 }

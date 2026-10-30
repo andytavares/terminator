@@ -17,8 +17,6 @@ import {
 } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
-import { writeBaseline } from '../../src/line/baseline.js'
-import { provenBaseline } from '../helpers/environment.js'
 import { orderStoreAt } from '../../src/state/live-index.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import {
@@ -222,7 +220,6 @@ describe('letting go of an order with nothing to pick up', () => {
 async function releasedBefore(): Promise<void> {
   const store = orderStoreAt(dataDir)
   await store.save(readyDraft(repo))
-  await writeBaseline(dataDir, 'WO-1', provenBaseline())
   for (const action of ['order.agreed', 'run.started', 'gate.decided']) {
     await store.record({
       at: '2026-10-12T10:05:00.000Z',

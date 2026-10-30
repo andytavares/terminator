@@ -18,8 +18,7 @@ import {
 } from './scouted-converge.js'
 import type { ConvergeOutcome, ConvergeStarted } from '../ipc/forge-channels.js'
 import { rungOutputPath } from '../line/rung-output.js'
-import { baselineDepsFor } from '../line/baseline-deps.js'
-import { proveScoutCommands } from '../line/scout-commands.js'
+import { keepScoutCommands } from '../line/scout-commands.js'
 import {
   MAX_REVIEW_ROUNDS,
   reviewPrompt,
@@ -277,10 +276,13 @@ async function afterRedraft(
 ): Promise<void> {
   const { order } = ask
   const store = orderStoreAt(root)
-  // The scout runs beside a first draft, so it may have stored its
-  // findings while this turn was still writing.
-  const drafted = withScoutContext(outcome.order, await store.load(order.id))
-  await store.save({ ...drafted, intake: intakeAt('ready', new Date()) })
+  // The scout runs beside a first draft, so it may have stored its findings while this
+  // turn was still writing; an update queues behind its write instead of replacing it.
+  const saved = await store.update(order.id, (latest) => ({
+    ...withScoutContext(outcome.order, latest),
+    intake: intakeAt('ready', new Date()),
+  }))
+  const drafted = saved ?? outcome.order
   await recordLoopEntry(root, {
     orderId: order.id,
     actor: 'role:architect',
@@ -687,9 +689,8 @@ function startScout(forge: Forge, root: string, scoutOrder: WorkOrder): Promise<
         nodeId: 'forge-scout',
         prompt: (role) => scoutBrief(forge, root, { order: scoutOrder, role }),
         onCommands: (orderId, commands) => {
-          const store = orderStoreAt(root)
-          const base = baselineDepsFor(forge.api, root, store)
-          return proveScoutCommands(orderId, commands, { base, store })
+          const now = () => new Date().toISOString()
+          return keepScoutCommands(orderId, commands, { root, now, store: orderStoreAt(root) })
         },
         startedAction: 'scout.started',
         startedReason: 'reading the repository beside the first draft',

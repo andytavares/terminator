@@ -24,10 +24,8 @@ import type { OrderRun, RunContext } from './run-context.js'
 import { runNodeSession } from './node-session.js'
 import {
   reinstallDependencies,
-  releaseBaseCheckout,
   runRecipeCommand,
   runLaneStep,
-  runStepOnBaseCheckout,
   prepareNewCheckouts,
 } from './lane-commands.js'
 import { isoNow } from '../host-calls.js'
@@ -92,17 +90,6 @@ function settingsDeps(api: ExtensionAPI): Pick<ExecutorDeps, 'autonomy'> {
   return { autonomy: autonomyFor(api) }
 }
 
-/** The deps that run a failed rung again on the base branch, and let that checkout go. */
-function baseCheckoutDeps(
-  context: RunContext
-): Pick<ExecutorDeps, 'runStepOnBase' | 'reinstall' | 'releaseBase'> {
-  return {
-    runStepOnBase: (step, logPath) => runStepOnBaseCheckout(context, step, logPath),
-    reinstall: (where, logPath) => reinstallDependencies(context, where, logPath),
-    releaseBase: () => releaseBaseCheckout(context),
-  }
-}
-
 async function executorDepsFor(
   context: RunContext,
   parts: DepsParts,
@@ -124,7 +111,7 @@ async function executorDepsFor(
     raise: (gate) => raiseGate(context, parts.gates, gate),
     runStep: (step, logPath, options) => runLaneStep(context, step, { logPath, ...options }),
     picturesTaken: () => context.pictures.current,
-    ...baseCheckoutDeps(context),
+    reinstall: (where, logPath) => reinstallDependencies(context, where, logPath),
     runCommand: (input) => runRecipeCommand(context, input),
     endSession: endPreviousProcess,
     observe: async () => ({ elapsedMinutes: minutesSince(parts.startedAt) }),

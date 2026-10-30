@@ -838,7 +838,7 @@ const base = (over: Record<string, unknown> = {}) => ({
   autonomy: 'standard' as const,
   ...over,
 })
-function sentBack(o: WorkOrder, n: number) {
+function sentBack(o: WorkOrder, n: number, option = 'send_back') {
   return Array.from({ length: n }, (_, i) => ({
     ...raiseGate({
       id: `WO-1-verify.repeat-fail-${i + 1}`,
@@ -847,9 +847,10 @@ function sentBack(o: WorkOrder, n: number) {
       summary: 's',
       why: 'w',
       at: '2026-09-06T10:00:00.000Z',
+      finalCheck: true,
     }),
     decision: {
-      option: 'send_back',
+      option,
       by: 'operator' as const,
       note: '',
       at: '2026-09-06T10:05:00.000Z',
@@ -1057,17 +1058,15 @@ function lightsOutRunsTests() {
 
 describe('a failed final climb', () => {
   describe('a check that fails once', failedOnceTests)
-  describe('the base branch fails too', theBaseBranchFailsTooTests)
   describe('sending back', sendingBackTests)
   describe('the send-back limit', theSendBackLimitTests)
-  describe('an unchecked base', anUncheckedBaseTests)
-  describe('releasing the base checkout', releasingTheBaseCheckoutTests)
+  describe('accepted debt', acceptedDebtTests)
+  describe('a debt accepted on a stall', acceptedStallTests)
+  describe('a document outside the checkout', documentOutsideTheCheckoutTests)
   describe('preparing the checkout again', preparingAgainTests)
   describe('the question after it', afterPreparingTests)
-  describe('the base fails too', aFailingBaseTests)
   describe('without a prepare command', withoutPrepareTests)
   describe('a log is never read', noLogReadingTests)
-  describe('a passing ladder', aPassingLadderTests)
 })
 
 const TESTS = "The unit's own tests"
@@ -1116,50 +1115,13 @@ function failedOnceTests() {
   })
 }
 
-/** The gate a check failing on the base branch too raises: both runs, as evidence. */
-function expectBlockedOnBase(gate: Gate | undefined): void {
-  if (gate === undefined) throw new Error('no verify.base-fail gate was raised')
-  expect(gate.summary).toBe('x is blocked by a check that already fails on main')
-  expect(gate.why).toContain('Lint fails on main with exit code 2')
-  expect(gate.why).toContain('also fails without this change')
-  expect(gate.options.map((o) => o.id)).toEqual(['send_back', 'accept_debt', 'hold'])
-  expect(gate.evidence).toHaveLength(2)
-  expect(gate.evidence[0]).toMatchObject({ exitCode: 1 })
-  expect(gate.evidence[0].excerpt).toContain('Lint exited 1')
-  expect(gate.evidence[1]).toMatchObject({ exitCode: 2, step: 'Lint' })
-  expect(gate.evidence[1].command).toBeTruthy()
-  expect(gate.evidence[1].excerpt).toContain('.base.log')
-}
-
-function theBaseBranchFailsTooTests() {
-  it('blocks on the base branch when the same check fails there too', async () => {
-    const o = order([unit('U-1')])
-    const releaseBase = vi.fn(async () => undefined)
-    const outcome = await execute(
-      planOf(o),
-      base({
-        runStep: lintRunner(() => 1),
-        runStepOnBase: lintRunner(() => 2),
-        releaseBase,
-      })
-    )
-    expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.repeat-fail')
-    expectBlockedOnBase(outcome.gates.find((g) => g.rule === 'verify.base-fail'))
-    expect(releaseBase).toHaveBeenCalledTimes(1)
-  })
-}
-
 function sendingBackTests() {
   it('sends the change back when the base passes the same check', async () => {
     const o = order([unit('U-1')])
-    const outcome = await execute(
-      planOf(o),
-      base({ runStep: lintRunner(() => 1), runStepOnBase: lintRunner(() => 0) })
-    )
+    const outcome = await execute(planOf(o), base({ runStep: lintRunner(() => 1) }))
     const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
-    expect(gate?.why).toMatch(/It passes on main without this change\.$/)
+    expect(gate?.why).not.toContain('main')
     expect(gate?.options.map((o) => o.id)).toContain('send_back')
-    expect(outcome.gates.map((g) => g.rule)).not.toContain('verify.base-fail')
   })
 }
 
@@ -1170,7 +1132,6 @@ function theSendBackLimitTests() {
       planOf(o),
       base({
         runStep: lintRunner(() => 1),
-        runStepOnBase: lintRunner(() => 0),
         priorGates: sentBack(o, 2),
       })
     )
@@ -1190,36 +1151,77 @@ function theSendBackLimitTests() {
   })
 }
 
-function anUncheckedBaseTests() {
-  it('says so when the base branch could not be checked, and never counts it as a pass', async () => {
+function acceptedDebtTests() {
+  it('raises the gate when nobody has decided', async () => {
+    const outcome = await execute(
+      planOf(order([unit('U-1')])),
+      base({ runStep: lintRunner(() => 1) })
+    )
+    expect(outcome.gates.map((g) => g.rule)).toEqual(['verify.repeat-fail'])
+    expect(outcome.shippable).toBe(false)
+  })
+
+  it('raises no gate, records the debt and ships once the operator accepted it', async () => {
     const o = order([unit('U-1')])
+    const record = vi.fn(async () => undefined)
     const outcome = await execute(
       planOf(o),
-      base({ runStep: lintRunner(() => 1), runStepOnBase: async () => null })
+      base({
+        runStep: lintRunner(() => 1),
+        priorGates: sentBack(o, 1, 'accept_debt'),
+        record,
+      })
     )
-    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
-    expect(gate?.why).toContain('main could not be checked')
-    expect(gate?.options.map((o) => o.id)).toContain('send_back')
+    expect(outcome.gates).toEqual([])
+    expect(outcome.ladder?.ok).toBe(false)
+    expect(outcome.shippable).toBe(true)
+    expect(record).toHaveBeenCalledWith(
+      'verify.debt_accepted',
+      'Lint',
+      expect.stringMatching(/^Lint .* failed with exit code 1; you accepted this debt/)
+    )
   })
 }
 
-function releasingTheBaseCheckoutTests() {
-  it('releases the base checkout once, even when a base step throws', async () => {
+function acceptedStallTests() {
+  it('a debt accepted on a stall does not let a failing final check ship', async () => {
     const o = order([unit('U-1')])
-    const releaseBase = vi.fn(async () => undefined)
-    await expect(
-      execute(
-        planOf(o),
-        base({
-          runStep: lintRunner(() => 1),
-          runStepOnBase: async () => {
-            throw new Error('checkout gone')
-          },
-          releaseBase,
-        })
-      )
-    ).rejects.toThrow('checkout gone')
-    expect(releaseBase).toHaveBeenCalledTimes(1)
+    const stall = {
+      ...raiseGate({
+        id: 'WO-1-verify.repeat-fail-1',
+        rule: 'verify.repeat-fail',
+        orderId: o.id,
+        summary: `${o.title} cannot go any further on its own`,
+        why: 'a cycle',
+        at: '2026-09-06T10:00:00.000Z',
+      }),
+      decision: {
+        option: 'accept_debt',
+        by: 'operator' as const,
+        note: '',
+        at: '2026-09-06T10:05:00.000Z',
+      },
+    }
+    const outcome = await execute(
+      planOf(o),
+      base({ runStep: lintRunner(() => 1), priorGates: [stall] })
+    )
+    expect(outcome.gates.map((g) => g.rule)).toEqual(['verify.repeat-fail'])
+    expect(outcome.shippable).toBe(false)
+  })
+}
+
+function documentOutsideTheCheckoutTests() {
+  it('climbs nothing, raises nothing and ships when the change is not the end', async () => {
+    const runStep = vi.fn(async () => 1)
+    const outcome = await execute(
+      planOf(order([unit('U-1')])),
+      base({ runStep, shipsChange: async () => false })
+    )
+    expect(runStep).not.toHaveBeenCalled()
+    expect(outcome.gates).toEqual([])
+    expect(outcome.ladder).toBeNull()
+    expect(outcome.shippable).toBe(true)
   })
 }
 
@@ -1257,39 +1259,21 @@ function preparingAgainTests() {
 }
 
 function afterPreparingTests() {
-  it('asks the base branch when the check still fails after the checkout is prepared again', async () => {
+  it('raises the gate when the check still fails after the checkout is prepared again', async () => {
     const o = withPrepare(order([unit('U-1')]), 'make deps')
     const reinstall = vi.fn(async () => 0)
     const record = vi.fn(async () => undefined)
-    const runStepOnBase = vi.fn(async () => 0)
     const outcome = await execute(
       planOf(o),
-      base({ runStep: lintRunner(() => 1), reinstall, record, runStepOnBase })
+      base({ runStep: lintRunner(() => 1), reinstall, record })
     )
     expect(reinstall).toHaveBeenCalledTimes(1)
-    expect(runStepOnBase).toHaveBeenCalled()
     expect(record).not.toHaveBeenCalledWith(
       'verify.reprepared',
       expect.anything(),
       expect.anything()
     )
-    const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
-    expect(gate?.why).toMatch(/It passes on main without this change\.$/)
-  })
-}
-
-function aFailingBaseTests() {
-  it('names the base failure when the base fails too', async () => {
-    const o = withPrepare(order([unit('U-1')]), 'make deps')
-    const outcome = await execute(
-      planOf(o),
-      base({
-        runStep: lintRunner(() => 1),
-        runStepOnBase: lintRunner(() => 1),
-        reinstall: vi.fn(async () => 0),
-      })
-    )
-    expect(outcome.gates.map((g) => g.rule)).toContain('verify.base-fail')
+    expect(outcome.gates.map((g) => g.rule)).toContain('verify.repeat-fail')
   })
 }
 
@@ -1297,13 +1281,8 @@ function withoutPrepareTests() {
   it('skips the question when the order has no prepare command', async () => {
     const o = withPrepare(order([unit('U-1')]), null)
     const reinstall = vi.fn(async () => 0)
-    const runStepOnBase = vi.fn(async () => 0)
-    const outcome = await execute(
-      planOf(o),
-      base({ runStep: lintRunner(() => 1), reinstall, runStepOnBase })
-    )
+    const outcome = await execute(planOf(o), base({ runStep: lintRunner(() => 1), reinstall }))
     expect(reinstall).not.toHaveBeenCalled()
-    expect(runStepOnBase).toHaveBeenCalled()
     expect(outcome.gates.map((g) => g.rule)).toContain('verify.repeat-fail')
   })
 }
@@ -1316,10 +1295,10 @@ function noLogReadingTests() {
     const reinstall = vi.fn(async () => 0)
     const outcome = await execute(
       planOf(o),
-      base({ runStep: logRunner(missingPackage), runStepOnBase: lintRunner(() => 1), reinstall })
+      base({ runStep: logRunner(missingPackage), reinstall })
     )
     expect(reinstall).not.toHaveBeenCalled()
-    expect(outcome.gates.map((g) => g.rule)).toContain('verify.base-fail')
+    expect(outcome.gates.map((g) => g.rule)).toContain('verify.repeat-fail')
   })
 
   it('never says the dependencies are broken, whatever the log says', async () => {
@@ -1328,24 +1307,11 @@ function noLogReadingTests() {
       planOf(o),
       base({
         runStep: logRunner(missingPackage),
-        runStepOnBase: async () => 0,
         reinstall: vi.fn(async () => 1),
       })
     )
     const gate = outcome.gates.find((g) => g.rule === 'verify.repeat-fail')
     expect(gate?.why).not.toMatch(/install|dependencies/)
-    expect(gate?.why).toMatch(/It passes on main without this change\.$/)
-  })
-}
-
-function aPassingLadderTests() {
-  it('does not touch the base when the ladder passes', async () => {
-    const o = order([unit('U-1')])
-    const runStepOnBase = vi.fn(async () => 0)
-    const releaseBase = vi.fn(async () => undefined)
-    await execute(planOf(o), base({ runStep: async () => 0, runStepOnBase, releaseBase }))
-    expect(runStepOnBase).not.toHaveBeenCalled()
-    expect(releaseBase).not.toHaveBeenCalled()
   })
 }
 
@@ -2917,6 +2883,27 @@ describe('the stalled gate names what it would retry', () => {
       g.summary.endsWith('cannot go any further on its own')
     )
     expect(stalled?.nodeId).toBe('build:U-1')
+  })
+})
+
+describe('an accepted debt on a node', () => {
+  it('still stops a stalled run, because only a final check takes a debt as settled', async () => {
+    const o = order([unit('U-1')])
+    const failing = deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
+    const first = await execute(planOf(o), failing)
+    const asked = first.gates.find((g) => g.summary.endsWith('cannot go any further on its own'))
+    if (asked === undefined) throw new Error('expected the stall to be asked about')
+    const accepted = decide(asked, {
+      option: 'accept_debt',
+      note: '',
+      at: '2026-09-28T19:12:26.193Z',
+    })
+
+    const resumed = await execute(
+      { order: o, recipe: recipe(), graph: first.graph },
+      { ...failing, priorGates: [accepted] }
+    )
+    expect(resumed.gates.map((g) => g.nodeId)).toContain('build:U-1')
   })
 })
 

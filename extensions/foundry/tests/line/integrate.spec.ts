@@ -1766,6 +1766,33 @@ function redTeamFinding(over: Partial<WorkOrder['redTeam'][number]>): WorkOrder[
   }
 }
 
+const LEFT_STEPS: LadderOutcome['steps'] = [
+  {
+    rung: 'L0',
+    name: 'Lint',
+    result: 'pass',
+    reason: '',
+    exitCode: 0,
+    command: 'npm run lint',
+  },
+  {
+    rung: 'L5',
+    name: 'Build',
+    result: 'not_measured',
+    reason: 'no build command',
+    exitCode: null,
+    command: null,
+  },
+  {
+    rung: 'L1',
+    name: 'Tests',
+    result: 'fail',
+    reason: '',
+    exitCode: 1,
+    command: 'npm test',
+  },
+]
+
 function leftShipment(): Parameters<typeof prBody>[1] {
   return {
     verdicts: [
@@ -1774,25 +1801,7 @@ function leftShipment(): Parameters<typeof prBody>[1] {
       verdict({ criterionId: 'AC-3', result: 'not_measured', reason: 'no log harness' }),
     ],
     findings: [],
-    ladder: ladderWith([
-      {
-        rung: 'L0',
-        name: 'Lint',
-        result: 'pass',
-        reason: '',
-        exitCode: 0,
-        command: 'npm run lint',
-      },
-      {
-        rung: 'L5',
-        name: 'Build',
-        result: 'not_measured',
-        reason: 'no build command',
-        exitCode: null,
-        command: null,
-      },
-    ]),
-    failingOnBase: ['Tests'],
+    ladder: ladderWith(LEFT_STEPS),
   }
 }
 
@@ -1802,14 +1811,14 @@ function leftForYouTests() {
     expect(section.slice(0, 2)).toEqual(['**1 of 4** criteria pass. 3 need you.', ''])
   })
 
-  it('lists every item in order: criteria, unmeasured steps, base failures, accepted findings, assumptions, questions', () => {
+  it('lists every item in order: criteria, unmeasured steps, accepted debt, accepted findings, assumptions, questions', () => {
     const section = leftForYou(prBody(leftOrder(), leftShipment()))
     expect(section.slice(2)).toEqual([
       '- **AC-2** A valid token is kept: failed. kept token was refused',
       '- **AC-3** The refusal is logged: not measured. no log harness',
       '- **AC-4** The refusal is documented: not measured. nothing ran',
       '- **Build**: not measured. no build command',
-      "- **Tests**: fails on main before this change. Not this pull request's to fix.",
+      '- **Tests** failed: `npm test`, exit 1. You accepted this debt.',
       '- **RT-1** accepted by you: No rate limit. Reason: Later',
       '- **AS-1** assumed: Tokens live in Redis. Nobody struck it.',
       '- **Q-1** still open: Should refusal be silent?',
@@ -1831,17 +1840,6 @@ function leftForYouEdgeTests() {
     const section = leftForYou(prBody(refreshTokenOrder(), shipment))
     expect(section.slice(0, 2)).toEqual(['**1 of 1** criteria pass. These still need you:', ''])
     expect(section.join('\n')).not.toContain('0 need you')
-  })
-
-  it('names the base branch of the first repository', () => {
-    const order = leftOrder()
-    const moved = {
-      ...order,
-      context: { ...order.context, repos: [{ ...APP_REPO, baseBranch: 'develop' }] },
-    }
-    expect(leftForYou(prBody(moved, leftShipment())).join('\n')).toContain(
-      'fails on develop before this change'
-    )
   })
 
   it('says nothing is left when every criterion passed and nothing is pending', () => {

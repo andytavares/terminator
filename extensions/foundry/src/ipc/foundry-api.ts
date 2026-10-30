@@ -37,6 +37,7 @@ import type {
   transcriptTail,
   unmuteFeed,
 } from './supervision-registration.js'
+import type { RunLogPayload, readRunLog } from './run-log.js'
 import type { consumePendingNewOrder, setView, viewSetting } from './ui-registration.js'
 import type { fileTicket } from '../forge/ticket-offer.js'
 
@@ -117,6 +118,7 @@ export type FoundryApi = {
   'foundry:permission-hand-back': Handler<typeof handBackPermission>
   'foundry:run-terminal': Answers<typeof SessionPayload, typeof goToRunTerminal>
   'foundry:run-transcript': Handler<typeof transcriptTail>
+  'foundry:run-log': Answers<typeof RunLogPayload, typeof readRunLog>
   'foundry:run-interrupt': Handler<typeof interruptRun>
   'foundry:run-redirect': Handler<typeof redirectRun>
   'foundry:run-stop': Handler<typeof stopSessionOnRequest>

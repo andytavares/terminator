@@ -40,6 +40,8 @@ import type { Gate } from '../../gates/rules.js'
 import type { OrderMetrics } from '../../factory/metrics.js'
 import { HallScene } from './HallScene.js'
 import { StationMonitor } from './StationMonitor.js'
+import { RunLog } from './RunLog.js'
+import { whiteboardX, WHITEBOARD } from '../../factory/art/props.js'
 import type { MonitorStatus } from './StationMonitor.js'
 import type { NodeState, RunGraph } from '../../line/run-graph.js'
 import type { ToolActivity } from '../../runtime/transcript-tailer.js'
@@ -617,18 +619,9 @@ interface StationDeps {
   readonly setActivity: (activity: Activity) => void
 }
 
-/** The station open on its monitor, what its agent is saying, and attaching to it. */
-function useStation(orderId: string, { view, setActivity }: StationDeps) {
-  const [selected, setSelected] = useState<string | null>(null)
-  const [transcript, setTranscript] = useState<TranscriptLine[]>([])
+/** Attaching to a station's agent, and why it could not. */
+function useAttachment(orderId: string) {
   const [attachProblem, setAttachProblem] = useState<string | null>(null)
-  const selectedSessionId = sessionOf(view, selected)
-  useAgentWords(orderId, { selectedSessionId, setActivity, setTranscript })
-  useForgetTranscript(selectedSessionId, setTranscript)
-  const openStation = useCallback((nodeId: string) => {
-    setSelected(nodeId)
-    setAttachProblem(null)
-  }, [])
   const attach = useCallback(
     async (nodeId: string) => {
       const trouble = await attachTo(orderId, nodeId)
@@ -636,7 +629,29 @@ function useStation(orderId: string, { view, setActivity }: StationDeps) {
     },
     [orderId]
   )
-  return { selected, setSelected, transcript, attachProblem, openStation, attach }
+  return { attachProblem, clearProblem: () => setAttachProblem(null), attach }
+}
+
+/** The station open on its monitor (or the run log in its place), and what its agent is saying. */
+function useStation(orderId: string, { view, setActivity }: StationDeps) {
+  const [selected, setSelected] = useState<string | null>(null)
+  const [logOpen, setLogOpen] = useState(false)
+  const [transcript, setTranscript] = useState<TranscriptLine[]>([])
+  const { attachProblem, clearProblem, attach } = useAttachment(orderId)
+  const selectedSessionId = sessionOf(view, selected)
+  useAgentWords(orderId, { selectedSessionId, setActivity, setTranscript })
+  useForgetTranscript(selectedSessionId, setTranscript)
+  const openStation = (nodeId: string) => {
+    setSelected(nodeId)
+    setLogOpen(false)
+    clearProblem()
+  }
+  const openLog = () => {
+    setSelected(null)
+    setLogOpen(true)
+  }
+  const log = { open: logOpen, setOpen: setLogOpen, openLog }
+  return { selected, setSelected, transcript, attachProblem, openStation, attach, log }
 }
 
 /** Answers use the Floor's and the Inbox's channels; a refusal shows on its card. */
@@ -890,6 +905,7 @@ function HallFrame({ hall, model, overlayRef }: OverlayProps) {
       {selectedNode === null ? null : (
         <StationPanel hall={hall} model={model} node={selectedNode} />
       )}
+      {hall.station.log.open ? <RunLogPanel hall={hall} model={model} /> : null}
     </div>
   )
 }
@@ -903,6 +919,7 @@ function HallOverlay({ hall, model, overlayRef }: OverlayProps) {
   const { pinnedWait } = hall.layout
   return (
     <div className="fdry-hall-overlay" ref={overlayRef}>
+      <WhiteboardButton hall={hall} map={map} />
       {map.props
         .filter((prop) => prop.nodeId !== null)
         .map((prop) => (
@@ -921,6 +938,44 @@ function HallOverlay({ hall, model, overlayRef }: OverlayProps) {
         <HallInterruption key={`${item.kind}:${item.id}`} hall={hall} model={model} item={item} />
       ))}
     </div>
+  )
+}
+
+/** The whiteboard on the wall opens the log of every station. */
+function WhiteboardButton({ hall, map }: { readonly hall: Hall; readonly map: HallMap }) {
+  const x = whiteboardX(map)
+  if (x === null) return null
+  const wallW = map.width * TILE_PX
+  const wallH = map.height * TILE_PX
+  const style = {
+    left: `${(x / wallW) * 100}%`,
+    top: `${(WHITEBOARD.y / wallH) * 100}%`,
+    width: `${(WHITEBOARD.w / wallW) * 100}%`,
+    height: `${(WHITEBOARD.h / wallH) * 100}%`,
+  }
+  return (
+    <button
+      type="button"
+      className="fdry-hall-station"
+      title="Run log: every station"
+      style={style}
+      aria-label="Run log: every station"
+      onClick={hall.station.log.openLog}
+    />
+  )
+}
+
+function RunLogPanel({ hall, model }: StageProps) {
+  const nodeByStation = Object.fromEntries(
+    Object.entries(model.labels).map(([id, label]) => [label, id])
+  )
+  return (
+    <RunLog
+      orderId={hall.orderId}
+      nodeByStation={nodeByStation}
+      onOpenStation={hall.station.openStation}
+      onClose={() => hall.station.log.setOpen(false)}
+    />
   )
 }
 

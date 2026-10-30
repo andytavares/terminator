@@ -9,7 +9,6 @@ import type { WorkOrder } from '../../src/order/schema.js'
 import type { ProfileFacts } from '../../src/forge/checks-view.js'
 import { openForgeStep } from '../helpers/forge-steps.js'
 import { payloadsSentOn } from '../helpers/bridge-calls.js'
-import { PROVEN_ENVIRONMENT, baseStep, provenBaseline } from '../helpers/environment.js'
 import { bareProfile, glyphProfile } from '../helpers/profile.js'
 
 // The Checks step: every command Foundry runs in the repository, where it came from in
@@ -51,8 +50,8 @@ let tailReply: unknown
 let decisions: { continueUnmeasured: boolean; declinePictures: boolean }
 beforeEach(() => {
   recordUsage.mockClear()
-  bus = createChangeBus()
   tailReply = { tail: 'checking 214 files\nall files formatted' }
+  bus = createChangeBus()
   decisions = { continueUnmeasured: false, declinePictures: false }
   proveReply = { exitCode: 0, logPath: '/logs/format.log', commit: '4be1c09aaaa' }
 })
@@ -68,15 +67,11 @@ function recordDecision(move: string | undefined): void {
   if (move === 'decline-pictures') decisions.declinePictures = true
 }
 
-function mount(
-  profile: ProfileFacts,
-  order = orderWithUnit(),
-  environment = PROVEN_ENVIRONMENT
-): void {
+function mount(profile: ProfileFacts, order = orderWithUnit()): void {
   const answer = () => ({
     order,
     compile: compileOrder(order),
-    environment: { ...environment, decisions: { ...decisions } },
+    decisions: { ...decisions },
   })
   invoke = vi.fn(async (channel: string, payload?: { move?: string }) => {
     if (channel === 'foundry:forge.environment') recordDecision(payload?.move)
@@ -134,7 +129,7 @@ describe('the Checks step moves', () => {
   it('offers the moves for a command that failed on main, and none for a passing one', async () => {
     await openChecks()
     const format = rowNamed('Format')
-    for (const name of ['Edit', 'Show the log', 'Use it anyway', 'Remove']) {
+    for (const name of ['Edit', 'Use it anyway', 'Remove']) {
       expect(format.getByRole('button', { name })).toBeTruthy()
     }
     expect(
@@ -175,42 +170,6 @@ describe('Use it anyway and Remove', () => {
         { repoPath: '/repos/app', checks: { lint: null } },
       ])
     )
-  })
-})
-
-/** Opens Checks on an order whose base branch check kept a log of the failing Format, and shows it. */
-async function showKeptLog(): Promise<void> {
-  mount(glyphProfile(), orderWithUnit(), {
-    waivedAt: null,
-    baseline: provenBaseline({
-      state: 'failing',
-      steps: [baseStep('Format', { result: 'fail', exitCode: 1, command: './glyph fmt --check' })],
-      logs: { Format: '/logs/format.log' },
-    }),
-  })
-  await openForgeStep('Checks')
-  const format = await screen.findByRole('group', { name: 'Format' })
-  fireEvent.click(await within(format).findByRole('button', { name: 'Show the log' }))
-}
-
-describe('Show the log', () => {
-  it('names the log the base branch check kept for the command', async () => {
-    await showKeptLog()
-    expect(await screen.findByText(/\/logs\/format\.log/)).toBeTruthy()
-    expect(await screen.findByText(/all files formatted/)).toBeTruthy()
-    expect(payloadsSentOn(invoke, 'foundry:log-tail')).toEqual([{ path: '/logs/format.log' }])
-  })
-
-  it('says why when the log cannot be read', async () => {
-    tailReply = { error: 'No log was kept at that place.' }
-    await showKeptLog()
-    expect(await screen.findByText('No log was kept at that place.')).toBeTruthy()
-  })
-
-  it('says so when no log was kept', async () => {
-    await openChecks()
-    fireEvent.click(rowNamed('Format').getByRole('button', { name: 'Show the log' }))
-    expect(await screen.findByText(/No log was kept for this command/)).toBeTruthy()
   })
 })
 

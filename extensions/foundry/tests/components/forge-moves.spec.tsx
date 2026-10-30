@@ -1,4 +1,3 @@
-import { PROVEN_ENVIRONMENT, provenBaseline } from '../helpers/environment.js'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import React from 'react'
@@ -92,7 +91,6 @@ function mountForgeOver(
       return {
         order: shown,
         compile: compileOrder(shown),
-        environment: PROVEN_ENVIRONMENT,
         ...extra,
       }
     }
@@ -222,7 +220,6 @@ describe('the moves out of an agent Claude could not start', () => {
         'foundry:order.converge': () => ({
           order,
           compile: compileOrder(order),
-          environment: PROVEN_ENVIRONMENT,
           intake: NOT_STARTED,
           error: 'Claude did not say why.',
         }),
@@ -278,9 +275,7 @@ async function handOffWith(committed: unknown) {
   const onStarted = mountForgeOver(shown, {
     answers: {
       'foundry:order.compile': (payload) =>
-        payload.commit === true
-          ? committed
-          : { order: shown, compile: compileOrder(shown), environment: PROVEN_ENVIRONMENT },
+        payload.commit === true ? committed : { order: shown, compile: compileOrder(shown) },
     },
   })
   await openForgeStep('Hand off')
@@ -305,24 +300,8 @@ describe('a hand-off compile turns down', () => {
     const onStarted = await handOffWith({
       order: shown,
       compile: compileOrder(shown),
-      environment: PROVEN_ENVIRONMENT,
     })
     await screen.findByRole('button', { name: /^Hand off with/ })
-    expect(payloadsSentOn(invoke, 'foundry:run.start')).toEqual([])
-    expect(onStarted).not.toHaveBeenCalled()
-  })
-})
-
-describe('a hand-off the Foundry backend refuses', () => {
-  it('shows why, and starts nothing', async () => {
-    const shown = compilableOrder()
-    const onStarted = await handOffWith({
-      order: shown,
-      compile: compileOrder(shown),
-      environment: PROVEN_ENVIRONMENT,
-      refused: 'Lint failed on main with exit code 2: `npm run lint`.',
-    })
-    await screen.findByText('Lint failed on main with exit code 2: `npm run lint`.')
     expect(payloadsSentOn(invoke, 'foundry:run.start')).toEqual([])
     expect(onStarted).not.toHaveBeenCalled()
   })
@@ -350,61 +329,3 @@ describe('what this order writes back', () => {
     )
   })
 })
-
-const rows = () => document.querySelector('.fdry-checks') as HTMLElement
-
-describe('the base branch row on the hand-off step', theBaseBranchRowTests)
-describe('provenRowTests', provenRowTests)
-
-function theBaseBranchRowTests() {
-  it('offers to check again or skip this check, and sends the move chosen', async () => {
-    mountForgeOver(compilableOrder(), {
-      extra: { environment: { baseline: null, waivedAt: null } },
-    })
-    await openForgeStep('Hand off')
-    await screen.findByText('Not checked for this order yet.')
-    fireEvent.click(within(rows()).getByRole('button', { name: 'Check again' }))
-    fireEvent.click(within(rows()).getByRole('button', { name: 'Skip this check' }))
-    await waitFor(() =>
-      expect(payloadsSentOn(invoke, 'foundry:forge.environment')).toEqual([
-        { id: 'WO-1', move: 'check' },
-        { id: 'WO-1', move: 'waive' },
-      ])
-    )
-  })
-
-  it('offers only "Skip this check" while the check runs', async () => {
-    mountForgeOver(compilableOrder(), {
-      extra: { environment: { baseline: provenBaseline({ state: 'checking' }), waivedAt: null } },
-    })
-    await openForgeStep('Hand off')
-    await screen.findByText(/^Checking main:/)
-    expect(within(rows()).queryByRole('button', { name: 'Check again' })).toBeNull()
-    expect(within(rows()).getByRole('button', { name: 'Skip this check' })).toBeTruthy()
-  })
-}
-
-function provenRowTests() {
-  it('says why when a base branch move is turned down', async () => {
-    mountForgeOver(compilableOrder(), {
-      extra: { environment: { baseline: null, waivedAt: null } },
-      answers: {
-        'foundry:forge.environment': () => ({
-          error: 'Only a draft order can check its base branch again.',
-        }),
-      },
-    })
-    await openForgeStep('Hand off')
-    fireEvent.click(await within(rows()).findByRole('button', { name: 'Check again' }))
-    expect(
-      await screen.findByText('Only a draft order can check its base branch again.')
-    ).toBeTruthy()
-  })
-
-  it('offers neither once the base branch is proven', async () => {
-    mountForgeOver(compilableOrder(), {})
-    await openForgeStep('Hand off')
-    await screen.findByText(/^main at b289028 passed/)
-    expect(within(rows()).queryByRole('button', { name: 'Skip this check' })).toBeNull()
-  })
-}

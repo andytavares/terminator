@@ -30,3 +30,12 @@ export function formatDuration(ms: number): string {
   const minutes = Math.round((ms % HOUR_MS) / MINUTE_MS)
   return minutes === 0 ? `${hours} h` : `${hours} h ${minutes} min`
 }
+
+/** "14:05:09" in local time, from epoch milliseconds or an ISO string; dashes when unknown. */
+export function clockOf(at: number | string): string {
+  const time = new Date(at)
+  if (at === 0 || at === '' || Number.isNaN(time.getTime())) return '--:--:--'
+  return [time.getHours(), time.getMinutes(), time.getSeconds()]
+    .map((part) => String(part).padStart(2, '0'))
+    .join(':')
+}

@@ -280,7 +280,6 @@ export function intakeNotStarted(
 const REVIEW_HELD = 'review.held'
 const REVIEW_RELEASED = 'review.released'
 const ORDER_AGREED = 'order.agreed'
-const ENVIRONMENT_WAIVED = 'environment.waived'
 export const CHECKS_CONTINUE_UNMEASURED = 'checks.continue-unmeasured'
 export const PICTURES_DECLINED = 'pictures.declined'
 
@@ -364,20 +363,6 @@ export function agreedFacts(entries: readonly LedgerEntry[]): AgreedFacts | null
     if (entry.action === ORDER_AGREED) {
       return { at: entry.at, by: entry.actor === 'rule:forge' ? 'automatic' : 'you' }
     }
-  }
-  return null
-}
-
-/** When the operator last chose to hand off without a proven base branch. */
-export function environmentWaivedAt(
-  entries: readonly LedgerEntry[],
-  checkStartedAt: string | null = null
-): string | null {
-  for (let i = entries.length - 1; i >= 0; i -= 1) {
-    if (entries[i].action !== ENVIRONMENT_WAIVED) continue
-    const staleSinceCheck =
-      checkStartedAt !== null && Date.parse(entries[i].at) < Date.parse(checkStartedAt)
-    return staleSinceCheck ? null : entries[i].at
   }
   return null
 }

@@ -4070,3 +4070,78 @@
   border-radius: var(--tm-radius-sm);
   white-space: pre-wrap;
 }
+
+/* The whiteboard's run log: a panel in the slot a station's monitor uses. */
+.fdry-runlog {
+  position: absolute;
+  z-index: var(--tm-layer-modal);
+  top: 30px;
+  right: 10px;
+  bottom: 10px;
+  width: min(480px, 56%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  color: var(--tm-text-primary);
+}
+
+.fdry-runlog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fdry-runlog__head h3 {
+  margin: 0;
+}
+
+.fdry-runlog__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.fdry-runlog__lines {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  font-family: var(--tm-font-mono);
+  font-size: 12px;
+}
+
+.fdry-runlog__line {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  padding: 1px 0;
+}
+
+.fdry-runlog__line time,
+.fdry-runlog__station {
+  color: var(--tm-text-secondary);
+}
+
+.fdry-runlog__station {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+}
+
+button.fdry-runlog__station {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.fdry-runlog__text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

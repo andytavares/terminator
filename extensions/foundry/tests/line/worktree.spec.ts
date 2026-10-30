@@ -6,7 +6,6 @@ import {
   reattachCheckout,
   ensureCheckout,
   ensureCheckouts,
-  ensureBaseCheckout,
   ensureBaselineCheckout,
   removeBaseCheckout,
   removeCheckout,
@@ -129,6 +128,8 @@ describe('preparing a checkout', () => {
   describe('real git, other starts', realGitResetTests)
   describe('real git, two orders in one repository', realGitTwoOrdersTests)
   describe('real git, re-attaching only', realGitReattachTests)
+  describe('real git, a stale branch', realGitStaleBranchTests)
+  describe('real git, a stale branch with its own commit', realGitStaleBranchFetchTests)
   describe('real git, safety', realGitSafetyTests)
   describe('real git, fetching the base', realGitFetchTests)
   describe('real git, branch ownership', realGitBranchOwnershipTests)
@@ -372,6 +373,40 @@ function realGitReattachTests() {
   })
 }
 
+/** The lane's branch, left behind by an earlier cut, while main moved on by three commits. */
+function staleBranchRepo() {
+  const fixture = realRepo()
+  const branch = branchFor(fixture.order, 1)
+  git(fixture.repoPath, 'branch', branch)
+  const stale = git(fixture.repoPath, 'rev-parse', branch)
+  for (const n of [1, 2, 3]) commitOn(fixture.repoPath, `main moved ${n}`)
+  return { ...fixture, branch, stale, mainTip: git(fixture.repoPath, 'rev-parse', 'main') }
+}
+
+function realGitStaleBranchTests() {
+  it('moves an existing branch with no commits of its own to the base when the lane is cut', async () => {
+    const { deps: real, order: o, branch, mainTip } = staleBranchRepo()
+    const checkout = await ensureCheckout(o, 1, real)
+    expect(git(checkout.path, 'rev-parse', 'HEAD')).toBe(mainTip)
+    expect(git(checkout.path, 'rev-parse', `refs/heads/${branch}`)).toBe(mainTip)
+  })
+
+  it('attaches a branch with a commit of its own unchanged', async () => {
+    const { deps: real, repoPath, order: o, branch } = staleBranchRepo()
+    git(repoPath, 'checkout', '-q', branch)
+    const own = commitOn(repoPath, 'its own work')
+    git(repoPath, 'checkout', '-q', 'main')
+    const checkout = await ensureCheckout(o, 1, real)
+    expect(git(checkout.path, 'rev-parse', 'HEAD')).toBe(own)
+  })
+
+  it('never moves a branch when only re-attaching', async () => {
+    const { deps: real, order: o, stale } = staleBranchRepo()
+    const checkout = await reattachCheckout(o, 1, real)
+    expect(git(checkout.path, 'rev-parse', 'HEAD')).toBe(stale)
+  })
+}
+
 /** `origin` as a bare clone of `repoPath`, so the repository has a remote to fetch from. */
 function addOrigin(repoPath: string): string {
   const bare = tmpDir('foundry-origin-')
@@ -502,10 +537,10 @@ function realGitResetTests() {
 
   it('recreates a deleted base checkout detached', async () => {
     const { deps: real, order: o } = realRepo()
-    const first = await ensureBaseCheckout(o, 1, real)
+    const first = await ensureBaselineCheckout(o, 1, real)
     fs.rmSync(first.path, { recursive: true, force: true })
 
-    const again = await ensureBaseCheckout(o, 1, real)
+    const again = await ensureBaselineCheckout(o, 1, real)
 
     expect(again.created).toBe(true)
     expect(fs.statSync(again.path).isDirectory()).toBe(true)
@@ -876,11 +911,11 @@ function shareTakeBackTests() {
       context: { ...base.context, environment: { ...base.context.environment, share: ['vendor'] } },
     }
     expect((await ensureCheckout(shared, 1, deps())).share).toEqual(['vendor'])
-    expect((await ensureBaseCheckout(shared, 1, deps())).share).toEqual(['vendor'])
+    expect((await ensureBaselineCheckout(shared, 1, deps())).share).toEqual(['vendor'])
   })
 }
 
-const baseTarget = path.join(ROOT, 'orders', 'WO-1', 'worktrees', 'app@base')
+const baseTarget = path.join(ROOT, 'orders', 'WO-1', 'worktrees', 'app@baseline')
 
 function linkingTests() {
   it('links the origin root node_modules into the worktree', async () => {
@@ -1027,7 +1062,7 @@ describe('a checkout of the base branch', () => {
 function addingAndReusingTests() {
   it('adds a detached worktree of the base beside the lane checkout', async () => {
     const d = deps()
-    const checkout = await ensureBaseCheckout(order(), 1, d)
+    const checkout = await ensureBaselineCheckout(order(), 1, d)
 
     expect(calls(d.exec).find((c) => c.args[1] === 'add')).toMatchObject({
       cwd: '/repos/app',
@@ -1039,7 +1074,7 @@ function addingAndReusingTests() {
 
   it('reuses the one git already has', async () => {
     const root = tmpDir('foundry-reuse-base-')
-    const existing = `${checkoutPath(root, order(), 'app')}@base`
+    const existing = `${checkoutPath(root, order(), 'app')}@baseline`
     fs.mkdirSync(existing, { recursive: true })
     const exec = vi.fn(async (options: { args: string[] }) => ({
       exitCode: 0,
@@ -1047,7 +1082,7 @@ function addingAndReusingTests() {
       stderr: '',
       timedOut: false,
     }))
-    const checkout = await ensureBaseCheckout(order(), 1, deps({ exec: exec as never, root }))
+    const checkout = await ensureBaselineCheckout(order(), 1, deps({ exec: exec as never, root }))
 
     expect(checkout.created).toBe(false)
     expect(calls(exec).some((c) => c.args[1] === 'add')).toBe(false)
@@ -1062,20 +1097,22 @@ function baseFailuresTests() {
       stderr: options.args[1] === 'add' ? 'invalid reference: main' : '',
       timedOut: false,
     }))
-    await expect(ensureBaseCheckout(order(), 1, deps({ exec: exec as never }))).rejects.toThrow(
+    await expect(ensureBaselineCheckout(order(), 1, deps({ exec: exec as never }))).rejects.toThrow(
       /app.*invalid reference: main/
     )
   })
 
   it('refuses a lane the order does not have', async () => {
-    await expect(ensureBaseCheckout(order(), 9, deps())).rejects.toBeInstanceOf(CheckoutFailedError)
+    await expect(ensureBaselineCheckout(order(), 9, deps())).rejects.toBeInstanceOf(
+      CheckoutFailedError
+    )
   })
 }
 
 function removingItTests() {
   it('unlocks and removes it, never prunes, and never throws at a caller that is cleaning up', async () => {
     const d = deps()
-    const checkout = await ensureBaseCheckout(order(), 1, d)
+    const checkout = await ensureBaselineCheckout(order(), 1, d)
     d.exec.mockClear()
 
     await removeBaseCheckout(checkout, d)
@@ -1090,5 +1127,18 @@ function removingItTests() {
       }) as never,
     })
     await expect(removeBaseCheckout(checkout, failing)).resolves.toBeUndefined()
+  })
+}
+
+function realGitStaleBranchFetchTests() {
+  it('does not fetch to decide about a branch with a commit of its own', async () => {
+    const { deps: real, repoPath, order: o, branch } = staleBranchRepo()
+    addOrigin(repoPath)
+    git(repoPath, 'checkout', '-q', branch)
+    commitOn(repoPath, 'its own work')
+    git(repoPath, 'checkout', '-q', 'main')
+    const exec = vi.fn(real.exec)
+    await ensureCheckout(o, 1, { ...real, exec })
+    expect(calls(exec).filter((c) => c.args[0] === 'fetch')).toEqual([])
   })
 }
