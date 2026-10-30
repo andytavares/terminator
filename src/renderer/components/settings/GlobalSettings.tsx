@@ -175,9 +175,29 @@ function InterfaceFields({ settings }: { settings: Settings }): React.JSX.Elemen
         </span>
       </div>
       <HideSidebarOnHomeField hide={settings.ui?.hideSidebarOnHome ?? true} />
+      <ShowUsageTabField show={settings.ui?.showUsageTab ?? true} />
       <HomeLayoutField layout={settings.ui?.homeLayout ?? 'tasks'} />
       <StaleAfterField staleAfterMs={settings.sidebar.staleAfterMs} />
     </>
+  )
+}
+
+function ShowUsageTabField({ show }: { show: boolean }): React.JSX.Element {
+  const updateShowUsageTab = useSettingsStore((s) => s.updateShowUsageTab)
+  return (
+    <div className="settings-section__field">
+      <label className="settings-section__label settings-section__label--inline">
+        <input
+          type="checkbox"
+          checked={show}
+          onChange={(e) => void updateShowUsageTab(e.target.checked)}
+        />
+        Show Usage in the sidebar
+      </label>
+      <span className="settings-section__hint">
+        Window → Usage and ⌘P then U open it either way
+      </span>
+    </div>
   )
 }
 

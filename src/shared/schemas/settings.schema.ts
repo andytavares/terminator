@@ -65,6 +65,7 @@ export const GlobalSettingsSchema = z.object({
       showMetricsBar: z.boolean().optional(),
       /** Home lists all work itself, so the project tree stays out of its way; ⌘B shows it. */
       hideSidebarOnHome: z.boolean().default(true),
+      showUsageTab: z.boolean().default(true),
       homeLayout: HomeLayoutSchema.default('tasks'),
       /**
        * Which editor "Open in editor" launches, by id. Empty means detect —
@@ -77,6 +78,7 @@ export const GlobalSettingsSchema = z.object({
       hasSeenWelcome: false,
       editor: '',
       hideSidebarOnHome: true,
+      showUsageTab: true,
       homeLayout: 'tasks',
     }),
   // Bounded 1 minute to 30 days so "zero" or "a year" is a validation failure

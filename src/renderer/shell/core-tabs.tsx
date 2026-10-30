@@ -1,6 +1,7 @@
 import React, { Suspense, createElement, lazy, useEffect } from 'react'
 import { ChartLine, House, LayoutGrid } from 'lucide-react'
 import { useExtensionRegistry } from '../extensions/registry'
+import { useSettingsStore } from '../stores/settings.store'
 import { recordUse } from '../usage/record'
 
 // Opened on demand, so it is its own chunk rather than part of the first
@@ -50,9 +51,11 @@ export function useCoreTabs(openQuickActions: () => void): void {
   useUsageTab()
 }
 
-/** Usage is a review screen: it takes no place in the app band, so a menu item and a quick
- * action open it. The remote window has no menu events. */
+/** Usage sits in the app band unless `ui.showUsageTab` is off; a menu item and a quick action
+ * open it either way. The remote window has no menu events. */
 function useUsageTab(): void {
+  const show = useSettingsStore((s) => s.globalSettings?.ui?.showUsageTab ?? true)
+
   useEffect(() => {
     const unregister = useExtensionRegistry.getState().registerGlobalTab({
       id: 'core.usage',
@@ -63,7 +66,6 @@ function useUsageTab(): void {
           <UsageScreen />
         </Suspense>
       ),
-      hidden: true,
     })
     const unsubscribe = window.electronAPI.extensionEvents?.onMenuOpenUsage?.(() => {
       useExtensionRegistry.getState().setActiveGlobalTab('core.usage')
@@ -74,4 +76,7 @@ function useUsageTab(): void {
       unsubscribe?.()
     }
   }, [])
+  useEffect(() => {
+    useExtensionRegistry.getState().updateGlobalTab('core.usage', { hidden: !show })
+  }, [show])
 }

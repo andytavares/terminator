@@ -28,6 +28,7 @@ describe('GlobalSettingsSchema defaults for fields an older file lacks', () => {
       hasSeenWelcome: false,
       editor: '',
       hideSidebarOnHome: true,
+      showUsageTab: true,
       homeLayout: 'tasks',
     })
   })

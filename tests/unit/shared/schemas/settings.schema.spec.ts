@@ -45,3 +45,19 @@ describe('GlobalSettingsSchema — ui.homeLayout', () => {
     ).toBe(false)
   })
 })
+
+describe('GlobalSettingsSchema — ui.showUsageTab', () => {
+  it('is on when the settings have never set it', () => {
+    expect(
+      GlobalSettingsSchema.parse({ ...base, ui: { hasSeenWelcome: true } }).ui.showUsageTab
+    ).toBe(true)
+  })
+
+  it('keeps an explicit off', () => {
+    const parsed = GlobalSettingsSchema.parse({
+      ...base,
+      ui: { hasSeenWelcome: true, showUsageTab: false },
+    })
+    expect(parsed.ui.showUsageTab).toBe(false)
+  })
+})
