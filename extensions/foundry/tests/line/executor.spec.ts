@@ -3414,8 +3414,7 @@ describe('an author handing back a document', () => {
   describe('the outputs directory', theOutputsDirectoryTests)
   describe('recording the document', recordingTheDocumentTests)
   describe('a document outside the checkout', aDocumentOutsideTheCheckoutTests)
-  describe('a document said to be in the checkout', aDocumentSaidToBeInTheCheckoutTests)
-  describe('nothing handed back', nothingHandedBackTests)
+  describe('the author commits nothing', theAuthorCommitsNothingTests)
 })
 
 const docsUnit = (id: string) => unit(id, { touches: [`docs/${id}.md`] })
@@ -3474,36 +3473,15 @@ function aDocumentOutsideTheCheckoutTests() {
   })
 }
 
-function aDocumentSaidToBeInTheCheckoutTests() {
-  it('fails when the document is said to be in the checkout and nothing changed there', async () => {
-    const order1 = order([])
-    const outcome = await execute(planOf(order1, recipe(AUTHORING)), {
+function theAuthorCommitsNothingTests() {
+  it('never commits the author: its document is outside the checkout', async () => {
+    const commitNode = vi.fn(async () => ({ kind: 'committed' }) as const)
+    const outcome = await execute(planOf(order([]), recipe(AUTHORING)), {
       ...deps(vi.fn(ok)),
-      collect: collecting({ path: 'docs/answer.md', location: 'checkout' }),
-      commitNode: async () => ({ kind: 'clean' }) as const,
+      collect: collecting({ path: 'answer.md', location: 'outputs' }),
+      commitNode,
     })
-    expect(outcome.graph.nodes.find((n) => n.id === 'write')?.state).toBe('failed')
-  })
-}
-
-function nothingHandedBackTests() {
-  it('fails when it handed back nothing and changed nothing', async () => {
-    const order1 = order([])
-    const outcome = await execute(planOf(order1, recipe(AUTHORING)), {
-      ...deps(vi.fn(ok)),
-      collect: collecting(null),
-      commitNode: async () => ({ kind: 'clean' }) as const,
-    })
-    expect(outcome.graph.nodes.find((n) => n.id === 'write')?.state).toBe('failed')
-  })
-
-  it('passes when it handed back nothing but did commit a change', async () => {
-    const order1 = order([])
-    const outcome = await execute(planOf(order1, recipe(AUTHORING)), {
-      ...deps(vi.fn(ok)),
-      collect: collecting(null),
-      commitNode: async () => ({ kind: 'committed' }) as const,
-    })
+    expect(commitNode).not.toHaveBeenCalled()
     expect(outcome.graph.nodes.find((n) => n.id === 'write')?.state).toBe('passed')
   })
 }

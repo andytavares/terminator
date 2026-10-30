@@ -213,7 +213,7 @@ function afterTheCheckWroteTests() {
     await early.beforeFinalCheck({ risk: risk('P3'), verdicts: [] })
     await early.finish(outcome())
     expect(calls).toContain('git commit -m')
-    expect(calls.filter((c) => c === 'git push --set-upstream')).toHaveLength(2)
+    expect(calls.filter((c) => c === 'git -c foundry.push=true')).toHaveLength(2)
     expect(watchCi).toHaveBeenCalledTimes(2)
   })
 
@@ -236,6 +236,6 @@ function failuresAndReEntryTests() {
     const second = setup()
     await second.early.beforeFinalCheck({ risk: risk('P3'), verdicts: [] })
     expect(second.calls.filter((c) => c === 'gh pr create')).toHaveLength(0)
-    expect(second.calls.some((c) => c.startsWith('git push'))).toBe(true)
+    expect(second.calls.some((c) => c === 'git -c foundry.push=true')).toBe(true)
   })
 }

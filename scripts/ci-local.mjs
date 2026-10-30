@@ -226,13 +226,25 @@ export const passRecord = (headSha, mainSha) => `${headSha} ${mainSha}\n`
 /** The commit a pass record names, or null when there is no record. */
 export const passedHead = (record) => record?.trim().split(/\s+/)[0] || null
 
-/** Whether the pre-push hook checks a push. A CI job pushing its own commit is CI already. */
-export function checksPushes(env) {
-  return !env.CI
+/**
+ * Whether the pre-push hook checks a push. A CI job pushing its own commit is CI already.
+ * Foundry marks its pushes with `git -c foundry.push=true`: its final check ran, and CI runs
+ * on the draft it opens (ADR 139).
+ */
+export function checksPushes(env, foundryPush = '') {
+  return !env.CI && foundryPush !== 'true'
 }
 
 const git = (cwd, ...args) =>
   execFileSync('git', args, { cwd, encoding: 'utf8', env: checkEnvironment(process.env) }).trim()
+/** A git setting, or '' when it is not set. */
+function gitSetting(name) {
+  try {
+    return git(REPO_ROOT, 'config', '--get', name)
+  } catch {
+    return ''
+  }
+}
 const passFile = () =>
   resolve(REPO_ROOT, git(REPO_ROOT, 'rev-parse', '--git-path', 'ci-local-passed'))
 const mainCheckout = () => resolve(REPO_ROOT, git(REPO_ROOT, 'rev-parse', '--git-common-dir'), '..')
@@ -257,7 +269,7 @@ function pushesNeedingCanary(pushed) {
 const recordedHead = (file) => passedHead(existsSync(file) ? readFileSync(file, 'utf8') : null)
 
 function checkPush() {
-  if (!checksPushes(process.env)) return
+  if (!checksPushes(process.env, gitSetting('foundry.push'))) return
   const pushed = readFileSync(0, 'utf8')
   const refused = unverifiedPushes(pushed, recordedHead(passFile()))
   if (refused.length > 0) {

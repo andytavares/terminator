@@ -586,6 +586,12 @@ export async function commitAndPushLanes(
 }
 
 /**
+ * Marks a push as Foundry's. Git hands `-c` settings to the hooks it runs, so a
+ * repository's pre-push hook can read `git config foundry.push` and trust it. @internal
+ */
+export const FOUNDRY_PUSH = ['-c', 'foundry.push=true'] as const
+
+/**
  * Push one lane's branch.
  *
  * `HEAD:<branch>` rather than the branch name alone so this works from a
@@ -597,7 +603,7 @@ async function pushLane(
 ): Promise<void> {
   const result = await deps.exec({
     command: 'git',
-    args: ['push', '--set-upstream', 'origin', `HEAD:${repo.headBranch}`],
+    args: [...FOUNDRY_PUSH, 'push', '--set-upstream', 'origin', `HEAD:${repo.headBranch}`],
     cwd: repo.path,
     timeoutMs: NETWORK_STEP_TIMEOUT_MS,
   })
