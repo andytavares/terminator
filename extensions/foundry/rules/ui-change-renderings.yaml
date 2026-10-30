@@ -1,0 +1,13 @@
+schemaVersion: 1
+id: ui-change-renderings
+scope: universal
+rung: L3
+asserts: >
+  A document or specification that proposes a change to what a person sees or
+  does shows each change as a before rendering and an after rendering, side by
+  side, each with one or two sentences on what changed and why. Each rendering
+  is drawn from the code it shows: the before from the current component and
+  stylesheet, the after from the proposed change. A document with a UI change
+  and no renderings is not finished.
+appliesWhen: always
+origin: built-in

@@ -2,7 +2,7 @@ schemaVersion: 1
 id: scribe
 modelTier: fast
 allowResume: true
-reads: [diff, order]
+reads: [diff, order, rules]
 writes: [docs]
 tools: [read, edit]
 prompt: |
