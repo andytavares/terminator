@@ -341,8 +341,9 @@ export type OrderIntake = z.infer<typeof IntakeSchema>
 /**
  * Where an author put the document it was asked for.
  *
- * `checkout` ships as a pull request. `outputs` is the order's own directory
- * and `published` is a link the author made, so neither has a change to ship.
+ * `outputs` is the order's own directory and `published` is a link the author
+ * made, so neither has a change to ship. `checkout` is read on orders written
+ * before ADR 138, when a document could ship as a pull request.
  */
 export const DOCUMENT_LOCATIONS = ['checkout', 'outputs', 'published'] as const
 

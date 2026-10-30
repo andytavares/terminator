@@ -58,6 +58,9 @@ export const COLLECTABLE = {
 
 export type Collectable = keyof typeof COLLECTABLE
 
+// `checkout` stays readable on orders written before ADR 138; no rung hands it back now.
+const HANDED_BACK_LOCATIONS = DOCUMENT_LOCATIONS.filter((location) => location !== 'checkout')
+
 const orderShape = WorkOrderSchema.shape
 
 /**
@@ -93,7 +96,10 @@ const SHAPES: Record<Collectable, z.ZodTypeAny> = {
   findings: z.array(AgentFindingSchema),
   plan: orderShape.plan,
   acceptance: orderShape.acceptance,
-  document: DocumentHandBackSchema,
+  document: DocumentHandBackSchema.refine((document) => document.location !== 'checkout', {
+    message: 'A document goes to outputs or is published; it never ships as a pull request.',
+    path: ['location'],
+  }),
 }
 
 /** @internal */
@@ -205,9 +211,9 @@ const EXAMPLE: Record<Collectable, string[]> = {
   ],
   document: [
     '  "document": {',
-    '    "path": "where the document is: a path in the checkout, or in outputs/",',
+    '    "path": "where the document is, in outputs/",',
     '    "url": "the link to it, only when you published it somewhere",',
-    `    "location": "${DOCUMENT_LOCATIONS.join(' | ')}"`,
+    `    "location": "${HANDED_BACK_LOCATIONS.join(' | ')}"`,
     '  },',
   ],
 }
@@ -242,13 +248,11 @@ const REPORTED_NOT_APPLIED = [
 function documentGuide(outputsDir: string | undefined): string[] {
   return [
     '',
-    'Say where the document is in `document`. `location` is `checkout` when you',
-    'wrote it in the repository, which ships as a pull request; `outputs` when',
-    'you wrote it to the order\u2019s own directory',
-    ...(outputsDir === undefined ? [] : [`(\`${outputsDir}\`), which ships nothing;`]),
-    'and `published` when you published it as a Claude artifact. When the order',
-    'names a target outside the checkout, or in another repository, write the',
-    'document to outputs and say so here.',
+    'Say where the document is in `document`. `location` is `outputs` when you',
+    'wrote it to the order\u2019s own directory',
+    ...(outputsDir === undefined ? [] : [`(\`${outputsDir}\`)`]),
+    'and `published` when you published it as a Claude artifact. Never write it',
+    'into the checkout: a document opens no pull request.',
     '',
     'When you can, write the document as an HTML page in the outputs directory and',
     'publish it with the Artifact tool. Hand back `published`, with `path` set to',

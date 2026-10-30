@@ -145,6 +145,12 @@ function rungOutputRefusingTests() {
     ).toThrow(RungOutputRejected)
   })
 
+  it('refuses a document in the checkout: research ends in an artifact, not a pull request', () => {
+    expect(() =>
+      parseRungOutput({ document: { path: 'docs/a.md', location: 'checkout' } }, [...AUTHOR])
+    ).toThrow(RungOutputRejected)
+  })
+
   it('refuses a document from a role that did not declare it', () => {
     expect(() =>
       parseRungOutput({ document: { path: 'a.md', location: 'checkout' } }, ['context'])
@@ -156,12 +162,12 @@ function onTheOrderTests() {
   it("puts the document on the order and reports it as this turn's", () => {
     const applied = applyRungOutput(order(), {
       role: 'author',
-      output: { document: { path: 'docs/answer.md', location: 'checkout' }, note: 'done' },
+      output: { document: { path: 'answer.md', location: 'outputs' }, note: 'done' },
       writes: [...AUTHOR],
       at: AT,
     })
-    expect(applied.order.document).toEqual({ path: 'docs/answer.md', location: 'checkout' })
-    expect(applied.document).toEqual({ path: 'docs/answer.md', location: 'checkout' })
+    expect(applied.order.document).toEqual({ path: 'answer.md', location: 'outputs' })
+    expect(applied.document).toEqual({ path: 'answer.md', location: 'outputs' })
     expect(applied.defect).toBeNull()
     expect(applied.order.status).toBe('agreed')
   })

@@ -12,6 +12,7 @@ import type { ExecutorDeps, RunOutcome } from './executor.js'
 import type { RunGraph } from './run-graph.js'
 import type { Recipe } from '../recipe/parse.js'
 import { documentOutcome } from './document-outcome.js'
+import type { DocumentOutcome } from './document-outcome.js'
 import type { IntegrateDeps, ShellExec, Shipment, ShipOutcome } from './integrate.js'
 import { writeBack } from '../trackers/write-back.js'
 import type { IssuesPort } from '../trackers/write-back.js'
@@ -261,13 +262,12 @@ async function finishTail(
   await shipFinishedRun(tail, ran)
 }
 
-// A document shape ends on where its author put it: in the checkout it ships as a
-// pull request below; elsewhere, an author that handed nothing back has not finished.
+// A document shape ends on where its author put it, and opens no pull request (ADR 138).
+// An author that handed nothing back has not finished. A `checkout` document is an
+// order written before ADR 138, which still ships as a pull request below.
 async function endedOnDocument(tail: RunTail, outcome: RunOutcome): Promise<boolean> {
   const latest = await tail.store.load(tail.order.id)
-  const documentEnd = outcome.shippable
-    ? documentOutcome(tail.recipe, latest?.document ?? null)
-    : ({ kind: 'not-a-document-shape' } as const)
+  const documentEnd = documentEndOf(tail.recipe, outcome, latest)
   if (documentEnd.kind !== 'missing' && documentEnd.kind !== 'ready') return false
   await recordTailEntry(tail, {
     action: documentEnd.kind === 'missing' ? 'run.failed' : 'run.document_ready',
@@ -276,6 +276,17 @@ async function endedOnDocument(tail: RunTail, outcome: RunOutcome): Promise<bool
   await settleShipNode(tail, documentEnd.kind === 'ready')
   if (documentEnd.kind === 'ready' && latest !== null) await shipDocument(tail, latest)
   return true
+}
+
+function documentEndOf(
+  recipe: Recipe,
+  outcome: RunOutcome,
+  latest: WorkOrder | null
+): DocumentOutcome {
+  const finished = outcome.complete && outcome.gates.length === 0
+  return finished
+    ? documentOutcome(recipe, latest?.document ?? null)
+    : { kind: 'not-a-document-shape' }
 }
 
 // A run that ended on a ready document is finished: no pull request follows it.

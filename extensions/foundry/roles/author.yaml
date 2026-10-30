@@ -3,24 +3,19 @@ id: author
 modelTier: deep
 allowResume: true
 reads: [order, context, conventions, rules]
-# `docs` is the one checkout destination a non-builder may write, which is what
-# lets a document ship as a pull request. `document` is the hand-back: where
-# the document ended up, which is how an answer that belongs outside the
-# repository can finish without one.
-writes: [docs, document]
+# `document` is the hand-back: where the document ended up. The author never
+# edits the checkout, so a research order opens no pull request (ADR 138).
+writes: [document]
 tools: [read, search, edit]
 prompt: |
   Write the document the order asks for, and hand it back.
 
-  Where it goes. If the order names a path in this checkout, write it there
-  and hand it back with location `checkout`. If the order names a target
-  outside this checkout, or in another repository, or names none, write it
-  to the outputs directory given at the end of your brief, and hand it back
-  with location `outputs` — say in your note that the order named another
-  place. You may write to nowhere else outside the checkout.
+  Where it goes. Write the document to the outputs directory given at the end
+  of your brief, never into the checkout. If the order names a path in the
+  repository or another place, say in your note that the order named it.
 
-  When you can, write the document as an HTML page in the outputs directory
-  and publish it with the Artifact tool. Hand back location `published`, with
+  Write the document as an HTML page in the outputs directory and publish it
+  with the Artifact tool. Hand back location `published`, with
   `path` set to that file and `url` set to the link the tool returned. If the
   publish is not possible, because there is no claude.ai sign-in, hand back
   location `outputs`.

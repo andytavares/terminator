@@ -176,10 +176,11 @@ describe('the shape whose product is a document', () => {
     expect(recipe('research.yaml').steps.find((s) => s.id === 'write')?.role).toBe('author')
   })
 
-  it('is checked in a fresh context and ends at a ready-for-review gate', () => {
+  it('is checked in a fresh context and opens no pull request: it ends in a Claude artifact', () => {
     const steps = recipe('research.yaml').steps
     expect(steps.find((s) => s.id === 'verify')?.context).toBe('fresh')
-    expect(steps.find((s) => s.id === 'ship')?.rule).toBe('ready-for-review')
+    expect(steps.some((s) => s.kind === 'gate' && s.rule === 'ready-for-review')).toBe(false)
+    expect(steps.some((s) => s.kind === 'join')).toBe(false)
   })
 
   it('has no red-team step on the Line, because the red team argues with the architect in the Forge before agreement', () => {
@@ -299,14 +300,14 @@ function theJoinTests() {
 describe('the author role', () => {
   const author = parseRole(readRecipeFile(rolesDir, 'author.yaml'), 'author.yaml')
 
-  it('hands back where the document is, beside writing documentation', () => {
-    expect(author.ok && author.value.writes).toEqual(['docs', 'document'])
+  it('hands back where the document is and writes nothing in the checkout', () => {
+    expect(author.ok && author.value.writes).toEqual(['document'])
   })
 
-  it('is told about outputs, the checkout and a published link', () => {
+  it('is told about outputs and a published link, never the checkout', () => {
     const prompt = author.ok ? author.value.prompt : ''
     expect(prompt).toContain('outputs')
-    expect(prompt).toContain('`checkout`')
+    expect(prompt).not.toContain('`checkout`')
     expect(prompt).toContain('`published`')
     expect(prompt).toContain('`url`')
   })
@@ -357,9 +358,9 @@ function builtInsResumingTests() {
 function builtInsWritingTests() {
   // The property that matters is narrower than "writes nothing": the red team
   // does produce output — findings — it just may not touch a checkout.
-  it('lets only the builder, the scribe and the author write to a checkout', () => {
+  it('lets only the builder and the scribe write to a checkout', () => {
     const CHECKOUT = ['worktree', 'integration_branch', 'docs']
-    const allowed = new Set(['builder', 'scribe', 'author'])
+    const allowed = new Set(['builder', 'scribe'])
     for (const file of roleFiles) {
       const parsed = parseRole(readRecipeFile(rolesDir, file), file)
       if (!parsed.ok) throw new Error(parsed.reason)
@@ -564,8 +565,10 @@ describe('ci rounds on every shape that ships code', () => {
   const watched = withReadyForReviewGate.filter((file) => !DOCUMENT_SHAPES.includes(file))
   const unwatched = recipeFiles.filter((file) => !watched.includes(file))
 
-  it('finds a ready-for-review gate in every shape', () => {
-    expect(recipeFiles.filter((file) => !withReadyForReviewGate.includes(file))).toEqual([])
+  it('finds a ready-for-review gate in every shape but the document shape', () => {
+    expect(recipeFiles.filter((file) => !withReadyForReviewGate.includes(file))).toEqual(
+      DOCUMENT_SHAPES
+    )
   })
 
   it.each(watched)('%s gives its draft two rounds of CI', (file) => {

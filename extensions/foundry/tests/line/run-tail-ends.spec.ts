@@ -13,7 +13,7 @@ import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/found
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { agentsAnswer, agreedLineOrder, repositoryWithRemote } from '../helpers/line-run.js'
 import { createOrderStore } from '../../src/order/store.js'
-import { orderStoreAt, readGraph } from '../../src/state/live-index.js'
+import { orderStoreAt } from '../../src/state/live-index.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 import { eventually } from '../../../../tests/support/eventually'
@@ -84,19 +84,10 @@ async function tailEntry(action: string): Promise<{ reason: string }> {
   })
 }
 
-/** The ship node, once the tail has settled it to `state`. */
-async function shipSettledTo(state: string): Promise<void> {
-  await eventually(async () => {
-    const graph = await readGraph(dataDir, 'WO-1')
-    expect(graph?.nodes.find((node) => node.stepId === 'ship')?.state).toBe(state)
-  })
-}
-
 describe('a research order whose document is outside the checkout', () => {
-  it('ends on where the document is, passes its ship node, and opens no pull request', async () => {
+  it('ends on where the document is and opens no pull request', async () => {
     await startResearch({ path: 'answers/why.md', location: 'outputs' })
     expect((await tailEntry('run.document_ready')).reason).toBe('outputs: answers/why.md')
-    await shipSettledTo('passed')
     await eventually(async () =>
       expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('shipped')
     )
@@ -113,7 +104,6 @@ describe('a research order whose author handed nothing back', () => {
   it('fails, saying so, rather than shipping an empty change', async () => {
     await startResearch(null)
     expect((await tailEntry('run.failed')).reason).toBe('the author handed back no document')
-    await shipSettledTo('waiting')
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).not.toBe('shipped')
   })
 })

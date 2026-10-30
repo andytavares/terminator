@@ -174,8 +174,8 @@ async function judgeExpectations(
 }
 
 // An agent that may write must have written something, committed by it or here. A
-// documenting role may have nothing, and a document outside the checkout changes
-// nothing in it. NOTHING_SHORT when the work stands.
+// documenting role may have nothing, and a handed-back document is never in the
+// checkout (ADR 138). NOTHING_SHORT when the work stands.
 async function commitWork(
   run: Execution,
   { node, roleId }: Ran,
@@ -185,7 +185,7 @@ async function commitWork(
   if (roleId === null || !roles.mayWrite(roleId)) return NOTHING_SHORT
   const commit = await run.deps.commitNode({ node, message: commitMessage(node, run.order) })
   const mayChangeNothing =
-    (handedBack !== null && handedBack.location !== 'checkout') ||
+    handedBack !== null ||
     (roles.writesOnlyDocs(roleId) && !collectableWrites(roles.get(roleId)).includes('document'))
   if (commit.kind === 'committed' || mayChangeNothing) return NOTHING_SHORT
   if (commit.kind === 'refused') {
