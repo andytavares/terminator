@@ -26,10 +26,10 @@ Use **CodeMirror 6** (`@codemirror/*`) as the editor engine.
 
 ## Motivation
 
-1. **Live preview via decorations**: CM6's `Decoration.mark` and `Decoration.replace` on a `ViewPlugin` allow per-line cursor-aware syntax hiding with ~100 lines of pure TypeScript, testable without a DOM.
-2. **Comment anchor remapping**: `StateField<CommentAnchor[]>` with `tr.changes.mapPos()` provides exact, transaction-aware position tracking — no polling or diffing needed.
-3. **Official docs verified**: CM6 API is stable (1.x), actively maintained, and used in production by large codebases (Replit, Obsidian, Linear).
-4. **Testable core logic**: `buildDecorations(state, selection)` is a pure function callable in Vitest without jsdom; only the `ViewPlugin` wrapper needs `/* v8 ignore */`.
+1. **Live preview via decorations**: CM6's `Decoration.mark` and `Decoration.replace` on a `ViewPlugin` allow per-line cursor-aware syntax hiding with ~100 lines of pure TypeScript. A test can cover it without a DOM.
+2. **Comment anchor remapping**: `StateField<CommentAnchor[]>` with `tr.changes.mapPos()` gives exact, transaction-aware position tracking. It needs no polling or diffing.
+3. **Official docs verified**: The CM6 API is stable (1.x) and actively maintained. Large codebases use it in production (Replit, Obsidian, Linear).
+4. **Testable core logic**: `buildDecorations(state, selection)` is a pure function that Vitest can call without jsdom. Only the `ViewPlugin` wrapper needs `/* v8 ignore */`.
 
 ---
 
@@ -45,7 +45,7 @@ Use **CodeMirror 6** (`@codemirror/*`) as the editor engine.
 
 ## Consequences
 
-- **Positive**: Decorations are incremental and O(viewport) not O(document). Performance benchmark (T030a) confirms p95 ≤ 16 ms on 5,000-line documents.
-- **Positive**: All `@codemirror/*` packages are namespaced in `extensions/notepad/package.json`; root bundle is unaffected.
-- **Negative**: CM6's WidgetType subclasses require DOM and cannot be unit-tested without jsdom; covered by `/* v8 ignore */`.
-- **Negative**: FTS5 `bm25()` cannot be used in ORDER BY when the FTS table is joined — resolved by using `rank` via a subquery.
+- **Positive**: Decorations are incremental and O(viewport), not O(document). The performance benchmark (T030a) confirms p95 ≤ 16 ms on 5,000-line documents.
+- **Positive**: `extensions/notepad/package.json` namespaces all `@codemirror/*` packages. The root bundle is unaffected.
+- **Negative**: CM6's WidgetType subclasses require a DOM, so tests cannot cover them without jsdom. `/* v8 ignore */` covers them.
+- **Negative**: FTS5 `bm25()` cannot be used in ORDER BY when the FTS table is joined. The fix is to use `rank` via a subquery.

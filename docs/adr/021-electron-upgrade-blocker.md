@@ -5,7 +5,7 @@
 
 ## Context
 
-The audit (FR-019) flagged Electron 30.4.0 as end-of-life. An initial upgrade attempt to Electron 32 was deferred because `node-pty@1.0.0` and `1.1.0` use NAN (Native Abstractions for Node.js), which is incompatible with the C++20 requirement enforced by Electron 32+ Node.js headers.
+The audit (FR-019) flagged Electron 30.4.0 as end-of-life. The team deferred an initial upgrade attempt to Electron 32. `node-pty@1.0.0` and `1.1.0` use NAN (Native Abstractions for Node.js), which is incompatible with the C++20 requirement that the Node.js headers of Electron 32+ enforce.
 
 ## Resolution
 
@@ -17,11 +17,11 @@ Verified empirically: `node-pty` built against Node ABI 137 loads and spawns a P
 
 ### `electron-rebuild` removed
 
-Because `node-pty` is now NAPI and is the only runtime native module, the per-Electron `electron-rebuild` step is no longer needed. The `electron-rebuild` devDependency and the `npm run rebuild` script were removed. This also cleared the `electron-rebuild` → `cacache`/`node-gyp`/`tar`/`make-fetch-happen` chain of high-severity npm-audit advisories.
+`node-pty` is now NAPI and is the only runtime native module, so the per-Electron `electron-rebuild` step is no longer needed. The team removed the `electron-rebuild` devDependency and the `npm run rebuild` script. This also cleared the high-severity npm-audit advisories in the `electron-rebuild` → `cacache`/`node-gyp`/`tar`/`make-fetch-happen` chain.
 
 ## Consequences
 
-- App runs on Electron 42.4.1 (Chrome 136, Node.js 22 runtime).
-- `node-pty` is pinned at `1.2.0-beta.13` until the 1.2.x stable release; monitor for the stable tag.
-- No `electron-rebuild` / `npm run rebuild` step — `npm install` is sufficient.
-- Previous Electron 30 CVEs are resolved by this upgrade.
+- The app runs on Electron 42.4.1 (Chrome 136, Node.js 22 runtime).
+- `node-pty` is pinned at `1.2.0-beta.13` until the 1.2.x stable release. Monitor for the stable tag.
+- No `electron-rebuild` / `npm run rebuild` step: `npm install` is sufficient.
+- The upgrade resolves the previous Electron 30 CVEs.

@@ -8,18 +8,18 @@
 
 ## Context
 
-A project can now carry an issue (ADR-029). The point of that is not the badge — it is that an
+A project can now carry an issue (ADR-029). The point of that is not the badge. An
 agent session started in the project should already know what it is for, without the operator
 pasting a ticket into every new conversation.
 
-The requirement that decides the mechanism is **FR-020**: a session the operator starts _by hand_,
+**FR-020** decides the mechanism: a session the operator starts _by hand_,
 at an ordinary shell prompt in the project's directory, must get the same context as one this
-application launched. That rules out anything that depends on us being the one who spawns it.
+application launched. That rules out anything that depends on us spawning the session.
 
 ## Decision
 
 **A `SessionStart` hook, registered in the project directory's `.claude/settings.local.json`,
-running a Terminator-written script that prints the issue as `additionalContext`.**
+runs a Terminator-written script that prints the issue as `additionalContext`.**
 
 Three pieces, and the script is deliberately the dumbest of them:
 
@@ -37,40 +37,40 @@ Three pieces, and the script is deliberately the dumbest of them:
 ```
 
 The script holds **no credential**, makes **no network call**, and knows nothing about trackers.
-It reads one file and prints. That is the whole of its authority, and it is why putting it inside
-the operator's own repository directory is acceptable.
+It reads one file and prints. That is the whole of its authority, and that is why it is acceptable to put it inside
+the operator's own repository directory.
 
 ### The verified contract
 
-From the published hook documentation, and consistent with what ADR-026 established by running the
+This comes from the published hook documentation, and it is consistent with what ADR-026 established by running the
 binary:
 
-- `SessionStart` accepts JSON on stdout; `hookSpecificOutput.additionalContext` is added to the
+- `SessionStart` accepts JSON on stdout. The runtime adds `hookSpecificOutput.additionalContext` to the
   model's context at session start, and `sessionTitle` names the session.
-- **`hookEventName` is required inside `hookSpecificOutput`.** Omit it and the runtime ignores the
-  entire object — silently. ADR-026 recorded this the expensive way; this feature's hook test runs
-  the real script under node and asserts the field is present, so it cannot regress.
-- **Hook output fields are capped at 10,000 characters.** Past that the runtime does not fail: it
+- **`hookEventName` is required inside `hookSpecificOutput`.** If it is omitted, the runtime ignores the
+  entire object, silently. ADR-026 recorded this the expensive way. This feature's hook test runs
+  the real script under node and asserts that the field is present, so it cannot regress.
+- **Hook output fields are capped at 10,000 characters.** Past that, the runtime does not fail. It
   writes the value to a file and substitutes a preview and a path. An over-budget context would
-  therefore become a pointer nobody follows, which is why the budget is enforced by us and shown to
+  therefore become a pointer nobody follows. That is why we enforce the budget ourselves and show it to
   the operator (FR-022, FR-023).
 - `.claude/settings.local.json` is the highest-precedence filesystem settings file, is gitignored by
-  convention, and hooks from every level **merge** rather than replace.
+  convention, and hooks from every level **merge** and do not replace each other.
 
-`ELECTRON_RUN_AS_NODE=1` with the application's own binary runs the script — the same invocation
-ADR-026 uses, so the hook depends on neither a `node` on `PATH` nor whatever a login shell exported.
+`ELECTRON_RUN_AS_NODE=1` with the application's own binary runs the script. This is the same invocation
+ADR-026 uses, so the hook depends neither on a `node` on `PATH` nor on whatever a login shell exported.
 
 ### The budget
 
-Header first, always: key, title, tracker, state, assignee, labels, URL. Then the description
-(trimmed near 4,000 characters), then at most the five most recent comments. If anything was
+The order is: header first, always (key, title, tracker, state, assignee, labels, URL). Then the description
+(trimmed near 4,000 characters). Then at most the five most recent comments. If anything was
 dropped, a closing line says so and names the issue URL.
 
-Composed in that order on purpose. When the budget bites it costs **discussion, never identity** —
-an agent that knows the key, the title and the state but not the third comment is still working on
-the right thing; one that got the tail of a description and no key is not.
+This order is deliberate. When the budget bites, it costs **discussion, never identity**.
+An agent that knows the key, the title and the state but not the third comment is still working on
+the right thing. An agent that got the tail of a description and no key is not.
 
-Truncation prefers whole blocks, and re-closes a fenced code block it had to cut, because a
+Truncation prefers whole blocks. It re-closes a fenced code block that it had to cut, because a
 half-open fence swallows everything after it and would turn the rest of the context into code.
 
 ### Rejected alternatives
@@ -83,34 +83,33 @@ half-open fence swallows everything after it and would turn the rest of the cont
 | `UserPromptSubmit` instead of `SessionStart`       | Would re-inject the issue on every turn, spending context repeatedly on a fact that does not change within a session.                |
 
 Environment variables (`TERMINATOR_ISSUE_KEY`, `TERMINATOR_ISSUE_TRACKER`) are still stamped on
-terminals in a linked project — but as a convenience for scripts and prompts, not as the mechanism.
-They cannot be the mechanism: they only reach terminals this application spawns.
+terminals in a linked project. They are a convenience for scripts and prompts, not the mechanism.
+They cannot be the mechanism, because they only reach terminals this application spawns.
 
 ## Consequences
 
 **The cost, stated plainly: this writes one file inside the operator's repository directory.**
-That is a real intrusion and it is bounded by rules the code enforces and tests check:
+That is a real intrusion. The code enforces rules that bound it, and tests check them:
 
-- **Merge, never replace.** An existing `SessionStart` array keeps every entry it had, and every
-  other settings key is left alone.
-- **`.claude/settings.json` — the shared, checked-in one — is never read or written.** Only
+- **Merge, never replace.** An existing `SessionStart` array keeps every entry it had, and the
+  code leaves every other settings key alone.
+- **The code never reads or writes `.claude/settings.json`, the shared, checked-in file.** It uses only
   `settings.local.json`.
-- **Settings that cannot be parsed are refused, not clobbered.** Overwriting a file we do not
+- **The code refuses settings that it cannot parse and does not clobber them.** Overwriting a file we do not
   understand would destroy whatever the operator put there.
-- **Unlinking restores.** Our block is removed; if the file is then empty it goes, and if we created
-  the `.claude` directory that goes too. SC-010 — "the project directory is unchanged after
-  detachment" — is a test that compares the directory listing before and after.
-- **An unwritable directory fails loudly and the link is undone** (FR-026). A link that looks
+- **Unlinking restores.** The code removes our block. If the file is then empty, the code removes it. If we created
+  the `.claude` directory, the code removes that too. SC-010 ("the project directory is unchanged after
+  detachment") is a test that compares the directory listing before and after.
+- **An unwritable directory fails loudly and the code undoes the link** (FR-026). A link that looks
   attached and silently feeds nothing is worse than no link at all.
 
-**Also good.** The drawer's preview is produced by the same function that writes the file, so what
-the operator inspects is the thing itself rather than a second rendering of it. And a tracker
+**Also good.** The same function produces the drawer's preview and writes the file, so what
+the operator inspects is the thing itself and not a second rendering of it. A tracker
 outage does not cost the operator their context: the previous file stays until a successful read
 replaces it.
 
-**Verified, not assumed.** The load-bearing claim — that a `claude` started by hand, in an ordinary
-shell, in a linked project directory actually receives the context — was proven against a live
-agent runtime. A project was built containing nothing but the hook and a context file naming a
-_fictional_ issue; the agent named that issue. A control run in a directory with no hook answered
-something else entirely. Recorded in
+**Verified, not assumed.** The team proved the load-bearing claim against a live
+agent runtime: a `claude` started by hand, in an ordinary shell, in a linked project directory actually receives the context. The team built a project that contained nothing but the hook and a context file that named a
+_fictional_ issue, and the agent named that issue. A control run in a directory with no hook answered
+something else entirely. See
 [verifications.md](../../specs/031-linear-project-integration/verifications.md).

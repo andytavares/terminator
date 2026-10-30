@@ -6,9 +6,9 @@
 
 ## Context
 
-ADR 035 takes terminals out of the sidebar. That removes the surface answering "which terminal is in what state", so something has to replace it — and across every repo at once, not only inside the branch that happens to be selected.
+ADR 035 takes terminals out of the sidebar. That removes the surface that answered "which terminal is in what state". Something has to replace it, and it must answer across every repo at once, not only inside the branch that happens to be selected.
 
-The Overview screen already drew every terminal as a tile with a **live** preview, but as one flat `auto-fill` grid with no state grouping, and its tile showed only whether a terminal was busy rather than which of the four states it was in. Arranging those tiles into lanes by state is the obvious move.
+The Overview screen already drew every terminal as a tile with a **live** preview. It used one flat `auto-fill` grid with no state grouping, and its tile showed only whether a terminal was busy, not which of the four states it was in. Arranging those tiles into lanes by state is the obvious move.
 
 The obvious implementation is not available.
 
@@ -25,36 +25,36 @@ mountPreview(container: HTMLElement): (() => void) | null {
 
 and `SessionTile` calls it from a `useLayoutEffect` keyed on the session id. There is exactly one such element per session.
 
-So if each lane were its own container, a terminal changing state would move its card to a different React parent. React would unmount the old subtree and mount a new one, the layout effect's cleanup would run, and the live element would be torn out and re-appended — blanking the preview in the middle of the very transition the board exists to make legible. Worse, any arrangement that could mount two previews of one session at once would tear it out of the first.
+So if each lane were its own container, a terminal that changed state would move its card to a different React parent. React would unmount the old subtree and mount a new one. The layout effect's cleanup would run, and the live element would be torn out and re-appended. That blanks the preview in the middle of the very transition the board exists to make legible. Worse, any arrangement that could mount two previews of one session at once would tear it out of the first.
 
 ## Decision
 
-**The board is one CSS grid containing every card. A lane is a `grid-column`, not a container.**
+**The board is one CSS grid that contains every card. A lane is a `grid-column`, not a container.**
 
 Three properties follow, and all three are load-bearing:
 
 1. Every card is a **direct child of the one grid**, positioned by `grid-column` and `grid-row`.
-2. Cards are emitted in a **stable order that does not depend on their lane** (sorted by session id), so React never reorders the DOM either.
+2. The app emits cards in a **stable order that does not depend on their lane** (sorted by session id), so React never reorders the DOM either.
 3. A state change therefore rewrites two style properties and nothing else. The DOM node is never re-created, re-parented, or moved.
 
-`BoardScreen.spec.tsx` asserts the node identity survives a lane change, and `tests/e2e/board.spec.ts` marks a card's node in the running app, forces a re-render, and checks the marker survived.
+`BoardScreen.spec.tsx` asserts that the node identity survives a lane change. `tests/e2e/board.spec.ts` marks a card's node in the running app, forces a re-render, and checks that the marker survived.
 
-Grid placement is discrete and cannot be transitioned, so the 180ms move FR-011 asks for is played back by **FLIP**: measure where each card was, let it land, then replay it from the old position. Only the card that actually moved animates, and `prefers-reduced-motion` skips the replay entirely.
+Grid placement is discrete and cannot be transitioned. **FLIP** therefore plays back the 180ms move that FR-011 asks for: measure where each card was, let it land, then replay it from the old position. Only the card that actually moved animates, and `prefers-reduced-motion` skips the replay entirely.
 
 ## Consequences
 
-**Rows align across lanes.** With explicit `grid-row` placement, the *n*th card of every lane shares a row, so cards must be uniform height or gaps appear. The card is built to be: a fixed-height preview, a single-line title, a single-line source label, and a footer that is always present. Every optional fact is omitted rather than drawn empty, which keeps the height constant rather than varying it.
+**Rows align across lanes.** With explicit `grid-row` placement, the *n*th card of every lane shares a row, so cards must be uniform height or gaps appear. The card is built to be uniform: a fixed-height preview, a single-line title, a single-line source label, and a footer that is always present. The card omits every optional fact and does not draw it empty, which keeps the height constant.
 
-**An empty lane is free.** "Draw nothing in the body" is the natural result of no card claiming that column, rather than a special case. The exited lane hiding itself while empty is a column-template change, not an unmount.
+**An empty lane is free.** "Draw nothing in the body" is the natural result of no card claiming that column, not a special case. The exited lane hides itself while empty through a column-template change, not an unmount.
 
-**Lane visibility is presentational.** A hidden lane keeps its cards; only `visible` flips. Showing it again costs nothing and needs no recomputation.
+**Lane visibility is presentational.** A hidden lane keeps its cards. Only `visible` flips. Showing the lane again costs nothing and needs no recomputation.
 
-**Constitution XII constrains the design.** The reference product tints its lane icons — grey, green, purple. Icons here are flat and inherit `currentColor`, and never differentiate state by colour. Lanes are told apart by position, label and count; the glyphs separate by shape, and opacity alone holds the history lane back. This is also what makes the board readable in greyscale.
+**Constitution XII constrains the design.** The reference product tints its lane icons: grey, green, purple. Icons here are flat and inherit `currentColor`, and never differentiate state by colour. Position, label and count tell the lanes apart. The glyphs separate by shape, and opacity alone holds the history lane back. This is also what makes the board readable in greyscale.
 
 ## Alternatives considered
 
 **Per-lane containers, accept the flash.** Simplest to write. Rejected: it breaks the preview at exactly the moment the transition is meant to be legible, which is the one moment the board is for.
 
-**Replace the live preview with `captureToDataUrl` snapshots.** The method already exists and would make cards freely movable. Rejected: it trades a live surface for a stale JPEG, and the live preview is what makes a card worth more than a row — you can read the question an agent is actually asking without opening it.
+**Replace the live preview with `captureToDataUrl` snapshots.** The method already exists and would make cards freely movable. Rejected: it trades a live surface for a stale JPEG. The live preview is what makes a card worth more than a row, because you can read the question an agent is actually asking without opening it.
 
-**Absolute positioning with transforms.** Would allow ragged column heights. Rejected as substantially more code to maintain, with responsive behaviour to reimplement by hand, for a layout difference nobody asked for.
+**Absolute positioning with transforms.** It would allow ragged column heights. Rejected as substantially more code to maintain, with responsive behaviour to reimplement by hand, for a layout difference nobody asked for.

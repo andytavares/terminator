@@ -8,19 +8,19 @@
 
 Add three new namespaces to `ExtensionAPI` in `src/main/extensions/api.ts`:
 
-- `sidebar.registerGlobalTab(tab)` — registers a permanent, app-level tab always visible in WorkspaceRail
+- `sidebar.registerGlobalTab(tab)` — registers a permanent, app-level tab that is always visible in WorkspaceRail
 - `globalShortcut.register(accelerator, handler)` — wraps Electron's OS-level `globalShortcut` module
 - `workspace.list() / listProjects() / onDelete() / onProjectDelete()` — exposes workspace metadata and deletion events to extensions
 
-Also add `'global-tab'` to the `PanelSlot` union and `GlobalTabContribution`, `WorkspaceSnapshot`, `ProjectSnapshot` types.
+Also add `'global-tab'` to the `PanelSlot` union, and add the `GlobalTabContribution`, `WorkspaceSnapshot`, and `ProjectSnapshot` types.
 
 ## Motivation
 
-The task-vault extension requires capabilities not present in v1.1.x:
+The task-vault extension requires capabilities that v1.1.x lacks:
 
-- **FR-027/FR-028**: Task Vault must occupy a permanent top-level tab visible regardless of active workspace/project. The existing `sidebar.registerPanel('right-sidebar')` produces a floating panel scoped to the project view — it cannot produce a top-level tab.
-- **FR-003**: The capture overlay must open from any application via an OS-level hotkey. Only Electron's `globalShortcut` (not `api.keyboard.register`) fires when the app is backgrounded.
-- **FR-029/FR-033**: Vault↔Terminator links store opaque workspace/project UUIDs. The extension needs `workspace.list()` to resolve display names and `onDelete` to detect broken links without importing from core stores.
+- **FR-027/FR-028**: Task Vault must occupy a permanent top-level tab, visible regardless of active workspace/project. The existing `sidebar.registerPanel('right-sidebar')` produces a floating panel scoped to the project view. It cannot produce a top-level tab.
+- **FR-003**: The capture overlay must open from any application via an OS-level hotkey. Only Electron's `globalShortcut` (not `api.keyboard.register`) fires when the app is in the background.
+- **FR-029/FR-033**: Vault↔Terminator links store opaque workspace/project UUIDs. The extension needs `workspace.list()` to resolve display names. It needs `onDelete` to detect broken links without importing from core stores.
 
 ## Alternatives Considered
 
@@ -33,6 +33,6 @@ The task-vault extension requires capabilities not present in v1.1.x:
 
 ## Consequences
 
-- All v1.2.0 additions are purely additive. Existing extensions (git-integration, speckit-pilot) require no changes.
-- `GlobalTabContribution.component` is typed as `unknown` in the main-process API to avoid a renderer dependency in the main-process type definition. The renderer registry uses `ComponentType`.
-- Deletion events are routed through `src/main/extensions/workspace-events.ts` — a thin event bus imported by both `workspace.ipc.ts` (emitter) and `api.ts` (subscriber). No circular imports.
+- All v1.2.0 additions are purely additive. Existing extensions (git-integration, speckit-pilot) need no changes.
+- `GlobalTabContribution.component` is typed as `unknown` in the main-process API, to avoid a renderer dependency in the main-process type definition. The renderer registry uses `ComponentType`.
+- Deletion events go through `src/main/extensions/workspace-events.ts`, a thin event bus. `workspace.ipc.ts` (emitter) and `api.ts` (subscriber) both import it. There are no circular imports.

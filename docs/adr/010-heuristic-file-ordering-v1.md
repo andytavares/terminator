@@ -6,11 +6,11 @@
 
 ## Decision
 
-For v1, file ordering within chapters uses a static filename-pattern heuristic (four tiers: types/interfaces → source → tests → mechanical), with no call-graph construction. Tree-sitter or LSP-based topological ordering is explicitly deferred to v2.
+For v1, file ordering within chapters uses a static filename-pattern heuristic (four tiers: types/interfaces → source → tests → mechanical). v1 builds no call graph. Tree-sitter or LSP-based topological ordering is explicitly deferred to v2.
 
 ## Motivation
 
-The spec (FR-015) explicitly requires graceful degradation to heuristic ordering when a call graph cannot be built. The PRD acknowledges that building a correct cross-language call graph is a separate, week-long prototyping effort. The primary value of ordering — separating type definitions from implementations and tests from source — is achievable with the heuristic alone. Research cited in the PRD (Bagirov 2023/2026) shows that even a simple non-alphabetical ordering reduces missed defects; the exact caller→callee precision matters less than the broad structure.
+The spec (FR-015) explicitly requires graceful degradation to heuristic ordering when no call graph can be built. The PRD acknowledges that building a correct cross-language call graph is a separate, week-long prototyping effort. The heuristic alone achieves the primary value of ordering: separating type definitions from implementations and tests from source. Research cited in the PRD (Bagirov 2023/2026) shows that even a simple non-alphabetical ordering reduces missed defects. The broad structure matters more than exact caller→callee precision.
 
 ## Heuristic Tiers (applied within each chapter)
 
@@ -27,7 +27,7 @@ Files are grouped by their first differing path segment (e.g., `src/auth`, `src/
 
 ## v1 Complexity Detection: Keyword-Count Cyclomatic Approximation (FR-021)
 
-FR-021 requires inline complexity-hotspot annotations. Since Tree-sitter/LSP is deferred, v1 computes **cyclomatic complexity delta** from the diff using keyword counting — a well-established approximation used by tools such as `complexity-report` and ESLint's `complexity` rule.
+FR-021 requires inline complexity-hotspot annotations. Tree-sitter/LSP is deferred, so v1 computes **cyclomatic complexity delta** from the diff by counting keywords. This is a well-established approximation used by tools such as `complexity-report` and ESLint's `complexity` rule.
 
 ### Decision-point keywords counted
 
@@ -56,10 +56,10 @@ A hunk is annotated as a hotspot when `hunkDelta >= 5`. Annotation text:
 
 ### v2 upgrade path
 
-Replace `detectComplexityHotspots()` with a Tree-sitter-backed implementation that computes actual per-function cyclomatic complexity and reports the specific function name. The function signature and annotation rendering stay identical; no UI changes required.
+Replace `detectComplexityHotspots()` with a Tree-sitter-backed implementation. It computes actual per-function cyclomatic complexity and reports the specific function name. The function signature and annotation rendering stay identical. No UI changes are required.
 
 ## Consequences
 
-- Reviewers may occasionally encounter a file before something it depends on (especially in circular dependency or monorepo scenarios). The "why this file is here" label and drag-and-drop reorder (FR-015b) mitigate this.
-- The `buildChapters()` function is a pure function with no I/O, making it trivially testable (see `chapter-builder.spec.ts`).
-- v2 upgrade path: Replace `buildChapters()` with a Tree-sitter–backed implementation. The interface (`PrChangedFile[]` → `Chapter[]`) stays identical; no UI changes required.
+- Reviewers can occasionally meet a file before something it depends on (especially in circular dependency or monorepo scenarios). The "why this file is here" label and drag-and-drop reorder (FR-015b) mitigate this.
+- The `buildChapters()` function is a pure function with no I/O, so it is trivially testable (see `chapter-builder.spec.ts`).
+- v2 upgrade path: Replace `buildChapters()` with a Tree-sitter–backed implementation. The interface (`PrChangedFile[]` → `Chapter[]`) stays identical. No UI changes are required.
