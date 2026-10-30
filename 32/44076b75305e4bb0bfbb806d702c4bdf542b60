@@ -1,0 +1,41 @@
+docs/adr/138-research-opens-no-pull-request.md
+  s_aa083ade4d6b38::t_47b941a5c38bd7 1-26
+extensions/foundry/recipes/research.yaml
+  s_aa083ade4d6b38::t_c4d517601658c9 5-6
+extensions/foundry/roles/author.yaml
+  s_aa083ade4d6b38::t_215583ad6b05c5 6-8,13-15,17-18
+extensions/foundry/src/line/execute-run.ts
+  s_aa083ade4d6b38::t_741af8f529c612 15,265-267,270,281-291
+extensions/foundry/src/line/execution-settle.ts
+  s_aa083ade4d6b38::t_46e5c710dbda21 177-178,188
+extensions/foundry/src/line/rung-output.ts
+  s_aa083ade4d6b38::t_4ff205118766b7 61-63,99-102,214,216,251-255
+extensions/foundry/src/order/schema.ts
+  s_aa083ade4d6b38::t_0729093117c8e8 344-346
+extensions/foundry/tests/line/executor.spec.ts
+  s_aa083ade4d6b38::t_347c20513d2bf4 3417,3476-3479,3481-3482,3484
+extensions/foundry/tests/line/roles.spec.ts
+  s_aa083ade4d6b38::t_355d11b51d2f3b 186-189
+extensions/foundry/tests/line/run-tail-ends.spec.ts
+  s_aa083ade4d6b38::t_581c3ff2b6c08f 16,88
+extensions/foundry/tests/line/rung-output.spec.ts
+  s_aa083ade4d6b38::t_5e288aeb67d0f4 148-153,165,169-170
+extensions/foundry/tests/recipe/built-ins.spec.ts
+  s_aa083ade4d6b38::t_cfa7f7d257af18 179,182-183,303-304,307,310,361,363,568-571
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3244076b75305e4bb0bfbb806d702c4bdf542b60",
+  "prompts": {},
+  "sessions": {
+    "s_aa083ade4d6b38": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f16587e8-cfb1-4ac5-b5e9-1f3f71d60dab",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
