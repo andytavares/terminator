@@ -42,7 +42,7 @@ interface FoldedRow {
 type Row = { readonly kind: 'line'; readonly line: RunLogLine; readonly key: string } | FoldedRow
 
 /** The lines to draw: a command log past its first 20 lines is folded until it is expanded. */
-export function logRowsOf(lines: readonly RunLogLine[], expanded: ReadonlySet<string>): Row[] {
+function logRowsOf(lines: readonly RunLogLine[], expanded: ReadonlySet<string>): Row[] {
   const totals = new Map<string, number>()
   for (const line of lines) {
     if (line.logPath !== undefined) totals.set(line.logPath, (totals.get(line.logPath) ?? 0) + 1)
