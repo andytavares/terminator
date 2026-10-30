@@ -245,7 +245,7 @@ function withUnitIds(node: RunNode): RunNode {
 }
 
 /** A proposed shape and the reason it fits this order (FR-014). */
-export interface ProposedRecipe {
+interface ProposedRecipe {
   readonly name: string
   readonly why: string
 }
@@ -301,7 +301,7 @@ function recipeLadder(order: WorkOrder): ProposedRecipe[] {
   return [heaviest]
 }
 
-/** The lightest shape that fits, ignoring whether this repository can run it. */
+/** The lightest shape that fits, ignoring whether this repository can run it. @internal */
 export function proposeRecipe(order: WorkOrder): ProposedRecipe {
   return recipeLadder(order)[0]
 }

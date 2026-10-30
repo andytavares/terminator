@@ -215,6 +215,7 @@ function takenSpans(map: WallMap, taken: readonly WallSpan[]): WallSpan[] {
  * The first x along the wall where a `width`-px item clears every wall fixture and every
  * `taken` span by a margin: a preferred spot first, then any spot left to right. Null when the
  * wall has no room, and the item is not drawn.
+ * @internal
  */
 export function wallDecorX(
   map: WallMap,
@@ -251,7 +252,7 @@ export function whiteboardX(map: WallMap): number | null {
   })
 }
 
-/** Where the vending machine stands: clear of the fixtures, the whiteboard and the sign. */
+/** Where the vending machine stands: clear of the fixtures, the whiteboard and the sign. @internal */
 export function vendingDecorX(map: WallMap): number | null {
   const board = whiteboardX(map)
   return wallDecorX(map, {
