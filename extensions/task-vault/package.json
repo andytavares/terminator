@@ -1,6 +1,6 @@
 {
   "name": "@terminator/extension-task-vault",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "Task Vault: GTD+BuJo+PARA daily productivity system backed by the shared SQLite database",
   "scripts": {

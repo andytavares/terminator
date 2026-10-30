@@ -1,6 +1,6 @@
 {
   "name": "@terminator/extension-git-integration",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "Git & GitHub integration extension for Terminator",
   "scripts": {
