@@ -1,4 +1,19 @@
 <!--
+SYNC IMPACT REPORT (8.0.0)
+==========================
+Version change: 7.0.1 → 8.0.0 (MAJOR: where complexity deviations are recorded is redefined)
+
+Modified principles:
+  - Simplicity and Governance: complexity deviations are recorded in the pull request
+    description, not in the plan's Complexity Tracking table. Spec Kit is removed from the
+    repository, so no plan.md exists. Approved by the maintainer on 2026-10-30.
+Moved: `.specify/memory/constitution.md` → `docs/CONSTITUTION.md`
+Added sections: none
+Removed sections: none
+Templates requiring updates: none (the Spec Kit templates are removed)
+Follow-up TODOs: none
+-->
+<!--
 SYNC IMPACT REPORT (7.0.1)
 ==========================
 Version change: 7.0.0 → 7.0.1 (PATCH: prose rewritten to the plain-language writing rules; no rule changed)
@@ -279,8 +294,8 @@ harmful.
   spec does not require MUST NOT be introduced.
 - The simplest design that correctly implements the spec MUST be chosen over a more
   "extensible" alternative that goes beyond scope.
-- Complexity deviations from the plan MUST be recorded, with justification, in the plan's
-  Complexity Tracking table.
+- Complexity deviations from the plan MUST be recorded, with justification, in the pull
+  request description.
 
 ### VIII. Documentation as First-Class
 
@@ -420,8 +435,8 @@ Isolation and process discipline prevent environment drift and protect the share
 - All feature work MUST start from an agreed spec. No implementation begins without
   a ratified specification.
 - All work MUST happen on a feature branch. Direct commits to `main` are forbidden.
-- Complexity deviations from the plan MUST be recorded in the plan's Complexity Tracking
-  table. Do not accept them silently.
+- Complexity deviations from the plan MUST be recorded in the pull request description.
+  Do not accept them silently.
 
 ## Governance
 
@@ -436,4 +451,4 @@ This constitution supersedes all other practices, conventions, and ad-hoc guidan
 - The constitution version and amendment history are the authoritative record of governance
   decisions that affect this project.
 
-**Version**: 7.0.1 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-10-30
+**Version**: 8.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-10-30

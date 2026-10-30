@@ -238,7 +238,6 @@ docs/
 ├── EXTENSION-STYLE.md        # UI rules for extensions
 └── adr/                      # Architectural Decision Records
 
-specs/                        # Spec Kit feature specs, plans and contracts
 ```
 
 ## Architecture Overview

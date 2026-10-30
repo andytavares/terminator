@@ -2,7 +2,7 @@
 
 Foundry is a software factory. A **Forge** converges an idea or tracker issue into a compilable work order. A **Line** executes that order with typed agent roles, independent verification and risk-priced human gates, and ends in a draft pull request.
 
-Design documents: `specs/037-foundry-software-factory/`.
+Design documents: [`specs/037-foundry-software-factory/`](https://github.com/andytavares/terminator/tree/8e1f355937df5328fc4e8fc52f5d1e794e949a6b/specs/037-foundry-software-factory/). `specs/` is no longer in the repository; the link opens the last version.
 
 ## The rules that are specific to this extension
 

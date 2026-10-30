@@ -39,4 +39,3 @@ ignore:
   - 'extensions/*/vite.renderer.config.ts'
   - '.github/**'
   - '.claude/**'
-  - '.specify/**'

@@ -2,7 +2,7 @@
 
 **Status**: Accepted
 **Date**: 2026-08-22
-**Feature**: [031-linear-project-integration](../../specs/031-linear-project-integration/spec.md)
+**Feature**: [031-linear-project-integration](https://github.com/andytavares/terminator/blob/8e1f355937df5328fc4e8fc52f5d1e794e949a6b/specs/031-linear-project-integration/spec.md)
 **Builds on**: [ADR-026](026-supervised-runs-in-a-terminal.md) (the verified hook contract),
 [ADR-029](029-core-issue-tracker-service.md) (where the issue comes from)
 
@@ -112,4 +112,4 @@ replaces it.
 agent runtime: a `claude` started by hand, in an ordinary shell, in a linked project directory actually receives the context. The team built a project that contained nothing but the hook and a context file that named a
 _fictional_ issue, and the agent named that issue. A control run in a directory with no hook answered
 something else entirely. See
-[verifications.md](../../specs/031-linear-project-integration/verifications.md).
+[verifications.md](https://github.com/andytavares/terminator/blob/8e1f355937df5328fc4e8fc52f5d1e794e949a6b/specs/031-linear-project-integration/verifications.md).

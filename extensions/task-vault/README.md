@@ -30,4 +30,4 @@ The **Reset (delete all data)** setting deletes every task, project and area, an
 
 Task IDs are UUIDs assigned at creation and stored in the shared SQLite database (`app.sqlite`). IDs are stable across restarts. A `{ error: 'STALE_ID' }` response means the task no longer exists (for example, it was deleted or migrated).
 
-See also: `specs/005-task-vault-extension/quickstart.md` for integration scenarios.
+See also: [`specs/005-task-vault-extension/quickstart.md`](https://github.com/andytavares/terminator/blob/8e1f355937df5328fc4e8fc52f5d1e794e949a6b/specs/005-task-vault-extension/quickstart.md) for integration scenarios. `specs/` is no longer in the repository; the link opens the last version.

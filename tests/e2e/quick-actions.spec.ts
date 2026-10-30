@@ -15,7 +15,7 @@ import { expectTerminalFocused } from './session-views'
 import { extensionFrame } from './extension-page'
 import { expectCentredInWindow } from './modal-centre'
 
-// Feature 057, Quick Actions: what specs/057-quick-actions/SPEC.md asks that a unit test cannot
+// Feature 057, Quick Actions: what https://github.com/andytavares/terminator/blob/8e1f355937df5328fc4e8fc52f5d1e794e949a6b/specs/057-quick-actions/SPEC.md asks that a unit test cannot
 // reach — the leader inside an extension's view, a real push to a bare remote, a custom action's
 // PTY output, and Escape between the panel and an extension underneath it.
 

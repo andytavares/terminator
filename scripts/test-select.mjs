@@ -35,7 +35,7 @@ export const ALWAYS_ALL = [
 ]
 
 // Paths no test reads.
-export const DOCS_GLOBS = ['docs/**', 'specs/**', '.specify/**', '**/*.md']
+export const DOCS_GLOBS = ['docs/**', '**/*.md']
 
 const FOUNDRY_SPECS = [
   'extensions/foundry/tests/**',

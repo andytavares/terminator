@@ -553,10 +553,10 @@ you turn notifications off wholesale.
 ## When a recipe needs something this repository does not have
 
 A recipe declares what it requires. `recipe/requirements.ts` checks the
-requirements against the order before anything starts. The `speckit` recipe
-requires the SpecKit skills, so Foundry does not offer it in a repository without
-them. Without this check, the run would start and answer "Unknown command:
-/speckit-specify", and the step would be over before it began.
+requirements against the order before anything starts. A recipe that needs a
+skill names it, so Foundry does not offer that recipe in a repository without the
+skill. Without this check, the run would start and answer "Unknown command", and
+the step would be over before it began.
 
 The check runs in the **worktree**, because the agent runs there. `git worktree
 add` brings across only what is committed. `.claude/skills/` is routinely

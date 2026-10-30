@@ -2,7 +2,7 @@
 
 **Status**: Accepted
 **Date**: 2026-08-22
-**Feature**: [031-linear-project-integration](../../specs/031-linear-project-integration/spec.md)
+**Feature**: [031-linear-project-integration](https://github.com/andytavares/terminator/blob/8e1f355937df5328fc4e8fc52f5d1e794e949a6b/specs/031-linear-project-integration/spec.md)
 
 ## Context
 
@@ -133,7 +133,7 @@ first, which is documented to work in every case, and the silent catch is gone.
 
 **Three things the documentation could not settle.** The team closed each deliberately and did not assume
 an answer. The reasoning is in
-[verifications.md](../../specs/031-linear-project-integration/verifications.md):
+[verifications.md](https://github.com/andytavares/terminator/blob/8e1f355937df5328fc4e8fc52f5d1e794e949a6b/specs/031-linear-project-integration/verifications.md):
 
 - Whether Linear accepts an issue's human key when creating a comment. The team **designed this out** and did not
   answer it: we address Linear issues by UUID everywhere, which is documented to work for

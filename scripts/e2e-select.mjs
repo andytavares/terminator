@@ -63,8 +63,6 @@ export const IMPACT_MAP = [
 // running app behaviour.
 export const NONE_GLOBS = [
   'docs/**',
-  'specs/**',
-  '.specify/**',
   '**/*.md',
   'tests/unit/**',
   'tests/fixtures/**',

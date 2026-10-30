@@ -10,7 +10,7 @@ Enforcement: the three vocabulary rules below are `no-restricted-syntax` selecto
 
 ## 1. Say what the reader sees, not how it is stored
 
-A person using Notepad has notes. They have no vault and have never heard of SQLite. A person running a Spec Kit phase gets files. The word "artifact" is a build-system term from the pipeline that produces the files. The reader did not ask for it.
+A person using Notepad has notes. They have no vault and have never heard of SQLite. A person running a Foundry order gets files. The word "artifact" is a build-system term from the pipeline that produces the files. The reader did not ask for it.
 
 | Never                                       | Say                                        |
 | ------------------------------------------- | ------------------------------------------ |
@@ -29,7 +29,7 @@ There are two exemptions. Both are deliberate:
 
 Use sentence case for headings, section labels, tab names, buttons, menu items and table columns. Do not use Title Case. Never use `ALL CAPS`: caps shout a word the reader does not need shouted, and they force an abbreviation (`HIGH`, `MED`) that then needs a legend nobody has.
 
-Proper nouns keep their capitals: GitHub, Spec Kit, Task Vault, macOS.
+Proper nouns keep their capitals: GitHub, Foundry, Task Vault, macOS.
 
 ```
 ✅ Read these first        ❌ READ THESE FIRST

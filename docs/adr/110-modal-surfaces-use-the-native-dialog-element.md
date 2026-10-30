@@ -3,7 +3,7 @@
 **Status**: Accepted
 **Date**: 2026-10-13
 **Changes**: [ADR 038](038-dialogs-render-in-the-extension-view.md) (how a dialog is rendered and how modals stack; where it renders is unchanged)
-**Relates to**: [ADR 026](026-double-escape-extension-exit.md), [ADR 098](098-one-design-system.md), Constitution Principle XIII
+**Relates to**: [ADR 026](026-double-escape-extension-exit.md), [ADR 098](098-one-design-system-documented-in-storybook.md), Constitution Principle XIII
 
 ## Context
 

@@ -225,7 +225,7 @@ e.g. 001-extension-first-terminal
 
 ## TDD (Non-Negotiable)
 
-The [project constitution](../.specify/memory/constitution.md) requires a failing test before any production code: **write no production code without a failing test first**.
+The [project constitution](CONSTITUTION.md) requires a failing test before any production code: **write no production code without a failing test first**.
 
 1. Write a failing test that captures the requirement.
 2. Implement the minimum code to make it pass.
@@ -256,7 +256,7 @@ Test location by type:
 | Change to the Extension API         | `packages/extension-sdk/types/api.d.ts`, its `CHANGELOG.md` and version, and `docs/EXTENSION-DEVELOPMENT.md`   |
 | New npm script                      | `README.md` scripts table                                                                                      |
 | Architectural decision              | New ADR in `docs/adr/`                                                                                         |
-| Data model change                   | `specs/<feature>/data-model.md` of the feature, and `docs/ARCHITECTURE.md`                                     |
+| Data model change                   | `docs/ARCHITECTURE.md`                                                                                         |
 | Setup step change                   | `README.md` and `docs/CONTRIBUTING.md`                                                                         |
 | New keyboard shortcut               | `README.md` features list and `CORE_SHORTCUTS` in `src/renderer/quick-actions/shortcut-behaviors.ts`           |
 
@@ -266,7 +266,7 @@ Test location by type:
 
 `src/shared/electron-api/manifest.ts` is the one declaration of the core's channels. To add one:
 
-1. Describe it in your feature's `specs/<feature>/contracts/`.
+1. Describe it in the pull request description.
 2. Add the Zod payload schema to `src/shared/schemas/` (or beside the handler for a one-off shape).
 3. Declare it in `src/shared/electron-api/manifest.ts` with its `signature`. The native and remote adapters, the remote allowlist and the renderer's `window.electronAPI` type all come from that one entry. If extension views need it, mark it `extensionView`: the frame's `window.electronAPI` is built from the manifest, so nothing else is written by hand.
 4. Register it in the appropriate `src/main/ipc/*.ipc.ts` file as a row of `registerInvokeTable([...invokeSpec({ channel, schema, invalid, run })])` in `src/main/ipc/invoke-table.ts`.

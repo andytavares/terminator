@@ -232,6 +232,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Removed
 
+- **Spec Kit.** The repository no longer uses it: `specs/`, `.specify/` and the `speckit-*` skills are deleted. The constitution moved to `docs/CONSTITUTION.md` (8.0.0), and records complexity deviations in the pull request description. Links to deleted specs open the last commit that held them. Foundry still reads a `.specify/` constitution in another repository
 - **The SpecKit Pilot's card model and ten-phase pipeline**, superseding ADR-010 and ADR-012. Removed: the board and its seventeen components, the ten-value phase union and its three prompt tables, the phase state machine, the card model, the phase runner, and 24 card-shaped IPC channels. The extension's entry point went from 3,138 lines to under 1,200, and from 40 channels to 34. The ten phases survive as one recipe, `speckit.yaml`, beside five others. The `speckit-pilot` extension directory is now `foundry`, and `speckit:*` channels are `foundry:*`. `tests/e2e/foundry.spec.ts` replaces `tests/e2e/speckit-supervised-run.spec.ts`
 - `foundry:self-review-read`, which read a `.pilot/self-review.json` that nothing produces now
 - `ExtensionToastContainer` in task-vault and its 12 CSS rules, superseded by `ToastRegion` in `packages/extension-ui`. The old container printed ℹ ✓ ⚠ ✕ as text, and made the whole toast a click target with nothing on screen to say so. The shared toast offers a named action button instead

@@ -46,4 +46,4 @@ A view reads the values with `extension.getSettingsValues()` and again on `exten
 
 The extension stores notes, tags, comments, diagrams and settings in the shared SQLite database (`app.sqlite`) through the injected `ExtensionDB`. Note, tag and comment IDs are UUIDs assigned at creation and stable across restarts. The schema is created with `CREATE TABLE IF NOT EXISTS` on every launch, so a launch never alters data that is already there. Search applies the tag filters in SQL and matches the text in JavaScript, so case folds for every script (`é` matches `É`). FTS5 was tried and rejected: its `trigram` tokenizer finds no match for a query under 3 characters, and its word tokenizer cannot match inside a word.
 
-See also: `specs/010-markdown-notepad/contracts/ipc-channels.md` for the full IPC surface.
+See also: [`specs/010-markdown-notepad/contracts/ipc-channels.md`](https://github.com/andytavares/terminator/blob/8e1f355937df5328fc4e8fc52f5d1e794e949a6b/specs/010-markdown-notepad/contracts/ipc-channels.md) for the full IPC surface. `specs/` is no longer in the repository; the link opens the last version.
