@@ -1,0 +1,58 @@
+extensions/foundry/CLAUDE.md
+  s_c95e5dc2240fad::t_d9e16e344b56b7 5
+docs/EXTENSION-STYLE.md
+  s_c95e5dc2240fad::t_7e08a8d3c0923b 13,32
+extensions/notepad/README.md
+  s_c95e5dc2240fad::t_d9e16e344b56b7 49
+.foundry/rules/flat-icons.yaml
+  s_c95e5dc2240fad::t_d9e16e344b56b7 8
+docs/CONTRIBUTING.md
+  s_c95e5dc2240fad::t_4efbc1e0026d1d 259
+  s_c95e5dc2240fad::t_d9e16e344b56b7 228,269
+.foundry/rules/docs-in-pr.yaml
+  s_c95e5dc2240fad::t_d9e16e344b56b7 9
+extensions/foundry/SUPERVISION.md
+  s_c95e5dc2240fad::t_d9e16e344b56b7 556-559
+docs/adr/030-session-start-issue-context.md
+  s_c95e5dc2240fad::t_d9e16e344b56b7 5,115
+docs/CONSTITUTION.md
+  s_c95e5dc2240fad::t_e4029d742d2c5c 1-454
+docs/adr/110-modal-surfaces-use-the-native-dialog-element.md
+  s_c95e5dc2240fad::t_4efbc1e0026d1d 6
+extensions/task-vault/README.md
+  s_c95e5dc2240fad::t_d9e16e344b56b7 33
+docs/adr/029-core-issue-tracker-service.md
+  s_c95e5dc2240fad::t_d9e16e344b56b7 5,136
+docs/user-guide/USER-GUIDE.md
+  s_c95e5dc2240fad::t_d9e16e344b56b7 820,828
+CHANGELOG.md
+  s_c95e5dc2240fad::t_4efbc1e0026d1d 235
+scripts/test-select.mjs
+  s_c95e5dc2240fad::t_7fae1801115934 38
+extensions/foundry/tests/line/rung-handback.spec.ts
+  s_c95e5dc2240fad::t_d9e16e344b56b7 99
+tests/e2e/quick-actions.spec.ts
+  s_c95e5dc2240fad::t_d9e16e344b56b7 18
+docs/ARCHITECTURE.md
+  s_c95e5dc2240fad::t_d9e16e344b56b7 673,776,822,830,972
+.foundry/rules/delete-unreachable.yaml
+  s_c95e5dc2240fad::t_d9e16e344b56b7 9
+CLAUDE.md
+  s_c95e5dc2240fad::t_d9e16e344b56b7 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bef149eb511e9d88beb05014d6ab52dc38d6aad6",
+  "prompts": {},
+  "sessions": {
+    "s_c95e5dc2240fad": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2553a3b-dbdf-4cef-8ed1-b781ffa52630",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
