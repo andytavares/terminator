@@ -1,29 +1,16 @@
 # Extension house style
 
-The five bundled extensions were written at different times and read like it: the
-same control is a `Button` in one and a `button` in another, one says `M` where
-another says `Changed`, and three different views spell "stale" three ways. This
-is the one rule set they all follow.
+The five bundled extensions were written at different times and are not consistent. The same control is a `Button` in one and a `button` in another. One says `M` where another says `Changed`. Three views spell "stale" three ways. This is the one rule set they all follow.
 
-Scope: every string an extension puts on screen, in any of the five bundled
-extensions and in `packages/extension-ui`. Identifiers, IPC channel names, CSS
-class names, database columns and type names are **not** in scope — they keep
-whatever name they have.
+Scope: every string an extension shows on screen, in the five bundled extensions and in `packages/extension-ui`. Identifiers, IPC channel names, CSS class names, database columns and type names are **not** in scope. They keep their names.
 
-Enforcement: the three vocabulary rules below are `no-restricted-syntax`
-selectors in `eslint.config.mjs`, scoped to `extensions/*/src/**/*.tsx` and
-`packages/extension-ui/src/**/*.tsx`. Their fixture spec is
-`tests/unit/lint/extension-rules.spec.ts`. Everything else here is a
-convention a reviewer applies.
+Enforcement: the three vocabulary rules below are `no-restricted-syntax` selectors in `eslint.config.mjs`, scoped to `extensions/*/src/**/*.tsx` and `packages/extension-ui/src/**/*.tsx`. Their fixture spec is `tests/unit/lint/extension-rules.spec.ts`. A reviewer applies every other rule here.
 
 ---
 
 ## 1. Say what the reader sees, not how it is stored
 
-A person using Notepad has notes. They do not have a vault, and they have never
-heard of SQLite. A person running a Spec Kit phase gets files. The word
-"artifact" is a build-system term that arrived from the pipeline that produces
-them, not from anything the reader asked for.
+A person using Notepad has notes. They have no vault and have never heard of SQLite. A person running a Spec Kit phase gets files. The word "artifact" is a build-system term from the pipeline that produces the files. The reader did not ask for it.
 
 | Never                                       | Say                                        |
 | ------------------------------------------- | ------------------------------------------ |
@@ -33,21 +20,14 @@ them, not from anything the reader asked for.
 | `Public URL (ngrok)`, `ngrok not installed` | `Public address`, `needs one more program` |
 | `excess connections are rejected`           | `only N devices can watch at once`         |
 
-Two exemptions, both deliberate:
+There are two exemptions. Both are deliberate:
 
-- **The extension's own name.** "Task Vault" is what the reader is looking for
-  in the sidebar. Lowercase `vault` as a common noun is the thing being
-  forbidden; the capitalised product name is not.
-- **A command the reader types verbatim.** `<code>brew install ngrok</code>` has
-  to say ngrok, because that is the command. The rule skips `JSXText` whose
-  direct parent is a `<code>` element, and nothing else.
+- **The extension's own name.** "Task Vault" is what the reader looks for in the sidebar. The rule forbids lowercase `vault` as a common noun. It does not forbid the capitalised product name.
+- **A command the reader types verbatim.** `<code>brew install ngrok</code>` must say ngrok, because that is the command. The rule skips `JSXText` whose direct parent is a `<code>` element, and nothing else.
 
 ## 2. Sentence case everywhere
 
-Headings, section labels, tab names, buttons, menu items, table columns. Not
-Title Case, and never `ALL CAPS` — caps are how a label shouts a word the reader
-does not need shouted, and they force an abbreviation (`HIGH`, `MED`) that then
-needs a legend nobody has.
+Use sentence case for headings, section labels, tab names, buttons, menu items and table columns. Do not use Title Case. Never use `ALL CAPS`: caps shout a word the reader does not need shouted, and they force an abbreviation (`HIGH`, `MED`) that then needs a legend nobody has.
 
 Proper nouns keep their capitals: GitHub, Spec Kit, Task Vault, macOS.
 
@@ -59,8 +39,7 @@ Proper nouns keep their capitals: GitHub, Spec Kit, Task Vault, macOS.
 
 ## 3. A button says what pressing it does
 
-Verb first, in the present tense, naming the outcome. The word on the button is
-the word in the confirmation that follows it: "Publish" produces "Published".
+Start with a verb in the present tense and name the outcome. The word on the button is the word in the confirmation that follows: "Publish" produces "Published".
 
 ```
 ✅ Turn on          ❌ Enable Remote Control Server
@@ -69,17 +48,13 @@ the word in the confirmation that follows it: "Publish" produces "Published".
 ✅ Review           ❌ Approve   (when the click opens the diff)
 ```
 
-A control must never name an outcome the click does not produce. That is the
-most expensive mistake in this document, and it shipped: the PR queue row was a
-single button whose `onClick` opened the diff, labelled `Approve`.
+A control must never name an outcome that the click does not produce. This is the most expensive mistake in this document, and it shipped: the PR queue row was one button labelled `Approve` whose `onClick` opened the diff.
 
-Two buttons side by side get one visual weight between them. If both look
-primary, neither is.
+Two buttons side by side share one visual weight. If both look primary, neither is.
 
 ## 4. An empty state has three parts
 
-A heading that says what is not here, one line that says why, and — when there
-is one — the control that fills it. Never a bare "No items."
+Give a heading that says what is not here, one line that says why, and, when one exists, the control that fills it. Never write a bare "No items."
 
 ```
 ✅ No notes yet
@@ -89,33 +64,25 @@ is one — the control that fills it. Never a bare "No items."
 ❌ No notes.
 ```
 
-An empty surface must be distinguishable from a broken one. A panel that renders
-nothing when it has nothing looks exactly like a panel that failed to load, and
-only one of those is fine — so the frame stays and the frame says which.
+An empty surface must look different from a broken one. A panel that renders nothing when it has nothing looks the same as a panel that failed to load, and only one of those is acceptable. So the frame stays, and the frame says which case it is.
 
 ## 5. Destructive and irreversible actions
 
-- Never the primary action in a list row. The row is the surface furthest from
-  having read what it is about.
-- Styling does not soften with the tool's own risk score. A heuristic that
-  scored a PR "low risk" is a guess; an approval is permanent.
-- Say what will happen, in the sentence, before it happens: "Anyone with this
-  address and password can type into your terminals."
+- Never make it the primary action in a list row. The row is the surface where the reader has least read what the action is about.
+- Do not soften the styling because of the tool's own risk score. A heuristic that scored a PR "low risk" is a guess. An approval is permanent.
+- Say what will happen, in the sentence, before it happens: "Anyone with this address and password can type into your terminals."
 
 ## 6. Numbers
 
-- A count is the real count, not the page size. If more are still loading, say
-  the total and mark the partial figure as a floor ("at least 210 min").
-- A duration carries its unit: `~4 min`, not `4m`.
-- Digits that line up in a column get `font-variant-numeric: tabular-nums`.
+- Show the real count, not the page size. If more are still loading, show the total and mark the partial figure as a floor ("at least 210 min").
+- Give a duration its unit: `~4 min`, not `4m`.
+- Give digits that line up in a column `font-variant-numeric: tabular-nums`.
 
 ## 7. Icons
 
 Constitution Principle XII: lucide-react only, flat, inheriting `currentColor`.
 
-**Size comes from the scale, never from a `size` prop.** Three steps, injected
-into every extension document alongside the colour tokens, so nothing needs
-importing:
+**Size comes from the scale, never from a `size` prop.** The scale has three steps. The app injects them into every extension document with the colour tokens, so nothing needs importing:
 
 | Class        | Size | For                                        |
 | ------------ | ---- | ------------------------------------------ |
@@ -128,18 +95,13 @@ importing:
 ❌ <Check size={14} />
 ```
 
-Anything outside those three sizes gets a rule on its own selector — an empty
-state's 36px glyph, a status dot's 7px tick — not a fourth scale step. The
-`size` prop is an ESLint error, with two named exemptions: `<select size={n}>`
-is the HTML rows attribute, and a generator that computes a raster from a pixel
-count (`QRCodeSVG`) is not CSS-sizable.
+A size outside those three gets a rule on its own selector, not a fourth scale step. Examples are an empty state's 36px glyph and a status dot's 7px tick. The `size` prop is an ESLint error, with two named exemptions. `<select size={n}>` is the HTML rows attribute. A generator that computes a raster from a pixel count (`QRCodeSVG`) cannot be sized with CSS.
 
-**No unicode as a visual element.** `⚠ ✓ ✕ ← → ↑ ↓ ↺ ↻ ▸ ▾ ℹ ✦` standing for a
-state or an action are `TriangleAlert`, `Check`, `X`, `ArrowLeft`,
+**No unicode as a visual element.** When `⚠ ✓ ✕ ← → ↑ ↓ ↺ ↻ ▸ ▾ ℹ ✦` stand for a state or an action, use `TriangleAlert`, `Check`, `X`, `ArrowLeft`,
 `ChevronRight`, `ChevronUp`, `ArrowDown`, `RotateCcw`, `RefreshCw`,
 `ChevronRight`, `ChevronDown` and `Info`.
 
-Typography is not iconography, and stays:
+Typography is not iconography. Keep it:
 
 | Keep                        | Because                                                     |
 | --------------------------- | ----------------------------------------------------------- |
@@ -150,41 +112,23 @@ Typography is not iconography, and stays:
 | `⌘↵ Save · Esc Cancel`      | the glyphs printed on the keys                              |
 | `old/path.ts → new/path.ts` | a relational mark between two named things, like an en dash |
 
-The line is whether the character stands **alone as a control** (an icon) or
-sits **between two named things in a sentence** (typography).
+The test: a character that stands **alone as a control** is an icon. A character that sits **between two named things in a sentence** is typography.
 
 ## 8. Colour
 
-Every colour comes from the published `--tm-*` tokens, and
-`packages/extension-ui/src/tokens.css` is the only place one is defined — for
-the core, for every extension view and for the remote client. An extension view
-does not load the core stylesheet, so a raw hex is a value that cannot follow the
-theme, and `rgba(255,255,255,0.08)` is a light-theme bug waiting for someone to
-switch themes. State is never carried by hue alone — pair it with a word, a
-shape or a position.
+Every colour comes from the published `--tm-*` tokens. `packages/extension-ui/src/tokens.css` is the only place that defines one, for the core, for every extension view and for the remote client. An extension view does not load the core stylesheet, so a raw hex cannot follow the theme. `rgba(255,255,255,0.08)` is a light-theme bug that appears when someone switches themes. Never carry state by hue alone: pair it with a word, a shape or a position.
 
 ## 9. Layering
 
-Stacking comes from the published scale in `@terminator/extension-ui`:
-`layerValue()` in TypeScript, `var(--tm-layer-*)` in CSS. A modal surface is a `ModalShell`, which the browser stacks itself (ADR 110).
-A raw `z-index` number is how 38 unmanaged values ended up deciding order by
-whoever picked the biggest.
+Stacking comes from the published scale in `@terminator/extension-ui`: `layerValue()` in TypeScript, `var(--tm-layer-*)` in CSS. A modal surface is a `ModalShell`, which the browser stacks itself (ADR 110). A raw `z-index` number let 38 unmanaged values decide the order by whoever picked the biggest.
 
 ## 10. Control height
 
-Every single-line `<input>` and `<select>` is `var(--tm-control-height)` (28px),
-set by a zero-specificity base rule in both the core and the extension
-stylesheets, so a search box and the Sort beside it are always the same height
-whatever padding or font size each class picks. Do not size a control with
-padding. A field drawn borderless inside a container that is the visible box (the
-sidebar search, the Quick Actions search), or an inline rename in a dense row (a
-tab, a branch row), opts out with `height: auto` on its own selector.
+Every single-line `<input>` and `<select>` is `var(--tm-control-height)` (28px). A zero-specificity base rule sets it in both the core and the extension stylesheets. A search box and the Sort beside it are therefore the same height, whatever padding or font size each class picks. Do not size a control with padding. Two kinds of field opt out with `height: auto` on their own selector: a borderless field inside a container that is the visible box (the sidebar search, the Quick Actions search), and an inline rename in a dense row (a tab, a branch row).
 
 ## 11. Use the components
 
-If `@terminator/extension-ui` has the control, use it; do not write another. A
-missing one is added there first (ADR 098). Storybook shows each in both themes:
-`npm run storybook`.
+If `@terminator/extension-ui` has the control, use it. Do not write another. Add a missing control there first (ADR 098). Storybook shows each control in both themes: `npm run storybook`.
 
 | Need                           | Use                                                                                                        |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------- |
@@ -197,20 +141,10 @@ missing one is added there first (ADR 098). Storybook shows each in both themes:
 | Re-reading something on a tick | `usePolling`                                                                                               |
 | A dropdown or menu that closes | `Popover` / `Menu` (Escape, a click outside and focus return are the browser's), never a document listener |
 
-A button's icon is the `icon` prop, sized by the stylesheet, not by `size`.
+A button's icon is the `icon` prop. The stylesheet sizes it, not `size`.
 
-Fonts ship with the app. Each view's entry imports `@terminator/extension-ui/fonts`
-once (the core renderer does the same); do not add a `<link>` to a font service or
-an `@import url(https://…)`; the UI must draw offline.
+Fonts ship with the app. Each view's entry imports `@terminator/extension-ui/fonts` once (the core renderer does the same). Do not add a `<link>` to a font service or an `@import url(https://…)`. The UI must draw offline.
 
-A form in a dialog is a `Dialog` whose primary action has `submit: true`, so Enter
-submits; do not draw your own overlay, title or action row.
+A form in a dialog is a `Dialog` whose primary action has `submit: true`, so Enter submits. Do not draw your own overlay, title or action row.
 
-Every story is screenshot by `npm run test:visual` (Playwright, over the built
-Storybook, both themes). A change that moves a component's pixels updates its
-baseline in the same commit, generated on Linux with the Playwright version the
-repository pins. Baselines live under `__screenshots__/linux/` in
-`packages/extension-ui/visual/` (the `snapshotPathTemplate` in
-`packages/extension-ui/playwright.visual.config.ts`). A story without one gets it
-from the Story baselines workflow (`update-story-baselines` label, see
-`packages/extension-ui/README.md`).
+`npm run test:visual` takes a screenshot of every story (Playwright, over the built Storybook, both themes). A change that moves a component's pixels updates its baseline in the same commit. Generate the baseline on Linux with the Playwright version the repository pins. Baselines live under `__screenshots__/linux/` in `packages/extension-ui/visual/` (the `snapshotPathTemplate` in `packages/extension-ui/playwright.visual.config.ts`). The Story baselines workflow gives a story without a baseline one (`update-story-baselines` label, see `packages/extension-ui/README.md`).
