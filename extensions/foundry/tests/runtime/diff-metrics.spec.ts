@@ -73,17 +73,25 @@ function oddRowsTests() {
  * are not interchangeable, and a mock that answers both the same way reported
  * the diff rows back as a list of untracked files.
  */
-function git(over: { diff?: string; untracked?: string; ok?: boolean; mergeBase?: string } = {}) {
-  return vi.fn(async (_cmd: string, args: string[], _cwd?: string) => {
-    if (args.includes('merge-base')) {
-      return { ok: over.mergeBase !== undefined, stdout: over.mergeBase ?? '', stderr: '' }
-    }
-    return {
-      ok: over.ok ?? true,
-      stdout: args.includes('ls-files') ? (over.untracked ?? '') : (over.diff ?? ''),
-      stderr: '',
-    }
-  })
+interface GitAnswers {
+  readonly diff?: string
+  readonly untracked?: string
+  readonly ok?: boolean
+  readonly mergeBase?: string
+}
+
+function git(over: GitAnswers = {}) {
+  return vi.fn(async (_cmd: string, args: string[], _cwd?: string) => ({
+    ...answerFor(over, args),
+    stderr: '',
+  }))
+}
+
+function answerFor(over: GitAnswers, args: string[]): { ok: boolean; stdout: string } {
+  if (args.includes('merge-base'))
+    return { ok: over.mergeBase !== undefined, stdout: over.mergeBase ?? '' }
+  const stdout = args.includes('ls-files') ? over.untracked : over.diff
+  return { ok: over.ok ?? true, stdout: stdout ?? '' }
 }
 
 // A new file's lines count towards the change like any other, so the
@@ -286,25 +294,34 @@ function commitFile(repo: string, name: string, message: string): void {
 
 describe('a lane branch behind its base', laneBehindBaseTests)
 
-function laneBehindBaseTests() {
-  const sh = (cwd: string, ...args: string[]) =>
-    execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim()
-  const run = async (_cmd: string, args: string[], cwd: string) => {
-    try {
-      return { ok: true, stdout: sh(cwd, ...args), stderr: '' }
-    } catch (error) {
-      return { ok: false, stdout: '', stderr: String(error) }
-    }
+const sh = (cwd: string, ...args: string[]) =>
+  execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim()
+
+/** Real git, as the host's shell answers it. */
+const run = async (_cmd: string, args: string[], cwd: string) => {
+  try {
+    return { ok: true, stdout: sh(cwd, ...args), stderr: '' }
+  } catch (error) {
+    return { ok: false, stdout: '', stderr: String(error) }
   }
+}
+
+/** A lane cut from main, main one commit further on, and the lane's edits uncommitted. */
+function laneBehindMain(): string {
+  const repo = makeTempDir('diff-metrics-fork-')
+  sh(repo, 'init', '-q', '-b', 'main')
+  commitFile(repo, 'a.txt', 'base')
+  sh(repo, 'branch', 'lane')
+  commitFile(repo, 'newer-on-main.txt', 'main moved')
+  sh(repo, 'checkout', '-q', 'lane')
+  for (const name of ['a.txt', 'fresh.txt']) writeFileSync(join(repo, name), 'changed\n')
+  return repo
+}
+
+function laneBehindBaseTests() {
   let repo: string
   beforeEach(() => {
-    repo = makeTempDir('diff-metrics-fork-')
-    sh(repo, 'init', '-q', '-b', 'main')
-    commitFile(repo, 'a.txt', 'base')
-    sh(repo, 'branch', 'lane')
-    commitFile(repo, 'newer-on-main.txt', 'main moved')
-    sh(repo, 'checkout', '-q', 'lane')
-    for (const name of ['a.txt', 'fresh.txt']) writeFileSync(join(repo, name), 'changed\n')
+    repo = laneBehindMain()
   })
   afterEach(() => rmSync(repo, { recursive: true, force: true, maxRetries: 5 }))
 
@@ -316,6 +333,19 @@ function laneBehindBaseTests() {
   it("counts only the lane's own files in the summary", async () => {
     const summary = await readDiffSummary(repo, 'main', { run })
     expect(summary.files).toBe(2)
+  })
+
+  it('measures from origin/<base> when the lane was cut from it and the local base is behind', async () => {
+    sh(repo, 'checkout', '-q', 'main')
+    sh(repo, 'update-ref', 'refs/remotes/origin/main', 'HEAD')
+    sh(repo, 'checkout', '-q', '-B', 'cut-from-origin', 'origin/main')
+    sh(repo, 'branch', '-f', 'main', 'HEAD~1')
+    writeFileSync(join(repo, 'only-mine.txt'), 'new\n')
+    expect((await readChangedFiles(repo, 'main', run)).sort()).toEqual([
+      'a.txt',
+      'fresh.txt',
+      'only-mine.txt',
+    ])
   })
 }
 

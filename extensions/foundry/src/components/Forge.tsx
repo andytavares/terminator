@@ -51,6 +51,7 @@ import {
   type StepMark,
 } from '../forge/readiness.js'
 import { foundryInvoke } from '../renderer/foundry-invoke.js'
+import { clockOf } from '../factory/format.js'
 import type { FoundryApi } from '../ipc/foundry-api.js'
 
 // The Forge.
@@ -255,12 +256,6 @@ async function readCompiled(orderId: string): Promise<OrderView> {
 
 async function readRecipes(orderId: string): Promise<RecipesView> {
   return await foundryInvoke('foundry:run.recipes', { id: orderId })
-}
-
-function clockOf(iso: string): string {
-  const d = new Date(iso)
-  const pad = (n: number): string => String(n).padStart(2, '0')
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 export interface ForgeProps {

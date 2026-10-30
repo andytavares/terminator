@@ -6,24 +6,25 @@ import { defaultHintsDir } from '../profile/hints.js'
 import { resolveProfile, type ResolvedProfile } from '../profile/resolve.js'
 import { emptyProfile, isRemoved, type Profile } from '../profile/schema.js'
 import { readProfile, writeProfile } from '../profile/store.js'
-import type { BaselineDeps } from './baseline.js'
 import { leadRepo } from '../order/lead-repo.js'
 
 // What the scout proposed fills a check that has no command, unproven: the base branch
 // is assumed to pass (ADR 137). A command someone else gave is never replaced.
 
-export interface ScoutProofDeps {
-  readonly base: BaselineDeps
+export interface ScoutCommandDeps {
+  /** The data root the stored profiles live under. */
+  readonly root: string
+  readonly now: () => string
   readonly store: OrderStore
 }
 
 function record(
-  deps: ScoutProofDeps,
+  deps: ScoutCommandDeps,
   entry: Pick<LedgerEntry, 'orderId' | 'action' | 'subject' | 'reason'> &
     Partial<Pick<LedgerEntry, 'evidence'>>
 ): Promise<void> {
   return deps.store.record({
-    at: deps.base.now(),
+    at: deps.now(),
     actor: 'role:scout',
     evidence: [],
     ...entry,
@@ -55,10 +56,10 @@ function skipReason(
 async function worthKeeping(
   order: WorkOrder,
   proposals: readonly CommandProposal[],
-  deps: ScoutProofDeps
+  deps: ScoutCommandDeps
 ): Promise<CommandProposal[]> {
   const repoPath = leadRepo(order)?.path ?? ''
-  const stored = await readProfile(deps.base.root, repoPath)
+  const stored = await readProfile(deps.root, repoPath)
   const resolved = resolveProfile({ repoPath, hintsDir: defaultHintsDir(), stored })
   const wanted: CommandProposal[] = []
   for (const proposal of proposals) {
@@ -76,7 +77,7 @@ interface Verdict {
   readonly why: string
 }
 
-function skipped(deps: ScoutProofDeps, { orderId, proposal, why }: Verdict): Promise<void> {
+function skipped(deps: ScoutCommandDeps, { orderId, proposal, why }: Verdict): Promise<void> {
   return record(deps, {
     orderId,
     action: 'scout.command.skipped',
@@ -86,10 +87,10 @@ function skipped(deps: ScoutProofDeps, { orderId, proposal, why }: Verdict): Pro
 }
 
 /** Keep the first scout proposal for each check that has no command; nothing is run. */
-export async function proveScoutCommands(
+export async function keepScoutCommands(
   orderId: string,
   proposals: readonly CommandProposal[],
-  deps: ScoutProofDeps
+  deps: ScoutCommandDeps
 ): Promise<void> {
   const order = await deps.store.load(orderId)
   if (order === null || proposals.length === 0) return
@@ -103,12 +104,12 @@ interface Settling {
   readonly proposal: CommandProposal
 }
 
-async function keep(deps: ScoutProofDeps, { order, proposal }: Settling): Promise<void> {
+async function keep(deps: ScoutCommandDeps, { order, proposal }: Settling): Promise<void> {
   const { check, command, evidence } = proposal
   const entry = { command, source: 'scout' as const, evidence }
   const repoPath = leadRepo(order)?.path ?? ''
-  const stored = (await readProfile(deps.base.root, repoPath)) ?? emptyProfile(repoPath)
-  await writeProfile(deps.base.root, repoPath, {
+  const stored = (await readProfile(deps.root, repoPath)) ?? emptyProfile(repoPath)
+  await writeProfile(deps.root, repoPath, {
     ...stored,
     checks: { ...stored.checks, [check]: entry },
   })

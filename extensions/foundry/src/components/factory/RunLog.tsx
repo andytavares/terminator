@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { usePolling } from '@terminator/extension-ui'
 import type { RunLogLine } from '../../ipc/run-log.js'
 import { foundryInvoke } from '../../renderer/foundry-invoke.js'
+import { clockOf } from '../../factory/format.js'
 
 // The whiteboard's log: every station's words, the ledger's decisions and the command logs of
 // one order, newest last. Lines come from `foundry:run-log`, which reads files only.
@@ -32,14 +33,6 @@ type Filter = string | null
 const matches = (line: RunLogLine, filter: Filter): boolean =>
   filter === null || filter === `station:${line.station}` || filter === `kind:${line.kind}`
 
-export function clockOf(at: number): string {
-  if (at === 0) return '--:--:--'
-  const time = new Date(at)
-  return [time.getHours(), time.getMinutes(), time.getSeconds()]
-    .map((part) => String(part).padStart(2, '0'))
-    .join(':')
-}
-
 interface FoldedRow {
   readonly kind: 'fold'
   readonly logPath: string
@@ -49,7 +42,7 @@ interface FoldedRow {
 type Row = { readonly kind: 'line'; readonly line: RunLogLine; readonly key: string } | FoldedRow
 
 /** The lines to draw: a command log past its first 20 lines is folded until it is expanded. */
-export function rowsOf(lines: readonly RunLogLine[], expanded: ReadonlySet<string>): Row[] {
+export function logRowsOf(lines: readonly RunLogLine[], expanded: ReadonlySet<string>): Row[] {
   const totals = new Map<string, number>()
   for (const line of lines) {
     if (line.logPath !== undefined) totals.set(line.logPath, (totals.get(line.logPath) ?? 0) + 1)
@@ -157,7 +150,7 @@ function RunLogList(props: RunLogProps & { readonly lines: readonly RunLogLine[]
   return (
     <>
       <ol ref={listRef} className="fdry-runlog__lines" onScroll={onScroll}>
-        {rowsOf(lines, expanded).map((row) =>
+        {logRowsOf(lines, expanded).map((row) =>
           row.kind === 'fold' ? (
             <FoldRow key={row.key} row={row} onExpand={expand} />
           ) : (

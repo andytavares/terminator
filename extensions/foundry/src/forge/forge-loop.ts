@@ -18,8 +18,7 @@ import {
 } from './scouted-converge.js'
 import type { ConvergeOutcome, ConvergeStarted } from '../ipc/forge-channels.js'
 import { rungOutputPath } from '../line/rung-output.js'
-import { baselineDepsFor } from '../line/baseline-deps.js'
-import { proveScoutCommands } from '../line/scout-commands.js'
+import { keepScoutCommands } from '../line/scout-commands.js'
 import {
   MAX_REVIEW_ROUNDS,
   reviewPrompt,
@@ -687,9 +686,8 @@ function startScout(forge: Forge, root: string, scoutOrder: WorkOrder): Promise<
         nodeId: 'forge-scout',
         prompt: (role) => scoutBrief(forge, root, { order: scoutOrder, role }),
         onCommands: (orderId, commands) => {
-          const store = orderStoreAt(root)
-          const base = baselineDepsFor(forge.api, root, store)
-          return proveScoutCommands(orderId, commands, { base, store })
+          const now = () => new Date().toISOString()
+          return keepScoutCommands(orderId, commands, { root, now, store: orderStoreAt(root) })
         },
         startedAction: 'scout.started',
         startedReason: 'reading the repository beside the first draft',

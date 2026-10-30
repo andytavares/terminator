@@ -232,9 +232,15 @@ async function moveStaleBranch(
   branch: string,
   deps: CheckoutDeps
 ): Promise<void> {
-  const startPoint = await startPointFor(repo, deps)
   const git = (...args: string[]) =>
     deps.exec({ command: 'git', args, cwd: repo.path, timeoutMs: 30_000 })
+  // Inside no base ref already here means commits of its own: no fetch is worth it.
+  const known = [repo.baseBranch, `origin/${repo.baseBranch}`]
+  const inside = await Promise.all(
+    known.map((ref) => git('merge-base', '--is-ancestor', branch, ref))
+  )
+  if (inside.every((result) => result.exitCode !== 0)) return
+  const startPoint = await startPointFor(repo, deps)
   const behind = await git('merge-base', '--is-ancestor', branch, startPoint)
   if (behind.exitCode !== 0) return
   const [tip, target] = await Promise.all([git('rev-parse', branch), git('rev-parse', startPoint)])

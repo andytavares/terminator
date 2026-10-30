@@ -64,7 +64,7 @@ async function climbOverChange(
   const climbed = await new FinalClimb(run, change).climbAll()
   const debt = !climbed.ladder.ok && debtAccepted(run)
   if (!run.halted) await raiseAfterWork(run, { change, climbed, debt })
-  if (draftsOpen && !climbed.ladder.ok) await recordFinalCheckFailed(run, climbed.ladder)
+  if (draftsOpen && !climbed.ladder.ok && !debt) await recordFinalCheckFailed(run, climbed.ladder)
   return runOutcomeOf(run, { change, workDone, ladder: climbed.ladder, debt })
 }
 
@@ -243,7 +243,7 @@ function debtAccepted(run: Execution): boolean {
   return run.priorGates.some(
     (g) =>
       (g.rule === 'verify.repeat-fail' || g.rule === 'verify.base-fail') &&
-      g.nodeId === null &&
+      g.finalCheck === true &&
       g.decision?.option === 'accept_debt'
   )
 }
@@ -301,6 +301,7 @@ async function raiseFailedCheck(run: Execution, climbed: Climb): Promise<void> {
     summary: `${run.order.title} did not pass verification`,
     why: `${failed.why}${capped ? ' It has been sent back twice; take over, accept the debt, or hold.' : ''}`,
     omitOptions: capped ? ['send_back'] : undefined,
+    finalCheck: true,
   })
 }
 

@@ -103,9 +103,10 @@ async function runCommandsOnBase(proof: Proof, commands: readonly string[]): Pro
     }
     return { commit, exitCodes, logPaths }
   } finally {
-    await removeBaseCheckout(checkout, proof.deps)
-    // The run opened a sidebar project for the checkout; it must not outlive the checkout.
+    // The run opened a sidebar project for the checkout; it must not outlive the checkout,
+    // so it goes first: a throwing removal below would otherwise leave it behind.
     proof.deps.removeProjectAt?.(checkout.path)
+    await removeBaseCheckout(checkout, proof.deps)
   }
 }
 

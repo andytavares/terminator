@@ -228,9 +228,13 @@ export function wallDecorX(
       ([left, right]) => x + want.width + DECOR_MARGIN <= left || x >= right + DECOR_MARGIN
     )
   const wallPx = map.width * TILE_PX
-  const preferred = want.preferred.map((f) => Math.round(wallPx * f))
-  const scanned = Array.from({ length: wallPx }, (_, x) => x)
-  return preferred.find(fits) ?? scanned.find(fits) ?? null
+  const preferred = want.preferred.map((f) => Math.round(wallPx * f)).find(fits)
+  return preferred ?? firstFit(wallPx, fits)
+}
+
+function firstFit(wallPx: number, fits: (x: number) => boolean): number | null {
+  for (let x = 0; x < wallPx; x++) if (fits(x)) return x
+  return null
 }
 
 const extinguisherSpan = (map: WallMap): WallSpan => {

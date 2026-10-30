@@ -122,14 +122,18 @@ function addedLinesIn(worktreePath: string, relativePath: string): number {
 }
 
 // The fork point, not the base tip: a base that moved on since the lane was cut would
-// otherwise read every newer commit as the lane's change. Falls back to the base itself.
+// otherwise read every newer commit as the lane's change. `origin/<base>` first, where
+// `startPointFor` cuts a lane; then the local base; then the base itself.
 async function diffBaseFor(
   worktreePath: string,
   baseBranch: string,
   run: RunCommand
 ): Promise<string> {
-  const mergeBase = await run('git', ['merge-base', 'HEAD', baseBranch], worktreePath)
-  return mergeBase.ok && mergeBase.stdout.trim() !== '' ? mergeBase.stdout.trim() : baseBranch
+  for (const ref of [`origin/${baseBranch}`, baseBranch]) {
+    const mergeBase = await run('git', ['merge-base', 'HEAD', ref], worktreePath)
+    if (mergeBase.ok && mergeBase.stdout.trim() !== '') return mergeBase.stdout.trim()
+  }
+  return baseBranch
 }
 
 /**

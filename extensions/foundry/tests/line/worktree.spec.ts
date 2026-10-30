@@ -129,6 +129,7 @@ describe('preparing a checkout', () => {
   describe('real git, two orders in one repository', realGitTwoOrdersTests)
   describe('real git, re-attaching only', realGitReattachTests)
   describe('real git, a stale branch', realGitStaleBranchTests)
+  describe('real git, a stale branch with its own commit', realGitStaleBranchFetchTests)
   describe('real git, safety', realGitSafetyTests)
   describe('real git, fetching the base', realGitFetchTests)
   describe('real git, branch ownership', realGitBranchOwnershipTests)
@@ -1126,5 +1127,18 @@ function removingItTests() {
       }) as never,
     })
     await expect(removeBaseCheckout(checkout, failing)).resolves.toBeUndefined()
+  })
+}
+
+function realGitStaleBranchFetchTests() {
+  it('does not fetch to decide about a branch with a commit of its own', async () => {
+    const { deps: real, repoPath, order: o, branch } = staleBranchRepo()
+    addOrigin(repoPath)
+    git(repoPath, 'checkout', '-q', branch)
+    commitOn(repoPath, 'its own work')
+    git(repoPath, 'checkout', '-q', 'main')
+    const exec = vi.fn(real.exec)
+    await ensureCheckout(o, 1, { ...real, exec })
+    expect(calls(exec).filter((c) => c.args[0] === 'fetch')).toEqual([])
   })
 }

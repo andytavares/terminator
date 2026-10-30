@@ -215,7 +215,7 @@ function supervisionTheBranchTests() {
     })
     addRun(s)
     await s.measure('session-1')
-    expect(calls[0]).toContain('develop')
+    expect(calls[0]).toEqual(['merge-base', 'HEAD', 'origin/develop'])
   })
 }
 

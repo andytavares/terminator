@@ -29,6 +29,7 @@ export interface GateAsk {
   readonly breach?: BudgetBreach
   readonly evidence?: readonly Evidence[]
   readonly omitOptions?: readonly string[]
+  readonly finalCheck?: boolean
 }
 
 type Breach = NonNullable<ReturnType<typeof budgetBreach>>
@@ -129,7 +130,11 @@ export class Execution {
       (g) =>
         g.rule === rule &&
         g.nodeId === nodeId &&
-        (g.decision?.option === 'approve' || g.decision?.option === 'accept_debt')
+        // A debt settles only the final check; on a stall it would leave a run with no gate.
+        (g.decision?.option === 'approve' ||
+          (g.decision?.option === 'accept_debt' &&
+            g.finalCheck === true &&
+            ask.finalCheck === true))
     )
     if (settled) return false
     this.gateSeq += 1
@@ -159,6 +164,7 @@ export class Execution {
       breach: ask.breach ?? null,
       evidence: ask.evidence,
       omitOptions: ask.omitOptions,
+      finalCheck: ask.finalCheck,
     })
   }
 

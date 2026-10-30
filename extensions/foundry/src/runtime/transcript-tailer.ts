@@ -180,7 +180,8 @@ export function transcriptSize(transcriptPath: string): number {
   }
 }
 
-function tailLines(transcriptPath: string): string[] | null {
+/** The file's lines, from at most its last MAX_TAIL_BYTES; null when there is no file. */
+export function tailLines(transcriptPath: string): string[] | null {
   try {
     const stat = statSync(transcriptPath)
     if (!stat.isFile()) return null

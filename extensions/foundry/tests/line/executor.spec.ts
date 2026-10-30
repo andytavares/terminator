@@ -847,6 +847,7 @@ function sentBack(o: WorkOrder, n: number, option = 'send_back') {
       summary: 's',
       why: 'w',
       at: '2026-09-06T10:00:00.000Z',
+      finalCheck: true,
     }),
     decision: {
       option,
@@ -1060,6 +1061,7 @@ describe('a failed final climb', () => {
   describe('sending back', sendingBackTests)
   describe('the send-back limit', theSendBackLimitTests)
   describe('accepted debt', acceptedDebtTests)
+  describe('a debt accepted on a stall', acceptedStallTests)
   describe('a document outside the checkout', documentOutsideTheCheckoutTests)
   describe('preparing the checkout again', preparingAgainTests)
   describe('the question after it', afterPreparingTests)
@@ -1178,6 +1180,34 @@ function acceptedDebtTests() {
       'Lint',
       expect.stringMatching(/^Lint .* failed with exit code 1; you accepted this debt/)
     )
+  })
+}
+
+function acceptedStallTests() {
+  it('a debt accepted on a stall does not let a failing final check ship', async () => {
+    const o = order([unit('U-1')])
+    const stall = {
+      ...raiseGate({
+        id: 'WO-1-verify.repeat-fail-1',
+        rule: 'verify.repeat-fail',
+        orderId: o.id,
+        summary: `${o.title} cannot go any further on its own`,
+        why: 'a cycle',
+        at: '2026-09-06T10:00:00.000Z',
+      }),
+      decision: {
+        option: 'accept_debt',
+        by: 'operator' as const,
+        note: '',
+        at: '2026-09-06T10:05:00.000Z',
+      },
+    }
+    const outcome = await execute(
+      planOf(o),
+      base({ runStep: lintRunner(() => 1), priorGates: [stall] })
+    )
+    expect(outcome.gates.map((g) => g.rule)).toEqual(['verify.repeat-fail'])
+    expect(outcome.shippable).toBe(false)
   })
 }
 
@@ -2853,6 +2883,27 @@ describe('the stalled gate names what it would retry', () => {
       g.summary.endsWith('cannot go any further on its own')
     )
     expect(stalled?.nodeId).toBe('build:U-1')
+  })
+})
+
+describe('an accepted debt on a node', () => {
+  it('still stops a stalled run, because only a final check takes a debt as settled', async () => {
+    const o = order([unit('U-1')])
+    const failing = deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
+    const first = await execute(planOf(o), failing)
+    const asked = first.gates.find((g) => g.summary.endsWith('cannot go any further on its own'))
+    if (asked === undefined) throw new Error('expected the stall to be asked about')
+    const accepted = decide(asked, {
+      option: 'accept_debt',
+      note: '',
+      at: '2026-09-28T19:12:26.193Z',
+    })
+
+    const resumed = await execute(
+      { order: o, recipe: recipe(), graph: first.graph },
+      { ...failing, priorGates: [accepted] }
+    )
+    expect(resumed.gates.map((g) => g.nodeId)).toContain('build:U-1')
   })
 })
 

@@ -125,6 +125,7 @@ async function seedTwoStationsAndTheLedger(): Promise<void> {
 describe('the run log', () => {
   describe('merging', mergingTests)
   describe('limits and growth', limitsTests)
+  describe('a long command log', longCommandLogTests)
 })
 
 function mergingTests() {
@@ -181,5 +182,24 @@ function limitsTests() {
     expect(await host.call('foundry:run-log', { orderId: 'WO-1', limit: 5001 })).toEqual({
       lines: [],
     })
+  })
+}
+
+function longCommandLogTests() {
+  it('keeps what the stations said when a newer command log is longer than the limit', async () => {
+    await seedTwoStationsAndTheLedger()
+    fs.mkdirSync(runsFolder(), { recursive: true })
+    const suite = Array.from({ length: 600 }, (_, i) => `test ${i}`).join('\n')
+    fs.writeFileSync(path.join(runsFolder(), 'e2e.log'), `${suite}\n`)
+    const lines = await readLog(10)
+    expect(lines.filter((line) => line.kind !== 'command').map((line) => line.text)).toEqual([
+      'reading tokens',
+      'approve · looks right',
+      'checking',
+      'Bash: ls',
+    ])
+    const body = lines.filter((line) => line.kind === 'command').slice(1)
+    expect(body).toHaveLength(200)
+    expect(body.at(-1)?.text).toBe('test 599')
   })
 }
