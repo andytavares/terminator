@@ -1,18 +1,18 @@
 # Clean-gate report: the overhaul branch
 
-Measured 2026-10-13 on `claude/brave-newton-5ssiux` at `2d3160c` (base `da1fe0b`). The rules are the
-ones in the user's clean-code standard: functions within 30 lines, complexity 10 and 3 parameters, no
+Measured 2026-10-13 on `claude/brave-newton-5ssiux` at `2d3160c` (base `da1fe0b`). The rules come
+from the user's clean-code standard: functions within 30 lines, complexity 10 and 3 parameters, no
 `as unknown as`, no `@ts-ignore` or `@ts-expect-error`, no `any`, no coverage-ignore comments.
 
-Two tools measure them, and they disagree, so both are reported:
+Two tools measure the rules, and they disagree. This report gives both:
 
-- **ESLint** (the project's own check, `npm run lint`) for size and `any`.
-- **gate.py** (`/home/user/andytavares/claude/at/hooks/clean-gate/gate.py`, lizard 1.24.1) for the
-  handoff's two open items, repeated names and comment runs.
+- **ESLint** (the project's own check, `npm run lint`) measures size and `any`.
+- **gate.py** (`/home/user/andytavares/claude/at/hooks/clean-gate/gate.py`, lizard 1.24.1) measures
+  the handoff's two open items, repeated names and comment runs.
 
 ## Where it stands
 
-Measured 2026-10-14 at `fe2e2a89`, after the clean-up passes. This section replaces the numbers in
+Measured 2026-10-14 at `fe2e2a89`, after the clean-up passes. These numbers replace the numbers in
 the sections below, which record the first measurement.
 
 | Rule                                                  | First measurement | Now | Command                                                                              |
@@ -25,19 +25,22 @@ the sections below, which record the first measurement.
 | Repeated names (gate.py)                              | 2,807             | 0   | same                                                                                 |
 | Size and ratchet (gate.py, lizard)                    | 277               | 278 | same; ESLint reports 0                                                               |
 
-The gate reads `.clean-gate.json`: it skips PNGs, which it could not decode, and the names the
-owner asked it to skip: those an interface, a `vi.mock`, an event handler or a call site gives
-(`run`, `dispose`, `onKeyDown`), which lizard counts as function definitions, and the names lizard
-invents for an anonymous callback (`return`, `describe`, `useEffect`). Functions that only shared a
-generic name were renamed for what they do, and copies were merged.
+The gate reads `.clean-gate.json`. The file makes the gate skip three groups:
 
-What is left, all listed in [clean-gate-findings.tsv](clean-gate-findings.tsv):
+- PNGs, which the gate could not decode.
+- Names that an interface, a `vi.mock`, an event handler or a call site gives (`run`, `dispose`,
+  `onKeyDown`). lizard counts these as function definitions. The owner asked to skip them.
+- Names that lizard invents for an anonymous callback (`return`, `describe`, `useEffect`).
 
-- **6 comment runs.** Three are lines of the template `scripts/create-extension.cjs` writes into a
-  new extension, not comments of that file. Three are file headers (`types/api.d.ts`,
-  `electron-api/manifest.ts`), which the rule allows; the gate reports them because line 1 itself
+Functions that only shared a generic name now have names for what they do. Copies are merged.
+
+What is left is listed in [clean-gate-findings.tsv](clean-gate-findings.tsv):
+
+- **6 comment runs.** Three are lines of the template that `scripts/create-extension.cjs` writes into
+  a new extension, not comments of that file. Three are file headers (`types/api.d.ts`,
+  `electron-api/manifest.ts`), which the rule allows. The gate reports them because line 1 itself
   did not change.
-- **278 size and ratchet findings.** lizard counts each field of a destructured parameter and loses
+- **278 size and ratchet findings.** lizard counts each field of a destructured parameter. It loses
   the end of a function after some generics and template literals. ESLint parses TypeScript and
   reports none over the limits.
 
@@ -51,17 +54,16 @@ What is left, all listed in [clean-gate-findings.tsv](clean-gate-findings.tsv):
 | `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck`                         | 0            | 0   | `git grep -nE '@ts-(ignore\|expect-error\|nocheck)' -- '*.ts' '*.tsx'` (3 matches, all text the review insights look for in a diff: `extensions/git-integration/src/review/insights.ts:291`, its spec) |
 | Coverage-ignore comments                                                | 30           | 30  | `git grep -niE '(istanbul\|v8\|c8) ignore' -- '*.ts' '*.tsx' \| wc -l`                                                                                                                                 |
 
-`npm run lint` now holds every `.js`, `.mjs`, `.cjs`, `.ts`, `.mts` and `.tsx` file to the size
-limits, and `@typescript-eslint/no-explicit-any` is an error (`eslint.config.mjs`, last block;
+`npm run lint` now applies the size limits to every `.js`, `.mjs`, `.cjs`, `.ts`, `.mts` and `.tsx` file, and `@typescript-eslint/no-explicit-any` is an error (`eslint.config.mjs`, last block;
 `tests/unit/lint/size-limits.spec.ts`). That covers `tests/unit/e2e-harness/**`,
 `tests/unit/support/**`, `tests/unit/extension-css-layers.spec.ts` and
-`tests/integration/foundry-portability.spec.ts`, which were outside every block before.
+`tests/integration/foundry-portability.spec.ts`. No block covered these files before.
 
 ## What was fixed
 
 - 242 `as unknown as` lines in 85 extension spec files: `partialFake`, `vi.mocked`, `Object.assign` and
-  `Reflect.deleteProperty` (commit `2a8d850`). Removing them showed fixtures that no longer matched
-  their types (a gate rule `merge`, a decision with `actor`, git files without `isBinary`), now fixed.
+  `Reflect.deleteProperty` (commit `2a8d850`). The removal showed fixtures that no longer matched
+  their types (a gate rule `merge`, a decision with `actor`, git files without `isBinary`). These are now fixed.
 - 9 `as unknown as` lines in 8 extension source files (`4fa8a48`).
 - 21 `any`: the remote shim, its spec, `build-api.spec.ts`, `review-agent.spec.ts` and
   `scripts/perf/git-integration.mts` (`ede6874`, `2a8d850`).
@@ -70,15 +72,15 @@ limits, and `@typescript-eslint/no-explicit-any` is an error (`eslint.config.mjs
 
 ## First measurement: repeated names and comment runs
 
-The handoff's 929 and 255 came from gate.py's report mode over the branch, run in the main checkout:
+The handoff's 929 and 255 came from the report mode of gate.py over the branch. The run was in the main checkout:
 `uv run --script /home/user/andytavares/claude/at/hooks/clean-gate/gate.py report origin/main..HEAD`
 (2026-10-12 13:31 UTC; it also printed 121 size, 142 ratchet and 53,463 added lines). That command
 now crashes: `git show` of the 118 Linux story baselines is not UTF-8, and gate.py decodes it as text.
-Skipping them with an untracked `.clean-gate.json` of `{"ignorePaths": ["*.png"]}` runs it again,
-but here it did not finish in 2 hours and was stopped: it parses every file that mentions a name once
-per name. The numbers below come from this wrapper (measured at `16439dd`; the two commits after it
-change no function), which calls the same `report_findings` with the same PNG skip and caches lizard's
-result per file. It finished in 11 minutes 26 seconds:
+An untracked `.clean-gate.json` of `{"ignorePaths": ["*.png"]}` skips the baselines, and the command
+runs again. It did not finish in 2 hours, and we stopped it: it parses every file that mentions a
+name once per name. The numbers below come from this wrapper. It calls the same `report_findings`
+with the same PNG skip and caches the result of lizard per file. We measured at `16439dd` (the two
+commits after it change no function). The wrapper finished in 11 minutes 26 seconds:
 
 ```sh
 # from the repository root; findings.py is the script below
@@ -128,20 +130,20 @@ for f in gate.report_findings(root, sys.argv[1], config):
 | Functions over a limit (lizard)                             | 121        | 251                                     |
 | Ratchet breaches (lizard)                                   | 142        | 26                                      |
 
-The counts grew because the span did: the branch added 134,509 more lines since the first count. None
-of the four is a small mechanical fix, so all are left:
+The counts grew because the span grew: the branch added 134,509 more lines since the first count. No
+fix of the four is small or mechanical, so all four are left:
 
-- **Repeated names.** Most are not copies. lizard names callbacks by the call they are passed to and
-  sometimes by a keyword: the most repeated names are `run` (149, the `run` of each `ChannelSpec`),
-  `return` (45), `useEffect` (40), `play` (28, Storybook), `describe` (26). Methods that implement one
-  interface (`register`, `dispose`, `close`) repeat by design. A real copy is a judgement per name:
-  `openInBrowser` in Foundry, Task Vault and the core is one, but an extension may not import another
-  extension (Constitution II), so sharing it means adding it to the SDK.
-- **Comment runs.** 986 comments longer than 3 lines in added code. Each needs a reading: most state a
-  constraint (ADR references, platform behaviour), which the standard keeps, in one to three lines.
-  Shortening them is an edit per comment, not a mechanical change.
-- **Size and ratchet (lizard).** ESLint finds no function over the limits; lizard finds 251. lizard
+- **Repeated names.** Most are not copies. lizard names a callback by the call that receives it, and
+  sometimes by a keyword. The most repeated names are `run` (149, the `run` of each `ChannelSpec`),
+  `return` (45), `useEffect` (40), `play` (28, Storybook) and `describe` (26). Methods that implement
+  one interface (`register`, `dispose`, `close`) repeat by design. A real copy needs a judgement per
+  name. `openInBrowser` in Foundry, Task Vault and the core is a real copy. An extension cannot import
+  another extension (Constitution II), so sharing it means adding it to the SDK.
+- **Comment runs.** 986 comments are longer than 3 lines in added code. Each needs a reading. Most
+  state a constraint (ADR references, platform behaviour), which the standard keeps, in one to three
+  lines. Shortening them is an edit per comment, not a mechanical change.
+- **Size and ratchet (lizard).** ESLint finds no function over the limits. lizard finds 251. lizard
   counts a destructured props object as one parameter per field (`NoLimit({ row, draft, disabled,
-onChange })`, `extensions/foundry/src/components/BudgetForm.tsx:131`, "4 parameters"), and loses the
+onChange })`, `extensions/foundry/src/components/BudgetForm.tsx:131`, "4 parameters"). It loses the
   end of a function after some TypeScript generics (`useOrderMoves`, `Forge.tsx:597`, "1,211 lines").
-  ESLint parses TypeScript with typescript-eslint, so its 0 is the number to trust.
+  ESLint parses TypeScript with typescript-eslint, so trust its 0.
