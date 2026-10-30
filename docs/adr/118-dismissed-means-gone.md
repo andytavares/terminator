@@ -8,16 +8,16 @@
 
 ## Context
 
-Dismissing an In flight row on Home hid it only until the work showed new activity. The git extension stamped every open pull request facet with the time of its fetch, which runs every two minutes, so every dismissed pull request row came back within two minutes. The operator's rule is that a dismissed row stays gone.
+Dismissing an In flight row on Home hid the row only until the work showed new activity. The git extension stamped every open pull request facet with the time of its fetch, which runs every two minutes. So every dismissed pull request row came back within two minutes. The rule of the operator is that a dismissed row stays gone.
 
 ## Decision
 
-- A dismissal is kept by work key and hides the row until the operator undoes it. Activity on the work does not bring it back (`isDismissed` in `src/renderer/components/home/dismissed-threads.ts`).
-- The toast that confirms a dismissal offers **Undo**. Starting that ticket or branch from Start work also restores it (`restoreStarted` in `start-work.ts`), so work the operator just launched is never hidden.
-- A facet's `updatedAt` is when the work last changed, not when it was read. The git extension takes it from GitHub's `PullRequest.updatedAt`.
+- The app keeps a dismissal by work key. It hides the row until the operator undoes the dismissal. Activity on the work does not bring the row back (`isDismissed` in `src/renderer/components/home/dismissed-threads.ts`).
+- The toast that confirms a dismissal offers **Undo**. Starting that ticket or branch from Start work also restores the row (`restoreStarted` in `start-work.ts`). So work that the operator just launched is never hidden.
+- The `updatedAt` of a facet is when the work last changed, not when the extension read it. The git extension takes the value from `PullRequest.updatedAt` of GitHub.
 
 ## Consequences
 
-- A dismissed row stays hidden even when its checks fail. Asks raised for it, such as a failed check, are separate items on the Desk.
-- Dismissals are stored in the renderer's `localStorage` (`terminator.home.dismissed-threads`), one set per app profile, and are forgotten 30 days after the work itself is gone.
-- "Last" on a pull request row is now the pull request's own last update.
+- A dismissed row stays hidden even when its checks fail. Asks raised for the row, such as a failed check, are separate items on the Desk.
+- The app stores dismissals in the `localStorage` of the renderer (`terminator.home.dismissed-threads`), one set per app profile. It forgets a dismissal 30 days after the work itself is gone.
+- "Last" on a pull request row is now the own last update of the pull request.
