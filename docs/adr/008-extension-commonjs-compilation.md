@@ -6,13 +6,13 @@
 
 ## Context
 
-The `ExtensionHost` loads extensions dynamically at runtime using Node.js `require()`. This requires extension entry points to be CommonJS modules (`.js` files), not TypeScript source (`.ts`) files.
+The `ExtensionHost` loads extensions dynamically at runtime using Node.js `require()`. Extension entry points must therefore be CommonJS modules (`.js` files), not TypeScript source (`.ts`) files.
 
 Two options were considered:
 
-**Option A**: Add a TypeScript compile step for extensions (`tsc` with a separate `tsconfig.extensions.json`). Extensions are authored in TypeScript and compiled to CommonJS during the build step.
+**Option A**: Add a TypeScript compile step for extensions (`tsc` with a separate `tsconfig.extensions.json`). Authors write extensions in TypeScript. The build step compiles them to CommonJS.
 
-**Option B**: Generate extensions as plain CommonJS JavaScript (`.js` files with `module.exports`). Extension authors write JavaScript directly, bypassing the TypeScript compile step for extensions.
+**Option B**: Generate extensions as plain CommonJS JavaScript (`.js` files with `module.exports`). Extension authors write JavaScript directly and skip the TypeScript compile step for extensions.
 
 ## Decision
 
@@ -22,15 +22,15 @@ Two options were considered:
 
 Rationale:
 
-- The git-integration extension is a first-party codebase extension — TypeScript provides type safety and IDE support against the `ExtensionAPI` interface.
-- The scaffolding CLI generates `.js` files (not `.ts`) so users can run generated extensions without a build step. The `manifest.json` `main` field points to `src/index.js`.
-- Vitest handles TypeScript transpilation for unit/integration tests, so tests import `.ts` files directly.
-- For production, the bundled extension's TypeScript is compiled via a separate `tsconfig.extensions.json` step (or included in the main electron-vite build).
+- The git-integration extension is a first-party codebase extension. TypeScript gives type safety and IDE support against the `ExtensionAPI` interface.
+- The scaffolding CLI generates `.js` files (not `.ts`), so users can run generated extensions without a build step. The `manifest.json` `main` field points to `src/index.js`.
+- Vitest transpiles TypeScript for unit and integration tests, so tests import `.ts` files directly.
+- For production, a separate `tsconfig.extensions.json` step compiles the bundled extension's TypeScript (or the main electron-vite build includes it).
 
 ## Consequences
 
 - `ExtensionHost` reads `manifest.json` (not `extension.json`) — updated in T085.
 - The `manifest.json` `main` field for the git-integration extension points to `src/index.js` (compiled output).
 - The scaffolding CLI generates `src/index.js` (CommonJS) using `module.exports = { activate, deactivate }`.
-- Third-party extension authors who want TypeScript must add their own compile step and ensure `main` points to the compiled `.js` output.
-- The `EXTENSION-DEVELOPMENT.md` documents this workflow clearly.
+- Third-party extension authors who want TypeScript must add their own compile step and make `main` point to the compiled `.js` output.
+- `EXTENSION-DEVELOPMENT.md` documents this workflow.

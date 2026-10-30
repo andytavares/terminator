@@ -1,24 +1,24 @@
 # @terminator/extension-sdk
 
-The Extension API every Terminator extension is written against, and the helpers they share.
-`types/api.d.ts` declares the API; the core implements it in `src/main/extensions/api.ts` and the
-compiler checks the two agree ([ADR 094](../../docs/adr/094-extensions-follow-the-vs-code-model.md)).
-The version is `6.0.0`; `CHANGELOG.md` lists each version's changes and how to migrate.
+The Extension API that every Terminator extension uses, and the helpers they share.
+`types/api.d.ts` declares the API. The core implements it in `src/main/extensions/api.ts`, and the
+compiler checks that the two agree ([ADR 094](../../docs/adr/094-extensions-follow-the-vs-code-model.md)).
+The version is `6.0.0`. `CHANGELOG.md` lists the changes in each version and how to migrate.
 
-This README is a map of the package. How to write an extension (the manifest, the backend, the
-view, the build and every API namespace) is in the
-[Extension Development Guide](../../docs/EXTENSION-DEVELOPMENT.md).
+This README is a map of the package. The
+[Extension Development Guide](../../docs/EXTENSION-DEVELOPMENT.md) explains how to write an extension: the manifest, the backend, the
+view, the build and every API namespace.
 
 ## What the package exports
 
 An extension imports only this package, `@terminator/extension-ui` and the npm packages in its
-own `package.json`. `npm run lint` rejects anything else, including core source and other
+own `package.json`. `npm run lint` rejects any other import, including core source and other
 extensions ([What an extension may import](../../docs/EXTENSION-DEVELOPMENT.md#what-an-extension-may-import)).
 
 | Entry                                      | Source                | What it holds                                                                                                                                                                                 |
 | ------------------------------------------ | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@terminator/extension-sdk`                | `src/index.ts`        | The types in `types/api.d.ts`, `types/issues.d.ts` and `types/github.d.ts`; `ChannelSpec`, `defineChannel`, `dispatchChannel`, `noPayload`, `createIpcRegistrar`, `validationError`, `plural` |
-| `@terminator/extension-sdk/renderer`       | `src/renderer.tsx`    | `invoke<T>(channel, payload = {})`, `mountExtension(<App />)` and `openInBrowser(url)`, for an extension's view                                                                               |
+| `@terminator/extension-sdk/renderer`       | `src/renderer.tsx`    | `invoke<T>(channel, payload = {})`, `mountExtension(<App />)` and `openInBrowser(url)`, for the view of an extension                                                                          |
 | `@terminator/extension-sdk/node`           | `src/node.ts`         | `writeJsonAtomic(path, value)`, `shellQuote(value)`                                                                                                                                           |
 | `@terminator/extension-sdk/types/renderer` | `types/renderer.d.ts` | `ElectronAPI`, the `window.electronAPI` an extension view receives (`tsconfig.extension.json` loads it)                                                                                       |
 
@@ -31,21 +31,21 @@ The declaration files:
 | `types/issues.d.ts`   | The issue-tracker types behind `api.issues`, such as `TrackerId`, `Issue` and `IssueSummary`                                                        |
 | `types/renderer.d.ts` | `ElectronAPI`, the view's `window.electronAPI`                                                                                                      |
 
-Source-only TypeScript, with `react`, `react-dom` and `zod` as peer dependencies. It is a
-workspace package: an extension under `extensions/` declares it in its own `package.json` at the
+The package is source-only TypeScript, with `react`, `react-dom` and `zod` as peer dependencies. It is a
+workspace package. An extension under `extensions/` declares it in its own `package.json` at the
 version in this package's `package.json` ([Dependencies](../../docs/EXTENSION-DEVELOPMENT.md#dependencies)).
 
 ## Where a backend runs
 
-Since 4.0.0 every extension backend runs in the extension host, one Electron `utilityProcess`
+Since 4.0.0, every extension backend runs in the extension host: one Electron `utilityProcess`
 that `src/main/extensions/host/host-process.ts` starts and `src/main/extensions/host/entry.ts`
-runs. The API crosses a `MessagePort`: a value the core holds is a promise or a snapshot the core
-pushes, a callback is called by id, and `electron` cannot be imported (use `api.paths`,
+runs. The API crosses a `MessagePort`. A value the core holds is a promise or a snapshot that the core
+pushes. The host calls a callback by id. `electron` cannot be imported (use `api.paths`,
 `api.dialog` and `api.window`). See
 [Where your backend runs](../../docs/EXTENSION-DEVELOPMENT.md#where-your-backend-runs).
 
-The manifest's `main` is the backend: a CommonJS file exporting `activate(api)` and optionally
-`deactivate()`. An extension offers nothing to another extension: what `activate` returns is not read.
+The manifest's `main` is the backend: a CommonJS file that exports `activate(api)` and, optionally,
+`deactivate()`. An extension offers nothing to another extension: the host does not read what `activate` returns.
 
 ## A minimal extension
 
@@ -88,11 +88,11 @@ my-extension/
 ```
 
 The `contributes` keys are `globalTab`, `workspaceTab`, `projectTab`, `sidebarPanel`,
-`insightsSection`, `windowViews`, `commands`, `quickActions` and `shellRoots`; the guide's
-[`contributes`](../../docs/EXTENSION-DEVELOPMENT.md#contributes) table gives each one's fields.
+`insightsSection`, `windowViews`, `commands`, `quickActions` and `shellRoots`. The guide's
+[`contributes`](../../docs/EXTENSION-DEVELOPMENT.md#contributes) table gives the fields of each key.
 
-The backend, `src/index.ts`. Every channel is a `ChannelSpec` whose payload is parsed with its
-zod `schema` before `run` sees it ([ADR 096](../../docs/adr/096-every-ipc-channel-has-a-schema.md)):
+The backend, `src/index.ts`. Every channel is a `ChannelSpec`. The host parses its payload with its
+zod `schema` before `run` sees the payload ([ADR 096](../../docs/adr/096-every-ipc-channel-has-a-schema.md)):
 
 ```typescript
 import { z } from 'zod'
@@ -113,7 +113,7 @@ export function activate(api: ExtensionAPI): void {
 export function deactivate(): void {}
 ```
 
-The view, `src/renderer/App.tsx`, calls the channel and listens for what the backend broadcasts
+The view, `src/renderer/App.tsx`, calls the channel and listens for the messages that the backend sends
 with `api.window.broadcast`
 ([Talking to your backend](../../docs/EXTENSION-DEVELOPMENT.md#talking-to-your-backend)):
 
@@ -127,20 +127,20 @@ const off = window.electronAPI.extensionBridge.on('my-tool:update', (data) => co
 ## Building
 
 `npm run build:extensions` (`scripts/build-extensions.cjs`) builds every directory under
-`extensions/`: esbuild bundles `src/index.ts` into the file `manifest.main` names, and when the
-extension has a `vite.renderer.config.ts` it runs that extension's `npm run build:renderer`
+`extensions/`. esbuild bundles `src/index.ts` into the file that `manifest.main` names. When the
+extension has a `vite.renderer.config.ts`, the script runs that extension's `npm run build:renderer`
 (`vite build --config vite.renderer.config.ts`) into `dist/`. `npm run dev` and `npm run build`
-run it first. The guide's [Setting up a view](../../docs/EXTENSION-DEVELOPMENT.md#setting-up-a-view)
+run the script first. The guide's [Setting up a view](../../docs/EXTENSION-DEVELOPMENT.md#setting-up-a-view)
 has the `index.html` and `vite.renderer.config.ts` to start from.
 
-An extension outside `extensions/` is built by its own scripts, then installed from Settings →
-Extensions → **Install from Directory**; **Reload** there runs its backend again from disk and
+Build an extension outside `extensions/` with its own scripts. Then install it from Settings →
+Extensions → **Install from Directory**. **Reload** there runs its backend again from disk and
 remounts its views without rebuilding the app
 ([Installing, reloading and disabling](../../docs/EXTENSION-DEVELOPMENT.md#installing-reloading-and-disabling)).
 
 ## The design system
 
-A view's UI comes from `@terminator/extension-ui` (`packages/extension-ui`): its components,
-the `--tm-*` tokens the host injects into the view, and its fonts. See
+The UI of a view comes from `@terminator/extension-ui` (`packages/extension-ui`): its components,
+the `--tm-*` tokens that the host injects into the view, and its fonts. See
 [The design system](../../docs/EXTENSION-DEVELOPMENT.md#the-design-system--terminatorextension-ui)
 and `docs/EXTENSION-STYLE.md`.

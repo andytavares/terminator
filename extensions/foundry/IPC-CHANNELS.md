@@ -4,7 +4,7 @@
 > specified, and is not edited. The code no longer has `foundry:review-hunks`, `foundry:review-decide-hunk`, `foundry:review-apply`, `foundry:review-intent`, `foundry:supervision-snapshot`, `foundry:feed-digest`, `foundry:auto-hand-off` and `foundry:auto-hand-off-set`. Do not build against it. The
 > current contract lives in:
 >
-> - `extensions/foundry/src/ipc/`: each channel is a `ChannelSpec` whose zod schema is its payload contract ([ADR 096](../../../docs/adr/096-every-ipc-channel-has-a-schema.md))
+> - `extensions/foundry/src/ipc/`: each channel is a `ChannelSpec` whose zod schema is its payload contract ([ADR 096](../../docs/adr/096-every-ipc-channel-has-a-schema.md))
 
 **Feature**: `037-foundry-software-factory` | **Date**: 2026-09-06
 
@@ -16,7 +16,7 @@ Every channel is registered with the zod schema of the payload below (ADR 096), 
 
 The count is worth stating plainly: an earlier draft of this contract said ten, which was the design's ambition rather than what shipped. Supervising a live agent — its permissions, its transcript, its stalls — is where the others went.
 
-Entity shapes referenced below are defined in [data-model.md](../data-model.md) and are not repeated here.
+Entity shapes referenced below are defined in [data-model.md](https://github.com/andytavares/terminator/blob/8e1f355937df5328fc4e8fc52f5d1e794e949a6b/specs/037-foundry-software-factory/data-model.md) and are not repeated here.
 
 ---
 

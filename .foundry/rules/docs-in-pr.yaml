@@ -6,5 +6,5 @@ asserts: >
   Documentation ships in the same change as the code it describes — readme,
   architecture notes, decision records, changelog. A feature is not complete
   until what is written about it is true.
-appliesWhen: 'house_doc: .specify/memory/constitution.md'
+appliesWhen: 'path_exists: docs/CONSTITUTION.md'
 origin: repository

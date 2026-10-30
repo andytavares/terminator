@@ -17,21 +17,21 @@ We spawn **Claude Code CLI** (`claude`) as a child process via Node.js `child_pr
 
 ## Rationale
 
-- **Tool use is handled for us.** Claude Code already knows how to read/write files, run shell commands, and iterate. Reimplementing this over the raw API would require a full tool-execution loop.
-- **Slash skills work out of the box.** Self-review uses `/google-review`, which is a Claude Code skill — impossible to replicate via raw API.
-- **Output is line-oriented.** Stdout lines map 1-to-1 to `speckit:run-output` push events, making progress streaming trivial.
-- **Isolation.** Each phase runs in its own subprocess and its own git worktree, so a hanging phase can be killed without affecting the app process.
+- **Claude Code handles tool use.** It already knows how to read and write files, run shell commands, and iterate. To reimplement this over the raw API, we would need a full tool-execution loop.
+- **Slash skills work out of the box.** Self-review uses `/google-review`, which is a Claude Code skill. The raw API cannot replicate it.
+- **Output is line-oriented.** Stdout lines map 1-to-1 to `speckit:run-output` push events, so progress streaming is trivial.
+- **Isolation.** Each phase runs in its own subprocess and its own git worktree. We can kill a hanging phase without affecting the app process.
 
 ## Consequences
 
 - **Requires Claude Code installed.** The user must have `claude` on their PATH. We validate this at dispatch time.
-- **Headless runs bypass permission prompts.** Each phase is spawned as a non-interactive `claude --print` pipe with no channel to answer approval prompts, so it runs with `--permission-mode bypassPermissions`. Without this every Write/Edit/Bash tool call stalls forever waiting on approval that can never arrive. This is safe because each phase runs in the card's own isolated git worktree (see ADR-011), the exact "isolated environment" this mode is intended for. Batch check-ins (implement phase) remain the human gate — the user reviews diffs at batch boundaries rather than approving individual tool calls.
+- **Headless runs bypass permission prompts.** Each phase is spawned as a non-interactive `claude --print` pipe. It has no channel to answer approval prompts, so it runs with `--permission-mode bypassPermissions`. Without this, every Write/Edit/Bash tool call stalls forever waiting for an approval that can never arrive. This is safe because each phase runs in the card's own isolated git worktree (see ADR-011), the exact "isolated environment" this mode is intended for. Batch check-ins (implement phase) remain the human gate: the user reviews diffs at batch boundaries and does not approve individual tool calls.
 - **Self-review command:** `npm run format && npm run lint && npx vitest run --coverage && claude --print --permission-mode bypassPermissions /google-review`
-  - _Superseded._ The review no longer bypasses permissions — it runs under a
-    read-only command policy (see [ADR-026](026-supervised-runs-in-a-terminal.md)) — and the
-    four checks run as separate steps rather than an `&&` chain, so each records
-    its own result. `format` was replaced by the repository's `format:check`:
-    the former is `prettier --write`, and a review that reformats the code under
+  - _Superseded._ The review no longer bypasses permissions. It runs under a
+    read-only command policy (see [ADR-026](026-supervised-runs-in-a-terminal.md)). The
+    four checks run as separate steps and not as an `&&` chain, so each records
+    its own result. The repository's `format:check` replaced `format`:
+    `format` is `prettier --write`, and a review that reformats the code under
     review is not a review. See `src/runner/self-review-plan.ts`.
 
 ## Alternatives Considered

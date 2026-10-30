@@ -1,9 +1,9 @@
 # Handoff: the overhaul branch (claude/brave-newton-5ssiux, draft PR #259)
 
-Written 2026-10-13 so the work can move to another machine with `claude --teleport`
-(https://code.claude.com/docs/en/claude-code-on-the-web). Teleport carries the conversation and the
-pushed branch only. Worker branches that were never merged and background workers do not move, so
-everything worth keeping is merged into the branch before this file was committed.
+Written 2026-10-13 to move the work to another machine with `claude --teleport`
+(https://code.claude.com/docs/en/claude-code-on-the-web). Teleport carries only the conversation and
+the pushed branch. Unmerged worker branches and background workers do not move. Before the commit of
+this file, the author merged everything worth keeping into the branch.
 
 ## What is done
 
@@ -34,13 +34,16 @@ The phases in `docs/research/perf/` and the ADRs 093–105 record each decision.
 
 1. Done: function size limits for Foundry, the core and every other file; the ESLint rule is on
    for all of them (decision 33).
-2. Done: the clean gate. `docs/research/clean-gate.md` has the numbers and the commands. Comment
-   runs went from 986 to 6 and no `as unknown as`, explicit `any` or coverage-ignore comment is
-   left. Repeated names went from 2,807 to the count in that report: real duplicates were merged
-   or renamed, and `.clean-gate.json` lists the names an interface, a mock, an event handler or a
-   call site gives, which the owner asked the gate to skip. The helpers the extensions each kept
-   a copy of are in the SDK (`createIpcRegistrar`, `validationError`, `plural`, `openInBrowser`,
-   `shellQuote`), and `defineChannel` has no cast.
+2. Done: the clean gate. `docs/research/clean-gate.md` has the numbers and the commands.
+
+   - Comment runs went from 986 to 6.
+   - No `as unknown as`, explicit `any` or coverage-ignore comment remains.
+   - Repeated names went from 2,807 to the count in that report. The work merged or renamed real
+     duplicates.
+   - `.clean-gate.json` lists the names that an interface, a mock, an event handler or a call site
+     gives. The owner asked the gate to skip those names.
+   - Each extension kept a copy of some helpers. They are now in the SDK (`createIpcRegistrar`,
+     `validationError`, `plural`, `openInBrowser`, `shellQuote`), and `defineChannel` has no cast.
 
 3. Done: the settings nothing read are implemented or removed (decisions 15–18).
 4. Done: list settings are edited one item per line (decision 19).
@@ -59,23 +62,23 @@ The phases in `docs/research/perf/` and the ADRs 093–105 record each decision.
 
 ## Decisions made without the user
 
-Each entry: what was decided, why, and how to undo it.
+Each entry gives the decision, the reason and the way to undo it.
 
 1. Story baselines are written by CI on the `update-story-baselines` label: the artifact host was
-   blocked here, and baselines must come from the platform that compares them
+   blocked here, and the baselines must come from the platform that compares them
    (https://playwright.dev/docs/test-snapshots). Undo: delete the workflow and the PNGs.
 2. Broken links inside docs/adr and docs/research (34) stay: ADRs are immutable (Principle IX) and
    research notes are dated records.
-3. Constitution Principle X named `scripts/build-extensions.js`; the file is `.cjs`. Fixed as a PATCH
-   amendment (2.0.0 → 2.0.1).
+3. Constitution Principle X named `scripts/build-extensions.js`; the file is `.cjs`. A PATCH
+   amendment (2.0.0 → 2.0.1) fixed it.
 4. Foundry: closing an agent's tab archives the run as "stopped", not "ended". node-pty reports a
    signal kill as exit 0; the core now reports null.
 5. Foundry verification keeps a status file next to its log (dash has no pipefail).
 6. Verification commands keep the user's full shell environment (rc files).
-7. Foundry checks run as `$SHELL -i -l -c "exec $SHELL <script>"`. A zsh check whose tab closes
-   mid-run reads as failed; under bash it reads "not measured". Neither reads as a pass.
-8. The lazy-load memory fix (fastify, electron-store) was reverted, then relanded once the real
-   cause of the Remote Control failures (fixed ports) was fixed with port 0.
+7. Foundry checks run as `$SHELL -i -l -c "exec $SHELL <script>"`. If its tab closes mid-run, a
+   zsh check reads as failed and a bash check reads "not measured". Neither reads as a pass.
+8. The lazy-load memory fix (fastify, electron-store) was reverted. It landed again after port 0
+   fixed the real cause of the Remote Control failures (fixed ports).
 9. Packaging config moved to `electron-builder.cjs` so the bundled extensions ship; `npmRebuild` is
    off because node-pty loads N-API prebuilds. macOS signing runs only in the release workflow.
 10. Network services are stubbed locally in e2e, never called live.
@@ -86,62 +89,62 @@ Each entry: what was decided, why, and how to undo it.
     "Commit without hooks" for plain git hook failures, atomic merge-flow writes.
 14. No worker may install system packages or run `npm install` in a shared container.
 15. Git Integration's **Add sign-off to commits** and **Max displayed changed files** are
-    implemented, not removed: the README promised both. `git:commit` and `git:status` read them on
-    every call (`src/git-settings.ts`); sign-off is
-    [`git commit --signoff`](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---signoff),
-    and the file limit is clamped to its declared 10–5000. The `signOff` (commit) and `maxFiles`
-    (status) payload fields went: the view always sent `signOff: false` and never sent `maxFiles`,
-    so a payload could override the setting with a value nobody chose. Undo: revert the commit and
-    give the payload fields back.
-16. Notepad's **Enable MCP sidecar** setting is removed. Nothing implements a Notepad MCP
-    sidecar: spec 010 deferred it to a polish phase that never came, and ADR-020 removed the only
-    MCP sidecar the app had (Task Vault's), superseded by the Remote Control bridge. There is no
-    settings migration: a stored value is inert, since nothing reads it and the settings page lists
-    only declared keys, and the extension-settings store has no delete. Undo: put the declaration
-    back in `extensions/notepad/src/index.ts`.
-17. Notepad's **Autosave debounce** and **Editor font size** are implemented. The delay applies
-    to notes in the panel and in pop-out windows; diagrams keep their own 1.2 s, since a scene is
-    written whole and the setting speaks of notes. Each is clamped (100–10000 ms, 8–32 px) and an
-    emptied field falls back to its default (`src/notepad-settings.ts`). A view re-reads them on
-    the new `extension.onSettingsChanged` (the core broadcasts `extension:settings-changed`): an
-    extension view gets no focus or visibility event when Settings closes, measured under xvfb.
-    Undo: revert the notepad commit; the SDK event can stay, it has no other cost.
-18. Task Vault's `staleThresholdDays` now sets when a task is stale, and is labelled **Stale
-    Task Threshold (days)**. It was declared as "days without modification before a project is
-    considered stale", which the product does not do: a project is stale when it has no open next
-    action (GTD), and that stays. What did use a days threshold was task staleness on Today and the
-    review's Stale step, read from a `stale_days_threshold` row only the remote channel could set.
-    The setting is now that threshold, default 7 (what users had, not the declared 14), 1–365.
-    Activation moves an existing row into the setting and deletes it; `set-stale-threshold` writes
-    the setting. Undo: revert the commit; a moved value then lives only in the setting, so put it
-    back with `task-vault:settings:set-stale-threshold` from the previous build.
-19. Settings has a `list` setting type, stored as a `string[]` and edited one item per line in
-    the design system's new `ListInput` (trimmed, blank lines dropped). Foundry's
-    `readOnlyTools` and `criticalPaths` use it. They were text settings read one item per line,
-    so Foundry's activation turns a stored text value into its list once
-    (`migrateLineListSettings`, `src/state/settings.ts`). A list type, rather than a multi-line
-    flag on `string`, because the value is a list everywhere it is read. Its story needs a Linux
-    baseline from the `update-story-baselines` label (decision 1). Undo: revert both commits;
-    a migrated value is then a `string[]` the old readers do not split, so set the two lists
-    again.
-20. Workspace settings: a workspace's own **Default Shell** is applied, and **Use global
-    default** works. The schema and the user guide offered a per-workspace shell, but Settings had
-    no field for it and terminals always opened the global shell; main now resolves a project's
-    shell through its workspace (`src/main/terminal/default-shell.ts`), for the app's terminals and
-    for `api.pty.openTerminal`. "Use global default" sent `{ key: undefined }`, which the store's
-    merge skipped, so no override could be handed back; a workspace patch now removes a key it sets
+    implemented, not removed, because the README promised both. `git:commit` and `git:status` read
+    them on every call (`src/git-settings.ts`). Sign-off is
+    [`git commit --signoff`](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---signoff).
+    The file limit is clamped to its declared 10–5000. The `signOff` (commit) and `maxFiles`
+    (status) payload fields are gone. The view always sent `signOff: false` and never sent
+    `maxFiles`, so a payload could override the setting with a value nobody chose. Undo: revert the
+    commit and give the payload fields back.
+16. Notepad's **Enable MCP sidecar** setting is removed. Nothing implements a Notepad MCP sidecar.
+    Spec 010 deferred it to a polish phase that never came. ADR-020 removed the only MCP sidecar
+    the app had (Task Vault's), and the Remote Control bridge replaced it. There is no settings
+    migration. A stored value is inert: nothing reads it, the settings page lists only declared
+    keys, and the extension-settings store has no delete. Undo: put the declaration back in
+    `extensions/notepad/src/index.ts`.
+17. Notepad's **Autosave debounce** and **Editor font size** are implemented. The delay applies to
+    notes in the panel and in pop-out windows. Diagrams keep their own 1.2 s, because a scene is
+    written whole and the setting speaks of notes. Each setting is clamped (100–10000 ms, 8–32 px).
+    An emptied field falls back to its default (`src/notepad-settings.ts`). A view re-reads the
+    settings on the new `extension.onSettingsChanged` (the core broadcasts
+    `extension:settings-changed`). An extension view gets no focus or visibility event when
+    Settings closes, as measured under xvfb. Undo: revert the notepad commit. The SDK event can
+    stay, because it has no other cost.
+18. Task Vault's `staleThresholdDays` now sets when a task is stale. Its label is **Stale Task
+    Threshold (days)**. It was declared as "days without modification before a project is
+    considered stale", which the product does not do. A project is stale when it has no open next
+    action (GTD), and that stays. Task staleness on Today and in the review's Stale step did use a
+    days threshold. That threshold came from a `stale_days_threshold` row that only the remote
+    channel could set. The setting is now that threshold. The default is 7 (what users had, not
+    the declared 14), and the range is 1–365. Activation moves an existing row into the setting and
+    deletes it. `set-stale-threshold` writes the setting. Undo: revert the commit. A moved value
+    then lives only in the setting, so put it back with
+    `task-vault:settings:set-stale-threshold` from the previous build.
+19. Settings has a `list` setting type. It is stored as a `string[]` and edited one item per line
+    in the design system's new `ListInput` (trimmed, blank lines dropped). Foundry's
+    `readOnlyTools` and `criticalPaths` use it. They were text settings read one item per line, so
+    Foundry's activation turns a stored text value into its list once (`migrateLineListSettings`,
+    `src/state/settings.ts`). The type is a list, not a multi-line flag on `string`, because the
+    value is a list everywhere it is read. Its story needs a Linux baseline from the
+    `update-story-baselines` label (decision 1). Undo: revert both commits. A migrated value is
+    then a `string[]` that the old readers do not split, so set the two lists again.
+20. Workspace settings: a workspace's own **Default Shell** is applied, and **Use global default**
+    works. The schema and the user guide offered a per-workspace shell. Settings had no field for
+    it, and terminals always opened the global shell. Main now resolves a project's shell through
+    its workspace (`src/main/terminal/default-shell.ts`), for the app's terminals and for
+    `api.pty.openTerminal`. "Use global default" sent `{ key: undefined }`, which the store's merge
+    skipped, so no override could be handed back. A workspace patch now removes a key that it sets
     to undefined (`mergeOverrides`), and each reset names only its own setting. Undo: revert the
-    commit; the field goes and overrides become sticky again.
-21. `workspaceScoped` extension settings are built rather than dropped. The SDK docs and the git
-    README promise a per-workspace override, the user asked for every documented feature to work,
-    and both settings schemas already hold an unused `extensions` record for these values. The
-    change to `api.settings.get` is additive (an optional workspace), so no extension breaks. Undo:
-    remove `workspaceScoped` and the `extensions` records, and the docs' per-workspace wording.
-    The global settings' `extensions` record stayed unused (global values live in the
-    extension-settings store) and is removed. A stored file that still has it loads, since
-    reads merge over the defaults, and the next global write drops it: the zod object strips
-    keys it does not declare (`tests/unit/storage/settings-store.spec.ts`). Undo: revert that
-    commit.
+    commit. The field goes and overrides become sticky again.
+21. `workspaceScoped` extension settings are built, not dropped. The SDK docs and the git README
+    promise a per-workspace override. The user asked for every documented feature to work. Both
+    settings schemas already hold an unused `extensions` record for these values. The change to
+    `api.settings.get` is additive (an optional workspace), so no extension breaks. Undo: remove
+    `workspaceScoped` and the `extensions` records, and the docs' per-workspace wording. The global
+    settings' `extensions` record stayed unused (global values live in the extension-settings
+    store), and it is removed. A stored file that still has it loads, because reads merge over the
+    defaults. The next global write drops it, because the zod object strips keys it does not
+    declare (`tests/unit/storage/settings-store.spec.ts`). Undo: revert that commit.
 22. TypeScript is pinned at 6.0.3, not 7.0: 7.0 is the Go port and ships no compiler API, which
     typescript-eslint needs (ADR 106). Undo: when typescript-eslint supports 7, follow ADR 106.
 23. A split pane belongs to the tab it was made in, not to the branch: a new tab beside a split
@@ -168,10 +171,10 @@ Each entry: what was decided, why, and how to undo it.
     git-integration chunk was 1,208 kB against 1,200 kB after the size-limits split, fixed with a
     lazy boundary. Run `npm run build` before every push, not only typecheck, lint and vitest.
 30. Commits are made with `git commit --no-verify` in this container, after the full checks pass
-    under `setpriv`. The pre-commit hook runs `vitest related` as root without `setpriv`, so the
-    chmod specs cannot make a write fail and fail every commit that touches Foundry's IPC
+    under `setpriv`. The pre-commit hook runs `vitest related` as root without `setpriv`. The chmod
+    specs then cannot make a write fail, and every commit that touches Foundry's IPC fails
     (`run-channels.spec.ts`: "refuses to start when the records location cannot be written to").
-    On a machine where you are not root the hook runs as is.
+    On a machine where you are not root, the hook runs as is.
 31. The extensions' specs are typechecked (`746b6d2`): 538 type errors across 5 extensions were
     fixed without casts or ignores.
 32. Specs fake with `partialFake`, never `as unknown as` (`2a8d850`, `4fa8a48`). Removing the
@@ -188,101 +191,104 @@ Each entry: what was decided, why, and how to undo it.
 - A monthly task due on the 31st repeats on the last day of a shorter month (Jan 31, then Feb 28),
   and on the 31st again after it (Mar 31): the day comes from the series' first due date. It used
   to skip that month.
-- The notification drawer is not a modal: the app stays usable beside it.
+- The notification drawer is not a modal. The app stays usable beside it.
 - `@terminator/extension-sdk` is 5.0.0, for the change in who owns a view's file watch.
 - The clean gate skips the names in `.clean-gate.json`.
 - Modals use the native `<dialog>` element and are always centred, horizontally and vertically.
 
 ## Known advisories
 
-Checked 2026-10-13 at 311df92. `npm audit` reports 10 (2 low, 8 moderate), exit 1;
-`npm audit --audit-level=high` (the CI gate) exits 0. The two dependency advisories (1, 2) stay because no
-released upgrade removes them. `overrides` were not used: they would force versions the parents
-do not declare.
+Checked 2026-10-13 at 311df92. `npm audit` reports 10 (2 low, 8 moderate) and exits 1.
+`npm audit --audit-level=high` (the CI gate) exits 0. The two dependency advisories (1, 2) stay,
+because no released upgrade removes them. The work did not use `overrides`, because they would
+force versions that the parents do not declare.
 
 1. **katex 0.16.47, low** ([GHSA-238p-pmpm-9mq7](https://github.com/advisories/GHSA-238p-pmpm-9mq7)).
    Path: `extensions/notepad` → `mermaid@11.16.1` → `katex@^0.16.45`. Affected `>=0.11.0 <0.18.2`;
-   the only fix is 0.18.2. KaTeX does not pollute prototypes itself: it reads an already polluted
+   the only fix is 0.18.2. KaTeX does not pollute prototypes itself. It reads an already polluted
    `Object.prototype` (for example an inherited `trust`) as settings. Notepad renders only the
-   user's own notes, so exploiting it needs a separate prototype-pollution bug in the renderer first.
-   - mermaid 12.1.0 does not fix it: every release from 11.17.0 to 12.1.0 declares `katex: ^0.16.47`
-     (`npm view "mermaid@>=11.16.1" dependencies.katex`), and a caret on 0.x stays within 0.16
+   user's own notes. To exploit the flaw, an attacker first needs a separate prototype-pollution
+   bug in the renderer.
+   - mermaid 12.1.0 does not fix it. Every release from 11.17.0 to 12.1.0 declares
+     `katex: ^0.16.47` (`npm view "mermaid@>=11.16.1" dependencies.katex`), and a caret on 0.x
+     stays within 0.16
      ([node-semver caret ranges](https://github.com/npm/node-semver#caret-ranges-123-025-004)).
      12.0.0 also makes ELK the default layout and changes themes
      ([12.0.0 notes](https://github.com/mermaid-js/mermaid/releases/tag/mermaid%4012.0.0),
-     [12.1.0 notes](https://github.com/mermaid-js/mermaid/releases/tag/mermaid%4012.1.0)),
-     so upgrading now changes every diagram and clears nothing.
+     [12.1.0 notes](https://github.com/mermaid-js/mermaid/releases/tag/mermaid%4012.1.0)).
+     An upgrade now changes every diagram and clears nothing.
    - The fix is merged upstream but unreleased: [#8411](https://github.com/mermaid-js/mermaid/pull/8411)
-     (katex `^0.18.0`, merged to `develop` 2026-10-09), included in the open release PR
+     (katex `^0.18.0`, merged to `develop` 2026-10-09). It is in the open release PR
      [#8428](https://github.com/mermaid-js/mermaid/pull/8428) (12.2.0). Upgrade notepad's mermaid
-     when 12.2.0 is published, keeping `layout: 'dagre', theme: 'default', look: 'classic'` if the
-     old look is wanted, and rerun `tests/e2e/notepad-diagrams.spec.ts`.
+     when 12.2.0 is published. Keep `layout: 'dagre', theme: 'default', look: 'classic'` if the old
+     look is wanted. Rerun `tests/e2e/notepad-diagrams.spec.ts`.
 2. **sprintf-js 1.1.3, moderate** ([GHSA-hp3w-g68c-fv3c](https://github.com/advisories/GHSA-hp3w-g68c-fv3c)).
    Path: `electron-builder@26.15.3` → `app-builder-lib@26.15.3` → `@electron/get@3.1.0` →
-   (optional) `global-agent@3.0.0` → `roarr@2.15.4` → `sprintf-js@1.1.3`. Affected `<=1.1.3`, no
-   patched version. A format string with an out-of-range precision throws a `RangeError`.
+   (optional) `global-agent@3.0.0` → `roarr@2.15.4` → `sprintf-js@1.1.3`. Affected `<=1.1.3`; no
+   patched version exists. A format string with an out-of-range precision throws a `RangeError`.
 
-   - Not reachable: build-time packaging only, never shipped in the app. `@electron/get` loads
-     `global-agent` only when `ELECTRON_GET_USE_PROXY` is set (`dist/cjs/index.js`, `proxy.js`),
-     and every `global-agent` log call passes a literal message with no precision specifier
+   - Not reachable: the path is build-time packaging only and never ships in the app.
+     `@electron/get` loads `global-agent` only when `ELECTRON_GET_USE_PROXY` is set
+     (`dist/cjs/index.js`, `proxy.js`). Every `global-agent` log call passes a literal message
+     with no precision specifier
      (`grep -rhE "^\s*\}, '|log\.\w+\('" node_modules/global-agent/dist`).
-   - No stable upgrade: `@electron/get` 5.x drops `global-agent`, and `global-agent` 4.x drops
-     `roarr`, but `app-builder-lib` 26.15.3 (`latest`) and 26.17.0 (`v26` tag) both declare
+   - No stable upgrade exists. `@electron/get` 5.x drops `global-agent`, and `global-agent` 4.x
+     drops `roarr`. But `app-builder-lib` 26.15.3 (`latest`) and 26.17.0 (`v26` tag) both declare
      `@electron/get: ^3.0.0` (`npm view app-builder-lib@26.17.0 dependencies.@electron/get`). Only
-     the prerelease `27.0.0-alpha.10` (`next`) moves to `^5.0.0`. Move to electron-builder 27 once it
-     is released as stable ([releases](https://github.com/electron-userland/electron-builder/releases)).
+     the prerelease `27.0.0-alpha.10` (`next`) moves to `^5.0.0`. Move to electron-builder 27 when
+     it is released as stable ([releases](https://github.com/electron-userland/electron-builder/releases)).
 
-3. Resolved: Codecov reported one uncovered patch line in `forge-channels.ts`; from `d8d48f1` it
+3. Resolved: Codecov reported one uncovered patch line in `forge-channels.ts`. From `d8d48f1` it
    reports every changed line covered.
 4. **Three Foundry jsdom specs time out only at about 10x CPU oversubscription** (load 40 on 4
-   cores): jsdom's `getComputedStyle` for `ByRole` queries is the cost. CI's 4 unit shards stay
-   green. happy-dom was tried for Foundry and rejected: 6 specs went red and the change is global.
-   The notepad and git-integration DOM specs do run in happy-dom (`7318fe9`).
+   cores). The cost is jsdom's `getComputedStyle` for `ByRole` queries. CI's 4 unit shards stay
+   green. happy-dom was tried for Foundry and rejected: 6 specs went red, and the change is
+   global. The notepad and git-integration DOM specs do run in happy-dom (`7318fe9`).
 5. **The live Linear spec was fixed but not run.** `extensions/foundry/tests/live/linear-transition-live.spec.ts`
-   read a field the provider no longer returns (`issue.status`); it is fixed, but it needs a Linear
-   API key and an issue it may move, which this container does not have. Run it with
-   `LINEAR_API_KEY=lin_api_… LINEAR_TEST_ISSUE=TEAM-123 npm run test:live` on a scratch issue.
+   read a field that the provider no longer returns (`issue.status`). It is fixed. It needs a
+   Linear API key and an issue it may move, which this container does not have. Run it on a
+   scratch issue with `LINEAR_API_KEY=lin_api_… LINEAR_TEST_ISSUE=TEAM-123 npm run test:live`.
 6. **The extension-ui Playwright visual suite passes on CI and fails locally.** CI's Stories job
-   compares every story with the Linux baselines in `packages/extension-ui/visual/__screenshots__/linux`
-   and passed at `da1fe0b` (run 38425911132). In this container,
+   compares every story with the Linux baselines in `packages/extension-ui/visual/__screenshots__/linux`.
+   It passed at `da1fe0b` (run 38425911132). In this container,
    `npm run build-storybook && PLAYWRIGHT_BROWSERS_PATH=… CI=1 npm run test:visual` exits 1: 106 of
-   118 stories differ by about 1% of their pixels (55 to 1,996 pixels). The baselines were written by
-   CI's ubuntu runner, and Playwright's screenshots depend on the platform and browser build
-   ([Playwright docs](https://playwright.dev/docs/test-snapshots)). Compare on CI only; refresh
+   118 stories differ by about 1% of their pixels (55 to 1,996 pixels). CI's ubuntu runner wrote
+   the baselines, and Playwright's screenshots depend on the platform and browser build
+   ([Playwright docs](https://playwright.dev/docs/test-snapshots)). Compare on CI only. Refresh
    baselines with the `update-story-baselines` label (decision 1).
 
 7. Resolved: two file-watching specs failed now and then on macOS, where `fs.watch` is armed a
    moment after it returns ([fs.watch caveats](https://nodejs.org/api/fs.html#caveats)). The agent
-   session watcher now proves its watch is armed with a probe file and reads its directory once
-   more then (`src/main/agents/agent-session-watcher.ts`); the `fs:watch-start` test changes its
+   session watcher now proves its watch is armed with a probe file. It then reads its directory
+   once more (`src/main/agents/agent-session-watcher.ts`). The `fs:watch-start` test changes its
    file on every look. The loaded batch that failed 2 runs in 4 passed 6 in 6.
 8. Resolved: `fs.watchStart` had no caller, so `fs:changed` never fired and the Git tab polled
    git status every 3 s. The Git tab now starts a watch for its repository and reads status when
    a change is reported ([ADR 109](../adr/109-a-file-watch-belongs-to-the-view-that-asked.md)).
-   A watch belongs to the view that asked for it; the remote browser client has none and still
-   polls. Git processes started in one idle minute with the Git tab open went from 54 to 14
-   (the Git tab's own, 40 to 0); the method is in the ADR. Three things are left as they were:
+   A watch belongs to the view that asked for it. The remote browser client has no watch and
+   still polls. Git processes started in one idle minute with the Git tab open went from 54 to 14
+   (the Git tab's own, 40 to 0). The ADR gives the method. Three things are left as they were:
 
    - The 14 are the core sidebar's polls: `useBranchSync` (`git branch --show-current` every
-     5 s per card) and the change count. The view API watches trees and the branch is one file,
-     so a watch per card would cost more than the poll.
+     5 s per card) and the change count. The view API watches trees, and the branch is one file.
+     A watch per card would cost more than the poll.
    - The SDK changelog records the watch's new behaviour under 4.1.0 "Changed". It is a break
-     for a view that relied on another view's watch, or used the watch from the remote client;
-     no extension here did. Whether that makes the release 5.0.0 is the user's call.
+     for a view that relied on another view's watch, or used the watch from the remote client.
+     No extension here did. Whether that makes the release 5.0.0 is the user's call.
    - `tests/e2e/git-commit-flow.spec.ts` fails about one run in two on a machine whose global
      git config sends trace2 to a daemon (`rmSync` of the spec's own clone, `ENOTEMPTY`). It
-     passes with `GIT_TRACE2_EVENT=0`, which `tests/setup.ts` sets for vitest and nothing sets
-     for Playwright.
+     passes with `GIT_TRACE2_EVENT=0`. `tests/setup.ts` sets that for vitest, and nothing sets
+     it for Playwright.
 
 9. **`remote-control.spec.ts` fails on a machine already running ngrok.** The extension reads
-   the tunnel from `127.0.0.1:4040`, which a real `ngrok` holds, so the spec's stand-in never
+   the tunnel from `127.0.0.1:4040`, which a real `ngrok` holds. The spec's stand-in then never
    shows the public address. CI is not affected.
 10. **The native dialog was not run on a real iPhone.** WebKit was checked with Playwright's
     WebKit build on macOS (`packages/extension-ui/visual/modal-keys.visual.ts`).
-11. **An e2e teardown reported "The app left 1 process running" twice in eleven batch runs**, on
-    a machine that was also running three other test suites, right after the file watch landed.
-    Ten runs alone did not repeat it and the process was not identified. If it returns, the
-    message names the process (`tests/e2e/leftover-processes.ts`).
+11. **An e2e teardown reported "The app left 1 process running" twice in eleven batch runs.**
+    The machine was also running three other test suites, right after the file watch landed. Ten
+    runs alone did not repeat it, and the process was not identified. If it returns, the message
+    names the process (`tests/e2e/leftover-processes.ts`).
 
 ## How to continue
 
@@ -292,6 +298,6 @@ do not declare.
   `npm run lint:deps`, `npm run build` (0 `(!)` lines), `npx vitest run`.
 - On Linux as root, run vitest under
   `setpriv --bounding-set=-dac_override,-dac_read_search` so the chmod specs can fail a write.
-- The open work items above split cleanly by area. Each can be a separate worker in its own worktree:
-  write the failing test first, keep functions within the limits, one commit per logical unit,
-  and merge into this branch only after the full checks pass.
+- The open work items above split by area. Give each item to a separate worker in its own worktree.
+  Each worker must write the failing test first, keep functions within the limits and make one
+  commit per logical unit. Merge into this branch only after the full checks pass.

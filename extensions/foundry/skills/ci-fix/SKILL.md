@@ -4,11 +4,11 @@ description: Use when a previous attempt failed a check or CI run handed back in
 ---
 
 Read the failing output under "Your previous attempt failed a check" in the
-brief. Reproduce it locally with the project's own command the brief names —
-not a guess at one.
+brief. Reproduce the failure locally with the project's own command that the
+brief names. Do not guess a command.
 
-Fix the cause in the code. Never fix the check itself, and never make it pass
-by skipping, weakening, or deleting a test. Keep the fix within the files the
-unit already declared.
+Fix the cause in the code. Never fix the check itself. Never make it pass by
+skipping, weakening or deleting a test. Keep the fix within the files the unit
+already declared.
 
 Commit the fix.

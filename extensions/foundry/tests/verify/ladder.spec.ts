@@ -439,10 +439,9 @@ function universalAndProjectRulesTests() {
 function conditionsTests() {
   it('applies a project rule once the repository carries what it rests on', () => {
     carryRules('docs-in-pr', 'flat-icons')
-    const loaded = rulesFor(sources(), {
-      repoPaths: [repo],
-      houseDocs: ['.specify/memory/constitution.md'],
-    })
+    fs.mkdirSync(path.join(repo, 'docs'), { recursive: true })
+    fs.writeFileSync(path.join(repo, 'docs', 'CONSTITUTION.md'), '# constitution')
+    const loaded = rulesFor(sources(), { repoPaths: [repo], houseDocs: [] })
     expect(loaded.rules.map((r) => r.id)).toContain('docs-in-pr')
     expect(loaded.rules.map((r) => r.id)).toContain('flat-icons')
   })

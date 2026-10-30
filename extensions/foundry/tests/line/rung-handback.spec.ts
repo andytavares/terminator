@@ -96,7 +96,7 @@ function order(): WorkOrder {
 
 /** The whole of `index.ts`'s `collect`, over a real role registry. Not mocked: a stub proves the
  * shape of a call, not the behaviour, which is how twelve mechanisms once passed their tests while
- * called by nothing (specs/037-foundry-software-factory/tasks.md, T144). */
+ * called by nothing (https://github.com/andytavares/terminator/blob/8e1f355937df5328fc4e8fc52f5d1e794e949a6b/specs/037-foundry-software-factory/tasks.md, T144). */
 function collectorFor(sources: Sources) {
   const roles = createRoleRegistry(sources)
   let saved: WorkOrder | null = null

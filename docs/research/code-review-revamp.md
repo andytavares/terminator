@@ -3,7 +3,7 @@
 Design document · `extensions/git-integration` · Draft · 2026-09-27
 Published with interactive renderings: https://claude.ai/artifact/QmQe8PHN4jx4NJQW9kAyEk
 
-Five changes you asked for (R1–R5) and five drawn from current diff and review tools (S1–S5).
+The document has five changes you asked for (R1–R5) and five changes drawn from current diff and review tools (S1–S5).
 
 | ID  | Change               | One line                                      |
 | --- | -------------------- | --------------------------------------------- |
@@ -20,18 +20,24 @@ Five changes you asked for (R1–R5) and five drawn from current diff and review
 
 ## Context
 
-Code review takes a large share of your day. The Code Reviews tab already splits a PR into chapters, scores risk, and keeps your place. Four things still slow you down. It sees one repository at a time. It shows callers before the code they call. Its coverage and complexity numbers don't measure the PR's own code. It has no agent. And every push from the author wipes your viewed-file progress, which is the worst of these when you are interrupted mid-review.
+Code review takes a large share of your day. The Code Reviews tab already splits a PR into chapters, scores risk and keeps your place. Five problems still slow you down:
+
+- The tab sees one repository at a time.
+- The tab shows callers before the code they call.
+- The coverage and complexity numbers do not measure the code of the PR itself.
+- The tab has no agent.
+- Every push from the author wipes your viewed-file progress. This is the worst problem when an interruption stops your review.
 
 ## Goals and non-goals
 
 - **G1** One dashboard of every open PR that needs you, across repositories, including requests made to your teams.
-- **G2** Comments show or hide with one key, without losing track that they exist.
-- **G3** A function's hunk is shown before any hunk that calls it.
-- **G4** Complexity, risk, coverage, health and understandability, each stating where its number came from, or "not measured".
-- **G5** An agent reviews a PR, chapter, file, hunk or line range on request. Results stay private. Nothing reaches GitHub until you click Post.
+- **G2** One key shows or hides comments. You still see that the comments exist.
+- **G3** The hunk of a function comes before any hunk that calls the function.
+- **G4** Complexity, risk, coverage, health and understandability, each stating the source of its number, or "not measured".
+- **G5** An agent reviews a PR, chapter, file, hunk or line range on request. The results stay private. Nothing reaches GitHub until you click Post.
 - **G6** A push, a restart or a two-hour meeting never costs you your place.
 
-**Non-goals:** approving automatically; the agent editing the branch or writing to the PR; GitLab or Bitbucket; merge queues; replacing GitHub for PRs you author.
+**Non-goals:** automatic approval; an agent that edits the branch or writes to the PR; GitLab or Bitbucket; merge queues; a replacement of GitHub for PRs you author.
 
 ## Current state
 
@@ -41,7 +47,7 @@ Paths are under `extensions/git-integration/src/` unless noted.
 | ---------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | Queue scope      | One repo. `repository.pullRequests(first:20, orderBy CREATED_AT DESC)`, then up to 10 more pages.   | `ipc/github.ipc.ts:122`; `MAX_AUTO_PAGES = 10` at `components/pr-review/PrReviewTab.tsx:23` | Other repos invisible. "Needs my review" computed from loaded pages, matches your login only, not teams (`ReviewQueue.tsx:83-92`). |
 | Reading order    | Implementation files first, sorted by `layerScore` desc (route 9 … util 1), then types, then tests. | `github/pr-review-service.ts:538-541`, `:257-271`                                           | Callers before callees. Contradicts ADR-010's own tier table (types first).                                                        |
-| Measured example | Ran the real `buildChapters` on seven paths of a risk-score change (esbuild bundle, node).          | Output below                                                                                | `computeRiskScore` is in the third chapter; its caller `usePrReview.ts:312` is in the second.                                      |
+| Measured example | We ran the real `buildChapters` on seven paths of a risk-score change (esbuild bundle, node).       | Output below                                                                                | `computeRiskScore` is in the third chapter; its caller `usePrReview.ts:312` is in the second.                                      |
 | Comments         | Each thread collapses on its own; threads from REST `pulls/{n}/comments`.                           | `components/pr-review/InlineCommentThread.tsx:11`                                           | No global hide. Resolved state never fetched.                                                                                      |
 | Complexity       | Keyword count (`if`, `&&`, `??` …) in added lines; +5 per hunk is a hotspot.                        | ADR-010; `github/pr-review-service.ts:48`                                                   | Counts keywords in strings and comments; can't name the function.                                                                  |
 | Coverage         | Reads `coverage/coverage-summary.json` or `coverage/lcov.info` from the local checkout.             | `ipc/github.ipc.ts:755-775`                                                                 | Measures your checked-out branch, not the PR head.                                                                                 |
@@ -62,7 +68,7 @@ Tests => risk-score.spec.ts[t2]
 
 ## Inspiration
 
-I could not read the linked article; you later named its tools (see Decisions below). WebFetch got HTTP 403, curl got Cloudflare's "Sorry, you have been blocked", the r.jina.ai reader got a CAPTCHA page, it isn't in Stackademic's RSS feed, and the Wayback Machine has no copy. I did not try to get past the bot check. Tools in the same category, checked on 2026-09-27:
+I could not read the linked article. You later named its tools (see Decisions below). WebFetch got HTTP 403. curl got the Cloudflare page "Sorry, you have been blocked". The r.jina.ai reader got a CAPTCHA page. The article is not in the RSS feed of Stackademic, and the Wayback Machine has no copy. I did not try to get past the bot check. These tools are in the same category (checked on 2026-09-27):
 
 | Tool                                                                                        | What it does well                                                                                    | Taken into         |
 | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------ |
@@ -77,33 +83,33 @@ I could not read the linked article; you later named its tools (see Decisions be
 
 ### D1 · How to find definitions and their uses
 
-- **A. Extend the import regex.** `IMPORT_RE` links files by relative imports. JS/TS only, file-level; can't see same-file calls or order hunks.
-- **B. Tree-sitter in WASM (chosen).** `web-tree-sitter` 0.27.0 (published 2026-08-30) with prebuilt grammars from `@vscode/tree-sitter-wasm` 0.3.1: TypeScript, TSX, JavaScript, Python, Go, Rust, Java, C#, Ruby, PHP, C++, Bash, CSS. Parses base and head of each changed file; definitions and references per hunk. No native build. ADR-010 names Tree-sitter as its v2.
-- **C. Language servers.** Precise, but a server per language and installed dependencies. Too slow to start.
+- **A. Extend the import regex.** `IMPORT_RE` links files by relative imports. It works for JS/TS only and at file level. It cannot see same-file calls or order hunks.
+- **B. Tree-sitter in WASM (chosen).** `web-tree-sitter` 0.27.0 (published 2026-08-30) with prebuilt grammars from `@vscode/tree-sitter-wasm` 0.3.1: TypeScript, TSX, JavaScript, Python, Go, Rust, Java, C#, Ruby, PHP, C++, Bash, CSS. It parses the base and head of each changed file and gives definitions and references per hunk. It needs no native build. ADR-010 names Tree-sitter as its v2.
+- **C. Language servers.** Precise, but it needs a server per language and installed dependencies. It starts too slowly.
 
-Files without a grammar fall back to A, then to today's tiers.
+A file without a grammar falls back to A, then to the current tiers.
 
 ### D2 · Where the review agent runs
 
-- **A. Headless `claude -p`, JSON schema, read-only tools (chosen).** `claude -p --output-format json --json-schema … --tools "Read,Grep,Glob" --session-id <uuid>` in a detached worktree at the PR head. Structured, quiet, and without Bash it can't run `gh`. ADR-026 keeps headless spawn for self-review; this extension already uses `child_process` (`git/git-service.ts`, `ipc/merge-flow.ipc.ts`). Flags checked with `claude --help` and the [headless docs](https://code.claude.com/docs/en/headless).
-- **B. Interactive agent in a terminal tab.** Foundry's pattern. Visible, but results must come back through a file, and a tab per question is noise.
+- **A. Headless `claude -p`, JSON schema, read-only tools (chosen).** `claude -p --output-format json --json-schema … --tools "Read,Grep,Glob" --session-id <uuid>` in a detached worktree at the PR head. The output is structured and quiet. Without Bash, the agent cannot run `gh`. ADR-026 keeps headless spawn for self-review. This extension already uses `child_process` (`git/git-service.ts`, `ipc/merge-flow.ipc.ts`). We checked the flags with `claude --help` and the [headless docs](https://code.claude.com/docs/en/headless).
+- **B. Interactive agent in a terminal tab.** Foundry's pattern. Visible, but the results must come back through a file, and a tab per question is noise.
 - **C. Reuse Foundry's supervised runner.** Principle II forbids it.
 
 Plus **Continue in terminal**: `claude --resume <session-id>` in a tab via `api.pty.openTerminalTab`.
 
 ### D3 · Where the dashboard gets its PRs
 
-- **A. Per-repo query for every workspace project.** One query per repo; misses repos not open in Terminator.
-- **B. GitHub search, one query per section (chosen).** Cross-repo, filtered server-side. [Documented qualifiers](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests): `user-review-requested:@me`, `team-review-requested:`, `reviewed-by:`, `involves:`, `review:changes_requested`, `draft:`, `archived:`. `gh search prs --review-requested=@me` exists in gh 2.97.0.
+- **A. Per-repo query for every workspace project.** One query per repo. It misses repos that are not open in Terminator.
+- **B. GitHub search, one query per section (chosen).** Works across repos and filters on the server. [Documented qualifiers](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests): `user-review-requested:@me`, `team-review-requested:`, `reviewed-by:`, `involves:`, `review:changes_requested`, `draft:`, `archived:`. `gh search prs --review-requested=@me` exists in gh 2.97.0.
 
 ### D4 · What a review session is keyed by
 
-- **A. Keep `headSHA`, copy on push.** Smallest change; "viewed" still means "viewed at a SHA we threw away".
-- **B. Key by repo and PR; store each file's viewed SHA (chosen).** Enables S1. Matches GitHub: `FileViewedState.DISMISSED` = "The file has new changes since last viewed" (GraphQL introspection).
+- **A. Keep `headSHA`, copy on push.** The smallest change. "Viewed" still means "viewed at a SHA we threw away".
+- **B. Key by repo and PR; store each file's viewed SHA (chosen).** Enables S1. Matches GitHub, where `FileViewedState.DISMISSED` = "The file has new changes since last viewed" (GraphQL introspection).
 
 ## R1 · Review dashboard
 
-A new global tab, **Reviews**, via `api.sidebar.registerGlobalTab`. Each section is a saved GitHub search. The waiting count shows on the tab. Opening a row goes to the existing per-repo Code Reviews tab.
+A new global tab, **Reviews**, uses `api.sidebar.registerGlobalTab`. Each section is a saved GitHub search. The tab shows the waiting count. A click on a row opens the existing per-repo Code Reviews tab.
 
 ```
 ┌ Reviews  [5 need you]                                     Updated 1 min ago  [Refresh] ┐
@@ -121,9 +127,9 @@ A new global tab, **Reviews**, via `api.sidebar.registerGlobalTab`. Each section
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Rows use real titles and sizes (`gh pr list --state all --limit 12`); sections, risk and estimates are illustrative.
+The rows use real titles and sizes (`gh pr list --state all --limit 12`). The sections, risk and estimates are illustrative.
 
-Default section queries (editable):
+Default section queries (you can edit them):
 
 - **Re-review:** `is:pr is:open archived:false reviewed-by:@me -author:@me`, kept only if a commit landed after your latest review.
 - **Requested of you:** `is:pr is:open archived:false user-review-requested:@me`
@@ -131,11 +137,11 @@ Default section queries (editable):
 - **My PRs:** `is:pr is:open author:@me`, labelled by blocker: changes asked, CI failing, approved.
 - **Involved:** `is:pr is:open involves:@me -author:@me`
 
-A row opens against the workspace project whose `origin` matches its `owner/repo`; with no match it offers **Clone and review**.
+A row opens against the workspace project whose `origin` matches its `owner/repo`. With no match, the row offers **Clone and review**.
 
 ## R2 · Comment visibility
 
-One toolbar control, three states, cycled by `c`: **All** (resolved dimmed), **Unresolved** (hides resolved and outdated), **Hidden** (threads leave the flow; a count stays in the gutter). Agent notes have their own switch, `shift+c`. The choice is remembered.
+One toolbar control has three states, and `c` cycles them: **All** (resolved threads dimmed), **Unresolved** (hides resolved and outdated threads) and **Hidden** (threads leave the flow, and a count stays in the gutter). Agent notes have their own switch, `shift+c`. The app remembers the choice.
 
 ```
 components/pr-review/HealthChips.tsx  Medium risk   Comments [All|Unresolved|Hidden]  Agent notes [On|Off]
@@ -150,11 +156,11 @@ components/pr-review/HealthChips.tsx  Medium risk   Comments [All|Unresolved|Hid
     ┌ andytavares · 1 h ago: Tooltip should say this is only files in the PR, not the repo.
 ```
 
-Needs threads from GraphQL `reviewThreads` for `isResolved` (field exists on `PullRequestReviewThread`, checked by introspection); `ThreadSchema` gains `resolved: boolean`.
+This needs threads from GraphQL `reviewThreads` for `isResolved` (the field exists on `PullRequestReviewThread`, checked by introspection). `ThreadSchema` gains `resolved: boolean`.
 
 ## R3 · Definitions first
 
-Ordering moves from files to hunks. Tree-sitter records what each hunk defines and references; a topological sort gives the reading order; files that reference each other stay together as one step. Chapters group the ordered hunks.
+Ordering moves from files to hunks. Tree-sitter records what each hunk defines and references. A topological sort gives the reading order. Files that reference each other stay together as one step. Chapters group the ordered hunks.
 
 ```mermaid
 flowchart LR
@@ -166,7 +172,7 @@ flowchart LR
   H --> D["ReviewDiffPane.tsx:329<br/>renders &lt;HealthChips&gt;"]
 ```
 
-Edges checked with `grep -rn "computeRiskScore(\|<HealthChips\|RiskScore"`. An arrow means "read this before".
+We checked the edges with `grep -rn "computeRiskScore(\|<HealthChips\|RiskScore"`. An arrow means "read this before".
 
 ```
 TODAY (buildChapters)                     PROPOSED (definitions first)
@@ -189,11 +195,11 @@ Rules, in order:
 4. Lock and generated files (tier 3) stay last and collapsed.
 5. Manual drag-reorder (`fileOrderOverrides`) still wins.
 
-Each step shows a one-line reason, replacing the fixed `whyHere` strings.
+Each step shows a one-line reason, which replaces the fixed `whyHere` strings.
 
 ## R4 · Insights
 
-A **Review brief** at the top of the Overview, a line per file, a gutter mark per function. Every figure names its source or says "not measured".
+The Overview gets a **Review brief** at the top, a line per file and a gutter mark per function. Every figure names its source or says "not measured".
 
 ```
 Review brief · #211                                                High risk
@@ -210,7 +216,7 @@ Understandability Moderate       1,120 lines to read, 9 new exports,        read
  89 [0%] +   if (shards < 1) throw new Error('shards must be ≥ 1')
 ```
 
-Values for #211 are illustrative; function names are placeholders.
+The values for #211 are illustrative. The function names are placeholders.
 
 | Measure           | How it's computed                                                                                                                                                           | When it can't be measured                                      |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
@@ -222,7 +228,7 @@ Values for #211 are illustrative; function names are placeholders.
 
 ## R5 · Agent review
 
-Select lines, a hunk, a file, a chapter or the PR; press `a` or **Ask agent**; pick **Review**, **Explain** or a question. Results arrive in a side panel and as dashed private notes in the diff. **Post as comment** opens the composer filled in for you to edit.
+Select lines, a hunk, a file, a chapter or the PR. Press `a` or **Ask agent**. Pick **Review**, **Explain** or a question. The results arrive in a side panel and as dashed private notes in the diff. **Post as comment** opens the composer, filled in for you to edit.
 
 ```
 1 SELECT                                   │ Ask about lines 309–317
@@ -246,7 +252,7 @@ Select lines, a hunk, a file, a chapter or the PR; press `a` or **Ask agent**; p
             [Add to pending review] [Cancel]   Sent when you submit your review (S5)
 ```
 
-Both findings are real: `usePrReview.ts` calls `computeRiskScore` at 312 and again at 317 on the same metrics; `ipc/github.ipc.ts:755` reads coverage from the local checkout.
+Both findings are real. `usePrReview.ts` calls `computeRiskScore` at 312 and again at 317 on the same metrics. `ipc/github.ipc.ts:755` reads coverage from the local checkout.
 
 ```mermaid
 sequenceDiagram
@@ -269,13 +275,13 @@ sequenceDiagram
   UI->>GH: only now, through the existing github:* channels
 ```
 
-- **Scopes:** line range, hunk, file, chapter, PR. PR scope adds a **walkthrough**: one paragraph per chapter, what changed then what it affects, at the top of the Overview, cached per head SHA.
-- **Finding shape:** `{ severity: 'must-fix' | 'suggestion' | 'nit' | 'question', path, startLine, endLine, side, title, body, suggestedCode? }`; severities rendered into the prompt from the schema constant.
-- **Controls:** `review.agentModel` (default `opus`) and effort in settings, 5-minute default timeout, one run per scope, Cancel kills the process.
+- **Scopes:** line range, hunk, file, chapter, PR. PR scope adds a **walkthrough** at the top of the Overview: one paragraph per chapter, which says what changed and then what it affects. The app caches the walkthrough per head SHA.
+- **Finding shape:** `{ severity: 'must-fix' | 'suggestion' | 'nit' | 'question', path, startLine, endLine, side, title, body, suggestedCode? }`; the prompt gets the severities from the schema constant.
+- **Controls:** `review.agentModel` (default `opus`) and effort in settings, a 5-minute default timeout and one run per scope. Cancel kills the process.
 
 ## S1 · Since your review
 
-Each file remembers the SHA you viewed it at. After a push, unchanged files stay ticked; changed ones show **Changed since you viewed** and open on the diff from your SHA to the new head. Viewed state is also written to GitHub (`markFileAsViewed`, input `pullRequestId, path`).
+Each file remembers the SHA where you viewed it. After a push, unchanged files stay ticked. Changed files show **Changed since you viewed** and open on the diff from your SHA to the new head. The app also writes the viewed state to GitHub (`markFileAsViewed`, input `pullRequestId, path`).
 
 ```
 3 commits since you last looked · 2 h ago · 4 files changed · 51 still viewed   [Since my review s | Whole PR]
@@ -287,7 +293,7 @@ CHAPTER 2 · SHARDING               │ scripts/e2e-shard.ts  [Changed since you
 ✓ .github/workflows/ci.yml viewed  │
 ```
 
-Paths, commit `9f0c76eb` and PR are real; the hunk is invented.
+The paths, commit `9f0c76eb` and PR are real. The hunk is invented.
 
 ```mermaid
 stateDiagram-v2
@@ -299,11 +305,11 @@ stateDiagram-v2
   ChangedSince --> Unviewed: you unmark it
 ```
 
-`ChangedSince` is GitHub's `DISMISSED`. If a force-push removed your SHA, the interdiff falls back to the whole file with a "history rewritten" note; old heads are fetched into `refs/terminator/review/<pr>/<sha>` while you review.
+`ChangedSince` is GitHub's `DISMISSED`. If a force-push removed your SHA, the interdiff falls back to the whole file with a "history rewritten" note. The app fetches old heads into `refs/terminator/review/<pr>/<sha>` while you review.
 
 ## S2 · Resume card and private notes
 
-Reopen a PR after 15+ minutes away and a card shows where you were and what moved. `m` leaves a private note on a line; a note containing `??` is a question the card offers to send to the agent. Notes stay on your machine.
+When you reopen a PR after 15+ minutes away, a card shows your position and what moved. `m` leaves a private note on a line. The card offers to send a note that contains `??` to the agent as a question. Notes stay on your machine.
 
 ```
 Where you left off · #209   Yesterday 17:42 · 9 of 16 files viewed           [Continue ↵]
@@ -318,7 +324,7 @@ Where you left off · #209   Yesterday 17:42 · 9 of 16 files viewed           [
 
 ## S3 · Keyboard-first review
 
-Renderer `keydown` only (never `globalShortcut`). Escape is left alone because double Escape exits the extension. `?` shows the sheet.
+The keys use renderer `keydown` only (never `globalShortcut`). The app does not use Escape, because double Escape exits the extension. `?` shows the sheet.
 
 | Keys    | Action                     | Keys | Action                 | Keys  | Action          |
 | ------- | -------------------------- | ---- | ---------------------- | ----- | --------------- |
@@ -328,11 +334,11 @@ Renderer `keydown` only (never `globalShortcut`). Escape is left alone because d
 | `v`     | Mark file viewed           | `e`  | Explain selection      | `i`   | Insights panel  |
 | `s`     | Since my review / whole PR | `r`  | Comment on line        | `⌘↵`  | Submit review   |
 
-`j`/`k` continue into the next file at a file's end (revdiff's `--cross-file-hunks`).
+At the end of a file, `j`/`k` continue into the next file (revdiff's `--cross-file-hunks`).
 
 ## S4 · Moved code collapses
 
-A block deleted in one place and added unchanged elsewhere (3+ lines, whitespace normalised) collapses to one row linking both ends; a moved block with small edits shows only the edits. Same parse as R3. The Semantic filter (`classifyHunk`) stays.
+A block deleted in one place and added unchanged elsewhere (3+ lines, whitespace normalised) collapses to one row that links both ends. A moved block with small edits shows only the edits. The parse is the same as for R3. The Semantic filter (`classifyHunk`) stays.
 
 ```
 review/reading-order.ts   new file
@@ -340,11 +346,11 @@ review/reading-order.ts   new file
 41 + export function orderHunks(graph: HunkGraph): HunkRef[] {
 ```
 
-Illustrative: how moving the existing `UnionFind` class would read.
+Illustrative: how a move of the existing `UnionFind` class would read.
 
 ## S5 · One review, not N comments
 
-Comments go into a pending review instead of posting one by one: "To create a pending review for a pull request, leave the event parameter blank" ([REST docs](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request)). Drafts are editable until you submit; the author gets one notification.
+Comments go into a pending review instead of posting one by one: "To create a pending review for a pull request, leave the event parameter blank" ([REST docs](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request)). You can edit drafts until you submit. The author gets one notification.
 
 ```
 (3) 3 draft comments on 2 files · 1 from an agent finding   [Review drafts]  [Comment|Approve|Request changes]  [Submit review]
@@ -382,7 +388,7 @@ flowchart TB
   CL --> WT
 ```
 
-All inside `extensions/git-integration`. Core APIs used already exist: `sidebar.registerGlobalTab`, `pty.openTerminalTab`, `settings`, `ipc.registerHandler`.
+All pieces are inside `extensions/git-integration`. The core APIs that the pieces use already exist: `sidebar.registerGlobalTab`, `pty.openTerminalTab`, `settings`, `ipc.registerHandler`.
 
 | Piece                          | Path (under `extensions/git-integration/src`)                                                                                      | Kind         |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------ |
@@ -396,7 +402,7 @@ All inside `extensions/git-integration`. Core APIs used already exist: `sidebar.
 | Keys, resume, moved, drafts    | `hooks/useReviewKeys.ts`, `components/pr-review/ResumeCard.tsx`, `review/moved-blocks.ts`, `github:pending-review-add` / `-submit` | new          |
 | Dependencies                   | `web-tree-sitter` 0.27.0, `@vscode/tree-sitter-wasm` 0.3.1 in the extension's `package.json`                                       | new          |
 
-New IPC channels get a contract file (as in `specs/006-mergeflow-conflict-resolver/contracts/ipc-channels.md`). Two ADRs: hunk-level reading order (superseding ADR-010's ordering) and the read-only headless review agent.
+Each new IPC channel gets a contract file (as in `specs/006-mergeflow-conflict-resolver/contracts/ipc-channels.md`). Two ADRs: hunk-level reading order (superseding ADR-010's ordering) and the read-only headless review agent.
 
 ## Sequence of changes
 
@@ -412,7 +418,7 @@ New IPC channels get a contract file (as in `specs/006-mergeflow-conflict-resolv
 
 ## Testing and verification
 
-Each PR is done when these exit 0 from the worktree:
+A PR is done when these commands exit 0 from the worktree:
 
 ```
 npm run format
@@ -421,36 +427,36 @@ npx vitest run --coverage          # all pass, patch coverage ≥ 80%
 npx playwright test tests/e2e/git-integration-smoke.spec.ts
 ```
 
-Tests first, per unit:
+Write the tests first, per unit:
 
-- `reading-order.spec.ts`: the seven-file example yields the proposed order; a cycle stays together; no-grammar falls back to tiers; overrides win.
-- `symbols.spec.ts`: definitions and references for TS, TSX, Python, Go fixtures shaped like real hunks.
-- `insights.spec.ts`: coverage source order (check, worktree at head, else "not measured"); `&&` inside a string is not a branch.
-- `review-agent.spec.ts`: argv contains `--tools Read,Grep,Glob` and no Bash; schema-failing output becomes an error, never a partial list; timeout and cancel kill the process.
-- `pr-review.store.spec.ts`: a new head keeps viewed files whose content is unchanged; a v1 session migrates.
-- E2E: toggle comments and assert the rendered DOM hides threads; reload and assert the choice held.
+- `reading-order.spec.ts`: the seven-file example yields the proposed order, a cycle stays together, no-grammar falls back to tiers, and overrides win.
+- `symbols.spec.ts`: definitions and references for TS, TSX, Python and Go fixtures shaped like real hunks.
+- `insights.spec.ts`: coverage source order (check, worktree at head, else "not measured"), and `&&` inside a string is not a branch.
+- `review-agent.spec.ts`: argv contains `--tools Read,Grep,Glob` and no Bash, schema-failing output becomes an error and never a partial list, and timeout and cancel kill the process.
+- `pr-review.store.spec.ts`: a new head keeps viewed files whose content is unchanged, and a v1 session migrates.
+- E2E: toggle comments and assert that the rendered DOM hides threads, then reload and assert that the choice held.
 
-Then a live run on PR #213 (109 files): screenshot every surface in the running app and time one agent review per scope.
+Then do a live run on PR #213 (109 files): screenshot every surface in the running app and time one agent review per scope.
 
 ## Risks and mitigations
 
-| Risk                             | Mitigation                                                                                                              |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Parsing 100+ files blocks main   | Worker thread; changed files only; cache by blob SHA.                                                                   |
-| Grammar WASM weight              | Load a grammar on first use. **[UNVERIFIED]** total size not measured.                                                  |
-| Agent cost and wait on large PRs | Default scope is the selection; PR scope shows file count first; one run per scope; cache per head SHA.                 |
-| Agent findings are wrong         | Private, never auto-posted, dismissible; dismissals kept so the same finding isn't repeated.                            |
-| Search rate limits               | One GraphQL request with aliases for all sections; refresh on focus, at most every 2 min; existing `RATE_LIMITED` path. |
-| Worktrees pile up                | Keep 5 most recent; remove on PR close; `git worktree prune` at start.                                                  |
-| Force-push removed your old SHA  | Old heads fetched into `refs/terminator/review/*`; if absent, whole file with a note.                                   |
+| Risk                             | Mitigation                                                                                                                      |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Parsing 100+ files blocks main   | Worker thread; changed files only; cache by blob SHA.                                                                           |
+| Grammar WASM weight              | Load a grammar on first use. **[UNVERIFIED]** total size not measured.                                                          |
+| Agent cost and wait on large PRs | Default scope is the selection. PR scope shows the file count first. One run per scope. Cache per head SHA.                     |
+| Agent findings are wrong         | Private, never auto-posted and dismissible. The app keeps dismissals, so the same finding does not repeat.                      |
+| Search rate limits               | One GraphQL request with aliases for all sections. Refresh on focus, at most every 2 min. Use the existing `RATE_LIMITED` path. |
+| Worktrees pile up                | Keep 5 most recent; remove on PR close; `git worktree prune` at start.                                                          |
+| Force-push removed your old SHA  | Old heads fetched into `refs/terminator/review/*`; if absent, whole file with a note.                                           |
 
 ## Decisions on the open questions (2026-09-27)
 
-1. **Article's tools:** gh-dash, [lazygit](https://github.com/jesseduffield/lazygit), [hunk](https://github.com/modem-dev/hunk), difftastic, delta. hunk's inline agent notes and lazygit's keyboard panels match R5 and S3; neither changes the plan.
+1. **Article's tools:** gh-dash, [lazygit](https://github.com/jesseduffield/lazygit), [hunk](https://github.com/modem-dev/hunk), difftastic, delta. The inline agent notes of hunk match R5, and the keyboard panels of lazygit match S3. Neither changes the plan.
 2. **Team query:** uses the login from `github:current-user`, not `@me`.
-3. **Agent model:** Sonnet by default; you can pick Opus per run (and in settings).
-4. **Coverage:** the question is "does this changed function have a test", not a percentage. A function counts as tested when a test file in the PR or already in the repo references it. A CI patch-coverage percentage, when CI publishes one, is shown second.
-5. **Uncloned repos:** diff-only review by default (GitHub's patches, no local metrics). "Clone and review" appears when you set `review.cloneFolder`.
+3. **Agent model:** Sonnet by default. You can pick Opus per run (and in settings).
+4. **Coverage:** the question is "does this changed function have a test", not a percentage. A function counts as tested when a test file in the PR or already in the repo references the function. When CI publishes a patch-coverage percentage, the review shows it second.
+5. **Uncloned repos:** diff-only review by default (the patches of GitHub, no local metrics). "Clone and review" appears when you set `review.cloneFolder`.
 6. **Dismissed findings:** stay on this machine.
 
 ## Alternatives rejected

@@ -7,11 +7,11 @@
 
 ## Context
 
-Under ADR 022 every extension view was a native `WebContentsView` that main placed over a placeholder in the window. A native view paints above the page's DOM, so nothing in the main renderer could draw over it: not a modal, not a drawer, not a toast. The workaround was to hide every view while any modal was open, and to reserve a strip of the window for the notification drawer (`setLeftInset`). Opening Quick Actions over the Git view blanked the screen behind the palette.
+Under ADR 022, every extension view was a native `WebContentsView` that main placed over a placeholder in the window. A native view paints above the DOM of the page. So nothing in the main renderer could draw over it: not a modal, not a drawer, not a toast. The workaround hid every view while any modal was open, and reserved a strip of the window for the notification drawer (`setLeftInset`). Opening Quick Actions over the Git view blanked the screen behind the palette.
 
 ## Decision
 
-**An extension's view is an `<iframe>` in the main window, loading `ext://<id>/<renderer>`. It talks to main over one `MessagePort` per frame. A shim that the `ext://` handler injects into the extension's HTML builds its `window.electronAPI` from the channel manifest.**
+**The view of an extension is an `<iframe>` in the main window, loading `ext://<id>/<renderer>`. It talks to main over one `MessagePort` per frame. The `ext://` handler injects a shim into the HTML of the extension. The shim builds the `window.electronAPI` of the extension from the channel manifest.**
 
 ```
 ExtensionPanelPortal ── iframe load ──▶ extension.openFramePort {extensionId, viewParam, frameToken}
@@ -22,24 +22,24 @@ ExtensionPanelPortal ── postMessage(terminator:frame-port, ext://<id>, [port
 frame-shim.js ── invoke / send / subscribe / request-exit / quick-actions-open / settings-open ──▶ FrameBridge ──▶ ipc registry
 ```
 
-- **Layering.** The frame is page content, so a modal's `::backdrop` dims it, and a drawer or toast draws over it ([ADR 110](110-modal-surfaces-use-the-native-dialog-element.md)). Nothing is hidden and no strip is reserved.
-- **Identity.** Main knows which surface a call came from by the port it arrived on. A frame cannot claim to be another extension. The file watch of ADR 109 is keyed by the caller, a port or a window, and ends when the port closes or the surface opens a new one.
+- **Layering.** The frame is page content. So the `::backdrop` of a modal dims it, and a drawer or toast draws over it ([ADR 110](110-modal-surfaces-use-the-native-dialog-element.md)). The app hides nothing and reserves no strip.
+- **Identity.** Main knows which surface sent a call by the port that the call arrived on. A frame cannot claim to be another extension. The file watch of ADR 109 is keyed by the caller, a port or a window. It ends when the port closes or the surface opens a new port.
 - **The API.** The frame mode of `buildElectronApi` gives a frame exactly the specs marked `extensionView`, as the hand-written view preload did. Extension code does not change.
-- **Keys.** The double-Escape exit (ADR 026), the ⌘P leader (ADR 057) and ⌘, for Settings are heard in the frame by the shim and sent to main over the port.
-- **Theme.** Main sends the theme over the port, and the shim sets `data-theme` as the view host did.
-- **The model.** This is VS Code's webview model: an iframe that talks to its extension by message passing ([VS Code: Webview API](https://code.visualstudio.com/api/extension-guides/webview)). Ports into a context-isolated page follow Electron's guide ([Electron: MessagePorts](https://www.electronjs.org/docs/latest/tutorial/message-ports)).
+- **Keys.** The shim hears the double-Escape exit (ADR 026), the ⌘P leader (ADR 057) and ⌘, for Settings in the frame. It sends them to main over the port.
+- **Theme.** Main sends the theme over the port. The shim sets `data-theme`, as the view host did.
+- **The model.** This is the webview model of VS Code: an iframe that talks to its extension by message passing ([VS Code: Webview API](https://code.visualstudio.com/api/extension-guides/webview)). The ports into a context-isolated page follow the guide of Electron ([Electron: MessagePorts](https://www.electronjs.org/docs/latest/tutorial/message-ports)).
 
 ## Alternatives considered
 
-| Option                                           | Why not                                                                                                                                                                                                                 |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Keep views, hide them while a modal is open      | The screen behind the modal goes blank. That is the bug.                                                                                                                                                                |
-| Keep views, show a screenshot under the modal    | It imitates the page instead of showing it, and the content goes stale while the modal is open.                                                                                                                         |
-| Keep views, draw modals in a topmost native view | It needs a second renderer, and 11 modals would have to move across a process boundary with their stores and callbacks. Popovers and toasts would still be covered.                                                     |
-| Iframe with `nodeIntegrationInSubFrames`         | Experimental, and "all your preloads will load for every iframe" ([WebPreferences](https://www.electronjs.org/docs/latest/api/structures/web-preferences)), which hands the main preload's whole API to extension code. |
+| Option                                           | Why not                                                                                                                                                                                                                     |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Keep views, hide them while a modal is open      | The screen behind the modal goes blank. That is the bug.                                                                                                                                                                    |
+| Keep views, show a screenshot under the modal    | It imitates the page instead of showing the page. The content goes stale while the modal is open.                                                                                                                           |
+| Keep views, draw modals in a topmost native view | It needs a second renderer. 11 modals would have to move across a process boundary with their stores and callbacks. Native views would still cover popovers and toasts.                                                     |
+| Iframe with `nodeIntegrationInSubFrames`         | Experimental, and "all your preloads will load for every iframe" ([WebPreferences](https://www.electronjs.org/docs/latest/api/structures/web-preferences)). This hands the whole API of the main preload to extension code. |
 
 ## Consequences
 
 - `ExtensionViewHost`, `preload-webview.ts`, the `ext-views` partition, and the channels `extension:update-panel-bounds`, `extension:set-bottom-inset`, `extension:set-left-inset`, `extension:set-theme` and `extension:panel-loaded` are gone.
-- A frame's process is Chromium's choice, not ours. Under ADR 022 every view had its own. Whether an `ext://` frame is placed out of process has not been measured. If it is not, a stalled extension view can stall the window.
+- Chromium chooses the process of a frame, not the app. Under ADR 022, every view had its own process. Nobody has measured whether Chromium places an `ext://` frame out of process. If it does not, a stalled extension view can stall the window.
 - Extension `localStorage` lives in the default session, so it now survives a restart. The in-memory `ext-views` partition dropped it.

@@ -6,11 +6,11 @@
 
 ## Decision
 
-1. The password is stored only as a hash: `scrypt$cost$blockSize$parallelism$salt$key`, from Node's `crypto.scrypt` (N=16384, r=8, p=1, 64-byte key) with a random 16-byte salt per password, compared with `crypto.timingSafeEqual`. `bcryptjs` and `@types/bcryptjs` are removed from `extensions/remote-control/package.json`.
-2. The password is checked once, by `POST /api/login`. A correct password is exchanged for a `remote-session` cookie (256-bit random token, HttpOnly, SameSite=Strict, `Path=/`, 8 hours, held in the existing `SessionStore`). Every other `/api` route accepts that cookie and nothing else; an `Authorization: Bearer` header is no longer read. The existing per-IP `AuthRateLimiter` now guards the login route, where guesses are made; session tokens are not guessable, so the other routes do not count failures.
-3. Nothing returns or displays the stored password. `remote:get-settings` reports `hasPassword`. `remote:update-password` returns a password only when it generated one, once, so the owner can copy it. Changing the password ends every session and closes every remote terminal, as before.
-4. The QR code carries the address only. The existing `ConnectCode` component encoded `address#p=<password>`; it has no one-time-code mechanism (the one-time `app-ticket` and `mobile-ticket` are issued to an already-authenticated client and live 30 seconds, too short to sit in a QR code), so it falls back to the URL.
-5. Remote Control does not start without a password. A first start used to generate one silently and store it in plain text; now `remote:toggle` answers `PASSWORD_REQUIRED` and the view says to set or generate one in Settings.
+1. The app stores the password only as a hash: `scrypt$cost$blockSize$parallelism$salt$key`. The hash comes from `crypto.scrypt` of Node (N=16384, r=8, p=1, 64-byte key) with a random 16-byte salt per password. The comparison uses `crypto.timingSafeEqual`. `bcryptjs` and `@types/bcryptjs` are removed from `extensions/remote-control/package.json`.
+2. `POST /api/login` checks the password once. A correct password is exchanged for a `remote-session` cookie. The cookie has these properties: a 256-bit random token, HttpOnly, SameSite=Strict, `Path=/`, 8 hours, held in the existing `SessionStore`. Every other `/api` route accepts that cookie and nothing else. The app no longer reads an `Authorization: Bearer` header. The existing per-IP `AuthRateLimiter` now guards the login route, where guesses are made. Session tokens are not guessable, so the other routes do not count failures.
+3. Nothing returns or displays the stored password. `remote:get-settings` reports `hasPassword`. `remote:update-password` returns a password only when it generated one, and only once, so the owner can copy it. Changing the password ends every session and closes every remote terminal, as before.
+4. The QR code carries the address only. The existing `ConnectCode` component encoded `address#p=<password>`. It has no one-time-code mechanism. The one-time `app-ticket` and `mobile-ticket` are issued to an already-authenticated client and live 30 seconds, which is too short to sit in a QR code. So `ConnectCode` falls back to the URL.
+5. Remote Control does not start without a password. A first start used to generate a password silently and store it in plain text. Now `remote:toggle` answers `PASSWORD_REQUIRED`. The view says to set or generate a password in Settings.
 
 ### Existing stored values
 
@@ -20,11 +20,22 @@
 | Only a bcrypt hash                            | Cleared. Remote Control is turned off and says the password must be set again. |
 | A scrypt hash, plus a leftover plaintext      | The plaintext is erased; the hash is kept.                                     |
 
-A plaintext is migrated rather than discarded because the owner already knows it and every device they use has it typed in or remembered; discarding it would lock them out for no gain once it is erased. A bcrypt hash cannot be turned into a scrypt hash without the password, so the only safe options are to keep verifying with bcrypt (which needs the dependency this ADR removes) or to invalidate it. It is invalidated, with a message, because a one-off "set your password again" is cheaper than carrying a second algorithm indefinitely. The settings store (`electron-store`) rewrites its JSON file on every write, so the erased plaintext does not remain in it; copies of the file in backups are outside this change.
+The app migrates a plaintext and does not discard it. The owner already knows the plaintext, and every device they use has it typed in or remembered. Discarding it would lock them out for no gain once the app erases it.
+
+A bcrypt hash cannot become a scrypt hash without the password. There are two safe options. One is to keep verifying with bcrypt, which needs the dependency that this ADR removes. The other is to invalidate the hash. The app invalidates it, with a message. A one-off "set your password again" is cheaper than carrying a second algorithm indefinitely.
+
+The settings store (`electron-store`) rewrites its JSON file on every write, so the erased plaintext does not remain in it. Copies of the file in backups are outside this change.
 
 ## Context
 
-An audit found the password in plain text on disk (`terminator.remote-control.password`, kept so Settings could show it), in the browser's `localStorage` (`remote_token`), in an `Authorization` header on every request, and in the QR code (`#p=`). Each request also paid for a bcrypt comparison, and every request was a password guess as far as the rate limiter was concerned.
+An audit found the password in these places:
+
+- in plain text on disk (`terminator.remote-control.password`, kept so Settings could show it)
+- in the `localStorage` of the browser (`remote_token`)
+- in an `Authorization` header on every request
+- in the QR code (`#p=`)
+
+Each request also paid for a bcrypt comparison. For the rate limiter, every request was a password guess.
 
 ## Alternatives considered
 
@@ -38,7 +49,7 @@ An audit found the password in plain text on disk (`terminator.remote-control.pa
 
 ## Consequences
 
-- **Not changed: no TLS.** The cookie and the login password cross the LAN in clear text, as the old header did (ADR-017's accepted risk). The cookie has no `Secure` flag for that reason; behind the ngrok tunnel the browser sees HTTPS and the cookie is protected in transit.
-- **The browser client uses the session.** `src/renderer-remote/` posts the password to `/api/login` once, then sends every request with `credentials: 'same-origin'` and no `Authorization` header. A 401 sends the page back to the login screen. `remote_token` is no longer written, and an older version's value is removed on load.
-- Sessions live in memory: restarting Remote Control signs every browser out, which is also what a password change does.
-- There is no logout route, because the client has no logout control; a session ends at its 8-hour limit, a restart, or a password change.
+- **Not changed: no TLS.** The cookie and the login password cross the LAN in clear text, as the old header did (accepted risk of ADR-017). For that reason the cookie has no `Secure` flag. Behind the ngrok tunnel the browser sees HTTPS, and the cookie is protected in transit.
+- **The browser client uses the session.** `src/renderer-remote/` posts the password to `/api/login` once. It then sends every request with `credentials: 'same-origin'` and no `Authorization` header. A 401 sends the page back to the login screen. The client no longer writes `remote_token`, and it removes a value from an older version on load.
+- Sessions live in memory. Restarting Remote Control signs every browser out. A password change does the same.
+- There is no logout route, because the client has no logout control. A session ends at its 8-hour limit, a restart, or a password change.

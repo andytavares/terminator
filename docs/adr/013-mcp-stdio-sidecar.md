@@ -6,11 +6,11 @@
 
 ## Decision
 
-Bundle the MCP server as a standalone Node.js script (`extensions/task-vault/src/mcp/server.ts`) that MCP clients spawn as a subprocess communicating over stdio. The script reads vault files directly using the same parser/writer modules as the Electron extension.
+Bundle the MCP server as a standalone Node.js script (`extensions/task-vault/src/mcp/server.ts`). MCP clients spawn it as a subprocess and communicate over stdio. The script reads vault files directly, using the same parser/writer modules as the Electron extension.
 
 ## Motivation
 
-Agent-native access (FR-006, US3) requires a way for Claude Code, Cursor, and Claude Desktop to call into the vault without any per-client integration work beyond standard MCP configuration. The MCP protocol's canonical transport model for local servers is: _the client spawns the server process and communicates over stdin/stdout_.
+Agent-native access (FR-006, US3) requires a way for Claude Code, Cursor, and Claude Desktop to call into the vault. It must need no per-client integration work beyond standard MCP configuration. The MCP protocol's canonical transport model for local servers is: _the client spawns the server process and communicates over stdin/stdout_.
 
 ## Alternatives Considered
 
@@ -22,7 +22,7 @@ Agent-native access (FR-006, US3) requires a way for Claude Code, Cursor, and Cl
 
 ## Consequences
 
-- The MCP server reads vault files directly (not via IPC to the Electron process). This means two writers can coexist: the UI and an MCP client. Atomic writes (`write-to-temp + rename`) prevent corruption.
-- `TASK_VAULT_PATH` environment variable is required at startup; server exits with a clear error if absent.
-- The server path is shown in extension settings so users can copy it into their MCP client config.
-- VaultIndex is rebuilt after every write. Two concurrent MCP writes may race; the second writer will receive a `STALE_ID` error and must re-query — this is documented behavior, not a bug.
+- The MCP server reads vault files directly (not via IPC to the Electron process). Two writers can therefore coexist: the UI and an MCP client. Atomic writes (`write-to-temp + rename`) prevent corruption.
+- The `TASK_VAULT_PATH` environment variable is required at startup. The server exits with a clear error if it is absent.
+- Extension settings show the server path, so users can copy it into their MCP client config.
+- VaultIndex is rebuilt after every write. Two concurrent MCP writes can race. The second writer receives a `STALE_ID` error and must re-query. This is documented behavior, not a bug.

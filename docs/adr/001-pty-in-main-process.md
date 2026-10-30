@@ -5,23 +5,23 @@
 
 ## Decision
 
-All PTY processes (via `node-pty`) are spawned and managed exclusively in the Electron **main process**. The renderer process never has direct access to PTY instances. Communication between the renderer's xterm.js terminal and the main process PTY occurs through the IPC channels defined in `contracts/ipc-channels.md`.
+The Electron **main process** spawns and manages all PTY processes (via `node-pty`). The renderer process never has direct access to PTY instances. The renderer's xterm.js terminal and the main process PTY communicate through the IPC channels defined in `contracts/ipc-channels.md`.
 
 ## Motivation
 
-1. **Security baseline**: Electron's security model requires `nodeIntegration: false` in renderer processes. Enabling it to allow PTY access would expose the full Node.js API surface to any XSS vulnerability in the renderer.
+1. **Security baseline**: Electron's security model requires `nodeIntegration: false` in renderer processes. If it were enabled for PTY access, any XSS vulnerability in the renderer would expose the full Node.js API surface.
 
-2. **Native module requirement**: `node-pty` is a native Node.js addon. Native modules require the Node.js runtime, which is only available in the main process when `contextIsolation: true` is enforced.
+2. **Native module requirement**: `node-pty` is a native Node.js addon. Native modules need the Node.js runtime. With `contextIsolation: true` enforced, only the main process has that runtime.
 
-3. **Process lifecycle management**: The main process outlives any individual renderer window. Keeping PTY processes in main ensures they can continue running even if the renderer encounters a problem, and ensures cleanup responsibility is centralized.
+3. **Process lifecycle management**: The main process outlives any individual renderer window. PTY processes in main continue to run if the renderer has a problem. Cleanup responsibility stays in one place.
 
 ## Alternatives Considered
 
-- **`nodeIntegration: true` in renderer**: Rejected. Violates Electron security baseline (Constitution §VIII). Any content rendered in the window would have full Node.js access.
-- **Separate PTY host process** (child_process): More isolated, but adds IPC complexity between main and the PTY host, with no security benefit over the main-process approach for Phase 1.
+- **`nodeIntegration: true` in renderer**: Rejected. It violates the Electron security baseline (Constitution §VIII). Any content in the window would have full Node.js access.
+- **Separate PTY host process** (child_process): More isolated, but it adds IPC complexity between main and the PTY host. It gives no security benefit over the main-process approach for Phase 1.
 
 ## Consequences
 
 - All PTY I/O is asynchronous IPC. Input latency is negligible (sub-millisecond on localhost IPC).
-- PTY cleanup on tab close or app exit is centralized in `src/main/terminal/pty-manager.ts`.
-- Renderer tests that test terminal behavior must mock the IPC layer rather than calling PTY directly.
+- `src/main/terminal/pty-manager.ts` handles PTY cleanup on tab close or app exit.
+- Renderer tests of terminal behavior must mock the IPC layer. They must not call the PTY directly.

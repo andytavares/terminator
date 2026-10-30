@@ -8,12 +8,12 @@ Amends ADR 123 (tests run once, sealed and selected): "Every job has a time limi
 
 ## Context
 
-ADR 123 gave every job and many steps a `timeout-minutes` of 8 or less. A job that ran long was cancelled and its check went red, though nothing in it had failed. On PR #312, Quarantine (E2E) was cancelled this way after 15 minutes.
+ADR 123 gave every job and many steps a `timeout-minutes` of 8 or less. A job that ran long was cancelled, and its check went red, though nothing in it had failed. On PR #312, Quarantine (E2E) was cancelled this way after 15 minutes.
 
 ## Decision
 
-1. **No workflow sets `timeout-minutes`**, on a job or a step. `tests/unit/scripts/ci-plan.spec.ts` fails if any file in `.github/workflows` does.
-2. **Eight minutes per step stays the goal.** A step that takes longer is a finding to fix (split a shard, re-record `timings.json`), not a reason to cancel the run.
+1. **No workflow sets `timeout-minutes`**, on a job or a step. `tests/unit/scripts/ci-plan.spec.ts` fails if any file in `.github/workflows` sets it.
+2. **Eight minutes per step stays the goal.** A step that takes longer is a finding to fix (split a shard, re-record `timings.json`). It is not a reason to cancel the run.
 
 ## Alternatives considered
 
@@ -22,4 +22,4 @@ ADR 123 gave every job and many steps a `timeout-minutes` of 8 or less. A job th
 
 ## Consequences
 
-- A hung job runs until GitHub's own limit (6 hours on a hosted runner, https://docs.github.com/en/actions/reference/limits) or until someone cancels it.
+- A hung job runs until the GitHub limit (6 hours on a hosted runner, https://docs.github.com/en/actions/reference/limits) or until someone cancels it.

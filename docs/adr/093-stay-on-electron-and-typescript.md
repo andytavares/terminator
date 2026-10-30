@@ -5,11 +5,18 @@
 
 ## Decision
 
-Terminator stays on Electron, React and TypeScript. The measured costs are fixed in that stack: the embedded database is replaced (ADR 099), the window is created before anything else starts, extension backends leave the main process (ADR 094), and the terminal output path is batched. A native daemon in Rust that owns the terminals is considered again only if measurements taken after that work still show a need.
+Terminator stays on Electron, React and TypeScript. The measured costs are fixed in that stack:
+
+- The embedded database is replaced (ADR 099).
+- The window is created before anything else starts.
+- Extension backends leave the main process (ADR 094).
+- The terminal output path is batched.
+
+A native daemon in Rust that owns the terminals is considered again only if measurements taken after that work still show a need.
 
 ## Context
 
-The 2026-10-11 architecture audit asked whether to port the app to Rust or Go for performance. The costs it measured are not language costs:
+The architecture audit of 2026-10-11 asked whether to port the app to Rust or Go for performance. The costs that it measured are not language costs:
 
 | Measured                        | Cause                                                                       |
 | ------------------------------- | --------------------------------------------------------------------------- |
@@ -17,7 +24,7 @@ The 2026-10-11 architecture audit asked whether to port the app to Rust or Go fo
 | 1.2 s before the window exists  | Database boot and five extensions activated in series before the window     |
 | Up to 195 IPC calls a minute    | Foundry's views poll because nothing pushes                                 |
 
-Rewriting any of these in Rust reproduces them in Rust. A port also cannot remove JavaScript: every extension backend and view needs it, so a Rust core would run Node beside it and need the same process contract that ADR 094 builds inside Electron.
+Rewriting any of these in Rust reproduces them in Rust. A port also cannot remove JavaScript. Every extension backend and view needs it, so a Rust core would run Node beside it and need the same process contract that ADR 094 builds inside Electron.
 
 ## Alternatives considered
 
@@ -31,4 +38,4 @@ Rewriting any of these in Rust reproduces them in Rust. A port also cannot remov
 ## Consequences
 
 - The work is ordered by measured effect, not rewritten. Each change records a before and after with the scripts that will live in `scripts/perf/`.
-- Electron is upgraded to 44 first. Electron supports only the latest three stable majors ([policy](https://github.com/electron/electron/blob/main/docs/tutorial/electron-timelines.md#version-support-policy)); 42 leaves support when 45 ships, scheduled for 2026-10-20, and 43 leaves when 46 ships.
+- Electron is upgraded to 44 first. Electron supports only the latest three stable majors ([policy](https://github.com/electron/electron/blob/main/docs/tutorial/electron-timelines.md#version-support-policy)). 42 leaves support when 45 ships, scheduled for 2026-10-20. 43 leaves when 46 ships.

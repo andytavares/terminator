@@ -17,19 +17,7 @@ import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminato
 vi.mock('../src/runtime/supervised-runner.js', () => import('./helpers/supervision-mocks.js'))
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const contract = fs.readFileSync(
-  path.join(
-    here,
-    '..',
-    '..',
-    '..',
-    'specs',
-    '037-foundry-software-factory',
-    'contracts',
-    'ipc-channels.md'
-  ),
-  'utf8'
-)
+const contract = fs.readFileSync(path.join(here, '..', 'IPC-CHANNELS.md'), 'utf8')
 
 const disposable = { dispose: vi.fn() }
 const specs: ChannelSpec[] = []
