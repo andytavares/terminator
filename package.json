@@ -97,7 +97,7 @@
     "@vitest/coverage-v8": "5.0.5",
     "@vitest/eslint-plugin": "1.6.27",
     "electron": "44.9.3",
-    "electron-builder": "26.15.3",
+    "electron-builder": "26.16.1",
     "electron-vite": "5.0.0",
     "esbuild": "0.25.12",
     "eslint": "10.12.0",
