@@ -4,11 +4,11 @@
 
 **Date**: 2026-09-05
 
-**Supersedes**: `033-one-app-band`, in its colour half only — the app-band consolidation that ADR stands for is unchanged, and this feature keeps it.
+**Supersedes**: `033-one-app-band`, in its colour half only. The app-band consolidation that ADR stands for is unchanged, and this feature keeps it.
 
 ## Context
 
-Feature 033 gave a repo's identity colour the run of the sidebar column. It was spent in six places at once:
+Feature 033 gave a repo's identity colour the whole sidebar column. The colour was used in six places at once:
 
 | Surface      | Treatment                                           |
 | ------------ | --------------------------------------------------- |
@@ -19,13 +19,13 @@ Feature 033 gave a repo's identity colour the run of the sidebar column. It was 
 | Edge rails   | `inset 2px` at 70% (header) and 30% (row)           |
 | Header text  | the raw swatch, as `color`                          |
 
-The reasoning was continuity: an unpainted element in the middle of a run reads as the tint breaking rather than as the run ending. That reasoning is sound, and the implementation carried real care — `sidebar-workspace-tint.spec.ts` read the actual CSS and asserted every wash stayed shallow enough to hold WCAG AA for all ten preset colours in both themes.
+The reasoning was continuity. An unpainted element in the middle of a run reads as a break in the tint, not as the end of the run. That reasoning is sound. The implementation was also careful: `sidebar-workspace-tint.spec.ts` read the actual CSS. It asserted that every wash stayed shallow enough to hold WCAG AA for all ten preset colours in both themes.
 
-Two things were wrong with it anyway.
+Two things were still wrong.
 
-**It spent the loudest channel on the least urgent fact.** Which repo a row belongs to is the most stable thing about it and almost never the thing you are looking for. Meanwhile the state of the row — the thing you _are_ looking for — had a single small glyph. The eye was drawn by hue and had to work to find the shape.
+**It spent the loudest channel on the least urgent fact.** The repo a row belongs to is the most stable fact about it, and you almost never look for it. The state of the row is the fact you _do_ look for, and it had one small glyph. Hue drew the eye, and you had to work to find the shape.
 
-**The header text failed AA outright.** The washes were tested; the text colour was not tested in situ. Painting a repo name in its own swatch, composited over that swatch's own 10% wash, measures in the light theme at:
+**The header text failed AA outright.** The tests covered the washes, but not the text colour in place. A repo name painted in its own swatch, over that swatch's own 10% wash, measures in the light theme at:
 
 | Preset    | Contrast     |
 | --------- | ------------ |
@@ -33,29 +33,29 @@ Two things were wrong with it anyway.
 | `#4ade80` | **1.23 : 1** |
 | `#5cc0bb` | **1.52 : 1** |
 
-against the 4.5 : 1 AA requires. Measured in a browser, not inferred.
+AA requires 4.5 : 1. We measured these in a browser. We did not infer them.
 
 ## Decision
 
-**A repo's colour appears as one 2px rail on the rows belonging to it, and as a small swatch beside the repo's name. Nowhere else.**
+**A repo's colour appears as one 2px rail on the rows that belong to it, and as a small swatch beside the repo's name. Nowhere else.**
 
 - No background tint at rest, on hover, or when selected.
-- Hover and selection are neutral theme surfaces, **identical for every repo**.
+- Hover and selection use neutral theme surfaces, **identical for every repo**.
 - The repo name is `--text-primary`, ordinary text.
-- A row with no repo draws no rail and is otherwise laid out identically.
+- A row with no repo draws no rail. Its layout is otherwise identical.
 
-The edge belongs to the repo alone. In particular the "needs you" emphasis, which used to be a 3px accent edge that deliberately overrode the repo rail, moves into the status gutter — the two were fighting for the same three pixels, which was a contradiction between two requirements as written.
+The edge belongs to the repo alone. The "needs you" emphasis used to be a 3px accent edge that deliberately overrode the repo rail. It moves into the status gutter. The two fought for the same three pixels, which was a contradiction between two requirements as written.
 
 ## Consequences
 
-**The AA failure is fixed rather than worked around.** Moving the colour into a 7px swatch and the name to `--text-primary` takes those three from 1.08/1.23/1.52 to **15.0 : 1**.
+**The AA failure is fixed, not worked around.** The colour moves into a 7px swatch and the name moves to `--text-primary`. This takes those three presets from 1.08/1.23/1.52 to **15.0 : 1**.
 
-**The contrast guarantee is retargeted, not deleted.** `sidebar-workspace-tint.spec.ts` still exists and still runs over all ten presets in both themes. It now asserts the washes are _gone_ — no `color-mix` of `--ws-color` survives anywhere in the sidebar, and the colour is used only in a `box-shadow` rail and a swatch `background` — and it checks the text tokens against the flat surfaces they now sit on. With no `color-mix` left there is nothing a browser would resolve differently from the arithmetic in that spec.
+**The contrast guarantee has a new target. It is not deleted.** `sidebar-workspace-tint.spec.ts` still exists and still runs over all ten presets in both themes. It now asserts that the washes are _gone_. No `color-mix` of `--ws-color` survives in the sidebar, and the colour appears only in a `box-shadow` rail and a swatch `background`. It also checks the text tokens against the flat surfaces they now sit on. No `color-mix` is left, so a browser cannot resolve anything differently from the arithmetic in that spec.
 
-**Continuity is no longer a concern.** It was a property of a run of tinted surfaces; there is no run. Repos are separated by their headers and by the change of rail colour.
+**Continuity is no longer a concern.** It was a property of a run of tinted surfaces, and there is no run now. Repo headers and the change of rail colour separate the repos.
 
 ## Alternatives considered
 
-**Keep the washes, fix only the header text.** The narrowest correction, and it would have closed the AA defect. Rejected: it leaves the colour still doing the loudest work on the least urgent fact, which is the substance of the complaint rather than an accessibility footnote.
+**Keep the washes, fix only the header text.** This is the narrowest correction, and it would have closed the AA defect. Rejected: the colour would still do the loudest work on the least urgent fact. That is the substance of the complaint, not an accessibility footnote.
 
-**Drop colour to a dot beside the repo name and go fully greyscale in the column.** Closest to the reference product, and the most disciplined option. Rejected because with several repos on screen the rail is what lets a row be assigned to its repo without reading upward to find its header — the dot answers "which repo is this header" but not "which repo is this row".
+**Drop colour to a dot beside the repo name and go fully greyscale in the column.** This is closest to the reference product and the most disciplined option. Rejected: with several repos on screen, the rail lets you assign a row to its repo without reading upward to find its header. The dot answers "which repo is this header" but not "which repo is this row".
