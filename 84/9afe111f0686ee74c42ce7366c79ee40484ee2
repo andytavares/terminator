@@ -1,0 +1,22 @@
+extensions/foundry/tests/forge/round-output.spec.ts
+  s_3b2932418ffe56::t_15c9dc37392b11 1-74
+extensions/foundry/src/forge/intake-turn.ts
+  s_3b2932418ffe56::t_4003f7707400ab 14,557-562
+  s_3b2932418ffe56::t_79f2889ad4b640 563-571,580-589
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "849afe111f0686ee74c42ce7366c79ee40484ee2",
+  "prompts": {},
+  "sessions": {
+    "s_3b2932418ffe56": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea2c55f8-2b5a-46f8-9cf4-d59aab4d031d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
