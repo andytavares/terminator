@@ -1,0 +1,25 @@
+extensions/foundry/src/components/factory/RunLog.tsx
+  s_3b2932418ffe56::t_fcbfae5b38b5ec 33,94
+extensions/foundry/src/ipc/supervision-registration.ts
+  s_3b2932418ffe56::t_39d8b3bd272ff2 16,160
+extensions/foundry/src/ipc/run-log.ts
+  s_3b2932418ffe56::t_39d8b3bd272ff2 36
+extensions/foundry/src/ipc/foundry-api.ts
+  s_3b2932418ffe56::t_39d8b3bd272ff2 40,121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "715a8d0021f105aa5af761b23e89e076951fb189",
+  "prompts": {},
+  "sessions": {
+    "s_3b2932418ffe56": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea2c55f8-2b5a-46f8-9cf4-d59aab4d031d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

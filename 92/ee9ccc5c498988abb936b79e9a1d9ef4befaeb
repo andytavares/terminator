@@ -1,0 +1,80 @@
+extensions/foundry/tests/runtime/transcript-excerpt.spec.ts
+  s_3b2932418ffe56::t_0306aaa9c8eef4 33,267-280
+  s_3b2932418ffe56::t_641039b29322d3 281-282
+extensions/foundry/tests/ipc/run-log.spec.ts
+  s_3b2932418ffe56::t_4234e470c72afd 205
+  s_3b2932418ffe56::t_0306aaa9c8eef4 128,187-188
+  s_3b2932418ffe56::t_dbeaedf54cdccb 189-203
+  s_3b2932418ffe56::t_4db079b8479222 204
+extensions/foundry/src/forge/forge-loop.ts
+  s_3b2932418ffe56::t_ed4787c72f47b2 21,689-690
+extensions/foundry/src/components/factory/RunLog.tsx
+  s_3b2932418ffe56::t_fa8660ed37a845 45
+  s_3b2932418ffe56::t_aaa3761f666ba9 5,153
+extensions/foundry/tests/runtime/diff-metrics.spec.ts
+  s_3b2932418ffe56::t_cce3ba1d137bd3 297-305,307-321,324
+  s_3b2932418ffe56::t_5d4f9d7e4accec 337-343,349
+  s_3b2932418ffe56::t_59ecef056b4338 76-94
+  s_3b2932418ffe56::t_b53df8bb2ddfc0 344-348
+extensions/foundry/tests/runtime/supervision.spec.ts
+  s_3b2932418ffe56::t_fafa6c069c7e8e 218
+extensions/foundry/src/gates/rules.ts
+  s_3b2932418ffe56::t_16238e43d4be8a 85-86,238,283
+extensions/foundry/tests/line/worktree.spec.ts
+  s_3b2932418ffe56::t_0306aaa9c8eef4 132,1132-1142
+  s_3b2932418ffe56::t_57b2b429e44583 1143-1144
+extensions/foundry/src/line/scout-commands.ts
+  s_3b2932418ffe56::t_ed4787c72f47b2 14-17,22,27,59,62,80,90,93,107,111-112
+extensions/foundry/src/factory/format.ts
+  s_3b2932418ffe56::t_fa8660ed37a845 33-41
+extensions/foundry/src/line/execution.ts
+  s_3b2932418ffe56::t_267785bb737495 135-137
+  s_3b2932418ffe56::t_16238e43d4be8a 32,133,167
+  s_3b2932418ffe56::t_a14ed193b2d080 134
+extensions/foundry/src/line/worktree.ts
+  s_3b2932418ffe56::t_617691d97ae045 237-238,242-243
+  s_3b2932418ffe56::t_efcc8648cc6100 239-241
+extensions/foundry/src/runtime/transcript-excerpt.ts
+  s_3b2932418ffe56::t_777874e24acf9a 1
+  s_3b2932418ffe56::t_6f025b359db787 100
+extensions/foundry/src/components/Forge.tsx
+  s_3b2932418ffe56::t_aaa3761f666ba9 54
+extensions/foundry/src/factory/art/props.ts
+  s_3b2932418ffe56::t_be8289dd1b327b 231-237
+extensions/foundry/src/runtime/transcript-tailer.ts
+  s_3b2932418ffe56::t_6f025b359db787 183-184
+extensions/foundry/src/runtime/diff-metrics.ts
+  s_3b2932418ffe56::t_d698a443f105c6 125-126,132-136
+extensions/foundry/src/ipc/run-log.ts
+  s_3b2932418ffe56::t_a97ff5c4faf582 11,17-18,45-46,51,53-57,94-100,103-104,107-122
+  s_3b2932418ffe56::t_f29f258d4a0219 35
+extensions/foundry/src/line/execution-final.ts
+  s_3b2932418ffe56::t_16238e43d4be8a 67,246
+  s_3b2932418ffe56::t_267785bb737495 304
+extensions/foundry/tests/line/scout-commands.spec.ts
+  s_3b2932418ffe56::t_be8289dd1b327b 53,74,87,99
+  s_3b2932418ffe56::t_ed4787c72f47b2 5,12,41-42,51,65,80,92
+extensions/foundry/src/line/baseline.ts
+  s_3b2932418ffe56::t_b6291b34fb1e3c 106-107,109
+extensions/foundry/tests/line/executor.spec.ts
+  s_3b2932418ffe56::t_d26910cd08d9b7 1211,2889-2895,2901-2909
+  s_3b2932418ffe56::t_4527f6736fd80e 2896-2900
+  s_3b2932418ffe56::t_84ac862399ebb1 850,1064,1186-1210
+  s_3b2932418ffe56::t_806be77531c569 1212-1213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "92ee9ccc5c498988abb936b79e9a1d9ef4befaeb",
+  "prompts": {},
+  "sessions": {
+    "s_3b2932418ffe56": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea2c55f8-2b5a-46f8-9cf4-d59aab4d031d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
