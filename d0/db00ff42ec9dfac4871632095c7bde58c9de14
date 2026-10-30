@@ -1,0 +1,60 @@
+.claude/skills/speckit-plan/SKILL.md
+  s_c95e5dc2240fad::t_fd2a791263e932 20,27,29,32-33,55,60,81,84-85,94
+  s_c95e5dc2240fad::t_5401da461b115d 62,64,67,109,129,145-147,149,152-156,162,168
+.claude/skills/speckit-tasks/SKILL.md
+  s_c95e5dc2240fad::t_fd2a791263e932 20,27,29,32-33,55,101,104-105,114
+  s_c95e5dc2240fad::t_1e17ead18d10a4 60,66,75-77,79,88,129,132,135,139,143,145,149,159,188,191,195,210,216
+.claude/skills/speckit-converge/SKILL.md
+  s_c95e5dc2240fad::t_fd2a791263e932 19,27,29,32-33,58,108,246,248,253-254,277
+  s_c95e5dc2240fad::t_e1c74080ffa8be 64-70,74,78,87,92-93,99,105,112,117,131,140,147,152-153,156-158,160-162,169-170,185,205,207,209-210,217,222,224-225,229,231,235-239,243,251-252
+.claude/skills/speckit-taskstoissues/SKILL.md
+  s_c95e5dc2240fad::t_fd2a791263e932 20,27,29,32-33,55,60,85,87,90-91,111
+  s_c95e5dc2240fad::t_1e17ead18d10a4 62-63,72-75
+.claude/skills/speckit-constitution/SKILL.md
+  s_c95e5dc2240fad::t_e1c74080ffa8be 24-25,27,29-30,32-38,79-81,83,87-88,90-91,95-102,106,108-112,114,119,121,125,127,129,131-132,137-138,140,142,144,146
+  s_c95e5dc2240fad::t_fd2a791263e932 20,46,48,51-52,74,153,155,158-159,179
+.claude/skills/speckit-implement/SKILL.md
+  s_c95e5dc2240fad::t_fd2a791263e932 20,27,29,32-33,55,60,194,197-198,207
+  s_c95e5dc2240fad::t_e1c74080ffa8be 63-65,81,86,88-90,93-94,106,109,123-124,149,155-160,163,171-175,183,222,228
+.claude/skills/speckit-checklist/SKILL.md
+  s_c95e5dc2240fad::t_11319a30cf4517 16,33,37-38,40-42,96-100,103-107,116-119,121,126,128-132,140-143,146-148,150,152-154,192-197,225,228,232,244-246,264,266,270,272,274-276,278,284
+  s_c95e5dc2240fad::t_fd2a791263e932 50,57,59,62-63,85,92,359,361,364-365,385
+.claude/skills/speckit-analyze/SKILL.md
+  s_c95e5dc2240fad::t_fd2a791263e932 20,27,29,32-33,55,79,214,216,219-220,240
+  s_c95e5dc2240fad::t_5401da461b115d 60,64,66,72,78,83,89,114,116,118,123,132,137-139,143-144,149-150,154-157,161,163,170,178,200,202-204,212,247-250,254-256,258
+.claude/skills/speckit-git-remote/SKILL.md
+  s_c95e5dc2240fad::t_bd0a5f2637cae5 16,20-21,28,36,38-39,48-49,56
+.claude/skills/speckit-clarify/SKILL.md
+  s_c95e5dc2240fad::t_11319a30cf4517 60,62,66,70,75,128-140,143,145-149,151,155-156,158,169,174-176,178-185,187-190,193-208,217-220,223-225,229,233-239,280-281,284,286,293
+  s_c95e5dc2240fad::t_fd2a791263e932 20,27,29,32-33,55,71,252,255-256,265
+.claude/skills/speckit-git-commit/SKILL.md
+  s_c95e5dc2240fad::t_fd2a791263e932 16,20,22-27,31,36,55-57
+.claude/skills/speckit-specify/SKILL.md
+  s_c95e5dc2240fad::t_fd2a791263e932 20,27,29,32-33,55,247,250-251,260
+  s_c95e5dc2240fad::t_1e17ead18d10a4 60,62,65-69,78,80,84,87-89,91-92,94,98,101,107-108,111-113,115,119-120,125-128,131,138-139,144,146,187-189,193,197,199,203-204,225-234,236,276-277,281,287-288,292,294,298,300,302-307,310-311,313,319,327-328,347
+.claude/skills/speckit-git-validate/SKILL.md
+  s_c95e5dc2240fad::t_bd0a5f2637cae5 16,20-21,36-37,44-46,60-61
+.claude/skills/speckit-git-feature/SKILL.md
+  s_c95e5dc2240fad::t_bd0a5f2637cae5 16,28,30-32,36,41,43-45,51-53,55,64-67,73-74,78,80
+  s_c95e5dc2240fad::t_fd2a791263e932 24
+.claude/skills/speckit-git-initialize/SKILL.md
+  s_c95e5dc2240fad::t_bd0a5f2637cae5 16,20,25,30,33,38,59,63-64
+.claude/skills/speckit-agent-context-update/SKILL.md
+  s_c95e5dc2240fad::t_fd2a791263e932 16,21,23-25,27,29,36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d0db00ff42ec9dfac4871632095c7bde58c9de14",
+  "prompts": {},
+  "sessions": {
+    "s_c95e5dc2240fad": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2553a3b-dbdf-4cef-8ed1-b781ffa52630",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
