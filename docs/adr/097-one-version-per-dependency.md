@@ -6,19 +6,30 @@
 
 ## Decision
 
-Every package is declared at one exact version across the root and all workspace `package.json` files. A library published under two names counts as one: `xterm` 5.3 is removed in favour of `@xterm/xterm` 6. Ranges are not allowed outside references to this repository's own workspaces. A CI check fails the build on any mismatch or range.
+Every package is declared at one exact version across the root and all workspace `package.json` files. A library published under two names counts as one. `xterm` 5.3 is removed in favour of `@xterm/xterm` 6. Ranges are not allowed, except in references to the own workspaces of this repository. A CI check fails the build on any mismatch or range.
 
-npm `overrides` is not used to force a version, except to apply a security fix with the advisory linked beside it. A transitive duplicate is resolved by upgrading the direct dependency that pulls it in.
+npm `overrides` is not used to force a version. The one exception is a security fix, with the advisory linked beside it. To resolve a transitive duplicate, upgrade the direct dependency that pulls it in.
 
-The check is [`syncpack`](https://syncpack.dev) `lint`, pinned at 15.3.3, run in CI. One configuration covers all three rules: a single version policy, exact specifiers, and a ban on `xterm` so only `@xterm/xterm` remains ([README](https://github.com/JamieMason/syncpack#readme)).
+The check is [`syncpack`](https://syncpack.dev) `lint`, pinned at 15.3.3, run in CI. One configuration covers all three rules: a single version policy, exact specifiers, and a ban on `xterm` so that only `@xterm/xterm` remains ([README](https://github.com/JamieMason/syncpack#readme)).
 
 ## Principle IV exception
 
-`syncpack` is published by one npm maintainer, which Principle IV forbids. The project owner approved the exception on 2026-10-12, choosing the tool Turborepo's documentation lists first for this job. It is accepted because it is a development-only lint: it never ships in the app and never runs at the app's run time, and if it stops being maintained the cost is replacing one CI step. If it is deprecated or carries an active CVE, it is replaced under Principle IV's last rule.
+`syncpack` is published by one npm maintainer, which Principle IV forbids. The project owner approved the exception on 2026-10-12. The owner chose the tool that the documentation of Turborepo lists first for this job. The exception is accepted for these reasons:
+
+- `syncpack` is a development-only lint. It never ships in the app and never runs at the run time of the app.
+- If it stops being maintained, the cost is replacing one CI step.
+
+If `syncpack` is deprecated or carries an active CVE, the project replaces it under the last rule of Principle IV.
 
 ## Context
 
-On 2026-10-12, 11 packages were declared at different versions across workspaces, two of them a major apart (`lucide-react` 0.475 and 1.x; `react-markdown` 9 and 10), the terminal library was installed under two names, and 48 specs were ranges. The lockfile held 102 packages at more than one version.
+On 2026-10-12, the repository had these problems:
+
+- 11 packages were declared at different versions across workspaces.
+- Two of those 11 packages were a major version apart (`lucide-react` 0.475 and 1.x; `react-markdown` 9 and 10).
+- The terminal library was installed under two names.
+- 48 specs were ranges.
+- The lockfile held 102 packages at more than one version.
 
 ## Alternatives considered
 

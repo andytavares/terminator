@@ -6,12 +6,12 @@
 
 ## Decision
 
-Every command an extension runs through `api.shell.exec` or `api.github` starts in a directory that is, after `fs.realpath`, one of the extension's **shell roots** or below one. The roots are read on every call:
+Every command that an extension runs through `api.shell.exec` or `api.github` starts in a directory. After `fs.realpath`, that directory must be one of the **shell roots** of the extension, or below one. The app reads the roots on every call:
 
 1. every workspace `folderPath`;
 2. every project `worktreePath`;
-3. `api.paths.userData`. This is `app.getPath('userData')`, the application's per-user data directory, and it is the same directory for every extension: there is no per-extension data directory today;
-4. the current value of each setting the extension declares in its manifest's `contributes.shellRoots`, counted only while the extension has registered that key, through `settings.register`, as a `folder` setting.
+3. `api.paths.userData`. This is `app.getPath('userData')`, the per-user data directory of the application. It is the same directory for every extension, because there is no per-extension data directory today;
+4. the current value of each setting that the extension declares in `contributes.shellRoots` of its manifest. The app counts a setting only while the extension has registered that key, through `settings.register`, as a `folder` setting.
 
 ```json
 "contributes": {
@@ -19,19 +19,19 @@ Every command an extension runs through `api.shell.exec` or `api.github` starts 
 }
 ```
 
-`shellRoots` is a list of setting keys, beside `windowViews` and `commands`. A key that does not start with the extension's own id (`<id>.`) refuses the manifest at load with `INVALID_MANIFEST`. Settings are registered by `activate`, after the manifest is read, so whether the key is a registered `folder` setting is checked at call time. An unregistered key, or one registered with another type, adds no root.
+`shellRoots` is a list of setting keys, beside `windowViews` and `commands`. A key that does not start with the own id of the extension (`<id>.`) refuses the manifest at load with `INVALID_MANIFEST`. `activate` registers settings after the app reads the manifest. So the app checks at call time whether the key is a registered `folder` setting. An unregistered key, or a key registered with another type, adds no root.
 
-The check is `assertCwdInScope(cwd, roots)` in `src/main/shell/shell-executor.ts`. It resolves the `cwd` and every root with `realpath`, so a symlink inside a root cannot lead out of it and a `..` after a symlink resolves the way the operating system will resolve it. A directory that does not exist yet (a clone target) resolves through its nearest existing ancestor. Containment is by path segment: `/a/bc` is not inside `/a/b`. A relative `cwd` is refused, and a relative or empty root is ignored.
+The check is `assertCwdInScope(cwd, roots)` in `src/main/shell/shell-executor.ts`. It resolves the `cwd` and every root with `realpath`. So a symlink inside a root cannot lead out of it. A `..` after a symlink resolves the way the operating system will resolve it. A directory that does not exist yet (a clone target) resolves through its nearest existing ancestor. Containment is by path segment: `/a/bc` is not inside `/a/b`. The check refuses a relative `cwd` and ignores a relative or empty root.
 
-A refused call rejects with an error named `CwdOutOfScopeError` and runs nothing. Only `name` and `message` cross the extension host's link (`src/main/extensions/host/rpc-endpoint.ts`), as for `MissingCwdError`.
+A refused call rejects with an error named `CwdOutOfScopeError` and runs nothing. Only `name` and `message` cross the link of the extension host (`src/main/extensions/host/rpc-endpoint.ts`), as for `MissingCwdError`.
 
-The renderer's `shell:exec` channel keeps its single optional `workspaceRoot` and goes through the same function, so it gains the `realpath` comparison.
+The `shell:exec` channel of the renderer keeps its single optional `workspaceRoot`. It goes through the same function, so it gains the `realpath` comparison.
 
 ## Context
 
-ADR-006 described the cwd pin, but only the renderer's `shell:exec` channel applied it, and only when the caller passed a `workspaceRoot`. `api.shell.exec` and `api.github` checked the command and nothing else, so an extension could run git or gh in any directory. The check that did exist compared paths as written, so a symlink inside the workspace led out of it.
+ADR-006 described the cwd pin. But only the `shell:exec` channel of the renderer applied it, and only when the caller passed a `workspaceRoot`. `api.shell.exec` and `api.github` checked the command and nothing else. So an extension could run git or gh in any directory. The check that did exist compared paths as written, so a symlink inside the workspace led out of it.
 
-Applying ADR-006's rule as written would have refused five legitimate callers:
+Applying the rule of ADR-006 as written would have refused five legitimate callers:
 
 | Caller                                                   | Where its cwd is                                                                          | Root that admits it               |
 | -------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------- |
@@ -41,9 +41,9 @@ Applying ADR-006's rule as written would have refused five legitimate callers:
 | Foundry with `terminator.foundry.dataDir` set            | that absolute directory (`extensions/foundry/src/data-root.ts`)                           | 4, declared by Foundry            |
 | A Foundry lane worktree                                  | `<records root>/orders/<id>/worktrees/<repo>` (`extensions/foundry/src/line/worktree.ts`) | the records root's own: 1, 3 or 4 |
 
-Three gh calls in git-integration ran in the home directory because their directory did not matter to gh: a `gh:owner/name` root (gh reads `GH_REPO`), `github:accessible-repos` and `github:dashboard-search`. The home directory is not made a root. They pass `api.paths.userData` instead (`GithubAccess.noCheckoutCwd`).
+Three gh calls in git-integration ran in the home directory, because their directory did not matter to gh. They are a `gh:owner/name` root (gh reads `GH_REPO`), `github:accessible-repos` and `github:dashboard-search`. The home directory is not made a root. These calls pass `api.paths.userData` instead (`GithubAccess.noCheckoutCwd`).
 
-`tests/unit/extensions/shell-scope-callers.spec.ts` runs each of these callers, with the directory its own code computes, through the real check; `tests/unit/extensions/shell-scope.spec.ts` covers the roots and the refusals.
+`tests/unit/extensions/shell-scope-callers.spec.ts` runs each of these callers through the real check. Each caller uses the directory that its own code computes. `tests/unit/extensions/shell-scope.spec.ts` covers the roots and the refusals.
 
 ## Alternatives considered
 
@@ -58,8 +58,8 @@ Three gh calls in git-integration ran in the home directory because their direct
 
 ## Consequences
 
-- An extension that ran git or gh outside these roots now gets `CwdOutOfScopeError`. It declares a folder setting in `contributes.shellRoots`, or runs in `api.paths.userData` when the directory does not matter. The SDK's 4.0.0 changelog records this.
-- A declared root is only as narrow as its setting. An extension can write its own setting with `settings.set`, so `shellRoots` confines a well-behaved extension to what the operator chose and makes the widening visible in the manifest; it is not a boundary against a hostile extension, which ADR-006 already does not claim to be.
-- `userData` is shared: any extension may run git or gh anywhere in it, including another extension's records.
-- The check runs on every call and reads the workspace store and the settings each time, so a folder chosen in settings applies to the next call without a restart. The check resolves each root with `realpath`, a few system calls per root per command.
-- Between the check and `execFile` the directory can change (a symlink swapped in). The allowlist and `shell: false` still bound what can run there.
+- An extension that ran git or gh outside these roots now gets `CwdOutOfScopeError`. The extension must declare a folder setting in `contributes.shellRoots`. Or it runs in `api.paths.userData` when the directory does not matter. The 4.0.0 changelog of the SDK records this.
+- A declared root is only as narrow as its setting. An extension can write its own setting with `settings.set`. So `shellRoots` confines a well-behaved extension to what the operator chose, and it makes the widening visible in the manifest. It is not a boundary against a hostile extension. ADR-006 already does not claim to be one.
+- `userData` is shared. Any extension may run git or gh anywhere in it, including in the records of another extension.
+- The check runs on every call. It reads the workspace store and the settings each time. So a folder chosen in settings applies to the next call without a restart. The check resolves each root with `realpath`, which costs a few system calls per root per command.
+- Between the check and `execFile`, the directory can change (a symlink swapped in). The allowlist and `shell: false` still bound what can run there.

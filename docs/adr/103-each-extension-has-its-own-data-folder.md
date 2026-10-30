@@ -6,24 +6,24 @@
 
 ## Decision
 
-`api.paths.globalStorage` is the extension's own data folder, `<userData>/extensions/<id>` (`src/main/extensions/extension-paths.ts`). It replaces `api.paths.userData` in the SDK, and it replaces userData as ADR-102's third shell root: an extension's git and gh may run in its own folder and below it, and nowhere else in userData.
+`api.paths.globalStorage` is the own data folder of the extension, `<userData>/extensions/<id>` (`src/main/extensions/extension-paths.ts`). It replaces `api.paths.userData` in the SDK. It also replaces userData as the third shell root of ADR-102. The git and gh commands of an extension may run in its own folder and below it, and nowhere else in userData.
 
-The name and the contract are VS Code's `ExtensionContext.globalStorageUri` ([API reference](https://code.visualstudio.com/api/references/vscode-api#ExtensionContext)): "a directory in which the extension can store global state. The directory might not exist on disk and creation is up to the extension." VS Code's `storageUri` is per workspace; this folder is not, so it takes the global name. Inside `paths` the SDK names a directory by what it is (`app`), without VS Code's `Uri` suffix.
+The name and the contract are the `ExtensionContext.globalStorageUri` of VS Code ([API reference](https://code.visualstudio.com/api/references/vscode-api#ExtensionContext)): "a directory in which the extension can store global state. The directory might not exist on disk and creation is up to the extension." The `storageUri` of VS Code is per workspace. This folder is not per workspace, so it takes the global name. Inside `paths` the SDK names a directory by what it is (`app`), without the `Uri` suffix of VS Code.
 
-The core creates nothing: an extension creates the folder when it first writes. `moveFromUserData` (`@terminator/extension-sdk/node`) moves what an earlier build kept in userData into the folder at activation, each path only while its new location does not exist. When both exist neither is touched and `api.log.warn` names the old copy.
+The core creates nothing. An extension creates the folder when it first writes. `moveFromUserData` (`@terminator/extension-sdk/node`) moves what an earlier build kept in userData into the folder at activation. It moves each path only while its new location does not exist. When both exist, it touches neither, and `api.log.warn` names the old copy.
 
 | Extension       | Moved from userData                                                                         | To, under `globalStorage` |
 | --------------- | ------------------------------------------------------------------------------------------- | ------------------------- |
 | Foundry         | `foundry/` (fallback records), `foundry-runtime/`                                           | `records/`, `runtime/`    |
 | git-integration | `config.json`, `pr-review-sessions.json`, `pr-active-reviews.json`, `pr-agent-reviews.json` | the same names            |
 
-A Foundry lane worktree can sit under the fallback records. Its repository records the worktree's path, so after the move Foundry runs `git worktree repair` inside each lane; otherwise `git worktree prune` would delete the lane's metadata.
+A Foundry lane worktree can sit under the fallback records. Its repository records the path of the worktree. So after the move, Foundry runs `git worktree repair` inside each lane. Without the repair, `git worktree prune` would delete the metadata of the lane.
 
 ## Context
 
-ADR-102 made userData a root because no per-extension folder existed, and recorded the cost: any extension could run git or gh anywhere in it, including in another extension's records. `tests/unit/extensions/shell-scope.spec.ts` now refuses one extension's `shell.exec` in another extension's folder and in userData outside its own.
+ADR-102 made userData a root because no per-extension folder existed. It recorded the cost: any extension could run git or gh anywhere in userData, including in the records of another extension. `tests/unit/extensions/shell-scope.spec.ts` now refuses the `shell.exec` of one extension in the folder of another extension. It also refuses it in userData outside the own folder of the extension.
 
-No extension needs the shared folder once its own data has moved, so `paths.userData` is removed from SDK 4.0.0 before release (constitution VI: unreachable code is deleted).
+No extension needs the shared folder once its own data has moved. So the team removes `paths.userData` from SDK 4.0.0 before release (constitution VI: unreachable code is deleted).
 
 ## Alternatives considered
 
@@ -38,5 +38,5 @@ No extension needs the shared folder once its own data has moved, so `paths.user
 ## Consequences
 
 - An extension that ran git or gh in userData outside its own folder gets `CwdOutOfScopeError`.
-- Moving is a `rename` inside userData, so it is atomic and needs no copy; it cannot cross file systems, and it does not need to.
-- An operator who ran a newer build and then an older one may have both copies; the newer is used and the log names the older.
+- Moving is a `rename` inside userData. It is atomic and needs no copy. It cannot cross file systems, and it does not need to.
+- An operator who ran a newer build and then an older one may have both copies. The app uses the newer copy, and the log names the older copy.

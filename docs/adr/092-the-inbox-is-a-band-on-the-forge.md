@@ -5,7 +5,7 @@
 
 ## Decision
 
-Foundry has two surfaces, the Forge and the Ledger. The Inbox stops being a tab. Its queue (gates, orders waiting on you, sensor signals) renders as a band across the top of the Forge, above the list, the factory site, a hall or an open order. When the queue is empty the band is not rendered at all. The Forge is home.
+Foundry has two surfaces, the Forge and the Ledger. The Inbox stops being a tab. Its queue (gates, orders waiting on you, sensor signals) renders as a band across the top of the Forge. The band sits above the list, the factory site, a hall or an open order. When the queue is empty, the app does not render the band at all. The Forge is home.
 
 ```
 before                               after
@@ -17,15 +17,15 @@ before                               after
 └────────────────────────┘           └──────────────────────────────┘
 ```
 
-The Forge tab's badge is the sum of `foundry:attention`'s `inbox` and `forge` counts.
+The badge of the Forge tab is the sum of the `inbox` and `forge` counts of `foundry:attention`.
 
 ## Context
 
-The Inbox was home because it was "the one surface the operator is required to visit". Between runs it held nothing, so opening Foundry landed on a page that said "Nothing needs you" and offered nothing to do. The work (start an order, watch one) was a click away on the Forge. The Inbox's own rows already sent you to the Forge: a waiting order's **Open** button switched tabs.
+The Inbox was home because it was "the one surface the operator is required to visit". Between runs it held nothing. Opening Foundry landed on a page that said "Nothing needs you" and offered nothing to do. The work (start an order, watch one) was a click away on the Forge. The own rows of the Inbox already sent you to the Forge: the **Open** button of a waiting order switched tabs.
 
 ## Consequences
 
-- The empty state goes, along with what it carried: the "since you last looked" digest, the counts of what is building and converging, and the list of rules the autonomy setting silences. `foundry:feed-digest` and the `silenced` field of `foundry:inbox.list` no longer have a caller in this UI.
+- The empty state goes, along with what it carried: the "since you last looked" digest, the counts of what is building and converging, and the list of rules that the autonomy setting silences. `foundry:feed-digest` and the `silenced` field of `foundry:inbox.list` no longer have a caller in this UI.
 - A hall halted on a gate no longer has an **Open Inbox** button. The gate is in the band above it.
 - The band caps at 45% of the view height and scrolls inside itself, so a long queue cannot push the Forge off the screen.
 
