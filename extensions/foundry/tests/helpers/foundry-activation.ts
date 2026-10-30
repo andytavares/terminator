@@ -11,7 +11,6 @@
 import { eventually } from '../../../../tests/support/eventually'
 import { activate } from '../../src/index.ts'
 import { runtime } from '../../src/runtime/runtime-state.ts'
-import { settleProofs } from '../../src/line/baseline.ts'
 import { settleBackground } from '../../src/background.ts'
 import { endOpenTurns } from './supervision-mocks.ts'
 import type { FoundryHost } from './foundry-host.js'
@@ -33,5 +32,5 @@ export async function settleFoundryWork(): Promise<void> {
   // A turn a test left running ends as the runner's dispose would end it; work that waits on it
   // then ends too.
   endOpenTurns()
-  await Promise.all([settleProofs(), settleBackground()])
+  await settleBackground()
 }

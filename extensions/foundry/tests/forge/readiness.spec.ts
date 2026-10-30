@@ -1,9 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { PROVEN_ENVIRONMENT, baseStep, provenBaseline } from '../helpers/environment.js'
 import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import { REWRITING_UNREADABLE } from '../../src/forge/autonomy.js'
-import { environmentPasses, readiness } from '../../src/forge/readiness.js'
-import type { EnvironmentFacts, LoopFacts, ReadinessInput } from '../../src/forge/readiness.js'
+import { readiness } from '../../src/forge/readiness.js'
+import type { LoopFacts, ReadinessInput } from '../../src/forge/readiness.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -110,7 +109,6 @@ function baseInput(
     intake: baseIntake(),
     loop: baseLoop(),
     agreed: null,
-    environment: PROVEN_ENVIRONMENT,
     turnEndedAt: null,
     shape: { name: 'Direct', yours: false },
     offers: { shape: true, tracker: true },
@@ -280,7 +278,7 @@ function intakeNotStartedTests() {
   })
 
   it('fails the turn row with the start failure, not a refusal', () => {
-    const turn = readiness(notStartedInput()).rows[6]
+    const turn = readiness(notStartedInput()).rows[5]
     expect(turn.state).toBe('failing')
     expect(turn.detail).toBe('Claude could not start the architect, so no turn ran.')
   })
@@ -621,7 +619,7 @@ describe('readiness — rows', () => {
 })
 
 function allRowsPassTests() {
-  it('all seven rows pass on the clean WO-0928-9c6-like fixture', () => {
+  it('all six rows pass on the clean WO-0928-9c6-like fixture', () => {
     const result = readiness(baseInput())
     expect(result.rows.map((r) => r.id)).toEqual([
       'questions',
@@ -629,7 +627,6 @@ function allRowsPassTests() {
       'coverage',
       'risk',
       'redTeam',
-      'environment',
       'turn',
     ])
     expect(result.rows.map((r) => r.label)).toEqual([
@@ -638,11 +635,10 @@ function allRowsPassTests() {
       'Plan and criteria cover each other',
       'Risk graded against this plan',
       'No blocking red-team findings',
-      'The base branch builds and passes its checks',
       'Nobody is changing the plan',
     ])
     expect(result.rows.every((r) => r.state === 'passed')).toBe(true)
-    const [questions, verifiable, coverage, risk, redTeam, , turn] = result.rows
+    const [questions, verifiable, coverage, risk, redTeam, turn] = result.rows
     expect(questions.detail).toBe('None were asked.')
     expect(verifiable.detail).toBe(`Both criteria are proven by a named test in ${SPEC_PATH}.`)
     expect(coverage.detail).toBe('1 unit builds both criteria.')
@@ -786,7 +782,7 @@ function turnRowPerActorTests() {
       baseInput({
         intake: runningTurn({ actor: 'red team', round: 2 }),
       })
-    ).rows[6]
+    ).rows[5]
     expect(redTeam.detail).toBe(
       'The red team is reviewing round 2. The checks above can change when it finishes.'
     )
@@ -795,7 +791,7 @@ function turnRowPerActorTests() {
       baseInput({
         intake: runningTurn({ trigger: 'you' }),
       })
-    ).rows[6]
+    ).rows[5]
     expect(architect.detail).toBe(
       'The architect is changing the plan. The checks above can change when it finishes.'
     )
@@ -804,7 +800,7 @@ function turnRowPerActorTests() {
       baseInput({
         intake: runningTurn({ asked: 'scout', actor: 'scout' }),
       })
-    ).rows[6]
+    ).rows[5]
     expect(scout.detail).toBe('The scout is reading the repository.')
   })
 }
@@ -812,15 +808,15 @@ function turnRowPerActorTests() {
 function turnRowRefusedAndPassedTests() {
   it('turn row: refused is failing', () => {
     const result = readiness(baseInput({ intake: { kind: 'refused', at: T1, reason: 'bad' } }))
-    expect(result.rows[6].state).toBe('failing')
-    expect(result.rows[6].detail).toBe(
+    expect(result.rows[5].state).toBe('failing')
+    expect(result.rows[5].detail).toBe(
       'The last turn ended in a refusal, so the plan is not the one the architect meant to write.'
     )
   })
 
   it('turn row: passed shows when the last turn ended', () => {
     const result = readiness(baseInput({ turnEndedAt: T1 }))
-    expect(result.rows[6].detail).toBe(`The last turn ended at ${T1}.`)
+    expect(result.rows[5].detail).toBe(`The last turn ended at ${T1}.`)
   })
 }
 
@@ -1238,179 +1234,8 @@ describe('readiness — finding text in plain words', () => {
   })
 })
 
-// The base branch row: whether the branch the work starts from builds and passes,
-// and the one place hand-off waits for it.
-const environmentOf = (environment: ReadinessInput['environment'], over = {}) =>
-  readiness(baseInput({ environment, ...over }))
-const rowOf = (result: ReturnType<typeof readiness>) =>
-  result.rows.find((row) => row.id === 'environment')
-
-const testsFailOnBase = provenBaseline({
-  state: 'failing',
-  steps: [baseStep('Build'), baseStep('Tests', { result: 'fail', exitCode: 1 })],
-})
-
-describe('readiness — the base branch row', () => {
-  describe('before and during the check', beforeAndDuringTests)
-  describe('after the check', afterTheCheckTests)
-  describe('failing', failingTests)
-  describe('failingEdgesTests', failingEdgesTests)
-  describe('a check that stopped', stoppedCheckTests)
-  describe('tests failing on the base', testsFailingOnBaseTests)
-  describe('handing off anyway', handingOffAnywayTests)
-  describe('questionsStillShowTests', questionsStillShowTests)
-})
-
-function beforeAndDuringTests() {
-  it('is not checked yet when there is no baseline, and hand-off waits', () => {
-    const result = environmentOf({ baseline: null, waivedAt: null })
-    expect(rowOf(result)).toMatchObject({
-      state: 'needs-you',
-      detail: 'Not checked for this order yet.',
-    })
-    expect(result.canHandOff).toBe(false)
-    expect(result.locks.handOff).toBe(
-      'Not checked for this order yet. Check it again, or skip this check.'
-    )
-  })
-
-  it('says what is being checked while it runs, and hand-off waits', () => {
-    const result = environmentOf({
-      baseline: provenBaseline({ state: 'checking' }),
-      waivedAt: null,
-    })
-    expect(rowOf(result)).toMatchObject({
-      state: 'in-progress',
-      detail: 'Checking main: format, lint, tests and build, in their own terminal tabs.',
-    })
-    expect(result.canHandOff).toBe(false)
-    expect(result.locks.handOff).toBe(
-      'Hand-off opens when the base branch check finishes, or skip this check.'
-    )
-  })
-}
-
-function afterTheCheckTests() {
-  it('names the commit and the steps that passed, and opens hand-off', () => {
-    const result = environmentOf({ baseline: provenBaseline(), waivedAt: null })
-    expect(rowOf(result)).toMatchObject({
-      state: 'passed',
-      detail: 'main at b289028 passed format, lint, tests and build.',
-    })
-    expect(result.canHandOff).toBe(true)
-    expect(result.locks.handOff).toBeNull()
-  })
-
-  it('says so when a reinstall was needed, and names what was not measured', () => {
-    const baseline = provenBaseline({
-      mended: true,
-      steps: [baseStep('Lint'), baseStep('Build', { result: 'not_measured', exitCode: null })],
-    })
-    expect(rowOf(environmentOf({ baseline, waivedAt: null }))?.detail).toBe(
-      'main at b289028 passed lint after a reinstall. Not measured: Build.'
-    )
-  })
-}
-
-function failingTests() {
-  it('names each failed step with its exit code and command, and blocks hand-off', () => {
-    const baseline = provenBaseline({
-      state: 'failing',
-      steps: [
-        baseStep('Lint', { result: 'fail', exitCode: 2, command: 'npm run lint' }),
-        baseStep('Tests', { result: 'fail', exitCode: 1, command: 'npm test' }),
-      ],
-    })
-    const result = environmentOf({ baseline, waivedAt: null })
-    expect(rowOf(result)).toMatchObject({
-      state: 'failing',
-      detail:
-        'Lint failed on main with exit code 2: `npm run lint`. Tests failed on main with exit code 1: `npm test`.',
-    })
-    expect(result.canHandOff).toBe(false)
-    expect(result.locks.handOff).toContain('Check it again, or skip this check.')
-  })
-
-  it('says the branch could not be checked when no step failed', () => {
-    const baseline = provenBaseline({ state: 'failing', steps: [] })
-    expect(rowOf(environmentOf({ baseline, waivedAt: null }))).toMatchObject({
-      state: 'failing',
-      detail: 'Nothing could be measured on main.',
-    })
-  })
-}
-
-function failingEdgesTests() {
-  it('says nothing could be measured when every step was not measured', () => {
-    const baseline = provenBaseline({
-      state: 'failing',
-      steps: [baseStep('Lint', { result: 'not_measured', exitCode: null })],
-    })
-    expect(rowOf(environmentOf({ baseline, waivedAt: null }))?.detail).toBe(
-      'Nothing could be measured on main.'
-    )
-  })
-
-  it('never reads "passed ." when a proven check has no passed step', () => {
-    const baseline = provenBaseline({ steps: [] })
-    const detail = rowOf(environmentOf({ baseline, waivedAt: null }))?.detail ?? ''
-    expect(detail).not.toMatch(/passed \./)
-    expect(detail).toBe('main at b289028 had nothing that could be measured.')
-  })
-}
-
-function stoppedCheckTests() {
-  it('reads a check left "checking" by a quit app as stopped, and offers it again', () => {
-    const baseline = provenBaseline({ state: 'checking' })
-    const result = environmentOf({ baseline, waivedAt: null, proving: false })
-    expect(rowOf(result)).toMatchObject({
-      state: 'failing',
-      detail: 'The check of main stopped before it finished.',
-    })
-    expect(result.locks.handOff).toBe(
-      'The check of main stopped before it finished. Check it again, or skip this check.'
-    )
-  })
-
-  it('keeps reading a check that is really running as in progress', () => {
-    const baseline = provenBaseline({ state: 'checking' })
-    expect(rowOf(environmentOf({ baseline, waivedAt: null, proving: true }))?.state).toBe(
-      'in-progress'
-    )
-  })
-}
-
-function testsFailingOnBaseTests() {
-  it('is a failing row, because no shape starts from a failing test', () => {
-    expect(rowOf(environmentOf({ baseline: testsFailOnBase, waivedAt: null }))?.state).toBe(
-      'failing'
-    )
-  })
-}
-
-function handingOffAnywayTests() {
-  it('passes once the operator hands off anyway, and says when', () => {
-    const baseline = provenBaseline({
-      state: 'failing',
-      steps: [baseStep('Build', { result: 'fail' })],
-    })
-    const result = environmentOf({ baseline, waivedAt: T2 })
-    expect(rowOf(result)).toMatchObject({
-      state: 'passed',
-      detail: `You handed off without it at ${T2}. Checks that fail on main will read “failing on base”.`,
-    })
-    expect(result.canHandOff).toBe(true)
-  })
-
-  it('passes a waiver even when the base branch was never checked', () => {
-    const result = environmentOf({ baseline: null, waivedAt: T2 })
-    expect(rowOf(result)?.state).toBe('passed')
-    expect(result.canHandOff).toBe(true)
-  })
-}
-
-function questionsStillShowTests() {
-  it('does not hide an open question behind the base branch', () => {
+describe('readiness — an open question', () => {
+  it('holds hand-off with its own reason', () => {
     const order = wo0928Order({
       openQuestions: [
         {
@@ -1427,69 +1252,8 @@ function questionsStillShowTests() {
         },
       ],
     })
-    const result = environmentOf({ baseline: null, waivedAt: null }, { order })
+    const result = readiness(baseInput({ order }))
     expect(result.locks.handOff).toContain('questions need your answer')
-  })
-}
-
-const failing = provenBaseline({
-  state: 'failing',
-  steps: [baseStep('Lint', { result: 'fail', exitCode: 1 })],
-})
-
-const nothingMeasurable = provenBaseline({ state: 'failing', steps: [] })
-
-const passesCases: [string, EnvironmentFacts, string | null, boolean][] = [
-  ['never checked', { baseline: null, waivedAt: null }, null, false],
-  ['checking', { baseline: provenBaseline({ state: 'checking' }), waivedAt: null }, null, false],
-  [
-    'a check that stopped',
-    { baseline: provenBaseline({ state: 'checking' }), waivedAt: null, proving: false },
-    null,
-    false,
-  ],
-  ['failing', { baseline: failing, waivedAt: null }, null, false],
-  ['proven', { baseline: provenBaseline(), waivedAt: null }, null, true],
-  ['failing but waived', { baseline: failing, waivedAt: T2 }, null, true],
-  ['never checked but waived', { baseline: null, waivedAt: T2 }, null, true],
-  [
-    'nothing measurable on a research order, which runs no code',
-    { baseline: nothingMeasurable, waivedAt: null },
-    'research',
-    true,
-  ],
-  [
-    'nothing measurable on a shape that runs code',
-    { baseline: nothingMeasurable, waivedAt: null },
-    'direct',
-    false,
-  ],
-  [
-    'a lint failure on a research order is still the base branch failing',
-    { baseline: failing, waivedAt: null },
-    'research',
-    false,
-  ],
-  [
-    'only tests failing on another shape',
-    { baseline: testsFailOnBase, waivedAt: null },
-    'feature',
-    false,
-  ],
-]
-
-const passesRows = passesCases.map(([name, environment, shapeName, expected]) => ({
-  name,
-  environment,
-  shapeName,
-  expected,
-}))
-
-describe('environmentPasses', () => {
-  it.each(passesRows)('$name', ({ environment, shapeName, expected }) => {
-    expect(environmentPasses(environment, shapeName)).toBe(expected)
-    const row = rowOf(environmentOf(environment, { shape: { name: shapeName, yours: false } }))
-    expect(row?.state === 'passed').toBe(expected)
   })
 })
 

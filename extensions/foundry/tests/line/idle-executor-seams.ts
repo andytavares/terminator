@@ -19,8 +19,6 @@ export function idleExecutorSeams(): Omit<
     // Never resolves: a poll that fires would read the budget mid-wave.
     wait: () => new Promise<void>(() => undefined),
     runStep: async () => null,
-    runStepOnBase: async () => null,
-    releaseBase: async () => undefined,
     reinstall: async () => null,
     observedChange: async () => ({ changedFiles: [], linesChanged: 0 }),
     commitNode: async () => ({ kind: 'committed' }),

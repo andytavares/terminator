@@ -100,6 +100,8 @@ describe('a research order whose document is outside the checkout', () => {
     await eventually(async () =>
       expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('shipped')
     )
+    // No change to verify: the final check climbs nothing.
+    expect(theRunner.runCommand).not.toHaveBeenCalled()
     const prCreates = host.gh.mock.calls.filter(([call]) =>
       call.args.join(' ').includes('pr create')
     )

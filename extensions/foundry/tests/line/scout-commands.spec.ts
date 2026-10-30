@@ -10,10 +10,10 @@ import { createOrderStore } from '../../src/order/store.js'
 import type { OrderStore } from '../../src/order/store.js'
 import { readProfile, writeProfile } from '../../src/profile/store.js'
 import { emptyProfile } from '../../src/profile/schema.js'
-import { gitAt, realGit, seededRepository, temporaryDirectory } from '../helpers/foundry-host.js'
+import { realGit, seededRepository, temporaryDirectory } from '../helpers/foundry-host.js'
 
-// A command the scout read out of the repository is proved on the base branch
-// before anything trusts it, and never replaces a command someone else gave.
+// A command the scout read out of the repository fills a check that has none, unproven
+// and never run on the base (ADR 137); it never replaces a command someone else gave.
 
 let parent: string
 let repo: string
@@ -64,52 +64,21 @@ async function ledgerActions(): Promise<string[]> {
 }
 
 describe('proveScoutCommands', () => {
-  it('stores a command that exits 0 on the base, in the profile and on the order', async () => {
+  it('keeps a proposal for an empty check unproven, in the profile and on the order, running nothing', async () => {
     await proveScoutCommands(
       'WO-1',
       [lintProposal],
       depsExiting(() => 0)
     )
+    const kept = { command: 'make lint', source: 'scout', evidence: 'Makefile:12' }
     const profile = await readProfile(root, repo)
-    expect(profile?.checks.lint).toEqual({
-      command: 'make lint',
-      source: 'scout',
-      evidence: 'Makefile:12',
-    })
-    const head = (await gitAt(repo, 'rev-parse', 'main')).stdout.trim()
-    expect(profile?.proof).toMatchObject({ commit: head, exitCodes: { 'make lint': 0 } })
-    const order = await store.load('WO-1')
-    expect(order?.context.toolchain.lint).toEqual({
-      command: 'make lint',
-      source: 'scout',
-      evidence: 'Makefile:12',
-    })
-    expect(await ledgerActions()).toEqual(['scout.command.proved'])
-  })
-})
-
-describe('proveScoutCommands on a command that does not hold', () => {
-  it('stores nothing for a command that exits 1, and says so in the ledger', async () => {
-    await proveScoutCommands(
-      'WO-1',
-      [lintProposal],
-      depsExiting(() => 1)
-    )
-    expect(await readProfile(root, repo)).toBeNull()
-    expect((await store.load('WO-1'))?.context.toolchain.lint).toBeNull()
+    expect(profile?.checks.lint).toEqual(kept)
+    expect(profile?.proof).toBeNull()
+    expect((await store.load('WO-1'))?.context.toolchain.lint).toEqual(kept)
+    expect(ran).toEqual([])
     const [entry] = await store.entries('WO-1')
-    expect(entry).toMatchObject({ action: 'scout.command.unproved', actor: 'role:scout' })
-    expect(entry?.reason).toContain('exited 1')
-  })
-
-  it('stores nothing for a command that did not run to an exit', async () => {
-    await proveScoutCommands(
-      'WO-1',
-      [lintProposal],
-      depsExiting(() => null)
-    )
-    expect((await store.load('WO-1'))?.context.toolchain.lint).toBeNull()
-    expect(await ledgerActions()).toEqual(['scout.command.unproved'])
+    expect(entry).toMatchObject({ action: 'scout.command.kept', actor: 'role:scout' })
+    expect(entry?.reason).toBe("Kept the scout's `make lint` for lint, not run.")
   })
 })
 

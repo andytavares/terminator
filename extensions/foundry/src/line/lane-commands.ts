@@ -9,11 +9,9 @@ import { agentTitle } from '../runtime/agent-title.js'
 import { runtime } from '../runtime/runtime-state.js'
 import type { RunCommandOptions } from '../runtime/supervised-runner.js'
 import type { ExecutorDeps } from './executor.js'
-import { readBaseline, recordedOnBase } from './baseline.js'
 import { issueOf } from './order-project.js'
-import { ensureBaseCheckout, removeBaseCheckout, unlinkBorrowedDependencies } from './worktree.js'
+import { unlinkBorrowedDependencies } from './worktree.js'
 import type { Checkout } from './worktree.js'
-import type { ShellExec } from './integrate.js'
 import { firstLane, workspaceOf } from './run-context.js'
 import type { RunContext } from './run-context.js'
 
@@ -164,75 +162,17 @@ async function runPrepare(
   )
 }
 
-// The same rung on the base branch, to tell a failure the change caused
-// from one that was already there. Never reads or writes the pass cache:
-// a pass on the base says nothing about the change, and the reverse.
-export async function runStepOnBaseCheckout(
-  context: RunContext,
-  step: LadderStep,
-  logPath: string
-): Promise<number | null> {
-  if (step.command === null) return null
-  const runner = runtime.supervisedRunner
-  if (runner === null) return null
-  const { order, exec, root, base } = context
-  const lane = firstLane(context.checkouts)
-  const recorded = await recordedBaseExitCode(context, { command: step.command, lane, logPath })
-  if (recorded !== null) return recorded
-  try {
-    base.current ??= await ensureBaseCheckout(order, lane, { exec, root })
-  } catch {
-    return null
-  }
-  const baseBranch = order.context.repos.find((r) => r.lane === lane)?.baseBranch ?? 'base'
-  return runner.runCommand(
-    commandIn(context, base.current, {
-      title: `${step.name} on ${baseBranch}`,
-      command: step.command,
-      logPath,
-    })
-  )
-}
-
-/** The commit the repository's base branch is at now, or null when git cannot say. */
-export async function baseBranchCommit(
-  exec: ShellExec,
-  repo: { readonly baseBranch: string; readonly path: string }
-): Promise<string | null> {
-  const head = await exec({ command: 'git', args: ['rev-parse', repo.baseBranch], cwd: repo.path })
-  return head.exitCode === 0 ? head.stdout.trim() : null
-}
-
-// What the order's baseline already found for this command on the unmoved base branch.
-async function recordedBaseExitCode(
-  context: RunContext,
-  { command, lane, logPath }: { command: string; lane: number; logPath: string }
-): Promise<number | null> {
-  const repo = context.order.context.repos.find((r) => r.lane === lane)
-  if (repo === undefined) return null
-  const commit = await baseBranchCommit(context.exec, repo)
-  const baseline = await readBaseline(context.root, context.order.id)
-  const exitCode = recordedOnBase(baseline, command, commit)
-  if (exitCode === null || commit === null) return null
-  await fs.promises.mkdir(path.dirname(logPath), { recursive: true })
-  await fs.promises.writeFile(
-    logPath,
-    `\`${command}\` already ran on ${repo.baseBranch} at ${commit.slice(0, 7)} while the order was shaped (exit ${exitCode}); not run again.\n`
-  )
-  return exitCode
-}
-
 // A broken install, mended in place. The borrowed links go first, so the
 // install lands in this checkout and never writes into the origin's.
 export async function reinstallDependencies(
   context: RunContext,
-  where: 'change' | 'base',
+  where: 'change',
   logPath: string
 ): Promise<number | null> {
   const runner = runtime.supervisedRunner
   if (runner === null) return null
   const lane = firstLane(context.checkouts)
-  const checkout = where === 'base' ? context.base.current : (context.checkouts.get(lane) ?? null)
+  const checkout = context.checkouts.get(lane) ?? null
   if (checkout === null) return null
   const command = context.order.context.environment.prepare
   if (command === null) return null
@@ -240,13 +180,6 @@ export async function reinstallDependencies(
   return runner.runCommand(
     commandIn(context, checkout, { title: 'Reinstall dependencies', command, logPath })
   )
-}
-
-export async function releaseBaseCheckout(context: RunContext): Promise<void> {
-  const checkout = context.base.current
-  if (checkout === null) return
-  context.base.current = null
-  await removeBaseCheckout(checkout, { exec: context.exec, root: context.root })
 }
 
 // A recipe `run` step that is not a slash instruction runs as a command in the lane's

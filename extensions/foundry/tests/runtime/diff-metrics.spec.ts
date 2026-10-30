@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { rmSync, writeFileSync } from 'fs'
+import { execFileSync } from 'child_process'
 import { join } from 'path'
 import {
   parseDiffStat,
@@ -72,12 +73,17 @@ function oddRowsTests() {
  * are not interchangeable, and a mock that answers both the same way reported
  * the diff rows back as a list of untracked files.
  */
-function git(over: { diff?: string; untracked?: string; ok?: boolean } = {}) {
-  return vi.fn(async (_cmd: string, args: string[]) => ({
-    ok: over.ok ?? true,
-    stdout: args.includes('ls-files') ? (over.untracked ?? '') : (over.diff ?? ''),
-    stderr: '',
-  }))
+function git(over: { diff?: string; untracked?: string; ok?: boolean; mergeBase?: string } = {}) {
+  return vi.fn(async (_cmd: string, args: string[], _cwd?: string) => {
+    if (args.includes('merge-base')) {
+      return { ok: over.mergeBase !== undefined, stdout: over.mergeBase ?? '', stderr: '' }
+    }
+    return {
+      ok: over.ok ?? true,
+      stdout: args.includes('ls-files') ? (over.untracked ?? '') : (over.diff ?? ''),
+      stderr: '',
+    }
+  })
 }
 
 // A new file's lines count towards the change like any other, so the
@@ -150,11 +156,11 @@ describe('readDiffSummary', () => {
 
 function diffMetricsAskingTests() {
   it('asks git for numeric stats against the merge base', async () => {
-    const run = vi.fn().mockResolvedValue({ ok: true, stdout: '1\t1\ta.ts\n', stderr: '' })
+    const run = git({ diff: '1\t1\ta.ts\n', mergeBase: 'abc123' })
     await readDiffSummary('/wt/s1', 'main', { run })
-    const [command, args, cwd] = run.mock.calls[0]
+    const [command, args, cwd] = run.mock.calls.find((call) => call[1].includes('--numstat'))!
     expect(command).toBe('git')
-    expect(args).toContain('--numstat')
+    expect(args).toEqual(['diff', '--numstat', 'abc123'])
     expect(cwd).toBe('/wt/s1')
   })
 
@@ -244,9 +250,9 @@ describe('readChangedFiles', () => {
 
 function theDiffTests() {
   it('diffs the worktree against the base branch', async () => {
-    const run = vi.fn().mockResolvedValue({ ok: true, stdout: '1\t0\ta.ts\n', stderr: '' })
+    const run = git({ diff: '1\t0\ta.ts\n' })
     await readChangedFiles('/wt/s1', 'main', run)
-    const [bin, args, cwd] = run.mock.calls[0]
+    const [bin, args, cwd] = run.mock.calls.find((call) => call[1].includes('diff'))!
     expect(bin).toBe('git')
     // Against the base itself: the three-dot form sees only commits, and an
     // agent that edits and stops would report having changed nothing.
@@ -268,6 +274,48 @@ function theDiffTests() {
         git({ diff: '1\t0\tsrc/a.ts\n', untracked: 'migrations/003_add_users.sql\n' })
       )
     ).resolves.toEqual(['src/a.ts', 'migrations/003_add_users.sql'])
+  })
+}
+
+function commitFile(repo: string, name: string, message: string): void {
+  const sh = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'pipe' })
+  writeFileSync(join(repo, name), `${name}\n`)
+  sh('add', '.')
+  sh('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', message)
+}
+
+describe('a lane branch behind its base', laneBehindBaseTests)
+
+function laneBehindBaseTests() {
+  const sh = (cwd: string, ...args: string[]) =>
+    execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim()
+  const run = async (_cmd: string, args: string[], cwd: string) => {
+    try {
+      return { ok: true, stdout: sh(cwd, ...args), stderr: '' }
+    } catch (error) {
+      return { ok: false, stdout: '', stderr: String(error) }
+    }
+  }
+  let repo: string
+  beforeEach(() => {
+    repo = makeTempDir('diff-metrics-fork-')
+    sh(repo, 'init', '-q', '-b', 'main')
+    commitFile(repo, 'a.txt', 'base')
+    sh(repo, 'branch', 'lane')
+    commitFile(repo, 'newer-on-main.txt', 'main moved')
+    sh(repo, 'checkout', '-q', 'lane')
+    for (const name of ['a.txt', 'fresh.txt']) writeFileSync(join(repo, name), 'changed\n')
+  })
+  afterEach(() => rmSync(repo, { recursive: true, force: true, maxRetries: 5 }))
+
+  it("lists only the lane's own files, not the base's newer ones", async () => {
+    const files = await readChangedFiles(repo, 'main', run)
+    expect(files.sort()).toEqual(['a.txt', 'fresh.txt'])
+  })
+
+  it("counts only the lane's own files in the summary", async () => {
+    const summary = await readDiffSummary(repo, 'main', { run })
+    expect(summary.files).toBe(2)
   })
 }
 

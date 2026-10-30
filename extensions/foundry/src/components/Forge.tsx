@@ -41,7 +41,7 @@ import {
   LOCAL_REASONS,
   type LoopFacts,
   type AgreedFacts,
-  type EnvironmentFacts,
+  type CheckDecisions,
   type Row,
   type StepView,
   type FindingView,
@@ -72,10 +72,8 @@ interface OrderView {
   loop?: LoopFacts
   agreed?: AgreedFacts | null
   turnEndedAt?: string | null
-  environment?: EnvironmentFacts
+  decisions?: CheckDecisions
   advisory?: string | null
-  /** Why hand-off was turned down, when the base branch check held it. */
-  refused?: string
 }
 
 interface StatesView {
@@ -596,13 +594,13 @@ async function startAgreedRun(
   return started.error ?? null
 }
 
-/** Checking the base branch again, or handing off without it. */
-function useEnvironmentMove(
+/** Recording what the operator decided about checks that cannot be measured. */
+function useCheckDecision(
   orderId: string,
   { setView, setProblem }: Pick<Shown, 'setView' | 'setProblem'>
 ) {
   return useCallback(
-    async (move: 'check' | 'waive' | 'continue-unmeasured' | 'decline-pictures') => {
+    async (move: 'continue-unmeasured' | 'decline-pictures') => {
       const next = await foundryInvoke('foundry:forge.environment', { id: orderId, move })
       if (next.error !== undefined) setProblem(next.error)
       else if ('order' in next) setView(next)
@@ -611,12 +609,12 @@ function useEnvironmentMove(
   )
 }
 
-/** The base branch check, and the Checks step that reads and edits what it runs. */
+/** The Checks step that reads and edits what Foundry runs. */
 function useEnvironment(orderId: string, shown: Shown) {
-  const moveEnvironment = useEnvironmentMove(orderId, shown)
+  const decide = useCheckDecision(orderId, shown)
   const record = (decision: Decision): void =>
-    void moveEnvironment(decision === 'unmeasured' ? 'continue-unmeasured' : 'decline-pictures')
-  return { moveEnvironment, checks: useChecks(shown.view, record) }
+    void decide(decision === 'unmeasured' ? 'continue-unmeasured' : 'decline-pictures')
+  return { checks: useChecks(shown.view, record) }
 }
 
 /** Holding the order, and picking its shape. */
@@ -669,10 +667,6 @@ function useHandOff({ orderId, onStarted, shown, shapes }: HandOffDeps) {
           return
         }
         setView(next)
-        if (next.refused !== undefined) {
-          setProblem(next.refused)
-          return
-        }
         if (next.order.status !== 'agreed') return
         const trouble = await startAgreedRun(orderId, chosen)
         if (trouble !== null) {
@@ -724,7 +718,6 @@ function settledFacts(view: OrderView) {
     loop: view.loop ?? { rounds: [], heldAt: null, exhausted: false },
     agreed: view.agreed ?? null,
     turnEndedAt: view.turnEndedAt ?? null,
-    environment: view.environment,
   }
 }
 
@@ -1100,7 +1093,6 @@ const SCOUT_AGAIN =
 
 function checksActions(forge: ForgeModel): ChecksActions {
   return {
-    checkAgain: () => void forge.moveEnvironment('check'),
     askScout: () => void forge.converge(SCOUT_AGAIN),
     openChecks: () => openStep(forge, 'checks'),
   }
@@ -1229,7 +1221,6 @@ function CheckRow({ forge, row }: ForgeProp & { readonly row: Row }) {
 function RowMoves({ forge, row }: ForgeProp & { readonly row: Row }) {
   if (row.state === 'passed' || row.state === 'waiting') return null
   if (row.id === 'turn') return <TurnMoves forge={forge} row={row} />
-  if (row.id === 'environment') return <EnvironmentMoves forge={forge} row={row} />
   const remedies = CHECK_REMEDIES[row.id]
   if (row.state === 'in-progress') {
     const answering = remedies.some(
@@ -1246,22 +1237,6 @@ function RowMoves({ forge, row }: ForgeProp & { readonly row: Row }) {
       {remedies.map((remedy) => (
         <RemedyMove key={remedy.label} forge={forge} remedy={remedy} />
       ))}
-    </div>
-  )
-}
-
-// Not proven: check it again, or skip this check. A check under way has no move.
-function EnvironmentMoves({ forge, row }: ForgeProp & { readonly row: Row }) {
-  return (
-    <div className="fdry-chk-moves">
-      {row.state === 'in-progress' ? null : (
-        <Button size="sm" onClick={() => void forge.moveEnvironment('check')}>
-          Check again
-        </Button>
-      )}
-      <Button size="sm" onClick={() => void forge.moveEnvironment('waive')}>
-        Skip this check
-      </Button>
     </div>
   )
 }

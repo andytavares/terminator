@@ -17,8 +17,6 @@ import { makeTempDir } from '../../../../tests/support/temp-dir'
 import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import { builderUnit, testCriterion } from '../helpers/order-parts.js'
-import { writeBaseline } from '../../src/line/baseline.js'
-import { provenBaseline } from '../helpers/environment.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { gateStoreAt, orderStoreAt } from '../../src/state/live-index.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -154,7 +152,6 @@ async function seed(released: boolean): Promise<void> {
   const store = orderStoreAt(dataDir)
   await store.save(cleanOrder())
   if (released) {
-    await writeBaseline(dataDir, 'WO-1', provenBaseline())
     await store.record({
       at: '2026-10-08T01:55:24.000Z',
       orderId: 'WO-1',

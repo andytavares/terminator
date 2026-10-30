@@ -205,25 +205,16 @@ export interface ExecutorDeps {
   readonly picturesTaken?: () => PicturesTaken | null
 
   /**
-   * Run one rung in a checkout of the order's base branch, without this change.
-   *
-   * It is how a failure the change caused is told from one that was already
-   * there. Null means it could not run there, which is "not known", never
-   * "passes on the base".
+   * Whether the run's end is a change to verify and ship. False when the author
+   * handed back a document that is not in the checkout. Absent means true.
    */
-  readonly runStepOnBase: (step: LadderStep, logPath: string) => Promise<number | null>
+  readonly shipsChange?: () => Promise<boolean>
 
   /**
-   * Let go of the base checkout `runStepOnBase` used. Called once, in a
-   * `finally`, after any base run, so a throwing rung cannot leave it behind.
+   * Install the dependencies afresh in the order's own checkout, returning the
+   * install's exit status. Null means it could not run.
    */
-  readonly releaseBase: () => Promise<void>
-
-  /**
-   * Install the dependencies afresh in the order's own checkout or the base
-   * checkout, returning the install's exit status. Null means it could not run.
-   */
-  readonly reinstall: (where: 'change' | 'base', logPath: string) => Promise<number | null>
+  readonly reinstall: (where: 'change', logPath: string) => Promise<number | null>
 
   /** Minutes elapsed, for the wall-clock budget. */
   readonly observe: () => { elapsedMinutes: number } | Promise<{ elapsedMinutes: number }>

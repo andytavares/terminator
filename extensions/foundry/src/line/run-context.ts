@@ -35,9 +35,6 @@ export interface RunContext {
   readonly featureDir: string
   readonly diffCommand: RunCommand
   readonly passes: PassCache
-  // Made the first time a failed rung is run again on the base branch, and
-  // taken away by `releaseBase` — most runs never need one.
-  readonly base: { current: Checkout | null }
   // What the last pictures step left, for the pull request body to count.
   readonly pictures: { current: PicturesTaken | null }
   readonly conversations: Map<string, string>
@@ -65,7 +62,6 @@ export async function createRunContext(api: ExtensionAPI, run: OrderRun): Promis
       const result = await exec({ command: 'git', args, cwd })
       return { exitCode: result.exitCode, stdout: result.stdout }
     }),
-    base: { current: null },
     pictures: { current: null },
     conversations: seededConversations(run.graph),
     prepareFailed: new Set(),

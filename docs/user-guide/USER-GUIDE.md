@@ -928,25 +928,19 @@ when you press **Hold for me**.
 starting anything else on its own. The turn already running finishes. **Let it
 continue** picks up where it would have gone.
 
-**Seven rows** on the Hand off step, and it will not hand off until all seven pass:
+**Six rows** on the Hand off step, and it will not hand off until all six pass:
 no open questions, every criterion can be proven, plan and criteria cover each
-other, risk graded against _this_ plan, no blocking red-team findings, the base
-branch builds and passes its checks, and nobody is changing the plan. A passing
+other, risk graded against _this_ plan, no blocking red-team findings, and
+nobody is changing the plan. A passing
 row says why it passed. A failing check
 also shows on the step that clears it, with what to do about it: either a
 button that takes you to the control that clears it, or one that redrafts with
 the instruction the architect needs.
 
-**The base branch** is checked as soon as the order is created. While the
-architect drafts, Foundry checks out the base branch and runs its format, lint,
-test and build commands, each in its own terminal tab. A broken install is
-reinstalled once. If a check fails there, the row says which one, with its exit
-code and command, and offers **Check again** (after you fix the branch or the
-setup) or **Skip this check**. Skipping it is recorded in the ledger,
-and a check that fails on the base branch then reads **failing on base** in the
-pull request, not as this change's fault. A bug fix whose only failure there is
-its tests passes this row: a failing test is where a bug fix starts. A
-base branch where nothing could be measured does not pass either.
+**The base branch** is assumed to pass. Foundry runs nothing on it on its own:
+not while the order is shaped, and not after a failed check. A check that fails
+in the final check is this order's failure, and you decide what to do with it.
+To try one command on the base yourself, use **Prove** on the Checks step.
 
 The one that catches people is **criteria falsifiable** on a change somebody
 can see: a plan that touches a `.tsx`, `.css` or `.html` file and has no
@@ -1117,6 +1111,13 @@ Two things you can do without leaving:
   **Stop** it. The terminal is always there as the backstop: the agent runs in
   a real terminal in its own worktree project, and you can go and type at it.
 
+In the factory hall, click the **whiteboard** on the back wall to open the
+**Run log**: every agent's words and tool calls, every decision in the ledger,
+and every command's output, in one list in time order. It refreshes every two
+seconds and follows the newest line until you scroll up; **Jump to latest**
+brings you back. Filter it by station or by kind, and click a station's name to
+open that station's monitor. **Esc** closes it.
+
 ### Autonomy — how much it asks you
 
 Three settings, differing in which rules stop the line. Four things ask at
@@ -1168,8 +1169,8 @@ Work ends in a **draft pull request** without being asked, carrying a written
 summary, the verdict for every criterion (including the ones nothing could
 check) and any inspection findings. Under the verdicts, **What's left for
 you** lists everything that still needs a person: criteria that failed or were
-not measured, checks not measured, checks that fail on the base branch,
-red-team findings you accepted, assumptions nobody struck and questions still
+not measured, checks not measured, checks that failed and you accepted as a
+debt, red-team findings you accepted, assumptions nobody struck and questions still
 open. It starts with a count ("**7 of 9** criteria pass. 2 need you."), and
 every item comes from the order's own record, never from an estimate. The
 decision you are then offered is whether to **mark it ready** — never whether
@@ -1185,6 +1186,14 @@ while the draft's own checks do. "Mark it ready?" appears only when both are
 green; if the final check fails, the draft stays a draft and you are asked what
 to do about the failed check. The recipe's last step reads as running until
 then, because it is: shipping is still under way.
+
+**Accept the debt** on a failed check is final. The run does not ask again: it
+records the debt in the ledger, opens or keeps the draft, and lists the failed
+check under **What's left for you**.
+
+An order whose product is a document outside the repository, such as a
+research order that publishes a page, runs no repository checks. It ends when
+the author hands the document back and the verifier has read it.
 
 ### Where Foundry keeps its things
 

@@ -15,17 +15,13 @@ import {
   currentIntake,
   loopFacts,
   agreedFacts,
-  environmentWaivedAt,
   checkDecisions,
   CHECKS_CONTINUE_UNMEASURED,
   PICTURES_DECLINED,
   turnEndedAt as turnEndedAtOf,
 } from '../forge/intake-outcome.js'
 import type { IntakeOutcome } from '../forge/intake-outcome.js'
-import { environmentRefusal } from '../forge/readiness.js'
-import { proposeRecipe } from './run-channels.js'
-import type { LoopFacts, AgreedFacts, EnvironmentFacts } from '../forge/readiness.js'
-import { isProving, readBaseline } from '../line/baseline.js'
+import type { LoopFacts, AgreedFacts, CheckDecisions } from '../forge/readiness.js'
 import { readCiState } from '../line/ci-state.js'
 import { readPulls } from '../line/integrate.js'
 import { pullNumber } from '../line/pull-number.js'
@@ -145,7 +141,7 @@ const HoldPayload = z.object({ id: z.string(), held: z.boolean() })
 const OrderIdOnly = z.object({ id: z.string() })
 const EnvironmentPayload = z.object({
   id: z.string(),
-  move: z.enum(['check', 'waive', 'continue-unmeasured', 'decline-pictures']),
+  move: z.enum(['continue-unmeasured', 'decline-pictures']),
 })
 
 const WriteBackPayload = z.object({
@@ -241,8 +237,6 @@ export interface ForgeDeps {
    * follow-up, hand off) is the loop's own business, in `src/index.ts`.
    */
   readonly onReleased: (order: WorkOrder) => void
-  /** Prove the base branch builds and passes its checks. Never throws. */
-  readonly proveEnvironment?: (order: WorkOrder) => Promise<void>
 }
 
 export interface ForgeChannels {
@@ -293,22 +287,16 @@ async function readFacts(
   loop: LoopFacts
   agreed: AgreedFacts | null
   turnEndedAt: string | null
-  environment: EnvironmentFacts
+  decisions: CheckDecisions
 }> {
   const entries = await deps.store.entries(orderId)
   const order = await deps.store.load(orderId)
-  const baseline = await readBaseline(deps.dataRoot(), orderId)
   return {
     intake: currentIntake(entries, order?.intake, { now: Date.now(), isLive: isLiveSession }),
     loop: loopFacts(entries),
     agreed: agreedFacts(entries),
     turnEndedAt: turnEndedAtOf(entries),
-    environment: {
-      baseline,
-      waivedAt: environmentWaivedAt(entries, baseline?.startedAt ?? null),
-      proving: isProving(orderId),
-      decisions: checkDecisions(entries),
-    },
+    decisions: checkDecisions(entries),
   }
 }
 
@@ -405,9 +393,6 @@ async function create(deps: ForgeDeps, payload: CreateInput) {
     reason: `seeded from ${attacked.source.kind}`,
     evidence: [],
   })
-  // Minutes of work on the base branch, which the operator reads when it lands.
-  void deps.proveEnvironment?.(attacked)
-
   return { ...view(attacked), unavailableChecks: seeded.unavailableChecks }
 }
 
@@ -702,10 +687,6 @@ async function compile(
   // the ledger, and without this "working" and "finished, nothing accepted" look alike.
   const facts = await readFacts(deps, id)
   if (!commit || !result.ok) return { compile: result, order, ...facts }
-
-  // Hand-off waits for the base branch check here too, so no caller can go around the Forge's row.
-  const refused = environmentRefusal(facts.environment, order.recipe ?? proposeRecipe(order).name)
-  if (refused !== null) return { compile: result, order, ...facts, refused }
 
   const agreed = agreeOrder(order, deps.now())
   if (!agreed.ok) return { compile: agreed.result, order, ...facts }
@@ -1027,38 +1008,30 @@ async function hold(deps: ForgeDeps, payload: z.infer<typeof HoldPayload>) {
   return view(order)
 }
 
-const WAIVED_REASON =
-  'Handed off without a proven base branch; checks that fail there will read "failing on base".'
-
-/** What each move that is not a re-check writes to the order's ledger. */
+/** What each move writes to the order's ledger. */
 const MOVE_RECORDS: Record<
-  Exclude<z.infer<typeof EnvironmentPayload>['move'], 'check'>,
+  z.infer<typeof EnvironmentPayload>['move'],
   { action: string; reason: string }
 > = {
-  waive: { action: 'environment.waived', reason: WAIVED_REASON },
   'continue-unmeasured': {
     action: CHECKS_CONTINUE_UNMEASURED,
-
     reason: 'Went on with nothing measured: no command was found and none was given.',
   },
   'decline-pictures': {
     action: PICTURES_DECLINED,
-
     reason: 'Ships without pictures although the plan changes the interface.',
   },
 }
 
-// Check the base branch again, or hand off without it. A check runs on after the answer;
-// the Forge reads its result when baseline.json announces.
+// Record what the operator decided about checks that cannot be measured.
 async function environment(deps: ForgeDeps, payload: z.infer<typeof EnvironmentPayload>) {
   const order = await deps.store.load(payload.id)
   if (order === null) return { error: `No order ${payload.id}.` }
   if (order.status !== 'draft') {
-    return { error: 'Only a draft order can check its base branch again.' }
+    return { error: 'Only a draft order can change its check decisions.' }
   }
 
-  if (payload.move === 'check') void deps.proveEnvironment?.(order)
-  else await recordOperator(deps, order.id, { ...MOVE_RECORDS[payload.move], subject: order.id })
+  await recordOperator(deps, order.id, { ...MOVE_RECORDS[payload.move], subject: order.id })
 
   return { ...view(order), ...(await readFacts(deps, order.id)) }
 }

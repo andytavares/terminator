@@ -1,6 +1,6 @@
 # ADR 111: The base branch is proven while the order is shaped
 
-**Status**: Accepted; Amended by ADR 121, ADR 122
+**Status**: Accepted; Amended by ADR 121, ADR 122; decisions 1, 3 and 4 superseded by ADR 137
 
 **Date**: 2026-10-14
 

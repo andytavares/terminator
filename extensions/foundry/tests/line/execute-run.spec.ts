@@ -4,7 +4,6 @@
  * runner does, and `gh` answering as GitHub would.
  */
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
-import { execFileSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
@@ -15,10 +14,6 @@ import { agentsAnswer, agreedLineOrder, checks, repositoryWithRemote } from '../
 import { createOrderStore } from '../../src/order/store.js'
 import { createGateStore } from '../../src/gates/store.js'
 import { checkoutPath } from '../../src/line/worktree.js'
-import { failingOnBaseOf } from '../../src/line/execute-run.js'
-import { writeBaseline } from '../../src/line/baseline.js'
-import type { Baseline } from '../../src/line/baseline.js'
-import { orderDir } from '../../src/data-root.js'
 import { orderStoreAt, readGraph } from '../../src/state/live-index.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
@@ -91,23 +86,6 @@ beforeEach(async () => {
   agentsAnswer(theRunner, parent)
 })
 
-function failingBaseline(commit: string): Baseline {
-  const step = { rung: 'L0' as const, exitCode: 0, command: 'npm run lint', reason: '' }
-  return {
-    state: 'failing',
-    startedAt: '2026-09-06T10:00:00.000Z',
-    finishedAt: '2026-09-06T10:01:00.000Z',
-    baseBranch: 'main',
-    commit,
-    steps: [
-      { ...step, name: 'Lint', result: 'pass' },
-      { ...step, rung: 'L1', name: 'Tests', result: 'fail', exitCode: 1 },
-    ],
-    logs: {},
-    mended: false,
-  }
-}
-
 beforeEach(() => host.recordUsage.mockClear())
 
 describe('an agreed order whose checks pass', () => {
@@ -126,43 +104,6 @@ describe('an agreed order whose checks pass', () => {
     await startOrderRun(agreedLineOrder(repo))
     await untilShipped()
     expect(host.recordUsage.mock.calls).toEqual([['run-start'], ['ship']])
-  })
-})
-
-function baseTip(): string {
-  return execFileSync('git', ['rev-parse', 'main'], { cwd: repo, encoding: 'utf8' }).trim()
-}
-
-async function draftBodyAfterRun(recipe: string, commit: string): Promise<string> {
-  githubWithOneDraft(() => checks('pass'))
-  await writeBaseline(dataDir, 'WO-1', failingBaseline(commit))
-  await startOrderRun(agreedLineOrder(repo), recipe)
-  await untilShipped()
-  return fs.readFileSync(path.join(orderDir(dataDir, 'WO-1'), 'pull-request-lane-1.md'), 'utf8')
-}
-
-describe('an order whose base branch was already failing', () => {
-  it('says in the draft body which checks failed on the base before the change', async () => {
-    const body = await draftBodyAfterRun('direct', baseTip())
-    expect(body).toContain('- **Tests**: fails on main before this change.')
-    expect(body).not.toContain('**Lint**: fails on')
-  })
-
-  it('lists the failing tests on the base', async () => {
-    await writeBaseline(dataDir, 'WO-1', failingBaseline(baseTip()))
-    const exec = async () => ({
-      exitCode: 0,
-      stdout: `${baseTip()}\n`,
-      stderr: '',
-      timedOut: false,
-    })
-    const run = { root: dataDir, order: agreedLineOrder(repo), exec }
-    expect(await failingOnBaseOf(run)).toEqual(['Tests'])
-  })
-
-  it('lists nothing when the base branch has moved since the baseline was taken', async () => {
-    const body = await draftBodyAfterRun('direct', 'a'.repeat(40))
-    expect(body).not.toContain('fails on main before this change')
   })
 })
 

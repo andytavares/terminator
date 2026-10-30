@@ -59,6 +59,19 @@ function trackShellCalls(api: FoundryHost['api']): void {
   }) as typeof exec
 }
 
+// A measurement runs its git commands one after another, so between two of them no
+// shell call is open: teardown waits on the whole measurement instead.
+function trackMeasurements(supervision: NonNullable<typeof runtime.supervision>): void {
+  const measure = supervision.measure.bind(supervision)
+  supervision.measure = (sessionId) => {
+    const call = measure(sessionId)
+    shellCalls.add(call)
+    const forget = () => shellCalls.delete(call)
+    call.then(forget, forget)
+    return call
+  }
+}
+
 function agreed(repoPath: string): WorkOrder {
   const base = draftOrder({
     id: 'WO-1',
@@ -92,6 +105,7 @@ beforeEach(async () => {
     stateDir: path.join(parent, 'state'),
     onFeedChange: () => undefined,
   })
+  trackMeasurements(runtime.supervision)
   order = agreed(repo)
   await createOrderStore(root).save(order)
   const resolved = resolveRecipe('direct', resolveSources(host.api, root))
@@ -337,7 +351,7 @@ describe('a check rung', () => {
       expect(runner.runCommand).toHaveBeenCalledTimes(2)
     })
   })
-  describe('nothing to measure and the base branch', nothingToMeasureAndTheBaseBranchTests)
+  describe('nothing to measure', nothingToMeasureTests)
 })
 
 function runningAndReRunningTests() {
@@ -368,30 +382,16 @@ function runningAndReRunningTests() {
   })
 }
 
-function nothingToMeasureAndTheBaseBranchTests() {
+function nothingToMeasureTests() {
   it('measures nothing when there is no command or no runtime', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     expect(await deps.runStep({ ...step, command: null }, '/x.log')).toBeNull()
-    expect(await deps.runStepOnBase({ ...step, command: null }, '/x.log')).toBeNull()
     runtime.supervisedRunner = null
     expect(await deps.runStep(step, '/x.log')).toBeNull()
-    expect(await deps.runStepOnBase(step, '/x.log')).toBeNull()
     expect(await deps.reinstall('change', '/x.log')).toBeNull()
     expect(
       await deps.runCommand({ node: builderNode(), command: 'make', title: 't', logPath: '/x' })
     ).toBeNull()
-  })
-
-  it('runs on the base branch in a checkout of its own, which is taken away again', async () => {
-    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
-    runner.runCommand.mockResolvedValueOnce(1)
-    expect(await deps.runStepOnBase(step, path.join(root, 'base.log'))).toBe(1)
-    const ran = runner.runCommand.mock.calls[0][0] as { worktreePath: string; title: string }
-    expect(ran.title).toBe('test on main')
-    expect(ran.worktreePath).not.toBe(checkoutPath(root, order, 'app'))
-    expect(fs.existsSync(ran.worktreePath)).toBe(true)
-    await deps.releaseBase()
-    expect(fs.existsSync(ran.worktreePath)).toBe(false)
   })
 }
 
@@ -421,7 +421,6 @@ describe('a reinstall', () => {
     const log = path.join(root, 'install.log')
     const bare = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     expect(await bare.deps.reinstall('change', log)).toBeNull()
-    expect(await bare.deps.reinstall('base', log)).toBeNull()
     expect(runner.runCommand).not.toHaveBeenCalled()
 
     const { deps } = await buildWithPrepare('make deps')

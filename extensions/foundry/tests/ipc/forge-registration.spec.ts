@@ -16,7 +16,6 @@ import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
 import { priorArtInRecords } from '../../src/ipc/forge-registration.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-import { settleProofs } from '../../src/line/baseline.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
@@ -39,9 +38,6 @@ afterAll(async () => {
   await deactivate()
   vi.unstubAllEnvs()
 })
-
-// Creating an order starts its base-branch proof, which writes into the spec's folder until it ends.
-afterEach(settleProofs)
 
 beforeEach(() => {
   parent = temporaryDirectory('fdry-forge-reg-order')

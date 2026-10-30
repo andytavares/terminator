@@ -121,6 +121,17 @@ function addedLinesIn(worktreePath: string, relativePath: string): number {
   }
 }
 
+// The fork point, not the base tip: a base that moved on since the lane was cut would
+// otherwise read every newer commit as the lane's change. Falls back to the base itself.
+async function diffBaseFor(
+  worktreePath: string,
+  baseBranch: string,
+  run: RunCommand
+): Promise<string> {
+  const mergeBase = await run('git', ['merge-base', 'HEAD', baseBranch], worktreePath)
+  return mergeBase.ok && mergeBase.stdout.trim() !== '' ? mergeBase.stdout.trim() : baseBranch
+}
+
 /**
  * Reads which files a working copy changed against its base branch. Returns an
  * empty list when git cannot be read — but note the caller must treat that as
@@ -133,7 +144,11 @@ export async function readChangedFiles(
   run: RunCommand
 ): Promise<string[]> {
   try {
-    const result = await run('git', ['diff', '--numstat', baseBranch], worktreePath)
+    const result = await run(
+      'git',
+      ['diff', '--numstat', await diffBaseFor(worktreePath, baseBranch, run)],
+      worktreePath
+    )
     const tracked = result.ok ? parseChangedFiles(result.stdout) : []
     // A new file is as much a change as an edited one, and risk grading needs
     // its path as much as any other — a new migration is still a migration.
@@ -165,7 +180,11 @@ export async function readDiffSummary(
     // what has been committed, and an agent that edits files and stops — which
     // is most of them — would report having changed nothing at all. Nothing
     // changed means nothing to review, so the review queue could never fill.
-    const result = await run('git', ['diff', '--numstat', baseBranch], worktreePath)
+    const result = await run(
+      'git',
+      ['diff', '--numstat', await diffBaseFor(worktreePath, baseBranch, run)],
+      worktreePath
+    )
     const tracked = result.ok ? parseDiffStat(result.stdout, weighLines) : EMPTY
 
     // Plus the files git has never seen, which `git diff` does not report at

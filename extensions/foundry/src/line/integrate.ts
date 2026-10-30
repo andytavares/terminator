@@ -104,8 +104,6 @@ export interface Shipment {
    * known, which reads as the older "no findings" rather than as a skip.
    */
   readonly inspection?: { readonly ran: boolean; readonly reason: string }
-  /** Checks that already failed on the base branch before this change, by name. */
-  readonly failingOnBase?: readonly string[]
 }
 
 export interface LanePullRequest {
@@ -351,7 +349,7 @@ function leftForYouLines(order: WorkOrder, shipment: Shipment): string[] {
   const items = [
     ...failing.map((criterion) => criterionItem(criterion, shipment.verdicts)),
     ...unmeasuredStepItems(shipment.ladder ?? null),
-    ...failingOnBaseItems(order, shipment.failingOnBase ?? []),
+    ...acceptedDebtItems(shipment.ladder ?? null),
     ...pendingDecisionItems(order),
   ]
   const bullets = items.length === 0 ? [] : ['', ...items]
@@ -389,11 +387,14 @@ function unmeasuredStepItems(ladder: LadderOutcome | null): string[] {
     .map((step) => `- **${step.name}**: not measured. ${step.reason}`)
 }
 
-function failingOnBaseItems(order: WorkOrder, names: readonly string[]): string[] {
-  const base = order.context.repos[0]?.baseBranch ?? 'the base branch'
-  return names.map(
-    (name) => `- **${name}**: fails on ${base} before this change. Not this pull request's to fix.`
-  )
+// A change ships with a failed step only when the operator accepted that debt.
+function acceptedDebtItems(ladder: LadderOutcome | null): string[] {
+  return (ladder?.steps ?? [])
+    .filter((step) => step.result === 'fail')
+    .map(
+      (step) =>
+        `- **${step.name}** failed${step.command === null ? '' : `: \`${step.command}\``}, exit ${step.exitCode ?? 'unknown'}. You accepted this debt.`
+    )
 }
 
 function pendingDecisionItems(order: WorkOrder): string[] {

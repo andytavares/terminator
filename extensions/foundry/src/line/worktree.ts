@@ -224,6 +224,26 @@ async function startPointFor(repo: CheckoutPlan['repo'], deps: CheckoutDeps): Pr
   return base
 }
 
+// A branch left by an earlier cut with no commits of its own sits behind the base, and
+// attaching it as it is would run the lane on old code. Moves it to the start point;
+// a branch with its own commits, or one git will not move, is left alone.
+async function moveStaleBranch(
+  repo: CheckoutPlan['repo'],
+  branch: string,
+  deps: CheckoutDeps
+): Promise<void> {
+  const startPoint = await startPointFor(repo, deps)
+  const git = (...args: string[]) =>
+    deps.exec({ command: 'git', args, cwd: repo.path, timeoutMs: 30_000 })
+  const behind = await git('merge-base', '--is-ancestor', branch, startPoint)
+  if (behind.exitCode !== 0) return
+  const [tip, target] = await Promise.all([git('rev-parse', branch), git('rev-parse', startPoint)])
+  if (tip.stdout.trim() === target.stdout.trim()) return
+  const moved = await git('branch', '-f', branch, startPoint)
+  if (moved.exitCode === 0)
+    deps.note?.(`${branch} had no commits of its own; moved to ${startPoint}`)
+}
+
 type Addition = 'present' | 'attached' | 'cut'
 
 // A stale registration (folder gone, still locked) is replaced with `--force --force`,
@@ -239,6 +259,7 @@ async function addWorktree(
   if (state === 'present') return 'present'
   const force = state === 'stale' ? ['--force', '--force'] : []
   if (branch !== undefined && (await branchExists(repo, branch, deps))) {
+    if (reattachOnly !== true && state === 'absent') await moveStaleBranch(repo, branch, deps)
     await runAdd(repo, [...force, target, branch], deps)
     return 'attached'
   }
@@ -458,23 +479,7 @@ export async function unlockCheckout(
   })
 }
 
-/**
- * A checkout of a lane's base branch as it is, without the lane's change.
- *
- * It answers whether a failing check was already failing before the change.
- * Detached, so no branch of the repository moves and the lane's own branch is
- * untouched; it sits beside the lane's checkout, under the data root, for the
- * same reason that one does.
- */
-export async function ensureBaseCheckout(
-  order: WorkOrder,
-  lane: number,
-  deps: CheckoutDeps
-): Promise<Checkout> {
-  return detachedBaseCheckout({ order, lane, suffix: '@base', fresh: false }, deps)
-}
-
-/** Never the line's `@base`, and always new: a crash's leftover stands at an older commit. */
+/** Always new: a crash's leftover stands at an older commit. */
 export async function ensureBaselineCheckout(
   order: WorkOrder,
   lane: number,

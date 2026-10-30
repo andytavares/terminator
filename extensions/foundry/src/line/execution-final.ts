@@ -46,17 +46,26 @@ export function touchesUi(order: WorkOrder, files: readonly string[]): boolean {
 export async function finishExecution(run: Execution): Promise<RunOutcome> {
   const change = await assessChange(run)
   const workDone = isWorkDone(run)
-  const climber = new FinalClimb(run, change)
   // The ladder runs over the finished work, and only when there is finished
   // work to climb over: a run that halted at a gate has not earned a verdict
-  // on the whole change, and reporting one would be inventing it.
-  const owed = !run.halted && !run.stalled && workDone
-  const draftsOpen = owed && (await openDraftsEarly(run, change))
-  const climbed = owed ? await climber.climbAll() : null
-  if (climbed === null) return runOutcomeOf(run, { change, workDone, ladder: null })
-  if (!run.halted) await raiseAfterWork(run, { change, climbed, climber })
+  // on the whole change, and reporting one would be inventing it. A document
+  // handed back outside the checkout has no change to verify either.
+  const shipsChange = (await run.deps.shipsChange?.()) ?? true
+  const owed = !run.halted && !run.stalled && workDone && shipsChange
+  if (!owed) return runOutcomeOf(run, { change, workDone, ladder: null, debt: false })
+  return climbOverChange(run, { change, workDone })
+}
+
+async function climbOverChange(
+  run: Execution,
+  { change, workDone }: { change: Change; workDone: boolean }
+): Promise<RunOutcome> {
+  const draftsOpen = await openDraftsEarly(run, change)
+  const climbed = await new FinalClimb(run, change).climbAll()
+  const debt = !climbed.ladder.ok && debtAccepted(run)
+  if (!run.halted) await raiseAfterWork(run, { change, climbed, debt })
   if (draftsOpen && !climbed.ladder.ok) await recordFinalCheckFailed(run, climbed.ladder)
-  return runOutcomeOf(run, { change, workDone, ladder: climbed.ladder })
+  return runOutcomeOf(run, { change, workDone, ladder: climbed.ladder, debt })
 }
 
 /** The pictures step's outcome carries what it left, or why it measured nothing. */
@@ -118,15 +127,6 @@ interface Climb {
 
 /** A climb's outcome as `climbWith` returns it. */
 type ClimbResult = Awaited<ReturnType<FinalClimb['climbWith']>>
-
-/** Where the final check climbed on the base branch, and what that showed. */
-interface BaseCheck {
-  readonly onBase: 'fails' | 'passes' | 'unknown'
-  readonly failed: StepOutcome | null
-  readonly logs: Map<string, string>
-}
-
-const BASE_UNKNOWN: BaseCheck = { onBase: 'unknown', failed: null, logs: new Map() }
 
 class FinalClimb {
   readonly steps: LadderStep[]
@@ -200,32 +200,6 @@ class FinalClimb {
     )
     return again
   }
-
-  // The same rungs on the base branch, up to the failed one, so a failure already
-  // there is not sent back to a builder; the base checkout is let go regardless.
-  async onBase(failedStep: StepOutcome): Promise<BaseCheck> {
-    const upTo = this.steps.findIndex((s) => s.name === failedStep.name)
-    const baseSteps = this.steps.slice(0, upTo + 1)
-    try {
-      const base = await this.climbWith(baseSteps, this.run.deps.runStepOnBase, '.base')
-      const failed = base.outcome.steps.find((s) => s.result === 'fail') ?? null
-      const atStep = base.outcome.steps.find((s) => s.name === failedStep.name)
-      return { onBase: baseVerdict({ failed, atStep }), failed, logs: base.logs }
-    } finally {
-      await this.run.deps.releaseBase()
-    }
-  }
-}
-
-function baseVerdict({
-  failed,
-  atStep,
-}: {
-  failed: StepOutcome | null
-  atStep: StepOutcome | undefined
-}): BaseCheck['onBase'] {
-  if (failed !== null) return 'fails'
-  return atStep?.result === 'pass' ? 'passes' : 'unknown'
 }
 
 /** The last lines of a step's log, or nothing when it never wrote one. */
@@ -238,7 +212,8 @@ function excerptOf(logPath: string | undefined): string {
 interface AfterWork {
   readonly change: Change
   readonly climbed: Climb
-  readonly climber: FinalClimb
+  // The operator already accepted a failing final check for this order.
+  readonly debt: boolean
 }
 
 // The rules that fire on what the change turned out to be, raised after the
@@ -258,7 +233,30 @@ async function raiseAfterWork(run: Execution, after: AfterWork): Promise<void> {
       why: `${inspection.reason} Triggered by ${inspection.unplanned.join(', ')}.`,
     })
   }
-  if (!run.halted && !after.climbed.ladder.ok) await raiseFailedCheck(run, after)
+  if (run.halted || after.climbed.ladder.ok) return
+  if (after.debt) await recordAcceptedDebt(run, after.climbed.ladder)
+  else await raiseFailedCheck(run, after.climbed)
+}
+
+/** The operator accepted a failing final check for this order, on an earlier run. */
+function debtAccepted(run: Execution): boolean {
+  return run.priorGates.some(
+    (g) =>
+      (g.rule === 'verify.repeat-fail' || g.rule === 'verify.base-fail') &&
+      g.nodeId === null &&
+      g.decision?.option === 'accept_debt'
+  )
+}
+
+async function recordAcceptedDebt(run: Execution, ladder: LadderOutcome): Promise<void> {
+  const step = ladder.steps.find((s) => s.result === 'fail')
+  if (step === undefined) return
+  const command = step.command === null ? '' : ` (\`${step.command}\`)`
+  await run.deps.record(
+    'verify.debt_accepted',
+    step.name,
+    `${step.name}${command} failed with exit code ${step.exitCode ?? 'unknown'}; you accepted this debt, so the change ships.`
+  )
 }
 
 /** How many times the operator sent the finished change back from a gate of this rule. */
@@ -295,58 +293,15 @@ function failedCheckOf({ ladder, logs }: Climb): FailedCheck {
   }
 }
 
-async function raiseFailedCheck(run: Execution, { climbed, climber }: AfterWork): Promise<void> {
+async function raiseFailedCheck(run: Execution, climbed: Climb): Promise<void> {
   const failed = failedCheckOf(climbed)
-  const base = failed.step !== null ? await climber.onBase(failed.step) : BASE_UNKNOWN
-  const baseBranch = run.order.context.repos[0]?.baseBranch ?? 'the base branch'
-  if (base.onBase === 'fails' && base.failed !== null) {
-    run.halted = await run.stopAtGate(
-      'verify.base-fail',
-      baseFailAsk(run, { failed, base, baseBranch })
-    )
-    return
-  }
   const capped = sentBackCount(run, 'verify.repeat-fail') >= MAX_FINAL_SEND_BACKS
-  const note = baseNote({ failed, base, baseBranch })
   run.halted = await run.stopAtGate('verify.repeat-fail', {
     evidence: failed.evidence,
     summary: `${run.order.title} did not pass verification`,
-    why: `${failed.why}${note}${capped ? ' It has been sent back twice; take over, accept the debt, or hold.' : ''}`,
+    why: `${failed.why}${capped ? ' It has been sent back twice; take over, accept the debt, or hold.' : ''}`,
     omitOptions: capped ? ['send_back'] : undefined,
   })
-}
-
-interface BaseFinding {
-  readonly failed: FailedCheck
-  readonly base: BaseCheck
-  readonly baseBranch: string
-}
-
-function baseFailAsk(run: Execution, { failed, base, baseBranch }: BaseFinding) {
-  const baseFailed = base.failed as StepOutcome
-  const baseCommand = baseFailed.command === null ? '' : `: \`${baseFailed.command}\``
-  const baseLog = base.logs.get(baseFailed.name)
-  return {
-    evidence: [
-      ...failed.evidence,
-      {
-        kind: 'stdout' as const,
-        exitCode: baseFailed.exitCode ?? undefined,
-        step: baseFailed.name,
-        command: baseFailed.command ?? undefined,
-        path: baseLog,
-        excerpt: excerptOf(baseLog),
-      },
-    ],
-    summary: `${run.order.title} is blocked by a check that already fails on ${baseBranch}`,
-    why: `${baseFailed.name} fails on ${baseBranch} with exit code ${baseFailed.exitCode ?? 'unknown'}${baseCommand}. It also fails without this change.`,
-  }
-}
-
-function baseNote({ failed, base, baseBranch }: BaseFinding): string {
-  if (failed.step === null) return ''
-  if (base.onBase === 'passes') return ` It passes on ${baseBranch} without this change.`
-  return ` ${baseBranch} could not be checked to see whether it fails there too.`
 }
 
 async function recordFinalCheckFailed(run: Execution, ladder: LadderOutcome): Promise<void> {
@@ -360,10 +315,14 @@ async function recordFinalCheckFailed(run: Execution, ladder: LadderOutcome): Pr
   )
 }
 
-function runOutcomeOf(
-  run: Execution,
-  { change, workDone, ladder }: { change: Change; workDone: boolean; ladder: LadderOutcome | null }
-): RunOutcome {
+interface Outcome {
+  readonly change: Change
+  readonly workDone: boolean
+  readonly ladder: LadderOutcome | null
+  readonly debt: boolean
+}
+
+function runOutcomeOf(run: Execution, { change, workDone, ladder, debt }: Outcome): RunOutcome {
   const { inspection } = change
   return {
     graph: run.current,
@@ -378,14 +337,15 @@ function runOutcomeOf(
       reason: inspection.reason,
     },
     risk: change.risk,
-    // Done, nothing waiting on a person, and the climb passed or was not owed: a
-    // complete graph with an open gate is not shippable, nor is a shape with no ship step.
+    // Done, nothing waiting on a person, and the climb passed, was not owed, or its
+    // failure was accepted as debt: a complete graph with an open gate is not
+    // shippable, nor is a shape with no ship step.
     shippable:
       opensPullRequest(run.recipe) &&
       workDone &&
       !run.halted &&
       !run.stalled &&
       run.gates.length === 0 &&
-      (ladder?.ok ?? false),
+      ((ladder?.ok ?? true) || debt),
   }
 }

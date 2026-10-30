@@ -5,8 +5,6 @@ import { RUNGS, rungLevelInWords } from '../verify/ladder.js'
 import { askOnce, createLiveGateStore } from '../gates/store.js'
 import type { GateStore } from '../gates/store.js'
 import { shipOrder } from './integrate.js'
-import { readBaseline } from './baseline.js'
-import { baseBranchCommit } from './lane-commands.js'
 import { afterFinalCheck, ciRounds, settledOnce } from './ship-tail.js'
 import { createEarlyShip } from './early-ship.js'
 import { executePlan } from './executor.js'
@@ -58,8 +56,6 @@ interface RunTail {
   // sends work back only once the check has settled, so a builder never edits
   // the checkout the check is climbing over.
   readonly finalCheck: ReturnType<typeof settledOnce<boolean>>
-  // Checks the base branch already failed, so the draft can say they are not this change's.
-  readonly failingOnBase: readonly string[]
 }
 
 /** What a shipment is drawn from: the run's verdicts, its ladder, and whether inspection is owed. */
@@ -122,22 +118,7 @@ async function prepareRun(api: ExtensionAPI, run: OrderRun): Promise<RunTail> {
     graphRef: { current: graph },
     shippedOrderRef: { current: order },
     finalCheck: settledOnce<boolean>(),
-    failingOnBase: await failingOnBaseOf({ root, order, exec: built.exec }),
   }
-}
-
-// A baseline on an older base commit says nothing about this one.
-/** @internal */
-export async function failingOnBaseOf(run: {
-  root: string
-  order: WorkOrder
-  exec: ShellExec
-}): Promise<string[]> {
-  const baseline = await readBaseline(run.root, run.order.id)
-  const repo = run.order.context.repos[0]
-  if (baseline?.state !== 'failing' || repo === undefined) return []
-  if (baseline.commit !== (await baseBranchCommit(run.exec, repo))) return []
-  return baseline.steps.filter((s) => s.result === 'fail').map((s) => s.name)
 }
 
 function shipmentFor(tail: RunTail, found: Found): Shipment {
@@ -149,7 +130,6 @@ function shipmentFor(tail: RunTail, found: Found): Shipment {
       reason: `graded ${tail.shippedOrderRef.current.risk.grade} with no risk triggers`,
     },
     ladder: found.ladder,
-    failingOnBase: tail.failingOnBase,
     // Grouped by rung, so the record says what was in force where rather
     // than listing every rule as though they all applied at once.
     rulesInForce: RUNGS.flatMap((rung) =>
@@ -213,11 +193,13 @@ async function executeGraph(tail: RunTail, early: EarlyShip, graph: RunGraph): P
       { order, recipe, graph },
       {
         ...tail.executorDeps,
+        // A document outside the checkout has no change to verify or open a draft on.
+        shipsChange: async () => {
+          const end = documentOutcome(recipe, (await store.load(order.id))?.document ?? null)
+          return end.kind !== 'ready' && end.kind !== 'missing'
+        },
         beforeFinalCheck: async (found) => {
           tail.shippedOrderRef.current = { ...order, risk: found.risk }
-          // A document outside the checkout has no change to open a draft on.
-          const end = documentOutcome(recipe, (await store.load(order.id))?.document ?? null)
-          if (end.kind === 'ready' || end.kind === 'missing') return false
           return early.beforeFinalCheck(found)
         },
       }
