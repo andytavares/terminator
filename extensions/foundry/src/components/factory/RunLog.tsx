@@ -117,6 +117,7 @@ function RunLogChips({ lines, filter, onFilter }: ChipsProps) {
           type="button"
           className="fdry-hall-btn"
           aria-pressed={filter === value}
+          title={name}
           onClick={() => onFilter(value)}
         >
           {name}
@@ -199,9 +200,16 @@ function RunLogRow({ line, nodeId, onOpen }: RowProps) {
     <li className="fdry-runlog__line" data-kind={line.kind}>
       <time>{clockOf(line.at)}</time>
       {nodeId === undefined ? (
-        <span className="fdry-runlog__station">{line.station}</span>
+        <span className="fdry-runlog__station" title={line.station}>
+          {line.station}
+        </span>
       ) : (
-        <button type="button" className="fdry-runlog__station" onClick={() => onOpen(nodeId)}>
+        <button
+          type="button"
+          className="fdry-runlog__station"
+          title={line.station}
+          onClick={() => onOpen(nodeId)}
+        >
           {line.station}
         </button>
       )}

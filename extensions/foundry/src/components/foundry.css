@@ -4105,6 +4105,15 @@
   gap: 4px;
 }
 
+/* A station chip carries the unit's title; one line, cut with an ellipsis. */
+.fdry-runlog__chips .fdry-hall-btn {
+  display: inline-block;
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .fdry-runlog__lines {
   flex: 1;
   min-height: 0;
@@ -4118,7 +4127,8 @@
 
 .fdry-runlog__line {
   display: grid;
-  grid-template-columns: auto auto 1fr;
+  grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr);
+  align-items: start;
   gap: 8px;
   padding: 1px 0;
 }
@@ -4134,6 +4144,14 @@
   background: transparent;
   padding: 0;
   font: inherit;
+}
+
+.fdry-runlog__station {
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: start;
 }
 
 button.fdry-runlog__station {
