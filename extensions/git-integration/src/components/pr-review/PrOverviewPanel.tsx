@@ -12,10 +12,11 @@ import { ExternalLink, RefreshCw, X } from 'lucide-react'
 import { plural } from '@terminator/extension-sdk'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { useLoadIssueComments } from '../../hooks/usePrReview'
+import { usePaneWidth } from '../../hooks/usePaneWidth'
 import { githubAPI } from '../../api/github'
 import { mergeFlowAPI } from '../../api/merge-flow'
 import { RichContent } from './RichContent'
-import { OverviewSummary, summaryShown, useSummary, type Summary } from './OverviewSummary'
+import { OverviewSummary, useSummary, type Summary } from './OverviewSummary'
 import { ReadinessStrip, type ReadinessBranch } from './ReadinessStrip'
 import { ReviewPlan } from './ReviewPlan'
 import { PropertiesRail } from './PropertiesRail'
@@ -372,33 +373,45 @@ function OverviewFooter(footer: HeaderProps) {
   )
 }
 
-function Reading({ pr, clamped }: { pr: PrReviewDetail; clamped: boolean }) {
+interface ReadingProps {
+  text: string
+  /** The class of the box that holds the text; the clamp class is added to it. */
+  className: string
+  /** The button that lifts the clamp: "Show full description". */
+  expandLabel: string
+}
+
+/** The clamp, and the fade at its foot only when the text runs past it. */
+function readingClass(className: string, expanded: boolean, overflows: boolean): string {
+  if (expanded) return className
+  const fade = choose(overflows, ' pr-overview-reading--overflows', '')
+  return `${className} pr-overview-reading--clamped${fade}`
+}
+
+/** Text clamped to its stylesheet's height, with a button to read it all when it overflows. */
+function Reading({ text, className, expandLabel }: ReadingProps) {
   const [expanded, setExpanded] = useState(false)
   const [overflows, setOverflows] = useState(false)
   const readingRef = useRef<HTMLDivElement>(null)
-  const clamp = clamped && !expanded
   useEffect(() => {
     const element = readingRef.current
-    if (clamp && element) setOverflows(element.scrollHeight > element.clientHeight)
-  }, [clamp, pr.body])
+    if (!expanded && element) setOverflows(element.scrollHeight > element.clientHeight)
+  }, [expanded, text])
   return (
     <>
-      <div
-        ref={readingRef}
-        className={`pr-overview-reading${clamp ? ' pr-overview-reading--clamped' : ''}`}
-      >
-        <RichContent>{pr.body}</RichContent>
+      <div ref={readingRef} className={readingClass(className, expanded, overflows)}>
+        <RichContent>{text}</RichContent>
       </div>
-      {clamped && (expanded || overflows) && (
+      {(expanded || overflows) && (
         <Button variant="ghost" size="sm" onClick={() => setExpanded(!expanded)}>
-          {choose(expanded, 'Show less', 'Show full description')}
+          {choose(expanded, 'Show less', expandLabel)}
         </Button>
       )}
     </>
   )
 }
 
-function DescriptionSection({ pr, clamped }: { pr: PrReviewDetail; clamped: boolean }) {
+function DescriptionSection({ pr }: { pr: PrReviewDetail }) {
   return (
     <section className="pr-overview-section">
       <div className="pr-overview-section-head">
@@ -406,7 +419,13 @@ function DescriptionSection({ pr, clamped }: { pr: PrReviewDetail; clamped: bool
         {pr.body && <span className="pr-overview-byline">{pr.author} wrote</span>}
       </div>
       {!pr.body && <p className="pr-overview-no-desc">No description provided.</p>}
-      {pr.body && <Reading pr={pr} clamped={clamped} />}
+      {pr.body && (
+        <Reading
+          text={pr.body}
+          className="pr-overview-reading"
+          expandLabel="Show full description"
+        />
+      )}
     </section>
   )
 }
@@ -420,16 +439,14 @@ interface OverviewBodyProps {
   onStartReview: Props['onStartReview']
 }
 
-function OverviewTabContent(props: OverviewBodyProps & { summary: Summary }) {
+/** The change: Brief, review plan and description, a rule between each. */
+function ChangeContent(props: OverviewBodyProps & { summary: Summary }) {
   const { pr, summary } = props
   return (
-    <div className="pr-overview-layout">
-      <div className="pr-overview-column">
-        <OverviewSummary subject={{ kind: 'description', body: pr.body }} summary={summary} />
-        <ReviewPlan chapters={pr.chapters} onStartAt={props.onStartReview} />
-        <DescriptionSection pr={pr} clamped={summaryShown(summary)} />
-      </div>
-      <PropertiesRail pr={pr} />
+    <div className="pr-overview-column pr-overview-column--change">
+      <OverviewSummary subject={{ kind: 'description', body: pr.body }} summary={summary} />
+      <ReviewPlan chapters={pr.chapters} onStartAt={props.onStartReview} />
+      <DescriptionSection pr={pr} />
     </div>
   )
 }
@@ -463,9 +480,46 @@ function IssueCommentItem(props: CommentProps) {
       />
       <div>
         <IssueCommentHeader {...props} />
-        <div className="pr-issue-comment-body">
-          <RichContent>{comment.body}</RichContent>
-        </div>
+        <Reading
+          text={comment.body}
+          className="pr-issue-comment-body"
+          expandLabel="Show full comment"
+        />
+      </div>
+    </div>
+  )
+}
+
+/** How many of the latest comments show before "Show N earlier comments". */
+const LATEST_COMMENTS = 3
+
+/** The latest comments, oldest first, behind one row that shows the earlier ones. */
+function CommentTimeline({
+  comments,
+  onReply,
+}: {
+  comments: IssueComment[]
+  onReply: CommentProps['onReply']
+}) {
+  const [showEarlier, setShowEarlier] = useState(false)
+  const earlier = choose(showEarlier, 0, Math.max(0, comments.length - LATEST_COMMENTS))
+  if (comments.length === 0) return null
+  return (
+    <div>
+      {earlier > 0 && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="pr-issue-earlier"
+          onClick={() => setShowEarlier(true)}
+        >
+          Show {earlier} earlier {plural(earlier, 'comment')}
+        </Button>
+      )}
+      <div className="pr-issue-comment-list">
+        {comments.slice(earlier).map((comment) => (
+          <IssueCommentItem key={comment.id} comment={comment} onReply={onReply} />
+        ))}
       </div>
     </div>
   )
@@ -475,42 +529,66 @@ function IssueCommentItem(props: CommentProps) {
 function DiscussionContent(props: OverviewBodyProps & { summary: Summary }) {
   const { comments, box } = props
   return (
-    <div className="pr-overview-layout pr-overview-layout--single">
-      <div className="pr-overview-column">
-        <OverviewSummary subject={{ kind: 'discussion', comments }} summary={props.summary} />
-        {comments.length > 0 && (
-          <div className="pr-issue-comment-list">
-            {comments.map((comment) => (
-              <IssueCommentItem key={comment.id} comment={comment} onReply={box.handleReply} />
-            ))}
-          </div>
-        )}
-        <DiscussionComposer box={box} composerRef={props.composerRef} />
-      </div>
+    <div className="pr-overview-column">
+      <OverviewSummary subject={{ kind: 'discussion', comments }} summary={props.summary} />
+      <CommentTimeline comments={comments} onReply={box.handleReply} />
+      <DiscussionComposer box={box} composerRef={props.composerRef} />
     </div>
   )
 }
 
-/** Overview and Discussion, one at a time. Each summary lives here, so it outlasts a tab switch
- *  and goes with the overview. */
-function OverviewTabs(props: OverviewBodyProps) {
-  const [tab, setTab] = useState<'overview' | 'discussion'>('overview')
+type OverviewTab = 'change' | 'discussion' | 'properties'
+
+function DiscussionTab({ count }: { count: number }) {
+  return (
+    <Tab id="discussion" accessibleName={`Discussion, ${count}`}>
+      Discussion <span className="tmui-tabs__count">· {count}</span>
+    </Tab>
+  )
+}
+
+/** Change and Discussion, one at a time, and Properties while the pane is too narrow for the
+ *  rail. Each summary lives here, so it outlasts a tab switch and goes with the overview. */
+function OverviewTabs(props: OverviewBodyProps & { narrow: boolean }) {
+  const [chosen, setTab] = useState<OverviewTab>('change')
+  const tab = choose(chosen === 'properties' && !props.narrow, 'change', chosen)
   const descriptionSummary = useSummary(props.repoRoot, props.pr.number)
   const discussionSummary = useSummary(props.repoRoot, props.pr.number)
   return (
     <div className="pr-overview-main">
       <TabsRoot selectedId={tab} onSelect={setTab}>
         <TabList label="Pull request sections" className="pr-overview-tabs">
-          <Tab id="overview">Overview</Tab>
-          <Tab id="discussion">Discussion · {props.comments.length}</Tab>
+          <Tab id="change">Change</Tab>
+          <DiscussionTab count={props.comments.length} />
+          {props.narrow && <Tab id="properties">Properties</Tab>}
         </TabList>
-        <TabPanel id="overview" className="pr-overview-tab-panel">
-          <OverviewTabContent {...props} summary={descriptionSummary} />
+        <TabPanel id="change" className="pr-overview-tab-panel">
+          <ChangeContent {...props} summary={descriptionSummary} />
         </TabPanel>
         <TabPanel id="discussion" className="pr-overview-tab-panel">
           <DiscussionContent {...props} summary={discussionSummary} />
         </TabPanel>
+        <TabPanel id="properties" className="pr-overview-tab-panel">
+          <PropertiesRail pr={props.pr} />
+        </TabPanel>
       </TabsRoot>
+    </div>
+  )
+}
+
+/** The narrowest pane that draws the rail beside the tabs; narrower, the rail is the Properties
+ *  tab. pr-overview.css switches its grid at the same width. */
+const RAIL_MIN_PANE_WIDTH = 900
+
+/** The tabs, and the rail beside them while the pane is wide enough. The body spans the
+ *  overview's width, so it measures what the `pr-overview` container query measures. */
+function OverviewBody(props: OverviewBodyProps) {
+  const { paneRef, width } = usePaneWidth()
+  const narrow = width !== null && width < RAIL_MIN_PANE_WIDTH
+  return (
+    <div className="pr-overview-body" ref={paneRef}>
+      <OverviewTabs {...props} narrow={narrow} />
+      {!narrow && <PropertiesRail pr={props.pr} />}
     </div>
   )
 }
@@ -548,7 +626,7 @@ export function PrOverviewPanel(props: Props) {
         youAreRequested={isRequestedOf(pr, currentUserLogin)}
         branch={branchOf(actions)}
       />
-      <OverviewTabs
+      <OverviewBody
         key={pr.number}
         repoRoot={repoRoot}
         pr={pr}

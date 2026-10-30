@@ -1476,7 +1476,7 @@
       ><a href="#research">What others do</a><a href="#options">Options</a
       ><a href="#decision">Decision</a><a href="#design">Design</a><a href="#build">Changes</a
       ><a href="#verify">Verification</a><a href="#risks">Risks</a
-      ><a href="#questions">Open questions</a>
+      ><a href="#questions">Open questions</a><a href="#amended">Amended</a>
     </nav>
   </header>
 
@@ -2812,6 +2812,2183 @@
           the reading column off the reviewer's focal line.
         </li>
       </ul>
+    </div>
+  </section>
+  <section id="amended">
+    <h2>Amended: four sections (2026-10-30)</h2>
+    <div class="prose">
+      <p>
+        The overview is now four fixed sections (ADR 112, Amended). The header and the status strip
+        stay pinned. The tabs are <b>Change</b> and <b>Discussion · N</b>, and each scrolls on its
+        own. The properties rail sits beside both tabs with its own scroll; below 900px it is a
+        third tab, <b>Properties</b>. The description is always clamped, a comment is clamped at
+        160px, and only the last three comments show. Icons are flat. Each pair below is drawn from
+        the stylesheets it names, with the dark tokens of
+        <code>packages/extension-ui/src/tokens.css</code>; the before from the screen this amendment
+        replaced, the after from the built screen.
+      </p>
+    </div>
+    <style>
+      #overview-sections .sx-pair {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 20px;
+        margin: 12px 0 8px;
+      }
+      #overview-sections .sx-pair figure {
+        margin: 0;
+        min-width: 0;
+      }
+      #overview-sections .sx-pair figcaption {
+        font-size: 14px;
+        margin-top: 8px;
+      }
+      #overview-sections .sx-pair figcaption b {
+        display: block;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      #overview-sections .sx-stage {
+        overflow: hidden;
+        border-radius: 8px;
+        box-shadow:
+          0 1px 0 #ccc,
+          0 6px 18px rgba(0, 0, 0, 0.12);
+      }
+      #overview-sections .zoom-wide {
+        zoom: 0.46;
+      }
+      #overview-sections .zoom-narrow {
+        zoom: 0.74;
+      }
+      #overview-sections .zoom-crop {
+        zoom: 0.9;
+      }
+      #overview-sections .tm {
+        --tm-bg-base: #0c0c0f;
+        --tm-bg-surface: #111116;
+        --tm-bg-elevated: #18181f;
+        --tm-text-primary: #e2e2ee;
+        --tm-text-secondary: #9090c4;
+        --tm-text-muted: #8585b8;
+        --tm-border: rgba(255, 255, 255, 0.06);
+        --tm-border-strong: rgba(255, 255, 255, 0.12);
+        --tm-accent: #5c6bc0;
+        --tm-accent-text: #8b98e8;
+        --tm-accent-dim: rgba(92, 107, 192, 0.14);
+        --tm-danger: #e46a6a;
+        --tm-success: #4ade80;
+        --tm-warning: #facc15;
+        --tm-agent: #b39cf5;
+        --tm-agent-dim: rgba(179, 156, 245, 0.1);
+        --tm-overlay-subtle: rgba(255, 255, 255, 0.04);
+        --tm-overlay-soft: rgba(255, 255, 255, 0.06);
+        --tm-overlay: rgba(255, 255, 255, 0.09);
+        --tm-radius-xs: 4px;
+        --tm-radius-md: 10px;
+        --tm-space-1: 4px;
+        --tm-space-2: 8px;
+        --tm-space-3: 12px;
+        --tm-space-4: 16px;
+        --tm-space-5: 20px;
+        --tm-space-6: 24px;
+        --tm-font-mono: 'IBM Plex Mono', 'JetBrains Mono', Menlo, monospace;
+        --tm-font-ui: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: var(--tm-bg-base);
+        color: var(--tm-text-primary);
+        font-family: var(--tm-font-ui);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+      #overview-sections .tm.wide {
+        width: 1180px;
+        height: 760px;
+      }
+      #overview-sections .tm.narrow {
+        width: 760px;
+        height: 760px;
+      }
+      #overview-sections .tm button {
+        font: inherit;
+        color: inherit;
+      }
+      #overview-sections .tm svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      #overview-sections .tm h2 {
+        margin: 0;
+      }
+      #overview-sections .sx-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 28px;
+        padding: 0 12px;
+        border-radius: 6px;
+        border: 1px solid var(--tm-border-strong);
+        background: var(--tm-bg-elevated);
+        font-size: 13px;
+        cursor: default;
+        white-space: nowrap;
+      }
+      #overview-sections .sx-btn--primary {
+        background: var(--tm-accent);
+        border-color: var(--tm-accent);
+        color: #fff;
+      }
+      #overview-sections .sx-btn--sm {
+        height: 22px;
+        padding: 0 8px;
+        font-size: 12px;
+      }
+      #overview-sections .sx-btn--ghost {
+        background: transparent;
+        border-color: transparent;
+        color: var(--tm-text-secondary);
+      }
+      #overview-sections .sx-ibtn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border: 0;
+        background: none;
+        color: var(--tm-text-secondary);
+      }
+      #overview-sections .tmui-tabs__list {
+        display: flex;
+        gap: var(--tm-space-1);
+        border-bottom: 1px solid var(--tm-border);
+      }
+      #overview-sections .tmui-tabs__tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-bottom: -1px;
+        padding: 6px 12px;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        background: transparent;
+        color: var(--tm-text-secondary);
+        font-size: 13px;
+      }
+      #overview-sections .tmui-tabs__tab[aria-selected='true'] {
+        border-bottom-color: var(--tm-accent);
+        color: var(--tm-text-primary);
+        font-weight: 500;
+      }
+      #overview-sections .tmui-tabs__count {
+        color: var(--tm-text-muted);
+      }
+      #overview-sections .pr-overview {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+        container: pr-overview / inline-size;
+      }
+      #overview-sections .pr-overview-header {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--tm-space-4);
+        padding: var(--tm-space-5) var(--tm-space-6) var(--tm-space-4);
+        flex-shrink: 0;
+      }
+      #overview-sections .pr-overview-heading {
+        display: flex;
+        flex-direction: column;
+        gap: var(--tm-space-2);
+        min-width: 0;
+        flex: 1;
+      }
+      #overview-sections .pr-overview-title {
+        margin: 0;
+        font-size: 19px;
+        line-height: 1.3;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      #overview-sections .pr-overview-number {
+        color: var(--tm-text-muted);
+        font-weight: 400;
+      }
+      #overview-sections .pr-overview-state {
+        display: inline-flex;
+        align-items: center;
+        height: 22px;
+        margin-right: 8px;
+        padding: 0 9px;
+        border-radius: 999px;
+        font-size: 11.5px;
+        font-weight: 600;
+        vertical-align: 3px;
+      }
+      #overview-sections .pr-overview-state--open {
+        background: color-mix(in srgb, var(--tm-success) 14%, transparent);
+        color: var(--tm-success);
+      }
+      #overview-sections .pr-overview-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 16px;
+        font-size: 12.5px;
+        color: var(--tm-text-secondary);
+      }
+      #overview-sections .pr-overview-meta strong {
+        color: var(--tm-text-primary);
+        font-weight: 500;
+      }
+      #overview-sections .pr-overview-ref {
+        padding: 1px 6px;
+        border-radius: var(--tm-radius-xs);
+        background: var(--tm-overlay-soft);
+        color: var(--tm-text-primary);
+        font-family: var(--tm-font-mono);
+        font-size: 11.5px;
+      }
+      #overview-sections .pr-overview-added {
+        color: var(--tm-success);
+        font-weight: 500;
+      }
+      #overview-sections .pr-overview-removed {
+        color: var(--tm-danger);
+        font-weight: 500;
+      }
+      #overview-sections .pr-overview-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+      #overview-sections .pr-overview-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+      }
+      #overview-sections .pr-overview-tabs {
+        flex-shrink: 0;
+        padding: 0 var(--tm-space-6);
+      }
+      #overview-sections .pr-overview-tab-panel {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+      }
+      #overview-sections .pr-overview-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
+        min-height: 100%;
+      }
+      #overview-sections .pr-overview-layout--single {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      #overview-sections .pr-overview-column {
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+        min-width: 0;
+        padding: 26px 40px 36px var(--tm-space-6);
+      }
+      #overview-sections .pr-overview-section {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--tm-space-3);
+      }
+      #overview-sections .pr-overview-section-head {
+        display: flex;
+        align-items: baseline;
+        gap: var(--tm-space-3);
+      }
+      #overview-sections .pr-overview-section-head h2 {
+        margin: 0;
+        font-size: 13.5px;
+        font-weight: 600;
+      }
+      #overview-sections .pr-overview-byline {
+        font-size: 12px;
+        color: var(--tm-text-muted);
+      }
+      #overview-sections .pr-overview-reading {
+        position: relative;
+        font-size: 13.5px;
+        line-height: 1.65;
+        max-width: 68ch;
+        min-width: 0;
+      }
+      #overview-sections .pr-overview-reading p {
+        margin: 0 0 10px;
+      }
+      #overview-sections .pr-overview-reading--clamped {
+        max-height: 300px;
+        overflow: hidden;
+      }
+      #overview-sections .pr-overview-reading--clamped::after {
+        content: '';
+        position: absolute;
+        inset: auto 0 0;
+        height: 96px;
+        background: linear-gradient(to bottom, transparent, var(--tm-bg-base));
+      }
+      #overview-sections .pr-overview-reading table {
+        border-collapse: collapse;
+        font-size: 12.5px;
+      }
+      #overview-sections .pr-overview-reading th,
+      #overview-sections .pr-overview-reading td {
+        padding: 7px 20px 7px 0;
+        border-bottom: 1px solid var(--tm-border);
+        text-align: left;
+      }
+      #overview-sections .pr-overview-reading th {
+        color: var(--tm-text-muted);
+        font-size: 11.5px;
+      }
+      #overview-sections .pr-issue-comment-list {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+      }
+      #overview-sections .pr-issue-comment-list::before {
+        content: '';
+        position: absolute;
+        left: 12px;
+        top: 26px;
+        bottom: 26px;
+        width: 1px;
+        background: var(--tm-border-strong);
+      }
+      #overview-sections .pr-issue-comment {
+        position: relative;
+        display: grid;
+        grid-template-columns: 26px minmax(0, 1fr);
+        gap: 12px;
+        padding-bottom: 20px;
+      }
+      #overview-sections .pr-issue-comment-avatar {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: var(--tm-overlay);
+        position: relative;
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+        color: var(--tm-text-secondary);
+      }
+      #overview-sections .pr-issue-comment-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12.5px;
+        color: var(--tm-text-muted);
+      }
+      #overview-sections .pr-issue-comment-header strong {
+        color: var(--tm-text-primary);
+        font-weight: 600;
+      }
+      #overview-sections .pr-issue-comment-header .sx-btn {
+        margin-left: auto;
+      }
+      #overview-sections .pr-issue-comment-body {
+        margin-top: 4px;
+        font-size: 13.5px;
+        line-height: 1.6;
+      }
+      #overview-sections .pr-issue-comment-body p {
+        margin: 0 0 8px;
+      }
+      #overview-sections .comment-composer {
+        border: 1px solid var(--tm-border-strong);
+        border-radius: 8px;
+        padding: 8px;
+      }
+      #overview-sections .comment-composer-textarea {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        height: 74px;
+        margin-top: 8px;
+        background: var(--tm-bg-surface);
+        border: 1px solid var(--tm-border);
+        border-radius: 6px;
+        color: var(--tm-text-muted);
+        padding: 6px 8px;
+      }
+      #overview-sections .comment-composer-actions {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 10px;
+        margin-top: 8px;
+      }
+      #overview-sections .pr-issue-composer-hint {
+        font-size: 11px;
+        color: var(--tm-text-muted);
+      }
+      @container pr-overview (max-width: 900px) {
+        #overview-sections .pr-overview-layout {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        #overview-sections .pr-overview-column {
+          padding-right: var(--tm-space-6);
+        }
+      }
+      #overview-sections .rs-strip {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr);
+        border-top: 1px solid var(--tm-border);
+        border-bottom: 1px solid var(--tm-border);
+        flex-shrink: 0;
+      }
+      #overview-sections .rs-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 20px;
+        min-width: 0;
+        font-size: 12.5px;
+      }
+      #overview-sections .rs-cell + .rs-cell {
+        border-left: 1px solid var(--tm-border);
+      }
+      #overview-sections .rs-label {
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      #overview-sections .rs-detail {
+        color: var(--tm-text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+      }
+      #overview-sections .rs-end {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      #overview-sections .rs-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+        color: var(--tm-accent-text);
+        font-size: 11.5px;
+      }
+      #overview-sections .rs-chip svg {
+        width: 12px;
+        height: 12px;
+      }
+      #overview-sections .rs-cell--quiet .rs-label {
+        color: var(--tm-text-secondary);
+      }
+      #overview-sections .rs-cell--bad {
+        background: color-mix(in srgb, var(--tm-danger) 7%, transparent);
+      }
+      #overview-sections .rs-cell--bad .rs-label {
+        color: var(--tm-danger);
+      }
+      #overview-sections .rs-cell--bad .rs-detail {
+        color: var(--tm-text-primary);
+      }
+      #overview-sections .before .rs-cell--ok .rs-icon {
+        color: var(--tm-success);
+      }
+      #overview-sections .before .rs-cell--wait .rs-icon {
+        color: var(--tm-warning);
+      }
+      #overview-sections .before .rs-cell--quiet .rs-icon {
+        color: var(--tm-text-muted);
+      }
+      #overview-sections .before .rs-cell--bad .rs-icon {
+        color: var(--tm-danger);
+      }
+      #overview-sections .pr-rail {
+        display: flex;
+        flex-direction: column;
+        gap: 26px;
+        padding: 24px 20px;
+        border-left: 1px solid var(--tm-border);
+        background: var(--tm-bg-surface);
+        min-width: 0;
+        overflow-x: hidden;
+      }
+      #overview-sections .pr-rail-heading {
+        margin: 0 0 10px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--tm-text-muted);
+      }
+      #overview-sections .pr-rail-signals {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      #overview-sections .pr-rail-signal {
+        display: grid;
+        grid-template-columns: 16px 82px minmax(0, 1fr);
+        align-items: baseline;
+        gap: 8px;
+        padding: 6px 8px;
+        margin: 0 -8px;
+        border-radius: 6px;
+        font-size: 12.5px;
+      }
+      #overview-sections .pr-rail-signal svg {
+        position: relative;
+        top: 2px;
+      }
+      #overview-sections .pr-rail-signal-label {
+        color: var(--tm-text-muted);
+      }
+      #overview-sections .pr-rail-signal-value small {
+        display: block;
+        margin-top: 1px;
+        font-size: 11.5px;
+        color: var(--tm-text-muted);
+      }
+      #overview-sections .pr-rail-details {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr);
+        gap: 10px;
+        margin: 0;
+        font-size: 12.5px;
+        align-items: baseline;
+      }
+      #overview-sections .pr-rail-details dt {
+        color: var(--tm-text-muted);
+      }
+      #overview-sections .pr-rail-details dd {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+        min-width: 0;
+      }
+      #overview-sections .pr-rail-details code {
+        font-family: var(--tm-font-mono);
+        font-size: 12px;
+      }
+      #overview-sections .pr-rail-details small {
+        font-size: 11.5px;
+        color: var(--tm-text-muted);
+      }
+      #overview-sections .before .pr-rail-signal--danger svg {
+        color: var(--tm-danger);
+      }
+      #overview-sections .before .pr-rail-signal--warning svg {
+        color: var(--tm-warning);
+      }
+      #overview-sections .before .pr-rail-signal--success svg {
+        color: var(--tm-success);
+      }
+      #overview-sections .before .pr-rail-signal--neutral svg {
+        color: var(--tm-text-muted);
+      }
+      #overview-sections .brief-idle {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-md);
+        color: var(--tm-text-secondary);
+        font-size: 12.5px;
+        align-self: stretch;
+      }
+      #overview-sections .brief-idle__text {
+        flex: 1;
+      }
+      #overview-sections .before .brief-card__icon {
+        color: var(--tm-agent);
+      }
+      #overview-sections .review-plan {
+        align-self: stretch;
+      }
+      #overview-sections .review-plan__heading {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      #overview-sections .review-plan__heading h2 {
+        margin: 0;
+        font-size: 13.5px;
+        font-weight: 600;
+      }
+      #overview-sections .review-plan__heading span {
+        font-size: 12px;
+        color: var(--tm-text-muted);
+      }
+      #overview-sections .review-plan__rows {
+        border: 1px solid var(--tm-border);
+        border-radius: var(--tm-radius-md);
+        overflow: hidden;
+      }
+      #overview-sections .review-plan__row {
+        display: grid;
+        grid-template-columns: 28px minmax(0, 1fr) 88px 64px 120px 56px;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        height: 40px;
+        padding: 0 14px;
+        border: 0;
+        border-top: 1px solid var(--tm-border);
+        background: transparent;
+        font-size: 13px;
+        text-align: left;
+      }
+      #overview-sections .review-plan__row:first-child {
+        border-top: 0;
+      }
+      #overview-sections .review-plan__number {
+        font-family: var(--tm-font-mono);
+        font-size: 11.5px;
+        color: var(--tm-text-muted);
+      }
+      #overview-sections .review-plan__name {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #overview-sections .review-plan__name small {
+        margin-left: 8px;
+        font-size: 12px;
+        color: var(--tm-text-muted);
+      }
+      #overview-sections .review-plan__risk {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      #overview-sections .review-plan__risk::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      #overview-sections .review-plan__risk--high {
+        color: var(--tm-danger);
+      }
+      #overview-sections .review-plan__risk--medium {
+        color: var(--tm-warning);
+      }
+      #overview-sections .review-plan__risk--low {
+        color: var(--tm-text-muted);
+        font-weight: 400;
+      }
+      #overview-sections .review-plan__files,
+      #overview-sections .review-plan__minutes {
+        font-size: 12px;
+        color: var(--tm-text-secondary);
+      }
+      #overview-sections .review-plan__minutes {
+        text-align: right;
+      }
+      #overview-sections .review-plan__bar {
+        display: flex;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--tm-overlay);
+        overflow: hidden;
+      }
+      #overview-sections .review-plan__bar b {
+        display: block;
+        height: 100%;
+      }
+      #overview-sections .review-plan__bar-added {
+        background: color-mix(in srgb, var(--tm-success) 70%, transparent);
+      }
+      #overview-sections .review-plan__bar-removed {
+        background: color-mix(in srgb, var(--tm-danger) 70%, transparent);
+      }
+      @container pr-overview (max-width: 900px) {
+        #overview-sections .review-plan__row {
+          grid-template-columns: 28px minmax(0, 1fr) 88px 64px 56px;
+        }
+        #overview-sections .review-plan__change {
+          display: none;
+        }
+      }
+      #overview-sections .after .pr-overview-body {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
+      }
+      #overview-sections .after .pr-overview-body > .pr-rail {
+        overflow-y: auto;
+      }
+      #overview-sections .after .pr-overview-tab-panel > .pr-overview-column {
+        min-height: 100%;
+        box-sizing: border-box;
+      }
+      #overview-sections .after .pr-overview-column {
+        gap: 0;
+      }
+      #overview-sections .after .pr-overview-column > section + section {
+        margin-top: 22px;
+        padding-top: 22px;
+        border-top: 1px solid var(--tm-border);
+      }
+      #overview-sections .after .rs-cell--quiet .rs-icon,
+      #overview-sections .after .pr-rail-signal--neutral svg {
+        opacity: 0.6;
+      }
+      #overview-sections .after .pr-issue-earlier {
+        margin: 0 0 14px 38px;
+      }
+      #overview-sections .after .pr-issue-comment-body.pr-overview-reading--clamped {
+        max-height: 160px;
+      }
+      #overview-sections .after .pr-issue-comment-body.pr-overview-reading--clamped::after {
+        height: 60px;
+      }
+      @container pr-overview (width < 900px) {
+        #overview-sections .after .pr-overview-body {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+    <div id="overview-sections">
+      <!-- ═══ Pair 1: wide, Change tab ═══ -->
+      <h3>1. The overview, wide pane</h3>
+      <div class="sx-pair">
+        <figure>
+          <div class="sx-stage zoom-wide">
+            <div class="tm wide before">
+              <div class="pr-overview">
+                <header class="pr-overview-header">
+                  <div class="pr-overview-heading">
+                    <h1 class="pr-overview-title">
+                      <span class="pr-overview-state pr-overview-state--open">Open</span>Retry
+                      webhook deliveries with backoff <span class="pr-overview-number">#412</span>
+                    </h1>
+                    <div class="pr-overview-meta">
+                      <strong>mara</strong
+                      ><span
+                        ><code class="pr-overview-ref">feat/webhook-retry</code> →
+                        <code class="pr-overview-ref">main</code></span
+                      ><span>opened 2 days ago</span><span>14 files</span
+                      ><span
+                        ><b class="pr-overview-added">+612</b>
+                        <b class="pr-overview-removed">−88</b></span
+                      ><span>about 38 min</span>
+                    </div>
+                  </div>
+                  <div class="pr-overview-actions">
+                    <span class="sx-ibtn"
+                      ><svg viewBox="0 0 24 24">
+                        <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+                        <path d="M21 3v5h-5" /></svg></span
+                    ><span class="sx-ibtn"
+                      ><svg viewBox="0 0 24 24">
+                        <path
+                          d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
+                        /></svg></span
+                    ><span class="sx-ibtn"
+                      ><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg></span
+                    ><span class="sx-btn sx-btn--primary">Start review</span>
+                  </div>
+                </header>
+                <div class="rs-strip" role="group" aria-label="Readiness">
+                  <div class="rs-cell rs-cell--bad">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="m15 9-6 6M9 9l6 6" /></svg
+                    ><span class="rs-label">Checks</span
+                    ><span class="rs-detail">1 failing, 6 passed</span>
+                  </div>
+                  <div class="rs-cell rs-cell--wait">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="9" cy="8" r="4" />
+                      <path
+                        d="M2 21a7 7 0 0 1 14 0M16 3.1a4 4 0 0 1 0 7.8M22 21a7 7 0 0 0-5-6.7"
+                      /></svg
+                    ><span class="rs-label">Reviews</span
+                    ><span class="rs-detail">Waiting on you, devon</span
+                    ><span class="rs-end"
+                      ><span class="rs-chip"
+                        ><svg viewBox="0 0 24 24">
+                          <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" />
+                          <circle cx="12" cy="12" r="3" /></svg
+                        >Your review requested</span
+                      ></span
+                    >
+                  </div>
+                  <div class="rs-cell rs-cell--ok">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="18" cy="18" r="3" />
+                      <circle cx="6" cy="6" r="3" />
+                      <path d="M6 21V9a9 9 0 0 0 9 9" /></svg
+                    ><span class="rs-label">Merge</span
+                    ><span class="rs-detail">No conflicts with main</span>
+                  </div>
+                </div>
+                <div class="pr-overview-main">
+                  <div class="tmui-tabs__list pr-overview-tabs">
+                    <span class="tmui-tabs__tab" aria-selected="true">Overview</span
+                    ><span class="tmui-tabs__tab">Discussion · 6</span>
+                  </div>
+                  <div class="pr-overview-tab-panel">
+                    <div class="pr-overview-layout">
+                      <div class="pr-overview-column">
+                        <div class="brief-idle">
+                          <svg class="brief-card__icon" viewBox="0 0 24 24">
+                            <path
+                              d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"
+                            /></svg
+                          ><span class="brief-idle__text"
+                            >Summarize the description with the review agent</span
+                          ><span class="sx-btn sx-btn--sm">Summarize</span>
+                        </div>
+                        <section class="review-plan">
+                          <header class="review-plan__heading">
+                            <h2>Review plan</h2>
+                            <span>5 chapters · about 38 min</span>
+                          </header>
+                          <div class="review-plan__rows">
+                            <div class="review-plan__row">
+                              <span class="review-plan__number">1</span
+                              ><span class="review-plan__name"
+                                >Retry policy<small>backoff.ts, policy.ts</small></span
+                              ><span class="review-plan__risk review-plan__risk--high"
+                                >High risk</span
+                              ><span class="review-plan__files">2 files</span
+                              ><span class="review-plan__change"
+                                ><span class="review-plan__bar"
+                                  ><b class="review-plan__bar-added" style="width: 62%"></b
+                                  ><b
+                                    class="review-plan__bar-removed"
+                                    style="width: 8%"
+                                  ></b></span></span
+                              ><span class="review-plan__minutes">12 min</span>
+                            </div>
+                            <div class="review-plan__row">
+                              <span class="review-plan__number">2</span
+                              ><span class="review-plan__name"
+                                >Delivery queue<small>queue.ts, worker.ts, lease.ts</small></span
+                              ><span class="review-plan__risk review-plan__risk--medium"
+                                >Medium risk</span
+                              ><span class="review-plan__files">3 files</span
+                              ><span class="review-plan__change"
+                                ><span class="review-plan__bar"
+                                  ><b class="review-plan__bar-added" style="width: 48%"></b
+                                  ><b
+                                    class="review-plan__bar-removed"
+                                    style="width: 14%"
+                                  ></b></span></span
+                              ><span class="review-plan__minutes">9 min</span>
+                            </div>
+                            <div class="review-plan__row">
+                              <span class="review-plan__number">3</span
+                              ><span class="review-plan__name"
+                                >Schema<small>0042_retry.sql</small></span
+                              ><span class="review-plan__risk review-plan__risk--medium"
+                                >Medium risk</span
+                              ><span class="review-plan__files">1 file</span
+                              ><span class="review-plan__change"
+                                ><span class="review-plan__bar"
+                                  ><b
+                                    class="review-plan__bar-added"
+                                    style="width: 20%"
+                                  ></b></span></span
+                              ><span class="review-plan__minutes">4 min</span>
+                            </div>
+                            <div class="review-plan__row">
+                              <span class="review-plan__number">4</span
+                              ><span class="review-plan__name"
+                                >Settings page<small>RetrySettings.tsx, copy.ts</small></span
+                              ><span class="review-plan__risk review-plan__risk--low">Low risk</span
+                              ><span class="review-plan__files">2 files</span
+                              ><span class="review-plan__change"
+                                ><span class="review-plan__bar"
+                                  ><b class="review-plan__bar-added" style="width: 30%"></b
+                                  ><b
+                                    class="review-plan__bar-removed"
+                                    style="width: 6%"
+                                  ></b></span></span
+                              ><span class="review-plan__minutes">6 min</span>
+                            </div>
+                            <div class="review-plan__row">
+                              <span class="review-plan__number">5</span
+                              ><span class="review-plan__name"
+                                >Tests<small>backoff.spec.ts, queue.spec.ts +4</small></span
+                              ><span class="review-plan__risk review-plan__risk--low">Low risk</span
+                              ><span class="review-plan__files">6 files</span
+                              ><span class="review-plan__change"
+                                ><span class="review-plan__bar"
+                                  ><b
+                                    class="review-plan__bar-added"
+                                    style="width: 100%"
+                                  ></b></span></span
+                              ><span class="review-plan__minutes">7 min</span>
+                            </div>
+                          </div>
+                        </section>
+                        <section class="pr-overview-section">
+                          <div class="pr-overview-section-head">
+                            <h2>Description</h2>
+                            <span class="pr-overview-byline">mara wrote</span>
+                          </div>
+                          <div class="pr-overview-reading">
+                            <p>
+                              <b>Current state.</b> A webhook delivery that gets a 5xx is dropped
+                              after one attempt. Customers see gaps in their event stream and file
+                              tickets.
+                            </p>
+                            <p>
+                              <b>This PR.</b> Failed deliveries go back on the queue with
+                              exponential backoff (2s, 4s, 8s … capped at 10 min) and a jitter of
+                              ±20%. After eight attempts the delivery is marked dead and shows in
+                              the admin page.
+                            </p>
+                            <table>
+                              <tr>
+                                <th>Attempt</th>
+                                <th>Delay</th>
+                                <th>Cumulative</th>
+                              </tr>
+                              <tr>
+                                <td>1</td>
+                                <td>2s</td>
+                                <td>2s</td>
+                              </tr>
+                              <tr>
+                                <td>2</td>
+                                <td>4s</td>
+                                <td>6s</td>
+                              </tr>
+                              <tr>
+                                <td>3</td>
+                                <td>8s</td>
+                                <td>14s</td>
+                              </tr>
+                              <tr>
+                                <td>8</td>
+                                <td>10 min</td>
+                                <td>~21 min</td>
+                              </tr>
+                            </table>
+                            <p>
+                              <b>Migration.</b>
+                              <code class="pr-overview-ref">0042_retry.sql</code> adds
+                              <code class="pr-overview-ref">attempts</code> and
+                              <code class="pr-overview-ref">next_attempt_at</code>. It is additive;
+                              the old worker ignores both columns.
+                            </p>
+                            <p>
+                              <b>Rollout.</b> Behind
+                              <code class="pr-overview-ref">webhooks.retry</code>. We turn it on for
+                              internal tenants first, then 10%, then all.
+                            </p>
+                            <p>
+                              <b>Testing.</b> Unit tests for the policy and queue lease. A soak test
+                              ran 40k deliveries against a flaky receiver with no lost events.
+                            </p>
+                            <p>
+                              <b>Screenshots.</b> The admin page now has a Dead deliveries table
+                              with Retry and Discard actions.
+                            </p>
+                            <p>
+                              <b>Out of scope.</b> Per-endpoint retry settings and a signed-replay
+                              API.
+                            </p>
+                          </div>
+                        </section>
+                      </div>
+                      <aside class="pr-rail" aria-label="Pull request details">
+                        <section>
+                          <h2 class="pr-rail-heading">Signals</h2>
+                          <ul class="pr-rail-signals">
+                            <li class="pr-rail-signal pr-rail-signal--danger">
+                              <svg viewBox="0 0 24 24">
+                                <path
+                                  d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3.2.2 1.6 1.1 2.7 2.5 2.7z"
+                                /></svg
+                              ><span class="pr-rail-signal-label">Risk</span
+                              ><span class="pr-rail-signal-value"
+                                >High<small>backoff.ts changes a hot path</small></span
+                              >
+                            </li>
+                            <li class="pr-rail-signal pr-rail-signal--warning">
+                              <svg viewBox="0 0 24 24">
+                                <path d="M9 3h6M10 3v6L4 20h16L14 9V3" /></svg
+                              ><span class="pr-rail-signal-label">Tests</span
+                              ><span class="pr-rail-signal-value">7 of 11 functions</span>
+                            </li>
+                            <li class="pr-rail-signal pr-rail-signal--success">
+                              <svg viewBox="0 0 24 24">
+                                <circle cx="6" cy="6" r="3" />
+                                <circle cx="6" cy="18" r="3" />
+                                <path d="M6 9v6M18 9a9 9 0 0 1-9 9" />
+                                <circle cx="18" cy="6" r="3" /></svg
+                              ><span class="pr-rail-signal-label">Complexity</span
+                              ><span class="pr-rail-signal-value">Low</span>
+                            </li>
+                            <li class="pr-rail-signal pr-rail-signal--neutral">
+                              <svg viewBox="0 0 24 24">
+                                <path
+                                  d="M2 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2zM22 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z"
+                                /></svg
+                              ><span class="pr-rail-signal-label">Reading</span
+                              ><span class="pr-rail-signal-value">About 38 min</span>
+                            </li>
+                          </ul>
+                        </section>
+                        <section>
+                          <h2 class="pr-rail-heading">Details</h2>
+                          <dl class="pr-rail-details">
+                            <dt>Author</dt>
+                            <dd>mara</dd>
+                            <dt>Branch</dt>
+                            <dd><code>feat/webhook-retry</code></dd>
+                            <dt>Into</dt>
+                            <dd><code>main</code></dd>
+                            <dt>Opened</dt>
+                            <dd>Oct 28, 2026<small>2 days ago</small></dd>
+                            <dt>Head</dt>
+                            <dd><code>9f3c2ab</code></dd>
+                            <dt>Linked issues</dt>
+                            <dd>TAV-14</dd>
+                          </dl>
+                        </section>
+                      </aside>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>Before</b> Brief, plan, description and the rail scroll as one panel
+            (<code>PrOverviewPanel.tsx:426-433</code>). Nothing marks where the plan ends and the
+            description starts, and the description runs in full.
+          </figcaption>
+        </figure>
+
+        <figure>
+          <div class="sx-stage zoom-wide">
+            <div class="tm wide after">
+              <div class="pr-overview">
+                <header class="pr-overview-header">
+                  <div class="pr-overview-heading">
+                    <h1 class="pr-overview-title">
+                      <span class="pr-overview-state pr-overview-state--open">Open</span>Retry
+                      webhook deliveries with backoff <span class="pr-overview-number">#412</span>
+                    </h1>
+                    <div class="pr-overview-meta">
+                      <strong>mara</strong
+                      ><span
+                        ><code class="pr-overview-ref">feat/webhook-retry</code> →
+                        <code class="pr-overview-ref">main</code></span
+                      ><span>opened 2 days ago</span><span>14 files</span
+                      ><span
+                        ><b class="pr-overview-added">+612</b>
+                        <b class="pr-overview-removed">−88</b></span
+                      ><span>about 38 min</span>
+                    </div>
+                  </div>
+                  <div class="pr-overview-actions">
+                    <span class="sx-ibtn"
+                      ><svg viewBox="0 0 24 24">
+                        <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+                        <path d="M21 3v5h-5" /></svg></span
+                    ><span class="sx-ibtn"
+                      ><svg viewBox="0 0 24 24">
+                        <path
+                          d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
+                        /></svg></span
+                    ><span class="sx-ibtn"
+                      ><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg></span
+                    ><span class="sx-btn sx-btn--primary">Start review</span>
+                  </div>
+                </header>
+                <div class="rs-strip" role="group" aria-label="Status">
+                  <div class="rs-cell rs-cell--bad">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="m15 9-6 6M9 9l6 6" /></svg
+                    ><span class="rs-label">Checks</span
+                    ><span class="rs-detail">1 failing, 6 passed</span>
+                  </div>
+                  <div class="rs-cell rs-cell--wait">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="9" cy="8" r="4" />
+                      <path
+                        d="M2 21a7 7 0 0 1 14 0M16 3.1a4 4 0 0 1 0 7.8M22 21a7 7 0 0 0-5-6.7"
+                      /></svg
+                    ><span class="rs-label">Reviews</span
+                    ><span class="rs-detail">Waiting on you, devon</span
+                    ><span class="rs-end"
+                      ><span class="rs-chip"
+                        ><svg viewBox="0 0 24 24">
+                          <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" />
+                          <circle cx="12" cy="12" r="3" /></svg
+                        >Your review requested</span
+                      ></span
+                    >
+                  </div>
+                  <div class="rs-cell rs-cell--ok">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="18" cy="18" r="3" />
+                      <circle cx="6" cy="6" r="3" />
+                      <path d="M6 21V9a9 9 0 0 0 9 9" /></svg
+                    ><span class="rs-label">Merge</span
+                    ><span class="rs-detail">No conflicts with main</span>
+                  </div>
+                </div>
+                <div class="pr-overview-body">
+                  <div class="pr-overview-main">
+                    <div class="tmui-tabs__list pr-overview-tabs">
+                      <span class="tmui-tabs__tab" aria-selected="true">Change</span
+                      ><span class="tmui-tabs__tab"
+                        >Discussion <span class="tmui-tabs__count">· 6</span></span
+                      >
+                    </div>
+                    <div class="pr-overview-tab-panel">
+                      <div class="pr-overview-column">
+                        <section aria-label="Brief">
+                          <div class="brief-idle">
+                            <svg class="brief-card__icon" viewBox="0 0 24 24">
+                              <path
+                                d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"
+                              /></svg
+                            ><span class="brief-idle__text"
+                              >Summarize the description with the review agent</span
+                            ><span class="sx-btn sx-btn--sm">Summarize</span>
+                          </div>
+                        </section>
+                        <section class="review-plan">
+                          <header class="review-plan__heading">
+                            <h2>Review plan</h2>
+                            <span>5 chapters · about 38 min</span>
+                          </header>
+                          <div class="review-plan__rows">
+                            <div class="review-plan__row">
+                              <span class="review-plan__number">1</span
+                              ><span class="review-plan__name"
+                                >Retry policy<small>backoff.ts, policy.ts</small></span
+                              ><span class="review-plan__risk review-plan__risk--high"
+                                >High risk</span
+                              ><span class="review-plan__files">2 files</span
+                              ><span class="review-plan__change"
+                                ><span class="review-plan__bar"
+                                  ><b class="review-plan__bar-added" style="width: 62%"></b
+                                  ><b
+                                    class="review-plan__bar-removed"
+                                    style="width: 8%"
+                                  ></b></span></span
+                              ><span class="review-plan__minutes">12 min</span>
+                            </div>
+                            <div class="review-plan__row">
+                              <span class="review-plan__number">2</span
+                              ><span class="review-plan__name"
+                                >Delivery queue<small>queue.ts, worker.ts, lease.ts</small></span
+                              ><span class="review-plan__risk review-plan__risk--medium"
+                                >Medium risk</span
+                              ><span class="review-plan__files">3 files</span
+                              ><span class="review-plan__change"
+                                ><span class="review-plan__bar"
+                                  ><b class="review-plan__bar-added" style="width: 48%"></b
+                                  ><b
+                                    class="review-plan__bar-removed"
+                                    style="width: 14%"
+                                  ></b></span></span
+                              ><span class="review-plan__minutes">9 min</span>
+                            </div>
+                            <div class="review-plan__row">
+                              <span class="review-plan__number">3</span
+                              ><span class="review-plan__name"
+                                >Schema<small>0042_retry.sql</small></span
+                              ><span class="review-plan__risk review-plan__risk--medium"
+                                >Medium risk</span
+                              ><span class="review-plan__files">1 file</span
+                              ><span class="review-plan__change"
+                                ><span class="review-plan__bar"
+                                  ><b
+                                    class="review-plan__bar-added"
+                                    style="width: 20%"
+                                  ></b></span></span
+                              ><span class="review-plan__minutes">4 min</span>
+                            </div>
+                            <div class="review-plan__row">
+                              <span class="review-plan__number">4</span
+                              ><span class="review-plan__name"
+                                >Settings page<small>RetrySettings.tsx, copy.ts</small></span
+                              ><span class="review-plan__risk review-plan__risk--low">Low risk</span
+                              ><span class="review-plan__files">2 files</span
+                              ><span class="review-plan__change"
+                                ><span class="review-plan__bar"
+                                  ><b class="review-plan__bar-added" style="width: 30%"></b
+                                  ><b
+                                    class="review-plan__bar-removed"
+                                    style="width: 6%"
+                                  ></b></span></span
+                              ><span class="review-plan__minutes">6 min</span>
+                            </div>
+                            <div class="review-plan__row">
+                              <span class="review-plan__number">5</span
+                              ><span class="review-plan__name"
+                                >Tests<small>backoff.spec.ts, queue.spec.ts +4</small></span
+                              ><span class="review-plan__risk review-plan__risk--low">Low risk</span
+                              ><span class="review-plan__files">6 files</span
+                              ><span class="review-plan__change"
+                                ><span class="review-plan__bar"
+                                  ><b
+                                    class="review-plan__bar-added"
+                                    style="width: 100%"
+                                  ></b></span></span
+                              ><span class="review-plan__minutes">7 min</span>
+                            </div>
+                          </div>
+                        </section>
+                        <section class="pr-overview-section">
+                          <div class="pr-overview-section-head">
+                            <h2>Description</h2>
+                            <span class="pr-overview-byline">mara wrote</span>
+                          </div>
+                          <div class="pr-overview-reading pr-overview-reading--clamped">
+                            <p>
+                              <b>Current state.</b> A webhook delivery that gets a 5xx is dropped
+                              after one attempt. Customers see gaps in their event stream and file
+                              tickets.
+                            </p>
+                            <p>
+                              <b>This PR.</b> Failed deliveries go back on the queue with
+                              exponential backoff (2s, 4s, 8s … capped at 10 min) and a jitter of
+                              ±20%. After eight attempts the delivery is marked dead and shows in
+                              the admin page.
+                            </p>
+                            <table>
+                              <tr>
+                                <th>Attempt</th>
+                                <th>Delay</th>
+                                <th>Cumulative</th>
+                              </tr>
+                              <tr>
+                                <td>1</td>
+                                <td>2s</td>
+                                <td>2s</td>
+                              </tr>
+                              <tr>
+                                <td>2</td>
+                                <td>4s</td>
+                                <td>6s</td>
+                              </tr>
+                              <tr>
+                                <td>3</td>
+                                <td>8s</td>
+                                <td>14s</td>
+                              </tr>
+                              <tr>
+                                <td>8</td>
+                                <td>10 min</td>
+                                <td>~21 min</td>
+                              </tr>
+                            </table>
+                            <p>
+                              <b>Migration.</b>
+                              <code class="pr-overview-ref">0042_retry.sql</code> adds two columns.
+                            </p>
+                          </div>
+                          <span class="sx-btn sx-btn--ghost sx-btn--sm">Show full description</span>
+                        </section>
+                      </div>
+                    </div>
+                  </div>
+                  <aside class="pr-rail" aria-label="Pull request details">
+                    <section>
+                      <h2 class="pr-rail-heading">Signals</h2>
+                      <ul class="pr-rail-signals">
+                        <li class="pr-rail-signal pr-rail-signal--danger">
+                          <svg viewBox="0 0 24 24">
+                            <path
+                              d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3.2.2 1.6 1.1 2.7 2.5 2.7z"
+                            /></svg
+                          ><span class="pr-rail-signal-label">Risk</span
+                          ><span class="pr-rail-signal-value"
+                            >High<small>backoff.ts changes a hot path</small></span
+                          >
+                        </li>
+                        <li class="pr-rail-signal pr-rail-signal--warning">
+                          <svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6L4 20h16L14 9V3" /></svg
+                          ><span class="pr-rail-signal-label">Tests</span
+                          ><span class="pr-rail-signal-value">7 of 11 functions</span>
+                        </li>
+                        <li class="pr-rail-signal pr-rail-signal--success">
+                          <svg viewBox="0 0 24 24">
+                            <circle cx="6" cy="6" r="3" />
+                            <circle cx="6" cy="18" r="3" />
+                            <path d="M6 9v6M18 9a9 9 0 0 1-9 9" />
+                            <circle cx="18" cy="6" r="3" /></svg
+                          ><span class="pr-rail-signal-label">Complexity</span
+                          ><span class="pr-rail-signal-value">Low</span>
+                        </li>
+                        <li class="pr-rail-signal pr-rail-signal--neutral">
+                          <svg viewBox="0 0 24 24">
+                            <path
+                              d="M2 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2zM22 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z"
+                            /></svg
+                          ><span class="pr-rail-signal-label">Reading</span
+                          ><span class="pr-rail-signal-value">About 38 min</span>
+                        </li>
+                      </ul>
+                    </section>
+                    <section>
+                      <h2 class="pr-rail-heading">Details</h2>
+                      <dl class="pr-rail-details">
+                        <dt>Author</dt>
+                        <dd>mara</dd>
+                        <dt>Branch</dt>
+                        <dd><code>feat/webhook-retry</code></dd>
+                        <dt>Into</dt>
+                        <dd><code>main</code></dd>
+                        <dt>Opened</dt>
+                        <dd>Oct 28, 2026<small>2 days ago</small></dd>
+                        <dt>Head</dt>
+                        <dd><code>9f3c2ab</code></dd>
+                        <dt>Linked issues</dt>
+                        <dd>TAV-14</dd>
+                      </dl>
+                    </section>
+                  </aside>
+                </div>
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>After</b> The rail sits beside the tabs and stays in place while the change scrolls.
+            A rule marks each part of the change, and the description is clamped until the reviewer
+            opens it.
+          </figcaption>
+        </figure>
+      </div>
+
+      <!-- ═══ Pair 2: Discussion ═══ -->
+      <h3>2. The discussion</h3>
+      <div class="sx-pair">
+        <figure>
+          <div class="sx-stage zoom-wide">
+            <div class="tm wide before">
+              <div class="pr-overview">
+                <header class="pr-overview-header">
+                  <div class="pr-overview-heading">
+                    <h1 class="pr-overview-title">
+                      <span class="pr-overview-state pr-overview-state--open">Open</span>Retry
+                      webhook deliveries with backoff <span class="pr-overview-number">#412</span>
+                    </h1>
+                    <div class="pr-overview-meta">
+                      <strong>mara</strong
+                      ><span
+                        ><code class="pr-overview-ref">feat/webhook-retry</code> →
+                        <code class="pr-overview-ref">main</code></span
+                      ><span>14 files</span><span>about 38 min</span>
+                    </div>
+                  </div>
+                  <div class="pr-overview-actions">
+                    <span class="sx-btn sx-btn--primary">Start review</span>
+                  </div>
+                </header>
+                <div class="rs-strip">
+                  <div class="rs-cell rs-cell--bad">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="m15 9-6 6M9 9l6 6" /></svg
+                    ><span class="rs-label">Checks</span
+                    ><span class="rs-detail">1 failing, 6 passed</span>
+                  </div>
+                  <div class="rs-cell rs-cell--wait">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="9" cy="8" r="4" />
+                      <path d="M2 21a7 7 0 0 1 14 0" /></svg
+                    ><span class="rs-label">Reviews</span
+                    ><span class="rs-detail">Waiting on you, devon</span>
+                  </div>
+                  <div class="rs-cell rs-cell--ok">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="18" cy="18" r="3" />
+                      <circle cx="6" cy="6" r="3" />
+                      <path d="M6 21V9a9 9 0 0 0 9 9" /></svg
+                    ><span class="rs-label">Merge</span
+                    ><span class="rs-detail">No conflicts with main</span>
+                  </div>
+                </div>
+                <div class="pr-overview-main">
+                  <div class="tmui-tabs__list pr-overview-tabs">
+                    <span class="tmui-tabs__tab">Overview</span
+                    ><span class="tmui-tabs__tab" aria-selected="true">Discussion · 6</span>
+                  </div>
+                  <div class="pr-overview-tab-panel">
+                    <div class="pr-overview-layout pr-overview-layout--single">
+                      <div class="pr-overview-column">
+                        <div class="brief-idle">
+                          <svg class="brief-card__icon" viewBox="0 0 24 24">
+                            <path
+                              d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"
+                            /></svg
+                          ><span class="brief-idle__text"
+                            >Summarize the discussion with the review agent</span
+                          ><span class="sx-btn sx-btn--sm">Summarize</span>
+                        </div>
+                        <div class="pr-issue-comment-list">
+                          <div class="pr-issue-comment">
+                            <span class="pr-issue-comment-avatar">d</span>
+                            <div>
+                              <div class="pr-issue-comment-header">
+                                <strong>devon</strong><span>2 days ago</span
+                                ><span class="sx-btn sx-btn--ghost sx-btn--sm">Reply</span>
+                              </div>
+                              <div class="pr-issue-comment-body">
+                                <p>
+                                  Why cap at 10 minutes? Some receivers are down for an hour during
+                                  deploys.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="pr-issue-comment">
+                            <span class="pr-issue-comment-avatar">m</span>
+                            <div>
+                              <div class="pr-issue-comment-header">
+                                <strong>mara</strong><span>2 days ago</span
+                                ><span class="sx-btn sx-btn--ghost sx-btn--sm">Reply</span>
+                              </div>
+                              <div class="pr-issue-comment-body">
+                                <p>
+                                  Eight attempts with the cap is about 21 minutes in total. Longer
+                                  than that and the event is stale for most consumers. The
+                                  dead-delivery page lets an admin replay it.
+                                </p>
+                                <p>
+                                  I measured the receivers we host: the p99 outage in the last
+                                  quarter was 14 minutes.
+                                </p>
+                                <p>
+                                  If we need longer, it should be per-endpoint, which is out of
+                                  scope here.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="pr-issue-comment">
+                            <span class="pr-issue-comment-avatar">s</span>
+                            <div>
+                              <div class="pr-issue-comment-header">
+                                <strong>sam</strong><span>yesterday</span
+                                ><span class="sx-btn sx-btn--ghost sx-btn--sm">Reply</span>
+                              </div>
+                              <div class="pr-issue-comment-body">
+                                <p>
+                                  The migration adds an index on
+                                  <code class="pr-overview-ref">next_attempt_at</code> without
+                                  <code class="pr-overview-ref">CONCURRENTLY</code>. On the
+                                  deliveries table that locks writes for minutes.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="pr-issue-comment">
+                            <span class="pr-issue-comment-avatar">m</span>
+                            <div>
+                              <div class="pr-issue-comment-header">
+                                <strong>mara</strong><span>yesterday</span
+                                ><span class="sx-btn sx-btn--ghost sx-btn--sm">Reply</span>
+                              </div>
+                              <div class="pr-issue-comment-body">
+                                <p>Good catch. Fixed in 9f3c2ab.</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="pr-issue-comment">
+                            <span class="pr-issue-comment-avatar">d</span>
+                            <div>
+                              <div class="pr-issue-comment-header">
+                                <strong>devon</strong><span>3 hours ago</span
+                                ><span class="sx-btn sx-btn--ghost sx-btn--sm">Reply</span>
+                              </div>
+                              <div class="pr-issue-comment-body">
+                                <p>
+                                  CI is red on the soak job. Is that the flaky receiver or a real
+                                  regression?
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="pr-issue-comment">
+                            <span class="pr-issue-comment-avatar">m</span>
+                            <div>
+                              <div class="pr-issue-comment-header">
+                                <strong>mara</strong><span>1 hour ago</span
+                                ><span class="sx-btn sx-btn--ghost sx-btn--sm">Reply</span>
+                              </div>
+                              <div class="pr-issue-comment-body">
+                                <p>
+                                  The receiver. It returned 200 with an empty body, which the old
+                                  assertion counted as lost. I am fixing the assertion in a
+                                  follow-up.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="comment-composer">
+                          <div class="tmui-tabs__list">
+                            <span class="tmui-tabs__tab" aria-selected="true">Write</span
+                            ><span class="tmui-tabs__tab">Preview</span>
+                          </div>
+                          <div class="comment-composer-textarea">Leave a comment…</div>
+                          <div class="comment-composer-actions">
+                            <span class="pr-issue-composer-hint">⌘↵ to submit</span
+                            ><span class="sx-btn sx-btn--primary sx-btn--sm">Comment</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>Before</b> Every comment shows in full and the composer is below the last one
+            (<code>PrOverviewPanel.tsx:481-488</code>). The rail is not on this tab
+            (<code>:478</code>).
+          </figcaption>
+        </figure>
+
+        <figure>
+          <div class="sx-stage zoom-wide">
+            <div class="tm wide after">
+              <div class="pr-overview">
+                <header class="pr-overview-header">
+                  <div class="pr-overview-heading">
+                    <h1 class="pr-overview-title">
+                      <span class="pr-overview-state pr-overview-state--open">Open</span>Retry
+                      webhook deliveries with backoff <span class="pr-overview-number">#412</span>
+                    </h1>
+                    <div class="pr-overview-meta">
+                      <strong>mara</strong
+                      ><span
+                        ><code class="pr-overview-ref">feat/webhook-retry</code> →
+                        <code class="pr-overview-ref">main</code></span
+                      ><span>14 files</span><span>about 38 min</span>
+                    </div>
+                  </div>
+                  <div class="pr-overview-actions">
+                    <span class="sx-btn sx-btn--primary">Start review</span>
+                  </div>
+                </header>
+                <div class="rs-strip" aria-label="Status">
+                  <div class="rs-cell rs-cell--bad">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="m15 9-6 6M9 9l6 6" /></svg
+                    ><span class="rs-label">Checks</span
+                    ><span class="rs-detail">1 failing, 6 passed</span>
+                  </div>
+                  <div class="rs-cell rs-cell--wait">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="9" cy="8" r="4" />
+                      <path d="M2 21a7 7 0 0 1 14 0" /></svg
+                    ><span class="rs-label">Reviews</span
+                    ><span class="rs-detail">Waiting on you, devon</span>
+                  </div>
+                  <div class="rs-cell rs-cell--ok">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="18" cy="18" r="3" />
+                      <circle cx="6" cy="6" r="3" />
+                      <path d="M6 21V9a9 9 0 0 0 9 9" /></svg
+                    ><span class="rs-label">Merge</span
+                    ><span class="rs-detail">No conflicts with main</span>
+                  </div>
+                </div>
+                <div class="pr-overview-body">
+                  <div class="pr-overview-main">
+                    <div class="tmui-tabs__list pr-overview-tabs">
+                      <span class="tmui-tabs__tab">Change</span
+                      ><span class="tmui-tabs__tab" aria-selected="true"
+                        >Discussion <span class="tmui-tabs__count">· 6</span></span
+                      >
+                    </div>
+                    <div class="pr-overview-tab-panel">
+                      <div class="pr-overview-column">
+                        <section aria-label="Brief">
+                          <div class="brief-idle">
+                            <svg class="brief-card__icon" viewBox="0 0 24 24">
+                              <path
+                                d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"
+                              /></svg
+                            ><span class="brief-idle__text"
+                              >Summarize the discussion with the review agent</span
+                            ><span class="sx-btn sx-btn--sm">Summarize</span>
+                          </div>
+                        </section>
+                        <section aria-label="Comments">
+                          <div class="pr-issue-earlier">
+                            <span class="sx-btn sx-btn--ghost sx-btn--sm"
+                              >Show 3 earlier comments</span
+                            >
+                          </div>
+                          <div class="pr-issue-comment-list">
+                            <div class="pr-issue-comment">
+                              <span class="pr-issue-comment-avatar">m</span>
+                              <div>
+                                <div class="pr-issue-comment-header">
+                                  <strong>mara</strong><span>yesterday</span
+                                  ><span class="sx-btn sx-btn--ghost sx-btn--sm">Reply</span>
+                                </div>
+                                <div class="pr-issue-comment-body">
+                                  <p>Good catch. Fixed in 9f3c2ab.</p>
+                                </div>
+                              </div>
+                            </div>
+                            <div class="pr-issue-comment">
+                              <span class="pr-issue-comment-avatar">d</span>
+                              <div>
+                                <div class="pr-issue-comment-header">
+                                  <strong>devon</strong><span>3 hours ago</span
+                                  ><span class="sx-btn sx-btn--ghost sx-btn--sm">Reply</span>
+                                </div>
+                                <div class="pr-issue-comment-body">
+                                  <p>
+                                    CI is red on the soak job. Is that the flaky receiver or a real
+                                    regression?
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            <div class="pr-issue-comment">
+                              <span class="pr-issue-comment-avatar">m</span>
+                              <div>
+                                <div class="pr-issue-comment-header">
+                                  <strong>mara</strong><span>1 hour ago</span
+                                  ><span class="sx-btn sx-btn--ghost sx-btn--sm">Reply</span>
+                                </div>
+                                <div class="pr-issue-comment-body">
+                                  <p>
+                                    The receiver. It returned 200 with an empty body, which the old
+                                    assertion counted as lost. I am fixing the assertion in a
+                                    follow-up.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </section>
+                        <section aria-label="New comment">
+                          <div class="comment-composer">
+                            <div class="tmui-tabs__list">
+                              <span class="tmui-tabs__tab" aria-selected="true">Write</span
+                              ><span class="tmui-tabs__tab">Preview</span>
+                            </div>
+                            <div class="comment-composer-textarea">Leave a comment…</div>
+                            <div class="comment-composer-actions">
+                              <span class="pr-issue-composer-hint">⌘↵ to submit</span
+                              ><span class="sx-btn sx-btn--primary sx-btn--sm">Comment</span>
+                            </div>
+                          </div>
+                        </section>
+                      </div>
+                    </div>
+                  </div>
+                  <aside class="pr-rail">
+                    <section>
+                      <h2 class="pr-rail-heading">Signals</h2>
+                      <ul class="pr-rail-signals">
+                        <li class="pr-rail-signal pr-rail-signal--danger">
+                          <svg viewBox="0 0 24 24">
+                            <path
+                              d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3.2.2 1.6 1.1 2.7 2.5 2.7z"
+                            /></svg
+                          ><span class="pr-rail-signal-label">Risk</span
+                          ><span class="pr-rail-signal-value"
+                            >High<small>backoff.ts changes a hot path</small></span
+                          >
+                        </li>
+                        <li class="pr-rail-signal pr-rail-signal--warning">
+                          <svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6L4 20h16L14 9V3" /></svg
+                          ><span class="pr-rail-signal-label">Tests</span
+                          ><span class="pr-rail-signal-value">7 of 11 functions</span>
+                        </li>
+                      </ul>
+                    </section>
+                    <section>
+                      <h2 class="pr-rail-heading">Details</h2>
+                      <dl class="pr-rail-details">
+                        <dt>Author</dt>
+                        <dd>mara</dd>
+                        <dt>Branch</dt>
+                        <dd><code>feat/webhook-retry</code></dd>
+                        <dt>Into</dt>
+                        <dd><code>main</code></dd>
+                        <dt>Head</dt>
+                        <dd><code>9f3c2ab</code></dd>
+                      </dl>
+                    </section>
+                  </aside>
+                </div>
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>After</b> The last three comments show and the earlier ones collapse behind one row,
+            so the newest reply and the composer are in view. The rail stays beside the discussion
+            too.
+          </figcaption>
+        </figure>
+      </div>
+
+      <!-- ═══ Pair 3: narrow pane ═══ -->
+      <h3>3. A pane narrower than 900px</h3>
+      <div class="sx-pair">
+        <figure>
+          <div class="sx-stage zoom-narrow">
+            <div class="tm narrow before">
+              <div class="pr-overview">
+                <header class="pr-overview-header">
+                  <div class="pr-overview-heading">
+                    <h1 class="pr-overview-title">
+                      <span class="pr-overview-state pr-overview-state--open">Open</span>Retry
+                      webhook deliveries with backoff <span class="pr-overview-number">#412</span>
+                    </h1>
+                    <div class="pr-overview-meta">
+                      <strong>mara</strong><span>14 files</span><span>about 38 min</span>
+                    </div>
+                  </div>
+                  <div class="pr-overview-actions">
+                    <span class="sx-btn sx-btn--primary">Start review</span>
+                  </div>
+                </header>
+                <div class="rs-strip">
+                  <div class="rs-cell rs-cell--bad">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="m15 9-6 6M9 9l6 6" /></svg
+                    ><span class="rs-label">Checks</span><span class="rs-detail">1 failing</span>
+                  </div>
+                  <div class="rs-cell rs-cell--wait">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="9" cy="8" r="4" />
+                      <path d="M2 21a7 7 0 0 1 14 0" /></svg
+                    ><span class="rs-label">Reviews</span
+                    ><span class="rs-detail">Waiting on you</span>
+                  </div>
+                  <div class="rs-cell rs-cell--ok">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="18" cy="18" r="3" />
+                      <circle cx="6" cy="6" r="3" />
+                      <path d="M6 21V9a9 9 0 0 0 9 9" /></svg
+                    ><span class="rs-label">Merge</span><span class="rs-detail">No conflicts</span>
+                  </div>
+                </div>
+                <div class="pr-overview-main">
+                  <div class="tmui-tabs__list pr-overview-tabs">
+                    <span class="tmui-tabs__tab" aria-selected="true">Overview</span
+                    ><span class="tmui-tabs__tab">Discussion · 6</span>
+                  </div>
+                  <div class="pr-overview-tab-panel">
+                    <div class="pr-overview-layout">
+                      <div class="pr-overview-column">
+                        <div class="brief-idle">
+                          <svg class="brief-card__icon" viewBox="0 0 24 24">
+                            <path
+                              d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"
+                            /></svg
+                          ><span class="brief-idle__text"
+                            >Summarize the description with the review agent</span
+                          ><span class="sx-btn sx-btn--sm">Summarize</span>
+                        </div>
+                        <section class="review-plan">
+                          <header class="review-plan__heading">
+                            <h2>Review plan</h2>
+                            <span>5 chapters · about 38 min</span>
+                          </header>
+                          <div class="review-plan__rows">
+                            <div class="review-plan__row">
+                              <span class="review-plan__number">1</span
+                              ><span class="review-plan__name">Retry policy</span
+                              ><span class="review-plan__risk review-plan__risk--high"
+                                >High risk</span
+                              ><span class="review-plan__files">2 files</span
+                              ><span class="review-plan__change"></span
+                              ><span class="review-plan__minutes">12 min</span>
+                            </div>
+                            <div class="review-plan__row">
+                              <span class="review-plan__number">2</span
+                              ><span class="review-plan__name">Delivery queue</span
+                              ><span class="review-plan__risk review-plan__risk--medium"
+                                >Medium risk</span
+                              ><span class="review-plan__files">3 files</span
+                              ><span class="review-plan__change"></span
+                              ><span class="review-plan__minutes">9 min</span>
+                            </div>
+                            <div class="review-plan__row">
+                              <span class="review-plan__number">3</span
+                              ><span class="review-plan__name">Schema</span
+                              ><span class="review-plan__risk review-plan__risk--medium"
+                                >Medium risk</span
+                              ><span class="review-plan__files">1 file</span
+                              ><span class="review-plan__change"></span
+                              ><span class="review-plan__minutes">4 min</span>
+                            </div>
+                          </div>
+                        </section>
+                        <section class="pr-overview-section">
+                          <div class="pr-overview-section-head">
+                            <h2>Description</h2>
+                            <span class="pr-overview-byline">mara wrote</span>
+                          </div>
+                          <div class="pr-overview-reading">
+                            <p>
+                              <b>Current state.</b> A webhook delivery that gets a 5xx is dropped
+                              after one attempt.
+                            </p>
+                            <p>
+                              <b>This PR.</b> Failed deliveries go back on the queue with
+                              exponential backoff, capped at 10 min, with ±20% jitter. After eight
+                              attempts the delivery is marked dead.
+                            </p>
+                            <p>
+                              <b>Migration.</b> Adds
+                              <code class="pr-overview-ref">attempts</code> and
+                              <code class="pr-overview-ref">next_attempt_at</code>.
+                            </p>
+                            <p>
+                              <b>Rollout.</b> Behind
+                              <code class="pr-overview-ref">webhooks.retry</code>: internal tenants,
+                              then 10%, then all.
+                            </p>
+                            <p><b>Testing.</b> Unit tests and a 40k-delivery soak test.</p>
+                            <p><b>Out of scope.</b> Per-endpoint retry settings.</p>
+                          </div>
+                        </section>
+                      </div>
+                      <aside class="pr-rail">
+                        <section>
+                          <h2 class="pr-rail-heading">Signals</h2>
+                          <ul class="pr-rail-signals">
+                            <li class="pr-rail-signal pr-rail-signal--danger">
+                              <svg viewBox="0 0 24 24">
+                                <path
+                                  d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3.2.2 1.6 1.1 2.7 2.5 2.7z"
+                                /></svg
+                              ><span class="pr-rail-signal-label">Risk</span
+                              ><span class="pr-rail-signal-value">High</span>
+                            </li>
+                          </ul>
+                        </section>
+                        <section>
+                          <h2 class="pr-rail-heading">Details</h2>
+                          <dl class="pr-rail-details">
+                            <dt>Branch</dt>
+                            <dd><code>feat/webhook-retry</code></dd>
+                            <dt>Head</dt>
+                            <dd><code>9f3c2ab</code></dd>
+                            <dt>Linked issues</dt>
+                            <dd>TAV-14</dd>
+                          </dl>
+                        </section>
+                      </aside>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>Before</b> Below 900px the rail drops under the description
+            (<code>pr-overview.css:386-394</code>). Signals and Details are reached only by
+            scrolling past the whole change.
+          </figcaption>
+        </figure>
+
+        <figure>
+          <div class="sx-stage zoom-narrow">
+            <div class="tm narrow after">
+              <div class="pr-overview">
+                <header class="pr-overview-header">
+                  <div class="pr-overview-heading">
+                    <h1 class="pr-overview-title">
+                      <span class="pr-overview-state pr-overview-state--open">Open</span>Retry
+                      webhook deliveries with backoff <span class="pr-overview-number">#412</span>
+                    </h1>
+                    <div class="pr-overview-meta">
+                      <strong>mara</strong><span>14 files</span><span>about 38 min</span>
+                    </div>
+                  </div>
+                  <div class="pr-overview-actions">
+                    <span class="sx-btn sx-btn--primary">Start review</span>
+                  </div>
+                </header>
+                <div class="rs-strip" aria-label="Status">
+                  <div class="rs-cell rs-cell--bad">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="m15 9-6 6M9 9l6 6" /></svg
+                    ><span class="rs-label">Checks</span><span class="rs-detail">1 failing</span>
+                  </div>
+                  <div class="rs-cell rs-cell--wait">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="9" cy="8" r="4" />
+                      <path d="M2 21a7 7 0 0 1 14 0" /></svg
+                    ><span class="rs-label">Reviews</span
+                    ><span class="rs-detail">Waiting on you</span>
+                  </div>
+                  <div class="rs-cell rs-cell--ok">
+                    <svg class="rs-icon" viewBox="0 0 24 24">
+                      <circle cx="18" cy="18" r="3" />
+                      <circle cx="6" cy="6" r="3" />
+                      <path d="M6 21V9a9 9 0 0 0 9 9" /></svg
+                    ><span class="rs-label">Merge</span><span class="rs-detail">No conflicts</span>
+                  </div>
+                </div>
+                <div class="pr-overview-body">
+                  <div class="pr-overview-main">
+                    <div class="tmui-tabs__list pr-overview-tabs">
+                      <span class="tmui-tabs__tab">Change</span
+                      ><span class="tmui-tabs__tab"
+                        >Discussion <span class="tmui-tabs__count">· 6</span></span
+                      ><span class="tmui-tabs__tab" aria-selected="true">Properties</span>
+                    </div>
+                    <div class="pr-overview-tab-panel">
+                      <div class="pr-overview-column">
+                        <aside class="pr-rail" style="border-left: 0; background: none; padding: 0">
+                          <section>
+                            <h2 class="pr-rail-heading">Signals</h2>
+                            <ul class="pr-rail-signals">
+                              <li class="pr-rail-signal pr-rail-signal--danger">
+                                <svg viewBox="0 0 24 24">
+                                  <path
+                                    d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3.2.2 1.6 1.1 2.7 2.5 2.7z"
+                                  /></svg
+                                ><span class="pr-rail-signal-label">Risk</span
+                                ><span class="pr-rail-signal-value"
+                                  >High<small>backoff.ts changes a hot path</small></span
+                                >
+                              </li>
+                              <li class="pr-rail-signal pr-rail-signal--warning">
+                                <svg viewBox="0 0 24 24">
+                                  <path d="M9 3h6M10 3v6L4 20h16L14 9V3" /></svg
+                                ><span class="pr-rail-signal-label">Tests</span
+                                ><span class="pr-rail-signal-value">7 of 11 functions</span>
+                              </li>
+                              <li class="pr-rail-signal pr-rail-signal--neutral">
+                                <svg viewBox="0 0 24 24">
+                                  <path
+                                    d="M2 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2zM22 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z"
+                                  /></svg
+                                ><span class="pr-rail-signal-label">Reading</span
+                                ><span class="pr-rail-signal-value">About 38 min</span>
+                              </li>
+                            </ul>
+                          </section>
+                          <section>
+                            <h2 class="pr-rail-heading">Details</h2>
+                            <dl class="pr-rail-details">
+                              <dt>Author</dt>
+                              <dd>mara</dd>
+                              <dt>Branch</dt>
+                              <dd><code>feat/webhook-retry</code></dd>
+                              <dt>Into</dt>
+                              <dd><code>main</code></dd>
+                              <dt>Head</dt>
+                              <dd><code>9f3c2ab</code></dd>
+                              <dt>Linked issues</dt>
+                              <dd>TAV-14</dd>
+                            </dl>
+                          </section>
+                        </aside>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>After</b> Below 900px, Properties is a third tab with the same rail content, one
+            click from any section. The aside beside the tabs is not drawn at this width.
+          </figcaption>
+        </figure>
+      </div>
+
+      <!-- ═══ Pair 4: flat icons ═══ -->
+      <h3>4. Icons</h3>
+      <div class="sx-pair">
+        <figure>
+          <div class="sx-stage zoom-crop">
+            <div class="tm before" style="width: 620px; padding-bottom: 12px">
+              <div class="rs-strip">
+                <div class="rs-cell rs-cell--bad">
+                  <svg class="rs-icon" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="m15 9-6 6M9 9l6 6" /></svg
+                  ><span class="rs-label">Checks</span><span class="rs-detail">1 failing</span>
+                </div>
+                <div class="rs-cell rs-cell--wait">
+                  <svg class="rs-icon" viewBox="0 0 24 24">
+                    <circle cx="9" cy="8" r="4" />
+                    <path d="M2 21a7 7 0 0 1 14 0" /></svg
+                  ><span class="rs-label">Reviews</span
+                  ><span class="rs-detail">Waiting on you</span>
+                </div>
+                <div class="rs-cell rs-cell--ok">
+                  <svg class="rs-icon" viewBox="0 0 24 24">
+                    <circle cx="18" cy="18" r="3" />
+                    <circle cx="6" cy="6" r="3" />
+                    <path d="M6 21V9a9 9 0 0 0 9 9" /></svg
+                  ><span class="rs-label">Merge</span><span class="rs-detail">No conflicts</span>
+                </div>
+              </div>
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: 1fr 1fr;
+                  gap: 20px;
+                  padding: 14px 20px 0;
+                "
+              >
+                <ul class="pr-rail-signals">
+                  <li class="pr-rail-signal pr-rail-signal--danger">
+                    <svg viewBox="0 0 24 24">
+                      <path
+                        d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3.2.2 1.6 1.1 2.7 2.5 2.7z"
+                      /></svg
+                    ><span class="pr-rail-signal-label">Risk</span
+                    ><span class="pr-rail-signal-value">High</span>
+                  </li>
+                  <li class="pr-rail-signal pr-rail-signal--success">
+                    <svg viewBox="0 0 24 24">
+                      <circle cx="6" cy="6" r="3" />
+                      <circle cx="6" cy="18" r="3" />
+                      <path d="M6 9v6M18 9a9 9 0 0 1-9 9" />
+                      <circle cx="18" cy="6" r="3" /></svg
+                    ><span class="pr-rail-signal-label">Complexity</span
+                    ><span class="pr-rail-signal-value">Low</span>
+                  </li>
+                  <li class="pr-rail-signal pr-rail-signal--neutral">
+                    <svg viewBox="0 0 24 24">
+                      <path
+                        d="M2 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2zM22 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z"
+                      /></svg
+                    ><span class="pr-rail-signal-label">Reading</span
+                    ><span class="pr-rail-signal-value">38 min</span>
+                  </li>
+                </ul>
+                <div class="brief-idle" style="align-self: start">
+                  <svg class="brief-card__icon" viewBox="0 0 24 24">
+                    <path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z" /></svg
+                  ><span class="brief-idle__text">Summarize</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>Before</b> Icons are red, amber, green and violet
+            (<code>readiness-strip.css:84-107</code>, <code>properties-rail.css:64-75</code>,
+            <code>brief-card.css:33</code>).
+          </figcaption>
+        </figure>
+        <figure>
+          <div class="sx-stage zoom-crop">
+            <div class="tm after" style="width: 620px; padding-bottom: 12px">
+              <div class="rs-strip">
+                <div class="rs-cell rs-cell--bad">
+                  <svg class="rs-icon" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="m15 9-6 6M9 9l6 6" /></svg
+                  ><span class="rs-label">Checks</span><span class="rs-detail">1 failing</span>
+                </div>
+                <div class="rs-cell rs-cell--wait">
+                  <svg class="rs-icon" viewBox="0 0 24 24">
+                    <circle cx="9" cy="8" r="4" />
+                    <path d="M2 21a7 7 0 0 1 14 0" /></svg
+                  ><span class="rs-label">Reviews</span
+                  ><span class="rs-detail">Waiting on you</span>
+                </div>
+                <div class="rs-cell rs-cell--ok">
+                  <svg class="rs-icon" viewBox="0 0 24 24">
+                    <circle cx="18" cy="18" r="3" />
+                    <circle cx="6" cy="6" r="3" />
+                    <path d="M6 21V9a9 9 0 0 0 9 9" /></svg
+                  ><span class="rs-label">Merge</span><span class="rs-detail">No conflicts</span>
+                </div>
+              </div>
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: 1fr 1fr;
+                  gap: 20px;
+                  padding: 14px 20px 0;
+                "
+              >
+                <ul class="pr-rail-signals">
+                  <li class="pr-rail-signal pr-rail-signal--danger">
+                    <svg viewBox="0 0 24 24">
+                      <path
+                        d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3.2.2 1.6 1.1 2.7 2.5 2.7z"
+                      /></svg
+                    ><span class="pr-rail-signal-label">Risk</span
+                    ><span class="pr-rail-signal-value">High</span>
+                  </li>
+                  <li class="pr-rail-signal pr-rail-signal--success">
+                    <svg viewBox="0 0 24 24">
+                      <circle cx="6" cy="6" r="3" />
+                      <circle cx="6" cy="18" r="3" />
+                      <path d="M6 9v6M18 9a9 9 0 0 1-9 9" />
+                      <circle cx="18" cy="6" r="3" /></svg
+                    ><span class="pr-rail-signal-label">Complexity</span
+                    ><span class="pr-rail-signal-value">Low</span>
+                  </li>
+                  <li class="pr-rail-signal pr-rail-signal--neutral">
+                    <svg viewBox="0 0 24 24">
+                      <path
+                        d="M2 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2zM22 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z"
+                      /></svg
+                    ><span class="pr-rail-signal-label">Reading</span
+                    ><span class="pr-rail-signal-value">38 min</span>
+                  </li>
+                </ul>
+                <div class="brief-idle" style="align-self: start">
+                  <svg class="brief-card__icon" viewBox="0 0 24 24">
+                    <path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z" /></svg
+                  ><span class="brief-idle__text">Summarize</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>After</b> Icons take the text colour; a settled or neutral state is drawn at 60%
+            opacity. The failing cell keeps its tinted background and red label, which already said
+            "fail" without the icon's hue.
+          </figcaption>
+        </figure>
+      </div>
     </div>
   </section>
 </main>

@@ -58,11 +58,6 @@ interface Props {
   summary: Summary
 }
 
-/** Whether the Brief is showing a summary, so the description below it can be clamped. */
-export function summaryShown(summary: Summary): boolean {
-  return Boolean(summary.summary) && !summary.error
-}
-
 function BriefHeading({ meta, action }: { meta: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div className="brief-card__head">

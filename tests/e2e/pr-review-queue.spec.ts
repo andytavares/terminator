@@ -89,8 +89,9 @@ async function theQueueListsAndSearchNarrows(): Promise<void> {
 
 async function aDiscussionCommentIsPosted(): Promise<void> {
   const view = await openPrOverview('Add subtract')
-  await view.getByRole('tab', { name: /^Discussion · 1/ }).click()
+  await view.getByRole('tab', { name: 'Discussion, 1' }).click()
   await expect(view.locator('.pr-issue-comment-list')).toContainText('once CI is green')
+  await expect(view.getByRole('complementary', { name: 'Pull request details' })).toBeVisible()
   await view.getByPlaceholder('Leave a comment…').fill('Looking now.')
   await view.getByRole('button', { name: 'Comment', exact: true }).click()
 

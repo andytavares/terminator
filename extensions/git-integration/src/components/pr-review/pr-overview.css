@@ -1,5 +1,6 @@
 /*
- * PrOverviewPanel: header, tabs, the reading column and the discussion timeline.
+ * PrOverviewPanel in four sections: header and status strip, pinned; the Change and Discussion
+ * tabs, one scroll each; the properties rail beside them, with its own scroll.
  * The readiness strip, review plan, Brief and properties rail have their own files.
  * Narrow-pane rules use the `pr-overview` container declared on `.pr-overview`.
  */
@@ -117,6 +118,14 @@
 
 /* Tabs and body */
 
+.pr-overview-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
+  grid-template-rows: minmax(0, 1fr);
+}
+
 .pr-overview-main {
   flex: 1;
   display: flex;
@@ -136,22 +145,29 @@
   overflow-y: auto;
 }
 
-.pr-overview-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
-  min-height: 100%;
-}
-
-.pr-overview-layout--single {
-  grid-template-columns: minmax(0, 1fr);
-}
-
 .pr-overview-column {
   display: flex;
   flex-direction: column;
   gap: 30px;
   min-width: 0;
   padding: 26px 40px 36px var(--tm-space-6);
+}
+
+/* A rule marks where each part of the change starts. */
+.pr-overview-column--change {
+  gap: 22px;
+}
+
+.pr-overview-column--change > * + * {
+  padding-top: 22px;
+  border-top: 1px solid var(--tm-border);
+}
+
+/* The Properties tab, below 900px, holds the rail at full width. */
+.pr-overview-tab-panel > .pr-rail {
+  min-height: 100%;
+  box-sizing: border-box;
+  border-left: 0;
 }
 
 /* Description */
@@ -199,7 +215,7 @@
   overflow: hidden;
 }
 
-.pr-overview-reading--clamped::after {
+.pr-overview-reading--overflows::after {
   content: '';
   position: absolute;
   inset: auto 0 0;
@@ -366,11 +382,25 @@
 }
 
 .pr-issue-comment-body {
+  position: relative;
   margin-top: 4px;
   font-size: 13.5px;
   line-height: 1.6;
   color: var(--tm-text-primary);
   overflow-wrap: break-word;
+}
+
+.pr-issue-comment-body.pr-overview-reading--clamped {
+  max-height: 160px;
+}
+
+.pr-issue-comment-body.pr-overview-reading--overflows::after {
+  height: 60px;
+}
+
+/* "Show N earlier comments", lined up with the comment text. */
+.pr-issue-earlier {
+  margin: 0 0 14px 38px;
 }
 
 .pr-issue-composer {
@@ -382,9 +412,9 @@
   color: var(--tm-text-muted);
 }
 
-/* Narrower than 900px the rail drops below the main column. */
-@container pr-overview (max-width: 900px) {
-  .pr-overview-layout {
+/* Narrower than 900px the rail is the Properties tab (RAIL_MIN_PANE_WIDTH in PrOverviewPanel). */
+@container pr-overview (width < 900px) {
+  .pr-overview-body {
     grid-template-columns: minmax(0, 1fr);
   }
 

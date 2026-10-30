@@ -1,14 +1,13 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import fs from 'node:fs'
+import path from 'node:path'
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import {
   OverviewSummary,
-  summaryShown,
   useSummary,
-  type Summary,
   type SummarySubject,
 } from '../../src/components/pr-review/OverviewSummary'
-import { partialFake } from '../../../../tests/support/fakes'
 import type { IssueComment } from '../../src/schemas/pr-review.schema'
 import type { SummaryResult } from '../../src/schemas/review-agent.schema'
 
@@ -92,17 +91,6 @@ describe('OverviewSummary — a description with nothing to summarize', () => {
   })
 })
 
-describe('summaryShown', () => {
-  const state = (summary: string | null, error: string | null) =>
-    partialFake<Summary>({ summary, error })
-
-  it('is true only with summary text and no error', () => {
-    expect(summaryShown(state('Adds X.', null))).toBe(true)
-    expect(summaryShown(state(null, null))).toBe(false)
-    expect(summaryShown(state('Adds X.', 'Timed out'))).toBe(false)
-  })
-})
-
 describe('OverviewSummary — summarizing a discussion', () => {
   it('sends each comment as **author**: body', () => {
     mockSummarize.mockResolvedValue({ summary: 's' })
@@ -153,5 +141,44 @@ describe('OverviewSummary — when the agent cannot summarize', () => {
       'No handler for review-agent:summarize'
     )
     expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy()
+  })
+})
+
+const TOKENS = path.resolve(__dirname, '../../../../packages/extension-ui/src/tokens.css')
+
+/** Adds the design tokens and one of the overview's stylesheets to the document, so the icons'
+ *  colours can be computed. */
+function addStylesheet(file: string): () => void {
+  const style = document.createElement('style')
+  const sheet = path.resolve(__dirname, '../../src/components/pr-review', file)
+  style.textContent = [TOKENS, sheet].map((css) => fs.readFileSync(css, 'utf8')).join('\n')
+  document.head.append(style)
+  return () => style.remove()
+}
+
+/** Whether an icon draws in its parent's text colour, the flat-icons rule. */
+function inheritsTextColour(icon: Element): boolean {
+  return getComputedStyle(icon).color === getComputedStyle(icon.parentElement as Element).color
+}
+
+describe('OverviewSummary — flat icons', () => {
+  let removeStylesheet = () => {}
+  beforeEach(() => {
+    removeStylesheet = addStylesheet('brief-card.css')
+  })
+  afterEach(() => removeStylesheet())
+
+  it('draws the Brief icon in its text colour', () => {
+    renderDescription('Adds X.')
+    const icon = document.querySelector('.brief-card__icon') as Element
+    expect(inheritsTextColour(icon)).toBe(true)
+  })
+
+  it('draws the error icon in its text colour', async () => {
+    mockSummarize.mockResolvedValue({ error: 'Timed out' })
+    renderDescription('Adds X.')
+    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
+    await screen.findByRole('alert')
+    expect(inheritsTextColour(document.querySelector('.brief-error__icon') as Element)).toBe(true)
   })
 })
