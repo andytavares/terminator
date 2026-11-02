@@ -1,0 +1,42 @@
+extensions/git-integration/src/components/git-integration.css
+  s_b5d2e9359cd05b::t_45dc421b0155d6 97-98,104-108
+tests/unit/renderer/form-control-styling.spec.ts
+  s_b5d2e9359cd05b::t_cb66871134003f 41
+src/renderer/components/NotificationPanel.css
+  s_b5d2e9359cd05b::t_3e1a62d54ace66 129-130,183,199-200
+  s_b5d2e9359cd05b::t_c6552bb77cf2fd 64,67-69,78-80,88
+src/renderer/styles.css
+  s_b5d2e9359cd05b::t_2dd0b9944b051e 238-254
+src/renderer/components/sidebar/AppBand.tsx
+  s_b5d2e9359cd05b::t_2dd0b9944b051e 117
+src/renderer/components/sidebar/FilterMenu.tsx
+  s_b5d2e9359cd05b::t_2dd0b9944b051e 40
+extensions/foundry/src/components/foundry.css
+  s_b5d2e9359cd05b::t_cb66871134003f 1783-1784,1792-1794
+  s_b5d2e9359cd05b::t_3389f787e6a1c8 1795-1796
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_b5d2e9359cd05b::t_45dc421b0155d6 788,796,811,821
+src/renderer/components/settings/SettingsPanel.css
+  s_b5d2e9359cd05b::t_1cf68570cb6704 242,262,310,458
+packages/extension-ui/src/tokens.css
+  s_b5d2e9359cd05b::t_edc9434a710436 74
+  s_b5d2e9359cd05b::t_4d8ad4914cf0fd 77
+src/renderer/components/screen-chrome.css
+  s_b5d2e9359cd05b::t_45dc421b0155d6 94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "70ca85e8034b2c5f130b91bfa776657595b0363c",
+  "prompts": {},
+  "sessions": {
+    "s_b5d2e9359cd05b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da33f7e5-cdc0-4c80-a907-6950bc8d8b20",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
