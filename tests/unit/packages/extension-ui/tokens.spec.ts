@@ -7,6 +7,15 @@ import { readBeside } from '../../../support/files'
 
 const TOKENS = readBeside(import.meta.url, '../../../../packages/extension-ui/src/tokens.css')
 const CORE_DIRECTORY = fileURLToPath(new URL('../../../../src/renderer', import.meta.url))
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url))
+// A raw size in `font-size`, or the size in the `font` shorthand (after any style and weight words).
+const RAW_FONT_SIZE = /(?<![-\w])font(-size)?:\s*(?:(?:[a-z]+|\d{3})\s+)*[0-9.]+(px|rem)\b/g
+const STYLE_ROOTS = [
+  'src/renderer',
+  'src/renderer-remote',
+  'packages/extension-ui/src',
+  'extensions',
+]
 
 /** Every stylesheet of the core renderer, as one text. */
 const CORE_STYLES = readdirSync(CORE_DIRECTORY, { recursive: true, encoding: 'utf8' })
@@ -44,5 +53,24 @@ describe('tokens.css', () => {
     for (const name of ['--tm-bg-base', '--tm-text-primary', '--tm-border', '--tm-accent-text']) {
       expect(light).toContain(`${name}:`)
     }
+  })
+})
+
+describe('the type scale', () => {
+  it('sizes every font from the type scale, in the core and every extension', () => {
+    const stylesheets = STYLE_ROOTS.flatMap((root) =>
+      readdirSync(join(REPO_ROOT, root), { recursive: true, encoding: 'utf8' })
+        .filter(
+          (file) => file.endsWith('.css') && !/(^|\/)(node_modules|dist|coverage)\//.test(file)
+        )
+        .map((file) => join(root, file))
+    )
+    expect(stylesheets.length).toBeGreaterThan(90)
+    const rawSizes = stylesheets.flatMap((file) =>
+      [...readFileSync(join(REPO_ROOT, file), 'utf8').matchAll(RAW_FONT_SIZE)].map(
+        (match) => `${file}: ${match[0]}`
+      )
+    )
+    expect(rawSizes).toEqual([])
   })
 })

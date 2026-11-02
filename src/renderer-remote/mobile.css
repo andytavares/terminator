@@ -12,9 +12,9 @@ body,
   width: 100%;
   height: 100dvh;
   overflow: hidden;
-  background: var(--tm-bg-base, #1e1e1e);
-  color: var(--tm-text-primary, #cccccc);
-  font-family: var(--tm-font-ui, 'IBM Plex Sans', sans-serif);
+  background: var(--tm-bg-base);
+  color: var(--tm-text-primary);
+  font-family: var(--tm-font-ui);
   -webkit-text-size-adjust: 100%;
 }
 
@@ -30,16 +30,16 @@ body,
 }
 
 .mobile-list__workspace {
-  background: var(--tm-bg-elevated, #252526);
-  border: 1px solid var(--tm-border-strong, #3c3c3c);
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-strong);
   border-radius: 8px;
   padding: 12px;
 }
 
 .mobile-list__workspace-name {
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 600;
-  color: var(--tm-text-primary, #cccccc);
+  color: var(--tm-text-primary);
   margin: 0 0 10px;
   letter-spacing: -0.01em;
 }
@@ -48,7 +48,7 @@ body,
   display: flex;
   align-items: center;
   padding: 10px 12px;
-  background: var(--tm-bg-input, #2d2d2d);
+  background: var(--tm-bg-input);
   border-radius: 6px;
   margin-bottom: 6px;
   cursor: pointer;
@@ -58,13 +58,13 @@ body,
 }
 
 .mobile-list__terminal:active {
-  border-color: var(--tm-accent, #0e7a0d);
+  border-color: var(--tm-accent);
 }
 
 .mobile-list__terminal-label {
-  font-size: 13px;
-  font-family: var(--tm-font-mono, 'IBM Plex Mono', monospace);
-  color: var(--tm-text-primary, #cccccc);
+  font-size: var(--tm-font-size-md);
+  font-family: var(--tm-font-mono);
+  color: var(--tm-text-primary);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -74,7 +74,7 @@ body,
 /* Ensure button elements used as terminal items inherit layout and reset browser defaults */
 button.mobile-list__terminal {
   font-family: inherit;
-  background: var(--tm-bg-input, #2d2d2d);
+  background: var(--tm-bg-input);
   width: 100%;
   text-align: left;
 }
@@ -83,11 +83,11 @@ button.mobile-list__terminal {
   width: 100%;
   padding: 10px;
   background: transparent;
-  border: 1px dashed var(--tm-border-strong, #3c3c3c);
+  border: 1px dashed var(--tm-border-strong);
   border-radius: 6px;
-  color: var(--tm-text-muted, #858585);
-  font-size: 13px;
-  font-family: var(--tm-font-ui, 'IBM Plex Sans', sans-serif);
+  color: var(--tm-text-muted);
+  font-size: var(--tm-font-size-md);
+  font-family: var(--tm-font-ui);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -99,8 +99,8 @@ button.mobile-list__terminal {
 }
 
 .mobile-list__new-terminal-btn:active {
-  border-color: var(--tm-accent, #0e7a0d);
-  color: var(--tm-text-primary, #cccccc);
+  border-color: var(--tm-accent);
+  color: var(--tm-text-primary);
 }
 
 /* ── Terminal view ─────────────────────────────────────────────── */
@@ -117,15 +117,15 @@ button.mobile-list__terminal {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  background: var(--tm-bg-elevated, #252526);
-  border-bottom: 1px solid var(--tm-border-strong, #3c3c3c);
+  background: var(--tm-bg-elevated);
+  border-bottom: 1px solid var(--tm-border-strong);
   flex-shrink: 0;
 }
 
 .mobile-terminal-header__back {
   background: transparent;
   border: none;
-  color: var(--tm-text-primary, #cccccc);
+  color: var(--tm-text-primary);
   cursor: pointer;
   padding: 4px;
   display: flex;
@@ -133,9 +133,9 @@ button.mobile-list__terminal {
 }
 
 .mobile-terminal-header__title {
-  font-size: 13px;
-  font-family: var(--tm-font-mono, 'IBM Plex Mono', monospace);
-  color: var(--tm-text-muted, #858585);
+  font-size: var(--tm-font-size-md);
+  font-family: var(--tm-font-mono);
+  color: var(--tm-text-muted);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -155,25 +155,25 @@ button.mobile-list__terminal {
 .mobile-terminal-status {
   padding: 10px 16px;
   text-align: center;
-  font-size: 12px;
-  color: var(--tm-text-muted, #858585);
-  background: var(--tm-bg-elevated, #252526);
-  border-top: 1px solid var(--tm-border-strong, #3c3c3c);
+  font-size: var(--tm-font-size-sm);
+  color: var(--tm-text-muted);
+  background: var(--tm-bg-elevated);
+  border-top: 1px solid var(--tm-border-strong);
   flex-shrink: 0;
 }
 
 .mobile-terminal-status--error {
-  color: var(--tm-danger, #f14c4c);
+  color: var(--tm-danger);
 }
 
 .mobile-terminal-status__retry {
   margin-left: 8px;
   padding: 3px 10px;
-  background: var(--tm-accent, #0e7a0d);
+  background: var(--tm-accent);
   color: #fff;
   border: none;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   cursor: pointer;
 }
 
@@ -188,8 +188,8 @@ button.mobile-list__terminal {
 .mobile-context-menu {
   position: fixed;
   z-index: 100;
-  background: var(--tm-bg-elevated, #252526);
-  border: 1px solid var(--tm-border-strong, #3c3c3c);
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-strong);
   border-radius: 8px;
   min-width: 180px;
   padding: 4px 0;
@@ -198,9 +198,9 @@ button.mobile-list__terminal {
 }
 
 .mobile-context-menu__label {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 600;
-  color: var(--tm-text-muted, #858585);
+  color: var(--tm-text-muted);
   margin: 0;
   padding: 6px 12px 4px;
   letter-spacing: 0.04em;
@@ -213,22 +213,22 @@ button.mobile-list__terminal {
   padding: 10px 12px;
   background: transparent;
   border: none;
-  color: var(--tm-text-primary, #cccccc);
-  font-size: 13px;
-  font-family: var(--tm-font-ui, 'IBM Plex Sans', sans-serif);
+  color: var(--tm-text-primary);
+  font-size: var(--tm-font-size-md);
+  font-family: var(--tm-font-ui);
   text-align: left;
   cursor: pointer;
 }
 
 .mobile-context-menu__item:active {
-  background: var(--tm-bg-input, #2d2d2d);
+  background: var(--tm-bg-input);
 }
 
 .mobile-context-menu__empty {
   display: block;
   padding: 10px 12px;
-  font-size: 13px;
-  color: var(--tm-text-muted, #858585);
+  font-size: var(--tm-font-size-md);
+  color: var(--tm-text-muted);
 }
 
 /* ── Control toolbar ───────────────────────────────────────────── */
@@ -237,8 +237,8 @@ button.mobile-list__terminal {
   display: flex;
   gap: 4px;
   padding: 6px 8px;
-  background: var(--tm-bg-elevated, #252526);
-  border-top: 1px solid var(--tm-border-strong, #3c3c3c);
+  background: var(--tm-bg-elevated);
+  border-top: 1px solid var(--tm-border-strong);
   overflow-x: auto;
   flex-shrink: 0;
   -webkit-overflow-scrolling: touch;
@@ -248,12 +248,12 @@ button.mobile-list__terminal {
   flex-shrink: 0;
   min-width: 44px;
   height: 36px;
-  background: var(--tm-bg-input, #2d2d2d);
-  border: 1px solid var(--tm-border-strong, #3c3c3c);
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border-strong);
   border-radius: 6px;
-  color: var(--tm-text-primary, #cccccc);
-  font-size: 11px;
-  font-family: var(--tm-font-mono, 'IBM Plex Mono', monospace);
+  color: var(--tm-text-primary);
+  font-size: var(--tm-font-size-xs);
+  font-family: var(--tm-font-mono);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -262,5 +262,5 @@ button.mobile-list__terminal {
 }
 
 .mobile-toolbar__btn:active {
-  background: var(--tm-bg-base, #1e1e1e);
+  background: var(--tm-bg-base);
 }

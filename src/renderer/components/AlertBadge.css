@@ -8,7 +8,7 @@
   border-radius: 8px;
   background: #e03131;
   color: #fff;
-  font-size: 9px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 700;
   line-height: 1;
   flex-shrink: 0;

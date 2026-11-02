@@ -261,7 +261,7 @@ function ProjectLinkPicker({ open, onSelect, onClose }: PickerProps): React.JSX.
   if (sessions.length === 0) {
     return (
       <span className="projects-browser__link-picker">
-        <span className="tv-text-muted-sm">No active sessions</span>
+        <span className="tv-muted-sm">No active sessions</span>
         <IconButton icon={X} label="Close" size="sm" onClick={onClose} />
       </span>
     )

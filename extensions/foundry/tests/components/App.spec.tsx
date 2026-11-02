@@ -246,7 +246,7 @@ function whatIsWaitingTests() {
     render(<App />)
     await screen.findByRole('region', { name: 'Waiting on you' })
     fireEvent.click(await screen.findByRole('tab', { name: 'Ledger' }))
-    await screen.findByText('Nothing recorded yet.')
+    await screen.findByRole('heading', { name: 'Nothing recorded yet' })
     expect(screen.queryByRole('region', { name: 'Waiting on you' })).toBeNull()
   })
 }
@@ -410,7 +410,7 @@ describe('the palette and a notification going to a run', () => {
     orderRows = [{ ...WORKING_ROW, id: 'WO-0' }, WORKING_ROW]
     render(<App />)
     fireEvent.click(screen.getByRole('tab', { name: 'Ledger' }))
-    await screen.findByText('Nothing recorded yet.')
+    await screen.findByRole('heading', { name: 'Nothing recorded yet' })
 
     act(() =>
       bridgeHandlers['foundry:palette-goto']({ kind: 'run', sessionId: 'S-9', orderId: 'WO-1' })
@@ -427,13 +427,13 @@ describe('the Ledger surface', () => {
   it('is reachable from its own tab', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('tab', { name: 'Ledger' }))
-    await screen.findByText('Nothing recorded yet.')
+    await screen.findByRole('heading', { name: 'Nothing recorded yet' })
   })
 
   it('comes back to the Forge', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('tab', { name: 'Ledger' }))
-    await screen.findByText('Nothing recorded yet.')
+    await screen.findByRole('heading', { name: 'Nothing recorded yet' })
     fireEvent.click(await screen.findByRole('tab', { name: 'Forge' }))
     await screen.findByText(/no orders yet/i)
   })
@@ -448,7 +448,7 @@ function theForgeBroughtForwardTests() {
   it('brings the Forge forward and focuses the idea box when the extension asks', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('tab', { name: 'Ledger' }))
-    await screen.findByText('Nothing recorded yet.')
+    await screen.findByRole('heading', { name: 'Nothing recorded yet' })
     bridgeHandlers['foundry:ui.open-new-order']({})
     await waitFor(() =>
       expect(screen.getByRole('tab', { name: 'Forge' }).getAttribute('aria-selected')).toBe('true')
@@ -503,7 +503,7 @@ function whereItIsOfferedAndStartsTests() {
   it('is not offered outside the Forge', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('tab', { name: 'Ledger' }))
-    await screen.findByText('Nothing recorded yet.')
+    await screen.findByRole('heading', { name: 'Nothing recorded yet' })
     expect(screen.queryByRole('button', { name: 'Factory view' })).toBeNull()
   })
 

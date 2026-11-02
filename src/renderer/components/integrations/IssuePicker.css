@@ -54,7 +54,7 @@
 
 .issue-picker__failures {
   padding: 6px 10px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-warning);
   border-bottom: 1px solid var(--tm-border);
 }
@@ -73,7 +73,7 @@
 .issue-picker__key {
   flex-shrink: 0;
   font-family: var(--tm-font-mono);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-secondary);
 }
 
@@ -83,12 +83,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .issue-picker__tracker {
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
 }
 

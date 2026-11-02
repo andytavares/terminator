@@ -149,7 +149,7 @@ describe('the factory site card', () => {
             : { orders: [] }
     )
     const onOpen = vi.fn()
-    render(<FactorySite repoRoot="/repo" onOpen={onOpen} />)
+    render(<FactorySite repoRoot="/repo" onOpen={onOpen} onShowList={vi.fn()} />)
     const link = await screen.findByRole('link', { name: 'Claude artifact' })
     expect(link.closest('button')).toBeNull()
     fireEvent.click(link)

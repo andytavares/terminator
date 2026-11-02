@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react'
-import { Button, SegmentedControl } from '@terminator/extension-ui'
+import { FileDiff as FileDiffIcon } from 'lucide-react'
+import { Button, EmptyState, SegmentedControl } from '@terminator/extension-ui'
 import type { FileDiff, DiffLine, DiffHunk } from '../schemas/git.schema'
 import { choose } from './text'
 import { useSplitDrag } from '../hooks/useSplitDrag'
@@ -12,7 +13,18 @@ interface FileDiffViewProps {
   diff: FileDiff | null
   isStale?: boolean
   onRefresh?: () => void
+  /** What the pane says while no diff is shown. */
+  empty: DiffEmptyCase
 }
+
+/** Why no diff is shown: still reading, a change to pick, none at all, or the selection failed. */
+export type DiffEmptyCase =
+  | { kind: 'reading' }
+  | { kind: 'pick'; onOpenFirstChange: () => void }
+  | { kind: 'clean' | 'unreadable'; onRefreshStatus: () => void }
+
+/** What a diff on screen needs: the empty-state actions belong to the empty case only. */
+type ShownDiffProps = Pick<FileDiffViewProps, 'isStale' | 'onRefresh'> & { diff: FileDiff }
 
 // ── Unified view ──────────────────────────────────────────────────────────────
 
@@ -241,7 +253,7 @@ function DiffToolbar(props: {
   )
 }
 
-function DiffNotices({ props }: { props: FileDiffViewProps & { diff: FileDiff } }) {
+function DiffNotices({ props }: { props: ShownDiffProps }) {
   return (
     <>
       {props.isStale && (
@@ -288,13 +300,44 @@ function FileDiffBody({ diff, view }: { diff: FileDiff; view: ViewState }) {
   )
 }
 
-function LoadedDiff(props: FileDiffViewProps & { diff: FileDiff; view: ViewState }) {
+function LoadedDiff(props: ShownDiffProps & { view: ViewState }) {
   const { view } = props
   return (
     <div className="file-diff-view">
       <DiffToolbar diff={props.diff} viewMode={view.viewMode} setViewMode={view.setViewMode} />
       <DiffNotices props={props} />
       <FileDiffBody diff={props.diff} view={view} />
+    </div>
+  )
+}
+
+const EMPTY_TEXT = {
+  pick: ['No file selected', 'Pick a changed file on the right to see what changed in it.'],
+  clean: ['No changes', 'Edit a file in this branch and it shows here.'],
+  unreadable: [
+    "This file's changes cannot be shown",
+    'It may have changed since the list was read. Refresh to read it again.',
+  ],
+} as const
+
+/** What the pane says while no diff is shown. */
+function NoDiff({ empty }: { empty: DiffEmptyCase }): React.JSX.Element {
+  if (empty.kind === 'reading') {
+    return <div className="file-diff-view file-diff-view--empty">Reading changes…</div>
+  }
+  const [heading, description] = EMPTY_TEXT[empty.kind]
+  const action =
+    empty.kind === 'pick'
+      ? { label: 'Open the first change', onSelect: empty.onOpenFirstChange }
+      : { label: 'Refresh', onSelect: empty.onRefreshStatus }
+  return (
+    <div className="file-diff-view file-diff-view--empty">
+      <EmptyState
+        icon={FileDiffIcon}
+        heading={heading}
+        description={description}
+        actions={[action]}
+      />
     </div>
   )
 }
@@ -309,9 +352,7 @@ export function FileDiffView(props: FileDiffViewProps): React.JSX.Element {
     if (shownPath) recordUsage('diff-open')
   }, [shownPath])
   if (!diff) {
-    return (
-      <div className="file-diff-view file-diff-view--empty">Select a file to view its diff.</div>
-    )
+    return <NoDiff empty={props.empty} />
   }
   if (diff.isBinary) {
     return (

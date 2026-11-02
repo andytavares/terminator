@@ -27,13 +27,13 @@
 }
 
 .rh-num {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
   flex-shrink: 0;
 }
 
 .rh-draft-badge {
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.02em;
@@ -45,7 +45,7 @@
 }
 
 .rh-title {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-weight: 500;
   color: var(--tm-text-primary);
   overflow: hidden;
@@ -68,7 +68,7 @@
   border: 1px solid var(--tm-border-strong);
   border-radius: 999px;
   padding: 2px 8px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font: inherit;
   color: var(--tm-text-muted);
   cursor: pointer;
@@ -129,7 +129,7 @@
 }
 
 .rh-progress-text {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -152,7 +152,7 @@
 }
 
 .rh-large-pr-text {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
   line-height: 1.4;
   margin: 4px 6px 8px;
@@ -172,7 +172,7 @@
   border: none;
   border-radius: 6px;
   padding: 6px 8px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font: inherit;
   color: var(--tm-text-primary);
   cursor: pointer;
@@ -194,7 +194,7 @@
 }
 
 .rh-menu-hint {
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
 }
 
@@ -222,7 +222,7 @@
 }
 
 .rh-count {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-variant-numeric: tabular-nums;
   background: color-mix(in srgb, var(--tm-on-accent) 22%, transparent);
   padding: 0 6px;

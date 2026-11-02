@@ -785,7 +785,7 @@ describe('UnifiedSidebar — two menus replace four bands of chrome (US5) — re
     const { container } = renderSidebar()
     openFilter()
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Needs me/ }))
-    expect(container.querySelector('.sidebar-menu__badge')!.textContent).toBe('3')
+    expect(container.querySelector('.count-badge')!.textContent).toBe('3')
   })
 
   it('counts what a search is hiding too', () => {
@@ -793,7 +793,7 @@ describe('UnifiedSidebar — two menus replace four bands of chrome (US5) — re
     fireEvent.change(container.querySelector('.sidebar-search input, input')!, {
       target: { value: 'jobs' },
     })
-    expect(container.querySelector('.sidebar-menu__badge')!.textContent).toBe('2')
+    expect(container.querySelector('.count-badge')!.textContent).toBe('2')
   })
 })
 
@@ -808,7 +808,7 @@ describe('UnifiedSidebar — two menus replace four bands of chrome (US5) — dr
 
   it('shows no badge when nothing is hidden', () => {
     const { container } = renderSidebar()
-    expect(container.querySelector('.sidebar-menu__badge')).toBeNull()
+    expect(container.querySelector('.count-badge')).toBeNull()
   })
 
   it('restores every branch in one interaction from the same control (SC-007)', () => {
@@ -818,7 +818,7 @@ describe('UnifiedSidebar — two menus replace four bands of chrome (US5) — dr
     openFilter()
     fireEvent.click(screen.getByRole('menuitem', { name: /show all/ }))
     expect(screen.getByText('main')).toBeTruthy()
-    expect(container.querySelector('.sidebar-menu__badge')).toBeNull()
+    expect(container.querySelector('.count-badge')).toBeNull()
   })
 })
 

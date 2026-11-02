@@ -1,4 +1,5 @@
 import '@terminator/extension-ui/fonts'
+import '@terminator/extension-ui/tokens.css'
 import './mobile.css'
 import React from 'react'
 import { createRoot } from 'react-dom/client'

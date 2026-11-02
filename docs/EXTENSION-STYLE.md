@@ -118,6 +118,28 @@ The test: a character that stands **alone as a control** is an icon. A character
 
 Every colour comes from the published `--tm-*` tokens. `packages/extension-ui/src/tokens.css` is the only place that defines one, for the core, for every extension view and for the remote client. An extension view does not load the core stylesheet, so a raw hex cannot follow the theme. `rgba(255,255,255,0.08)` is a light-theme bug that appears when someone switches themes. Never carry state by hue alone: pair it with a word, a shape or a position.
 
+Each background token has one role (ADR 140). Pick the token by what the region is, not by how dark you want it:
+
+| Region                                                        | Token                | Dark value |
+| ------------------------------------------------------------- | -------------------- | ---------- |
+| Navigation that recedes: the app band, a sidebar, a side rail | `--tm-bg-surface`    | `#0b0b0e`  |
+| The canvas: where the work is                                 | `--tm-bg-base`       | `#19191d`  |
+| A block on the canvas: a card, a table, a metric              | `--tm-bg-card`       | `#222229`  |
+| A float: a dialog, menu, popover or drawer                    | `--tm-bg-elevated`   | `#26262d`  |
+| Hover, and the one selected row                               | `--tm-bg-card-hover` | `#2c2c34`  |
+| A text field                                                  | `--tm-bg-input`      | `#0f0f11`  |
+
+A float also takes `border: 1px solid var(--tm-border-strong)` and `box-shadow: var(--tm-shadow-overlay)`. Borders have three strengths: `--tm-border` for region edges and cards, `--tm-border-strong` for what you can click, and `--tm-border-control` for a field, whose border is its only outline (3:1, WCAG 1.4.11). Text has three readable tiers: primary, secondary and muted. `--tm-text-faint` is for disabled text only.
+
+## 8a. Type
+
+Every `font-size` is a token: `--tm-font-size-xs` (11px), `sm` (12), `md` (13), `lg` (15), `xl` (18), `2xl` (22) and `display` (28). A unit test rejects any other size. Two roles cover the labels:
+
+- A section title names what follows: `md`, weight 600, `--tm-text-primary`, sentence case.
+- A field or column label: `sm`, weight 500, `--tm-text-secondary`, sentence case.
+
+Do not mark a heading with small uppercase muted text. The label of a section was the quietest text in it.
+
 ## 9. Layering
 
 Stacking comes from the published scale in `@terminator/extension-ui`: `layerValue()` in TypeScript, `var(--tm-layer-*)` in CSS. A modal surface is a `ModalShell`, which the browser stacks itself (ADR 110). A raw `z-index` number let 38 unmanaged values decide the order by whoever picked the biggest.

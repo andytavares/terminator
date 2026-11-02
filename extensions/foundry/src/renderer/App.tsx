@@ -285,7 +285,7 @@ export function App(): React.JSX.Element {
 
 function ShownSurface({ chrome }: { chrome: Chrome }): React.JSX.Element {
   if (chrome.showing === null) return <FoundrySettingsPanel onBack={chrome.closeSettings} />
-  if (chrome.showing === 'ledger') return <Ledger />
+  if (chrome.showing === 'ledger') return <Ledger onOpenForge={() => chrome.show('forge')} />
   return (
     <ForgeSurface
       forge={chrome.forge}
@@ -411,7 +411,14 @@ function OrdersView({ forge, repoRoot, focusIdeaSignal }: ForgeSurfaceProps): Re
       />
     )
   }
-  if (hall === null) return <FactorySite repoRoot={repoRoot} onOpen={forge.openFromSite} />
+  if (hall === null)
+    return (
+      <FactorySite
+        repoRoot={repoRoot}
+        onOpen={forge.openFromSite}
+        onShowList={() => forge.choose('list')}
+      />
+    )
   return (
     <FactoryHall
       orderId={hall.id}

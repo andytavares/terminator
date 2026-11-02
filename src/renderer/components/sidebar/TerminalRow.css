@@ -15,7 +15,7 @@
   padding: 0 10px 0 47px;
   color: var(--tm-text-secondary);
   font-family: var(--tm-font-ui);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   user-select: none;
   cursor: pointer;
   outline: none;
@@ -71,7 +71,7 @@
 .terminal-row__key {
   flex: 0 0 auto;
   font-family: var(--tm-font-mono);
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   white-space: nowrap;
 }
@@ -79,7 +79,7 @@
 .terminal-row__bell {
   flex: 0 0 auto;
   font-family: var(--tm-font-mono);
-  font-size: 9.5px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-primary);
   font-variant-numeric: tabular-nums;
 }

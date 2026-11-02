@@ -22,16 +22,16 @@
 .wt-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .wt-table th {
   text-align: left;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--tm-text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-sm);
   font-weight: 500;
+  color: var(--tm-text-secondary);
   padding: var(--tm-space-1) var(--tm-space-2);
   border-bottom: 1px solid var(--tm-border);
 }
@@ -74,7 +74,7 @@
 
 .wt-failure {
   color: var(--tm-danger);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .wt-locked {
@@ -83,7 +83,7 @@
 
 .wt-commands {
   font-family: var(--tm-font-mono);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   background: var(--tm-bg-base);
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-radius-sm);

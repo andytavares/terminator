@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { Terminal, type IBuffer, type IBufferNamespace, type IBufferLine } from '@xterm/xterm'
 import {
   TerminalInstance,
@@ -1202,6 +1203,15 @@ function setUpTerminalInstanceXtermTheming(): void {
   })
 }
 
+describe('XTERM_THEMES — the dark canvas', () => {
+  it('paints the dark terminal in the canvas colour, --tm-bg-base', () => {
+    const css = readFileSync('packages/extension-ui/src/tokens.css', 'utf8')
+    const darkBlock = css.slice(css.indexOf(':root'), css.indexOf("[data-theme='light']"))
+    const base = darkBlock.match(/--tm-bg-base:\s*(#[0-9a-fA-F]{6})/)?.[1]
+    expect(XTERM_THEMES.dark.background).toBe(base)
+  })
+})
+
 describe('TerminalInstance — xterm theming', () => {
   setUpTerminalInstanceXtermTheming()
 
@@ -1239,7 +1249,7 @@ describe('TerminalInstance — the padding around the terminal', () => {
 
   it("is painted in the terminal's own background, so no edge shows around it", () => {
     const instance = new TerminalInstance('ses-edge', 1000)
-    expect(instance.element.style.backgroundColor).toBe('rgb(30, 30, 30)')
+    expect(instance.element.style.backgroundColor).toBe('rgb(25, 25, 29)')
   })
 
   it('follows the theme when it changes', () => {

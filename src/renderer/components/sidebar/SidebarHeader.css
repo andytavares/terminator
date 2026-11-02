@@ -24,7 +24,7 @@
   outline: none;
   border-radius: var(--tm-radius-xs);
   color: var(--tm-text-muted);
-  font-size: 16px;
+  font-size: var(--tm-font-size-lg);
   cursor: pointer;
 }
 

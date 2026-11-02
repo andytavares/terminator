@@ -18,7 +18,7 @@
 
 .usage__of {
   color: var(--tm-text-secondary);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 400;
 }
 
@@ -39,7 +39,7 @@
   border-radius: 11px;
   background: transparent;
   color: var(--tm-text-secondary);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   cursor: pointer;
 }
 
@@ -60,7 +60,7 @@
   padding: 0;
   list-style: none;
   color: var(--tm-text-secondary);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .usage__legend li {
@@ -84,7 +84,7 @@
   margin-inline-start: 6px;
   color: var(--tm-text-faint);
   font-family: var(--tm-font-mono);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .usage__dim {
@@ -113,13 +113,13 @@
 
 .usage-drawer__title {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--tm-font-size-lg);
   font-weight: 600;
 }
 
 .usage-drawer__sub {
   color: var(--tm-text-secondary);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .usage-drawer__facts {
@@ -127,7 +127,7 @@
   grid-template-columns: max-content 1fr;
   gap: 6px var(--tm-space-4);
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .usage-drawer__facts dt {
@@ -140,11 +140,11 @@
 
 .usage-drawer__heading {
   margin: 0 0 var(--tm-space-2);
-  color: var(--tm-text-secondary);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-md);
+  font-weight: 600;
+  color: var(--tm-text-primary);
 }
 
 .usage-drawer__bars {
@@ -166,7 +166,7 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .usage-drawer__rows li {

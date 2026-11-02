@@ -9,7 +9,7 @@
 .tab-bar {
   display: flex;
   align-items: stretch;
-  background: var(--tm-bg-surface);
+  background: var(--tm-bg-base);
   border-bottom: 1px solid var(--tm-border);
   overflow-x: auto;
   overflow-y: hidden;
@@ -43,7 +43,7 @@
   border-right: 1px solid var(--tm-border);
   background: transparent;
   color: var(--tm-text-secondary);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   letter-spacing: 0.01em;
   white-space: nowrap;
   overflow: hidden;
@@ -55,14 +55,14 @@
 
 /* Primary tabs are slightly bolder */
 .tab-bar--primary .tab-bar__tab {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-weight: 500;
   min-width: 80px;
 }
 
 /* Session sub-tabs are smaller */
 .tab-bar--sessions .tab-bar__tab {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   min-width: 100px;
   padding: 0 10px;
 }
@@ -110,7 +110,7 @@
 .tab-bar__key {
   flex: 0 0 auto;
   font-family: var(--tm-font-mono);
-  font-size: 9.5px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   margin-left: 4px;
   white-space: nowrap;
@@ -118,7 +118,7 @@
 
 /* ── Agent badge ─────────────────────────────────────────────── */
 .tab-bar__badge--agent {
-  font-size: 8px;
+  font-size: var(--tm-font-size-xs);
   padding: 2px 5px;
   border-radius: 4px;
   font-weight: 600;
@@ -134,7 +134,7 @@
   background: none;
   border: none;
   color: var(--tm-text-muted);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   line-height: 1;
   padding: 1px 3px;
   border-radius: 3px;
@@ -163,7 +163,7 @@
   border: none;
   border-right: 1px solid var(--tm-border);
   color: var(--tm-text-muted);
-  font-size: 18px;
+  font-size: var(--tm-font-size-xl);
   padding: 0 10px;
   height: 100%;
   line-height: 1;
@@ -199,7 +199,7 @@
   border: 1px solid var(--ws-color, var(--tm-accent));
   border-radius: 3px;
   color: var(--tm-text-primary);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-family: inherit;
   padding: 1px 4px;
   outline: none;
@@ -213,7 +213,7 @@
   align-items: center;
   flex-shrink: 0;
   padding: 0 10px 0 12px;
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   letter-spacing: 0.04em;
   color: var(--tm-text-muted);
   border-right: 1px solid var(--tm-border);

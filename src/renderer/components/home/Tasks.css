@@ -28,7 +28,7 @@
 }
 .task-list__head h2 {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 600;
 }
 .task-list__head .desk-group-menu {
@@ -46,10 +46,11 @@
 }
 .task-group h3 {
   margin: 0;
-  font-size: 11.5px;
-  font-weight: 400;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-md);
+  font-weight: 600;
+  color: var(--tm-text-primary);
 }
 .task-group .state-glyph {
   width: 12px;
@@ -61,7 +62,7 @@
   background: transparent;
   color: var(--tm-text-faint);
   font: inherit;
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   cursor: pointer;
 }
 
@@ -111,7 +112,7 @@
 .task-row__ticket {
   color: var(--tm-text-muted);
   font-family: var(--tm-font-mono);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 400;
 }
 .task-row__star {
@@ -149,7 +150,7 @@
   background: var(--tm-bg-elevated);
   color: var(--tm-text-secondary);
   font-family: var(--tm-font-mono);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   white-space: nowrap;
 }
 /* A long branch name is cut, not pushed into the next column; the chip's title holds it whole. */
@@ -172,13 +173,13 @@
 .task-row__now {
   overflow: hidden;
   color: var(--tm-text-secondary);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .task-row__last {
   color: var(--tm-text-faint);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   text-align: right;
 }
 
@@ -206,5 +207,5 @@
 .archived-tasks__empty {
   margin: 0;
   color: var(--tm-text-muted);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }

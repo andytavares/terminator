@@ -1,11 +1,19 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { RecordShown } from '../renderer/RecordShown.js'
-import { ScrollText, Sparkles, Check, X, Trash2 } from 'lucide-react'
+import { ScrollText, Sparkles, Check, X, Trash2, FilterX } from 'lucide-react'
 import type { LedgerEntry } from '../ledger/append.js'
 import type { Proposal } from '../ledger/curator.js'
 import type { FactoryMetrics } from '../factory/metrics.js'
 import { formatDuration } from '../factory/format.js'
-import { Button, Markdown, Tab, TabList, TabPanel, TabsRoot } from '@terminator/extension-ui'
+import {
+  Button,
+  EmptyState,
+  Markdown,
+  Tab,
+  TabList,
+  TabPanel,
+  TabsRoot,
+} from '@terminator/extension-ui'
 import { openInBrowser } from '@terminator/extension-sdk/renderer'
 import { useFoundryQuery, ANY_RECORD } from '../renderer/foundry-query.js'
 import { MetricsTiles, WindowToggle } from './MetricsTiles.js'
@@ -70,7 +78,12 @@ function actorKind(actor: string): string {
 
 type LedgerTab = 'record' | 'factory'
 
-export function Ledger(): React.JSX.Element {
+interface LedgerProps {
+  /** Switches the window to the Forge tab. */
+  readonly onOpenForge: () => void
+}
+
+export function Ledger({ onOpenForge }: LedgerProps): React.JSX.Element {
   const [tab, setTab] = useState<LedgerTab>('record')
   const entries = useLedgerEntries()
   const { rules, refreshRules } = useRules()
@@ -93,10 +106,9 @@ export function Ledger(): React.JSX.Element {
         </TabPanel>
         <TabPanel id="record" className="fdry-ledger-panel">
           <RecordTab
-            entries={entries}
+            {...{ entries, proposals, onOpenForge }}
             view={entries.view}
             rules={rules ?? NO_RULES}
-            proposals={proposals}
           />
         </TabPanel>
       </TabsRoot>
@@ -111,10 +123,11 @@ interface RecordTabProps {
   readonly view: LedgerView
   readonly rules: RulesView
   readonly proposals: ReturnType<typeof useProposals>
+  readonly onOpenForge: () => void
 }
 
 /** The Record tab: the filters, the rules asked about and in force, and the entries. */
-function RecordTab({ entries, view, rules, proposals }: RecordTabProps) {
+function RecordTab({ entries, view, rules, proposals, onOpenForge }: RecordTabProps) {
   return (
     <>
       <LedgerFilters entries={entries} view={view} onAsk={() => void proposals.ask()} />
@@ -122,7 +135,7 @@ function RecordTab({ entries, view, rules, proposals }: RecordTabProps) {
       <ProposalsPanel proposals={proposals.proposals} onDecide={proposals.decide} />
       <AcceptedPanel rules={rules} onRemove={proposals.remove} />
       <SkillsPanel rules={rules} />
-      <EntriesTable entries={view.entries} />
+      <RecordBody entries={entries} view={view} onOpenForge={onOpenForge} />
       <footer className="fdry-queue-foot">
         <span>
           showing <b>{view.entries.length}</b> of <b>{view.total}</b>
@@ -439,15 +452,41 @@ function SkillsPanel({ rules }: { readonly rules: RulesView }) {
   )
 }
 
-function EntriesTable({ entries }: { readonly entries: readonly LedgerEntry[] }) {
-  if (entries.length === 0) {
-    return (
-      <div className="fdry-nothing">
-        <ScrollText aria-hidden="true" />
-        <p>Nothing recorded yet.</p>
-      </div>
-    )
+/** The entries, or why there are none: nothing recorded, or the filters hide them all. */
+function RecordBody({ entries, view, onOpenForge }: Omit<RecordTabProps, 'rules' | 'proposals'>) {
+  if (view.total === 0) return <NothingRecorded onOpenForge={onOpenForge} />
+  if (view.entries.length === 0) return <NoMatches entries={entries} total={view.total} />
+  return <EntriesTable entries={view.entries} />
+}
+
+function NoMatches({ entries, total }: { entries: RecordTabProps['entries']; total: number }) {
+  const showEvery = () => {
+    entries.setOrderId('')
+    entries.setActor('')
+    entries.setAction('')
   }
+  return (
+    <EmptyState
+      icon={FilterX}
+      heading="No entries match these filters"
+      description={`The record has ${total} entries. Every order, anyone and anything shows them all.`}
+      actions={[{ label: 'Show every entry', onSelect: showEvery }]}
+    />
+  )
+}
+
+function NothingRecorded({ onOpenForge }: LedgerProps) {
+  return (
+    <EmptyState
+      icon={ScrollText}
+      heading="Nothing recorded yet"
+      description="Every decision on an order is recorded here with its reason, whoever made it."
+      actions={[{ label: 'Open the Forge', onSelect: onOpenForge }]}
+    />
+  )
+}
+
+function EntriesTable({ entries }: { readonly entries: readonly LedgerEntry[] }) {
   return (
     <div className="fdry-scroll">
       <table className="fdry-ledger">

@@ -8,7 +8,7 @@
   background: var(--tm-bg-base);
   color: var(--tm-text-primary);
   font-family: var(--tm-font-ui, system-ui, sans-serif);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
 }
 
 .notepad-view__sidebar {
@@ -43,7 +43,7 @@
 
 .notepad-view__save-status {
   margin-right: auto;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
 }
 
@@ -113,7 +113,7 @@
 }
 
 .notepad-composer__body {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-family: inherit;
   padding: 6px 8px;
   resize: none;
@@ -127,15 +127,6 @@
   display: flex;
   justify-content: flex-end;
   gap: 6px;
-}
-
-.notepad-view__no-selection {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--tm-text-muted);
-  font-size: 13px;
 }
 
 /* The right rail holds the outline over the comments. It owns the width and the
@@ -190,7 +181,7 @@
   height: 36px;
   padding: 0 6px 0 12px;
   color: var(--tm-text-muted);
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 600;
 }
 
@@ -216,7 +207,7 @@
   background: transparent;
   color: var(--tm-text-muted);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   line-height: 1.4;
   text-align: left;
   cursor: pointer;
@@ -232,7 +223,7 @@
 
 .notepad-outline__empty {
   padding: 0 12px 10px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
 }
 
@@ -260,7 +251,7 @@
   border: none;
   padding: 0;
   color: var(--tm-text-primary);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   outline: none;
   font-family: inherit;
 }
@@ -270,7 +261,7 @@
 }
 
 .notepad-search-kbd {
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   background: var(--tm-overlay-soft);
   border: 1px solid var(--tm-border-strong);
@@ -321,7 +312,7 @@
   border: none;
   border-radius: 4px;
   padding: 5px 8px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-family: inherit;
   color: var(--tm-text-muted);
   cursor: pointer;
@@ -352,7 +343,7 @@
 .notepad-tag-filter__count {
   margin-left: auto;
   opacity: 0.4;
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .notepad-note-list__notes {
@@ -376,7 +367,7 @@
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   cursor: pointer;
   border-top: 1px solid var(--tm-border);
@@ -426,7 +417,7 @@
   padding: 6px 10px;
   cursor: pointer;
   color: var(--tm-text-muted);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-family: inherit;
   text-align: left;
 }
@@ -463,13 +454,13 @@
   border-radius: 3px;
   color: inherit;
   font-family: inherit;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   padding: 1px 4px;
   outline: none;
 }
 
 .notepad-folder-header__count {
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   opacity: 0.4;
   flex-shrink: 0;
 }
@@ -480,7 +471,7 @@
 
 .notepad-folder-empty {
   padding: 6px 10px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   font-style: italic;
 }
@@ -517,7 +508,7 @@
 }
 
 .notepad-note-row__title {
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 500;
   color: var(--tm-text-primary);
   white-space: nowrap;
@@ -533,7 +524,7 @@
 }
 
 .notepad-note-row__tag {
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   background: var(--tm-overlay-soft);
   border: 1px solid var(--tm-border-strong);
   border-radius: 8px;
@@ -543,7 +534,7 @@
 }
 
 .notepad-note-row__meta {
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   margin-top: 3px;
 }
@@ -552,7 +543,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   margin-top: 2px;
   min-width: 0;
@@ -580,69 +571,6 @@
   justify-content: center;
 }
 
-.notepad-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  gap: 16px;
-  padding: 48px 32px;
-  text-align: center;
-  color: var(--tm-text-muted);
-  max-width: 520px;
-}
-
-/* Principle XII: sized here, not with a `size` prop. */
-.notepad-empty-state__icon svg {
-  width: 36px;
-  height: 36px;
-}
-
-.notepad-empty-state__icon {
-  opacity: 0.4;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.notepad-empty-state__heading {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--tm-text-primary);
-  margin: 0;
-}
-
-.notepad-empty-state__desc {
-  font-size: 14px;
-  color: var(--tm-text-secondary);
-  margin: 0;
-  line-height: 1.6;
-}
-
-.notepad-empty-state__buttons {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-top: 4px;
-}
-
-.notepad-empty-state__tip {
-  font-size: 12px;
-  color: var(--tm-text-muted);
-  margin: 0;
-}
-
-.notepad-kbd {
-  font-family: var(--tm-font-mono, monospace);
-  font-size: 11px;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border);
-  border-radius: 4px;
-  padding: 1px 5px;
-  color: var(--tm-text-secondary);
-}
-
 /* ── Tag chips ──────────────────────────────────────────────────── */
 .notepad-tag-chip {
   display: inline-flex;
@@ -652,7 +580,7 @@
   border: 1px solid var(--tm-border-strong);
   border-radius: 999px;
   color: var(--tm-text-muted);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   padding: 2px 7px;
   cursor: pointer;
   font-family: inherit;
@@ -669,7 +597,7 @@
 
 /* ── Form inputs ────────────────────────────────────────────────── */
 .notepad-input {
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-family: inherit;
   padding: 7px 10px;
   transition: border-color 100ms ease;
@@ -713,7 +641,7 @@
 }
 
 .notepad-quick-create__vault-status {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
 }
 
@@ -736,7 +664,7 @@
   background: transparent;
   border: none;
   outline: none;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 500;
   color: var(--tm-text-primary);
   padding: 8px 14px 6px;
@@ -796,7 +724,7 @@
   border: none;
   outline: none;
   color: var(--tm-text-muted);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-family: inherit;
   min-width: 80px;
   padding: 0;
@@ -839,7 +767,7 @@
   background: var(--tm-accent-dim, color-mix(in srgb, var(--tm-accent) 15%, transparent));
   border: 1px solid var(--tm-accent, color-mix(in srgb, var(--tm-accent) 30%, transparent));
   color: var(--tm-accent-text);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 500;
   padding: 2px 6px 2px 8px;
   border-radius: 10px;
@@ -871,7 +799,7 @@
   border: none;
   outline: none;
   color: var(--tm-text-primary);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-family: inherit;
   padding: 0;
 }
@@ -952,14 +880,14 @@
 }
 
 .notepad-comment-column__title {
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 600;
   color: var(--tm-text-primary);
   flex: 1;
 }
 
 .notepad-comment-column__badge {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 500;
   background: var(--tm-overlay);
   color: var(--tm-text-secondary);
@@ -980,7 +908,7 @@
   justify-content: center;
   flex: 1;
   color: var(--tm-text-muted);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   padding: 16px;
   text-align: center;
 }
@@ -1011,7 +939,7 @@
 }
 
 .notepad-export-dialog__field-label {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   margin-bottom: 8px;
 }
@@ -1041,12 +969,12 @@
   gap: 16px;
   padding: 14px 18px;
   border-bottom: 1px solid var(--tm-border);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   color: var(--tm-text-primary);
 }
 
 .notepad-export-dialog__toggle-desc {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -1061,7 +989,7 @@
 }
 
 .notepad-export-dialog__preview-line {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-family: var(--tm-font-mono, monospace);
   color: var(--tm-text-muted);
   line-height: 1.7;
@@ -1082,7 +1010,7 @@
 
 .notepad-export-dialog__footer-meta {
   flex: 1;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -1136,7 +1064,7 @@
   border: none;
   border-right: 1px solid var(--tm-border-strong);
   color: var(--tm-text-muted);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-family: inherit;
   padding: 6px 12px;
   cursor: pointer;
@@ -1275,7 +1203,7 @@ input[type='checkbox'].notepad-task-checkbox {
   height: 15px;
   border: 1px solid currentColor;
   border-radius: 50%;
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   line-height: 1;
 }
 
@@ -1319,7 +1247,7 @@ input[type='checkbox'].notepad-task-checkbox {
   border-radius: 50%;
   background: var(--tm-accent);
   color: var(--tm-on-accent);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -1329,14 +1257,14 @@ input[type='checkbox'].notepad-task-checkbox {
 }
 
 .notepad-comment__author-name {
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 600;
   color: var(--tm-text-primary);
   flex: 1;
 }
 
 .notepad-comment__timestamp {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
   flex-shrink: 0;
 }
@@ -1370,7 +1298,7 @@ input[type='checkbox'].notepad-task-checkbox {
 .notepad-comment__reply-inline {
   display: flex;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
   line-height: 1.5;
 }
@@ -1398,7 +1326,7 @@ input[type='checkbox'].notepad-task-checkbox {
   border: none;
   border-left: 2px solid var(--tm-accent);
   padding: 2px 6px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-style: italic;
   color: var(--tm-text-muted);
   white-space: nowrap;
@@ -1423,7 +1351,7 @@ input[type='checkbox'].notepad-task-checkbox {
 }
 
 .notepad-comment__body {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-primary);
   line-height: 1.5;
   cursor: text;
@@ -1442,7 +1370,7 @@ input[type='checkbox'].notepad-task-checkbox {
   border: 1px solid var(--tm-accent, color-mix(in srgb, var(--tm-accent) 40%, transparent));
   border-radius: 4px;
   color: var(--tm-text-primary);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-family: inherit;
   padding: 5px 7px;
   outline: none;
@@ -1457,7 +1385,7 @@ input[type='checkbox'].notepad-task-checkbox {
 }
 
 .notepad-comment__author {
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
 }
 
@@ -1480,7 +1408,7 @@ input[type='checkbox'].notepad-task-checkbox {
   border: 1px solid var(--tm-border);
   border-radius: 4px;
   color: var(--tm-text-primary);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-family: inherit;
   padding: 4px 6px;
   outline: none;
@@ -1510,7 +1438,7 @@ input[type='checkbox'].notepad-task-checkbox {
 }
 
 .notepad-comment-margin__hint {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   text-align: center;
   margin: 0;
   color: var(--tm-text-muted);
@@ -1539,7 +1467,7 @@ input[type='checkbox'].notepad-task-checkbox {
   padding: 5px 10px;
   background: color-mix(in srgb, var(--tm-warning) 10%, transparent);
   color: var(--tm-warning);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 600;
 }
 
@@ -1560,7 +1488,7 @@ input[type='checkbox'].notepad-task-checkbox {
   background: none;
   border: none;
   color: var(--tm-text-muted);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-family: inherit;
   cursor: pointer;
   padding: 5px 2px;
@@ -1589,7 +1517,7 @@ input[type='checkbox'].notepad-task-checkbox {
   border: 1px solid var(--tm-border);
   border-radius: 5px;
   color: var(--tm-text-primary);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-family: inherit;
   padding: 4px 10px;
   cursor: pointer;
@@ -1644,7 +1572,7 @@ input[type='checkbox'].notepad-task-checkbox {
   background: transparent;
   border: none;
   color: var(--tm-text-primary);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-family: inherit;
   padding: 6px 10px;
   border-radius: 5px;
@@ -1699,7 +1627,7 @@ input[type='checkbox'].notepad-task-checkbox {
   border: none;
   padding: 0;
   outline: none;
-  font-size: 15px;
+  font-size: var(--tm-font-size-lg);
   font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
   color: var(--tm-text-primary);
   caret-color: var(--tm-text-primary);
@@ -1710,7 +1638,7 @@ input[type='checkbox'].notepad-task-checkbox {
 }
 
 .notepad-search-overlay__count {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   white-space: nowrap;
   flex-shrink: 0;
@@ -1726,7 +1654,7 @@ input[type='checkbox'].notepad-task-checkbox {
 }
 
 .notepad-search-overlay__filter-label {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   margin-right: 2px;
 }
@@ -1740,7 +1668,7 @@ input[type='checkbox'].notepad-task-checkbox {
   border: 1px solid var(--tm-border-strong);
   background: var(--tm-overlay-soft);
   color: var(--tm-text-secondary);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   cursor: pointer;
   transition:
     background 0.1s,
@@ -1767,7 +1695,7 @@ input[type='checkbox'].notepad-task-checkbox {
 .notepad-search-overlay__empty {
   padding: 24px 20px;
   color: var(--tm-text-muted);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   text-align: center;
 }
 
@@ -1813,7 +1741,7 @@ input[type='checkbox'].notepad-task-checkbox {
 }
 
 .notepad-window__title {
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 500;
   color: var(--tm-text-primary);
   overflow: hidden;
@@ -1839,7 +1767,7 @@ input[type='checkbox'].notepad-task-checkbox {
 }
 
 .notepad-window__tag {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   padding: 1px 6px;
   border-radius: 3px;
   background: var(--tm-overlay-soft);
@@ -1847,7 +1775,7 @@ input[type='checkbox'].notepad-task-checkbox {
 }
 
 .notepad-window__status {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   flex-shrink: 0;
   min-width: 48px;
@@ -1883,7 +1811,7 @@ input[type='checkbox'].notepad-task-checkbox {
   justify-content: center;
   height: 100vh;
   color: var(--tm-text-muted);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
 }
 
 .notepad-search-overlay__result--selected,
@@ -1892,14 +1820,14 @@ input[type='checkbox'].notepad-task-checkbox {
 }
 
 .notepad-search-overlay__result-title {
-  font-size: 14px;
+  font-size: var(--tm-font-size-lg);
   font-weight: 600;
   color: var(--tm-text-primary);
   margin-bottom: 4px;
 }
 
 .notepad-search-overlay__result-snippet {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
   margin-bottom: 6px;
   line-height: 1.5;
@@ -1921,12 +1849,12 @@ input[type='checkbox'].notepad-task-checkbox {
 }
 
 .notepad-search-overlay__result-tags {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
 }
 
 .notepad-search-overlay__result-time {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
 }
 
@@ -1983,7 +1911,7 @@ input[type='checkbox'].notepad-task-checkbox {
   border: none;
   padding: 2px 4px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 500;
   color: var(--tm-text-primary);
   cursor: pointer;
@@ -2016,7 +1944,7 @@ input[type='checkbox'].notepad-task-checkbox {
   border: 1px solid var(--tm-accent);
   border-radius: 4px;
   padding: 2px 6px;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 500;
   color: var(--tm-text-primary);
   outline: none;
@@ -2025,7 +1953,7 @@ input[type='checkbox'].notepad-task-checkbox {
 }
 
 .diagram-view__tags {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -2034,7 +1962,7 @@ input[type='checkbox'].notepad-task-checkbox {
 }
 
 .diagram-view__save-status {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
 }
 
@@ -2066,7 +1994,7 @@ input[type='checkbox'].notepad-task-checkbox {
   justify-content: center;
   height: 100%;
   color: var(--tm-text-muted);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
 }
 
 .diagram-view__loading {
@@ -2075,7 +2003,7 @@ input[type='checkbox'].notepad-task-checkbox {
   justify-content: center;
   height: 100%;
   color: var(--tm-text-muted);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
 }
 
 /* ── Diagram comment pins ────────────────────────────────────── */
@@ -2116,7 +2044,7 @@ input[type='checkbox'].notepad-task-checkbox {
   right: -4px;
   background: var(--tm-danger);
   color: var(--tm-on-accent);
-  font-size: 9px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 700;
   min-width: 14px;
   height: 14px;
@@ -2150,7 +2078,7 @@ input[type='checkbox'].notepad-task-checkbox {
 }
 
 .diagram-comment-popover__title {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 600;
   color: var(--tm-text-muted);
 }
@@ -2177,13 +2105,13 @@ input[type='checkbox'].notepad-task-checkbox {
 }
 
 .diagram-comment-popover__author {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 600;
   color: var(--tm-text-muted);
 }
 
 .diagram-comment-popover__body {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-primary);
   margin: 0;
   line-height: 1.4;
@@ -2203,7 +2131,7 @@ input[type='checkbox'].notepad-task-checkbox {
   border: 1px solid var(--tm-border);
   border-radius: 4px;
   color: var(--tm-text-primary);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-family: inherit;
   padding: 6px 8px;
   resize: none;

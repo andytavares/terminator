@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { RecordShown } from '../renderer/RecordShown.js'
-import { ArrowLeft, Plus, CheckCircle2, AlertCircle, Loader } from 'lucide-react'
-import { Button, ConfirmButton, SegmentedControl } from '@terminator/extension-ui'
+import { ArrowLeft, Plus, CheckCircle2, AlertCircle, Loader, Hammer } from 'lucide-react'
+import { Button, ConfirmButton, EmptyState, SegmentedControl } from '@terminator/extension-ui'
 import { GateAnswers } from './GateCard.js'
 import { OrderLinks } from './OrderLinks.js'
 import { DocumentChip } from './DocumentChip.js'
@@ -77,7 +77,13 @@ export function Orders({ repoRoot, focusIdeaSignal, openOrderId }: OrdersProps):
   const shared: Shared = { repoRoot, busy, setBusy, setProblem, setOpen, refresh }
   const seeding = useSeeding(shared)
 
-  const list = { rows, answering, onOpen: setOpen, onAnswer: answer }
+  const list = {
+    rows,
+    answering,
+    onOpen: setOpen,
+    onAnswer: answer,
+    onStartFromTicket: () => setFrom('tracker'),
+  }
   return (
     <>
       <RecordShown feature="orders" />
@@ -721,17 +727,22 @@ interface OrderListProps {
   readonly answering: string | null
   readonly onOpen: (orderId: string) => void
   readonly onAnswer: (gateId: string, option: string) => Promise<void>
+  readonly onStartFromTicket: () => void
 }
 
-function OrderList({ rows, answering, onOpen, onAnswer }: OrderListProps) {
-  if (rows.length === 0) {
-    return (
-      <p className="fdry-note">
-        No orders yet. Describe something above, or give it a ticket, and Foundry will read the
-        repository before it asks you anything.
-      </p>
-    )
-  }
+function NoOrders({ onStartFromTicket }: Pick<OrderListProps, 'onStartFromTicket'>) {
+  return (
+    <EmptyState
+      icon={Hammer}
+      heading="No orders yet"
+      description="Describe what you want built above, or start from a ticket. Foundry reads the repository before it asks you anything."
+      actions={[{ label: 'Start from a ticket', onSelect: onStartFromTicket }]}
+    />
+  )
+}
+
+function OrderList({ rows, answering, onOpen, onAnswer, onStartFromTicket }: OrderListProps) {
+  if (rows.length === 0) return <NoOrders onStartFromTicket={onStartFromTicket} />
   return (
     <>
       <h2 className="fdry-list-h">

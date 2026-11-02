@@ -6,7 +6,7 @@
   height: 100%;
   background: var(--tm-bg-base);
   color: var(--tm-text-primary);
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   line-height: 1.4;
   outline: none;
 }
@@ -30,12 +30,12 @@
 }
 .hd__title {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--tm-font-size-lg);
   font-weight: 600;
 }
 .hd__date {
   color: var(--tm-text-secondary);
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
 }
 .hd .tmui-segmented {
   margin-left: 8px;
@@ -61,7 +61,7 @@
   padding: 0 10px;
   border: 1px solid var(--tm-border-strong);
   border-radius: 7px;
-  background: var(--tm-bg-surface);
+  background: var(--tm-bg-input);
   color: var(--tm-text-faint);
 }
 .desk-field svg {

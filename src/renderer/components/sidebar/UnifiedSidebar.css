@@ -59,7 +59,7 @@
 
 .unified-sidebar__empty {
   padding: 12px 10px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   text-align: center;
 }
@@ -92,7 +92,7 @@
   border: none;
   background: transparent;
   color: inherit;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   line-height: 1;
   cursor: pointer;
   opacity: 0;
@@ -120,11 +120,12 @@
   align-items: center;
   gap: 7px;
   padding: 0 10px 0 8px;
-  font-family: var(--tm-font-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--tm-text-muted);
+  font-family: var(--tm-font-ui);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-md);
+  font-weight: 600;
+  color: var(--tm-text-primary);
   user-select: none;
 }
 
@@ -132,19 +133,21 @@
    the slack ahead of it, so it lands in the same column as the other rows' +
    rather than sitting against the label. */
 .unified-sidebar__scratch-count {
+  /* The heading beside it is in the UI face; counts keep the one type every sidebar count uses. */
+  font-family: var(--tm-font-mono);
   flex: 0 0 var(--sidebar-count-w, 20px);
   width: var(--sidebar-count-w, 20px);
   text-align: right;
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
 }
 
 .unified-sidebar__subheading {
   padding: 10px 10px 2px;
-  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-md);
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--tm-text-muted);
+  color: var(--tm-text-primary);
 }

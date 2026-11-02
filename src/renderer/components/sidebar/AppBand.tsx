@@ -114,7 +114,7 @@ function Entry({
       <span className="app-band__icon" aria-hidden="true">
         {icon ?? <Puzzle />}
       </span>
-      {badge > 0 && <span className="app-band__badge">{badge > 9 ? '9+' : badge}</span>}
+      {badge > 0 && <span className="count-badge app-band__badge">{badge > 9 ? '9+' : badge}</span>}
     </button>
   )
 }

@@ -6,10 +6,11 @@
 
 .dialog__label {
   display: block;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--tm-text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-sm);
+  font-weight: 500;
+  color: var(--tm-text-secondary);
   margin-bottom: 5px;
 }
 
@@ -21,7 +22,7 @@
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-sm);
   padding: 7px 10px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-family: var(--tm-font-ui);
   color: var(--tm-text-primary);
   transition: border-color 0.15s;
@@ -41,7 +42,7 @@
 
 .dialog__error {
   display: block;
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-danger);
   margin-top: 4px;
   letter-spacing: 0.01em;
@@ -91,7 +92,7 @@
   gap: 8px;
   text-transform: none;
   letter-spacing: normal;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
   cursor: pointer;
   margin-bottom: 0;
@@ -111,7 +112,7 @@
   border: none;
   border-right: 1px solid var(--tm-border-strong);
   padding: 6px 10px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-family: var(--tm-font-ui);
   color: var(--tm-text-secondary);
   cursor: pointer;
@@ -147,7 +148,7 @@
 /* ── Hint text ───────────────────────────────────────────────── */
 .dialog__hint {
   display: block;
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   margin-top: 4px;
   letter-spacing: 0.01em;

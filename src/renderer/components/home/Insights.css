@@ -53,27 +53,27 @@
 .ins__kpi small {
   display: block;
   color: var(--tm-text-secondary);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .ins__kpi b {
   display: block;
   margin-top: 1px;
-  font-size: 19px;
+  font-size: var(--tm-font-size-xl);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
 .ins__kpi i {
   color: var(--tm-text-faint);
-  font-size: 10.5px;
+  font-size: var(--tm-font-size-xs);
   font-style: normal;
 }
 
 .ins__note {
   margin-top: 12px;
   color: var(--tm-text-faint);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .ins__note b {
@@ -88,7 +88,7 @@
   gap: 9px;
   padding: 6px 0;
   border-bottom: 1px solid var(--tm-border);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .ins__lr:last-child {
@@ -120,7 +120,7 @@
   align-items: center;
   gap: 8px;
   padding: 3px 0;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .ins__tl-key {
@@ -166,7 +166,7 @@
   padding: 0;
   list-style: none;
   color: var(--tm-text-muted);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .ins__swatch {

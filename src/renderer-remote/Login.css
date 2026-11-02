@@ -31,7 +31,7 @@
 }
 
 .login__title {
-  font-size: 15px;
+  font-size: var(--tm-font-size-lg);
   font-weight: 600;
   color: var(--tm-text-primary);
   text-align: center;
@@ -45,7 +45,7 @@
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-sm);
   padding: 9px 12px;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-family: var(--tm-font-ui);
   color: var(--tm-text-primary);
   outline: none;
@@ -57,7 +57,7 @@
 }
 
 .login__error {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-danger);
   text-align: center;
   min-height: 16px;
@@ -70,7 +70,7 @@
   border: none;
   border-radius: var(--tm-radius-sm);
   padding: 9px;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-family: var(--tm-font-ui);
   font-weight: 500;
   cursor: pointer;

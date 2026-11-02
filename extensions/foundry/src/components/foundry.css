@@ -20,7 +20,7 @@
 }
 .sk-appbar__title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
 }
 
 .fdry-settings-open {
@@ -101,7 +101,7 @@
 .fdry-step-h {
   scroll-margin-top: 22px;
   margin: 0 0 6px;
-  font-size: 18px;
+  font-size: var(--tm-font-size-xl);
   font-weight: 600;
   line-height: 1.3;
 }
@@ -109,7 +109,7 @@
 .fdry-step-intro {
   margin: 0 0 18px;
   max-width: 68ch;
-  font-size: 13.5px;
+  font-size: var(--tm-font-size-md);
   line-height: 1.55;
   color: var(--tm-text-secondary);
 }
@@ -118,9 +118,9 @@
   margin: 18px 0 0;
   padding: 10px 14px;
   border-left: 3px solid var(--tm-accent);
-  background: var(--tm-bg-surface);
+  background: var(--tm-bg-card);
   border-radius: var(--tm-radius-sm);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   line-height: 1.5;
   color: var(--tm-text-primary);
 }
@@ -129,7 +129,7 @@
 .fdry-field-h {
   scroll-margin-top: 22px;
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 600;
   color: var(--tm-text-primary);
 }
@@ -154,7 +154,7 @@
 
 /* The order's own words are what the step is about, not a caption. */
 .fdry-main .fdry-md {
-  font-size: 13.5px;
+  font-size: var(--tm-font-size-md);
   line-height: 1.55;
   color: var(--tm-text-primary);
 }
@@ -167,11 +167,11 @@
 }
 
 .fdry-panel-h {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--tm-text-muted);
+  font-size: var(--tm-font-size-md);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--tm-text-primary);
   margin: 0 0 10px;
 }
 
@@ -196,7 +196,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   padding: 4px 11px;
   border: 1px solid var(--tm-accent);
   border-radius: 999px;
@@ -230,13 +230,13 @@
 }
 
 .fdry-wiz-title b {
-  font-size: 15px;
+  font-size: var(--tm-font-size-lg);
   font-weight: 600;
   display: block;
 }
 
 .fdry-wiz-sub {
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
   display: flex;
   gap: 8px;
@@ -286,7 +286,7 @@
 
 .fdry-strip-who small {
   color: var(--tm-text-secondary);
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   display: block;
   margin-top: 2px;
 }
@@ -377,7 +377,7 @@
   border: 1px solid var(--tm-border-strong);
   display: grid;
   place-items: center;
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
 }
 
@@ -389,12 +389,12 @@
 .fdry-rail-step b {
   font-weight: 500;
   display: block;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
 }
 
 .fdry-rail-step small {
   display: block;
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
   line-height: 1.35;
 }
@@ -452,7 +452,7 @@
 .fdry-chk small {
   display: block;
   color: var(--tm-text-secondary);
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .fdry-chk-icon svg {
@@ -482,7 +482,7 @@
   align-items: center;
   padding: 8px 12px;
   border-bottom: 1px solid var(--tm-border);
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   font-weight: 600;
   cursor: default;
 }
@@ -523,7 +523,7 @@
 
 .fdry-fnd-meta {
   display: block;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -539,12 +539,13 @@
 }
 
 .fdry-opts-legend {
+  font-size: var(--tm-font-size-md);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--tm-text-primary);
   padding: 0;
   margin-bottom: 4px;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--tm-text-muted);
 }
 
 .fdry-opt {
@@ -555,7 +556,7 @@
   padding: 10px 12px;
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-radius-sm);
-  background: var(--tm-bg-surface);
+  background: var(--tm-bg-card);
   cursor: pointer;
 }
 
@@ -587,7 +588,7 @@
   display: inline-block;
   margin-left: 2px;
   padding: 0 5px;
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--tm-accent);
@@ -599,7 +600,7 @@
 .fdry-fnd input:not([type='radio'], [type='checkbox']),
 .fdry-fnd textarea {
   font: inherit;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   background: var(--tm-bg-input);
   color: var(--tm-text-primary);
   border: 1px solid var(--tm-border-strong);
@@ -665,12 +666,12 @@
 
 .fdry-shape small {
   color: var(--tm-text-secondary);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   line-height: 1.4;
 }
 
 .fdry-mark {
-  font-size: 10.5px;
+  font-size: var(--tm-font-size-xs);
   padding: 0 6px;
   border: 1px solid var(--tm-accent);
   border-radius: 999px;
@@ -687,7 +688,7 @@
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
 }
 
@@ -715,7 +716,7 @@
 .fdry-why {
   flex: 1;
   min-width: 120px;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
   display: flex;
   gap: 8px;
@@ -759,15 +760,15 @@
 }
 
 .fdry-needs-you-h {
+  font-size: var(--tm-font-size-md);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--tm-text-primary);
   display: flex;
   align-items: center;
   gap: 6px;
   margin: 0 0 10px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--tm-warning);
 }
 
 .fdry-needs-you-h svg {
@@ -796,7 +797,7 @@
 
 .fdry-note {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   line-height: 1.5;
   color: var(--tm-text-secondary);
 }
@@ -835,7 +836,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .fdry-ask-main small {
@@ -846,7 +847,7 @@
 .fdry-ask-detail,
 .fdry-transcript {
   overflow: auto;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-radius-sm);
@@ -900,7 +901,7 @@
   flex: 1;
   min-width: 0;
   padding: 5px 8px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .fdry-accept {
@@ -944,14 +945,14 @@
   gap: 8px;
   padding: 5px 0;
   border-bottom: 1px solid var(--tm-border);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 /* The author is a margin note, not a status: the pill treatment belongs to
    run state and review grade, which are the things worth spotting. */
 .fdry-feed-author {
   flex: 0 0 auto;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
 }
 
@@ -977,13 +978,13 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-secondary);
 }
 
 .fdry-ledger-bar select {
   padding: 4px 6px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .fdry-propose {
@@ -993,7 +994,7 @@
 .fdry-ledger {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .fdry-ledger th {
@@ -1038,7 +1039,7 @@
 .fdry-citations {
   margin: 6px 0;
   padding-left: 18px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-secondary);
 }
 
@@ -1056,7 +1057,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-primary);
 }
 
@@ -1080,7 +1081,7 @@
   padding: 1px 6px;
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-radius-sm);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-secondary);
 }
 
@@ -1094,7 +1095,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   color: var(--tm-text-secondary);
 }
 
@@ -1106,7 +1107,7 @@
   gap: 12px;
   max-width: 520px;
   margin-top: 10px;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   color: var(--tm-text-secondary);
 }
 
@@ -1123,7 +1124,7 @@
 .fdry-src,
 .fdry-id {
   font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
 }
 
@@ -1150,7 +1151,7 @@
   color: var(--tm-text-secondary);
   border-radius: var(--tm-radius-sm);
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   cursor: pointer;
 }
 
@@ -1167,7 +1168,7 @@
 
 .fdry-field p {
   margin: 0 0 6px;
-  font-size: 13.5px;
+  font-size: var(--tm-font-size-md);
   line-height: 1.55;
 }
 
@@ -1177,7 +1178,7 @@
   gap: 10px;
   padding: 10px 0;
   border-bottom: 1px solid var(--tm-border);
-  font-size: 13.5px;
+  font-size: var(--tm-font-size-md);
 }
 
 .fdry-ac:last-child {
@@ -1186,7 +1187,7 @@
 
 .fdry-ac-id {
   font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -1197,7 +1198,7 @@
 
 .fdry-verify {
   font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-secondary);
 }
 
@@ -1213,7 +1214,7 @@
 
 .fdry-ac-excused {
   margin: 5px 0 0;
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -1224,7 +1225,7 @@
 .fdry-matrix {
   border-collapse: collapse;
   font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .fdry-matrix th,
@@ -1264,7 +1265,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   border: 1px solid var(--tm-border-strong);
   background: transparent;
   border-radius: 999px;
@@ -1291,7 +1292,7 @@
 
 .fdry-finding-detail > summary {
   width: fit-content;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   cursor: pointer;
 }
 
@@ -1318,7 +1319,7 @@
 }
 
 .fdry-input input {
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 /* ─── Foundry: orders list and shell ─────────────────────────────── */
@@ -1345,7 +1346,7 @@
   border-radius: 999px;
   background: var(--tm-warning);
   color: var(--tm-on-warning);
-  font-size: 10.5px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 700;
   line-height: 1;
 }
@@ -1386,7 +1387,7 @@
 }
 
 .fdry-seed input {
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
 }
 
 .fdry-seed-from {
@@ -1419,7 +1420,7 @@
 .fdry-ticket-offer p {
   flex: 1 1 260px;
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-primary);
 }
 
@@ -1429,7 +1430,7 @@
   border-radius: var(--tm-radius-sm);
   padding: 6px 8px;
   color: var(--tm-text-primary);
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 /* Your tickets, listed. */
@@ -1439,7 +1440,7 @@
 
 /* A ticket's own words, in the shape they were written. */
 .fdry-md {
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
   line-height: 1.5;
 }
@@ -1457,7 +1458,7 @@
 .fdry-md :is(h1, h2, h3, h4, h5, h6) {
   color: var(--tm-text-primary);
   font-weight: 600;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   margin-top: 8px;
 }
 
@@ -1481,7 +1482,7 @@
 .fdry-md code,
 .fdry-md-inline code {
   font-family: var(--tm-font-mono);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   background: var(--tm-bg-input);
   border-radius: 3px;
   padding: 1px 4px;
@@ -1511,7 +1512,7 @@
   align-items: baseline;
   gap: 6px;
   margin: 4px 0 8px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-weight: 600;
   color: var(--tm-text-secondary);
 }
@@ -1542,7 +1543,7 @@
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-radius-md);
   padding: 11px 14px;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   color: var(--tm-text-primary);
   cursor: pointer;
 }
@@ -1553,7 +1554,7 @@
 
 .fdry-ticket-key {
   flex: 0 0 auto;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-variant-numeric: tabular-nums;
   color: var(--tm-text-secondary);
 }
@@ -1567,13 +1568,13 @@
 
 .fdry-ticket-status {
   flex: 0 0 auto;
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
 .fdry-problem {
   color: var(--tm-danger);
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   margin: 0 0 12px;
 }
 
@@ -1624,19 +1625,19 @@
 
 .fdry-order-main b {
   display: block;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 500;
 }
 
 .fdry-order-main small {
   display: block;
   margin-top: 2px;
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
 .fdry-order-state {
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
   white-space: nowrap;
 }
@@ -1676,7 +1677,7 @@
   align-items: center;
   gap: 10px;
   font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .fdry-order-links a {
@@ -1720,33 +1721,6 @@
   overflow-y: auto;
   padding: 16px;
   border-bottom: 1px solid var(--tm-border);
-}
-
-.fdry-nothing {
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-  padding: 48px 16px;
-  text-align: center;
-  color: var(--tm-text-secondary);
-}
-
-.fdry-nothing svg {
-  width: 22px;
-  height: 22px;
-  opacity: 0.6;
-}
-
-.fdry-nothing p {
-  margin: 0;
-  font-size: 15px;
-  color: var(--tm-text-primary);
-}
-
-.fdry-nothing small {
-  font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 11.5px;
-  color: var(--tm-text-muted);
 }
 
 .fdry-queue {
@@ -1799,21 +1773,25 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-accent);
   background: var(--tm-bg-elevated);
   padding: 1px 7px;
   border-radius: var(--tm-radius-xs);
 }
 
-.fdry-gate-meta {
+.fdry-gate-meta,
+.fdry-sensor-meta {
   display: flex;
-  align-items: center;
-  gap: 6px;
   flex-wrap: wrap;
   font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
+}
+
+.fdry-gate-meta {
+  align-items: center;
+  gap: 6px;
 }
 
 .fdry-gate-meta span {
@@ -1840,14 +1818,14 @@
 }
 
 .fdry-waiting-title {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
   overflow-wrap: anywhere;
 }
 
 .fdry-waiting-main p {
   margin: 4px 0 0;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   overflow-wrap: anywhere;
 }
 
@@ -1893,7 +1871,7 @@
 }
 
 .fdry-gate-summary {
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1914,7 +1892,7 @@
 
 .fdry-gate-detail {
   padding: 0 12px 10px 26px;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
 }
 
@@ -1922,7 +1900,7 @@
   margin: 8px 0 0;
   padding: 0;
   list-style: none;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -1947,7 +1925,7 @@
   display: flex;
   gap: 18px;
   flex-wrap: wrap;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -1985,7 +1963,7 @@
 }
 
 .fdry-signal-main b {
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 600;
 }
 
@@ -1994,7 +1972,7 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -2015,7 +1993,7 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .fdry-signal-promote label {
@@ -2051,7 +2029,7 @@
 
 .fdry-lane-name {
   font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -2075,7 +2053,7 @@
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-sm);
   padding: 5px 10px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   background: var(--tm-bg-elevated);
   color: var(--tm-text-secondary);
   white-space: nowrap;
@@ -2100,7 +2078,7 @@
 .fdry-unit u {
   text-decoration: none;
   font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 10.5px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
 }
 
@@ -2135,20 +2113,20 @@
 }
 
 .fdry-unit-rework {
-  font-size: 10.5px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-danger);
 }
 
 .fdry-unit-skills {
   flex-basis: 100%;
   margin: 0;
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
 .fdry-unit-feedback {
   flex-basis: 100%;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
 }
 
@@ -2166,7 +2144,7 @@
 .fdry-unit-problem {
   flex-basis: 100%;
   margin: 0;
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-danger);
 }
 
@@ -2210,7 +2188,7 @@
 
 .fdry-models b {
   display: block;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 500;
 }
 
@@ -2218,7 +2196,7 @@
   display: block;
   margin-top: 2px;
   font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
 }
 
@@ -2245,13 +2223,13 @@
 }
 
 .fdry-sensor-head b {
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 500;
 }
 
 .fdry-sensor-rung {
   font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-radius-xs);
@@ -2263,7 +2241,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
 }
 
@@ -2272,7 +2250,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
 }
 
@@ -2287,12 +2265,7 @@
 
 .fdry-sensor-meta {
   margin-top: 6px;
-  display: flex;
   gap: 12px;
-  flex-wrap: wrap;
-  font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 11px;
-  color: var(--tm-text-muted);
 }
 
 .fdry-sensor-actions {
@@ -2303,7 +2276,7 @@
 }
 
 .fdry-sensor-actions span {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
 }
 
@@ -2341,7 +2314,7 @@
 
 .fdry-order-title {
   margin: 0;
-  font-size: 19px;
+  font-size: var(--tm-font-size-xl);
   font-weight: 600;
   line-height: 1.3;
   color: var(--tm-text-primary);
@@ -2353,7 +2326,7 @@
   align-items: center;
   gap: 8px 14px;
   margin: -6px 0 14px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .fdry-order-links a {
@@ -2371,7 +2344,7 @@
 .fdry-order-sub {
   margin: 3px 0 14px;
   font-family: var(--tm-font-mono);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--tm-text-muted);
@@ -2431,7 +2404,7 @@
 
 .fdry-standing-h {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--tm-font-size-lg);
   font-weight: 600;
   line-height: 1.3;
   color: var(--tm-text-primary);
@@ -2444,7 +2417,7 @@
 
 .fdry-standing-detail {
   margin: 4px 0 0;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   line-height: 1.5;
   color: var(--tm-text-secondary);
 }
@@ -2452,7 +2425,7 @@
 .fdry-standing-count {
   flex: none;
   font-family: var(--tm-font-mono);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
   white-space: nowrap;
 }
@@ -2485,12 +2458,12 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-primary);
 }
 
 .fdry-live-head time {
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -2499,7 +2472,7 @@
   margin: 6px 0 0;
   padding: 0;
   font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   line-height: 1.6;
   color: var(--tm-text-muted);
 }
@@ -2516,7 +2489,7 @@
 
 .fdry-live-empty {
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -2530,7 +2503,7 @@
 
 .fdry-standing-gate-h {
   margin: 0 0 4px;
-  font-size: 13.5px;
+  font-size: var(--tm-font-size-md);
   font-weight: 600;
   line-height: 1.4;
   color: var(--tm-text-primary);
@@ -2554,7 +2527,7 @@
 }
 
 .fdry-standing-option small {
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   line-height: 1.45;
   color: var(--tm-text-muted);
 }
@@ -2573,7 +2546,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 12px;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
 }
 
 .fdry-budget-label {
@@ -2584,7 +2557,7 @@
 .fdry-budget input[type='number'] {
   width: 90px;
   padding: 5px 8px;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .fdry-budget input[aria-invalid='true'] {
@@ -2599,7 +2572,7 @@
 }
 
 .fdry-budget-min {
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -2658,12 +2631,12 @@
 }
 
 .fdry-crate b {
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 600;
 }
 
 .fdry-crate-meta {
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -2677,7 +2650,7 @@
   gap: 6px;
   flex-wrap: wrap;
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .fdry-crate-promote label {
@@ -2801,7 +2774,7 @@
   justify-content: center;
   padding: 8px;
   text-align: center;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
 }
 
@@ -2816,12 +2789,12 @@
 }
 
 .fdry-hall-card-state {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
 }
 
 .fdry-hall-card-ci {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-variant-numeric: tabular-nums;
   color: var(--tm-text-secondary);
 }
@@ -2844,12 +2817,12 @@
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-radius-md);
   background: var(--tm-bg-card);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-primary);
 }
 
 .fdry-refinery-join {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-secondary);
   white-space: nowrap;
 }
@@ -2876,7 +2849,7 @@
   margin: 8px 0 0;
   padding: 0;
   list-style: none;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .fdry-ci-checks li {
@@ -2894,7 +2867,7 @@
   display: inline-block;
   margin-top: 4px;
   color: var(--tm-accent-text);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .fdry-ci-bucket {
@@ -3005,7 +2978,7 @@
   box-shadow:
     0 0 0 2px #07090d,
     0 4px 0 0 rgba(0, 0, 0, 0.35);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   white-space: nowrap;
@@ -3086,7 +3059,7 @@
   border-radius: 3px;
   background: #15110a;
   color: #f5e6c8;
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   line-height: 1.45;
   box-shadow:
     0 0 0 2px #07090d,
@@ -3152,7 +3125,7 @@
   background: #1d222b;
   color: #e6e9ee;
   font: inherit;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   cursor: pointer;
 }
 
@@ -3201,7 +3174,7 @@
   border: 1px solid #2c3340;
   border-radius: 2px;
   background: rgba(10, 12, 18, 0.86);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .fdry-hall-hud__title {
@@ -3237,7 +3210,7 @@
   border-radius: 2px;
   background: #e0a13a;
   color: #1a1206;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 600;
   animation: fdry-card-pulse 1.6s ease-in-out infinite;
 }
@@ -3251,7 +3224,7 @@
   border-radius: 2px;
   background: #15110a;
   color: #f5e6c8;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .fdry-hall-hud__tag {
@@ -3259,7 +3232,7 @@
   border-radius: 2px;
   background: #72d8f2;
   color: #06202a;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -3271,7 +3244,7 @@
   border-radius: 2px;
   background: rgba(10, 12, 18, 0.86);
   color: #98a2b1;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 /* Where the order's pull requests and ticket are, on the heads-up bar. */
@@ -3279,7 +3252,7 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .fdry-hall-hud__links a {
@@ -3367,7 +3340,7 @@
   border: 1px solid #2c3340;
   border-radius: 3px;
   background: rgba(10, 12, 18, 0.92);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .fdry-replay .fdry-replay__track {
@@ -3462,7 +3435,7 @@
     inset 0 0 3px rgba(0, 0, 0, 0.9);
   font-family: var(--fdry-crt-font);
   color: var(--fdry-crt-phosphor);
-  font-size: 19px;
+  font-size: var(--tm-font-size-xl);
   line-height: 1.02;
   text-shadow:
     0 0 5px rgba(51, 255, 102, 0.55),
@@ -3599,7 +3572,7 @@
 
 .fdry-crt__badge {
   font-family: var(--fdry-crt-font);
-  font-size: 17px;
+  font-size: var(--tm-font-size-xl);
   letter-spacing: 0.06em;
   color: #4a4336;
   text-shadow: 0 1px 0 #e9e2cc;
@@ -3647,7 +3620,7 @@
 .fdry-crt__power {
   appearance: none;
   font-family: var(--fdry-crt-font);
-  font-size: 17px;
+  font-size: var(--tm-font-size-xl);
   letter-spacing: 0.06em;
   color: #3b362c;
   cursor: pointer;
@@ -3835,7 +3808,7 @@
   padding: 12px;
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-radius-md);
-  background: var(--tm-bg-surface);
+  background: var(--tm-bg-card);
 }
 
 .fdry-status-wall .fdry-metrics-tiles {
@@ -3857,14 +3830,14 @@
 }
 
 .fdry-status-wall .tmui-metric-card__question {
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   letter-spacing: normal;
   text-transform: none;
 }
 
 .fdry-status-wall .tmui-metric-card__value {
   margin-top: 0;
-  font-size: 14px;
+  font-size: var(--tm-font-size-lg);
   font-weight: 600;
   color: var(--tm-text-primary);
 }
@@ -3883,7 +3856,7 @@
 
 .fdry-gate-evidence summary {
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
 }
 
@@ -3894,7 +3867,7 @@
   padding: 8px 10px;
   border-radius: var(--tm-radius-sm);
   background: var(--tm-bg-input);
-  font: 12px/1.45 var(--tm-font-mono);
+  font: var(--tm-font-size-sm) / 1.45 var(--tm-font-mono);
   color: var(--tm-text-primary);
   white-space: pre-wrap;
   word-break: break-word;
@@ -3923,7 +3896,7 @@
 .fdry-inline-why {
   display: block;
   margin-top: 6px;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
   border-left: 2px solid var(--tm-accent);
   padding: 4px 8px;
@@ -3937,7 +3910,7 @@
   display: block;
   margin-top: 2px;
   font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-primary);
   overflow-wrap: anywhere;
 }
@@ -3970,7 +3943,7 @@
   padding: 0 8px;
   font: inherit;
   font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-primary);
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-border-strong);
@@ -3988,7 +3961,7 @@
 .fdry-chk-result code,
 .fdry-chk small code {
   font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-primary);
 }
 
@@ -4034,7 +4007,7 @@
 .fdry-setrow small {
   display: block;
   color: var(--tm-text-secondary);
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   overflow-wrap: anywhere;
 }
 
@@ -4053,7 +4026,7 @@
 
 .fdry-profile-commands code {
   font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .fdry-chk-log {
@@ -4062,7 +4035,7 @@
   max-height: 220px;
   overflow: auto;
   font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   line-height: 1.5;
   color: var(--tm-text-primary);
   background: var(--tm-bg-input);
@@ -4122,7 +4095,7 @@
   overflow-y: auto;
   list-style: none;
   font-family: var(--tm-font-mono);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .fdry-runlog__line {

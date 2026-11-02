@@ -19,7 +19,7 @@ export function SessionPicker({ onSelect, onClose }: SessionPickerProps): React.
   if (activeSessions.length === 0) {
     return (
       <span className="daily-log__link-picker">
-        <span className="tv-text-muted-sm">No active terminal sessions.</span>
+        <span className="tv-muted-sm">No active terminal sessions.</span>
         <IconButton icon={X} label="Close" size="sm" onClick={onClose} />
       </span>
     )

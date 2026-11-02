@@ -69,7 +69,7 @@
 }
 
 .branch-select__caret {
-  font-size: 9px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   flex-shrink: 0;
   margin-left: 6px;
@@ -108,7 +108,7 @@
   border: none;
   border-bottom: 1px solid var(--tm-border-strong);
   padding: 7px 10px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-family: var(--tm-font-ui);
   color: var(--tm-text-primary);
   outline: none;
@@ -132,7 +132,7 @@
   background: none;
   border: none;
   padding: 7px 10px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-family: var(--tm-font-ui);
   color: var(--tm-text-secondary);
   cursor: pointer;
@@ -157,7 +157,7 @@
 }
 
 .branch-select__check {
-  font-size: 9px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-accent);
   width: 12px;
   flex-shrink: 0;
@@ -172,7 +172,7 @@
 
 .branch-select__empty {
   padding: 10px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   text-align: center;
 }

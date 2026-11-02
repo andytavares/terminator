@@ -19,7 +19,7 @@
   align-items: center;
   gap: 2px;
   padding: 7px 5px;
-  background: var(--tm-bg-elevated);
+  background: var(--tm-bg-surface);
   border-right: 1px solid var(--tm-border);
   overflow-y: auto;
   scrollbar-width: none;
@@ -78,14 +78,4 @@
   position: absolute;
   top: 1px;
   right: 0;
-  min-width: 12px;
-  height: 12px;
-  padding: 0 3px;
-  display: grid;
-  place-items: center;
-  border-radius: 6px;
-  background: var(--tm-accent);
-  color: var(--tm-on-accent);
-  font-family: var(--tm-font-mono);
-  font-size: 8px;
 }

@@ -75,6 +75,7 @@
   color: var(--tm-text-primary);
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-md, 10px);
+  box-shadow: var(--tm-shadow-overlay);
   font-family: var(--tm-font-ui);
 }
 
@@ -92,7 +93,7 @@
   min-height: 26px;
   margin: 0;
   padding-right: calc(26px + var(--tm-space-3, 12px));
-  font-size: 15px;
+  font-size: var(--tm-font-size-lg);
   font-weight: 600;
   line-height: 1.3;
 }
@@ -101,12 +102,12 @@
   margin: 0;
   white-space: pre-line;
   color: var(--tm-text-secondary);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   line-height: 1.5;
 }
 
 .tmui-dialog__body {
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   line-height: 1.5;
 }
 
@@ -138,7 +139,7 @@
   background: transparent;
   color: var(--tm-text-primary);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   line-height: 1.3;
   cursor: pointer;
 }
@@ -147,15 +148,21 @@
   background: var(--tm-bg-card-hover);
 }
 
-.tmui-button:disabled {
-  opacity: 0.45;
+/* Listed with the variants so the variant's colours cannot win by order. */
+.tmui-button:disabled,
+.tmui-button--primary:disabled,
+.tmui-button--danger:disabled {
+  opacity: 1;
+  background: var(--tm-bg-card);
+  border-color: var(--tm-border);
+  color: var(--tm-text-faint);
   cursor: default;
 }
 
 .tmui-button--sm {
   height: var(--tm-control-height-sm);
   padding: 0 8px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .tmui-button--ghost {
@@ -265,7 +272,7 @@
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-radius-sm, 6px);
   color: var(--tm-text-primary);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   padding: 7px 10px;
   outline: none;
 }
@@ -284,7 +291,7 @@
   border-radius: var(--tm-radius-sm, 6px);
   color: var(--tm-text-primary);
   font-family: var(--tm-font-mono);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   line-height: 1.5;
   padding: 6px 9px;
   resize: vertical;
@@ -306,7 +313,7 @@
   background: var(--tm-bg-input);
   color: var(--tm-text-secondary);
   font-family: var(--tm-font-mono);
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .tmui-button--primary .tmui-kbd {
@@ -340,7 +347,7 @@
 .tmui-empty__heading {
   margin: 0;
   color: var(--tm-text-primary);
-  font-size: 15px;
+  font-size: var(--tm-font-size-lg);
   font-weight: 600;
 }
 
@@ -348,7 +355,7 @@
   max-width: 46ch;
   margin: 0;
   color: var(--tm-text-secondary);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   line-height: 1.55;
 }
 
@@ -361,7 +368,7 @@
 .tmui-empty__hint {
   margin-top: var(--tm-space-2, 8px);
   color: var(--tm-text-muted);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 /* ── Toast ──────────────────────────────────────────────────────────────── */
@@ -386,7 +393,7 @@
   background: var(--tm-bg-elevated);
   color: var(--tm-text-primary);
   font-family: var(--tm-font-ui);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
 }
 
 .tmui-toast {
@@ -452,6 +459,7 @@
 }
 
 :where(.tmui-popover) {
+  box-shadow: var(--tm-shadow-overlay);
   min-width: 200px;
   padding: var(--tm-space-2, 8px);
 }
@@ -489,7 +497,7 @@
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   cursor: pointer;
 }
 
@@ -522,7 +530,7 @@
   background: transparent;
   color: var(--tm-text-secondary);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   cursor: pointer;
 }
 
@@ -600,7 +608,7 @@
   background: transparent;
   color: var(--tm-text-secondary);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   line-height: 1.3;
   white-space: nowrap;
   cursor: pointer;
@@ -608,7 +616,7 @@
 
 .tmui-segmented--sm .tmui-segmented__option {
   padding: 2px 8px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .tmui-segmented__option svg {
@@ -644,7 +652,7 @@
 
 :where(.tmui-markdown) {
   color: var(--tm-text-primary);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   line-height: 1.6;
   overflow-wrap: break-word;
   word-break: break-word;
@@ -670,7 +678,7 @@
   border-radius: 3px;
   background: var(--tm-overlay);
   font-family: var(--tm-font-mono);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 :where(.tmui-markdown pre) {
@@ -779,7 +787,7 @@
   margin: 0;
   max-width: 280px;
   padding: 3px 8px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   line-height: 1.4;
   white-space: nowrap;
   overflow: hidden;
@@ -804,7 +812,7 @@
   align-items: flex-start;
   gap: 8px;
   margin: 0;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   line-height: 1.5;
   color: var(--tm-text-secondary);
 }

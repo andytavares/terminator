@@ -1,13 +1,17 @@
 import './notepad.css'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { ListTree, MessageSquare } from 'lucide-react'
-import { IconButton, SegmentedControl, type SegmentedOption } from '@terminator/extension-ui'
+import { ListTree, MessageSquare, NotebookPen, Pencil } from 'lucide-react'
+import {
+  EmptyState,
+  IconButton,
+  SegmentedControl,
+  type SegmentedOption,
+} from '@terminator/extension-ui'
 import { loadLibrary, useNotesStore } from '../stores/notes.store'
 import { useEditorStore } from '../stores/editor.store'
 import { useCommentsStore } from '../stores/comments.store'
 import { NoteList } from './NoteList'
 import { NoteOutline } from './NoteOutline'
-import { EmptyState } from './EmptyState'
 import { DiagramView } from './DiagramView'
 import { ExportDialog } from './ExportDialog'
 import { SearchOverlay } from './SearchOverlay'
@@ -105,14 +109,35 @@ function usePanelToggles() {
   }
 }
 
+function NoNoteOpen(): React.JSX.Element {
+  const setShowQuickCreate = useNotesStore((s) => s.setShowQuickCreate)
+  return (
+    <EmptyState
+      icon={NotebookPen}
+      heading="No note open"
+      description="Pick a note from the list, or start a new one."
+      actions={[{ label: 'New note', onSelect: () => setShowQuickCreate(true) }]}
+    />
+  )
+}
+
 function EmptyNotepad({ search }: { search: React.ReactNode }): React.JSX.Element {
   const setShowQuickCreate = useNotesStore((s) => s.setShowQuickCreate)
   return (
     <div className="notepad-view notepad-view--empty-screen">
       {search}
       <EmptyState
-        onNewNote={() => setShowQuickCreate(true)}
-        onImport={() => void importNotes(() => void reloadNoteList())}
+        icon={Pencil}
+        heading="No notes yet"
+        description="Capture your first note from anywhere in Terminator — even mid-command. Notes are kept on this machine and export to plain markdown whenever you want."
+        actions={[
+          { label: 'New note', tone: 'primary', onSelect: () => setShowQuickCreate(true) },
+          {
+            label: 'Import a folder…',
+            onSelect: () => void importNotes(() => void reloadNoteList()),
+          },
+        ]}
+        hint="Tip: press ⌘⇧N anytime — the overlay opens over your terminal."
       />
     </div>
   )
@@ -197,7 +222,7 @@ function NoteWorkspace({ toggles, search, session }: NoteWorkspaceProps) {
         {selectedNoteId ? (
           <NoteEditorPane session={session} readingMode={toggles.readingMode} />
         ) : (
-          <div className="notepad-view__no-selection">Select a note to start editing</div>
+          <NoNoteOpen />
         )}
       </div>
       <NotepadRail session={session} toggles={toggles} />

@@ -94,7 +94,7 @@ body {
 
      A default that is right is the fix; a rule that wants larger still says
      so. */
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
 }

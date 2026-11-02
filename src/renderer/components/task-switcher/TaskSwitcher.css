@@ -2,10 +2,11 @@
   width: 560px;
   max-width: calc(100vw - 32px);
   padding: 0;
-  border: 1px solid var(--tm-border);
+  border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-md);
-  background: var(--tm-bg-surface);
+  background: var(--tm-bg-elevated);
   color: var(--tm-text-primary);
+  box-shadow: var(--tm-shadow-overlay);
 }
 
 .task-switcher__field {
@@ -17,7 +18,7 @@
   border-bottom: 1px solid var(--tm-border);
   background: none;
   color: inherit;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   outline: none;
 }
 
@@ -29,11 +30,11 @@
 
 .task-switcher__heading {
   padding: 8px 8px 2px;
-  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-md);
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--tm-text-muted);
+  color: var(--tm-text-primary);
 }
 
 .task-switcher__choice {
@@ -42,7 +43,7 @@
   gap: 8px;
   padding: 6px 8px;
   border-radius: var(--tm-radius-sm);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   cursor: pointer;
 }
 
@@ -64,7 +65,7 @@
 .task-switcher__empty {
   padding: 12px;
   text-align: center;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -73,7 +74,7 @@
   gap: 14px;
   padding: 8px 12px;
   border-top: 1px solid var(--tm-border);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
 }
 

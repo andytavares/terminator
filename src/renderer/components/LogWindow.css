@@ -32,10 +32,11 @@
 }
 
 .log-window__title {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--tm-text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-md);
+  font-weight: 600;
+  color: var(--tm-text-primary);
 }
 
 .log-window__actions {
@@ -48,7 +49,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
   color: var(--tm-text-muted);
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   font-family: var(--tm-font-mono);
   padding: 2px 8px;
   cursor: pointer;
@@ -74,7 +75,7 @@
 
 .log-window__empty {
   padding: 20px 12px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   text-align: center;
 }
@@ -84,7 +85,7 @@
   display: flex;
   gap: 10px;
   padding: 2px 12px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   line-height: 1.6;
   border-left: 2px solid transparent;
 }

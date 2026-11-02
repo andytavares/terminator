@@ -11,7 +11,7 @@
   padding: 0 12px;
   background: var(--tm-bg-elevated);
   border-top: 1px solid var(--tm-border);
-  font: 13px/1.45 var(--tm-font-ui);
+  font: var(--tm-font-size-md) / 1.45 var(--tm-font-ui);
   color: var(--tm-text-primary);
   white-space: nowrap;
   container-type: inline-size;

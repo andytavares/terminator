@@ -67,3 +67,40 @@ describe('design token contrast (WCAG AA)', () => {
     })
   }
 })
+
+// The dark backgrounds sat 1.04 to 1.16:1 apart, so no region stood apart from its neighbour.
+// Each one now differs from the canvas (--tm-bg-base) by a step the eye separates.
+const canvas = token(rootBlock, '--tm-bg-base')
+const againstCanvas = (name: string) => contrast(token(rootBlock, name), canvas)
+const lighterThanCanvas = (name: string) =>
+  relativeLuminance(token(rootBlock, name)) > relativeLuminance(canvas)
+
+describe('dark background ladder', () => {
+  it('recesses the side panels below the canvas', () => {
+    expect(lighterThanCanvas('--tm-bg-surface')).toBe(false)
+    expect(againstCanvas('--tm-bg-surface')).toBeGreaterThanOrEqual(1.1)
+  })
+
+  it('raises card, float and hover above the canvas in that order', () => {
+    const raised = ['--tm-bg-card', '--tm-bg-elevated', '--tm-bg-card-hover']
+    expect(raised.filter(lighterThanCanvas)).toEqual(raised)
+    const [card, float, hover] = raised.map(againstCanvas)
+    expect(card).toBeGreaterThanOrEqual(1.1)
+    expect(float).toBeGreaterThan(card)
+    expect(hover).toBeGreaterThan(float)
+  })
+})
+
+describe('dark text tiers', () => {
+  it('keeps every text tier at AA on the lightest background it sits on', () => {
+    const hover = token(rootBlock, '--tm-bg-card-hover')
+    const tiers = ['--tm-text-primary', '--tm-text-secondary', '--tm-text-muted', '--tm-danger']
+    const belowAa = tiers.filter((name) => contrast(token(rootBlock, name), hover) < AA_NORMAL)
+    expect(belowAa).toEqual([])
+  })
+
+  it('keeps secondary and muted text far enough apart to read as two tiers', () => {
+    const secondary = token(rootBlock, '--tm-text-secondary')
+    expect(contrast(secondary, token(rootBlock, '--tm-text-muted'))).toBeGreaterThanOrEqual(1.5)
+  })
+})

@@ -33,6 +33,14 @@ export const Disabled: Story = {
     await userEvent.click(button)
     await expect(button).toBeDisabled()
     await expect(args.onClick).not.toHaveBeenCalled()
+    // A disabled primary reads as an inert card, not a live accent button.
+    const probe = document.createElement('div')
+    probe.style.background = 'var(--tm-bg-card)'
+    canvasElement.append(probe)
+    const style = getComputedStyle(button)
+    await expect(style.backgroundColor).toBe(getComputedStyle(probe).backgroundColor)
+    await expect(style.opacity).toBe('1')
+    probe.remove()
   },
 }
 

@@ -9,7 +9,7 @@
 }
 
 .rs-note {
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -22,7 +22,7 @@
   border: 1px solid var(--tm-border-strong);
   border-radius: 6px;
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-primary);
   cursor: pointer;
 }
@@ -50,7 +50,7 @@
   border: 1px solid var(--tm-border-strong);
   border-radius: 8px;
   background: var(--tm-bg-elevated);
-  font: 13px/1.5 var(--tm-font-ui);
+  font: var(--tm-font-size-md) / 1.5 var(--tm-font-ui);
   white-space: normal;
 }
 
@@ -60,7 +60,7 @@
   align-items: center;
   padding: 6px 10px;
   border-bottom: 1px solid var(--tm-border);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
 }
 
@@ -96,11 +96,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font: 600 10px/1 var(--tm-font-ui);
+  font: 600 var(--tm-font-size-xs) / 1 var(--tm-font-ui);
 }
 
 .rs-float {
-  font: 13px/1.45 var(--tm-font-ui);
+  font: var(--tm-font-size-md) / 1.45 var(--tm-font-ui);
   white-space: normal;
   display: inline-flex;
   gap: 6px;
@@ -114,7 +114,7 @@
 }
 
 .rs-sev {
-  font: 600 10px/1 var(--tm-font-mono);
+  font: 600 var(--tm-font-size-xs) / 1 var(--tm-font-mono);
   padding: 3px 5px;
   border-radius: 3px;
   text-transform: uppercase;
@@ -149,7 +149,7 @@
   padding: 6px 14px;
   background: var(--tm-bg-surface);
   border-block: 1px dashed var(--tm-border-strong);
-  font: 12px/1.4 var(--tm-font-ui);
+  font: var(--tm-font-size-sm) / 1.4 var(--tm-font-ui);
   color: var(--tm-text-secondary);
 }
 
@@ -165,7 +165,7 @@
 .rs-gutter-chip {
   display: inline-flex;
   align-items: center;
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   padding: 0 5px;
   border-radius: 999px;
   border: 1px solid currentColor;
@@ -195,7 +195,7 @@
 }
 
 .rs-note-composer textarea {
-  font: 12px/1.4 var(--tm-font-ui);
+  font: var(--tm-font-size-sm) / 1.4 var(--tm-font-ui);
   padding: 6px 8px;
   border: 1px solid var(--tm-border-strong);
   border-radius: 6px;
@@ -218,7 +218,7 @@
   border-top: 1px solid var(--tm-border-strong);
   border-bottom: 1px solid var(--tm-border-strong);
   color: var(--tm-text-muted);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 tr.diff-gap-row {
@@ -244,7 +244,7 @@ tr.diff-gap-row > td {
   border: 1px solid var(--tm-border-strong);
   border-radius: 6px;
   color: var(--tm-text-secondary);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   cursor: pointer;
 }
 

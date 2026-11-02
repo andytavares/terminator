@@ -12,7 +12,7 @@
 }
 
 .issue-drawer__state {
-  font-size: 10.5px;
+  font-size: var(--tm-font-size-xs);
   color: #c9c9ee;
   background: var(--tm-accent-dim);
   border: 1px solid var(--tm-accent-glow);
@@ -60,7 +60,7 @@
   padding: 10px;
   border: 1px dashed var(--tm-border-strong);
   border-radius: var(--tm-radius-sm);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -80,7 +80,7 @@
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-radius-sm);
   font-family: var(--tm-font-mono);
-  font-size: 10.5px;
+  font-size: var(--tm-font-size-xs);
   line-height: 1.6;
   color: var(--tm-text-muted);
   white-space: pre-wrap;
@@ -88,7 +88,7 @@
 
 .issue-drawer__truncated {
   margin-top: 6px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-warning);
 }
 
@@ -97,7 +97,7 @@
   align-items: center;
   gap: 8px;
   margin-top: 12px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
   cursor: pointer;
 }
@@ -111,7 +111,7 @@
   border-radius: var(--tm-radius-sm);
   color: var(--tm-text-primary);
   font-family: var(--tm-font-ui);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   padding: 7px 9px;
 }
 

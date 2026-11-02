@@ -11,20 +11,20 @@
 }
 
 .about-dialog__logo {
-  font-size: 32px;
+  font-size: var(--tm-font-size-display);
   line-height: 1;
   margin-bottom: 2px;
 }
 
 .about-dialog__name {
-  font-size: 16px;
+  font-size: var(--tm-font-size-lg);
   font-weight: 700;
   color: var(--tm-text-primary);
   letter-spacing: -0.02em;
 }
 
 .about-dialog__version {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   font-family: var(--tm-font-mono);
 }
@@ -43,14 +43,15 @@
 }
 
 .about-dialog__row dt {
-  font-size: 11px;
-  color: var(--tm-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-sm);
+  font-weight: 500;
+  color: var(--tm-text-secondary);
 }
 
 .about-dialog__row dd {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-secondary);
   font-family: var(--tm-font-mono);
   margin: 0;
@@ -58,7 +59,7 @@
 
 .about-dialog__section {
   margin: 16px 0 8px;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 600;
   color: var(--tm-text-muted);
   text-align: left;

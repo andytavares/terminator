@@ -21,7 +21,7 @@
   align-items: center;
   gap: var(--tm-space-2);
   margin: 0;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 600;
   color: var(--tm-text-primary);
 }
@@ -34,13 +34,13 @@
 
 .brief-card__meta {
   flex: 1;
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
 .brief-card__body {
   margin-top: var(--tm-space-2);
-  font-size: 13.5px;
+  font-size: var(--tm-font-size-md);
   line-height: 1.55;
 }
 
@@ -78,7 +78,7 @@
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-radius-md);
   color: var(--tm-text-secondary);
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .brief-idle__text {
@@ -107,7 +107,7 @@
   border: 1px solid color-mix(in srgb, var(--tm-danger) 30%, transparent);
   border-radius: var(--tm-radius-md);
   background: color-mix(in srgb, var(--tm-danger) 6%, transparent);
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .brief-error p {
