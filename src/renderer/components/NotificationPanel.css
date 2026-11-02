@@ -17,14 +17,14 @@
   max-height: 70vh;
   display: flex;
   flex-direction: column;
-  background: var(--tm-bg-surface);
-  border: 1px solid var(--tm-border);
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-strong);
   border-left: none;
   border-top-left-radius: 0;
   border-top-right-radius: 6px;
   border-bottom-right-radius: 6px;
   border-bottom-left-radius: 0;
-  box-shadow: 4px 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--tm-shadow-overlay);
   z-index: 801;
   overflow: hidden;
 }

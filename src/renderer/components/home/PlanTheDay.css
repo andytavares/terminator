@@ -8,7 +8,7 @@
   margin: 14px 18px 0;
   border: 1px solid var(--tm-border-strong);
   border-radius: 12px;
-  background: var(--tm-bg-surface);
+  background: var(--tm-bg-card);
 }
 
 .plan__head {
@@ -73,7 +73,7 @@
   gap: 6px;
   margin: 0 0 8px;
   padding: 12px 0 4px;
-  background: var(--tm-bg-surface);
+  background: var(--tm-bg-card);
   color: var(--tm-text-secondary);
   font-size: 11.5px;
   font-weight: 600;

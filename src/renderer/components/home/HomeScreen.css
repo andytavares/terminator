@@ -61,7 +61,7 @@
   padding: 0 10px;
   border: 1px solid var(--tm-border-strong);
   border-radius: 7px;
-  background: var(--tm-bg-surface);
+  background: var(--tm-bg-input);
   color: var(--tm-text-faint);
 }
 .desk-field svg {

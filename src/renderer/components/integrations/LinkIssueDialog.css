@@ -34,12 +34,12 @@
 
 .link-issue__group {
   padding: 7px 10px 5px;
-  background: var(--tm-bg-surface);
-  font-size: 9.5px;
+  background: var(--tm-bg-card);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-md);
   font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--tm-text-muted);
+  color: var(--tm-text-primary);
   position: sticky;
   top: 0;
 }

@@ -43,10 +43,11 @@
 }
 
 .about-dialog__row dt {
-  font-size: 11px;
-  color: var(--tm-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-sm);
+  font-weight: 500;
+  color: var(--tm-text-secondary);
 }
 
 .about-dialog__row dd {

@@ -1,7 +1,7 @@
 .terminal-pane {
   flex: 1;
   overflow: hidden;
-  background: #0c0c0f;
+  background: var(--tm-bg-base);
   position: relative;
 }
 

@@ -140,11 +140,11 @@
 
 .usage-drawer__heading {
   margin: 0 0 var(--tm-space-2);
-  color: var(--tm-text-secondary);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-md);
+  font-weight: 600;
+  color: var(--tm-text-primary);
 }
 
 .usage-drawer__bars {

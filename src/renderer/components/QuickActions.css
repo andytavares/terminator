@@ -2,10 +2,10 @@
 .qa-panel {
   width: 560px;
   max-width: calc(100vw - 48px);
-  background: var(--tm-bg-elevated, #1e1e2e);
-  border: 1px solid var(--tm-border-strong, rgba(255, 255, 255, 0.12));
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-strong);
   border-radius: 12px;
-  box-shadow: var(--shadow, 0 24px 80px rgba(0, 0, 0, 0.7));
+  box-shadow: var(--tm-shadow-overlay);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -97,14 +97,15 @@
   max-height: 420px;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--tm-border-strong, rgba(255, 255, 255, 0.12)) transparent;
+  scrollbar-color: var(--tm-border-strong) transparent;
 }
 
 .qa-section-label {
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--tm-text-muted, rgba(255, 255, 255, 0.4));
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-md);
+  font-weight: 600;
+  color: var(--tm-text-primary);
   padding: 0 8px;
 }
 
@@ -306,7 +307,7 @@
 .qa-footer__hint kbd {
   display: inline-block;
   padding: 1px 4px;
-  border: 1px solid var(--tm-border-strong, rgba(255, 255, 255, 0.12));
+  border: 1px solid var(--tm-border-strong);
   border-radius: 3px;
   font-size: 9px;
   background: var(--tm-bg-card, rgba(255, 255, 255, 0.04));

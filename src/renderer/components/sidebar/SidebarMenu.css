@@ -63,10 +63,11 @@
 .sidebar-menu__heading {
   padding: 5px 8px 3px;
   font-family: var(--tm-font-mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--tm-text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-md);
+  font-weight: 600;
+  color: var(--tm-text-primary);
 }
 
 .sidebar-menu__item {

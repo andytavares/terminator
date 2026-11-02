@@ -46,10 +46,11 @@
 }
 .task-group h3 {
   margin: 0;
-  font-size: 11.5px;
-  font-weight: 400;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-md);
+  font-weight: 600;
+  color: var(--tm-text-primary);
 }
 .task-group .state-glyph {
   width: 12px;

@@ -120,11 +120,12 @@
   align-items: center;
   gap: 7px;
   padding: 0 10px 0 8px;
-  font-family: var(--tm-font-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--tm-text-muted);
+  font-family: var(--tm-font-ui);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-md);
+  font-weight: 600;
+  color: var(--tm-text-primary);
   user-select: none;
 }
 
@@ -142,9 +143,9 @@
 
 .unified-sidebar__subheading {
   padding: 10px 10px 2px;
-  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-md);
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--tm-text-muted);
+  color: var(--tm-text-primary);
 }

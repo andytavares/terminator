@@ -32,10 +32,11 @@
 }
 
 .log-window__title {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--tm-text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-md);
+  font-weight: 600;
+  color: var(--tm-text-primary);
 }
 
 .log-window__actions {

@@ -26,6 +26,11 @@
 .qa-settings-list__label {
   flex: 1 1 auto;
   min-width: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-sm);
+  font-weight: 500;
+  color: var(--tm-text-secondary);
 }
 
 .qa-settings-list__chip {

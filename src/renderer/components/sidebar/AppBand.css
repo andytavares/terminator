@@ -19,7 +19,7 @@
   align-items: center;
   gap: 2px;
   padding: 7px 5px;
-  background: var(--tm-bg-elevated);
+  background: var(--tm-bg-surface);
   border-right: 1px solid var(--tm-border);
   overflow-y: auto;
   scrollbar-width: none;

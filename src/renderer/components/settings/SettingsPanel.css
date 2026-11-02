@@ -10,7 +10,7 @@
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-lg);
   overflow: hidden;
-  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.8);
+  box-shadow: var(--tm-shadow-overlay);
 }
 
 .settings-panel__sidebar {
@@ -24,12 +24,12 @@
 }
 
 .settings-panel__title {
-  font-size: 9px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-md);
   font-weight: 600;
+  color: var(--tm-text-primary);
   padding: 0 16px 14px;
-  color: var(--tm-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
 }
 
 .settings-panel__nav {

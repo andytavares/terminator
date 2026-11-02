@@ -6,10 +6,11 @@
 
 .dialog__label {
   display: block;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--tm-text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-sm);
+  font-weight: 500;
+  color: var(--tm-text-secondary);
   margin-bottom: 5px;
 }
 

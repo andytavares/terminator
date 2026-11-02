@@ -342,7 +342,7 @@ async function paddingIsTheTerminalsColour(): Promise<void> {
     }
   })
   // XTERM_THEMES.dark.background behind a clear viewport: the padding shows the cells' colour.
-  expect(colours).toEqual({ surround: 'rgb(30, 30, 30)', padding: 'rgba(0, 0, 0, 0)' })
+  expect(colours).toEqual({ surround: 'rgb(25, 25, 29)', padding: 'rgba(0, 0, 0, 0)' })
 }
 
 /** A flow's steps in order, each titled for the behaviour it checks. */

@@ -9,7 +9,7 @@
 .tab-bar {
   display: flex;
   align-items: stretch;
-  background: var(--tm-bg-surface);
+  background: var(--tm-bg-base);
   border-bottom: 1px solid var(--tm-border);
   overflow-x: auto;
   overflow-y: hidden;

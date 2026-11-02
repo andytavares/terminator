@@ -14,7 +14,7 @@ const IDLE_DEBOUNCE_MS = 1500
 /** @internal */
 export const XTERM_THEMES = {
   dark: {
-    background: '#1e1e1e',
+    background: '#19191d',
     foreground: '#cccccc',
     scrollbarSliderBackground: 'rgba(255, 255, 255, 0.18)',
     scrollbarSliderHoverBackground: 'rgba(255, 255, 255, 0.28)',
