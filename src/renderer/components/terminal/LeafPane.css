@@ -58,7 +58,7 @@
 }
 
 .leaf-pane__title {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-family:
     system-ui,
     -apple-system,

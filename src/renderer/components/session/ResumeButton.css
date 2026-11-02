@@ -11,7 +11,7 @@
   background: var(--tm-bg-elevated);
   color: var(--tm-text-primary);
   font: inherit;
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   cursor: pointer;
 }
 
@@ -35,7 +35,7 @@
 
 .resume-button__gone {
   flex: none;
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
   white-space: nowrap;
 }

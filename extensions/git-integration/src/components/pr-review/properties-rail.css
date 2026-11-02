@@ -41,7 +41,7 @@
   padding: 6px 8px;
   margin: 0 -8px;
   border-radius: 6px;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .pr-rail-signal-icon {
@@ -58,7 +58,7 @@
 .pr-rail-signal-value small {
   display: block;
   margin-top: 1px;
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -69,7 +69,7 @@
 
 .pr-rail-pending {
   padding: 6px 0;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 
@@ -78,7 +78,7 @@
   grid-template-columns: 92px minmax(0, 1fr);
   gap: 10px;
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   align-items: baseline;
 }
 
@@ -97,10 +97,10 @@
 
 .pr-rail-details code {
   font-family: var(--tm-font-mono);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .pr-rail-details small {
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }

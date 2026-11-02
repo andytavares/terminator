@@ -48,7 +48,7 @@ input:where(
   border-radius: var(--tm-radius-sm);
   color: var(--tm-text-primary);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   transition: border-color 0.15s;
 }
 

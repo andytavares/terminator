@@ -40,7 +40,7 @@
     0 4px 0 0 rgba(0, 0, 0, 0.35);
   color: #06202a;
   background: #72d8f2;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   white-space: nowrap;

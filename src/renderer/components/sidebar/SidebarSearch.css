@@ -21,7 +21,7 @@
 
 .sidebar-search__icon {
   color: var(--tm-text-muted);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   flex-shrink: 0;
   line-height: 1;
 }
@@ -33,7 +33,7 @@
   padding: 0;
   outline: none;
   color: var(--tm-text-primary);
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   flex: 1;
   min-width: 0;
 }
@@ -47,7 +47,7 @@
   border: none;
   cursor: pointer;
   color: var(--tm-text-muted);
-  font-size: 14px;
+  font-size: var(--tm-font-size-lg);
   line-height: 1;
   padding: 0;
   flex-shrink: 0;

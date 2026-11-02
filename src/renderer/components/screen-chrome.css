@@ -24,13 +24,13 @@
 
 .wall__title {
   margin: 0 6px 0 0;
-  font-size: 14px;
+  font-size: var(--tm-font-size-lg);
   font-weight: 600;
 }
 
 .wall__meta {
   margin-right: auto;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
   font-variant-numeric: tabular-nums;
 }
@@ -68,7 +68,7 @@
   background: transparent;
   color: var(--tm-text-primary);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .wall__empty {
@@ -78,7 +78,7 @@
   gap: var(--tm-space-2);
   padding: var(--tm-space-6) var(--tm-space-4);
   color: var(--tm-text-secondary);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
 }
 
 .wall__empty p {
@@ -94,7 +94,7 @@
   background: var(--tm-bg-elevated);
   color: var(--tm-text-primary);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   cursor: pointer;
 }
 
@@ -111,5 +111,5 @@
   border: 1px solid var(--tm-border-strong);
   background: var(--tm-bg-input);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }

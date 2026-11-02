@@ -8,7 +8,7 @@
   background: var(--tm-bg-base);
   color: var(--tm-text-primary);
   font-family: var(--tm-font-ui);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
 }
 
 .agent-view__usage {
@@ -16,7 +16,7 @@
   padding: var(--tm-space-1) var(--tm-space-4);
   border-bottom: 1px solid var(--tm-border);
   color: var(--tm-text-muted);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .agent-view__log {
@@ -103,7 +103,7 @@
 
 .agent-tool__status {
   color: var(--tm-text-muted);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .agent-tool__output pre {
@@ -111,7 +111,7 @@
   max-height: 240px;
   overflow: auto;
   font-family: var(--tm-font-mono);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .agent-plan {

@@ -44,7 +44,7 @@
   padding: 7px 10px;
   border-radius: var(--tm-radius-sm);
   text-align: left;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-primary);
   transition: background 0.1s;
   cursor: pointer;
@@ -60,7 +60,7 @@
 }
 
 .move-session-dialog__current-label {
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   font-style: italic;
 }
@@ -73,7 +73,7 @@
   padding: 6px 10px;
   border-radius: var(--tm-radius-sm);
   text-align: left;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   transition:
     background 0.1s,

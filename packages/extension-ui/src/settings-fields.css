@@ -35,7 +35,7 @@
   align-items: center;
   gap: 7px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   text-transform: none;
   letter-spacing: 0;
   color: var(--tm-text-primary);
@@ -46,7 +46,7 @@
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-sm);
   padding: 6px 9px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-family: var(--tm-font-mono);
   color: var(--tm-text-primary);
   width: 200px;
@@ -59,7 +59,7 @@
 
 .settings-section__hint {
   display: block;
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   margin-top: 4px;
   line-height: 1.5;

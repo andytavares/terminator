@@ -44,7 +44,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   color: var(--tm-text-muted, rgba(255, 255, 255, 0.4));
   min-width: 0;
   flex: 1;
@@ -61,7 +61,7 @@
 
 .qa-chip {
   font-family: var(--tm-font-mono, ui-monospace, Menlo, monospace);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   padding: 1px 7px;
   border-radius: 99px;
   background: var(--tm-accent-dim, rgba(88, 166, 255, 0.14));
@@ -84,7 +84,7 @@
   padding: 0;
   outline: none;
   color: var(--tm-text-primary, #e0e0e0);
-  font-size: 14px;
+  font-size: var(--tm-font-size-lg);
   font-family: var(--tm-font-ui, system-ui, sans-serif);
 }
 
@@ -137,7 +137,7 @@
   gap: 10px;
   padding: 6px 8px;
   border-radius: 7px;
-  font-size: 13.5px;
+  font-size: var(--tm-font-size-md);
   color: var(--tm-text-primary, #e0e0e0);
   min-width: 0;
   cursor: pointer;
@@ -170,7 +170,7 @@
 
 .qa-row__group {
   color: var(--tm-text-muted, rgba(255, 255, 255, 0.4));
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .qa-row__label {
@@ -181,7 +181,7 @@
 
 .qa-row__desc {
   color: var(--tm-text-muted, rgba(255, 255, 255, 0.4));
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -190,7 +190,7 @@
 .qa-row__reason {
   display: block;
   flex-basis: 100%;
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-warning, #9a7400);
 }
 
@@ -203,7 +203,7 @@
 
 .qa-row__shortcut {
   font-family: var(--tm-font-mono, ui-monospace, Menlo, monospace);
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   padding: 2px 6px;
   border: 1px solid var(--tm-border-strong, rgba(255, 255, 255, 0.1));
   border-radius: 4px;
@@ -264,7 +264,7 @@
 
 .qa-key {
   font-family: var(--tm-font-mono, ui-monospace, Menlo, monospace);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-weight: 500;
   width: 22px;
   height: 22px;
@@ -300,7 +300,7 @@
 }
 
 .qa-footer__hint {
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted, rgba(255, 255, 255, 0.4));
 }
 
@@ -309,12 +309,12 @@
   padding: 1px 4px;
   border: 1px solid var(--tm-border-strong);
   border-radius: 3px;
-  font-size: 9px;
+  font-size: var(--tm-font-size-xs);
   background: var(--tm-bg-card, rgba(255, 255, 255, 0.04));
   font-family: var(--tm-font-ui, system-ui, sans-serif);
 }
 
 .qa-footer__message {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-primary, #e0e0e0);
 }

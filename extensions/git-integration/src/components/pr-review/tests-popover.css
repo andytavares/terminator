@@ -10,7 +10,7 @@
   border-radius: var(--tm-radius-md);
   box-shadow: 0 8px 24px var(--tm-scrim);
   padding: 8px;
-  font: 13px/1.45 var(--tm-font-ui);
+  font: var(--tm-font-size-md) / 1.45 var(--tm-font-ui);
   color: var(--tm-text-primary);
   white-space: normal;
 }
@@ -58,21 +58,21 @@
 
 .tp-where {
   font-family: var(--tm-font-mono);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .tp-action {
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-accent-text);
 }
 
 .tp-text {
   grid-column: 1 / -1;
   font-family: var(--tm-font-mono);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -85,7 +85,7 @@
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-xs);
   padding: 0 8px;
-  font: 500 11px/18px var(--tm-font-ui);
+  font: 500 var(--tm-font-size-xs) / 18px var(--tm-font-ui);
   color: var(--tm-text-secondary);
   cursor: pointer;
 }
@@ -109,7 +109,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-secondary);
   cursor: pointer;
 }

@@ -18,7 +18,7 @@
   background: var(--tm-bg-elevated);
   color: var(--tm-text-primary);
   font-family: var(--tm-font-ui);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
 }
 
 .breakout-drop-zone__icon {
@@ -29,5 +29,5 @@
 
 .breakout-drop-zone__place {
   color: var(--tm-text-secondary);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
 }

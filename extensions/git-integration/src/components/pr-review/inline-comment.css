@@ -8,7 +8,7 @@
   border-radius: var(--tm-radius-md);
   background: var(--tm-bg-elevated);
   font-family: var(--tm-font-ui);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
 }
 .inline-comment-thread--outdated {
   border-style: dashed;
@@ -17,7 +17,7 @@
   display: block;
   padding: 2px 14px;
   background: var(--tm-overlay-soft);
-  font-size: 10.5px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 600;
   color: var(--tm-text-muted);
 }
@@ -38,21 +38,21 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
 }
 .inline-comment-thread .inline-comment-author {
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
 }
 .inline-comment-resolved-label {
-  font-size: 10.5px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 600;
   color: var(--tm-success);
 }
 .inline-comment-body {
   margin-top: 3px;
   max-width: 72ch;
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   line-height: 1.55;
   color: var(--tm-text-primary);
   overflow-wrap: break-word;
@@ -73,7 +73,7 @@
   background: var(--tm-bg-base);
   color: var(--tm-text-muted);
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   text-align: left;
   cursor: text;
 }

@@ -22,7 +22,7 @@
   background: var(--tm-bg-base);
   color: var(--tm-text-secondary);
   font-family: var(--tm-font-ui);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .live-preview-window__line {

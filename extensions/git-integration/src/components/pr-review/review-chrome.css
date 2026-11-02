@@ -13,7 +13,7 @@
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
-  font: 13px/1.45 var(--tm-font-ui);
+  font: var(--tm-font-size-md) / 1.45 var(--tm-font-ui);
   color: var(--tm-text-primary);
 }
 
@@ -26,7 +26,7 @@
 }
 
 .rc-note {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
 }
 
@@ -40,7 +40,7 @@
   padding: 14px;
   display: grid;
   gap: 10px;
-  font: 13px/1.45 var(--tm-font-ui);
+  font: var(--tm-font-size-md) / 1.45 var(--tm-font-ui);
   color: var(--tm-text-primary);
 }
 
@@ -76,7 +76,7 @@
 
 .rc-keys-overlay {
   color: var(--tm-text-primary);
-  font: 13px/1.45 var(--tm-font-ui);
+  font: var(--tm-font-size-md) / 1.45 var(--tm-font-ui);
 }
 
 .rc-keys {

@@ -34,7 +34,7 @@
 }
 
 .qa-settings-list__chip {
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -42,14 +42,14 @@
 }
 
 .qa-settings-list__target {
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
   flex-shrink: 0;
 }
 
 .qa-settings-list__body {
   font-family: Menlo, Monaco, 'Courier New', monospace;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-muted);
   max-width: 200px;
   overflow: hidden;
@@ -78,7 +78,7 @@
 
 .qa-settings-form__error {
   color: var(--tm-danger);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   margin: 0;
 }
 

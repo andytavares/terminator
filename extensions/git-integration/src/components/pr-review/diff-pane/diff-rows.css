@@ -14,7 +14,7 @@
 .diff-table--review {
   background: var(--tm-bg-base);
   font-family: var(--tm-font-mono);
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 /* Split view */
@@ -22,7 +22,7 @@
   background: var(--tm-bg-base);
   color: var(--tm-text-muted);
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-family: var(--tm-font-ui);
 }
 .diff-table--split {
@@ -31,7 +31,7 @@
   min-width: 0;
   table-layout: fixed;
   font-family: var(--tm-font-mono);
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   border-collapse: collapse;
 }
 
@@ -42,11 +42,11 @@
   color: var(--tm-text-muted);
   padding: 4px 8px;
   font-family: var(--tm-font-ui);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 .diff-hunk-header code {
   font-family: var(--tm-font-mono);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   background: none;
   padding: 0;
   color: var(--tm-text-primary);
@@ -88,7 +88,7 @@
   color: var(--tm-text-muted);
   user-select: none;
   vertical-align: top;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   font-variant-numeric: tabular-nums;
 }
 .diff-line__num-gutter {

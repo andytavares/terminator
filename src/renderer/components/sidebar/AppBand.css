@@ -87,5 +87,5 @@
   background: var(--tm-accent);
   color: var(--tm-on-accent);
   font-family: var(--tm-font-mono);
-  font-size: 8px;
+  font-size: var(--tm-font-size-xs);
 }

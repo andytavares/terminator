@@ -14,7 +14,7 @@
   padding: var(--tm-space-2) var(--tm-space-5);
   min-width: 0;
   position: relative;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .rs-cell + .rs-cell {
@@ -78,7 +78,7 @@
   gap: var(--tm-space-1);
   white-space: nowrap;
   color: var(--tm-accent-text);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 /* Icons are flat: they take the cell's text colour, and a quiet state is drawn faint. */
@@ -110,13 +110,13 @@
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-md);
   padding: var(--tm-space-2);
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .rs-error {
   margin: var(--tm-space-2) 0 0;
   color: var(--tm-danger);
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 @container pr-overview (max-width: 640px) {

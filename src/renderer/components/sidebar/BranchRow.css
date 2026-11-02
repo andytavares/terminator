@@ -121,7 +121,7 @@
 /* A machine fact: the name you would have to type exactly. */
 .branch-row__name {
   font-family: var(--tm-font-mono);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   color: var(--tm-text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -135,7 +135,7 @@
   padding: 0 4px;
   margin-left: 4px;
   font-family: var(--tm-font-mono);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .branch-row__meta {
@@ -146,7 +146,7 @@
   flex: 0 0 auto;
   padding-left: 8px;
   font-family: var(--tm-font-mono);
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -183,7 +183,7 @@
   text-align: right;
   white-space: nowrap;
   font-family: var(--tm-font-mono);
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   font-weight: 400;
   font-variant-numeric: tabular-nums;
 }

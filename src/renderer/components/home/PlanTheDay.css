@@ -22,14 +22,14 @@
 
 .plan__head h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--tm-font-size-lg);
   font-weight: 600;
 }
 
 .plan__head p {
   margin: 0;
   color: var(--tm-text-secondary);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .plan__sun {
@@ -75,7 +75,7 @@
   padding: 12px 0 4px;
   background: var(--tm-bg-card);
   color: var(--tm-text-secondary);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   font-weight: 600;
   text-wrap: balance;
 }
@@ -88,7 +88,7 @@
 .plan__none {
   margin: 0;
   color: var(--tm-text-faint);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .plan__row {
@@ -98,7 +98,7 @@
   gap: 8px;
   padding: 6px 0;
   border-bottom: 1px solid var(--tm-border);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .plan__row:last-child {
@@ -112,7 +112,7 @@
 .plan__row small {
   display: block;
   color: var(--tm-text-faint);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .plan__slot {
@@ -125,7 +125,7 @@
   border: 1px dashed var(--tm-border-strong);
   border-radius: 8px;
   color: var(--tm-text-faint);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .plan__slot[data-filled] {
@@ -138,13 +138,13 @@
 .plan__slot-number {
   color: var(--tm-text-secondary);
   font-family: var(--tm-font-mono);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .plan__load {
   margin-top: 10px;
   color: var(--tm-text-secondary);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .plan__load-track {
@@ -191,7 +191,7 @@
   background: transparent;
   color: var(--tm-text-primary);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .plan__search input::placeholder {
@@ -202,7 +202,7 @@
   flex: none;
   margin-left: auto;
   color: var(--tm-text-faint);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 /* Key, then the title over its assignee, then Add: the title takes whatever the column has. */
@@ -214,7 +214,7 @@
   padding: 6px 4px;
   border-bottom: 1px solid var(--tm-border);
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   cursor: pointer;
 }
 
@@ -229,7 +229,7 @@
 .plan__ticket-key {
   color: var(--tm-text-secondary);
   font-family: var(--tm-font-mono);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .plan__ticket-text {
@@ -249,7 +249,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--tm-text-secondary);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .plan__ticket-assignee[data-unassigned] {

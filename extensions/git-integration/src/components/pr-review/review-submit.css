@@ -8,17 +8,17 @@
   flex-direction: column;
   gap: 12px;
   min-width: 380px;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .rs-heading {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--tm-font-size-lg);
   font-weight: 600;
 }
 
 .rs-label {
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   font-weight: 600;
   color: var(--tm-text-muted);
 }
@@ -105,13 +105,13 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   font-weight: 600;
 }
 
 .rs-verdict small {
   color: var(--tm-text-muted);
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
 }
 
 .rs-verdict-icon {
@@ -162,7 +162,7 @@
 .rs-hint {
   margin-right: auto;
   color: var(--tm-text-muted);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .rs-success {

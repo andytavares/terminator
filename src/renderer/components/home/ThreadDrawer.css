@@ -8,7 +8,7 @@
   align-items: center;
   gap: 8px;
   color: var(--tm-text-secondary);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
 }
 .desk-dr-h__top svg {
   width: 11px;
@@ -22,14 +22,14 @@
 }
 .desk-dr-h h4 {
   margin: 6px 0 0;
-  font-size: 17px;
+  font-size: var(--tm-font-size-xl);
   font-weight: 600;
   line-height: 1.3;
 }
 .desk-dr-h__key {
   color: var(--tm-text-secondary);
   font-family: var(--tm-font-mono);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   font-weight: 500;
 }
 .desk-dr-h__acts {
@@ -53,13 +53,13 @@
 .desk-dr-s h6 {
   margin: 12px 0 7px;
   color: var(--tm-text-secondary);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
   font-weight: 600;
   letter-spacing: 0.02em;
 }
 .desk-dr-text {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--tm-font-size-sm);
   line-height: 1.55;
 }
 .desk-dr-note {
@@ -86,12 +86,12 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-secondary);
 }
 .desk-dr-hint {
   margin: 6px 0 0;
-  font-size: 11px;
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
 }
 
@@ -102,7 +102,7 @@
   align-items: center;
   padding: 6px 0;
   border-bottom: 1px solid var(--tm-border);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 .desk-lr:last-child {
   border-bottom: 0;
@@ -140,7 +140,7 @@
   margin: 0;
   padding: 3px 0;
   color: var(--tm-text-secondary);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
 }
 .desk-tl time {
   color: var(--tm-text-muted);
@@ -158,7 +158,7 @@
 .task-summary {
   margin: 6px 0 0;
   color: var(--tm-text-muted);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 .task-summary--counts {
   color: var(--tm-text-secondary);
@@ -184,11 +184,11 @@
 }
 .task-lane-row__name {
   font-family: var(--tm-font-mono);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 .task-lane-row__details {
   color: var(--tm-text-muted);
-  font-size: 11.5px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .task-add-lane {

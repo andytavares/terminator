@@ -22,7 +22,7 @@
   outline: none;
   color: var(--tm-text-primary);
   font-family: var(--tm-font-ui);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
 }
 
 .issue-picker__input::placeholder,
@@ -41,7 +41,7 @@
   background: transparent;
   color: var(--tm-text-primary);
   font-family: var(--tm-font-ui);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   text-align: left;
   cursor: pointer;
 }

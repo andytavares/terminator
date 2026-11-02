@@ -58,7 +58,7 @@ body,
   width: 100%;
   overflow: hidden;
   font-family: var(--tm-font-ui);
-  font-size: 13px;
+  font-size: var(--tm-font-size-md);
   background: var(--tm-bg-base);
   color: var(--tm-text-primary);
   -webkit-font-smoothing: antialiased;
@@ -187,7 +187,7 @@ button {
   border: none;
   border-radius: var(--tm-radius-xs);
   color: var(--tm-text-primary);
-  font-size: 12px;
+  font-size: var(--tm-font-size-sm);
   font-family: var(--tm-font-ui);
   text-align: left;
   cursor: pointer;
