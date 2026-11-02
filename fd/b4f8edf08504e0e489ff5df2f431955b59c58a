@@ -1,0 +1,23 @@
+tests/unit/renderer/design-tokens-contrast.spec.ts
+  s_b5d2e9359cd05b::t_039f6606a16519 70-94,96-104
+  s_b5d2e9359cd05b::t_fdb6d07d464351 95,105-106
+packages/extension-ui/src/tokens.css
+  s_b5d2e9359cd05b::t_58771a84f88938 22,147
+  s_b5d2e9359cd05b::t_1265cc23a7df91 16-21,23-39,52,91-93,123-130,187
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fdb4f8edf08504e0e489ff5df2f431955b59c58a",
+  "prompts": {},
+  "sessions": {
+    "s_b5d2e9359cd05b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da33f7e5-cdc0-4c80-a907-6950bc8d8b20",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
