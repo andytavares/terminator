@@ -1780,14 +1780,18 @@
   border-radius: var(--tm-radius-xs);
 }
 
-.fdry-gate-meta {
+.fdry-gate-meta,
+.fdry-sensor-meta {
   display: flex;
-  align-items: center;
-  gap: 6px;
   flex-wrap: wrap;
   font-family: var(--tm-font-mono, ui-monospace, monospace);
   font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
+}
+
+.fdry-gate-meta {
+  align-items: center;
+  gap: 6px;
 }
 
 .fdry-gate-meta span {
@@ -2261,12 +2265,7 @@
 
 .fdry-sensor-meta {
   margin-top: 6px;
-  display: flex;
   gap: 12px;
-  flex-wrap: wrap;
-  font-family: var(--tm-font-mono, ui-monospace, monospace);
-  font-size: var(--tm-font-size-xs);
-  color: var(--tm-text-muted);
 }
 
 .fdry-sensor-actions {

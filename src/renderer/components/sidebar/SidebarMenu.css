@@ -36,23 +36,6 @@
   display: block;
 }
 
-/* The count the filter notice used to draw in a band of its own. */
-.sidebar-menu__badge {
-  /* Fits an 11px digit, the smallest step of the type scale. */
-  min-width: 15px;
-  height: 15px;
-  line-height: 1;
-  padding: 0 3px;
-  display: grid;
-  place-items: center;
-  border-radius: 7px;
-  background: var(--tm-accent);
-  color: var(--tm-on-accent);
-  font-family: var(--tm-font-mono);
-  font-size: var(--tm-font-size-xs);
-  font-variant-numeric: tabular-nums;
-}
-
 .sidebar-menu__panel {
   min-width: 168px;
   padding: 4px;

@@ -37,7 +37,7 @@ export function FilterMenu(props: FilterMenuProps): React.JSX.Element {
       icon={<ListFilter aria-hidden="true" />}
       ariaLabel={hidden > 0 ? `Filter — ${hidden} hidden` : 'Filter'}
       on={hidden > 0}
-      badge={hidden > 0 && <span className="sidebar-menu__badge">{hidden}</span>}
+      badge={hidden > 0 && <span className="count-badge">{hidden}</span>}
     >
       {(close) => (
         <>

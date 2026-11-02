@@ -17,7 +17,6 @@
   border-radius: var(--tm-radius-xs);
   background: var(--tm-bg-elevated);
   color: var(--tm-text-primary);
-  font-family: var(--tm-font-ui);
   font-size: var(--tm-font-size-md);
 }
 

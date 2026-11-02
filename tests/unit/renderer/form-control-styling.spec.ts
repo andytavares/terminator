@@ -38,7 +38,7 @@ describe('checkbox styling', () => {
   it('uses theme tokens for its surface and border, never a hard-coded colour', () => {
     const base = ruleBody(CONTROLS, BOX)
     expect(base).toMatch(/background:\s*var\(--tm-bg-input\)/)
-    expect(base).toMatch(/border:\s*1px solid var\(--tm-border-strong\)/)
+    expect(base).toMatch(/border:\s*1px solid var\(--tm-border-control\)/)
   })
 
   it('fills with the accent when checked', () => {

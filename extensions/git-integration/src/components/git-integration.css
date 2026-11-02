@@ -94,14 +94,18 @@
   background: color-mix(in srgb, var(--tm-danger) 8%, transparent);
 }
 
-.git-view__hook-output-pre {
-  margin: 0;
-  padding: 8px;
+.git-view__hook-output-pre,
+.git-view__hook-live {
   font-size: var(--tm-font-size-xs);
   font-family: var(--tm-font-mono, monospace);
   white-space: pre-wrap;
   word-break: break-all;
   color: var(--tm-text-primary);
+}
+
+.git-view__hook-output-pre {
+  margin: 0;
+  padding: 8px;
   max-height: 180px;
   overflow-y: auto;
   border-top: 1px solid var(--tm-danger);
@@ -110,11 +114,6 @@
 .git-view__hook-live {
   margin: 0 0 4px;
   padding: 6px 8px;
-  font-size: var(--tm-font-size-xs);
-  font-family: var(--tm-font-mono, monospace);
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: var(--tm-text-primary);
   background: var(--tm-bg-surface);
   border-radius: 4px;
   max-height: 160px;

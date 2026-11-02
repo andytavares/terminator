@@ -91,7 +91,7 @@
   height: 28px;
   border-radius: var(--tm-radius-sm);
   border: 1px solid var(--tm-border-strong);
-  background: var(--tm-bg-elevated);
+  background: var(--tm-bg-card);
   color: var(--tm-text-primary);
   font: inherit;
   font-size: var(--tm-font-size-sm);

@@ -239,7 +239,7 @@
 }
 
 .extension-item__status--disabled {
-  background: var(--tm-bg-elevated);
+  background: var(--tm-overlay);
   color: var(--tm-text-muted);
   border: 1px solid var(--tm-border);
 }
@@ -259,7 +259,7 @@
 
 /* Small inline buttons specific to extension items */
 .ext-btn {
-  background: var(--tm-bg-elevated);
+  background: var(--tm-bg-card);
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-sm);
   color: var(--tm-text-secondary);
@@ -307,7 +307,7 @@
 
 /* Settings panel */
 .extension-settings-panel {
-  background: var(--tm-bg-elevated);
+  background: var(--tm-bg-card);
   border: 1px solid var(--tm-border);
   border-top: none;
   border-radius: 0 0 var(--tm-radius-md) var(--tm-radius-md);
@@ -455,7 +455,7 @@
 }
 
 .ext-segmented__btn {
-  background: var(--tm-bg-elevated);
+  background: var(--tm-bg-card);
   border: none;
   border-right: 1px solid var(--tm-border-strong);
   color: var(--tm-text-secondary);

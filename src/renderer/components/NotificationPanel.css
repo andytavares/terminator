@@ -61,10 +61,12 @@
 
 .notif-panel__action-btn:hover {
   color: var(--tm-text-primary);
-  background: var(--tm-bg-elevated);
+  background: var(--tm-bg-card-hover);
 }
 
-.notif-panel__close {
+/* The two × buttons: closing the panel, dismissing one notification. */
+.notif-panel__close,
+.notif-item__dismiss {
   background: none;
   border: none;
   color: var(--tm-text-muted);
@@ -73,6 +75,9 @@
   padding: 2px 4px;
   border-radius: 3px;
   cursor: pointer;
+}
+
+.notif-panel__close {
   transition:
     color 0.1s,
     background 0.1s;
@@ -80,7 +85,7 @@
 
 .notif-panel__close:hover {
   color: var(--tm-text-primary);
-  background: var(--tm-bg-elevated);
+  background: var(--tm-bg-card-hover);
 }
 
 /* ── Scrollable list ───────────────────────────────────────────── */
@@ -121,7 +126,8 @@
 }
 
 .notif-item--unread {
-  background: var(--tm-bg-elevated);
+  /* The panel is a float; an accent tint marks unread on it. */
+  background: var(--tm-accent-dim);
 }
 
 .notif-item:hover {
@@ -174,7 +180,7 @@
 .notif-item__source {
   font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
-  background: var(--tm-bg-elevated);
+  background: var(--tm-overlay);
   border-radius: 3px;
   padding: 1px 4px;
 }
@@ -190,8 +196,8 @@
   font-size: var(--tm-font-size-xs);
   padding: 2px 8px;
   border-radius: 4px;
-  border: 1px solid var(--tm-border);
-  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-strong);
+  background: transparent;
   color: var(--tm-text-primary);
   cursor: pointer;
   transition:
@@ -209,14 +215,6 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  background: none;
-  border: none;
-  color: var(--tm-text-muted);
-  font-size: var(--tm-font-size-lg);
-  line-height: 1;
-  padding: 2px 4px;
-  border-radius: 3px;
-  cursor: pointer;
   opacity: 0;
   transition:
     opacity 0.1s,

@@ -235,3 +235,20 @@ button {
 .terminal-surround .xterm .xterm-viewport {
   background-color: transparent;
 }
+
+/* An accent count on a control: the band's Home badge, the filter's hidden count. Fits an 11px
+   digit, the smallest step of the type scale. */
+.count-badge {
+  min-width: 15px;
+  height: 15px;
+  line-height: 1;
+  padding: 0 3px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-family: var(--tm-font-mono);
+  font-size: var(--tm-font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
