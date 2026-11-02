@@ -1,0 +1,75 @@
+src/renderer/components/integrations/issue-sections.css
+  s_b5d2e9359cd05b::t_f43daace697adb 53-55,57
+src/renderer/components/settings/QuickActionsSettings.css
+  s_b5d2e9359cd05b::t_f43daace697adb 29-33
+src/renderer/components/task-switcher/TaskSwitcher.css
+  s_b5d2e9359cd05b::t_7ddaa4297a3017 5,7
+  s_b5d2e9359cd05b::t_203a2656a08fb9 9
+  s_b5d2e9359cd05b::t_f43daace697adb 33-35,37
+src/renderer/components/terminal/TerminalPane.css
+  s_b5d2e9359cd05b::t_7ddaa4297a3017 4
+tests/e2e/extension-lifecycle.spec.ts
+  s_b5d2e9359cd05b::t_7ddaa4297a3017 345
+src/renderer/components/sidebar/SidebarMenu.css
+  s_b5d2e9359cd05b::t_f43daace697adb 66-70
+src/renderer/components/usage/UsageScreen.css
+  s_b5d2e9359cd05b::t_f43daace697adb 143-147
+src/renderer/components/settings/SettingsPanel.css
+  s_b5d2e9359cd05b::t_f43daace697adb 27-29,31
+  s_b5d2e9359cd05b::t_7ddaa4297a3017 13
+src/renderer/components/sidebar/UnifiedSidebar.css
+  s_b5d2e9359cd05b::t_f43daace697adb 123-128,146-148,150
+src/renderer/components/overview/MetricsBar.css
+  s_b5d2e9359cd05b::t_f43daace697adb 21-25
+src/renderer/components/home/HomeScreen.css
+  s_b5d2e9359cd05b::t_7ddaa4297a3017 64
+src/renderer/components/sidebar/dialog-fields.css
+  s_b5d2e9359cd05b::t_f43daace697adb 9-13
+src/renderer/components/terminal/TerminalSession.tsx
+  s_b5d2e9359cd05b::t_7ddaa4297a3017 17
+src/renderer/components/QuickActions.css
+  s_b5d2e9359cd05b::t_7ddaa4297a3017 5-6,8,100,310
+  s_b5d2e9359cd05b::t_f43daace697adb 104-108
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_b5d2e9359cd05b::t_699d3c5ea988c7 2,1206-1212
+  s_b5d2e9359cd05b::t_4b57d2a528be4a 1213-1214,1252
+src/renderer/components/home/Tasks.css
+  s_b5d2e9359cd05b::t_f43daace697adb 49-53
+src/renderer/components/AboutDialog.css
+  s_b5d2e9359cd05b::t_f43daace697adb 46-50
+src/renderer/components/sidebar/MoveSessionDialog.css
+  s_b5d2e9359cd05b::t_f43daace697adb 22-24,26
+src/renderer/components/terminal/TabBar.css
+  s_b5d2e9359cd05b::t_7ddaa4297a3017 12
+src/renderer/components/integrations/LinkIssueDialog.css
+  s_b5d2e9359cd05b::t_f43daace697adb 38-40,42
+  s_b5d2e9359cd05b::t_7ddaa4297a3017 37
+src/renderer/components/LogWindow.css
+  s_b5d2e9359cd05b::t_f43daace697adb 35-39
+src/renderer/components/home/PlanTheDay.css
+  s_b5d2e9359cd05b::t_7ddaa4297a3017 11,76
+src/renderer/components/sidebar/AppBand.css
+  s_b5d2e9359cd05b::t_7ddaa4297a3017 22
+src/renderer/components/NotificationPanel.css
+  s_b5d2e9359cd05b::t_7ddaa4297a3017 20-21,27
+src/renderer-remote/mobile.css
+  s_b5d2e9359cd05b::t_60a30bb564ed65 15-17,33-34,42,51,61,66-67,77,86,88,90,102-103,120-121,128,137-138,159-161,166,172,191-192,203,216,218,224,231,240-241,251-252,254,256,265
+src/renderer-remote/mobile.main.tsx
+  s_b5d2e9359cd05b::t_6e89aea41a194a 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7ddfbe6285d8195da1cfdd18a7adc18b91aadb32",
+  "prompts": {},
+  "sessions": {
+    "s_b5d2e9359cd05b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da33f7e5-cdc0-4c80-a907-6950bc8d8b20",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
