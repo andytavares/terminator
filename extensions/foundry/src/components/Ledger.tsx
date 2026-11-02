@@ -480,7 +480,7 @@ function NothingRecorded({ onOpenForge }: LedgerProps) {
     <EmptyState
       icon={ScrollText}
       heading="Nothing recorded yet"
-      description="Every decision on an order, yours or Foundry's, is recorded here with its reason."
+      description="Every decision on an order is recorded here with its reason, whoever made it."
       actions={[{ label: 'Open the Forge', onSelect: onOpenForge }]}
     />
   )
