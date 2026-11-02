@@ -21,7 +21,11 @@ vi.mock('../../src/components/StagingArea', () => ({
   ),
 }))
 vi.mock('../../src/components/FileDiffView', () => ({
-  FileDiffView: () => <div data-testid="file-diff-view" />,
+  FileDiffView: ({ onOpenFirstChange }: { onOpenFirstChange?: () => void }) => (
+    <div data-testid="file-diff-view">
+      {onOpenFirstChange && <button onClick={onOpenFirstChange}>OpenFirstChange</button>}
+    </div>
+  ),
 }))
 vi.mock('../../src/components/PrDialog', () => ({
   PrDialog: ({
@@ -144,6 +148,17 @@ beforeAll(async () => {
 })
 
 describe('GitFullView', () => {
+  it('opens the first changed file from the empty diff pane', async () => {
+    await renderView('/repo', { status: featureWithStagedFile() })
+    fireEvent.click(screen.getByText('OpenFirstChange'))
+    expect(mockSetSelectedFile).toHaveBeenCalledWith('src/foo.ts')
+  })
+
+  it('offers no first change when the branch has none', async () => {
+    await renderView()
+    expect(screen.queryByText('OpenFirstChange')).toBeNull()
+  })
+
   it('shows "No project selected" when repoRoot is null', async () => {
     await renderView(null)
     expect(screen.getByText('No project selected.')).toBeTruthy()

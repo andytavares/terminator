@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react'
-import { Button, SegmentedControl } from '@terminator/extension-ui'
+import { FileDiff as FileDiffIcon } from 'lucide-react'
+import { Button, EmptyState, SegmentedControl } from '@terminator/extension-ui'
 import type { FileDiff, DiffLine, DiffHunk } from '../schemas/git.schema'
 import { choose } from './text'
 import { useSplitDrag } from '../hooks/useSplitDrag'
@@ -12,6 +13,10 @@ interface FileDiffViewProps {
   diff: FileDiff | null
   isStale?: boolean
   onRefresh?: () => void
+  /** Present when the branch has a changed file to show; the empty state offers it. */
+  onOpenFirstChange?: () => void
+  /** Reads the branch's status again, for the empty state when nothing has changed. */
+  onRefreshStatus?: () => void
 }
 
 // ── Unified view ──────────────────────────────────────────────────────────────
@@ -299,6 +304,27 @@ function LoadedDiff(props: FileDiffViewProps & { diff: FileDiff; view: ViewState
   )
 }
 
+/** What the pane says while no diff is shown: pick a change, or none exists. */
+function NoDiff(props: FileDiffViewProps): React.JSX.Element {
+  const { onOpenFirstChange, onRefreshStatus } = props
+  const empty = onOpenFirstChange
+    ? {
+        heading: 'No file selected',
+        description: 'Pick a changed file on the right to see what changed in it.',
+        actions: [{ label: 'Open the first change', onSelect: onOpenFirstChange }] as const,
+      }
+    : {
+        heading: 'No changes',
+        description: 'Edit a file in this branch and it shows here.',
+        actions: [{ label: 'Refresh', onSelect: onRefreshStatus ?? (() => undefined) }] as const,
+      }
+  return (
+    <div className="file-diff-view file-diff-view--empty">
+      <EmptyState icon={FileDiffIcon} {...empty} />
+    </div>
+  )
+}
+
 export function FileDiffView(props: FileDiffViewProps): React.JSX.Element {
   const { diff } = props
   // The layout and divider position outlive the file shown, so they stay as files change.
@@ -309,9 +335,7 @@ export function FileDiffView(props: FileDiffViewProps): React.JSX.Element {
     if (shownPath) recordUsage('diff-open')
   }, [shownPath])
   if (!diff) {
-    return (
-      <div className="file-diff-view file-diff-view--empty">Select a file to view its diff.</div>
-    )
+    return <NoDiff {...props} />
   }
   if (diff.isBinary) {
     return (

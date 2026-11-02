@@ -8,22 +8,25 @@
 
 .diff-table {
   width: 100%;
+  background: var(--tm-bg-base);
   border-collapse: collapse;
 }
 .diff-table--review {
+  background: var(--tm-bg-base);
   font-family: var(--tm-font-mono);
   font-size: 12.5px;
 }
 
 /* Split view */
 .diff-split-header {
-  background: var(--tm-bg-surface);
+  background: var(--tm-bg-base);
   color: var(--tm-text-muted);
   padding: 4px 10px;
   font-size: 12px;
   font-family: var(--tm-font-ui);
 }
 .diff-table--split {
+  background: var(--tm-bg-base);
   flex: 0 1 auto;
   min-width: 0;
   table-layout: fixed;
@@ -34,7 +37,7 @@
 
 /* Hunk row: names the enclosing symbol in the UI face; the ranges stay out of it. */
 .diff-hunk-header {
-  background: var(--tm-bg-surface);
+  background: var(--tm-bg-base);
   border-block: 1px solid var(--tm-border);
   color: var(--tm-text-muted);
   padding: 4px 8px;

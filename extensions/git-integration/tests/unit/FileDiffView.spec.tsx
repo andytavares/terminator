@@ -41,12 +41,6 @@ beforeAll(async () => {
 })
 
 describe('FileDiffView', () => {
-  it('shows empty state when diff is null', async () => {
-    const { FileDiffView } = await import('../../src/components/FileDiffView')
-    render(<FileDiffView diff={null} />)
-    expect(screen.getByText('Select a file to view its diff.')).toBeTruthy()
-  })
-
   it('shows binary message for binary files', async () => {
     const { FileDiffView } = await import('../../src/components/FileDiffView')
     render(<FileDiffView diff={makeDiff({ isBinary: true })} />)
@@ -206,5 +200,31 @@ describe('FileDiffView usage', () => {
     const { FileDiffView } = await import('../../src/components/FileDiffView')
     render(<FileDiffView diff={null} />)
     expect(mockRecordUsage).not.toHaveBeenCalled()
+  })
+})
+
+describe('FileDiffView empty state', () => {
+  it('offers to open the first change when no file is selected', async () => {
+    const { FileDiffView } = await import('../../src/components/FileDiffView')
+    function Harness() {
+      const [opened, setOpened] = React.useState(false)
+      return (
+        <FileDiffView diff={opened ? makeDiff() : null} onOpenFirstChange={() => setOpened(true)} />
+      )
+    }
+    render(<Harness />)
+    expect(screen.getByText('No file selected')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Open the first change' }))
+    expect(screen.getByText('src/foo.ts')).toBeTruthy()
+    expect(screen.queryByText('No file selected')).toBeNull()
+  })
+
+  it('offers a refresh when nothing has changed', async () => {
+    const { FileDiffView } = await import('../../src/components/FileDiffView')
+    const onRefreshStatus = vi.fn()
+    render(<FileDiffView diff={null} onRefreshStatus={onRefreshStatus} />)
+    expect(screen.getByText('No changes')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    expect(onRefreshStatus).toHaveBeenCalledTimes(1)
   })
 })

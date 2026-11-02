@@ -129,7 +129,10 @@ function useFileDiff(repoRoot: string | null) {
     [repoRoot, status, diffCache, setSelectedFile, setDiff, setLoading]
   )
   const cached = selectedFile && diffCache.get(diffCacheKey(selectedFile, selectedStaged))
-  return { selectedDiff: cached || null, handleFileSelect }
+  const firstChange = status?.files[0]
+  const openFirstChange =
+    firstChange && (() => handleFileSelect(firstChange.path, firstChange.staged))
+  return { selectedDiff: cached || null, handleFileSelect, openFirstChange }
 }
 
 /** The commit's progress: "hooks" while hook output streams in, "committing" after three quiet
@@ -509,7 +512,7 @@ function OpenPrDialog({ repoRoot, pr }: { repoRoot: string; pr: PrDialogState })
 }
 
 function useGitFullView(repoRoot: string | null) {
-  useGitStatus(repoRoot)
+  const refreshStatus = useGitStatus(repoRoot)
   const resize = useResizePanel(300, { min: 160, max: 600 }, -1)
   const { status, disabled, view, setView } = useGitStore(
     useShallow((s) => ({
@@ -519,7 +522,7 @@ function useGitFullView(repoRoot: string | null) {
       setView: s.setView,
     }))
   )
-  const { selectedDiff, handleFileSelect } = useFileDiff(repoRoot)
+  const { selectedDiff, handleFileSelect, openFirstChange } = useFileDiff(repoRoot)
   const flow = useCommitFlow(repoRoot, status?.files.some((f) => f.staged) ?? false)
   const pr = usePrDialog(repoRoot)
   const commitMessageRef = useRef<HTMLTextAreaElement>(null)
@@ -527,6 +530,7 @@ function useGitFullView(repoRoot: string | null) {
   return {
     ...{ resize, disabled, view, setView, selectedDiff, handleFileSelect },
     ...{ flow, pr, commitMessageRef },
+    emptyDiff: { onRefreshStatus: refreshStatus, onOpenFirstChange: openFirstChange },
   }
 }
 
@@ -548,7 +552,7 @@ export function GitFullView({ repoRoot }: Props): React.JSX.Element {
   return (
     <div className="git-full-view">
       <div className="git-full-view__diff-pane">
-        <FileDiffView diff={g.selectedDiff} />
+        <FileDiffView {...g.emptyDiff} diff={g.selectedDiff} />
       </div>
       <div className="git-resize-handle" onMouseDown={g.resize.handleMouseDown} />
       <ChangesPane

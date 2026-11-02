@@ -27,11 +27,11 @@
 
 .wt-table th {
   text-align: left;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--tm-text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-sm);
   font-weight: 500;
+  color: var(--tm-text-secondary);
   padding: var(--tm-space-1) var(--tm-space-2);
   border-bottom: 1px solid var(--tm-border);
 }

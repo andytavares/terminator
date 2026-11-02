@@ -161,6 +161,7 @@
 }
 
 .staging-area__section {
+  background: transparent;
   border-bottom: 1px solid var(--tm-border);
 }
 
@@ -169,7 +170,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 5px 10px;
-  background: var(--tm-bg-surface);
+  background: transparent;
   font-size: 11px;
   font-weight: 600;
   color: var(--tm-text-secondary);
@@ -211,7 +212,7 @@
 .staging-area__badge {
   font-size: 10px;
   font-weight: 700;
-  flex: 0 0 56px;
+  flex: 0 0 64px;
   text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -339,6 +340,7 @@
 
 .diff-table {
   width: 100%;
+  background: var(--tm-bg-base);
   border-collapse: collapse;
 }
 
@@ -391,6 +393,7 @@
 
 /* Split diff table */
 .diff-table--split {
+  background: var(--tm-bg-base);
   table-layout: fixed;
 }
 
@@ -641,6 +644,7 @@
 }
 
 .git-full-view__staging {
+  background: var(--tm-bg-surface);
   flex: 1;
   min-height: 0;
   overflow-y: auto;

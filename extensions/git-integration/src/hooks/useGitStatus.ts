@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useGitStore } from '../stores/git.store'
 import type { GitStatus } from '../schemas/git.schema'
 import { gitAPI } from '../api/git'
@@ -99,7 +99,9 @@ function followChanges(repoRoot: string, refresh: Refresh, isCancelled: () => bo
   }
 }
 
-export function useGitStatus(repoRoot: string | null): void {
+/** Follows the status of `repoRoot`; returns the way to read it again now. */
+export function useGitStatus(repoRoot: string | null): () => void {
+  const refreshRef = useRef<Refresh | null>(null)
   const setStatus = useGitStore((s) => s.setStatus)
   const setDisabled = useGitStore((s) => s.setDisabled)
   const setLoading = useGitStore((s) => s.setLoading)
@@ -111,11 +113,14 @@ export function useGitStatus(repoRoot: string | null): void {
     let cancelled = false
     const isCancelled = () => cancelled
     const refresh = statusRefresher(repoRoot, { setStatus, setDisabled, setLoading }, isCancelled)
+    refreshRef.current = refresh
     setLoading(true)
     const stopFollowing = followChanges(repoRoot, refresh, isCancelled)
     return () => {
       cancelled = true
+      refreshRef.current = null
       stopFollowing()
     }
   }, [repoRoot, setStatus, setDisabled, setLoading])
+  return useCallback(() => void refreshRef.current?.(), [])
 }
