@@ -1,0 +1,29 @@
+packages/extension-ui/src/settings-fields.css
+  s_b5d2e9359cd05b::t_20a2e5192cc290 7-11,16-20,26-30
+packages/extension-ui/src/extension-ui.css
+  s_b5d2e9359cd05b::t_20a2e5192cc290 78,151-158,462
+packages/extension-ui/src/controls.css
+  s_b5d2e9359cd05b::t_20a2e5192cc290 47,112
+packages/extension-ui/src/desk.css
+  s_b5d2e9359cd05b::t_20a2e5192cc290 157,160-163,202-203,275,288-290,292
+packages/extension-ui/stories/Button.stories.tsx
+  s_b5d2e9359cd05b::t_f97449278a9218 36-43
+packages/extension-ui/stories/Tokens.stories.tsx
+  s_b5d2e9359cd05b::t_9e2f2280cea167 67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "af59c0229cf3f6f37be276aeca6dc4d5e83ed452",
+  "prompts": {},
+  "sessions": {
+    "s_b5d2e9359cd05b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da33f7e5-cdc0-4c80-a907-6950bc8d8b20",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
