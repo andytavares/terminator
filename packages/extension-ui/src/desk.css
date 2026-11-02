@@ -154,13 +154,14 @@
   padding: 13px 14px;
   border: 1px solid var(--tm-border);
   border-radius: var(--tm-radius-md);
-  background: var(--tm-bg-surface);
+  background: var(--tm-bg-card);
 }
 .tmui-metric-card__question {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-sm);
+  font-weight: 500;
   color: var(--tm-text-secondary);
-  font-size: 11px;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
 }
 .tmui-metric-card__qualifier {
   color: var(--tm-text-faint);
@@ -198,8 +199,8 @@
   max-height: 100%;
   margin: 0;
   border-left: 1px solid var(--tm-border-strong);
-  background: var(--tm-bg-surface);
-  box-shadow: -20px 0 40px var(--tm-scrim);
+  background: var(--tm-bg-elevated);
+  box-shadow: var(--tm-shadow-overlay);
   overflow: hidden;
 }
 .tmui-drawer__panel {
@@ -271,7 +272,7 @@ button.tmui-checkbox {
   border: 1px solid var(--tm-border);
   border-collapse: collapse;
   border-radius: var(--tm-radius-md);
-  background: var(--tm-bg-surface);
+  background: var(--tm-bg-card);
   font-size: 12px;
 }
 .tmui-data-table th,
@@ -284,11 +285,11 @@ button.tmui-checkbox {
 .tmui-data-table__head {
   border-bottom-color: var(--tm-border-strong);
   background: var(--tm-bg-card);
-  color: var(--tm-text-secondary);
-  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--tm-font-size-sm);
   font-weight: 500;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  color: var(--tm-text-secondary);
 }
 .tmui-data-table__sort {
   padding: 0;

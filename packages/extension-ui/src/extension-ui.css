@@ -75,6 +75,7 @@
   color: var(--tm-text-primary);
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-md, 10px);
+  box-shadow: var(--tm-shadow-overlay);
   font-family: var(--tm-font-ui);
 }
 
@@ -147,8 +148,14 @@
   background: var(--tm-bg-card-hover);
 }
 
-.tmui-button:disabled {
-  opacity: 0.45;
+/* Listed with the variants so the variant's colours cannot win by order. */
+.tmui-button:disabled,
+.tmui-button--primary:disabled,
+.tmui-button--danger:disabled {
+  opacity: 1;
+  background: var(--tm-bg-card);
+  border-color: var(--tm-border);
+  color: var(--tm-text-faint);
   cursor: default;
 }
 
@@ -452,6 +459,7 @@
 }
 
 :where(.tmui-popover) {
+  box-shadow: var(--tm-shadow-overlay);
   min-width: 200px;
   padding: var(--tm-space-2, 8px);
 }

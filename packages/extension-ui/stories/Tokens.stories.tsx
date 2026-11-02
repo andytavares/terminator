@@ -64,7 +64,7 @@ const expectDistinctHeatLevels = async (): Promise<void> => {
 export const Dark: Story = {
   play: async () => {
     await expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
-    await expect(tokenValue('--tm-bg-base')).toBe('#0c0c0f')
+    await expect(tokenValue('--tm-bg-base')).toBe('#19191d')
     await expect(tokenValue('--tm-heat-4')).toBe('#4ade80')
     await expectDistinctHeatLevels()
   },

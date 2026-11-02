@@ -44,7 +44,7 @@ input:where(
   box-sizing: border-box;
   padding: 0 8px;
   background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border-strong);
+  border: 1px solid var(--tm-border-control);
   border-radius: var(--tm-radius-sm);
   color: var(--tm-text-primary);
   font: inherit;
@@ -109,7 +109,7 @@ input[type='radio'] {
   height: 14px;
   margin: 0;
   padding: 0;
-  border: 1px solid var(--tm-border-strong);
+  border: 1px solid var(--tm-border-control);
   background: var(--tm-bg-input);
   cursor: pointer;
   transition:
