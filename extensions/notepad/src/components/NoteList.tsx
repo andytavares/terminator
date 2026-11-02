@@ -5,14 +5,14 @@ import {
   ChevronRight,
   Download,
   Folder as FolderIcon,
+  Pencil,
   Plus,
   Tag as TagIcon,
   X,
 } from 'lucide-react'
-import { Button, ConfirmDialog, Menu, Popover } from '@terminator/extension-ui'
+import { Button, ConfirmDialog, EmptyState, Menu, Popover } from '@terminator/extension-ui'
 import { loadLibrary, useNotesStore } from '../stores/notes.store'
 import { useFilterStore } from '../stores/filter.store'
-import { EmptyState } from './EmptyState'
 import {
   ItemEditModal,
   NoteOrDiagramRow,
@@ -407,6 +407,19 @@ function TagOption(props: { tag: Tag; isActive: boolean; onToggle: () => void })
 
 // ── List body ─────────────────────────────────────────────────────
 
+function NoNotesYet(): React.JSX.Element {
+  const setShowQuickCreate = useNotesStore((s) => s.setShowQuickCreate)
+  return (
+    <EmptyState
+      icon={Pencil}
+      heading="No notes yet"
+      description="Capture your first note from anywhere in Terminator — even mid-command. Notes are kept on this machine and export to plain markdown whenever you want."
+      actions={[{ label: 'New note', tone: 'primary', onSelect: () => setShowQuickCreate(true) }]}
+      hint="Tip: press ⌘⇧N anytime — the overlay opens over your terminal."
+    />
+  )
+}
+
 function ListBody(props: { view: ListView; activeTagNames: string[] }): React.JSX.Element {
   const { view, activeTagNames } = props
   const { model } = view
@@ -422,7 +435,7 @@ function ListBody(props: { view: ListView; activeTagNames: string[] }): React.JS
           {noResultsText(activeTagNames, searchQuery)}
         </div>
       )}
-      {showsNothing && !model.isFiltering && <EmptyState />}
+      {showsNothing && !model.isFiltering && <NoNotesYet />}
       {!showsNothing && <ActiveItems view={view} folders={folders} />}
       <ArchivedSection view={view} />
     </div>

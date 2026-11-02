@@ -68,6 +68,14 @@ describe('NotepadView loading', () => {
     expect(bridge.calls('terminator.notepad:diagrams.list')).toEqual([{ includeArchived: true }])
   })
 
+  it('invites the reader to pick or start a note when none is open, and the action opens the composer', () => {
+    useNotesStore.setState({ notes: [listItem('n1', 'Plan', [])], showQuickCreate: false })
+    render(<NotepadView />)
+    expect(screen.getByRole('heading', { name: 'No note open' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'New note' }))
+    expect(useNotesStore.getState().showQuickCreate).toBe(true)
+  })
+
   it('opens the selected note with its comments', async () => {
     await openNote()
     expect(bridge.calls('terminator.notepad:comments.list')).toEqual([

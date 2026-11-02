@@ -129,15 +129,6 @@
   gap: 6px;
 }
 
-.notepad-view__no-selection {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--tm-text-muted);
-  font-size: 13px;
-}
-
 /* The right rail holds the outline over the comments. It owns the width and the
    border the comments panel used to own, so hiding either one does not leave a
    stray edge — and hiding both collapses the rail and gives the width back to
@@ -578,69 +569,6 @@
 .notepad-view--empty-screen {
   align-items: center;
   justify-content: center;
-}
-
-.notepad-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  gap: 16px;
-  padding: 48px 32px;
-  text-align: center;
-  color: var(--tm-text-muted);
-  max-width: 520px;
-}
-
-/* Principle XII: sized here, not with a `size` prop. */
-.notepad-empty-state__icon svg {
-  width: 36px;
-  height: 36px;
-}
-
-.notepad-empty-state__icon {
-  opacity: 0.4;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.notepad-empty-state__heading {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--tm-text-primary);
-  margin: 0;
-}
-
-.notepad-empty-state__desc {
-  font-size: 14px;
-  color: var(--tm-text-secondary);
-  margin: 0;
-  line-height: 1.6;
-}
-
-.notepad-empty-state__buttons {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-top: 4px;
-}
-
-.notepad-empty-state__tip {
-  font-size: 12px;
-  color: var(--tm-text-muted);
-  margin: 0;
-}
-
-.notepad-kbd {
-  font-family: var(--tm-font-mono, monospace);
-  font-size: 11px;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border);
-  border-radius: 4px;
-  padding: 1px 5px;
-  color: var(--tm-text-secondary);
 }
 
 /* ── Tag chips ──────────────────────────────────────────────────── */

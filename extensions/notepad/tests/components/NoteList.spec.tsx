@@ -100,9 +100,18 @@ function noteListTests() {
 }
 
 function noteListRenderingTests() {
-  it('shows EmptyState when there are no notes', () => {
+  it('shows the empty state when there are no notes', () => {
     render(<NoteList />)
-    expect(screen.getByText(/no notes/i)).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'No notes yet' })).toBeDefined()
+    expect(screen.getByText(/Capture your first note/i)).toBeDefined()
+    expect(screen.getByText(/Tip:/i)).toBeDefined()
+  })
+
+  it('opens the composer when New note is chosen in the empty state', () => {
+    useNotesStore.setState({ showQuickCreate: false })
+    render(<NoteList />)
+    fireEvent.click(screen.getByRole('button', { name: /^New note/ }))
+    expect(useNotesStore.getState().showQuickCreate).toBe(true)
   })
 
   it('renders note titles', () => {

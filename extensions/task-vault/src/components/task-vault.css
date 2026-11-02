@@ -5,15 +5,6 @@
   --tv-radius-lg: 10px;
   --tv-radius-pill: 20px;
 
-  /* Typography scale */
-  --tv-text-xs: 10px;
-  --tv-text-sm: 11px;
-  --tv-text-base: 13px;
-  --tv-text-md: 14px;
-  --tv-text-lg: 16px;
-  --tv-text-xl: 18px;
-  --tv-text-2xl: 20px;
-
   /* Tints of the design system's status colours */
   --tv-color-danger-bg: color-mix(in srgb, var(--tm-danger) 10%, transparent);
   --tv-color-danger-border: color-mix(in srgb, var(--tm-danger) 35%, transparent);
@@ -158,6 +149,7 @@
 
 .daily-log__task {
   position: relative;
+  background: var(--tm-bg-card);
   display: flex;
   align-items: center;
   gap: var(--tm-space-2);
@@ -1102,7 +1094,7 @@
 }
 
 .areas-view__card-name {
-  font-size: var(--tv-text-md);
+  font-size: var(--tm-font-size-lg);
   font-weight: 600;
   margin-bottom: var(--tm-space-2);
   color: var(--tm-text-primary);
@@ -1111,7 +1103,7 @@
 .areas-view__card-stats {
   display: flex;
   gap: var(--tm-space-2);
-  font-size: var(--tv-text-sm);
+  font-size: var(--tm-font-size-xs);
 }
 
 .areas-view__open-count {
@@ -1236,7 +1228,7 @@
   gap: var(--tm-space-2);
   padding: var(--tm-space-2) var(--tm-space-3);
   border-radius: var(--tm-radius-sm);
-  font-size: var(--tv-text-base);
+  font-size: var(--tm-font-size-md);
   transition: background 120ms ease-out;
 }
 
@@ -1719,7 +1711,7 @@
 }
 
 .daily-log__task:hover {
-  background: var(--tm-bg-surface);
+  background: var(--tm-bg-card-hover);
 }
 
 .daily-log__task-actions {
@@ -1769,7 +1761,7 @@
 }
 
 .projects-browser__name {
-  font-size: var(--tv-text-md);
+  font-size: var(--tm-font-size-lg);
   letter-spacing: -0.01em;
 }
 
@@ -1780,7 +1772,7 @@
 .areas-view__header h2,
 .archive-view__header h2,
 .area-detail__header h2 {
-  font-size: var(--tv-text-xl);
+  font-size: var(--tm-font-size-xl);
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.2;
@@ -1790,7 +1782,7 @@
 /* Section sub-headers */
 .daily-log__section-header h3,
 .archive-view__section-title {
-  font-size: var(--tv-text-sm);
+  font-size: var(--tm-font-size-xs);
   font-weight: 600;
   color: var(--tm-text-muted);
 }
@@ -1809,8 +1801,8 @@
 }
 
 /* ── Utility classes ─────────────────────────────────────────────── */
-.tv-text-muted-sm {
-  font-size: var(--tv-text-sm);
+.tv-muted-sm {
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
 }
 
@@ -2142,7 +2134,7 @@ h2.daily-log__date {
 /* Back btn for processor mode */
 
 .inbox-item__text {
-  font-size: var(--tv-text-base);
+  font-size: var(--tm-font-size-md);
   line-height: 1.5;
 }
 
@@ -2333,7 +2325,7 @@ h2.daily-log__date {
 }
 
 .areas-view__card-name {
-  font-size: var(--tv-text-md);
+  font-size: var(--tm-font-size-lg);
   font-weight: 700;
   letter-spacing: -0.015em;
   margin-bottom: 0;
@@ -2346,7 +2338,7 @@ h2.daily-log__date {
 }
 
 .areas-view__open-count {
-  font-size: var(--tv-text-2xl);
+  font-size: var(--tm-font-size-2xl);
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1;
@@ -2355,7 +2347,7 @@ h2.daily-log__date {
 }
 
 .areas-view__total-count {
-  font-size: var(--tv-text-sm);
+  font-size: var(--tm-font-size-xs);
   color: var(--tm-text-muted);
   letter-spacing: 0.01em;
 }
@@ -3592,7 +3584,7 @@ h2.daily-log__date {
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-xs);
   color: var(--tm-text-secondary);
-  font-size: var(--tv-text-sm);
+  font-size: var(--tm-font-size-xs);
   font-family: inherit;
   padding: 4px 8px;
   cursor: pointer;
@@ -3622,7 +3614,7 @@ h2.daily-log__date {
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-xs);
   color: var(--tm-text-primary);
-  font-size: var(--tv-text-base);
+  font-size: var(--tm-font-size-md);
   font-family: inherit;
   padding: 4px 8px;
   outline: none;
@@ -3635,7 +3627,7 @@ h2.daily-log__date {
 }
 
 .recurrence-modal__count-label {
-  font-size: var(--tv-text-base);
+  font-size: var(--tm-font-size-md);
   color: var(--tm-text-secondary);
 }
 
