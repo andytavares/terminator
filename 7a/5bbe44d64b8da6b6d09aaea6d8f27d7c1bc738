@@ -1,0 +1,21 @@
+docs/EXTENSION-STYLE.md
+  s_b5d2e9359cd05b::t_e632ecd115e6e3 121-142
+docs/adr/140-each-background-token-has-one-role.md
+  s_b5d2e9359cd05b::t_e632ecd115e6e3 1-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7a5bbe44d64b8da6b6d09aaea6d8f27d7c1bc738",
+  "prompts": {},
+  "sessions": {
+    "s_b5d2e9359cd05b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da33f7e5-cdc0-4c80-a907-6950bc8d8b20",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
