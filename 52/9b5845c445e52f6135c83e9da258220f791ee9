@@ -1,0 +1,42 @@
+extensions/git-integration/tests/unit/FileDiffView.spec.tsx
+  s_b5d2e9359cd05b::t_b216fe0f65fb79 205-229
+  s_b5d2e9359cd05b::t_0761a8f7eb2498 230
+extensions/git-integration/src/components/pr-review/review-dashboard.css
+  s_b5d2e9359cd05b::t_b216fe0f65fb79 83
+  s_b5d2e9359cd05b::t_203a2656a08fb9 20,33,84-86
+extensions/git-integration/src/components/pr-review/properties-rail.css
+  s_b5d2e9359cd05b::t_203a2656a08fb9 20-22,24
+extensions/git-integration/src/hooks/useGitStatus.ts
+  s_b5d2e9359cd05b::t_f983b1b4e5fddc 1,102-104,116,121,125
+extensions/git-integration/src/components/worktrees/worktrees.css
+  s_b5d2e9359cd05b::t_203a2656a08fb9 30-32,34
+extensions/git-integration/src/components/pr-review/diff-pane/diff-rows.css
+  s_b5d2e9359cd05b::t_203a2656a08fb9 11,15,22,29,40
+extensions/git-integration/src/components/git-integration.css
+  s_b5d2e9359cd05b::t_203a2656a08fb9 164,173,215,343,396,647
+extensions/git-integration/src/components/FileDiffView.tsx
+  s_b5d2e9359cd05b::t_f983b1b4e5fddc 2-3,16-19,307-327,338
+extensions/git-integration/tests/unit/GitFullView.spec.tsx
+  s_b5d2e9359cd05b::t_6ffee0c3266201 24-28,151-161
+extensions/git-integration/src/components/pr-review/tests-popover.css
+  s_b5d2e9359cd05b::t_203a2656a08fb9 19-23
+extensions/git-integration/src/components/GitFullView.tsx
+  s_b5d2e9359cd05b::t_a2f01e5d76a89f 132-135,525,533,555
+  s_b5d2e9359cd05b::t_f983b1b4e5fddc 515
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "529b5845c445e52f6135c83e9da258220f791ee9",
+  "prompts": {},
+  "sessions": {
+    "s_b5d2e9359cd05b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da33f7e5-cdc0-4c80-a907-6950bc8d8b20",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
