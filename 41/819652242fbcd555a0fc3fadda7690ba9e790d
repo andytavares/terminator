@@ -1,0 +1,213 @@
+src/renderer/components/session/LivePreview.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 25
+src/renderer/components/integrations/issue-search.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 25,44
+extensions/git-integration/src/components/pr-review/review-submit.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 11,16,21,108,114,165
+extensions/task-vault/src/components/task-vault.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 44,92,123,133,144,177,192,275,296,338,346,359,387,406,420,441,448,462,473,506,562,571,610,616,652,665,701,723,737,752,772,781,811,836,855,862,873,890,897,916,928,944,950,967,998,1038,1131,1170,1192,1219,1241,1260,1287,1295,1373,1384,1404,1422,1442,1456,1487,1495,1509,1526,1568,1593,1615,1638,1644,1662,1698,1985,1993,2003,2026,2071,2087,2095,2109,2171,2179,2186,2207,2244,2258,2274,2280,2366,2458,2464,2500,2506,2523,2529,2557,2572,2585,2643,2685,2698,2756,2766,2779,2837,2856,2883,2908,2917,2945,2954,2968,2971,2974,2996,3037,3106,3144,3160,3164,3191,3209,3216,3236,3245,3305,3312,3344,3407,3428,3457,3497,3504,3514,3546,3720,3733,3781,3822,3834,3887,3901,3924,4010,4056,4069,4081,4147,4201,4269,4278,4324,4362,4376
+extensions/git-integration/src/components/worktrees/worktrees.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 25,77,86
+packages/extension-ui/src/extension-base.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 97
+src/renderer/components/home/PlanTheDay.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 25,32,78,91,101,115,128,141,147,194,205,217,232,252
+src/renderer/components/integrations/LinkIssueDialog.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 23,68,84,90,100,106
+src/renderer/components/NotificationPanel.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 44,53,71,101,147,155,170,175,190,215
+src/renderer/components/sidebar/RepoHeader.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 30,103,142
+src/renderer/components/AboutDialog.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 14,20,27,54,62
+extensions/foundry/src/components/factory/hall.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 43
+extensions/git-integration/src/components/pr-review/diff-pane/diff-rows.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 17,25,34,45,49,91
+packages/extension-ui/src/desk.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 12,52,117,127,173,179,185,276,312
+extensions/foundry/src/components/foundry.css
+  s_b5d2e9359cd05b::t_f12afae46d1cbc 3871
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 23,104,112,123,132,157,199,233,239,289,380,392,397,455,485,526,591,603,669,674,691,719,800,839,850,904,948,955,981,987,997,1042,1060,1084,1098,1110,1127,1154,1171,1181,1190,1201,1217,1228,1268,1295,1322,1349,1390,1423,1433,1443,1461,1485,1515,1546,1557,1571,1577,1628,1635,1640,1680,1776,1789,1817,1824,1870,1891,1899,1924,1962,1971,1992,2028,2052,2077,2112,2119,2125,2143,2187,2195,2222,2228,2240,2249,2268,2280,2318,2330,2348,2408,2421,2429,2462,2467,2476,2493,2507,2531,2550,2561,2576,2635,2640,2654,2778,2793,2798,2821,2826,2853,2871,2982,3063,3129,3178,3214,3228,3236,3248,3256,3344,3439,3576,3624,3834,3841,3860,3900,3914,3947,3965,4011,4030,4039,4099
+src/renderer/components/home/ThreadDrawer.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 11,25,32,56,62,89,94,105,143,161,187,191
+src/renderer/components/overview/MetricsBar.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 10
+src/renderer/components/screen-chrome.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 27,33,71,81,97,114
+extensions/git-integration/src/components/pr-review/agent-panel.css
+  s_b5d2e9359cd05b::t_f12afae46d1cbc 17,31,88
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 11,36
+extensions/git-integration/src/components/pr-review/review-footer.css
+  s_b5d2e9359cd05b::t_f12afae46d1cbc 14
+extensions/git-integration/src/components/merge-flow/merge-flow.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 23,39,85,89,107,120,139,146,163,178,189,210,225,232,243,301,320,336,341,348,368,379,407,413,450,465,507,527,544,564,654,667,676,682,740,768,781,793,810,815,826,836,843,853,870,881,901,915,925,932,960,966,976,1007,1038,1044,1092,1099,1115,1145,1167,1192,1203,1230,1272,1289
+src/renderer/components/settings/IntegrationsSettings.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 52,58,108
+extensions/git-integration/src/components/pr-review/brief-card.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 24,37,43,81,110
+extensions/git-integration/src/components/pr-review/diff-pane/file-header.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 28,81,93,104
+  s_b5d2e9359cd05b::t_f12afae46d1cbc 71,115
+extensions/git-integration/src/components/pr-review/review-chrome.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 29
+  s_b5d2e9359cd05b::t_f12afae46d1cbc 16,43,79
+src/renderer/components/home/AcrossRepos.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 24,36,62
+src/renderer/components/home/Insights.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 56,62,69,76,91,123,169
+src/renderer/components/home/TodayRail.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 35,44,55,60,66,115
+extensions/git-integration/src/components/shared-chrome.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 49
+  s_b5d2e9359cd05b::t_f12afae46d1cbc 20,40
+packages/extension-ui/src/controls.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 51
+src/renderer/components/sidebar/dialog-fields.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 25,45,95,115,151
+tests/unit/packages/extension-ui/tokens.spec.ts
+  s_b5d2e9359cd05b::t_f12afae46d1cbc 11-12,70
+  s_b5d2e9359cd05b::t_5d39fe3d7d790c 13-18,63-65
+  s_b5d2e9359cd05b::t_9156e3b24dff6f 10,58-62,66-69,71-74
+  s_b5d2e9359cd05b::t_bfd0c30563a030 75-76
+src/renderer/components/home/TasksBody.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 70,152
+src/renderer/components/terminal/TabBar.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 46,58,65,113,121,137,166,202,216
+src/renderer/components/terminal/TerminalPane.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 18
+extensions/git-integration/src/components/pr-review/file-tree.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 17,32,48,101,109
+packages/extension-ui/src/extension-ui.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 96,105,110,142,165,275,294,316,350,358,371,396,500,533,611,619,655,681,790,815
+src/renderer/components/home/Tasks.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 31,65,115,153,176,182,210
+extensions/git-integration/src/components/pr-review/review-header.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 30,36,48,71,132,155,175,197,225
+extensions/git-integration/src/components/git-integration.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 36,44,61,67,88,100,113,139,174,213,246,254,259,268,276,295,320,330,338,350,371,460,472,508,522,535,548,557,565,579,587,606,636,670,679
+src/renderer/components/task-switcher/TaskSwitcher.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 21,46,68,77
+src/renderer/components/integrations/IssuePicker.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 57,76,86,91
+src/renderer/components/home/HomeScreen.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 9,33,38
+src/renderer/components/session/StateChip.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 62
+src/renderer/components/settings/SettingsPanel.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 49,83,114,123,148,157,165,170,209,218,225,266,299,339,345,356,370,385,462,491
+src/renderer/components/sidebar/MoveSessionDialog.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 47,63,76
+extensions/git-integration/src/components/pr-review/pr-overview.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 36,55,75,91,190,195,201,208,242,258,266,292,322,327,371,387,411,433
+src/renderer/components/sidebar/SidebarMenu.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 21,50,84,103,110
+src/renderer/components/terminal/BreakoutDropZone.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 21,32
+extensions/git-integration/src/components/pr-review/view-menu.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 17,36,84
+src/renderer/components/tasks/AddToTaskDialog.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 18,25,58
+extensions/git-integration/src/components/pr-review/inline-comment.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 11,20,41,45,48,55,76
+src/renderer/components/session/ResumeButton.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 14,38
+src/renderer/components/integrations/issue-sections.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 17,23,37,65,77,89,96,101
+src/renderer/components/home/YourMove.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 23,33,53,108,131,151,169
+extensions/git-integration/src/components/pr-review/review-plan.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 9,13,34,47,57,64,86,114
+extensions/git-integration/src/components/pr-review/properties-rail.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 44,61,72,81,100,104
+extensions/git-integration/src/components/contributions/contributions.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 24,87,112,118,126,144,163,171,213,239,261
+  s_b5d2e9359cd05b::t_f12afae46d1cbc 13
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 9,44,52,84,105,111,137,154,177,199,208,240,295,318,340,344,377,418,459,473,490,504,509,530,540,546,571,625
+src/renderer/components/integrations/IssueDrawer.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 15,63,83,91,100,114
+src/renderer/components/home/InFlight.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 18,23,39,56,80,106,113,127,152,157,190
+src/renderer/components/sidebar/SidebarHeader.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 27
+src/renderer/components/QuickActions.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 47,64,87,140,173,184,193,206,267,303,312,318
+src/renderer/components/sidebar/SidebarSearch.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 24,36,50
+src/renderer/components/terminal/BreakoutWindowView.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 32,55
+src/renderer/components/sidebar/TerminalRow.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 18,74,82
+src/renderer/components/terminal/LaneSwitcher.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 8,29
+extensions/git-integration/src/components/pr-review/review-inspector.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 30,81,88,120,131,155,163,180,191,197
+src/renderer/components/overview/WallTile.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 55,107
+src/renderer/components/agent/AgentView.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 11,19,106,114
+src/renderer/components/home/StartWork.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 12,24,60,86,119,131,166,187,199,211,298,304,310
+src/renderer/components/session/WorkItemCell.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 6,11,43,80
+src/renderer/components/sidebar/BranchRow.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 124,138,149,186
+extensions/git-integration/src/components/pr-review/tests-popover.css
+  s_b5d2e9359cd05b::t_f12afae46d1cbc 13,88
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 61,68,75,112
+src/renderer/components/sidebar/AppBand.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 90
+extensions/git-integration/src/components/pr-review/review-dashboard.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 34,59,147,167,198,209,236,276,316,340,344
+  s_b5d2e9359cd05b::t_f12afae46d1cbc 12,256
+extensions/git-integration/src/components/pr-review/readiness-strip.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 17,81,113,119
+src/renderer/components/LogWindow.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 52,78,88
+extensions/git-integration/src/components/pr-review/review-surface.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 12,25,63,168,221,247
+  s_b5d2e9359cd05b::t_f12afae46d1cbc 53,99,103,117,152,198
+src/renderer/components/settings/QuickActionsSettings.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 37,45,52,81
+src/renderer/components/sidebar/UnifiedSidebar.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 62,95,139
+src/renderer-remote/Login.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 34,48,60,73
+extensions/notepad/src/components/notepad.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 11,46,116,184,210,226,254,264,315,346,370,420,457,463,474,511,527,537,546,583,600,644,667,727,770,802,883,890,911,942,972,977,992,1013,1067,1206,1250,1260,1267,1301,1329,1354,1373,1388,1411,1441,1470,1491,1520,1575,1630,1641,1657,1671,1698,1744,1770,1778,1814,1823,1830,1852,1857,1914,1947,1956,1965,1997,2006,2047,2081,2108,2114,2134
+src/renderer/styles.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 61,190
+src/renderer-remote/mobile.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 40,65,89,136,158,176,201,217,230,255
+src/renderer/components/AlertBadge.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 11
+src/renderer/components/usage/UsageScreen.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 21,42,63,87,116,122,130,169
+src/renderer/components/overview/OverviewScreen.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 17,72,85
+packages/extension-ui/src/settings-fields.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 38,49,62
+src/renderer/components/sidebar/BranchSelect.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 72,111,135,160,175
+extensions/remote-control/src/components/remote-control-view.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 92,99,120,141,150,167,188,195,201,217,232,238,258,273
+src/renderer/components/terminal/LeafPane.css
+  s_b5d2e9359cd05b::t_bd63fd7b0f7170 61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "41819652242fbcd555a0fc3fadda7690ba9e790d",
+  "prompts": {},
+  "sessions": {
+    "s_b5d2e9359cd05b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da33f7e5-cdc0-4c80-a907-6950bc8d8b20",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
