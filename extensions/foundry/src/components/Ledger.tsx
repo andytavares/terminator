@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { RecordShown } from '../renderer/RecordShown.js'
-import { ScrollText, Sparkles, Check, X, Trash2 } from 'lucide-react'
+import { ScrollText, Sparkles, Check, X, Trash2, FilterX } from 'lucide-react'
 import type { LedgerEntry } from '../ledger/append.js'
 import type { Proposal } from '../ledger/curator.js'
 import type { FactoryMetrics } from '../factory/metrics.js'
@@ -135,11 +135,7 @@ function RecordTab({ entries, view, rules, proposals, onOpenForge }: RecordTabPr
       <ProposalsPanel proposals={proposals.proposals} onDecide={proposals.decide} />
       <AcceptedPanel rules={rules} onRemove={proposals.remove} />
       <SkillsPanel rules={rules} />
-      {view.entries.length === 0 ? (
-        <NothingRecorded onOpenForge={onOpenForge} />
-      ) : (
-        <EntriesTable entries={view.entries} />
-      )}
+      <RecordBody entries={entries} view={view} onOpenForge={onOpenForge} />
       <footer className="fdry-queue-foot">
         <span>
           showing <b>{view.entries.length}</b> of <b>{view.total}</b>
@@ -453,6 +449,29 @@ function SkillsPanel({ rules }: { readonly rules: RulesView }) {
         ))}
       </ul>
     </section>
+  )
+}
+
+/** The entries, or why there are none: nothing recorded, or the filters hide them all. */
+function RecordBody({ entries, view, onOpenForge }: Omit<RecordTabProps, 'rules' | 'proposals'>) {
+  if (view.total === 0) return <NothingRecorded onOpenForge={onOpenForge} />
+  if (view.entries.length === 0) return <NoMatches entries={entries} total={view.total} />
+  return <EntriesTable entries={view.entries} />
+}
+
+function NoMatches({ entries, total }: { entries: RecordTabProps['entries']; total: number }) {
+  const showEvery = () => {
+    entries.setOrderId('')
+    entries.setActor('')
+    entries.setAction('')
+  }
+  return (
+    <EmptyState
+      icon={FilterX}
+      heading="No entries match these filters"
+      description={`The record has ${total} entries. Every order, anyone and anything shows them all.`}
+      actions={[{ label: 'Show every entry', onSelect: showEvery }]}
+    />
   )
 }
 

@@ -146,6 +146,7 @@ describe('reading the record', () => {
   describe('filters', filtersTests)
   describe('filtering by who and what', filteringByWhoAndWhatTests)
   describe('counts and empty', countsAndEmptyTests)
+  describe('a filter that matches nothing', filteredOutTests)
 })
 
 function whoDecidedTests() {
@@ -236,6 +237,23 @@ function countsAndEmptyTests() {
     mount({ entries: [], total: 0, actors: [], actions: [], orders: [] })
     fireEvent.click(await screen.findByRole('button', { name: 'Open the Forge' }))
     expect(onOpenForge).toHaveBeenCalledTimes(1)
+  })
+}
+
+// The record has entries, but the filters hide them all: say so, and offer to clear them.
+function filteredOutTests() {
+  it('says the filters match nothing rather than that nothing was recorded', async () => {
+    mount({ entries: [], total: 2 })
+    await screen.findByRole('heading', { name: 'No entries match these filters' })
+    expect(screen.queryByRole('heading', { name: 'Nothing recorded yet' })).toBeNull()
+  })
+
+  it('clears the filters when asked to show every entry', async () => {
+    mount({ entries: [], total: 2 })
+    const order = (await screen.findByLabelText('Order')) as HTMLSelectElement
+    fireEvent.change(order, { target: { value: 'WO-2' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Show every entry' }))
+    await waitFor(() => expect(order.value).toBe(''))
   })
 }
 
