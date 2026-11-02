@@ -41,7 +41,7 @@ function paintOf(): Record<string, string[]> {
     ...fields,
     tokens: [
       resolved('--tm-bg-input'),
-      resolved('--tm-border-strong'),
+      resolved('--tm-border-control'),
       resolved('--tm-text-primary'),
     ],
   }

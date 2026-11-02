@@ -213,7 +213,7 @@ export async function openFoundry(handle: AppHandle): Promise<void> {
 /** Opens the Forge tab and waits for its own content to have rendered. */
 export async function openForge(handle: AppHandle): Promise<void> {
   await expect.poll(() => clickByName(handle, 'button', 'Forge')).toBe(true)
-  await expect.poll(() => bodyText(handle)).toMatch(/New order|Steps|All orders|STATUS WALL/)
+  await expect.poll(() => bodyText(handle)).toMatch(/New order|Steps|All orders|Status wall/)
 }
 
 /** Run in Foundry's view: whether some button's text contains `id`. */

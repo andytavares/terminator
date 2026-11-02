@@ -133,6 +133,8 @@
    the slack ahead of it, so it lands in the same column as the other rows' +
    rather than sitting against the label. */
 .unified-sidebar__scratch-count {
+  /* The heading beside it is in the UI face; counts keep the one type every sidebar count uses. */
+  font-family: var(--tm-font-mono);
   flex: 0 0 var(--sidebar-count-w, 20px);
   width: var(--sidebar-count-w, 20px);
   text-align: right;
