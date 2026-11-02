@@ -4,7 +4,8 @@ import type { Signal } from '../../sensors/types.js'
 import { DocumentChip } from '../DocumentChip.js'
 import { HallThumbnail } from './HallThumbnail.js'
 import { ciLabel } from '../../line/ci-label.js'
-import { Button } from '@terminator/extension-ui'
+import { Factory } from 'lucide-react'
+import { Button, EmptyState } from '@terminator/extension-ui'
 import { useFoundryQuery, ANY_RECORD } from '../../renderer/foundry-query.js'
 import { foundryInvoke } from '../../renderer/foundry-invoke.js'
 import type { FoundryApi } from '../../ipc/foundry-api.js'
@@ -171,6 +172,8 @@ function HallCardButton({
 export interface FactorySiteProps {
   readonly repoRoot: string | null
   readonly onOpen: (order: FactoryOrderRow) => void
+  /** Switches the Forge to the List view, where orders are started. */
+  readonly onShowList: () => void
 }
 
 /** The CI round in the words every other surface uses (`ciLabel`). A row
@@ -212,7 +215,7 @@ function useDock() {
 
 type Dock = ReturnType<typeof useDock>
 
-export function FactorySite({ onOpen }: FactorySiteProps): React.JSX.Element {
+export function FactorySite({ onOpen, onShowList }: FactorySiteProps): React.JSX.Element {
   const { rows, window_, setWindow, metrics } = useSiteRecords()
   const dock = useDock()
   return (
@@ -228,7 +231,7 @@ export function FactorySite({ onOpen }: FactorySiteProps): React.JSX.Element {
       </aside>
       <div className="fdry-site-main">
         {dock.signals.length > 0 ? <SignalDock dock={dock} /> : null}
-        <OrderHalls rows={rows} onOpen={onOpen} />
+        <OrderHalls rows={rows} onOpen={onOpen} onShowList={onShowList} />
         <Refinery chains={refineryChains(rows)} />
       </div>
     </div>
@@ -300,10 +303,23 @@ function DockPromoteForm({ signal, dock }: { readonly signal: Signal; readonly d
   )
 }
 
-function OrderHalls({ rows, onOpen }: GridProps) {
-  if (rows.length === 0) {
-    return <p className="fdry-note">No orders yet. Start one from the List view.</p>
-  }
+function NoHalls({ onShowList }: Pick<FactorySiteProps, 'onShowList'>) {
+  return (
+    <EmptyState
+      icon={Factory}
+      heading="No orders yet"
+      description="Each order you start shows here as a hall on the factory floor."
+      actions={[{ label: 'Go to the list view', onSelect: onShowList }]}
+    />
+  )
+}
+
+function OrderHalls({
+  rows,
+  onOpen,
+  onShowList,
+}: GridProps & Pick<FactorySiteProps, 'onShowList'>) {
+  if (rows.length === 0) return <NoHalls onShowList={onShowList} />
   const completed = rows.filter(isCompleted)
   const active = rows.filter((row) => !isCompleted(row))
   return (

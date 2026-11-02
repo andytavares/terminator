@@ -473,3 +473,12 @@ function theListsTests() {
     expect(screen.getAllByText('shipped')).toHaveLength(1)
   })
 }
+
+describe('the empty list', () => {
+  it('offers to start from a ticket, and the Ticket search opens', async () => {
+    mount([])
+    await screen.findByRole('heading', { name: 'No orders yet' })
+    screen.getByRole('button', { name: 'Start from a ticket' }).click()
+    await screen.findByLabelText('Search your tickets')
+  })
+})

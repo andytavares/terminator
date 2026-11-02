@@ -95,6 +95,7 @@ function ledgerReplies(over: Record<string, unknown>): Record<string, () => unkn
 }
 
 let recordUsage = vi.fn()
+let onOpenForge = vi.fn()
 
 function mount(over: Record<string, unknown> = {}) {
   recordUsage = vi.fn()
@@ -107,7 +108,8 @@ function mount(over: Record<string, unknown> = {}) {
       extensionBridge: { invoke, on: bus.on },
     },
   })
-  render(<Ledger />)
+  onOpenForge = vi.fn()
+  render(<Ledger onOpenForge={onOpenForge} />)
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -226,7 +228,14 @@ function countsAndEmptyTests() {
 
   it('says so when nothing has been recorded', async () => {
     mount({ entries: [], total: 0, actors: [], actions: [], orders: [] })
-    await screen.findByText('Nothing recorded yet.')
+    await screen.findByRole('heading', { name: 'Nothing recorded yet' })
+  })
+
+  // The tab is the parent's state, so the action's whole effect is the callback.
+  it('offers a way to the Forge when nothing has been recorded', async () => {
+    mount({ entries: [], total: 0, actors: [], actions: [], orders: [] })
+    fireEvent.click(await screen.findByRole('button', { name: 'Open the Forge' }))
+    expect(onOpenForge).toHaveBeenCalledTimes(1)
   })
 }
 

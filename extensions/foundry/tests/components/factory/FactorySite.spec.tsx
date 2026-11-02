@@ -70,8 +70,9 @@ function mount(
       extensionBridge: { invoke, on: bus.on },
     },
   })
-  render(<FactorySite repoRoot="/repo" onOpen={onOpen} />)
-  return { onOpen, invoke }
+  const onShowList = vi.fn()
+  render(<FactorySite repoRoot="/repo" onOpen={onOpen} onShowList={onShowList} />)
+  return { onOpen, onShowList, invoke }
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -106,7 +107,15 @@ describe('FactorySite', () => {
 function theCardsTests() {
   it('says there is nothing yet', async () => {
     mount([])
-    await screen.findByText(/no orders yet/i)
+    await screen.findByRole('heading', { name: 'No orders yet' })
+  })
+
+  // The List view is the parent's state, so the action's whole effect is the callback.
+  it('offers a way to the List view when there are no orders', async () => {
+    const { onShowList } = mount([])
+    const action = await screen.findByRole('button', { name: 'Go to the list view' })
+    fireEvent.click(action)
+    expect(onShowList).toHaveBeenCalledTimes(1)
   })
 
   it('lists a card per order, newest first', async () => {
@@ -339,7 +348,7 @@ describe('the Dock', () => {
 function factorySiteCratesTests() {
   it('shows nothing when there are no open signals', async () => {
     mount([])
-    await screen.findByText(/no orders yet/i)
+    await screen.findByRole('heading', { name: 'No orders yet' })
     expect(screen.queryByLabelText('Dock')).toBeNull()
   })
 
