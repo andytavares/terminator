@@ -38,8 +38,10 @@
 
 /* The count the filter notice used to draw in a band of its own. */
 .sidebar-menu__badge {
-  min-width: 13px;
-  height: 13px;
+  /* Fits an 11px digit, the smallest step of the type scale. */
+  min-width: 15px;
+  height: 15px;
+  line-height: 1;
   padding: 0 3px;
   display: grid;
   place-items: center;

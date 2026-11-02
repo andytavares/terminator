@@ -78,12 +78,14 @@
   position: absolute;
   top: 1px;
   right: 0;
-  min-width: 12px;
-  height: 12px;
+  /* Fits an 11px digit, the smallest step of the type scale. */
+  min-width: 15px;
+  height: 15px;
+  line-height: 1;
   padding: 0 3px;
   display: grid;
   place-items: center;
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--tm-accent);
   color: var(--tm-on-accent);
   font-family: var(--tm-font-mono);
