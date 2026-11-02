@@ -3,6 +3,8 @@ import { describe, it, beforeAll, beforeEach, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { FileDiff } from '../../src/schemas/git.schema'
 
+const noop = (): void => undefined
+
 const makeDiff = (overrides: Partial<FileDiff> = {}): FileDiff => ({
   path: 'src/foo.ts',
   isBinary: false,
@@ -24,7 +26,7 @@ async function renderDiff(
   props: { diff?: FileDiff; isStale?: boolean; onRefresh?: () => void } = {}
 ) {
   const { FileDiffView } = await import('../../src/components/FileDiffView')
-  return render(<FileDiffView diff={props.diff ?? makeDiff()} {...props} />)
+  return render(<FileDiffView diff={props.diff ?? makeDiff()} onRefreshStatus={noop} {...props} />)
 }
 
 const mockRecordUsage = vi.fn()
@@ -43,7 +45,7 @@ beforeAll(async () => {
 describe('FileDiffView', () => {
   it('shows binary message for binary files', async () => {
     const { FileDiffView } = await import('../../src/components/FileDiffView')
-    render(<FileDiffView diff={makeDiff({ isBinary: true })} />)
+    render(<FileDiffView diff={makeDiff({ isBinary: true })} onRefreshStatus={noop} />)
     expect(screen.getByText('Binary file — no diff available.')).toBeTruthy()
   })
 
@@ -190,15 +192,15 @@ describe('FileDiffView usage', () => {
   it('counts a diff once when it is opened, and again for another file', async () => {
     const { rerender } = await renderDiff()
     const { FileDiffView } = await import('../../src/components/FileDiffView')
-    rerender(<FileDiffView diff={makeDiff()} isStale />)
+    rerender(<FileDiffView diff={makeDiff()} isStale onRefreshStatus={noop} />)
     expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('diff-open')
-    rerender(<FileDiffView diff={makeDiff({ path: 'src/bar.ts' })} />)
+    rerender(<FileDiffView diff={makeDiff({ path: 'src/bar.ts' })} onRefreshStatus={noop} />)
     expect(mockRecordUsage).toHaveBeenCalledTimes(2)
   })
 
   it('counts nothing while no file is selected', async () => {
     const { FileDiffView } = await import('../../src/components/FileDiffView')
-    render(<FileDiffView diff={null} />)
+    render(<FileDiffView diff={null} onRefreshStatus={noop} />)
     expect(mockRecordUsage).not.toHaveBeenCalled()
   })
 })
@@ -209,7 +211,11 @@ describe('FileDiffView empty state', () => {
     function Harness() {
       const [opened, setOpened] = React.useState(false)
       return (
-        <FileDiffView diff={opened ? makeDiff() : null} onOpenFirstChange={() => setOpened(true)} />
+        <FileDiffView
+          diff={opened ? makeDiff() : null}
+          onOpenFirstChange={() => setOpened(true)}
+          onRefreshStatus={noop}
+        />
       )
     }
     render(<Harness />)

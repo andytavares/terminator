@@ -16,8 +16,11 @@ interface FileDiffViewProps {
   /** Present when the branch has a changed file to show; the empty state offers it. */
   onOpenFirstChange?: () => void
   /** Reads the branch's status again, for the empty state when nothing has changed. */
-  onRefreshStatus?: () => void
+  onRefreshStatus: () => void
 }
+
+/** What a diff on screen needs: the empty-state actions belong to the empty case only. */
+type ShownDiffProps = Pick<FileDiffViewProps, 'isStale' | 'onRefresh'> & { diff: FileDiff }
 
 // ── Unified view ──────────────────────────────────────────────────────────────
 
@@ -246,7 +249,7 @@ function DiffToolbar(props: {
   )
 }
 
-function DiffNotices({ props }: { props: FileDiffViewProps & { diff: FileDiff } }) {
+function DiffNotices({ props }: { props: ShownDiffProps }) {
   return (
     <>
       {props.isStale && (
@@ -293,7 +296,7 @@ function FileDiffBody({ diff, view }: { diff: FileDiff; view: ViewState }) {
   )
 }
 
-function LoadedDiff(props: FileDiffViewProps & { diff: FileDiff; view: ViewState }) {
+function LoadedDiff(props: ShownDiffProps & { view: ViewState }) {
   const { view } = props
   return (
     <div className="file-diff-view">
@@ -316,7 +319,7 @@ function NoDiff(props: FileDiffViewProps): React.JSX.Element {
     : {
         heading: 'No changes',
         description: 'Edit a file in this branch and it shows here.',
-        actions: [{ label: 'Refresh', onSelect: onRefreshStatus ?? (() => undefined) }] as const,
+        actions: [{ label: 'Refresh', onSelect: onRefreshStatus }] as const,
       }
   return (
     <div className="file-diff-view file-diff-view--empty">
