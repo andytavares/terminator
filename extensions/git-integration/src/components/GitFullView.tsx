@@ -7,7 +7,7 @@ import { useGitStore, diffCacheKey } from '../stores/git.store'
 import { useGitStatus } from '../hooks/useGitStatus'
 import { useResizePanel } from '../hooks/useResizePanel'
 import { StagingArea } from './StagingArea'
-import { FileDiffView } from './FileDiffView'
+import { FileDiffView, type DiffEmptyCase } from './FileDiffView'
 import { PrDialog } from './PrDialog'
 import { PrCreatedNotice } from './PrCreatedNotice'
 import type { FileDiff, PullRequest } from '../schemas/git.schema'
@@ -102,13 +102,15 @@ function useDiffStore() {
       setSelectedFile: s.setSelectedFile,
       setDiff: s.setDiff,
       setLoading: s.setLoading,
+      isLoading: s.isLoading,
     }))
   )
 }
 
 /** The selected file's diff, read once per file and side and kept in the store's cache. */
 function useFileDiff(repoRoot: string | null) {
-  const { status, selectedFile, diffCache, setSelectedFile, setDiff, setLoading } = useDiffStore()
+  const { status, selectedFile, diffCache, setSelectedFile, setDiff, setLoading, isLoading } =
+    useDiffStore()
   const [selectedStaged, setSelectedStaged] = useState(false)
   const handleFileSelect = useCallback(
     async (path: string, staged: boolean) => {
@@ -132,7 +134,23 @@ function useFileDiff(repoRoot: string | null) {
   const firstChange = status?.files[0]
   const openFirstChange =
     firstChange && (() => handleFileSelect(firstChange.path, firstChange.staged))
-  return { selectedDiff: cached || null, handleFileSelect, openFirstChange }
+  const shown = { hasStatus: status !== null, selectedFile, isLoading, openFirstChange }
+  return { selectedDiff: cached || null, handleFileSelect, shown }
+}
+
+interface EmptyInputs {
+  hasStatus: boolean
+  selectedFile: string | null
+  isLoading: boolean
+  openFirstChange: (() => void) | undefined
+}
+
+/** Why the diff pane is empty, from what the store knows. */
+function diffEmptyCase(inputs: EmptyInputs, onRefreshStatus: () => void): DiffEmptyCase {
+  if (!inputs.hasStatus || inputs.isLoading) return { kind: 'reading' }
+  if (inputs.selectedFile) return { kind: 'unreadable', onRefreshStatus }
+  if (inputs.openFirstChange) return { kind: 'pick', onOpenFirstChange: inputs.openFirstChange }
+  return { kind: 'clean', onRefreshStatus }
 }
 
 /** The commit's progress: "hooks" while hook output streams in, "committing" after three quiet
@@ -522,7 +540,7 @@ function useGitFullView(repoRoot: string | null) {
       setView: s.setView,
     }))
   )
-  const { selectedDiff, handleFileSelect, openFirstChange } = useFileDiff(repoRoot)
+  const { selectedDiff, handleFileSelect, shown } = useFileDiff(repoRoot)
   const flow = useCommitFlow(repoRoot, status?.files.some((f) => f.staged) ?? false)
   const pr = usePrDialog(repoRoot)
   const commitMessageRef = useRef<HTMLTextAreaElement>(null)
@@ -530,7 +548,7 @@ function useGitFullView(repoRoot: string | null) {
   return {
     ...{ resize, disabled, view, setView, selectedDiff, handleFileSelect },
     ...{ flow, pr, commitMessageRef },
-    emptyDiff: { onRefreshStatus: refreshStatus, onOpenFirstChange: openFirstChange },
+    emptyDiff: diffEmptyCase(shown, refreshStatus),
   }
 }
 
@@ -552,7 +570,7 @@ export function GitFullView({ repoRoot }: Props): React.JSX.Element {
   return (
     <div className="git-full-view">
       <div className="git-full-view__diff-pane">
-        <FileDiffView {...g.emptyDiff} diff={g.selectedDiff} />
+        <FileDiffView empty={g.emptyDiff} diff={g.selectedDiff} />
       </div>
       <div className="git-resize-handle" onMouseDown={g.resize.handleMouseDown} />
       <ChangesPane

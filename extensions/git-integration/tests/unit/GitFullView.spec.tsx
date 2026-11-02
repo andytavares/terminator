@@ -21,9 +21,11 @@ vi.mock('../../src/components/StagingArea', () => ({
   ),
 }))
 vi.mock('../../src/components/FileDiffView', () => ({
-  FileDiffView: ({ onOpenFirstChange }: { onOpenFirstChange?: () => void }) => (
-    <div data-testid="file-diff-view">
-      {onOpenFirstChange && <button onClick={onOpenFirstChange}>OpenFirstChange</button>}
+  FileDiffView: ({ empty }: { empty: { kind: string; onOpenFirstChange?: () => void } }) => (
+    <div data-testid="file-diff-view" data-empty={empty.kind}>
+      {empty.onOpenFirstChange && (
+        <button onClick={empty.onOpenFirstChange}>OpenFirstChange</button>
+      )}
     </div>
   ),
 }))
@@ -157,6 +159,39 @@ describe('GitFullView', () => {
   it('offers no first change when the branch has none', async () => {
     await renderView()
     expect(screen.queryByText('OpenFirstChange')).toBeNull()
+  })
+})
+
+const emptyCase = () => screen.getByTestId('file-diff-view').dataset.empty
+
+describe('GitFullView empty diff pane while a diff is not in hand', () => {
+  it('says it is reading before the first status arrives, not that nothing changed', async () => {
+    await renderView('/repo', { status: null })
+    expect(emptyCase()).toBe('reading')
+  })
+
+  it('says it is reading while the selected file loads', async () => {
+    await renderView('/repo', {
+      status: featureWithStagedFile(),
+      selectedFile: 'src/foo.ts',
+      isLoading: true,
+    })
+    expect(emptyCase()).toBe('reading')
+  })
+
+  it('says the selected file cannot be shown when its diff did not load', async () => {
+    await renderView('/repo', { status: featureWithStagedFile(), selectedFile: 'src/foo.ts' })
+    expect(emptyCase()).toBe('unreadable')
+  })
+})
+
+describe('GitFullView empty diff pane once status is read', () => {
+  it('offers a pick when changes exist and none is selected, and a refresh when none exist', async () => {
+    const { unmount } = await renderView('/repo', { status: featureWithStagedFile() })
+    expect(emptyCase()).toBe('pick')
+    unmount()
+    await renderView()
+    expect(emptyCase()).toBe('clean')
   })
 
   it('shows "No project selected" when repoRoot is null', async () => {

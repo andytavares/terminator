@@ -3,7 +3,7 @@ import { describe, it, beforeAll, beforeEach, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { FileDiff } from '../../src/schemas/git.schema'
 
-const noop = (): void => undefined
+const CLEAN = { kind: 'clean', onRefreshStatus: (): void => undefined } as const
 
 const makeDiff = (overrides: Partial<FileDiff> = {}): FileDiff => ({
   path: 'src/foo.ts',
@@ -26,7 +26,7 @@ async function renderDiff(
   props: { diff?: FileDiff; isStale?: boolean; onRefresh?: () => void } = {}
 ) {
   const { FileDiffView } = await import('../../src/components/FileDiffView')
-  return render(<FileDiffView diff={props.diff ?? makeDiff()} onRefreshStatus={noop} {...props} />)
+  return render(<FileDiffView diff={props.diff ?? makeDiff()} empty={CLEAN} {...props} />)
 }
 
 const mockRecordUsage = vi.fn()
@@ -45,7 +45,7 @@ beforeAll(async () => {
 describe('FileDiffView', () => {
   it('shows binary message for binary files', async () => {
     const { FileDiffView } = await import('../../src/components/FileDiffView')
-    render(<FileDiffView diff={makeDiff({ isBinary: true })} onRefreshStatus={noop} />)
+    render(<FileDiffView diff={makeDiff({ isBinary: true })} empty={CLEAN} />)
     expect(screen.getByText('Binary file — no diff available.')).toBeTruthy()
   })
 
@@ -192,15 +192,15 @@ describe('FileDiffView usage', () => {
   it('counts a diff once when it is opened, and again for another file', async () => {
     const { rerender } = await renderDiff()
     const { FileDiffView } = await import('../../src/components/FileDiffView')
-    rerender(<FileDiffView diff={makeDiff()} isStale onRefreshStatus={noop} />)
+    rerender(<FileDiffView diff={makeDiff()} isStale empty={CLEAN} />)
     expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('diff-open')
-    rerender(<FileDiffView diff={makeDiff({ path: 'src/bar.ts' })} onRefreshStatus={noop} />)
+    rerender(<FileDiffView diff={makeDiff({ path: 'src/bar.ts' })} empty={CLEAN} />)
     expect(mockRecordUsage).toHaveBeenCalledTimes(2)
   })
 
   it('counts nothing while no file is selected', async () => {
     const { FileDiffView } = await import('../../src/components/FileDiffView')
-    render(<FileDiffView diff={null} onRefreshStatus={noop} />)
+    render(<FileDiffView diff={null} empty={CLEAN} />)
     expect(mockRecordUsage).not.toHaveBeenCalled()
   })
 })
@@ -213,8 +213,7 @@ describe('FileDiffView empty state', () => {
       return (
         <FileDiffView
           diff={opened ? makeDiff() : null}
-          onOpenFirstChange={() => setOpened(true)}
-          onRefreshStatus={noop}
+          empty={{ kind: 'pick', onOpenFirstChange: () => setOpened(true) }}
         />
       )
     }
@@ -228,8 +227,26 @@ describe('FileDiffView empty state', () => {
   it('offers a refresh when nothing has changed', async () => {
     const { FileDiffView } = await import('../../src/components/FileDiffView')
     const onRefreshStatus = vi.fn()
-    render(<FileDiffView diff={null} onRefreshStatus={onRefreshStatus} />)
+    render(<FileDiffView diff={null} empty={{ kind: 'clean', onRefreshStatus }} />)
     expect(screen.getByText('No changes')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    expect(onRefreshStatus).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('FileDiffView while no diff is shown for the selection', () => {
+  it('shows a quiet reading line with no action while the diff loads', async () => {
+    const { FileDiffView } = await import('../../src/components/FileDiffView')
+    render(<FileDiffView diff={null} empty={{ kind: 'reading' }} />)
+    expect(screen.getByText('Reading changes…')).toBeTruthy()
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('says the selected file cannot be shown and offers a refresh', async () => {
+    const { FileDiffView } = await import('../../src/components/FileDiffView')
+    const onRefreshStatus = vi.fn()
+    render(<FileDiffView diff={null} empty={{ kind: 'unreadable', onRefreshStatus }} />)
+    expect(screen.getByText("This file's changes cannot be shown")).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
     expect(onRefreshStatus).toHaveBeenCalledTimes(1)
   })

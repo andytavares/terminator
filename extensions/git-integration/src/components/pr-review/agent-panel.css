@@ -14,7 +14,9 @@
 
 .ap-panel h5 {
   margin: 0;
-  font: 600 var(--tm-font-size-sm) / 1.2 inherit;
+  font-weight: 600;
+  font-size: var(--tm-font-size-sm);
+  line-height: 1.2;
   display: flex;
   gap: 8px;
   align-items: center;
@@ -28,7 +30,9 @@
 }
 
 .ap-header-title {
-  font: 600 var(--tm-font-size-sm) / 1.2 inherit;
+  font-weight: 600;
+  font-size: var(--tm-font-size-sm);
+  line-height: 1.2;
   color: var(--tm-text-primary);
 }
 

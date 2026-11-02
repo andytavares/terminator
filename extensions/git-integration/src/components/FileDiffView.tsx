@@ -13,11 +13,15 @@ interface FileDiffViewProps {
   diff: FileDiff | null
   isStale?: boolean
   onRefresh?: () => void
-  /** Present when the branch has a changed file to show; the empty state offers it. */
-  onOpenFirstChange?: () => void
-  /** Reads the branch's status again, for the empty state when nothing has changed. */
-  onRefreshStatus: () => void
+  /** What the pane says while no diff is shown. */
+  empty: DiffEmptyCase
 }
+
+/** Why no diff is shown: still reading, a change to pick, none at all, or the selection failed. */
+export type DiffEmptyCase =
+  | { kind: 'reading' }
+  | { kind: 'pick'; onOpenFirstChange: () => void }
+  | { kind: 'clean' | 'unreadable'; onRefreshStatus: () => void }
 
 /** What a diff on screen needs: the empty-state actions belong to the empty case only. */
 type ShownDiffProps = Pick<FileDiffViewProps, 'isStale' | 'onRefresh'> & { diff: FileDiff }
@@ -307,23 +311,33 @@ function LoadedDiff(props: ShownDiffProps & { view: ViewState }) {
   )
 }
 
-/** What the pane says while no diff is shown: pick a change, or none exists. */
-function NoDiff(props: FileDiffViewProps): React.JSX.Element {
-  const { onOpenFirstChange, onRefreshStatus } = props
-  const empty = onOpenFirstChange
-    ? {
-        heading: 'No file selected',
-        description: 'Pick a changed file on the right to see what changed in it.',
-        actions: [{ label: 'Open the first change', onSelect: onOpenFirstChange }] as const,
-      }
-    : {
-        heading: 'No changes',
-        description: 'Edit a file in this branch and it shows here.',
-        actions: [{ label: 'Refresh', onSelect: onRefreshStatus }] as const,
-      }
+const EMPTY_TEXT = {
+  pick: ['No file selected', 'Pick a changed file on the right to see what changed in it.'],
+  clean: ['No changes', 'Edit a file in this branch and it shows here.'],
+  unreadable: [
+    "This file's changes cannot be shown",
+    'It may have changed since the list was read. Refresh to read it again.',
+  ],
+} as const
+
+/** What the pane says while no diff is shown. */
+function NoDiff({ empty }: { empty: DiffEmptyCase }): React.JSX.Element {
+  if (empty.kind === 'reading') {
+    return <div className="file-diff-view file-diff-view--empty">Reading changes…</div>
+  }
+  const [heading, description] = EMPTY_TEXT[empty.kind]
+  const action =
+    empty.kind === 'pick'
+      ? { label: 'Open the first change', onSelect: empty.onOpenFirstChange }
+      : { label: 'Refresh', onSelect: empty.onRefreshStatus }
   return (
     <div className="file-diff-view file-diff-view--empty">
-      <EmptyState icon={FileDiffIcon} {...empty} />
+      <EmptyState
+        icon={FileDiffIcon}
+        heading={heading}
+        description={description}
+        actions={[action]}
+      />
     </div>
   )
 }
@@ -338,7 +352,7 @@ export function FileDiffView(props: FileDiffViewProps): React.JSX.Element {
     if (shownPath) recordUsage('diff-open')
   }, [shownPath])
   if (!diff) {
-    return <NoDiff {...props} />
+    return <NoDiff empty={props.empty} />
   }
   if (diff.isBinary) {
     return (
