@@ -99,4 +99,3 @@ export { useCloseOnOutsidePress } from './useCloseOnOutsidePress'
 
 export { DiffView, buildSplitRows, linesFromTexts } from './DiffView'
 export type { SplitRow, DiffViewHunk, DiffViewLine, DiffViewProps } from './DiffView'
-export { extensionOf, highlight, hljs } from './highlight'

@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react'
-import { highlight } from './highlight'
 
 /** One line of a diff. Plain data, so any source (git, ACP old and new text) can fill it. */
 export interface DiffViewLine {
@@ -16,8 +15,9 @@ export interface DiffViewHunk {
 
 export interface DiffViewProps {
   hunks: DiffViewHunk[]
-  /** A highlight.js language or file extension; none shows plain, escaped text. */
-  language?: string
+  /** Turns a line into HTML, for syntax highlighting. It must escape what it does not mark up.
+   * Absent: plain, escaped text. The caller brings the highlighter, so this package bundles none. */
+  toHtml?: (code: string) => string
   layout?: 'unified' | 'split'
   /** Split layout only: the caller moves the divider and sets `--split-left` on a parent. */
   onDividerMouseDown?: (e: React.MouseEvent) => void
@@ -25,16 +25,21 @@ export interface DiffViewProps {
 
 // ── Unified view ──────────────────────────────────────────────────────────────
 
+type ToHtml = (code: string) => string
+
+function escapeHtml(code: string): string {
+  return code
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 const LINE_PREFIX: Record<DiffViewLine['type'], string> = { add: '+', remove: '-', context: ' ' }
 
-function UnifiedRow({
-  line,
-  lang,
-}: {
-  line: DiffViewLine
-  lang: string | undefined
-}): React.JSX.Element {
-  const html = useMemo(() => highlight(line.content, lang), [line.content, lang])
+function UnifiedRow({ line, toHtml }: { line: DiffViewLine; toHtml: ToHtml }): React.JSX.Element {
+  const html = useMemo(() => toHtml(line.content), [line.content, toHtml])
   return (
     <tr className={`diff-line diff-line--${line.type}`}>
       <td className="diff-line__old-num">{line.oldLineNumber ?? ''}</td>
@@ -49,7 +54,7 @@ function UnifiedRow({
 
 interface TableProps {
   hunks: DiffViewHunk[]
-  lang: string | undefined
+  toHtml: ToHtml
 }
 
 function FileHunkHeader(props: { header: string; colSpan: number }) {
@@ -62,7 +67,7 @@ function FileHunkHeader(props: { header: string; colSpan: number }) {
   )
 }
 
-function UnifiedTable({ hunks, lang }: TableProps): React.JSX.Element {
+function UnifiedTable({ hunks, toHtml }: TableProps): React.JSX.Element {
   return (
     <table className="diff-table">
       <tbody>
@@ -70,7 +75,7 @@ function UnifiedTable({ hunks, lang }: TableProps): React.JSX.Element {
           <React.Fragment key={hi}>
             <FileHunkHeader header={hunk.header} colSpan={4} />
             {hunk.lines.map((line, li) => (
-              <UnifiedRow key={`${hi}-${li}`} line={line} lang={lang} />
+              <UnifiedRow key={`${hi}-${li}`} line={line} toHtml={toHtml} />
             ))}
           </React.Fragment>
         ))}
@@ -138,9 +143,9 @@ function sideLineNumber(line: DiffViewLine, side: SplitSide): number | null | un
   return line.newLineNumber
 }
 
-function SplitCode(props: { line: DiffViewLine; side: SplitSide; lang: string | undefined }) {
-  const { line, side, lang } = props
-  const html = useMemo(() => highlight(line.content, lang), [line, lang])
+function SplitCode(props: { line: DiffViewLine; side: SplitSide; toHtml: ToHtml }) {
+  const { line, side, toHtml } = props
+  const html = useMemo(() => toHtml(line.content), [line, toHtml])
   return (
     <>
       <td className="diff-line__old-num">{sideLineNumber(line, side) ?? ''}</td>
@@ -151,12 +156,8 @@ function SplitCode(props: { line: DiffViewLine; side: SplitSide; lang: string | 
   )
 }
 
-function SplitCell(props: {
-  line: DiffViewLine | null
-  side: SplitSide
-  lang: string | undefined
-}) {
-  if (props.line) return <SplitCode line={props.line} side={props.side} lang={props.lang} />
+function SplitCell(props: { line: DiffViewLine | null; side: SplitSide; toHtml: ToHtml }) {
+  if (props.line) return <SplitCode line={props.line} side={props.side} toHtml={props.toHtml} />
   return (
     <>
       <td className="diff-line__old-num" />
@@ -182,20 +183,20 @@ function rowSides(row: SplitRow): {
 
 function SplitTableRow(props: {
   row: SplitRow
-  lang: string | undefined
+  toHtml: ToHtml
   onDividerMouseDown: SplitTableProps['onDividerMouseDown']
 }) {
   const { oldLine, newLine, cls } = rowSides(props.row)
   return (
     <tr className={cls}>
-      <SplitCell line={oldLine} side="old" lang={props.lang} />
+      <SplitCell line={oldLine} side="old" toHtml={props.toHtml} />
       <td className="diff-table__split-divider" onMouseDown={props.onDividerMouseDown} />
-      <SplitCell line={newLine} side="new" lang={props.lang} />
+      <SplitCell line={newLine} side="new" toHtml={props.toHtml} />
     </tr>
   )
 }
 
-function SplitTable({ hunks, lang, onDividerMouseDown }: SplitTableProps) {
+function SplitTable({ hunks, toHtml, onDividerMouseDown }: SplitTableProps) {
   return (
     <table className="diff-table diff-table--split">
       <tbody>
@@ -206,7 +207,7 @@ function SplitTable({ hunks, lang, onDividerMouseDown }: SplitTableProps) {
               <SplitTableRow
                 key={ri}
                 row={row}
-                lang={lang}
+                toHtml={toHtml}
                 onDividerMouseDown={onDividerMouseDown}
               />
             ))}
@@ -217,18 +218,23 @@ function SplitTable({ hunks, lang, onDividerMouseDown }: SplitTableProps) {
   )
 }
 
-/** The rows of a diff as a unified or split table. Only `highlight` output reaches the HTML. */
+/** The rows of a diff as a unified or split table. Only `toHtml` or escaped text reaches the HTML. */
 export function DiffView(props: DiffViewProps): React.JSX.Element {
-  const { hunks, language, layout = 'unified', onDividerMouseDown = () => undefined } = props
+  const {
+    hunks,
+    toHtml = escapeHtml,
+    layout = 'unified',
+    onDividerMouseDown = () => undefined,
+  } = props
   if (layout === 'split') {
-    return <SplitTable hunks={hunks} lang={language} onDividerMouseDown={onDividerMouseDown} />
+    return <SplitTable hunks={hunks} toHtml={toHtml} onDividerMouseDown={onDividerMouseDown} />
   }
-  return <UnifiedTable hunks={hunks} lang={language} />
+  return <UnifiedTable hunks={hunks} toHtml={toHtml} />
 }
 
 /** Longest-common-subsequence lengths: `lcs[i][j]` is for the tails `a[i..]` and `b[j..]`. */
 function lcsTable(a: string[], b: string[]): number[][] {
-  // shortcut: O(n*m) table, fine for one tool call's file; use a Myers diff for large files.
+  // shortcut: O(n*m) table, capped by MAX_COMPARED_CELLS; a Myers diff would compare larger files.
   const lcs = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0))
   for (let i = a.length - 1; i >= 0; i--) {
     for (let j = b.length - 1; j >= 0; j--) {
@@ -257,8 +263,33 @@ function lineDiffOps(a: string[], b: string[]): DiffViewLine[] {
   return lines
 }
 
-/** The lines of a change from its old and new text; `null` old text means a new file. */
+/** The lines of a change from its old and new text. `null` old text shows every line as added;
+ *  it does not mean a new file (an agent sends it for an inserted snippet too). */
 export function linesFromTexts(oldText: string | null, newText: string): DiffViewLine[] {
   const split = (text: string): string[] => text.split('\n')
-  return lineDiffOps(oldText === null ? [] : split(oldText), split(newText))
+  const before = oldText === null ? [] : split(oldText)
+  const after = split(newText)
+  if (before.length * after.length > MAX_COMPARED_CELLS) return replacedWhole(before, after)
+  return lineDiffOps(before, after)
+}
+
+/** Past this many line pairs the table costs too much for a view; ~700 lines against ~700. */
+const MAX_COMPARED_CELLS = 500_000
+
+/** Every old line removed, then every new line added: what a change too large to compare shows. */
+function replacedWhole(before: string[], after: string[]): DiffViewLine[] {
+  return [
+    ...before.map((content, i) => ({
+      type: 'remove' as const,
+      content,
+      oldLineNumber: i + 1,
+      newLineNumber: null,
+    })),
+    ...after.map((content, i) => ({
+      type: 'add' as const,
+      content,
+      oldLineNumber: null,
+      newLineNumber: i + 1,
+    })),
+  ]
 }

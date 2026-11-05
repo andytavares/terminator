@@ -57,8 +57,9 @@ describe('DiffView highlighting', () => {
     )
   })
 
-  it('highlights a line when the language is known', () => {
-    const { container } = render(<DiffView hunks={HUNKS} language="ts" />)
+  it('draws each line through the given toHtml', () => {
+    const toHtml = (code: string) => `<span class="hljs-keyword">${code.length}</span>`
+    const { container } = render(<DiffView hunks={HUNKS} toHtml={toHtml} />)
     expect(container.querySelector('.hljs-keyword')).toBeTruthy()
   })
 })
@@ -69,6 +70,20 @@ describe('linesFromTexts', () => {
       { type: 'add', content: 'a', oldLineNumber: null, newLineNumber: 1 },
       { type: 'add', content: 'b', oldLineNumber: null, newLineNumber: 2 },
     ])
+  })
+
+  it('shows a change too large to compare line by line as removed then added, at once', () => {
+    // Every other line is shared: compared line by line, those would show as unchanged context.
+    const old = Array.from({ length: 2000 }, (_, i) => (i % 2 ? `shared ${i}` : `old ${i}`)).join(
+      '\n'
+    )
+    const next = Array.from({ length: 2000 }, (_, i) => (i % 2 ? `shared ${i}` : `new ${i}`)).join(
+      '\n'
+    )
+    const lines = linesFromTexts(old, next)
+    expect(lines).toHaveLength(4000)
+    expect(lines.slice(0, 2000).every((line) => line.type === 'remove')).toBe(true)
+    expect(lines.slice(2000).every((line) => line.type === 'add')).toBe(true)
   })
 
   it('marks a changed middle line removed then added', () => {

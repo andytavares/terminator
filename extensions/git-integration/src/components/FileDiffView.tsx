@@ -4,7 +4,7 @@ import { Button, DiffView, EmptyState, SegmentedControl } from '@terminator/exte
 import type { FileDiff } from '../schemas/git.schema'
 import { choose } from './text'
 import { useSplitDrag } from '../hooks/useSplitDrag'
-import { extensionOf } from '../utils/syntax'
+import { extensionOf, highlight } from '../utils/syntax'
 import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 export { buildSplitRows } from '@terminator/extension-ui'
@@ -108,7 +108,7 @@ function FileDiffBody({ diff, view }: { diff: FileDiff; view: ViewState }) {
     >
       <DiffView
         hunks={diff.hunks}
-        language={lang}
+        toHtml={(code) => highlight(code, lang)}
         layout={viewMode}
         onDividerMouseDown={onDividerMouseDown}
       />
