@@ -1,0 +1,19 @@
+packages/extension-sdk/types/api.d.ts
+  s_a5e467e4da5497::t_a6353bae278d78 346-347,349-350
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "581afb4d876ad01e31566ece62bd8ef9b47b41fb",
+  "prompts": {},
+  "sessions": {
+    "s_a5e467e4da5497": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d038af6c-7a59-4002-9e1a-b5c973e92542",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
