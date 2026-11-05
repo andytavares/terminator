@@ -1,9 +1,19 @@
-import React, { useEffect, useState } from 'react'
-import { Square } from 'lucide-react'
-import { Button } from '@terminator/extension-ui'
+import React, { useEffect, useRef } from 'react'
+import { Button, DiffView, linesFromTexts } from '@terminator/extension-ui'
 import type { AgentPermissionAsk } from '@terminator/extension-sdk'
 import { useSessionStore } from '../../stores/session.store'
-import { inputSummary, type ToolEntry, type Transcript, type Usage } from './fold-updates'
+import {
+  inputSummary,
+  relativeTo,
+  splitTurns,
+  type TranscriptEntry,
+  type Turn,
+  type ToolEntry,
+  type Transcript,
+  type Usage,
+} from './fold-updates'
+import { Composer } from './Composer'
+import { FindBar, Highlighted, firstMatches, noFind, useFind, type FindState } from './find'
 import { useAgentTranscript } from './use-agent-transcript'
 import { recordUse } from '../../usage/record'
 import './AgentView.css'
@@ -46,20 +56,49 @@ function AskBand({
   )
 }
 
-function ToolCall({ tool }: { tool: ToolEntry }): React.JSX.Element {
+function ToolCall({ tool, cwd }: { tool: ToolEntry; cwd: string }): React.JSX.Element {
   return (
     <div className="agent-tool">
       <div className="agent-tool__head">
         <span className="agent-tool__title">{tool.title}</span>
         {tool.status && <span className="agent-tool__status">{tool.status.replace('_', ' ')}</span>}
-        {tool.detail && <code className="agent-tool__detail">{tool.detail}</code>}
+        {tool.detail && <code className="agent-tool__detail">{relativeTo(cwd, tool.detail)}</code>}
       </div>
-      {tool.output.map((out, i) => (
-        <details key={i} className="agent-tool__output">
-          <summary>{out.kind === 'diff' ? `Changes to ${out.path}` : 'Output'}</summary>
-          <pre>{out.kind === 'diff' ? `${out.oldText}\n${out.newText}` : out.text}</pre>
-        </details>
-      ))}
+      {tool.output.map((out, i) =>
+        out.kind === 'diff' ? (
+          <details key={i} className="agent-tool__output" open>
+            <summary>
+              <span className="agent-tool__summary">{relativeTo(cwd, out.path)}</span>
+            </summary>
+            <DiffView
+              language={out.path.split('.').pop()}
+              hunks={[{ header: '', lines: linesFromTexts(out.oldText, out.newText) }]}
+            />
+          </details>
+        ) : (
+          <details key={i} className="agent-tool__output">
+            <summary>Output</summary>
+            <pre>{out.text}</pre>
+          </details>
+        )
+      )}
+    </div>
+  )
+}
+
+function ChangesCard({ turn, cwd }: { turn: Turn; cwd: string }): React.JSX.Element {
+  return (
+    <div role="group" aria-label="Changed in this turn" className="agent-changes">
+      <strong>Changed in this turn</strong>
+      <ul>
+        {turn.changes.map((file) => (
+          <li key={file.path} className="agent-changes__file">
+            <span className="agent-changes__path">{relativeTo(cwd, file.path)}</span>
+            <span className="agent-changes__added">{`+${file.added}`}</span>
+            <span className="agent-changes__removed">{`−${file.removed}`}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
@@ -76,79 +115,89 @@ function PlanList({ plan }: { plan: NonNullable<Transcript['plan']> }): React.JS
   )
 }
 
-function TranscriptLog({ transcript }: { transcript: Transcript }): React.JSX.Element {
+function TurnView(props: {
+  turn: Turn
+  cwd: string
+  find: FindState
+  firstMatch: Map<TranscriptEntry, number>
+}): React.JSX.Element {
+  const { turn, cwd, find } = props
   return (
-    <div role="log" aria-live="polite" aria-label="Agent transcript" className="agent-view__log">
-      {transcript.entries.map((entry, i) =>
+    <>
+      {turn.entries.map((entry, i) =>
         entry.kind === 'tool' ? (
-          <ToolCall key={entry.toolCallId} tool={entry} />
+          <ToolCall key={entry.toolCallId} tool={entry} cwd={cwd} />
         ) : (
           <p key={i} className={`agent-message agent-message--${entry.role}`}>
-            {entry.text}
+            <Highlighted
+              text={entry.text}
+              query={find.query}
+              first={props.firstMatch.get(entry) ?? 0}
+              current={find.current}
+            />
           </p>
         )
       )}
+      {turn.changes.length > 0 && <ChangesCard turn={turn} cwd={cwd} />}
+    </>
+  )
+}
+
+function TranscriptLog(props: {
+  transcript: Transcript
+  cwd: string
+  find: FindState
+}): React.JSX.Element {
+  const { transcript, cwd, find } = props
+  const log = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    log.current?.querySelector('.agent-find__match--current')?.scrollIntoView?.({ block: 'center' })
+  }, [find])
+  const firstMatch = firstMatches(transcript.entries, find.query)
+  return (
+    <div
+      ref={log}
+      role="log"
+      aria-live="polite"
+      aria-label="Agent transcript"
+      className="agent-view__log"
+    >
+      {splitTurns(transcript.entries).map((turn, i) => (
+        <TurnView key={i} turn={turn} cwd={cwd} find={find} firstMatch={firstMatch} />
+      ))}
       {transcript.plan && <PlanList plan={transcript.plan} />}
     </div>
   )
 }
 
-interface ComposerProps {
-  sessionId: string
-  disabled: boolean
-  running: boolean
-}
-
-/** Enter sends; Shift+Enter stays a newline. */
-function sendOnEnter(e: React.KeyboardEvent, send: () => void): void {
-  if (e.key !== 'Enter' || e.shiftKey) return
-  e.preventDefault()
-  send()
-}
-
-function Composer({ sessionId, disabled, running }: ComposerProps): React.JSX.Element {
-  const [draft, setDraft] = useState('')
-  const send = (): void => {
-    const text = draft.trim()
-    if (!text) return
-    setDraft('')
-    void window.electronAPI.agents.prompt({ sessionId, text })
-  }
-  return (
-    <div className="agent-composer">
-      <textarea
-        aria-label="Message the agent"
-        className="agent-composer__input"
-        rows={2}
-        value={draft}
-        disabled={disabled || running}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => sendOnEnter(e, send)}
-      />
-      {running && !disabled && (
-        <Button icon={Square} onClick={() => void window.electronAPI.agents.cancel({ sessionId })}>
-          Stop
-        </Button>
-      )}
-    </div>
-  )
+/** Cmd or Ctrl plus F, inside the agent tab only. */
+function isFindKey(e: React.KeyboardEvent): boolean {
+  return (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f'
 }
 
 export function AgentView({ sessionId }: { sessionId: string }): React.JSX.Element {
   const { transcript, asks, exited } = useAgentTranscript(sessionId)
   const running = useSessionStore((s) => s.sessions.get(sessionId)?.agentTurn === true)
+  const cwd = useSessionStore((s) => s.sessions.get(sessionId)?.cwd ?? '')
+  const controls = useFind(transcript)
   useEffect(() => recordUse('core.agent.view', 'shown'), [sessionId])
   const answer = (requestId: string, optionId: string): void =>
     void window.electronAPI.agents.answer({ sessionId, requestId, optionId })
+  const onKeyDown = (e: React.KeyboardEvent): void => {
+    if (!isFindKey(e)) return
+    e.preventDefault()
+    controls.open()
+  }
   return (
-    <section className="agent-view" aria-label="Agent session">
+    <section className="agent-view" aria-label="Agent session" onKeyDown={onKeyDown}>
+      {controls.find && <FindBar find={controls.find} controls={controls} />}
       {asks.map((ask) => (
         <AskBand key={ask.requestId} ask={ask} onAnswer={(id) => answer(ask.requestId, id)} />
       ))}
       {transcript.usage && (
         <div className="agent-view__usage">{contextLabel(transcript.usage)}</div>
       )}
-      <TranscriptLog transcript={transcript} />
+      <TranscriptLog transcript={transcript} cwd={cwd} find={controls.find ?? noFind} />
       {exited && <p className="agent-view__exited">The agent exited.</p>}
       <Composer sessionId={sessionId} disabled={exited} running={running} />
     </section>

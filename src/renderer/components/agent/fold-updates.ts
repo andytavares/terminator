@@ -1,9 +1,10 @@
 import type { AgentUpdate } from '@terminator/extension-sdk'
+import { linesFromTexts } from '@terminator/extension-ui'
 
 type MessageRole = 'agent' | 'thought' | 'user'
 
 type ToolOutput =
-  | { kind: 'diff'; path: string; oldText: string; newText: string }
+  | { kind: 'diff'; path: string; oldText: string | null; newText: string }
   | { kind: 'text'; text: string }
 
 export type ToolEntry = {
@@ -17,7 +18,7 @@ export type ToolEntry = {
   output: ToolOutput[]
 }
 
-type TranscriptEntry = { kind: 'message'; role: MessageRole; text: string } | ToolEntry
+export type TranscriptEntry = { kind: 'message'; role: MessageRole; text: string } | ToolEntry
 
 interface PlanItem {
   content: string
@@ -59,7 +60,7 @@ function diffOutput(item: Json): ToolOutput {
   return {
     kind: 'diff',
     path: asString(item.path) ?? '',
-    oldText: asString(item.oldText) ?? '',
+    oldText: asString(item.oldText),
     newText: asString(item.newText) ?? '',
   }
 }
@@ -150,4 +151,49 @@ export function foldUpdates(transcript: Transcript, update: AgentUpdate): Transc
     default:
       return transcript
   }
+}
+
+/** A path relative to the session directory; a path outside it stays as it is. */
+export function relativeTo(cwd: string, path: string): string {
+  return cwd && path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : path
+}
+
+export interface ChangedFile {
+  path: string
+  added: number
+  removed: number
+}
+
+export interface Turn {
+  entries: TranscriptEntry[]
+  /** One row per file, however many edits touched it. */
+  changes: ChangedFile[]
+}
+
+function changesOf(entries: TranscriptEntry[]): ChangedFile[] {
+  const byPath = new Map<string, ChangedFile>()
+  for (const entry of entries) {
+    if (entry.kind !== 'tool') continue
+    for (const out of entry.output) {
+      if (out.kind !== 'diff') continue
+      const file = byPath.get(out.path) ?? { path: out.path, added: 0, removed: 0 }
+      for (const line of linesFromTexts(out.oldText, out.newText)) {
+        if (line.type === 'add') file.added++
+        if (line.type === 'remove') file.removed++
+      }
+      byPath.set(out.path, file)
+    }
+  }
+  return [...byPath.values()]
+}
+
+/** The entries cut into turns: a turn starts at each message the person sent. */
+export function splitTurns(entries: TranscriptEntry[]): Turn[] {
+  const groups: TranscriptEntry[][] = []
+  for (const entry of entries) {
+    const startsTurn = entry.kind === 'message' && entry.role === 'user'
+    if (startsTurn || groups.length === 0) groups.push([entry])
+    else groups[groups.length - 1].push(entry)
+  }
+  return groups.map((group) => ({ entries: group, changes: changesOf(group) }))
 }
