@@ -91,3 +91,28 @@
   overflow: auto;
   white-space: pre;
 }
+
+.wt-report {
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  padding: var(--tm-space-3);
+}
+
+.wt-report-title {
+  margin: 0 0 var(--tm-space-2);
+  font-size: var(--tm-font-size-md);
+}
+
+.wt-report-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wt-report-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) auto minmax(0, 3fr);
+  align-items: center;
+  gap: var(--tm-space-3);
+  padding: var(--tm-space-1) 0;
+}

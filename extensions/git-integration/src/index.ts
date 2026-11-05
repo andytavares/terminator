@@ -7,7 +7,13 @@ import type {
   SettingDefinition,
 } from '@terminator/extension-sdk'
 import { registerGitExtensionHandlers } from './ipc/git.ipc.js'
-import { gitEnabled, gitEnabledAnywhere, gitSettings, MAX_DISPLAYED_FILES } from './git-settings.js'
+import {
+  cleanupSettings,
+  gitEnabled,
+  gitEnabledAnywhere,
+  gitSettings,
+  MAX_DISPLAYED_FILES,
+} from './git-settings.js'
 import { gatedByWorkspace } from './ipc/workspace-switch.js'
 import { bindWorkspaceRoots } from './ipc/repo-root.js'
 import { projectForCheckout } from './review/terminal-project.js'
@@ -16,7 +22,7 @@ import { registerGithubHandlers, type GithubHandlerOptions } from './ipc/github.
 import { registerWorktreesHandlers } from './ipc/worktrees.ipc.js'
 import { registerReviewAgentHandlers } from './ipc/review-agent.ipc.js'
 import { consumePendingViewRequest, registerQuickActionCommands } from './commands.js'
-import { createHomePublisher } from './home/publisher.js'
+import { createHomePublisher, type HomePublisher } from './home/publisher.js'
 import { remoteAccessFor } from './remote-access.js'
 import { bindShell } from './shell/run-git.js'
 import { openStorageDirectory } from './storage-directory.js'
@@ -105,6 +111,58 @@ const SETTINGS: Record<string, SettingDefinition> = {
     default: false,
     workspaceScoped: true,
   },
+  'terminator.git-integration.git.autoPullDefault': {
+    type: 'boolean',
+    label: 'Keep the default branch up to date',
+    description:
+      'Fast-forward the default branch when its checkout is clean and has no local commits. Never merges or rebases.',
+    default: false,
+  },
+  'terminator.git-integration.git.merge.stripAgentCredits': {
+    type: 'boolean',
+    label: 'Remove agent credits when merging',
+    description: 'Merge stack drops Co-Authored-By lines from known agents in the squash message.',
+    default: false,
+  },
+  'terminator.git-integration.worktrees.removeAfterMerge': {
+    type: 'boolean',
+    label: 'Remove worktrees after their pull request merges',
+    description:
+      'Runs on each Worktrees refresh. A worktree with work you would lose is kept, see below.',
+    default: false,
+  },
+  'terminator.git-integration.worktrees.idleDays': {
+    type: 'number',
+    label: 'Remove worktrees idle for this many days',
+    description: '0 turns this off. Idle means no commit and no file change.',
+    default: 0,
+    min: 0,
+    max: 365,
+  },
+  'terminator.git-integration.worktrees.removeUnchanged': {
+    type: 'boolean',
+    label: 'Remove worktrees with no commits of their own',
+    description: 'A branch with no commits beyond the default branch.',
+    default: false,
+  },
+  'terminator.git-integration.worktrees.removeWithClosedSessions': {
+    type: 'boolean',
+    label: 'Remove worktrees whose terminals are closed',
+    description: 'A worktree with an open terminal is always kept.',
+    default: false,
+  },
+  'terminator.git-integration.worktrees.keep': {
+    type: 'enum',
+    label: 'Keep a worktree that has',
+    description: 'What counts as work you would lose.',
+    options: ['uncommitted', 'any-local', 'edited-tracked'],
+    default: 'uncommitted',
+  },
+  'terminator.git-integration.prWatch.enabled': {
+    type: 'boolean',
+    label: 'Wake an agent when its pull request needs it',
+    default: true,
+  },
   'terminator.git-integration.git.maxDisplayedFiles': {
     type: 'number',
     label: 'Max displayed changed files',
@@ -175,8 +233,12 @@ interface ChannelRoots {
   storage: string
 }
 
-function registerGithub(api: ExtensionAPI, registerFn: RegisterFn, roots: ChannelRoots) {
-  const home = createHomePublisher(api, roots.storage)
+interface GithubWiring extends ChannelRoots {
+  home: HomePublisher
+}
+
+function registerGithub(api: ExtensionAPI, registerFn: RegisterFn, roots: GithubWiring) {
+  const { home } = roots
   const access = {
     github: api.github,
     getToken: () => api.settings.get<string>(`${SETTING}.git.githubToken`) ?? '',
@@ -210,9 +272,13 @@ function registerChannels(api: ExtensionAPI, roots: ChannelRoots): void {
     disposables.push(api.ipc.registerHandler(gated, remoteAccessFor(spec.channel)))
   }
   registerGitExtensionHandlers(registerFn, gitSettings(api))
-  registerWorktreesHandlers(registerFn, api)
+  const home = createHomePublisher(api, roots.storage, roots.projectRoots)
+  registerWorktreesHandlers(registerFn, api, {
+    settings: () => cleanupSettings(api),
+    mergedHeads: home.mergedHeads,
+  })
   registerFn(pendingRequestChannel())
-  registerGithub(api, registerFn, roots)
+  registerGithub(api, registerFn, { ...roots, home })
   // Read-only review agent: over ACP (`api.agents`) in a detached PR-head worktree.
   const reviewAgent = registerReviewAgentHandlers(registerFn, {
     getSetting: (key) => api.settings.get(key),

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Trash2 } from 'lucide-react'
 import {
   Button,
   Checkbox,
@@ -12,6 +12,7 @@ import {
 import { gitAPI } from '../../api/git'
 import type { LocalInventoryRow } from '../../git/local-inventory'
 import type { RemoveItem, RemoveResult } from '../../git/remove-local'
+import type { CleanupReport } from '../../ipc/worktrees.ipc'
 import './worktrees.css'
 import { recordUsage } from '@terminator/extension-sdk/renderer'
 
@@ -63,6 +64,7 @@ interface TableProps {
 
 interface ToolbarProps {
   selectedCount: number
+  onCleanup: () => void
   onSelectStale: () => void
   onRemove: () => void
   onRefresh: () => void
@@ -82,6 +84,9 @@ interface RemovalState {
   onRemoved: (results: RemoveResult[]) => void
 }
 
+/** What the last cleanup did; null before any run changed something. */
+type ReportState = CleanupReport | null
+
 interface BodyProps {
   rows: ViewRow[]
   repoRoot: string
@@ -90,6 +95,8 @@ interface BodyProps {
 }
 
 interface LoadedViewProps {
+  report: ReportState
+  onCleanup: () => void
   rows: ViewRow[]
   repoRoot: string
   selection: Selection
@@ -190,30 +197,43 @@ async function loadRows(repoRoot: string): Promise<ViewRow[]> {
 }
 
 interface RowsState {
+  report: ReportState
+  setReport: (report: ReportState) => void
   rows: ViewRow[]
   setRows: React.Dispatch<React.SetStateAction<ViewRow[]>>
   reload: () => Promise<void>
 }
 
-/** The rows of `repoRoot`, loaded on mount and reloaded on demand. */
+/** Runs the cleanup rules, then loads the rows they left; the report is kept only when a rule acted. */
+async function cleanAndLoad(repoRoot: string): Promise<{ rows: ViewRow[]; report: ReportState }> {
+  const report = await gitAPI.cleanupRun(repoRoot).catch(() => null)
+  const acted = (report?.removed?.length ?? 0) + (report?.kept?.length ?? 0) > 0
+  return { rows: await loadRows(repoRoot), report: acted ? (report as CleanupReport) : null }
+}
+
+/** The rows of `repoRoot`, loaded on mount and reloaded on demand; each load runs the cleanup rules first. */
 function useInventoryRows(repoRoot: string | null): RowsState {
   const [rows, setRows] = useState<ViewRow[]>([])
+  const [report, setReport] = useState<ReportState>(null)
   const reload = useCallback(async () => {
     if (!repoRoot) return
-    const loaded = await loadRows(repoRoot)
-    setRows(loaded)
+    const loaded = await cleanAndLoad(repoRoot)
+    setRows(loaded.rows)
+    if (loaded.report) setReport(loaded.report)
   }, [repoRoot])
   useEffect(() => {
     let alive = true
     if (!repoRoot) return undefined
-    void loadRows(repoRoot).then((loaded) => {
-      if (alive) setRows(loaded)
+    void cleanAndLoad(repoRoot).then((loaded) => {
+      if (!alive) return
+      setRows(loaded.rows)
+      setReport(loaded.report)
     })
     return () => {
       alive = false
     }
   }, [repoRoot])
-  return { rows, setRows, reload }
+  return { report, setReport, rows, setRows, reload }
 }
 
 /** Each failed removal's reason, keyed by the row it names. */
@@ -403,6 +423,9 @@ function Toolbar(props: ToolbarProps): React.JSX.Element {
   return (
     <div className="wt-toolbar">
       <span className="wt-toolbar-spacer" />
+      <Button variant="primary" size="sm" icon={Trash2} onClick={props.onCleanup}>
+        Clean up now
+      </Button>
       <Button variant="secondary" size="sm" onClick={props.onSelectStale}>
         Select stale
       </Button>
@@ -453,6 +476,18 @@ function useRemoval(
   return { removing, open: setRemoving, close: () => setRemoving(null), onRemoved }
 }
 
+/** "Clean up now": runs the rules, counts the use, shows what happened and reloads the rows. */
+async function cleanNow(
+  repoRoot: string,
+  setReport: (report: ReportState) => void,
+  reload: () => Promise<void>
+): Promise<void> {
+  const report = await gitAPI.cleanupRun(repoRoot).catch(() => null)
+  recordUsage('worktree-cleanup', report ? {} : { failed: true })
+  if (report) setReport({ removed: report.removed ?? [], kept: report.kept ?? [] })
+  await reload()
+}
+
 /** The table, or the empty state when only the main checkout is left. */
 function WorktreesBody(props: BodyProps): React.JSX.Element {
   if (props.rows.every((row) => row.isMain))
@@ -468,12 +503,51 @@ function WorktreesBody(props: BodyProps): React.JSX.Element {
   return <InventoryTable {...table} />
 }
 
+const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? '' : 's'}`
+
+function ReportRow(props: { entry: CleanupReport['kept'][number]; removed: boolean }) {
+  const { entry, removed } = props
+  return (
+    <li className="wt-report-row">
+      <span className="wt-mono">{entry.branch ?? entry.worktreePath}</span>
+      <Chip tone={removed ? 'good' : 'waiting'}>{removed ? 'removed' : 'kept'}</Chip>
+      <span className="wt-muted">{entry.reason}</span>
+    </li>
+  )
+}
+
+/** "Cleanup removed N worktrees and kept M", and a row per branch with its reason. */
+function CleanupReportView(props: { report: CleanupReport }): React.JSX.Element {
+  const { removed, kept } = props.report
+  return (
+    <section className="wt-report" aria-label="Cleanup report">
+      <h3 className="wt-report-title">
+        {`Cleanup removed ${plural(removed.length, 'worktree')} and kept ${kept.length}`}
+        <span className="wt-muted"> by your rules in Settings</span>
+      </h3>
+      <ul className="wt-report-list">
+        {removed.map((entry) => (
+          <ReportRow key={`r:${entry.branch ?? entry.worktreePath}`} entry={entry} removed />
+        ))}
+        {kept.map((entry) => (
+          <ReportRow
+            key={`k:${entry.branch ?? entry.worktreePath}`}
+            entry={entry}
+            removed={false}
+          />
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 /** The tab once a repository is named: toolbar, table and the removal dialog. */
 function LoadedView(props: LoadedViewProps): React.JSX.Element {
-  const { rows, repoRoot, selection, removal, onRefresh } = props
+  const { rows, repoRoot, selection, removal, onRefresh, report, onCleanup } = props
   const selectedRows = rows.filter((row) => selection.selected.has(rowKey(row)))
   const toolbar = {
     selectedCount: selectedRows.length,
+    onCleanup,
     onSelectStale: selection.selectStale,
     onRemove: () => removal.open(selectedRows),
     onRefresh,
@@ -482,6 +556,7 @@ function LoadedView(props: LoadedViewProps): React.JSX.Element {
   return (
     <div className="wt-view">
       <Toolbar {...toolbar} />
+      {report !== null && <CleanupReportView report={report} />}
       <WorktreesBody {...body} />
       {removal.removing !== null && (
         <RemoveDialog
@@ -497,7 +572,7 @@ function LoadedView(props: LoadedViewProps): React.JSX.Element {
 
 /** The Worktrees tab: every local branch and worktree, and the cleanup of the stale ones. */
 export function WorktreesView(props: { repoRoot: string | null }): React.JSX.Element {
-  const { rows, setRows, reload } = useInventoryRows(props.repoRoot)
+  const { rows, setRows, reload, report, setReport } = useInventoryRows(props.repoRoot)
   const selection = useSelection(rows)
   const removal = useRemoval(setRows, selection.clear, reload)
   if (!props.repoRoot)
@@ -509,6 +584,7 @@ export function WorktreesView(props: { repoRoot: string | null }): React.JSX.Ele
       />
     )
   const onRefresh = (): void => void reload()
-  const view = { rows, repoRoot: props.repoRoot, selection, removal, onRefresh }
+  const onCleanup = (): void => void cleanNow(props.repoRoot!, setReport, reload)
+  const view = { report, onCleanup, rows, repoRoot: props.repoRoot, selection, removal, onRefresh }
   return <LoadedView {...view} />
 }

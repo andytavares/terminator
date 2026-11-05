@@ -22,6 +22,8 @@ export interface LocalInventoryRow {
   prunable: boolean
   isAgent: boolean
   project: { id: string; name: string } | null
+  /** `git status --porcelain` of the worktree, split into tracked and untracked entries. */
+  changes?: { tracked: number; untracked: number }
 }
 
 /** The shell local-inventory runs against; the backend binds it to runGit and fs. */
@@ -274,7 +276,7 @@ export async function loadLocalInventory(
     ),
     shell.listProjects(),
   ])
-  return inventoryRows({
+  const rows = inventoryRows({
     repoRoot,
     worktrees,
     defaultBranch,
@@ -283,4 +285,26 @@ export async function loadLocalInventory(
     reflogOldest,
     projects,
   })
+  return withChanges(rows, shell)
+}
+
+/** Counts the lines of `git status --porcelain`: `??` is untracked, anything else is tracked. @internal */
+export function parseChanges(text: string): { tracked: number; untracked: number } {
+  const lines = text.split('\n').filter(Boolean)
+  const untracked = lines.filter((line) => line.startsWith('??')).length
+  return { tracked: lines.length - untracked, untracked }
+}
+
+/** Each row with a worktree gets its change counts; a folder git cannot read has none. */
+async function withChanges(
+  rows: LocalInventoryRow[],
+  shell: InventoryShell
+): Promise<LocalInventoryRow[]> {
+  return Promise.all(
+    rows.map(async (row) => {
+      if (row.worktreePath === null || row.prunable) return row
+      const status = await shell.exec(row.worktreePath, ['status', '--porcelain']).catch(() => null)
+      return status === null ? row : { ...row, changes: parseChanges(status) }
+    })
+  )
 }

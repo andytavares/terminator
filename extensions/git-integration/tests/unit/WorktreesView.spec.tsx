@@ -296,3 +296,42 @@ describe('WorktreesView — empty and refresh', () => {
     )
   })
 })
+
+const CLEANUP_REPORT = {
+  removed: [{ branch: 'feat/rate-limit', worktreePath: null, reason: 'Its pull request merged' }],
+  kept: [{ branch: 'feat/retry', worktreePath: null, reason: '2 uncommitted changes' }],
+}
+
+function stubCleanup(report: unknown) {
+  mockInvoke.mockImplementation((channel: string) => {
+    if (channel === 'git:local-inventory') return Promise.resolve({ rows: [MAIN, MERGED] })
+    if (channel === 'git:cleanup-run') return Promise.resolve(report)
+    return Promise.resolve({})
+  })
+  mockListSessions.mockResolvedValue([])
+}
+
+describe('WorktreesView — cleanup report', () => {
+  it('runs the rules on Clean up now, counts the use and lists each branch with its reason', async () => {
+    stubCleanup({ removed: [], kept: [] })
+    await renderWorktrees()
+    expect(screen.queryByRole('region', { name: 'Cleanup report' })).toBeNull()
+    stubCleanup(CLEANUP_REPORT)
+    fireEvent.click(screen.getByRole('button', { name: 'Clean up now' }))
+    const report = await screen.findByRole('region', { name: 'Cleanup report' })
+    expect(within(report).getByText(/Cleanup removed 1 worktree and kept 1/)).toBeDefined()
+    expect(within(report).getByText('feat/rate-limit')).toBeDefined()
+    expect(within(report).getByText('removed')).toBeDefined()
+    expect(within(report).getByText('Its pull request merged')).toBeDefined()
+    expect(within(report).getByText('kept')).toBeDefined()
+    expect(within(report).getByText('2 uncommitted changes')).toBeDefined()
+    expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('worktree-cleanup', {})
+  })
+
+  it('shows the report of the rules a refresh ran', async () => {
+    stubCleanup(CLEANUP_REPORT)
+    render(<WorktreesView repoRoot="/repo" />)
+    expect(await screen.findByRole('region', { name: 'Cleanup report' })).toBeDefined()
+    expect(mockRecordUsage).not.toHaveBeenCalled()
+  })
+})
