@@ -527,11 +527,33 @@ Terminator works out "Waiting on you" from what the terminal does: a bell, or a 
 
 Terminator starts agents over the Agent Client Protocol (ACP) and shows each agent as an **agent tab**. Claude Code is built in. **Settings → Agents** sets the **Default agent** and lists your own. Any agent that speaks ACP works. Choose **Add agent** and give it an id, a label and the command line that starts it, for example `opencode acp`. Everywhere you start an agent (Start work, a thread's **New agent on this branch**, Send to agent), the agent tab is the default and **Claude in a terminal** stays available.
 
+**Known agents** above your list shows Codex, Gemini CLI, OpenCode and Cursor with the command each one runs, and whether its program is installed. **Add** puts it in your list; it is disabled for an agent that is not installed.
+
+#### Talking to a busy agent
+
+The text box stays open while the agent works. Press **Enter** to queue a message. Queued messages show above the box; edit or remove one before it goes. They send one by one as each turn ends. **Stop** keeps the queue. Press **Cmd+Enter** (or **Steer**) to steer: Claude Code takes the message into the running turn; another agent stops the turn and gets the message as the next prompt.
+
+#### What a turn changed
+
+Each edit shows as a diff, open, with the path relative to the worktree. A **Changed in this turn** card ends each turn with its files and their added and removed lines.
+
+#### Find and images
+
+**Cmd+F** in an agent tab opens a find bar over the transcript: **Enter** and **Shift+Enter** move, **Esc** closes. Paste or drop an image into the text box, or use the paperclip. PNG, JPEG, GIF and WebP up to 5 MB each are sent with your next message, to agents that read images.
+
+### Agent wakes
+
+When one of your pull requests gets a failed check, a new review or comment, or a merge conflict, the Git extension prompts the agent on that branch. The message starts "Sent by Terminator · pull request #N · wake k of 10" and holds the check name and the last lines of its log, or the comment text. With no agent running, a recorded conversation for that worktree resumes once. Rules: nothing happens on the first poll after start-up; at most 10 wakes per pull request, then **Wakes stopped** asks you to answer yourself; at most one resume per pull request; a worktree with uncommitted changes and no running agent is skipped. Each wake shows as **Agent woken** in **Needs you**. Turn it off with **Wake an agent when its pull request needs it** in Git Integration's settings.
+
+### Scheduled runs
+
+In **Start work**, a prompt has a **When** row: **Now**, **Once**, **Daily** or **Weekdays**, and a time. The button then reads **Schedule**. A scheduled run starts what Start work would start, while Terminator is open. A run missed while it was closed waits in **Needs you** with **Run now** and **Skip**; it never starts by itself. A prompt run as an agent starts in a new worktree on a branch Claude names, for example `fix/fetch-user-retry`. If naming takes over 5 seconds or fails, the branch is `prompt/<first words>`. **Use the repo folder** runs it in the main checkout as before.
+
 ### Picking a Claude Code conversation back up
 
 When a Claude Code session ends (you typed `/exit`, the terminal closed, or you quit Terminator), the conversation stays on disk. A **Resume** button appears on that session wherever it shows: its work thread's drawer on Home, and its Overview tile. Press it, and Terminator opens the conversation on the same branch, in the same folder. A conversation that ran in a terminal opens a terminal that runs `claude --resume`. A conversation that ran in an agent tab opens an agent tab. The new terminal takes over the old one's description and ticket link, and the exited tab closes, so there is one terminal per conversation.
 
-After a restart, conversations from the last run wait with their Resume button. Terminator resumes nothing for you. A restart never starts agents on its own, so you choose which threads to pick up. A thread whose sessions have all ended stays in the task list until its pull request merges or closes, you archive it, or Terminator drops its records after 30 days. **Resume a conversation…** in Quick actions (`Cmd+P`) opens the drawer of the thread that holds the most recent conversation.
+After a restart, conversations from the last run wait with their Resume button. Terminator resumes nothing for you. A restart never starts agents on its own, so you choose which threads to pick up. The one exception is an agent wake for a pull request event after start-up (see [Agent wakes](#agent-wakes)). A thread whose sessions have all ended stays in the task list until its pull request merges or closes, you archive it, or Terminator drops its records after 30 days. **Resume a conversation…** in Quick actions (`Cmd+P`) opens the drawer of the thread that holds the most recent conversation.
 
 Resume appears only where it can work:
 
@@ -590,31 +612,35 @@ Click the **bell icon** in the sidebar header to open the notification center pa
 
 ## 13. Keyboard Shortcuts
 
-| Action                               | Shortcut                 |
-| ------------------------------------ | ------------------------ |
-| Toggle sidebar                       | `Cmd+B`                  |
-| Focus workspace 1–9                  | `Cmd+1`–`Cmd+9`          |
-| Cycle workspaces                     | `Cmd++` / `Cmd+-`        |
-| New tab                              | `Cmd+T`                  |
-| New scratch terminal                 | `Cmd+Shift+T`            |
-| Close focused pane / active tab      | `Cmd+W`                  |
-| Split pane vertically                | `Cmd+D`                  |
-| Split pane horizontally              | `Cmd+Shift+D`            |
-| Move terminal to its own window      | `Cmd+Shift+O`            |
-| Cycle tabs left/right                | `Cmd+Left` / `Cmd+Right` |
-| Clear terminal                       | `Cmd+K`                  |
-| Quick actions                        | `Cmd+P`                  |
-| Settings                             | `Cmd+,`                  |
-| Toggle Overview screen               | `Cmd+Shift+E`            |
-| Open Home                            | `Cmd+~`                  |
-| Switch task                          | `Cmd+J`                  |
-| Switch to lane 1–9 of the task       | `Ctrl+1` – `Ctrl+9`      |
-| Plan today (on Home)                 | `P`                      |
-| Start work (on Home)                 | `Cmd+N`                  |
-| Search Home                          | `Cmd+K` (on Home)        |
-| Send newline (always)                | `Cmd+Enter`              |
-| Send newline (bracketed paste mode)  | `Shift+Enter`            |
-| Leave an extension, back to terminal | `Esc` `Esc`              |
+| Action                               | Shortcut                               |
+| ------------------------------------ | -------------------------------------- |
+| Toggle sidebar                       | `Cmd+B`                                |
+| Focus workspace 1–9                  | `Cmd+1`–`Cmd+9`                        |
+| Cycle workspaces                     | `Cmd++` / `Cmd+-`                      |
+| New tab                              | `Cmd+T`                                |
+| New scratch terminal                 | `Cmd+Shift+T`                          |
+| Close focused pane / active tab      | `Cmd+W`                                |
+| Split pane vertically                | `Cmd+D`                                |
+| Split pane horizontally              | `Cmd+Shift+D`                          |
+| Move terminal to its own window      | `Cmd+Shift+O`                          |
+| Cycle tabs left/right                | `Cmd+Left` / `Cmd+Right`               |
+| Go back / forward between screens    | `Cmd+Option+Left` / `Cmd+Option+Right` |
+| Reopen the last closed tab           | `Cmd+Option+T`                         |
+| Queue / steer in an agent tab        | `Enter` / `Cmd+Enter`                  |
+| Find in an agent tab                 | `Cmd+F`                                |
+| Clear terminal                       | `Cmd+K`                                |
+| Quick actions                        | `Cmd+P`                                |
+| Settings                             | `Cmd+,`                                |
+| Toggle Overview screen               | `Cmd+Shift+E`                          |
+| Open Home                            | `Cmd+~`                                |
+| Switch task                          | `Cmd+J`                                |
+| Switch to lane 1–9 of the task       | `Ctrl+1` – `Ctrl+9`                    |
+| Plan today (on Home)                 | `P`                                    |
+| Start work (on Home)                 | `Cmd+N`                                |
+| Search Home                          | `Cmd+K` (on Home)                      |
+| Send newline (always)                | `Cmd+Enter`                            |
+| Send newline (bracketed paste mode)  | `Shift+Enter`                          |
+| Leave an extension, back to terminal | `Esc` `Esc`                            |
 
 ### Leaving an extension
 
@@ -650,7 +676,17 @@ The Git integration is a workspace-scoped extension that puts git tooling inside
 
 Git lives in the **Git** tab above the terminal. The tab lists the changed files and names each state (**Changed**, **New**, **Added**, **Deleted**, **Renamed**, **Conflict**). It stages and unstages files, and it commits. It shows a syntax-highlighted diff of the selected file (red for removed lines, green for added). It refreshes on file changes.
 
+With something staged, **Write message** under the message box drafts the commit message from the staged diff and the recent commit subjects. **Open PR** with staged changes opens **Commit and open a pull request**, filled in by Claude: a new branch when you are on the default branch, the commit message, the title and the description. Edit anything, then **Commit, push and create PR**. If the pull request step fails, try again: the branch and commit already made are not made twice.
+
 Two settings in **Settings → Extensions → Git Integration** change the tab. **Max displayed changed files** (500 by default) sets how many changed files the list shows. With more files, the list says "Showing first N files." **Add sign-off to commits** commits with [`--signoff`](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---signoff), which ends the message with a `Signed-off-by:` line that names you.
+
+### Merging a stack and reverting
+
+A pull request whose base is another open pull request shows **Merge stack · N**. It lists the order first, then merges from the bottom: each next pull request is retargeted onto the default branch, GitHub rechecks it, then it merges. It stops at the first one that cannot merge and says why. **Remove agent credits when merging** drops `Co-Authored-By` lines from known agents in those squash messages. A merged pull request says **Merged** and offers **Open revert PR**.
+
+### Worktree cleanup and the default branch
+
+Settings in Git Integration remove worktrees by rules, all off by default: after their pull request merges (merged on GitHub, so squash merges count), after a number of idle days, when the branch has no commits of its own, and when their sessions have closed. **Keep a worktree that has** says what counts as work you would lose (uncommitted changes, any local file, or edited tracked files); such a worktree is kept. Rules run on each Worktrees refresh; **Clean up now** runs them at once and lists what it removed and kept, with the reason. **Keep the default branch up to date** fast-forwards the default branch on each refresh, only when that is safe.
 
 ### The pull request queue
 
