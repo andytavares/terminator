@@ -829,3 +829,102 @@
   gap: 6px;
   align-items: flex-start;
 }
+
+/* ── Diff view ──────────────────────────────────────────────────────────── */
+
+.diff-table {
+  width: 100%;
+  background: var(--tm-bg-base);
+  border-collapse: collapse;
+}
+
+.diff-hunk-header {
+  background: color-mix(in srgb, var(--tm-accent) 8%, transparent);
+  color: var(--tm-accent-text);
+  font-size: var(--tm-font-size-xs);
+  padding: 2px 8px;
+  border-top: 1px solid var(--tm-border);
+}
+
+.diff-line--add {
+  background: var(--tm-diff-added-bg);
+}
+
+.diff-line--remove {
+  background: var(--tm-diff-removed-bg);
+}
+
+.diff-line__old-num,
+.diff-line__new-num {
+  user-select: none;
+  color: var(--tm-text-secondary);
+  min-width: 36px;
+  text-align: right;
+  padding: 0 6px;
+  border-right: 1px solid var(--tm-border);
+  font-size: var(--tm-font-size-xs);
+}
+
+.diff-line__prefix {
+  padding: 0 4px;
+  min-width: 16px;
+  user-select: none;
+}
+
+.diff-line--add .diff-line__prefix {
+  color: var(--tm-success);
+}
+.diff-line--remove .diff-line__prefix {
+  color: var(--tm-danger);
+}
+
+.diff-line__content {
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+}
+
+/* Split diff table */
+.diff-table--split {
+  background: var(--tm-bg-base);
+  table-layout: fixed;
+}
+
+.diff-table--split .diff-line__content--old-side {
+  width: var(--split-left, 50%);
+  overflow: hidden;
+}
+
+.diff-table--split .diff-line__content--new-side {
+  width: calc(100% - var(--split-left, 50%));
+  overflow: hidden;
+}
+
+.diff-table__split-divider {
+  width: 6px;
+  min-width: 6px;
+  background: var(--tm-overlay);
+  padding: 0;
+  cursor: col-resize;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.diff-table__split-divider:hover,
+.diff-table__split-divider:active {
+  background: var(--tm-accent);
+  opacity: 0.6;
+}
+
+.diff-line__content--remove {
+  background: var(--tm-diff-removed-bg);
+}
+
+.diff-line__content--add {
+  background: var(--tm-diff-added-bg);
+}
+
+.diff-line__content--empty {
+  background: var(--tm-bg-elevated);
+}
