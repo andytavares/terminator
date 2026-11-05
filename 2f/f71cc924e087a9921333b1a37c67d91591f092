@@ -1,0 +1,64 @@
+extensions/git-integration/src/github/dashboard-search.ts
+  s_a5e467e4da5497::t_f21f958a100b04 41,130
+  s_a5e467e4da5497::t_6e7a50ff3fa833 209-216,224
+extensions/git-integration/src/home/publisher.ts
+  s_a5e467e4da5497::t_d530336cf5a3fe 9-11,101-108,112-114,117-118,128,132-136
+  s_a5e467e4da5497::t_a08e8537f20ffd 109-111,115-116,119-120,124
+extensions/git-integration/src/ipc/github/dashboard.ts
+  s_a5e467e4da5497::t_f326e161f8ba14 19
+  s_a5e467e4da5497::t_f21f958a100b04 211
+extensions/git-integration/src/storage-directory.ts
+  s_a5e467e4da5497::t_f21f958a100b04 12
+extensions/git-integration/src/home/pr-watch-runner.ts
+  s_a5e467e4da5497::t_9c599725958448 1-177
+tests/e2e/github-stub-gh.ts
+  s_a5e467e4da5497::t_71b58c2dea290b 50-51,206,382-387,663-668,671-673,683-693
+  s_a5e467e4da5497::t_e1b614304f1876 694
+extensions/git-integration/src/home/feed.ts
+  s_a5e467e4da5497::t_d530336cf5a3fe 8,98-121,267-268,272,274
+extensions/git-integration/src/ipc/github/pr-comments.ts
+  s_a5e467e4da5497::t_f21f958a100b04 108,121
+extensions/git-integration/src/ipc/github/pr-watch-reads.ts
+  s_a5e467e4da5497::t_f326e161f8ba14 1-38
+docs/adr/142-a-pr-event-can-resume-an-agent.md
+  s_a5e467e4da5497::t_e6c43d64086186 1-40,42-45
+  s_a5e467e4da5497::t_338f4d18931868 41,46
+extensions/git-integration/manifest.json
+  s_a5e467e4da5497::t_f21f958a100b04 51-53
+  s_a5e467e4da5497::t_66fec101d93d6c 50
+extensions/git-integration/src/schemas/pr-review.schema.ts
+  s_a5e467e4da5497::t_f21f958a100b04 271
+  s_a5e467e4da5497::t_6e7a50ff3fa833 272
+extensions/git-integration/tests/unit/pr-watch.spec.ts
+  s_a5e467e4da5497::t_a08e8537f20ffd 23,47-65,138,140,159
+  s_a5e467e4da5497::t_185e960febc7a9 1-22,24,29-34,38-46,66-73,78-137,139,141-149,163-186,189,193-215
+  s_a5e467e4da5497::t_fcf64dbf83a803 25-28,35-37,74-77,187-188,190-192
+  s_a5e467e4da5497::t_37ede849edea31 150-158,160-162
+extensions/git-integration/src/ipc/github/context.ts
+  s_a5e467e4da5497::t_f21f958a100b04 13,29
+extensions/git-integration/src/home/actions.ts
+  s_a5e467e4da5497::t_f21f958a100b04 66-69,74-75,78,97-98
+  s_a5e467e4da5497::t_d530336cf5a3fe 70-73
+tests/e2e/pr-watch.spec.ts
+  s_a5e467e4da5497::t_71b58c2dea290b 1-58,60-63
+  s_a5e467e4da5497::t_41f2217f1a314d 59
+extensions/git-integration/src/home/pr-watch.ts
+  s_a5e467e4da5497::t_154c23750ec839 1-47,50-91,94-97,101-119,123-132
+  s_a5e467e4da5497::t_d530336cf5a3fe 48-49,92-93,98-100,120-122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2ff71cc924e087a9921333b1a37c67d91591f092",
+  "prompts": {},
+  "sessions": {
+    "s_a5e467e4da5497": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d038af6c-7a59-4002-9e1a-b5c973e92542",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
