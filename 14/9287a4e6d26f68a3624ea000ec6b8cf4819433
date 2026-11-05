@@ -1,0 +1,71 @@
+extensions/git-integration/tests/unit/merge-stack.spec.ts
+  s_a5e467e4da5497::t_4d005db638851a 27-28,32-48,75,114,129,136,138,141,151,160
+  s_a5e467e4da5497::t_23e67b8163ae2d 1-26,29-31,49-74,76-113,115-128,130-135,137,139-140,142-150,152-159,161-180
+extensions/git-integration/src/index.ts
+  s_a5e467e4da5497::t_12ac7ad8564886 255-256
+tests/e2e/github-stub-gh.ts
+  s_a5e467e4da5497::t_e640fa2bfeae5e 230,380-381,421,427-442,569,607-619
+  s_a5e467e4da5497::t_23e67b8163ae2d 422-426
+  s_a5e467e4da5497::t_768d54f2484c90 620
+extensions/git-integration/tests/unit/github-ipc.spec.ts
+  s_a5e467e4da5497::t_23e67b8163ae2d 413-431
+extensions/git-integration/src/ipc/github/pr-detail.ts
+  s_a5e467e4da5497::t_12ac7ad8564886 59
+  s_a5e467e4da5497::t_6adce92370a1f8 124-128,144
+extensions/git-integration/src/components/pr-review/ReadinessStrip.tsx
+  s_a5e467e4da5497::t_449683cd059c67 15,39-42,137-144,146-148,151,174-177,180,186
+  s_a5e467e4da5497::t_8d46e0ab468359 178-179
+  s_a5e467e4da5497::t_86ae8dfa506490 193-197
+extensions/git-integration/src/components/pr-review/MergeStack.tsx
+  s_a5e467e4da5497::t_4d005db638851a 21,27,46,48,57,63,67-68,70-94,99-155
+  s_a5e467e4da5497::t_23e67b8163ae2d 96-98
+  s_a5e467e4da5497::t_a7a1d83c2edc92 14
+  s_a5e467e4da5497::t_1a244669dc1372 1-13,15-20,22-26,28-45,47,49-56,58-62,64-66,69,95
+tests/e2e/merge-stack.spec.ts
+  s_a5e467e4da5497::t_63b1337ac5f5fb 1-55
+extensions/git-integration/src/ipc/github/pr-actions.ts
+  s_a5e467e4da5497::t_12ac7ad8564886 9,201
+extensions/git-integration/src/ipc/github/context.ts
+  s_a5e467e4da5497::t_12ac7ad8564886 25-26,69-71
+  s_a5e467e4da5497::t_b7ccbffea2ec5c 72-73
+extensions/git-integration/src/ipc/github/merge-stack.ts
+  s_a5e467e4da5497::t_4d005db638851a 132,135,175
+  s_a5e467e4da5497::t_23e67b8163ae2d 88-89
+  s_a5e467e4da5497::t_12ac7ad8564886 93-97,101-102,112,116-122,126,137,141,145
+  s_a5e467e4da5497::t_c8d396964a6e86 1-87,90-92,98-100,103-111,113-115,123-125,127-131,133-134,136,138-140,142-144,146-174,176-178
+extensions/git-integration/tests/unit/PrOverviewPanel.spec.tsx
+  s_a5e467e4da5497::t_23e67b8163ae2d 35-37,115
+  s_a5e467e4da5497::t_4bc10b92d032e5 724-764,766-779,781-804,806-823
+  s_a5e467e4da5497::t_2b2a7763733cb2 805
+  s_a5e467e4da5497::t_20a448cf7c24f4 765
+  s_a5e467e4da5497::t_49b5e3e9f9a3de 780
+extensions/git-integration/src/components/pr-review/pr-overview.css
+  s_a5e467e4da5497::t_449683cd059c67 70-107
+extensions/git-integration/src/components/pr-review/PrOverviewPanel.tsx
+  s_a5e467e4da5497::t_23e67b8163ae2d 20-26
+  s_a5e467e4da5497::t_449683cd059c67 141-143,145-147,292-295,297-299,301,304,335,343
+  s_a5e467e4da5497::t_a7a1d83c2edc92 296
+  s_a5e467e4da5497::t_2b2a7763733cb2 633-645,648,657
+extensions/git-integration/src/schemas/pr-review.schema.ts
+  s_a5e467e4da5497::t_a7a1d83c2edc92 198-199
+extensions/git-integration/manifest.json
+  s_a5e467e4da5497::t_b1be993d4bf8a4 58-65
+extensions/git-integration/src/api/github.ts
+  s_a5e467e4da5497::t_a04dbfd1d4c0a6 20-29,80-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "149287a4e6d26f68a3624ea000ec6b8cf4819433",
+  "prompts": {},
+  "sessions": {
+    "s_a5e467e4da5497": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d038af6c-7a59-4002-9e1a-b5c973e92542",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

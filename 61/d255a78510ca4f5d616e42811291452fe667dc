@@ -1,0 +1,48 @@
+src/renderer/components/home/start-work-model.ts
+  s_a5e467e4da5497::t_09128176411c58 80
+src/shared/schemas/schedules.schema.ts
+  s_a5e467e4da5497::t_4b3fdeddf77b9b 16-19
+tests/unit/renderer/components/ScheduledRuns.spec.tsx
+  s_a5e467e4da5497::t_81157134519b31 1-56
+src/renderer/components/home/WhenChoices.tsx
+  s_a5e467e4da5497::t_dc6f030c9ef4d2 1-3,5,45,71-84,87,97-98,100,107-121
+  s_a5e467e4da5497::t_321e623323a95f 85-86,88,99,101-106,123
+  s_a5e467e4da5497::t_f47c52b7fe60ec 89-96
+  s_a5e467e4da5497::t_fb454f9ce0a1c0 122
+tests/unit/home/schedules.spec.ts
+  s_a5e467e4da5497::t_9479b766a6f3f0 24-25,75-85,90
+  s_a5e467e4da5497::t_dc6f030c9ef4d2 86-88
+  s_a5e467e4da5497::t_dc8e370be8d2d5 89
+  s_a5e467e4da5497::t_81645d28f9a7be 91-92
+src/main/home/branch-name.ts
+  s_a5e467e4da5497::t_09128176411c58 11
+src/renderer/components/home/StartWork.css
+  s_a5e467e4da5497::t_dc6f030c9ef4d2 341-371
+src/renderer/components/home/StartWork.tsx
+  s_a5e467e4da5497::t_dc6f030c9ef4d2 46-53,66-70,222-223
+tests/unit/renderer/components/StartWork.spec.tsx
+  s_a5e467e4da5497::t_b4331bc493dbea 152,829-830
+src/renderer/components/home/start-work-schedule.ts
+  s_a5e467e4da5497::t_4b3fdeddf77b9b 4,23-24
+tests/unit/ipc/schedules.ipc.spec.ts
+  s_a5e467e4da5497::t_b4331bc493dbea 34-35
+src/main/home/schedules.ts
+  s_a5e467e4da5497::t_f47c52b7fe60ec 108-115,129
+  s_a5e467e4da5497::t_4b3fdeddf77b9b 15-16,28-29,42-43,100-107,122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "61d255a78510ca4f5d616e42811291452fe667dc",
+  "prompts": {},
+  "sessions": {
+    "s_a5e467e4da5497": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d038af6c-7a59-4002-9e1a-b5c973e92542",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

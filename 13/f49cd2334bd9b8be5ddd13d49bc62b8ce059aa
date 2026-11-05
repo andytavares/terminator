@@ -1,0 +1,73 @@
+src/main/agents/acp/agent-service.ts
+  s_a5e467e4da5497::t_8589b9e3cc98d2 2,8,38,47,56-57,88-89,95-96,108-113,117,139-141,221-223,239-240,271-277,279-294,411-415,507-517,523-536,538-544,547-584,587,591-598,601,610,613,630,633,713
+  s_a5e467e4da5497::t_5f5a51a06d9460 450-456,518-522
+src/main/extensions/host/host-api.ts
+  s_a5e467e4da5497::t_dd8ade58ee2033 162-164
+src/main/ipc/agents.ipc.ts
+  s_a5e467e4da5497::t_dd8ade58ee2033 34-54
+  s_a5e467e4da5497::t_8e1505f5d39a3a 7,11
+extensions/foundry/package.json
+  s_a5e467e4da5497::t_ea4adc635fb137 11
+packages/extension-sdk/package.json
+  s_a5e467e4da5497::t_8e1505f5d39a3a 3
+packages/extension-sdk/types/api.d.ts
+  s_a5e467e4da5497::t_dd8ade58ee2033 340-355
+packages/extension-sdk/CHANGELOG.md
+  s_a5e467e4da5497::t_8e1505f5d39a3a 3-12
+extensions/remote-control/package.json
+  s_a5e467e4da5497::t_ea4adc635fb137 12
+extensions/notepad/package.json
+  s_a5e467e4da5497::t_ea4adc635fb137 21
+tests/unit/agents/acp/agent-images-sessions.spec.ts
+  s_a5e467e4da5497::t_e28641a4a04daf 1,3-82
+  s_a5e467e4da5497::t_786633fe235a31 2
+tests/unit/agents/acp/agent-queue.spec.ts
+  s_a5e467e4da5497::t_555f3f0593fa10 1-74
+src/main/agents/acp/agent-service-instance.ts
+  s_a5e467e4da5497::t_dd8ade58ee2033 9,32
+src/main/extensions/host/api-server.ts
+  s_a5e467e4da5497::t_dd8ade58ee2033 65-66
+tests/unit/ipc/agents.ipc.spec.ts
+  s_a5e467e4da5497::t_8e1505f5d39a3a 9-10,48,51
+  s_a5e467e4da5497::t_70721f779924ae 102-116
+extensions/task-vault/package.json
+  s_a5e467e4da5497::t_ea4adc635fb137 10
+src/main/extensions/api.ts
+  s_a5e467e4da5497::t_dd8ade58ee2033 878-880
+tests/unit/agents/acp/agent-steer.spec.ts
+  s_a5e467e4da5497::t_e28641a4a04daf 1-42,44-94
+  s_a5e467e4da5497::t_62c360b6d3a91b 43
+package.json
+  s_a5e467e4da5497::t_ea4adc635fb137 71
+src/shared/schemas/agents.schema.ts
+  s_a5e467e4da5497::t_dd8ade58ee2033 16-27
+extensions/git-integration/package.json
+  s_a5e467e4da5497::t_ea4adc635fb137 16
+tests/unit/agents/acp/fake-agent.ts
+  s_a5e467e4da5497::t_ae84d8d0af6884 31-39,115-117,147-150,159
+  s_a5e467e4da5497::t_555f3f0593fa10 70-82,92,108,111,118,126-127
+  s_a5e467e4da5497::t_6055078a918c36 68-69
+src/shared/electron-api/manifest.ts
+  s_a5e467e4da5497::t_dd8ade58ee2033 1392-1415,1516-1525
+  s_a5e467e4da5497::t_8e1505f5d39a3a 65-66
+package-lock.json
+  s_a5e467e4da5497::t_e9191390a927a4 19,80,99,127,144,162,20196,20214
+packages/extension-ui/package.json
+  s_a5e467e4da5497::t_14bd1139d72f79 34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "13f49cd2334bd9b8be5ddd13d49bc62b8ce059aa",
+  "prompts": {},
+  "sessions": {
+    "s_a5e467e4da5497": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d038af6c-7a59-4002-9e1a-b5c973e92542",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,65 @@
+extensions/git-integration/tests/unit/worktrees-cleanup-ipc.spec.ts
+  s_a5e467e4da5497::t_d5231d150dd518 58-59,77-80
+  s_a5e467e4da5497::t_42f23cc8e98138 1-57,60-71,73,75-76,81-100
+  s_a5e467e4da5497::t_58b54b51473e43 72,74
+extensions/git-integration/src/index.ts
+  s_a5e467e4da5497::t_41fff358bb226b 114-165
+  s_a5e467e4da5497::t_415570cb46483d 25,236-241,275-279,281
+  s_a5e467e4da5497::t_8e1505f5d39a3a 10-16
+extensions/git-integration/src/git-settings.ts
+  s_a5e467e4da5497::t_7cca556df53040 38-51
+  s_a5e467e4da5497::t_9b22c911ea8f77 3
+  s_a5e467e4da5497::t_8086463d2a2bb5 52
+extensions/git-integration/tests/unit/home-publisher.spec.ts
+  s_a5e467e4da5497::t_7c4b0d8d0e52cb 24
+  s_a5e467e4da5497::t_761c0425468b66 13,27
+  s_a5e467e4da5497::t_9807011708a70c 8,125-154
+  s_a5e467e4da5497::t_3d50cf1ae578fe 155-156
+extensions/git-integration/src/git/auto-pull.ts
+  s_a5e467e4da5497::t_7cca556df53040 1-17,23-39
+  s_a5e467e4da5497::t_661080c28297d1 18-22
+extensions/git-integration/src/git/local-inventory.ts
+  s_a5e467e4da5497::t_9d134915b1ea9e 25-26,279,288-309
+extensions/git-integration/tests/unit/auto-pull.spec.ts
+  s_a5e467e4da5497::t_d5231d150dd518 19-21
+  s_a5e467e4da5497::t_7cca556df53040 1-18,22-48
+extensions/git-integration/tests/unit/WorktreesView.spec.tsx
+  s_a5e467e4da5497::t_d5231d150dd518 299-337
+extensions/git-integration/src/home/publisher.ts
+  s_a5e467e4da5497::t_9b22c911ea8f77 5-6,36-57,77,79-80,125-129,137-140
+  s_a5e467e4da5497::t_58b54b51473e43 98-100,102-109,111-115,117-123,130-133
+  s_a5e467e4da5497::t_415570cb46483d 143-144
+  s_a5e467e4da5497::t_4a6884dd408904 124
+extensions/git-integration/src/api/git.ts
+  s_a5e467e4da5497::t_8e1505f5d39a3a 7,46-48
+extensions/git-integration/src/components/worktrees/WorktreesView.tsx
+  s_a5e467e4da5497::t_94993d614d59f6 2,15,67,87-89,98-99,200-201,207-214,217,220-222,227-230,236,426-428,479-490,506-532,538-543,546,550,559,575,587-588
+  s_a5e467e4da5497::t_d5231d150dd518 533-537
+extensions/git-integration/src/components/worktrees/worktrees.css
+  s_a5e467e4da5497::t_94993d614d59f6 94-118
+extensions/git-integration/src/ipc/worktrees.ipc.ts
+  s_a5e467e4da5497::t_8e1505f5d39a3a 10,32-51,114-149,167-173,179-180,182
+extensions/git-integration/src/git/cleanup-plan.ts
+  s_a5e467e4da5497::t_58b54b51473e43 56-59,61
+  s_a5e467e4da5497::t_9d134915b1ea9e 1-55,60,62-93
+extensions/git-integration/tests/unit/cleanup-plan.spec.ts
+  s_a5e467e4da5497::t_58b54b51473e43 58,60
+  s_a5e467e4da5497::t_423f0b8aeddc35 1,3-57,59,61-102,106-124
+  s_a5e467e4da5497::t_d5231d150dd518 2,103-105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "178da936801ad99b96c260a6c59041b44b5cae94",
+  "prompts": {},
+  "sessions": {
+    "s_a5e467e4da5497": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d038af6c-7a59-4002-9e1a-b5c973e92542",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

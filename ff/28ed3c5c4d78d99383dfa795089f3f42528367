@@ -1,0 +1,25 @@
+src/renderer/components/terminal/LeafPane.tsx
+  s_a5e467e4da5497::t_5921181b770d8f 7,68
+src/renderer/components/terminal/BreakoutWindowView.tsx
+  s_a5e467e4da5497::t_5921181b770d8f 13,69
+src/renderer/components/agent/LazyAgentView.tsx
+  s_a5e467e4da5497::t_5921181b770d8f 1-14
+src/renderer/components/terminal/TerminalPane.tsx
+  s_a5e467e4da5497::t_5921181b770d8f 15,219
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ff28ed3c5c4d78d99383dfa795089f3f42528367",
+  "prompts": {},
+  "sessions": {
+    "s_a5e467e4da5497": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d038af6c-7a59-4002-9e1a-b5c973e92542",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

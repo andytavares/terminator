@@ -1,0 +1,40 @@
+extensions/git-integration/src/components/git-integration.css
+  s_a5e467e4da5497::t_661080c28297d1 488-491
+  s_a5e467e4da5497::t_0fb941bbdcd874 492-493
+extensions/git-integration/src/utils/syntax.ts
+  s_a5e467e4da5497::t_401b41e6c4361c 1,3
+extensions/git-integration/src/utils/hljs.ts
+  s_a5e467e4da5497::t_401b41e6c4361c 1
+packages/extension-ui/src/highlight.ts
+  s_a5e467e4da5497::t_401b41e6c4361c 1-29
+tests/unit/DiffView.spec.tsx
+  s_a5e467e4da5497::t_c8327f958c74a8 1-35,37,39-94
+  s_a5e467e4da5497::t_8589b9e3cc98d2 36,38
+packages/extension-ui/src/DiffView.tsx
+  s_a5e467e4da5497::t_c8327f958c74a8 154-158
+  s_a5e467e4da5497::t_9f40328e9980e0 1-153,159-264
+docs/adr/141-one-diff-view-in-extension-ui.md
+  s_a5e467e4da5497::t_ede7f101a18cab 1-23
+extensions/git-integration/src/components/FileDiffView.tsx
+  s_a5e467e4da5497::t_a466a84d258c68 1,3-4,7,10-12,109-114
+packages/extension-ui/src/extension-ui.css
+  s_a5e467e4da5497::t_e294b8c6664cc6 832-930
+packages/extension-ui/src/index.ts
+  s_a5e467e4da5497::t_1040f630cbba61 99-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2d0ed3518af734817a7f76cef1628c3f9ab7faa6",
+  "prompts": {},
+  "sessions": {
+    "s_a5e467e4da5497": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d038af6c-7a59-4002-9e1a-b5c973e92542",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
