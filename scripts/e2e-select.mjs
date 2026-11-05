@@ -40,7 +40,9 @@ export const IMPACT_MAP = [
       'git-status-watch.spec.ts',
       'home-contributions-setting.spec.ts',
       'merge-flow.spec.ts',
+      'merge-stack.spec.ts',
       'pr-review-*.spec.ts',
+      'pr-watch.spec.ts',
       'review-*.spec.ts',
       ...EXTENSION_TRIO,
     ],
@@ -93,6 +95,7 @@ export const SMOKE_SPECS = ['extension-smoke.spec.ts', 'terminal.spec.ts', 'work
 // selects everything, so these run only then; the list exists so a new spec
 // has to be placed somewhere deliberately.
 export const CORE_SPECS = [
+  'agent-tab.spec.ts',
   'app-menu.spec.ts',
   'branch-name.spec.ts',
   'core-ipc.spec.ts',
@@ -105,6 +108,7 @@ export const CORE_SPECS = [
   'live-preview-spacing.spec.ts',
   'menus-keyboard.spec.ts',
   'monitor-wall.spec.ts',
+  'navigation.spec.ts',
   'resume-session.spec.ts',
   'session-home.spec.ts',
   'session-surfaces.spec.ts',

@@ -10,7 +10,7 @@ export interface NavigationEntry {
 }
 
 /** What reopening a closed terminal needs. Scrollback is not kept. */
-export interface ClosedTab {
+interface ClosedTab {
   projectId: string
   cwd: string
   title: string
