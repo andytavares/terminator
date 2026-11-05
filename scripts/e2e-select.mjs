@@ -42,7 +42,7 @@ export const IMPACT_MAP = [
       'merge-flow.spec.ts',
       'merge-stack.spec.ts',
       'pr-review-*.spec.ts',
-      'pr-watch.spec.ts',
+      'pr-watch*.spec.ts',
       'review-*.spec.ts',
       ...EXTENSION_TRIO,
     ],

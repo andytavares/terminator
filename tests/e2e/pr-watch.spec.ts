@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
-import { readFileSync, existsSync, rmSync } from 'node:fs'
-import { agentRecordFile, closeApp, launchApp, type AppHandle } from './helpers'
+import { readFileSync, existsSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { agentRecordFile, closeApp, e2eTempDir, launchApp, type AppHandle } from './helpers'
 import { git, gitView, makeRepoWithRemote, openRepo, pushBranchToOrigin } from './git-harness'
 import { startGithubStub, type GithubStub } from './github-stub'
 import { openHome } from './session-views'
@@ -30,10 +31,16 @@ test.beforeAll(async () => {
   ;({ repo, bare } = makeRepoWithRemote('terminator-e2e-pr-watch'))
   pushBranchToOrigin(repo, BRANCH, { 'src/watch.ts': 'export const watched = true\n' })
   git(repo, 'checkout', '--quiet', BRANCH)
+  // The dashboard joins a pull request to a checkout by its origin's owner/name, which a bare
+  // path does not have; the test pushes nothing after this.
+  git(repo, 'remote', 'set-url', 'origin', 'https://github.com/acme/widgets.git')
   stub = await startGithubStub({ bareRepo: bare, viewer: 'andrew' })
   stub.openPullRequest({ title: 'Watch me', headRefName: BRANCH, author: 'andrew' }).failedChecks =
     ['unit']
-  handle = await launchApp(undefined, stub.env)
+  // A reply ends each turn: a wake waits for the running turn, so an endless one would hold it.
+  const reply = join(e2eTempDir('pr-watch-reply-'), 'reply.txt')
+  writeFileSync(reply, 'Done.')
+  handle = await launchApp(undefined, { ...stub.env, E2E_AGENT_REPLY: reply })
   await openRepo(handle, 'widgets', repo)
 })
 
