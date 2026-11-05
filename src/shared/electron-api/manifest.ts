@@ -1429,6 +1429,18 @@ export const ELECTRON_API_MANIFEST = [
     remote: 'omit',
   }),
   method({
+    path: 'agents.queueGet',
+    kind: 'invoke',
+    channel: 'agents:queue-get',
+    signature:
+      signature<
+        (
+          input: z.input<typeof AgentSessionInputSchema>
+        ) => Promise<{ data: string[] } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
     path: 'agents.cancel',
     kind: 'invoke',
     channel: 'agents:cancel',

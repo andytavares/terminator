@@ -40,6 +40,7 @@ const agents = {
   cancel: vi.fn(),
   steer: vi.fn(),
   queueSet: vi.fn(),
+  queueGet: vi.fn(),
 }
 const queues = pushedEvent<[{ sessionId: string; messages: string[] }]>()
 
@@ -59,6 +60,7 @@ beforeEach(() => {
   agents.cancel.mockResolvedValue({ data: true })
   agents.steer.mockResolvedValue({ data: true })
   agents.queueSet.mockResolvedValue({ data: true })
+  agents.queueGet.mockResolvedValue({ data: [] })
   installElectronApi({
     agents: {
       ...agents,
@@ -260,6 +262,12 @@ describe('AgentView follow-up queue and steer', () => {
 
 describe('AgentView queue list', () => {
   beforeEach(() => useSessionStore.getState().setAgentTurn('agent-1', true))
+
+  it('shows a queue set before the tab opened', async () => {
+    agents.queueGet.mockResolvedValue({ data: ['set earlier'] })
+    await mountView()
+    expect(screen.getByText('1 message sends when this turn ends')).toBeTruthy()
+  })
 
   it('shows the queue from the main process, edits and removes items', async () => {
     await mountView()

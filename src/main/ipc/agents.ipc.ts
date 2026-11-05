@@ -52,6 +52,12 @@ const agentChannels: ChannelSpec[] = [
     },
   }),
   defineChannel({
+    channel: 'agents:queue-get',
+    schema: AgentSessionInputSchema,
+    invalid: validationError,
+    run: ({ sessionId }) => ({ data: agentService().queueOf(sessionId) }),
+  }),
+  defineChannel({
     channel: 'agents:queue-set',
     schema: AgentQueueInputSchema,
     invalid: validationError,

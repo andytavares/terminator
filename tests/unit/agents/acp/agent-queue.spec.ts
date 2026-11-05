@@ -23,6 +23,26 @@ function scriptedAgent(agent: FakeAgent, stopReasons: Array<'end_turn' | 'cancel
   return texts
 }
 
+/** An agent whose first turn waits for `release`; later turns end at once. `overlapped` turns
+ *  true when a prompt reaches it while the first turn is still running. */
+function gatedAgent(agent: FakeAgent) {
+  const texts: string[] = []
+  const state = { overlapped: false, firstRunning: false }
+  let release = (): void => undefined
+  const gate = new Promise<void>((resolve) => (release = resolve))
+  agent.onPrompt = async (params) => {
+    texts.push(textOf(params))
+    if (texts.length > 1) state.overlapped ||= state.firstRunning
+    if (texts.length === 1) {
+      state.firstRunning = true
+      await gate
+      state.firstRunning = false
+    }
+    return { stopReason: 'end_turn' }
+  }
+  return { texts, state, release: () => release() }
+}
+
 async function started() {
   const fakes = fakeConnector()
   const broadcast = vi.fn()
@@ -45,29 +65,83 @@ async function started() {
 describe('the follow-up queue', () => {
   it('sends the queued messages in order, each after the turn before it ended', async () => {
     const { service, agent, sessionId } = await started()
-    const texts = scriptedAgent(agent, [])
+    const { texts, release } = gatedAgent(agent)
+    const first = service.prompt(sessionId, 'first')
+    await eventually(() => expect(texts).toEqual(['first']))
     service.queueSet(sessionId, ['second', 'third'])
-    await service.prompt(sessionId, 'first')
+    release()
+    await first
     await eventually(() => expect(texts).toEqual(['first', 'second', 'third']))
   })
 
   it('publishes each change of the queue', async () => {
     const { service, agent, broadcast, sessionId } = await started()
-    scriptedAgent(agent, [])
+    const { texts, release } = gatedAgent(agent)
+    const first = service.prompt(sessionId, 'first')
+    await eventually(() => expect(texts).toEqual(['first']))
     service.queueSet(sessionId, ['second'])
-    await service.prompt(sessionId, 'first')
+    release()
+    await first
     await eventually(() =>
       expect(broadcast).toHaveBeenLastCalledWith('agents:queue', { sessionId, messages: [] })
     )
     expect(broadcast).toHaveBeenCalledWith('agents:queue', { sessionId, messages: ['second'] })
   })
+})
 
+describe('the follow-up queue while idle or reopened', () => {
+  it('sends a message queued while no turn runs at once', async () => {
+    const { service, agent, sessionId } = await started()
+    const texts = scriptedAgent(agent, [])
+    service.queueSet(sessionId, ['now'])
+    await eventually(() => expect(texts).toEqual(['now']))
+  })
+
+  it('gives the current queue to a tab that opens later', async () => {
+    const { service, agent, sessionId } = await started()
+    const { texts, release } = gatedAgent(agent)
+    const first = service.prompt(sessionId, 'first')
+    await eventually(() => expect(texts).toEqual(['first']))
+    service.queueSet(sessionId, ['later'])
+    expect(service.queueOf(sessionId)).toEqual(['later'])
+    release()
+    await first
+  })
+})
+
+describe('one turn at a time', () => {
+  it('holds a prompt asked during a running turn until that turn ends', async () => {
+    const { service, agent, sessionId } = await started()
+    const { texts, state, release } = gatedAgent(agent)
+    const first = service.prompt(sessionId, 'first')
+    await eventually(() => expect(texts).toEqual(['first']))
+    vi.useFakeTimers()
+    const second = service.prompt(sessionId, 'second')
+    // Settles every pending step: a prompt sent beside the first turn would reach the agent now.
+    await vi.advanceTimersByTimeAsync(1)
+    vi.useRealTimers()
+    release()
+    await Promise.all([first, second])
+    expect(texts).toEqual(['first', 'second'])
+    expect(state.overlapped).toBe(false)
+  })
+})
+
+describe('Stop', () => {
   it('keeps the queue and sends nothing when Stop ends the turn', async () => {
     const { service, agent, broadcast, sessionId } = await started()
-    const texts = scriptedAgent(agent, ['cancelled'])
+    const texts: string[] = []
+    let stop = (): void => undefined
+    agent.onPrompt = async (params) => {
+      texts.push(textOf(params))
+      await new Promise<void>((resolve) => (stop = resolve))
+      return { stopReason: 'cancelled' }
+    }
+    const first = service.prompt(sessionId, 'first')
+    await eventually(() => expect(texts).toEqual(['first']))
     service.queueSet(sessionId, ['second'])
-    expect(await service.prompt(sessionId, 'first')).toEqual({ stopReason: 'cancelled' })
-    // The queue is read in the turn's own settle step, which ran before this await returned.
+    stop()
+    expect(await first).toEqual({ stopReason: 'cancelled' })
     expect(texts).toEqual(['first'])
     expect(broadcast).not.toHaveBeenCalledWith('agents:queue', { sessionId, messages: [] })
   })

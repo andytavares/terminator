@@ -158,7 +158,7 @@ export function relativeTo(cwd: string, path: string): string {
   return cwd && path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : path
 }
 
-export interface ChangedFile {
+interface ChangedFile {
   path: string
   added: number
   removed: number
@@ -170,6 +170,19 @@ export interface Turn {
   changes: ChangedFile[]
 }
 
+type DiffOutput = Extract<ToolOutput, { kind: 'diff' }>
+
+const diffLines = new WeakMap<DiffOutput, ReturnType<typeof linesFromTexts>>()
+
+/** A diff's lines, worked out once per diff: the transcript re-renders as text streams in. */
+export function diffLinesOf(out: DiffOutput): ReturnType<typeof linesFromTexts> {
+  const known = diffLines.get(out)
+  if (known) return known
+  const lines = linesFromTexts(out.oldText, out.newText)
+  diffLines.set(out, lines)
+  return lines
+}
+
 function changesOf(entries: TranscriptEntry[]): ChangedFile[] {
   const byPath = new Map<string, ChangedFile>()
   for (const entry of entries) {
@@ -177,7 +190,7 @@ function changesOf(entries: TranscriptEntry[]): ChangedFile[] {
     for (const out of entry.output) {
       if (out.kind !== 'diff') continue
       const file = byPath.get(out.path) ?? { path: out.path, added: 0, removed: 0 }
-      for (const line of linesFromTexts(out.oldText, out.newText)) {
+      for (const line of diffLinesOf(out)) {
         if (line.type === 'add') file.added++
         if (line.type === 'remove') file.removed++
       }

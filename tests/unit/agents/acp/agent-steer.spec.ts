@@ -74,6 +74,26 @@ describe('steer into an idle session', () => {
   })
 })
 
+describe('a steering request that fails', () => {
+  it('cancels the running turn, then prompts, rather than sending a second prompt beside it', async () => {
+    const { service, agent, sessionId, texts, release, methods } = await started({
+      image: true,
+      steering: true,
+    })
+    agent.onSteer = async () => {
+      throw new Error('steering broke')
+    }
+    const running = service.prompt(sessionId, 'first')
+    await eventually(() => expect(texts).toEqual(['first']))
+    await service.steer(sessionId, 'instead')
+    await eventually(() => expect(methods()).toContain('cancel'))
+    expect(texts).toEqual(['first'])
+    release()
+    await running
+    await eventually(() => expect(texts).toEqual(['first', 'instead']))
+  })
+})
+
 describe('steer without steering advertised', () => {
   it('cancels, then prompts, when the agent does not advertise steering', async () => {
     const { service, agent, sessionId, texts, release, methods } = await started({

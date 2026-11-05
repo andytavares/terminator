@@ -39,11 +39,10 @@ export const AgentSetConfigInputSchema = z.object({
 })
 
 /** A preset agent and whether its binary is on the user's PATH; the answer of `agents:known`. */
-export const KnownAgentStatusSchema = z.object({
-  id: z.string().min(1),
-  label: z.string().min(1),
-  command: z.string().min(1),
-  args: z.array(z.string()),
-  installed: z.boolean(),
-})
-export type KnownAgentStatus = z.infer<typeof KnownAgentStatusSchema>
+export interface KnownAgentStatus {
+  id: string
+  label: string
+  command: string
+  args: string[]
+  installed: boolean
+}

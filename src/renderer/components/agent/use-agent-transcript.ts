@@ -74,13 +74,15 @@ export function useAgentTranscript(sessionId: string): AgentTranscriptState {
 /** The follow-up messages waiting for the turn to end; changing them tells main. */
 export function useFollowUpQueue(sessionId: string): [string[], (messages: string[]) => void] {
   const [messages, setMessages] = useState<string[]>([])
-  useEffect(
-    () =>
-      window.electronAPI.agents.onQueueChanged((p) => {
-        if (p.sessionId === sessionId) setMessages(p.messages)
-      }),
-    [sessionId]
-  )
+  useEffect(() => {
+    // The queue lives in main; a tab that opens later reads what is there, then follows changes.
+    void window.electronAPI.agents.queueGet({ sessionId }).then((answer) => {
+      if ('data' in answer) setMessages(answer.data)
+    })
+    return window.electronAPI.agents.onQueueChanged((p) => {
+      if (p.sessionId === sessionId) setMessages(p.messages)
+    })
+  }, [sessionId])
   const change = (next: string[]): void => {
     setMessages(next)
     void window.electronAPI.agents.queueSet({ sessionId, messages: next })

@@ -34,7 +34,7 @@ export function Highlighted(props: {
   })
 }
 
-export const countMatches = (text: string, query: string): number =>
+const countMatches = (text: string, query: string): number =>
   query ? text.toLowerCase().split(query.toLowerCase()).length - 1 : 0
 
 /** For each message, the global index of its first match. */

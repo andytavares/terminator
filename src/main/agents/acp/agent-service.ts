@@ -92,8 +92,11 @@ export interface AgentServiceDeps {
 }
 
 export interface AgentService extends AgentsAPI {
-  /** Replaces the follow-up queue: sent one by one, each after a turn that ended on its own. */
+  /** Replaces the follow-up queue: sent one by one, each after a turn that ended on its own.
+   * With no turn running, the first message goes at once. */
   queueSet(sessionId: string, messages: string[]): void
+  /** The follow-up queue as it stands, for a tab that opens after it was set. */
+  queueOf(sessionId: string): string[]
   /** Asks that wait for an answer now, for a view that opens after they were raised. */
   openAsks(): AgentPermissionAsk[]
   readHistory(sessionId: string): AgentUpdate[]
@@ -139,6 +142,8 @@ interface Session {
   capabilities: AgentCapabilities
   /** Messages to send, in order, as the turns before them end. */
   queue: string[]
+  /** The last turn asked; the next one waits for it, so the agent never gets two prompts at once. */
+  lastTurn: Promise<unknown>
   /** How many cancels there were; a prompt cancelled by none since it was asked was dropped. */
   cancels: number
 }
@@ -238,6 +243,7 @@ function newSession(
     cancelling: Promise.resolve(),
     capabilities: { image: false, steering: false },
     queue: [],
+    lastTurn: Promise.resolve(),
     cancels: 0,
   }
 }
@@ -525,7 +531,13 @@ class AcpAgentService implements AgentService {
 
   queueSet(sessionId: string, messages: string[]): void {
     const session = this.live(sessionId)
-    if (session) this.setQueue(session, messages)
+    if (!session) return
+    this.setQueue(session, messages)
+    if (session.pending.size === 0) this.sendNext(session, 'end_turn')
+  }
+
+  queueOf(sessionId: string): string[] {
+    return this.live(sessionId)?.queue ?? []
   }
 
   private setQueue(session: Session, messages: string[]): void {
@@ -536,16 +548,15 @@ class AcpAgentService implements AgentService {
   async steer(sessionId: string, text: string): Promise<void> {
     const session = this.live(sessionId)
     if (!session) return
-    if (session.capabilities.steering) {
-      if (await this.steered(session, text)) return
-    } else {
-      this.cancelSession(session)
-    }
+    const outcome = session.capabilities.steering ? await this.steered(session, text) : 'failed'
+    if (outcome === 'joined') return
+    // A failed request may leave a turn running; a prompt beside it is not allowed.
+    if (outcome === 'failed') this.cancelSession(session)
     void this.promptSession(session, textPrompt(text))
   }
 
-  /** False when the agent has no turn to join (`promptRequired`) or refused. */
-  private async steered(session: Session, text: string): Promise<boolean> {
+  /** `idle` when the agent has no turn to join (`promptRequired`); `failed` when it refused. */
+  private async steered(session: Session, text: string): Promise<'joined' | 'idle' | 'failed'> {
     try {
       const answer = await session.link.agent.request<{ outcome?: string }, unknown>(
         '_session/steering',
@@ -555,10 +566,10 @@ class AcpAgentService implements AgentService {
           _meta: { steering: { idleBehavior: 'promptRequired' } },
         }
       )
-      return answer.outcome !== 'promptRequired'
+      return answer.outcome === 'promptRequired' ? 'idle' : 'joined'
     } catch (error) {
       logger.error('agent steering failed', { error: String(error) })
-      return false
+      return 'failed'
     }
   }
 
@@ -581,7 +592,10 @@ class AcpAgentService implements AgentService {
     session: Session,
     content: PromptRequest['prompt']
   ): Promise<{ stopReason: string }> {
-    const turn = this.runTurn(session, content, session.cancels)
+    // Read now: a cancel after this point waits for this turn, so the turn must not wait for it.
+    const asked = { cancels: session.cancels, cancelling: session.cancelling }
+    const turn = session.lastTurn.then(() => this.runTurn(session, content, asked))
+    session.lastTurn = turn.catch(() => undefined)
     session.pending.add(turn)
     void turn.finally(() => session.pending.delete(turn))
     void turn.then(({ stopReason }) => this.sendNext(session, stopReason))
@@ -599,10 +613,11 @@ class AcpAgentService implements AgentService {
   private async runTurn(
     session: Session,
     content: PromptRequest['prompt'],
-    cancelsAtAsk: number
+    asked: { cancels: number; cancelling: Promise<unknown> }
   ): Promise<{ stopReason: string }> {
+    const cancelsAtAsk = asked.cancels
     // An agent's cancel also drops a prompt that reaches it before the cancelled turn has ended.
-    await session.cancelling
+    await asked.cancelling
     if (session.ended) return { stopReason: 'error' }
     if (session.cancels !== cancelsAtAsk) return { stopReason: 'cancelled' }
     setTurn(session.id, true)

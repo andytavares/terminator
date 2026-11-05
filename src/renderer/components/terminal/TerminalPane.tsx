@@ -215,7 +215,8 @@ function SingleTab({
   if (!showsAgent || !shownSessionId) return <SingleTerminal {...terminal} />
   return (
     <div className="terminal-pane">
-      <AgentView sessionId={shownSessionId} />
+      {/* Keyed: each session's draft, queue and attachments are its own. */}
+      <AgentView key={shownSessionId} sessionId={shownSessionId} />
     </div>
   )
 }

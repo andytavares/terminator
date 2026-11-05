@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react'
-import { Button, DiffView, linesFromTexts } from '@terminator/extension-ui'
+import { Button, DiffView } from '@terminator/extension-ui'
 import type { AgentPermissionAsk } from '@terminator/extension-sdk'
 import { useSessionStore } from '../../stores/session.store'
 import {
+  diffLinesOf,
   inputSummary,
   relativeTo,
   splitTurns,
@@ -70,10 +71,7 @@ function ToolCall({ tool, cwd }: { tool: ToolEntry; cwd: string }): React.JSX.El
             <summary>
               <span className="agent-tool__summary">{relativeTo(cwd, out.path)}</span>
             </summary>
-            <DiffView
-              language={out.path.split('.').pop()}
-              hunks={[{ header: '', lines: linesFromTexts(out.oldText, out.newText) }]}
-            />
+            <DiffView hunks={[{ header: '', lines: diffLinesOf(out) }]} />
           </details>
         ) : (
           <details key={i} className="agent-tool__output">

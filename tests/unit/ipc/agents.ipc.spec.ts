@@ -8,6 +8,7 @@ const service = vi.hoisted(() => ({
   prompt: vi.fn(),
   steer: vi.fn(),
   queueSet: vi.fn(),
+  queueOf: vi.fn(() => ['waiting']),
   cancel: vi.fn(),
   answer: vi.fn(),
   setConfig: vi.fn(),
@@ -52,6 +53,7 @@ describe('agents channels', () => {
         'agents:list',
         'agents:open-asks',
         'agents:prompt',
+        'agents:queue-get',
         'agents:queue-set',
         'agents:set-config',
         'agents:start',
@@ -123,6 +125,11 @@ describe('agents steer, queue and images', () => {
     await invoke('agents:queue-set', { sessionId: 's1', messages: ['next'] })
     expect(service.steer).toHaveBeenCalledWith('s1', 'instead')
     expect(service.queueSet).toHaveBeenCalledWith('s1', ['next'])
+  })
+
+  it('answers the queue of a session as it stands', async () => {
+    expect(await invoke('agents:queue-get', { sessionId: 's1' })).toEqual({ data: ['waiting'] })
+    expect(service.queueOf).toHaveBeenCalledWith('s1')
   })
 
   it('passes the images of a prompt to the service', async () => {

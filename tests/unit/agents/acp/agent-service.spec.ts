@@ -676,7 +676,7 @@ describe('an agent that never answers the mode', () => {
   it('is killed and reported not started once the start time runs out', async () => {
     const link = {
       agent: partialFake<AgentLink['agent']>({
-        initialize: async () => ({}),
+        initialize: async () => ({ protocolVersion: 1 }),
         newSession: async () => ({ sessionId: SESSION_ID }),
         setSessionMode: () => new Promise(() => undefined),
       }),
