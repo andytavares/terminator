@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Pen } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@terminator/extension-ui'
 import './git-integration.css'
@@ -13,7 +13,8 @@ import { PrCreatedNotice } from './PrCreatedNotice'
 import type { FileDiff, PullRequest } from '../schemas/git.schema'
 import { gitAPI, type CommitResult } from '../api/git'
 import { MergeFlowView } from './merge-flow/MergeFlowView'
-import { choose } from './text'
+import { choose, COMMIT_ERRORS } from './text'
+import { requestDraft } from '../hooks/requestDraft'
 import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 interface Props {
@@ -24,13 +25,6 @@ type CommitPhase = 'idle' | 'hooks' | 'committing'
 type DiffAnswer = { diff: FileDiff } | { error: string }
 type PrStatusAnswer = { pr: PullRequest | null } | { error: string }
 type PushAnswer = { success: true } | { error: string }
-
-const COMMIT_ERRORS: Record<string, string> = {
-  NOTHING_TO_COMMIT: 'Nothing staged to commit. Stage at least one file first.',
-  EMPTY_MESSAGE: 'Commit message cannot be empty.',
-  TIMEOUT: 'Commit timed out — a pre-commit hook may have hung.',
-  HOOK_FAILED: 'Pre-commit hooks failed.',
-}
 
 const PUSH_ERRORS: Record<string, string> = {
   NO_UPSTREAM: 'Committed but push failed — no upstream branch set.',
@@ -60,12 +54,13 @@ interface ViewRequest {
 interface PendingRequestTargets {
   commitMessageRef: React.RefObject<HTMLTextAreaElement | null>
   openPrDialog: () => void
+  writeMessage: () => void
 }
 
 /** A Commit… or Create PR… run before this view existed broadcast to nobody; the request waits
  *  in the backend for the view to collect it on mount. */
 function usePendingViewRequest(repoRoot: string | null, targets: PendingRequestTargets): void {
-  const { commitMessageRef, openPrDialog } = targets
+  const { commitMessageRef, openPrDialog, writeMessage } = targets
   useEffect(() => {
     if (!repoRoot) return
     void window.electronAPI.extensionBridge
@@ -74,10 +69,11 @@ function usePendingViewRequest(repoRoot: string | null, targets: PendingRequestT
         const request = (result as { request?: ViewRequest | null })?.request
         if (!request || request.repoRoot !== repoRoot) return
         if (request.kind === 'commit') commitMessageRef.current?.focus()
+        else if (request.kind === 'write-message') writeMessage()
         else openPrDialog()
       })
       .catch(() => {})
-  }, [repoRoot, commitMessageRef, openPrDialog])
+  }, [repoRoot, commitMessageRef, openPrDialog, writeMessage])
 }
 
 interface DiffRequest {
@@ -292,6 +288,26 @@ async function commitAndPush(c: CommitControls, noVerify: boolean): Promise<void
   }
 }
 
+/** Fills the commit message from the agent's draft of the staged diff; a failure shows as the commit error. */
+function useWriteMessage(
+  repoRoot: string | null,
+  setCommitMessage: (message: string) => void,
+  errors: CommitErrorState
+) {
+  const [isDrafting, setIsDrafting] = useState(false)
+  const { reset, setCommitError } = errors
+  const writeMessage = useCallback(async () => {
+    if (!repoRoot) return
+    setIsDrafting(true)
+    reset()
+    const result = await requestDraft(repoRoot)
+    if ('error' in result) setCommitError(result.error)
+    else setCommitMessage(result.draft.commitMessage)
+    setIsDrafting(false)
+  }, [repoRoot, setCommitMessage, reset, setCommitError])
+  return { isDrafting, writeMessage }
+}
+
 function useCommitFlow(repoRoot: string | null, canCommitFiles: boolean) {
   const [commitMessage, setCommitMessage] = useState('')
   const [isCommitting, setIsCommitting] = useState(false)
@@ -301,7 +317,9 @@ function useCommitFlow(repoRoot: string | null, canCommitFiles: boolean) {
   const canCommit = canCommitFiles && commitMessage.trim().length > 0
   const runner = { repoRoot, message: commitMessage, canCommit, phase, errors, setIsCommitting }
   const controls: CommitControls = { runner, setCommitMessage, setIsPushing }
+  const drafting = useWriteMessage(repoRoot, setCommitMessage, errors)
   return {
+    ...drafting,
     commitMessage,
     setCommitMessage,
     isCommitting,
@@ -411,12 +429,27 @@ function idleHint(stagedCount: number, message: string): string | null {
   return null
 }
 
+function WriteMessageButton({ flow }: { flow: CommitFlow }) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      icon={Pen}
+      onClick={() => void flow.writeMessage()}
+      disabled={flow.isDrafting}
+    >
+      {choose(flow.isDrafting, 'Writing…', 'Write message')}
+    </Button>
+  )
+}
+
 function CommitHint({ flow, stagedCount }: { flow: CommitFlow; stagedCount: number }) {
   const hint = idleHint(stagedCount, flow.commitMessage)
   return (
     <div className="git-view__commit-hint">
       {flow.isCommitting && <CommittingHint phase={flow.phase} />}
       {!flow.isCommitting && hint && <span className="git-view__hint-text">{hint}</span>}
+      {!flow.isCommitting && stagedCount > 0 && <WriteMessageButton flow={flow} />}
     </div>
   )
 }
@@ -458,6 +491,7 @@ function CommitSection(props: CommitSectionProps) {
   useBridgeTrigger('git:focus-commit-message', props.repoRoot, () =>
     commitMessageRef.current?.focus()
   )
+  useBridgeTrigger('git:write-commit-message', props.repoRoot, () => void flow.writeMessage())
   return (
     <div className="git-full-view__commit-section">
       <textarea
@@ -522,6 +556,7 @@ function OpenPrDialog({ repoRoot, pr }: { repoRoot: string; pr: PrDialogState })
     <PrDialog
       repoRoot={repoRoot}
       branch={status.branch}
+      hasStagedChanges={status.files.some((f) => f.staged)}
       existingPr={pr.existingPr}
       onClose={() => pr.setShowPrDialog(false)}
       onCreated={pr.handlePrCreated}
@@ -544,7 +579,11 @@ function useGitFullView(repoRoot: string | null) {
   const flow = useCommitFlow(repoRoot, status?.files.some((f) => f.staged) ?? false)
   const pr = usePrDialog(repoRoot)
   const commitMessageRef = useRef<HTMLTextAreaElement>(null)
-  usePendingViewRequest(repoRoot, { commitMessageRef, openPrDialog: pr.handleOpenPr })
+  usePendingViewRequest(repoRoot, {
+    commitMessageRef,
+    openPrDialog: pr.handleOpenPr,
+    writeMessage: flow.writeMessage,
+  })
   return {
     ...{ resize, disabled, view, setView, selectedDiff, handleFileSelect },
     ...{ flow, pr, commitMessageRef },

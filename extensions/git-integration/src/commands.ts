@@ -8,13 +8,14 @@ const PUSH_ERROR_MESSAGES: Record<string, string> = {
 
 /** What a command asked the Git view to do, kept for a view that does not exist yet. */
 export interface ViewRequest {
-  kind: 'commit' | 'pull-request'
+  kind: 'commit' | 'pull-request' | 'write-message'
   repoRoot: string
 }
 
 const VIEW_REQUEST_CHANNEL: Record<ViewRequest['kind'], string> = {
   commit: 'git:focus-commit-message',
   'pull-request': 'git:open-pr-dialog',
+  'write-message': 'git:write-commit-message',
 }
 const PENDING_REQUEST_MS = 5000
 let pendingRequest: ViewRequest | null = null
@@ -96,6 +97,14 @@ export function registerQuickActionCommands(api: ExtensionAPI): Disposable[] {
     ),
     registerGitCommand(
       { id: 'create-pr', label: 'Create PR…', mnemonic: 'r', ...GIT_COMMAND },
+      viewCommand(api, 'pull-request')
+    ),
+    registerGitCommand(
+      { id: 'write-commit-message', label: 'Write commit message', mnemonic: 'w', ...GIT_COMMAND },
+      viewCommand(api, 'write-message')
+    ),
+    registerGitCommand(
+      { id: 'commit-and-open-pr', label: 'Commit and open PR…', mnemonic: 'o', ...GIT_COMMAND },
       viewCommand(api, 'pull-request')
     ),
   ]

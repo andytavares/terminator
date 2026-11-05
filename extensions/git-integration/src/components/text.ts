@@ -16,3 +16,11 @@ export function errorMessageOf(err: unknown): string {
   if (err instanceof Error) return err.message
   return String(err)
 }
+
+/** What the user reads for each error code `git:commit` answers. */
+export const COMMIT_ERRORS: Record<string, string> = {
+  NOTHING_TO_COMMIT: 'Nothing staged to commit. Stage at least one file first.',
+  EMPTY_MESSAGE: 'Commit message cannot be empty.',
+  TIMEOUT: 'Commit timed out — a pre-commit hook may have hung.',
+  HOOK_FAILED: 'Pre-commit hooks failed.',
+}

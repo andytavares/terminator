@@ -30,6 +30,7 @@ async function previewOf(template: string): Promise<HTMLElement> {
     <PrDialog
       repoRoot="/repo"
       branch="feature/x"
+      hasStagedChanges={false}
       existingPr={null}
       onClose={vi.fn()}
       onCreated={vi.fn()}
@@ -64,26 +65,27 @@ describe('PrDialog template preview', () => {
   })
 })
 
-describe('PrDialog usage', () => {
-  async function createWith(prCreate: () => ReturnType<typeof githubAPI.prCreate>) {
-    mockReadFile.mockResolvedValue({ content: '' })
-    mockExec.mockResolvedValue({ exitCode: 0, stdout: '2\n', stderr: '' })
-    vi.spyOn(githubAPI, 'prCreate').mockImplementation(prCreate)
-    render(
-      <PrDialog
-        repoRoot="/repo"
-        branch="feature/x"
-        existingPr={null}
-        onClose={vi.fn()}
-        onCreated={vi.fn()}
-      />
-    )
-    fireEvent.change(screen.getByPlaceholderText('Pull request title'), {
-      target: { value: 'Add x' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /^Create (Draft )?PR$/ }))
-  }
+async function createWith(prCreate: () => ReturnType<typeof githubAPI.prCreate>) {
+  mockReadFile.mockResolvedValue({ content: '' })
+  mockExec.mockResolvedValue({ exitCode: 0, stdout: '2\n', stderr: '' })
+  vi.spyOn(githubAPI, 'prCreate').mockImplementation(prCreate)
+  render(
+    <PrDialog
+      repoRoot="/repo"
+      branch="feature/x"
+      hasStagedChanges={false}
+      existingPr={null}
+      onClose={vi.fn()}
+      onCreated={vi.fn()}
+    />
+  )
+  fireEvent.change(screen.getByPlaceholderText('Pull request title'), {
+    target: { value: 'Add x' },
+  })
+  fireEvent.click(screen.getByRole('button', { name: /^Create (Draft )?PR$/ }))
+}
 
+describe('PrDialog usage', () => {
   it('counts a pull request that was opened', async () => {
     await createWith(async () => ({ number: 7, url: 'https://github.com/o/r/pull/7' }))
     await waitFor(() => expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('pr-create', {}))

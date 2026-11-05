@@ -52,6 +52,10 @@
         "label": "Open a pull request"
       },
       {
+        "id": "draft-change",
+        "label": "Draft a commit message"
+      },
+      {
         "id": "diff-open",
         "label": "Open a file diff"
       },
@@ -62,6 +66,10 @@
       {
         "id": "worktree-remove",
         "label": "Remove a worktree or branch"
+      },
+      {
+        "id": "worktree-cleanup",
+        "label": "Clean up worktrees by the rules"
       },
       {
         "id": "review-comment",

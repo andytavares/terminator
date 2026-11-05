@@ -7,10 +7,16 @@ import {
   SUMMARY_KINDS,
   type AgentRun,
   type SummaryResult,
+  type DraftResult,
 } from '../schemas/review-agent.schema.js'
 import type { PrHead } from '../schemas/pr-review.schema.js'
 import { ensureReviewWorktree } from '../review/worktree.js'
-import { runAgentReview, runSummary, type RunAgentReviewDeps } from '../review/review-agent.js'
+import {
+  runAgentReview,
+  runSummary,
+  runDraft,
+  type RunAgentReviewDeps,
+} from '../review/review-agent.js'
 import {
   defineChannel,
   noPayload,
@@ -18,6 +24,7 @@ import {
   type AgentsAPI,
   type Disposable,
 } from '@terminator/extension-sdk'
+import { runGit } from '../shell/run-git.js'
 import { RepoRoot } from './repo-root.js'
 import { VALIDATION_ERROR, errorEnvelope, type RegisterFn } from './register.js'
 
@@ -36,6 +43,7 @@ export interface ReviewAgentDeps {
   ensureWorktree?: typeof ensureReviewWorktree
   runReview?: typeof runAgentReview
   runSummary?: typeof runSummary
+  runDraft?: typeof runDraft
 }
 
 /** The agent settings one run uses: model, optional effort, and how long it may take. */
@@ -51,6 +59,7 @@ interface AgentContext {
   ensureWorktree: typeof ensureReviewWorktree
   runReview: typeof runAgentReview
   runSummary: typeof runSummary
+  runDraft: typeof runDraft
   /** repoRoot:::prNumber:::scopeJson -> the run currently going for that (pr, scope) */
   runningByScope: Map<string, AgentRun>
   /** runId -> its cancel, for a run or summary this process started */
@@ -94,6 +103,8 @@ const SummarizePayload = z.object({
   kind: z.enum(SUMMARY_KINDS),
   text: z.string().trim().min(1),
 })
+
+const DraftChangePayload = z.object({ repoRoot: RepoRoot })
 
 const SETTING = 'terminator.git-integration.review'
 
@@ -277,11 +288,52 @@ async function summarize(
   }
 }
 
+const DRAFT_FAILED = 'Could not read the staged changes. Write the message yourself.'
+const NOTHING_STAGED = 'Nothing is staged, so there is nothing to describe.'
+
+/** Drafts the commit and pull request text for the staged diff; the draft is answered, never stored. */
+async function draftChange(
+  ctx: AgentContext,
+  { repoRoot }: z.infer<typeof DraftChangePayload>
+): Promise<DraftResult> {
+  let diff: string
+  let subjects: string[]
+  try {
+    diff = await runGit(repoRoot, ['diff', '--cached'], { maxBuffer: 20 * 1024 * 1024 })
+    subjects = (await runGit(repoRoot, ['log', '-20', '--format=%s'])).split('\n').filter(Boolean)
+  } catch {
+    return { error: DRAFT_FAILED }
+  }
+  if (!diff) return { error: NOTHING_STAGED }
+  const { model, effort, timeoutMs } = runSettings(ctx.deps)
+  const { done, cancel } = ctx.runDraft(
+    { diff, subjects, cwd: repoRoot, model, effort, timeoutMs },
+    agentDepsOf(ctx)
+  )
+  const id = randomUUID()
+  ctx.liveRuns.set(id, cancel)
+  try {
+    return await done
+  } finally {
+    ctx.liveRuns.delete(id)
+  }
+}
+
 function cancelRun(ctx: AgentContext, runId: string) {
   const cancel = ctx.liveRuns.get(runId)
   if (!cancel) return { ok: false }
   cancel()
   return { ok: true }
+}
+
+function draftChannel(ctx: AgentContext): ChannelSpec {
+  return defineChannel({
+    channel: 'review-agent:draft-change',
+    schema: DraftChangePayload,
+    invalid: VALIDATION_ERROR,
+    run: (input) => draftChange(ctx, input),
+    onError: () => ({ error: DRAFT_FAILED }),
+  })
 }
 
 function runChannels(ctx: AgentContext): ChannelSpec[] {
@@ -348,9 +400,11 @@ export function registerReviewAgentHandlers(
     ensureWorktree: deps.ensureWorktree ?? ensureReviewWorktree,
     runReview: deps.runReview ?? runAgentReview,
     runSummary: deps.runSummary ?? runSummary,
+    runDraft: deps.runDraft ?? runDraft,
     runningByScope: new Map(),
     liveRuns: new Map(),
   }
-  for (const spec of [...runChannels(ctx), ...storedRunChannels(deps)]) register(spec)
+  for (const spec of [...runChannels(ctx), draftChannel(ctx), ...storedRunChannels(deps)])
+    register(spec)
   return { dispose: () => ctx.liveRuns.forEach((cancel) => cancel()) }
 }

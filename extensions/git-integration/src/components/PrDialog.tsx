@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Dialog, Tab, TabList, TabPanel, TabsRoot } from '@terminator/extension-ui'
 import type { PullRequest } from '../schemas/git.schema'
+import type { ChangeDraft } from '../schemas/review-agent.schema'
 import { RichContent } from './pr-review/RichContent'
 import { githubAPI } from '../api/github'
-import { choose } from './text'
+import { choose, COMMIT_ERRORS } from './text'
+import { gitAPI } from '../api/git'
+import { requestDraft } from '../hooks/requestDraft'
 import { recordUsage } from '@terminator/extension-sdk/renderer'
 
 interface Branch {
@@ -15,6 +18,8 @@ interface Branch {
 interface PrDialogProps {
   repoRoot: string
   branch: string
+  /** With staged changes the dialog commits them first, from a message the agent drafts. */
+  hasStagedChanges: boolean
   existingPr: PullRequest | null
   onClose: () => void
   onCreated: (pr: PullRequest) => void
@@ -41,6 +46,18 @@ async function pushBeforePr(repoRoot: string): Promise<Failure | null> {
   })
   if ('error' in result) return { error: result.error }
   if (result.exitCode !== 0) return { error: result.stderr || 'git push failed' }
+  return null
+}
+
+async function createBranch(repoRoot: string, name: string): Promise<Failure | null> {
+  const result = await window.electronAPI.shell.exec({
+    command: 'git',
+    args: ['checkout', '-b', name],
+    cwd: repoRoot,
+    timeoutMs: 30000,
+  })
+  if ('error' in result) return { error: result.error }
+  if (result.exitCode !== 0) return { error: result.stderr || `Could not create branch ${name}` }
   return null
 }
 
@@ -150,43 +167,93 @@ function defaultBase(local: Branch[]): string | undefined {
   return (preferred ?? local[0])?.name
 }
 
+function isDefaultBranch(branch: string): boolean {
+  return branch === 'main' || branch === 'master'
+}
+
 /** The repository's other branches, its PR template, and a sensible base. */
 function useBranchChoices(props: PrDialogProps, setBody: (body: string) => void) {
-  const { repoRoot, branch } = props
+  const { repoRoot, branch, hasStagedChanges } = props
+  // A new branch off the default branch opens its PR against that branch, so it stays a choice.
+  const keepCurrent = hasStagedChanges && isDefaultBranch(branch)
   const [base, setBase] = useState('main')
   const [localBranches, setLocalBranches] = useState<Branch[]>([])
   const [remoteBranches, setRemoteBranches] = useState<Branch[]>([])
   useEffect(() => {
-    void loadPrTemplate(repoRoot).then((template) => {
-      if (template) setBody(template)
-    })
+    // The draft writes the description, so a staged commit does not start from the template.
+    if (!hasStagedChanges) {
+      void loadPrTemplate(repoRoot).then((template) => {
+        if (template) setBody(template)
+      })
+    }
     void window.electronAPI.git.listBranches(repoRoot).then((result) => {
       if (!('branches' in result)) return
-      const others = result.branches.filter((b) => b.name !== branch)
+      const others = result.branches.filter((b) => keepCurrent || b.name !== branch)
       const local = others.filter((b) => !b.isRemote)
       setLocalBranches(local)
       setRemoteBranches(others.filter((b) => b.isRemote))
       const picked = defaultBase(local)
       if (picked) setBase(picked)
     })
-  }, [repoRoot, branch, setBody])
+  }, [repoRoot, branch, hasStagedChanges, keepCurrent, setBody])
   return { base, setBase, localBranches, remoteBranches }
 }
 
+/** The agent's draft of the staged changes: loading, then either filled in or the reason it failed. */
+function useStagedDraft(props: PrDialogProps, fill: (draft: ChangeDraft) => void) {
+  const { repoRoot, hasStagedChanges } = props
+  const [isDrafting, setIsDrafting] = useState(hasStagedChanges)
+  const [draftError, setDraftError] = useState<string | null>(null)
+  const [isDrafted, setIsDrafted] = useState(false)
+  useEffect(() => {
+    if (!hasStagedChanges) return
+    void requestDraft(repoRoot).then((result) => {
+      if ('error' in result) setDraftError(result.error)
+      else {
+        fill(result.draft)
+        setIsDrafted(true)
+      }
+      setIsDrafting(false)
+    })
+  }, [repoRoot, hasStagedChanges, fill])
+  return { isDrafting, draftError, isDrafted }
+}
+
 function usePrForm(props: PrDialogProps) {
-  const [title, setTitle] = useState(() => titleFromBranch(props.branch))
+  const [title, setTitle] = useState(() =>
+    props.hasStagedChanges ? '' : titleFromBranch(props.branch)
+  )
   const [body, setBody] = useState('')
   const [isDraft, setIsDraft] = useState(false)
+  const [commitMessage, setCommitMessage] = useState('')
+  const [newBranch, setNewBranch] = useState('')
   const branches = useBranchChoices(props, setBody)
-  return { title, setTitle, body, setBody, isDraft, setIsDraft, ...branches }
+  const fill = useCallback((draft: ChangeDraft) => {
+    setTitle(draft.title)
+    setBody(draft.body)
+    setCommitMessage(draft.commitMessage)
+    setNewBranch(draft.branch)
+  }, [])
+  const drafting = useStagedDraft(props, fill)
+  return {
+    ...{ title, setTitle, body, setBody, isDraft, setIsDraft },
+    ...{ commitMessage, setCommitMessage, newBranch, setNewBranch },
+    ...branches,
+    ...drafting,
+  }
 }
 
 type PrForm = ReturnType<typeof usePrForm>
 
+/** A staged commit made on the default branch goes to a new branch first. */
+function needsNewBranch(props: PrDialogProps): boolean {
+  return props.hasStagedChanges && isDefaultBranch(props.branch)
+}
+
 function draftOf(props: PrDialogProps, form: PrForm): PrDraft {
   return {
     repoRoot: props.repoRoot,
-    branch: props.branch,
+    branch: needsNewBranch(props) ? form.newBranch.trim() : props.branch,
     title: form.title.trim(),
     body: form.body,
     base: form.base,
@@ -194,17 +261,54 @@ function draftOf(props: PrDialogProps, form: PrForm): PrDraft {
   }
 }
 
+/** Makes the new branch if the commit needs one, commits the staged changes, then opens the PR. */
+async function commitThenCreate(
+  props: PrDialogProps,
+  form: PrForm,
+  onStatus: (msg: string) => void
+): Promise<CreatedPr | Failure> {
+  const draft = draftOf(props, form)
+  if (needsNewBranch(props)) {
+    onStatus('Creating branch…')
+    const failure = await createBranch(props.repoRoot, draft.branch)
+    if (failure) return failure
+  }
+  onStatus('Committing…')
+  const committed = await gitAPI.commit({
+    repoRoot: props.repoRoot,
+    message: form.commitMessage.trim(),
+  })
+  recordUsage('commit', 'error' in committed ? { failed: true } : {})
+  if ('error' in committed) return { error: COMMIT_ERRORS[committed.error] ?? committed.error }
+  return ghPrCreate(draft, onStatus)
+}
+
+/** The first thing the form still needs, or null when it can be submitted. */
+function missingField(props: PrDialogProps, form: PrForm): string | null {
+  if (!form.title.trim()) return 'Title is required'
+  if (!props.hasStagedChanges) return null
+  if (!form.commitMessage.trim()) return 'Commit message is required'
+  if (needsNewBranch(props) && !form.newBranch.trim()) return 'New branch is required'
+  return null
+}
+
+function ghPrCreateFrom(props: PrDialogProps, form: PrForm, onStatus: (msg: string) => void) {
+  return ghPrCreate(draftOf(props, form), onStatus)
+}
+
 function usePrCreate(props: PrDialogProps, form: PrForm) {
   const [isCreating, setIsCreating] = useState(false)
   const [creatingStatus, setCreatingStatus] = useState('')
   const [error, setError] = useState<string | null>(null)
   const handleCreate = async (): Promise<void> => {
-    if (!form.title.trim()) return setError('Title is required')
+    const missing = missingField(props, form)
+    if (missing) return setError(missing)
     setIsCreating(true)
     setCreatingStatus('')
     setError(null)
     try {
-      const result = await ghPrCreate(draftOf(props, form), setCreatingStatus)
+      const create = props.hasStagedChanges ? commitThenCreate : ghPrCreateFrom
+      const result = await create(props, form, setCreatingStatus)
       recordUsage('pr-create', 'error' in result ? { failed: true } : {})
       if ('error' in result) setError(result.error)
       else props.onCreated(result.pr)
@@ -221,9 +325,12 @@ function usePrCreate(props: PrDialogProps, form: PrForm) {
 
 type PrCreate = ReturnType<typeof usePrCreate>
 
-function submitLabel(isCreating: boolean, isDraft: boolean): string {
+function submitLabel(props: PrDialogProps, form: PrForm, isCreating: boolean): string {
   if (isCreating) return '…'
-  return choose(isDraft, 'Create Draft PR', 'Create PR')
+  if (props.hasStagedChanges) {
+    return choose(form.isDraft, 'Commit, push and create draft PR', 'Commit, push and create PR')
+  }
+  return choose(form.isDraft, 'Create Draft PR', 'Create PR')
 }
 
 function prDialogActions(props: PrDialogProps, form: PrForm, create: PrCreate) {
@@ -231,9 +338,9 @@ function prDialogActions(props: PrDialogProps, form: PrForm, create: PrCreate) {
   return [
     { label: 'Cancel', disabled: isCreating, onSelect: props.onClose },
     {
-      label: submitLabel(isCreating, form.isDraft),
+      label: submitLabel(props, form, isCreating),
       tone: 'primary' as const,
-      disabled: isCreating || !form.title.trim() || !!props.existingPr,
+      disabled: isCreating || form.isDrafting || !form.title.trim() || !!props.existingPr,
       onSelect: () => void create.handleCreate(),
     },
   ]
@@ -253,6 +360,57 @@ function ExistingPr({ pr }: { pr: PullRequest }) {
         #{pr.number}: {pr.title}
       </a>
     </div>
+  )
+}
+
+function TextField(props: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+}) {
+  return (
+    <div className="pr-dialog__field">
+      <label className="pr-dialog__label">{props.label}</label>
+      <input
+        className="pr-dialog__input"
+        value={props.value}
+        onChange={(e) => props.onChange(e.target.value)}
+        placeholder={props.placeholder}
+      />
+    </div>
+  )
+}
+
+function CommitFields({ props, form }: { props: PrDialogProps; form: PrForm }) {
+  return (
+    <>
+      {needsNewBranch(props) && (
+        <TextField
+          label="New branch"
+          value={form.newBranch}
+          onChange={form.setNewBranch}
+          placeholder="branch-name"
+        />
+      )}
+      <TextField
+        label="Commit message"
+        value={form.commitMessage}
+        onChange={form.setCommitMessage}
+        placeholder="Commit message"
+      />
+    </>
+  )
+}
+
+function DraftNote({ form }: { form: PrForm }) {
+  if (form.isDrafting) return <p className="pr-dialog__status">Drafting from the staged diff…</p>
+  if (form.draftError) return <div className="pr-dialog__error">{form.draftError}</div>
+  if (!form.isDrafted) return null
+  return (
+    <p className="pr-dialog__note">
+      Drafted by Claude from the staged diff and recent commit subjects.
+    </p>
   )
 }
 
@@ -360,22 +518,24 @@ export function PrDialog(props: PrDialogProps): React.JSX.Element {
   const { branch, existingPr } = props
   const form = usePrForm(props)
   const create = usePrCreate(props, form)
-  const isDefaultBranch = branch === 'main' || branch === 'master'
+  const warnsDefaultBranch = isDefaultBranch(branch) && !props.hasStagedChanges
   return (
     <Dialog
-      title="Open Pull Request"
+      title={choose(props.hasStagedChanges, 'Commit and open a pull request', 'Open Pull Request')}
       onDismiss={props.onClose}
       actions={prDialogActions(props, form, create)}
     >
       {existingPr && <ExistingPr pr={existingPr} />}
-      {isDefaultBranch && (
+      {warnsDefaultBranch && (
         <div className="pr-dialog__warning">
           Warning: creating a PR from the default branch ({branch}).
         </div>
       )}
+      {props.hasStagedChanges && <CommitFields props={props} form={form} />}
       <TitleField form={form} />
       <DescriptionField form={form} />
       <BaseAndDraft form={form} />
+      {props.hasStagedChanges && <DraftNote form={form} />}
       {create.error && <div className="pr-dialog__error">{create.error}</div>}
       {create.isCreating && create.creatingStatus && (
         <p className="pr-dialog__status">{create.creatingStatus}</p>
