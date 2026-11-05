@@ -4,7 +4,7 @@ export const CORE_GROUPS: QuickActionGroup[] = [
   { id: 'terminal', mnemonic: 't', label: 'Terminal' },
   { id: 'sessions', mnemonic: 's', label: 'Sessions' },
   { id: 'workspace', mnemonic: 'w', label: 'Workspace' },
-  { id: 'navigate', mnemonic: 'v', label: 'Navigate' },
+  { id: 'navigate', mnemonic: 'y', label: 'Navigate' },
   { id: 'custom', mnemonic: 'x', label: 'Custom' },
 ]
 

@@ -32,7 +32,8 @@ async function launchScheduled(schedule: Schedule): Promise<void> {
 /** Main says a schedule is due; this window starts it. */
 export function useScheduledRuns(): void {
   useEffect(
-    () => window.electronAPI.schedules.onRun((schedule) => void launchScheduled(schedule)),
+    // The remote browser client has no schedules API (manifest `remote: 'omit'`).
+    () => window.electronAPI.schedules?.onRun?.((schedule) => void launchScheduled(schedule)),
     []
   )
 }

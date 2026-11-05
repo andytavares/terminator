@@ -65,7 +65,7 @@ describe('allocateExtensionGroups — assigns no group when every a-z letter is 
       mnemonic: String.fromCharCode(97 + i),
       label: `Ext${i}`,
     }))
-    // Core reserves t, s, w, x, v, h, o, a and b, so only 17 letters are left
+    // Core reserves t, s, w, y, x, h, o, a and b, so only 17 letters are left
     // for 27 requests.
     requests.push({ extensionId: 'overflow', mnemonic: 'a', label: 'Aaa' })
     const { groups, warnings } = allocateExtensionGroups(requests)
@@ -86,6 +86,16 @@ describe('allocateExtensionGroups — assigns no group when every a-z letter is 
   it('falls back to the first free label letter when no mnemonic is requested', () => {
     const { groups } = allocateExtensionGroups([{ extensionId: 'notes', label: 'Notes' }])
     expect(groups[0].mnemonic).toBe('n')
+  })
+})
+
+describe('allocateExtensionGroups — the bundled extensions keep their letters', () => {
+  it('gives Task Vault v and Git g, so the core groups take none of them', () => {
+    const { groups } = allocateExtensionGroups([
+      { extensionId: 'terminator.task-vault', mnemonic: 'v', label: 'Task Vault' },
+      { extensionId: 'terminator.git-integration', mnemonic: 'g', label: 'Git' },
+    ])
+    expect(groups.map((g) => g.mnemonic)).toEqual(['v', 'g'])
   })
 })
 
