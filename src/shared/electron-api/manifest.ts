@@ -62,6 +62,8 @@ import type {
 import type {
   AgentAnswerInputSchema,
   AgentPromptInputSchema,
+  AgentQueueInputSchema,
+  AgentSteerInputSchema,
   AgentSessionInputSchema,
   AgentSetConfigInputSchema,
   AgentStartInputSchema,
@@ -1388,6 +1390,30 @@ export const ELECTRON_API_MANIFEST = [
     remote: 'omit',
   }),
   method({
+    path: 'agents.steer',
+    kind: 'invoke',
+    channel: 'agents:steer',
+    signature:
+      signature<
+        (
+          input: z.input<typeof AgentSteerInputSchema>
+        ) => Promise<{ data: true } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.queueSet',
+    kind: 'invoke',
+    channel: 'agents:queue-set',
+    signature:
+      signature<
+        (
+          input: z.input<typeof AgentQueueInputSchema>
+        ) => Promise<{ data: true } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
     path: 'agents.cancel',
     kind: 'invoke',
     channel: 'agents:cancel',
@@ -1484,6 +1510,16 @@ export const ELECTRON_API_MANIFEST = [
     signature:
       signature<
         (handler: (payload: { sessionId: string; requestId: string }) => void) => Unsubscribe
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.onQueueChanged',
+    kind: 'event',
+    channel: 'agents:queue',
+    signature:
+      signature<
+        (handler: (payload: { sessionId: string; messages: string[] }) => void) => Unsubscribe
       >(),
     remote: 'omit',
   }),

@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, realpathSync } from 'node:fs'
 import { PROTOCOL_VERSION } from '@agentclientprotocol/sdk'
 import type {
   CancelNotification,
   Client,
   InitializeRequest,
+  InitializeResponse,
   LoadSessionRequest,
   LoadSessionResponse,
   NewSessionRequest,
@@ -34,6 +35,7 @@ import type {
 import { makeLogger } from '../../logger.js'
 import { clearTurn, setTurn } from '../agent-turns.js'
 import { clearAsk, raiseAsk } from '../ask-watcher.js'
+import type { AgentConversation } from '../../../shared/types/index.js'
 import type { AgentLog } from './agent-log.js'
 
 const logger = makeLogger('agent-service')
@@ -42,7 +44,7 @@ const DEFAULT_START_TIMEOUT_MS = 60_000
 
 /** The calls the service makes on an agent: a `ClientSideConnection` has them all. */
 interface AgentCalls {
-  initialize(params: InitializeRequest): Promise<unknown>
+  initialize(params: InitializeRequest): Promise<InitializeResponse>
   newSession(params: NewSessionRequest): Promise<NewSessionResponse>
   loadSession(params: LoadSessionRequest): Promise<LoadSessionResponse | void>
   setSessionMode(params: SetSessionModeRequest): Promise<unknown>
@@ -51,6 +53,8 @@ interface AgentCalls {
   ): Promise<SetSessionConfigOptionResponse>
   prompt(params: PromptRequest): Promise<PromptResponse>
   cancel(params: CancelNotification): Promise<void>
+  /** An extension request, such as `_session/steering`. */
+  request<Response, Params>(method: string, params: Params): Promise<Response>
   /** Aborts when the connection closes, which can come before the process's exit is seen. */
   readonly signal?: AbortSignal
 }
@@ -81,11 +85,15 @@ export interface AgentServiceDeps {
     tab: { projectId: string; title: string }
   }): void
   now(): number
+  /** The agent conversations the session records hold, for `sessionsIn`. */
+  conversations?(): AgentConversation[]
   /** How long an agent may take to open a session before it is killed. Default 60 s. */
   startTimeoutMs?: number
 }
 
 export interface AgentService extends AgentsAPI {
+  /** Replaces the follow-up queue: sent one by one, each after a turn that ended on its own. */
+  queueSet(sessionId: string, messages: string[]): void
   /** Asks that wait for an answer now, for a view that opens after they were raised. */
   openAsks(): AgentPermissionAsk[]
   readHistory(sessionId: string): AgentUpdate[]
@@ -97,9 +105,16 @@ interface OpenAsk {
   resolve(response: RequestPermissionResponse): void
 }
 
+/** What the agent said in its `initialize` response that the service acts on. */
+interface AgentCapabilities {
+  image: boolean
+  steering: boolean
+}
+
 interface Session {
   id: string
   agentId: string
+  cwd: string
   link: AgentLink
   /** Nobody can answer: asks are rejected. */
   unattended: boolean
@@ -121,6 +136,9 @@ interface Session {
   sent: number
   /** Settles once the prompts the last cancel was for have ended. */
   cancelling: Promise<unknown>
+  capabilities: AgentCapabilities
+  /** Messages to send, in order, as the turns before them end. */
+  queue: string[]
   /** How many cancels there were; a prompt cancelled by none since it was asked was dropped. */
   cancels: number
 }
@@ -200,7 +218,9 @@ const PROMPT_FAILED_MESSAGE =
 const timeoutMessage = (timeoutMs: number): string =>
   `The agent did not finish within ${Math.round(timeoutMs / 1000)} seconds.`
 
-function newSession(fields: Pick<Session, 'id' | 'agentId' | 'link' | 'unattended'>): Session {
+function newSession(
+  fields: Pick<Session, 'id' | 'agentId' | 'cwd' | 'link' | 'unattended'>
+): Session {
   return {
     ...fields,
     hasTab: false,
@@ -216,6 +236,8 @@ function newSession(fields: Pick<Session, 'id' | 'agentId' | 'link' | 'unattende
     pending: new Set(),
     sent: 0,
     cancelling: Promise.resolve(),
+    capabilities: { image: false, steering: false },
+    queue: [],
     cancels: 0,
   }
 }
@@ -246,12 +268,30 @@ function whenExited(link: AgentLink): Promise<never> {
   )
 }
 
-/** What the conversation shows when a prompt fails: plain words, the detail is in the log. */
-function failureNotice(): AgentUpdate {
+/** What the conversation shows when a prompt fails or is refused: plain words, the detail is in the log. */
+function noticeOf(text: string): AgentUpdate {
+  return { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } } as AgentUpdate
+}
+
+function capabilitiesOf(response: InitializeResponse): AgentCapabilities {
+  const steering = (response._meta?.steering as { supported?: unknown } | undefined)?.supported
   return {
-    sessionUpdate: 'agent_message_chunk',
-    content: { type: 'text', text: PROMPT_FAILED_MESSAGE },
-  } as AgentUpdate
+    image: response.agentCapabilities?.promptCapabilities?.image === true,
+    steering: steering === true,
+  }
+}
+
+const textPrompt = (text: string): PromptRequest['prompt'] => [{ type: 'text', text }]
+
+const IMAGES_REFUSED_MESSAGE = '\n\nThis agent cannot read images. Send the message without them.'
+
+/** Where two spellings of a folder meet; a folder that is gone keeps its own spelling. */
+function canonical(folder: string): string {
+  try {
+    return realpathSync(folder)
+  } catch {
+    return folder
+  }
 }
 
 /** Starts collecting the session's reply text; the returned function reads what came so far. */
@@ -368,7 +408,11 @@ class AcpAgentService implements AgentService {
 
   private async begin(session: Session, input: StartAgentInput): Promise<AgentConfigOption[]> {
     const { agent } = session.link
-    await agent.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
+    const initialized = await agent.initialize({
+      protocolVersion: PROTOCOL_VERSION,
+      clientCapabilities: {},
+    })
+    session.capabilities = capabilitiesOf(initialized)
     const request = { cwd: input.cwd, mcpServers: [], _meta: input.agentMeta ?? {} }
     if (input.resume === undefined) {
       const created = await agent.newSession(request)
@@ -403,7 +447,13 @@ class AcpAgentService implements AgentService {
   private async open(input: StartAgentInput, unattended: boolean): Promise<Session> {
     const agentId = input.agentId ?? this.deps.defaultAgentId()
     const link = await this.deps.connect({ agentId, client: this.client })
-    const session = newSession({ id: input.resume ?? '', agentId, link, unattended })
+    const session = newSession({
+      id: input.resume ?? '',
+      agentId,
+      cwd: input.cwd,
+      link,
+      unattended,
+    })
     link.onExit((exitCode) => this.finish(session, exitCode))
     try {
       const limit = this.deps.startTimeoutMs ?? DEFAULT_START_TIMEOUT_MS
@@ -454,21 +504,101 @@ class AcpAgentService implements AgentService {
     }
   }
 
-  async prompt(sessionId: string, text: string): Promise<{ stopReason: string }> {
+  async prompt(
+    sessionId: string,
+    text: string,
+    images: Array<{ mimeType: string; data: string }> = []
+  ): Promise<{ stopReason: string }> {
     const session = this.live(sessionId)
-    return session ? this.promptSession(session, text) : { stopReason: 'error' }
+    if (!session) return { stopReason: 'error' }
+    if (images.length > 0 && !session.capabilities.image) {
+      this.publishUpdate(session, noticeOf(IMAGES_REFUSED_MESSAGE))
+      return { stopReason: 'error' }
+    }
+    const pictures = images.map(({ mimeType, data }) => ({
+      type: 'image' as const,
+      mimeType,
+      data,
+    }))
+    return this.promptSession(session, [...textPrompt(text), ...pictures])
   }
 
-  private promptSession(session: Session, text: string): Promise<{ stopReason: string }> {
-    const turn = this.runTurn(session, text, session.cancels)
+  queueSet(sessionId: string, messages: string[]): void {
+    const session = this.live(sessionId)
+    if (session) this.setQueue(session, messages)
+  }
+
+  private setQueue(session: Session, messages: string[]): void {
+    session.queue = messages
+    this.deps.broadcast('agents:queue', { sessionId: session.id, messages })
+  }
+
+  async steer(sessionId: string, text: string): Promise<void> {
+    const session = this.live(sessionId)
+    if (!session) return
+    if (session.capabilities.steering) {
+      if (await this.steered(session, text)) return
+    } else {
+      this.cancelSession(session)
+    }
+    void this.promptSession(session, textPrompt(text))
+  }
+
+  /** False when the agent has no turn to join (`promptRequired`) or refused. */
+  private async steered(session: Session, text: string): Promise<boolean> {
+    try {
+      const answer = await session.link.agent.request<{ outcome?: string }, unknown>(
+        '_session/steering',
+        {
+          sessionId: session.id,
+          prompt: textPrompt(text),
+          _meta: { steering: { idleBehavior: 'promptRequired' } },
+        }
+      )
+      return answer.outcome !== 'promptRequired'
+    } catch (error) {
+      logger.error('agent steering failed', { error: String(error) })
+      return false
+    }
+  }
+
+  async sessionsIn(cwd: string): Promise<{ live: string[]; resumable: string | null }> {
+    const folder = canonical(cwd)
+    const live = [...this.sessions.values()]
+      .filter((session) => !session.unattended && canonical(session.cwd) === folder)
+      .map((session) => session.id)
+    const here = (this.deps.conversations?.() ?? []).filter(
+      (conversation) => conversation.transport === 'acp' && canonical(conversation.cwd) === folder
+    )
+    const last = here.reduce<AgentConversation | null>(
+      (latest, next) => (latest && latest.capturedAt > next.capturedAt ? latest : next),
+      null
+    )
+    return { live, resumable: last?.sessionId ?? null }
+  }
+
+  private promptSession(
+    session: Session,
+    content: PromptRequest['prompt']
+  ): Promise<{ stopReason: string }> {
+    const turn = this.runTurn(session, content, session.cancels)
     session.pending.add(turn)
     void turn.finally(() => session.pending.delete(turn))
+    void turn.then(({ stopReason }) => this.sendNext(session, stopReason))
     return turn
+  }
+
+  /** The head of the queue follows a turn that ended on its own; a Stop leaves the queue alone. */
+  private sendNext(session: Session, stopReason: string): void {
+    const [next, ...rest] = session.queue
+    if (stopReason !== 'end_turn' || session.ended || next === undefined) return
+    this.setQueue(session, rest)
+    void this.promptSession(session, textPrompt(next))
   }
 
   private async runTurn(
     session: Session,
-    text: string,
+    content: PromptRequest['prompt'],
     cancelsAtAsk: number
   ): Promise<{ stopReason: string }> {
     // An agent's cancel also drops a prompt that reaches it before the cancelled turn has ended.
@@ -477,10 +607,10 @@ class AcpAgentService implements AgentService {
     if (session.cancels !== cancelsAtAsk) return { stopReason: 'cancelled' }
     setTurn(session.id, true)
     try {
-      const first = await this.send(session, text)
+      const first = await this.send(session, content)
       // Cancelled, but by no cancel since it was asked: the one before it dropped it.
       const dropped = first === 'cancelled' && cancelsAtAsk > 0 && session.cancels === cancelsAtAsk
-      return { stopReason: dropped && !session.ended ? await this.send(session, text) : first }
+      return { stopReason: dropped && !session.ended ? await this.send(session, content) : first }
     } catch (error) {
       this.promptFailed(session, error)
       return { stopReason: 'error' }
@@ -497,13 +627,12 @@ class AcpAgentService implements AgentService {
     }
     logger.error('agent prompt failed', { error: String(error) })
     // A one-shot session has no tab to show it in, and its reply is read as the answer.
-    if (!session.unattended) this.publishUpdate(session, failureNotice())
+    if (!session.unattended) this.publishUpdate(session, noticeOf(PROMPT_FAILED_MESSAGE))
   }
 
-  private async send(session: Session, text: string): Promise<string> {
+  private async send(session: Session, prompt: PromptRequest['prompt']): Promise<string> {
     session.sent += 1
     try {
-      const prompt: PromptRequest['prompt'] = [{ type: 'text', text }]
       return (await session.link.agent.prompt({ sessionId: session.id, prompt })).stopReason
     } finally {
       session.sent -= 1
@@ -581,7 +710,7 @@ class AcpAgentService implements AgentService {
     }
     const reply = collectReply(session)
     // Asked first, so a cancel from `onStarted` finds it.
-    const turn = this.promptSession(session, prompt)
+    const turn = this.promptSession(session, textPrompt(prompt))
     onStarted?.(session.id)
     try {
       // An agent that ignores the cancel is killed by the close below, not waited for.

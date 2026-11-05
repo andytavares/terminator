@@ -62,6 +62,8 @@ const CROSSING_MEMBERS: ReadonlySet<string> = new Set([
   'agents.list',
   'agents.start',
   'agents.prompt',
+  'agents.steer',
+  'agents.sessionsIn',
   'agents.cancel',
   'agents.setConfig',
   'agents.close',

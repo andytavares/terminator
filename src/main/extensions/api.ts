@@ -875,7 +875,9 @@ function agentsApi(): ExtensionAPI['agents'] {
   return {
     list: () => agentService().list(),
     start: (input) => agentService().start(input),
-    prompt: (sessionId, text) => agentService().prompt(sessionId, text),
+    prompt: (sessionId, text, images) => agentService().prompt(sessionId, text, images),
+    steer: (sessionId, text) => agentService().steer(sessionId, text),
+    sessionsIn: (cwd) => agentService().sessionsIn(cwd),
     cancel: (sessionId) => agentService().cancel(sessionId),
     setConfig: (sessionId, configId, value) => agentService().setConfig(sessionId, configId, value),
     close: (sessionId) => agentService().close(sessionId),

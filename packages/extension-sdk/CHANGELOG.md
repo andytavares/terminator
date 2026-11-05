@@ -1,5 +1,15 @@
 # Changelog — @terminator/extension-sdk
 
+## 6.3.0
+
+Minor: additive.
+
+### Added
+
+- `api.agents.steer(sessionId, text)`: adds `text` to the running turn when the agent supports steering. Otherwise it cancels the turn and sends `text` as a new prompt.
+- `api.agents.prompt(sessionId, text, images?)`: `images` are `{ mimeType, data }` with base64 data. An agent that cannot read images gets no prompt; the turn ends with `error`.
+- `api.agents.sessionsIn(cwd)`: the open agent sessions in a folder, and the last conversation recorded for it.
+
 ## 6.2.0
 
 Minor: additive.

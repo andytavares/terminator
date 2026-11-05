@@ -4,9 +4,11 @@ import { agentService } from '../agents/acp/agent-service-instance.js'
 import {
   AgentAnswerInputSchema,
   AgentPromptInputSchema,
+  AgentQueueInputSchema,
   AgentSessionInputSchema,
   AgentSetConfigInputSchema,
   AgentStartInputSchema,
+  AgentSteerInputSchema,
 } from '../../shared/schemas/agents.schema.js'
 
 // Core-only. The renderer's side of the agents over ACP; the pushes (`agents:update`,
@@ -29,7 +31,27 @@ const agentChannels: ChannelSpec[] = [
     channel: 'agents:prompt',
     schema: AgentPromptInputSchema,
     invalid: validationError,
-    run: async ({ sessionId, text }) => ({ data: await agentService().prompt(sessionId, text) }),
+    run: async ({ sessionId, text, images }) => ({
+      data: await agentService().prompt(sessionId, text, images),
+    }),
+  }),
+  defineChannel({
+    channel: 'agents:steer',
+    schema: AgentSteerInputSchema,
+    invalid: validationError,
+    run: async ({ sessionId, text }) => {
+      await agentService().steer(sessionId, text)
+      return { data: true }
+    },
+  }),
+  defineChannel({
+    channel: 'agents:queue-set',
+    schema: AgentQueueInputSchema,
+    invalid: validationError,
+    run: ({ sessionId, messages }) => {
+      agentService().queueSet(sessionId, messages)
+      return { data: true }
+    },
   }),
   defineChannel({
     channel: 'agents:cancel',

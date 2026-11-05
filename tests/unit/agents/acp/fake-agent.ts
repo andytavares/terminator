@@ -28,6 +28,15 @@ export interface FakeAgent {
   failures: { newSession?: Error; setSessionMode?: Error }
   /** Settles when the client cancels. */
   cancelled: Promise<void>
+  /** What the agent advertises in its `initialize` response. */
+  advertised: Advertised
+  /** How the agent answers `_session/steering`; by default the text joins the running turn. */
+  onSteer: (params: unknown) => Promise<{ outcome: string }>
+}
+
+export interface Advertised {
+  image: boolean
+  steering: boolean
 }
 
 export const SESSION_ID = 'session-1'
@@ -56,6 +65,21 @@ const CONFIG_OPTIONS = [
   { id: 'fast', name: 'Fast', type: 'boolean' as const, currentValue: false },
 ]
 
+const configOptionsAnswer = async () => ({ configOptions: CONFIG_OPTIONS })
+
+function initializeAnswer(advertised: Advertised) {
+  return {
+    protocolVersion: 1,
+    agentCapabilities: { promptCapabilities: { image: advertised.image } },
+    _meta: advertised.steering ? { steering: { supported: true } } : undefined,
+  }
+}
+
+async function extAnswer(fake: FakeAgent, method: string, params: Record<string, unknown>) {
+  fake.calls.push({ method, params })
+  return method === '_session/steering' ? fake.onSteer(params) : {}
+}
+
 /** The agent's answers to the client's requests; each request is recorded first. */
 function agentHandlers(fake: FakeAgent, cancel: () => void): Agent {
   const recorded = <P, R>(method: string, answer: (params: P) => R) => {
@@ -65,7 +89,7 @@ function agentHandlers(fake: FakeAgent, cancel: () => void): Agent {
     }
   }
   return {
-    initialize: recorded('initialize', async () => ({ protocolVersion: 1 })),
+    initialize: recorded('initialize', async () => initializeAnswer(fake.advertised)),
     authenticate: async () => ({}),
     newSession: recorded('newSession', async () => {
       if (fake.failures.newSession) throw fake.failures.newSession
@@ -81,18 +105,17 @@ function agentHandlers(fake: FakeAgent, cancel: () => void): Agent {
         })
       return {}
     }),
-    setSessionConfigOption: recorded('setSessionConfigOption', async () => ({
-      configOptions: CONFIG_OPTIONS,
-    })),
+    setSessionConfigOption: recorded('setSessionConfigOption', configOptionsAnswer),
     prompt: recorded('prompt', (params: PromptRequest) => fake.onPrompt(params)),
     cancel: recorded('cancel', async () => cancel()),
+    extMethod: (method, params) => extAnswer(fake, method, params),
   }
 }
 
-function newFake(failures: FakeAgent['failures']): {
-  fake: FakeAgent
-  agentStream: ReturnType<typeof ndJsonStream>
-} {
+function newFake(
+  failures: FakeAgent['failures'],
+  advertised: Advertised
+): { fake: FakeAgent; agentStream: ReturnType<typeof ndJsonStream> } {
   const toAgent = new TransformStream<Uint8Array, Uint8Array>()
   const toClient = new TransformStream<Uint8Array, Uint8Array>()
   let signalCancel: () => void = () => undefined
@@ -100,6 +123,8 @@ function newFake(failures: FakeAgent['failures']): {
     calls: [],
     killed: false,
     failures,
+    advertised,
+    onSteer: async () => ({ outcome: 'steered' }),
     exit: () => undefined,
     disconnect: () => undefined,
     onPrompt: async () => ({ stopReason: 'end_turn' }),
@@ -119,7 +144,10 @@ function newFake(failures: FakeAgent['failures']): {
 
 /** A `connect` for the service whose agent runs in memory, over two streams, with no process.
  * `firstAgent` settles when the first agent is started. */
-export function fakeConnector(failures: FakeAgent['failures'] = {}): {
+export function fakeConnector(
+  failures: FakeAgent['failures'] = {},
+  advertised: Advertised = { image: true, steering: true }
+): {
   connect(request: { agentId: string; client: Client }): Promise<AgentLink>
   agents: FakeAgent[]
   firstAgent: Promise<FakeAgent>
@@ -128,7 +156,7 @@ export function fakeConnector(failures: FakeAgent['failures'] = {}): {
   let announce: (fake: FakeAgent) => void = () => undefined
   const firstAgent = new Promise<FakeAgent>((resolve) => (announce = resolve))
   async function connect({ client }: { agentId: string; client: Client }): Promise<AgentLink> {
-    const { fake, agentStream } = newFake(failures)
+    const { fake, agentStream } = newFake(failures, advertised)
     const exitListeners: Array<(code: number | null) => void> = []
     fake.exit = (code) => exitListeners.forEach((listener) => listener(code))
     agents.push(fake)
