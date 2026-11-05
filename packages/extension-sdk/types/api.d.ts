@@ -343,15 +343,11 @@ export interface AgentsAPI {
     /** Since 6.3.0. Base64 data. The turn ends with `error`, and the conversation says why, when the agent cannot read images. */
     images?: Array<{ mimeType: string; data: string }>
   ): Promise<AgentTurnEnd>
-  /**
-   * Since 6.3.0. Adds `text` to the running turn when the agent supports steering, else cancels the
-   * turn and sends `text` as a new prompt. With no turn running it is a prompt. Resolves once sent.
-   */
+  /** Since 6.3.0. Adds `text` to the running turn when the agent supports steering, else cancels
+   * the turn and sends `text` as a new prompt. With no turn running it is a prompt. */
   steer(sessionId: string, text: string): Promise<void>
-  /**
-   * Since 6.3.0. The open agent sessions in a folder, and the id of the last conversation recorded
-   * for it (the `resume` input of `start`), or null when there is none.
-   */
+  /** Since 6.3.0. The open agent sessions in a folder, and the last conversation recorded there
+   * (the `resume` input of `start`), or null. */
   sessionsIn(cwd: string): Promise<{ live: string[]; resumable: string | null }>
   /** Cancels the running and waiting prompts. With none, it does nothing. */
   cancel(sessionId: string): void
