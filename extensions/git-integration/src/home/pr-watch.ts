@@ -84,6 +84,7 @@ export function latestSeen(all: WatchComment[], seenAt: string): string {
   return all.reduce((latest, c) => (c.createdAt > latest ? c.createdAt : latest), seenAt)
 }
 
+/** @internal */
 export function tailLines(text: string, count = LOG_TAIL_LINES): string {
   return text.trimEnd().split('\n').slice(-count).join('\n')
 }

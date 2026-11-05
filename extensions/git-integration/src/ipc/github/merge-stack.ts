@@ -2,7 +2,7 @@ import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { VALIDATION_ERROR } from '../register.js'
 import { catchError, PullRequestNumberPayload, type GithubContext } from './context.js'
 
-/** An open pull request, as the stack walk reads it. */
+/** An open pull request, as the stack walk reads it. @internal */
 export interface StackPullRequest {
   number: number
   title: string
@@ -13,12 +13,13 @@ export interface StackPullRequest {
   isCrossRepository?: boolean
 }
 
+/** @internal */
 export interface StackResult {
   merged: number[]
   failed?: { number: number; reason: string }
 }
 
-/** The waits of a stack merge; a spec replaces them so it does not wait. */
+/** The waits of a stack merge; a spec replaces them so it does not wait. @internal */
 export interface StackClock {
   sleep: (ms: number) => Promise<void>
   pollMs: number
@@ -42,7 +43,7 @@ const STACK_FIELDS = [
 const KNOWN_AGENTS = /\b(claude|codex|gemini|cursor|copilot)\b/i
 
 /** The open pull requests from `number` down to the one whose base is not another open pull
- *  request's branch, bottom first. Empty when `number` is not open. */
+ *  request's branch, bottom first. Empty when `number` is not open. @internal */
 export function stackOf(open: StackPullRequest[], number: number): StackPullRequest[] {
   const stack: StackPullRequest[] = []
   let next = open.find((pr) => pr.number === number)
@@ -54,7 +55,7 @@ export function stackOf(open: StackPullRequest[], number: number): StackPullRequ
   return stack
 }
 
-/** The message without the Co-Authored-By lines whose name is a known agent. */
+/** The message without the Co-Authored-By lines whose name is a known agent. @internal */
 export function withoutAgentCredits(message: string): string {
   const credit = /^co-authored-by:(.*)$/i
   return message
@@ -135,7 +136,7 @@ async function retargetAndWait(run: StackRun, pr: StackPullRequest, base: string
   if (mergeable === 'CONFLICTING') throw new Error(`#${pr.number} has conflicts with ${base}`)
 }
 
-/** Squash-merges the stack's pull requests bottom first; stops at the first that cannot merge. */
+/** Squash-merges the stack's pull requests bottom first; stops at the first that cannot merge. @internal */
 export async function mergeStack(
   ctx: GithubContext,
   at: { repoRoot: string; number: number },
@@ -157,7 +158,7 @@ export async function mergeStack(
   return { merged }
 }
 
-/** Opens GitHub's revert of a merged pull request; the new pull request's number and URL. */
+/** Opens GitHub's revert of a merged pull request; the new pull request's number and URL. @internal */
 export async function revertPullRequest(ctx: GithubContext, repoRoot: string, number: number) {
   const view = await ctx.github.pullRequests.view(ctx.target(repoRoot), number, ['id'])
   const query =

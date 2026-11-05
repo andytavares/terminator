@@ -25,7 +25,7 @@ import {
 
 const ENABLED_SETTING = 'terminator.git-integration.prWatch.enabled'
 
-/** The per-pull-request state, kept between runs of the app. */
+/** The per-pull-request state, kept between runs of the app. @internal */
 export interface WatchStore {
   get(key: string): Promise<PrWatchState | undefined>
   set(key: string, state: PrWatchState): Promise<void>

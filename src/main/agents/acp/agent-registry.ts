@@ -67,7 +67,7 @@ export function binaryOnPath(binary: string): string | null {
 }
 
 /** Agents the settings offer to add. Each launch command is from the agent's own documentation.
- * `binary` is what must be on PATH; for an `npx` preset that is `npx`. */
+ * `binary` is what must be on PATH; for an `npx` preset that is `npx`. @internal */
 export const KNOWN_AGENTS = [
   {
     // https://github.com/agentclientprotocol/codex-acp (the adapter Zed runs for Codex)

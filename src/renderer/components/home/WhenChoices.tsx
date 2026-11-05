@@ -101,7 +101,7 @@ function useSavedRuns(): [Schedule[], (id: string) => Promise<void>] {
   return [saved, remove]
 }
 
-/** The runs already saved, so one can be removed; nothing when there are none. */
+/** The runs already saved, so one can be removed; nothing when there are none. @internal */
 export function ScheduledRuns(): React.JSX.Element | null {
   const [saved, remove] = useSavedRuns()
   if (saved.length === 0) return null

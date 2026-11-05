@@ -134,7 +134,7 @@ export const branchOf = (issue: IssueSummary): string => issue.branchName ?? iss
 
 export const worktreeFolder = (branch: string): string => `.worktrees/${branch}`
 
-/** How long the person waits for the agent to name a branch before the plain name is used. */
+/** How long the person waits for the agent to name a branch before the plain name is used. @internal */
 export const NAMING_WAIT_MS = 5_000
 
 /** The agent's `feat/…` or `fix/…` name for the prompt; null when it was late, failed or gave no name. */
