@@ -1,0 +1,26 @@
+scripts/e2e-select.mjs
+  s_a5e467e4da5497::t_10134b5836144e 45
+tests/e2e/pr-watch.spec.ts
+  s_a5e467e4da5497::t_e4602d124eefc1 2-4,40-43
+  s_a5e467e4da5497::t_a139f515999364 34-36
+tests/e2e/pr-watch-resume.spec.ts
+  s_a5e467e4da5497::t_dc079147beca6d 1-32,35-58,62-91,96-100
+  s_a5e467e4da5497::t_10134b5836144e 33-34,92-95
+  s_a5e467e4da5497::t_5f7b15edc20937 59-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "51000672391bff694cc0fdb0858c9b2450b58237",
+  "prompts": {},
+  "sessions": {
+    "s_a5e467e4da5497": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d038af6c-7a59-4002-9e1a-b5c973e92542",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
