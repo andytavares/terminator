@@ -155,7 +155,10 @@ export function foldUpdates(transcript: Transcript, update: AgentUpdate): Transc
 
 /** A path relative to the session directory; a path outside it stays as it is. */
 export function relativeTo(cwd: string, path: string): string {
-  return cwd && path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : path
+  // An agent reports real paths: on macOS /var and /tmp resolve to /private/var and /private/tmp.
+  const real = (p: string): string => p.replace(/^\/private(?=\/)/, '')
+  const [folder, file] = [real(cwd), real(path)]
+  return folder && file.startsWith(`${folder}/`) ? file.slice(folder.length + 1) : path
 }
 
 interface ChangedFile {

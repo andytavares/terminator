@@ -482,6 +482,7 @@ class AcpAgentService implements AgentService {
       tabTitle: tab.title,
       scrollbackLimit: this.deps.scrollbackLimit(),
       surface: 'agent',
+      cwd: session.cwd,
     })
   }
 

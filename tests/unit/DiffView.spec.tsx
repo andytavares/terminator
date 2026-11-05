@@ -65,13 +65,21 @@ describe('DiffView highlighting', () => {
 })
 
 describe('linesFromTexts', () => {
+  it('does not count the end of the last line as a line of its own', () => {
+    expect(linesFromTexts(null, 'only\n')).toEqual([
+      { type: 'add', content: 'only', oldLineNumber: null, newLineNumber: 1 },
+    ])
+  })
+
   it('marks every line added when there is no old text', () => {
     expect(linesFromTexts(null, 'a\nb')).toEqual([
       { type: 'add', content: 'a', oldLineNumber: null, newLineNumber: 1 },
       { type: 'add', content: 'b', oldLineNumber: null, newLineNumber: 2 },
     ])
   })
+})
 
+describe('linesFromTexts — a large change', () => {
   it('shows a change too large to compare line by line as removed then added, at once', () => {
     // Every other line is shared: compared line by line, those would show as unchanged context.
     const old = Array.from({ length: 2000 }, (_, i) => (i % 2 ? `shared ${i}` : `old ${i}`)).join(
@@ -85,7 +93,9 @@ describe('linesFromTexts', () => {
     expect(lines.slice(0, 2000).every((line) => line.type === 'remove')).toBe(true)
     expect(lines.slice(2000).every((line) => line.type === 'add')).toBe(true)
   })
+})
 
+describe('linesFromTexts — a changed line', () => {
   it('marks a changed middle line removed then added', () => {
     expect(linesFromTexts('a\nb\nc', 'a\nB\nc')).toEqual([
       { type: 'context', content: 'a', oldLineNumber: 1, newLineNumber: 1 },

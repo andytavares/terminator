@@ -856,6 +856,9 @@
 
 .diff-line__old-num,
 .diff-line__new-num {
+  /* As narrow as their numbers: the code column takes the rest, however short its lines. */
+  width: 1%;
+  white-space: nowrap;
   user-select: none;
   color: var(--tm-text-secondary);
   min-width: 36px;

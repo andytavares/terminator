@@ -1062,6 +1062,11 @@ function setUpAdoptSession(): void {
 describe('adoptSession', () => {
   setUpAdoptSession()
 
+  it('keeps the folder it runs in, so an agent tab can show paths relative to it', () => {
+    useSessionStore.getState().adoptSession({ ...adopted, cwd: '/repo/.worktrees/x' })
+    expect(useSessionStore.getState().sessions.get('terminal-1')?.cwd).toBe('/repo/.worktrees/x')
+  })
+
   it('records it as an agent’s terminal', () => {
     useSessionStore.getState().adoptSession(adopted)
     expect(useSessionStore.getState().sessions.get('terminal-1')).toMatchObject({

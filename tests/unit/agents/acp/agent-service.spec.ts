@@ -130,6 +130,7 @@ describe('start with a resume or a tab', () => {
       tabTitle: 'Fix',
       scrollbackLimit: 5000,
       surface: 'agent',
+      cwd: '/work',
     })
   })
 })

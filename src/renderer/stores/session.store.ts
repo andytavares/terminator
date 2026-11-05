@@ -185,6 +185,8 @@ interface SessionState {
     tabTitle: string
     scrollbackLimit: number
     surface?: 'terminal' | 'agent'
+    /** Where it runs; an agent tab shows paths relative to it. */
+    cwd?: string
   }) => void
   closeSession: (sessionId: string) => Promise<void>
   /** Forget a deleted project's tabs; the main process already ended them. */
@@ -340,6 +342,7 @@ function adoptedSession(s: SessionData, adopted: Adopted): Partial<SessionData> 
     type: 'agent',
     scrollbackLimit: adopted.scrollbackLimit,
     surface: adopted.surface,
+    ...(adopted.cwd === undefined ? {} : { cwd: adopted.cwd }),
     createdAt,
     lastActivityAt: Date.parse(createdAt),
     agentState: 'idle',

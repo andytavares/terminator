@@ -162,6 +162,14 @@ describe('splitTurns', () => {
   })
 })
 
+describe('relativeTo — a symlinked folder', () => {
+  it('matches a path the agent reports through /private, as macOS resolves /var and /tmp', () => {
+    expect(relativeTo('/var/folders/x/repo', '/private/var/folders/x/repo/src/a.ts')).toBe(
+      'src/a.ts'
+    )
+  })
+})
+
 describe('relativeTo', () => {
   it('strips the session directory and leaves other paths alone', () => {
     expect(relativeTo('/r', '/r/src/a.ts')).toBe('src/a.ts')

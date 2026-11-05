@@ -266,7 +266,8 @@ function lineDiffOps(a: string[], b: string[]): DiffViewLine[] {
 /** The lines of a change from its old and new text. `null` old text shows every line as added;
  *  it does not mean a new file (an agent sends it for an inserted snippet too). */
 export function linesFromTexts(oldText: string | null, newText: string): DiffViewLine[] {
-  const split = (text: string): string[] => text.split('\n')
+  // A final newline ends the last line; it does not start another one.
+  const split = (text: string): string[] => text.replace(/\n$/, '').split('\n')
   const before = oldText === null ? [] : split(oldText)
   const after = split(newText)
   if (before.length * after.length > MAX_COMPARED_CELLS) return replacedWhole(before, after)
