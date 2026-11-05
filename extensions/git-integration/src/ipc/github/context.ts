@@ -22,6 +22,8 @@ export interface GithubHandlerOptions {
   getReviewRepos?: () => string[]
   /** Settings → Git → Branch Exclude Patterns, matched by the core. */
   isBranchExcluded?: BranchExclusionQuery
+  /** Settings → Git → Remove agent credits when merging. */
+  stripAgentCredits?: () => boolean
   /** Home publishes from each dashboard search and each all-repositories contributions fetch. */
   onDashboard?: (result: { prs: DashboardPR[]; failed: unknown[] }) => void
   onMerged?: (merged: MergedPullRequest[]) => void
@@ -62,6 +64,11 @@ export const RepoRootPayload = z.object({ repoRoot: RepoRoot })
 /** Payload of a channel that acts on one pull request of a checkout. */
 export const PullRequestPayload = RepoRootPayload.extend({
   prNumber: z.number().int().positive(),
+})
+
+/** Payload of a channel that acts on one pull request, numbered `number`. */
+export const PullRequestNumberPayload = RepoRootPayload.extend({
+  number: z.number().int().positive(),
 })
 
 export const isOverflow = (e: unknown) =>

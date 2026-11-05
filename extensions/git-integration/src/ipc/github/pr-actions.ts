@@ -6,6 +6,7 @@ import { runGit } from '../../shell/run-git.js'
 import { findTestLocations, symbolsForBlock } from '../../review/test-locations.js'
 import { RepoRoot } from '../repo-root.js'
 import { VALIDATION_ERROR, errorEnvelope } from '../register.js'
+import { mergeStackChannels } from './merge-stack.js'
 import { catchError, PullRequestPayload, RepoRootPayload, type GithubContext } from './context.js'
 
 interface CompareResponse {
@@ -197,5 +198,5 @@ function lookupChannels(ctx: GithubContext): ChannelSpec[] {
 }
 
 export function prActionChannels(ctx: GithubContext): ChannelSpec[] {
-  return [...pullRequestVerbChannels(ctx), ...lookupChannels(ctx)]
+  return [...pullRequestVerbChannels(ctx), ...lookupChannels(ctx), ...mergeStackChannels(ctx)]
 }

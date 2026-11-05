@@ -227,6 +227,7 @@ function pullRequestJson(context: StubContext, pr: StubPullRequest): Record<stri
     headRefOid: headSha(context, pr),
     isDraft: pr.isDraft,
     mergeStateStatus: pr.mergeStateStatus,
+    mergeable: 'MERGEABLE',
     statusCheckRollup: [{ name: 'build', status: 'COMPLETED', conclusion: 'SUCCESS' }],
     assignees: [],
     files: files.map((f) => ({ path: f.filename, additions: f.additions, deletions: f.deletions })),
@@ -376,6 +377,8 @@ const REPO = 'repos/[^/]+/[^/]+'
 const REST_ROUTES: Array<[string, RegExp, RestHandler]> = [
   ['GET', /^user$/, (context) => ({ login: context.viewer })],
   ['GET', /^user\/repos$/, (context) => accessibleRepositories(context)],
+  ['PUT', new RegExp(`^${REPO}/pulls/(\\d+)/merge$`), (c, r, m) => squashMergePullRequest(c, r, m)],
+  ['PATCH', new RegExp(`^${REPO}/pulls/(\\d+)$`), (c, r, m) => retargetPullRequest(c, r, m)],
   ['GET', new RegExp(`^${REPO}/pulls/(\\d+)/files$`), (c, _r, m) => prFiles(c, m)],
   ['GET', new RegExp(`^${REPO}/pulls/(\\d+)/reviews$`), (c, _r, m) => pr(c, m).reviews],
   [
@@ -414,6 +417,28 @@ const pr = (context: StubContext, match: RegExpMatchArray) =>
 
 const prFiles = (context: StubContext, match: RegExpMatchArray) =>
   pullRequestFiles(context, pr(context, match))
+
+/** PUT .../merge: GitHub refuses a stale `sha` (gh's --match-head-commit) and a closed pull request. */
+function squashMergePullRequest(
+  context: StubContext,
+  request: ApiRequest,
+  match: RegExpMatchArray
+) {
+  const pullRequest = pr(context, match)
+  if (pullRequest.state !== 'OPEN') throw new GhFailure(405, 'Pull Request is not mergeable')
+  if (request.body.sha !== headSha(context, pullRequest)) {
+    throw new GhFailure(409, 'Head branch was modified. Review and try the merge again.')
+  }
+  pullRequest.state = 'MERGED'
+  return { merged: true }
+}
+
+/** PATCH .../pulls/N: the base branch is the one field Merge stack changes. */
+function retargetPullRequest(context: StubContext, request: ApiRequest, match: RegExpMatchArray) {
+  const pullRequest = pr(context, match)
+  pullRequest.baseRefName = String(request.body.base ?? pullRequest.baseRefName)
+  return { number: pullRequest.number }
+}
 
 const noReviewers = () => ({ users: [], teams: [] })
 
@@ -541,6 +566,7 @@ function graphql(context: StubContext, request: ApiRequest): unknown {
   if (query.includes('pullRequests(first:')) return openPullRequestPage(context)
   if (query.includes('reviewThreads(first:100)')) return reviewThreads(context, request)
   if (query.includes('pullRequest(number:$n){id}')) return stubPullRequestNodeId(request)
+  if (query.includes('revertPullRequest')) return revertPullRequest(context, request)
   if (query.includes('markFileAsViewed')) return markPathViewed(context, request)
   if (query.includes('search(query:')) return searchDashboard(context, query)
   throw new GhFailure(1, `stub GitHub cannot answer this query: ${query.slice(0, 80)}`)
@@ -576,6 +602,20 @@ function reviewThreads(context: StubContext, request: ApiRequest) {
       comments: { nodes: [{ databaseId: c.id }] },
     }))
   return { data: { repository: { pullRequest: { reviewThreads: { nodes } } } } }
+}
+
+/** The revert opens a new pull request, from a new branch at the merged head, into main. */
+function revertPullRequest(context: StubContext, request: ApiRequest) {
+  const merged = findPullRequest(context, Number(request.fields.id.replace('PR_node_', '')))
+  const headRefName = `revert-${merged.number}`
+  bareGit(context, 'update-ref', `refs/heads/${headRefName}`, headSha(context, merged))
+  const created = addPullRequest(context, {
+    title: `Revert "${merged.title}"`,
+    headRefName,
+    author: context.viewer,
+  })
+  const url = `https://github.com/${context.owner}/${context.name}/pull/${created.number}`
+  return { data: { revertPullRequest: { revertPullRequest: { number: created.number, url } } } }
 }
 
 function stubPullRequestNodeId(request: ApiRequest) {

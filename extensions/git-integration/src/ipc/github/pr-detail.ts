@@ -56,6 +56,7 @@ const PR_DETAIL_FIELDS = [
   'baseRefName',
   'headRefOid',
   'isDraft',
+  'state',
   'mergeStateStatus',
   'statusCheckRollup',
   'assignees',
@@ -120,6 +121,11 @@ async function checkRollup(ctx: GithubContext, meta: RawRecord, where: RepoAt) {
   }
 }
 
+function stateOf(meta: RawRecord): PrReviewDetail['state'] {
+  const state = asText(meta.state).toLowerCase()
+  return state === 'merged' || state === 'closed' ? state : 'open'
+}
+
 /** Who opened the PR, when, from which branch, and where it stands. */
 function prIdentity(meta: RawRecord) {
   const author = (meta.author ?? {}) as RawRecord
@@ -135,6 +141,7 @@ function prIdentity(meta: RawRecord) {
     headSHA: asText(meta.headRefOid),
     nodeId: typeof meta.id === 'string' ? meta.id : undefined,
     isDraft: Boolean(meta.isDraft),
+    state: stateOf(meta),
     mergeStateStatus: mapMergeStateStatus(asText(meta.mergeStateStatus)),
   }
 }

@@ -410,6 +410,25 @@ describe('github:pr-review-detail — the files the viewer owns', () => {
   })
 })
 
+describe('github:pr-review-detail — state', () => {
+  const handlers = freshHandlers()
+
+  it.each([
+    ['MERGED', 'merged'],
+    ['CLOSED', 'closed'],
+    ['OPEN', 'open'],
+    [undefined, 'open'],
+  ])('reads gh state %s as %s', async (state, expected) => {
+    mockPrDetail({ ...PR_META, state })
+    mockGitFailure('not found')
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { state: string } }
+    expect(result.pr.state).toBe(expected)
+  })
+})
+
 describe('github:pr-review-detail — returns a pr object on success with no status checks', () => {
   const handlers = freshHandlers()
 

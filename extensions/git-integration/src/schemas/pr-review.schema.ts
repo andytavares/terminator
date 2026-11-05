@@ -195,6 +195,8 @@ export const PrReviewDetailSchema = z.object({
   /** GraphQL node id; lets viewed-file mutations skip the lookup. */
   nodeId: z.string().optional(),
   isDraft: z.boolean().default(false),
+  /** Absent means open. */
+  state: z.enum(['open', 'closed', 'merged']).optional(),
   mergeStateStatus: z.enum(['behind', 'dirty', 'clean', 'unknown']).default('unknown'),
   ciStatus: z.enum(['passing', 'failing', 'pending', 'none']),
   lintStatus: SignalValueSchema.default('unknown'),

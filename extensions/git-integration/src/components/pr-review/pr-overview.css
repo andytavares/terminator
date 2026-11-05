@@ -67,6 +67,44 @@
   color: var(--tm-success);
 }
 
+.pr-overview-state--merged {
+  background: var(--tm-accent-dim);
+  color: var(--tm-accent-text);
+}
+
+.pr-overview-state--closed {
+  background: color-mix(in srgb, var(--tm-danger) 14%, transparent);
+  color: var(--tm-danger);
+}
+
+.pr-merge-stack {
+  position: relative;
+}
+
+.pr-merge-stack-pop {
+  width: 420px;
+  padding: var(--tm-space-4);
+}
+
+.pr-merge-stack-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-3);
+  margin: var(--tm-space-3) 0;
+  padding-left: var(--tm-space-5);
+}
+
+.pr-merge-stack-steps li span {
+  display: block;
+  color: var(--tm-text-secondary);
+}
+
+.pr-merge-stack-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tm-space-2);
+}
+
 .pr-overview-meta {
   display: flex;
   flex-wrap: wrap;

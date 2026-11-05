@@ -32,6 +32,9 @@ vi.mock('../../src/api/github', () => ({
     prMarkReady: vi.fn().mockResolvedValue({}),
     prIssueCommentAdd: vi.fn().mockResolvedValue({}),
     prUpdateBranch: vi.fn().mockResolvedValue({ ok: true }),
+    mergeStackPlan: vi.fn().mockResolvedValue({ into: 'main', stack: [] }),
+    mergeStack: vi.fn().mockResolvedValue({ merged: [41, 42] }),
+    revert: vi.fn().mockResolvedValue({ number: 43, url: 'https://github.com/o/r/pull/43' }),
   },
 }))
 
@@ -109,6 +112,7 @@ const basePr: PrReviewDetail = {
   baseRefName: 'main',
   headSHA: 'abc123',
   isDraft: false,
+  state: 'open',
   mergeStateStatus: 'clean',
   ciStatus: 'passing',
   lintStatus: 'pass',
@@ -715,5 +719,105 @@ describe('PrOverviewPanel — a pane that widens', () => {
       />
     )
     expect(screen.getByRole('tabpanel', { name: 'Change' })).toBeTruthy()
+  })
+})
+
+/** The plan of #42 stacked on #41, which the header and the strip read. */
+async function mockStackedPlan() {
+  const { githubAPI } = await import('../../src/api/github')
+  vi.mocked(githubAPI.mergeStackPlan).mockResolvedValue({
+    into: 'main',
+    stack: [
+      { number: 41, title: 'Base work', headRefName: 'feat/base', baseRefName: 'main' },
+      { number: 42, title: 'Add feature X', headRefName: 'feature/x', baseRefName: 'feat/base' },
+    ],
+  })
+}
+
+describe('PrOverviewPanel — the state of the pull request', () => {
+  it.each([
+    [{ state: 'merged' as const }, 'Merged'],
+    [{ state: 'closed' as const }, 'Closed'],
+    [{ isDraft: true }, 'Draft'],
+    [{}, 'Open'],
+  ])('draws the state pill for %o as %s', (overrides, pill) => {
+    renderPanel(overrides)
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(new RegExp(`^${pill}`))
+  })
+
+  it('replaces Start review with Open revert PR on a merged pull request', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    window.electronAPI.shell = { openExternal: vi.fn().mockResolvedValue(undefined) } as never
+    renderPanel({ state: 'merged' })
+    expect(within(headerActions()).queryByRole('button', { name: /review/ })).toBeNull()
+    expect(within(readiness()).getByText('Merged into main')).toBeTruthy()
+    fireEvent.click(within(headerActions()).getByRole('button', { name: 'Open revert PR' }))
+    await waitFor(() => expect(githubAPI.revert).toHaveBeenCalledWith('/repo', 42))
+    await waitFor(() =>
+      expect(window.electronAPI.shell.openExternal).toHaveBeenCalledWith(
+        'https://github.com/o/r/pull/43'
+      )
+    )
+  })
+})
+
+describe('PrOverviewPanel — a pull request stacked on another', () => {
+  beforeEach(mockStackedPlan)
+
+  it('says what it is stacked on and offers Merge stack before Start review', async () => {
+    renderPanel({ baseRefName: 'feat/base' })
+    const button = await within(headerActions()).findByRole('button', { name: 'Merge stack · 2' })
+    expect(
+      button.compareDocumentPosition(
+        within(headerActions()).getByRole('button', { name: 'Start review' })
+      )
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(within(readiness()).getByText(/Stacked on #41/)).toBeTruthy()
+  })
+})
+
+describe('PrOverviewPanel — merging the stack', () => {
+  beforeEach(mockStackedPlan)
+
+  it('lists the steps, merges on confirm and reports the result', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    renderPanel({ baseRefName: 'feat/base' })
+    fireEvent.click(await within(headerActions()).findByRole('button', { name: 'Merge stack · 2' }))
+    const confirm = screen.getAllByRole('group', { name: 'Merge stack' })[0]
+    expect(confirm.textContent).toContain('Squash-merge into main')
+    expect(confirm.textContent).toContain(
+      'Retarget from feat/base to main, wait for GitHub to recheck, then squash-merge'
+    )
+    expect(confirm.textContent).toContain(
+      'Stops at the first pull request that cannot merge and says why.'
+    )
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Merge 2 pull requests' }))
+    await waitFor(() => expect(githubAPI.mergeStack).toHaveBeenCalledWith('/repo', 42))
+    expect(await screen.findByText('Merged 2 pull requests.')).toBeTruthy()
+  })
+})
+
+describe('PrOverviewPanel — a stack that cannot merge', () => {
+  beforeEach(mockStackedPlan)
+
+  it('names the pull request and the reason when the stack stops', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    vi.mocked(githubAPI.mergeStack).mockResolvedValueOnce({
+      merged: [41],
+      failed: { number: 42, reason: '#42 has conflicts with main' },
+    })
+    renderPanel({ baseRefName: 'feat/base' })
+    fireEvent.click(await within(headerActions()).findByRole('button', { name: 'Merge stack · 2' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Merge 2 pull requests' })[0])
+    expect(
+      await screen.findByText('Merged 1 pull request. Stopped at #42: #42 has conflicts with main')
+    ).toBeTruthy()
+  })
+})
+
+describe('PrOverviewPanel — a pull request that is not stacked', () => {
+  it('offers no Merge stack on a pull request that is not stacked', () => {
+    renderPanel()
+    expect(screen.queryByRole('button', { name: /Merge stack/ })).toBeNull()
   })
 })

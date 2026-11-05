@@ -56,6 +56,14 @@
         "label": "Draft a commit message"
       },
       {
+        "id": "merge-stack",
+        "label": "Merge a stack of pull requests"
+      },
+      {
+        "id": "revert-pr",
+        "label": "Open a revert pull request"
+      },
+      {
         "id": "diff-open",
         "label": "Open a file diff"
       },

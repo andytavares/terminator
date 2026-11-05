@@ -252,6 +252,8 @@ function registerGithub(api: ExtensionAPI, registerFn: RegisterFn, roots: Github
     getReviewRepos: () => api.settings.get<string[]>(`${SETTING}.review.repos`) ?? [],
     // Settings → Git → Branch Exclude Patterns, matched by the core.
     isBranchExcluded: (branch, repoPath) => api.settings.isBranchExcluded(branch, repoPath),
+    stripAgentCredits: () =>
+      api.settings.get<boolean>(`${SETTING}.git.merge.stripAgentCredits`) === true,
     ...home.hooks,
   }
   const { refreshDashboard, refreshMerged } = registerGithubHandlers(registerFn, access, options)
