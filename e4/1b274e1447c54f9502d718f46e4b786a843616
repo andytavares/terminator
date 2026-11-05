@@ -1,0 +1,23 @@
+extensions/foundry/src/components/factory/RunLog.tsx
+  s_2305cf21e5aeec::t_d5a2152f171ffa 120,203-205,207-212
+extensions/foundry/src/components/foundry.css
+  s_2305cf21e5aeec::t_ae812072e1c072 4131
+  s_2305cf21e5aeec::t_d5a2152f171ffa 4108-4116,4130,4149-4155
+  s_2305cf21e5aeec::t_baeaff8defe664 4156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e41b274e1447c54f9502d718f46e4b786a843616",
+  "prompts": {},
+  "sessions": {
+    "s_2305cf21e5aeec": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8fb57aeb-0041-4112-9b99-b35380b51ab3",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

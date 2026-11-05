@@ -1,0 +1,44 @@
+.specify/extensions/agent-context/commands/speckit.agent-context.update.md
+  s_c95e5dc2240fad::t_b77a4c1a30efa0 7,12,15-16,18,20,27
+.specify/extensions/agent-context/README.md
+  s_c95e5dc2240fad::t_b77a4c1a30efa0 3,5,9,11-14,24,43-45,49,51,65-66
+.specify/templates/checklist-template.md
+  s_c95e5dc2240fad::t_35221f1bd60024 7-9,15-16,40-42,45
+.specify/templates/plan-template.md
+  s_c95e5dc2240fad::t_35221f1bd60024 7,17,40,42,63
+.specify/templates/spec-template.md
+  s_c95e5dc2240fad::t_35221f1bd60024 14-16,18-19,32,47,74-75,84-85,110,123-125
+.specify/extensions/git/README.md
+  s_c95e5dc2240fad::t_b77a4c1a30efa0 3,7,11,13,50,87,89-92
+.specify/templates/tasks-template.md
+  s_c95e5dc2240fad::t_35221f1bd60024 11,13,26,30,32,38,63,98,120,141,166,170,175-177,185,194,246-248,250
+.specify/memory/constitution.md
+  s_c95e5dc2240fad::t_88baa62742c803 208,229,268-269,282-283,324,369-370,424,434
+  s_c95e5dc2240fad::t_9a8d3a5da779e8 2-12,139-141,143,149-153,157-160,169-171,178-181,196-197,203-207,220,227,230-232,239,241-244,256-258,265-267,278-279,292-294,298-299,301,304-305,309,311-313,315,332-335,339,341,347-350,352,361,372-375,378-379,381-382,386-387,390,394,399-400,408,431,435,437,439
+.specify/extensions/git/commands/speckit.git.commit.md
+  s_c95e5dc2240fad::t_9fe6bd505ff3e1 7,11,13,15-18,27,46-48
+.specify/extensions/git/commands/speckit.git.feature.md
+  s_c95e5dc2240fad::t_dfc6b54a4ce477 7,15,19,21,23,32,40,43-44,46,55-58,64-65,69
+.specify/extensions/git/commands/speckit.git.initialize.md
+  s_c95e5dc2240fad::t_2abf97f15d5525 7,11,16,21,29,50,54-55
+.specify/extensions/git/commands/speckit.git.remote.md
+  s_c95e5dc2240fad::t_eaf89f00fe1afb 7,11-12,19,27,29-30,39-40,47
+.specify/extensions/git/commands/speckit.git.validate.md
+  s_c95e5dc2240fad::t_ce560303989157 7,11,27-28,35-37,52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ebed4b7936f994a04b0000000313fd5161c6b494",
+  "prompts": {},
+  "sessions": {
+    "s_c95e5dc2240fad": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2553a3b-dbdf-4cef-8ed1-b781ffa52630",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

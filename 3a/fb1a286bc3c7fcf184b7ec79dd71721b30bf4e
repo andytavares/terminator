@@ -1,0 +1,35 @@
+extensions/notepad/src/components/NoteList.tsx
+  s_b5d2e9359cd05b::t_f43daace697adb 410-422,438
+  s_b5d2e9359cd05b::t_e22e6969a9a10f 8,13
+extensions/remote-control/src/components/remote-control-view.css
+  s_b5d2e9359cd05b::t_3ab012bf07f8ec 20,175
+extensions/notepad/src/components/NotepadView.tsx
+  s_b5d2e9359cd05b::t_f43daace697adb 3-9,112-123,130-134,139-140,225
+  s_b5d2e9359cd05b::t_5e6181186b50b2 135-138
+extensions/task-vault/src/components/task-vault.css
+  s_b5d2e9359cd05b::t_3ab012bf07f8ec 152,1097,1106,1231,1714,1764,1775,1785,1804-1805,2137,2328,2341,2350,3587,3617,3630
+extensions/notepad/tests/components/NoteList.spec.tsx
+  s_b5d2e9359cd05b::t_8c778a78bdf120 103,105-114
+extensions/notepad/tests/components/NotepadView.spec.tsx
+  s_b5d2e9359cd05b::t_7a7256191e5e5b 71-78
+extensions/task-vault/src/components/DailyLogSessionPicker.tsx
+  s_b5d2e9359cd05b::t_e5bc4cb3d883af 22
+extensions/task-vault/src/components/ProjectsBrowser.tsx
+  s_b5d2e9359cd05b::t_d2959c7fb025a1 264
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3afb1a286bc3c7fcf184b7ec79dd71721b30bf4e",
+  "prompts": {},
+  "sessions": {
+    "s_b5d2e9359cd05b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da33f7e5-cdc0-4c80-a907-6950bc8d8b20",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

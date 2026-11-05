@@ -1,0 +1,47 @@
+extensions/foundry/src/components/foundry.css
+  s_b5d2e9359cd05b::t_9c1dd70cad5ebe 121,170-174,542-546,559,763-767,3812
+extensions/foundry/src/components/Ledger.tsx
+  s_b5d2e9359cd05b::t_86e30cef121b63 459-466
+  s_b5d2e9359cd05b::t_faf45eab8e82ef 138-142
+  s_b5d2e9359cd05b::t_194ab52dcf12d5 8-16
+  s_b5d2e9359cd05b::t_9c1dd70cad5ebe 126,130
+  s_b5d2e9359cd05b::t_63b684429ee469 81-86,468
+  s_b5d2e9359cd05b::t_36714fa0e97ab0 109
+  s_b5d2e9359cd05b::t_f122e07ffb3870 467,469
+extensions/foundry/src/components/Orders.tsx
+  s_b5d2e9359cd05b::t_63b684429ee469 3-4,80-86,730,744
+  s_b5d2e9359cd05b::t_86e30cef121b63 733-743,745
+extensions/foundry/src/components/factory/FactorySite.tsx
+  s_b5d2e9359cd05b::t_63b684429ee469 7-8,175-176,218,234
+  s_b5d2e9359cd05b::t_86e30cef121b63 306-316,322
+  s_b5d2e9359cd05b::t_194ab52dcf12d5 317-321
+extensions/foundry/tests/components/order-document.spec.tsx
+  s_b5d2e9359cd05b::t_86e30cef121b63 152
+extensions/foundry/src/renderer/App.tsx
+  s_b5d2e9359cd05b::t_9c1dd70cad5ebe 288,416-421
+  s_b5d2e9359cd05b::t_194ab52dcf12d5 414-415
+extensions/foundry/tests/components/App.spec.tsx
+  s_b5d2e9359cd05b::t_86e30cef121b63 249,413,430,436,451,506
+extensions/foundry/tests/components/Ledger.spec.tsx
+  s_b5d2e9359cd05b::t_511c74760ce044 98,111-112,231-238
+extensions/foundry/tests/components/Orders.spec.tsx
+  s_b5d2e9359cd05b::t_e515a1102d1d3c 476-484
+extensions/foundry/tests/components/factory/FactorySite.spec.tsx
+  s_b5d2e9359cd05b::t_2fd29ca8eb7729 73-75,110-118,351
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f9a6156e283418b17e9691073615d0761c6dfb90",
+  "prompts": {},
+  "sessions": {
+    "s_b5d2e9359cd05b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da33f7e5-cdc0-4c80-a907-6950bc8d8b20",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+extensions/foundry/src/components/Ledger.tsx
+  s_b5d2e9359cd05b::t_3b2fcb8b912749 483
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e6ad72857ffa67cf179df8b5e668cecdc0cc4ace",
+  "prompts": {},
+  "sessions": {
+    "s_b5d2e9359cd05b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da33f7e5-cdc0-4c80-a907-6950bc8d8b20",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

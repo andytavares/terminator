@@ -1,0 +1,19 @@
+docs/research/pr-overview-redesign.html
+  s_d59d53f31eaaeb::t_0d4d372d7031ef 1479,2817-4187
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8efe504f39fb97a1748d60acf13a1393eee92756",
+  "prompts": {},
+  "sessions": {
+    "s_d59d53f31eaaeb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "890c9c0e-bc38-4fda-b2c6-c399f30f40e6",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+docs/CONTRIBUTING.md
+  s_aa083ade4d6b38::t_e52b3c4f2b3b48 79
+docs/adr/139-the-pre-push-hook-trusts-foundry.md
+  s_aa083ade4d6b38::t_80802706b155dc 1-21
+extensions/foundry/src/line/integrate.ts
+  s_aa083ade4d6b38::t_b89e7c447c8396 588-593,606
+extensions/foundry/tests/line/early-ship.spec.ts
+  s_aa083ade4d6b38::t_c834b3cebef67d 216,239
+extensions/foundry/tests/line/integrate.spec.ts
+  s_aa083ade4d6b38::t_3547f02779e1f0 20,186,206,1170-1176,1464,1466-1472,1520,1561,1565
+scripts/ci-local.mjs
+  s_aa083ade4d6b38::t_936e4d99888855 229-235,240-247,272
+tests/unit/scripts/ci-local.spec.ts
+  s_aa083ade4d6b38::t_bb380e8d6249c6 78-85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "708cccba350aa53db3f1f0ca06f437763add7645",
+  "prompts": {},
+  "sessions": {
+    "s_aa083ade4d6b38": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f16587e8-cfb1-4ac5-b5e9-1f3f71d60dab",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

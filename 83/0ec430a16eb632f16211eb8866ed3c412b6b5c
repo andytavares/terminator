@@ -1,0 +1,23 @@
+tests/e2e/design-system-fields.spec.ts
+  s_b5d2e9359cd05b::t_814f2c9c3f7de3 44
+tests/e2e/foundry-harness.ts
+  s_b5d2e9359cd05b::t_814f2c9c3f7de3 216
+src/renderer/components/sidebar/UnifiedSidebar.css
+  s_b5d2e9359cd05b::t_814f2c9c3f7de3 136-137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "830ec430a16eb632f16211eb8866ed3c412b6b5c",
+  "prompts": {},
+  "sessions": {
+    "s_b5d2e9359cd05b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da33f7e5-cdc0-4c80-a907-6950bc8d8b20",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

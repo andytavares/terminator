@@ -1,0 +1,101 @@
+docs/adr/020-mcp-sidecar-removal.md
+  s_c95e5dc2240fad::t_8341562279715c 9,13,17-19,32-33
+docs/adr/034-a-branch-is-named-by-its-branch.md
+  s_c95e5dc2240fad::t_217bf9673130fb 11,13,21,23,27,29,31-33,35,37,44,49-50,54
+docs/adr/008-extension-commonjs-compilation.md
+  s_c95e5dc2240fad::t_308a6c027ee8a0 9,13,15,25-28,35-36
+docs/adr/007-agent-runner-subprocess.md
+  s_c95e5dc2240fad::t_9a8d3a5da779e8 20-23,28,30-34
+docs/adr/033-one-app-band.md
+  s_c95e5dc2240fad::t_6c70030dfe23a7 11,16,18,25-26,28,31,37,43-44,49
+docs/adr/001-pty-in-main-process.md
+  s_c95e5dc2240fad::t_9ca9a5fa8bc077 8,12,14,16,20-21,26-27
+docs/adr/026-double-escape-extension-exit.md
+  s_c95e5dc2240fad::t_f01b7b13783462 11,13,18,26,28,33,35-39,51,55,59,67-69,73-75
+docs/adr/036-the-board-is-one-grid.md
+  s_c95e5dc2240fad::t_217bf9673130fb 9,11,28,32,37,40,42,46,48,50,52,58,60
+docs/adr/019-ilike-search-over-fts5.md
+  s_c95e5dc2240fad::t_e183ede952b7f5 11,13,19,27-29,35,41,49
+docs/adr/007-bundled-first-extension-distribution.md
+  s_c95e5dc2240fad::t_9a8d3a5da779e8 9,15-17,23,27,32-34
+docs/adr/030-session-start-issue-context.md
+  s_c95e5dc2240fad::t_2146d6b8bef170 11,15,17,22,40-41,45,48,50-53,55,58,60-61,65-66,69-71,73,86-87,92,94-96,98,100-103,106-107,111-114
+docs/adr/031-change-stats-out-of-band.md
+  s_c95e5dc2240fad::t_6c70030dfe23a7 11,15-16,18,22,26,28,31,33,39,45-47,51,53
+docs/adr/018-codemirror6-editor.md
+  s_c95e5dc2240fad::t_e183ede952b7f5 29-32,48-51
+docs/adr/035-the-sidebar-stops-at-the-branch.md
+  s_c95e5dc2240fad::t_217bf9673130fb 9,13-16,18,24,26,28,32,36,38,40,42,46,48,50
+docs/adr/012-extension-api-v1.2.0.md
+  s_c95e5dc2240fad::t_fe906e142d6628 11,15,19,21-23,36-38
+docs/adr/021-electron-upgrade-blocker.md
+  s_c95e5dc2240fad::t_8341562279715c 8,20,24-27
+docs/adr/017-a3-color-band-sidebar.md
+  s_c95e5dc2240fad::t_e183ede952b7f5 8,10,22,26,29-30,34-35,39
+docs/adr/011-speckit-parallel-runs.md
+  s_c95e5dc2240fad::t_fe906e142d6628 11-13,17-18,23,25,27-28,30-32,36,38,44-48
+docs/adr/004-xterm-instances-persist-on-tab-switch.md
+  s_c95e5dc2240fad::t_9ca9a5fa8bc077 8,12,14,16,20-22,26-28
+docs/adr/032-branch-vocabulary-ui-only.md
+  s_c95e5dc2240fad::t_6c70030dfe23a7 11,15,17,26,32,38,40,44-46,50,52,56
+docs/adr/002-extension-host-in-main-process.md
+  s_c95e5dc2240fad::t_9ca9a5fa8bc077 8,12,14,16,20-21,25-27
+docs/adr/005-native-fswatcher-over-chokidar.md
+  s_c95e5dc2240fad::t_9a8d3a5da779e8 9,13,21,31,33,37,41-43
+docs/adr/029-core-issue-tracker-service.md
+  s_c95e5dc2240fad::t_2146d6b8bef170 13,17,19-21,29-30,33,41,44,48-50,54-56,64-65,76-79,84-86,90-93,95,100-102,104,106-107,111,118-119,121-123,127,129-130,134-135,138-139,141-144
+docs/adr/006-sandboxed-shell-exec-for-extensions.md
+  s_c95e5dc2240fad::t_9a8d3a5da779e8 9,13-15,17,23-25,31,35,39,43-45
+docs/adr/010-heuristic-file-ordering-v1.md
+  s_c95e5dc2240fad::t_308a6c027ee8a0 9,13,30,59,63-65
+docs/adr/011-react-markdown-for-comments.md
+  s_c95e5dc2240fad::t_308a6c027ee8a0 9,13,15,17,19,31-34
+docs/adr/016-uuid-task-ids.md
+  s_c95e5dc2240fad::t_e183ede952b7f5 10,16,36-37
+docs/adr/013-speckit-native-skills-and-reply.md
+  s_c95e5dc2240fad::t_fe906e142d6628 8,12-13,16-17,28-29,34,37-38,43,49-51,58-60
+docs/adr/024-ptymanager-session-authority.md
+  s_c95e5dc2240fad::t_f01b7b13783462 9-19,27-31,34,37,39-40,45-46,48,54-56,59,61
+docs/adr/013-mcp-stdio-sidecar.md
+  s_c95e5dc2240fad::t_fe906e142d6628 9,13,25-28
+docs/adr/022-webview-isolated-extension-renderer.md
+  s_c95e5dc2240fad::t_8341562279715c 11,15,25,27,29,41,45,49,58-59,65-66,74
+docs/adr/026-supervised-runs-in-a-terminal.md
+  s_c95e5dc2240fad::t_24ed41a6a2352a 11,14-15,17,19-21,33,36-37,39,43,47-48,59-61,67-70,75,78-80,82,92-93,99,102-103,105,109-111
+docs/adr/014-line-based-task-ids.md
+  s_c95e5dc2240fad::t_e183ede952b7f5 13,22,26-29
+docs/adr/003-electron-store-for-persistence.md
+  s_c95e5dc2240fad::t_9ca9a5fa8bc077 8,12,16,18,22-24,28,30
+docs/adr/027-flat-session-list-view-model.md
+  s_c95e5dc2240fad::t_24ed41a6a2352a 11,13,15-17,19,25,31,33,35-36,40,42,55,60,66,70,72,74
+docs/adr/025-deliberate-git-parser-duplication.md
+  s_c95e5dc2240fad::t_f01b7b13783462 9-17,22-24,26-27,31,33,35,37
+docs/adr/012-speckit-run-modes-and-reset.md
+  s_c95e5dc2240fad::t_fe906e142d6628 8-9,17,19-20,22,31-34,39-41,47-48,50
+docs/adr/023-channel-manifest-and-declared-remote-access.md
+  s_c95e5dc2240fad::t_f01b7b13783462 9-14,16,19,22-25,32-34,37-38,42,44,47,49,54-55,58-59,61-62,65
+docs/adr/017-embedded-http-remote-server.md
+  s_c95e5dc2240fad::t_8341562279715c 8,12,16,18,20,22,26,28,32,36-43,47,52,54,56,61-62,64
+docs/adr/015-sqlite-first-task-vault.md
+  s_c95e5dc2240fad::t_e183ede952b7f5 10,14,19,24-26
+docs/adr/010-speckit-card-model.md
+  s_c95e5dc2240fad::t_308a6c027ee8a0 13,18,27,29-30,36-40,44-49
+docs/adr/009-gh-cli-for-review-ops.md
+  s_c95e5dc2240fad::t_308a6c027ee8a0 9,13,15,17,19,31-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "80def7c005edb121f349f6f510dcd02249d83d8d",
+  "prompts": {},
+  "sessions": {
+    "s_c95e5dc2240fad": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2553a3b-dbdf-4cef-8ed1-b781ffa52630",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

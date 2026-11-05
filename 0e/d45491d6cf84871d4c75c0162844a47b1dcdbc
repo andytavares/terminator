@@ -1,0 +1,31 @@
+extensions/git-integration/src/components/FileDiffView.tsx
+  s_b5d2e9359cd05b::t_07eb63cc6c6d3c 335-340
+  s_b5d2e9359cd05b::t_9dff35fa3ae6c3 16-17,20-25,314-332,355
+extensions/git-integration/src/components/GitFullView.tsx
+  s_b5d2e9359cd05b::t_9dff35fa3ae6c3 105,112-113,137-153,543,551,573
+  s_b5d2e9359cd05b::t_07eb63cc6c6d3c 10
+extensions/git-integration/tests/unit/FileDiffView.spec.tsx
+  s_b5d2e9359cd05b::t_f31d6c584f4824 6,29,48,195,197,203,216,230,236-249,252
+  s_b5d2e9359cd05b::t_7f4721d77f4ddd 250-251,253
+extensions/git-integration/src/components/pr-review/agent-panel.css
+  s_b5d2e9359cd05b::t_5ea9f3573b371a 17-19,33-35
+extensions/git-integration/tests/unit/GitFullView.spec.tsx
+  s_b5d2e9359cd05b::t_d52e3bd3495b42 165,167,186,188
+  s_b5d2e9359cd05b::t_f31d6c584f4824 24-28,163-164,166,168-185,187,189-195
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0ed45491d6cf84871d4c75c0162844a47b1dcdbc",
+  "prompts": {},
+  "sessions": {
+    "s_b5d2e9359cd05b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da33f7e5-cdc0-4c80-a907-6950bc8d8b20",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

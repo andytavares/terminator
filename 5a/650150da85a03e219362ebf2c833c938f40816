@@ -1,0 +1,28 @@
+extensions/foundry/tests/channel-schemas.spec.ts
+  s_c95e5dc2240fad::t_2915c35878b919 20
+extensions/foundry/tests/verify/ladder.spec.ts
+  s_c95e5dc2240fad::t_2915c35878b919 442-444
+extensions/foundry/IPC-CHANNELS.md
+  s_c95e5dc2240fad::t_9127657dff38f9 1-6,8-18,20-713
+  s_c95e5dc2240fad::t_2915c35878b919 7,19
+.github/PULL_REQUEST_TEMPLATE.md
+  s_c95e5dc2240fad::t_e50dc486eed737 17
+.github/workflows/fill-pr-description.yml
+  s_c95e5dc2240fad::t_2a93ef468786be 116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5a650150da85a03e219362ebf2c833c938f40816",
+  "prompts": {},
+  "sessions": {
+    "s_c95e5dc2240fad": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2553a3b-dbdf-4cef-8ed1-b781ffa52630",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
