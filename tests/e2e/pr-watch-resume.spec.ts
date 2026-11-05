@@ -54,17 +54,29 @@ test.afterAll(async () => {
   for (const dir of [repo, bare]) if (dir) rmSync(dir, { recursive: true, force: true })
 })
 
-async function failAnotherCheck(name: string): Promise<void> {
-  stub.pullRequest(1).failedChecks.push(name)
+const dashboardReads = () =>
+  stub.calls.filter((call) => call.args.some((arg) => arg.includes('search(query:'))).length
+
+/** A dashboard read made now knows the workspace; the one at app start ran before it existed,
+ *  so it joined the pull request to no checkout and Send to agent had nowhere to go. */
+async function refreshDashboard(): Promise<void> {
+  const before = dashboardReads()
   const entry = handle.page.getByRole('button', { name: 'Reviews', exact: true })
   // A second click on the open Reviews closes it.
   if ((await entry.getAttribute('aria-current')) !== 'page') await entry.click()
   const reviews = await gitView(handle, 'reviews')
   await reviews.getByRole('button', { name: 'Refresh' }).click()
+  await expect.poll(dashboardReads).toBeGreaterThan(before)
+}
+
+async function failAnotherCheck(name: string): Promise<void> {
+  stub.pullRequest(1).failedChecks.push(name)
+  await refreshDashboard()
 }
 
 async function startThenCloseTheAgentTab(): Promise<void> {
   const { page } = handle
+  await refreshDashboard()
   await openHome(page)
   await page.getByRole('button', { name: 'Send to agent' }).first().click()
   await expect.poll(prompts).toBe(1)

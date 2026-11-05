@@ -124,25 +124,25 @@ export function MergeStackButton({ plan, merge }: { plan: StackPlan; merge: Stac
   )
 }
 
-/** Opens GitHub's revert of this merged pull request, then shows it. */
+/** Opens GitHub's revert of this merged pull request, then says which one it is. */
 export function useRevert(repoRoot: string, pr: PrReviewDetail) {
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
   const run = async () => {
     setBusy(true)
-    setError(null)
+    setMessage(null)
     recordUsage('revert-pr')
     try {
       const result = await githubAPI.revert(repoRoot, pr.number)
-      if ('error' in result) setError(`Could not open the revert: ${result.error}`)
-      else window.electronAPI.shell.openExternal(result.url).catch(() => {})
+      if ('error' in result) setMessage(`Could not open the revert: ${result.error}`)
+      else setMessage(`Opened revert pull request #${result.number}.`)
     } catch (e) {
-      setError(errorMessageOf(e))
+      setMessage(errorMessageOf(e))
     } finally {
       setBusy(false)
     }
   }
-  return { busy, error, run }
+  return { busy, message, run }
 }
 
 export function RevertButton({ revert }: { revert: ReturnType<typeof useRevert> }) {

@@ -753,11 +753,9 @@ describe('PrOverviewPanel — the state of the pull request', () => {
     expect(within(readiness()).getByText('Merged into main')).toBeTruthy()
     fireEvent.click(within(headerActions()).getByRole('button', { name: 'Open revert PR' }))
     await waitFor(() => expect(githubAPI.revert).toHaveBeenCalledWith('/repo', 42))
-    await waitFor(() =>
-      expect(window.electronAPI.shell.openExternal).toHaveBeenCalledWith(
-        'https://github.com/o/r/pull/43'
-      )
-    )
+    expect(await screen.findByText('Opened revert pull request #43.')).toBeTruthy()
+    // Says so in place: launching a browser unasked would take the operator out of the app.
+    expect(window.electronAPI.shell.openExternal).not.toHaveBeenCalled()
   })
 })
 

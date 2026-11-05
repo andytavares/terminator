@@ -100,7 +100,7 @@ function KnownAgents(props: {
 }): React.JSX.Element | null {
   const known = useKnownAgents()
   const add = ({ installed: _installed, ...agent }: KnownAgentStatus): void => {
-    recordUse('settings.agents.add-known')
+    recordUse('core.settings.agents.add-known')
     props.onAdd([...props.custom, agent])
   }
   if (known.length === 0) return null

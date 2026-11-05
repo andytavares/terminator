@@ -638,7 +638,7 @@ function PrStatusStrip({ pr, actions }: { pr: PrReviewDetail; actions: OverviewA
       youAreRequested={isRequestedOf(pr, currentUserLogin)}
       branch={branchOf(actions)}
       stack={actions.plan}
-      notice={actions.stackMerge.message ?? actions.revert.error}
+      notice={actions.stackMerge.message ?? actions.revert.message}
     />
   )
 }

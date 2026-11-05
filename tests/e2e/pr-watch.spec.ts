@@ -53,18 +53,29 @@ test.afterAll(async () => {
 const dashboardReads = () =>
   stub.calls.filter((call) => call.args.some((arg) => arg.includes('search(query:'))).length
 
+/** A dashboard read made now knows the workspace; the one at app start ran before it existed,
+ *  so it joined the pull request to no checkout and Send to agent had nowhere to go. */
+async function refreshDashboard(): Promise<void> {
+  const before = dashboardReads()
+  const entry = handle.page.getByRole('button', { name: 'Reviews', exact: true })
+  // A second click on the open Reviews closes it.
+  if ((await entry.getAttribute('aria-current')) !== 'page') await entry.click()
+  const reviews = await gitView(handle, 'reviews')
+  await reviews.getByRole('button', { name: 'Refresh' }).click()
+  await expect.poll(dashboardReads).toBeGreaterThan(before)
+}
+
 test('a failing check at app start wakes nothing; a new failing check prompts the agent tab', async () => {
   await expect.poll(dashboardReads).toBeGreaterThan(0)
   expect(records()).toEqual([])
 
   // The operator starts the agent tab once from Home; the watch then finds it live.
+  await refreshDashboard()
   await openHome(handle.page)
   await handle.page.getByRole('button', { name: 'Send to agent' }).first().click()
   await expect.poll(prompts).toBe(1)
 
   stub.pullRequest(1).failedChecks.push('e2e')
-  await handle.page.getByRole('button', { name: 'Reviews', exact: true }).click()
-  const reviews = await gitView(handle, 'reviews')
-  await reviews.getByRole('button', { name: 'Refresh' }).click()
+  await refreshDashboard()
   await expect.poll(prompts).toBe(2)
 })
