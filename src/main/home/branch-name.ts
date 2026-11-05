@@ -8,7 +8,7 @@ const NAMING_MODEL = 'claude-haiku-5-5'
 export const NAMING_TIMEOUT_MS = 5_000
 
 /** @internal */
-export const NAMING_INSTRUCTION =
+const NAMING_INSTRUCTION =
   'Reply with only a git branch name for the task: "feat/" or "fix/" and two to five lowercase ' +
   'words joined by hyphens. No quotes, no explanation.'
 

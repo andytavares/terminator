@@ -13,6 +13,10 @@ const ScheduleFields = {
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable(),
+  /** Runs on a branch of its own, as Start work's default for an agent prompt. */
+  newWorktree: z.boolean(),
+  /** The agent chosen in Start work; null runs the default agent. */
+  agentId: z.string().min(1).nullable(),
 }
 
 export const ScheduleInputSchema = z

@@ -149,7 +149,7 @@ beforeEach(() => {
     git,
     agents: { list: agentsList },
     homeBranchName: { get: nameBranch },
-    schedules: { create: createSchedule },
+    schedules: { create: createSchedule, list: async () => ({ data: [] }) },
     extension: {
       executeCommand,
       getCommands: vi.fn(async () => ({ commands: [] })),
@@ -826,6 +826,8 @@ describe('StartWork — When, saving', () => {
       kind: 'daily',
       time: '07:30',
       date: null,
+      newWorktree: true,
+      agentId: null,
     })
     expect(launched.agentInBranch).not.toHaveBeenCalled()
     expect(recordUse).toHaveBeenCalledWith('core.start-work.schedule', 'click', expect.anything())

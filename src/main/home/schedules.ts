@@ -12,7 +12,8 @@ const START_GRACE_MS = 2 * 60_000
 
 const SCHEMA = `CREATE TABLE IF NOT EXISTS schedules (
   id TEXT PRIMARY KEY, repo_root TEXT NOT NULL, prompt TEXT NOT NULL, run_as TEXT NOT NULL,
-  kind TEXT NOT NULL, time TEXT NOT NULL, date TEXT, last_run_at TEXT, created_at TEXT NOT NULL)`
+  kind TEXT NOT NULL, time TEXT NOT NULL, date TEXT, last_run_at TEXT, created_at TEXT NOT NULL,
+  new_worktree INTEGER NOT NULL, agent_id TEXT)`
 
 interface Row extends Record<string, unknown> {
   id: string
@@ -24,6 +25,8 @@ interface Row extends Record<string, unknown> {
   date: string | null
   last_run_at: string | null
   created_at: string
+  new_worktree: number
+  agent_id: string | null
 }
 
 const toSchedule = (row: Row): Schedule => ({
@@ -36,6 +39,8 @@ const toSchedule = (row: Row): Schedule => ({
   date: row.date,
   lastRunAt: row.last_run_at,
   createdAt: row.created_at,
+  newWorktree: row.new_worktree === 1,
+  agentId: row.agent_id,
 })
 
 export interface SchedulerDeps {
@@ -92,22 +97,36 @@ function missedAsk(schedule: Schedule, occurrence: Date): HomeAsk {
 }
 
 /** The schedules table: what was saved, and the end of each occurrence. */
+/** A one-time run whose moment is already behind `now`: it would never come due. */
+function hasPassed(input: ScheduleInput, now: Date): boolean {
+  if (input.kind !== 'once' || input.date === null) return false
+  const [year, month, day] = input.date.split('-').map(Number)
+  const [hours, minutes] = input.time.split(':').map(Number)
+  return new Date(year, month - 1, day, hours, minutes).getTime() <= now.getTime()
+}
+
+function insertSchedule(db: ExtensionDB, schedule: Schedule): Promise<unknown> {
+  return db.run('INSERT INTO schedules VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+    ...[schedule.id, schedule.repoRoot, schedule.prompt, schedule.runAs, schedule.kind],
+    ...[schedule.time, schedule.date, null, schedule.createdAt],
+    ...[schedule.newWorktree ? 1 : 0, schedule.agentId],
+  ])
+}
+
 function createScheduleStore({ db, now }: Pick<SchedulerDeps, 'db' | 'now'>) {
   return {
     init: async (): Promise<void> => void (await db.exec(SCHEMA)),
     list: async (): Promise<Schedule[]> =>
       (await db.query<Row>('SELECT * FROM schedules ORDER BY created_at')).map(toSchedule),
     async create(input: ScheduleInput): Promise<Schedule> {
+      if (hasPassed(input, now())) throw new Error('That time has passed. Pick a later time.')
       const schedule: Schedule = {
         ...input,
         id: randomUUID(),
         lastRunAt: null,
         createdAt: now().toISOString(),
       }
-      await db.run('INSERT INTO schedules VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [
-        ...[schedule.id, schedule.repoRoot, schedule.prompt, schedule.runAs, schedule.kind],
-        ...[schedule.time, schedule.date, null, schedule.createdAt],
-      ])
+      await insertSchedule(db, schedule)
       return schedule
     },
     remove: async (id: string): Promise<void> =>

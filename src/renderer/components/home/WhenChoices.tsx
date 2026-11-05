@@ -1,7 +1,8 @@
-import React from 'react'
-import { Clock } from 'lucide-react'
-import { SegmentedControl } from '@terminator/extension-ui'
+import React, { useEffect, useState } from 'react'
+import { Clock, X } from 'lucide-react'
+import { IconButton, SegmentedControl } from '@terminator/extension-ui'
 import type { When } from './start-work-schedule'
+import type { Schedule } from '../../../shared/schemas/schedules.schema'
 
 const OPTIONS: Array<{ value: When; label: string }> = [
   { value: 'now', label: 'Now' },
@@ -41,6 +42,7 @@ export function WhenChoices({ value, onChange }: WhenChoicesProps): React.JSX.El
           Runs while Terminator is open. A missed run waits in Needs you.
         </p>
       )}
+      {value.when !== 'now' && <ScheduledRuns />}
     </>
   )
 }
@@ -64,5 +66,58 @@ function TimeInputs({ value, onChange }: WhenChoicesProps): React.JSX.Element {
         onChange={(e) => onChange({ ...value, time: e.target.value })}
       />
     </div>
+  )
+}
+
+const KIND_WORDS: Record<Schedule['kind'], string> = {
+  once: 'once',
+  daily: 'every day',
+  weekdays: 'every weekday',
+}
+
+/** When a saved run runs, and in which repository. */
+function whenOf(schedule: Schedule): string {
+  const day = schedule.kind === 'once' ? `on ${schedule.date} ` : `${KIND_WORDS[schedule.kind]} `
+  const repo = schedule.repoRoot.split('/').pop() ?? schedule.repoRoot
+  return `${day}at ${schedule.time} · ${repo}`
+}
+
+/** The saved runs, read once, and a remove that reads them again. */
+function useSavedRuns(): [Schedule[], (id: string) => Promise<void>] {
+  const [saved, setSaved] = useState<Schedule[]>([])
+  const read = (): Promise<void> =>
+    window.electronAPI.schedules.list().then((answer) => {
+      if ('data' in answer) setSaved(answer.data)
+    })
+  useEffect(() => {
+    void window.electronAPI.schedules.list().then((answer) => {
+      if ('data' in answer) setSaved(answer.data)
+    })
+  }, [])
+  const remove = async (id: string): Promise<void> => {
+    await window.electronAPI.schedules.delete({ id })
+    await read()
+  }
+  return [saved, remove]
+}
+
+/** The runs already saved, so one can be removed; nothing when there are none. */
+export function ScheduledRuns(): React.JSX.Element | null {
+  const [saved, remove] = useSavedRuns()
+  if (saved.length === 0) return null
+  return (
+    <ul className="start-work__scheduled" aria-label="Scheduled runs">
+      {saved.map((schedule) => (
+        <li key={schedule.id}>
+          <span className="start-work__scheduled-prompt">{schedule.prompt}</span>
+          <small>{whenOf(schedule)}</small>
+          <IconButton
+            icon={X}
+            label={`Remove ${schedule.prompt}`}
+            onClick={() => void remove(schedule.id)}
+          />
+        </li>
+      ))}
+    </ul>
   )
 }

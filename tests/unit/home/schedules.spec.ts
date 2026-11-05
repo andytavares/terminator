@@ -21,6 +21,8 @@ const daily: ScheduleInput = {
   kind: 'daily',
   time: '09:00',
   date: null,
+  newWorktree: true,
+  agentId: null,
 }
 
 function scheduler() {
@@ -66,6 +68,24 @@ describe('the schedules table', () => {
       { ...daily, id: created.id, lastRunAt: null, createdAt: clock.toISOString() },
     ])
     await s.remove(created.id)
+    expect(await s.list()).toEqual([])
+  })
+})
+
+describe('saving a schedule', () => {
+  it('keeps the worktree choice and the agent', async () => {
+    const s = scheduler()
+    await s.init()
+    await s.create({ ...daily, newWorktree: false, agentId: 'codex' })
+    expect(await s.list()).toMatchObject([{ newWorktree: false, agentId: 'codex' }])
+  })
+
+  it('refuses a one-time run whose time has passed, so it cannot wait for ever', async () => {
+    const s = scheduler()
+    await s.init()
+    await expect(
+      s.create({ ...daily, kind: 'once', date: '2026-11-04', time: '07:00' })
+    ).rejects.toThrow('That time has passed')
     expect(await s.list()).toEqual([])
   })
 })

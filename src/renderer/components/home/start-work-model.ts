@@ -77,7 +77,7 @@ async function readRepoGit(folderPath: string): Promise<RepoGit> {
 }
 
 /** A pause in typing this long starts asking the agent for a branch name. */
-export const NAMING_PAUSE_MS = 800
+const NAMING_PAUSE_MS = 800
 
 /** The branch the agent names for `prompt`, asked for once typing pauses; null until it answers. */
 export function useAgentBranchName(prompt: string, enabled: boolean): string | null {

@@ -31,6 +31,8 @@ const daily = {
   kind: 'daily',
   time: '09:00',
   date: null,
+  newWorktree: true,
+  agentId: null,
 }
 
 beforeEach(async () => {

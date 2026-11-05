@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useToastStore } from '../../stores/toast.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
-import { isAgentRun, startWork } from './start-work'
+import { startWork } from './start-work'
 import type { Schedule } from '../../../shared/schemas/schedules.schema'
 
 // A saved prompt coming due starts the way Start work starts a typed prompt.
@@ -20,7 +20,8 @@ async function launchScheduled(schedule: Schedule): Promise<void> {
           text: schedule.prompt,
           workspace,
           runAs: schedule.runAs,
-          newWorktree: isAgentRun(schedule.runAs),
+          newWorktree: schedule.newWorktree,
+          ...(schedule.agentId === null ? {} : { agentId: schedule.agentId }),
         })
   if (message !== null)
     useToastStore

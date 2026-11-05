@@ -43,7 +43,14 @@ const TABS: Array<{ id: LauncherTab; label: string }> = [
 ]
 
 /** Today as 'YYYY-MM-DD', local. */
-const today = (): string => new Date().toLocaleDateString('sv-SE')
+/** Today, or tomorrow once `time` has passed: the first day a one-time run can still happen. */
+const firstDayFor = (time: string): string => {
+  const now = new Date()
+  const [hours, minutes] = time.split(':').map(Number)
+  const passed = now.getHours() * 60 + now.getMinutes() >= hours * 60 + minutes
+  if (passed) now.setDate(now.getDate() + 1)
+  return now.toLocaleDateString('sv-SE')
+}
 
 /** What the person has typed, picked and been told so far. */
 function useLauncherFields() {
@@ -56,7 +63,11 @@ function useLauncherFields() {
   const [pickedRepoId, setPickedRepoId] = useState<string | null>(null)
   const [picking, setPicking] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [when, setWhen] = useState<WhenValue>({ when: 'now', time: '09:00', date: today() })
+  const [when, setWhen] = useState<WhenValue>({
+    when: 'now',
+    time: '09:00',
+    date: firstDayFor('09:00'),
+  })
   const [useRepoFolder, setUseRepoFolder] = useState(false)
   return {
     ...{ tab, query, runAs, agentId, selectedIndex, pickedRepoId, picking, error },
@@ -208,6 +219,8 @@ async function schedule(view: ActionsInput['view'], request: WorkRequest): Promi
     kind: when === 'now' ? 'daily' : when,
     time,
     date: when === 'once' ? date : null,
+    newWorktree: request.newWorktree === true,
+    agentId: request.agentId ?? null,
   })
   return 'data' in result ? null : result.message
 }
