@@ -1,5 +1,5 @@
 import { test, expect, type Locator } from '@playwright/test'
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -34,6 +34,7 @@ let stub: GithubStub
 let repo: string
 let bare: string
 const directories: string[] = []
+let agentReply: string
 const BRANCH = 'feat/greeting'
 const PANEL = '[data-extension-panel="terminator.git-integration"]'
 
@@ -59,7 +60,10 @@ function makeFeatureBranchRepo(): void {
 test.beforeAll(async () => {
   makeFeatureBranchRepo()
   stub = await startGithubStub({ bareRepo: bare })
-  handle = await launchApp(undefined, stub.env)
+  const replyDir = mkdtempSync(join(tmpdir(), 'terminator-e2e-draft-reply-'))
+  directories.push(replyDir)
+  agentReply = join(replyDir, 'reply.json')
+  handle = await launchApp(undefined, { ...stub.env, E2E_AGENT_REPLY: agentReply })
   await openRepo(handle, 'Commit Flow', repo)
 })
 
@@ -299,6 +303,29 @@ async function pullQuickActionFastForwards(): Promise<void> {
   expect(readFileSync(join(repo, 'docs/notes.md'), 'utf8')).toBe('from a teammate\n')
 }
 
+const DRAFT = {
+  branch: 'feat/farewell',
+  commitMessage: 'Add a farewell',
+  title: 'Say goodbye',
+  body: 'Adds a farewell.',
+}
+
+/** The stand-in agent answers the draft request with DRAFT (fixtures/acp-stub-agent.mjs). */
+async function openPrWithStagedChangesShowsTheDraft(): Promise<void> {
+  writeFileSync(agentReply, JSON.stringify(DRAFT))
+  writeFile(repo, 'src/farewell.ts', 'export const farewell = "bye"\n')
+  const view = await openGitTab(handle)
+  await fileRow(view, 'src/farewell.ts').locator('input[type=checkbox]').click()
+  await expect(gitViewSection(view, /^Staged \(1\)/)).toContainText('src/farewell.ts')
+  await view.getByRole('button', { name: 'Open PR' }).click()
+  const dialog = view.getByRole('dialog', { name: 'Commit and open a pull request' })
+  await expect(dialog.getByPlaceholder('Pull request title')).toHaveValue('Say goodbye')
+  await expect(dialog.getByPlaceholder('Commit message')).toHaveValue('Add a farewell')
+  await expect(dialog).toContainText('Drafted by Claude from the staged diff')
+  await dialog.getByRole('button', { name: 'Cancel' }).click()
+  await expect(dialog).toBeHidden()
+}
+
 /** A flow's steps, run in order, each titled with the behaviour it checks. */
 type Steps = Array<[title: string, run: () => Promise<void>]>
 
@@ -336,6 +363,10 @@ const CHANGE_TO_PULL_REQUEST: Steps = [
   [
     'the Pull Quick Action fast-forwards the branch to what a teammate pushed',
     pullQuickActionFastForwards,
+  ],
+  [
+    'Open PR with staged changes opens the dialog with the drafted title and commit message',
+    openPrWithStagedChangesShowsTheDraft,
   ],
 ]
 

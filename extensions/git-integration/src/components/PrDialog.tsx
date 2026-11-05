@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Dialog, Tab, TabList, TabPanel, TabsRoot } from '@terminator/extension-ui'
 import type { PullRequest } from '../schemas/git.schema'
 import type { ChangeDraft } from '../schemas/review-agent.schema'
@@ -261,25 +261,39 @@ function draftOf(props: PrDialogProps, form: PrForm): PrDraft {
   }
 }
 
-/** Makes the new branch if the commit needs one, commits the staged changes, then opens the PR. */
-async function commitThenCreate(
-  props: PrDialogProps,
-  form: PrForm,
+/** The steps of one submit, and which of them a failed earlier attempt already finished. */
+interface CreateRun {
+  props: PrDialogProps
+  form: PrForm
   onStatus: (msg: string) => void
-): Promise<CreatedPr | Failure> {
+  done: { branch: boolean; commit: boolean }
+}
+
+/** Makes the new branch if the commit needs one, commits the staged changes, then opens the PR.
+ * A retry after a failed PR step skips the branch and the commit that already exist. */
+async function commitThenCreate({
+  props,
+  form,
+  onStatus,
+  done,
+}: CreateRun): Promise<CreatedPr | Failure> {
   const draft = draftOf(props, form)
-  if (needsNewBranch(props)) {
+  if (needsNewBranch(props) && !done.branch) {
     onStatus('Creating branch…')
     const failure = await createBranch(props.repoRoot, draft.branch)
     if (failure) return failure
+    done.branch = true
   }
-  onStatus('Committing…')
-  const committed = await gitAPI.commit({
-    repoRoot: props.repoRoot,
-    message: form.commitMessage.trim(),
-  })
-  recordUsage('commit', 'error' in committed ? { failed: true } : {})
-  if ('error' in committed) return { error: COMMIT_ERRORS[committed.error] ?? committed.error }
+  if (!done.commit) {
+    onStatus('Committing…')
+    const committed = await gitAPI.commit({
+      repoRoot: props.repoRoot,
+      message: form.commitMessage.trim(),
+    })
+    recordUsage('commit', 'error' in committed ? { failed: true } : {})
+    if ('error' in committed) return { error: COMMIT_ERRORS[committed.error] ?? committed.error }
+    done.commit = true
+  }
   return ghPrCreate(draft, onStatus)
 }
 
@@ -292,7 +306,7 @@ function missingField(props: PrDialogProps, form: PrForm): string | null {
   return null
 }
 
-function ghPrCreateFrom(props: PrDialogProps, form: PrForm, onStatus: (msg: string) => void) {
+function ghPrCreateFrom({ props, form, onStatus }: CreateRun) {
   return ghPrCreate(draftOf(props, form), onStatus)
 }
 
@@ -300,6 +314,7 @@ function usePrCreate(props: PrDialogProps, form: PrForm) {
   const [isCreating, setIsCreating] = useState(false)
   const [creatingStatus, setCreatingStatus] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const done = useRef({ branch: false, commit: false })
   const handleCreate = async (): Promise<void> => {
     const missing = missingField(props, form)
     if (missing) return setError(missing)
@@ -308,7 +323,7 @@ function usePrCreate(props: PrDialogProps, form: PrForm) {
     setError(null)
     try {
       const create = props.hasStagedChanges ? commitThenCreate : ghPrCreateFrom
-      const result = await create(props, form, setCreatingStatus)
+      const result = await create({ props, form, onStatus: setCreatingStatus, done: done.current })
       recordUsage('pr-create', 'error' in result ? { failed: true } : {})
       if ('error' in result) setError(result.error)
       else props.onCreated(result.pr)

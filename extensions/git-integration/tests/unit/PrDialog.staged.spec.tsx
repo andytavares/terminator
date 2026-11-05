@@ -121,6 +121,29 @@ describe('PrDialog with staged changes — the submit', () => {
   })
 })
 
+describe('PrDialog with staged changes — a retry', () => {
+  it('after the PR step fails, a retry opens the PR without making the branch or commit again', async () => {
+    vi.spyOn(reviewAgentAPI, 'draftChange').mockResolvedValue({ draft: DRAFT })
+    const commit = vi.spyOn(gitAPI, 'commit').mockResolvedValue({ commitHash: 'abc' })
+    vi.spyOn(githubAPI, 'prCreate')
+      .mockResolvedValueOnce({ error: 'GitHub is down' })
+      .mockResolvedValueOnce({ number: 8, url: 'https://github.com/o/r/pull/8' })
+    open('main', true)
+    await waitFor(() => expect(valueOf('Commit message')).toBe('Add login form'))
+    const submit = () =>
+      fireEvent.click(screen.getByRole('button', { name: 'Commit, push and create PR' }))
+
+    submit()
+    expect(await screen.findByText(/GitHub is down/)).toBeTruthy()
+    submit()
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalled())
+    const branchMade = mockExec.mock.calls.filter(([call]) => call.args[0] === 'checkout')
+    expect(branchMade).toHaveLength(1)
+    expect(commit).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('PrDialog without staged changes', () => {
   it('stays the plain dialog and never asks for a draft', () => {
     const draft = vi.spyOn(reviewAgentAPI, 'draftChange')
