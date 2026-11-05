@@ -6,6 +6,9 @@ import { autoPullDefault } from '../git/auto-pull.js'
 import { runGit } from '../shell/run-git.js'
 import { createHomeActionHandler } from './actions.js'
 import { buildGitHomeFeed, type FeedInputs } from './feed.js'
+import type { PrWatchReads, PrWatchState } from './pr-watch.js'
+import { createPrWatch } from './pr-watch-runner.js'
+import { namedStore } from '../storage-directory.js'
 import type { TicketIndex } from './work-key.js'
 
 /** How often the dashboard refreshes while its view is open (FOCUS_REFRESH_MS in ReviewDashboard.tsx).
@@ -95,16 +98,42 @@ function latestFeedOf(api: ExtensionAPI) {
   return { latest, publishGitHomeFeed }
 }
 
+/** The pull request watch's state, one entry per pull request, in the extension's own store. */
+const watchStore = {
+  get: async (key: string) => (await namedStore<PrWatchState>('pr-watch')).get(key),
+  set: async (key: string, state: PrWatchState) =>
+    void (await namedStore<PrWatchState>('pr-watch')).set(key, state),
+  delete: async (key: string) => void (await namedStore<PrWatchState>('pr-watch')).delete(key),
+}
+
+/** The pull request watch; its notes join the next feed. */
+function prWatchOf(api: ExtensionAPI, feed: ReturnType<typeof latestFeedOf>) {
+  return createPrWatch({
+    api,
+    store: watchStore,
+    onNotes: (notes) => {
+      feed.latest.watchNotes = notes
+      feed.publishGitHomeFeed()
+    },
+  })
+}
+
 /** What the GitHub handlers call when a dashboard, merged search or contributions fetch lands. */
 function feedHooks(api: ExtensionAPI, feed: ReturnType<typeof latestFeedOf>) {
   const { latest, publishGitHomeFeed } = feed
+  const watch = prWatchOf(api, feed)
   return {
     // A section that failed leaves its pull requests out; keep the previous feed instead.
     // The issues arrive later and must not hold up the dashboard's own answer.
-    onDashboard: (result: DashboardRefresh) => {
+    onDashboard: (result: DashboardRefresh, reads?: PrWatchReads) => {
       if (result.failed.length > 0) return
       latest.prs = result.prs
       publishGitHomeFeed()
+      if (reads) {
+        void watch
+          .onDashboard(result.prs, reads)
+          .catch((error) => api.log.warn(`home: pull request watch failed: ${error}`))
+      }
       void ticketIndexOf(api).then((index) => {
         latest.tickets = index
         publishGitHomeFeed()

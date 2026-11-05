@@ -5,6 +5,7 @@ import type { MergedPullRequest } from '../github/merged-search.js'
 import type { ContributionCalendar } from '../review/contribution-calendar.js'
 import { workKeyOf, type TicketIndex } from './work-key.js'
 import type { DashboardCheck } from '../schemas/pr-review.schema.js'
+import { WAKE_LIMIT, type WatchNote } from './pr-watch.js'
 
 // Pure builders from the data the Reviews dashboard and the contributions calendar already
 // fetched to what Home draws (ADR 117). Nothing here reads GitHub.
@@ -92,6 +93,30 @@ export function buildAsks(prs: DashboardPR[], tickets: TicketIndex): HomeAsk[] {
     if (pr.section === 'mine' && pr.ciStatus === 'failing') return [fixAsk(pr, tickets)]
     return []
   })
+}
+
+/** "Agent woken" after a wake, "Wakes stopped" at the limit (ADR 142). */
+function watchAsk(note: WatchNote, tickets: TicketIndex): HomeAsk {
+  const { pr } = note
+  const woken = note.kind === 'woken'
+  return {
+    id: `${note.kind}:${pullRequestId(pr)}`,
+    kind: woken ? 'finished' : 'decide',
+    title: woken ? 'Agent woken' : 'Wakes stopped',
+    detail: woken ? note.summary : `${WAKE_LIMIT} wakes reached`,
+    where: pullRequestWhere(pr, tickets),
+    facts: woken
+      ? [`sent to the agent on ${pr.headRefName}`, `wake ${note.wake} of ${WAKE_LIMIT}`]
+      : ['answer the review comments yourself'],
+    workKey: workKeyOf(pr, tickets),
+    since: note.since,
+    actions: [
+      woken
+        ? { id: 'open-agent', label: 'Open agent', primary: true }
+        : { id: 'start-review', label: 'Open PR', primary: true },
+    ],
+    open: { command: REVIEW_PULL_REQUEST, args: reviewTarget(pr) },
+  }
 }
 
 type PullRequestState = Pick<ThreadFacet, 'stage' | 'whoseMove' | 'tone' | 'line'>
@@ -239,12 +264,14 @@ export interface FeedInputs {
   tickets: TicketIndex
   calendar: ContributionCalendar | null
   merged: MergedPullRequest[]
+  /** What the pull request watch did lately. */
+  watchNotes?: WatchNote[]
 }
 
 export function buildGitHomeFeed(inputs: FeedInputs): HomeFeed {
-  const { prs, tickets, calendar, merged } = inputs
+  const { prs, tickets, calendar, merged, watchNotes = [] } = inputs
   return {
-    asks: buildAsks(prs, tickets),
+    asks: [...buildAsks(prs, tickets), ...watchNotes.map((n) => watchAsk(n, tickets))],
     facets: [...buildFacets(prs, tickets), ...buildMergedFacets(merged, tickets)],
     measures: buildMeasures(calendar),
   }

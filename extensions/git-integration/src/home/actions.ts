@@ -63,15 +63,19 @@ async function startAgentIn(api: ExtensionAPI, { folder, tabTitle }: AgentLaunch
   return started.sessionId
 }
 
+/** The folder the pull request's branch is checked out in, when it has a local checkout. */
+export async function worktreeFolderOf(pr: DashboardPR): Promise<string | undefined> {
+  const branch = pr.headRefName ?? ''
+  if (!pr.localRepoRoot || !branch) return undefined
+  return worktreeOfBranch(
+    await runGit(pr.localRepoRoot, ['worktree', 'list', '--porcelain']),
+    branch
+  )
+}
+
 async function sendToAgent({ api, agentTabs }: RunDeps, pr: DashboardPR): Promise<void> {
   const branch = pr.headRefName ?? ''
-  const folder =
-    pr.localRepoRoot && branch
-      ? worktreeOfBranch(
-          await runGit(pr.localRepoRoot, ['worktree', 'list', '--porcelain']),
-          branch
-        )
-      : undefined
+  const folder = await worktreeFolderOf(pr)
   if (!folder) return api.log.warn(`home: ${branch || pr.url} is checked out nowhere; nothing sent`)
   const message = `Checks are failing on ${pr.url}. Find the failing checks, fix them and push.`
   const key = canonical(folder)
@@ -90,6 +94,8 @@ const ACTIONS: Record<string, (deps: RunDeps, pr: DashboardPR) => void | Promise
   'start-review': ({ api }, pr) => openReviewWindowFor(api, pr),
   'open-log': openLog,
   'send-to-agent': sendToAgent,
+  // No SDK call focuses one agent tab; raising the window is as near as an extension gets.
+  'open-agent': ({ api }) => api.window.raise(),
 }
 
 /** The handler for `api.home.onAction`; the item id is `<kind>:<owner/name>#<number>`. */

@@ -48,6 +48,10 @@
         "label": "Commit"
       },
       {
+        "id": "pr-watch-wake",
+        "label": "Wake an agent on a pull request event"
+      },
+      {
         "id": "pr-create",
         "label": "Open a pull request"
       },

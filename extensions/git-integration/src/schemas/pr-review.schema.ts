@@ -268,6 +268,8 @@ export const DashboardPRSchema = z.object({
   headRefName: z.string().optional(),
   /** Mine only: the latest commit's checks. */
   checks: z.array(DashboardCheckSchema).optional(),
+  /** Mine only: `dirty` when the branch conflicts with its base. */
+  mergeStateStatus: z.enum(['behind', 'dirty', 'clean', 'unknown']).optional(),
   /** Requested and re-review only: when the review was requested. */
   reviewRequestedAt: z.string().optional(),
   section: DashboardSectionSchema,

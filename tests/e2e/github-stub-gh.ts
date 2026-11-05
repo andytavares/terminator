@@ -47,6 +47,8 @@ export interface StubPullRequest {
   resolvedCommentIds: number[]
   viewedPaths: string[]
   branchUpdates: number
+  /** Names of the checks that fail on the latest commit; the dashboard shows them. */
+  failedChecks: string[]
 }
 
 export interface NewStubPullRequest {
@@ -201,6 +203,7 @@ export function addPullRequest(context: StubContext, input: NewStubPullRequest):
     resolvedCommentIds: [],
     viewedPaths: [],
     branchUpdates: 0,
+    failedChecks: [],
   }
   context.pullRequests.push(pr)
   return pr
@@ -376,6 +379,12 @@ const REPO = 'repos/[^/]+/[^/]+'
 
 const REST_ROUTES: Array<[string, RegExp, RestHandler]> = [
   ['GET', /^user$/, (context) => ({ login: context.viewer })],
+  // The log of a job, as GitHub's job-logs endpoint prints it (the pull request watch reads its tail).
+  [
+    'GET',
+    new RegExp(`^${REPO}/actions/jobs/(\\d+)/logs$`),
+    () => 'step 1\nAssertionError: expected 1 to be 2\n',
+  ],
   ['GET', /^user\/repos$/, (context) => accessibleRepositories(context)],
   ['PUT', new RegExp(`^${REPO}/pulls/(\\d+)/merge$`), (c, r, m) => squashMergePullRequest(c, r, m)],
   ['PATCH', new RegExp(`^${REPO}/pulls/(\\d+)$`), (c, r, m) => retargetPullRequest(c, r, m)],
@@ -651,9 +660,17 @@ function searchDashboard(context: StubContext, query: string) {
 
 function prDashboardNode(context: StubContext, pr: StubPullRequest) {
   const json = pullRequestJson(context, pr)
-  const head = { oid: json.headRefOid, committedDate: pr.createdAt, statusCheckRollup: null }
+  const failing = pr.failedChecks.length > 0
+  const head = {
+    oid: json.headRefOid,
+    committedDate: pr.createdAt,
+    statusCheckRollup: failing ? { state: 'FAILURE' } : null,
+  }
   return {
     ...json,
+    latestChecks: {
+      nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: failedRuns(pr) } } } }],
+    },
     changedFiles: (json.files as unknown[]).length,
     repository: { nameWithOwner: `${context.owner}/${context.name}` },
     reviewDecision: null,
@@ -662,4 +679,16 @@ function prDashboardNode(context: StubContext, pr: StubPullRequest) {
     commits: { nodes: [{ commit: head }] },
     latestReviews: { nodes: [] },
   }
+}
+
+/** The failing check runs of a pull request; the job id in the details URL is the check's position. */
+function failedRuns(pr: StubPullRequest) {
+  return pr.failedChecks.map((name, index) => ({
+    __typename: 'CheckRun',
+    name,
+    status: 'COMPLETED',
+    conclusion: 'FAILURE',
+    detailsUrl: `https://github.com/acme/widgets/actions/runs/9/job/${index + 1}`,
+    completedAt: '2026-10-16T09:30:00Z',
+  }))
 }
