@@ -7,7 +7,12 @@ import {
   type WorktreeEntry,
 } from '../git/local-inventory.js'
 import { removeLocalItems, type RemoveShell } from '../git/remove-local.js'
-import { anyCleanupRuleOn, planCleanup, type CleanupSettings } from '../git/cleanup-plan.js'
+import {
+  anyCleanupRuleOn,
+  planCleanup,
+  type CleanupSettings,
+  type MergedHead,
+} from '../git/cleanup-plan.js'
 import { runGit } from '../shell/run-git.js'
 import { RepoRoot } from './repo-root.js'
 import { VALIDATION_ERROR, errorEnvelope, type RegisterFn } from './register.js'
@@ -32,7 +37,7 @@ const RemoveLocalPayload = z.object({
 const CleanupRunPayload = z.object({ repoRoot: RepoRoot })
 
 /** One branch or worktree the cleanup removed or kept, and why. */
-export interface CleanupEntry {
+interface CleanupEntry {
   branch: string | null
   worktreePath: string | null
   reason: string
@@ -46,7 +51,7 @@ export interface CleanupReport {
 /** What the cleanup reads beyond git: the rules, and GitHub's merged head branches of a repository. */
 export interface CleanupDeps {
   settings: () => CleanupSettings
-  mergedHeads: (repoRoot: string) => string[]
+  mergedHeads: (repoRoot: string) => MergedHead[]
 }
 
 type Workspace = ExtensionAPI['workspace']

@@ -228,6 +228,7 @@ function pullRequestJson(context: StubContext, pr: StubPullRequest): Record<stri
     headRefName: pr.headRefName,
     baseRefName: pr.baseRefName,
     headRefOid: headSha(context, pr),
+    isCrossRepository: false,
     isDraft: pr.isDraft,
     mergeStateStatus: pr.mergeStateStatus,
     mergeable: 'MERGEABLE',

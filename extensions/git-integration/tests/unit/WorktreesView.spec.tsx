@@ -11,6 +11,7 @@ const mockListSessions = vi.fn()
 function inventoryRow(overrides: Partial<LocalInventoryRow>): LocalInventoryRow {
   return {
     branch: null,
+    tip: '',
     worktreePath: null,
     isMain: false,
     isCurrent: false,

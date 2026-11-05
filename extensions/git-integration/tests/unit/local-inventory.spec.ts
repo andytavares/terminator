@@ -25,14 +25,21 @@ const WORKTREES: WorktreeEntry[] = [
   { path: '/gone/old-worktree', branch: 'feature-old', detached: false, prunable: true },
 ]
 
-// Five NUL-separated fields per branch, records newline-separated, as
+// Six NUL-separated fields per branch, records newline-separated, as
 // `git for-each-ref refs/heads --format=...` prints them.
 const REF_LISTING = [
-  ['main', '', '', '1700000000', '/repo'],
-  ['feature-merged', 'origin/feature-merged', '', '1700001000', ''],
-  ['feature-gone', 'origin/feature-gone', '[gone]', '1700002000', ''],
-  ['worktree-agent-x', '', '[ahead 2, behind 3]', '1700003000', '/repo/.claude/worktrees/agent-x'],
-  ['feature-old', 'origin/feature-old', '', '1700004000', '/gone/old-worktree'],
+  ['main', '', '', '1700000000', '/repo', 't-main'],
+  ['feature-merged', 'origin/feature-merged', '', '1700001000', '', 't-merged'],
+  ['feature-gone', 'origin/feature-gone', '[gone]', '1700002000', '', 't-gone'],
+  [
+    'worktree-agent-x',
+    '',
+    '[ahead 2, behind 3]',
+    '1700003000',
+    '/repo/.claude/worktrees/agent-x',
+    't-agent',
+  ],
+  ['feature-old', 'origin/feature-old', '', '1700004000', '/gone/old-worktree', 't-old'],
 ]
   .map((record) => record.join('\0'))
   .join('\n')
@@ -47,6 +54,7 @@ const PARSED_REFS = [
     track: '',
     committerUnix: 1700000000,
     worktreePath: '/repo',
+    tip: 't-main',
   },
   {
     branch: 'feature-merged',
@@ -54,6 +62,7 @@ const PARSED_REFS = [
     track: '',
     committerUnix: 1700001000,
     worktreePath: '',
+    tip: 't-merged',
   },
   {
     branch: 'feature-gone',
@@ -61,6 +70,7 @@ const PARSED_REFS = [
     track: '[gone]',
     committerUnix: 1700002000,
     worktreePath: '',
+    tip: 't-gone',
   },
   {
     branch: 'worktree-agent-x',
@@ -68,6 +78,7 @@ const PARSED_REFS = [
     track: '[ahead 2, behind 3]',
     committerUnix: 1700003000,
     worktreePath: '/repo/.claude/worktrees/agent-x',
+    tip: 't-agent',
   },
   {
     branch: 'feature-old',
@@ -75,6 +86,7 @@ const PARSED_REFS = [
     track: '',
     committerUnix: 1700004000,
     worktreePath: '/gone/old-worktree',
+    tip: 't-old',
   },
 ]
 

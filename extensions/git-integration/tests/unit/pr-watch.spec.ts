@@ -196,14 +196,14 @@ describe('comments', () => {
   })
 })
 
-describe('a merged pull request', () => {
-  it('ends the watch and its notes', async () => {
+describe('a pull request that leaves my list', () => {
+  it('clears its notes but keeps its counts, so its limits do not start again', async () => {
     const { feed, saved, notes } = setup({ live: ['live-1'] })
     await feed({ checks: [passing] })
     await feed({ checks: [failed] })
-    expect(saved.size).toBe(1)
+    const counts = [...saved.values()]
     await feed()
-    expect(saved.size).toBe(0)
+    expect([...saved.values()]).toEqual(counts)
     expect(notes.mock.calls.at(-1)?.[0]).toEqual([])
   })
 })

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { anyCleanupRuleOn, planCleanup, type CleanupSettings } from '../../src/git/cleanup-plan'
+import {
+  anyCleanupRuleOn,
+  planCleanup,
+  type CleanupSettings,
+  type MergedHead,
+} from '../../src/git/cleanup-plan'
 import { parseChanges, type LocalInventoryRow } from '../../src/git/local-inventory'
 
 const NOW = Date.parse('2026-11-04T00:00:00Z')
@@ -16,6 +21,7 @@ const OFF: CleanupSettings = {
 function row(overrides: Partial<LocalInventoryRow>): LocalInventoryRow {
   return {
     branch: 'feat/x',
+    tip: 'abc123',
     worktreePath: '/repo/.worktrees/x',
     isMain: false,
     isCurrent: false,
@@ -34,18 +40,22 @@ function row(overrides: Partial<LocalInventoryRow>): LocalInventoryRow {
   }
 }
 
-const plan = (rows: LocalInventoryRow[], settings: Partial<CleanupSettings>, mergedHeads = ['']) =>
-  planCleanup({ rows, mergedHeads, settings: { ...OFF, ...settings }, now: NOW })
+const MERGED_X = [{ branch: 'feat/x', oid: 'abc123' }]
+const plan = (
+  rows: LocalInventoryRow[],
+  settings: Partial<CleanupSettings>,
+  mergedHeads: MergedHead[] = []
+) => planCleanup({ rows, mergedHeads, settings: { ...OFF, ...settings }, now: NOW })
 
 describe('planCleanup — rules', () => {
   it('removes nothing when every rule is off', () => {
     const rows = [row({ merged: true, project: { id: 'p', name: 'P' } })]
-    expect(plan(rows, {}, ['feat/x'])).toEqual({ remove: [], keep: [] })
+    expect(plan(rows, {}, MERGED_X)).toEqual({ remove: [], keep: [] })
     expect(anyCleanupRuleOn(OFF)).toBe(false)
   })
 
   it('removes a squash-merged head with force although git says not merged', () => {
-    const result = plan([row({ merged: false })], { removeAfterMerge: true }, ['feat/x'])
+    const result = plan([row({ merged: false })], { removeAfterMerge: true }, MERGED_X)
     expect(result.remove).toEqual([
       {
         branch: 'feat/x',
@@ -54,6 +64,21 @@ describe('planCleanup — rules', () => {
         reason: 'Its pull request merged',
       },
     ])
+  })
+})
+
+describe('planCleanup — a branch that moved on after its merge', () => {
+  it('neither removes nor force-deletes a branch with commits after the merged head', () => {
+    const result = plan([row({ tip: 'later999' })], { removeAfterMerge: true }, MERGED_X)
+    expect(result).toEqual({ remove: [], keep: [] })
+  })
+
+  it('removes a branch reusing a merged name only by another rule, never with force', () => {
+    const rows = [
+      row({ tip: 'other', lastCommitAt: NOW - 30 * DAY_MS, modifiedAt: NOW - 30 * DAY_MS }),
+    ]
+    const result = plan(rows, { removeAfterMerge: true, idleDays: 14 }, MERGED_X)
+    expect(result.remove.map((r) => r.forceBranch)).toEqual([false])
   })
 })
 

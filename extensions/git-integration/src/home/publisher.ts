@@ -165,7 +165,9 @@ export function createHomePublisher(
     ),
     /** Head branches of my merged pull requests in `repoRoot`; the Worktrees cleanup reads them. */
     mergedHeads: (repoRoot: string) =>
-      latest.merged.filter((pr) => pr.localRepoRoot === repoRoot).map((pr) => pr.headRefName),
+      latest.merged
+        .filter((pr) => pr.localRepoRoot === repoRoot)
+        .map((pr) => ({ branch: pr.headRefName, oid: pr.headRefOid })),
     ...refreshersOf(api, repoRoots),
   }
 }

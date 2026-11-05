@@ -15,8 +15,12 @@ const RULES_OFF: CleanupSettings = {
 const RULE_MERGE: CleanupSettings = { ...RULES_OFF, removeAfterMerge: true }
 const NOW_UNIX = Math.floor(Date.now() / 1000)
 
-/** for-each-ref record: branch, upstream, track, committer time, worktree path. */
-const refRecord = (branch: string, path: string) => `${branch}\0\0\0${NOW_UNIX}\0${path}`
+/** for-each-ref record: branch, upstream, track, committer time, worktree path, tip. */
+const refRecord = (branch: string, path: string) =>
+  `${branch}\0\0\0${NOW_UNIX}\0${path}\0tip-${branch}`
+
+/** Both feature branches merged on GitHub at the commit they still end at. */
+const MERGED = ['feat/done', 'feat/dirty'].map((branch) => ({ branch, oid: `tip-${branch}` }))
 
 interface Setup {
   settings: CleanupSettings
@@ -48,7 +52,7 @@ function setup({ settings, dirty = [], sessionCwd }: Setup) {
   })
   const deps: CleanupDeps = {
     settings: () => settings,
-    mergedHeads: () => ['feat/done', 'feat/dirty'],
+    mergedHeads: () => MERGED,
   }
   registerWorktreesHandlers((spec) => void specs.push(spec), api, deps)
   const channel = specs.find((spec) => spec.channel === 'git:cleanup-run')!

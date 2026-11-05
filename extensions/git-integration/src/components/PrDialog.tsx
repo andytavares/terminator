@@ -266,7 +266,8 @@ interface CreateRun {
   props: PrDialogProps
   form: PrForm
   onStatus: (msg: string) => void
-  done: { branch: boolean; commit: boolean }
+  /** `branch`: the branch an earlier attempt made, which a retry keeps whatever the field says. */
+  done: { branch: string | null; commit: boolean }
 }
 
 /** Makes the new branch if the commit needs one, commits the staged changes, then opens the PR.
@@ -277,12 +278,12 @@ async function commitThenCreate({
   onStatus,
   done,
 }: CreateRun): Promise<CreatedPr | Failure> {
-  const draft = draftOf(props, form)
+  const draft = { ...draftOf(props, form), ...(done.branch ? { branch: done.branch } : {}) }
   if (needsNewBranch(props) && !done.branch) {
     onStatus('Creating branch…')
     const failure = await createBranch(props.repoRoot, draft.branch)
     if (failure) return failure
-    done.branch = true
+    done.branch = draft.branch
   }
   if (!done.commit) {
     onStatus('Committing…')
@@ -314,7 +315,7 @@ function usePrCreate(props: PrDialogProps, form: PrForm) {
   const [isCreating, setIsCreating] = useState(false)
   const [creatingStatus, setCreatingStatus] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const done = useRef({ branch: false, commit: false })
+  const done = useRef<CreateRun['done']>({ branch: null, commit: false })
   const handleCreate = async (): Promise<void> => {
     const missing = missingField(props, form)
     if (missing) return setError(missing)

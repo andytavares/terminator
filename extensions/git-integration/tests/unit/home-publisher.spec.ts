@@ -144,13 +144,13 @@ describe('default branch pull', () => {
     expect(await commandsRunOnRefresh(false)).toEqual([])
   })
 
-  it('names the head branches of the merged pull requests of one repository', () => {
+  it('names the head branch and merged commit of each merged pull request of one repository', () => {
     const { publisher } = setupPublisher()
     publisher.hooks.onMerged([
       { ...merged, headRefName: 'feat/login' },
       { ...merged, headRefName: 'feat/other', localRepoRoot: '/work/other' },
     ] as never)
-    expect(publisher.mergedHeads('/work/widgets')).toEqual(['feat/login'])
+    expect(publisher.mergedHeads('/work/widgets')).toEqual([{ branch: 'feat/login', oid: 'abc1' }])
   })
 })
 
@@ -160,6 +160,7 @@ const merged = {
   title: 'Add login redirect',
   url: 'https://github.com/acme/widgets/pull/41',
   headRefName: 'feat/login',
+  headRefOid: 'abc1',
   localRepoRoot: '/work/widgets',
   openedAt: '2026-10-10T09:00:00Z',
   readyAt: '2026-10-10T09:00:00Z',

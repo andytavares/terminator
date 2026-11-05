@@ -9,6 +9,8 @@ export interface StackPullRequest {
   headRefName: string
   baseRefName: string
   headRefOid: string
+  /** From a fork: its branch names say nothing about this repository's branches. */
+  isCrossRepository?: boolean
 }
 
 export interface StackResult {
@@ -29,7 +31,14 @@ const REAL_CLOCK: StackClock = {
   timeoutMs: 60_000,
 }
 
-const STACK_FIELDS = ['number', 'title', 'headRefName', 'baseRefName', 'headRefOid']
+const STACK_FIELDS = [
+  'number',
+  'title',
+  'headRefName',
+  'baseRefName',
+  'headRefOid',
+  'isCrossRepository',
+]
 const KNOWN_AGENTS = /\b(claude|codex|gemini|cursor|copilot)\b/i
 
 /** The open pull requests from `number` down to the one whose base is not another open pull
@@ -40,7 +49,7 @@ export function stackOf(open: StackPullRequest[], number: number): StackPullRequ
   while (next && !stack.includes(next)) {
     stack.unshift(next)
     const base = next.baseRefName
-    next = open.find((pr) => pr.headRefName === base)
+    next = open.find((pr) => pr.headRefName === base && pr.isCrossRepository !== true)
   }
   return stack
 }

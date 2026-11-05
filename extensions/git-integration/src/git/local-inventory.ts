@@ -5,6 +5,8 @@ import { isAbsolute, join } from 'node:path'
 
 export interface LocalInventoryRow {
   branch: string | null
+  /** The commit the branch ends at; empty for a detached row. */
+  tip: string
   worktreePath: string | null
   isMain: boolean
   isCurrent: boolean
@@ -49,22 +51,24 @@ export interface RefEntry {
   track: string
   committerUnix: number
   worktreePath: string
+  tip: string
 }
 
-/** One ref record of the listing: five NUL-separated fields. */
+/** One ref record of the listing: six NUL-separated fields. */
 function parseRefRecord(record: string): RefEntry | null {
   const fields = record.split('\0')
-  if (fields.length < 5 || fields[0] === '') return null
+  if (fields.length < 6 || fields[0] === '') return null
   return {
     branch: fields[0],
     upstream: fields[1] || null,
     track: fields[2],
     committerUnix: Number(fields[3]) || 0,
     worktreePath: fields[4],
+    tip: fields[5],
   }
 }
 
-/** Parses the `for-each-ref` listing: five NUL-separated fields per branch, records
+/** Parses the `for-each-ref` listing: six NUL-separated fields per branch, records
  *  newline-separated (the format's own terminator, since none is set). @internal */
 export function parseRefListing(text: string): RefEntry[] {
   return text
@@ -138,6 +142,7 @@ function rowForBranch(ref: RefEntry, facts: InventoryFacts): LocalInventoryRow {
   const { ahead, behind } = aheadBehind(ref.track)
   return {
     branch: ref.branch,
+    tip: ref.tip,
     worktreePath,
     isMain: ref.branch === facts.defaultBranch,
     isCurrent: ref.branch === facts.currentBranch,
@@ -159,6 +164,7 @@ function rowForDetached(entry: WorktreeEntry, facts: InventoryFacts): LocalInven
   const { stats, index } = worktreeTimes(facts, entry.path)
   return {
     branch: null,
+    tip: '',
     worktreePath: entry.path,
     isMain: false,
     isCurrent: false,
@@ -239,7 +245,7 @@ async function reflogOldestOf(
 }
 
 const FOR_EACH_REF_FORMAT =
-  '%(refname:short)%00%(upstream:short)%00%(upstream:track)%00%(committerdate:unix)%00%(worktreepath)'
+  '%(refname:short)%00%(upstream:short)%00%(upstream:track)%00%(committerdate:unix)%00%(worktreepath)%00%(objectname)'
 
 async function readBranchFacts(repoRoot: string, shell: InventoryShell, defaultBranch: string) {
   const [refListing, mergedText, currentBranch] = await Promise.all([

@@ -79,10 +79,13 @@ export function createPrWatch(deps: WatchDeps) {
   }
 }
 
+/** A pull request left my list: merged, closed, or out of the search for now. Its notes go;
+ *  its counts stay, so a pull request that comes back does not get its limits again. */
 async function endWatch(watch: Watch, pr: DashboardPR): Promise<void> {
   const key = pullRequestId(pr)
-  await watch.store.delete(key)
-  if (watch.notes.delete(`woken:${key}`) || watch.notes.delete(`stopped:${key}`)) publish(watch)
+  const woken = watch.notes.delete(`woken:${key}`)
+  const stopped = watch.notes.delete(`stopped:${key}`)
+  if (woken || stopped) publish(watch)
 }
 
 function publish(watch: Watch): void {

@@ -6,6 +6,18 @@ import type { RemoveItem } from './remove-local.js'
 
 export type KeepMode = 'uncommitted' | 'any-local' | 'edited-tracked'
 
+/** A merged pull request's head on GitHub: its branch and the commit it merged. */
+export interface MergedHead {
+  branch: string
+  oid: string
+}
+
+/** Merged on GitHub, and the branch still ends at the commit that merged: a squash merge
+ *  counts, but commits made after the merge, or a reused name, do not. */
+function mergedOnGitHub(row: LocalInventoryRow, heads: MergedHead[]): boolean {
+  return heads.some((head) => head.branch === row.branch && head.oid === row.tip)
+}
+
 export interface CleanupSettings {
   removeAfterMerge: boolean
   /** 0 turns the rule off. */
@@ -15,7 +27,7 @@ export interface CleanupSettings {
   keep: KeepMode
 }
 
-export interface PlannedRemoval extends RemoveItem {
+interface PlannedRemoval extends RemoveItem {
   reason: string
 }
 
@@ -27,7 +39,7 @@ export interface CleanupPlan {
 interface PlanInput {
   rows: LocalInventoryRow[]
   /** Head branch names of the pull requests GitHub reports merged: `git branch --merged` misses squash merges. */
-  mergedHeads: string[]
+  mergedHeads: MergedHead[]
   settings: CleanupSettings
   now: number
 }
@@ -49,7 +61,7 @@ export function anyCleanupRuleOn(settings: CleanupSettings): boolean {
 /** The first rule that picks the row, as the reason shown for its removal; null when none does. */
 function removalReason(row: LocalInventoryRow, input: PlanInput): string | null {
   const { settings, mergedHeads, now } = input
-  if (settings.removeAfterMerge && row.branch !== null && mergedHeads.includes(row.branch))
+  if (settings.removeAfterMerge && mergedOnGitHub(row, mergedHeads))
     return 'Its pull request merged'
   if (settings.removeUnchanged && row.merged) return 'No commits beyond the default branch'
   if (settings.removeWithClosedSessions && row.project) return 'Its terminal is closed'
@@ -85,7 +97,7 @@ export function planCleanup(input: PlanInput): CleanupPlan {
       plan.remove.push({
         branch: row.branch,
         worktreePath: row.worktreePath,
-        forceBranch: row.branch !== null && input.mergedHeads.includes(row.branch),
+        forceBranch: mergedOnGitHub(row, input.mergedHeads),
         reason,
       })
   }

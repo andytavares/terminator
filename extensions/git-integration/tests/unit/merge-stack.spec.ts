@@ -84,6 +84,11 @@ describe('stackOf', () => {
     expect(stackOf(STACK, 3).map((p) => p.number)).toEqual([3])
   })
 
+  it('never stacks on a pull request from a fork, whatever its branch is named', () => {
+    const fork = { ...pr(7, 'main', 'main'), isCrossRepository: true }
+    expect(stackOf([fork, pr(1, 'feat/a', 'main')], 1).map((p) => p.number)).toEqual([1])
+  })
+
   it('returns nothing for a pull request that is not open, and stops on a loop', () => {
     expect(stackOf(STACK, 9)).toEqual([])
     expect(stackOf([pr(1, 'a', 'b'), pr(2, 'b', 'a')], 1)).toHaveLength(2)
