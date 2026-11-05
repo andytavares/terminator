@@ -114,6 +114,8 @@ const git = {
 }
 const executeCommand = vi.fn<ElectronAPI['extension']['executeCommand']>()
 const agentsList = vi.fn<ElectronAPI['agents']['list']>()
+const nameBranch = vi.fn<ElectronAPI['homeBranchName']['get']>()
+const createSchedule = vi.fn<ElectronAPI['schedules']['create']>()
 
 function seedStartWorkStores(): void {
   useWorkspaceStore.setState({
@@ -146,12 +148,15 @@ beforeEach(() => {
   installElectronApi({
     git,
     agents: { list: agentsList },
+    homeBranchName: { get: nameBranch },
+    schedules: { create: createSchedule },
     extension: {
       executeCommand,
       getCommands: vi.fn(async () => ({ commands: [] })),
       list: vi.fn(async () => ({ extensions: [] })),
     },
   })
+  nameBranch.mockResolvedValue({ text: 'fix/dev-build' })
   launched.inBranch.mockResolvedValue('s-new')
   launched.agentInBranch.mockResolvedValue('s-new')
   launched.createFromDraft.mockResolvedValue('p-new')
@@ -165,6 +170,8 @@ const open = async (onClose = vi.fn()) => {
   return onClose
 }
 const goToTab = (name: string) => fireEvent.click(screen.getByRole('tab', { name }))
+const useRepoFolder = () =>
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Use the repo folder' }))
 const rowKeys = () => screen.getAllByTestId('start-work-key').map((n) => n.textContent)
 
 /** A worktree git still has a checkout for. */
@@ -430,6 +437,7 @@ describe('StartWork — other tabs', () => {
   it('Prompt tab starts an agent tab with the typed prompt and links nothing', async () => {
     const onClose = await open()
     goToTab('Prompt')
+    useRepoFolder()
     fireEvent.change(searchBox(), { target: { value: "fix the dev's build" } })
     fireEvent.keyDown(searchBox(), { key: 'Enter' })
     await waitFor(() => expect(onClose).toHaveBeenCalled())
@@ -446,6 +454,7 @@ describe('StartWork — other tabs', () => {
   it('Prompt tab sends an agent tab a prompt of any length', async () => {
     const onClose = await open()
     goToTab('Prompt')
+    useRepoFolder()
     fireEvent.change(searchBox(), { target: { value: 'x'.repeat(1200) } })
     fireEvent.keyDown(searchBox(), { key: 'Enter' })
     await waitFor(() => expect(onClose).toHaveBeenCalled())
@@ -459,6 +468,7 @@ describe('StartWork — other tabs, Claude in a terminal', () => {
   it('Prompt tab types the command for Claude in a terminal', async () => {
     const onClose = await open()
     goToTab('Prompt')
+    useRepoFolder()
     fireEvent.change(searchBox(), { target: { value: "fix the dev's build" } })
     fireEvent.keyDown(searchBox(), { key: 'Tab' })
     fireEvent.keyDown(searchBox(), { key: 'Enter' })
@@ -672,3 +682,170 @@ const secondWorkspaceProject: Project = {
   workspaceId: 'ws-2',
   gitBranch: 'tav-1',
 }
+
+const typePrompt = (text: string) => {
+  goToTab('Prompt')
+  fireEvent.change(searchBox(), { target: { value: text } })
+}
+
+describe('StartWork — a prompt on a branch of its own', () => {
+  it('runs an agent prompt in a new worktree on the branch the agent named', async () => {
+    const onClose = await open()
+    typePrompt("fix the dev's build")
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(launched.createFromDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        draft: expect.objectContaining({
+          newBranchName: 'fix/dev-build',
+          worktreePath: '/repo/.worktrees/fix/dev-build',
+        }),
+      })
+    )
+    expect(launched.agentInBranch).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: 'p-new', prompt: "fix the dev's build" })
+    )
+  })
+})
+
+describe('StartWork — a prompt on its own branch, failures', () => {
+  it('falls back to prompt/ and the first four words when the agent fails', async () => {
+    nameBranch.mockRejectedValue(new Error('no agent'))
+    const onClose = await open()
+    typePrompt("fix the dev's build")
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(launched.createFromDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        draft: expect.objectContaining({ newBranchName: 'prompt/fix-the-dev-s' }),
+      })
+    )
+  })
+})
+
+describe('StartWork — a prompt on its own branch, fallbacks', () => {
+  it('falls back when the agent answers something that is not a branch name', async () => {
+    nameBranch.mockResolvedValue({ text: 'Sure! Here you go' })
+    const onClose = await open()
+    typePrompt('tidy the readme')
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(launched.createFromDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        draft: expect.objectContaining({ newBranchName: 'prompt/tidy-the-readme' }),
+      })
+    )
+  })
+})
+
+describe('StartWork — the branch summary of a prompt', () => {
+  it('shows the branch, who named it, and a new worktree', async () => {
+    await open()
+    typePrompt("fix the dev's build")
+    const summary = screen.getByRole('group', { name: 'Where it runs' })
+    expect(within(summary).getByText('a new worktree')).toBeTruthy()
+    expect(within(summary).getByText('prompt/fix-the-dev-s')).toBeTruthy()
+    expect(await within(summary).findByText(/fix\/dev-build/, {}, { timeout: 3000 })).toBeTruthy()
+    expect(within(summary).getByText('named by Claude')).toBeTruthy()
+  })
+
+  it('keeps the repo folder, and asks for no name, when "Use the repo folder" is checked', async () => {
+    await open()
+    typePrompt('tidy the readme')
+    useRepoFolder()
+    const summary = screen.getByRole('group', { name: 'Where it runs' })
+    expect(within(summary).getByText('the repo folder')).toBeTruthy()
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await waitFor(() => expect(launched.agentInBranch).toHaveBeenCalled())
+    expect(nameBranch).not.toHaveBeenCalled()
+    expect(launched.createFromDraft).not.toHaveBeenCalled()
+  })
+
+  it('offers no worktree for Terminal only', async () => {
+    await open()
+    typePrompt('tidy the readme')
+    fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    expect(screen.queryByRole('checkbox', { name: 'Use the repo folder' })).toBeNull()
+  })
+})
+
+describe('StartWork — When', () => {
+  const choice = (name: string) => screen.getByRole('radio', { name })
+
+  it('offers Now, Once, Daily and Weekdays on a prompt, Now first', async () => {
+    await open()
+    typePrompt('tidy the readme')
+    const group = screen.getByRole('radiogroup', { name: 'When' })
+    expect(
+      within(group)
+        .getAllByRole('radio')
+        .map((r) => r.textContent)
+    ).toEqual(['Now', 'Once', 'Daily', 'Weekdays'])
+    expect(choice('Now').getAttribute('aria-checked')).toBe('true')
+    expect(screen.queryByLabelText('Time')).toBeNull()
+  })
+
+  it('is not offered for a ticket', async () => {
+    await open()
+    expect(screen.queryByRole('radiogroup', { name: 'When' })).toBeNull()
+  })
+})
+
+describe('StartWork — When, scheduling', () => {
+  const choice = (name: string) => screen.getByRole('radio', { name })
+
+  it('shows the time, the note and a Schedule button once it is not Now', async () => {
+    await open()
+    typePrompt('tidy the readme')
+    expect(screen.getByRole('button', { name: /^Start/ })).toBeTruthy()
+    fireEvent.click(choice('Daily'))
+    expect((screen.getByLabelText('Time') as HTMLInputElement).value).toBe('09:00')
+    expect(
+      screen.getByText('Runs while Terminator is open. A missed run waits in Needs you.')
+    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Schedule/ })).toBeTruthy()
+  })
+})
+
+describe('StartWork — When, saving', () => {
+  const choice = (name: string) => screen.getByRole('radio', { name })
+
+  it('saves a daily schedule instead of starting, counts it, and closes', async () => {
+    createSchedule.mockResolvedValue({ data: {} as never })
+    const onClose = await open()
+    typePrompt('tidy the readme')
+    fireEvent.click(choice('Daily'))
+    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '07:30' } })
+    fireEvent.click(screen.getByRole('button', { name: /^Schedule/ }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(createSchedule).toHaveBeenCalledWith({
+      repoRoot: '/repo',
+      prompt: 'tidy the readme',
+      runAs: 'agent',
+      kind: 'daily',
+      time: '07:30',
+      date: null,
+    })
+    expect(launched.agentInBranch).not.toHaveBeenCalled()
+    expect(recordUse).toHaveBeenCalledWith('core.start-work.schedule', 'click', expect.anything())
+  })
+})
+
+describe('StartWork — When, Once', () => {
+  const choice = (name: string) => screen.getByRole('radio', { name })
+
+  it('sends a date with Once, and shows a refusal in the dialog', async () => {
+    createSchedule.mockResolvedValue({ error: 'failed', message: 'The date is in the past.' })
+    const onClose = await open()
+    typePrompt('tidy the readme')
+    fireEvent.click(choice('Once'))
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2030-01-02' } })
+    fireEvent.click(screen.getByRole('button', { name: /^Schedule/ }))
+    expect((await screen.findByRole('alert')).textContent).toBe('The date is in the past.')
+    expect(createSchedule).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'once', date: '2030-01-02' })
+    )
+    expect(onClose).not.toHaveBeenCalled()
+  })
+})

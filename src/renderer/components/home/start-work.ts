@@ -13,6 +13,7 @@ import { openSnapshot } from '../../sidebar/session-facts'
 import { createFromDraft } from '../sidebar/create-project'
 import { useDismissedThreads } from './dismissed-threads'
 import { workKeyId } from '../../home/work-threads'
+import { promptBranch, semanticBranch } from '../../../shared/home/branch-name'
 import type { IssueSummary, Workspace } from '../../../shared/types/index'
 
 // What the Start work launcher decides and does, apart from how it is drawn.
@@ -133,6 +134,28 @@ export const branchOf = (issue: IssueSummary): string => issue.branchName ?? iss
 
 export const worktreeFolder = (branch: string): string => `.worktrees/${branch}`
 
+/** How long the person waits for the agent to name a branch before the plain name is used. */
+export const NAMING_WAIT_MS = 5_000
+
+/** The agent's `feat/…` or `fix/…` name for the prompt; null when it was late, failed or gave no name. */
+export async function askBranchName(prompt: string): Promise<string | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const late = new Promise<null>((resolve) => (timer = setTimeout(resolve, NAMING_WAIT_MS, null)))
+  const named = window.electronAPI.homeBranchName
+    .get({ prompt })
+    .then((reply) => ('text' in reply ? semanticBranch(reply.text) : null))
+    .catch(() => null)
+  try {
+    return await Promise.race([named, late])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** The agent runs that get a branch of their own; a plain terminal stays in the repo folder. */
+export const isAgentRun = (runAs: RunAs): boolean =>
+  runAs === 'agent' || runAs === 'claude-terminal'
+
 const PROMPT_TOO_LONG = 'That prompt is too long to start an agent with. Shorten it.'
 
 /** `claude '<prompt>'`, or plain `claude` for none; null when the line would be too long to type.
@@ -148,7 +171,8 @@ const ticketPrompt = (issue: IssueSummary): string =>
 
 export type WorkRequest = { workspace: Workspace; runAs: RunAs; agentId?: string } & (
   | { kind: 'ticket'; issue: IssueSummary }
-  | { kind: 'prompt'; text: string }
+  /** `newWorktree` runs it on a branch of its own: `branch` when given, else one the agent names. */
+  | { kind: 'prompt'; text: string; newWorktree?: boolean; branch?: string }
   /** `prompt` is what the agent is first told on this branch; none starts it with nothing. */
   | { kind: 'branch'; branch: string; prompt?: string }
 )
@@ -197,12 +221,18 @@ function mainProjectId(workspace: Workspace): string | Error {
   return main?.id ?? new Error(`Add a branch to ${workspace.name} first, then start it there.`)
 }
 
+async function promptProject(request: WorkRequest & { kind: 'prompt' }): Promise<string | Error> {
+  if (request.newWorktree !== true) return mainProjectId(request.workspace)
+  const branch = request.branch ?? (await askBranchName(request.text)) ?? promptBranch(request.text)
+  return projectForBranch(request.workspace, branch)
+}
+
 const projectFor = (request: WorkRequest): Promise<string | Error> | string | Error =>
   request.kind === 'ticket'
     ? projectForBranch(request.workspace, branchOf(request.issue))
     : request.kind === 'branch'
       ? projectForBranch(request.workspace, request.branch)
-      : mainProjectId(request.workspace)
+      : promptProject(request)
 
 function promptOf(request: WorkRequest): string | null {
   if (request.kind === 'ticket') return ticketPrompt(request.issue)

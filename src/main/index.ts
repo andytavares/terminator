@@ -39,6 +39,7 @@ import { startAskWatcher } from './agents/ask-watcher.js'
 import { registerAgentUsageHandlers } from './ipc/agent-usage.ipc.js'
 import { registerThreadSummaryHandler } from './ipc/thread-summary.ipc.js'
 import { registerHomeFeedHandlers } from './ipc/home-feed.ipc.js'
+import { registerScheduleHandlers } from './ipc/schedules.ipc.js'
 import { ensureHookScript } from './integrations/context-sync.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
 import { startAdoptingLoginShellPath } from './shell/login-shell-path.js'
@@ -424,6 +425,7 @@ function registerSessionHandlers(): OutputRelay {
   registerAgentUsageHandlers()
   registerThreadSummaryHandler()
   registerHomeFeedHandlers(() => mainWindow)
+  registerScheduleHandlers(() => mainWindow)
   return terminalRelay
 }
 

@@ -319,3 +319,22 @@
   border: 1px solid var(--tm-border-strong);
   border-radius: 4px;
 }
+
+.start-work__when {
+  display: flex;
+  gap: 6px;
+}
+
+.start-work__time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--tm-text-muted);
+}
+
+.start-work__note,
+.start-work__muted {
+  margin: 0;
+  color: var(--tm-text-muted);
+  font-size: var(--tm-font-size-xs);
+}

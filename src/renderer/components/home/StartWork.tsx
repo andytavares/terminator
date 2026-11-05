@@ -4,12 +4,15 @@ import { Button, Chip, Kbd, ModalShell, Tab, TabList, TabsRoot } from '@terminat
 import { WorkspacePicker } from './WorkspacePicker'
 import { AcrossRepos } from './AcrossRepos'
 import { RunAsChoices } from './RunAsChoices'
+import { promptBranch } from '../../../shared/home/branch-name'
+import { WhenChoices, type WhenValue } from './WhenChoices'
 import { agentLabel, useAgentChoices } from './agent-choices'
 import { startScratchSession } from '../../terminal/start-session'
 import { recordUse } from '../../usage/record'
 import {
   branchOf,
   cycleRunAs,
+  isAgentRun,
   startWork,
   useRunAsOptions,
   useStartWorkStore,
@@ -19,6 +22,7 @@ import {
 } from './start-work'
 import {
   NO_GIT,
+  useAgentBranchName,
   useChosenRepo,
   useMyTickets,
   useRepoGit,
@@ -38,6 +42,9 @@ const TABS: Array<{ id: LauncherTab; label: string }> = [
   { id: 'scratch', label: 'Scratch terminal' },
 ]
 
+/** Today as 'YYYY-MM-DD', local. */
+const today = (): string => new Date().toLocaleDateString('sv-SE')
+
 /** What the person has typed, picked and been told so far. */
 function useLauncherFields() {
   const prefill = useStartWorkStore.getState().prefill
@@ -49,10 +56,12 @@ function useLauncherFields() {
   const [pickedRepoId, setPickedRepoId] = useState<string | null>(null)
   const [picking, setPicking] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [when, setWhen] = useState<WhenValue>({ when: 'now', time: '09:00', date: today() })
+  const [useRepoFolder, setUseRepoFolder] = useState(false)
   return {
     ...{ tab, query, runAs, agentId, selectedIndex, pickedRepoId, picking, error },
     ...{ setTab, setQuery, setRunAs, setAgentId, setSelectedIndex, setPickedRepoId },
-    ...{ setPicking, setError },
+    ...{ setPicking, setError, when, setWhen, useRepoFolder, setUseRepoFolder },
   }
 }
 
@@ -87,9 +96,15 @@ function useLauncher(onClose: () => void) {
   const { tab, query, runAs, agentId, picking, error } = fields
   const choices = useAgentChoices()
   const runAsOptions = useRunAsOptions(agentLabel(choices, agentId))
+  const { when, useRepoFolder } = fields
+  const isPrompt = tab === 'prompt' || data.selected?.kind === 'prompt'
+  // A prompt run by an agent gets a branch of its own unless the person chose the repo folder.
+  const ownBranch = isPrompt && isAgentRun(runAs) && !useRepoFolder
+  const agentBranch = useAgentBranchName(query.trim(), ownBranch)
   const view = { tab, query, runAs, agentId, choices, picking, error, runAsOptions, ...data }
-  const actions = launcherActions({ fields, view, onClose })
-  return { view, actions, selectedIndex: data.index }
+  const promptView = { when, useRepoFolder, isPrompt, ownBranch, agentBranch }
+  const actions = launcherActions({ fields, view: { ...view, ...promptView }, onClose })
+  return { view: { ...view, ...promptView }, actions, selectedIndex: data.index }
 }
 
 interface ActionsInput {
@@ -101,6 +116,11 @@ interface ActionsInput {
     agentId: string | null
     selected?: LauncherRow
     repo: Workspace | null
+    when: WhenValue
+    useRepoFolder: boolean
+    isPrompt: boolean
+    ownBranch: boolean
+    agentBranch: string | null
   }
   onClose: () => void
 }
@@ -118,6 +138,8 @@ function launcherActions({ fields, view, onClose }: ActionsInput) {
     },
     setRunAs: fields.setRunAs,
     setAgentId: fields.setAgentId,
+    setWhen: fields.setWhen,
+    setUseRepoFolder: fields.setUseRepoFolder,
     select: fields.setSelectedIndex,
     pickRepo: (id: string) => {
       fields.setPickedRepoId(id)
@@ -138,10 +160,12 @@ interface SubmitInput {
 }
 
 function requestFor(view: ActionsInput['view'], repo: Workspace): WorkRequest | null {
-  const { selected, runAs, agentId, tab, query } = view
+  const { selected, runAs, agentId, query, isPrompt, ownBranch, agentBranch } = view
   const common = { workspace: repo, runAs, ...(agentId === null ? {} : { agentId }) }
-  if (tab === 'prompt' || selected?.kind === 'prompt') {
-    return query.trim() === '' ? null : { kind: 'prompt', text: query, ...common }
+  if (isPrompt) {
+    if (query.trim() === '') return null
+    const branch = agentBranch === null ? {} : { branch: agentBranch }
+    return { kind: 'prompt', text: query, newWorktree: ownBranch, ...branch, ...common }
   }
   if (selected?.kind === 'ticket') return { kind: 'ticket', issue: selected.issue, ...common }
   if (selected?.kind === 'branch') return { kind: 'branch', branch: selected.name, ...common }
@@ -156,11 +180,36 @@ async function submit({ view, onClose, setError }: SubmitInput): Promise<void> {
   if (view.repo === null) return setError('Add a workspace in the sidebar first.')
   const request = requestFor(view, view.repo)
   if (request === null) return
-  const message = await startWork(request)
+  const message =
+    view.when.when === 'now' ? await startWork(request) : await schedule(view, request)
   if (message === null) {
-    recordUse('core.start-work.launch')
+    recordUse(view.when.when === 'now' ? 'core.start-work.launch' : SCHEDULE_FEATURE, 'click', {
+      declare: view.when.when === 'now' ? undefined : SCHEDULE_DECLARATION,
+    })
     onClose()
   } else setError(message)
+}
+
+const SCHEDULE_FEATURE = 'core.start-work.schedule'
+const SCHEDULE_DECLARATION = {
+  label: 'Schedule a prompt',
+  kind: 'control' as const,
+  source: 'core',
+}
+
+/** Saves the prompt to run later. Null when saved; otherwise what to tell the person. */
+async function schedule(view: ActionsInput['view'], request: WorkRequest): Promise<string | null> {
+  if (request.kind !== 'prompt') return 'Only a typed prompt can be scheduled.'
+  const { when, time, date } = view.when
+  const result = await window.electronAPI.schedules.create({
+    repoRoot: request.workspace.folderPath,
+    prompt: request.text.trim(),
+    runAs: request.runAs,
+    kind: when === 'now' ? 'daily' : when,
+    time,
+    date: when === 'once' ? date : null,
+  })
+  return 'data' in result ? null : result.message
 }
 
 /** The launcher: pick a ticket, a prompt or a branch, choose how to run it, press Enter. */
@@ -374,6 +423,8 @@ function RunAsPanel({ view, actions }: Launcher): React.JSX.Element {
       <div className="start-work__label">Run it as</div>
       <RunAsChoices options={view.runAsOptions} runAs={view.runAs} onPick={actions.setRunAs} />
       <AgentPicker view={view} actions={actions} />
+      {view.isPrompt && isAgentRun(view.runAs) && <RepoFolderChoice {...{ view, actions }} />}
+      {view.isPrompt && <WhenChoices value={view.when} onChange={actions.setWhen} />}
       <Summary {...{ view, actions }} />
     </div>
   )
@@ -399,8 +450,25 @@ function AgentPicker({ view, actions }: PartProps): React.JSX.Element | null {
   )
 }
 
+function RepoFolderChoice({ view, actions }: PartProps): React.JSX.Element {
+  return (
+    <label className="start-work__agent">
+      <input
+        type="checkbox"
+        checked={view.useRepoFolder}
+        onChange={(e) => actions.setUseRepoFolder(e.target.checked)}
+      />
+      Use the repo folder
+    </label>
+  )
+}
+
 function summaryOf(view: Launcher['view']): { branch: string; worktree: string } {
   const { selected } = view
+  if (view.isPrompt && view.ownBranch) {
+    const branch = view.agentBranch ?? promptBranch(view.query)
+    return { branch, worktree: 'a new worktree' }
+  }
   if (selected?.kind === 'ticket') {
     const branch = branchOf(selected.issue)
     return { branch, worktree: worktreeFolder(branch) }
@@ -415,7 +483,12 @@ function Summary({ view }: PartProps): React.JSX.Element {
   return (
     <dl className="start-work__summary" role="group" aria-label="Where it runs">
       <dt>Branch</dt>
-      <dd>{branch}</dd>
+      <dd>
+        {branch}
+        {view.ownBranch && view.agentBranch !== null && (
+          <span className="start-work__muted"> named by Claude</span>
+        )}
+      </dd>
       <dt>Worktree</dt>
       <dd>{worktree}</dd>
       <dt>From</dt>
@@ -426,6 +499,7 @@ function Summary({ view }: PartProps): React.JSX.Element {
 
 function startLabel(view: Launcher['view']): string {
   if (view.tab === 'scratch') return 'Start terminal'
+  if (view.isPrompt && view.when.when !== 'now') return 'Schedule'
   if (view.selected?.kind === 'ticket') return `Start ${view.selected.issue.key}`
   return 'Start'
 }
