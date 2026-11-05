@@ -1,0 +1,19 @@
+docs/foundry-canary.md
+  s_c9833548cd0faa::t_94e65fee40774b 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8fb9608a3ee2a662d5f6cc1fcf4a80d260730cd7",
+  "prompts": {},
+  "sessions": {
+    "s_c9833548cd0faa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "94914d45-423f-43c0-b512-e5b2f35d95e9",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
