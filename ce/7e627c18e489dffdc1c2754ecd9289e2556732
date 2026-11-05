@@ -1,0 +1,39 @@
+src/main/agents/acp/agent-service.ts
+  s_a5e467e4da5497::t_51842404c57b3a 485
+tests/unit/DiffView.spec.tsx
+  s_a5e467e4da5497::t_74ea6a38fdaf48 68-73
+  s_a5e467e4da5497::t_d8a538490e5681 80,82,96,98
+tests/unit/renderer/agent/fold-updates.spec.ts
+  s_a5e467e4da5497::t_376a9855cbf0d9 167-169
+  s_a5e467e4da5497::t_74ea6a38fdaf48 165-166,170-172
+tests/unit/renderer/stores/session.store.spec.ts
+  s_a5e467e4da5497::t_b691e070267b27 1065-1069
+src/renderer/terminal/session-controller.ts
+  s_a5e467e4da5497::t_51842404c57b3a 174
+packages/extension-ui/src/DiffView.tsx
+  s_a5e467e4da5497::t_376a9855cbf0d9 269-270
+src/renderer/components/agent/fold-updates.ts
+  s_a5e467e4da5497::t_376a9855cbf0d9 158-161
+tests/unit/agents/acp/agent-service.spec.ts
+  s_a5e467e4da5497::t_b691e070267b27 133
+packages/extension-ui/src/extension-ui.css
+  s_a5e467e4da5497::t_376a9855cbf0d9 859-861
+src/renderer/stores/session.store.ts
+  s_a5e467e4da5497::t_51842404c57b3a 188-189,345
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ce7e627c18e489dffdc1c2754ecd9289e2556732",
+  "prompts": {},
+  "sessions": {
+    "s_a5e467e4da5497": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d038af6c-7a59-4002-9e1a-b5c973e92542",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
