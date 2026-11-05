@@ -4,7 +4,7 @@ import { useSessionStore } from '../../stores/session.store'
 import './LeafPane.css'
 import { droppedPaths } from './dropped-paths'
 import { useMountedTerminal } from './use-mounted-terminal'
-import { AgentView } from '../agent/AgentView'
+import { LazyAgentView } from '../agent/LazyAgentView'
 
 interface Props {
   sessionId: string
@@ -65,7 +65,7 @@ function PaneBody({
   containerRef: React.RefObject<HTMLDivElement | null>
 }): React.JSX.Element {
   const isAgent = useSessionStore((s) => s.sessions.get(sessionId)?.surface === 'agent')
-  if (isAgent) return <AgentView sessionId={sessionId} />
+  if (isAgent) return <LazyAgentView sessionId={sessionId} />
   return <div ref={containerRef} className="leaf-pane__container" />
 }
 

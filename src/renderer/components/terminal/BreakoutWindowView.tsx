@@ -10,7 +10,7 @@ import { dockBack } from '../../terminal/breakout'
 import { useMountedTerminal } from './use-mounted-terminal'
 import { usePlaceOf } from './place-of'
 import { BreakoutDropZone } from './BreakoutDropZone'
-import { AgentView } from '../agent/AgentView'
+import { LazyAgentView } from '../agent/LazyAgentView'
 import './BreakoutWindowView.css'
 
 /** Let go over the main window, the terminal goes back among its tabs. `window` is the main
@@ -66,7 +66,7 @@ function BreakoutWindowView({ sessionId }: { sessionId: string }): React.JSX.Ele
     <div className="breakout-window">
       <BreakoutHeader session={session} />
       {session.surface === 'agent' ? (
-        <AgentView sessionId={sessionId} />
+        <LazyAgentView sessionId={sessionId} />
       ) : (
         <div ref={containerRef} className="breakout-window__terminal" />
       )}
