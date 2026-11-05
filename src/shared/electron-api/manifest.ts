@@ -67,6 +67,7 @@ import type {
   AgentSessionInputSchema,
   AgentSetConfigInputSchema,
   AgentStartInputSchema,
+  KnownAgentStatus,
 } from '../schemas/agents.schema'
 import type { AgentUsageInputSchema, ThreadSummaryInputSchema } from '../schemas/agent-usage.schema'
 import type { AgentUsage } from '../agents/agent-usage'
@@ -1369,6 +1370,14 @@ export const ELECTRON_API_MANIFEST = [
     channel: 'agents:list',
     signature:
       signature<() => Promise<{ data: AgentDescriptor[] } | { error: string; message: string }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.known',
+    kind: 'invoke',
+    channel: 'agents:known',
+    signature:
+      signature<() => Promise<{ data: KnownAgentStatus[] } | { error: string; message: string }>>(),
     remote: 'omit',
   }),
   method({

@@ -1,5 +1,6 @@
 import { defineChannel, validationError, type ChannelSpec } from '@terminator/extension-sdk'
 import { registerInvokeTable, noPayload } from './invoke-table.js'
+import { knownAgentStatuses } from '../agents/acp/agent-registry.js'
 import { agentService } from '../agents/acp/agent-service-instance.js'
 import {
   AgentAnswerInputSchema,
@@ -20,6 +21,12 @@ const agentChannels: ChannelSpec[] = [
     schema: noPayload,
     invalid: validationError,
     run: async () => ({ data: await agentService().list() }),
+  }),
+  defineChannel({
+    channel: 'agents:known',
+    schema: noPayload,
+    invalid: validationError,
+    run: async () => ({ data: await knownAgentStatuses() }),
   }),
   defineChannel({
     channel: 'agents:start',

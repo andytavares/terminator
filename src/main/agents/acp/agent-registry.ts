@@ -1,7 +1,11 @@
+import { accessSync, constants } from 'node:fs'
 import { createRequire } from 'node:module'
+import { delimiter, join } from 'node:path'
 import type { AgentDescriptor } from '@terminator/extension-sdk'
 import { envWithoutParentClaude } from '@terminator/extension-sdk/node'
+import type { KnownAgentStatus } from '../../../shared/schemas/agents.schema.js'
 import type { AgentsSettings } from '../../../shared/schemas/settings.schema.js'
+import { loginShellPathReady } from '../../shell/login-shell-path.js'
 
 export const CLAUDE_AGENT_ID = 'claude'
 
@@ -46,4 +50,63 @@ export function resolveAgent(
     }
   }
   return null
+}
+
+/** The first executable called `binary` on PATH, or null. */
+export function binaryOnPath(binary: string): string | null {
+  for (const directory of (process.env.PATH ?? '').split(delimiter)) {
+    const candidate = join(directory, binary)
+    try {
+      accessSync(candidate, constants.X_OK)
+      return candidate
+    } catch {
+      // Not in this directory.
+    }
+  }
+  return null
+}
+
+/** Agents the settings offer to add. Each launch command is from the agent's own documentation.
+ * `binary` is what must be on PATH; for an `npx` preset that is `npx`. */
+export const KNOWN_AGENTS = [
+  {
+    // https://github.com/agentclientprotocol/codex-acp (the adapter Zed runs for Codex)
+    id: 'codex',
+    label: 'Codex',
+    command: 'npx',
+    args: ['-y', '@agentclientprotocol/codex-acp'],
+    binary: 'npx',
+  },
+  {
+    // https://geminicli.com/docs/cli/acp-mode/
+    id: 'gemini',
+    label: 'Gemini CLI',
+    command: 'gemini',
+    args: ['--acp'],
+    binary: 'gemini',
+  },
+  {
+    // https://opencode.ai/docs/acp/
+    id: 'opencode',
+    label: 'OpenCode',
+    command: 'opencode',
+    args: ['acp'],
+    binary: 'opencode',
+  },
+  {
+    // https://cursor.com/docs/cli/acp
+    id: 'cursor',
+    label: 'Cursor',
+    command: 'agent',
+    args: ['acp'],
+    binary: 'agent',
+  },
+]
+
+/** Each preset with whether its binary is on the login-shell PATH. */
+export async function knownAgentStatuses(
+  isOnPath: (binary: string) => boolean = (binary) => binaryOnPath(binary) !== null
+): Promise<KnownAgentStatus[]> {
+  await loginShellPathReady()
+  return KNOWN_AGENTS.map(({ binary, ...agent }) => ({ ...agent, installed: isOnPath(binary) }))
 }

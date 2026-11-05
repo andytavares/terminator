@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { listAgents, resolveAgent } from '../../../../src/main/agents/acp/agent-registry'
+import {
+  KNOWN_AGENTS,
+  knownAgentStatuses,
+  listAgents,
+  resolveAgent,
+} from '../../../../src/main/agents/acp/agent-registry'
 
 const settings = {
   default: 'claude',
@@ -51,5 +56,38 @@ describe('the Claude executable', () => {
     expect(resolveAgent(settings, 'claude', null)?.env.CLAUDE_CODE_EXECUTABLE).toBeUndefined()
     const gemini = resolveAgent(settings, 'gemini', '/Users/me/.local/bin/claude')
     expect(gemini?.env.CLAUDE_CODE_EXECUTABLE).toBeUndefined()
+  })
+})
+
+describe('known agents', () => {
+  it('lists each preset with an id, label, command, arguments and the binary to look for', () => {
+    expect(KNOWN_AGENTS.map((agent) => agent.id)).toEqual(['codex', 'gemini', 'opencode', 'cursor'])
+    for (const agent of KNOWN_AGENTS) {
+      expect(agent).toMatchObject({
+        label: expect.any(String),
+        command: expect.any(String),
+        args: expect.any(Array),
+        binary: expect.any(String),
+      })
+    }
+  })
+
+  it('reports a preset installed when its binary is found, not installed otherwise', async () => {
+    const found = new Set(['gemini', 'npx'])
+    const statuses = await knownAgentStatuses((binary) => found.has(binary))
+    expect(statuses.map(({ id, installed }) => [id, installed])).toEqual([
+      ['codex', true],
+      ['gemini', true],
+      ['opencode', false],
+      ['cursor', false],
+    ])
+  })
+
+  it('gives the same command and arguments a hand-typed agent would have', async () => {
+    const [codex] = await knownAgentStatuses(() => true)
+    expect(codex).toMatchObject({
+      command: 'npx',
+      args: ['-y', '@agentclientprotocol/codex-acp'],
+    })
   })
 })

@@ -24,6 +24,12 @@ vi.mock('../../../src/main/agents/acp/agent-service-instance', () => ({
   agentService: () => service,
 }))
 
+vi.mock('../../../src/main/agents/acp/agent-registry', () => ({
+  knownAgentStatuses: async () => [
+    { id: 'gemini', label: 'Gemini CLI', command: 'gemini', args: ['--acp'], installed: true },
+  ],
+}))
+
 import { registerAgentsHandlers } from '../../../src/main/ipc/agents.ipc'
 
 const invoke = (channel: string, payload?: unknown) => handlers.get(channel)!({}, payload)
@@ -42,6 +48,7 @@ describe('agents channels', () => {
         'agents:cancel',
         'agents:close',
         'agents:history',
+        'agents:known',
         'agents:list',
         'agents:open-asks',
         'agents:prompt',
@@ -51,6 +58,16 @@ describe('agents channels', () => {
         'agents:steer',
       ].sort()
     )
+  })
+})
+
+describe('agents known', () => {
+  it('answers with the presets and whether each is installed', async () => {
+    expect(await invoke('agents:known')).toEqual({
+      data: [
+        { id: 'gemini', label: 'Gemini CLI', command: 'gemini', args: ['--acp'], installed: true },
+      ],
+    })
   })
 })
 

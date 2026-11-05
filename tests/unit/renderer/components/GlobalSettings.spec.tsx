@@ -63,6 +63,7 @@ beforeEach(() => {
   })
   installElectronApi({
     settings: { updateGlobal: mockUpdateGlobal },
+    agents: { known: async () => ({ data: [] }) },
   })
 })
 
