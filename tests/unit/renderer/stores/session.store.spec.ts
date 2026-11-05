@@ -15,6 +15,7 @@ Object.defineProperty(globalThis, 'window', {
   writable: true,
 })
 
+import { useNavigationStore } from '../../../../src/renderer/stores/navigation.store'
 import {
   useSessionStore,
   type NewSessionRequest,
@@ -202,6 +203,26 @@ describe('useSessionStore — closeSession', () => {
     mockElectronAPI.terminal.close.mockResolvedValue({})
     await useSessionStore.getState().closeSession('sess-1')
     expect(dispose).toHaveBeenCalled()
+  })
+})
+
+describe('useSessionStore — closeSession — reopening', () => {
+  setUpUseSessionStore()
+
+  it('remembers a closed terminal for reopening, when it knows its folder', async () => {
+    useNavigationStore.setState(useNavigationStore.getInitialState(), true)
+    useSessionStore.setState({
+      sessions: new Map([
+        ['sess-1', makeSession({ cwd: '/work/api', tabTitle: 'Terminal 3' })],
+        ['sess-2', makeSession({ id: 'sess-2' })],
+      ]),
+    })
+    mockElectronAPI.terminal.close.mockResolvedValue({})
+    await useSessionStore.getState().closeSession('sess-1')
+    await useSessionStore.getState().closeSession('sess-2')
+    expect(useNavigationStore.getState().closedTabs).toEqual([
+      { projectId: 'proj-1', cwd: '/work/api', title: 'Terminal 3' },
+    ])
   })
 
   it('clears bell count for closed session', async () => {

@@ -65,11 +65,11 @@ describe('allocateExtensionGroups — assigns no group when every a-z letter is 
       mnemonic: String.fromCharCode(97 + i),
       label: `Ext${i}`,
     }))
-    // Core reserves t, s, w, x, h, o, a and b, so only 18 letters are left
+    // Core reserves t, s, w, x, v, h, o, a and b, so only 17 letters are left
     // for 27 requests.
     requests.push({ extensionId: 'overflow', mnemonic: 'a', label: 'Aaa' })
     const { groups, warnings } = allocateExtensionGroups(requests)
-    expect(groups).toHaveLength(18)
+    expect(groups).toHaveLength(17)
     expect(warnings.at(-1)).toBe('"overflow" wanted mnemonic "a" but no group letter was free.')
   })
 

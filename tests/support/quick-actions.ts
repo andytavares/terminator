@@ -74,7 +74,7 @@ export const CORE_SHORTCUTS: ShortcutSpec[] = [
   {
     actionId: 'core.new-tab',
     display: '⌘T',
-    firedBy: (e) => meta(e) && !e.shiftKey && e.key.toLowerCase() === 't',
+    firedBy: (e) => meta(e) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 't',
   },
   {
     actionId: 'core.split-vertical',
@@ -119,12 +119,27 @@ export const CORE_SHORTCUTS: ShortcutSpec[] = [
   {
     actionId: 'core.prev-tab',
     display: '⌘←',
-    firedBy: (e) => meta(e) && e.key === 'ArrowLeft',
+    firedBy: (e) => meta(e) && !e.altKey && e.key === 'ArrowLeft',
   },
   {
     actionId: 'core.next-tab',
     display: '⌘→',
-    firedBy: (e) => meta(e) && e.key === 'ArrowRight',
+    firedBy: (e) => meta(e) && !e.altKey && e.key === 'ArrowRight',
+  },
+  {
+    actionId: 'core.go-back',
+    display: '⌘⌥←',
+    firedBy: (e) => meta(e) && e.altKey && e.key === 'ArrowLeft',
+  },
+  {
+    actionId: 'core.go-forward',
+    display: '⌘⌥→',
+    firedBy: (e) => meta(e) && e.altKey && e.key === 'ArrowRight',
+  },
+  {
+    actionId: 'core.reopen-closed-tab',
+    display: '⌘⌥T',
+    firedBy: (e) => meta(e) && e.altKey && !e.shiftKey && e.key.toLowerCase() === 't',
   },
   {
     actionId: 'core.toggle-sidebar',

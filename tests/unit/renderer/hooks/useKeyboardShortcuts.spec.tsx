@@ -4,6 +4,7 @@ import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.sto
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
+import { useNavigationStore } from '../../../../src/renderer/stores/navigation.store'
 import { useKeyboardShortcuts } from '../../../../src/renderer/hooks/useKeyboardShortcuts'
 import type { useTerminalSession } from '../../../../src/renderer/hooks/useTerminalSession'
 import { resetStore, terminalSessionOf, workspaceFixture } from '../../../support/renderer-stores'
@@ -77,7 +78,7 @@ beforeEach(() => {
 
 function pressKey(
   key: string,
-  options: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean } = {}
+  options: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean; altKey?: boolean } = {}
 ) {
   const event = new KeyboardEvent('keydown', { key, bubbles: true, ...options })
   window.dispatchEvent(event)
@@ -549,5 +550,60 @@ describe('useKeyboardShortcuts — Cmd+K on Home', () => {
     renderHook(() => useKeyboardShortcuts())
     pressKey('k', { metaKey: true })
     expect(input).not.toHaveBeenCalled()
+  })
+})
+
+describe('back, forward and reopen closed tab', () => {
+  beforeEach(() => resetStore(useNavigationStore))
+
+  it('Cmd+Option+Left goes back and does not also switch to the previous tab', () => {
+    setup({ activeProjectId: 'proj-1' })
+    withTabs('proj-1', ['s1', 's2'], 's2')
+    renderHook(() => useKeyboardShortcuts())
+    useExtensionRegistry.getState().setActiveGlobalTab('core.home')
+    pressKey('ArrowLeft', { metaKey: true, altKey: true })
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
+    expect(sessionState().getActiveSessionForProject('proj-1')).toBe('s2')
+  })
+
+  it('Cmd+Option+Right goes forward again', () => {
+    renderHook(() => useKeyboardShortcuts())
+    useExtensionRegistry.getState().setActiveGlobalTab('core.home')
+    pressKey('ArrowLeft', { metaKey: true, altKey: true })
+    pressKey('ArrowRight', { metaKey: true, altKey: true })
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.home')
+  })
+
+  it('the mouse back button goes back and the forward button goes forward', () => {
+    renderHook(() => useKeyboardShortcuts())
+    useExtensionRegistry.getState().setActiveGlobalTab('core.home')
+    window.dispatchEvent(new MouseEvent('mouseup', { button: 3 }))
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
+    window.dispatchEvent(new MouseEvent('mouseup', { button: 4 }))
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.home')
+  })
+})
+
+describe('reopen closed tab', () => {
+  beforeEach(() => resetStore(useNavigationStore))
+
+  it('Cmd+Option+T reopens the last closed terminal in its folder; Cmd+T is not it', () => {
+    setup({ activeProjectId: 'proj-1' })
+    useNavigationStore
+      .getState()
+      .rememberClosed({ projectId: 'proj-1', cwd: '/work/api', title: 'Terminal 2' })
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('t', { metaKey: true, altKey: true })
+    expect(createSession).toHaveBeenCalledTimes(1)
+    expect(createSession).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: 'proj-1', cwd: '/work/api', title: 'Terminal 2' })
+    )
+    expect(useNavigationStore.getState().closedTabs).toHaveLength(0)
+  })
+
+  it('Cmd+Option+T does nothing when no tab was closed', () => {
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('t', { metaKey: true, altKey: true })
+    expect(createSession).not.toHaveBeenCalled()
   })
 })

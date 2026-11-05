@@ -19,7 +19,9 @@ import type { QuickActionTarget } from './use-active-scope'
 import type { CoreActionDeps } from './core-actions'
 import type { PaneSplitDirection, TerminalSession, Workspace } from '../../shared/types/index'
 import type { QuickAction } from './types'
-import { cycleTab } from './shortcut-behaviors'
+import { cycleTab, reopenClosedTab } from './shortcut-behaviors'
+import { useNavigationStore } from '../stores/navigation.store'
+import { goBack, goForward } from '../stores/navigation-sync'
 import { toggleBreakout } from '../terminal/breakout'
 
 /** What the app shell does on behalf of an action: its own dialogs, panes and toggles. */
@@ -93,7 +95,7 @@ interface CoreContext {
   issueLink: CoreActionDeps['issueLink']
   issue: { url: string } | null
   shell: ShellCommands
-  splitSession: ReturnType<typeof useTerminalSession>['splitSession']
+  terminals: ReturnType<typeof useTerminalSession>
 }
 
 type Handlers<Keys extends keyof CoreActionDeps> = Pick<CoreActionDeps, Keys>
@@ -102,7 +104,7 @@ function splitFocused(c: CoreContext, direction: PaneSplitDirection): void {
   if (!c.projectId) return
   const settings = useSettingsStore.getState().resolveSettings(c.activeWorkspaceId)
   const cwd = useWorkspaceStore.getState().resolveActiveCwd()
-  void c.splitSession(c.projectId, direction, {
+  void c.terminals.splitSession(c.projectId, direction, {
     cwd,
     scrollbackLimit: settings.terminal.scrollbackLimit,
   })
@@ -123,6 +125,16 @@ function closePane(projectId: string | null): void {
   }
 }
 
+function reopenLastClosed(c: CoreContext): void {
+  const workspaces = useWorkspaceStore.getState()
+  reopenClosedTab({
+    resolveSettings: useSettingsStore.getState().resolveSettings,
+    resolveActiveCwd: workspaces.resolveActiveCwd,
+    activeWorkspaceId: workspaces.activeWorkspaceId,
+    createSession: c.terminals.createSession,
+  })
+}
+
 function terminalHandlers(
   c: CoreContext
 ): Handlers<
@@ -134,6 +146,7 @@ function terminalHandlers(
   | 'onNewScratch'
   | 'onEditNote'
   | 'onCycleTab'
+  | 'onReopenClosedTab'
 > {
   return {
     onNewTab: c.shell.onNewTab,
@@ -144,6 +157,7 @@ function terminalHandlers(
       if (c.focusedSessionId) window.electronAPI.terminal.input(c.focusedSessionId, '\x0c')
     },
     onNewScratch: c.shell.onNewScratch,
+    onReopenClosedTab: () => reopenLastClosed(c),
     onEditNote: () => c.shell.onEditNote(c.focusedSessionId),
     // Within the project on screen, not the session's own: cycleTab leaves any other tab first.
     onCycleTab: (delta) => {
@@ -234,8 +248,27 @@ function shellHandlers(
   }
 }
 
-function coreActionDeps(c: CoreContext, paletteSessions: CoreSessionSummary[]): CoreActionDeps {
+type NavigationFacts = Pick<CoreActionDeps, 'canGoBack' | 'canGoForward' | 'hasClosedTab'>
+
+function useNavigationFacts(): NavigationFacts {
+  return useNavigationStore(
+    useShallow((s) => ({
+      canGoBack: s.cursor > 0,
+      canGoForward: s.cursor < s.entries.length - 1,
+      hasClosedTab: s.closedTabs.length > 0,
+    }))
+  )
+}
+
+function coreActionDeps(
+  c: CoreContext,
+  paletteSessions: CoreSessionSummary[],
+  navigation: NavigationFacts
+): CoreActionDeps {
   return {
+    ...navigation,
+    onGoBack: goBack,
+    onGoForward: goForward,
     hasProjectFocused: !!c.projectId,
     hasTerminalFocused: !!c.focusedSessionId,
     activeWorkspaceId: c.activeWorkspaceId,
@@ -264,7 +297,7 @@ function useCoreContext(target: QuickActionTarget, shell: ShellCommands): CoreCo
     }))
   )
   const sessions = useSessionStore((s) => s.sessions)
-  const { splitSession } = useTerminalSession()
+  const terminals = useTerminalSession()
   const focusedIssue = useFocusedIssue(focusedSessionId)
   return useMemo(
     () => ({
@@ -274,9 +307,9 @@ function useCoreContext(target: QuickActionTarget, shell: ShellCommands): CoreCo
       sessions,
       ...focusedIssue,
       shell,
-      splitSession,
+      terminals,
     }),
-    [projectId, focusedSessionId, workspaceFocus, sessions, focusedIssue, shell, splitSession]
+    [projectId, focusedSessionId, workspaceFocus, sessions, focusedIssue, shell, terminals]
   )
 }
 
@@ -286,8 +319,9 @@ export function useCoreQuickActions(
 ): QuickAction[] {
   const context = useCoreContext(target, shell)
   const paletteSessions = usePaletteSessions()
+  const navigation = useNavigationFacts()
   return useMemo(
-    () => buildCoreActions(coreActionDeps(context, paletteSessions)),
-    [context, paletteSessions]
+    () => buildCoreActions(coreActionDeps(context, paletteSessions, navigation)),
+    [context, paletteSessions, navigation]
   )
 }
