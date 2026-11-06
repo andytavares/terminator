@@ -1,6 +1,6 @@
 import { noPayload } from '@terminator/extension-sdk'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
-import type { z } from 'zod'
+import { z } from 'zod'
 
 import { foundryChannel } from './channel.js'
 import { ViewPayload } from './payloads.js'
@@ -8,6 +8,18 @@ import type { ForgeChannels } from './forge-channels.js'
 
 import { disposables, reg } from './register.js'
 import { inBackground } from '../background.js'
+
+// Core passes a command its arguments only when it declares them (src/main/extensions/api.ts).
+const NewOrderArgs = z
+  .object({
+    tracker: z.string().optional(),
+    key: z.string().optional(),
+    title: z.string().optional(),
+    prompt: z.string().optional(),
+    repoRoot: z.string().optional(),
+  })
+  .optional()
+const OpenOrderArgs = z.object({ orderId: z.string().optional() }).optional()
 
 // Auto-expires so a late manual visit to the Forge doesn't surprise the
 // operator with an intake that opened itself for no reason they can see.
@@ -60,6 +72,7 @@ export function registerCommands(api: ExtensionAPI, forge: Pick<ForgeChannels, '
         label: 'New work order…',
         category: 'Foundry',
         mnemonic: 'n',
+        args: NewOrderArgs,
       },
       (_context, args?: unknown) => {
         const source = sourceOf(args)
@@ -77,7 +90,7 @@ export function registerCommands(api: ExtensionAPI, forge: Pick<ForgeChannels, '
 function registerOpenOrder(api: ExtensionAPI): void {
   disposables.push(
     api.commands.register(
-      { id: 'open-order', label: 'Open Foundry', category: 'Foundry' },
+      { id: 'open-order', label: 'Open Foundry', category: 'Foundry', args: OpenOrderArgs },
       (_context, args?: unknown) => {
         api.window.showSelf('main')
         const orderId = (args as { orderId?: unknown } | undefined)?.orderId

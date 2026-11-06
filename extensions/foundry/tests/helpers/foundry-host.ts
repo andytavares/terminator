@@ -168,8 +168,15 @@ export function disposableStub() {
 function hostCommands(commands: HostParts['commands']): ExtensionAPI['commands'] {
   return partialFake<ExtensionAPI['commands']>({
     register: vi.fn(
-      (contribution: { id: string }, handler: (context?: unknown, args?: unknown) => void) => {
-        commands.set(contribution.id, handler)
+      (
+        contribution: { id: string; args?: { parse: (args: unknown) => unknown } },
+        handler: (context?: unknown, args?: unknown) => void
+      ) => {
+        // As core runs it (src/main/extensions/api.ts): args reach only a command that declares them.
+        const { args: schema } = contribution
+        commands.set(contribution.id, (context, args) =>
+          schema ? handler(context, schema.parse(args)) : handler(context)
+        )
         return { dispose: () => commands.delete(contribution.id) }
       }
     ),
