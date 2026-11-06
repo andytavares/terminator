@@ -1,6 +1,6 @@
 {
   "name": "@terminator/extension-foundry",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "description": "Foundry — a software factory for Terminator",
   "scripts": {
