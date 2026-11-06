@@ -68,9 +68,11 @@ async function startAgentFromAPrompt(): Promise<void> {
   await page.keyboard.press('ControlOrMeta+n')
   const launcher = page.getByRole('dialog', { name: 'Start work' })
   await launcher.getByRole('tab', { name: 'Prompt' }).click()
+  // Before typing: a prompt on a branch of its own asks the agent to name it, which the stub
+  // records as one more prompt.
+  await launcher.getByRole('checkbox', { name: 'Use the repo folder' }).check()
   await launcher.getByLabel('What should it do?').fill('Add a retry to fetchUser')
   await aRepeatKeepsScheduleOnScreen()
-  await launcher.getByRole('checkbox', { name: 'Use the repo folder' }).check()
   await launcher
     .getByRole('button', { name: /^Start/ })
     .last()
