@@ -4136,3 +4136,26 @@ button.fdry-runlog__station {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* The plan reader: a header with its actions, a body that scrolls, a path footer. */
+.fdry-plan-head {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tm-space-2);
+  padding: var(--tm-space-3) var(--tm-space-4);
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.fdry-plan-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--tm-space-4);
+}
+
+.fdry-plan-foot {
+  padding: var(--tm-space-2) var(--tm-space-4);
+  border-top: 1px solid var(--tm-border);
+  color: var(--tm-text-muted);
+  font-size: var(--tm-font-size-sm);
+}

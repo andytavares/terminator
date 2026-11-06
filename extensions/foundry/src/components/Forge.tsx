@@ -8,6 +8,7 @@ import {
   Terminal,
   Play,
   Wand,
+  FileText,
   AlertCircle,
   LoaderCircle,
   User,
@@ -29,6 +30,7 @@ import type { CapabilityReport } from '../trackers/write-back.js'
 import type { IntakeOutcome } from '../forge/intake-outcome.js'
 import { openingStep, forgeSteps, type StepId } from '../forge/steps.js'
 import { budgetsInWords } from '../order/render.js'
+import { PlanReader } from './PlanReader.js'
 import { BudgetForm } from './BudgetForm.js'
 import { ChecksStep, HandOffChecks, type ChecksActions } from './ForgeChecks.js'
 import { useChecks, type Decision } from './use-checks.js'
@@ -953,6 +955,7 @@ function ForgeHeader({ forge }: ForgeProp) {
       </div>
       <div className="fdry-wiz-actions">
         <WatchButton forge={forge} />
+        <OpenPlanButton order={order} />
         {forge.isDraft && !r.strip.actions.includes('draft') ? (
           <ReasonButton reason={r.locks.redraft} icon={Wand} onClick={() => void forge.converge()}>
             {order.plan.units.length === 0 ? 'Draft the plan' : 'Redraft'}
@@ -970,6 +973,19 @@ function SourceChip({ source }: { readonly source: WorkOrder['source'] }) {
     <Chip>
       {capitalise(source.tracker ?? '')} {source.key}
     </Chip>
+  )
+}
+
+/** Opens the whole plan as Markdown; shown at every status. */
+function OpenPlanButton({ order }: { order: WorkOrder }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button icon={FileText} onClick={() => setOpen(true)}>
+        Open plan
+      </Button>
+      {open ? <PlanReader order={order} onClose={() => setOpen(false)} /> : null}
+    </>
   )
 }
 
