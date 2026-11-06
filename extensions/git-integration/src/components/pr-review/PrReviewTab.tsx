@@ -239,6 +239,7 @@ async function showOpenedPr(ctx: TabContext, pr: ReviewQueuePR, detail: PrReview
   useReviewUiStore.getState().resetForPr()
   store.setActivePr(detail)
   view.setShowOverview(true)
+  console.log(`[DEBUG-f0c5] showOpenedPr done #${pr.number} ${performance.now().toFixed(0)}`)
   // Kick off risk score computation in the background (non-blocking).
   loaders.fetchFileMetrics(detail)
   // Load conversation comments in the background (pass prNumber directly to avoid stale closure).
@@ -250,6 +251,7 @@ async function showOpenedPr(ctx: TabContext, pr: ReviewQueuePR, detail: PrReview
 function closePr(ctx: TabContext, loadQueue: ReturnType<typeof useLoadPrQueue>): void {
   const { repoRoot, store, view } = ctx
   const { activePr } = store
+  console.log(`[DEBUG-f0c5] closePr #${activePr?.number} ${performance.now().toFixed(0)}`)
   if (activePr) {
     const head = { repoRoot, prNumber: activePr.number, headSHA: activePr.headSHA }
     store.setPaused(head, new Date().toISOString())
@@ -320,6 +322,7 @@ function tabHandlers(t: PrReviewTabState, ctx: TabContext) {
   const handleClosePr = () => closePr(ctx, t.loadQueue)
   return {
     handleOpenPr: async (pr: ReviewQueuePR) => {
+      console.log(`[DEBUG-f0c5] handleOpenPr #${pr.number} ${performance.now().toFixed(0)}`)
       view.setActiveQueuePr(pr)
       await loaders.loadPrDetail(pr.number, (detail) => showOpenedPr(ctx, pr, detail))
     },
@@ -388,7 +391,10 @@ function OpenPr(props: OpenPrProps) {
       pr={pr}
       onClose={h.handleClosePr}
       onRefresh={h.handleRefreshPr}
-      onShowOverview={() => view.setShowOverview(true)}
+      onShowOverview={() => {
+        console.log(`[DEBUG-f0c5] onShowOverview ${performance.now().toFixed(0)}`)
+        view.setShowOverview(true)
+      }}
       onPopOut={popOutHandler(t, h)}
       onApproved={h.handleApproved}
       sinceInfo={view.sinceInfo}

@@ -58,6 +58,9 @@ test.beforeAll(async () => {
   stub = await startGithubStub({ bareRepo: bare })
   openQueuePullRequests(stub)
   handle = await launchApp(undefined, stub.env)
+  handle.page.on('console', (m) => {
+    if (m.text().includes('[DEBUG-f0c5]')) console.log(m.text())
+  })
   await openRepo(handle, 'Review Queue', repo)
 })
 
@@ -129,7 +132,9 @@ async function anOpenedReviewStaysInProgressUntilDismissed(): Promise<void> {
 
 async function aReviewMergedElsewhereLeavesTheQueue(): Promise<void> {
   const view = await openPrOverview('Tidy docs')
+  console.log(`[DEBUG-f0c5] test clicks Close`)
   await view.getByRole('button', { name: 'Close' }).click()
+  console.log(`[DEBUG-f0c5] test click returned`)
   await expect(queueRow(view, 'Tidy docs')).toContainText('0 of 1 viewed')
 
   stub.pullRequest(3).state = 'MERGED'
