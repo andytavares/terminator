@@ -971,6 +971,19 @@ describe('StartWork — When, Repeat, warning', () => {
   })
 })
 
+describe('StartWork — When, Repeat window ends before it starts', () => {
+  it('shows an error and disables Schedule', async () => {
+    await open()
+    typePrompt('tidy the readme')
+    fireEvent.click(screen.getByRole('radio', { name: 'Repeat' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Every 30 min' }))
+    fireEvent.change(screen.getByLabelText('To'), { target: { value: '08:00' } })
+    expect(screen.getByText('The end time must be after the start time.')).toBeTruthy()
+    const button = screen.getByRole('button', { name: /^Schedule/ }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+  })
+})
+
 describe('StartWork — When, Once in the past', () => {
   it('shows an error and disables Schedule', async () => {
     await open()

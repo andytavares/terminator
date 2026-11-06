@@ -61,6 +61,9 @@ const onceAt = ({ date, time }: WhenValue): Date => new Date(`${date}T${time}`)
 
 /** What stops a Once from being saved; null when it can be. */
 export function whenProblem(value: WhenValue): string | null {
+  const { between } = value.rule
+  if (value.when === 'repeat' && between !== null && between.to <= between.from)
+    return 'The end time must be after the start time.'
   if (value.when !== 'once') return null
   const at = onceAt(value)
   if (Number.isNaN(at.getTime())) return 'Pick a date and time.'
@@ -218,8 +221,17 @@ function RepeatFields({ value, onChange }: WhenChoicesProps): React.JSX.Element 
           <option value="start">Start another</option>
         </select>
       </label>
-      <NextRuns value={value} />
+      <RepeatSummary value={value} />
     </>
+  )
+}
+
+function RepeatSummary({ value }: { value: WhenValue }): React.JSX.Element {
+  const problem = whenProblem(value)
+  return problem === null ? (
+    <NextRuns value={value} />
+  ) : (
+    <p className="start-work__error">{problem}</p>
   )
 }
 
