@@ -50,13 +50,29 @@ test.afterAll(async () => {
   for (const dir of [repo, bare]) rmSync(dir, { recursive: true, force: true })
 })
 
+/** The Repeat form is the tallest Start work gets: its button stays in the window and the divider
+ *  (the side column's left border) runs down to the footer. Then back to Now. */
+async function aRepeatKeepsScheduleOnScreen(): Promise<void> {
+  const launcher = handle.page.getByRole('dialog', { name: 'Start work' })
+  await launcher.getByRole('radio', { name: 'Repeat' }).click()
+  await launcher.getByRole('button', { name: 'Every 30 min' }).click()
+  await expect(launcher.getByRole('button', { name: /^Schedule/ })).toBeInViewport()
+  const side = await launcher.locator('.start-work__side').boundingBox()
+  const footer = await launcher.locator('.start-work__footer').boundingBox()
+  expect(Math.abs((side?.y ?? 0) + (side?.height ?? 0) - (footer?.y ?? -10))).toBeLessThan(2)
+  await launcher.getByRole('radio', { name: 'Now' }).click()
+}
+
 async function startAgentFromAPrompt(): Promise<void> {
   const { page } = handle
   await page.keyboard.press('ControlOrMeta+n')
   const launcher = page.getByRole('dialog', { name: 'Start work' })
   await launcher.getByRole('tab', { name: 'Prompt' }).click()
-  await launcher.getByLabel('Search tickets or type a prompt').fill('Add a retry to fetchUser')
+  // Before typing: a prompt on a branch of its own asks the agent to name it, which the stub
+  // records as one more prompt.
   await launcher.getByRole('checkbox', { name: 'Use the repo folder' }).check()
+  await launcher.getByLabel('What should it do?').fill('Add a retry to fetchUser')
+  await aRepeatKeepsScheduleOnScreen()
   await launcher
     .getByRole('button', { name: /^Start/ })
     .last()

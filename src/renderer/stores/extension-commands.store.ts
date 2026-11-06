@@ -37,3 +37,13 @@ export const useExtensionCommandsStore = create<ExtensionCommandsState>((set) =>
     set({ registered: commands, declared })
   },
 }))
+
+/** An extension command's key when it is registered, including one that takes args and so is in
+ * no quick-action list; null when its extension is not running it. `id` may be the full key. */
+export async function registeredCommandKey(
+  extensionId: string,
+  id: string
+): Promise<string | null> {
+  const key = id.includes('.command.') ? id : `${extensionId}.command.${id}`
+  return (await window.electronAPI.extension.hasCommand(key)) ? key : null
+}

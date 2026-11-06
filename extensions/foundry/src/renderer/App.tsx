@@ -159,10 +159,12 @@ function usePaletteGotoRequests(open: (orderId: string) => void): void {
 
 // The "New work order…" quick action, whether or not this view was open: a request
 // now, or one that fired before the view existed, picked up on first mount.
-function useNewOrderRequests(open: () => void): void {
+function useNewOrderRequests(open: () => void, openOrder: (orderId: string) => void): void {
   const latest = useRef(open)
+  const latestOrder = useRef(openOrder)
   useEffect(() => {
     latest.current = open
+    latestOrder.current = openOrder
   })
   useEffect(() => {
     return window.electronAPI.extensionBridge.on('foundry:ui.open-new-order', () =>
@@ -173,7 +175,8 @@ function useNewOrderRequests(open: () => void): void {
   useEffect(() => {
     foundryInvoke('foundry:ui.consume-pending-new-order')
       .then((result) => {
-        if (result.pending) latest.current()
+        if (result.pending?.kind === 'new') latest.current()
+        else if (result.pending?.kind === 'order') latestOrder.current(result.pending.orderId)
       })
       .catch(() => {})
   }, [])
@@ -238,14 +241,14 @@ function useChrome(): Chrome {
   const surfaces = useSurfaces()
   const forge = useForgeView()
   // Bring the Forge into view with the cursor already in the idea box.
-  useNewOrderRequests(() => {
-    surfaces.show('forge')
-    setFocusIdeaSignal((n) => n + 1)
-  })
   const openOrder = (orderId: string): void => {
     surfaces.show('forge')
     forge.openInList(orderId)
   }
+  useNewOrderRequests(() => {
+    surfaces.show('forge')
+    setFocusIdeaSignal((n) => n + 1)
+  }, openOrder)
   useOpenOrderRequests(openOrder)
   usePaletteGotoRequests(openOrder)
   useWorkspaceSwitch((next) => {

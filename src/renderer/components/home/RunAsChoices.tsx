@@ -31,7 +31,7 @@ export function RunAsChoices({ options, runAs, onPick }: RunAsChoicesProps): Rea
             <span className="start-work__radio" aria-hidden="true" />
             <span>
               {option.label}
-              <small>{option.hint}</small>
+              {option.value === runAs && <small>{option.hint}</small>}
             </span>
           </>
         ),

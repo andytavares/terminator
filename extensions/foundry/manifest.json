@@ -23,7 +23,7 @@
         "id": "new-order",
         "label": "Foundry order",
         "description": "Shaped, planned and built by Foundry's line.",
-        "command": "new-order"
+        "command": "start-order"
       }
     ],
     "shellRoots": ["terminator.foundry.dataDir"],

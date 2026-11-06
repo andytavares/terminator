@@ -6,14 +6,16 @@ import {
   registerCommands,
   clearPendingNewOrder,
 } from '../../src/ipc/ui-registration.js'
+import { settleBackground } from '../../src/background.js'
 import { registerModelChannels } from '../../src/ipc/model-registration.js'
 
 let host: FoundryHost
+const create = vi.fn()
 
 beforeAll(() => {
   host = fakeHost(() => '/unused')
   registerViewChannels(host.api)
-  registerCommands(host.api, { create: vi.fn() })
+  registerCommands(host.api, { create })
   registerModelChannels(host.api)
 })
 
@@ -21,6 +23,7 @@ beforeEach(() => {
   host.settings.clear()
   host.broadcast.mockClear()
   clearPendingNewOrder()
+  create.mockReset()
 })
 
 afterEach(() => vi.useRealTimers())
@@ -53,15 +56,55 @@ describe('a new work order asked for from the palette', () => {
   it('opens in a view that already exists, and waits once for a view that does not yet', async () => {
     host.commands.get('new-order')?.()
     expect(host.broadcast).toHaveBeenCalledWith('foundry:ui.open-new-order', {})
-    expect(await host.call('foundry:ui.consume-pending-new-order')).toEqual({ pending: true })
-    expect(await host.call('foundry:ui.consume-pending-new-order')).toEqual({ pending: false })
+    expect(await host.call('foundry:ui.consume-pending-new-order')).toEqual({
+      pending: { kind: 'new' },
+    })
+    expect(await host.call('foundry:ui.consume-pending-new-order')).toEqual({ pending: null })
   })
 
   it('is forgotten if no view picks it up within five seconds', async () => {
     vi.useFakeTimers()
     host.commands.get('new-order')?.()
     vi.advanceTimersByTime(5_000)
-    expect(await host.call('foundry:ui.consume-pending-new-order')).toEqual({ pending: false })
+    expect(await host.call('foundry:ui.consume-pending-new-order')).toEqual({ pending: null })
+  })
+})
+
+describe('an order opened from Start work or Home before the view exists', () => {
+  const start = (args: unknown) => host.commands.get('start-order')?.({}, args)
+
+  it('leaves the order for the view to read on mount, from a ticket', async () => {
+    create.mockResolvedValue({ order: { id: 'WO-7' } })
+    start({ tracker: 'linear', key: 'TAV-1', repoRoot: '/repo' })
+    await settleBackground()
+    expect(host.broadcast).toHaveBeenCalledWith('foundry:ui.open-order', { orderId: 'WO-7' })
+    expect(await host.call('foundry:ui.consume-pending-new-order')).toEqual({
+      pending: { kind: 'order', orderId: 'WO-7' },
+    })
+  })
+
+  it('creates a typed order from a prompt and opens it', async () => {
+    create.mockResolvedValue({ order: { id: 'WO-8' } })
+    start({ prompt: 'fix the build', repoRoot: '/repo' })
+    await settleBackground()
+    expect(host.broadcast).toHaveBeenCalledWith('foundry:ui.open-order', { orderId: 'WO-8' })
+    expect(create).toHaveBeenCalledWith({
+      source: { kind: 'typed', text: 'fix the build' },
+      repoPaths: ['/repo'],
+    })
+  })
+})
+
+describe('Home Open on an order before the view exists', () => {
+  it('is left for the view, and forgotten after five seconds', async () => {
+    vi.useFakeTimers()
+    host.commands.get('show-order')?.({}, { orderId: 'WO-9' })
+    vi.advanceTimersByTime(5_000)
+    expect(await host.call('foundry:ui.consume-pending-new-order')).toEqual({ pending: null })
+    host.commands.get('show-order')?.({}, { orderId: 'WO-9' })
+    expect(await host.call('foundry:ui.consume-pending-new-order')).toEqual({
+      pending: { kind: 'order', orderId: 'WO-9' },
+    })
   })
 })
 

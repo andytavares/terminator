@@ -773,7 +773,9 @@ export const ELECTRON_API_MANIFEST = [
     channel: 'extension:has-command',
     signature: signature<(key: string) => Promise<boolean>>(),
     toPayload: (key) => ({ key }),
-    extensionView: 'only',
+    // The app renderer too: a command that takes args is in no quick-action list.
+    extensionView: 'shared',
+    remote: 'omit',
   }),
   // Remote stub: WebContentsView positioning is an Electron-only concept.
   method({

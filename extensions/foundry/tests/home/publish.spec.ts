@@ -161,9 +161,9 @@ describe('answering from Home', () => {
   })
 })
 
-describe('the open-order command Home runs', () => {
+describe('the show-order command Home runs', () => {
   it('brings Foundry forward and tells its view which order to open', () => {
-    const open = host.commands.get('open-order') as unknown as (ctx: object, args: object) => void
+    const open = host.commands.get('show-order') as unknown as (ctx: object, args: object) => void
     open({}, { orderId: 'WO-1' })
     expect(host.api.window.showSelf).toHaveBeenCalledWith('main')
     expect(host.broadcast).toHaveBeenCalledWith('foundry:ui.open-order', { orderId: 'WO-1' })

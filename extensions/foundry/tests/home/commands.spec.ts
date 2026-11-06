@@ -32,9 +32,9 @@ beforeEach(() => {
   host.showToast.mockClear()
 })
 
-const newOrder = (): Command => host.commands.get('new-order') as unknown as Command
+const newOrder = (): Command => host.commands.get('start-order') as unknown as Command
 
-describe('new-order', () => {
+describe('start-order', () => {
   it('opens the empty intake when given no ticket', () => {
     newOrder()({})
     expect(host.broadcast).toHaveBeenCalledWith('foundry:ui.open-new-order', {})
@@ -61,7 +61,7 @@ describe('new-order', () => {
   })
 })
 
-describe('new-order from a ticket Foundry cannot read', () => {
+describe('start-order from a ticket Foundry cannot read', () => {
   it('says so when the ticket cannot be read', async () => {
     vi.mocked(host.issues.get).mockResolvedValueOnce(null)
     newOrder()({}, { tracker: 'linear', key: 'WT-99', title: 'x', repoRoot: dataDir })

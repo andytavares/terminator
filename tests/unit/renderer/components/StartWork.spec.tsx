@@ -2,12 +2,14 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
 import { StartWork } from '../../../../src/renderer/components/home/StartWork'
+import { startingWhen, whenProblem } from '../../../../src/renderer/components/home/WhenChoices'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useDismissedThreads } from '../../../../src/renderer/components/home/dismissed-threads'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
+import userEvent from '@testing-library/user-event'
 import { installElectronApi } from '../../../support/electron-api'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 import type {
@@ -153,6 +155,7 @@ beforeEach(() => {
     extension: {
       executeCommand,
       getCommands: vi.fn(async () => ({ commands: [] })),
+      hasCommand: vi.fn(async () => false),
       list: vi.fn(async () => ({ extensions: [] })),
     },
   })
@@ -163,7 +166,9 @@ beforeEach(() => {
   seedStartWorkStores()
 })
 
-const searchBox = () => screen.getByRole('textbox', { name: 'Search tickets or type a prompt' })
+/** The field the person types in: the search row, or the Prompt tab's own box. */
+const searchBox = () =>
+  screen.getByRole('textbox', { name: /^(Search tickets or type a prompt|What should it do\?)$/ })
 const open = async (onClose = vi.fn()) => {
   render(<StartWork onClose={onClose} />)
   await screen.findByText('TAV-33')
@@ -398,6 +403,24 @@ describe('StartWork — an extension option', () => {
   })
 })
 
+describe('StartWork — an extension option given a typed prompt', () => {
+  it('passes the prompt and the repository', async () => {
+    registerFoundryOption()
+    useExtensionCommandsRegistered()
+    const onClose = await open()
+    goToTab('Prompt')
+    useRepoFolder()
+    fireEvent.change(searchBox(), { target: { value: 'fix the build' } })
+    for (let step = 0; step < 3; step++) fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(executeCommand).toHaveBeenCalledWith('x.command.new-order', expect.anything(), {
+      prompt: 'fix the build',
+      repoRoot: '/repo',
+    })
+  })
+})
+
 describe('StartWork — an extension option whose command is not running', () => {
   it('says so in plain words and starts nothing', async () => {
     registerFoundryOption()
@@ -416,18 +439,12 @@ function useExtensionCommandsRegistered(): void {
   installElectronApi({
     git,
     agents: { list: agentsList },
+    schedules: { create: createSchedule, list: async () => ({ data: [] }) },
     extension: {
       executeCommand,
-      getCommands: vi.fn(async () => ({
-        commands: [
-          {
-            key: 'x.command.new-order',
-            extensionId: 'x',
-            id: 'new-order',
-            label: 'New work order…',
-          },
-        ],
-      })),
+      // As core answers: a command that takes args is in no quick-action list, only registered.
+      getCommands: vi.fn(async () => ({ commands: [] })),
+      hasCommand: vi.fn(async (key: string) => key === 'x.command.new-order'),
       list: vi.fn(async () => ({ extensions: [] })),
     },
   })
@@ -519,7 +536,7 @@ describe('StartWork — scratch and branch tabs', () => {
   it('Scratch terminal tab starts a scratch session', async () => {
     const onClose = await open()
     goToTab('Scratch terminal')
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Scratch terminal' }), { key: 'Enter' })
     await waitFor(() => expect(launched.scratch).toHaveBeenCalledTimes(1))
     expect(onClose).toHaveBeenCalled()
     expect(launched.inBranch).not.toHaveBeenCalled()
@@ -773,7 +790,7 @@ describe('StartWork — the branch summary of a prompt', () => {
 describe('StartWork — When', () => {
   const choice = (name: string) => screen.getByRole('radio', { name })
 
-  it('offers Now, Once, Daily and Weekdays on a prompt, Now first', async () => {
+  it('offers Now, Once and Repeat on a prompt, Now first', async () => {
     await open()
     typePrompt('tidy the readme')
     const group = screen.getByRole('radiogroup', { name: 'When' })
@@ -781,7 +798,7 @@ describe('StartWork — When', () => {
       within(group)
         .getAllByRole('radio')
         .map((r) => r.textContent)
-    ).toEqual(['Now', 'Once', 'Daily', 'Weekdays'])
+    ).toEqual(['Now', 'Once', 'Repeat'])
     expect(choice('Now').getAttribute('aria-checked')).toBe('true')
     expect(screen.queryByLabelText('Time')).toBeNull()
   })
@@ -799,7 +816,7 @@ describe('StartWork — When, scheduling', () => {
     await open()
     typePrompt('tidy the readme')
     expect(screen.getByRole('button', { name: /^Start/ })).toBeTruthy()
-    fireEvent.click(choice('Daily'))
+    fireEvent.click(choice('Repeat'))
     expect((screen.getByLabelText('Time') as HTMLInputElement).value).toBe('09:00')
     expect(
       screen.getByText('Runs while Terminator is open. A missed run waits in Needs you.')
@@ -811,11 +828,11 @@ describe('StartWork — When, scheduling', () => {
 describe('StartWork — When, saving', () => {
   const choice = (name: string) => screen.getByRole('radio', { name })
 
-  it('saves a daily schedule instead of starting, counts it, and closes', async () => {
+  it('saves a repeat schedule instead of starting, counts it, and closes', async () => {
     createSchedule.mockResolvedValue({ data: {} as never })
     const onClose = await open()
     typePrompt('tidy the readme')
-    fireEvent.click(choice('Daily'))
+    fireEvent.click(choice('Repeat'))
     fireEvent.change(screen.getByLabelText('Time'), { target: { value: '07:30' } })
     fireEvent.click(screen.getByRole('button', { name: /^Schedule/ }))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
@@ -823,7 +840,9 @@ describe('StartWork — When, saving', () => {
       repoRoot: '/repo',
       prompt: 'tidy the readme',
       runAs: 'agent',
-      kind: 'daily',
+      kind: 'repeat',
+      repeat: { every: 1, unit: 'day', days: [], between: null, overlap: 'skip' },
+      branch: 'fix/dev-build',
       time: '07:30',
       date: null,
       newWorktree: true,
@@ -849,5 +868,190 @@ describe('StartWork — When, Once', () => {
       expect.objectContaining({ kind: 'once', date: '2030-01-02' })
     )
     expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
+describe('StartWork — the Prompt tab', () => {
+  it('has its own box and no field in the title bar', async () => {
+    await open()
+    goToTab('Prompt')
+    expect(screen.queryByRole('textbox', { name: 'Search tickets or type a prompt' })).toBeNull()
+    expect(screen.getByRole('textbox', { name: 'What should it do?' })).toBeTruthy()
+  })
+
+  it('Shift+Enter adds a line and Enter starts', async () => {
+    const user = userEvent.setup()
+    const onClose = await open()
+    goToTab('Prompt')
+    useRepoFolder()
+    const box = screen.getByRole('textbox', { name: 'What should it do?' }) as HTMLTextAreaElement
+    await user.type(box, 'tidy{Shift>}{Enter}{/Shift}readme')
+    expect(box.value).toBe('tidy\nreadme')
+    expect(onClose).not.toHaveBeenCalled()
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(launched.agentInBranch).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'tidy\nreadme' })
+    )
+  })
+})
+
+describe('StartWork — My tickets with no match', () => {
+  it('offers to write the text as a prompt and keeps it', async () => {
+    await open()
+    fireEvent.change(searchBox(), { target: { value: 'zzz no such ticket' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Write it as a prompt' }))
+    const box = screen.getByRole('textbox', { name: 'What should it do?' }) as HTMLTextAreaElement
+    expect(box.value).toBe('zzz no such ticket')
+  })
+})
+
+describe('StartWork — When, Repeat', () => {
+  const choice = (name: string) => screen.getByRole('radio', { name })
+
+  it('shows three next times and how many runs a day', async () => {
+    await open()
+    typePrompt('tidy the readme')
+    fireEvent.click(choice('Repeat'))
+    fireEvent.click(screen.getByRole('button', { name: 'Every 30 min' }))
+    const next = screen.getByText(/^Next: /).textContent ?? ''
+    expect(next).toMatch(/^Next: .+ · \d+ runs a day$/)
+    expect(
+      next
+        .replace(/^Next: /, '')
+        .replace(/ · .*$/, '')
+        .split(', ')
+    ).toHaveLength(3)
+  })
+})
+
+describe('StartWork — When, Repeat, saving', () => {
+  const choice = (name: string) => screen.getByRole('radio', { name })
+
+  it('saves Every 30 min with the default window and a toggled weekday', async () => {
+    createSchedule.mockResolvedValue({ data: {} as never })
+    const onClose = await open()
+    typePrompt('tidy the readme')
+    fireEvent.click(choice('Repeat'))
+    fireEvent.click(screen.getByRole('button', { name: 'Every 30 min' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Tue' }))
+    expect(screen.getByRole('button', { name: 'Tue' }).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: /^Schedule/ }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(createSchedule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'repeat',
+        time: '09:00',
+        repeat: {
+          every: 30,
+          unit: 'minute',
+          days: [2],
+          between: { from: '09:00', to: '18:00' },
+          overlap: 'skip',
+        },
+      })
+    )
+  })
+})
+
+describe('StartWork — When, Repeat, warning', () => {
+  const choice = (name: string) => screen.getByRole('radio', { name })
+
+  it('warns when it runs more than every 5 minutes', async () => {
+    await open()
+    typePrompt('tidy the readme')
+    fireEvent.click(choice('Repeat'))
+    fireEvent.click(screen.getByRole('button', { name: 'Every 30 min' }))
+    fireEvent.change(screen.getByLabelText('Every'), { target: { value: '2' } })
+    expect(screen.getByText('Runs 288 times a day or more.')).toBeTruthy()
+  })
+})
+
+describe('StartWork — When, Repeat window ends before it starts', () => {
+  it('shows an error and disables Schedule', async () => {
+    await open()
+    typePrompt('tidy the readme')
+    fireEvent.click(screen.getByRole('radio', { name: 'Repeat' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Every 30 min' }))
+    fireEvent.change(screen.getByLabelText('To'), { target: { value: '08:00' } })
+    expect(screen.getByText('The end time must be after the start time.')).toBeTruthy()
+    const button = screen.getByRole('button', { name: /^Schedule/ }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+  })
+})
+
+describe('StartWork — When, Once in the past', () => {
+  it('shows an error and disables Schedule', async () => {
+    await open()
+    typePrompt('tidy the readme')
+    fireEvent.click(screen.getByRole('radio', { name: 'Once' }))
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2020-01-01' } })
+    expect(screen.getByText('That time has passed.')).toBeTruthy()
+    const button = screen.getByRole('button', { name: /^Schedule/ }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+  })
+})
+
+describe('StartWork — Once after a clock repeat', () => {
+  it('saves the time shown, not the repeat window start', async () => {
+    createSchedule.mockResolvedValue({ data: {} as never })
+    await open()
+    typePrompt('cut the release notes')
+    fireEvent.click(screen.getByRole('radio', { name: 'Repeat' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Every 30 min' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Once' }))
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2099-01-01' } })
+    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '17:00' } })
+    fireEvent.click(screen.getByRole('button', { name: /^Schedule/ }))
+    await waitFor(() => expect(createSchedule).toHaveBeenCalled())
+    expect(createSchedule.mock.calls.at(-1)?.[0]).toMatchObject({ kind: 'once', time: '17:00' })
+  })
+})
+
+describe('StartWork — keys on a focused control', () => {
+  it('Enter on a preset presses it and saves nothing', async () => {
+    await open()
+    typePrompt('tidy the readme')
+    fireEvent.click(screen.getByRole('radio', { name: 'Repeat' }))
+    // Not prevented: the browser turns it into a click on the preset.
+    expect(
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Hourly' }), { key: 'Enter' })
+    ).toBe(true)
+    expect(fireEvent.keyDown(screen.getByRole('button', { name: 'Hourly' }), { key: 'Tab' })).toBe(
+      true
+    )
+  })
+
+  it('Enter in the prompt box does not save a schedule Schedule refuses', async () => {
+    await open()
+    typePrompt('tidy the readme')
+    fireEvent.click(screen.getByRole('radio', { name: 'Once' }))
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2020-01-01' } })
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    expect(createSchedule).not.toHaveBeenCalled()
+  })
+})
+
+describe('whenProblem — a repeat that never runs', () => {
+  it('says so, so it cannot be saved', () => {
+    const notToday = (new Date().getDay() + 1) % 7
+    const value = { ...startingWhen('2099-01-01'), when: 'repeat' as const }
+    const rule = { ...value.rule, every: 7, unit: 'day' as const, days: [notToday], between: null }
+    expect(whenProblem({ ...value, rule })).toBe('This repeat never runs.')
+  })
+})
+
+describe('StartWork — an extension option on a repeat', () => {
+  it('is refused: each run would start a new order', async () => {
+    registerFoundryOption()
+    useExtensionCommandsRegistered()
+    await open()
+    goToTab('Prompt')
+    fireEvent.change(searchBox(), { target: { value: 'fix the build' } })
+    for (let step = 0; step < 3; step++) fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    fireEvent.click(screen.getByRole('radio', { name: 'Repeat' }))
+    expect(screen.getByText('Foundry order cannot repeat. Pick Once or Now.')).toBeTruthy()
+    const button = screen.getByRole('button', { name: /^Schedule/ }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
   })
 })

@@ -2345,3 +2345,16 @@ function theShapeStepTests() {
     expectUnavailableControlsHold()
   })
 }
+
+describe('the plan reader from the order header', () => {
+  it('opens the plan at any status and closes again', async () => {
+    mountShowing(compilable({ status: 'running' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Open plan' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Plan · WO-1' })
+    expect(
+      within(dialog).getByRole('heading', { name: /Refuse an expired refresh token/ })
+    ).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog', { name: 'Plan · WO-1' })).toBeNull()
+  })
+})

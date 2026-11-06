@@ -2,7 +2,7 @@ import { pastedLine } from '../../terminal/typed-input'
 import { answerChoice } from '../../terminal/session-controller'
 import { revealSession } from '../../terminal/navigate-to-session'
 import { useHomeFeedStore } from '../../stores/home-feed.store'
-import { useExtensionCommandsStore } from '../../stores/extension-commands.store'
+import { registeredCommandKey } from '../../stores/extension-commands.store'
 import { useToastStore } from '../../stores/toast.store'
 import { useSessionStore } from '../../stores/session.store'
 import { REVEAL_SESSION_COMMAND, type DeskAsk } from '../../home/core-asks'
@@ -87,11 +87,8 @@ export async function openAsk(ask: DeskAsk): Promise<void> {
     if (ask.sessionId) revealSession(ask.sessionId)
     return
   }
-  await useExtensionCommandsStore.getState().refresh()
-  const found = useExtensionCommandsStore
-    .getState()
-    .registered.find((c) => c.key === command || (c.extensionId === ask.source && c.id === command))
-  if (found === undefined) {
+  const key = await registeredCommandKey(ask.source, command)
+  if (key === null) {
     useToastStore.getState().addToast({
       type: 'error',
       message: 'Could not open this: the extension that sent it is not running.',
@@ -99,5 +96,5 @@ export async function openAsk(ask: DeskAsk): Promise<void> {
     return
   }
   const context = { projectId: null, sessionId: null, repoRoot: null }
-  window.electronAPI.extension.executeCommand(found.key, context, args)
+  window.electronAPI.extension.executeCommand(key, context, args)
 }

@@ -5,7 +5,7 @@ import { useSessionStore } from '../../stores/session.store'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry, type StartWorkOptionRegistration } from '../../extensions/registry'
-import { useExtensionCommandsStore } from '../../stores/extension-commands.store'
+import { registeredCommandKey } from '../../stores/extension-commands.store'
 import { startAgentInBranch, startSessionInBranch } from '../../terminal/start-session'
 import { singleQuoted } from '../../terminal/typed-input'
 import { MAX_TYPED_LINE_BYTES } from '../../quick-actions/custom-actions'
@@ -247,8 +247,10 @@ function commandFor(request: WorkRequest): string | undefined | Error {
   return command ?? new Error(PROMPT_TOO_LONG)
 }
 
-/** What an extension's start-work command is given when a ticket was chosen. */
+/** What an extension's start-work command is given when a ticket or a prompt was chosen. */
 function optionArgs(request: WorkRequest): object | undefined {
+  if (request.kind === 'prompt')
+    return { prompt: request.text, repoRoot: request.workspace.folderPath }
   if (request.kind !== 'ticket') return undefined
   const { tracker, key, title } = request.issue
   return { tracker, key, title, repoRoot: request.workspace.folderPath }
@@ -256,14 +258,10 @@ function optionArgs(request: WorkRequest): object | undefined {
 
 /** The extension's own command for this option, given the chosen ticket when there is one. */
 async function startExtensionOption(option: StartWorkOptionRegistration, request: WorkRequest) {
-  await useExtensionCommandsStore.getState().refresh()
-  const { registered } = useExtensionCommandsStore.getState()
-  const command = registered.find(
-    (c) => c.extensionId === option.extensionId && c.id === option.command
-  )
-  if (command === undefined) return `${option.label} is not turned on, so it cannot take this.`
+  const key = await registeredCommandKey(option.extensionId, option.command)
+  if (key === null) return `${option.label} is not turned on, so it cannot take this.`
   const context = { projectId: null, sessionId: null, repoRoot: request.workspace.folderPath }
-  window.electronAPI.extension.executeCommand(command.key, context, optionArgs(request))
+  window.electronAPI.extension.executeCommand(key, context, optionArgs(request))
   restoreStarted(request)
   return null
 }

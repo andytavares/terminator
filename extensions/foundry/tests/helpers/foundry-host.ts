@@ -97,7 +97,7 @@ export interface FoundryHost {
   /** Every `api.usage.record` call. */
   readonly recordUsage: ReturnType<typeof vi.fn>
   /** Palette and menu commands by id, so a spec can run one. */
-  readonly commands: Map<string, () => void>
+  readonly commands: Map<string, (context?: unknown, args?: unknown) => void>
   /** Every `gh` call goes here; git runs for real. */
   readonly gh: Mock<ShellExec>
   readonly exec: ReturnType<typeof vi.fn>
@@ -141,7 +141,7 @@ function hostParts() {
   )
   return {
     settings: new Map<string, unknown>(),
-    commands: new Map<string, () => void>(),
+    commands: new Map<string, (context?: unknown, args?: unknown) => void>(),
     workspaces: [] as Array<{ id: string; folderPath: string }>,
     gh,
     exec: vi.fn((options: Parameters<ShellExec>[0]) =>
@@ -167,10 +167,19 @@ export function disposableStub() {
 
 function hostCommands(commands: HostParts['commands']): ExtensionAPI['commands'] {
   return partialFake<ExtensionAPI['commands']>({
-    register: vi.fn((contribution: { id: string }, handler: () => void) => {
-      commands.set(contribution.id, handler)
-      return { dispose: () => commands.delete(contribution.id) }
-    }),
+    register: vi.fn(
+      (
+        contribution: { id: string; args?: { parse: (args: unknown) => unknown } },
+        handler: (context?: unknown, args?: unknown) => void
+      ) => {
+        // As core runs it (src/main/extensions/api.ts): args reach only a command that declares them.
+        const { args: schema } = contribution
+        commands.set(contribution.id, (context, args) =>
+          schema ? handler(context, schema.parse(args)) : handler(context)
+        )
+        return { dispose: () => commands.delete(contribution.id) }
+      }
+    ),
   })
 }
 

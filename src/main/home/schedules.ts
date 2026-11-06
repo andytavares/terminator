@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { basename } from 'node:path'
 import type { ExtensionDB } from '@terminator/extension-sdk'
+import { describeRepeat, latestRun, type RepeatRule } from '../../shared/recurrence.js'
 import type { HomeAsk } from '../../shared/schemas/home-feed.schema.js'
 import type { Schedule, ScheduleInput } from '../../shared/schemas/schedules.schema.js'
 
@@ -13,34 +14,51 @@ const START_GRACE_MS = 2 * 60_000
 const SCHEMA = `CREATE TABLE IF NOT EXISTS schedules (
   id TEXT PRIMARY KEY, repo_root TEXT NOT NULL, prompt TEXT NOT NULL, run_as TEXT NOT NULL,
   kind TEXT NOT NULL, time TEXT NOT NULL, date TEXT, last_run_at TEXT, created_at TEXT NOT NULL,
-  new_worktree INTEGER NOT NULL, agent_id TEXT)`
+  new_worktree INTEGER NOT NULL, agent_id TEXT, repeat TEXT, branch TEXT)`
+
+/** Columns added after the first release; CREATE TABLE IF NOT EXISTS leaves old tables without them. */
+const ADDED_COLUMNS = ['repeat', 'branch']
 
 interface Row extends Record<string, unknown> {
   id: string
   repo_root: string
   prompt: string
   run_as: string
-  kind: Schedule['kind']
+  /** Old rows hold 'daily' or 'weekdays'. */
+  kind: string
   time: string
   date: string | null
   last_run_at: string | null
   created_at: string
   new_worktree: number
   agent_id: string | null
+  repeat: string | null
+  branch: string | null
 }
+
+const EVERY_DAY: RepeatRule = { every: 1, unit: 'day', days: [], between: null, overlap: 'skip' }
+const OLD_KINDS: Record<string, RepeatRule> = {
+  daily: EVERY_DAY,
+  weekdays: { ...EVERY_DAY, days: [1, 2, 3, 4, 5] },
+}
+
+const repeatOf = (row: Row): RepeatRule | null =>
+  row.repeat === null ? (OLD_KINDS[row.kind] ?? null) : (JSON.parse(row.repeat) as RepeatRule)
 
 const toSchedule = (row: Row): Schedule => ({
   id: row.id,
   repoRoot: row.repo_root,
   prompt: row.prompt,
   runAs: row.run_as,
-  kind: row.kind,
+  kind: row.kind === 'once' ? 'once' : 'repeat',
   time: row.time,
   date: row.date,
   lastRunAt: row.last_run_at,
   createdAt: row.created_at,
   newWorktree: row.new_worktree === 1,
   agentId: row.agent_id,
+  repeat: repeatOf(row),
+  branch: row.branch,
 })
 
 export interface SchedulerDeps {
@@ -54,18 +72,14 @@ export interface SchedulerDeps {
 /** The latest moment, up to now, this schedule was meant to run (local time). */
 function latestOccurrence(schedule: Schedule, now: Date): Date | null {
   const [hours, minutes] = schedule.time.split(':').map(Number)
-  if (schedule.kind === 'once') {
-    const [year, month, day] = (schedule.date ?? '').split('-').map(Number)
-    const at = new Date(year, month - 1, day, hours, minutes)
-    return at <= now ? at : null
-  }
-  // Four days back is enough to step over a weekend.
-  for (let back = 0; back < 4; back++) {
-    const at = new Date(now.getFullYear(), now.getMonth(), now.getDate() - back, hours, minutes)
-    const weekend = at.getDay() === 0 || at.getDay() === 6
-    if (at <= now && !(schedule.kind === 'weekdays' && weekend)) return at
-  }
-  return null
+  if (schedule.repeat !== null)
+    return latestRun(
+      { rule: schedule.repeat, time: schedule.time, anchor: new Date(schedule.createdAt) },
+      now
+    )
+  const [year, month, day] = (schedule.date ?? '').split('-').map(Number)
+  const at = new Date(year, month - 1, day, hours, minutes)
+  return at <= now ? at : null
 }
 
 /** The occurrence nobody has run or skipped yet. */
@@ -75,7 +89,14 @@ function dueOccurrence(schedule: Schedule, now: Date): Date | null {
   return occurrence !== null && occurrence > handled ? occurrence : null
 }
 
-const KIND_WORDS = { once: 'once', daily: 'every day', weekdays: 'every weekday' }
+const whenWords = (schedule: Schedule): string =>
+  schedule.repeat === null
+    ? `once at ${schedule.time}`
+    : describeRepeat(schedule.repeat, schedule.time)
+
+/** A minute or hour repeat that came due while the app was closed is not worth an ask. */
+const settlesSilently = (schedule: Schedule): boolean =>
+  schedule.repeat?.unit === 'minute' || schedule.repeat?.unit === 'hour'
 
 function missedAsk(schedule: Schedule, occurrence: Date): HomeAsk {
   return {
@@ -83,7 +104,7 @@ function missedAsk(schedule: Schedule, occurrence: Date): HomeAsk {
     kind: 'task',
     title: 'Scheduled run missed',
     detail: schedule.prompt,
-    where: `${basename(schedule.repoRoot)} · ${KIND_WORDS[schedule.kind]} at ${schedule.time}`,
+    where: `${basename(schedule.repoRoot)} · ${whenWords(schedule)}`,
     facts: [`Was due ${occurrence.toLocaleString()}, while Terminator was closed`],
     workKey: null,
     since: occurrence.toISOString(),
@@ -106,16 +127,29 @@ function hasPassed(input: ScheduleInput, now: Date): boolean {
 }
 
 function insertSchedule(db: ExtensionDB, schedule: Schedule): Promise<unknown> {
-  return db.run('INSERT INTO schedules VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
-    ...[schedule.id, schedule.repoRoot, schedule.prompt, schedule.runAs, schedule.kind],
-    ...[schedule.time, schedule.date, null, schedule.createdAt],
-    ...[schedule.newWorktree ? 1 : 0, schedule.agentId],
-  ])
+  const columns =
+    'id, repo_root, prompt, run_as, kind, time, date, last_run_at, created_at, new_worktree, agent_id, repeat, branch'
+  return db.run(
+    `INSERT INTO schedules (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      ...[schedule.id, schedule.repoRoot, schedule.prompt, schedule.runAs, schedule.kind],
+      ...[schedule.time, schedule.date, null, schedule.createdAt],
+      ...[schedule.newWorktree ? 1 : 0, schedule.agentId],
+      ...[schedule.repeat === null ? null : JSON.stringify(schedule.repeat), schedule.branch],
+    ]
+  )
+}
+
+async function addMissingColumns(db: ExtensionDB): Promise<void> {
+  await db.exec(SCHEMA)
+  const have = (await db.query<{ name: string }>('PRAGMA table_info(schedules)')).map((c) => c.name)
+  for (const column of ADDED_COLUMNS)
+    if (!have.includes(column)) await db.exec(`ALTER TABLE schedules ADD COLUMN ${column} TEXT`)
 }
 
 function createScheduleStore({ db, now }: Pick<SchedulerDeps, 'db' | 'now'>) {
   return {
-    init: async (): Promise<void> => void (await db.exec(SCHEMA)),
+    init: () => addMissingColumns(db),
     list: async (): Promise<Schedule[]> =>
       (await db.query<Row>('SELECT * FROM schedules ORDER BY created_at')).map(toSchedule),
     async create(input: ScheduleInput): Promise<Schedule> {
@@ -173,11 +207,11 @@ async function scanSchedules(deps: ScanDeps, graceMs: number): Promise<void> {
   for (const schedule of await store.list()) {
     const occurrence = missed.has(schedule.id) ? null : dueOccurrence(schedule, now())
     if (occurrence === null) continue
-    if (now().getTime() - occurrence.getTime() > graceMs) missed.add(schedule, occurrence)
-    else {
+    if (now().getTime() - occurrence.getTime() <= graceMs) {
       await store.settle(schedule)
       start(schedule)
-    }
+    } else if (settlesSilently(schedule)) await store.settle(schedule)
+    else missed.add(schedule, occurrence)
   }
   missed.publishAll()
 }

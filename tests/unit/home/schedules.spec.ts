@@ -18,7 +18,9 @@ const daily: ScheduleInput = {
   repoRoot: '/repo',
   prompt: 'Triage the inbox',
   runAs: 'agent',
-  kind: 'daily',
+  kind: 'repeat',
+  repeat: { every: 1, unit: 'day', days: [], between: null, overlap: 'skip' },
+  branch: 'scheduled/triage',
   time: '09:00',
   date: null,
   newWorktree: true,
@@ -84,7 +86,14 @@ describe('saving a schedule', () => {
     const s = scheduler()
     await s.init()
     await expect(
-      s.create({ ...daily, kind: 'once', date: '2026-11-04', time: '07:00' })
+      s.create({
+        ...daily,
+        kind: 'once',
+        repeat: null,
+        branch: null,
+        date: '2026-11-04',
+        time: '07:00',
+      })
     ).rejects.toThrow('That time has passed')
     expect(await s.list()).toEqual([])
   })
@@ -121,7 +130,7 @@ describe('the tick', () => {
 describe('the tick, by day', () => {
   it('skips Saturday and Sunday for weekdays', async () => {
     clock = at('2026-11-07T08:00:00') // Saturday
-    const s = await withSchedule({ ...daily, kind: 'weekdays' })
+    const s = await withSchedule({ ...daily, repeat: { ...daily.repeat!, days: [1, 2, 3, 4, 5] } })
     for (const day of ['2026-11-07', '2026-11-08']) {
       clock = at(`${day}T09:00:00`)
       await s.tick()
@@ -133,7 +142,13 @@ describe('the tick, by day', () => {
   })
 
   it('runs a one-time schedule once, then removes it', async () => {
-    const s = await withSchedule({ ...daily, kind: 'once', date: '2026-11-04' })
+    const s = await withSchedule({
+      ...daily,
+      kind: 'once',
+      repeat: null,
+      branch: null,
+      date: '2026-11-04',
+    })
     clock = at('2026-11-04T09:00:00')
     await s.tick()
     clock = at('2026-11-04T09:01:00')
@@ -173,8 +188,93 @@ describe('answering a missed run', () => {
   })
 
   it('drops a skipped one-time schedule', async () => {
-    const s = await closedOverNine({ ...daily, kind: 'once', date: '2026-11-04' })
+    const s = await closedOverNine({
+      ...daily,
+      kind: 'once',
+      repeat: null,
+      branch: null,
+      date: '2026-11-04',
+    })
     await s.act(asks[0].id, 'skip')
     expect(await s.list()).toEqual([])
+  })
+})
+
+async function oldRow(kind: string) {
+  await db.exec(`CREATE TABLE schedules (
+    id TEXT PRIMARY KEY, repo_root TEXT NOT NULL, prompt TEXT NOT NULL, run_as TEXT NOT NULL,
+    kind TEXT NOT NULL, time TEXT NOT NULL, date TEXT, last_run_at TEXT, created_at TEXT NOT NULL,
+    new_worktree INTEGER NOT NULL, agent_id TEXT)`)
+  await db.run(
+    `INSERT INTO schedules (id, repo_root, prompt, run_as, kind, time, date, last_run_at, created_at, new_worktree, agent_id)
+     VALUES ('old', '/repo', 'Triage', 'agent', ?, '09:00', NULL, NULL, ?, 1, NULL)`,
+    [kind, clock.toISOString()]
+  )
+  const s = scheduler()
+  await s.init()
+  return s
+}
+
+describe('rows saved before repeat rules', () => {
+  it('reads daily as a repeat every day', async () => {
+    const s = await oldRow('daily')
+    expect(await s.list()).toMatchObject([
+      { kind: 'repeat', repeat: { every: 1, unit: 'day', days: [], overlap: 'skip' } },
+    ])
+  })
+
+  it('reads weekdays as a repeat Monday to Friday', async () => {
+    const s = await oldRow('weekdays')
+    expect(await s.list()).toMatchObject([
+      { kind: 'repeat', repeat: { unit: 'day', days: [1, 2, 3, 4, 5] } },
+    ])
+  })
+
+  it('adds the new columns to a table that already exists', async () => {
+    const s = await oldRow('daily')
+    await s.init()
+    expect((await s.list())[0].branch).toBeNull()
+  })
+})
+
+const everyHalfHour: ScheduleInput = {
+  ...daily,
+  time: '09:00',
+  repeat: {
+    every: 30,
+    unit: 'minute',
+    days: [],
+    between: { from: '09:00', to: '18:00' },
+    overlap: 'skip',
+  },
+}
+
+describe('a repeat on an interval', () => {
+  it('comes due on each interval and not between', async () => {
+    const s = await withSchedule(everyHalfHour)
+    for (const time of ['09:00', '09:10', '09:30', '09:31']) {
+      clock = at(`2026-11-04T${time}:00`)
+      await s.tick()
+    }
+    expect(started).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('a repeat missed while the app was closed', () => {
+  it('settles a missed hour repeat without an ask', async () => {
+    const s = await closedOverNine({
+      ...everyHalfHour,
+      repeat: { ...everyHalfHour.repeat!, every: 1, unit: 'hour' },
+    })
+    await s.tick()
+    expect(started).not.toHaveBeenCalled()
+    expect(asks).toEqual([])
+  })
+
+  it('asks once about a missed day repeat, in words', async () => {
+    const s = await closedOverNine()
+    await s.tick()
+    expect(asks).toHaveLength(1)
+    expect(asks[0].where).toBe('repo · every day at 09:00')
   })
 })

@@ -19,7 +19,6 @@ import { REVEAL_SESSION_COMMAND, type DeskAsk } from '../../../../src/renderer/h
 import { useHomeFeedStore } from '../../../../src/renderer/stores/home-feed.store'
 import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
-import { useExtensionCommandsStore } from '../../../../src/renderer/stores/extension-commands.store'
 
 const HOUR = 3_600_000
 const MORNING = new Date(2026, 9, 18, 10, 40).getTime()
@@ -131,19 +130,17 @@ describe('openAsk', () => {
 
   it("runs an extension ask's open command, found by id within its extension", async () => {
     const executeCommand = vi.fn()
-    installElectronApi({ extension: { executeCommand } })
-    useExtensionCommandsStore.setState({
-      refresh: vi.fn().mockResolvedValue(undefined),
-      registered: [{ key: 'foundry.k1', extensionId: 'foundry', id: 'open-order', label: 'Open' }],
-    })
+    // A command that takes args is in no quick-action list; core says whether it is registered.
+    const hasCommand = vi.fn(async (key: string) => key === 'foundry.command.show-order')
+    installElectronApi({ extension: { executeCommand, hasCommand } })
     const extensionAsk = ask({
       source: 'foundry',
       sessionId: undefined,
-      open: { command: 'open-order', args: { orderId: 'o1' } },
+      open: { command: 'show-order', args: { orderId: 'o1' } },
     })
     await openAsk(extensionAsk)
     expect(executeCommand).toHaveBeenCalledWith(
-      'foundry.k1',
+      'foundry.command.show-order',
       { projectId: null, sessionId: null, repoRoot: null },
       { orderId: 'o1' }
     )
@@ -174,9 +171,8 @@ describe('terminalExcerpt', () => {
 
 describe('openAsk — nothing to run it', () => {
   it('says so in plain words', async () => {
-    useExtensionCommandsStore.setState({
-      refresh: vi.fn().mockResolvedValue(undefined),
-      registered: [],
+    installElectronApi({
+      extension: { executeCommand: vi.fn(), hasCommand: vi.fn(async () => false) },
     })
     await openAsk(ask({ source: 'foundry', sessionId: undefined, open: { command: 'gone' } }))
     expect(useToastStore.getState().toasts.map((t) => t.message)).toContain(

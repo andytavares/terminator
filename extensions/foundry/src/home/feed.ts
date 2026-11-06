@@ -76,7 +76,7 @@ function askOf({ order, standing, gate, since }: OrderRow): HomeAsk {
     workKey: foundryWorkKeyOf(order),
     since,
     actions: movesOf(gate),
-    open: { command: 'open-order', args: { orderId: order.id } },
+    open: { command: 'show-order', args: { orderId: order.id } },
   }
 }
 
