@@ -2,6 +2,10 @@
 
 <!-- One paragraph: what changed and why. Describe the decision, not the diff. -->
 
+## Release notes
+
+<!-- Bullets for people who use the app, in plain words. The release uses this section as its notes. Write "Internal changes only." when users see nothing new. -->
+
 ## How to test
 
 <!-- Steps a reviewer follows to verify the behavior. Name what to look for. -->
