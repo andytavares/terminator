@@ -154,6 +154,7 @@ beforeEach(() => {
     extension: {
       executeCommand,
       getCommands: vi.fn(async () => ({ commands: [] })),
+      hasCommand: vi.fn(async () => false),
       list: vi.fn(async () => ({ extensions: [] })),
     },
   })
@@ -439,16 +440,9 @@ function useExtensionCommandsRegistered(): void {
     agents: { list: agentsList },
     extension: {
       executeCommand,
-      getCommands: vi.fn(async () => ({
-        commands: [
-          {
-            key: 'x.command.new-order',
-            extensionId: 'x',
-            id: 'new-order',
-            label: 'New work order…',
-          },
-        ],
-      })),
+      // As core answers: a command that takes args is in no quick-action list, only registered.
+      getCommands: vi.fn(async () => ({ commands: [] })),
+      hasCommand: vi.fn(async (key: string) => key === 'x.command.new-order'),
       list: vi.fn(async () => ({ extensions: [] })),
     },
   })

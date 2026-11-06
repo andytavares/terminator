@@ -63,17 +63,16 @@ function setPending(request: PendingRequest): void {
   pendingTimer = setTimeout(clearPendingNewOrder, 5000)
 }
 
-/** The palette's fixed commands: a new work order, the view toggle, and opening Foundry from Home. */
+/** The palette's fixed commands, and the two that Start work and Home call with arguments. */
 export function registerCommands(api: ExtensionAPI, forge: Pick<ForgeChannels, 'create'>): void {
   disposables.push(
     api.commands.register(
-      {
-        id: 'new-order',
-        label: 'New work order…',
-        category: 'Foundry',
-        mnemonic: 'n',
-        args: NewOrderArgs,
-      },
+      { id: 'new-order', label: 'New work order…', category: 'Foundry', mnemonic: 'n' },
+      () => openNewOrder(api)
+    ),
+    // Start work's "Foundry order": a command with args is no quick action (src/main/extensions/api.ts).
+    api.commands.register(
+      { id: 'start-order', label: 'Start a work order', category: 'Foundry', args: NewOrderArgs },
       (_context, args?: unknown) => {
         const source = sourceOf(args)
         if (source === null) openNewOrder(api)
@@ -81,16 +80,18 @@ export function registerCommands(api: ExtensionAPI, forge: Pick<ForgeChannels, '
       }
     )
   )
-
   registerOpenOrder(api)
   registerToggleView(api)
 }
 
-// Home's "Open" on a Foundry item: bring Foundry forward and open that order in its list.
+// The palette's "Open Foundry", and Home's "Open" on a Foundry item, which names the order.
 function registerOpenOrder(api: ExtensionAPI): void {
   disposables.push(
+    api.commands.register({ id: 'open-order', label: 'Open Foundry', category: 'Foundry' }, () =>
+      api.window.showSelf('main')
+    ),
     api.commands.register(
-      { id: 'open-order', label: 'Open Foundry', category: 'Foundry', args: OpenOrderArgs },
+      { id: 'show-order', label: 'Show a work order', category: 'Foundry', args: OpenOrderArgs },
       (_context, args?: unknown) => {
         api.window.showSelf('main')
         const orderId = (args as { orderId?: unknown } | undefined)?.orderId

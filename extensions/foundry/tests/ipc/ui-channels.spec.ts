@@ -71,7 +71,7 @@ describe('a new work order asked for from the palette', () => {
 })
 
 describe('an order opened from Start work or Home before the view exists', () => {
-  const start = (args: unknown) => host.commands.get('new-order')?.({}, args)
+  const start = (args: unknown) => host.commands.get('start-order')?.({}, args)
 
   it('leaves the order for the view to read on mount, from a ticket', async () => {
     create.mockResolvedValue({ order: { id: 'WO-7' } })
@@ -98,10 +98,10 @@ describe('an order opened from Start work or Home before the view exists', () =>
 describe('Home Open on an order before the view exists', () => {
   it('is left for the view, and forgotten after five seconds', async () => {
     vi.useFakeTimers()
-    host.commands.get('open-order')?.({}, { orderId: 'WO-9' })
+    host.commands.get('show-order')?.({}, { orderId: 'WO-9' })
     vi.advanceTimersByTime(5_000)
     expect(await host.call('foundry:ui.consume-pending-new-order')).toEqual({ pending: null })
-    host.commands.get('open-order')?.({}, { orderId: 'WO-9' })
+    host.commands.get('show-order')?.({}, { orderId: 'WO-9' })
     expect(await host.call('foundry:ui.consume-pending-new-order')).toEqual({
       pending: { kind: 'order', orderId: 'WO-9' },
     })
