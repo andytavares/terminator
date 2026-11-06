@@ -11,6 +11,7 @@ import { useMetricsStore } from '../stores/metrics.store'
 import { useActiveScope } from '../quick-actions/use-active-scope'
 import { useBranchSync } from '../hooks/useBranchSync'
 import { useAgentAttention } from './agent-attention'
+import { useScheduledRuns } from '../components/home/start-work-schedule'
 
 // What the window loads when it opens, and what it keeps in step with the
 // stores for as long as it is open.
@@ -49,6 +50,7 @@ export function useInitialLoad(): void {
 
   useTasks()
   useHomeFeed()
+  useScheduledRuns()
 
   // Read before the first ⌘P, so the keys typed straight after it find them,
   // and again whenever a backend registers or drops a command.

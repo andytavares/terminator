@@ -1,12 +1,15 @@
 import { defineChannel, validationError, type ChannelSpec } from '@terminator/extension-sdk'
 import { registerInvokeTable, noPayload } from './invoke-table.js'
+import { knownAgentStatuses } from '../agents/acp/agent-registry.js'
 import { agentService } from '../agents/acp/agent-service-instance.js'
 import {
   AgentAnswerInputSchema,
   AgentPromptInputSchema,
+  AgentQueueInputSchema,
   AgentSessionInputSchema,
   AgentSetConfigInputSchema,
   AgentStartInputSchema,
+  AgentSteerInputSchema,
 } from '../../shared/schemas/agents.schema.js'
 
 // Core-only. The renderer's side of the agents over ACP; the pushes (`agents:update`,
@@ -20,6 +23,12 @@ const agentChannels: ChannelSpec[] = [
     run: async () => ({ data: await agentService().list() }),
   }),
   defineChannel({
+    channel: 'agents:known',
+    schema: noPayload,
+    invalid: validationError,
+    run: async () => ({ data: await knownAgentStatuses() }),
+  }),
+  defineChannel({
     channel: 'agents:start',
     schema: AgentStartInputSchema,
     invalid: validationError,
@@ -29,7 +38,33 @@ const agentChannels: ChannelSpec[] = [
     channel: 'agents:prompt',
     schema: AgentPromptInputSchema,
     invalid: validationError,
-    run: async ({ sessionId, text }) => ({ data: await agentService().prompt(sessionId, text) }),
+    run: async ({ sessionId, text, images }) => ({
+      data: await agentService().prompt(sessionId, text, images),
+    }),
+  }),
+  defineChannel({
+    channel: 'agents:steer',
+    schema: AgentSteerInputSchema,
+    invalid: validationError,
+    run: async ({ sessionId, text }) => {
+      await agentService().steer(sessionId, text)
+      return { data: true }
+    },
+  }),
+  defineChannel({
+    channel: 'agents:queue-get',
+    schema: AgentSessionInputSchema,
+    invalid: validationError,
+    run: ({ sessionId }) => ({ data: agentService().queueOf(sessionId) }),
+  }),
+  defineChannel({
+    channel: 'agents:queue-set',
+    schema: AgentQueueInputSchema,
+    invalid: validationError,
+    run: ({ sessionId, messages }) => {
+      agentService().queueSet(sessionId, messages)
+      return { data: true }
+    },
   }),
   defineChannel({
     channel: 'agents:cancel',

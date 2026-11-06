@@ -54,6 +54,7 @@ describe('useInitialLoad: the Home feed', () => {
     const load = vi.fn().mockResolvedValue(undefined)
     const subscribe = vi.fn(() => unsubscribe)
     installElectronApi({
+      schedules: { onRun: () => () => {} },
       terminal: { onProcessExit: () => () => {} },
       extension: { onCommandsChanged: () => () => {} },
     })

@@ -12,7 +12,7 @@ import { LeafPane } from './LeafPane'
 import { leafIds } from '../../utils/pane-tree'
 import './TerminalPane.css'
 import { droppedPaths } from './dropped-paths'
-import { AgentView } from '../agent/AgentView'
+import { LazyAgentView } from '../agent/LazyAgentView'
 
 interface Props {
   projectId: string
@@ -215,7 +215,8 @@ function SingleTab({
   if (!showsAgent || !shownSessionId) return <SingleTerminal {...terminal} />
   return (
     <div className="terminal-pane">
-      <AgentView sessionId={shownSessionId} />
+      {/* Keyed: each session's draft, queue and attachments are its own. */}
+      <LazyAgentView key={shownSessionId} sessionId={shownSessionId} />
     </div>
   )
 }

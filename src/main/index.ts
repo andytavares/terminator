@@ -39,6 +39,7 @@ import { startAskWatcher } from './agents/ask-watcher.js'
 import { registerAgentUsageHandlers } from './ipc/agent-usage.ipc.js'
 import { registerThreadSummaryHandler } from './ipc/thread-summary.ipc.js'
 import { registerHomeFeedHandlers } from './ipc/home-feed.ipc.js'
+import { registerScheduleHandlers } from './ipc/schedules.ipc.js'
 import { ensureHookScript } from './integrations/context-sync.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
 import { startAdoptingLoginShellPath } from './shell/login-shell-path.js'
@@ -217,6 +218,26 @@ function extensionViewMenuItems(): Electron.MenuItemConstructorOptions[] {
   )
 }
 
+/** A menu item for a key the renderer handles itself: it shows the accelerator and presses the key,
+ * so the renderer keeps the one handler. `registerAccelerator: false` lets the real key reach the page. */
+function pressedKeyItem(
+  label: string,
+  accelerator: string,
+  keyCode: string
+): Electron.MenuItemConstructorOptions {
+  return {
+    label,
+    accelerator,
+    registerAccelerator: false,
+    click: () =>
+      mainWindow?.webContents.sendInputEvent({
+        type: 'keyDown',
+        keyCode,
+        modifiers: ['meta', 'alt'],
+      }),
+  }
+}
+
 function buildViewSubmenu(): Electron.MenuItemConstructorOptions[] {
   const extItems = extensionViewMenuItems()
   return [
@@ -225,6 +246,10 @@ function buildViewSubmenu(): Electron.MenuItemConstructorOptions[] {
       accelerator: 'CmdOrCtrl+B',
       click: () => mainWindow?.webContents.send('menu:toggle-sidebar'),
     },
+    { type: 'separator' },
+    pressedKeyItem('Go Back', 'CmdOrCtrl+Alt+Left', 'Left'),
+    pressedKeyItem('Go Forward', 'CmdOrCtrl+Alt+Right', 'Right'),
+    pressedKeyItem('Reopen Closed Tab', 'CmdOrCtrl+Alt+T', 'T'),
     { type: 'separator' },
     ...extItems,
     ...(extItems.length > 0 ? [{ type: 'separator' as const }] : []),
@@ -400,6 +425,7 @@ function registerSessionHandlers(): OutputRelay {
   registerAgentUsageHandlers()
   registerThreadSummaryHandler()
   registerHomeFeedHandlers(() => mainWindow)
+  registerScheduleHandlers(() => mainWindow)
   return terminalRelay
 }
 

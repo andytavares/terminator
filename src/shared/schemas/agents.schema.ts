@@ -13,7 +13,18 @@ export const AgentStartInputSchema = z.object({
 
 export const AgentSessionInputSchema = z.object({ sessionId: SessionId })
 
-export const AgentPromptInputSchema = z.object({ sessionId: SessionId, text: z.string() })
+export const AgentPromptInputSchema = z.object({
+  sessionId: SessionId,
+  text: z.string(),
+  images: z.array(z.object({ mimeType: z.string().min(1), data: z.string().min(1) })).optional(),
+})
+
+export const AgentSteerInputSchema = z.object({ sessionId: SessionId, text: z.string() })
+
+export const AgentQueueInputSchema = z.object({
+  sessionId: SessionId,
+  messages: z.array(z.string()),
+})
 
 export const AgentAnswerInputSchema = z.object({
   sessionId: SessionId,
@@ -26,3 +37,12 @@ export const AgentSetConfigInputSchema = z.object({
   configId: z.string().min(1),
   value: z.string(),
 })
+
+/** A preset agent and whether its binary is on the user's PATH; the answer of `agents:known`. */
+export interface KnownAgentStatus {
+  id: string
+  label: string
+  command: string
+  args: string[]
+  installed: boolean
+}

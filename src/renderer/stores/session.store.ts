@@ -1,6 +1,7 @@
 import { create, type StoreApi } from 'zustand'
 import type { ChoicePrompt, TerminalSession, PaneNode } from '../../shared/types/index'
 import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
+import { useNavigationStore } from './navigation.store'
 import type { AgentAsk } from '../../shared/agent-sessions/ask'
 import {
   splitLeaf,
@@ -184,6 +185,8 @@ interface SessionState {
     tabTitle: string
     scrollbackLimit: number
     surface?: 'terminal' | 'agent'
+    /** Where it runs; an agent tab shows paths relative to it. */
+    cwd?: string
   }) => void
   closeSession: (sessionId: string) => Promise<void>
   /** Forget a deleted project's tabs; the main process already ended them. */
@@ -285,6 +288,7 @@ function newSessionRecord(
     status: 'active',
     type: request.type,
     scrollbackLimit: request.scrollbackLimit,
+    cwd: request.cwd,
     createdAt,
     parentSessionId: request.parentSessionId,
     // A session with no recorded activity is treated as last active when it
@@ -338,6 +342,7 @@ function adoptedSession(s: SessionData, adopted: Adopted): Partial<SessionData> 
     type: 'agent',
     scrollbackLimit: adopted.scrollbackLimit,
     surface: adopted.surface,
+    ...(adopted.cwd === undefined ? {} : { cwd: adopted.cwd }),
     createdAt,
     lastActivityAt: Date.parse(createdAt),
     agentState: 'idle',
@@ -412,6 +417,10 @@ async function closeSession(set: SetSessions, get: GetSessions, sessionId: strin
   // Dispose xterm instance before removing from store
   const instance = get().terminalInstances.get(sessionId)
   instance?.dispose?.()
+  if (session.cwd) {
+    const { projectId, cwd, tabTitle: title } = session
+    useNavigationStore.getState().rememberClosed({ projectId, cwd, title })
+  }
   await window.electronAPI.terminal.close(sessionId)
   set((s) => withoutSession(s, sessionId))
 }

@@ -16,6 +16,7 @@ import { runGit } from '../../shell/run-git.js'
 import { VALIDATION_ERROR } from '../register.js'
 import { catchError, type AccessibleRepo, type GithubContext } from './context.js'
 import { storedSessionsForRepo, storedSessions } from './sessions.js'
+import { prWatchReads } from './pr-watch-reads.js'
 
 type SectionResults = Record<string, { issueCount?: number; nodes?: unknown[] }>
 
@@ -207,7 +208,7 @@ export async function runDashboardSearch(ctx: GithubContext) {
     failed: [...results.failed].map(([section, error]) => ({ section, error })),
     scopedTo: repos.length,
   }
-  ctx.options.onDashboard?.(answer)
+  ctx.options.onDashboard?.(answer, prWatchReads(ctx))
   return answer
 }
 

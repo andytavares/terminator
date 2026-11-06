@@ -300,6 +300,7 @@ function quietParts() {
       getProcesses: async () => ({ data: [] }),
     },
     git: { currentBranch: async () => ({ branch: 'main' }) },
+    schedules: { onRun: () => () => {} },
     usage: {
       recordUse: async () => ({ data: true as const }),
       declare: async () => ({ data: true as const }),

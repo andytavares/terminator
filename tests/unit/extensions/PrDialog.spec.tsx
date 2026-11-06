@@ -43,6 +43,7 @@ const defaultProps = {
   repoRoot: '/repo',
   branch: 'feature/my-feature',
   existingPr: null,
+  hasStagedChanges: false,
   onClose: vi.fn(),
   onCreated: vi.fn(),
 }

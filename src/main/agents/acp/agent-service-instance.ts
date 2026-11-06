@@ -6,6 +6,7 @@ import { createAgentLog } from './agent-log.js'
 import { createConnector } from './agent-connection.js'
 import { listAgents } from './agent-registry.js'
 import { recordAgentTab } from './record-agent-tab.js'
+import { listRecords } from '../../sessions/session-record-store.js'
 import { createAgentService, type AgentService } from './agent-service.js'
 
 let service: AgentService | undefined
@@ -28,6 +29,7 @@ export function startAgentService(
     broadcast,
     recordTab: (session) => recordAgentTab(session, () => new Date().toISOString()),
     now: Date.now,
+    conversations: () => listRecords().flatMap((record) => (record.agent ? [record.agent] : [])),
   })
   return service
 }

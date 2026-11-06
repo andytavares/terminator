@@ -5,6 +5,8 @@ import { useExtensionRegistry } from '../extensions/registry'
 import { dispatchNotification } from '../lib/notifications'
 import { agentStateOf } from '../sidebar/agent-state'
 import { isBrokenOut } from '../stores/breakout.store'
+import { useNavigationStore } from '../stores/navigation.store'
+import { useToastStore } from '../stores/toast.store'
 
 /** Leaves whatever global/workspace/project tab is showing, the way every
  * "go to session" path must (see navigate-to-session.ts's revealSession). */
@@ -139,6 +141,29 @@ export function newTerminalTab(effectiveProjectId: string | null, deps: NewTabDe
       scrollbackLimit: settings.terminal.scrollbackLimit,
     })
     .catch(() => {})
+}
+
+let scrollbackNoteShown = false
+
+/** Opens a fresh terminal where the last closed one was; says once that its scrollback is gone. */
+export function reopenClosedTab(deps: NewTabDeps): void {
+  const tab = useNavigationStore.getState().takeClosed()
+  if (!tab) return
+  const settings = deps.resolveSettings(deps.activeWorkspaceId)
+  void deps
+    .createSession({
+      projectId: tab.projectId,
+      type: 'human',
+      title: tab.title,
+      cwd: tab.cwd,
+      scrollbackLimit: settings.terminal.scrollbackLimit,
+    })
+    .catch(() => {})
+  if (scrollbackNoteShown) return
+  scrollbackNoteShown = true
+  useToastStore
+    .getState()
+    .addToast({ type: 'info', message: 'Reopened in the same folder. Scrollback is not restored.' })
 }
 
 export interface SplitDeps {

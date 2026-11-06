@@ -5,6 +5,7 @@ import type {
   AgentScope,
   SummaryKind,
   SummaryResult,
+  DraftResult,
 } from '../schemas/review-agent.schema'
 import { invoke } from '@terminator/extension-sdk/renderer'
 
@@ -51,6 +52,8 @@ export const reviewAgentAPI = {
   settings: () => bridge().invoke('review-agent:settings', {}),
 
   summarize: (input: SummarizeInput) => invoke<SummaryResult>('review-agent:summarize', input),
+
+  draftChange: (repoRoot: string) => invoke<DraftResult>('review-agent:draft-change', { repoRoot }),
 
   onEvent: (cb: (payload: { run: AgentRun }) => void) =>
     bridge().on('review-agent:event', (data: unknown) => cb(data as { run: AgentRun })),

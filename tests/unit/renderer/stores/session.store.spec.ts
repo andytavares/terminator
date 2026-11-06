@@ -15,6 +15,7 @@ Object.defineProperty(globalThis, 'window', {
   writable: true,
 })
 
+import { useNavigationStore } from '../../../../src/renderer/stores/navigation.store'
 import {
   useSessionStore,
   type NewSessionRequest,
@@ -202,6 +203,26 @@ describe('useSessionStore — closeSession', () => {
     mockElectronAPI.terminal.close.mockResolvedValue({})
     await useSessionStore.getState().closeSession('sess-1')
     expect(dispose).toHaveBeenCalled()
+  })
+})
+
+describe('useSessionStore — closeSession — reopening', () => {
+  setUpUseSessionStore()
+
+  it('remembers a closed terminal for reopening, when it knows its folder', async () => {
+    useNavigationStore.setState(useNavigationStore.getInitialState(), true)
+    useSessionStore.setState({
+      sessions: new Map([
+        ['sess-1', makeSession({ cwd: '/work/api', tabTitle: 'Terminal 3' })],
+        ['sess-2', makeSession({ id: 'sess-2' })],
+      ]),
+    })
+    mockElectronAPI.terminal.close.mockResolvedValue({})
+    await useSessionStore.getState().closeSession('sess-1')
+    await useSessionStore.getState().closeSession('sess-2')
+    expect(useNavigationStore.getState().closedTabs).toEqual([
+      { projectId: 'proj-1', cwd: '/work/api', title: 'Terminal 3' },
+    ])
   })
 
   it('clears bell count for closed session', async () => {
@@ -1040,6 +1061,11 @@ function setUpAdoptSession(): void {
 
 describe('adoptSession', () => {
   setUpAdoptSession()
+
+  it('keeps the folder it runs in, so an agent tab can show paths relative to it', () => {
+    useSessionStore.getState().adoptSession({ ...adopted, cwd: '/repo/.worktrees/x' })
+    expect(useSessionStore.getState().sessions.get('terminal-1')?.cwd).toBe('/repo/.worktrees/x')
+  })
 
   it('records it as an agent’s terminal', () => {
     useSessionStore.getState().adoptSession(adopted)

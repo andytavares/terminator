@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from '@terminator/extension-sdk'
 import type { GitSettings } from './ipc/git.ipc.js'
+import type { CleanupSettings, KeepMode } from './git/cleanup-plan.js'
 
 const SETTING = 'terminator.git-integration.git'
 
@@ -33,4 +34,19 @@ function clampedFileLimit(stored: unknown): number {
   const value = Number(stored)
   if (stored === '' || !Number.isFinite(value)) return MAX_DISPLAYED_FILES.default
   return Math.min(MAX_DISPLAYED_FILES.max, Math.max(MAX_DISPLAYED_FILES.min, Math.round(value)))
+}
+
+const WORKTREES = 'terminator.git-integration.worktrees'
+
+/** The Worktrees cleanup rules, read on every call; all off unless the user turned one on. */
+export function cleanupSettings(api: ExtensionAPI): CleanupSettings {
+  const flag = (name: string) => api.settings.get<boolean>(`${WORKTREES}.${name}`) === true
+  const keep = api.settings.get<KeepMode>(`${WORKTREES}.keep`)
+  return {
+    removeAfterMerge: flag('removeAfterMerge'),
+    idleDays: Math.max(0, Number(api.settings.get<number>(`${WORKTREES}.idleDays`)) || 0),
+    removeUnchanged: flag('removeUnchanged'),
+    removeWithClosedSessions: flag('removeWithClosedSessions'),
+    keep: keep === 'any-local' || keep === 'edited-tracked' ? keep : 'uncommitted',
+  }
 }

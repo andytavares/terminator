@@ -9,6 +9,7 @@ const STORE_NAMES = [
   'pr-review-sessions',
   'pr-active-reviews',
   'pr-agent-reviews',
+  'pr-watch',
 ] as const
 
 type StoreName = (typeof STORE_NAMES)[number]

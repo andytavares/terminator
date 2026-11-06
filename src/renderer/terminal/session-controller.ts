@@ -171,6 +171,7 @@ export function adoptTerminalSession(adopted: {
   tabTitle: string
   scrollbackLimit: number
   surface?: 'terminal' | 'agent'
+  cwd?: string
 }): void {
   const store = useSessionStore.getState()
   if (store.sessions.has(adopted.sessionId)) return

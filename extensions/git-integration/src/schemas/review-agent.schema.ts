@@ -89,3 +89,16 @@ export const SummaryOutputSchema = z.object({ summary: z.string() })
 
 /** review-agent:summarize's answer: the summary, or why there is none, in plain words. */
 export type SummaryResult = { summary: string } | { error: string }
+
+/** What the agent returns when it drafts a commit and its pull request from the staged diff. */
+export const DraftOutputSchema = z.object({
+  branch: z.string().trim().min(1),
+  commitMessage: z.string().trim().min(1),
+  title: z.string().trim().min(1),
+  body: z.string(),
+})
+
+export type ChangeDraft = z.infer<typeof DraftOutputSchema>
+
+/** review-agent:draft-change's answer: the draft, or why there is none, in plain words. */
+export type DraftResult = { draft: ChangeDraft } | { error: string }

@@ -17,6 +17,13 @@ import { githubAPI } from '../../api/github'
 import { mergeFlowAPI } from '../../api/merge-flow'
 import { RichContent } from './RichContent'
 import { OverviewSummary, useSummary, type Summary } from './OverviewSummary'
+import {
+  MergeStackButton,
+  RevertButton,
+  useRevert,
+  useStackMerge,
+  useStackPlan,
+} from './MergeStack'
 import { ReadinessStrip, type ReadinessBranch } from './ReadinessStrip'
 import { ReviewPlan } from './ReviewPlan'
 import { PropertiesRail } from './PropertiesRail'
@@ -131,7 +138,13 @@ function useOverviewActions(props: Props, loadIssueComments: (prNumber: number) 
   const update = useBusyAction()
   const merge = useBusyAction()
   const { repoRoot, pr, onRefresh } = props
+  const plan = useStackPlan(repoRoot, pr)
+  const stackMerge = useStackMerge(props)
+  const revert = useRevert(repoRoot, pr)
   return {
+    plan,
+    stackMerge,
+    revert,
     refresh,
     markReady,
     update,
@@ -276,14 +289,19 @@ interface HeaderProps {
   label: string
 }
 
+const STATE_LABEL = { merged: 'Merged', closed: 'Closed', draft: 'Draft', open: 'Open' } as const
+
+/** What the pill says: a merged or closed pull request is that, whatever its draft flag. */
+function stateOf(pr: PrReviewDetail): keyof typeof STATE_LABEL {
+  if (pr.state === 'merged' || pr.state === 'closed') return pr.state
+  return choose(pr.isDraft, 'draft', 'open')
+}
+
 function HeaderTitle({ pr }: { pr: PrReviewDetail }) {
+  const state = stateOf(pr)
   return (
     <h1 className="pr-overview-title">
-      <span
-        className={`pr-overview-state pr-overview-state--${choose(pr.isDraft, 'draft', 'open')}`}
-      >
-        {choose(pr.isDraft, 'Draft', 'Open')}
-      </span>
+      <span className={`pr-overview-state pr-overview-state--${state}`}>{STATE_LABEL[state]}</span>
       {pr.title} <span className="pr-overview-number">#{pr.number}</span>
     </h1>
   )
@@ -314,6 +332,7 @@ function HeaderMeta({ pr }: { pr: PrReviewDetail }) {
 }
 
 function ReviewActions({ props, actions, label }: HeaderProps) {
+  if (props.pr.state === 'merged') return <RevertButton revert={actions.revert} />
   return (
     <>
       {props.pr.isDraft && (
@@ -321,6 +340,7 @@ function ReviewActions({ props, actions, label }: HeaderProps) {
           {choose(actions.markReady.busy, 'Marking ready…', 'Mark as ready')}
         </Button>
       )}
+      {actions.plan && <MergeStackButton plan={actions.plan} merge={actions.stackMerge} />}
       <Button variant="primary" onClick={() => props.onStartReview()}>
         {label}
       </Button>
@@ -610,9 +630,22 @@ function branchOf(actions: OverviewActions): ReadinessBranch {
   }
 }
 
+function PrStatusStrip({ pr, actions }: { pr: PrReviewDetail; actions: OverviewActions }) {
+  const { currentUserLogin } = usePrReviewStore()
+  return (
+    <ReadinessStrip
+      pr={pr}
+      youAreRequested={isRequestedOf(pr, currentUserLogin)}
+      branch={branchOf(actions)}
+      stack={actions.plan}
+      notice={actions.stackMerge.message ?? actions.revert.message}
+    />
+  )
+}
+
 export function PrOverviewPanel(props: Props) {
   const { repoRoot, pr } = props
-  const { viewedFiles, issueComments, currentUserLogin } = usePrReviewStore()
+  const { viewedFiles, issueComments } = usePrReviewStore()
   const loadIssueComments = useLoadIssueComments(repoRoot)
   const actions = useOverviewActions(props, loadIssueComments)
   const { box, composerRef } = useIssueComment(props, loadIssueComments)
@@ -621,11 +654,7 @@ export function PrOverviewPanel(props: Props) {
   return (
     <div className="pr-overview">
       <OverviewHeader props={props} actions={actions} label={label} />
-      <ReadinessStrip
-        pr={pr}
-        youAreRequested={isRequestedOf(pr, currentUserLogin)}
-        branch={branchOf(actions)}
-      />
+      <PrStatusStrip pr={pr} actions={actions} />
       <OverviewBody
         key={pr.number}
         repoRoot={repoRoot}

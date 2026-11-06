@@ -105,7 +105,7 @@ async function resolvedCommentIds(ctx: GithubContext, at: PrAt): Promise<number[
   }
 }
 
-async function inlineComments(ctx: GithubContext, at: PrAt) {
+export async function inlineComments(ctx: GithubContext, at: PrAt) {
   const raw = await ctx.api(at.repoRoot, {
     path: `repos/{owner}/{repo}/pulls/${at.prNumber}/comments`,
     paginate: true,
@@ -118,7 +118,7 @@ async function inlineComments(ctx: GithubContext, at: PrAt) {
 
 /** Issue comments and review bodies, oldest first. A body sent with "Submit review" lives at
  *  /pulls/{n}/reviews, not /issues/{n}/comments, so the two are merged. */
-async function fetchIssueComments(ctx: GithubContext, at: PrAt) {
+export async function fetchIssueComments(ctx: GithubContext, at: PrAt) {
   const [issueRaw, reviewsRaw] = await Promise.all([
     ctx.api(at.repoRoot, {
       path: `repos/{owner}/{repo}/issues/${at.prNumber}/comments`,

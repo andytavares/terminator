@@ -47,6 +47,8 @@ export interface StubPullRequest {
   resolvedCommentIds: number[]
   viewedPaths: string[]
   branchUpdates: number
+  /** Names of the checks that fail on the latest commit; the dashboard shows them. */
+  failedChecks: string[]
 }
 
 export interface NewStubPullRequest {
@@ -201,6 +203,7 @@ export function addPullRequest(context: StubContext, input: NewStubPullRequest):
     resolvedCommentIds: [],
     viewedPaths: [],
     branchUpdates: 0,
+    failedChecks: [],
   }
   context.pullRequests.push(pr)
   return pr
@@ -225,8 +228,10 @@ function pullRequestJson(context: StubContext, pr: StubPullRequest): Record<stri
     headRefName: pr.headRefName,
     baseRefName: pr.baseRefName,
     headRefOid: headSha(context, pr),
+    isCrossRepository: false,
     isDraft: pr.isDraft,
     mergeStateStatus: pr.mergeStateStatus,
+    mergeable: 'MERGEABLE',
     statusCheckRollup: [{ name: 'build', status: 'COMPLETED', conclusion: 'SUCCESS' }],
     assignees: [],
     files: files.map((f) => ({ path: f.filename, additions: f.additions, deletions: f.deletions })),
@@ -375,7 +380,15 @@ const REPO = 'repos/[^/]+/[^/]+'
 
 const REST_ROUTES: Array<[string, RegExp, RestHandler]> = [
   ['GET', /^user$/, (context) => ({ login: context.viewer })],
+  // The log of a job, as GitHub's job-logs endpoint prints it (the pull request watch reads its tail).
+  [
+    'GET',
+    new RegExp(`^${REPO}/actions/jobs/(\\d+)/logs$`),
+    () => 'step 1\nAssertionError: expected 1 to be 2\n',
+  ],
   ['GET', /^user\/repos$/, (context) => accessibleRepositories(context)],
+  ['PUT', new RegExp(`^${REPO}/pulls/(\\d+)/merge$`), (c, r, m) => squashMergePullRequest(c, r, m)],
+  ['PATCH', new RegExp(`^${REPO}/pulls/(\\d+)$`), (c, r, m) => retargetPullRequest(c, r, m)],
   ['GET', new RegExp(`^${REPO}/pulls/(\\d+)/files$`), (c, _r, m) => prFiles(c, m)],
   ['GET', new RegExp(`^${REPO}/pulls/(\\d+)/reviews$`), (c, _r, m) => pr(c, m).reviews],
   [
@@ -414,6 +427,28 @@ const pr = (context: StubContext, match: RegExpMatchArray) =>
 
 const prFiles = (context: StubContext, match: RegExpMatchArray) =>
   pullRequestFiles(context, pr(context, match))
+
+/** PUT .../merge: GitHub refuses a stale `sha` (gh's --match-head-commit) and a closed pull request. */
+function squashMergePullRequest(
+  context: StubContext,
+  request: ApiRequest,
+  match: RegExpMatchArray
+) {
+  const pullRequest = pr(context, match)
+  if (pullRequest.state !== 'OPEN') throw new GhFailure(405, 'Pull Request is not mergeable')
+  if (request.body.sha !== headSha(context, pullRequest)) {
+    throw new GhFailure(409, 'Head branch was modified. Review and try the merge again.')
+  }
+  pullRequest.state = 'MERGED'
+  return { merged: true }
+}
+
+/** PATCH .../pulls/N: the base branch is the one field Merge stack changes. */
+function retargetPullRequest(context: StubContext, request: ApiRequest, match: RegExpMatchArray) {
+  const pullRequest = pr(context, match)
+  pullRequest.baseRefName = String(request.body.base ?? pullRequest.baseRefName)
+  return { number: pullRequest.number }
+}
 
 const noReviewers = () => ({ users: [], teams: [] })
 
@@ -541,6 +576,7 @@ function graphql(context: StubContext, request: ApiRequest): unknown {
   if (query.includes('pullRequests(first:')) return openPullRequestPage(context)
   if (query.includes('reviewThreads(first:100)')) return reviewThreads(context, request)
   if (query.includes('pullRequest(number:$n){id}')) return stubPullRequestNodeId(request)
+  if (query.includes('revertPullRequest')) return revertPullRequest(context, request)
   if (query.includes('markFileAsViewed')) return markPathViewed(context, request)
   if (query.includes('search(query:')) return searchDashboard(context, query)
   throw new GhFailure(1, `stub GitHub cannot answer this query: ${query.slice(0, 80)}`)
@@ -578,6 +614,20 @@ function reviewThreads(context: StubContext, request: ApiRequest) {
   return { data: { repository: { pullRequest: { reviewThreads: { nodes } } } } }
 }
 
+/** The revert opens a new pull request, from a new branch at the merged head, into main. */
+function revertPullRequest(context: StubContext, request: ApiRequest) {
+  const merged = findPullRequest(context, Number(request.fields.id.replace('PR_node_', '')))
+  const headRefName = `revert-${merged.number}`
+  bareGit(context, 'update-ref', `refs/heads/${headRefName}`, headSha(context, merged))
+  const created = addPullRequest(context, {
+    title: `Revert "${merged.title}"`,
+    headRefName,
+    author: context.viewer,
+  })
+  const url = `https://github.com/${context.owner}/${context.name}/pull/${created.number}`
+  return { data: { revertPullRequest: { revertPullRequest: { number: created.number, url } } } }
+}
+
 function stubPullRequestNodeId(request: ApiRequest) {
   return { data: { repository: { pullRequest: { id: `PR_node_${request.fields.n}` } } } }
 }
@@ -611,9 +661,17 @@ function searchDashboard(context: StubContext, query: string) {
 
 function prDashboardNode(context: StubContext, pr: StubPullRequest) {
   const json = pullRequestJson(context, pr)
-  const head = { oid: json.headRefOid, committedDate: pr.createdAt, statusCheckRollup: null }
+  const failing = pr.failedChecks.length > 0
+  const head = {
+    oid: json.headRefOid,
+    committedDate: pr.createdAt,
+    statusCheckRollup: failing ? { state: 'FAILURE' } : null,
+  }
   return {
     ...json,
+    latestChecks: {
+      nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: failedRuns(pr) } } } }],
+    },
     changedFiles: (json.files as unknown[]).length,
     repository: { nameWithOwner: `${context.owner}/${context.name}` },
     reviewDecision: null,
@@ -622,4 +680,16 @@ function prDashboardNode(context: StubContext, pr: StubPullRequest) {
     commits: { nodes: [{ commit: head }] },
     latestReviews: { nodes: [] },
   }
+}
+
+/** The failing check runs of a pull request; the job id in the details URL is the check's position. */
+function failedRuns(pr: StubPullRequest) {
+  return pr.failedChecks.map((name, index) => ({
+    __typename: 'CheckRun',
+    name,
+    status: 'COMPLETED',
+    conclusion: 'FAILURE',
+    detailsUrl: `https://github.com/acme/widgets/actions/runs/9/job/${index + 1}`,
+    completedAt: '2026-10-16T09:30:00Z',
+  }))
 }

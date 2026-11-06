@@ -48,6 +48,26 @@ export const CORE_FEATURES: FeatureDeclaration[] = [
   },
   { id: 'core.agent.answer-ask', label: 'Answer an agent ask', kind: 'control', source: 'core' },
   { id: 'core.agent.view', label: 'Agent view', kind: 'control', source: 'core' },
+  {
+    id: 'core.agent.queue',
+    label: 'Queue a message for an agent',
+    kind: 'control',
+    source: 'core',
+  },
+  { id: 'core.agent.steer', label: 'Steer a running agent', kind: 'control', source: 'core' },
+  { id: 'core.agent.find', label: 'Find in an agent tab', kind: 'control', source: 'core' },
+  {
+    id: 'core.agent.attach',
+    label: 'Attach an image for an agent',
+    kind: 'control',
+    source: 'core',
+  },
+  {
+    id: 'core.settings.agents.add-known',
+    label: 'Add a known agent',
+    kind: 'control',
+    source: 'core',
+  },
   { id: 'core.editor.open', label: 'Open in editor', kind: 'control', source: 'core' },
   {
     id: 'core.quick-actions.custom-create',

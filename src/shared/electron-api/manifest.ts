@@ -62,9 +62,12 @@ import type {
 import type {
   AgentAnswerInputSchema,
   AgentPromptInputSchema,
+  AgentQueueInputSchema,
+  AgentSteerInputSchema,
   AgentSessionInputSchema,
   AgentSetConfigInputSchema,
   AgentStartInputSchema,
+  KnownAgentStatus,
 } from '../schemas/agents.schema'
 import type { AgentUsageInputSchema, ThreadSummaryInputSchema } from '../schemas/agent-usage.schema'
 import type { AgentUsage } from '../agents/agent-usage'
@@ -84,6 +87,12 @@ import type {
   Task,
 } from '../schemas/tasks.schema'
 import type { HomeFeedActionInputSchema, MergedHomeFeed } from '../schemas/home-feed.schema'
+import type {
+  BranchNameInputSchema,
+  Schedule,
+  ScheduleIdInputSchema,
+  ScheduleInputSchema,
+} from '../schemas/schedules.schema'
 import type { AgentAsk } from '../agent-sessions/ask'
 import type { AttentionInterval, AttentionMeasures } from '../home/attention-measures'
 import type { MeasuresInputSchema, RecordStateInputSchema } from '../schemas/attention.schema'
@@ -1364,6 +1373,14 @@ export const ELECTRON_API_MANIFEST = [
     remote: 'omit',
   }),
   method({
+    path: 'agents.known',
+    kind: 'invoke',
+    channel: 'agents:known',
+    signature:
+      signature<() => Promise<{ data: KnownAgentStatus[] } | { error: string; message: string }>>(),
+    remote: 'omit',
+  }),
+  method({
     path: 'agents.start',
     kind: 'invoke',
     channel: 'agents:start',
@@ -1384,6 +1401,42 @@ export const ELECTRON_API_MANIFEST = [
         (
           input: z.input<typeof AgentPromptInputSchema>
         ) => Promise<{ data: AgentTurnEnd } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.steer',
+    kind: 'invoke',
+    channel: 'agents:steer',
+    signature:
+      signature<
+        (
+          input: z.input<typeof AgentSteerInputSchema>
+        ) => Promise<{ data: true } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.queueSet',
+    kind: 'invoke',
+    channel: 'agents:queue-set',
+    signature:
+      signature<
+        (
+          input: z.input<typeof AgentQueueInputSchema>
+        ) => Promise<{ data: true } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.queueGet',
+    kind: 'invoke',
+    channel: 'agents:queue-get',
+    signature:
+      signature<
+        (
+          input: z.input<typeof AgentSessionInputSchema>
+        ) => Promise<{ data: string[] } | { error: string; message: string }>
       >(),
     remote: 'omit',
   }),
@@ -1484,6 +1537,16 @@ export const ELECTRON_API_MANIFEST = [
     signature:
       signature<
         (handler: (payload: { sessionId: string; requestId: string }) => void) => Unsubscribe
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agents.onQueueChanged',
+    kind: 'event',
+    channel: 'agents:queue',
+    signature:
+      signature<
+        (handler: (payload: { sessionId: string; messages: string[] }) => void) => Unsubscribe
       >(),
     remote: 'omit',
   }),
@@ -1596,6 +1659,59 @@ export const ELECTRON_API_MANIFEST = [
     kind: 'event',
     channel: 'home:feed-changed',
     signature: signature<(handler: (feed: MergedHomeFeed) => void) => Unsubscribe>(),
+    remote: 'omit',
+  }),
+
+  // ── schedules (prompts that run later) and branch names (core only) ───────
+  method({
+    path: 'schedules.list',
+    kind: 'invoke',
+    channel: 'schedules:list',
+    signature:
+      signature<() => Promise<{ data: Schedule[] } | { error: string; message: string }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'schedules.create',
+    kind: 'invoke',
+    channel: 'schedules:create',
+    signature:
+      signature<
+        (
+          input: z.input<typeof ScheduleInputSchema>
+        ) => Promise<{ data: Schedule } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'schedules.delete',
+    kind: 'invoke',
+    channel: 'schedules:delete',
+    signature:
+      signature<
+        (
+          input: z.input<typeof ScheduleIdInputSchema>
+        ) => Promise<{ data: true } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'schedules.onRun',
+    kind: 'event',
+    channel: 'schedules:run',
+    signature: signature<(handler: (schedule: Schedule) => void) => Unsubscribe>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'homeBranchName.get',
+    kind: 'invoke',
+    channel: 'home:branch-name',
+    signature:
+      signature<
+        (
+          input: z.input<typeof BranchNameInputSchema>
+        ) => Promise<{ text: string } | { error: string }>
+      >(),
     remote: 'omit',
   }),
 

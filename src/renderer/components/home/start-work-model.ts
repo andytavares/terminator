@@ -3,6 +3,7 @@ import { defaultBranchFirst, freeBranches } from '../sidebar/create-project'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import {
+  askBranchName,
   groupTickets,
   defaultWorkspaceId,
   type SuggestionReason,
@@ -73,6 +74,28 @@ async function readRepoGit(folderPath: string): Promise<RepoGit> {
     worktreeBranches: worktrees.filter((w) => !w.isMain).map((w) => w.branch),
     freeBranchNames: freeBranches(local, worktrees).map((b) => b.name),
   }
+}
+
+/** A pause in typing this long starts asking the agent for a branch name. */
+const NAMING_PAUSE_MS = 800
+
+/** The branch the agent names for `prompt`, asked for once typing pauses; null until it answers. */
+export function useAgentBranchName(prompt: string, enabled: boolean): string | null {
+  const [named, setNamed] = useState<{ prompt: string; branch: string } | null>(null)
+  useEffect(() => {
+    if (!enabled || prompt === '') return
+    let current = true
+    const timer = setTimeout(() => {
+      void askBranchName(prompt).then(
+        (branch) => current && branch !== null && setNamed({ prompt, branch })
+      )
+    }, NAMING_PAUSE_MS)
+    return () => {
+      current = false
+      clearTimeout(timer)
+    }
+  }, [prompt, enabled])
+  return enabled && named?.prompt === prompt ? named.branch : null
 }
 
 export interface RowSource {

@@ -17,6 +17,16 @@ export interface RawFileMetrics {
   patchCoverage?: number | null
 }
 
+export interface StackPlan {
+  into: string
+  stack: Array<{ number: number; title: string; headRefName: string; baseRefName: string }>
+}
+
+export interface StackMergeResult {
+  merged: number[]
+  failed?: { number: number; reason: string }
+}
+
 export interface OpenPrsPage {
   prs: unknown[]
   hasMore: boolean
@@ -66,6 +76,17 @@ export const githubAPI = {
 
   prReviewDetail: (repoRoot: string, prNumber: number) =>
     invoke<BridgeResult<{ pr: unknown }>>('github:pr-review-detail', { repoRoot, prNumber }),
+
+  /** The open pull requests Merge stack merges for `number`, bottom first, and the branch they land on. */
+  mergeStackPlan: (repoRoot: string, number: number) =>
+    invoke<BridgeResult<StackPlan>>('github:merge-stack-plan', { repoRoot, number }),
+
+  mergeStack: (repoRoot: string, number: number) =>
+    invoke<BridgeResult<StackMergeResult>>('github:merge-stack', { repoRoot, number }),
+
+  /** Opens GitHub's revert of a merged pull request. */
+  revert: (repoRoot: string, number: number) =>
+    invoke<BridgeResult<{ number: number; url: string }>>('github:revert', { repoRoot, number }),
 
   prMarkReady: (repoRoot: string, prNumber: number) =>
     bridge().invoke('github:pr-mark-ready', { repoRoot, prNumber }),

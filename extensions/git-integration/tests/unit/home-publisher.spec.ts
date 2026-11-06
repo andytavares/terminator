@@ -5,11 +5,12 @@ import { partialFake } from '../../../../tests/support/fakes'
 import { createHomePublisher, HOME_REFRESH_MS, MERGED_REFRESH_MS } from '../../src/home/publisher'
 import { buildContributionCalendar } from '../../src/review/contribution-calendar'
 import { dashboardPrFixture } from './support/dashboard-pr'
+import { bindShellToAnswers } from './support/shell'
 import { eventually } from '../../../../tests/support/eventually'
 
 const issue = (key: string) => ({ key, tracker: 'linear' as const })
 
-function setupPublisher(myIssues: Array<ReturnType<typeof issue>> = []) {
+function setupPublisher(myIssues: Array<ReturnType<typeof issue>> = [], autoPull = false) {
   const published: HomeFeed[] = []
   const onActionDispose = vi.fn()
   const api = partialFake<ExtensionAPI>({
@@ -20,9 +21,10 @@ function setupPublisher(myIssues: Array<ReturnType<typeof issue>> = []) {
     issues: partialFake<ExtensionAPI['issues']>({
       listMine: async () => ({ issues: myIssues as never, failures: [] }),
     }),
+    settings: partialFake<ExtensionAPI['settings']>({ get: (() => autoPull) as never }),
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
   })
-  const publisher = createHomePublisher(api, '/storage')
+  const publisher = createHomePublisher(api, '/storage', () => ['/repo'])
   return { published, publisher, api, onActionDispose }
 }
 
@@ -120,12 +122,45 @@ describe('background refresh', () => {
   })
 })
 
+describe('default branch pull', () => {
+  async function commandsRunOnRefresh(autoPull: boolean): Promise<string[]> {
+    const commands: string[] = []
+    bindShellToAnswers((_command, args, { cwd }) => {
+      commands.push(`${cwd}: ${args[0]}`)
+      return args[0] === 'symbolic-ref' ? 'origin/main' : ''
+    })
+    vi.useFakeTimers()
+    const { publisher } = setupPublisher([], autoPull)
+    publisher.refreshEvery(async () => {}).dispose()
+    await vi.advanceTimersByTimeAsync(0)
+    return commands
+  }
+
+  it('runs git in each repository on a refresh when the setting is on', async () => {
+    expect(await commandsRunOnRefresh(true)).toContain('/repo: symbolic-ref')
+  })
+
+  it('runs no git when the setting is off', async () => {
+    expect(await commandsRunOnRefresh(false)).toEqual([])
+  })
+
+  it('names the head branch and merged commit of each merged pull request of one repository', () => {
+    const { publisher } = setupPublisher()
+    publisher.hooks.onMerged([
+      { ...merged, headRefName: 'feat/login' },
+      { ...merged, headRefName: 'feat/other', localRepoRoot: '/work/other' },
+    ] as never)
+    expect(publisher.mergedHeads('/work/widgets')).toEqual([{ branch: 'feat/login', oid: 'abc1' }])
+  })
+})
+
 const merged = {
   repo: 'acme/widgets',
   number: 41,
   title: 'Add login redirect',
   url: 'https://github.com/acme/widgets/pull/41',
   headRefName: 'feat/login',
+  headRefOid: 'abc1',
   localRepoRoot: '/work/widgets',
   openedAt: '2026-10-10T09:00:00Z',
   readyAt: '2026-10-10T09:00:00Z',

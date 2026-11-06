@@ -80,6 +80,8 @@ export interface TerminalSession {
   status: SessionStatus
   type: SessionType
   scrollbackLimit: number
+  /** The folder the terminal opened in (renderer-side; absent for adopted sessions). */
+  cwd?: string
   /** What the tab draws: a terminal (absent) or an ACP agent's transcript, which has no PTY or xterm. */
   surface?: 'terminal' | 'agent'
   createdAt: string

@@ -319,6 +319,7 @@ const merged = {
   title: 'TAV-20 Add login redirect',
   url: 'https://github.com/acme/widgets/pull/41',
   headRefName: 'tav-20-login',
+  headRefOid: 'abc41',
   localRepoRoot: '/work/widgets',
   openedAt: '2026-10-10T09:00:00Z',
   readyAt: '2026-10-12T10:00:00Z',

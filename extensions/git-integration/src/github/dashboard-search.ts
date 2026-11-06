@@ -38,7 +38,7 @@ const DEDUPE_ORDER: DashboardSection[] = ['requested', 're-review', 'team', 'inv
 
 /** Fields only some sections read, so the others do not pay for them. */
 const SECTION_FIELDS: Partial<Record<DashboardSection, string>> = {
-  mine: CHECKS_FIELDS,
+  mine: `${CHECKS_FIELDS} mergeStateStatus`,
   requested: REVIEW_REQUEST_FIELDS,
   're-review': REVIEW_REQUEST_FIELDS,
 }
@@ -127,6 +127,7 @@ interface RawPrNode {
       commit: { oid: string } | null
     }>
   }
+  mergeStateStatus?: string
   latestChecks?: {
     nodes: Array<{ commit: { statusCheckRollup: { contexts: { nodes: RawContext[] } } | null } }>
   }
@@ -205,6 +206,14 @@ function reviewProgressOf(node: RawPrNode, login: string) {
   }
 }
 
+const MERGE_STATES: Record<string, NonNullable<DashboardPR['mergeStateStatus']>> = {
+  BEHIND: 'behind',
+  DIRTY: 'dirty',
+  CLEAN: 'clean',
+}
+
+const mergeStateOf = (state: string) => MERGE_STATES[state] ?? 'unknown'
+
 /** What only some sections ask for: my checks, and when a review was requested of me. */
 function sectionExtrasOf(node: RawPrNode, viewer: DashboardViewer) {
   const contexts = node.latestChecks?.nodes.at(-1)?.commit.statusCheckRollup?.contexts.nodes
@@ -212,6 +221,7 @@ function sectionExtrasOf(node: RawPrNode, viewer: DashboardViewer) {
   return {
     ...(contexts ? { checks: checksOf(contexts) } : {}),
     ...(requestedAt ? { reviewRequestedAt: requestedAt } : {}),
+    ...(node.mergeStateStatus ? { mergeStateStatus: mergeStateOf(node.mergeStateStatus) } : {}),
   }
 }
 

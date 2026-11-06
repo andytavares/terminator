@@ -159,7 +159,9 @@ function agentsFor(main: MainCalls): ExtensionAPI['agents'] {
   return {
     list: () => main.ask('agents.list'),
     start: (input) => main.ask('agents.start', input),
-    prompt: (sessionId, text) => main.ask('agents.prompt', sessionId, text),
+    prompt: (sessionId, text, images) => main.ask('agents.prompt', sessionId, text, images),
+    steer: (sessionId, text) => main.ask('agents.steer', sessionId, text),
+    sessionsIn: (cwd) => main.ask('agents.sessionsIn', cwd),
     cancel: (sessionId) => main.tell('agents.cancel', sessionId),
     setConfig: (sessionId, configId, value) =>
       main.ask('agents.setConfig', sessionId, configId, value),

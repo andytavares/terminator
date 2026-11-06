@@ -1,6 +1,8 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useSettingsStore } from '../../stores/settings.store'
 import type { AgentsSettings as AgentsValue } from '../../../shared/types'
+import { recordUse } from '../../usage/record'
+import type { KnownAgentStatus } from '../../../shared/schemas/agents.schema'
 import { FormButtons } from './QuickActionsSettings'
 import './QuickActionsSettings.css'
 
@@ -43,6 +45,7 @@ export function AgentsSettings(): React.JSX.Element {
         it, for example <code>opencode acp</code>.
       </p>
       <DefaultAgentField agents={agents} onPick={(id) => void update({ default: id })} />
+      <KnownAgents custom={agents.custom} onAdd={(custom) => void update({ custom })} />
       <AgentList agents={agents} update={(patch) => void update(patch)} />
       <AgentForm custom={agents.custom} onSave={(custom) => void update({ custom })} />
     </div>
@@ -81,25 +84,91 @@ interface AgentListProps {
   update: (patch: Partial<AgentsValue>) => void
 }
 
+function useKnownAgents(): KnownAgentStatus[] {
+  const [known, setKnown] = useState<KnownAgentStatus[]>([])
+  useEffect(() => {
+    void window.electronAPI.agents.known().then((answer) => {
+      if ('data' in answer) setKnown(answer.data)
+    })
+  }, [])
+  return known
+}
+
+function KnownAgents(props: {
+  custom: CustomAgent[]
+  onAdd: (custom: CustomAgent[]) => void
+}): React.JSX.Element | null {
+  const known = useKnownAgents()
+  const add = ({ installed: _installed, ...agent }: KnownAgentStatus): void => {
+    recordUse('core.settings.agents.add-known')
+    props.onAdd([...props.custom, agent])
+  }
+  if (known.length === 0) return null
+  return (
+    <>
+      <h4 className="settings-section__label">Known agents</h4>
+      <ul className="qa-settings-list">
+        {known.map((agent) => (
+          <KnownAgentRow
+            key={agent.id}
+            agent={agent}
+            added={props.custom.some((a) => a.id === agent.id)}
+            onAdd={() => add(agent)}
+          />
+        ))}
+      </ul>
+    </>
+  )
+}
+
+function KnownAgentRow(props: {
+  agent: KnownAgentStatus
+  added: boolean
+  onAdd: () => void
+}): React.JSX.Element {
+  const { agent } = props
+  return (
+    <li className="qa-settings-list__row">
+      <span className="qa-settings-list__label">{agent.label}</span>
+      <code className="qa-settings-list__body">{[agent.command, ...agent.args].join(' ')}</code>
+      <span>{agent.installed ? 'Installed' : 'Not installed'}</span>
+      <button
+        className="settings-section__btn"
+        aria-label={`Add ${agent.label}`}
+        disabled={!agent.installed || props.added}
+        onClick={props.onAdd}
+      >
+        Add
+      </button>
+    </li>
+  )
+}
+
 function AgentList({ agents, update }: AgentListProps): React.JSX.Element | null {
-  if (agents.custom.length === 0) return null
   const remove = (id: string): void =>
     update({
       custom: agents.custom.filter((a) => a.id !== id),
       ...(agents.default === id ? { default: BUILT_IN_ID } : {}),
     })
   return (
-    <ul className="qa-settings-list">
-      {agents.custom.map((a) => (
-        <li key={a.id} className="qa-settings-list__row">
-          <span className="qa-settings-list__label">{a.label}</span>
-          <code className="qa-settings-list__body">{[a.command, ...a.args].join(' ')}</code>
-          <button className="ext-btn ext-btn--danger" onClick={() => remove(a.id)}>
-            Delete
-          </button>
+    <>
+      <h4 className="settings-section__label">Your agents</h4>
+      <ul className="qa-settings-list">
+        <li className="qa-settings-list__row">
+          <span className="qa-settings-list__label">Claude Code</span>
+          <code className="qa-settings-list__body">claude-agent-acp (built in)</code>
         </li>
-      ))}
-    </ul>
+        {agents.custom.map((a) => (
+          <li key={a.id} className="qa-settings-list__row">
+            <span className="qa-settings-list__label">{a.label}</span>
+            <code className="qa-settings-list__body">{[a.command, ...a.args].join(' ')}</code>
+            <button className="ext-btn ext-btn--danger" onClick={() => remove(a.id)}>
+              Delete
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
   )
 }
 

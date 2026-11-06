@@ -48,8 +48,24 @@
         "label": "Commit"
       },
       {
+        "id": "pr-watch-wake",
+        "label": "Wake an agent on a pull request event"
+      },
+      {
         "id": "pr-create",
         "label": "Open a pull request"
+      },
+      {
+        "id": "draft-change",
+        "label": "Draft a commit message"
+      },
+      {
+        "id": "merge-stack",
+        "label": "Merge a stack of pull requests"
+      },
+      {
+        "id": "revert-pr",
+        "label": "Open a revert pull request"
       },
       {
         "id": "diff-open",
@@ -62,6 +78,10 @@
       {
         "id": "worktree-remove",
         "label": "Remove a worktree or branch"
+      },
+      {
+        "id": "worktree-cleanup",
+        "label": "Clean up worktrees by the rules"
       },
       {
         "id": "review-comment",

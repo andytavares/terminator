@@ -96,3 +96,6 @@ export { LAYERS, LAYER_NAMES, layerCssDeclarations, layerCssVar, layerValue } fr
 export type { LayerName } from './layers'
 
 export { useCloseOnOutsidePress } from './useCloseOnOutsidePress'
+
+export { DiffView, buildSplitRows, linesFromTexts } from './DiffView'
+export type { SplitRow, DiffViewHunk, DiffViewLine, DiffViewProps } from './DiffView'

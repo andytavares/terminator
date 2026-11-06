@@ -60,6 +60,7 @@ const mockSetDiff = vi.fn()
 const mockSetLoading = vi.fn()
 const mockGitCommit = vi.fn()
 const mockGitPush = vi.fn()
+const mockDraftChange = vi.fn()
 const mockGitPrStatus = vi.fn()
 const mockGitDiffFile = vi.fn()
 const mockInvoke = vi.fn()
@@ -111,6 +112,7 @@ beforeEach(() => {
   mockInvoke.mockImplementation((channel: string, payload: unknown) => {
     if (channel === 'git:diff-file') return mockGitDiffFile(payload)
     if (channel === 'git:commit') return mockGitCommit(payload)
+    if (channel === 'review-agent:draft-change') return mockDraftChange(payload)
     if (channel === 'git:push') return mockGitPush(payload)
     if (channel === 'git:pr-status') return mockGitPrStatus(payload)
     if (channel === 'git:commit-output-poll') return Promise.resolve({ lines: [] })
@@ -527,5 +529,41 @@ describe('GitFullView — a pending Create PR… and the pull request a branch h
       expect(mockInvoke).toHaveBeenCalledWith('git:ui.consume-pending-request', {})
     )
     expect(screen.queryByTestId('pr-dialog')).toBeNull()
+  })
+})
+
+describe('GitFullView — Write message', () => {
+  const draft = { branch: 'b', commitMessage: 'Add foo', title: 't', body: '' }
+
+  it('fills the commit message from the draft and counts the use', async () => {
+    mockDraftChange.mockResolvedValue({ draft })
+    setupStore({ status: featureWithStagedFile() })
+    render(<GitFullView repoRoot="/repo" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Write message' }))
+
+    await waitFor(() =>
+      expect((screen.getByPlaceholderText('Commit message…') as HTMLTextAreaElement).value).toBe(
+        'Add foo'
+      )
+    )
+    expect(mockDraftChange).toHaveBeenCalledWith({ repoRoot: '/repo' })
+    expect(mockRecordUsage).toHaveBeenCalledWith('draft-change')
+  })
+
+  it('shows the plain reason and leaves the message alone when drafting fails', async () => {
+    mockDraftChange.mockResolvedValue({ error: 'The agent is not signed in.' })
+    setupStore({ status: featureWithStagedFile() })
+    render(<GitFullView repoRoot="/repo" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Write message' }))
+
+    expect(await screen.findByText('The agent is not signed in.')).toBeTruthy()
+    expect((screen.getByPlaceholderText('Commit message…') as HTMLTextAreaElement).value).toBe('')
+  })
+
+  it('offers no button with nothing staged', async () => {
+    await renderView()
+    expect(screen.queryByRole('button', { name: 'Write message' })).toBeNull()
   })
 })

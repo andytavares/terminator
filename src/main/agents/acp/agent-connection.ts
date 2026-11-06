@@ -1,11 +1,9 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { accessSync, constants } from 'node:fs'
-import { delimiter, join } from 'node:path'
 import { Readable, Writable } from 'node:stream'
 import { ClientSideConnection, ndJsonStream } from '@agentclientprotocol/sdk'
 import { loginShellPathReady } from '../../shell/login-shell-path.js'
 import type { AgentsSettings } from '../../../shared/schemas/settings.schema.js'
-import { CLAUDE_AGENT_ID, resolveAgent } from './agent-registry.js'
+import { binaryOnPath, CLAUDE_AGENT_ID, resolveAgent } from './agent-registry.js'
 import type { AgentServiceDeps } from './agent-service.js'
 
 const STDERR_LIMIT = 16 * 1024
@@ -56,22 +54,9 @@ function exitOf(child: ChildProcess): Promise<number | null> {
   })
 }
 
-function claudeOnPath(): string | null {
-  for (const directory of (process.env.PATH ?? '').split(delimiter)) {
-    const candidate = join(directory, 'claude')
-    try {
-      accessSync(candidate, constants.X_OK)
-      return candidate
-    } catch {
-      // Not in this directory.
-    }
-  }
-  return null
-}
-
 /** The user's own `claude` for the built-in agent, found once the login-shell PATH is known. */
 async function claudeFor(agentId: string): Promise<string | null> {
   if (agentId !== CLAUDE_AGENT_ID) return null
   await loginShellPathReady()
-  return claudeOnPath()
+  return binaryOnPath('claude')
 }

@@ -57,11 +57,20 @@ export interface CoreActionDeps {
   onToggleSidebar(): void
   onOpenSettings(): void
   onToggleLog(): void
+  canGoBack: boolean
+  canGoForward: boolean
+  hasClosedTab: boolean
+  onGoBack(): void
+  onGoForward(): void
+  onReopenClosedTab(): void
 }
 
 const NO_TERMINAL = 'No terminal focused'
 const NO_PROJECT = 'No project focused'
 const NO_ISSUE = 'No linked issue'
+const NOTHING_BEFORE = 'Nothing to go back to'
+const NOTHING_AFTER = 'Nothing to go forward to'
+const NOTHING_CLOSED = 'No closed tab to reopen'
 
 /**
  * One core action as data: what it is called, where it sits, what it needs
@@ -75,6 +84,8 @@ interface CoreActionSpec {
   mnemonic?: string
   shortcut?: string
   requires?: 'terminal' | 'project' | 'issue'
+  /** Disabled with this reason when it returns one; checked after `requires`. */
+  unavailable?(deps: CoreActionDeps): string | undefined
   run(deps: CoreActionDeps): void
 }
 
@@ -87,6 +98,15 @@ const TERMINAL_ACTIONS: CoreActionSpec[] = [
     shortcut: '⌘T',
     requires: 'project',
     run: (d) => d.onNewTab(),
+  },
+  {
+    id: 'core.reopen-closed-tab',
+    label: 'Reopen closed tab',
+    group: 'terminal',
+    mnemonic: 'e',
+    shortcut: '⌘⌥T',
+    unavailable: (d) => (d.hasClosedTab ? undefined : NOTHING_CLOSED),
+    run: (d) => d.onReopenClosedTab(),
   },
   {
     id: 'core.split-vertical',
@@ -203,6 +223,27 @@ const RESUME: CoreActionSpec = {
 }
 
 const linkedIssueKey = (d: CoreActionDeps): string | undefined => d.issueLink?.key
+
+const NAVIGATE_ACTIONS: CoreActionSpec[] = [
+  {
+    id: 'core.go-back',
+    label: 'Go back',
+    group: 'navigate',
+    mnemonic: 'b',
+    shortcut: '⌘⌥←',
+    unavailable: (d) => (d.canGoBack ? undefined : NOTHING_BEFORE),
+    run: (d) => d.onGoBack(),
+  },
+  {
+    id: 'core.go-forward',
+    label: 'Go forward',
+    group: 'navigate',
+    mnemonic: 'f',
+    shortcut: '⌘⌥→',
+    unavailable: (d) => (d.canGoForward ? undefined : NOTHING_AFTER),
+    run: (d) => d.onGoForward(),
+  },
+]
 
 const WORKSPACE_ACTIONS: CoreActionSpec[] = [
   {
@@ -348,11 +389,13 @@ function disabledReason(
 }
 
 function actionOf(spec: CoreActionSpec, deps: CoreActionDeps): QuickAction {
-  const { label, requires, run, ...shown } = spec
+  const { label, requires, unavailable, run, ...shown } = spec
+  const disabledReasonOf =
+    (requires === undefined ? undefined : disabledReason(requires, deps)) ?? unavailable?.(deps)
   return {
     ...shown,
     label: typeof label === 'function' ? label(deps) : label,
-    ...(requires === undefined ? {} : { disabledReason: disabledReason(requires, deps) }),
+    ...(disabledReasonOf === undefined ? {} : { disabledReason: disabledReasonOf }),
     run: () => run(deps),
   }
 }
@@ -388,6 +431,7 @@ export function buildCoreActions(deps: CoreActionDeps): QuickAction[] {
     ...coreSessionActions(deps),
     actionOf(RESUME, deps),
     ...switchWorkspaceActions(deps),
+    ...fromSpecs(NAVIGATE_ACTIONS),
     ...fromSpecs(WORKSPACE_ACTIONS),
     ...fromSpecs(TOP_ACTIONS),
   ]

@@ -84,13 +84,9 @@ const KEYS = [
 
 function candidatesFor() {
   return KEYS.flatMap((key) =>
-    [false, true].map((shiftKey) => ({
-      key,
-      shiftKey,
-      metaKey: true,
-      ctrlKey: false,
-      altKey: false,
-    }))
+    [false, true].flatMap((shiftKey) =>
+      [false, true].map((altKey) => ({ key, shiftKey, metaKey: true, ctrlKey: false, altKey }))
+    )
   )
 }
 
@@ -134,6 +130,7 @@ describe('CORE_SHORTCUTS conflict guard (AC 4)', () => {
           key: keyEvent.key,
           metaKey: keyEvent.metaKey,
           shiftKey: keyEvent.shiftKey,
+          altKey: keyEvent.altKey,
           bubbles: true,
         })
       )

@@ -3,6 +3,8 @@ import {
   emptyTranscript,
   foldUpdates,
   inputSummary,
+  relativeTo,
+  splitTurns,
 } from '../../../../src/renderer/components/agent/fold-updates'
 import type { AgentUpdate } from '@terminator/extension-sdk'
 
@@ -128,5 +130,50 @@ describe('inputSummary', () => {
     ['text', null],
   ])('reads %j as %j', (input, expected) => {
     expect(inputSummary(input)).toBe(expected)
+  })
+})
+
+const edit = (id: string, path: string, change: [string | null, string]): AgentUpdate => ({
+  sessionUpdate: 'tool_call',
+  toolCallId: id,
+  title: 'Edit',
+  content: [{ type: 'diff', path, oldText: change[0], newText: change[1] }],
+})
+
+describe('splitTurns', () => {
+  it('counts two edits to one file as one changed file, per turn', () => {
+    const { entries } = foldAll([
+      chunk('user_message_chunk', 'first'),
+      edit('t1', '/r/a.ts', ['one', 'two']),
+      edit('t2', '/r/a.ts', ['two', 'two\nthree']),
+      chunk('user_message_chunk', 'second'),
+      edit('t3', '/r/b.ts', ['x', 'y']),
+    ])
+    const turns = splitTurns(entries)
+    expect(turns).toHaveLength(2)
+    expect(turns[0].changes).toEqual([{ path: '/r/a.ts', added: 2, removed: 1 }])
+    expect(turns[1].changes).toEqual([{ path: '/r/b.ts', added: 1, removed: 1 }])
+  })
+
+  it('keeps a null old text as null and has no changes for a text-only turn', () => {
+    const { entries } = foldAll([edit('t1', '/r/a.ts', [null, 'snippet'])])
+    expect(entries[0]).toMatchObject({ output: [{ kind: 'diff', oldText: null }] })
+    expect(splitTurns(foldAll([chunk('agent_message_chunk', 'hi')]).entries)[0].changes).toEqual([])
+  })
+})
+
+describe('relativeTo — a symlinked folder', () => {
+  it('matches a path the agent reports through /private, as macOS resolves /var and /tmp', () => {
+    expect(relativeTo('/var/folders/x/repo', '/private/var/folders/x/repo/src/a.ts')).toBe(
+      'src/a.ts'
+    )
+  })
+})
+
+describe('relativeTo', () => {
+  it('strips the session directory and leaves other paths alone', () => {
+    expect(relativeTo('/r', '/r/src/a.ts')).toBe('src/a.ts')
+    expect(relativeTo('/r', '/rx/a.ts')).toBe('/rx/a.ts')
+    expect(relativeTo('', '/r/a.ts')).toBe('/r/a.ts')
   })
 })

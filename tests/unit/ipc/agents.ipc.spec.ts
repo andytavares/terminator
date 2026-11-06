@@ -6,6 +6,9 @@ const service = vi.hoisted(() => ({
   list: vi.fn(),
   start: vi.fn(),
   prompt: vi.fn(),
+  steer: vi.fn(),
+  queueSet: vi.fn(),
+  queueOf: vi.fn(() => ['waiting']),
   cancel: vi.fn(),
   answer: vi.fn(),
   setConfig: vi.fn(),
@@ -20,6 +23,12 @@ vi.mock('electron', () => ({
 vi.mock('../../../src/main/logger', () => ({ logger: { error: vi.fn() } }))
 vi.mock('../../../src/main/agents/acp/agent-service-instance', () => ({
   agentService: () => service,
+}))
+
+vi.mock('../../../src/main/agents/acp/agent-registry', () => ({
+  knownAgentStatuses: async () => [
+    { id: 'gemini', label: 'Gemini CLI', command: 'gemini', args: ['--acp'], installed: true },
+  ],
 }))
 
 import { registerAgentsHandlers } from '../../../src/main/ipc/agents.ipc'
@@ -40,13 +49,27 @@ describe('agents channels', () => {
         'agents:cancel',
         'agents:close',
         'agents:history',
+        'agents:known',
         'agents:list',
         'agents:open-asks',
         'agents:prompt',
+        'agents:queue-get',
+        'agents:queue-set',
         'agents:set-config',
         'agents:start',
+        'agents:steer',
       ].sort()
     )
+  })
+})
+
+describe('agents known', () => {
+  it('answers with the presets and whether each is installed', async () => {
+    expect(await invoke('agents:known')).toEqual({
+      data: [
+        { id: 'gemini', label: 'Gemini CLI', command: 'gemini', args: ['--acp'], installed: true },
+      ],
+    })
   })
 })
 
@@ -93,5 +116,25 @@ describe('agents answers and history', () => {
     await invoke('agents:close', { sessionId: 's1' })
     expect(service.cancel).toHaveBeenCalledWith('s1')
     expect(service.close).toHaveBeenCalledWith('s1')
+  })
+})
+
+describe('agents steer, queue and images', () => {
+  it('steers a session and replaces its queue', async () => {
+    await invoke('agents:steer', { sessionId: 's1', text: 'instead' })
+    await invoke('agents:queue-set', { sessionId: 's1', messages: ['next'] })
+    expect(service.steer).toHaveBeenCalledWith('s1', 'instead')
+    expect(service.queueSet).toHaveBeenCalledWith('s1', ['next'])
+  })
+
+  it('answers the queue of a session as it stands', async () => {
+    expect(await invoke('agents:queue-get', { sessionId: 's1' })).toEqual({ data: ['waiting'] })
+    expect(service.queueOf).toHaveBeenCalledWith('s1')
+  })
+
+  it('passes the images of a prompt to the service', async () => {
+    const images = [{ mimeType: 'image/png', data: 'aGk=' }]
+    await invoke('agents:prompt', { sessionId: 's1', text: 'look', images })
+    expect(service.prompt).toHaveBeenCalledWith('s1', 'look', images)
   })
 })

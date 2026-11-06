@@ -16,6 +16,9 @@ function makeDeps(overrides: Partial<CoreActionDeps> = {}): CoreActionDeps {
     sessions: [{ id: 's1', projectId: 'p1', tabTitle: 'Terminal 1', projectName: 'main' }],
     issueLink: { key: 'ABC-1', tracker: 'linear' },
     issue: { url: 'https://example.com' },
+    canGoBack: true,
+    canGoForward: true,
+    hasClosedTab: true,
     ...coreActionHandlers(),
     ...overrides,
   }
@@ -38,6 +41,9 @@ function sessionHandlers() {
     onResume: vi.fn(),
     onSwitchWorkspace: vi.fn(),
     onCycleWorkspace: vi.fn(),
+    onGoBack: vi.fn(),
+    onGoForward: vi.fn(),
+    onReopenClosedTab: vi.fn(),
   }
 }
 
@@ -67,10 +73,10 @@ function actionLabelOf(actions: QuickAction[], id: string): string {
 }
 
 describe('buildCoreActions', () => {
-  it('places actions in the terminal, sessions, workspace and top groups', () => {
+  it('places actions in the terminal, sessions, navigate, workspace and top groups', () => {
     const actions = buildCoreActions(makeDeps())
     const groupsUsed = new Set(actions.map((a) => a.group))
-    expect(groupsUsed).toEqual(new Set(['terminal', 'sessions', 'workspace', 'top']))
+    expect(groupsUsed).toEqual(new Set(['terminal', 'sessions', 'navigate', 'workspace', 'top']))
   })
 
   it('assigns the documented mnemonics to the terminal group', () => {
@@ -293,5 +299,34 @@ describe('buildCoreActions — Move to its own window', () => {
   it('is unavailable without a focused terminal and available with one', () => {
     expect(find({ hasTerminalFocused: false })?.disabledReason).toBeDefined()
     expect(find({ hasTerminalFocused: true })?.disabledReason).toBeUndefined()
+  })
+})
+
+describe('buildCoreActions — back, forward and reopen', () => {
+  const actionOf = (deps: Partial<CoreActionDeps>, id: string) =>
+    buildCoreActions(makeDeps(deps)).find((a) => a.id === id)!
+
+  it('disables Go back and Go forward with a reason when the history has nowhere to go', () => {
+    const none = { canGoBack: false, canGoForward: false }
+    expect(actionOf(none, 'core.go-back').disabledReason).toBe('Nothing to go back to')
+    expect(actionOf(none, 'core.go-forward').disabledReason).toBe('Nothing to go forward to')
+    expect(actionOf({}, 'core.go-back').disabledReason).toBeUndefined()
+    expect(actionOf({}, 'core.go-forward').disabledReason).toBeUndefined()
+  })
+
+  it('disables Reopen closed tab with a reason when no tab was closed', () => {
+    expect(actionOf({ hasClosedTab: false }, 'core.reopen-closed-tab').disabledReason).toBe(
+      'No closed tab to reopen'
+    )
+    expect(actionOf({}, 'core.reopen-closed-tab').disabledReason).toBeUndefined()
+  })
+
+  it('runs the handler and shows the shortcut', async () => {
+    const deps = makeDeps()
+    const back = buildCoreActions(deps).find((a) => a.id === 'core.go-back')!
+    await back.run()
+    expect(deps.onGoBack).toHaveBeenCalled()
+    expect(back.shortcut).toBe('⌘⌥←')
+    expect(back.group).toBe('navigate')
   })
 })

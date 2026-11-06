@@ -4,6 +4,7 @@
 import { invoke } from '@terminator/extension-sdk/renderer'
 import type { LocalInventoryRow } from '../git/local-inventory'
 import type { RemoveItem, RemoveResult } from '../git/remove-local'
+import type { CleanupReport } from '../ipc/worktrees.ipc'
 
 export type CommitResult =
   | { commitHash: string }
@@ -42,4 +43,7 @@ export const gitAPI = {
   /** Removes the worktrees and branches the Worktrees tab has checked. */
   removeLocal: (repoRoot: string, items: RemoveItem[]) =>
     invoke<{ results: RemoveResult[] }>('git:remove-local', { repoRoot, items }),
+
+  /** Runs the cleanup rules of Settings; with every rule off it answers empty lists. */
+  cleanupRun: (repoRoot: string) => invoke<CleanupReport>('git:cleanup-run', { repoRoot }),
 }

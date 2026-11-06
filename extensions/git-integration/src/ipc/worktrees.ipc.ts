@@ -7,6 +7,12 @@ import {
   type WorktreeEntry,
 } from '../git/local-inventory.js'
 import { removeLocalItems, type RemoveShell } from '../git/remove-local.js'
+import {
+  anyCleanupRuleOn,
+  planCleanup,
+  type CleanupSettings,
+  type MergedHead,
+} from '../git/cleanup-plan.js'
 import { runGit } from '../shell/run-git.js'
 import { RepoRoot } from './repo-root.js'
 import { VALIDATION_ERROR, errorEnvelope, type RegisterFn } from './register.js'
@@ -27,6 +33,26 @@ const RemoveLocalPayload = z.object({
     )
     .min(1),
 })
+
+const CleanupRunPayload = z.object({ repoRoot: RepoRoot })
+
+/** One branch or worktree the cleanup removed or kept, and why. */
+interface CleanupEntry {
+  branch: string | null
+  worktreePath: string | null
+  reason: string
+}
+
+export interface CleanupReport {
+  removed: CleanupEntry[]
+  kept: CleanupEntry[]
+}
+
+/** What the cleanup reads beyond git: the rules, and GitHub's merged head branches of a repository. */
+export interface CleanupDeps {
+  settings: () => CleanupSettings
+  mergedHeads: (repoRoot: string) => MergedHead[]
+}
 
 type Workspace = ExtensionAPI['workspace']
 
@@ -90,8 +116,42 @@ function removeShell(api: Pick<ExtensionAPI, 'workspace' | 'pty' | 'ipc'>): Remo
   }
 }
 
-/** git:local-inventory and git:remove-local, the Worktrees tab's two channels. */
-function worktreesChannels(api: Pick<ExtensionAPI, 'workspace' | 'pty' | 'ipc'>): ChannelSpec[] {
+type WorktreesApi = Pick<ExtensionAPI, 'workspace' | 'pty' | 'ipc'>
+
+const REFUSAL_TEXT: Record<string, string> = { 'open session': 'An open terminal runs in it' }
+
+/** Plans the cleanup rules and runs the plan; removeLocalItems keeps its refusals, so a worktree
+ *  an open terminal runs in stays. With every rule off it reads nothing. */
+async function runCleanup(
+  repoRoot: string,
+  api: WorktreesApi,
+  deps: CleanupDeps
+): Promise<CleanupReport> {
+  const settings = deps.settings()
+  if (!anyCleanupRuleOn(settings)) return { removed: [], kept: [] }
+  const rows = await loadLocalInventory(repoRoot, inventoryShell(api))
+  const mergedHeads = deps.mergedHeads(repoRoot)
+  const { remove, keep } = planCleanup({ rows, mergedHeads, settings, now: Date.now() })
+  const kept = keep.map(({ row, reason }) => entryOf(row, reason))
+  if (remove.length === 0) return { removed: [], kept }
+  const { results } = await removeLocalItems(repoRoot, removeShell(api), remove)
+  const removed: CleanupEntry[] = []
+  results.forEach((result, i) => {
+    if (result.ok) removed.push(entryOf(remove[i], remove[i].reason))
+    else kept.push(entryOf(result, REFUSAL_TEXT[result.reason ?? ''] ?? result.reason ?? 'failed'))
+  })
+  return { removed, kept }
+}
+
+function entryOf(
+  item: { branch: string | null; worktreePath: string | null },
+  reason: string
+): CleanupEntry {
+  return { branch: item.branch, worktreePath: item.worktreePath, reason }
+}
+
+/** git:local-inventory, git:remove-local and git:cleanup-run, the Worktrees tab's channels. */
+function worktreesChannels(api: WorktreesApi, deps: CleanupDeps): ChannelSpec[] {
   return [
     defineChannel({
       channel: 'git:local-inventory',
@@ -109,12 +169,20 @@ function worktreesChannels(api: Pick<ExtensionAPI, 'workspace' | 'pty' | 'ipc'>)
       run: ({ repoRoot, items }) => removeLocalItems(repoRoot, removeShell(api), items),
       onError: errorEnvelope,
     }),
+    defineChannel({
+      channel: 'git:cleanup-run',
+      schema: CleanupRunPayload,
+      invalid: VALIDATION_ERROR,
+      run: ({ repoRoot }) => runCleanup(repoRoot, api, deps),
+      onError: errorEnvelope,
+    }),
   ]
 }
 
 export function registerWorktreesHandlers(
   register: RegisterFn,
-  api: Pick<ExtensionAPI, 'workspace' | 'pty' | 'ipc'>
+  api: WorktreesApi,
+  deps: CleanupDeps
 ): void {
-  for (const spec of worktreesChannels(api)) register(spec)
+  for (const spec of worktreesChannels(api, deps)) register(spec)
 }

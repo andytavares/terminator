@@ -14,7 +14,7 @@ export function mergedQuery(now: number): string {
   return `query {
     merged: search(query: ${JSON.stringify(search)}, type: ISSUE, first: 50) {
       nodes { ... on PullRequest {
-        number title url headRefName createdAt mergedAt
+        number title url headRefName headRefOid createdAt mergedAt
         author { login }
         repository { nameWithOwner }
         readyEvents: timelineItems(first: 1, itemTypes: [READY_FOR_REVIEW_EVENT]) { nodes { ... on ReadyForReviewEvent { createdAt } } }
@@ -32,6 +32,8 @@ export interface MergedPullRequest {
   title: string
   url: string
   headRefName: string
+  /** The commit GitHub merged. */
+  headRefOid: string
   localRepoRoot: string | null
   openedAt: string
   /** The first time it left draft, else when it was opened. */
@@ -48,6 +50,7 @@ interface RawMergedNode {
   title: string
   url: string
   headRefName: string
+  headRefOid: string
   createdAt: string
   mergedAt: string
   author: { login: string } | null
@@ -89,6 +92,7 @@ function mergedOf(node: RawMergedNode, localRoots: Map<string, string>): MergedP
     title: node.title,
     url: node.url,
     headRefName: node.headRefName,
+    headRefOid: node.headRefOid,
     localRepoRoot: localRoots.get(repo) ?? null,
     openedAt: node.createdAt,
     readyAt: node.readyEvents.nodes[0]?.createdAt ?? node.createdAt,

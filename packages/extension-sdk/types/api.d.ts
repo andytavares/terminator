@@ -337,7 +337,18 @@ export interface AgentsAPI {
   /** Null when the agent could not start; the reason is logged. */
   start(input: StartAgentInput): Promise<AgentStarted | null>
   /** Resolves when the turn ends. A prompt sent after a `cancel` waits for the cancelled turn to end. */
-  prompt(sessionId: string, text: string): Promise<AgentTurnEnd>
+  prompt(
+    sessionId: string,
+    text: string,
+    /** Since 6.3.0. Base64 data. The turn ends with `error`, and the conversation says why, when the agent cannot read images. */
+    images?: Array<{ mimeType: string; data: string }>
+  ): Promise<AgentTurnEnd>
+  /** Since 6.3.0. Adds `text` to the running turn when the agent supports steering, else cancels
+   * the turn and sends `text` as a new prompt. With no turn running it is a prompt. */
+  steer(sessionId: string, text: string): Promise<void>
+  /** Since 6.3.0. The open agent sessions in a folder, and the last conversation recorded there
+   * (the `resume` input of `start`), or null. */
+  sessionsIn(cwd: string): Promise<{ live: string[]; resumable: string | null }>
   /** Cancels the running and waiting prompts. With none, it does nothing. */
   cancel(sessionId: string): void
   /** False when the session or the option does not exist. */

@@ -72,6 +72,7 @@ const system: SystemMetrics = {
 
 function stubElectronApi(): void {
   installElectronApi({
+    schedules: { onRun: () => () => {} },
     terminal: { onProcessExit: () => () => {}, input: () => {} },
     notifications: { list: async () => [], onPush: () => () => {} },
     extensionBridge: { on: () => () => {} },

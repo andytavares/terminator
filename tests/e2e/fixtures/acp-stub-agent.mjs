@@ -131,7 +131,8 @@ async function scripted(connection, { sessionId, asked }) {
 function prompter(connection) {
   return async ({ sessionId, prompt }) => {
     const asked = prompt.map((block) => block.text ?? '').join(' ')
-    record({ kind: 'prompt', sessionId, length: asked.length })
+    const images = prompt.filter((block) => block.type === 'image').map((block) => block.mimeType)
+    record({ kind: 'prompt', sessionId, length: asked.length, images })
     const done = await scripted(connection, { sessionId, asked })
     const text = done ?? reply() ?? `acp-stub: ${asked.slice(0, 200)}`
     await connection.sessionUpdate({
@@ -148,7 +149,7 @@ function agent(connection) {
   return {
     initialize: async () => ({
       protocolVersion: PROTOCOL_VERSION,
-      agentCapabilities: { loadSession: true },
+      agentCapabilities: { loadSession: true, promptCapabilities: { image: true } },
     }),
     authenticate: async () => ({}),
     ...sessionHandlers,

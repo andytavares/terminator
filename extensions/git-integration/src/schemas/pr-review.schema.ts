@@ -195,6 +195,8 @@ export const PrReviewDetailSchema = z.object({
   /** GraphQL node id; lets viewed-file mutations skip the lookup. */
   nodeId: z.string().optional(),
   isDraft: z.boolean().default(false),
+  /** Absent means open. */
+  state: z.enum(['open', 'closed', 'merged']).optional(),
   mergeStateStatus: z.enum(['behind', 'dirty', 'clean', 'unknown']).default('unknown'),
   ciStatus: z.enum(['passing', 'failing', 'pending', 'none']),
   lintStatus: SignalValueSchema.default('unknown'),
@@ -266,6 +268,8 @@ export const DashboardPRSchema = z.object({
   headRefName: z.string().optional(),
   /** Mine only: the latest commit's checks. */
   checks: z.array(DashboardCheckSchema).optional(),
+  /** Mine only: `dirty` when the branch conflicts with its base. */
+  mergeStateStatus: z.enum(['behind', 'dirty', 'clean', 'unknown']).optional(),
   /** Requested and re-review only: when the review was requested. */
   reviewRequestedAt: z.string().optional(),
   section: DashboardSectionSchema,

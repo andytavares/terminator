@@ -5,6 +5,7 @@ import { useTerminalSession } from './useTerminalSession'
 import { useSettingsStore } from '../stores/settings.store'
 import { useExtensionRegistry, matchesAccelerator } from '../extensions/registry'
 import { useStartWorkStore } from '../components/home/start-work'
+import { trackNavigation, goBack, goForward } from '../stores/navigation-sync'
 import {
   cycleMostRecentlyAttended,
   jumpToNextAwaitingInput,
@@ -12,6 +13,7 @@ import {
   cycleTab,
   clearTerminal,
   newTerminalTab,
+  reopenClosedTab,
   splitPane,
   closeFocusedPane,
   switchToWorkspace,
@@ -146,12 +148,18 @@ const TERMINAL_KEYS: CoreKey[] = [
     run: (c) => clearTerminal(effectiveProjectOf(c), useSessionStore.getState()),
   },
   {
-    test: (e, at) => at.isMeta && e.key === 't',
+    test: (e, at) => at.isMeta && !e.altKey && e.key === 't',
     actionId: 'core.new-tab',
     run: (c) =>
       c.options.onNewTab
         ? c.options.onNewTab()
         : newTerminalTab(effectiveProjectOf(c), terminalDeps(c)),
+  },
+  // Option changes e.key on macOS (to a dagger), so Cmd+Option+T is matched on the physical key.
+  {
+    test: (e, at) => at.isMeta && e.altKey && !e.shiftKey && (e.code === 'KeyT' || e.key === 't'),
+    actionId: 'core.reopen-closed-tab',
+    run: (c) => reopenClosedTab(terminalDeps(c)),
   },
   // Cmd+D splits side by side, Cmd+Shift+D top and bottom. The effective project rather than the
   // active one, so a scratch terminal splits too — it used to do nothing at all there, and say
@@ -175,6 +183,17 @@ const TERMINAL_KEYS: CoreKey[] = [
 ]
 
 const SESSION_KEYS: CoreKey[] = [
+  // Cmd+Option+Left / Right: back and forward through what the main area showed.
+  {
+    test: (e, at) => at.isMeta && e.altKey && e.key === 'ArrowLeft',
+    actionId: 'core.go-back',
+    run: goBack,
+  },
+  {
+    test: (e, at) => at.isMeta && e.altKey && e.key === 'ArrowRight',
+    actionId: 'core.go-forward',
+    run: goForward,
+  },
   // Cmd+] / Cmd+[: cycle recently attended sessions across project
   // boundaries. lastAttendedAt is what makes "recently used" meaningful;
   // this is its only consumer.
@@ -201,12 +220,12 @@ const SESSION_KEYS: CoreKey[] = [
   },
   // Cmd+Left / Cmd+Right: previous and next tab (skip if typing — they move within text)
   {
-    test: (e, at) => at.isMeta && e.key === 'ArrowLeft' && !at.inTextField,
+    test: (e, at) => at.isMeta && !e.altKey && e.key === 'ArrowLeft' && !at.inTextField,
     actionId: 'core.prev-tab',
     run: (c) => cycleTabIn(effectiveProjectOf(c), -1),
   },
   {
-    test: (e, at) => at.isMeta && e.key === 'ArrowRight' && !at.inTextField,
+    test: (e, at) => at.isMeta && !e.altKey && e.key === 'ArrowRight' && !at.inTextField,
     actionId: 'core.next-tab',
     run: (c) => cycleTabIn(effectiveProjectOf(c), 1),
   },
@@ -266,6 +285,12 @@ function handleKeyDown(e: KeyboardEvent, c: ShortcutContext): void {
   }
 }
 
+/** The mouse's back (3) and forward (4) buttons; macOS sends no app-command for them. */
+function handleMouseButton(e: MouseEvent): void {
+  if (e.button === 3) goBack()
+  else if (e.button === 4) goForward()
+}
+
 /** The app's keyboard shortcuts, on the window. The store state they act on is read when the key
  * is pressed; the caller's callbacks are always its latest. */
 export function useKeyboardShortcuts(options: Options = {}): void {
@@ -279,6 +304,12 @@ export function useKeyboardShortcuts(options: Options = {}): void {
   useEffect(() => {
     const handleWindowKey = (e: KeyboardEvent): void => handleKeyDown(e, latest.current)
     window.addEventListener('keydown', handleWindowKey)
-    return () => window.removeEventListener('keydown', handleWindowKey)
+    window.addEventListener('mouseup', handleMouseButton)
+    const stopTracking = trackNavigation()
+    return () => {
+      window.removeEventListener('keydown', handleWindowKey)
+      window.removeEventListener('mouseup', handleMouseButton)
+      stopTracking()
+    }
   }, [])
 }

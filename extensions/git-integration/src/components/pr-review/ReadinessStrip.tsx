@@ -12,6 +12,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Button, Popover } from '@terminator/extension-ui'
+import type { StackPlan } from '../../api/github'
 import type { PrReviewDetail } from '../../schemas/pr-review.schema'
 import { choose } from '../text'
 import {
@@ -35,6 +36,10 @@ export interface ReadinessStripProps {
   pr: PrReviewDetail
   youAreRequested: boolean
   branch: ReadinessBranch
+  /** The pull requests this one is stacked on, when it is stacked. */
+  stack?: StackPlan | null
+  /** How the stack merge or the revert ended, in words. */
+  notice?: string | null
 }
 
 type Tone = 'ok' | 'wait' | 'quiet' | 'bad'
@@ -129,11 +134,21 @@ function ReviewsCell({ pr, youAreRequested }: { pr: PrReviewDetail; youAreReques
   )
 }
 
-function MergeCell({ pr, branch }: { pr: PrReviewDetail; branch: ReadinessBranch }) {
+/** "No conflicts with feat/retry", led by "Stacked on #1 · " when #1 is the pull request below. */
+function cleanDetail(base: string, stack?: StackPlan | null): string {
+  const below = stack?.stack.at(-2)
+  const clean = `No conflicts with ${base}`
+  return below ? `Stacked on #${below.number} · ${clean}` : clean
+}
+
+function MergeCell({ pr, branch, stack }: Pick<ReadinessStripProps, 'pr' | 'branch' | 'stack'>) {
   const base = pr.baseRefName
+  if (pr.state === 'merged') {
+    return <Cell tone="ok" icon={GitMerge} label="Merge" detail={`Merged into ${base}`} />
+  }
   switch (pr.mergeStateStatus) {
     case 'clean':
-      return <Cell tone="ok" icon={GitMerge} label="Merge" detail={`No conflicts with ${base}`} />
+      return <Cell tone="ok" icon={GitMerge} label="Merge" detail={cleanDetail(base, stack)} />
     case 'behind':
       return (
         <Cell tone="wait" icon={ArrowDown} label="Merge" detail={`Behind ${base}`}>
@@ -156,17 +171,28 @@ function MergeCell({ pr, branch }: { pr: PrReviewDetail; branch: ReadinessBranch
 }
 
 /** Checks, reviews and merge state in one row; the answer to "can this ship?". */
-export function ReadinessStrip({ pr, youAreRequested, branch }: ReadinessStripProps) {
+export function ReadinessStrip({
+  pr,
+  youAreRequested,
+  branch,
+  stack,
+  notice,
+}: ReadinessStripProps) {
   return (
     <>
       <div className="rs-strip" role="group" aria-label="Status">
         <ChecksCell pr={pr} />
         <ReviewsCell pr={pr} youAreRequested={youAreRequested} />
-        <MergeCell pr={pr} branch={branch} />
+        <MergeCell pr={pr} branch={branch} stack={stack} />
       </div>
       {branch.error && (
         <p className="rs-error" role="alert">
           {branch.error}
+        </p>
+      )}
+      {notice && (
+        <p className="rs-error" role="status">
+          {notice}
         </p>
       )}
     </>

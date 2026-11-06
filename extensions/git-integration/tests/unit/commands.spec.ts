@@ -50,11 +50,11 @@ beforeEach(() => {
 })
 
 describe('registerQuickActionCommands', () => {
-  it('registers exactly commit, push, pull and create-pr with mnemonics, labels, requires and category', () => {
+  it('registers exactly commit, push, pull, create-pr, write-commit-message and commit-and-open-pr with mnemonics, labels, requires and category', () => {
     const { api, registrations } = buildMockApi()
     registerQuickActionCommands(api as never)
 
-    expect(registrations).toHaveLength(4)
+    expect(registrations).toHaveLength(6)
     const byId = Object.fromEntries(registrations.map((r) => [r.command.id, r.command]))
 
     const expected = [
@@ -62,6 +62,8 @@ describe('registerQuickActionCommands', () => {
       ['push', 'Push', 'p'],
       ['pull', 'Pull', 'l'],
       ['create-pr', 'Create PR…', 'r'],
+      ['write-commit-message', 'Write commit message', 'w'],
+      ['commit-and-open-pr', 'Commit and open PR…', 'o'],
     ]
     for (const [id, label, mnemonic] of expected) {
       expect(byId[id]).toMatchObject({ label, mnemonic, requires: 'repo', category: 'Git' })
@@ -256,5 +258,27 @@ describe('registerQuickActionCommands (continued)', () => {
       expect(consumePendingViewRequest()).toBeNull()
       vi.useRealTimers()
     })
+  })
+})
+
+describe('registerQuickActionCommands — the draft commands', () => {
+  it('write-commit-message asks the open Git view to write the message', async () => {
+    const { api, registrations, showSelf, broadcast } = buildMockApi()
+    registerQuickActionCommands(api as never)
+
+    await registrations.find((r) => r.command.id === 'write-commit-message')!.handler(ctx('/repo'))
+
+    expect(showSelf).toHaveBeenCalledWith('project')
+    expect(broadcast).toHaveBeenCalledWith('git:write-commit-message', { repoRoot: '/repo' })
+    expect(consumePendingViewRequest()).toEqual({ kind: 'write-message', repoRoot: '/repo' })
+  })
+
+  it('commit-and-open-pr opens the pull request dialog', async () => {
+    const { api, registrations, broadcast } = buildMockApi()
+    registerQuickActionCommands(api as never)
+
+    await registrations.find((r) => r.command.id === 'commit-and-open-pr')!.handler(ctx('/repo'))
+
+    expect(broadcast).toHaveBeenCalledWith('git:open-pr-dialog', { repoRoot: '/repo' })
   })
 })
