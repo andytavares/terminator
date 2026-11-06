@@ -6,6 +6,7 @@ import { AcrossRepos } from './AcrossRepos'
 import { RunAsChoices } from './RunAsChoices'
 import { promptBranch } from '../../../shared/home/branch-name'
 import { WhenChoices, type WhenValue } from './WhenChoices'
+import { repeatOf } from './start-work-schedule'
 import { agentLabel, useAgentChoices } from './agent-choices'
 import { startScratchSession } from '../../terminal/start-session'
 import { recordUse } from '../../usage/record'
@@ -216,7 +217,9 @@ async function schedule(view: ActionsInput['view'], request: WorkRequest): Promi
     repoRoot: request.workspace.folderPath,
     prompt: request.text.trim(),
     runAs: request.runAs,
-    kind: when === 'now' ? 'daily' : when,
+    kind: when === 'once' ? 'once' : 'repeat',
+    repeat: repeatOf(when),
+    branch: null,
     time,
     date: when === 'once' ? date : null,
     newWorktree: request.newWorktree === true,

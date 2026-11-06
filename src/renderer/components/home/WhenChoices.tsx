@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Clock, X } from 'lucide-react'
 import { IconButton, SegmentedControl } from '@terminator/extension-ui'
+import { describeRepeat } from '../../../shared/recurrence'
 import type { When } from './start-work-schedule'
 import type { Schedule } from '../../../shared/schemas/schedules.schema'
 
@@ -69,17 +70,14 @@ function TimeInputs({ value, onChange }: WhenChoicesProps): React.JSX.Element {
   )
 }
 
-const KIND_WORDS: Record<Schedule['kind'], string> = {
-  once: 'once',
-  daily: 'every day',
-  weekdays: 'every weekday',
-}
-
 /** When a saved run runs, and in which repository. */
 function whenOf(schedule: Schedule): string {
-  const day = schedule.kind === 'once' ? `on ${schedule.date} ` : `${KIND_WORDS[schedule.kind]} `
+  const when =
+    schedule.repeat === null
+      ? `on ${schedule.date} at ${schedule.time}`
+      : describeRepeat(schedule.repeat, schedule.time)
   const repo = schedule.repoRoot.split('/').pop() ?? schedule.repoRoot
-  return `${day}at ${schedule.time} · ${repo}`
+  return `${when} · ${repo}`
 }
 
 /** The saved runs, read once, and a remove that reads them again. */

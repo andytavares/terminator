@@ -398,6 +398,24 @@ describe('StartWork — an extension option', () => {
   })
 })
 
+describe('StartWork — an extension option given a typed prompt', () => {
+  it('passes the prompt and the repository', async () => {
+    registerFoundryOption()
+    useExtensionCommandsRegistered()
+    const onClose = await open()
+    goToTab('Prompt')
+    useRepoFolder()
+    fireEvent.change(searchBox(), { target: { value: 'fix the build' } })
+    for (let step = 0; step < 3; step++) fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(executeCommand).toHaveBeenCalledWith('x.command.new-order', expect.anything(), {
+      prompt: 'fix the build',
+      repoRoot: '/repo',
+    })
+  })
+})
+
 describe('StartWork — an extension option whose command is not running', () => {
   it('says so in plain words and starts nothing', async () => {
     registerFoundryOption()
@@ -823,7 +841,9 @@ describe('StartWork — When, saving', () => {
       repoRoot: '/repo',
       prompt: 'tidy the readme',
       runAs: 'agent',
-      kind: 'daily',
+      kind: 'repeat',
+      repeat: { every: 1, unit: 'day', days: [], between: null, overlap: 'skip' },
+      branch: null,
       time: '07:30',
       date: null,
       newWorktree: true,

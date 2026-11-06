@@ -2,11 +2,19 @@ import { useEffect } from 'react'
 import { useToastStore } from '../../stores/toast.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { startWork } from './start-work'
+import type { RepeatRule } from '../../../shared/recurrence'
 import type { Schedule } from '../../../shared/schemas/schedules.schema'
 
 // A saved prompt coming due starts the way Start work starts a typed prompt.
 
 export type When = 'now' | 'once' | 'daily' | 'weekdays'
+
+/** The Repeat rule behind a When choice; null for Now and Once. */
+export function repeatOf(when: When): RepeatRule | null {
+  if (when !== 'daily' && when !== 'weekdays') return null
+  const days = when === 'weekdays' ? [1, 2, 3, 4, 5] : []
+  return { every: 1, unit: 'day', days, between: null, overlap: 'skip' }
+}
 
 async function launchScheduled(schedule: Schedule): Promise<void> {
   const workspace = useWorkspaceStore
