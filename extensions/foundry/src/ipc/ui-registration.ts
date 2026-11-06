@@ -11,8 +11,9 @@ import { inBackground } from '../background.js'
 
 // Auto-expires so a late manual visit to the Forge doesn't surprise the
 // operator with an intake that opened itself for no reason they can see.
-let pendingNewOrder = false
-let pendingNewOrderTimer: NodeJS.Timeout | null = null
+export type PendingRequest = { kind: 'new' } | { kind: 'order'; orderId: string }
+let pendingRequest: PendingRequest | null = null
+let pendingTimer: NodeJS.Timeout | null = null
 
 // Anything but 'factory' reads as 'list' — an unset or corrupted setting is
 // the same as never having chosen the newer view.
@@ -38,14 +39,16 @@ export function setView(api: ExtensionAPI, { view }: z.infer<typeof ViewPayload>
   return { view }
 }
 
-export function consumePendingNewOrder() {
-  const pending = pendingNewOrder
-  pendingNewOrder = false
-  if (pendingNewOrderTimer !== null) {
-    clearTimeout(pendingNewOrderTimer)
-    pendingNewOrderTimer = null
-  }
+export function consumePendingNewOrder(): { pending: PendingRequest | null } {
+  const pending = pendingRequest
+  clearPendingNewOrder()
   return { pending }
+}
+
+function setPending(request: PendingRequest): void {
+  clearPendingNewOrder()
+  pendingRequest = request
+  pendingTimer = setTimeout(clearPendingNewOrder, 5000)
 }
 
 /** The palette's fixed commands: a new work order, the view toggle, and opening Foundry from Home. */
@@ -59,9 +62,9 @@ export function registerCommands(api: ExtensionAPI, forge: Pick<ForgeChannels, '
         mnemonic: 'n',
       },
       (_context, args?: unknown) => {
-        const ticket = ticketOf(args)
-        if (ticket === null) openNewOrder(api)
-        else inBackground(orderFromTicket(api, forge, ticket))
+        const source = sourceOf(args)
+        if (source === null) openNewOrder(api)
+        else inBackground(createThenOpen(api, forge, source))
       }
     )
   )
@@ -78,7 +81,7 @@ function registerOpenOrder(api: ExtensionAPI): void {
       (_context, args?: unknown) => {
         api.window.showSelf('main')
         const orderId = (args as { orderId?: unknown } | undefined)?.orderId
-        if (typeof orderId === 'string') api.window.broadcast('foundry:ui.open-order', { orderId })
+        if (typeof orderId === 'string') openOrder(api, orderId)
       }
     )
   )
@@ -103,59 +106,66 @@ function registerToggleView(api: ExtensionAPI): void {
   )
 }
 
-interface TicketArgs {
-  readonly tracker: 'linear'
-  readonly key: string
+interface StartedSource {
+  readonly source:
+    | { kind: 'tracker'; tracker: 'linear'; key: string }
+    | { kind: 'typed'; text: string }
   readonly repoRoot: string
+  readonly label: string
 }
 
-/** The ticket Home's Start work launcher passed, when it passed one. */
-function ticketOf(args: unknown): TicketArgs | null {
-  const { tracker, key, repoRoot } = (args ?? {}) as Record<string, unknown>
-  const knownTracker = tracker === 'linear'
-  if (!knownTracker || typeof key !== 'string' || typeof repoRoot !== 'string') return null
-  return { tracker, key, repoRoot }
+/** The ticket or prompt Home's Start work launcher passed, when it passed one. */
+function sourceOf(args: unknown): StartedSource | null {
+  const { tracker, key, prompt, repoRoot } = (args ?? {}) as Record<string, unknown>
+  if (typeof repoRoot !== 'string') return null
+  if (tracker === 'linear' && typeof key === 'string') {
+    return { source: { kind: 'tracker', tracker, key }, repoRoot, label: key }
+  }
+  if (typeof prompt === 'string' && prompt !== '') {
+    return { source: { kind: 'typed', text: prompt }, repoRoot, label: 'that prompt' }
+  }
+  return null
 }
 
-// The same call the Forge's ticket picker makes; the order it opens is the form, prefilled.
-async function orderFromTicket(
+// The same call the Forge's picker makes; the order it opens is the form, prefilled.
+async function createThenOpen(
   api: ExtensionAPI,
   forge: Pick<ForgeChannels, 'create'>,
-  ticket: TicketArgs
+  { source, repoRoot, label }: StartedSource
 ): Promise<void> {
-  const { tracker, key, repoRoot } = ticket
-  const created = (await forge.create({
-    source: { kind: 'tracker', tracker, key },
-    repoPaths: [repoRoot],
-  })) as { order?: { id: string }; existing?: { id: string }; error?: string }
+  const created = (await forge.create({ source, repoPaths: [repoRoot] })) as {
+    order?: { id: string }
+    existing?: { id: string }
+    error?: string
+  }
   const orderId = created.order?.id ?? created.existing?.id
   if (orderId === undefined) {
     api.notifications.showToast(
       'error',
-      created.error ?? `Could not start ${key}.`,
-      `ticket-${key}`
+      created.error ?? `Could not start ${label}.`,
+      `start-${label}`
     )
     return
   }
+  openOrder(api, orderId)
+}
+
+// Broadcast to a running view, and set a pending request for one still loading;
+// otherwise a command run before the view mounts is dropped.
+function openOrder(api: ExtensionAPI, orderId: string): void {
   api.window.showSelf('main')
   api.window.broadcast('foundry:ui.open-order', { orderId })
+  setPending({ kind: 'order', orderId })
 }
 
 function openNewOrder(api: ExtensionAPI): void {
   api.window.showSelf('main')
-  // Broadcast to a running view, and set a pending flag for one not yet created, as
-  // Notepad's quick-create does; otherwise a command run before the view is dropped.
   api.window.broadcast('foundry:ui.open-new-order', {})
-  pendingNewOrder = true
-  if (pendingNewOrderTimer !== null) clearTimeout(pendingNewOrderTimer)
-  pendingNewOrderTimer = setTimeout(() => {
-    pendingNewOrder = false
-    pendingNewOrderTimer = null
-  }, 5000)
+  setPending({ kind: 'new' })
 }
 
 export function clearPendingNewOrder(): void {
-  if (pendingNewOrderTimer !== null) clearTimeout(pendingNewOrderTimer)
-  pendingNewOrderTimer = null
-  pendingNewOrder = false
+  if (pendingTimer !== null) clearTimeout(pendingTimer)
+  pendingTimer = null
+  pendingRequest = null
 }

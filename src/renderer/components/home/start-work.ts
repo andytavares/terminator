@@ -247,8 +247,10 @@ function commandFor(request: WorkRequest): string | undefined | Error {
   return command ?? new Error(PROMPT_TOO_LONG)
 }
 
-/** What an extension's start-work command is given when a ticket was chosen. */
+/** What an extension's start-work command is given when a ticket or a prompt was chosen. */
 function optionArgs(request: WorkRequest): object | undefined {
+  if (request.kind === 'prompt')
+    return { prompt: request.text, repoRoot: request.workspace.folderPath }
   if (request.kind !== 'ticket') return undefined
   const { tracker, key, title } = request.issue
   return { tracker, key, title, repoRoot: request.workspace.folderPath }

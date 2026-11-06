@@ -15,7 +15,7 @@ import { timesInvoked } from '../helpers/bridge-calls.js'
 const bridgeHandlers: Record<string, (data: unknown) => void> = {}
 /** Every handler, for events several parts of the window listen to. */
 const everyHandler: Record<string, ((data: unknown) => void)[]> = {}
-let pendingNewOrder = false
+let pendingRequest: unknown = null
 let orderRows: unknown[] = []
 let currentView: 'list' | 'factory' = 'list'
 let observeStanding: unknown
@@ -85,7 +85,7 @@ const replies: Record<string, (payload: unknown) => unknown> = {
     waiting: inboxWaiting,
     summary: { waiting: 0, orders: 0, automatic: 0, building: 0, converging: 0 },
   }),
-  'foundry:ui.consume-pending-new-order': () => ({ pending: pendingNewOrder }),
+  'foundry:ui.consume-pending-new-order': () => ({ pending: pendingRequest }),
   'foundry:ui.view': () => ({ view: currentView }),
   'foundry:ui.set-view': setViewReply,
   'foundry:run.observe': observedRun,
@@ -117,7 +117,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   // clearAllMocks keeps an implementation a test installed, so the next test would inherit it.
   mockBridgeInvoke.mockImplementation(answerFromReplies)
-  pendingNewOrder = false
+  pendingRequest = null
   orderRows = []
   inboxWaiting = []
   currentView = 'list'
@@ -471,8 +471,15 @@ function theForgeBroughtForwardTests() {
 }
 
 function anEarlierRequestTests() {
+  it('opens the order an earlier request named', async () => {
+    orderRows = [WORKING_ROW]
+    pendingRequest = { kind: 'order', orderId: 'WO-1' }
+    render(<App />)
+    await screen.findByRole('heading', { name: /WO-1/ })
+  })
+
   it('picks up a request made before this view existed', async () => {
-    pendingNewOrder = true
+    pendingRequest = { kind: 'new' }
     render(<App />)
     await waitFor(() =>
       expect(screen.getByRole('tab', { name: 'Forge' }).getAttribute('aria-selected')).toBe('true')
