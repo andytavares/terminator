@@ -2,6 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
 import { StartWork } from '../../../../src/renderer/components/home/StartWork'
+import { startingWhen, whenProblem } from '../../../../src/renderer/components/home/WhenChoices'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
@@ -438,6 +439,7 @@ function useExtensionCommandsRegistered(): void {
   installElectronApi({
     git,
     agents: { list: agentsList },
+    schedules: { create: createSchedule, list: async () => ({ data: [] }) },
     extension: {
       executeCommand,
       // As core answers: a command that takes args is in no quick-action list, only registered.
@@ -985,6 +987,70 @@ describe('StartWork — When, Once in the past', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Once' }))
     fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2020-01-01' } })
     expect(screen.getByText('That time has passed.')).toBeTruthy()
+    const button = screen.getByRole('button', { name: /^Schedule/ }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+  })
+})
+
+describe('StartWork — Once after a clock repeat', () => {
+  it('saves the time shown, not the repeat window start', async () => {
+    createSchedule.mockResolvedValue({ data: {} as never })
+    await open()
+    typePrompt('cut the release notes')
+    fireEvent.click(screen.getByRole('radio', { name: 'Repeat' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Every 30 min' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Once' }))
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2099-01-01' } })
+    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '17:00' } })
+    fireEvent.click(screen.getByRole('button', { name: /^Schedule/ }))
+    await waitFor(() => expect(createSchedule).toHaveBeenCalled())
+    expect(createSchedule.mock.calls.at(-1)?.[0]).toMatchObject({ kind: 'once', time: '17:00' })
+  })
+})
+
+describe('StartWork — keys on a focused control', () => {
+  it('Enter on a preset presses it and saves nothing', async () => {
+    await open()
+    typePrompt('tidy the readme')
+    fireEvent.click(screen.getByRole('radio', { name: 'Repeat' }))
+    // Not prevented: the browser turns it into a click on the preset.
+    expect(
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Hourly' }), { key: 'Enter' })
+    ).toBe(true)
+    expect(fireEvent.keyDown(screen.getByRole('button', { name: 'Hourly' }), { key: 'Tab' })).toBe(
+      true
+    )
+  })
+
+  it('Enter in the prompt box does not save a schedule Schedule refuses', async () => {
+    await open()
+    typePrompt('tidy the readme')
+    fireEvent.click(screen.getByRole('radio', { name: 'Once' }))
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2020-01-01' } })
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    expect(createSchedule).not.toHaveBeenCalled()
+  })
+})
+
+describe('whenProblem — a repeat that never runs', () => {
+  it('says so, so it cannot be saved', () => {
+    const notToday = (new Date().getDay() + 1) % 7
+    const value = { ...startingWhen('2099-01-01'), when: 'repeat' as const }
+    const rule = { ...value.rule, every: 7, unit: 'day' as const, days: [notToday], between: null }
+    expect(whenProblem({ ...value, rule })).toBe('This repeat never runs.')
+  })
+})
+
+describe('StartWork — an extension option on a repeat', () => {
+  it('is refused: each run would start a new order', async () => {
+    registerFoundryOption()
+    useExtensionCommandsRegistered()
+    await open()
+    goToTab('Prompt')
+    fireEvent.change(searchBox(), { target: { value: 'fix the build' } })
+    for (let step = 0; step < 3; step++) fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    fireEvent.click(screen.getByRole('radio', { name: 'Repeat' }))
+    expect(screen.getByText('Foundry order cannot repeat. Pick Once or Now.')).toBeTruthy()
     const button = screen.getByRole('button', { name: /^Schedule/ }) as HTMLButtonElement
     expect(button.disabled).toBe(true)
   })

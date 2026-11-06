@@ -1,3 +1,4 @@
+import { useExtensionRegistry } from '../../extensions/registry'
 import React, { useState } from 'react'
 import { Bot, GitBranch, Plus } from 'lucide-react'
 import { Button, Chip, Kbd, ModalShell, Tab, TabList, TabsRoot } from '@terminator/extension-ui'
@@ -189,6 +190,8 @@ async function submit({ view, onClose, setError }: SubmitInput): Promise<void> {
     return void startScratchSession()
   }
   if (view.repo === null) return setError('Add a workspace in the sidebar first.')
+  const problem = scheduleProblem(view)
+  if (problem !== null) return setError(problem)
   const request = requestFor(view, view.repo)
   if (request === null) return
   const message =
@@ -270,8 +273,13 @@ function LauncherBody(launcher: Launcher): React.JSX.Element {
   )
 }
 
-function handleKey(e: React.KeyboardEvent, { view, actions, selectedIndex }: Launcher): void {
-  if (view.tab === 'across' || (e.key === 'Enter' && e.shiftKey)) return
+/** Tab and Enter belong to the prompt box, the search box and the tab strip; on any other control
+ * they do what that control does. */
+const fromLauncherKeys = (target: EventTarget): boolean =>
+  target instanceof HTMLTextAreaElement ||
+  (target as Element).closest?.('.start-work__input, [role="tab"]') != null
+
+function keyMoves(e: React.KeyboardEvent, { view, actions, selectedIndex }: Launcher) {
   // The Prompt tab's box keeps the arrow keys for moving the caret between lines.
   const arrows: Record<string, () => void> =
     view.tab === 'prompt'
@@ -285,8 +293,14 @@ function handleKey(e: React.KeyboardEvent, { view, actions, selectedIndex }: Lau
     Tab: () => actions.setRunAs(cycleRunAs(view.runAsOptions, view.runAs, e.shiftKey ? -1 : 1)),
     Enter: () => void actions.start(),
   }
+  return moves
+}
+
+function handleKey(e: React.KeyboardEvent, launcher: Launcher): void {
+  if (launcher.view.tab === 'across' || (e.key === 'Enter' && e.shiftKey)) return
   const isRepoKey = e.key.toLowerCase() === 'r' && (e.metaKey || e.ctrlKey)
-  const run = isRepoKey ? actions.togglePicker : moves[e.key]
+  if (!isRepoKey && !fromLauncherKeys(e.target)) return
+  const run = isRepoKey ? launcher.actions.togglePicker : keyMoves(e, launcher)[e.key]
   if (run === undefined) return
   e.preventDefault()
   run()
@@ -575,18 +589,38 @@ function Footer({ view, actions }: Launcher): React.JSX.Element {
       <span>
         <Kbd>⌘R</Kbd> workspace
       </span>
-      {view.error !== null && (
-        <span role="alert" className="start-work__error">
-          {view.error}
-        </span>
-      )}
+      <FooterError view={view} />
       <StartButton {...{ view, actions }} />
     </div>
   )
 }
 
+type ScheduleView = Pick<Launcher['view'], 'isPrompt' | 'runAs' | 'when'>
+
+/** An extension's run makes a new thing each time (a Foundry order), so it cannot repeat. */
+function repeatRefusal(view: ScheduleView): string | null {
+  const option = useExtensionRegistry.getState().startWorkOptions.get(view.runAs)
+  return option !== undefined && view.isPrompt && view.when.when === 'repeat'
+    ? `${option.label} cannot repeat. Pick Once or Now.`
+    : null
+}
+
+/** What stops this prompt being started or saved as chosen; null when nothing does. */
+const scheduleProblem = (view: ScheduleView): string | null =>
+  view.isPrompt ? (repeatRefusal(view) ?? whenProblem(view.when)) : null
+
+function FooterError({ view }: { view: Launcher['view'] }): React.JSX.Element | null {
+  const message = view.error ?? repeatRefusal(view)
+  if (message === null) return null
+  return (
+    <span role="alert" className="start-work__error">
+      {message}
+    </span>
+  )
+}
+
 function StartButton({ view, actions }: PartProps): React.JSX.Element {
-  const blocked = view.isPrompt && whenProblem(view.when) !== null
+  const blocked = scheduleProblem(view) !== null
   return (
     <Button variant="primary" size="sm" disabled={blocked} onClick={() => void actions.start()}>
       {startLabel(view)}

@@ -44,8 +44,8 @@ interface WhenChoicesProps {
 const isClockUnit = (unit: RepeatUnit): boolean => unit === 'minute' || unit === 'hour'
 
 /** The time of day the saved schedule counts from. */
-export const runTime = ({ rule, time }: WhenValue): string =>
-  rule.between === null ? time : rule.between.from
+export const runTime = ({ when, rule, time }: WhenValue): string =>
+  when === 'repeat' && isClockUnit(rule.unit) && rule.between !== null ? rule.between.from : time
 
 const pad = (n: number): string => String(n).padStart(2, '0')
 const clockOf = (date: Date): string => `${pad(date.getHours())}:${pad(date.getMinutes())}`
@@ -61,13 +61,20 @@ const onceAt = ({ date, time }: WhenValue): Date => new Date(`${date}T${time}`)
 
 /** What stops a Once from being saved; null when it can be. */
 export function whenProblem(value: WhenValue): string | null {
-  const { between } = value.rule
-  if (value.when === 'repeat' && between !== null && between.to <= between.from)
-    return 'The end time must be after the start time.'
+  if (value.when === 'repeat') return repeatProblem(value)
   if (value.when !== 'once') return null
   const at = onceAt(value)
   if (Number.isNaN(at.getTime())) return 'Pick a date and time.'
   return at.getTime() <= Date.now() ? 'That time has passed.' : null
+}
+
+function repeatProblem(value: WhenValue): string | null {
+  const { between } = value.rule
+  if (between !== null && between.to <= between.from)
+    return 'The end time must be after the start time.'
+  const now = new Date()
+  const runs = nextRuns({ rule: value.rule, time: runTime(value), anchor: now }, now, 1)
+  return runs.length === 0 ? 'This repeat never runs.' : null
 }
 
 /** The "When" row: start now, or save the prompt to run once, or on a repeat. */
