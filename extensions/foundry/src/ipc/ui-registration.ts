@@ -95,7 +95,7 @@ function registerOpenOrder(api: ExtensionAPI): void {
       (_context, args?: unknown) => {
         api.window.showSelf('main')
         const orderId = (args as { orderId?: unknown } | undefined)?.orderId
-        if (typeof orderId === 'string') openOrder(api, orderId)
+        if (typeof orderId === 'string') showOrder(api, orderId)
       }
     )
   )
@@ -161,12 +161,12 @@ async function createThenOpen(
     )
     return
   }
-  openOrder(api, orderId)
+  showOrder(api, orderId)
 }
 
 // Broadcast to a running view, and set a pending request for one still loading;
 // otherwise a command run before the view mounts is dropped.
-function openOrder(api: ExtensionAPI, orderId: string): void {
+function showOrder(api: ExtensionAPI, orderId: string): void {
   api.window.showSelf('main')
   api.window.broadcast('foundry:ui.open-order', { orderId })
   setPending({ kind: 'order', orderId })

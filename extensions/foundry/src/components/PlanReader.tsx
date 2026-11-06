@@ -9,11 +9,11 @@ import { renderOrder } from '../order/render.js'
 export function PlanReader({ order, onClose }: { order: WorkOrder; onClose: () => void }) {
   const markdown = renderOrder(order)
   // A refused clipboard write changes nothing on screen; the text is still readable here.
-  const copy = () => void navigator.clipboard.writeText(markdown).catch(() => undefined)
+  const copyMarkdown = () => void navigator.clipboard.writeText(markdown).catch(() => undefined)
   return (
     <Drawer label={`Plan · ${order.id}`} onDismiss={onClose}>
       <div className="fdry-plan-head">
-        <Button size="sm" icon={Copy} onClick={copy}>
+        <Button size="sm" icon={Copy} onClick={copyMarkdown}>
           Copy Markdown
         </Button>
         <Button size="sm" variant="ghost" icon={X} onClick={onClose}>

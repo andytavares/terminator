@@ -4,7 +4,7 @@ import { z } from 'zod'
 
 const Clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)
 
-export const RepeatSchema = z
+const RepeatSchema = z
   .object({
     every: z.number().int().min(1).max(999),
     unit: z.enum(['minute', 'hour', 'day', 'week', 'month']),
@@ -51,6 +51,5 @@ export const ScheduleIdInputSchema = z.object({ id: z.string().min(1) })
 
 export const BranchNameInputSchema = z.object({ prompt: z.string().trim().min(1) })
 
-export type RepeatInput = z.infer<typeof RepeatSchema>
 export type ScheduleInput = z.infer<typeof ScheduleInputSchema>
 export type Schedule = ScheduleInput & { id: string; lastRunAt: string | null; createdAt: string }
