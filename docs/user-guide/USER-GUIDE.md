@@ -547,7 +547,14 @@ When one of your pull requests gets a failed check, a new review or comment, or 
 
 ### Scheduled runs
 
-In **Start work**, a prompt has a **When** row: **Now**, **Once**, **Daily** or **Weekdays**, and a time. The button then reads **Schedule**. A scheduled run starts what Start work would start, while Terminator is open. A run missed while it was closed waits in **Needs you** with **Run now** and **Skip**; it never starts by itself. A prompt run as an agent starts in a new worktree on a branch Claude names, for example `fix/fetch-user-retry`. If naming takes over 5 seconds or fails, the branch is `prompt/<first words>`. **Use the repo folder** runs it in the main checkout as before.
+In **Start work**, the **Prompt** tab takes the prompt in the text area under **What should it do?**. **Enter** starts it and **Shift+Enter** adds a line. On **My tickets**, text that matches no ticket offers **Write it as a prompt**.
+
+Under the prompt, **When** is **Now**, **Once** or **Repeat**, and the button then reads **Schedule**.
+
+- **Once** takes a date and a time, or a quick pick such as **Tomorrow 09:00**. It says when it runs and how far away that is. A time already passed is refused before you save.
+- **Repeat** runs **Every** N minutes, hours, days, weeks or months. **On** picks weekdays (none picked means every day). Minutes and hours run **Between** two times; days, weeks and months run **At** a time. Presets such as **Every 30 min** and **Weekdays 09:00** fill the fields. **Next** shows the next three runs. **If busy** says what happens when the last run is still going: skip it (the default) or start another.
+
+A scheduled run starts what Start work would start, while Terminator is open. A run missed while it was closed waits in **Needs you** with **Run now** and **Skip**; it never starts by itself. A minute or hour repeat skips runs missed while Terminator was closed, with no ask. A prompt run as an agent starts in a new worktree on a branch Claude names, for example `fix/fetch-user-retry`. If naming takes over 5 seconds or fails, the branch is `prompt/<first words>`. A repeat names its branch once, when you save it, and every run uses that one worktree. **Use the repo folder** runs it in the main checkout as before.
 
 ### Picking a Claude Code conversation back up
 
@@ -841,6 +848,8 @@ You can open any step from the step list at any time. An order opens where the n
 **Criteria falsifiable** on a change that somebody can see is the check that catches people. A plan that touches a `.tsx`, `.css` or `.html` file and has no criterion that asks for a picture of the running application fails, because a command cannot say whether a thing renders. **Ask for proof** has the architect add a `screenshot` criterion. If nothing here can take that picture (no display, no runner), mark the criterion **"Nothing here can prove this"** on the Plan step. That costs a written reason, which travels with the order and shows in the ledger.
 
 **Budgets** are yours to set, not the architect's. Each new order starts with the limits in Settings → Foundry: agents at once and minutes. There is no limit on how many files an order touches. In Settings, 0 means no limit. To change the limits for one order, use the **Budgets** section at the bottom of the Plan step. Enter a number or tick **No limit**, then press **Save budgets**.
+
+**Open plan** in the order's header shows the whole order as one formatted document: intent, acceptance criteria, the plan, coverage, assumptions, open questions, red-team findings and budgets. It is the same text Foundry saves as `.foundry/orders/<id>/order.md`. **Copy Markdown** copies it. It works at every status. Choosing **Foundry order** in Start work opens the new order in Foundry, from a ticket or from a prompt.
 
 If a run goes past a budget, it stops and asks you what to do. **Raise the budget** asks for the new limit. It suggests about a quarter more than the run has already used, and it does not accept less than the run has already used. Foundry saves the new limit to the order and the run resumes. You can tick **No limit** there as well.
 
