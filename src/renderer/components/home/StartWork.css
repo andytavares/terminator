@@ -12,7 +12,11 @@
   font-size: var(--tm-font-size-sm);
 }
 .start-work {
+  display: flex;
+  flex-direction: column;
   width: 820px;
+  /* .tmui-modal--top insets the dialog 92px from the top. */
+  max-height: calc(100vh - 92px - 24px);
 }
 
 .start-work__input {
@@ -69,14 +73,14 @@
 .start-work__body {
   display: grid;
   grid-template-columns: 1fr 300px;
-  min-height: 330px;
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
 }
 
 .start-work__list {
   padding: 6px;
-  border-right: 1px solid var(--tm-border);
   overflow-y: auto;
-  max-height: 420px;
 }
 
 .start-work__group {
@@ -125,6 +129,8 @@
   gap: 12px;
   align-content: start;
   padding: 14px;
+  border-left: 1px solid var(--tm-border);
+  overflow-y: auto;
 }
 
 .start-work__label {
@@ -368,4 +374,74 @@
 .start-work__scheduled .tmui-icon-button {
   grid-row: 1 / span 2;
   grid-column: 2;
+}
+
+.start-work__prompt {
+  display: grid;
+  gap: var(--tm-space-2);
+  align-content: start;
+  padding: 14px;
+}
+
+.start-work__prompt textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+  padding: var(--tm-space-2);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 6px;
+  background: var(--tm-bg-input);
+  color: var(--tm-text-primary);
+  font: inherit;
+}
+
+.start-work__prompt .start-work__hint {
+  padding: 0;
+}
+
+.start-work__write {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--tm-text-primary);
+  font: inherit;
+  text-align: left;
+}
+
+.start-work__inline {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-2);
+}
+
+.start-work__picks,
+.start-work__row-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tm-space-2);
+  color: var(--tm-text-secondary);
+}
+
+.start-work__row-fields input,
+.start-work__row-fields select,
+.start-work__time input {
+  height: var(--tm-control-height);
+  box-sizing: border-box;
+  padding: 0 var(--tm-space-2);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 4px;
+  background: var(--tm-bg-input);
+  color: var(--tm-text-primary);
+  font: inherit;
+}
+
+.start-work__row-fields input[type='number'] {
+  width: 64px;
+}
+
+.start-work__warning {
+  margin: 0;
+  color: var(--tm-warning);
+  font-size: var(--tm-font-size-xs);
 }

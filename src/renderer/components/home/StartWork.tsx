@@ -5,12 +5,13 @@ import { WorkspacePicker } from './WorkspacePicker'
 import { AcrossRepos } from './AcrossRepos'
 import { RunAsChoices } from './RunAsChoices'
 import { promptBranch } from '../../../shared/home/branch-name'
-import { WhenChoices, type WhenValue } from './WhenChoices'
-import { repeatOf } from './start-work-schedule'
+import { PromptPane } from './PromptPane'
+import { runTime, startingWhen, whenProblem, type WhenValue } from './WhenChoices'
 import { agentLabel, useAgentChoices } from './agent-choices'
 import { startScratchSession } from '../../terminal/start-session'
 import { recordUse } from '../../usage/record'
 import {
+  askBranchName,
   branchOf,
   cycleRunAs,
   isAgentRun,
@@ -64,11 +65,7 @@ function useLauncherFields() {
   const [pickedRepoId, setPickedRepoId] = useState<string | null>(null)
   const [picking, setPicking] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [when, setWhen] = useState<WhenValue>({
-    when: 'now',
-    time: '09:00',
-    date: firstDayFor('09:00'),
-  })
+  const [when, setWhen] = useState<WhenValue>(startingWhen(firstDayFor('09:00')))
   const [useRepoFolder, setUseRepoFolder] = useState(false)
   return {
     ...{ tab, query, runAs, agentId, selectedIndex, pickedRepoId, picking, error },
@@ -142,6 +139,8 @@ function launcherActions({ fields, view, onClose }: ActionsInput) {
   return {
     setTab: (next: LauncherTab) => {
       fields.setTab(next)
+      // Scheduling is chosen on the Prompt tab only.
+      if (next !== 'prompt') fields.setWhen({ ...view.when, when: 'now' })
       fresh()
     },
     typeQuery: (next: string) => {
@@ -209,19 +208,26 @@ const SCHEDULE_DECLARATION = {
   source: 'core',
 }
 
+/** The one branch a repeat runs on, named once on save; null when it runs in the repo folder. */
+async function repeatBranch(request: WorkRequest & { kind: 'prompt' }): Promise<string | null> {
+  if (request.newWorktree !== true) return null
+  const text = request.text.trim()
+  return request.branch ?? (await askBranchName(text)) ?? promptBranch(text)
+}
+
 /** Saves the prompt to run later. Null when saved; otherwise what to tell the person. */
 async function schedule(view: ActionsInput['view'], request: WorkRequest): Promise<string | null> {
   if (request.kind !== 'prompt') return 'Only a typed prompt can be scheduled.'
-  const { when, time, date } = view.when
+  const repeating = view.when.when === 'repeat'
   const result = await window.electronAPI.schedules.create({
     repoRoot: request.workspace.folderPath,
     prompt: request.text.trim(),
     runAs: request.runAs,
-    kind: when === 'once' ? 'once' : 'repeat',
-    repeat: repeatOf(when),
-    branch: null,
-    time,
-    date: when === 'once' ? date : null,
+    kind: repeating ? 'repeat' : 'once',
+    repeat: repeating ? view.when.rule : null,
+    branch: repeating ? await repeatBranch(request) : null,
+    time: runTime(view.when),
+    date: repeating ? null : view.when.date,
     newWorktree: request.newWorktree === true,
     agentId: request.agentId ?? null,
   })
@@ -235,7 +241,7 @@ export function StartWork({ onClose }: { onClose: () => void }): React.JSX.Eleme
   return (
     <ModalShell label="Start work" placement="top" onDismiss={actions.dismiss}>
       <div className="start-work" onKeyDown={(e) => handleKey(e, launcher)}>
-        {view.tab !== 'across' && <SearchRow {...{ view, actions }} />}
+        {(view.tab === 'tickets' || view.tab === 'branch') && <SearchRow {...{ view, actions }} />}
         <TabRow {...{ view, actions }} />
         {view.tab === 'across' ? <AcrossRepos onClose={onClose} /> : <LauncherBody {...launcher} />}
       </div>
@@ -247,7 +253,16 @@ function LauncherBody(launcher: Launcher): React.JSX.Element {
   return (
     <>
       <div className="start-work__body">
-        <ChoiceList {...launcher} />
+        {launcher.view.tab === 'prompt' ? (
+          <PromptPane
+            query={launcher.view.query}
+            onType={launcher.actions.typeQuery}
+            when={launcher.view.when}
+            onWhen={launcher.actions.setWhen}
+          />
+        ) : (
+          <ChoiceList {...launcher} />
+        )}
         <RunAsPanel {...launcher} />
       </div>
       <Footer {...launcher} />
@@ -256,10 +271,17 @@ function LauncherBody(launcher: Launcher): React.JSX.Element {
 }
 
 function handleKey(e: React.KeyboardEvent, { view, actions, selectedIndex }: Launcher): void {
-  if (view.tab === 'across') return
+  if (view.tab === 'across' || (e.key === 'Enter' && e.shiftKey)) return
+  // The Prompt tab's box keeps the arrow keys for moving the caret between lines.
+  const arrows: Record<string, () => void> =
+    view.tab === 'prompt'
+      ? {}
+      : {
+          ArrowDown: () => actions.select(Math.min(selectedIndex + 1, view.rows.length - 1)),
+          ArrowUp: () => actions.select(Math.max(selectedIndex - 1, 0)),
+        }
   const moves: Record<string, () => void> = {
-    ArrowDown: () => actions.select(Math.min(selectedIndex + 1, view.rows.length - 1)),
-    ArrowUp: () => actions.select(Math.max(selectedIndex - 1, 0)),
+    ...arrows,
     Tab: () => actions.setRunAs(cycleRunAs(view.runAsOptions, view.runAs, e.shiftKey ? -1 : 1)),
     Enter: () => void actions.start(),
   }
@@ -274,7 +296,7 @@ type PartProps = Pick<Launcher, 'view' | 'actions'>
 
 const PLACEHOLDERS: Record<LauncherTab, string> = {
   tickets: 'Search tickets, or type a prompt',
-  prompt: 'Describe the task',
+  prompt: 'What should it do?',
   branch: 'Search branches',
   across: 'Not used on this tab',
   scratch: 'Nothing to type for a scratch terminal',
@@ -324,7 +346,6 @@ function TabRow({ view, actions }: PartProps): React.JSX.Element {
 }
 
 const HINTS: Partial<Record<LauncherTab, string>> = {
-  prompt: 'Type the task above. Enter starts it.',
   scratch: 'A terminal that belongs to no branch. Enter opens it.',
 }
 
@@ -339,9 +360,7 @@ function ChoiceList({ view, actions, selectedIndex }: Launcher): React.JSX.Eleme
   )
 }
 
-function TicketRows({ view, actions, selectedIndex }: Launcher): React.JSX.Element {
-  const typed = view.query.trim()
-  const promptIndex = rowsBefore(view.groups, view.groups.length)
+function TicketGroups({ view, actions, selectedIndex }: Launcher): React.JSX.Element {
   return (
     <>
       {view.groups.map((group, g) => (
@@ -357,6 +376,19 @@ function TicketRows({ view, actions, selectedIndex }: Launcher): React.JSX.Eleme
           ))}
         </React.Fragment>
       ))}
+    </>
+  )
+}
+
+function TicketRows({ view, actions, selectedIndex }: Launcher): React.JSX.Element {
+  const typed = view.query.trim()
+  const promptIndex = rowsBefore(view.groups, view.groups.length)
+  return (
+    <>
+      <TicketGroups {...{ view, actions, selectedIndex }} />
+      {typed !== '' && view.groups.length === 0 && (
+        <WriteAsPrompt onClick={() => actions.setTab('prompt')} />
+      )}
       {typed !== '' && (
         <PromptRow
           text={typed}
@@ -365,6 +397,15 @@ function TicketRows({ view, actions, selectedIndex }: Launcher): React.JSX.Eleme
         />
       )}
     </>
+  )
+}
+
+function WriteAsPrompt({ onClick }: { onClick: () => void }): React.JSX.Element {
+  return (
+    <button type="button" className="start-work__row start-work__write" onClick={onClick}>
+      <Bot aria-hidden="true" />
+      <span>Write it as a prompt</span>
+    </button>
   )
 }
 
@@ -440,7 +481,6 @@ function RunAsPanel({ view, actions }: Launcher): React.JSX.Element {
       <RunAsChoices options={view.runAsOptions} runAs={view.runAs} onPick={actions.setRunAs} />
       <AgentPicker view={view} actions={actions} />
       {view.isPrompt && isAgentRun(view.runAs) && <RepoFolderChoice {...{ view, actions }} />}
-      {view.isPrompt && <WhenChoices value={view.when} onChange={actions.setWhen} />}
       <Summary {...{ view, actions }} />
     </div>
   )
@@ -468,7 +508,7 @@ function AgentPicker({ view, actions }: PartProps): React.JSX.Element | null {
 
 function RepoFolderChoice({ view, actions }: PartProps): React.JSX.Element {
   return (
-    <label className="start-work__agent">
+    <label className="start-work__agent start-work__inline">
       <input
         type="checkbox"
         checked={view.useRepoFolder}
@@ -523,10 +563,12 @@ function startLabel(view: Launcher['view']): string {
 function Footer({ view, actions }: Launcher): React.JSX.Element {
   return (
     <div className="start-work__footer">
-      <span>
-        <Kbd>↑</Kbd>
-        <Kbd>↓</Kbd> choose
-      </span>
+      {view.tab !== 'prompt' && (
+        <span>
+          <Kbd>↑</Kbd>
+          <Kbd>↓</Kbd> choose
+        </span>
+      )}
       <span>
         <Kbd>Tab</Kbd> run as
       </span>
@@ -538,10 +580,17 @@ function Footer({ view, actions }: Launcher): React.JSX.Element {
           {view.error}
         </span>
       )}
-      <Button variant="primary" size="sm" onClick={() => void actions.start()}>
-        {startLabel(view)}
-        <Kbd>↵</Kbd>
-      </Button>
+      <StartButton {...{ view, actions }} />
     </div>
+  )
+}
+
+function StartButton({ view, actions }: PartProps): React.JSX.Element {
+  const blocked = view.isPrompt && whenProblem(view.when) !== null
+  return (
+    <Button variant="primary" size="sm" disabled={blocked} onClick={() => void actions.start()}>
+      {startLabel(view)}
+      <Kbd>↵</Kbd>
+    </Button>
   )
 }
