@@ -82,9 +82,7 @@ export async function startAgentInBranch(request: AgentInBranch): Promise<string
     projectId: request.projectId,
     title: request.title,
     agentId: request.agentId,
-    ...(request.unattended === undefined
-      ? {}
-      : { agentMeta: unattendedAgentMeta(request.unattended) }),
+    ...(request.unattended === undefined ? {} : unattendedAgentStart(request.unattended)),
   })
   if (started === null) return null
   if (request.prompt !== null) promptAgentTab(started.sessionId, request.prompt)
@@ -125,10 +123,15 @@ export function agentCommand(prompt: string | null, unattended?: UnattendedLaunc
   return new TextEncoder().encode(command).length > MAX_TYPED_LINE_BYTES ? null : command
 }
 
-/** What the Claude agent reads from `session/new`: the same settings file and system prompt. */
-const unattendedAgentMeta = ({ settingsPath, systemPrompt }: UnattendedLaunch) => ({
-  systemPrompt: { append: systemPrompt },
-  claudeCode: { options: { settings: settingsPath } },
+/** What an agent tab of a scheduled run starts with. The Claude adapter takes its start mode only
+ * from the operator's own settings, never from the settings file in the meta, so `mode` asks for
+ * auto itself. */
+const unattendedAgentStart = ({ settingsPath, systemPrompt }: UnattendedLaunch) => ({
+  mode: 'auto',
+  agentMeta: {
+    systemPrompt: { append: systemPrompt },
+    claudeCode: { options: { settings: settingsPath } },
+  },
 })
 
 export interface GlobalPrompt {
@@ -151,7 +154,7 @@ async function openGlobalSession(prompt: GlobalPrompt): Promise<string | null> {
       projectId: SCRATCH_PROJECT_ID,
       title: 'Agent',
       agentId,
-      ...(unattended === undefined ? {} : { agentMeta: unattendedAgentMeta(unattended) }),
+      ...(unattended === undefined ? {} : unattendedAgentStart(unattended)),
     })
     if (started !== null) promptAgentTab(started.sessionId, text)
     return started?.sessionId ?? null
