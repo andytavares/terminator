@@ -1,0 +1,43 @@
+src/main/extensions/extension-host.ts
+  s_56e599e17e5b82::t_0ce89ee84e6fbe 21
+src/main/storage/cached-store.ts
+  s_56e599e17e5b82::t_7774529a2f56b7 1,5-7,11,26
+src/main/storage/extension-settings-store.ts
+  s_56e599e17e5b82::t_b253c519d4b8e6 11
+src/main/storage/settings-store.ts
+  s_56e599e17e5b82::t_8f5cf0dba34d9a 10
+src/main/storage/workspace-store.ts
+  s_56e599e17e5b82::t_36c6b4e3c85937 18
+tests/integration/terminal/run-in-terminal.spec.ts
+  s_56e599e17e5b82::t_0275dfe6a71e47 2-6
+tests/unit/agents/agent-usage-ipc.spec.ts
+  s_56e599e17e5b82::t_737d8878434ed3 2-6
+tests/unit/extensions/api-home.spec.ts
+  s_56e599e17e5b82::t_2c1d949d6b1671 3-7
+tests/unit/extensions/api-issues.spec.ts
+  s_56e599e17e5b82::t_df0e4d02f71154 3-7
+tests/unit/extensions/api-v1.2.0.spec.ts
+  s_56e599e17e5b82::t_d882d014de7cbf 3-7
+tests/unit/main/extensions/usage-capture.spec.ts
+  s_56e599e17e5b82::t_95db626ce78808 3-7
+tests/unit/main/ipc/extension.ipc.spec.ts
+  s_56e599e17e5b82::t_032b73967a8e8f 3-7
+tests/unit/storage/cached-store.spec.ts
+  s_56e599e17e5b82::t_d27ca0c88fb234 32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "88542564824829ddd58c8dcee0820444527b1e4d",
+  "prompts": {},
+  "sessions": {
+    "s_56e599e17e5b82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6c95cc7-f1de-49bf-a858-16efb95c5329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
