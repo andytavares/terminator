@@ -29,7 +29,7 @@ function branchPlace(projectId: string): { cwd: string; scrollbackLimit: number 
 }
 
 /**
- * Opens a terminal on a branch and shows it.
+ * Opens a terminal on a branch and shows it; `background` opens it without showing it.
  *
  * The working directory is the branch's own checkout when it has one — a
  * worktree — and otherwise the repo's folder, the same rule the rest of the app
@@ -37,7 +37,8 @@ function branchPlace(projectId: string): { cwd: string; scrollbackLimit: number 
  */
 export async function startSessionInBranch(
   projectId: string,
-  initialCommand?: string
+  initialCommand?: string,
+  background = false
 ): Promise<string | null> {
   const place = branchPlace(projectId)
   if (place === null) return null
@@ -50,8 +51,9 @@ export async function startSessionInBranch(
       cwd,
       scrollbackLimit,
       ...(initialCommand === undefined ? {} : { initialCommand }),
+      ...(background ? { background } : {}),
     })
-    revealSession(sessionId)
+    if (!background) revealSession(sessionId)
     return sessionId
   } catch {
     // The controller has already said why; Home stays where it is.
@@ -70,7 +72,8 @@ export interface AgentInBranch {
   unattended?: UnattendedLaunch
 }
 
-/** Starts an agent as a tab on a branch, tells it the prompt and shows it; null when none started. */
+/** Starts an agent as a tab on a branch, tells it the prompt and shows it, unless it is a scheduled
+ * run, which never takes the screen. Null when none started. */
 export async function startAgentInBranch(request: AgentInBranch): Promise<string | null> {
   const place = branchPlace(request.projectId)
   if (place === null) return null
@@ -85,7 +88,7 @@ export async function startAgentInBranch(request: AgentInBranch): Promise<string
   })
   if (started === null) return null
   if (request.prompt !== null) promptAgentTab(started.sessionId, request.prompt)
-  revealSession(started.sessionId)
+  if (request.unattended === undefined) revealSession(started.sessionId)
   return started.sessionId
 }
 
@@ -159,13 +162,17 @@ async function openGlobalSession(prompt: GlobalPrompt): Promise<string | null> {
     .getState()
     .resolveSettings(useWorkspaceStore.getState().activeWorkspaceId ?? null).terminal
   const opened = { projectId: SCRATCH_PROJECT_ID, type: 'human' as const, title: '', cwd }
-  return createTerminalSession({ ...opened, scrollbackLimit, initialCommand }).catch(() => null)
+  const background = unattended === undefined ? {} : { background: true }
+  return createTerminalSession({ ...opened, scrollbackLimit, initialCommand, ...background }).catch(
+    () => null
+  )
 }
 
-/** Starts a prompt that belongs to no workspace and shows it in Scratch; null when none started. */
+/** Starts a prompt that belongs to no workspace and shows it in Scratch, unless it is a scheduled
+ * run, which stays in the background. Null when none started. */
 export async function startGlobalPrompt(prompt: GlobalPrompt): Promise<string | null> {
   const sessionId = await openGlobalSession(prompt)
-  if (sessionId === null) return null
+  if (sessionId === null || prompt.unattended !== undefined) return sessionId
   useWorkspaceStore.getState().setScratchActive(true)
   useExtensionRegistry.getState().setActiveGlobalTab(null)
   revealSession(sessionId)

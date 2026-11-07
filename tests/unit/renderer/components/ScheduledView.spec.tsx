@@ -9,6 +9,12 @@ import { useExtensionRegistry } from '../../../../src/renderer/extensions/regist
 import { installElectronApi, pushedEvent } from '../../../support/electron-api'
 import type { DueSchedule, Schedule } from '../../../../src/shared/schemas/schedules.schema'
 import type { Workspace } from '../../../../src/shared/types/index'
+import { useScheduledRunSessions } from '../../../../src/renderer/components/home/scheduled-run-sessions'
+import { useSessionStore } from '../../../../src/renderer/stores/session.store'
+import { terminalSessionOf } from '../../../support/renderer-stores'
+
+const revealSession = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({ revealSession }))
 
 const triage: Schedule = {
   id: 's1',
@@ -70,6 +76,8 @@ beforeEach(() => {
   useExtensionRegistry.setState({ startWorkOptions: new Map() })
   useStartWorkStore.getState().closeLauncher()
   useToastStore.setState({ toasts: [] })
+  useScheduledRunSessions.setState({ sessions: new Map() })
+  useSessionStore.setState({ sessions: new Map() })
 })
 
 const shown = async () => {
@@ -230,5 +238,49 @@ describe('ScheduledView — no runs', () => {
     expect(screen.queryByRole('table')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'New scheduled run' }))
     expect(useStartWorkStore.getState()).toMatchObject({ open: true, repeat: true, editing: null })
+  })
+})
+
+/** Run s1 opened session run-1, which is open in `agentState`. */
+const live = (agentState: 'working' | 'awaiting-input' | 'idle') => {
+  useScheduledRunSessions.getState().record('s1', 'run-1')
+  useSessionStore.setState({
+    sessions: new Map([['run-1', terminalSessionOf({ id: 'run-1', projectId: 'p', agentState })]]),
+  })
+}
+
+describe('ScheduledView — a run that is going', () => {
+  it('says Running while its agent works, and View opens its session', async () => {
+    live('working')
+    await shown()
+    const row = rowOf('Triage the inbox')
+    expect(within(row).getByText('Running')).toBeTruthy()
+    fireEvent.click(within(row).getByRole('button', { name: 'View' }))
+    expect(revealSession).toHaveBeenCalledWith('run-1')
+    // View is not a press on the row, which edits the run.
+    expect(useStartWorkStore.getState().open).toBe(false)
+  })
+
+  it('says Needs you while it waits on the person', async () => {
+    live('awaiting-input')
+    await shown()
+    expect(within(rowOf('Triage the inbox')).getByText('Needs you')).toBeTruthy()
+  })
+})
+
+describe('ScheduledView — a run that has finished', () => {
+  it('keeps View, with no state, once the run finished and its tab is still open', async () => {
+    live('idle')
+    await shown()
+    const row = rowOf('Triage the inbox')
+    expect(within(row).queryByText('Running')).toBeNull()
+    expect(within(row).getByRole('button', { name: 'View' })).toBeTruthy()
+  })
+
+  it('shows no View for a run whose tab is closed', async () => {
+    useScheduledRunSessions.getState().record('s1', 'gone')
+    useSessionStore.setState({ sessions: new Map() })
+    await shown()
+    expect(within(rowOf('Triage the inbox')).queryByRole('button', { name: 'View' })).toBeNull()
   })
 })

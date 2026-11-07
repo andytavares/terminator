@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { CalendarClock, Ellipsis } from 'lucide-react'
 import {
+  Button,
   Chip,
   ConfirmDialog,
   DataTable,
@@ -25,7 +26,10 @@ import {
   type RunGroup,
 } from './scheduled-runs'
 import type { Schedule } from '../../../shared/schemas/schedules.schema'
-import type { Workspace } from '../../../shared/types/index'
+import type { AgentState, Workspace } from '../../../shared/types/index'
+import { useSessionStore } from '../../stores/session.store'
+import { revealSession } from '../../terminal/navigate-to-session'
+import { useScheduledRunSessions } from './scheduled-run-sessions'
 import './ScheduledView.css'
 
 type SavedRuns = ReturnType<typeof useSavedRuns>
@@ -119,11 +123,7 @@ function useColumns(saved: SavedRuns, onRemove: RowMenuProps['onRemove']) {
     },
     { id: 'when', header: 'When', render: whenOf },
     { id: 'next', header: 'Next run', render: nextRunCell },
-    {
-      id: 'last',
-      header: 'Last run',
-      render: (s) => (s.lastRunAt === null ? 'Never' : runLabel(new Date(s.lastRunAt))),
-    },
+    { id: 'last', header: 'Last run', render: (s) => <LastRunCell schedule={s} /> },
     { id: 'run-as', header: 'Run as', render: (s) => runAs.get(s.runAs) ?? s.runAs },
     {
       id: 'actions',
@@ -132,6 +132,37 @@ function useColumns(saved: SavedRuns, onRemove: RowMenuProps['onRemove']) {
     },
   ]
   return columns
+}
+
+const LIVE_STATES: Partial<Record<AgentState, string>> = {
+  working: 'Running',
+  'awaiting-input': 'Needs you',
+}
+
+/** When it last ran; while the session it opened is still open, how it is going and a way to it. */
+function LastRunCell({ schedule }: { schedule: Schedule }): React.JSX.Element {
+  const sessionId = useScheduledRunSessions((s) => s.sessions.get(schedule.id))
+  const session = useSessionStore((s) => (sessionId ? s.sessions.get(sessionId) : undefined))
+  const when = schedule.lastRunAt === null ? 'Never' : runLabel(new Date(schedule.lastRunAt))
+  if (session === undefined || session.status === 'closed') return <>{when}</>
+  const live = LIVE_STATES[session.agentState]
+  return (
+    <span className="scheduled__last-run">
+      {live ? <Chip>{live}</Chip> : when}
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={(e) => {
+          // A press on the row edits the run; View only opens its session.
+          e.stopPropagation()
+          revealSession(session.id)
+        }}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        View
+      </Button>
+    </span>
+  )
 }
 
 function nextRunCell(schedule: Schedule): React.ReactNode {

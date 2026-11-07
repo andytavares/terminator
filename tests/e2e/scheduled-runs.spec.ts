@@ -74,6 +74,9 @@ async function runNowStartsAnAgentInTheHomeFolder(): Promise<void> {
   await rowAction('Run now')
   // Branch naming may also run an agent, in the temporary folder, while the prompt is typed.
   await expect.poll(() => sessions().filter((s) => s.cwd === home).length).toBe(1)
+  // A scheduled run starts in the background: Home stays, and View opens the run's session.
+  await expect(handle.page.getByRole('heading', { name: 'Home' })).toBeVisible()
+  await runRow().getByRole('button', { name: 'View' }).click()
   await expect(handle.page.getByLabel('Message the agent')).toBeVisible()
 }
 
@@ -114,7 +117,7 @@ test('a global scheduled run is run, paused, edited and removed from Home', asyn
   await test.step('Start work saves a global repeat', scheduleAGlobalRepeat)
   await test.step('Home → Scheduled lists it under Global', theRunShowsUnderGlobal)
   await test.step(
-    'Run now starts an agent in the home folder, shown in Scratch',
+    'Run now starts an agent in the home folder in the background, and View opens it',
     runNowStartsAnAgentInTheHomeFolder
   )
   await test.step('Pause shows the Paused chip', pauseShowsThePausedChip)

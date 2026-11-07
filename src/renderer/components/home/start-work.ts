@@ -189,8 +189,11 @@ export type WorkRequest = {
   workspace: Workspace
   runAs: RunAs
   agentId?: string
-  /** A scheduled run's files; absent for work a person started. */
+  /** A scheduled run's files; absent for work a person started. A run with them stays in the
+   * background. */
   unattended?: UnattendedLaunch
+  /** Told the session the work opened, once it started. */
+  onStarted?: (sessionId: string) => void
 } & (
   | { kind: 'ticket'; issue: IssueSummary }
   /** `newWorktree` runs it on a branch of its own: `branch` when given, else one the agent names. */
@@ -330,12 +333,13 @@ export async function startWork(request: WorkRequest): Promise<Outcome> {
           agentId: request.agentId,
           unattended: request.unattended,
         })
-      : await startSessionInBranch(projectId, command)
+      : await startSessionInBranch(projectId, command, request.unattended !== undefined)
   if (sessionId === null)
     return request.runAs === 'agent'
       ? 'The agent could not be started.'
       : 'The terminal could not be opened.'
   if (request.kind === 'ticket') await linkTicket(sessionId, request.issue)
   restoreStarted(request)
+  request.onStarted?.(sessionId)
   return null
 }
