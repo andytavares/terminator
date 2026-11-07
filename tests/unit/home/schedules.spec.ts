@@ -292,7 +292,7 @@ describe('pausing a scheduled run', () => {
   it('does not start a paused repeat at its time', async () => {
     const s = await withSchedule(daily)
     const [{ id }] = await s.list()
-    await s.setPaused(id, true)
+    await s.pauseRun(id, true)
     expect(await s.list()).toMatchObject([{ paused: true }])
     clock = at('2026-11-04T09:00:00')
     await s.tick()
@@ -302,9 +302,9 @@ describe('pausing a scheduled run', () => {
   it('raises no missed ask for a time that passed while paused', async () => {
     const s = await withSchedule(daily)
     const [{ id }] = await s.list()
-    await s.setPaused(id, true)
+    await s.pauseRun(id, true)
     clock = at('2026-11-04T13:00:00')
-    await s.setPaused(id, false)
+    await s.pauseRun(id, false)
     await s.checkMissed()
     expect(asks).toEqual([])
     expect(await s.list()).toMatchObject([{ paused: false }])
@@ -318,15 +318,15 @@ describe('pausing and resuming a scheduled run', () => {
   it('keeps Last run at never after a pause and a resume', async () => {
     const s = await withSchedule(daily)
     const [{ id }] = await s.list()
-    await s.setPaused(id, true)
-    await s.setPaused(id, false)
+    await s.pauseRun(id, true)
+    await s.pauseRun(id, false)
     expect(await s.list()).toMatchObject([{ lastRunAt: null }])
   })
 
   it('drops the missed ask of a run it pauses', async () => {
     const s = await closedOverNine()
     const [{ id }] = await s.list()
-    await s.setPaused(id, true)
+    await s.pauseRun(id, true)
     expect(asks).toEqual([])
   })
 })
@@ -383,7 +383,7 @@ describe('a scheduled run that was deleted', () => {
   it('refuses to run, pause or edit it', async () => {
     const s = await withSchedule(daily)
     await expect(s.runNow('gone')).rejects.toThrow('That scheduled run no longer exists.')
-    await expect(s.setPaused('gone', true)).rejects.toThrow('That scheduled run no longer exists.')
+    await expect(s.pauseRun('gone', true)).rejects.toThrow('That scheduled run no longer exists.')
     await expect(s.update('gone', daily)).rejects.toThrow('That scheduled run no longer exists.')
   })
 })

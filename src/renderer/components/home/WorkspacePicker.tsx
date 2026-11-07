@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react'
 import { Kbd, Popover } from '@terminator/extension-ui'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import type { Workspace } from '../../../shared/types/index'
-import { GLOBAL_CHOICE, type ChosenRepo } from './start-work-model'
+import { GLOBAL_CHOICE, holdsText, type ChosenRepo } from './start-work-model'
 
 export interface WorkspacePickerProps {
   current: Workspace | null
@@ -113,8 +113,7 @@ function WorkspaceChoices(props: WorkspacePickerProps): React.JSX.Element {
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const [filter, setFilter] = useState('')
   const [cursor, setCursor] = useState(0)
-  const matches = (name: string): boolean =>
-    name.toLowerCase().includes(filter.trim().toLowerCase())
+  const matches = holdsText(filter)
   const shown = workspaces.filter((w) => matches(w.name))
   const showGlobal = props.offerGlobal && matches(GLOBAL_NAME)
   const ids = [...(showGlobal ? [GLOBAL_CHOICE] : []), ...shown.map((w) => w.id)]

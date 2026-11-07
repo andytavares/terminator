@@ -77,9 +77,10 @@ function RowMenu(props: RowMenuProps): React.JSX.Element {
   )
 }
 
-function RowMenuItems({ schedule, saved, onRemove, close }: RowMenuProps & { close: () => void }) {
+function RowMenuItems(props: RowMenuProps & { close: () => void }) {
+  const { schedule, saved } = props
   const pick = (action: () => void) => () => {
-    close()
+    props.close()
     action()
   }
   return (
@@ -89,7 +90,7 @@ function RowMenuItems({ schedule, saved, onRemove, close }: RowMenuProps & { clo
         {schedule.paused ? 'Resume' : 'Pause'}
       </MenuItem>
       <MenuItem onSelect={pick(() => saved.edit(schedule))}>Edit…</MenuItem>
-      <MenuItem danger onSelect={pick(() => onRemove(schedule))}>
+      <MenuItem danger onSelect={pick(() => props.onRemove(schedule))}>
         Remove…
       </MenuItem>
     </>
@@ -156,7 +157,7 @@ function NoRuns(): React.JSX.Element {
   )
 }
 
-const tableGroups = (runs: Schedule[], workspaces: Workspace[]): DataTableGroup<Schedule>[] =>
+const scheduledGroups = (runs: Schedule[], workspaces: Workspace[]): DataTableGroup<Schedule>[] =>
   groupRuns(runs, workspaces).map((group) => ({
     id: group.id,
     summary: groupSummary(group),
@@ -203,7 +204,7 @@ export function ScheduledView(): React.JSX.Element | null {
           <DataTable
             label="Scheduled runs"
             columns={columns}
-            groups={tableGroups(saved.runs, workspaces)}
+            groups={scheduledGroups(saved.runs, workspaces)}
             rowKey={(s) => s.id}
             onRowClick={saved.edit}
           />

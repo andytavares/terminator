@@ -77,7 +77,7 @@ function scheduleEditChannels(scheduler: Scheduler): ChannelSpec[] {
       channel: 'schedules:pause',
       schema: SchedulePauseInputSchema,
       invalid: validationError,
-      run: ({ id, paused }) => scheduler.setPaused(id, paused).then(() => ({ data: true })),
+      run: ({ id, paused }) => scheduler.pauseRun(id, paused).then(() => ({ data: true })),
       onError: failed,
     }),
     defineChannel({

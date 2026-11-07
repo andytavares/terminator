@@ -124,8 +124,14 @@ export function useRows(source: RowSource): { groups: TicketGroup[]; rows: Launc
   }, [tab, query, issues, git])
 }
 
+/** A filter that keeps names holding `text`, ignoring case and surrounding spaces. */
+export const holdsText =
+  (text: string) =>
+  (name: string): boolean =>
+    name.toLowerCase().includes(text.trim().toLowerCase())
+
 function branchChoices(git: RepoGit, text: string): LauncherRow[] {
-  const matches = (name: string): boolean => name.toLowerCase().includes(text.toLowerCase())
+  const matches = holdsText(text)
   return [
     ...git.worktreeBranches
       .filter(matches)

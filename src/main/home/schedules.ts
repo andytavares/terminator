@@ -78,16 +78,21 @@ export interface SchedulerDeps {
   publish: (asks: HomeAsk[]) => void
 }
 
+/** The local moment a one-time run is set for, from its 'YYYY-MM-DD' date and 'HH:MM' time. */
+function onceAt(date: string, time: string): Date {
+  const [year, month, day] = date.split('-').map(Number)
+  const [hours, minutes] = time.split(':').map(Number)
+  return new Date(year, month - 1, day, hours, minutes)
+}
+
 /** The latest moment, up to now, this schedule was meant to run (local time). */
 function latestOccurrence(schedule: Schedule, now: Date): Date | null {
-  const [hours, minutes] = schedule.time.split(':').map(Number)
   if (schedule.repeat !== null)
     return latestRun(
       { rule: schedule.repeat, time: schedule.time, anchor: new Date(schedule.createdAt) },
       now
     )
-  const [year, month, day] = (schedule.date ?? '').split('-').map(Number)
-  const at = new Date(year, month - 1, day, hours, minutes)
+  const at = onceAt(schedule.date ?? '', schedule.time)
   return at <= now ? at : null
 }
 
@@ -127,13 +132,10 @@ function missedAsk(schedule: Schedule, occurrence: Date): HomeAsk {
   }
 }
 
-/** The schedules table: what was saved, and the end of each occurrence. */
 /** A one-time run whose moment is already behind `now`: it would never come due. */
 function hasPassed(input: ScheduleInput, now: Date): boolean {
   if (input.kind !== 'once' || input.date === null) return false
-  const [year, month, day] = input.date.split('-').map(Number)
-  const [hours, minutes] = input.time.split(':').map(Number)
-  return new Date(year, month - 1, day, hours, minutes).getTime() <= now.getTime()
+  return onceAt(input.date, input.time).getTime() <= now.getTime()
 }
 
 interface RowMarks {
@@ -166,7 +168,7 @@ async function findRow(db: ExtensionDB, id: string): Promise<Row> {
   return row
 }
 
-const selectAll = (db: ExtensionDB): Promise<Row[]> =>
+const selectSchedules = (db: ExtensionDB): Promise<Row[]> =>
   db.query<Row>('SELECT * FROM schedules ORDER BY created_at')
 
 async function addMissingColumns(db: ExtensionDB): Promise<void> {
@@ -179,7 +181,7 @@ async function addMissingColumns(db: ExtensionDB): Promise<void> {
 /** Changes the person makes to a saved run after it was created. */
 function createScheduleEdits({ db, now }: Pick<SchedulerDeps, 'db' | 'now'>) {
   return {
-    find: async (id: string): Promise<Schedule> => toSchedule(await findRow(db, id)),
+    findSchedule: async (id: string): Promise<Schedule> => toSchedule(await findRow(db, id)),
     /** Occurrences before the edit count as handled, so the edit raises no missed ask. */
     async update(id: string, input: ScheduleInput): Promise<Schedule> {
       const row = await findRow(db, id)
@@ -190,7 +192,7 @@ function createScheduleEdits({ db, now }: Pick<SchedulerDeps, 'db' | 'now'>) {
       return schedule
     },
     /** A resume counts the occurrences during the pause as handled. */
-    async setPaused(id: string, paused: boolean): Promise<void> {
+    async writePaused(id: string, paused: boolean): Promise<void> {
       const changed = paused
         ? await db.run('UPDATE schedules SET paused_at = ? WHERE id = ?', [now().toISOString(), id])
         : await db.run('UPDATE schedules SET paused_at = NULL, settled_at = ? WHERE id = ?', [
@@ -206,8 +208,8 @@ function createScheduleStore({ db, now }: Pick<SchedulerDeps, 'db' | 'now'>) {
   return {
     ...createScheduleEdits({ db, now }),
     init: () => addMissingColumns(db),
-    list: async (): Promise<Schedule[]> => (await selectAll(db)).map(toSchedule),
-    stored: async (): Promise<StoredSchedule[]> => (await selectAll(db)).map(toStored),
+    list: async (): Promise<Schedule[]> => (await selectSchedules(db)).map(toSchedule),
+    stored: async (): Promise<StoredSchedule[]> => (await selectSchedules(db)).map(toStored),
     async create(input: ScheduleInput): Promise<Schedule> {
       if (hasPassed(input, now())) throw new Error('That time has passed. Pick a later time.')
       const schedule: Schedule = {
@@ -274,25 +276,24 @@ async function scanSchedules(deps: ScanDeps, graceMs: number): Promise<void> {
   missed.publishAll()
 }
 
+type ControlDeps = Omit<ScanDeps, keyof SchedulerDeps> & Pick<SchedulerDeps, 'start'>
+
 /** What the person does to a saved run; each drops the missed ask it would leave behind. */
-function createScheduleControls({
-  store,
-  missed,
-  start,
-}: Omit<ScanDeps, keyof SchedulerDeps> & Pick<SchedulerDeps, 'start'>) {
+function createScheduleControls(deps: ControlDeps) {
+  const { store, missed, start } = deps
   return {
     async update(id: string, input: ScheduleInput): Promise<Schedule> {
       const schedule = await store.update(id, input)
       if (missed.drop(id)) missed.publishAll()
       return schedule
     },
-    async setPaused(id: string, paused: boolean): Promise<void> {
-      await store.setPaused(id, paused)
+    async pauseRun(id: string, paused: boolean): Promise<void> {
+      await store.writePaused(id, paused)
       if (missed.drop(id)) missed.publishAll()
     },
     /** Starts it out of turn: a one-time run is used up, a repeat keeps its next time. */
     async runNow(id: string): Promise<void> {
-      const schedule = await store.find(id)
+      const schedule = await store.findSchedule(id)
       // Settling also stops the tick starting this occurrence again, or raising its missed ask.
       await store.settle(schedule, true)
       start(schedule)
