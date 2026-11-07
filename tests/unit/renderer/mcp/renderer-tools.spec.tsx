@@ -93,11 +93,6 @@ describe('answerCall — the call itself', () => {
     })
   })
 
-  it('answers bad arguments in plain words that name the argument, not a Zod dump', async () => {
-    const reply = await call('open_session', { sessionId: 7 })
-    expect(reply).toEqual({ id: 'c-1', error: 'These arguments are missing or wrong: sessionId.' })
-  })
-
   it('answers a tool that throws with its message', async () => {
     breakOut.mockImplementation(() => {
       throw new Error('The window could not open.')

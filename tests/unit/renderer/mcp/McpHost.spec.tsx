@@ -54,12 +54,6 @@ describe('McpHost', () => {
     expect(revealSession).toHaveBeenCalledWith('s-1')
   })
 
-  it('answers a call with bad arguments with an error', async () => {
-    render(<McpHost palette={palette} />)
-    const answer = await deliver({ id: 'c-8', tool: 'open_session', args: {} })
-    expect(answer).toEqual({ id: 'c-8', error: 'These arguments are missing or wrong: sessionId.' })
-  })
-
   it('answers a tool it does not know with an error', async () => {
     render(<McpHost palette={palette} />)
     const answer = await deliver({ id: 'c-9', tool: 'nope' as McpCall['tool'], args: {} })

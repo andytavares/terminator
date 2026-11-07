@@ -1,9 +1,10 @@
 import type { z } from 'zod'
-import {
+// Types only: zod stays out of the renderer bundle.
+import type {
   RENDERER_TOOLS,
-  type McpAnswer,
-  type McpCall,
-  type RendererToolName,
+  McpAnswer,
+  McpCall,
+  RendererToolName,
 } from '../../shared/mcp/renderer-tools'
 import { SCRATCH_PROJECT_ID, type Workspace } from '../../shared/types/index'
 import type { QuickAction } from '../quick-actions/types'
@@ -16,8 +17,8 @@ import { createTerminalSession } from '../terminal/session-controller'
 import { revealSession } from '../terminal/navigate-to-session'
 import { breakOut } from '../terminal/breakout'
 
-// The Terminator MCP server's screen tools, run in the renderer. Main checks the args first;
-// they are parsed again here because this is where they arrive.
+// The Terminator MCP server's screen tools, run in the renderer. Main parses the args against
+// the tool's schema before it sends the call (src/main/mcp/renderer-tools.ts).
 
 type ToolArgs<Tool extends RendererToolName> = z.infer<(typeof RENDERER_TOOLS)[Tool]['input']>
 type ToolHandlers = {
@@ -50,22 +51,14 @@ export async function answerCall(call: McpCall, actions: QuickAction[]): Promise
 
 async function toolAnswer(call: McpCall, actions: QuickAction[]): Promise<McpAnswer> {
   const { id, tool } = call
-  if (!Object.keys(RENDERER_TOOLS).includes(tool))
+  if (!Object.keys(HANDLERS).includes(tool))
     return { id, error: `Terminator has no tool named ${tool}.` }
-  const parsed = RENDERER_TOOLS[tool].input.safeParse(call.args ?? {})
-  if (!parsed.success) return { id, error: wrongArguments(parsed.error) }
   try {
     const handler = HANDLERS[tool] as (args: unknown, actions: QuickAction[]) => unknown
-    return { id, result: await handler(parsed.data, actions) }
+    return { id, result: await handler(call.args ?? {}, actions) }
   } catch (error: unknown) {
     return { id, error: error instanceof Error ? error.message : 'The tool did not finish.' }
   }
-}
-
-/** The arguments that failed, by name, without the validator's own wording. */
-function wrongArguments(error: z.ZodError): string {
-  const names = [...new Set(error.issues.map((issue) => issue.path.join('.') || 'the arguments'))]
-  return `These arguments are missing or wrong: ${names.join(', ')}.`
 }
 
 /** The workspace with this name or id; an error naming the known ones when there is none. */
