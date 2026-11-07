@@ -106,8 +106,15 @@ import type {
   Via,
 } from '../schemas/usage.schema'
 import type { UsageReport } from '../usage/usage-types'
+import type { McpAnswer, McpCall } from '../mcp/renderer-tools'
 
 type RemoteBehavior = 'same' | 'omit' | 'stub'
+
+/** How an invoke method appears in the Terminator MCP server: a tool, or `false` for hidden.
+ * `tool` is snake_case; `description` is one plain sentence for Claude. */
+type McpExposure =
+  | { tool: string; description: string; destructive?: true; readOnly?: true }
+  | false
 
 /** Whether extension views (WebContentsViews running an extension's renderer) receive the
  * method. 'shared': the app renderer and extension views both do. 'only': extension views do,
@@ -151,6 +158,8 @@ export interface ChannelSpec<
   toHandlerArgs?: (args: unknown[]) => unknown[]
   /** Behavior on the remote transport. Default: 'same'. */
   remote?: RemoteBehavior
+  /** Whether an invoke method is a Terminator MCP server tool. Every invoke method decides. */
+  mcp?: McpExposure
   /** Whether extension views receive the method. Default: they do not. */
   extensionView?: View
 }
@@ -179,6 +188,14 @@ function extensionIdEvent<const Path extends string>(path: Path, channel: string
   })
 }
 type Failure = { error: string }
+/** The Terminator MCP server's entry in Claude Code (ADR 145). */
+export interface ClaudeCodeStatus {
+  state: 'connected' | 'disconnected' | 'unavailable'
+  name: string
+  /** The `claude mcp add-json` line, shell-quoted, for a person to run by hand. */
+  command: string
+  reason?: string
+}
 type DetailedFailure = { error: string; message?: string }
 type SessionRecordResult<Data> = Promise<{ data: Data } | { error: string; message: string }>
 type TaskResult = Promise<{ data: Task } | { error: string; message: string }>
@@ -221,6 +238,7 @@ interface ExtensionCommand {
   category?: string
   mnemonic?: string
   requires?: 'repo' | 'session'
+  destructive?: boolean
 }
 
 interface AppInfo {
@@ -239,6 +257,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'terminal.create',
     kind: 'invoke',
     channel: 'terminal:create',
+    mcp: false,
     signature:
       signature<
         (
@@ -251,6 +270,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'terminal.close',
     kind: 'invoke',
     channel: 'terminal:close',
+    mcp: {
+      tool: 'close_terminal',
+      description: 'Closes one terminal session and ends its process.',
+      destructive: true,
+    },
     signature: signature<(sessionId: string) => Promise<{ success: boolean }>>(),
     toPayload: (sessionId) => ({ sessionId }),
     extensionView: 'shared',
@@ -262,6 +286,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'terminal.attach',
     kind: 'invoke',
     channel: 'terminal:attach',
+    mcp: false,
     signature: signature<(sessionId: string) => Promise<{ released: boolean }>>(),
     toPayload: (sessionId) => ({ sessionId }),
   }),
@@ -269,6 +294,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'terminal.listSessions',
     kind: 'invoke',
     channel: 'terminal:list-sessions',
+    mcp: {
+      tool: 'list_terminal_sessions',
+      description: 'Lists the terminal sessions that are running in Terminator.',
+      readOnly: true,
+    },
     signature:
       signature<
         () => Promise<
@@ -318,6 +348,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'terminal.closeAll',
     kind: 'invoke',
     channel: 'terminal:close-all',
+    mcp: {
+      tool: 'close_all_terminals',
+      description: 'Closes every terminal session and ends their processes.',
+      destructive: true,
+    },
     signature: signature<() => Promise<{ terminatedCount: number }>>(),
     extensionView: 'shared',
   }),
@@ -325,6 +360,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'terminal.cleanupOrphans',
     kind: 'invoke',
     channel: 'terminal:cleanup-orphans',
+    mcp: false,
     signature: signature<() => Promise<{ cleanedCount: number }>>(),
     extensionView: 'shared',
   }),
@@ -346,6 +382,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'workspace.list',
     kind: 'invoke',
     channel: 'workspace:list',
+    mcp: {
+      tool: 'list_workspaces',
+      description: 'Lists the workspaces in the Terminator sidebar.',
+      readOnly: true,
+    },
     signature: signature<() => Promise<{ workspaces: Workspace[] }>>(),
     extensionView: 'shared',
   }),
@@ -353,6 +394,10 @@ export const ELECTRON_API_MANIFEST = [
     path: 'workspace.create',
     kind: 'invoke',
     channel: 'workspace:create',
+    mcp: {
+      tool: 'create_workspace',
+      description: 'Creates a workspace in the Terminator sidebar.',
+    },
     signature: signature<(payload: unknown) => Promise<{ workspace: Workspace } | Failure>>(),
     extensionView: 'shared',
   }),
@@ -360,6 +405,10 @@ export const ELECTRON_API_MANIFEST = [
     path: 'workspace.update',
     kind: 'invoke',
     channel: 'workspace:update',
+    mcp: {
+      tool: 'update_workspace',
+      description: 'Changes the name, colour or other fields of a workspace.',
+    },
     signature: signature<(payload: unknown) => Promise<{ workspace: Workspace } | Failure>>(),
     extensionView: 'shared',
   }),
@@ -367,6 +416,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'workspace.delete',
     kind: 'invoke',
     channel: 'workspace:delete',
+    mcp: {
+      tool: 'delete_workspace',
+      description: 'Deletes a workspace and its projects from Terminator.',
+      destructive: true,
+    },
     signature: signature<
       (id: string) => Promise<{
         success: boolean
@@ -380,6 +434,10 @@ export const ELECTRON_API_MANIFEST = [
     path: 'workspace.reorder',
     kind: 'invoke',
     channel: 'workspace:reorder',
+    mcp: {
+      tool: 'reorder_workspaces',
+      description: 'Sets the order of the workspaces in the sidebar.',
+    },
     signature: signature<(ids: string[]) => Promise<{ success: boolean }>>(),
     toPayload: (ids) => ({ ids }),
     extensionView: 'shared',
@@ -388,6 +446,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'workspace.getActive',
     kind: 'invoke',
     channel: 'workspace:get-active',
+    mcp: false,
     signature: signature<
       () => Promise<{
         workspaceId: string | null
@@ -419,6 +478,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'project.list',
     kind: 'invoke',
     channel: 'project:list',
+    mcp: {
+      tool: 'list_projects',
+      description: 'Lists the projects of a workspace.',
+      readOnly: true,
+    },
     signature: signature<(workspaceId: string) => Promise<{ projects: Project[] }>>(),
     toPayload: (workspaceId) => ({ workspaceId }),
     extensionView: 'shared',
@@ -427,6 +491,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'project.create',
     kind: 'invoke',
     channel: 'project:create',
+    mcp: { tool: 'create_project', description: 'Adds a project folder to a workspace.' },
     signature: signature<(payload: unknown) => Promise<{ project: Project } | Failure>>(),
     extensionView: 'shared',
   }),
@@ -434,6 +499,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'project.delete',
     kind: 'invoke',
     channel: 'project:delete',
+    mcp: {
+      tool: 'delete_project',
+      description: 'Removes a project from its workspace.',
+      destructive: true,
+    },
     signature:
       signature<
         (
@@ -447,6 +517,10 @@ export const ELECTRON_API_MANIFEST = [
     path: 'project.updateBranch',
     kind: 'invoke',
     channel: 'project:update-branch',
+    mcp: {
+      tool: 'update_project_branch',
+      description: 'Records the git branch that a project shows.',
+    },
     signature:
       signature<(id: string, gitBranch: string) => Promise<{ project: Project } | Failure>>(),
     toPayload: (id, gitBranch) => ({ id, gitBranch }),
@@ -456,6 +530,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'project.rename',
     kind: 'invoke',
     channel: 'project:rename',
+    mcp: { tool: 'rename_project', description: 'Renames a project.' },
     signature: signature<(id: string, name: string) => Promise<{ project: Project } | Failure>>(),
     toPayload: (id, name) => ({ id, name }),
     extensionView: 'shared',
@@ -464,6 +539,10 @@ export const ELECTRON_API_MANIFEST = [
     path: 'project.reorder',
     kind: 'invoke',
     channel: 'project:reorder',
+    mcp: {
+      tool: 'reorder_projects',
+      description: 'Sets the order of the projects in a workspace.',
+    },
     signature: signature<(workspaceId: string, ids: string[]) => Promise<{ success: boolean }>>(),
     toPayload: (workspaceId, ids) => ({ workspaceId, ids }),
     extensionView: 'shared',
@@ -490,6 +569,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'git.isRepo',
     kind: 'invoke',
     channel: 'git:is-repo',
+    mcp: {
+      tool: 'is_git_repo',
+      description: 'Tells whether a folder is a git repository.',
+      readOnly: true,
+    },
     signature:
       signature<
         (path: string) => Promise<{ isRepo: boolean; root?: string } | { error: string }>
@@ -501,6 +585,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'git.currentBranch',
     kind: 'invoke',
     channel: 'git:current-branch',
+    mcp: {
+      tool: 'current_branch',
+      description: 'Returns the checked-out branch of a repository.',
+      readOnly: true,
+    },
     signature: signature<(path: string) => Promise<{ branch: string } | Failure>>(),
     toPayload: (path) => ({ path }),
     extensionView: 'shared',
@@ -509,6 +598,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'git.changeStats',
     kind: 'invoke',
     channel: 'git:change-stats',
+    mcp: {
+      tool: 'git_change_stats',
+      description: 'Counts the changed files and lines in a repository.',
+      readOnly: true,
+    },
     signature: signature<(path: string) => Promise<ChangeStats | Failure>>(),
     toPayload: (path) => ({ path }),
   }),
@@ -516,6 +610,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'git.listBranches',
     kind: 'invoke',
     channel: 'git:list-branches',
+    mcp: {
+      tool: 'list_branches',
+      description: 'Lists the branches of a repository.',
+      readOnly: true,
+    },
     signature: signature<(path: string) => Promise<{ branches: Branch[] }>>(),
     toPayload: (path) => ({ path }),
     extensionView: 'shared',
@@ -524,6 +623,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'git.fetch',
     kind: 'invoke',
     channel: 'git:fetch',
+    mcp: { tool: 'git_fetch', description: 'Fetches a repository from its remote.' },
     signature: signature<(path: string) => Promise<{ success: true } | Failure>>(),
     toPayload: (path) => ({ path }),
   }),
@@ -531,6 +631,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'git.checkout',
     kind: 'invoke',
     channel: 'git:checkout',
+    mcp: {
+      tool: 'git_checkout',
+      description: 'Checks out a branch, which changes the files in the working tree.',
+      destructive: true,
+    },
     signature: signature<(path: string, branch: string) => Promise<{ success: true } | Failure>>(),
     toPayload: (path, branch) => ({ path, branch }),
     extensionView: 'shared',
@@ -539,6 +644,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'git.createBranch',
     kind: 'invoke',
     channel: 'git:create-branch',
+    mcp: { tool: 'create_branch', description: 'Creates a git branch.' },
     signature: signature<(path: string, branch: string) => Promise<{ success: true } | Failure>>(),
     toPayload: (path, branch) => ({ path, branch }),
     extensionView: 'shared',
@@ -547,6 +653,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'git.suggestWorktreePath',
     kind: 'invoke',
     channel: 'git:suggest-worktree-path',
+    mcp: {
+      tool: 'suggest_worktree_path',
+      description: 'Suggests a folder for a new worktree of a branch.',
+      readOnly: true,
+    },
     signature:
       signature<
         (repoRoot: string, branch: string, baseDir?: string) => Promise<{ path: string }>
@@ -558,6 +669,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'git.createWorktree',
     kind: 'invoke',
     channel: 'git:create-worktree',
+    mcp: { tool: 'create_worktree', description: 'Creates a git worktree for a branch.' },
     signature: signature<(payload: unknown) => Promise<{ success: true } | Failure>>(),
     extensionView: 'shared',
   }),
@@ -565,6 +677,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'git.removeWorktree',
     kind: 'invoke',
     channel: 'git:remove-worktree',
+    mcp: {
+      tool: 'remove_worktree',
+      description: 'Removes a git worktree and its folder.',
+      destructive: true,
+    },
     signature:
       signature<(repoRoot: string, worktreePath: string) => Promise<{ success: true } | Failure>>(),
     toPayload: (repoRoot, worktreePath) => ({ repoRoot, worktreePath }),
@@ -574,6 +691,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'git.listWorktrees',
     kind: 'invoke',
     channel: 'git:list-worktrees',
+    mcp: {
+      tool: 'list_worktrees',
+      description: 'Lists the worktrees of a repository.',
+      readOnly: true,
+    },
     signature: signature<(path: string) => Promise<{ worktrees: WorktreeInfo[] }>>(),
     toPayload: (path) => ({ path }),
     extensionView: 'shared',
@@ -584,6 +706,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'settings.getGlobal',
     kind: 'invoke',
     channel: 'settings:get-global',
+    mcp: {
+      tool: 'get_global_settings',
+      description: 'Returns the global Terminator settings.',
+      readOnly: true,
+    },
     signature: signature<() => Promise<{ settings: GlobalSettings }>>(),
     extensionView: 'shared',
   }),
@@ -591,6 +718,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'settings.updateGlobal',
     kind: 'invoke',
     channel: 'settings:update-global',
+    mcp: { tool: 'update_global_settings', description: 'Changes global Terminator settings.' },
     signature: signature<(patch: unknown) => Promise<{ settings: GlobalSettings }>>(),
     toPayload: (patch) => ({ patch }),
     extensionView: 'shared',
@@ -599,6 +727,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'settings.getWorkspace',
     kind: 'invoke',
     channel: 'settings:get-workspace',
+    mcp: {
+      tool: 'get_workspace_settings',
+      description: 'Returns the settings of a workspace.',
+      readOnly: true,
+    },
     signature: signature<(workspaceId: string) => Promise<{ settings: WorkspaceSettings }>>(),
     toPayload: (workspaceId) => ({ workspaceId }),
     extensionView: 'shared',
@@ -607,6 +740,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'settings.updateWorkspace',
     kind: 'invoke',
     channel: 'settings:update-workspace',
+    mcp: { tool: 'update_workspace_settings', description: 'Changes the settings of a workspace.' },
     signature:
       signature<
         (workspaceId: string, patch: unknown) => Promise<{ settings: WorkspaceSettings }>
@@ -621,6 +755,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'dialog.openDirectory',
     kind: 'invoke',
     channel: 'dialog:open-directory',
+    mcp: false,
     signature: signature<() => Promise<{ filePath: string } | { cancelled: true }>>(),
     remote: 'stub',
     extensionView: 'shared',
@@ -631,6 +766,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.list',
     kind: 'invoke',
     channel: 'extension:list',
+    mcp: {
+      tool: 'list_extensions',
+      description: 'Lists the installed Terminator extensions.',
+      readOnly: true,
+    },
     signature: signature<() => Promise<{ extensions: Extension[] }>>(),
     extensionView: 'shared',
   }),
@@ -638,6 +778,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.install',
     kind: 'invoke',
     channel: 'extension:install',
+    mcp: {
+      tool: 'install_extension',
+      description: 'Installs a Terminator extension, which runs its code.',
+      destructive: true,
+    },
     signature: signature<(directoryPath: string) => Promise<{ extension: Extension } | Failure>>(),
     toPayload: (directoryPath) => ({ directoryPath }),
     extensionView: 'shared',
@@ -646,6 +791,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.toggle',
     kind: 'invoke',
     channel: 'extension:toggle',
+    mcp: { tool: 'toggle_extension', description: 'Turns a Terminator extension on or off.' },
     signature:
       signature<(id: string, enabled: boolean) => Promise<{ extension: Extension } | Failure>>(),
     toPayload: (id, enabled) => ({ id, enabled }),
@@ -655,6 +801,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.uninstall',
     kind: 'invoke',
     channel: 'extension:uninstall',
+    mcp: {
+      tool: 'uninstall_extension',
+      description: 'Uninstalls a Terminator extension.',
+      destructive: true,
+    },
     signature: signature<(id: string) => Promise<{ ok: true } | Failure>>(),
     toPayload: (id) => ({ id }),
     extensionView: 'shared',
@@ -663,6 +814,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.reload',
     kind: 'invoke',
     channel: 'extension:reload',
+    mcp: { tool: 'reload_extension', description: 'Reloads a Terminator extension.' },
     signature: signature<(id: string) => Promise<{ extension: Extension } | Failure>>(),
     toPayload: (id) => ({ id }),
     extensionView: 'shared',
@@ -671,6 +823,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.getSettingsSchemas',
     kind: 'invoke',
     channel: 'extension:get-settings-schemas',
+    mcp: {
+      tool: 'get_extension_settings_schemas',
+      description: 'Lists the settings that each extension declares.',
+      readOnly: true,
+    },
     signature: signature<() => Promise<{ schemas: ExtensionSettingsSchema[] }>>(),
     extensionView: 'shared',
   }),
@@ -678,6 +835,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.getSettingsValues',
     kind: 'invoke',
     channel: 'extension:get-settings-values',
+    mcp: {
+      tool: 'get_extension_settings',
+      description: 'Returns the current values of the extension settings.',
+      readOnly: true,
+    },
     signature: signature<() => Promise<{ values: Record<string, unknown> }>>(),
     extensionView: 'shared',
   }),
@@ -685,6 +847,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.updateSetting',
     kind: 'invoke',
     channel: 'extension:update-setting',
+    mcp: { tool: 'update_extension_setting', description: 'Changes one global extension setting.' },
     signature: signature<(key: string, value: unknown) => Promise<{ ok: true }>>(),
     toPayload: (key, value) => ({ key, value }),
     extensionView: 'shared',
@@ -695,6 +858,10 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.updateWorkspaceSetting',
     kind: 'invoke',
     channel: 'extension:update-workspace-setting',
+    mcp: {
+      tool: 'update_extension_workspace_setting',
+      description: 'Changes one extension setting for a workspace.',
+    },
     signature:
       signature<
         (
@@ -739,6 +906,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.getCommands',
     kind: 'invoke',
     channel: 'extension:get-commands',
+    mcp: {
+      tool: 'list_extension_commands',
+      description: 'Lists the commands that the extensions declare.',
+      readOnly: true,
+    },
     signature: signature<() => Promise<{ commands: ExtensionCommand[] }>>(),
     extensionView: 'shared',
   }),
@@ -763,6 +935,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.runCommand',
     kind: 'invoke',
     channel: 'extension:run-command',
+    mcp: false,
     signature:
       signature<
         (key: string, args?: unknown) => Promise<{ ok: true } | { ok: false; reason: string }>
@@ -774,6 +947,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.hasCommand',
     kind: 'invoke',
     channel: 'extension:has-command',
+    mcp: false,
     signature: signature<(key: string) => Promise<boolean>>(),
     toPayload: (key) => ({ key }),
     // The app renderer too: a command that takes args is in no quick-action list.
@@ -803,6 +977,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'shell.exec',
     kind: 'invoke',
     channel: 'shell:exec',
+    mcp: false,
     signature:
       signature<
         (options: {
@@ -821,6 +996,12 @@ export const ELECTRON_API_MANIFEST = [
     path: 'shell.openPath',
     kind: 'invoke',
     channel: 'shell:open-path',
+    mcp: {
+      tool: 'open_path',
+      description:
+        'Opens a file or folder with its default macOS app, which runs an app or script.',
+      destructive: true,
+    },
     signature: signature<(filePath: string) => Promise<{ ok: true } | Failure>>(),
     toPayload: (filePath) => ({ filePath }),
     extensionView: 'shared',
@@ -830,6 +1011,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'shell.openExternal',
     kind: 'invoke',
     channel: 'shell:open-external',
+    mcp: false,
     signature: signature<(url: string) => Promise<{ ok: true } | Failure>>(),
     toPayload: (url) => ({ url }),
     remote: 'stub',
@@ -846,6 +1028,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'editor.detect',
     kind: 'invoke',
     channel: 'editor:detect',
+    mcp: {
+      tool: 'detect_editors',
+      description: 'Lists the code editors installed on this Mac.',
+      readOnly: true,
+    },
     signature: signature<() => Promise<{ editor: { id: string; name: string } | null }>>(),
     remote: 'omit',
   }),
@@ -853,6 +1040,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'editor.open',
     kind: 'invoke',
     channel: 'editor:open',
+    mcp: { tool: 'open_in_editor', description: 'Opens a folder in a code editor.' },
     signature: signature<(folderPath: string) => Promise<{ ok: true; editor: string } | Failure>>(),
     toPayload: (folderPath) => ({ folderPath }),
     remote: 'omit',
@@ -865,6 +1053,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'fs.watchStart',
     kind: 'invoke',
     channel: 'fs:watch-start',
+    mcp: false,
     signature: signature<(projectRoot: string) => Promise<{ ok: true } | Failure>>(),
     toPayload: (projectRoot) => ({ projectRoot }),
     remote: 'stub',
@@ -874,6 +1063,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'fs.watchStop',
     kind: 'invoke',
     channel: 'fs:watch-stop',
+    mcp: false,
     signature: signature<() => Promise<{ ok: true }>>(),
     remote: 'stub',
     extensionView: 'shared',
@@ -900,6 +1090,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'fs.readFile',
     kind: 'invoke',
     channel: 'fs:read-file',
+    mcp: false,
     signature: signature<(filePath: string) => Promise<{ content: string } | Failure>>(),
     toPayload: (filePath) => ({ filePath }),
     extensionView: 'shared',
@@ -1038,6 +1229,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'app.getInfo',
     kind: 'invoke',
     channel: 'app:get-info',
+    mcp: {
+      tool: 'get_app_info',
+      description: 'Returns the Terminator version and platform.',
+      readOnly: true,
+    },
     signature: signature<() => Promise<AppInfo>>(),
     extensionView: 'shared',
   }),
@@ -1082,6 +1278,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'notifications.create',
     kind: 'invoke',
     channel: 'notifications:create',
+    mcp: false,
     signature:
       signature<
         (payload: {
@@ -1099,6 +1296,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'notifications.list',
     kind: 'invoke',
     channel: 'notifications:list',
+    mcp: {
+      tool: 'list_notifications',
+      description: 'Lists the Terminator notifications.',
+      readOnly: true,
+    },
     signature: signature<() => Promise<SerializedNotification[]>>(),
     extensionView: 'shared',
   }),
@@ -1106,6 +1308,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'notifications.dismiss',
     kind: 'invoke',
     channel: 'notifications:dismiss',
+    mcp: { tool: 'dismiss_notification', description: 'Dismisses a Terminator notification.' },
     signature: signature<(id: string) => Promise<{ ok: true } | Failure>>(),
     toPayload: (id) => ({ id }),
     extensionView: 'shared',
@@ -1114,6 +1317,12 @@ export const ELECTRON_API_MANIFEST = [
     path: 'notifications.triggerAction',
     kind: 'invoke',
     channel: 'notifications:trigger-action',
+    mcp: {
+      tool: 'trigger_notification_action',
+      description: 'Runs an action button of a notification.',
+      // Notification buttons include Restart now, which installs an update.
+      destructive: true,
+    },
     signature: signature<(notifId: string, actionId: string) => Promise<{ ok: true } | Failure>>(),
     toPayload: (notifId, actionId) => ({ notifId, actionId }),
     extensionView: 'shared',
@@ -1133,6 +1342,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'db.health',
     kind: 'invoke',
     channel: 'db:health',
+    mcp: false,
     signature: signature<() => Promise<{ ok: boolean; message?: string }>>(),
     remote: 'omit',
     extensionView: 'shared',
@@ -1143,6 +1353,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'metrics.getSystem',
     kind: 'invoke',
     channel: 'metrics:system',
+    mcp: {
+      tool: 'get_system_metrics',
+      description: 'Returns CPU and memory use of this Mac.',
+      readOnly: true,
+    },
     signature: signature<() => Promise<{ data: SystemMetrics } | Failure>>(),
     extensionView: 'shared',
   }),
@@ -1150,6 +1365,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'metrics.getProcesses',
     kind: 'invoke',
     channel: 'metrics:processes',
+    mcp: {
+      tool: 'get_process_metrics',
+      description: 'Returns CPU and memory use of the Terminator processes.',
+      readOnly: true,
+    },
     signature: signature<(pids: number[]) => Promise<{ data: ProcessMetrics[] } | Failure>>(),
     toPayload: (pids) => ({ pids }),
     extensionView: 'shared',
@@ -1158,6 +1378,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'metrics.getPids',
     kind: 'invoke',
     channel: 'metrics:pids',
+    mcp: false,
     signature:
       signature<
         (
@@ -1183,12 +1404,21 @@ export const ELECTRON_API_MANIFEST = [
     path: 'sessionRecords.list',
     kind: 'invoke',
     channel: 'session-records:list',
+    mcp: {
+      tool: 'list_session_records',
+      description: 'Lists the recorded sessions of a workspace.',
+      readOnly: true,
+    },
     signature: signature<() => Promise<{ data: SessionRecordListing[] }>>(),
   }),
   method({
     path: 'sessionRecords.setDescription',
     kind: 'invoke',
     channel: 'session-records:set-description',
+    mcp: {
+      tool: 'set_session_description',
+      description: 'Sets the description of a recorded session.',
+    },
     signature:
       signature<
         (
@@ -1200,6 +1430,10 @@ export const ELECTRON_API_MANIFEST = [
     path: 'sessionRecords.setLink',
     kind: 'invoke',
     channel: 'session-records:set-link',
+    mcp: {
+      tool: 'set_session_link',
+      description: 'Links a recorded session to an issue or pull request.',
+    },
     signature:
       signature<
         (
@@ -1212,6 +1446,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'sessionRecords.transfer',
     kind: 'invoke',
     channel: 'session-records:transfer',
+    mcp: false,
     signature:
       signature<
         (
@@ -1224,6 +1459,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'sessionRecords.forget',
     kind: 'invoke',
     channel: 'session-records:forget',
+    mcp: {
+      tool: 'forget_session_record',
+      description: 'Deletes a session record.',
+      destructive: true,
+    },
     signature:
       signature<(input: z.input<typeof ForgetInputSchema>) => SessionRecordResult<boolean>>(),
   }),
@@ -1244,6 +1484,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'tasks.list',
     kind: 'invoke',
     channel: 'task:list',
+    mcp: { tool: 'list_tasks', description: 'Lists the tasks on Home.', readOnly: true },
     signature: signature<() => Promise<{ data: Task[] }>>(),
     remote: 'omit',
   }),
@@ -1251,6 +1492,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'tasks.create',
     kind: 'invoke',
     channel: 'task:create',
+    mcp: { tool: 'create_task', description: 'Creates a task on Home.' },
     signature: signature<(input: z.input<typeof TaskCreateInputSchema>) => TaskResult>(),
     remote: 'omit',
   }),
@@ -1258,6 +1500,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'tasks.update',
     kind: 'invoke',
     channel: 'task:update',
+    mcp: { tool: 'update_task', description: 'Changes the fields of a task.' },
     signature: signature<(input: z.input<typeof TaskUpdateInputSchema>) => TaskResult>(),
     remote: 'omit',
   }),
@@ -1265,6 +1508,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'tasks.addLane',
     kind: 'invoke',
     channel: 'task:add-lane',
+    mcp: { tool: 'add_task_lane', description: 'Adds a lane to a task.' },
     signature: signature<(input: z.input<typeof TaskLaneInputSchema>) => TaskResult>(),
     remote: 'omit',
   }),
@@ -1272,6 +1516,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'tasks.removeLane',
     kind: 'invoke',
     channel: 'task:remove-lane',
+    mcp: {
+      tool: 'remove_task_lane',
+      description: 'Removes a lane from a task.',
+      destructive: true,
+    },
     signature: signature<(input: z.input<typeof TaskLaneInputSchema>) => TaskResult>(),
     remote: 'omit',
   }),
@@ -1279,6 +1528,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'tasks.archive',
     kind: 'invoke',
     channel: 'task:archive',
+    mcp: { tool: 'archive_task', description: 'Archives a task or brings it back.' },
     signature: signature<(input: z.input<typeof TaskArchiveInputSchema>) => TaskResult>(),
     remote: 'omit',
   }),
@@ -1286,6 +1536,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'tasks.delete',
     kind: 'invoke',
     channel: 'task:delete',
+    mcp: { tool: 'delete_task', description: 'Deletes a task.', destructive: true },
     signature: signature<(input: z.input<typeof TaskIdInputSchema>) => TaskResult>(),
     remote: 'omit',
   }),
@@ -1293,6 +1544,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'tasks.merge',
     kind: 'invoke',
     channel: 'task:merge',
+    mcp: { tool: 'merge_task', description: 'Merges one task into another.' },
     signature: signature<(input: z.input<typeof TaskMergeInputSchema>) => TaskResult>(),
     remote: 'omit',
   }),
@@ -1309,6 +1561,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'agentUsage.get',
     kind: 'invoke',
     channel: 'agents:usage',
+    mcp: {
+      tool: 'get_agent_usage',
+      description: 'Returns the token use and cost of an agent session.',
+      readOnly: true,
+    },
     signature:
       signature<
         (
@@ -1321,6 +1578,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'homeThreadSummary.get',
     kind: 'invoke',
     channel: 'home:thread-summary',
+    mcp: {
+      tool: 'get_thread_summary',
+      description: 'Summarises the work of a task in one paragraph.',
+      readOnly: true,
+    },
     signature:
       signature<
         (
@@ -1335,6 +1597,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'agentAsk.list',
     kind: 'invoke',
     channel: 'agent-ask:list',
+    mcp: {
+      tool: 'list_agent_asks',
+      description: 'Lists the questions that agent sessions wait on.',
+      readOnly: true,
+    },
     signature: signature<() => Promise<{ data: Array<{ sessionId: string; ask: AgentAsk }> }>>(),
     remote: 'omit',
   }),
@@ -1354,6 +1621,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'agentTurn.list',
     kind: 'invoke',
     channel: 'agent-turn:list',
+    mcp: {
+      tool: 'list_agent_turns',
+      description: 'Tells which agent sessions are in a turn.',
+      readOnly: true,
+    },
     signature: signature<() => Promise<{ data: Array<{ sessionId: string; inTurn: boolean }> }>>(),
     remote: 'omit',
   }),
@@ -1373,6 +1645,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'agents.list',
     kind: 'invoke',
     channel: 'agents:list',
+    mcp: { tool: 'list_agents', description: 'Lists the running agent sessions.', readOnly: true },
     signature:
       signature<() => Promise<{ data: AgentDescriptor[] } | { error: string; message: string }>>(),
     remote: 'omit',
@@ -1381,6 +1654,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'agents.known',
     kind: 'invoke',
     channel: 'agents:known',
+    mcp: {
+      tool: 'list_known_agents',
+      description: 'Lists the agents Terminator can start and whether each is installed.',
+      readOnly: true,
+    },
     signature:
       signature<() => Promise<{ data: KnownAgentStatus[] } | { error: string; message: string }>>(),
     remote: 'omit',
@@ -1389,6 +1667,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'agents.start',
     kind: 'invoke',
     channel: 'agents:start',
+    mcp: { tool: 'start_agent', description: 'Starts an agent session.' },
     signature:
       signature<
         (
@@ -1401,6 +1680,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'agents.prompt',
     kind: 'invoke',
     channel: 'agents:prompt',
+    mcp: { tool: 'prompt_agent', description: 'Sends a prompt to an agent session.' },
     signature:
       signature<
         (
@@ -1413,6 +1693,10 @@ export const ELECTRON_API_MANIFEST = [
     path: 'agents.steer',
     kind: 'invoke',
     channel: 'agents:steer',
+    mcp: {
+      tool: 'steer_agent',
+      description: 'Sends a message to an agent session during its turn.',
+    },
     signature:
       signature<
         (
@@ -1425,6 +1709,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'agents.queueSet',
     kind: 'invoke',
     channel: 'agents:queue-set',
+    mcp: false,
     signature:
       signature<
         (
@@ -1437,6 +1722,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'agents.queueGet',
     kind: 'invoke',
     channel: 'agents:queue-get',
+    mcp: false,
     signature:
       signature<
         (
@@ -1449,6 +1735,10 @@ export const ELECTRON_API_MANIFEST = [
     path: 'agents.cancel',
     kind: 'invoke',
     channel: 'agents:cancel',
+    mcp: {
+      tool: 'cancel_agent_turn',
+      description: 'Cancels the current turn of an agent session.',
+    },
     signature:
       signature<
         (
@@ -1461,6 +1751,12 @@ export const ELECTRON_API_MANIFEST = [
     path: 'agents.answer',
     kind: 'invoke',
     channel: 'agents:answer',
+    mcp: {
+      tool: 'answer_agent',
+      description: 'Answers a permission question of an agent session.',
+      // An answer can approve a held destructive command.
+      destructive: true,
+    },
     signature:
       signature<
         (
@@ -1473,6 +1769,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'agents.setConfig',
     kind: 'invoke',
     channel: 'agents:set-config',
+    mcp: false,
     signature:
       signature<
         (
@@ -1485,6 +1782,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'agents.close',
     kind: 'invoke',
     channel: 'agents:close',
+    mcp: { tool: 'close_agent', description: 'Closes an agent session.', destructive: true },
     signature:
       signature<
         (
@@ -1497,6 +1795,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'agents.history',
     kind: 'invoke',
     channel: 'agents:history',
+    mcp: {
+      tool: 'agent_history',
+      description: 'Returns the updates of an agent session.',
+      readOnly: true,
+    },
     signature:
       signature<
         (
@@ -1509,6 +1812,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'agents.openAsks',
     kind: 'invoke',
     channel: 'agents:open-asks',
+    mcp: {
+      tool: 'list_open_agent_asks',
+      description: 'Lists the open permission questions of agent sessions.',
+      readOnly: true,
+    },
     signature:
       signature<
         () => Promise<{ data: AgentPermissionAsk[] } | { error: string; message: string }>
@@ -1571,6 +1879,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'attention.record',
     kind: 'invoke',
     channel: 'attention:record',
+    mcp: false,
     signature:
       signature<
         (
@@ -1583,6 +1892,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'attention.measures',
     kind: 'invoke',
     channel: 'attention:measures',
+    mcp: false,
     signature:
       signature<
         (input: z.input<typeof MeasuresInputSchema>) => Promise<{ data: AttentionMeasures }>
@@ -1593,10 +1903,38 @@ export const ELECTRON_API_MANIFEST = [
     path: 'attention.intervals',
     kind: 'invoke',
     channel: 'attention:intervals',
+    mcp: false,
     signature:
       signature<
         (input: z.input<typeof MeasuresInputSchema>) => Promise<{ data: AttentionInterval[] }>
       >(),
+    remote: 'omit',
+  }),
+
+  // ── Claude Code (the Terminator MCP server's entry, in Settings › Integrations) ──
+  method({
+    path: 'claudeCode.status',
+    kind: 'invoke',
+    channel: 'claude-code:status',
+    mcp: false,
+    signature:
+      signature<() => Promise<{ data: ClaudeCodeStatus } | { error: string; message: string }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'claudeCode.connect',
+    kind: 'invoke',
+    channel: 'claude-code:connect',
+    mcp: false,
+    signature: signature<() => Promise<{ data: true } | { error: string; message: string }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'claudeCode.disconnect',
+    kind: 'invoke',
+    channel: 'claude-code:disconnect',
+    mcp: false,
+    signature: signature<() => Promise<{ data: true } | { error: string; message: string }>>(),
     remote: 'omit',
   }),
 
@@ -1606,6 +1944,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'usage.recordUse',
     kind: 'invoke',
     channel: 'usage:record',
+    mcp: false,
     signature:
       signature<
         (
@@ -1618,6 +1957,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'usage.declare',
     kind: 'invoke',
     channel: 'usage:declare',
+    mcp: false,
     signature:
       signature<
         (
@@ -1630,6 +1970,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'usage.report',
     kind: 'invoke',
     channel: 'usage:report',
+    mcp: false,
     signature:
       signature<
         (
@@ -1644,6 +1985,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'homeFeed.get',
     kind: 'invoke',
     channel: 'home:feed-get',
+    mcp: {
+      tool: 'get_home_feed',
+      description: 'Returns the items of the Home feed.',
+      readOnly: true,
+    },
     signature: signature<() => Promise<{ data: MergedHomeFeed }>>(),
     remote: 'omit',
   }),
@@ -1651,6 +1997,12 @@ export const ELECTRON_API_MANIFEST = [
     path: 'homeFeed.action',
     kind: 'invoke',
     channel: 'home:feed-action',
+    // Home actions include answering a held permission.
+    mcp: {
+      tool: 'run_home_feed_action',
+      description: 'Runs an action of a Home feed item.',
+      destructive: true,
+    },
     signature:
       signature<
         (
@@ -1672,6 +2024,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'schedules.list',
     kind: 'invoke',
     channel: 'schedules:list',
+    mcp: { tool: 'list_schedules', description: 'Lists the scheduled runs.', readOnly: true },
     signature:
       signature<() => Promise<{ data: Schedule[] } | { error: string; message: string }>>(),
     remote: 'omit',
@@ -1680,6 +2033,8 @@ export const ELECTRON_API_MANIFEST = [
     path: 'schedules.create',
     kind: 'invoke',
     channel: 'schedules:create',
+    // A scheduled run's prompt runs later with every tool allowed (ADR 144), so saving one asks.
+    mcp: { tool: 'create_schedule', description: 'Creates a scheduled run.', destructive: true },
     signature:
       signature<
         (
@@ -1692,6 +2047,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'schedules.delete',
     kind: 'invoke',
     channel: 'schedules:delete',
+    mcp: { tool: 'delete_schedule', description: 'Deletes a scheduled run.', destructive: true },
     signature:
       signature<
         (
@@ -1704,6 +2060,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'schedules.update',
     kind: 'invoke',
     channel: 'schedules:update',
+    mcp: { tool: 'update_schedule', description: 'Changes a scheduled run.', destructive: true },
     signature:
       signature<
         (
@@ -1716,6 +2073,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'schedules.pause',
     kind: 'invoke',
     channel: 'schedules:pause',
+    mcp: { tool: 'pause_schedule', description: 'Pauses or resumes a scheduled run.' },
     signature:
       signature<
         (
@@ -1728,6 +2086,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'schedules.runNow',
     kind: 'invoke',
     channel: 'schedules:run-now',
+    mcp: { tool: 'run_schedule_now', description: 'Starts a scheduled run now.' },
     signature:
       signature<
         (
@@ -1747,6 +2106,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'homeBranchName.get',
     kind: 'invoke',
     channel: 'home:branch-name',
+    mcp: {
+      tool: 'suggest_branch_name',
+      description: 'Suggests a branch name for a prompt.',
+      readOnly: true,
+    },
     signature:
       signature<
         (
@@ -1761,6 +2125,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'integrations.status',
     kind: 'invoke',
     channel: 'integrations:status',
+    mcp: {
+      tool: 'get_integration_status',
+      description: 'Returns the connection state of the issue trackers.',
+      readOnly: true,
+    },
     signature:
       signature<
         (
@@ -1775,6 +2144,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'integrations.connect',
     kind: 'invoke',
     channel: 'integrations:connect',
+    mcp: false,
     signature:
       signature<
         (
@@ -1787,6 +2157,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'integrations.disconnect',
     kind: 'invoke',
     channel: 'integrations:disconnect',
+    mcp: false,
     signature:
       signature<
         (input: z.input<typeof DisconnectInputSchema>) => Promise<{ ok: true } | Failure>
@@ -1797,6 +2168,10 @@ export const ELECTRON_API_MANIFEST = [
     path: 'integrations.setMine',
     kind: 'invoke',
     channel: 'integrations:set-mine',
+    mcp: {
+      tool: 'set_my_issues_filter',
+      description: 'Sets which issues count as mine in a tracker.',
+    },
     signature:
       signature<(input: z.input<typeof SetMineInputSchema>) => Promise<{ ok: true } | Failure>>(),
   }),
@@ -1804,6 +2179,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'integrations.listMine',
     kind: 'invoke',
     channel: 'integrations:issue-list-mine',
+    mcp: {
+      tool: 'list_my_issues',
+      description: 'Lists the issues assigned to me.',
+      readOnly: true,
+    },
     signature:
       signature<
         (input: z.input<typeof ListMineInputSchema>) => Promise<IssueListResult | DetailedFailure>
@@ -1813,6 +2193,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'integrations.search',
     kind: 'invoke',
     channel: 'integrations:issue-search',
+    mcp: { tool: 'search_issues', description: 'Searches the issue tracker.', readOnly: true },
     signature:
       signature<
         (input: z.input<typeof SearchInputSchema>) => Promise<IssueListResult | DetailedFailure>
@@ -1822,6 +2203,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'integrations.getIssue',
     kind: 'invoke',
     channel: 'integrations:issue-get',
+    mcp: { tool: 'get_issue', description: 'Returns one issue from the tracker.', readOnly: true },
     signature:
       signature<
         (
@@ -1833,6 +2215,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'integrations.comment',
     kind: 'invoke',
     channel: 'integrations:issue-comment',
+    mcp: { tool: 'comment_on_issue', description: 'Adds a comment to an issue.' },
     signature:
       signature<
         (input: z.input<typeof IssueCommentInputSchema>) => Promise<{ ok: true } | DetailedFailure>
@@ -1842,6 +2225,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'integrations.linkSet',
     kind: 'invoke',
     channel: 'integrations:link-set',
+    mcp: { tool: 'link_issue', description: 'Links an issue to a project.' },
     signature:
       signature<
         (
@@ -1853,6 +2237,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'integrations.linkGet',
     kind: 'invoke',
     channel: 'integrations:link-get',
+    mcp: {
+      tool: 'get_issue_link',
+      description: 'Returns the issue linked to a project.',
+      readOnly: true,
+    },
     signature:
       signature<
         (
@@ -1866,6 +2255,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'integrations.linkClear',
     kind: 'invoke',
     channel: 'integrations:link-clear',
+    mcp: { tool: 'unlink_issue', description: 'Removes the issue link of a project.' },
     signature:
       signature<(input: z.input<typeof ProjectIdInputSchema>) => Promise<{ ok: true } | Failure>>(),
   }),
@@ -1873,6 +2263,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'integrations.contextPreview',
     kind: 'invoke',
     channel: 'integrations:context-preview',
+    mcp: {
+      tool: 'preview_issue_context',
+      description: 'Shows the issue context that agents of a project get.',
+      readOnly: true,
+    },
     signature:
       signature<
         (
@@ -1884,6 +2279,10 @@ export const ELECTRON_API_MANIFEST = [
     path: 'integrations.setInjectContext',
     kind: 'invoke',
     channel: 'integrations:set-inject-context',
+    mcp: {
+      tool: 'set_inject_issue_context',
+      description: 'Turns issue context for the agents of a project on or off.',
+    },
     signature:
       signature<
         (input: {
@@ -1911,6 +2310,24 @@ export const ELECTRON_API_MANIFEST = [
     signature: signature<(handler: (payload: unknown) => void) => Unsubscribe>(),
   }),
 
+  // ── mcp ───────────────────────────────────────────────────────────────────
+  // Terminator MCP server tools that only the renderer can run (renderer-tools.ts).
+  method({
+    path: 'mcp.onCall',
+    kind: 'event',
+    channel: 'mcp:call',
+    signature: signature<(handler: (call: McpCall) => void) => Unsubscribe>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'mcp.answer',
+    kind: 'invoke',
+    channel: 'mcp:answer',
+    mcp: false,
+    signature: signature<(answer: McpAnswer) => Promise<void>>(),
+    remote: 'omit',
+  }),
+
   // ── top-level ─────────────────────────────────────────────────────────────
   // Native: webUtils.getPathForFile. No remote equivalent.
   method({
@@ -1934,4 +2351,30 @@ export function remoteAccessibleCoreChannels(): ReadonlySet<string> {
     if ((spec.remote ?? 'same') === 'same') channels.add(spec.channel!)
   }
   return channels
+}
+
+/** One Terminator MCP server tool that calls an invoke channel. */
+export interface McpToolSpec {
+  channel: string
+  tool: string
+  description: string
+  destructive: boolean
+  readOnly: boolean
+}
+
+/** The Terminator MCP server's manifest tools: every invoke method with an `mcp` object. */
+export function mcpToolSpecs(): McpToolSpec[] {
+  const tools: McpToolSpec[] = []
+  for (const spec of ELECTRON_API_MANIFEST as readonly ChannelSpec[]) {
+    if (spec.kind !== 'invoke' || !spec.mcp) continue
+    const { tool, description, destructive, readOnly } = spec.mcp
+    tools.push({
+      channel: spec.channel!,
+      tool,
+      description,
+      destructive: destructive === true,
+      readOnly: readOnly === true,
+    })
+  }
+  return tools
 }

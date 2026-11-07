@@ -68,6 +68,7 @@
     "@agentclientprotocol/claude-agent-acp": "0.89.1",
     "@agentclientprotocol/sdk": "1.8.0",
     "@linear/sdk": "97.1.0",
+    "@modelcontextprotocol/server": "2.4.0",
     "@terminator/extension-sdk": "6.3.0",
     "@terminator/extension-ui": "1.0.0",
     "@xterm/addon-fit": "0.11.0",
@@ -85,6 +86,7 @@
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
     "@eslint/js": "10.0.1",
+    "@modelcontextprotocol/client": "2.4.0",
     "@playwright/test": "1.64.0",
     "@testing-library/dom": "10.4.2",
     "@testing-library/react": "16.3.2",

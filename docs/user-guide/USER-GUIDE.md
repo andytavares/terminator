@@ -246,7 +246,7 @@ Open Settings with **`Cmd+,`** or **View → Open Settings**.
 | **Interface**      | Theme (dark/light), show CPU/Memory/Network bar, hide the branch tree on Home |
 | **Terminal**       | Default shell, scrollback limit                                               |
 | **Agents**         | Default agent and your own ACP agents — see below                             |
-| **Integrations**   | Connect Linear — see below                                                    |
+| **Integrations**   | Connect Linear and Claude Code — see below                                    |
 | **Extensions**     | Enable/disable individual extensions                                          |
 | **Remote Control** | Enable local server, port, ngrok tunnel, session password                     |
 
@@ -560,9 +560,9 @@ A scheduled run starts what Start work would start, while Terminator is open. A 
 
 ![Start work: a prompt with Global chosen, set to repeat on weekdays](screenshots/11e-start-work-global.png)
 
-A scheduled run needs nobody. When it runs as an agent tab or as Claude in a terminal, Claude starts with settings that approve every tool call and refuse clarifying questions. Commands that destroy data still ask you: `rm -rf`, `sudo`, `git reset --hard`, `git checkout --`, `git restore`, `git clean`, `git stash drop`, `git branch -D` and a force push. The ask shows in **Needs you**. Another agent, or an extension's run-as, keeps its own permission rules.
+A scheduled run needs nobody. When it runs as an agent tab or as Claude in a terminal, Claude starts with settings that approve every tool call and refuse clarifying questions. Commands that destroy data still ask you: `rm -rf`, `sudo`, `git reset --hard`, `git checkout --`, `git restore`, `git clean`, `git stash drop`, `git branch -D`, a force push, and the Terminator tools that ask first (see [Control Terminator from Claude Code](#control-terminator-from-claude-code)). The ask shows in **Needs you**. Another agent, or an extension's run-as, keeps its own permission rules.
 
-Ask a scheduled run to alert you, for example "Check CI on main and alert me if it is red". The agent can show an alert in **Needs you**, with **Dismiss**, and send a notification. **Settings → Notifications → Alert from a scheduled run** sets where the notification goes. Alerts on Home are gone after Terminator quits.
+Ask a scheduled run to alert you, for example "Check CI on main and alert me if it is red". The agent uses the `alert` tool of the [Terminator MCP server](#control-terminator-from-claude-code). It can show an alert in **Needs you**, with **Dismiss**, and send a notification. The alert names the scheduled run it came from. The same alert from the same run within a day replaces the earlier one. **Settings → Notifications → Alert from Claude** sets where the notification goes. Alerts on Home are gone after Terminator quits.
 
 Manage saved runs in **Scheduled** on Home (the header switch, or `g` then `s`). Start work shows only a count, for example **4 scheduled runs · Manage on Home**. The table groups runs under **Global** first, then by workspace, with **Prompt**, **When**, **Next run**, **Last run** and **Run as**. **New scheduled run** opens Start work on **Prompt**, with **When** set to **Repeat**. Press a row to edit it: Start work opens as **Edit scheduled run**, and **Save changes** saves it. The row's **…** menu has:
 
@@ -574,6 +574,46 @@ Manage saved runs in **Scheduled** on Home (the header switch, or `g` then `s`).
 With nothing saved, the view says **No scheduled runs**.
 
 ![Home's Scheduled view: one global run, two runs in api-gateway (one paused) and a one-time run in web-console](screenshots/11d-home-scheduled.png)
+
+### Control Terminator from Claude Code
+
+The Terminator MCP server lets a Claude Code session on this Mac use Terminator. Claude can open terminals, start work, run quick actions and send you an alert. It works in any Claude Code session: one Terminator started, one in another terminal, or the Claude desktop app.
+
+**Setup is automatic.** At each start, Terminator adds itself to Claude Code as the MCP server `terminator` (`terminator-dev` in a development build). It also adds the allow rule `mcp__terminator` to `~/.claude/settings.json`, so its tools need no approval. The server listens only on a socket in Terminator's data folder, which only your user can open. Nothing outside this Mac can reach it.
+
+**Settings → Integrations → Claude Code** shows the state: **Connected**, **Disconnected**, or the reason Claude Code is unavailable (for example, `claude` is not installed). **Copy server command** copies the `claude mcp add-json` line, to run by hand. **Disconnect** removes the server and its allow rule, and Terminator does not add them again at the next start. **Connect** adds them again.
+
+Examples of what Claude can do:
+
+- Show an alert in **Needs you** and send a notification: `alert`.
+- Start work on a prompt, as **Start work** does: `start_work`.
+- Open a terminal tab in a folder, and run a command in it: `open_terminal`.
+- Show a session, or move it into its own window: `open_session`, `open_in_window`.
+- List and run quick actions: `list_quick_actions`, `run_quick_action`.
+- Run an extension command: `run_extension_command`.
+- Work with workspaces, branches, worktrees, tasks, agents, scheduled runs and the issue tracker, for example `list_workspaces`, `create_worktree`, `create_task` and `create_schedule`.
+- Check for an update and restart into it: `check_for_update`, `install_update`.
+- Show the Terminator window: `show_window`.
+- Move the session into Terminator: `move_session_here` (see below).
+
+**Calls that close or delete something, run code, or approve something always ask you first**, also with the allow rule in place. These are `close_terminal`, `close_all_terminals`, `close_agent`, `delete_workspace`, `delete_project`, `delete_task`, `delete_schedule`, `remove_task_lane`, `remove_worktree`, `git_checkout`, `uninstall_extension`, `forget_session_record` and `install_update`. These also ask: `open_terminal` (it can run a command), `open_path` (it can open an app or script), `install_extension`, `create_schedule` and `update_schedule` (a scheduled run's prompt runs later with every tool allowed), and `answer_agent`, `run_home_feed_action` and `trigger_notification_action` (they can approve a held permission or restart Terminator). A quick action or an extension command that closes or deletes something runs only through `run_destructive_quick_action` or `run_destructive_extension_command`, and these ask too. The plain tools refuse it. In a scheduled run, these calls ask in **Needs you**.
+
+#### Moving a Claude session to Terminator
+
+A Move takes a Claude Code session from another app into a Terminator terminal tab, with its conversation.
+
+1. In the Claude Code session, ask Claude to move the session to Terminator. You can name a Terminator workspace to open it in.
+2. Home shows **A Claude session is moving here** in **Needs you**, with the session's folder. A notification of the same name is sent.
+3. Exit the session in the other app: type `/exit`, or close it in the Claude app.
+4. Terminator opens a terminal tab in the session's folder that runs `claude --resume <session id>`.
+
+**Open a copy now** opens the tab at once, without waiting for the exit. The tab runs `claude --resume <session id> --fork-session`, so the copy continues as a new conversation and the original stays as it is. **Cancel** stops the Move. Terminator waits for the exit because two `claude` processes on one session can write over each other's transcript.
+
+#### When Claude cannot reach Terminator
+
+- **Terminator was not running when the session started.** The server shows as failed in that session. Open Terminator, then run `/mcp` in the session to reconnect.
+- **The server is disconnected.** Open **Settings → Integrations → Claude Code** and press **Connect**. Then start a new session, or run `/mcp`.
+- **Claude Code is unavailable.** The row says why. Install Claude Code, then press **Connect**.
 
 ### Picking a Claude Code conversation back up
 

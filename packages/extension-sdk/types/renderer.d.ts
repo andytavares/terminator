@@ -144,6 +144,7 @@ export interface ElectronAPI {
         extensionId: string
         mnemonic?: string
         requires?: 'repo' | 'session'
+        destructive?: boolean
       }>
     }>
     executeCommand(

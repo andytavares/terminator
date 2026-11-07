@@ -14,6 +14,7 @@ import {
   defineViewChannel,
   type ViewCaller,
 } from '../../../src/main/ipc/invoke-table.js'
+import { ipcInvokeRegistry } from '../../../src/main/remote/ipc-registry.js'
 import { fakeWebContentsView } from '../../support/fake-web-contents.js'
 
 function capturedHandler(channel: string) {
@@ -223,5 +224,19 @@ describe('defineViewChannel — onGone', () => {
     view.navigate({ isMainFrame: true, isSameDocument: true })
     view.navigate({ isMainFrame: false, isSameDocument: false })
     expect(gone).not.toHaveBeenCalled()
+  })
+})
+
+describe('registerInvokeTable — the bridge registry', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("stores each row's schema with its handler", () => {
+    const schema = z.object({ name: z.string() })
+    registerInvokeTable([
+      defineChannel({ channel: 'a:schema', schema, invalid: null, run: () => 'ok' }),
+    ])
+    expect(ipcInvokeRegistry.get('a:schema')?.schema).toBe(schema)
   })
 })

@@ -1,3 +1,4 @@
+import type { z } from 'zod'
 import { ipcMain, type IpcMainInvokeEvent, type IpcMainEvent } from 'electron'
 import { REMOTE_ACCESSIBLE_CHANNELS } from '../remote/remote-accessible-channels.js'
 import { ipcInvokeRegistry, ipcSendRegistry, type IpcSendHandler } from '../remote/ipc-registry.js'
@@ -11,6 +12,7 @@ import { ipcInvokeRegistry, ipcSendRegistry, type IpcSendHandler } from '../remo
 
 export interface HandleChannelOptions {
   remoteAccessible?: boolean
+  schema?: z.ZodType
 }
 
 export function handleChannel(
@@ -20,7 +22,7 @@ export function handleChannel(
 ): void {
   ipcMain.handle(channel, handler)
   const remoteAccessible = opts?.remoteAccessible ?? REMOTE_ACCESSIBLE_CHANNELS.has(channel)
-  ipcInvokeRegistry.set(channel, { handler, remoteAccessible })
+  ipcInvokeRegistry.set(channel, { handler, remoteAccessible, schema: opts?.schema })
 }
 
 /** `Payload` is what the sender is trusted to send; nothing here checks it. */

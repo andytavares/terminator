@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { wrapDb } from '../../../src/main/db/index'
@@ -11,14 +11,10 @@ const runOnce = vi.hoisted(() => vi.fn())
 const database = vi.hoisted(() => ({ current: null as unknown }))
 const sendToWindow = vi.hoisted(() => vi.fn())
 const userData = vi.hoisted(() => ({ current: '' }))
-const notified = vi.hoisted(() => vi.fn())
 
 vi.mock('electron', () => ({
   ipcMain: { handle: (channel: string, handler: Handler) => handlers.set(channel, handler) },
   app: { getPath: () => userData.current },
-}))
-vi.mock('../../../src/main/notifications/notification-manager', () => ({
-  notificationManager: { create: notified },
 }))
 vi.mock('../../../src/main/logger', () => ({
   logger: { error: vi.fn() },
@@ -57,7 +53,6 @@ let started: Promise<void>
 beforeEach(async () => {
   vi.resetModules()
   sendToWindow.mockReset()
-  notified.mockReset()
   handlers.clear()
   userData.current = mkdtempSync(join(tmpdir(), 'user-data-'))
   database.current = wrapDb(new DatabaseSync(':memory:'))
@@ -125,27 +120,9 @@ function expectedLaunch() {
   return {
     settingsPath: join(folder, 'settings.json'),
     systemPromptPath: join(folder, 'system-prompt.md'),
-    systemPrompt: expect.stringContaining(join(folder, 'alerts')),
+    systemPrompt: expect.stringContaining('mcp__terminator-dev__alert'),
   }
 }
-
-describe('scheduled run alerts', () => {
-  it('shows an alert file on Home, sends a notification, and dismisses it', async () => {
-    const feed = await import('../../../src/main/home/home-feed')
-    const shown = new Promise((resolve) => feed.onFeedChange(resolve))
-    // Read on the watch event, or by the first scan when the watch starts after this write.
-    const alerts = join(userData.current, 'scheduled-runs', 'alerts')
-    mkdirSync(alerts, { recursive: true })
-    writeFileSync(join(alerts, 'ci.json'), JSON.stringify({ title: 'CI red' }))
-    await shown
-    expect(feed.getMergedFeed().asks).toEqual([
-      expect.objectContaining({ id: 'alert-ci', title: 'CI red', source: 'scheduled-alerts' }),
-    ])
-    expect(notified).toHaveBeenCalledWith(expect.objectContaining({ title: 'CI red' }))
-    await feed.runAction('scheduled-alerts', 'alert-ci', 'dismiss')
-    expect(feed.getMergedFeed().asks).toEqual([])
-  })
-})
 
 describe('a refused edit', () => {
   it('refuses an edit that does not validate, and answers a failure in words', async () => {

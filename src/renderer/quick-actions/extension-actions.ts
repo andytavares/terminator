@@ -10,6 +10,7 @@ export interface RegisteredCommand {
   category?: string
   mnemonic?: string
   requires?: 'repo' | 'session'
+  destructive?: boolean
 }
 
 export interface DeclaredCommand {
@@ -93,6 +94,7 @@ export function buildExtensionActions(
   const live = registered.map((cmd) => ({
     ...commandAction(cmd, groups),
     disabledReason: requiresReason(cmd.requires, ctx),
+    ...(cmd.destructive === true ? { destructive: true as const } : {}),
     run: () => execute(cmd.key, ctx),
   }))
   const missing = declared

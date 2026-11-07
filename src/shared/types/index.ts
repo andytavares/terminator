@@ -1,4 +1,5 @@
 export type { NotificationTarget } from '../notifications/resolve-targets'
+export { SESSION_ID } from '../session-id'
 import type { AgentAsk } from '../agent-sessions/ask'
 import type { NotificationTarget, NotificationType } from '../notifications/resolve-targets'
 

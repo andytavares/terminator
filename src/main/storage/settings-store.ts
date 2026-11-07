@@ -22,7 +22,17 @@ const store = new CachedStore<StoreSchema>({
 
 export function getGlobalSettings(): GlobalSettings {
   // Always normalize against defaults so schema migrations don't surface missing fields
-  return deepMerge(DEFAULT_GLOBAL_SETTINGS, store.get('global') as Partial<GlobalSettings>)
+  return renameAlertOverride(
+    deepMerge(DEFAULT_GLOBAL_SETTINGS, store.get('global') as Partial<GlobalSettings>)
+  )
+}
+
+/** `scheduledRunAlert` became `claudeAlert`; the next settings write stores the new key. */
+function renameAlertOverride(settings: GlobalSettings): GlobalSettings {
+  const { scheduledRunAlert, ...overrides } = settings.notifications.overrides
+  if (!scheduledRunAlert) return settings
+  overrides.claudeAlert ??= scheduledRunAlert
+  return { ...settings, notifications: { ...settings.notifications, overrides } }
 }
 
 /** Throws a ZodError, and stores nothing, when the merged settings break the schema. */

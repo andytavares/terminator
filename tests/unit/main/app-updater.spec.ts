@@ -266,3 +266,64 @@ describe('a test run of the packaged app', () => {
     expect(fake.checks).toBe(0)
   })
 })
+
+// The MCP check_for_update tool: no dialog, an answer Claude can read (ADR 145).
+describe('checkForUpdatesQuietly', () => {
+  it('answers up-to-date with the running version, and shows nothing', async () => {
+    const updates = await import('../../../src/main/app-updater')
+    expect(await updates.checkForUpdatesQuietly()).toEqual({
+      status: 'up-to-date',
+      version: '0.1.163',
+    })
+    expect(electron.dialog.shown).toEqual([])
+    expect(updates.downloadedUpdate()).toBeNull()
+  })
+
+  it('downloads a found update, remembers it, and does not announce it again', async () => {
+    fake.nextCheck = found('0.1.170')
+    const updates = await import('../../../src/main/app-updater')
+    startAppUpdates(reveal)
+    expect(await updates.checkForUpdatesQuietly()).toEqual({
+      status: 'downloaded',
+      version: '0.1.170',
+    })
+    expect(updates.downloadedUpdate()).toBe('0.1.170')
+    expect(notificationsWithTitle('Update ready')).toEqual([])
+    expect(electron.dialog.shown).toEqual([])
+  })
+})
+
+describe('checkForUpdatesQuietly when it cannot check', () => {
+  it('is off in an unpackaged app, and says why', async () => {
+    electron.app.isPackaged = false
+    const updates = await import('../../../src/main/app-updater')
+    expect(await updates.checkForUpdatesQuietly()).toEqual({
+      status: 'off',
+      reason: expect.stringContaining('installed'),
+    })
+    expect(fake.checks).toBe(0)
+  })
+
+  it('lets a failed check reject, so the tool reports it', async () => {
+    fake.nextCheck = () => Promise.reject(new Error('HttpError: 504 Gateway Time-out'))
+    const updates = await import('../../../src/main/app-updater')
+    await expect(updates.checkForUpdatesQuietly()).rejects.toThrow('504')
+  })
+})
+
+describe('downloadedUpdate', () => {
+  it('names the version a background check downloaded', async () => {
+    startAppUpdates(reveal)
+    fake.emit('update-downloaded', { version: '0.1.171' })
+    const updates = await import('../../../src/main/app-updater')
+    expect(updates.downloadedUpdate()).toBe('0.1.171')
+  })
+})
+
+describe('installUpdateNow', () => {
+  it('quits into the downloaded update', async () => {
+    const updates = await import('../../../src/main/app-updater')
+    updates.installUpdateNow()
+    expect(fake.installs).toBe(1)
+  })
+})

@@ -296,11 +296,7 @@ function useRecordPaletteOpen(): void {
 /** The palette and everything it offers, mounted only while it is open: the actions read every
  * session, so building them is work the closed palette should not cost the rest of the app. */
 export function QuickActionsHost(props: QuickActionsHostProps): JSX.Element {
-  const target = useQuickActionTarget()
-  const quickActionGroups = useExtensionRegistry((s) => s.quickActionGroups)
-  const groups = useMemo(() => [...CORE_GROUPS, ...quickActionGroups], [quickActionGroups])
-  const surfaceOwner = useSurfaceOwner()
-  const actions = usePaletteActions({ target, groups, surfaceOwner, props })
+  const { target, groups, surfaceOwner, actions } = usePaletteState(props)
   const { pinned, recent, pins } = useFirstScreen(actions, props.openedAt)
   const { onClose } = props
   useRecordPaletteOpen()
@@ -338,11 +334,25 @@ function useFirstScreen(actions: QuickAction[], openedAt: number) {
   return { ...firstScreen, pins }
 }
 
+/** What the shell gives the action list, whether or not the palette is open. */
+export type PaletteInputs = Pick<QuickActionsHostProps, 'surfaces' | 'activateSurface' | 'shell'>
+
+/** The palette's action list, and the target, groups and surface it was built for. The Terminator
+ * MCP server's quick-action tools read the same list without opening the palette. */
+export function usePaletteState(props: PaletteInputs) {
+  const target = useQuickActionTarget()
+  const quickActionGroups = useExtensionRegistry((s) => s.quickActionGroups)
+  const groups = useMemo(() => [...CORE_GROUPS, ...quickActionGroups], [quickActionGroups])
+  const surfaceOwner = useSurfaceOwner()
+  const actions = usePaletteActions({ target, groups, surfaceOwner, props })
+  return { target, groups, surfaceOwner, actions }
+}
+
 interface PaletteInput {
   target: QuickActionTarget
   groups: QuickActionGroup[]
   surfaceOwner: string | null
-  props: QuickActionsHostProps
+  props: PaletteInputs
 }
 
 /** Core actions, the open surfaces, extension commands and custom actions, in that order. */
