@@ -556,6 +556,21 @@ Under the prompt, **When** is **Now**, **Once** or **Repeat**, and the button th
 
 A scheduled run starts what Start work would start, while Terminator is open. A run missed while it was closed waits in **Needs you** with **Run now** and **Skip**; it never starts by itself. A minute or hour repeat skips runs missed while Terminator was closed, with no ask. A prompt run as an agent starts in a new worktree on a branch Claude names, for example `fix/fetch-user-retry`. If naming takes over 5 seconds or fails, the branch is `prompt/<first words>`. A repeat names its branch once, when you save it, and every run uses that one worktree. **Use the repo folder** runs it in the main checkout as before.
 
+**Global** is the first choice in the workspace picker on the **Prompt** tab. A global scheduled run belongs to no workspace. It starts in your home folder and shows in **Scratch**, as an agent tab or Claude in a terminal only. Its missed-run ask in **Needs you** says "Global" where a workspace run names its repository.
+
+![Start work: a prompt with Global chosen, set to repeat on weekdays](screenshots/11e-start-work-global.png)
+
+Manage saved runs in **Scheduled** on Home (the header switch, or `g` then `s`). Start work shows only a count, for example **4 scheduled runs · Manage on Home**. The table groups runs under **Global** first, then by workspace, with **Prompt**, **When**, **Next run**, **Last run** and **Run as**. **New scheduled run** opens Start work on **Prompt**, with **When** set to **Repeat**. Press a row to edit it: Start work opens as **Edit scheduled run**, and **Save changes** saves it. The row's **…** menu has:
+
+- **Run now** starts it at once. A repeat keeps its next run; a one-time run is removed.
+- **Pause** stops it from starting, and **Next run** shows **Paused**. **Resume** starts it again, with no missed-run ask for the paused time.
+- **Edit…** opens it in Start work.
+- **Remove…** asks first, then deletes it.
+
+With nothing saved, the view says **No scheduled runs**.
+
+![Home's Scheduled view: one global run, two runs in api-gateway (one paused) and a one-time run in web-console](screenshots/11d-home-scheduled.png)
+
 ### Picking a Claude Code conversation back up
 
 When a Claude Code session ends (you typed `/exit`, the terminal closed, or you quit Terminator), the conversation stays on disk. A **Resume** button appears on that session wherever it shows: its work thread's drawer on Home, and its Overview tile. Press it, and Terminator opens the conversation on the same branch, in the same folder. A conversation that ran in a terminal opens a terminal that runs `claude --resume`. A conversation that ran in an agent tab opens an agent tab. The new terminal takes over the old one's description and ticket link, and the exited tab closes, so there is one terminal per conversation.
