@@ -37,8 +37,8 @@ function whereOf(facts: SessionFacts, titles: IssueTitles): string {
   return [facts.workspaceName, work].filter(Boolean).join(SEPARATOR)
 }
 
-function itemId(kind: HomeAsk['kind'], facts: SessionFacts): string {
-  return `core:${kind}:${facts.sessionId}:${facts.lastActivityAt}`
+function itemId(kind: HomeAsk['kind'], facts: SessionFacts, at: number): string {
+  return `core:${kind}:${facts.sessionId}:${at}`
 }
 
 function baseAsk(facts: SessionFacts, titles: IssueTitles): Omit<DeskAsk, 'id' | 'kind'> {
@@ -61,7 +61,7 @@ function answerAsk(facts: SessionFacts, titles: IssueTitles): DeskAsk {
   const picks = choices.map((c) => ({ id: `choice-${c.number}`, label: c.label }))
   return {
     ...baseAsk(facts, titles),
-    id: itemId('answer', facts),
+    id: itemId('answer', facts, facts.lastActivityAt),
     kind: 'answer',
     title: 'Agent is asking',
     detail: facts.choicePrompt?.question ?? facts.askMessage ?? facts.latestLine,
@@ -72,10 +72,11 @@ function answerAsk(facts: SessionFacts, titles: IssueTitles): DeskAsk {
 }
 
 /** The agent's first prompt is not exposed to the renderer, so the description stands in. */
-function finishedAsk(facts: SessionFacts, titles: IssueTitles): DeskAsk {
+function finishedAsk(facts: SessionFacts, turnEndedAt: number, titles: IssueTitles): DeskAsk {
   return {
     ...baseAsk(facts, titles),
-    id: itemId('finished', facts),
+    id: itemId('finished', facts, turnEndedAt),
+    since: new Date(turnEndedAt).toISOString(),
     kind: 'finished',
     title: 'Agent finished',
     detail: facts.description ?? lastOutputOf(facts) ?? facts.branch ?? '',
@@ -87,13 +88,11 @@ function lastOutputOf(facts: SessionFacts): string | null {
   return facts.latestLine !== '' ? `Last output: ${facts.latestLine}` : null
 }
 
-function finishedWhileAway(facts: SessionFacts): boolean {
-  return (
-    facts.state === 'idle' &&
-    facts.agent !== null &&
-    !facts.isClosed &&
-    facts.lastActivityAt > (facts.lastAttendedAt ?? 0)
-  )
+/** When the agent's turn ended unseen. The Stop hook, not screen output: a status line redraws forever. */
+function finishedWhileAway(facts: SessionFacts): number | null {
+  const ended = facts.turnEndedAt
+  if (ended === null || facts.state !== 'idle' || facts.agent === null) return null
+  return ended > (facts.lastAttendedAt ?? 0) ? ended : null
 }
 
 /** Asks core raises itself: a session waiting on you, and one that finished while you were away. */
@@ -101,7 +100,8 @@ export function coreAsksFrom(facts: readonly SessionFacts[], titles: IssueTitles
   return facts.flatMap((f) => {
     if (f.isClosed) return []
     if (f.state === 'awaiting-input') return [answerAsk(f, titles)]
-    return finishedWhileAway(f) ? [finishedAsk(f, titles)] : []
+    const endedAt = finishedWhileAway(f)
+    return endedAt === null ? [] : [finishedAsk(f, endedAt, titles)]
   })
 }
 

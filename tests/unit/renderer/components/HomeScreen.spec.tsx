@@ -262,6 +262,7 @@ describe('HomeScreen — a finished agent', () => {
         state: 'idle',
         agent: {} as SessionFacts['agent'],
         lastActivityAt: NOW - 41 * 60_000,
+        turnEndedAt: NOW - 41 * 60_000,
       }),
     ]
     useChangeStatsStore.setState({

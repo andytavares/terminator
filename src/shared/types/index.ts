@@ -112,6 +112,8 @@ export interface TerminalSession {
   agentAsk?: AgentAsk
   /** Whether the agent is mid-turn, from its UserPromptSubmit and Stop hooks; undefined until this terminal reports one (renderer-side view state). */
   agentTurn?: boolean
+  /** Epoch ms of when the agent's last turn ended, from its Stop hook (renderer-side view state). */
+  agentTurnEndedAt?: number
 }
 
 /** One option in a numbered-choice prompt, numbered as on screen. */

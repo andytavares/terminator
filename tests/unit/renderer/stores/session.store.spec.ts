@@ -471,6 +471,21 @@ describe('useSessionStore — what the agent and the operator signal', () => {
   })
 })
 
+describe('useSessionStore — agent turn end', () => {
+  setUpUseSessionStore()
+
+  it('setAgentTurn stamps when a turn ends, and only then', () => {
+    useSessionStore.setState({ sessions: new Map([['sess-1', makeSession()]]) })
+    const { setAgentTurn } = useSessionStore.getState()
+    setAgentTurn('sess-1', false, 100)
+    expect(useSessionStore.getState().sessions.get('sess-1')!.agentTurnEndedAt).toBeUndefined()
+    setAgentTurn('sess-1', true, 200)
+    setAgentTurn('sess-1', false, 300)
+    setAgentTurn('sess-1', false, 400)
+    expect(useSessionStore.getState().sessions.get('sess-1')!.agentTurnEndedAt).toBe(300)
+  })
+})
+
 describe('useSessionStore — bell counts', () => {
   setUpUseSessionStore()
 

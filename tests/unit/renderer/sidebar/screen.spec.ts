@@ -35,6 +35,33 @@ describe('latestLineOf', () => {
   })
 })
 
+describe("latestLineOf — Claude Code's status line", () => {
+  const rule = '─'.repeat(80)
+  const statusLine = '● full $47.32 last $0.62 1h 9m 38% reuse 6 duplicate? ✓ 20 tests'
+
+  it('ignores a status line under the input box when the cursor sits below it', () => {
+    const rows = ['⏺ All 20 tests pass.', '', rule, '> ', rule, `  ${statusLine}`, '']
+    expect(latestLineOf(rows, 6)).toBe('⏺ All 20 tests pass.')
+  })
+
+  it('ignores a status line under a rounded input box with a multi-line draft', () => {
+    const rows = [
+      '⏺ Done.',
+      '╭' + '─'.repeat(40) + '╮',
+      '│ > first line │',
+      '│   second line │',
+      '╰' + '─'.repeat(40) + '╯',
+      `  ${statusLine}`,
+    ]
+    expect(latestLineOf(rows)).toBe('⏺ Done.')
+  })
+
+  it('reads output above the input box even when the output drew a table', () => {
+    const rows = ['┌──┬──┐', '│a │b │', '└──┴──┘', '⏺ Table above.', rule, '> ', rule, statusLine]
+    expect(latestLineOf(rows)).toBe('⏺ Table above.')
+  })
+})
+
 describe('latestLineOf — is empty for a blank screen', () => {
   it('is empty for a blank screen', () => {
     expect(latestLineOf(['', '  '])).toBe('')

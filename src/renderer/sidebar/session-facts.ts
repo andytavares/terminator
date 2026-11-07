@@ -37,6 +37,8 @@ export interface SessionFacts {
   lastActivityAt: number
   /** Epoch ms of when this session last became the visible one, null when it never has. */
   lastAttendedAt: number | null
+  /** Epoch ms of when the agent's last turn ended, from its Stop hook; null when none was reported. */
+  turnEndedAt: number | null
   startedAt: string
   closedAt: string | null
   latestLine: string
@@ -124,6 +126,7 @@ function liveFacts(session: TerminalSession) {
     runningFrom: runningFrom(session, state),
     lastActivityAt: session.lastActivityAt,
     lastAttendedAt: session.lastAttendedAt ?? null,
+    turnEndedAt: session.agentTurnEndedAt ?? null,
     latestLine: session.latestLine ?? '',
     choicePrompt: session.choicePrompt ?? null,
     askMessage: session.agentAsk?.message ?? null,
@@ -180,6 +183,7 @@ const CLOSED = {
   projectId: null,
   workspaceColor: null,
   lastAttendedAt: null,
+  turnEndedAt: null,
   latestLine: '',
   choicePrompt: null,
   askMessage: null,
