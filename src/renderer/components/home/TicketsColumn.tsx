@@ -14,6 +14,9 @@ import type { IssueSummary, TrackerId } from '../../../shared/types/index'
 
 type Pick = Omit<FocusItem, 'doneByHand'>
 
+// One array for a day with no focus: a zustand selector must return the same value for the same state.
+const NO_FOCUS: FocusItem[] = []
+
 function TicketPick(issue: IssueSummary): Pick {
   return {
     id: `${issue.tracker}:${issue.key}`,
@@ -166,7 +169,7 @@ export function TicketsColumn(): React.JSX.Element {
   const [term, setTerm] = useState('')
   const [openTicket, setOpenTicket] = useState<OpenTicket | null>(null)
   const { result, loading } = useIssueSearch(term, true, { limit: 50 })
-  const today = useFocusStore((s) => s.days[localDateKey(Date.now())] ?? [])
+  const today = useFocusStore((s) => s.days[localDateKey(Date.now())] ?? NO_FOCUS)
   const close = (): void => setOpenTicket(null)
   return (
     <div className="plan__column">
