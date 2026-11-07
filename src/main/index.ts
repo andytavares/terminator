@@ -24,7 +24,13 @@ import { registerExtensionHandlers } from './ipc/extension.ipc.js'
 import { registerGitHandlers } from './ipc/git.ipc.js'
 import { registerIntegrationsHandlers } from './ipc/integrations.ipc.js'
 import { loadLinks, registerLinkGarbageCollection } from './integrations/issue-link-store.js'
-import { loadRecords, markClosed, sweepOpenRecords } from './sessions/session-record-store.js'
+import {
+  configureRetention,
+  loadRecords,
+  markClosed,
+  startPurging,
+  sweepOpenRecords,
+} from './sessions/session-record-store.js'
 import { closeSessionsOfDeletedProjects } from './terminal/project-sessions.js'
 import { installUserHooks } from './agents/claude-hook.js'
 import { startAgentSessionWatcher } from './agents/agent-session-watcher.js'
@@ -75,6 +81,7 @@ import {
   onExtensionSettingsChanged,
 } from './storage/extension-settings-store.js'
 import { onWorkspacesChanged } from './storage/workspace-store.js'
+import { getGlobalSettings } from './storage/settings-store.js'
 import { createExtProtocolHandler } from './extensions/ext-protocol.js'
 import { EXTENSION_BASE_CSS } from '@terminator/extension-ui/extension-base-css'
 import { recordUsage } from './extensions/extension-usage.js'
@@ -455,6 +462,9 @@ function startIntegrationsAndRecords(): void {
   // Nothing can be open at startup: sessions die with the app, so whatever the
   // last run left open is closed at its last update before anyone reads it.
   void loadTasks().catch((error) => logger.error('could not load tasks', { error: String(error) }))
+  // A closed session's record is kept as long as the operator's setting says, read at each purge.
+  configureRetention(() => getGlobalSettings().sessions.deleteClosedAfterHours * 60 * 60 * 1000)
+  startPurging()
   void loadRecords()
     .then(sweepOpenRecords)
     .then(() => startAgentSessionWatcher({ snapshotFor: makeSnapshotFor(ptyManager) }))

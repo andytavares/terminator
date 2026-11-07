@@ -7,7 +7,8 @@ import { useChangeStatsStore } from '../../stores/change-stats.store'
 import { useSessionFacts } from '../session/useSessionFacts'
 import { useNow } from '../session/useNow'
 import { useParkedThreads } from './parked-threads'
-import { isDismissed, useDismissedThreads } from './dismissed-threads'
+import { endedSessionsOfDismissed, isDismissed, useDismissedThreads } from './dismissed-threads'
+import { useSessionRecordsStore } from '../../stores/session-records.store'
 import {
   allWorkThreads,
   buildWorkThreads,
@@ -137,5 +138,10 @@ export function useWorkThreads(): WorkThreads {
     useParkedThreads.getState().forgetGone(live, Date.now())
     useDismissedThreads.getState().forgetGone(live, Date.now())
   }, [result.allThreads])
+  useEffect(() => {
+    // Dismissed means gone: a dismissed row's sessions are deleted as soon as they have ended.
+    const { forget } = useSessionRecordsStore.getState()
+    for (const id of endedSessionsOfDismissed(result.allThreads, dismissed)) void forget(id)
+  }, [result.allThreads, dismissed])
   return result
 }

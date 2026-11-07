@@ -93,6 +93,12 @@ export const GlobalSettingsSchema = z.object({
         .default(2 * 60 * 60 * 1000),
     })
     .default({ staleAfterMs: 2 * 60 * 60 * 1000 }),
+  // A closed session leaves Home at once; its record stays this long only so it can be resumed.
+  sessions: z
+    .object({
+      deleteClosedAfterHours: z.number().int().min(1).max(720).default(24),
+    })
+    .default({ deleteClosedAfterHours: 24 }),
   // Core's own notification kinds only (e.g. 'terminalBell') — never keyed by
   // extension id. Each extension's own notification settings live entirely in
   // its own per-extension settings (registered via api.settings.register),

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { readStoredJson, writeStoredJson } from '../../home/local-storage'
 import { storedDismissedOf } from '../../home/stored-shapes'
+import type { WorkThread } from '../../home/work-threads'
 
 /** @internal */
 export const DISMISSED_THREADS_KEY = 'terminator.home.dismissed-threads'
@@ -45,4 +46,14 @@ export const useDismissedThreads = create<DismissedThreadsState>((set) => ({
 /** True once the operator dismissed the thread; later activity does not bring it back. */
 export function isDismissed(dismissed: Readonly<Record<string, number>>, key: string): boolean {
   return dismissed[key] !== undefined
+}
+
+/** The closed sessions on dismissed threads, whose records are deleted for good (ADR 118). */
+export function endedSessionsOfDismissed(
+  threads: readonly WorkThread[],
+  dismissed: Readonly<Record<string, number>>
+): string[] {
+  return threads
+    .filter((thread) => isDismissed(dismissed, thread.key))
+    .flatMap((thread) => thread.sessions.filter((s) => s.isClosed).map((s) => s.sessionId))
 }

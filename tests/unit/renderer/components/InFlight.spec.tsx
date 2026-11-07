@@ -14,7 +14,8 @@ import { ToastContainer } from '../../../../src/renderer/components/ToastContain
 import { useHomeFeedStore } from '../../../../src/renderer/stores/home-feed.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { installElectronApi } from '../../../support/electron-api'
-import { FACTS, REPO_ROOT, seedDesk, sendToAgentAsk } from '../home/desk-world'
+import { FACTS, REPO_ROOT, seedDesk, sendToAgentAsk, ticket } from '../home/desk-world'
+import { fact } from '../sidebar/fixtures/facts'
 import { task } from '../home/fixtures'
 
 const spies = vi.hoisted(() => ({
@@ -490,6 +491,36 @@ describe('the row menu — a dismissed thread stays gone', () => {
     expect(rowShown()).toBe(false)
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
     expect(rowShown()).toBe(true)
+  })
+})
+
+describe('the row menu — Dismiss deletes the sessions it holds', () => {
+  const TITLE = 'Reproduce staging 429s before release'
+  const endedOnTav31 = fact({
+    sessionId: 'ended-31',
+    isClosed: true,
+    state: 'exited',
+    projectId: null,
+    branch: 'tav-31',
+    workItem: ticket('TAV-31'),
+    snapshot: { ...fact().snapshot, projectId: 'p31' },
+  })
+
+  it('deletes the ended session record of a dismissed row, never the live one, and the row is gone', () => {
+    const forget = vi.fn().mockResolvedValue({ data: true })
+    installElectronApi({
+      homeThreadSummary: { get: summaryGet },
+      agentUsage: { get: usageGet },
+      shell: { openExternal },
+      git: { changeStats: vi.fn().mockResolvedValue({ added: 0, removed: 0, files: 0 }) },
+      sessionRecords: { forget },
+    })
+    spies.facts = [...FACTS, endedOnTav31]
+    render(<InFlight />)
+    expect(forget).not.toHaveBeenCalled()
+    parkViaMenu(TITLE, 'Dismiss')
+    expect(screen.queryByRole('button', { name: TITLE })).toBeNull()
+    expect(forget.mock.calls.map(([input]) => input)).toEqual([{ sessionId: 'ended-31' }])
   })
 })
 

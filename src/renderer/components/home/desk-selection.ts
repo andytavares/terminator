@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { useEffect } from 'react'
 import { useWorkThreads } from './useWorkThreads'
-import { latestResumableThread, type WorkThread } from '../../home/work-threads'
+import { latestResumableSession, type WorkThread } from '../../home/work-threads'
+import { resumeSession } from '../../terminal/start-session'
 import {
   deskGroups,
   filterThreads,
@@ -63,16 +64,17 @@ export function useOrderedThreadKeys(): string[] {
   )
 }
 
-/** Opens the drawer a "Resume a conversation" quick action asked for, once Home has a thread to show. */
+/** Resumes the latest ended conversation when a "Resume a conversation" quick action asks. A closed
+ * session is no longer on Home (ADR 146), so it reopens straight away rather than in a drawer. */
 export function useOpenRequestedResume(): void {
   const requested = useDeskSelection((s) => s.resumeRequested)
-  const { threads } = useWorkThreads()
+  const { allThreads } = useWorkThreads()
   useEffect(() => {
-    const target = requested ? latestResumableThread(threads) : undefined
+    const target = requested ? latestResumableSession(allThreads) : undefined
     if (!target) return
     useDeskSelection.setState({ resumeRequested: false })
-    useDeskSelection.getState().openThread(target.key)
-  }, [requested, threads])
+    void resumeSession(target)
+  }, [requested, allThreads])
 }
 
 /** The selected row's key, and a group's threads when they show: none while it is folded. */

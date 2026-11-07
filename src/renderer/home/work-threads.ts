@@ -343,19 +343,21 @@ export function allWorkThreads(input: WorkThreadInput): WorkThread[] {
   return collectDrafts(input).map((draft) => toThread(draft, input))
 }
 
-/** The thread holding the conversation that ended most recently and can still be resumed. */
-export function latestResumableThread(threads: readonly WorkThread[]): WorkThread | undefined {
-  const endedAt = (thread: WorkThread) =>
-    Math.max(
-      0,
-      ...thread.sessions.filter((s) => planResume(s) !== null).map((s) => s.lastActivityAt)
-    )
-  return threads.filter((thread) => endedAt(thread) > 0).sort((a, b) => endedAt(b) - endedAt(a))[0]
+/** The conversation that ended most recently and can still be resumed, from every thread. */
+export function latestResumableSession(threads: readonly WorkThread[]): SessionFacts | undefined {
+  return threads
+    .flatMap((thread) => thread.sessions)
+    .filter((session) => planResume(session) !== null)
+    .sort((a, b) => b.lastActivityAt - a.lastActivityAt)[0]
 }
 
-/** The threads worth showing: work with an open session or a facet still open. */
+/**
+ * The threads worth showing: work with an open session or a facet still open.
+ * A closed session leaves Home at once; its record waits only for resume and the purge.
+ */
 export function buildWorkThreads(input: WorkThreadInput): WorkThread[] {
-  return allWorkThreads(input).filter((t) => !t.closed || t.taskId !== null)
+  const open = { ...input, facts: input.facts.filter((f) => !f.isClosed) }
+  return allWorkThreads(open).filter((t) => !t.closed || t.taskId !== null)
 }
 
 /** The focused task first, then newest work first; a row never moves because its terminal printed. */

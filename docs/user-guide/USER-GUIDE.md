@@ -410,7 +410,7 @@ The drawer holds:
 - the terminals on the task, how long they have run and their tokens, and a timeline;
 - the buttons **Open all lanes**, **Link a ticket**, **Rename**, **Mark done** and **Archive**.
 
-**Mark done** finishes a task that will never have a pull request. **Archive** hides a task without finishing it. Both keep the task's records and list it under **Archived tasks** in the footer. There, **Restore** (or **Undo done**) brings it back. `Esc` closes the drawer. Right-click a row for the same actions and for **Dismiss**, which hides a row from Home. The toast has **Undo**.
+**Mark done** finishes a task that will never have a pull request. **Archive** hides a task without finishing it. Both keep the task's records and list it under **Archived tasks** in the footer. There, **Restore** (or **Undo done**) brings it back. `Esc` closes the drawer. Right-click a row for the same actions and for **Dismiss**, which takes a row off Home for good. The toast has **Undo**, which brings the row back. Dismiss deletes the record of every session on the row that has ended, and of each one still running as soon as it ends. Undo cannot bring a deleted record back. A row that only an extension shows, such as a pull request, stays hidden and nothing is deleted.
 
 #### Making a task
 
@@ -499,7 +499,7 @@ A line under the columns says how many agents already run, across how many tasks
 
 ### Saying what a session is for
 
-A session with no ticket can say what it is for. Right-click its tab and choose **Add description…** (or press `Cmd+I`). Type an answer and press `Enter`. On Overview, the tile asks **What is this session doing?** in place. Terminator saves the description at once and keeps it after a restart. On Home, the description names the work: the row and its drawer show your words when no ticket does. Terminator keeps a described or linked session for 30 days after it ends.
+A session with no ticket can say what it is for. Right-click its tab and choose **Add description…** (or press `Cmd+I`). Type an answer and press `Enter`. On Overview, the tile asks **What is this session doing?** in place. Terminator saves the description at once and keeps it after a restart. On Home, the description names the work: the row and its drawer show your words when no ticket does. When a session ends, it leaves Home at once. Terminator keeps its record only so you can resume it, for the time that **Delete closed sessions after** sets in **Settings → Appearance & Terminal** (24 hours by default, from 1 hour to 30 days). Then the record is deleted, without a restart.
 
 **New terminal** on Overview and **Start work** on Home start a session on any branch, or a scratch terminal, without a trip to the sidebar. When you close a session, the terminal ends exactly as it does when you close its tab.
 
@@ -617,9 +617,9 @@ A Move takes a Claude Code session from another app into a Terminator terminal t
 
 ### Picking a Claude Code conversation back up
 
-When a Claude Code session ends (you typed `/exit`, the terminal closed, or you quit Terminator), the conversation stays on disk. A **Resume** button appears on that session wherever it shows: its work thread's drawer on Home, and its Overview tile. Press it, and Terminator opens the conversation on the same branch, in the same folder. A conversation that ran in a terminal opens a terminal that runs `claude --resume`. A conversation that ran in an agent tab opens an agent tab. The new terminal takes over the old one's description and ticket link, and the exited tab closes, so there is one terminal per conversation.
+When a Claude Code session ends (you typed `/exit`, the terminal closed, or you quit Terminator), the conversation stays on disk. A **Resume** button appears on its Overview tile, and **Resume a conversation…** in Quick Actions reopens the one that ended most recently. An ended session is not on Home. Press it, and Terminator opens the conversation on the same branch, in the same folder. A conversation that ran in a terminal opens a terminal that runs `claude --resume`. A conversation that ran in an agent tab opens an agent tab. The new terminal takes over the old one's description and ticket link, and the exited tab closes, so there is one terminal per conversation.
 
-After a restart, conversations from the last run wait with their Resume button. Terminator resumes nothing for you. A restart never starts agents on its own, so you choose which threads to pick up. The one exception is an agent wake for a pull request event after start-up (see [Agent wakes](#agent-wakes)). A thread whose sessions have all ended stays in the task list until its pull request merges or closes, you archive it, or Terminator drops its records after 30 days. **Resume a conversation…** in Quick actions (`Cmd+P`) opens the drawer of the thread that holds the most recent conversation.
+After a restart, conversations from the last run wait with their Resume button. Terminator resumes nothing for you. A restart never starts agents on its own, so you choose which threads to pick up. The one exception is an agent wake for a pull request event after start-up (see [Agent wakes](#agent-wakes)). A thread whose sessions have all ended leaves the task list, unless a stored task or an open pull request keeps it there. Terminator deletes the ended records after the time that **Delete closed sessions after** sets.
 
 Resume appears only where it can work:
 
