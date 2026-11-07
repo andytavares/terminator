@@ -1,0 +1,21 @@
+src/renderer/hooks/useDragReorder.ts
+  s_07e7aef877c5aa::t_3b3a2ea9e1ae9b 38,48-49,51
+src/renderer/stores/attached-context.store.ts
+  s_07e7aef877c5aa::t_3b3a2ea9e1ae9b 53,79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5193dd85f03c8d90ba36da7e7cabe2b494aa7a8d",
+  "prompts": {},
+  "sessions": {
+    "s_07e7aef877c5aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "633c8d12-7dd7-4254-9663-67bc2d4d51f5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
