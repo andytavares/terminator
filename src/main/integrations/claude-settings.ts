@@ -76,3 +76,13 @@ export function putSessionStartHook(
 ): Promise<void> {
   return putHook(file, 'SessionStart', { marker, command })
 }
+
+/** Adds `rule` to `permissions.allow` once; every other key and entry survives. */
+export async function putAllowRule(file: string, rule: string): Promise<void> {
+  const settings = (await readClaudeSettings(file)) ?? {}
+  const permissions = (settings.permissions ?? {}) as { allow?: unknown }
+  const allow = Array.isArray(permissions.allow) ? permissions.allow : []
+  if (allow.includes(rule)) return
+  settings.permissions = { ...permissions, allow: [...allow, rule] }
+  await writeClaudeSettings(file, settings)
+}
