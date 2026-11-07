@@ -126,6 +126,35 @@ describe('TaskList', () => {
   })
 })
 
+describe('TaskList — a folded group header is one button', () => {
+  const quietHeader = () => screen.getByRole('button', { name: /^(Show|Hide) Quiet$/ })
+
+  it('opens and closes when the header row itself is clicked, not only its label', () => {
+    render(<TaskList />)
+    fireEvent.click(screen.getByRole('heading', { level: 3, name: 'Quiet · 1' }))
+    expect(screen.getByRole('button', { name: 'Scratch shell' })).toBeTruthy()
+    expect(quietHeader().getAttribute('aria-expanded')).toBe('true')
+    expect(within(quietHeader()).getByText('Hide ▾')).toBeTruthy()
+    fireEvent.click(quietHeader())
+    expect(screen.queryByRole('button', { name: 'Scratch shell' })).toBeNull()
+    expect(quietHeader().getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('toggles with Enter and with Space from the keyboard', () => {
+    render(<TaskList />)
+    fireEvent.keyDown(quietHeader(), { key: 'Enter' })
+    expect(screen.getByRole('button', { name: 'Scratch shell' })).toBeTruthy()
+    fireEvent.keyDown(quietHeader(), { key: ' ' })
+    expect(screen.queryByRole('button', { name: 'Scratch shell' })).toBeNull()
+  })
+
+  it('is focusable and holds no second button inside it', () => {
+    render(<TaskList />)
+    expect(quietHeader().tabIndex).toBe(0)
+    expect(quietHeader().querySelector('button, [role="button"]')).toBeNull()
+  })
+})
+
 describe('TaskList — pulse line', () => {
   it('shows only the state pressed on the pulse line', () => {
     deskFilter.taskState = 'running'

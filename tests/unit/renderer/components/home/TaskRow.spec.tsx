@@ -1,4 +1,5 @@
 import React from 'react'
+import { readFileSync } from 'node:fs'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { makeTempDir } from '../../../../support/temp-dir'
@@ -121,5 +122,36 @@ describe('TaskRow — lane chips', () => {
     render(<TaskRow thread={thread} now={Date.now()} selected={false} />)
     const chips = Array.from(document.querySelectorAll('.task-lane')).map((c) => c.textContent)
     expect(chips).toEqual(['api', 'web · rate-limits', 'web · usage-page'])
+  })
+})
+
+describe('TaskRow — the age and the actions button each have their own space', () => {
+  const tasksCss = readFileSync('src/renderer/components/home/Tasks.css', 'utf8')
+  const ruleFor = (selector: string) =>
+    tasksCss.match(
+      new RegExp(`(?:^|\\n)${selector.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`)
+    )?.[1] ?? ''
+
+  it("puts the age and then the button side by side in the row's last cell", async () => {
+    const created = await main.createTask({ title: 'Rate limits', lanes: [api] })
+    render(
+      <TaskRow
+        thread={rowThread('Rate limits', api, created.id)}
+        now={Date.now()}
+        selected={false}
+      />
+    )
+    const end = screen.getByRole('button', { name: 'Rate limits' }).querySelector('.task-row__end')
+    const age = end?.querySelector('.task-row__last')
+    const actions = screen.getByRole('button', { name: 'Work actions' })
+    expect(age?.textContent).toBe('now')
+    expect(end?.contains(actions)).toBe(true)
+    expect(age!.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('lays the cell out as a row and keeps the button in the flow, not over the age', () => {
+    expect(ruleFor('.task-row__end')).toMatch(/display:\s*flex/)
+    expect(ruleFor('.task-row__end .desk-tr__controls')).toMatch(/position:\s*static/)
+    expect(ruleFor('.task-row__end .desk-tr__menu')).toMatch(/position:\s*static/)
   })
 })
