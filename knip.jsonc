@@ -28,6 +28,8 @@
         "tests/e2e/fixtures/extensions/probe/*.{cjs,js}",
         // Run by path as the e2e profiles' agent: tests/e2e/helpers.ts (STUB_AGENT).
         "tests/e2e/fixtures/acp-stub-agent.mjs",
+        // Reached only through electron.vite.config.ts's alias for mermaid's ELK chunk.
+        "src/renderer/components/agent/no-elk-layout.ts",
       ],
       // Tools the e2e stubs call on the runner's PATH: openssl makes the stub
       // servers' throwaway CA (tracker-stub.ts, jira-stub.ts) and jq shapes the
