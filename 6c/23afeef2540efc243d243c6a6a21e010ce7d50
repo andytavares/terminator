@@ -1,0 +1,53 @@
+src/renderer/components/home/useWorkThreads.ts
+  s_56e599e17e5b82::t_2c68c7e1382f9a 31-32,93,98-103,133,136
+docs/adr/149-a-new-session-brings-a-dismissed-row-back.md
+  s_56e599e17e5b82::t_d7b57361b164bb 1-26
+src/renderer/components/home/DismissedTasks.tsx
+  s_56e599e17e5b82::t_2c68c7e1382f9a 4,42,44
+  s_56e599e17e5b82::t_8f0ce59c7863f3 1-3,5-41,43,45-61
+src/renderer/components/home/dismissed-threads.ts
+  s_56e599e17e5b82::t_cd569add709c7c 13-14,73,78-80
+  s_56e599e17e5b82::t_8a83991b3574c3 74-77,91
+  s_56e599e17e5b82::t_d7b57361b164bb 72
+tests/unit/renderer/components/PlanTheDay.spec.tsx
+  s_56e599e17e5b82::t_d12800354c34fc 20
+docs/adr/118-dismissed-means-gone.md
+  s_56e599e17e5b82::t_d7b57361b164bb 3
+tests/unit/renderer/home/dismissed-threads.spec.ts
+  s_56e599e17e5b82::t_2ecc985537ece7 47-51
+  s_56e599e17e5b82::t_29de9ccca45d4f 31,34-36,42-43,52-71
+  s_56e599e17e5b82::t_8d8960f7cac725 72
+tests/unit/renderer/components/HomeScreen.spec.tsx
+  s_56e599e17e5b82::t_d12800354c34fc 23-28
+tests/unit/renderer/home/resume-request.spec.tsx
+  s_56e599e17e5b82::t_d12800354c34fc 9-14
+tests/unit/renderer/components/TaskList.spec.tsx
+  s_56e599e17e5b82::t_fe996329f8aa96 6-7,296-314,316
+  s_56e599e17e5b82::t_a238fc6a265a59 315,317-318
+tests/unit/renderer/components/OverviewScreen.spec.tsx
+  s_56e599e17e5b82::t_d12800354c34fc 18-23
+src/renderer/components/home/HomeFooter.tsx
+  s_56e599e17e5b82::t_2c68c7e1382f9a 8,21,34
+tests/unit/renderer/components/home/HomeTasksLayout.spec.tsx
+  s_56e599e17e5b82::t_d12800354c34fc 15-20
+src/shared/usage/core-features.ts
+  s_56e599e17e5b82::t_54511e8913def9 21
+tests/unit/renderer/components/TaskSwitcher.spec.tsx
+  s_56e599e17e5b82::t_d12800354c34fc 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6c23afeef2540efc243d243c6a6a21e010ce7d50",
+  "prompts": {},
+  "sessions": {
+    "s_56e599e17e5b82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6c95cc7-f1de-49bf-a858-16efb95c5329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
