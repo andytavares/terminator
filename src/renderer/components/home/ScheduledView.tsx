@@ -149,7 +149,16 @@ function LastRunCell({ schedule }: { schedule: Schedule }): React.JSX.Element {
   return (
     <span className="scheduled__last-run">
       {live ? <Chip>{live}</Chip> : when}
-      <Button size="sm" variant="ghost" onClick={() => revealSession(session.id)}>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={(e) => {
+          // A press on the row edits the run; View only opens its session.
+          e.stopPropagation()
+          revealSession(session.id)
+        }}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
         View
       </Button>
     </span>

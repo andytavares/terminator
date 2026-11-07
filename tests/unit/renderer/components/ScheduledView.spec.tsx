@@ -257,6 +257,8 @@ describe('ScheduledView — a run that is going', () => {
     expect(within(row).getByText('Running')).toBeTruthy()
     fireEvent.click(within(row).getByRole('button', { name: 'View' }))
     expect(revealSession).toHaveBeenCalledWith('run-1')
+    // View is not a press on the row, which edits the run.
+    expect(useStartWorkStore.getState().open).toBe(false)
   })
 
   it('says Needs you while it waits on the person', async () => {
