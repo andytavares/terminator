@@ -85,9 +85,8 @@ function createHumanTerminal(projectId: string, tabTitle: string) {
 
 /** Registers the handlers again, sending to `win`. */
 async function registerWithWindow(win: { isDestroyed(): boolean; webContents: unknown }) {
-  const { registerTerminalHandlers, sendToRenderer } = await import(
-    '../../../src/main/ipc/terminal.ipc'
-  )
+  const { registerTerminalHandlers, sendToRenderer } =
+    await import('../../../src/main/ipc/terminal.ipc')
   const { OutputRelay } = await import('../../../src/main/terminal/output-relay')
   const registeredWindow = () => win as never
   registerTerminalHandlers(
@@ -106,9 +105,8 @@ function useTerminalIpc(): void {
     const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
     ptyManager = new PtyManager()
 
-    const { registerTerminalHandlers, sendToRenderer } = await import(
-      '../../../src/main/ipc/terminal.ipc'
-    )
+    const { registerTerminalHandlers, sendToRenderer } =
+      await import('../../../src/main/ipc/terminal.ipc')
     const { OutputRelay } = await import('../../../src/main/terminal/output-relay')
     registerTerminalHandlers(
       ptyManager,

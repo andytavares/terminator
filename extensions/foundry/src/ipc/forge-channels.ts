@@ -38,8 +38,7 @@ import { isLiveSession } from '../runtime/runtime-state.js'
 
 /** What one turn of intake produced, or why it produced nothing. */
 export type ConvergeOutcome =
-  | { ok: true; order: WorkOrder; note: string }
-  | { ok: false; reason: string }
+  { ok: true; order: WorkOrder; note: string } | { ok: false; reason: string }
 
 /** Whether the architect is now running, or why it is not. */
 export type ConvergeStarted =

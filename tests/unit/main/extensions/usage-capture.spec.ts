@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
+// electron-store 12 refuses to open outside Electron; the stores this spec reaches live in memory.
+vi.mock('electron-store', async () =>
+  (await import('../../../support/stores')).inMemoryElectronStore()
+)
+
 vi.mock('electron', () => ({
   app: { getPath: () => '/tmp', getVersion: () => '0.1.0' },
   globalShortcut: { register: vi.fn(), unregister: vi.fn(), isRegistered: vi.fn(() => false) },

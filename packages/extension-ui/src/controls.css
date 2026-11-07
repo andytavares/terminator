@@ -13,16 +13,16 @@
    row line up whatever padding and font size each class picks. :where() keeps
    it at zero specificity: a class that sets its own height still wins. */
 :where(
-    select:not([multiple], [size]),
-    input:not(
-        [type='checkbox'],
-        [type='radio'],
-        [type='range'],
-        [type='color'],
-        [type='file'],
-        [type='hidden']
-      )
-  ) {
+  select:not([multiple], [size]),
+  input:not(
+    [type='checkbox'],
+    [type='radio'],
+    [type='range'],
+    [type='color'],
+    [type='file'],
+    [type='hidden']
+  )
+) {
   height: var(--tm-control-height);
 }
 
@@ -32,15 +32,15 @@
 textarea,
 select,
 input:where(
-    :not(
-        [type='checkbox'],
-        [type='radio'],
-        [type='range'],
-        [type='color'],
-        [type='file'],
-        [type='hidden']
-      )
-  ) {
+  :not(
+    [type='checkbox'],
+    [type='radio'],
+    [type='range'],
+    [type='color'],
+    [type='file'],
+    [type='hidden']
+  )
+) {
   box-sizing: border-box;
   padding: 0 8px;
   background: var(--tm-bg-input);
@@ -66,17 +66,17 @@ textarea::placeholder {
 /* A field in use: the accent edge and its soft ring. Zero weight, so a field drawn inside a
    wrapper that shows its own focus (a search box with an icon) keeps its `outline: none`. */
 :where(
-    textarea:focus,
-    select:focus,
-    input:not(
-        [type='checkbox'],
-        [type='radio'],
-        [type='range'],
-        [type='color'],
-        [type='file'],
-        [type='hidden']
-      ):focus
-  ) {
+  textarea:focus,
+  select:focus,
+  input:not(
+      [type='checkbox'],
+      [type='radio'],
+      [type='range'],
+      [type='color'],
+      [type='file'],
+      [type='hidden']
+    ):focus
+) {
   border-color: var(--tm-accent);
   outline: 2px solid var(--tm-accent-glow);
   outline-offset: 0;
@@ -86,13 +86,13 @@ textarea:disabled,
 select:disabled,
 input:where(
     :not(
-        [type='checkbox'],
-        [type='radio'],
-        [type='range'],
-        [type='color'],
-        [type='file'],
-        [type='hidden']
-      )
+      [type='checkbox'],
+      [type='radio'],
+      [type='range'],
+      [type='color'],
+      [type='file'],
+      [type='hidden']
+    )
   ):disabled {
   cursor: default;
   opacity: 0.5;

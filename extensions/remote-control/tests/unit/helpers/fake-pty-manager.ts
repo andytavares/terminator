@@ -120,8 +120,8 @@ function fakeSessionQueries(state: FakePtyState) {
     write: vi.fn(),
     resize: vi.fn(),
     kill: vi.fn((sessionId: string) => emitPtyExit(state, sessionId, 0)),
-    listSessions: vi.fn(
-      async (): Promise<SessionInfo[]> => [...sessions.values()].map((s) => ({ ...s }))
+    listSessions: vi.fn(async (): Promise<SessionInfo[]> =>
+      [...sessions.values()].map((s) => ({ ...s }))
     ),
   }
 }

@@ -38,7 +38,7 @@ export function parseProcessTable(output: string): ProcessRow[] {
 export function descendantsOf(rows: ProcessRow[], rootPid: number): ProcessRow[] {
   const found: ProcessRow[] = []
   const parents = new Set([rootPid])
-  for (let grew = true; grew; ) {
+  for (let grew = true; grew;) {
     const children = rows.filter((row) => parents.has(row.ppid) && !parents.has(row.pid))
     for (const child of children) parents.add(child.pid)
     found.push(...children)
@@ -113,7 +113,7 @@ export async function expectNoProcessesLeft(
  * then killed: killing first hands children to init (https://man7.org/linux/man-pages/man7/signal.7.html). */
 function killTrees(roots: number[]): number {
   const stopped = new Set<number>()
-  for (let grew = true; grew; ) {
+  for (let grew = true; grew;) {
     const table = processTable()
     const tree = roots.flatMap((pid) => [pid, ...descendantsOf(table, pid).map((row) => row.pid)])
     const fresh = tree.filter((pid) => !stopped.has(pid))

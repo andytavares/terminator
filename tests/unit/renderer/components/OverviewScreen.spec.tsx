@@ -298,9 +298,8 @@ describe('OverviewScreen — starting and resuming from the wall', () => {
   it('starts a terminal in a branch from its bar', async () => {
     const { useWorkspaceStore } = await import('../../../../src/renderer/stores/workspace.store')
     const { startSessionInBranch } = await import('../../../../src/renderer/terminal/start-session')
-    const { workspaceFixture: workspaceOf, projectFixture: projectOf } = await import(
-      '../../../support/renderer-stores'
-    )
+    const { workspaceFixture: workspaceOf, projectFixture: projectOf } =
+      await import('../../../support/renderer-stores')
     useWorkspaceStore.setState({
       workspaces: [workspaceOf({ id: 'w1', name: 'repo' })],
       projectsByWorkspaceId: new Map([

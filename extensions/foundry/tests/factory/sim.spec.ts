@@ -526,7 +526,7 @@ function restSeatFacingTests() {
       0
     )
     let w = next
-    for (let elapsed = 0; elapsed < 30_000 && w.crew.find((c) => c.nodeId === 'document')!.goal; ) {
+    for (let elapsed = 0; elapsed < 30_000 && w.crew.find((c) => c.nodeId === 'document')!.goal;) {
       w = tick(w, 16)
       elapsed += 16
     }

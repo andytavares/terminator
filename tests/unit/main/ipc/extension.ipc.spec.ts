@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 
+// electron-store 12 refuses to open outside Electron; the stores this spec reaches live in memory.
+vi.mock('electron-store', async () =>
+  (await import('../../../support/stores')).inMemoryElectronStore()
+)
+
 type Handler = (event: unknown, payload: unknown) => unknown
 
 const handleHandlers = new Map<string, Handler>()

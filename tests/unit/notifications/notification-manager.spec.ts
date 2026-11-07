@@ -57,9 +57,8 @@ beforeEach(async () => {
   vi.clearAllMocks()
   vi.resetModules()
   ;({ updateGlobalSettings } = await import('../../../src/main/storage/settings-store'))
-  ;({ notificationManager, setExtensionNotificationSettingReader } = await import(
-    '../../../src/main/notifications/notification-manager'
-  ))
+  ;({ notificationManager, setExtensionNotificationSettingReader } =
+    await import('../../../src/main/notifications/notification-manager'))
   getAllWindows.mockReturnValue([mockWin])
   MockNotification.isSupported.mockReturnValue(true)
   withDefaultTargets('system', 'center', 'toast')
@@ -503,9 +502,8 @@ describe('NotificationManager.create — running in the background', () => {
   it('shows no OS notification and bounces no Dock icon, and still lists it', async () => {
     process.env.TERMINATOR_RUN_IN_BACKGROUND = '1'
     vi.resetModules()
-    const { notificationManager: background } = await import(
-      '../../../src/main/notifications/notification-manager'
-    )
+    const { notificationManager: background } =
+      await import('../../../src/main/notifications/notification-manager')
     delete process.env.TERMINATOR_RUN_IN_BACKGROUND
     withDefaultTargets('system', 'center')
     background.create({ type: 'info', title: 'Task done', key: 'k' })

@@ -160,9 +160,8 @@ async function githubChannels(): Promise<Record<string, (payload: unknown) => Pr
     label: 'Git',
     properties: { [CLONE_FOLDER]: { type: 'folder', label: 'Clone folder', default: '' } },
   })
-  const { registerGithubHandlers } = await import(
-    '../../../extensions/git-integration/src/ipc/github.ipc'
-  )
+  const { registerGithubHandlers } =
+    await import('../../../extensions/git-integration/src/ipc/github.ipc')
   const channels: Record<string, (payload: unknown) => Promise<unknown>> = {}
   mkdirSync(api.paths.globalStorage, { recursive: true })
   const access = {

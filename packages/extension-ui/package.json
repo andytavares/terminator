@@ -29,26 +29,26 @@
     "test:visual": "playwright test --config playwright.visual.config.ts"
   },
   "dependencies": {
-    "@fontsource/ibm-plex-mono": "5.2.7",
-    "@fontsource/ibm-plex-sans": "5.2.8",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@fontsource/ibm-plex-sans": "5.3.0",
     "react-markdown": "10.1.0",
     "rehype-raw": "7.0.0",
     "rehype-sanitize": "6.0.0",
     "remark-gfm": "4.0.1"
   },
   "peerDependencies": {
-    "lucide-react": "1.21.0",
+    "lucide-react": "1.61.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "zustand": "4.5.5"
+    "zustand": "5.0.16"
   },
   "devDependencies": {
-    "@playwright/test": "1.64.0",
-    "@storybook/addon-vitest": "10.6.2",
-    "@storybook/react-vite": "10.6.2",
+    "@playwright/test": "1.64.1",
+    "@storybook/addon-vitest": "10.6.3",
+    "@storybook/react-vite": "10.6.3",
     "@vitest/browser-playwright": "5.0.5",
-    "playwright": "1.64.0",
-    "storybook": "10.6.2"
+    "playwright": "1.64.1",
+    "storybook": "10.6.3"
   },
   "license": "MIT"
 }

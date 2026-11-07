@@ -330,8 +330,7 @@ export interface RunAgentOnceInput extends Omit<StartAgentInput, 'resume' | 'tab
 }
 
 export type RunAgentOnceResult =
-  | { text: string; stopReason: string; sessionId: string }
-  | { error: string; message: string }
+  { text: string; stopReason: string; sessionId: string } | { error: string; message: string }
 
 /** Agents over ACP (Since 5.2.0). An ask goes to each `onPermission` listener and to the
  * session's tab; the first `answer` wins. `runOnce` rejects every ask: nobody can answer. */

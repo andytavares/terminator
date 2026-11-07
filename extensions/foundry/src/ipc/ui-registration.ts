@@ -122,8 +122,7 @@ function registerToggleView(api: ExtensionAPI): void {
 
 interface StartedSource {
   readonly source:
-    | { kind: 'tracker'; tracker: 'linear'; key: string }
-    | { kind: 'typed'; text: string }
+    { kind: 'tracker'; tracker: 'linear'; key: string } | { kind: 'typed'; text: string }
   readonly repoRoot: string
   readonly label: string
 }

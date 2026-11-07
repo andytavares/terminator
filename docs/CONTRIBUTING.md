@@ -318,7 +318,7 @@ Per the constitution (Principle IV):
 
 | Override                                        | Patched version | Advisories                                                                                                                                         |
 | ----------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@agentclientprotocol/claude-agent-acp` → `zod` | 4.6.6           | [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)                                                                           |
+| `@agentclientprotocol/claude-agent-acp` → `zod` | 4.6.7           | [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)                                                                           |
 | `body-parser@2`                                 | 2.4.0           | [GHSA-27r3-jxmh-p828](https://github.com/advisories/GHSA-27r3-jxmh-p828)                                                                           |
 | `brace-expansion@^5`                            | 5.0.12          | [GHSA-q2hr-2g5m-vwhr](https://github.com/advisories/GHSA-q2hr-2g5m-vwhr), [GHSA-qhr7-859c-m2p7](https://github.com/advisories/GHSA-qhr7-859c-m2p7) |
 | `fast-uri`                                      | 3.1.8           | [GHSA-hrr3-gc8f-f4qj](https://github.com/advisories/GHSA-hrr3-gc8f-f4qj), [GHSA-qw65-cvwx-89v3](https://github.com/advisories/GHSA-qw65-cvwx-89v3) |

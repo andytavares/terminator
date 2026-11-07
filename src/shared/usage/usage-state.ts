@@ -1,12 +1,7 @@
 import type { UsageFeatureRow } from './usage-types.js'
 
 export type UsageState =
-  | 'gone'
-  | 'extension-off'
-  | 'new'
-  | 'never-used'
-  | 'not-used-in-period'
-  | 'used'
+  'gone' | 'extension-off' | 'new' | 'never-used' | 'not-used-in-period' | 'used'
 
 interface UsageStateContext {
   periodStart: string | null

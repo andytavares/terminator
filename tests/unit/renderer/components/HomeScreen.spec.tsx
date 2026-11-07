@@ -536,6 +536,8 @@ describe('focus when Home mounts inside a popover', () => {
   it('leaves focus inside an open popover', () => {
     const surface = document.createElement('div')
     surface.setAttribute('popover', 'auto')
+    // jsdom has no showPopover() and hides a closed popover, whose content cannot take focus.
+    surface.style.display = 'block'
     document.body.append(surface)
     const item = document.createElement('button')
     surface.append(item)

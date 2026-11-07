@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { RequestError, type PromptResponse } from '@agentclientprotocol/sdk'
+import { RequestError, type PromptResponse } from '@agentclientprotocol/sdk/unstable'
 import type {
   AgentPermissionAsk,
   AgentPermissionSettled,

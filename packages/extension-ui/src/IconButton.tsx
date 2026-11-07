@@ -4,11 +4,10 @@ import './extension-ui.css'
 
 export type IconButtonSize = 'sm' | 'md'
 
-export interface IconButtonProps
-  extends Omit<
-    React.ButtonHTMLAttributes<HTMLButtonElement>,
-    'children' | 'className' | 'title' | 'aria-label' | 'aria-pressed' | 'onClick'
-  > {
+export interface IconButtonProps extends Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  'children' | 'className' | 'title' | 'aria-label' | 'aria-pressed' | 'onClick'
+> {
   icon: LucideIcon
   /**
    * Required, and there is no way around it.
