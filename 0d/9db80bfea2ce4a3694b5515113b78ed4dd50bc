@@ -1,0 +1,19 @@
+tests/unit/shell/shell-executor-stop.spec.ts
+  s_193f9ce1f261b8::t_633e306b1ba2d0 40-41,55-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0d9db80bfea2ce4a3694b5515113b78ed4dd50bc",
+  "prompts": {},
+  "sessions": {
+    "s_193f9ce1f261b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "41e1cf09-75eb-4ceb-81b5-7467b1989f46",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
