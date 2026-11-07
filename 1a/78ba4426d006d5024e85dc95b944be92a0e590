@@ -1,5 +1,7 @@
 tests/unit/agents/acp/agent-service.spec.ts
   s_56e599e17e5b82::t_def59c86f97ed8 162-169
+  s_56e599e17e5b82::t_943ee2173c10af 162-166
+  s_56e599e17e5b82::t_6a7656ad0d01a6 167-169
 ---
 {
   "schema_version": "authorship/3.0.0",
