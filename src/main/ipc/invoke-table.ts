@@ -90,8 +90,10 @@ export function failureOf(error: unknown): { error: string; message: string } {
 
 export function registerInvokeTable(specs: ReadonlyArray<InvokeRow>): void {
   for (const spec of specs) {
-    handleChannel(spec.channel, (event, payload) =>
-      dispatchChannel(asDispatched(spec, event), payload)
+    handleChannel(
+      spec.channel,
+      (event, payload) => dispatchChannel(asDispatched(spec, event), payload),
+      { schema: spec.schema }
     )
   }
 }
