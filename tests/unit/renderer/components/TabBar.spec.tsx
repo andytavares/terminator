@@ -843,6 +843,8 @@ describe('TabBar — the drop target', () => {
     document.elementFromPoint = () => null
     pointerAt('pointermove', { x: 600, y: 300 })
     expect(tabs[1].classList.contains('tab-bar__tab--dnd-over')).toBe(false)
+    // An unreleased drag keeps listening on the document and would take a later test's release.
+    pointerAt('pointerup', { x: 600, y: 300 })
   })
 
   it('unmarks it, and moves nothing, when Escape cancels the drag', () => {
