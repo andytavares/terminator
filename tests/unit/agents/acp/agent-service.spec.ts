@@ -94,12 +94,6 @@ describe('start', () => {
     })
   })
 
-  it('starts in its own mode when the agent does not offer the one asked for', async () => {
-    const { result, agent } = await started({ cwd: '/work', mode: 'yolo' })
-    expect(result.configOptions[0].currentValue).toBe('auto')
-    expect(agent.calls.some((call) => call.method === 'setSessionMode')).toBe(false)
-  })
-
   it('flattens grouped choices', async () => {
     const { result } = await started()
     expect(result.configOptions[1].options).toEqual([
@@ -162,6 +156,14 @@ describe('start — recording a tab', () => {
   it('returns null when the agent cannot start', async () => {
     const service = serviceWith(() => Promise.reject(new Error('no such file')))
     expect(await service.start({ cwd: '/work' })).toBeNull()
+  })
+})
+
+describe('a start mode the agent does not offer', () => {
+  it('leaves the agent in its own mode', async () => {
+    const { result, agent } = await started({ cwd: '/work', mode: 'yolo' })
+    expect(result.configOptions[0].currentValue).toBe('auto')
+    expect(agent.calls.some((call) => call.method === 'setSessionMode')).toBe(false)
   })
 })
 
