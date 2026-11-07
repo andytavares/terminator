@@ -3,7 +3,13 @@ import { onChannel } from './ipc/channel-registrar.js'
 import { registerAppInfoHandlers, registerDialogHandlers } from './ipc/app.ipc.js'
 import { app, autoUpdater, BrowserWindow, dialog, Menu, shell, session, protocol } from 'electron'
 import { enterBackgroundMode, revealWindow, newWindow } from './background-mode.js'
-import { checkForUpdatesNow, startAppUpdates } from './app-updater.js'
+import {
+  checkForUpdatesNow,
+  checkForUpdatesQuietly,
+  downloadedUpdate,
+  installUpdateNow,
+  startAppUpdates,
+} from './app-updater.js'
 import { announceWindowReadiness, exposeReadinessToTests } from './e2e-readiness.js'
 import { join } from 'path'
 import {
@@ -41,6 +47,13 @@ import { registerThreadSummaryHandler } from './ipc/thread-summary.ipc.js'
 import { registerHomeFeedHandlers } from './ipc/home-feed.ipc.js'
 import { registerScheduleHandlers } from './ipc/schedules.ipc.js'
 import { ensureHookScript } from './integrations/context-sync.js'
+import { startMcpServer } from './mcp/mcp-server.js'
+import { installRelayScript } from './mcp/relay-script.js'
+import { manifestTools } from './mcp/manifest-tools.js'
+import { alertTool } from './mcp/alert-tool.js'
+import { registerRendererTools, rendererTools } from './mcp/renderer-tools.js'
+import { appTools } from './mcp/app-tools.js'
+import { registerWithClaude } from './mcp/registration.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
 import { startAdoptingLoginShellPath } from './shell/login-shell-path.js'
 import { stopRunningCommands } from './shell/command-runner.js'
@@ -453,9 +466,45 @@ function startIntegrationsAndRecords(): void {
   void ensureHookScript()
     .then((scriptPath) => installUserHooks({ execPath: process.execPath, scriptPath }))
     .catch((error) => logger.error('could not install the Claude hook', { error: String(error) }))
+  startTerminatorMcpServer()
   void loadAttentionLog().catch((error) =>
     logger.error('could not read the attention log', { error: String(error) })
   )
+}
+
+let mcpServer: Promise<{ close(): Promise<void> } | null> = Promise.resolve(null)
+
+/** The main window, shown and focused; created first if it was closed, as a Dock click does. */
+function showMainWindow(): BrowserWindow {
+  if (!mainWindow) createWindow()
+  // createWindow sets mainWindow.
+  const window = mainWindow!
+  revealWindow(window)
+  return window
+}
+
+/** The Terminator MCP server, its relay, and the relay's entry in Claude Code (ADR 145). */
+function startTerminatorMcpServer(): void {
+  const userData = app.getPath('userData')
+  const socketPath = join(userData, 'mcp.sock')
+  const directory = join(userData, 'mcp')
+  registerRendererTools({ showWindow: showMainWindow })
+  const updateTools = appTools({
+    checkForUpdate: checkForUpdatesQuietly,
+    downloadedUpdate,
+    quitAndInstall: installUpdateNow,
+    showWindow: showMainWindow,
+  })
+  mcpServer = startMcpServer({
+    socketPath,
+    providers: [manifestTools, alertTool, rendererTools, updateTools],
+    version: app.getVersion(),
+  })
+  void Promise.all([installRelayScript(directory), mcpServer])
+    .then(([relayPath]) => registerWithClaude({ relayPath, socketPath, directory }))
+    .catch((error) =>
+      logger.error('could not start the Terminator MCP server', { error: String(error) })
+    )
 }
 
 /** Shell, editor, files, logging, notifications, metrics, the database, dialogs and the app. */
@@ -593,6 +642,7 @@ app.on('before-quit', async (event) => {
   // running, and whatever it started, would outlive the app.
   await stopRunningCommands()
   await disposeAgentService()
+  await mcpServer.then((server) => server?.close()).catch(() => undefined)
   await ptyManager.killAll()
   closeAppDb()
   closeUsageStore()

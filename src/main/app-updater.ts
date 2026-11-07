@@ -15,6 +15,14 @@ const checksForUpdates = (): boolean => app.isPackaged && !runsInBackground()
 /** Each later check finds the cached download and emits `update-downloaded` again. */
 let announcedVersion: string | null = null
 
+/** The version whose download has ended; it installs on the next quit. */
+let downloadedVersion: string | null = null
+
+/** The version an update check has downloaded, or null when none has. */
+export function downloadedUpdate(): string | null {
+  return downloadedVersion
+}
+
 /** Checks GitHub Releases at launch and every four hours; an update installs on quit (ADR 128).
  * A click on the notification runs `revealApp`, never a restart, which closes every terminal. */
 export function startAppUpdates(revealApp: () => void): void {
@@ -22,7 +30,10 @@ export function startAppUpdates(revealApp: () => void): void {
   const { autoUpdater } = electronUpdater
   autoUpdater.logger = logger
   autoUpdater.on('error', (error) => logger.warn('update check failed', { error: String(error) }))
-  autoUpdater.on('update-downloaded', ({ version }) => announceUpdate(version, revealApp))
+  autoUpdater.on('update-downloaded', ({ version }) => {
+    downloadedVersion = version
+    announceUpdate(version, revealApp)
+  })
   const checkInBackground = (): void => {
     // The 'error' listener above logs it; a background check never interrupts anyone.
     autoUpdater
@@ -80,6 +91,33 @@ export async function checkForUpdatesNow(): Promise<void> {
       detail: 'Check your connection and try again.',
     })
   }
+}
+
+/** Quits and restarts into the downloaded update. */
+export function installUpdateNow(): void {
+  electronUpdater.autoUpdater.quitAndInstall()
+}
+
+export type QuietUpdateCheck =
+  | { status: 'up-to-date' | 'downloaded'; version: string }
+  | { status: 'off'; reason: string }
+
+/** The check behind the MCP check_for_update tool: no dialog, and a failed check rejects. */
+export async function checkForUpdatesQuietly(): Promise<QuietUpdateCheck> {
+  if (!app.isPackaged) {
+    return { status: 'off', reason: 'Only an installed Terminator checks for updates.' }
+  }
+  if (runsInBackground()) {
+    return { status: 'off', reason: 'A test run of Terminator never checks for updates.' }
+  }
+  const result = await electronUpdater.autoUpdater.checkForUpdates()
+  if (!result?.isUpdateAvailable) return { status: 'up-to-date', version: app.getVersion() }
+  const { version } = result.updateInfo
+  // This answer is the announcement; the Update ready notification would repeat it.
+  announcedVersion = version
+  await result.downloadPromise
+  downloadedVersion = version
+  return { status: 'downloaded', version }
 }
 
 async function offerRestart(version: string): Promise<void> {
