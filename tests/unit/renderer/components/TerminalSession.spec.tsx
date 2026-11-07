@@ -361,6 +361,20 @@ describe('TerminalInstance — reads the visible screen as one string per row, t
   })
 })
 
+describe('TerminalInstance — reads the whole buffer', () => {
+  it('reads every buffer line, scrollback included, dropping trailing empty lines', () => {
+    const instance = new TerminalInstance('ses-1', 1000)
+    const lines = ['$ make', 'built   ', '', '$ ', '', '']
+    const getLine = (line: number) =>
+      partialFake<IBufferLine>({
+        translateToString: (trimRight?: boolean) =>
+          trimRight ? lines[line].trimEnd() : lines[line],
+      })
+    showScreen(instance, 2, { length: lines.length, viewportY: 4, getLine })
+    expect(instance.readAllRows()).toEqual(['$ make', 'built', '', '$'])
+  })
+})
+
 describe('TerminalInstance — returns the xterm selection', () => {
   it('returns the xterm selection', () => {
     const instance = new TerminalInstance('ses-1', 1000)
