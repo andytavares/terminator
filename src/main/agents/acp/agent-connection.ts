@@ -50,7 +50,8 @@ export function createConnector(settings: () => AgentsSettings): AgentServiceDep
   }
 }
 
-/** Speaks ACP over `stream` as the client: `client` answers the agent, the result calls it. */
+/** Speaks ACP over `stream` as the client: `client` answers the agent, the result calls it.
+ * @internal */
 export function connectClient(client: AgentClient, stream: Stream): AgentCalls {
   const { agent, signal } = clientApp()
     .onRequest(methods.client.session.requestPermission, ({ params }) =>

@@ -104,6 +104,7 @@ export const CORE_SPECS = [
   'desk.spec.ts',
   'extension-lifecycle.spec.ts',
   'home-tasks.spec.ts',
+  'inbox-sidebar.spec.ts',
   'issue-trackers.spec.ts',
   'live-preview-spacing.spec.ts',
   'mcp.spec.ts',
