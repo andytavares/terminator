@@ -1,0 +1,32 @@
+src/renderer/components/home/StartWork.tsx
+  s_193f9ce1f261b8::t_09708d7bbac242 125-126
+  s_193f9ce1f261b8::t_a75b4b0122d345 147
+src/main/home/schedules.ts
+  s_193f9ce1f261b8::t_de29f8ccbe2612 17,20,38-39,68-72,95,97-98,139-143,145,147,149,156,169-171,187-189,196,209-210,220,226-232,264,269,271,296-297,326
+tests/unit/home/schedules.spec.ts
+  s_193f9ce1f261b8::t_d3e6219f2c4380 185,318-324,341,363-381,406,408-413
+  s_193f9ce1f261b8::t_1caa2c7cba572f 315-317,362,405,407
+tests/e2e/scheduled-runs.spec.ts
+  s_193f9ce1f261b8::t_86471dc623a467 96-103,121
+src/renderer/components/home/start-work-edit.ts
+  s_193f9ce1f261b8::t_09708d7bbac242 52-53,56-65,96
+  s_193f9ce1f261b8::t_d7c3e4a3958f01 97
+tests/unit/renderer/components/StartWork.spec.tsx
+  s_193f9ce1f261b8::t_997706e6ddea88 1307-1331
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1ea776a878116eb01409e4464e776049c97f2a9e",
+  "prompts": {},
+  "sessions": {
+    "s_193f9ce1f261b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "41e1cf09-75eb-4ceb-81b5-7467b1989f46",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
