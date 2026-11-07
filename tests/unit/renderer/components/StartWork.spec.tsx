@@ -362,7 +362,7 @@ describe('StartWork — Enter on a ticket, run another way', () => {
     fireEvent.keyDown(searchBox(), { key: 'Tab' })
     fireEvent.keyDown(searchBox(), { key: 'Tab' })
     fireEvent.keyDown(searchBox(), { key: 'Enter' })
-    await waitFor(() => expect(launched.inBranch).toHaveBeenCalledWith('p-new', undefined))
+    await waitFor(() => expect(launched.inBranch).toHaveBeenCalledWith('p-new', undefined, false))
     expect(setLink).toHaveBeenCalled()
   })
 
@@ -508,7 +508,11 @@ describe('StartWork — other tabs, Claude in a terminal', () => {
     fireEvent.keyDown(searchBox(), { key: 'Tab' })
     fireEvent.keyDown(searchBox(), { key: 'Enter' })
     await waitFor(() => expect(onClose).toHaveBeenCalled())
-    expect(launched.inBranch).toHaveBeenCalledWith('p-main', `claude 'fix the dev'\\''s build'`)
+    expect(launched.inBranch).toHaveBeenCalledWith(
+      'p-main',
+      `claude 'fix the dev'\\''s build'`,
+      false
+    )
   })
 
   it('Prompt tab refuses a prompt too long to type for Claude in a terminal', async () => {
