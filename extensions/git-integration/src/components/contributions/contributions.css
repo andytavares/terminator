@@ -179,38 +179,36 @@
   display: inline-block;
 }
 
+/* The map grows with its frame up to a cap, so a wide window keeps cells near GitHub's size. */
+.ct-map {
+  max-width: 1000px;
+}
+
 /*
- * The heatmap fills its frame: a week's pitch (cell plus gap) is the width left
- * after the weekday labels, split across 53 weeks. Below a 12px pitch it stops
- * shrinking and scrolls sideways inside its own box instead.
+ * The heatmap fills its frame at every width: each week is one fractional
+ * column (set inline from the week count) and a cell is a square of that
+ * column's width, so it never scrolls sideways or clips a week.
  */
 .ct-heatmap {
-  --ct-weekday-width: 22px;
-  --ct-pitch: max(12px, (100cqw - var(--ct-weekday-width) - 6px) / 53);
-  --ct-gap: max(2px, var(--ct-pitch) * 0.15);
-  --ct-cell: calc(var(--ct-pitch) - var(--ct-gap));
-  container-type: inline-size;
-  overflow-x: auto;
+  --ct-gap: 2px;
 }
 
 .ct-grid {
   display: flex;
-  gap: var(--ct-gap);
-  width: max-content;
-}
-
-.ct-heatmap > .ct-grid {
-  gap: 2px;
+  gap: 4px;
 }
 
 .ct-weekdays {
   display: grid;
-  grid-template-rows: repeat(7, var(--ct-cell));
+  grid-template-rows: repeat(7, minmax(0, 1fr));
   gap: var(--ct-gap);
-  width: var(--ct-weekday-width);
+  flex: none;
+  width: 22px;
+  /* Its labels must not make the rows taller than the cells beside them. */
+  contain: size;
   margin-top: 18px;
-  margin-right: 4px;
   font-size: var(--tm-font-size-xs);
+  line-height: 1;
   align-items: center;
   color: var(--tm-text-muted);
 }
@@ -229,6 +227,8 @@
 .ct-year {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-width: 0;
   gap: 2px;
 }
 
@@ -240,20 +240,25 @@
   color: var(--tm-text-muted);
 }
 
+/* A label in the last weeks moves left so it ends inside the map instead of past it. */
 .ct-months span {
   position: absolute;
+  left: min(var(--ct-month-at), 100% - 2.5em);
   white-space: nowrap;
+}
+
+.ct-weeks {
+  display: grid;
+  gap: var(--ct-gap);
 }
 
 .ct-week {
   display: grid;
-  grid-template-rows: repeat(7, var(--ct-cell));
   gap: var(--ct-gap);
 }
 
 .ct-day {
-  width: var(--ct-cell);
-  height: var(--ct-cell);
+  aspect-ratio: 1;
   border-radius: 2px;
 }
 

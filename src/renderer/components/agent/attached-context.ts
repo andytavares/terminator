@@ -3,7 +3,7 @@ import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { emptyTranscript, foldUpdates, type TranscriptEntry } from './fold-updates'
 import type { SessionRecordListing, TerminalSession } from '../../../shared/types/index'
 
-// Session context and citations reach the agent as text after the typed prompt (ADR 146).
+// Session context and citations reach the agent as text after the typed prompt (ADR 147).
 
 export const MAX_QUOTE_CHARS = 8000
 /** @internal Embedded text keeps its last this many characters. */

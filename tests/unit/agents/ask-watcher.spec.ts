@@ -113,7 +113,7 @@ describe('the ask watcher — turns', () => {
     write('s1', { event: 'notification', message: 'Allow?' })
     await seen(1)
     expect(turns).toEqual([['s1', true]])
-    expect(mod.currentTurns()).toEqual([{ sessionId: 's1', inTurn: true }])
+    expect(mod.currentTurns()).toMatchObject([{ sessionId: 's1', inTurn: true }])
     write('s1', { event: 'stop' })
     await eventually(() =>
       expect(turns).toEqual([
@@ -121,7 +121,7 @@ describe('the ask watcher — turns', () => {
         ['s1', false],
       ])
     )
-    expect(mod.currentTurns()).toEqual([{ sessionId: 's1', inTurn: false }])
+    expect(mod.currentTurns()).toMatchObject([{ sessionId: 's1', inTurn: false }])
   })
 
   it('lifts the ask at a prompt: the operator just answered', async () => {
@@ -155,12 +155,14 @@ describe('the ask watcher — interrupts', () => {
     write('s1', { event: 'prompt' })
     await eventually(() => expect(turns).toEqual([['s1', true]]))
     mod.noteTerminalInput('s1', 'more context')
-    expect(mod.currentTurns()).toEqual([{ sessionId: 's1', inTurn: true }])
+    expect(mod.currentTurns()).toMatchObject([{ sessionId: 's1', inTurn: true }])
     mod.noteTerminalInput('s1', '\x1b')
-    expect(mod.currentTurns()).toEqual([{ sessionId: 's1', inTurn: false }])
+    expect(mod.currentTurns()).toMatchObject([{ sessionId: 's1', inTurn: false }])
     write('s1', { event: 'prompt' })
-    await eventually(() => expect(mod.currentTurns()).toEqual([{ sessionId: 's1', inTurn: true }]))
+    await eventually(() =>
+      expect(mod.currentTurns()).toMatchObject([{ sessionId: 's1', inTurn: true }])
+    )
     mod.noteTerminalInput('s1', '\x03')
-    expect(mod.currentTurns()).toEqual([{ sessionId: 's1', inTurn: false }])
+    expect(mod.currentTurns()).toMatchObject([{ sessionId: 's1', inTurn: false }])
   })
 })

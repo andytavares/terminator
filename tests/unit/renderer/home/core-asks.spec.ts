@@ -58,6 +58,7 @@ describe('coreAsksFrom: where the work is', () => {
       state: 'idle',
       agent,
       lastActivityAt: 500,
+      turnEndedAt: 500,
       workspaceName: null,
       branch: null,
       name: 'terminal 3',
@@ -87,9 +88,15 @@ describe('coreAsksFrom: awaiting input without a prompt', () => {
   })
 })
 
-describe('coreAsksFrom: finished while away', () => {
-  const finished = { state: 'idle' as const, agent, lastActivityAt: 500, branch: 'tav-31' }
+const finished = {
+  state: 'idle' as const,
+  agent,
+  lastActivityAt: 500,
+  turnEndedAt: 500,
+  branch: 'tav-31',
+}
 
+describe('coreAsksFrom: finished while away', () => {
   it('raises a finished ask for an agent that went idle after you last looked', () => {
     const [ask] = coreAsksFrom(
       [fact({ ...finished, lastAttendedAt: 100, description: 'Add limits' })],
@@ -114,6 +121,32 @@ describe('coreAsksFrom: finished while away', () => {
     expect(coreAsksFrom([fact({ ...finished, agent: null })], titles)).toEqual([])
     expect(coreAsksFrom([fact({ ...finished, isClosed: true })], titles)).toEqual([])
     expect(coreAsksFrom([fact({ ...finished, state: 'working' })], titles)).toEqual([])
+  })
+})
+
+describe('coreAsksFrom: finished follows the turn end, not the screen', () => {
+  it('raises nothing when only the screen repainted after you looked, such as a status line redraw', () => {
+    const redrawn = fact({ ...finished, lastAttendedAt: 600, lastActivityAt: 9000 })
+    expect(coreAsksFrom([redrawn], titles)).toEqual([])
+  })
+
+  it('keeps the same id across screen repaints of one finished turn', () => {
+    const idAt = (lastActivityAt: number) =>
+      coreAsksFrom([fact({ ...finished, lastActivityAt })], titles)[0].id
+    expect(idAt(9000)).toBe(idAt(500))
+  })
+
+  it('raises a new ask with a new id when a later turn ends after you looked', () => {
+    const [ask] = coreAsksFrom(
+      [fact({ ...finished, lastAttendedAt: 600, turnEndedAt: 700 })],
+      titles
+    )
+    expect(ask.kind).toBe('finished')
+    expect(ask.id).not.toBe(coreAsksFrom([fact(finished)], titles)[0].id)
+  })
+
+  it('raises nothing for an agent whose turn end was never reported', () => {
+    expect(coreAsksFrom([fact({ ...finished, turnEndedAt: null })], titles)).toEqual([])
   })
 })
 

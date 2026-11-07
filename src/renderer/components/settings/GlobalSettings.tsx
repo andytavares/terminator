@@ -118,7 +118,38 @@ function TerminalFields({ settings }: { settings: Settings }): React.JSX.Element
       </div>
       <GlobalDefaultShellField shell={settings.terminal.defaultShell} />
       <PromptForNameField checked={settings.terminal.promptForName ?? false} />
+      <DeleteClosedSessionsField hours={settings.sessions.deleteClosedAfterHours} />
     </>
+  )
+}
+
+/** How long a closed session's record waits for a resume before it is deleted. */
+function DeleteClosedSessionsField({ hours }: { hours: number }): React.JSX.Element {
+  return (
+    <div className="settings-section__field">
+      <label className="settings-section__label" htmlFor="delete-closed-sessions-hours">
+        Delete closed sessions after (1–720 hours)
+      </label>
+      <input
+        id="delete-closed-sessions-hours"
+        type="number"
+        className="settings-section__input"
+        defaultValue={hours}
+        min={1}
+        max={720}
+        onChange={(e) => {
+          const val = parseInt(e.target.value, 10)
+          if (val >= 1 && val <= 720) {
+            void window.electronAPI.settings.updateGlobal({
+              sessions: { deleteClosedAfterHours: val },
+            })
+          }
+        }}
+      />
+      <span className="settings-section__hint">
+        A closed session leaves Home at once. Its record stays this long so you can resume it.
+      </span>
+    </div>
   )
 }
 

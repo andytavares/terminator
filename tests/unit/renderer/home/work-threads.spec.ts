@@ -3,7 +3,7 @@ import {
   allWorkThreads,
   buildWorkThreads,
   groupThreads,
-  latestResumableThread,
+  latestResumableSession,
   type WorkThreadInput,
 } from '../../../../src/renderer/home/work-threads'
 import { fact } from '../sidebar/fixtures/facts'
@@ -125,29 +125,29 @@ const ended = (patch: Partial<SessionFacts> = {}) =>
   })
 
 describe('joining: sessions that have ended', () => {
-  it('lists a resumable closed session with the open ones on its branch', () => {
+  it('leaves a closed session out of the rows, beside the open ones on its branch', () => {
     const [thread] = buildWorkThreads(
       input({ facts: [ended({ sessionId: 'old' }), working({ sessionId: 'live' })] })
     )
-    expect(thread.sessions.map((s) => s.sessionId)).toEqual(['live', 'old'])
-    expect(thread.lanes.map((l) => l.branch)).toEqual(['tav-31'])
+    expect(thread.sessions.map((s) => s.sessionId)).toEqual(['live'])
+    expect(thread.lanes.flatMap((l) => l.sessionIds)).toEqual(['live'])
   })
 
-  it('keeps a thread whose only sessions have ended, quiet and never parked by a timer', () => {
-    const stale = ended({ lastActivityAt: hoursBeforeNow(49) })
-    const [thread] = buildWorkThreads(input({ facts: [stale] }))
-    expect(thread).toMatchObject({ state: 'quiet', archived: false, closed: false })
+  it('shows no row for work whose only sessions have closed', () => {
+    expect(buildWorkThreads(input({ facts: [ended()] }))).toEqual([])
+    expect(buildWorkThreads(input({ facts: [ended({ resumable: false })] }))).toEqual([])
   })
 
-  it('drops the thread once its pull request has merged', () => {
+  it('keeps the row of an open pull request, without its closed session', () => {
     const merged = facet({ stage: 'shipped', closedAt: '2026-10-18T10:00:00.000Z' })
     expect(buildWorkThreads(input({ facts: [ended()], facets: [merged] }))).toEqual([])
-    expect(buildWorkThreads(input({ facts: [ended()], facets: [facet()] }))).toHaveLength(1)
+    const [thread] = buildWorkThreads(input({ facts: [ended()], facets: [facet()] }))
+    expect(thread.sessions).toEqual([])
   })
 
-  it('keeps an ended session that is not resumable, within its retention', () => {
-    const [thread] = buildWorkThreads(input({ facts: [ended({ resumable: false })] }))
-    expect(thread.sessions).toHaveLength(1)
+  it('still joins a closed session into every thread, so Dismiss can delete it', () => {
+    const [thread] = allWorkThreads(input({ facts: [ended({ sessionId: 'old' })] }))
+    expect(thread.sessions.map((s) => s.sessionId)).toEqual(['old'])
   })
 })
 
@@ -251,7 +251,7 @@ describe('thread fields: scratch title', () => {
   })
 })
 
-describe('latestResumableThread', () => {
+describe('latestResumableSession', () => {
   const agent = {
     agentId: 'claude',
     transport: 'tui' as const,
@@ -262,8 +262,8 @@ describe('latestResumableThread', () => {
   }
   const resumable = (patch: Partial<SessionFacts>) => ended({ agent, ...patch })
 
-  it('picks the thread whose conversation ended most recently', () => {
-    const threads = buildWorkThreads(
+  it('picks the conversation that ended most recently', () => {
+    const threads = allWorkThreads(
       input({
         facts: [
           resumable({ sessionId: 'a', branch: 'a', lastActivityAt: hoursBeforeNow(5) }),
@@ -272,14 +272,14 @@ describe('latestResumableThread', () => {
         ],
       })
     )
-    expect(latestResumableThread(threads)?.lanes[0].branch).toBe('b')
+    expect(latestResumableSession(threads)?.sessionId).toBe('b')
   })
 
   it('finds nothing when no ended conversation can be resumed', () => {
-    const threads = buildWorkThreads(
+    const threads = allWorkThreads(
       input({ facts: [resumable({ resumable: false }), working({ branch: 'c' })] })
     )
-    expect(latestResumableThread(threads)).toBeUndefined()
+    expect(latestResumableSession(threads)).toBeUndefined()
   })
 })
 

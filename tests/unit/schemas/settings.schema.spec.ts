@@ -92,3 +92,24 @@ describe('WorkspaceSettingsSchema defaults', () => {
     expect(parsed.extensions).toEqual({})
   })
 })
+
+describe('GlobalSettingsSchema — sessions.deleteClosedAfterHours', () => {
+  const withHours = (deleteClosedAfterHours: number) =>
+    GlobalSettingsSchema.safeParse({ ...validGlobal, sessions: { deleteClosedAfterHours } })
+
+  it('fills 24 hours, in the parsed and the shipped settings', () => {
+    expect(GlobalSettingsSchema.parse(validGlobal).sessions.deleteClosedAfterHours).toBe(24)
+    expect(DEFAULT_GLOBAL_SETTINGS.sessions.deleteClosedAfterHours).toBe(24)
+  })
+
+  it('accepts one hour and thirty days', () => {
+    expect(withHours(1).success).toBe(true)
+    expect(withHours(720).success).toBe(true)
+  })
+
+  it('refuses zero, more than thirty days, and part of an hour', () => {
+    expect(withHours(0).success).toBe(false)
+    expect(withHours(721).success).toBe(false)
+    expect(withHours(1.5).success).toBe(false)
+  })
+})

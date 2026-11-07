@@ -1,4 +1,4 @@
-# ADR 146: Attached context travels as prompt text
+# ADR 147: Attached context travels as prompt text
 
 **Status**: Accepted
 

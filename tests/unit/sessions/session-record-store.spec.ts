@@ -573,3 +573,49 @@ describe('session-record-store — what cannot be forgotten', () => {
     expect(seen).toEqual([['s1', null]])
   })
 })
+
+const HOUR = 60 * 60 * 1000
+
+describe('session-record-store — the operator’s retention', () => {
+  it('drops a closed record on load once it is older than the configured retention', async () => {
+    const closedTwoHoursAgo = {
+      ...SNAP,
+      description: 'why',
+      link: null,
+      updatedAt: SNAP.startedAt,
+      closedAt: new Date(Date.now() - 2 * HOUR).toISOString(),
+    }
+    fs.writeFileSync(FILE(), JSON.stringify([closedTwoHoursAgo]))
+    const store = await load()
+    store.configureRetention(() => HOUR)
+    await store.loadRecords()
+    expect(store.listRecords()).toEqual([])
+    expect(store.closedRetentionMs()).toBe(HOUR)
+  })
+})
+
+describe('session-record-store — the hourly purge', () => {
+  it('purges hourly: a record closed under the retention goes once it passes it, and is announced', async () => {
+    const store = await load()
+    store.configureRetention(() => 24 * HOUR)
+    await store.setDescription(SNAP, 'why')
+    await store.markClosed('s1', new Date(Date.now() - 23 * HOUR))
+    const scheduled: Array<{ purge: () => void; every: number | undefined }> = []
+    const schedule = ((purge: () => void, every?: number) => {
+      scheduled.push({ purge, every })
+      return { unref: () => undefined }
+    }) as unknown as typeof setInterval
+    const announced: Array<[string, unknown]> = []
+    store.onRecordChange((id, record) => announced.push([id, record]))
+    store.startPurging(schedule)
+    expect(scheduled.map((s) => s.every)).toEqual([HOUR])
+
+    scheduled[0].purge()
+    expect(store.listRecords()).toHaveLength(1)
+
+    vi.setSystemTime(Date.now() + 2 * HOUR)
+    scheduled[0].purge()
+    expect(store.listRecords()).toEqual([])
+    expect(announced).toEqual([['s1', null]])
+  })
+})

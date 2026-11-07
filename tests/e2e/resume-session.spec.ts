@@ -1,4 +1,4 @@
-import { test, expect, type Locator, type Page } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import {
@@ -206,43 +206,19 @@ async function firstRun(handle: AppHandle, run: Conversations): Promise<void> {
     resumeFromKeyboard(page, run))
 }
 
-/** The drawer of the thread holding the last conversation, opened the way an operator finds it. */
-async function openResumeDrawer(page: Page): Promise<Locator> {
-  await openHome(page)
-  await runQuickActionFromPanel(page, 'Resume a conversation…')
-  const drawer = page.getByRole('dialog')
-  await expect(drawer).toBeVisible()
-  return drawer
-}
-
-/** A restart starts no agent on its own, and the last run's conversations are still on offer. */
+/** A restart starts no agent on its own, and Home no longer lists the last run's ended
+ * conversations (ADR 146); Resume a conversation… still reaches them. */
 async function offeredAfterRestart(page: Page): Promise<void> {
   await expect(page.locator('.tab-bar__tab--session')).toHaveCount(0)
-  const drawer = await openResumeDrawer(page)
-  const rows = drawer.locator('.desk-lr')
-  await expect(
-    rows.filter({ hasText: 'resume test' }).getByRole('button', { name: 'Resume' })
-  ).toBeVisible()
-  // The conversation whose transcript is gone is listed as work too, with nothing to resume.
-  await page.keyboard.press('Escape')
-  await expect(drawer).toBeHidden()
-  // Sessions the restart left without an agent are Quiet, which the Tasks list folds to one line.
+  await openHome(page)
   const tasks = page.getByRole('region', { name: 'Tasks' })
-  await tasks.getByRole('button', { name: 'Show Quiet' }).click()
-  await expect(tasks.getByRole('button', { name: 'the other one' })).toBeVisible()
-  await openResumeDrawer(page)
-  await expect(drawer.getByRole('button', { name: 'Resume' })).toHaveCount(1)
+  await expect(tasks.getByText('resume test')).toHaveCount(0)
+  await expect(tasks.getByText('the other one')).toHaveCount(0)
 }
 
-/** Resumes from the keyboard, with a focus ring to show where it is: the one control that brings
- * work back must not need a mouse. */
-async function resumedFromTheDrawer(page: Page): Promise<void> {
-  const resume = page.getByRole('dialog').getByRole('button', { name: 'Resume' })
-  await resume.focus()
-  expect(
-    await resume.evaluate((el) => getComputedStyle(el, ':focus-visible').outlineWidth)
-  ).not.toBe('0px')
-  await page.keyboard.press('Enter')
+/** Resume a conversation… reopens the one that ended last and can be resumed, on its branch. */
+async function resumedFromQuickActions(page: Page): Promise<void> {
+  await runQuickActionFromPanel(page, 'Resume a conversation…')
   await expect(page.locator('.tab-bar__tab--session[title="resume test"]')).toBeVisible()
 }
 
@@ -265,10 +241,10 @@ test('a conversation is resumed, and only when it can be', async () => {
     handle = undefined
     handle = await launchApp(profile)
     const { page } = handle
-    await test.step('a conversation from the last run is offered on the Desk, and nothing restarted itself', () =>
+    await test.step('a conversation from the last run is off Home, and nothing restarted itself', () =>
       offeredAfterRestart(page))
-    await test.step('it is resumed from the keyboard on its branch', () =>
-      resumedFromTheDrawer(page))
+    await test.step('Resume a conversation… reopens it on its branch', () =>
+      resumedFromQuickActions(page))
   } finally {
     await closeApp(handle)
   }

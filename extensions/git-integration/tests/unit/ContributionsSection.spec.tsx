@@ -121,6 +121,18 @@ describe('ContributionsSection — draws 53 week columns', () => {
   })
 })
 
+describe('ContributionsSection — scales the heatmap to its width', () => {
+  it('splits the width into one fractional column per week and places months by percent', async () => {
+    const { container } = await renderSection(makeReply())
+    const weeks = container.querySelector<HTMLElement>('.ct-weeks')
+    expect(weeks?.style.gridTemplateColumns).toBe('repeat(53, minmax(0, 1fr))')
+    const months = [...container.querySelectorAll<HTMLElement>('.ct-months span')]
+    const offsets = months.map((month) => month.style.getPropertyValue('--ct-month-at'))
+    expect(offsets[0]).toBe('0%')
+    expect(offsets.every((offset) => /^\d+(\.\d+)?%$/.test(offset))).toBe(true)
+  })
+})
+
 describe('ContributionsSection — does not draw future days', () => {
   it('hides the cells after today and titles a day with its count', async () => {
     const { container } = await renderSection(makeReply())

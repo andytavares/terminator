@@ -343,3 +343,22 @@ describe('GlobalSettings — hide the branch tree on home', () => {
     expect(mockUpdateHideSidebarOnHome).toHaveBeenCalledWith(false)
   })
 })
+
+describe('GlobalSettings — Delete closed sessions after', () => {
+  const hoursField = (): HTMLInputElement =>
+    screen.getByRole('spinbutton', { name: /Delete closed sessions after/ }) as HTMLInputElement
+
+  it('shows the 24-hour default and saves a new number of hours', () => {
+    render(<GlobalSettings />)
+    expect(hoursField().value).toBe('24')
+    fireEvent.change(hoursField(), { target: { value: '48' } })
+    expect(mockUpdateGlobal).toHaveBeenCalledWith({ sessions: { deleteClosedAfterHours: 48 } })
+  })
+
+  it('saves nothing outside one hour to thirty days', () => {
+    render(<GlobalSettings />)
+    fireEvent.change(hoursField(), { target: { value: '0' } })
+    fireEvent.change(hoursField(), { target: { value: '721' } })
+    expect(mockUpdateGlobal).not.toHaveBeenCalled()
+  })
+})

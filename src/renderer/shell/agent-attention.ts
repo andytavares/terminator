@@ -110,8 +110,10 @@ export function useAgentAttention(): void {
 
   useEffect(() => {
     const api = window.electronAPI?.agentTurn
-    const setTurn = useSessionStore.getState().setAgentTurn
-    void api?.list?.().then(({ data }) => data.forEach((t) => setTurn(t.sessionId, t.inTurn)))
+    const { setAgentTurn: setTurn, restoreAgentTurn } = useSessionStore.getState()
+    void api
+      ?.list?.()
+      .then(({ data }) => data.forEach((t) => restoreAgentTurn(t.sessionId, t.inTurn, t.endedAt)))
     return api?.onChanged?.(({ sessionId, inTurn }) => setTurn(sessionId, inTurn))
   }, [])
 
