@@ -12,7 +12,12 @@ vi.mock('../../../../../src/renderer/components/session/useSessionFacts', () => 
   useIssueTitles: () => new Map(),
 }))
 vi.mock('../../../../../src/renderer/components/home/useWorkThreads', () => ({
-  useWorkThreads: () => ({ threads: state.threads, groups: [], allThreads: state.threads }),
+  useWorkThreads: () => ({
+    threads: state.threads,
+    groups: [],
+    allThreads: state.threads,
+    dismissedThreads: [],
+  }),
 }))
 vi.mock('../../../../../src/renderer/components/home/InFlight', () => ({
   InFlight: () => <div>In flight rows</div>,

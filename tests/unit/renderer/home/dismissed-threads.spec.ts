@@ -28,19 +28,47 @@ describe('useDismissedThreads', () => {
     expect(localStorage.getItem(DISMISSED_THREADS_KEY)).toBe('{}')
   })
 
-  it('a dismissed thread stays dismissed whatever its activity does afterwards', () => {
+  it('a dismissed thread stays dismissed whatever its sessions print afterwards', () => {
     useDismissedThreads.getState().dismiss('session:scratch', 100, false)
     const dismissed = useDismissedThreads.getState().dismissed
-    expect(isDismissed(dismissed, 'session:scratch')).toBe(true)
-    expect(isDismissed(dismissed, 'session:other')).toBe(false)
+    const printedLater = shown('session:scratch', [{ startedAt: 50, lastActivityAt: 500 }])
+    expect(isDismissed(dismissed, printedLater)).toBe(true)
+    expect(isDismissed(dismissed, shown('session:other', []))).toBe(false)
   })
 
   it('a restored thread is no longer dismissed', () => {
     useDismissedThreads.getState().dismiss('session:scratch', 100, false)
     useDismissedThreads.getState().restore('session:scratch')
-    expect(isDismissed(useDismissedThreads.getState().dismissed, 'session:scratch')).toBe(false)
+    const { dismissed } = useDismissedThreads.getState()
+    expect(isDismissed(dismissed, shown('session:scratch', []))).toBe(false)
   })
 })
+
+describe('isDismissed — a new session', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    useDismissedThreads.setState({ dismissed: {} })
+  })
+
+  // A branch row is keyed by repo and branch, so every later terminal on main joins a dismissed row.
+  it('a session started after the dismissal brings the thread back', () => {
+    useDismissedThreads.getState().dismiss('/repo#main', 100, false)
+    const { dismissed } = useDismissedThreads.getState()
+    const startedLater = shown('/repo#main', [{ startedAt: 50 }, { startedAt: 150 }])
+    expect(isDismissed(dismissed, startedLater)).toBe(false)
+  })
+})
+
+/** A thread with sessions started (and active) at the given epoch ms. */
+function shown(key: string, sessions: Array<{ startedAt: number; lastActivityAt?: number }>) {
+  return {
+    key,
+    sessions: sessions.map((s) => ({
+      startedAt: new Date(s.startedAt).toISOString(),
+      lastActivityAt: s.lastActivityAt ?? s.startedAt,
+    })),
+  } as unknown as WorkThread
+}
 
 describe('useDismissedThreads — forgetting', () => {
   beforeEach(() => {

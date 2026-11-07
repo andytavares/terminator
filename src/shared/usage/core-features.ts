@@ -18,6 +18,7 @@ export const CORE_FEATURES: FeatureDeclaration[] = [
   { id: 'core.home.snooze', label: 'Snooze', kind: 'control', source: 'core' },
   { id: 'core.home.search', label: 'Desk search', kind: 'control', source: 'core' },
   { id: 'core.home.archived', label: 'Archived tasks', kind: 'control', source: 'core' },
+  { id: 'core.home.dismissed', label: 'Dismissed tasks', kind: 'control', source: 'core' },
   { id: 'core.home.insights-window', label: 'Insights period', kind: 'control', source: 'core' },
   {
     id: 'core.overview.open-tile',

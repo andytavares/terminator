@@ -28,6 +28,8 @@ export interface WorkThreads {
   groups: ThreadGroup[]
   /** Every thread, finished ones too; a Focus item reads a shipped thread from here. */
   allThreads: WorkThread[]
+  /** The rows Home would show but the operator dismissed. */
+  dismissedThreads: WorkThread[]
 }
 
 /** Each project's repo root: its workspace's folder, which is what an extension names a branch by. */
@@ -88,15 +90,17 @@ function parkedByHand(threads: WorkThread[], keys: readonly string[]): WorkThrea
   return threads.map((t) => (keys.includes(t.key) ? { ...t, archived: true } : t))
 }
 
-/** The threads worth showing: those parked by hand marked archived, dismissed ones left out. */
+/** The threads worth showing, those parked by hand marked archived, split by dismissal. */
 function shownThreads(
   input: WorkThreadInput,
   parkedKeys: readonly string[],
   dismissed: Record<string, number>
-): WorkThread[] {
-  return parkedByHand(buildWorkThreads(input), parkedKeys).filter(
-    (t) => !isDismissed(dismissed, t.key)
-  )
+): { threads: WorkThread[]; dismissedThreads: WorkThread[] } {
+  const worth = parkedByHand(buildWorkThreads(input), parkedKeys)
+  return {
+    threads: worth.filter((t) => !isDismissed(dismissed, t)),
+    dismissedThreads: worth.filter((t) => isDismissed(dismissed, t)),
+  }
 }
 
 /** Everything the threads are joined from; the clock ticks each minute. */
@@ -126,9 +130,10 @@ export function useWorkThreads(): WorkThreads {
   const dismissed = useDismissedThreads((s) => s.dismissed)
   const result = useMemo(() => {
     // `allThreads` keeps dismissed threads so a Focus item's done check still sees the work.
-    const threads = shownThreads(input, parkedKeys, dismissed)
+    const { threads, dismissedThreads } = shownThreads(input, parkedKeys, dismissed)
     return {
       threads,
+      dismissedThreads,
       groups: groupThreads(threads),
       allThreads: parkedByHand(allWorkThreads(input), parkedKeys),
     }

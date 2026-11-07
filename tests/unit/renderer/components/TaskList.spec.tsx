@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
 import { TaskList } from '../../../../src/renderer/components/home/TaskList'
 import { ArchivedTasks } from '../../../../src/renderer/components/home/ArchivedTasks'
+import { DismissedTasks } from '../../../../src/renderer/components/home/DismissedTasks'
+import { taskKeyOf } from '../../../../src/renderer/home/task-lanes'
 import { useDeskSelection } from '../../../../src/renderer/components/home/desk-selection'
 import { useTaskStore } from '../../../../src/renderer/stores/task.store'
 import { useParkedThreads } from '../../../../src/renderer/components/home/parked-threads'
@@ -287,6 +289,29 @@ describe('ArchivedTasks', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Archived tasks (1)' }))
     fireEvent.click(screen.getByRole('button', { name: 'Restore Old spike' }))
     await screen.findByRole('button', { name: 'Archived tasks (0)' })
+    expect(groupHeadings()).toContain('Quiet · 2')
+  })
+})
+
+describe('DismissedTasks', () => {
+  const dismissedTask = task({
+    title: 'Flaky probe',
+    lanes: [{ repoRoot: REPO_ROOT, branch: 'probe' }],
+  })
+
+  it('lists a dismissed task and brings it back to the list when Restore is pressed', async () => {
+    useWritableTasks([dismissedTask])
+    useDismissedThreads.getState().dismiss(taskKeyOf(dismissedTask.id), Date.now(), false)
+    render(
+      <>
+        <TaskList />
+        <DismissedTasks />
+      </>
+    )
+    expect(screen.queryByRole('button', { name: 'Flaky probe' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Dismissed (1)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Restore Flaky probe' }))
+    await screen.findByRole('button', { name: 'Dismissed (0)' })
     expect(groupHeadings()).toContain('Quiet · 2')
   })
 })
