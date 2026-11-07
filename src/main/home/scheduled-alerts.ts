@@ -1,19 +1,17 @@
-import * as fs from 'node:fs'
-import * as path from 'node:path'
 import { z } from 'zod'
 import type { HomeAsk } from '../../shared/schemas/home-feed.schema.js'
-import { makeLogger } from '../logger.js'
 
-// Alerts a scheduled run's agent writes as JSON files into one folder (unattended-run.ts tells it
-// where). A file drop, as claude-hook.ts: the app runs no server an agent could reach.
+// Alerts Claude raises through the Terminator MCP server's `alert` tool (src/main/mcp/alert-tool.ts):
+// a Home ask with Dismiss, a notification, or both.
 
-const logger = makeLogger('scheduled-alerts')
+const DAY_MS = 24 * 60 * 60 * 1000
 
-const AlertSchema = z.object({
+export const AlertSchema = z.object({
   title: z.string().trim().min(1),
   message: z.string().default(''),
   home: z.boolean().default(true),
   notify: z.boolean().default(true),
+  source: z.string().trim().min(1).optional(),
 })
 
 interface AlertDeps {
@@ -25,12 +23,15 @@ interface AlertDeps {
 
 type Alert = z.infer<typeof AlertSchema>
 
-const homeAlert = (id: string, alert: Alert, since: Date): HomeAsk => ({
-  id: `alert-${id}`,
+/** Every alert with this place and title starts with it, so a later one can replace it. */
+const alertKey = (where: string, title: string): string => `alert-${where}: ${title}@`
+
+const homeAlert = (alert: Alert, where: string, since: Date): HomeAsk => ({
+  id: `${alertKey(where, alert.title)}${since.toISOString()}`,
   kind: 'finished',
   title: alert.title,
   detail: alert.message,
-  where: 'Scheduled run',
+  where,
   facts: [],
   workKey: null,
   since: since.toISOString(),
@@ -39,16 +40,26 @@ const homeAlert = (id: string, alert: Alert, since: Date): HomeAsk => ({
   open: { command: 'core:reveal-session' },
 })
 
+function parseAlert(raw: unknown): Alert {
+  const parsed = AlertSchema.safeParse(raw)
+  if (!parsed.success) throw new Error(z.prettifyError(parsed.error))
+  return parsed.data
+}
+
 // shortcut: Home alerts live in memory and go when the app quits; persist them if people miss them.
 export function createAlerts({ now, notify, publish }: AlertDeps) {
   let shown: HomeAsk[] = []
   return {
-    /** Throws when the file is not an alert. */
-    receive(id: string, raw: unknown): void {
-      const alert = AlertSchema.parse(raw)
+    /** `where` shows when the alert names no source. Throws, in words, when it is not an alert. */
+    receive(raw: unknown, where: string): void {
+      const alert = parseAlert(raw)
       if (alert.notify) notify(alert.title, alert.message)
       if (!alert.home) return
-      shown = [...shown, homeAlert(id, alert, now())]
+      const ask = homeAlert(alert, alert.source ?? where, now())
+      const key = alertKey(ask.where!, alert.title)
+      const sameWithinADay = (old: HomeAsk) =>
+        old.id.startsWith(key) && Date.parse(ask.since) - Date.parse(old.since) < DAY_MS
+      shown = [...shown.filter((old) => !sameWithinADay(old)), ask]
       publish(shown)
     },
     act(askId: string, actionId: string): void {
@@ -57,45 +68,4 @@ export function createAlerts({ now, notify, publish }: AlertDeps) {
       publish(shown)
     },
   }
-}
-
-/** Hands one file to `receive` and deletes it; a half-written file waits for the next event. */
-function readAlert(file: string, receive: (id: string, raw: unknown) => void): void {
-  let raw: unknown
-  try {
-    raw = JSON.parse(fs.readFileSync(file, 'utf8'))
-  } catch {
-    return
-  }
-  try {
-    receive(path.basename(file, '.json'), raw)
-  } catch (error) {
-    logger.error('alert refused', { file, error: String(error) })
-  }
-  fs.rmSync(file, { force: true })
-}
-
-/** A folder that cannot be read, for example one deleted while watched, holds no alerts. */
-function readFolder(folder: string, receive: (id: string, raw: unknown) => void): void {
-  let names: string[]
-  try {
-    names = fs.readdirSync(folder)
-  } catch {
-    return
-  }
-  for (const name of names.filter((n) => n.endsWith('.json')).sort())
-    readAlert(path.join(folder, name), receive)
-}
-
-/** Reads what is there now, then every file written later. Returns the way to stop. */
-export function watchAlerts(
-  folder: string,
-  receive: (id: string, raw: unknown) => void
-): () => void {
-  fs.mkdirSync(folder, { recursive: true })
-  // Not persistent: the windows keep the app alive, and the watch lasts as long as the app.
-  const watcher = fs.watch(folder, { persistent: false }, () => readFolder(folder, receive))
-  watcher.on('error', (error) => logger.error('alert watch failed', { error: String(error) }))
-  readFolder(folder, receive)
-  return () => watcher.close()
 }

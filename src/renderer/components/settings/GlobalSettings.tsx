@@ -32,7 +32,7 @@ const CORE_NOTIFICATION_KEYS: Array<{ key: string; label: string }> = [
   { key: 'closeTerminalFailed', label: 'Close terminal failed' },
   { key: 'remoteTunnelDisconnected', label: 'Remote tunnel disconnected' },
   { key: 'updateReady', label: 'Update ready to install' },
-  { key: 'scheduledRunAlert', label: 'Alert from a scheduled run' },
+  { key: 'claudeAlert', label: 'Alert from Claude' },
   { key: 'extensionInstalled', label: 'Extension installed' },
   { key: 'extensionInstallFailed', label: 'Extension install failed' },
   { key: 'extensionReloaded', label: 'Extension reloaded' },

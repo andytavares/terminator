@@ -172,4 +172,13 @@ describe('settings-store — a settings file that still has the removed `extensi
     expect(file.get('global')).not.toHaveProperty('extensions')
     expect(getGlobalSettings().appearance.theme).toBe('light')
   })
+
+  it('carries a notification override saved under scheduledRunAlert over to claudeAlert', async () => {
+    stores.settings = {
+      global: { notifications: { overrides: { scheduledRunAlert: ['toast'] } } },
+      workspaces: {},
+    }
+    const { getGlobalSettings } = await import('../../../src/main/storage/settings-store')
+    expect(getGlobalSettings().notifications.overrides).toEqual({ claudeAlert: ['toast'] })
+  })
 })

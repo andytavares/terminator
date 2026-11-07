@@ -1,10 +1,24 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import type { UnattendedLaunch } from '../../shared/schemas/schedules.schema.js'
+import { mcpToolSpecs } from '../../shared/electron-api/manifest.js'
+import { RENDERER_TOOLS } from '../../shared/mcp/renderer-tools.js'
 
 // A PreToolUse hook approves every call of a scheduled run; ask rules still prompt for destructive
 // commands, because deny and ask rules win over a hook's allow
 // (https://code.claude.com/docs/en/permissions#precedence-among-rules-hooks-and-mods).
+
+/** Destructive Terminator MCP tools; `install_update` lives in src/main/mcp/app-tools.ts. */
+const destructiveTerminatorTools = (): string[] =>
+  [
+    ...mcpToolSpecs()
+      .filter((spec) => spec.destructive)
+      .map((spec) => spec.tool),
+    ...Object.entries(RENDERER_TOOLS)
+      .filter(([, tool]) => 'destructive' in tool)
+      .map(([name]) => name),
+    'install_update',
+  ].map((tool) => `mcp__terminator__${tool}`)
 
 const DESTRUCTIVE_ASKS = [
   'Bash(rm -rf *)',
@@ -18,6 +32,7 @@ const DESTRUCTIVE_ASKS = [
   'Bash(git branch -D *)',
   'Bash(git push --force*)',
   'Bash(git push -f*)',
+  ...destructiveTerminatorTools(),
 ]
 
 const ALLOW_OUTPUT = JSON.stringify({
@@ -33,17 +48,12 @@ const SETTINGS = {
   },
 }
 
-/** The folder the agent writes alerts into; `watchAlerts` reads it. */
-export const alertsFolder = (folder: string): string => path.join(folder, 'alerts')
-
-const systemPrompt = (alerts: string): string => `This is a scheduled run. Nobody is watching it.
+const SYSTEM_PROMPT = `This is a scheduled run. Nobody is watching it, and nobody reads this tab.
 Do not ask questions. Make the most reasonable choice and continue. Commands that destroy data still ask the person.
 
-When the task asks you to alert the person, show something on Terminator's Home screen, or send a notification, write a JSON file with a new unique name ending in .json into this folder:
-${alerts}
-
-The file holds {"title": "<short title>", "message": "<one or two sentences>", "home": true, "notify": true}.
-"home": true shows the alert on Home until the person dismisses it. "notify": true sends a notification.
+Anything the person must see goes through the \`alert\` tool of the \`terminator\` MCP server (\`mcp__terminator__alert\`).
+Call it once for each item that needs the person. Do not call it when nothing does.
+Set \`source\` to "Scheduled run · " followed by the task in at most six words.
 `
 
 /** Writes the settings and the prompt into `folder`, overwriting the copies of an earlier start. */
@@ -51,9 +61,9 @@ export async function writeUnattendedFiles(folder: string): Promise<UnattendedLa
   const launch = {
     settingsPath: path.join(folder, 'settings.json'),
     systemPromptPath: path.join(folder, 'system-prompt.md'),
-    systemPrompt: systemPrompt(alertsFolder(folder)),
+    systemPrompt: SYSTEM_PROMPT,
   }
-  await fs.mkdir(alertsFolder(folder), { recursive: true })
+  await fs.mkdir(folder, { recursive: true })
   await fs.writeFile(launch.settingsPath, JSON.stringify(SETTINGS, null, 2), 'utf8')
   await fs.writeFile(launch.systemPromptPath, launch.systemPrompt, 'utf8')
   return launch

@@ -1,9 +1,11 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { execSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { writeUnattendedFiles } from '../../../src/main/home/unattended-run'
+import { mcpToolSpecs } from '../../../src/shared/electron-api/manifest'
+import { RENDERER_TOOLS } from '../../../src/shared/mcp/renderer-tools'
 
 const made: string[] = []
 afterEach(() => made.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true })))
@@ -49,17 +51,31 @@ describe('writeUnattendedFiles', () => {
   })
 })
 
+describe('writeUnattendedFiles, Terminator MCP tools', () => {
+  it('keeps asking for every destructive Terminator MCP tool', async () => {
+    const { settings } = await written()
+    const manifest = mcpToolSpecs().filter((spec) => spec.destructive)
+    const renderer = Object.entries(RENDERER_TOOLS).filter(([, tool]) => 'destructive' in tool)
+    const tools = [...manifest.map((spec) => spec.tool), ...renderer.map(([name]) => name)]
+    expect(manifest.length).toBeGreaterThan(0)
+    expect(settings.permissions.ask).toEqual(
+      expect.arrayContaining([...tools, 'install_update'].map((tool) => `mcp__terminator__${tool}`))
+    )
+  })
+})
+
 describe('writeUnattendedFiles, the prompt and the questions', () => {
   it('refuses clarifying questions, which nobody is there to answer', async () => {
     const { settings } = await written()
     expect(settings.permissions.deny).toEqual(['AskUserQuestion'])
   })
 
-  it('tells the agent where to write a Home alert or a notification', async () => {
+  it('tells the agent to alert through the Terminator MCP alert tool, not a folder', async () => {
     const { dir, prompt } = await written()
-    expect(prompt).toContain(join(dir, 'alerts'))
-    expect(prompt).toContain('"home"')
-    expect(prompt).toContain('"notify"')
+    expect(prompt).toContain('mcp__terminator__alert')
+    expect(prompt).toContain('Scheduled run · ')
+    expect(prompt).not.toContain(join(dir, 'alerts'))
+    expect(existsSync(join(dir, 'alerts'))).toBe(false)
   })
 
   it('hands over the prompt text, for an agent that takes it as text', async () => {
