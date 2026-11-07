@@ -1,0 +1,46 @@
+src/renderer/components/agent/AgentView.css
+  s_c3147c7a3f2e3c::t_946e05061f6eae 97
+  s_c3147c7a3f2e3c::t_fb197a7f19ee77 77-96,98-107
+src/renderer/components/agent/AgentMarkdown.tsx
+  s_c3147c7a3f2e3c::t_3f2b625a129186 12,14-15,17
+  s_c3147c7a3f2e3c::t_946e05061f6eae 8-11,13,16,18-29,37-38
+  s_c3147c7a3f2e3c::t_9151b18374c933 1-7,30-36,39-72,74-84,87-91
+  s_c3147c7a3f2e3c::t_2968faecc9bea2 73,85-86
+src/renderer/components/agent/AgentView.tsx
+  s_c3147c7a3f2e3c::t_0395a3f5b396cb 19,117-142,156
+tests/unit/renderer/agent/AgentView.spec.tsx
+  s_c3147c7a3f2e3c::t_0395a3f5b396cb 46,53-61,74,89-91,301-367
+  s_c3147c7a3f2e3c::t_95e4249a33a636 368
+docs/user-guide/USER-GUIDE.md
+  s_c3147c7a3f2e3c::t_0395a3f5b396cb 536-539
+packages/extension-ui/README.md
+  s_c3147c7a3f2e3c::t_0395a3f5b396cb 39,134-135,144-146
+electron.vite.config.ts
+  s_c3147c7a3f2e3c::t_5b6b2d8615d5a5 40-49
+package-lock.json
+  s_c3147c7a3f2e3c::t_946a634802a06f 28
+package.json
+  s_c3147c7a3f2e3c::t_0eb8308592d905 80
+packages/extension-ui/src/Markdown.tsx
+  s_c3147c7a3f2e3c::t_b8bc17d17f2c65 8-33,35,41,70-72,103-108,112,125,140
+src/renderer/components/agent/no-elk-layout.ts
+  s_c3147c7a3f2e3c::t_c3ee6bf352a611 1-2
+tests/unit/packages/extension-ui/markdown.spec.tsx
+  s_c3147c7a3f2e3c::t_0781bde2ff64b2 395-443
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9eee554f01b71ef35fb87a2edceb927381627cd7",
+  "prompts": {},
+  "sessions": {
+    "s_c3147c7a3f2e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6643d25-b995-4f50-b4d6-9e2f055e3cbe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

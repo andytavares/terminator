@@ -1,0 +1,21 @@
+package.json
+  s_c3147c7a3f2e3c::t_4314b4a8ccebdb 71,89
+package-lock.json
+  s_c3147c7a3f2e3c::t_687b14d08b1425 19,37,3742-3772,3863-3875
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1a93247bf92a0ed3d23ab0901330144807097242",
+  "prompts": {},
+  "sessions": {
+    "s_c3147c7a3f2e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6643d25-b995-4f50-b4d6-9e2f055e3cbe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

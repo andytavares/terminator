@@ -1,0 +1,51 @@
+src/main/mcp/app-tools.ts
+  s_c3147c7a3f2e3c::t_cec0eeceffb4f0 1-16,35,38-45,54,65-66
+  s_c3147c7a3f2e3c::t_4237f53711d1d9 64
+  s_c3147c7a3f2e3c::t_faaa6e3160e0f5 17-34,36-37,46-53,55-63
+tests/unit/mcp/renderer-tools.spec.ts
+  s_c3147c7a3f2e3c::t_faaa6e3160e0f5 114-116,149,151
+  s_c3147c7a3f2e3c::t_aaec86115a477b 103-105,107
+  s_c3147c7a3f2e3c::t_16c2c5c5e00912 1-102,106,108-113,117-148,150,152-155
+src/main/index.ts
+  s_c3147c7a3f2e3c::t_76dab768e69271 491,493-497
+  s_c3147c7a3f2e3c::t_42f8b91b6907b6 479-481
+  s_c3147c7a3f2e3c::t_dfd29f8ac16602 498-499,501-502
+  s_c3147c7a3f2e3c::t_2cfb9195544bd7 54-55
+  s_c3147c7a3f2e3c::t_ecdaef0c01ab96 492,500
+  s_c3147c7a3f2e3c::t_4cbe281f369016 50-52,56,469,475-476,486-490,503-509,645
+  s_c3147c7a3f2e3c::t_4237f53711d1d9 53
+  s_c3147c7a3f2e3c::t_fbfe39a7102e72 6-12
+  s_c3147c7a3f2e3c::t_35430fbe177eee 477-478,482-485
+tests/unit/main/app-updater.spec.ts
+  s_c3147c7a3f2e3c::t_3007d71f777fea 285
+  s_c3147c7a3f2e3c::t_5f1494622aa0b9 322-329
+  s_c3147c7a3f2e3c::t_edd0cce6da64e7 269-284,286-293,297-321
+  s_c3147c7a3f2e3c::t_faaa6e3160e0f5 294-296
+tests/unit/mcp/app-tools.spec.ts
+  s_c3147c7a3f2e3c::t_55b6267d6fd4c7 1-77
+  s_c3147c7a3f2e3c::t_043f6a9f702ef9 78-80
+src/main/mcp/renderer-tools.ts
+  s_c3147c7a3f2e3c::t_4eecd97841b04d 1-36,38-45,47-53,55-100
+  s_c3147c7a3f2e3c::t_aaec86115a477b 37,54
+  s_c3147c7a3f2e3c::t_edd0cce6da64e7 46
+src/main/app-updater.ts
+  s_c3147c7a3f2e3c::t_1fe553c5de7b9b 96-100,121
+  s_c3147c7a3f2e3c::t_c2f2b770028353 18-25,33-36,101-120
+  s_c3147c7a3f2e3c::t_571ae8f1400888 122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a8557c5927653fb7684487cf83e7b6b95345237f",
+  "prompts": {},
+  "sessions": {
+    "s_c3147c7a3f2e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6643d25-b995-4f50-b4d6-9e2f055e3cbe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+extensions/foundry/tests/helpers/foundry-host.ts
+  s_b2c9063a4eb63c::t_440c495cf8675c 100,144,170-175
+extensions/foundry/tests/ipc/ui-channels.spec.ts
+  s_b2c9063a4eb63c::t_440c495cf8675c 13,18,26,59-62,69-78,81-88,91-95,97,100-107
+  s_b2c9063a4eb63c::t_557ee4bd43cc06 9,79-80,89-90,96,98-99
+extensions/foundry/tests/components/App.spec.tsx
+  s_b2c9063a4eb63c::t_440c495cf8675c 18,88,120,474-480,482
+extensions/foundry/src/renderer/App.tsx
+  s_b2c9063a4eb63c::t_6b41ac7ed81266 162,164,167,178-179,248-251
+extensions/foundry/src/ipc/ui-registration.ts
+  s_b2c9063a4eb63c::t_6b41ac7ed81266 14-16,42-44,48-53,65-67,84,109,114,117-127,130-131,134,136-140,150-155,158,164,168-170
+  s_b2c9063a4eb63c::t_440c495cf8675c 110-112,145-146
+src/renderer/components/home/start-work.ts
+  s_b2c9063a4eb63c::t_6b41ac7ed81266 250
+  s_b2c9063a4eb63c::t_440c495cf8675c 252-253
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fb8d46be0c3f64593def7d3f61189d9815cb2633",
+  "prompts": {},
+  "sessions": {
+    "s_b2c9063a4eb63c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "37fd7485-3e79-47b8-870b-a31e0b8348c2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,27 @@
+extensions/git-integration/src/components/pr-review/PrReviewTab.tsx
+  s_b2c9063a4eb63c::t_278b6c1a201c88 242,254,325,394-397
+.github/workflows/flake-probe.yml
+  s_b2c9063a4eb63c::t_c42d212d9cbdbc 1-52
+tests/e2e/pr-review-queue.spec.ts
+  s_b2c9063a4eb63c::t_f1dfa60ac1e3c0 61-63,135,137
+tests/e2e/zz-probe-focus.spec.ts
+  s_b2c9063a4eb63c::t_ace5ddc82c6f89 1-28
+tests/e2e/zz-probe-launch.spec.ts
+  s_b2c9063a4eb63c::t_b91ab3ee55746b 1-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d03557687d1ab6d378a8e69d8df4273c54bb99a4",
+  "prompts": {},
+  "sessions": {
+    "s_b2c9063a4eb63c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "37fd7485-3e79-47b8-870b-a31e0b8348c2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,62 @@
+tests/unit/renderer/components/TerminalRow.spec.tsx
+  s_07e7aef877c5aa::t_da4d2741ca2837 7
+  s_07e7aef877c5aa::t_c304ad9f91b9b3 177-186
+  s_07e7aef877c5aa::t_baf5f7a6a18bc8 187-188
+tests/unit/renderer/hooks/useDragReorder.spec.tsx
+  s_07e7aef877c5aa::t_642db542a16eed 105-112
+  s_07e7aef877c5aa::t_3d8bf5668b0036 36
+  s_07e7aef877c5aa::t_d0ba56fb3aa4a5 28
+  s_c3147c7a3f2e3c::t_7be4e532788722 113-114
+src/renderer/components/home/thread-drag.ts
+  s_07e7aef877c5aa::t_0edb5cb92da3cd 59
+  s_07e7aef877c5aa::t_73d5693f8dbf08 57-58,60
+  s_07e7aef877c5aa::t_0fa104762746fb 4,61
+src/renderer/hooks/useDragReorder.ts
+  s_07e7aef877c5aa::t_f0ef1cd776f008 50-51
+  s_07e7aef877c5aa::t_dc9466bed9c28e 76
+  s_07e7aef877c5aa::t_73d5693f8dbf08 37-38,45-47,54
+  s_07e7aef877c5aa::t_0fa104762746fb 64
+  s_07e7aef877c5aa::t_4e3ffeb9dd69e2 48-49,52-53,55
+src/renderer/components/home/ScheduledView.tsx
+  s_07e7aef877c5aa::t_0fa104762746fb 33,159-161,163
+  s_07e7aef877c5aa::t_f0ef1cd776f008 143-150,162
+src/renderer/components/sidebar/TerminalRow.tsx
+  s_07e7aef877c5aa::t_0fa104762746fb 7,64
+  s_07e7aef877c5aa::t_f0ef1cd776f008 65,80-83
+  s_07e7aef877c5aa::t_5235f834a19b9c 84-85
+src/renderer/components/home/ScheduledView.css
+  s_07e7aef877c5aa::t_0fa104762746fb 39
+tests/unit/renderer/components/home/TaskRow.spec.tsx
+  s_07e7aef877c5aa::t_73d5693f8dbf08 132-138,147-151,156-158,161-163
+  s_07e7aef877c5aa::t_680de00f8675b0 8
+  s_07e7aef877c5aa::t_f5213f71fcc088 127-131,139-146,152-155,159-160,164
+  s_07e7aef877c5aa::t_cf017a5e6b8b95 165-166
+tests/unit/renderer/components/ScheduledView.spec.tsx
+  s_07e7aef877c5aa::t_2acb5e3b86d05f 288-304
+  s_07e7aef877c5aa::t_0de34f54ea39dd 15
+  s_c3147c7a3f2e3c::t_a0e6059534fb55 305
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "76659d968d1bc0ebca7c3389d4831f4c1acae1f3",
+  "prompts": {},
+  "sessions": {
+    "s_07e7aef877c5aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "633c8d12-7dd7-4254-9663-67bc2d4d51f5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_c3147c7a3f2e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6643d25-b995-4f50-b4d6-9e2f055e3cbe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

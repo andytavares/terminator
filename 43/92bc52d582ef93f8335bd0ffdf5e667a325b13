@@ -1,0 +1,30 @@
+src/renderer/components/home/ScheduledView.tsx
+  s_193f9ce1f261b8::t_a2d35a6e521c4e 80-81,83,93,160,207
+src/renderer/components/home/start-work-model.ts
+  s_193f9ce1f261b8::t_b7b44d5809fd4c 127-132,134
+tests/unit/home/schedules.spec.ts
+  s_193f9ce1f261b8::t_6487c95d5dea8a 295,305,307,321-322,329,386
+src/renderer/components/home/WorkspacePicker.tsx
+  s_193f9ce1f261b8::t_b7b44d5809fd4c 116
+  s_193f9ce1f261b8::t_e370e41401e87a 6
+src/main/ipc/schedules.ipc.ts
+  s_193f9ce1f261b8::t_6487c95d5dea8a 80
+src/main/home/schedules.ts
+  s_193f9ce1f261b8::t_6487c95d5dea8a 81-87,95,138,171,184,195,211-212,279-280,282-283,290-291,296
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4392bc52d582ef93f8335bd0ffdf5e667a325b13",
+  "prompts": {},
+  "sessions": {
+    "s_193f9ce1f261b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "41e1cf09-75eb-4ceb-81b5-7467b1989f46",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

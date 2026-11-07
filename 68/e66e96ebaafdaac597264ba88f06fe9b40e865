@@ -1,0 +1,23 @@
+.github/PULL_REQUEST_TEMPLATE.md
+  s_b2c9063a4eb63c::t_5bae630aac0278 5-8
+.github/workflows/ci.yml
+  s_b2c9063a4eb63c::t_7a78363c3977d2 667,741-742,744,746,749-752
+  s_b2c9063a4eb63c::t_5bae630aac0278 747-748
+  s_b2c9063a4eb63c::t_80a37f10a171c4 753,755
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "68e66e96ebaafdaac597264ba88f06fe9b40e865",
+  "prompts": {},
+  "sessions": {
+    "s_b2c9063a4eb63c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "37fd7485-3e79-47b8-870b-a31e0b8348c2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

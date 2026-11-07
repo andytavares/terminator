@@ -1,0 +1,31 @@
+tests/e2e/tools/capture-scheduled-runs-screenshots.spec.ts
+  s_193f9ce1f261b8::t_c8019c4c12e997 45,55-61,67,81
+  s_193f9ce1f261b8::t_a0bce90db70afe 1-14,16-44,46,65,92,109-111,116-120,125-142,146-151
+  s_193f9ce1f261b8::t_8e687496cd2d39 47-54,62-64,66,69,76,84,93-108
+  s_193f9ce1f261b8::t_548cb1a14759b3 15,68,70-75,77-80,82-83,85-91,112-115,121-124,143-145
+docs/adr/143-a-global-scheduled-run-starts-in-scratch.md
+  s_193f9ce1f261b8::t_04755585959570 17,28
+  s_193f9ce1f261b8::t_7d75ca103ad156 1-16,18-27,29-30
+docs/user-guide/USER-GUIDE.md
+  s_193f9ce1f261b8::t_04755585959570 559
+  s_193f9ce1f261b8::t_f3a1b270259265 560-573
+tests/e2e/scheduled-runs.spec.ts
+  s_193f9ce1f261b8::t_d83e4f2a68f399 1-51,56-114
+  s_193f9ce1f261b8::t_ed664c6a6f7bba 52-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4093ea65057e26609ed474e9cb065140b29c106e",
+  "prompts": {},
+  "sessions": {
+    "s_193f9ce1f261b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "41e1cf09-75eb-4ceb-81b5-7467b1989f46",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

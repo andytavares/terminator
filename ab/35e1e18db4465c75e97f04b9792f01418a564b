@@ -1,0 +1,48 @@
+tests/unit/renderer/components/StartWork.spec.tsx
+  s_b2c9063a4eb63c::t_e98c379454b0f0 157,443-445
+extensions/foundry/manifest.json
+  s_b2c9063a4eb63c::t_9f6dc3bdd2ea74 26
+extensions/foundry/tests/home/commands.spec.ts
+  s_b2c9063a4eb63c::t_cd991b5a66b71e 35,37,64
+src/renderer/stores/extension-commands.store.ts
+  s_b2c9063a4eb63c::t_53cc871de00a1d 40-42,47-49
+  s_b2c9063a4eb63c::t_7eafe846166d3a 43-46
+src/renderer/components/home/desk-actions.ts
+  s_b2c9063a4eb63c::t_53cc871de00a1d 90-91,99
+  s_b2c9063a4eb63c::t_7eafe846166d3a 5
+docs/EXTENSION-DEVELOPMENT.md
+  s_b2c9063a4eb63c::t_d9f350941745ba 106
+  s_b2c9063a4eb63c::t_91c3f8dea17d81 96-105,107
+extensions/foundry/src/ipc/ui-registration.ts
+  s_b2c9063a4eb63c::t_9f6dc3bdd2ea74 66,70-75,87,90-92,94
+src/renderer/components/home/start-work.ts
+  s_b2c9063a4eb63c::t_7eafe846166d3a 8
+  s_b2c9063a4eb63c::t_53cc871de00a1d 261-262,264
+extensions/foundry/src/home/feed.ts
+  s_b2c9063a4eb63c::t_9f6dc3bdd2ea74 79
+tests/unit/renderer/home/desk-actions.spec.ts
+  s_b2c9063a4eb63c::t_e98c379454b0f0 133-135,139,143
+  s_b2c9063a4eb63c::t_4b50b0d9e32945 174-175
+src/shared/electron-api/manifest.ts
+  s_b2c9063a4eb63c::t_53cc871de00a1d 776-778
+extensions/foundry/tests/ipc/ui-channels.spec.ts
+  s_b2c9063a4eb63c::t_cd991b5a66b71e 74,101,104
+extensions/foundry/tests/home/publish.spec.ts
+  s_b2c9063a4eb63c::t_cd991b5a66b71e 164,166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ab35e1e18db4465c75e97f04b9792f01418a564b",
+  "prompts": {},
+  "sessions": {
+    "s_b2c9063a4eb63c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "37fd7485-3e79-47b8-870b-a31e0b8348c2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

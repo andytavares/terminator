@@ -1,0 +1,27 @@
+tests/unit/renderer/components/sidebar/InboxSidebar.spec.tsx
+  s_c3147c7a3f2e3c::t_6f47120e332c3f 165-175,177-178,198-208
+  s_c3147c7a3f2e3c::t_446a2269b13335 209-210
+src/renderer/components/sidebar/InboxSidebar.tsx
+  s_c3147c7a3f2e3c::t_cce16ec3455618 92-93,96-97
+tests/unit/renderer/components/sidebar/inbox-marks.spec.ts
+  s_c3147c7a3f2e3c::t_6f47120e332c3f 43-51
+  s_c3147c7a3f2e3c::t_0f8348619d8e1c 52-54
+src/renderer/components/sidebar/inbox-marks.ts
+  s_c3147c7a3f2e3c::t_cce16ec3455618 74,79-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9fcd8a53a07b8a1e33bd4c122de1c043ca1466d5",
+  "prompts": {},
+  "sessions": {
+    "s_c3147c7a3f2e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6643d25-b995-4f50-b4d6-9e2f055e3cbe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

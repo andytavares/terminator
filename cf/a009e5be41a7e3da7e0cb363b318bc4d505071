@@ -1,0 +1,34 @@
+src/renderer/components/home/WhenChoices.tsx
+  s_b2c9063a4eb63c::t_769795a7745940 47-48,64,71-77
+  s_b2c9063a4eb63c::t_675dbb8a342a86 78-79
+tests/e2e/agent-tab.spec.ts
+  s_b2c9063a4eb63c::t_7118aead8a464a 53-65,71-72
+tests/unit/renderer/components/StartWork.spec.tsx
+  s_b2c9063a4eb63c::t_450d04503d6c7b 1016,1033-1040
+  s_b2c9063a4eb63c::t_6292391513e06d 442
+  s_b2c9063a4eb63c::t_4b9068d58c9ea6 994-1015,1023-1032,1041-1042
+  s_b2c9063a4eb63c::t_769795a7745940 1017-1022
+  s_b2c9063a4eb63c::t_4f2c48dc777142 1043-1057
+  s_b2c9063a4eb63c::t_34e9888f586ec3 5
+src/renderer/components/home/StartWork.tsx
+  s_b2c9063a4eb63c::t_769795a7745940 194,279,281
+  s_b2c9063a4eb63c::t_3c16a725a07e62 276-278,280,282,296-300,302-303
+  s_b2c9063a4eb63c::t_446172ee3c2143 598-601,603-605,607-610,613
+  s_b2c9063a4eb63c::t_0a37ea50a736dc 1,193,592,602,606,611-612,614-621,623
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cfa009e5be41a7e3da7e0cb363b318bc4d505071",
+  "prompts": {},
+  "sessions": {
+    "s_b2c9063a4eb63c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "37fd7485-3e79-47b8-870b-a31e0b8348c2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

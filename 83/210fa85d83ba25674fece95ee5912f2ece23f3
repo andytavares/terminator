@@ -1,0 +1,46 @@
+src/renderer/components/home/RunAsChoices.tsx
+  s_b2c9063a4eb63c::t_338cd9188810e5 34
+tests/unit/renderer/components/start-work-schedule.spec.tsx
+  s_b2c9063a4eb63c::t_ec0200ab931c8b 62,64
+  s_b2c9063a4eb63c::t_0cdad6331cdf52 1,4-5,7-49,56-61,63,65-86
+src/renderer/components/home/StartWork.css
+  s_b2c9063a4eb63c::t_338cd9188810e5 15-16,18-19,76-78,132-133,378-447
+tests/unit/renderer/components/StartWork.spec.tsx
+  s_b2c9063a4eb63c::t_21a7e3acec010b 916-917,929,931,935-940
+  s_b2c9063a4eb63c::t_338cd9188810e5 923-928
+  s_b2c9063a4eb63c::t_0cdad6331cdf52 11,167-169,797,805,823,835,839,849,877-915,918-922,941-958,963-984
+  s_b2c9063a4eb63c::t_ec0200ab931c8b 930,932-934,959-962
+  s_b2c9063a4eb63c::t_0dd3a4b0f98a8b 543
+src/renderer/components/home/PromptPane.tsx
+  s_b2c9063a4eb63c::t_338cd9188810e5 1-29
+src/renderer/components/home/start-work-schedule.ts
+  s_b2c9063a4eb63c::t_bce066c1af5467 3,10,12-19,26-32,42
+src/renderer/components/home/WhenChoices.tsx
+  s_b2c9063a4eb63c::t_bce066c1af5467 3,16,19-21,24,28,31-38,44-70,82-83,93-108,132,134,136-137,149,151,163-206,208-222,242-253,255-259,287-309,315,329-330,335-363,398-400,412-413
+  s_b2c9063a4eb63c::t_338cd9188810e5 4-9,401-411
+  s_b2c9063a4eb63c::t_ec0200ab931c8b 144-148,260-262,273-277,310-314
+  s_b2c9063a4eb63c::t_38db7b5337d2b8 150,152-162,207,223-241,264,269-272,278-286
+  s_b2c9063a4eb63c::t_d2aea30dd230cd 110-131,135,316-328,331-334
+  s_b2c9063a4eb63c::t_033e60c8da7457 109
+src/renderer/components/home/StartWork.tsx
+  s_b2c9063a4eb63c::t_d2aea30dd230cd 363,379-388,409-410,595-596
+  s_b2c9063a4eb63c::t_338cd9188810e5 8-9,14,68,142-143,211-217,221,226-230,244,256-265,274-282,284,299,389,391,511,566-571
+  s_b2c9063a4eb63c::t_645aeaccb31e78 390,403-408,583,587-594
+  s_b2c9063a4eb63c::t_1ce8316eff3e7f 411
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "83210fa85d83ba25674fece95ee5912f2ece23f3",
+  "prompts": {},
+  "sessions": {
+    "s_b2c9063a4eb63c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "37fd7485-3e79-47b8-870b-a31e0b8348c2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

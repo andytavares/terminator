@@ -1,0 +1,40 @@
+src/renderer/components/settings/GlobalSettings.tsx
+  s_c3147c7a3f2e3c::t_eac3177a77f101 36
+src/renderer/sidebar/resume.ts
+  s_c3147c7a3f2e3c::t_d3a530954edd3f 1
+  s_c3147c7a3f2e3c::t_49793a0ca22f5e 20-22
+src/shared/types/index.ts
+  s_c3147c7a3f2e3c::t_d3a530954edd3f 2
+src/shared/session-id.ts
+  s_c3147c7a3f2e3c::t_6fa9dd67074cc6 1-7
+src/main/mcp/move-session.ts
+  s_c3147c7a3f2e3c::t_5227c4e5245fda 1-8,10-25,27-29,33-40,48-65,68-106,191,193-215
+  s_c3147c7a3f2e3c::t_44b90e7ed10ae3 107-131,133-148,166-171,178-182
+  s_c3147c7a3f2e3c::t_b68fda34f082a2 154-164,173
+  s_c3147c7a3f2e3c::t_49793a0ca22f5e 9,26,30-32,41-47,66-67,132,149-153,165,172,174-177,183-190,192
+tests/unit/mcp/move-session.spec.ts
+  s_c3147c7a3f2e3c::t_cda90c1942e0a0 19,21-24,120,123,172,184
+  s_c3147c7a3f2e3c::t_0cbf36a578d128 178
+  s_c3147c7a3f2e3c::t_44b90e7ed10ae3 114,116,148,161,163
+  s_c3147c7a3f2e3c::t_3a60ecb06ee010 1-18,20,25-113,115,117-119,121-122,124-147,149-160,162,164-171,173-177,179-183,185-187
+src/main/index.ts
+  s_c3147c7a3f2e3c::t_994aa667994f22 505-510
+  s_c3147c7a3f2e3c::t_895334e87ef638 58
+  s_c3147c7a3f2e3c::t_73e26409322cde 54,502,617-618
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "216e776b7de921aed0a6439e85013ccf2f06eb69",
+  "prompts": {},
+  "sessions": {
+    "s_c3147c7a3f2e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6643d25-b995-4f50-b4d6-9e2f055e3cbe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

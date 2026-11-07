@@ -1,0 +1,25 @@
+src/main/mcp/socket-path.ts
+  s_c3147c7a3f2e3c::t_d1bc2c12d8836c 1-14
+src/main/index.ts
+  s_c3147c7a3f2e3c::t_cd13ed1d515f95 54,492
+tests/unit/mcp/socket-path.spec.ts
+  s_c3147c7a3f2e3c::t_69cbfbc0cee731 1-20
+src/renderer/mcp/renderer-tools.ts
+  s_c3147c7a3f2e3c::t_ca8887478913f2 148
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "687e1b8a0dedc97dbf829c55562bb4240ca469a8",
+  "prompts": {},
+  "sessions": {
+    "s_c3147c7a3f2e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6643d25-b995-4f50-b4d6-9e2f055e3cbe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

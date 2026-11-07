@@ -1,0 +1,65 @@
+tests/unit/home/unattended-run.spec.ts
+  s_c3147c7a3f2e3c::t_841a69f25ee074 1-57
+  s_c3147c7a3f2e3c::t_c864b516ea2524 58-68
+src/main/home/unattended-run.ts
+  s_c3147c7a3f2e3c::t_9881cec8c2db15 1-4,7-59
+  s_c3147c7a3f2e3c::t_8c3d907f00e7b2 5-6
+  s_c3147c7a3f2e3c::t_8d78cb1b899f92 60
+src/shared/schemas/schedules.schema.ts
+  s_c3147c7a3f2e3c::t_71909826b5df12 79-89
+tests/unit/home/scheduled-alerts.spec.ts
+  s_c3147c7a3f2e3c::t_dbd1bf28d2ffde 1-110
+  s_c3147c7a3f2e3c::t_0f511f2931857d 111
+src/main/home/scheduled-alerts.ts
+  s_c3147c7a3f2e3c::t_fd13d2e7c70481 1-91
+  s_c3147c7a3f2e3c::t_0d169acd2fdc73 92-97
+tests/unit/renderer/home/start-work-unattended.spec.ts
+  s_c3147c7a3f2e3c::t_0f4fe0873b769a 1-49
+  s_c3147c7a3f2e3c::t_0c226df38678ab 50-55
+README.md
+  s_c3147c7a3f2e3c::t_ac7ee30d52dd09 81
+docs/adr/144-a-scheduled-run-needs-nobody.md
+  s_c3147c7a3f2e3c::t_d8a4a663a1016c 1-32
+docs/user-guide/USER-GUIDE.md
+  s_c3147c7a3f2e3c::t_73a152422134c6 563-566
+src/main/ipc/schedules.ipc.ts
+  s_c3147c7a3f2e3c::t_6bd3aa16deda02 1-2,13-15,23,28,110-124,127-128,133-137,140-142
+src/renderer/components/home/start-work-schedule.ts
+  s_c3147c7a3f2e3c::t_668d2eba4b40a7 7,27,31,35,38,43,53,72
+src/renderer/components/home/start-work.ts
+  s_c3147c7a3f2e3c::t_a75da6db3ec120 20,176-181,188-194,268,331
+src/renderer/components/settings/GlobalSettings.tsx
+  s_c3147c7a3f2e3c::t_9d14aa211df120 35
+src/renderer/terminal/agent-tab.ts
+  s_c3147c7a3f2e3c::t_24dd651d6a9c28 12-13
+src/renderer/terminal/start-session.ts
+  s_c3147c7a3f2e3c::t_31dbc1057d419f 14,69-70,82-84,113-116,118,120-121,125-130,137-138,142-143,151,156
+src/shared/electron-api/manifest.ts
+  s_c3147c7a3f2e3c::t_ff143f983a83d7 93,1743
+tests/unit/ipc/schedules.ipc.spec.ts
+  s_c3147c7a3f2e3c::t_ddd33d5f8a2650 3-5,13-14,18-25,58,60,105,107,111,116-142
+tests/unit/renderer/components/ScheduledView.spec.tsx
+  s_c3147c7a3f2e3c::t_c37f2d9e326ca7 10,57,190-195
+tests/unit/renderer/components/start-work-schedule.spec.tsx
+  s_c3147c7a3f2e3c::t_d09c5347563d07 8,43-49,55-56,79-84,129
+tests/unit/renderer/home/agent-command.spec.ts
+  s_c3147c7a3f2e3c::t_50eb9a5e700844 48,50,55-71
+tests/unit/renderer/terminal/start-session.spec.ts
+  s_c3147c7a3f2e3c::t_0443a285e7950e 282-315
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "76cd248375283b3953c4ab0f461d57c756c2855e",
+  "prompts": {},
+  "sessions": {
+    "s_c3147c7a3f2e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6643d25-b995-4f50-b4d6-9e2f055e3cbe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

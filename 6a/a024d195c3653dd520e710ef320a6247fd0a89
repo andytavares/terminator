@@ -1,0 +1,71 @@
+src/main/mcp/manifest-tools.ts
+  s_c3147c7a3f2e3c::t_d12f96daaac312 32,47
+src/renderer/mcp/renderer-tools.ts
+  s_c3147c7a3f2e3c::t_d12f96daaac312 36,85
+src/main/home/unattended-run.ts
+  s_c3147c7a3f2e3c::t_b559b7495f271a 11-13,22,24,42-46,52,54-56,59,64-67
+  s_c3147c7a3f2e3c::t_cf646a6a92c207 68-69,73,76
+src/main/mcp/registration.ts
+  s_c3147c7a3f2e3c::t_d12f96daaac312 79,105
+  s_c3147c7a3f2e3c::t_b559b7495f271a 52-54,56
+  s_c3147c7a3f2e3c::t_9e3f805dcb1201 106-109
+docs/user-guide/USER-GUIDE.md
+  s_c3147c7a3f2e3c::t_39bf50091c83bf 599
+src/shared/mcp/renderer-tools.ts
+  s_c3147c7a3f2e3c::t_017983c35019e6 33-34
+src/shared/electron-api/manifest.ts
+  s_c3147c7a3f2e3c::t_d0a880ef6686f7 781-785,999-1004,1323-1324,1757-1758,2000-2005,2036
+  s_c3147c7a3f2e3c::t_5884f4d189d222 2037,2063
+src/renderer/App.tsx
+  s_c3147c7a3f2e3c::t_d5604f9b93cab9 83-84
+  s_c3147c7a3f2e3c::t_7cbde2440fd0f6 44,60
+tests/e2e/mcp.spec.ts
+  s_c3147c7a3f2e3c::t_0a6723551404fc 9,35-36
+src/main/ipc/schedules.ipc.ts
+  s_c3147c7a3f2e3c::t_f70390995139ee 10,120
+  s_c3147c7a3f2e3c::t_b559b7495f271a 14,111
+tests/unit/ipc/schedules.ipc.spec.ts
+  s_c3147c7a3f2e3c::t_6b06be7f5a62a1 123
+src/renderer/shell/ShellOverlays.tsx
+  s_c3147c7a3f2e3c::t_7cbde2440fd0f6 53-67
+src/main/mcp/move-session.ts
+  s_c3147c7a3f2e3c::t_12d4de5979d19a 111-114,131-134,149-154,157
+  s_c3147c7a3f2e3c::t_e505521dfa11c4 6
+src/main/mcp/renderer-tools.ts
+  s_c3147c7a3f2e3c::t_d12f96daaac312 84,99
+tests/unit/mcp/move-session.spec.ts
+  s_c3147c7a3f2e3c::t_f0b71041c61a30 148-169
+src/main/home/scheduled-alerts.ts
+  s_c3147c7a3f2e3c::t_ce1088c1efa577 27,57-59
+tests/unit/home/scheduled-alerts.spec.ts
+  s_c3147c7a3f2e3c::t_d35377085cf48b 71-79
+src/main/home/home-feed.ts
+  s_c3147c7a3f2e3c::t_12d4de5979d19a 3
+  s_c3147c7a3f2e3c::t_1a993d3482999c 56-61
+tests/unit/home/unattended-run.spec.ts
+  s_c3147c7a3f2e3c::t_ea46c71aa3c070 92-99
+  s_c3147c7a3f2e3c::t_4f8b2e41fd0e90 26,88-89
+  s_c3147c7a3f2e3c::t_9df5187eab70a6 90-91
+src/main/mcp/alert-tool.ts
+  s_c3147c7a3f2e3c::t_e505521dfa11c4 3,21
+src/shared/electron-api/__tests__/manifest.spec.ts
+  s_c3147c7a3f2e3c::t_850f64f2e37b2a 292,296,303-304,307-308,310
+src/main/index.ts
+  s_c3147c7a3f2e3c::t_d7a324acf90c4e 469,472,489-492,512-513
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6aa024d195c3653dd520e710ef320a6247fd0a89",
+  "prompts": {},
+  "sessions": {
+    "s_c3147c7a3f2e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6643d25-b995-4f50-b4d6-9e2f055e3cbe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

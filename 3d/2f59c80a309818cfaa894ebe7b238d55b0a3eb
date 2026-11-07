@@ -1,0 +1,21 @@
+extensions/foundry/tests/helpers/foundry-host.ts
+  s_b2c9063a4eb63c::t_2fc4d2ccce2b51 171-179
+extensions/foundry/src/ipc/ui-registration.ts
+  s_b2c9063a4eb63c::t_a66c14c9dfaa5f 3,12-23,75,93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3d2f59c80a309818cfaa894ebe7b238d55b0a3eb",
+  "prompts": {},
+  "sessions": {
+    "s_b2c9063a4eb63c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "37fd7485-3e79-47b8-870b-a31e0b8348c2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

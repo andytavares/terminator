@@ -1,0 +1,24 @@
+README.md
+  s_c3147c7a3f2e3c::t_3aee01dbbd311a 82
+docs/ARCHITECTURE.md
+  s_c3147c7a3f2e3c::t_3aee01dbbd311a 547-561
+docs/user-guide/USER-GUIDE.md
+  s_c3147c7a3f2e3c::t_39d47a010cb363 249,563,565,578-616
+  s_c3147c7a3f2e3c::t_015b55e1437003 617
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f5022173f59e02cfc2be4725043c6828c0d0427f",
+  "prompts": {},
+  "sessions": {
+    "s_c3147c7a3f2e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6643d25-b995-4f50-b4d6-9e2f055e3cbe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+src/main/agents/acp/agent-service.ts
+  s_07e7aef877c5aa::t_428d7650cad2c3 282-287,559,630
+tests/unit/agents/acp/agent-service.spec.ts
+  s_07e7aef877c5aa::t_35153b7b27b290 393-397
+  s_07e7aef877c5aa::t_e704243ec2326a 716-775,785
+  s_07e7aef877c5aa::t_6c7e020b0eee70 715,776-784
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8986cf0780eba3ab2c0c304485701c3d41cf87c3",
+  "prompts": {},
+  "sessions": {
+    "s_07e7aef877c5aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "633c8d12-7dd7-4254-9663-67bc2d4d51f5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
