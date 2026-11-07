@@ -26,7 +26,7 @@ const LETTER_COMMANDS: Record<string, DeskKeyCommand> = {
   Escape: { kind: 'escape' },
 }
 
-const AFTER_G: Record<string, HomeViewName> = { i: 'insights', d: 'desk' }
+const AFTER_G: Record<string, HomeViewName> = { i: 'insights', d: 'desk', s: 'scheduled' }
 
 /** What the key means on the Desk; `afterG` is true when the key before it was G.
  * @internal */

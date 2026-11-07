@@ -12,6 +12,7 @@ import { agentLabel, useAgentChoices } from './agent-choices'
 import { startGlobalPrompt, startScratchSession } from '../../terminal/start-session'
 import { recordUse } from '../../usage/record'
 import { saveSchedule, startingFields } from './start-work-edit'
+import { nextRunOf } from './scheduled-runs'
 import {
   branchOf,
   cycleRunAs,
@@ -49,8 +50,13 @@ const TABS: Array<{ id: LauncherTab; label: string }> = [
 
 /** What the person has typed, picked and been told so far. */
 function useLauncherFields() {
-  const { prefill, editing } = useStartWorkStore.getState()
-  const [start] = useState(() => startingFields(prefill, editing))
+  const { prefill, editing, repeat } = useStartWorkStore.getState()
+  const [start] = useState(() => {
+    const fields = startingFields(prefill, editing)
+    // Home's "New scheduled run" opens on a repeating prompt.
+    if (!repeat) return fields
+    return { ...fields, tab: 'prompt' as const, when: { ...fields.when, when: 'repeat' as const } }
+  })
   const [tab, setTab] = useState<LauncherTab>(start.tab)
   const [query, setQuery] = useState(start.query)
   const [runAs, setRunAs] = useState<RunAs>(start.runAs)
@@ -371,6 +377,7 @@ function Picker({ view, actions }: PartProps): React.JSX.Element {
 /** Edit mode's top: its title and the workspace in place of the tabs, then when it was made and run. */
 function EditHead({ view, actions, editing }: PartProps & { editing: Schedule }) {
   const lastRun = editing.lastRunAt === null ? 'never' : runLabel(new Date(editing.lastRunAt))
+  const nextRun = nextRunOf(editing, new Date())
   return (
     <>
       <div className="start-work__tabs">
@@ -378,7 +385,8 @@ function EditHead({ view, actions, editing }: PartProps & { editing: Schedule })
         <Picker {...{ view, actions }} />
       </div>
       <p className="start-work__created">
-        Created {runLabel(new Date(editing.createdAt))} · last run {lastRun}
+        Created {runLabel(new Date(editing.createdAt))} · last run {lastRun} · next run{' '}
+        {nextRun === null ? 'none' : runLabel(nextRun)}
       </p>
     </>
   )

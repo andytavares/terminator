@@ -371,37 +371,6 @@
   font-size: var(--tm-font-size-xs);
 }
 
-.start-work__scheduled {
-  display: grid;
-  gap: var(--tm-space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.start-work__scheduled li {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  column-gap: var(--tm-space-2);
-}
-
-.start-work__scheduled small {
-  grid-column: 1;
-  color: var(--tm-text-muted);
-}
-
-.start-work__scheduled-prompt {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.start-work__scheduled .tmui-icon-button {
-  grid-row: 1 / span 2;
-  grid-column: 2;
-}
-
 .start-work__prompt {
   display: grid;
   gap: var(--tm-space-2);

@@ -28,14 +28,20 @@ export const useStartWorkStore = create<{
   prefill: string
   /** The scheduled run the launcher edits; null when it starts new work. */
   editing: Schedule | null
+  /** Opens on the Prompt tab with When set to Repeat: Home's "New scheduled run". */
+  repeat: boolean
   openLauncher: (prefill?: string, editing?: Schedule | null) => void
+  openScheduledRun: () => void
   closeLauncher: () => void
 }>((set) => ({
   open: false,
   prefill: '',
   editing: null,
-  openLauncher: (prefill = '', editing = null) => set({ open: true, prefill, editing }),
-  closeLauncher: () => set({ open: false, prefill: '', editing: null }),
+  repeat: false,
+  openLauncher: (prefill = '', editing = null) =>
+    set({ open: true, prefill, editing, repeat: false }),
+  openScheduledRun: () => set({ open: true, prefill: '', editing: null, repeat: true }),
+  closeLauncher: () => set({ open: false, prefill: '', editing: null, repeat: false }),
 }))
 
 /** 'agent', 'claude-terminal', 'terminal', or the key of an extension's start-work option. */

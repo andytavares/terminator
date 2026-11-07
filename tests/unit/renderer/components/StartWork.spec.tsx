@@ -171,6 +171,7 @@ beforeEach(() => {
   })
   stubStarts()
   seedStartWorkStores()
+  useStartWorkStore.getState().closeLauncher()
 })
 
 /** Every start succeeds, the agent names fix/dev-build, and the launcher opens blank. */
@@ -1223,6 +1224,27 @@ describe('useStartWorkStore — editing', () => {
   })
 })
 
+describe('StartWork — a new scheduled run', () => {
+  beforeEach(seedTwoWorkspaces)
+
+  it('opens on the Prompt tab with When set to Repeat', async () => {
+    useStartWorkStore.getState().openScheduledRun()
+    render(<StartWork onClose={vi.fn()} />)
+    expect((await screen.findByRole('tab', { name: 'Prompt' })).getAttribute('aria-selected')).toBe(
+      'true'
+    )
+    expect(screen.getByRole('radio', { name: 'Repeat' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.queryByRole('heading', { name: 'Edit scheduled run' })).toBeNull()
+  })
+
+  it('opens plainly again after it closes', () => {
+    useStartWorkStore.getState().openScheduledRun()
+    useStartWorkStore.getState().closeLauncher()
+    useStartWorkStore.getState().openLauncher()
+    expect(useStartWorkStore.getState().repeat).toBe(false)
+  })
+})
+
 describe('StartWork — editing a scheduled run', () => {
   beforeEach(seedTwoWorkspaces)
 
@@ -1233,7 +1255,11 @@ describe('StartWork — editing a scheduled run', () => {
     expect(whenNames()).toEqual(['Once', 'Repeat'])
     expect(screen.getByRole('radio', { name: 'Repeat' }).getAttribute('aria-checked')).toBe('true')
     expect(pickerButton().getAttribute('aria-label')).toBe('Workspace: terminator')
-    expect(screen.getByText('Created Wed 4 Nov 10:00 · last run never')).toBeTruthy()
+    expect(
+      screen.getByText(
+        /^Created Wed 4 Nov 10:00 · last run never · next run \w{3} \d+ \w{3} 09:00$/
+      )
+    ).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy()
   })
 })
@@ -1308,7 +1334,11 @@ describe('StartWork — editing other scheduled runs', () => {
     expect(screen.getByRole('radio', { name: 'Once' }).getAttribute('aria-checked')).toBe('true')
     expect((screen.getByLabelText('Date') as HTMLInputElement).value).toBe('2099-01-02')
     expect(pickerButton().getAttribute('aria-label')).toBe('Workspace: Global')
-    expect(screen.getByText('Created Wed 4 Nov 10:00 · last run Thu 5 Nov 09:00')).toBeTruthy()
+    expect(
+      screen.getByText(
+        'Created Wed 4 Nov 10:00 · last run Thu 5 Nov 09:00 · next run Fri 2 Jan 09:00'
+      )
+    ).toBeTruthy()
   })
 
   it('counts the next runs from when the run was created, as the scheduler does', async () => {

@@ -39,6 +39,9 @@ vi.mock('../../../../src/renderer/components/home/PlanTheDay', () => ({
 vi.mock('../../../../src/renderer/components/home/Insights', () => ({
   Insights: () => <div>Insights view</div>,
 }))
+vi.mock('../../../../src/renderer/components/home/ScheduledView', () => ({
+  ScheduledView: () => <div>Scheduled view</div>,
+}))
 vi.mock('../../../../src/renderer/components/home/InsightsBar', () => ({
   InsightsBar: () => <div>Insights window</div>,
 }))
@@ -377,6 +380,28 @@ describe('HomeScreen — Desk and Insights', () => {
     fireEvent.keyDown(home(), { key: 'd' })
     expect(screen.queryByText('Insights view')).toBeNull()
     expect(askRows()).toHaveLength(1)
+  })
+})
+
+describe('HomeScreen — Scheduled', () => {
+  it('shows the Scheduled view from its segment and from G then S', async () => {
+    render(<HomeScreen />)
+    fireEvent.click(screen.getByRole('radio', { name: 'Scheduled' }))
+    expect(await screen.findByText('Scheduled view')).toBeTruthy()
+    expect(screen.queryByRole('searchbox', { name: 'Search work' })).toBeNull()
+    fireEvent.keyDown(home(), { key: 'g' })
+    fireEvent.keyDown(home(), { key: 'd' })
+    expect(screen.queryByText('Scheduled view')).toBeNull()
+    fireEvent.keyDown(home(), { key: 'g' })
+    fireEvent.keyDown(home(), { key: 's' })
+    expect(await screen.findByText('Scheduled view')).toBeTruthy()
+  })
+
+  it('opens Start work for a new scheduled run on a repeat from the header', () => {
+    useHomeView.setState({ view: 'scheduled' })
+    render(<HomeScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'New scheduled run' }))
+    expect(useStartWorkStore.getState()).toMatchObject({ open: true, repeat: true, editing: null })
   })
 })
 
