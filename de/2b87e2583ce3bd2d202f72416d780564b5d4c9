@@ -1,0 +1,23 @@
+src/renderer/components/sidebar/InboxSidebar.tsx
+  s_56e599e17e5b82::t_fd6ad0b01273b9 137
+  s_56e599e17e5b82::t_a8da833a1974e8 2,10,134-136,138-139
+tests/unit/renderer/components/sidebar/InboxSidebar.spec.tsx
+  s_56e599e17e5b82::t_cd4bd18333843e 7,178-186
+  s_56e599e17e5b82::t_00d7d63d809e20 187
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "de2b87e2583ce3bd2d202f72416d780564b5d4c9",
+  "prompts": {},
+  "sessions": {
+    "s_56e599e17e5b82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6c95cc7-f1de-49bf-a858-16efb95c5329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
