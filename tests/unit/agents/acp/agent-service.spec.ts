@@ -94,6 +94,12 @@ describe('start', () => {
     })
   })
 
+  it('starts in its own mode when the agent does not offer the one asked for', async () => {
+    const { result, agent } = await started({ cwd: '/work', mode: 'yolo' })
+    expect(result.configOptions[0].currentValue).toBe('auto')
+    expect(agent.calls.some((call) => call.method === 'setSessionMode')).toBe(false)
+  })
+
   it('flattens grouped choices', async () => {
     const { result } = await started()
     expect(result.configOptions[1].options).toEqual([
@@ -180,7 +186,7 @@ describe('a start that fails', () => {
   it('tells onStartFailed the details the agent gave when the mode is refused', async () => {
     const { result, onStartFailed } = await startFailing(
       { setSessionMode: new RequestError(-32603, 'Internal error', { details }) },
-      'dontAsk'
+      'default'
     )
     expect(result).toBeNull()
     expect(onStartFailed.mock.calls).toEqual([[details]])

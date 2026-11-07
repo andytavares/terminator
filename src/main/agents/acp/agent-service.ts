@@ -174,6 +174,12 @@ function toConfigOptions(options: SessionConfigOption[] | null | undefined): Age
   )
 }
 
+/** False only when the agent lists its modes and this is not one of them: Gemini has no `auto`. */
+function offersMode(session: Session, mode: string): boolean {
+  const modes = session.configOptions.find((option) => option.id === 'mode')
+  return modes === undefined || modes.options.some((option) => option.value === mode)
+}
+
 function notify<T>(listeners: Set<(value: T) => void>, value: T): void {
   for (const listener of listeners) {
     try {
@@ -446,7 +452,9 @@ class AcpAgentService implements AgentService {
   /** The session, its options and its mode: all of it within the start time. */
   private async openSession(session: Session, input: StartAgentInput): Promise<void> {
     session.configOptions = await this.begin(session, input)
-    if (input.mode !== undefined) await this.applyMode(session, input.mode)
+    if (input.mode !== undefined && offersMode(session, input.mode)) {
+      await this.applyMode(session, input.mode)
+    }
   }
 
   private async applyMode(session: Session, mode: string): Promise<void> {

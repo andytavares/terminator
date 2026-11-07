@@ -302,6 +302,18 @@ describe('a scheduled run starts with its settings and system prompt', () => {
     expect(startAgent).toHaveBeenCalledWith(expect.objectContaining({ agentMeta: unattendedMeta }))
   })
 
+  // The Claude adapter reads its start mode only from the operator's settings, never from the
+  // settings file in the meta, so the run asks for auto mode itself.
+  it('starts an agent on a branch in auto mode', async () => {
+    await startAgentInBranch({ projectId: 'p2', title: 'Agent', prompt: 'x', unattended })
+    expect(startAgent).toHaveBeenCalledWith(expect.objectContaining({ mode: 'auto' }))
+  })
+
+  it('starts a global agent in auto mode', async () => {
+    await startGlobalPrompt({ text: 'Sum up', runAs: 'agent', unattended })
+    expect(startAgent).toHaveBeenCalledWith(expect.objectContaining({ mode: 'auto' }))
+  })
+
   it('types them as flags for global Claude in a terminal', async () => {
     await startGlobalPrompt({ text: 'Sum up', runAs: 'claude-terminal', unattended })
     expect(create).toHaveBeenCalledWith(
