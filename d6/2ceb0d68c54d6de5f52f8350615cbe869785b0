@@ -1,0 +1,45 @@
+packages/extension-ui/README.md
+  s_0187df5455f094::t_e376cfe681e290 39,134-135,144-146
+tests/unit/renderer/agent/AgentView.spec.tsx
+  s_0187df5455f094::t_e376cfe681e290 7,48,55-63,76,91-93,303-399
+  s_0187df5455f094::t_c3fb61194e9169 400
+docs/user-guide/USER-GUIDE.md
+  s_0187df5455f094::t_e376cfe681e290 536-539
+package.json
+  s_0187df5455f094::t_e376cfe681e290 80
+knip.jsonc
+  s_0187df5455f094::t_e376cfe681e290 31-32
+src/renderer/components/agent/AgentMarkdown.tsx
+  s_0187df5455f094::t_e376cfe681e290 1-109
+src/renderer/components/agent/AgentView.css
+  s_0187df5455f094::t_e376cfe681e290 77-107
+electron.vite.config.ts
+  s_0187df5455f094::t_e376cfe681e290 40-49
+src/renderer/components/agent/no-elk-layout.ts
+  s_0187df5455f094::t_e376cfe681e290 1-2
+tests/unit/packages/extension-ui/markdown.spec.tsx
+  s_0187df5455f094::t_e376cfe681e290 395-458
+src/renderer/components/agent/AgentView.tsx
+  s_0187df5455f094::t_172db2010a4c53 156-164,166
+  s_0187df5455f094::t_e376cfe681e290 30
+packages/extension-ui/src/Markdown.tsx
+  s_0187df5455f094::t_e376cfe681e290 8-34,36,42,71-73,104-109,113,126,141
+package-lock.json
+  s_0187df5455f094::t_68cea51d55d1b6 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d62ceb0d68c54d6de5f52f8350615cbe869785b0",
+  "prompts": {},
+  "sessions": {
+    "s_0187df5455f094": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d44303bd-3018-464a-afb8-f927fe332d2e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
