@@ -72,7 +72,8 @@ async function theRunShowsUnderGlobal(): Promise<void> {
 async function runNowStartsAnAgentInTheHomeFolder(): Promise<void> {
   const home = await handle.app.evaluate(() => process.env.HOME)
   await rowAction('Run now')
-  await expect.poll(() => sessions().map((s) => s.cwd)).toEqual([home])
+  // Branch naming may also run an agent, in the temporary folder, while the prompt is typed.
+  await expect.poll(() => sessions().filter((s) => s.cwd === home).length).toBe(1)
   await expect(handle.page.getByLabel('Message the agent')).toBeVisible()
 }
 
