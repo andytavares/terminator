@@ -50,7 +50,7 @@ function withSessions(tabId: string, contexts: SessionContext[]): Change {
   }
 }
 
-const withoutSession =
+const withoutAttachedSession =
   (sessionId: string): Change =>
   (attached) => ({
     ...attached,
@@ -76,7 +76,7 @@ export const useAttachedContextStore = create<AttachedContextState>((set) => ({
   byTab: new Map(),
   sendRequests: new Map(),
   addSessions: (tabId, contexts) => changeTab(set, tabId, withSessions(tabId, contexts)),
-  removeSession: (tabId, sessionId) => changeTab(set, tabId, withoutSession(sessionId)),
+  removeSession: (tabId, sessionId) => changeTab(set, tabId, withoutAttachedSession(sessionId)),
   addCitation: (tabId, citation) =>
     changeTab(
       set,
