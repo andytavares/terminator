@@ -1,7 +1,7 @@
 import type React from 'react'
 import { useState } from 'react'
 import { create } from 'zustand'
-import { SESSION_DRAG_TYPE } from '../agent/attached-context'
+import { SESSION_DRAG_TYPE } from '../agent/session-drag'
 import { useToastStore } from '../../stores/toast.store'
 import { canMergeThreads, mergeThreads, undoMerge } from './task-actions'
 import type { WorkThread } from '../../home/work-threads'

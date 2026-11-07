@@ -30,7 +30,7 @@ import type { AgentState, Workspace } from '../../../shared/types/index'
 import { useSessionStore } from '../../stores/session.store'
 import { revealSession } from '../../terminal/navigate-to-session'
 import { useScheduledRunSessions } from './scheduled-run-sessions'
-import { SESSION_DRAG_TYPE } from '../agent/attached-context'
+import { SESSION_DRAG_TYPE } from '../agent/session-drag'
 import './ScheduledView.css'
 
 type SavedRuns = ReturnType<typeof useSavedRuns>

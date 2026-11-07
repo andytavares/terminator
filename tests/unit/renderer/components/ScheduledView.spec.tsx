@@ -12,7 +12,7 @@ import type { Workspace } from '../../../../src/shared/types/index'
 import { useScheduledRunSessions } from '../../../../src/renderer/components/home/scheduled-run-sessions'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { terminalSessionOf } from '../../../support/renderer-stores'
-import { SESSION_DRAG_TYPE } from '../../../../src/renderer/components/agent/attached-context'
+import { SESSION_DRAG_TYPE } from '../../../../src/renderer/components/agent/session-drag'
 
 const revealSession = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({ revealSession }))

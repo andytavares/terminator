@@ -5,7 +5,7 @@ import { makeTempDir } from '../../../../support/temp-dir'
 import { wireMainTaskStore } from '../../../../support/main-task-store'
 import { TaskRow } from '../../../../../src/renderer/components/home/TaskRow'
 import { useToastStore } from '../../../../../src/renderer/stores/toast.store'
-import { SESSION_DRAG_TYPE } from '../../../../../src/renderer/components/agent/attached-context'
+import { SESSION_DRAG_TYPE } from '../../../../../src/renderer/components/agent/session-drag'
 import type { WorkThread } from '../../../../../src/renderer/home/work-threads'
 import type { TaskLane } from '../../../../../src/shared/schemas/tasks.schema'
 

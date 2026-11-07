@@ -4,12 +4,12 @@ import { render, screen, fireEvent, act } from '@testing-library/react'
 
 import { Composer } from '../../../../src/renderer/components/agent/Composer'
 import {
-  SESSION_DRAG_TYPE,
   noAttachedContext,
   promptWithContext,
   type AttachedContext,
   type Citation,
 } from '../../../../src/renderer/components/agent/attached-context'
+import { SESSION_DRAG_TYPE } from '../../../../src/renderer/components/agent/session-drag'
 import {
   attachedOf,
   useAttachedContextStore,

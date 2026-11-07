@@ -4,7 +4,7 @@ import { useBreakoutStore } from '../../stores/breakout.store'
 import { StateChip } from '../session/StateChip'
 import type { BranchTerminal } from '../../sidebar/branch-rows'
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
-import { SESSION_DRAG_TYPE } from '../agent/attached-context'
+import { SESSION_DRAG_TYPE } from '../agent/session-drag'
 import { activateOnKey, afterClosing, clickOnly } from './row-events'
 import './TerminalRow.css'
 

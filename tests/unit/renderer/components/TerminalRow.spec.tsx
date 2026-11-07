@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { TerminalRow } from '../../../../src/renderer/components/sidebar/TerminalRow'
 import { useBreakoutStore } from '../../../../src/renderer/stores/breakout.store'
 import { resetStore } from '../../../support/renderer-stores'
-import { SESSION_DRAG_TYPE } from '../../../../src/renderer/components/agent/attached-context'
+import { SESSION_DRAG_TYPE } from '../../../../src/renderer/components/agent/session-drag'
 import type { BranchTerminal } from '../../../../src/renderer/sidebar/branch-rows'
 
 const terminal = (patch: Partial<BranchTerminal> = {}): BranchTerminal => ({

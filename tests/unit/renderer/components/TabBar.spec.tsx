@@ -9,6 +9,7 @@ import { useTabDragStore } from '../../../../src/renderer/terminal/tab-drag'
 import { TabBar } from '../../../../src/renderer/components/terminal/TabBar'
 import { projectFixture, seedStore, workspaceFixture } from '../../../support/renderer-stores'
 import { partialFake } from '../../../support/fakes'
+import { eventually } from '../../../support/eventually'
 
 const records = {
   setDescription: vi.fn().mockResolvedValue(true),
@@ -946,13 +947,13 @@ describe('TabBar — a tab let go somewhere it does not leave from', () => {
 describe('TabBar — a tab let go on an agent composer', () => {
   beforeEach(() => mockGetSessions.mockReturnValue(threeTabs))
 
-  it('attaches its session to that agent tab, and neither reorders nor breaks out', () => {
+  it('attaches its session to that agent tab, and neither reorders nor breaks out', async () => {
     renderTabBar()
     const composer = document.createElement('div')
     composer.dataset.contextDrop = 'agent-1'
     document.body.append(composer)
     dragTab(document.querySelectorAll('.tab-bar__tab--session')[1], composer)
-    expect(attachSessions).toHaveBeenCalledWith('agent-1', ['ses-2'])
+    await eventually(() => expect(attachSessions).toHaveBeenCalledWith('agent-1', ['ses-2']))
     expect(mockReorderSessions).not.toHaveBeenCalled()
     expect(breakOut).not.toHaveBeenCalled()
     composer.remove()

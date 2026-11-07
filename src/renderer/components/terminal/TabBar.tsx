@@ -29,7 +29,6 @@ import { moved } from '../../hooks/useDragReorder'
 import type { SessionFacts } from '../../sidebar/session-facts'
 import type { TerminalSession } from '../../../shared/types/index'
 import { recordUse } from '../../usage/record'
-import { attachSessions } from '../../stores/attached-context.store'
 
 /**
  * Past this many terminals the row scrolls, and it says so. Overflow being
@@ -248,7 +247,10 @@ function dropSessionTab(projectId: string, all: TerminalSession[], drawn: Termin
   return (sessionId: string) =>
     (point: ScreenPoint, overSessionId: string | null, overContextDrop: string | null): void => {
       if (overContextDrop !== null) {
-        void attachSessions(overContextDrop, [sessionId])
+        // Loaded on drop: the store pulls in agent code the main bundle does not need.
+        void import('../../stores/attached-context.store').then(({ attachSessions }) =>
+          attachSessions(overContextDrop, [sessionId])
+        )
         return
       }
       if (overSessionId === null) {

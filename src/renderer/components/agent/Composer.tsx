@@ -4,7 +4,6 @@ import { Button, Chip, IconButton } from '@terminator/extension-ui'
 import { useFollowUpQueue } from './use-agent-transcript'
 import { recordUse } from '../../usage/record'
 import {
-  SESSION_DRAG_TYPE,
   hasAttachedContext,
   promptWithContext,
   splitAttachedContext,
@@ -12,6 +11,7 @@ import {
   type Citation,
   type SessionContext,
 } from './attached-context'
+import { SESSION_DRAG_TYPE } from './session-drag'
 import {
   attachSessions,
   attachedOf,

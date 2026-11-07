@@ -5,10 +5,8 @@ import type { SessionRecordListing, TerminalSession } from '../../../shared/type
 
 // Session context and citations reach the agent as text after the typed prompt (ADR 146).
 
-/** Payload: the dragged session ids, joined by '\n'. */
-export const SESSION_DRAG_TYPE = 'application/x-terminator-session'
 export const MAX_QUOTE_CHARS = 8000
-/** Embedded text keeps its last this many characters. */
+/** @internal Embedded text keeps its last this many characters. */
 export const MAX_EMBEDDED_CHARS = 60000
 
 type SessionSource =
