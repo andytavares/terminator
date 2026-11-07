@@ -213,6 +213,8 @@ interface SessionState {
   setAgentAsk: (sessionId: string, ask: AgentAsk | null) => void
   /** `now` stamps a turn's end, so a finished ask follows the agent rather than its screen. */
   setAgentTurn: (sessionId: string, inTurn: boolean, now?: number) => void
+  /** A turn as main remembers it, for a window that opened or reloaded after it ended. */
+  restoreAgentTurn: (sessionId: string, inTurn: boolean, endedAt: number | null) => void
   /** What a session's screen showed when its output last settled. */
   setSessionScreen: (
     sessionId: string,
@@ -620,8 +622,16 @@ function inferredAskSlice(set: SetSessions): Slice<'clearInferredAsk'> {
 }
 
 /** Whether a session's agent is mid-turn, as its hooks report. */
-function agentTurnSlice(set: SetSessions): Slice<'setAgentTurn'> {
+function agentTurnSlice(set: SetSessions): Slice<'setAgentTurn' | 'restoreAgentTurn'> {
   return {
+    restoreAgentTurn: (sessionId, inTurn, endedAt) =>
+      set((s) => {
+        const patch =
+          endedAt === null
+            ? { agentTurn: inTurn }
+            : { agentTurn: inTurn, agentTurnEndedAt: endedAt }
+        return patchSession(s, sessionId, patch) ?? s
+      }),
     setAgentTurn: (sessionId, inTurn, now = Date.now()) =>
       set((s) => {
         const ended = !inTurn && s.sessions.get(sessionId)?.agentTurn === true

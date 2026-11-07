@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { useWorkThreads } from './useWorkThreads'
 import { latestResumableSession, type WorkThread } from '../../home/work-threads'
 import { resumeSession } from '../../terminal/start-session'
+import { useToastStore } from '../../stores/toast.store'
 import {
   deskGroups,
   filterThreads,
@@ -70,10 +71,12 @@ export function useOpenRequestedResume(): void {
   const requested = useDeskSelection((s) => s.resumeRequested)
   const { allThreads } = useWorkThreads()
   useEffect(() => {
-    const target = requested ? latestResumableSession(allThreads) : undefined
-    if (!target) return
+    if (!requested) return
+    // Cleared either way, so a later ended conversation never resumes without being asked.
     useDeskSelection.setState({ resumeRequested: false })
-    void resumeSession(target)
+    const target = latestResumableSession(allThreads)
+    if (target) void resumeSession(target)
+    else useToastStore.getState().addToast({ type: 'info', message: 'No conversation to resume.' })
   }, [requested, allThreads])
 }
 

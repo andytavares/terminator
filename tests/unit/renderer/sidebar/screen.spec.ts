@@ -62,6 +62,13 @@ describe("latestLineOf — Claude Code's status line", () => {
   })
 })
 
+describe('latestLineOf — a table in a plain shell', () => {
+  it('is not mistaken for an input box: output ends at the cursor as usual', () => {
+    const rows = ['$ column -t data', '┌──┬──┐', '│a │b │', '└──┴──┘', 'me@host ~ $ ', '']
+    expect(latestLineOf(rows, 4)).toBe('│a │b │')
+  })
+})
+
 describe('latestLineOf — is empty for a blank screen', () => {
   it('is empty for a blank screen', () => {
     expect(latestLineOf(['', '  '])).toBe('')

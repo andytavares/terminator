@@ -484,6 +484,13 @@ describe('useSessionStore — agent turn end', () => {
     setAgentTurn('sess-1', false, 400)
     expect(useSessionStore.getState().sessions.get('sess-1')!.agentTurnEndedAt).toBe(300)
   })
+
+  it('restoreAgentTurn takes the end main remembered, for a window that reloaded', () => {
+    useSessionStore.setState({ sessions: new Map([['sess-1', makeSession()]]) })
+    useSessionStore.getState().restoreAgentTurn('sess-1', false, 700)
+    const session = useSessionStore.getState().sessions.get('sess-1')!
+    expect([session.agentTurn, session.agentTurnEndedAt]).toEqual([false, 700])
+  })
 })
 
 describe('useSessionStore — bell counts', () => {

@@ -3,7 +3,8 @@
 
 export type TurnListener = (sessionId: string, inTurn: boolean) => void
 
-const turns = new Map<string, boolean>()
+/** Each terminal's turn, and when its last turn ended: a window that reloads still knows. */
+const turns = new Map<string, { inTurn: boolean; endedAt: number | null }>()
 const listeners = new Set<TurnListener>()
 
 export function onTurnChange(listener: TurnListener): () => void {
@@ -12,19 +13,25 @@ export function onTurnChange(listener: TurnListener): () => void {
 }
 
 /** Every terminal that has reported a turn, for a window that opens after one did. */
-export function currentTurns(): Array<{ sessionId: string; inTurn: boolean }> {
-  return [...turns].map(([sessionId, inTurn]) => ({ sessionId, inTurn }))
+export function currentTurns(): Array<{
+  sessionId: string
+  inTurn: boolean
+  endedAt: number | null
+}> {
+  return [...turns].map(([sessionId, turn]) => ({ sessionId, ...turn }))
 }
 
-export function setTurn(sessionId: string, inTurn: boolean): void {
-  if (turns.get(sessionId) === inTurn) return
-  turns.set(sessionId, inTurn)
+export function setTurn(sessionId: string, inTurn: boolean, now = Date.now()): void {
+  const before = turns.get(sessionId)
+  if (before?.inTurn === inTurn) return
+  const endedAt = before?.inTurn === true && !inTurn ? now : (before?.endedAt ?? null)
+  turns.set(sessionId, { inTurn, endedAt })
   for (const listener of listeners) listener(sessionId, inTurn)
 }
 
 /** Ends a turn in progress; a terminal not in one is left alone, so a shell's Esc changes nothing. */
 export function endTurn(sessionId: string): void {
-  if (turns.get(sessionId) === true) setTurn(sessionId, false)
+  if (turns.get(sessionId)?.inTurn === true) setTurn(sessionId, false)
 }
 
 /** The terminal is gone: forget its turn, and tell listeners it is no longer in one. */

@@ -21,11 +21,17 @@ export function latestLineOf(rows: readonly string[], cursorY: number = rows.len
   return lastBefore(end) || lastBefore(rows.length)
 }
 
+/** Claude Code's prompt row inside its input box: `> ` or `│ > `. */
+const PROMPT_ROW = /^\s*(│\s*)?>/
+
 /**
- * The top border of the last input box on screen: the second-last border-only row.
- * Rows below it are the draft, the box and Claude Code's status line, never output.
+ * The top border of Claude Code's input box: the second-last border-only row, when the rows
+ * between the two borders hold its `>` prompt. Rows below it are the draft, the box and the
+ * status line, never output. A table printed in a plain shell has no prompt, so it is output.
  */
 function inputFrameTop(rows: readonly string[]): number | null {
   const borders = rows.flatMap((row, i) => (row.trim() !== '' && BORDER_ONLY.test(row) ? [i] : []))
-  return borders.length >= 2 ? borders[borders.length - 2] : null
+  if (borders.length < 2) return null
+  const [top, bottom] = borders.slice(-2)
+  return rows.slice(top + 1, bottom).some((row) => PROMPT_ROW.test(row)) ? top : null
 }

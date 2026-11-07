@@ -65,7 +65,8 @@ function sessionItems(thread: WorkThread, run: Run, actions: ItemActions): Conte
 /** Hides the row for good and offers Undo in a toast. */
 function dismissWithUndo(thread: WorkThread): void {
   const { dismiss, restore } = useDismissedThreads.getState()
-  dismiss(thread.key, Date.now())
+  // Only a row that shows Terminator sessions has sessions of its own to delete.
+  dismiss(thread.key, Date.now(), thread.sessions.length > 0)
   useToastStore.getState().addToast({
     type: 'info',
     message: `Dismissed "${thread.title}"`,

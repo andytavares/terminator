@@ -138,10 +138,12 @@ export function useWorkThreads(): WorkThreads {
     useParkedThreads.getState().forgetGone(live, Date.now())
     useDismissedThreads.getState().forgetGone(live, Date.now())
   }, [result.allThreads])
+  const deletesSessions = useDismissedThreads((s) => s.deletesSessions)
   useEffect(() => {
     // Dismissed means gone: a dismissed row's sessions are deleted as soon as they have ended.
     const { forget } = useSessionRecordsStore.getState()
-    for (const id of endedSessionsOfDismissed(result.allThreads, dismissed)) void forget(id)
-  }, [result.allThreads, dismissed])
+    const ended = endedSessionsOfDismissed(result.allThreads, dismissed, deletesSessions)
+    for (const id of ended) void forget(id)
+  }, [result.allThreads, dismissed, deletesSessions])
   return result
 }
