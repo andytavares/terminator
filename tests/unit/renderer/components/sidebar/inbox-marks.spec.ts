@@ -40,6 +40,18 @@ describe('useInboxMarks', () => {
   })
 })
 
+describe('useInboxMarks — pinning', () => {
+  it('pinning a settled or snoozed card wakes it, so unpinning keeps it at the top', () => {
+    useInboxMarks.getState().settle('a', 10)
+    useInboxMarks.getState().snooze('b', 99)
+    useInboxMarks.getState().togglePin('a', 11)
+    useInboxMarks.getState().togglePin('b', 11)
+    useInboxMarks.getState().togglePin('a', 12)
+    const { settled, snoozed, pinned } = useInboxMarks.getState()
+    expect({ settled, snoozed, pinned }).toEqual({ settled: {}, snoozed: {}, pinned: { b: 11 } })
+  })
+})
+
 describe('useInboxMarks — forgetting', () => {
   it('forgets marks of gone threads once they are 30 days old', () => {
     const now = 100 * DAY_MS

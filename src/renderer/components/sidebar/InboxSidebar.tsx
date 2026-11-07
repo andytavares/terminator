@@ -89,9 +89,12 @@ function useWakeOnActivity(threads: readonly WorkThread[]): void {
   }, [threads])
 }
 
-/** Arrow keys move between cards, and from the search field onto the first one. */
+/** Arrow keys move between cards, and from the search field onto the first one. Keys from
+ * anything else (the Repo select, a Snooze menu) are theirs. */
 function moveBetweenCards(event: React.KeyboardEvent<HTMLDivElement>): void {
   if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+  const from = event.target as HTMLElement
+  if (!from.matches(`${CARD}, input[type="search"], input[aria-label="Search"]`)) return
   const cards = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(CARD))
   const at = cards.indexOf(document.activeElement as HTMLElement)
   const next = event.key === 'ArrowDown' ? at + 1 : at - 1

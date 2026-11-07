@@ -162,18 +162,20 @@ describe('InboxList — search and repo filter', () => {
   })
 })
 
-describe('InboxList — opening and the keyboard', () => {
-  const threads = [
-    threadOf('first', {
-      startedAt: 2,
-      sessions: [
-        { sessionId: 'old', lastActivityAt: NOW - HOUR_MS },
-        { sessionId: 'recent', lastActivityAt: NOW },
-      ],
-    }),
-    threadOf('second', { startedAt: 1, sessions: [{ sessionId: 's2', lastActivityAt: NOW }] }),
-  ]
+/** Two cards; the first has an older and a more recent session. */
+const keyboardThreads = [
+  threadOf('first', {
+    startedAt: 2,
+    sessions: [
+      { sessionId: 'old', lastActivityAt: NOW - HOUR_MS },
+      { sessionId: 'recent', lastActivityAt: NOW },
+    ],
+  }),
+  threadOf('second', { startedAt: 1, sessions: [{ sessionId: 's2', lastActivityAt: NOW }] }),
+]
 
+describe('InboxList — opening and the keyboard', () => {
+  const threads = keyboardThreads
   it('opens the most recent session of a card', () => {
     renderInbox(threads)
     fireEvent.click(screen.getByRole('button', { name: /Work first/ }))
@@ -191,5 +193,18 @@ describe('InboxList — opening and the keyboard', () => {
     await user.keyboard('{ArrowUp}')
     await user.keyboard('{Enter}')
     expect(revealSession).toHaveBeenCalledWith('recent')
+  })
+})
+
+describe('InboxList — keys that belong to the controls', () => {
+  const threads = keyboardThreads
+
+  it('leaves arrow keys alone in the repo filter', async () => {
+    const user = userEvent.setup()
+    renderInbox(threads)
+    const repo = screen.getByRole('combobox', { name: 'Repo' })
+    repo.focus()
+    await user.keyboard('{ArrowDown}')
+    expect(document.activeElement).toBe(repo)
   })
 })

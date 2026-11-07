@@ -71,10 +71,13 @@ export const useInboxMarks = create<InboxMarksState>((set) => ({
     set((s) =>
       persisted({ settled: { ...s.settled, [key]: at }, pinned: without(s.pinned, [key]) })
     ),
+  // Pinning wakes the card, so a later unpin leaves it among the active ones.
   togglePin: (key, at) =>
     set((s) =>
       persisted({
         pinned: s.pinned[key] === undefined ? { ...s.pinned, [key]: at } : without(s.pinned, [key]),
+        settled: without(s.settled, [key]),
+        snoozed: without(s.snoozed, [key]),
       })
     ),
   snooze: (key, until) =>
