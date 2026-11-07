@@ -1,0 +1,48 @@
+tests/unit/home/unattended-run.spec.ts
+  s_c3147c7a3f2e3c::t_dfd29f8ac16602 3,7-8,55-66,73,75-78
+  s_c3147c7a3f2e3c::t_fd8f4a81d2fbfc 54
+docs/user-guide/USER-GUIDE.md
+  s_c3147c7a3f2e3c::t_660b533d7c311b 565
+tests/unit/home/scheduled-alerts.spec.ts
+  s_c3147c7a3f2e3c::t_fd8f4a81d2fbfc 38,40
+  s_c3147c7a3f2e3c::t_67d52792e16af0 1-2,5,7,9,11-13,19,21,26,33-37,39,43,45-46,52,58-68,71-76,80-86,89-92
+src/main/storage/settings-store.ts
+  s_c3147c7a3f2e3c::t_41163b339a4feb 25-35
+src/renderer/components/settings/GlobalSettings.tsx
+  s_c3147c7a3f2e3c::t_41163b339a4feb 35
+tests/unit/storage/settings-store.spec.ts
+  s_c3147c7a3f2e3c::t_67d52792e16af0 175-183
+src/main/home/unattended-run.ts
+  s_c3147c7a3f2e3c::t_e4316a8b831ea4 4-5,11-22,35,51,54-56,64,66
+docs/adr/144-a-scheduled-run-needs-nobody.md
+  s_c3147c7a3f2e3c::t_660b533d7c311b 16,18,25
+src/main/mcp/alert-tool.ts
+  s_c3147c7a3f2e3c::t_011ed053114243 1-44
+src/main/home/scheduled-alerts.ts
+  s_c3147c7a3f2e3c::t_011ed053114243 4-5,7,9,14,26-30,34,43-48,53-55,58-62
+src/main/ipc/schedules.ipc.ts
+  s_c3147c7a3f2e3c::t_e4316a8b831ea4 13,111,133
+tests/unit/ipc/schedules.ipc.spec.ts
+  s_c3147c7a3f2e3c::t_67d52792e16af0 3,123
+tests/unit/mcp/alert-tool.spec.ts
+  s_c3147c7a3f2e3c::t_fd8f4a81d2fbfc 54,56
+  s_c3147c7a3f2e3c::t_cdf8d384a4cdd2 30
+  s_c3147c7a3f2e3c::t_dfd29f8ac16602 47-51
+  s_c3147c7a3f2e3c::t_020598067ced69 1-29,31-46,52-53,55,57-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "97fd317fe948d7776ae722c8b3b360ef538cb2c0",
+  "prompts": {},
+  "sessions": {
+    "s_c3147c7a3f2e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6643d25-b995-4f50-b4d6-9e2f055e3cbe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
