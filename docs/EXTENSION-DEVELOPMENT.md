@@ -749,6 +749,8 @@ api.commands.register(
 
 A command that the manifest's `contributes.commands` declares but the backend never registers shows dimmed with "Extension did not register this command". The manifest only reserves the row.
 
+Set `destructive: true` on a command that closes, clears or deletes something. The Terminator MCP server then runs it only through `run_destructive_extension_command`, which asks the person every time. `run_extension_command` refuses it.
+
 A command can declare a zod schema for `args`. A view runs such a command by id (see [Running another extension's command](#running-another-extensions-command)). The core validates the arguments before the handler runs. The panel lists only commands without `args`.
 
 ```typescript

@@ -11,7 +11,12 @@ import { AddToTaskDialog } from '../components/tasks/AddToTaskDialog'
 import { TaskSwitcher } from '../components/task-switcher/TaskSwitcher'
 // Not lazy: the keys typed straight after ⌘P ("n n", "/") would reach the
 // app before a lazily loaded panel mounted, and be lost.
-import { QuickActionsHost, type QuickActionsHostProps } from '../components/QuickActionsHost'
+import {
+  QuickActionsHost,
+  type PaletteInputs,
+  type QuickActionsHostProps,
+} from '../components/QuickActionsHost'
+import { McpHost } from '../mcp/McpHost'
 import type { PendingTab } from './terminal-launch'
 import { BreakoutWindows } from '../components/terminal/BreakoutWindowView'
 
@@ -36,6 +41,8 @@ export interface ShellOverlayState {
   cancelPendingTab: () => void
   /** The palette's props while it is open, else null. */
   quickActions: QuickActionsHostProps | null
+  /** What the quick-action list is built from, for the MCP tools while the palette is closed. */
+  paletteInputs: PaletteInputs
 }
 
 /** What draws over the shell: dialogs, windows, the palette, toasts and extension overlays. */
@@ -60,12 +67,25 @@ export function ShellOverlays(state: ShellOverlayState): React.JSX.Element {
       {state.linkSessionId !== null && (
         <SessionLinkHost sessionId={state.linkSessionId} onClose={state.closeLink} />
       )}
-      {state.quickActions && <QuickActionsHost {...state.quickActions} />}
+      <QuickActionHosts quickActions={state.quickActions} paletteInputs={state.paletteInputs} />
       <WorkDialogs />
       <HomeBadge />
       <ToastContainer />
       <ExtensionOverlays />
       <BreakoutWindows />
+    </>
+  )
+}
+
+/** The palette while it is open, and the MCP tools that run the same actions without it. */
+function QuickActionHosts({
+  quickActions,
+  paletteInputs,
+}: Pick<ShellOverlayState, 'quickActions' | 'paletteInputs'>): React.JSX.Element {
+  return (
+    <>
+      {quickActions && <QuickActionsHost {...quickActions} />}
+      <McpHost palette={paletteInputs} />
     </>
   )
 }

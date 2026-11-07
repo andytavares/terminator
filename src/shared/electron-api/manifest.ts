@@ -230,6 +230,7 @@ interface ExtensionCommand {
   category?: string
   mnemonic?: string
   requires?: 'repo' | 'session'
+  destructive?: boolean
 }
 
 interface AppInfo {

@@ -111,6 +111,9 @@ export interface CommandContribution {
   mnemonic?: string
   /** Dims the action, with a stock reason, when the focused context lacks this. */
   requires?: 'repo' | 'session'
+  /** True when running it closes, clears or deletes something. The Terminator MCP server then
+   * runs it only through `run_destructive_extension_command`, which asks the person first. */
+  destructive?: boolean
   /** Shape of the `args` another surface may pass when it runs this command (v2.7.0, ADR-083). A
    * command without one never receives args. */
   args?: ZodTypeAny

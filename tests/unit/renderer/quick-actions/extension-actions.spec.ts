@@ -118,3 +118,23 @@ describe('buildExtensionActions — shows a dimmed action for a declared command
     expect(action).toHaveBeenCalled()
   })
 })
+
+describe('buildExtensionActions — destructive marks', () => {
+  it('marks a registered command that declares itself destructive, and no other', () => {
+    const actions = buildExtensionActions(
+      {
+        registered: [
+          registered({ id: 'discard', key: 'git.discard', destructive: true }),
+          registered(),
+        ],
+        declared: [],
+      },
+      [gitGroup],
+      { ctx: ctx(), execute: vi.fn() }
+    )
+    expect(actions.map((a) => [a.id, a.destructive])).toEqual([
+      ['ext:git.command.discard', true],
+      ['ext:git.command.push', undefined],
+    ])
+  })
+})

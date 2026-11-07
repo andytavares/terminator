@@ -330,3 +330,52 @@ describe('buildCoreActions — back, forward and reopen', () => {
     expect(back.group).toBe('navigate')
   })
 })
+
+// Every core action with its mark: a new id fails here until someone decides whether it closes,
+// clears or deletes something, which makes the Terminator MCP server ask before it runs.
+const DESTRUCTIVE_BY_ID: Record<string, boolean> = {
+  'core.new-tab': false,
+  'core.reopen-closed-tab': false,
+  'core.split-vertical': false,
+  'core.split-horizontal': false,
+  'core.break-out': false,
+  'core.close-tab': true,
+  'core.clear': true,
+  'core.new-scratch': false,
+  'core.edit-note': false,
+  'core.prev-tab': false,
+  'core.next-tab': false,
+  'core.cycle-recent-prev': false,
+  'core.cycle-recent-next': false,
+  'core.next-waiting': false,
+  'core.resume': false,
+  'core.go-back': false,
+  'core.go-forward': false,
+  'core.cycle-workspace-next': false,
+  'core.cycle-workspace-prev': false,
+  'core.link-issue': false,
+  'core.link-issue-branch': false,
+  'core.view-issue': false,
+  'core.copy-issue-key': false,
+  'core.open-issue': false,
+  'core.start-work': false,
+  'core.open-home': false,
+  'core.switch-task': false,
+  'core.toggle-overview': false,
+  'core.open-usage': false,
+  'core.next-waiting-top': false,
+  'core.toggle-sidebar': false,
+  'core.open-settings': false,
+  'core.toggle-log': false,
+  'session:s1': false,
+  'core.switch-workspace-ws-1': false,
+}
+
+describe('buildCoreActions — destructive marks', () => {
+  it('marks exactly the actions that close or clear something', () => {
+    const marks = Object.fromEntries(
+      buildCoreActions(makeDeps()).map((a) => [a.id, a.destructive === true])
+    )
+    expect(marks).toEqual(DESTRUCTIVE_BY_ID)
+  })
+})

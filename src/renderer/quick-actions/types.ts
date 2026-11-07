@@ -25,5 +25,7 @@ export interface QuickAction {
   shortcut?: string
   description?: string
   disabledReason?: string
+  /** Closes, clears or deletes something; the Terminator MCP server asks before it runs. */
+  destructive?: true
   run(): void | Promise<void>
 }

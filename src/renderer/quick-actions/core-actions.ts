@@ -84,6 +84,8 @@ interface CoreActionSpec {
   mnemonic?: string
   shortcut?: string
   requires?: 'terminal' | 'project' | 'issue'
+  /** Closes, clears or deletes something. */
+  destructive?: true
   /** Disabled with this reason when it returns one; checked after `requires`. */
   unavailable?(deps: CoreActionDeps): string | undefined
   run(deps: CoreActionDeps): void
@@ -142,6 +144,7 @@ const TERMINAL_ACTIONS: CoreActionSpec[] = [
     mnemonic: 'w',
     shortcut: '⌘W',
     requires: 'terminal',
+    destructive: true,
     run: (d) => d.onClosePane(),
   },
   {
@@ -151,6 +154,7 @@ const TERMINAL_ACTIONS: CoreActionSpec[] = [
     mnemonic: 'k',
     shortcut: '⌘K',
     requires: 'terminal',
+    destructive: true,
     run: (d) => d.onClear(),
   },
   {

@@ -105,6 +105,11 @@ describe('api.commands.register', () => {
       requires: 'repo',
     })
   })
+  it('lists the destructive mark a command declares', () => {
+    const api = createExtensionAPI('test.ext')
+    api.commands.register({ id: 'discard', label: 'Discard', destructive: true }, vi.fn())
+    expect(listExtensionCommands().find((c) => c.id === 'discard')?.destructive).toBe(true)
+  })
 })
 
 describe('api.commands.register — context', () => {

@@ -219,6 +219,7 @@ export function listExtensionCommands(): Array<{
   category?: string
   mnemonic?: string
   requires?: 'repo' | 'session'
+  destructive?: boolean
 }> {
   // A command that takes args needs a caller to supply them; it is not a quick action.
   return [...globalRegistry.commandContributions.entries()]
@@ -233,6 +234,7 @@ export function listExtensionCommands(): Array<{
       category: cmd.category,
       mnemonic: cmd.mnemonic,
       requires: cmd.requires,
+      destructive: cmd.destructive,
     }))
 }
 
