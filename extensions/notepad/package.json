@@ -20,12 +20,12 @@
     "@lezer/markdown": "1.8.1",
     "@terminator/extension-sdk": "6.3.0",
     "@terminator/extension-ui": "1.0.0",
-    "js-yaml": "5.4.3",
-    "lucide-react": "1.21.0",
+    "js-yaml": "5.5.0",
+    "lucide-react": "1.61.0",
     "mermaid": "12.2.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "zod": "4.6.6",
-    "zustand": "4.5.5"
+    "zod": "4.6.7",
+    "zustand": "5.0.16"
   }
 }
