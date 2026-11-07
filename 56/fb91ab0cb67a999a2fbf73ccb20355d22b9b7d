@@ -1,0 +1,75 @@
+docs/adr/148-the-inbox-sidebar-reuses-home-threads.md
+  s_c3147c7a3f2e3c::t_0910438813973e 1-24
+src/renderer/components/sidebar/SidebarSearch.tsx
+  s_c3147c7a3f2e3c::t_0910438813973e 12-19,40
+src/shared/schemas/settings.schema.ts
+  s_c3147c7a3f2e3c::t_0910438813973e 49-52,74,88
+src/renderer/components/settings/GlobalSettings.tsx
+  s_c3147c7a3f2e3c::t_0910438813973e 7,14,183,253-271
+  s_c3147c7a3f2e3c::t_6b04ba40a0d7b7 272-276
+src/renderer/quick-actions/core-actions.ts
+  s_c3147c7a3f2e3c::t_0910438813973e 58,370-374
+  s_c3147c7a3f2e3c::t_7cf7bce7b374cc 375
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_c3147c7a3f2e3c::t_0910438813973e 213-234
+src/renderer/components/sidebar/inbox.ts
+  s_c3147c7a3f2e3c::t_0910438813973e 1-84
+src/renderer/stores/settings.store.ts
+  s_c3147c7a3f2e3c::t_0910438813973e 12,38,185,197
+src/renderer/components/sidebar/InboxSidebar.tsx
+  s_c3147c7a3f2e3c::t_0910438813973e 1-242
+src/renderer/components/sidebar/InboxSidebar.css
+  s_c3147c7a3f2e3c::t_b6a258b5dd26aa 1-104,108-109,115-144,146-184
+  s_c3147c7a3f2e3c::t_0910438813973e 105-107,110-114,145
+src/shared/settings-defaults.ts
+  s_c3147c7a3f2e3c::t_0910438813973e 17
+tests/unit/renderer/components/sidebar/inbox.spec.ts
+  s_c3147c7a3f2e3c::t_0910438813973e 1-124
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_c3147c7a3f2e3c::t_0910438813973e 2,27,30-32,60,73-97,100
+  s_c3147c7a3f2e3c::t_15ddb4e7c1031a 98-99,101
+src/renderer/quick-actions/use-core-quick-actions.ts
+  s_c3147c7a3f2e3c::t_0910438813973e 26,285
+docs/user-guide/USER-GUIDE.md
+  s_c3147c7a3f2e3c::t_0910438813973e 107-121,259-266
+tests/unit/renderer/components/sidebar/inbox-marks.spec.ts
+  s_c3147c7a3f2e3c::t_0910438813973e 1-53
+README.md
+  s_c3147c7a3f2e3c::t_0910438813973e 86
+tests/unit/renderer/quick-actions/core-actions.spec.ts
+  s_c3147c7a3f2e3c::t_0910438813973e 65,256,370
+tests/unit/renderer/components/sidebar/InboxSidebar.spec.tsx
+  s_c3147c7a3f2e3c::t_0910438813973e 1-195
+tests/unit/renderer/shell/useSidebarVisibility.spec.tsx
+  s_c3147c7a3f2e3c::t_0910438813973e 34
+tests/unit/renderer/stores/settings.store.spec.ts
+  s_c3147c7a3f2e3c::t_0910438813973e 35,329-338
+  s_c3147c7a3f2e3c::t_385c73de2f2a49 339-341
+tests/unit/renderer/components/GlobalSettings.spec.tsx
+  s_c3147c7a3f2e3c::t_0910438813973e 36,45,59,101-112
+  s_c3147c7a3f2e3c::t_328da9d049edb6 113-115
+src/renderer/components/sidebar/inbox-marks.ts
+  s_c3147c7a3f2e3c::t_0910438813973e 1-87
+src/renderer/components/home/desk-search.ts
+  s_c3147c7a3f2e3c::t_0910438813973e 34-41,48
+src/renderer/components/sidebar/sidebar-mode.ts
+  s_c3147c7a3f2e3c::t_0910438813973e 1-14
+tests/unit/schemas/settings.schema.spec.ts
+  s_c3147c7a3f2e3c::t_8f475387b0da79 33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "56fb91ab0cb67a999a2fbf73ccb20355d22b9b7d",
+  "prompts": {},
+  "sessions": {
+    "s_c3147c7a3f2e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6643d25-b995-4f50-b4d6-9e2f055e3cbe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
