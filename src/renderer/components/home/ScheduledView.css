@@ -19,12 +19,18 @@
   color: var(--tm-text-primary);
 }
 
+/* Long cells wrap, so the table never scrolls sideways. */
+.scheduled .tmui-data-table td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .scheduled__prompt {
-  display: block;
+  display: -webkit-box;
   max-width: 48ch;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .scheduled__menu {
