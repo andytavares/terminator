@@ -145,9 +145,7 @@ function projectHolding(
 
 /** Opens a terminal tab in `cwd`, runs `command` in it when given, and shows it. Moving a
  * session here opens `claude --resume <id>` through this. */
-export async function openTerminal(
-  args: ToolArgs<'open_terminal'>
-): Promise<{ sessionId: string }> {
+async function openTerminal(args: ToolArgs<'open_terminal'>): Promise<{ sessionId: string }> {
   const { projectId, workspaceId } = projectHolding(args.cwd, args.workspace)
   const { scrollbackLimit } = useSettingsStore.getState().resolveSettings(workspaceId).terminal
   const opened = { projectId, type: 'human' as const, title: '', cwd: args.cwd, scrollbackLimit }

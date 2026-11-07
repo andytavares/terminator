@@ -51,6 +51,7 @@ import { startMcpServer } from './mcp/mcp-server.js'
 import { installRelayScript } from './mcp/relay-script.js'
 import { manifestTools } from './mcp/manifest-tools.js'
 import { alertTool } from './mcp/alert-tool.js'
+import { mcpSocketPath } from './mcp/socket-path.js'
 import { moveSessionTool } from './mcp/move-session.js'
 import { registerRendererTools, rendererTools } from './mcp/renderer-tools.js'
 import { appTools } from './mcp/app-tools.js'
@@ -488,7 +489,7 @@ function showMainWindow(): BrowserWindow {
 /** The Terminator MCP server, its relay, and the relay's entry in Claude Code (ADR 145). */
 function startTerminatorMcpServer(): void {
   const userData = app.getPath('userData')
-  const socketPath = join(userData, 'mcp.sock')
+  const socketPath = mcpSocketPath(userData, app.getPath('temp'))
   const directory = join(userData, 'mcp')
   registerRendererTools({ showWindow: showMainWindow })
   const updateTools = appTools({
