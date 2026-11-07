@@ -7,19 +7,19 @@
     "build:renderer": "vite build --config vite.renderer.config.ts"
   },
   "dependencies": {
-    "@fastify/static": "10.1.6",
-    "@fastify/websocket": "11.2.0",
+    "@fastify/static": "10.1.7",
+    "@fastify/websocket": "11.3.4",
     "@terminator/extension-sdk": "6.3.0",
     "@terminator/extension-ui": "1.0.0",
-    "fastify": "5.12.6",
-    "lucide-react": "1.21.0",
+    "fastify": "5.12.7",
+    "lucide-react": "1.61.0",
     "qrcode.react": "4.2.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "ws": "8.21.0",
-    "zod": "4.6.6"
+    "ws": "8.22.0",
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "@types/ws": "8.5.13"
+    "@types/ws": "8.18.2"
   }
 }
