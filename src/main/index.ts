@@ -425,7 +425,7 @@ function registerSessionHandlers(): OutputRelay {
   registerAgentUsageHandlers()
   registerThreadSummaryHandler()
   registerHomeFeedHandlers(() => mainWindow)
-  registerScheduleHandlers(() => mainWindow)
+  void registerScheduleHandlers(() => mainWindow)
   return terminalRelay
 }
 

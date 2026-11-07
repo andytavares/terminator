@@ -123,7 +123,7 @@ export function agentCommand(prompt: string | null, unattended?: UnattendedLaunc
 }
 
 /** What the Claude agent reads from `session/new`: the same settings file and system prompt. */
-export const unattendedAgentMeta = ({ settingsPath, systemPrompt }: UnattendedLaunch) => ({
+const unattendedAgentMeta = ({ settingsPath, systemPrompt }: UnattendedLaunch) => ({
   systemPrompt: { append: systemPrompt },
   claudeCode: { options: { settings: settingsPath } },
 })

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { existsSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createAlerts, watchAlerts } from '../../../src/main/home/scheduled-alerts'
@@ -65,9 +65,17 @@ describe('createAlerts, dismissing and refusing', () => {
 })
 
 let stop = (): void => undefined
-afterEach(() => stop())
+const made: string[] = []
+afterEach(() => {
+  stop()
+  made.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true }))
+})
 
-const folder = () => mkdtempSync(join(tmpdir(), 'alerts-'))
+function folder(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'alerts-'))
+  made.push(dir)
+  return dir
+}
 
 describe('watchAlerts', () => {
   it('hands over each file written into the folder and deletes it', async () => {

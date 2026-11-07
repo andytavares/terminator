@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { wrapDb } from '../../../src/main/db/index'
@@ -52,6 +52,8 @@ const daily = {
 
 const global = { ...daily, repoRoot: null, newWorktree: false }
 
+let started: Promise<void>
+
 beforeEach(async () => {
   vi.resetModules()
   sendToWindow.mockReset()
@@ -60,7 +62,12 @@ beforeEach(async () => {
   userData.current = mkdtempSync(join(tmpdir(), 'user-data-'))
   database.current = wrapDb(new DatabaseSync(':memory:'))
   const ipc = await import('../../../src/main/ipc/schedules.ipc')
-  ipc.registerScheduleHandlers(() => null)
+  started = ipc.registerScheduleHandlers(() => null)
+})
+
+afterEach(async () => {
+  await started
+  rmSync(userData.current, { recursive: true, force: true })
 })
 
 describe('schedule channels', () => {

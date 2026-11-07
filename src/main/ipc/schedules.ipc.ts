@@ -122,8 +122,9 @@ function startAlerts(folder: string): void {
   watchAlerts(alertsFolder(folder), alerts.receive)
 }
 
-/** Opens the table, raises what was missed while closed, then checks once a minute. */
-export function registerScheduleHandlers(getWindow: () => BrowserWindow | null): void {
+/** Opens the table, raises what was missed while closed, then checks once a minute.
+ * Resolves once the scheduled-run files are written and alerts are watched. */
+export function registerScheduleHandlers(getWindow: () => BrowserWindow | null): Promise<void> {
   const folder = path.join(app.getPath('userData'), 'scheduled-runs')
   const launch = writeUnattendedFiles(folder)
   const scheduler = createScheduler({
@@ -137,14 +138,18 @@ export function registerScheduleHandlers(getWindow: () => BrowserWindow | null):
     publish: publisherFor(SOURCE),
   })
   setActionHandler(SOURCE, (askId, actionId) => scheduler.act(askId, actionId))
-  void launch
-    .then(() => startAlerts(folder))
-    .catch((error) => logger.error('scheduled run files not written', { error: String(error) }))
   registerInvokeTable([
     ...scheduleChannels(scheduler),
     ...scheduleEditChannels(scheduler),
     branchNameChannel,
   ])
+  startTicks(scheduler)
+  return launch
+    .then(() => startAlerts(folder))
+    .catch((error) => logger.error('scheduled run files not written', { error: String(error) }))
+}
+
+function startTicks(scheduler: Scheduler): void {
   const tick = (check: () => Promise<void>) => () =>
     void check().catch((error) => logger.error('schedule check failed', { error: String(error) }))
   void scheduler

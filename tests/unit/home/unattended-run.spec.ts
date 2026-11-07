@@ -1,11 +1,18 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { execSync } from 'node:child_process'
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { writeUnattendedFiles } from '../../../src/main/home/unattended-run'
 
-const folder = () => mkdtempSync(join(tmpdir(), 'unattended-'))
+const made: string[] = []
+afterEach(() => made.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true })))
+
+function folder(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'unattended-'))
+  made.push(dir)
+  return dir
+}
 
 interface Settings {
   permissions: { ask: string[]; deny: string[] }
