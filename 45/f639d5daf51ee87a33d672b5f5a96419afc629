@@ -1,0 +1,23 @@
+extensions/foundry/CLAUDE.md
+  s_56e599e17e5b82::t_0f30341b6257ed 93-124
+src/main/agents/acp/agent-connection.ts
+  s_56e599e17e5b82::t_943158e22be60e 53-54
+scripts/e2e-select.mjs
+  s_56e599e17e5b82::t_661f2cab8c2584 107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "45f639d5daf51ee87a33d672b5f5a96419afc629",
+  "prompts": {},
+  "sessions": {
+    "s_56e599e17e5b82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6c95cc7-f1de-49bf-a858-16efb95c5329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
