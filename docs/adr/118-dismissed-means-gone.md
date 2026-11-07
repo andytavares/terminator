@@ -1,6 +1,6 @@
 # ADR 118: Dismissed means gone
 
-**Status**: Accepted
+**Status**: Accepted, amended by [ADR 146](146-a-closed-session-leaves-home.md)
 
 **Date**: 2026-10-19
 
@@ -12,7 +12,7 @@ Dismissing an In flight row on Home hid the row only until the work showed new a
 
 ## Decision
 
-- The app keeps a dismissal by work key. It hides the row until the operator undoes the dismissal. Activity on the work does not bring the row back (`isDismissed` in `src/renderer/components/home/dismissed-threads.ts`).
+- The app keeps a dismissal by work key. For a row that holds Terminator sessions, Dismiss also deletes their records once they have ended (ADR 146). It hides the row until the operator undoes the dismissal. Activity on the work does not bring the row back (`isDismissed` in `src/renderer/components/home/dismissed-threads.ts`).
 - The toast that confirms a dismissal offers **Undo**. Starting that ticket or branch from Start work also restores the row (`restoreStarted` in `start-work.ts`). So work that the operator just launched is never hidden.
 - The `updatedAt` of a facet is when the work last changed, not when the extension read it. The git extension takes the value from `PullRequest.updatedAt` of GitHub.
 

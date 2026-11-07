@@ -74,6 +74,37 @@
   overflow-wrap: anywhere;
 }
 
+.agent-markdown {
+  white-space: normal;
+}
+
+/* A drawn diagram sits in the code block's pre; it needs no code chrome. */
+.agent-markdown pre:has(> .agent-mermaid) {
+  padding: 0;
+  overflow-x: auto;
+  background: none;
+}
+
+/* Mermaid sets an inline max-width on its SVG, so the cap goes on the wrapper. */
+.agent-mermaid {
+  display: block;
+  max-width: 560px;
+}
+
+.agent-mermaid svg {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  height: auto;
+}
+
+.agent-mermaid__error {
+  display: block;
+  margin-bottom: var(--tm-space-2);
+  font-family: var(--tm-font-ui);
+  color: var(--tm-danger);
+}
+
 .agent-message--thought {
   color: var(--tm-text-muted);
   font-style: italic;
@@ -129,6 +160,7 @@
 }
 
 .agent-composer__input,
+.agent-comment__input,
 .agent-find__input {
   flex: 1;
   background: var(--tm-bg-input);
@@ -138,12 +170,14 @@
   font: inherit;
 }
 
-.agent-composer__input {
+.agent-composer__input,
+.agent-comment__input {
   resize: none;
   padding: var(--tm-space-2) var(--tm-space-3);
 }
 
-.agent-composer__input:focus-visible {
+.agent-composer__input:focus-visible,
+.agent-comment__input:focus-visible {
   outline: 2px solid var(--tm-accent);
   outline-offset: 1px;
 }
@@ -153,8 +187,58 @@
 }
 
 .agent-composer {
+  position: relative;
   flex-direction: column;
   align-items: stretch;
+}
+
+.agent-composer--drop {
+  outline: 2px dashed var(--tm-accent);
+  outline-offset: -2px;
+}
+
+.agent-composer__drop {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tm-space-2);
+  background: var(--tm-accent-dim);
+  color: var(--tm-text-primary);
+  pointer-events: none;
+}
+
+.agent-composer__drop svg {
+  width: 16px;
+  height: 16px;
+}
+
+.agent-context-chip {
+  display: flex;
+  align-items: center;
+}
+
+.agent-context-chip .tmui-chip {
+  height: auto;
+  padding-right: 0;
+  border: 1px solid var(--tm-border);
+}
+
+.agent-context-chip--citation {
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  background: var(--tm-bg-card);
+}
+
+.agent-context-chip__meta {
+  color: var(--tm-text-muted);
+  font-size: var(--tm-font-size-xs);
+}
+
+.agent-context-chip--citation .agent-context-chip__meta {
+  margin-left: var(--tm-space-2);
 }
 
 .agent-composer__row {
@@ -266,4 +350,62 @@
   outline: 1px solid var(--tm-warning);
   background: var(--tm-warning);
   color: var(--tm-bg-base);
+}
+
+.agent-message-context {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-self: flex-end;
+  gap: var(--tm-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-cite {
+  min-width: 0;
+  padding: var(--tm-space-1);
+  translate: -50% calc(-100% - var(--tm-space-1));
+}
+
+.agent-comment {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-2);
+  width: 400px;
+  max-width: calc(100vw - var(--tm-space-4));
+}
+
+.agent-comment__quote {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-2);
+  margin: 0;
+  color: var(--tm-text-muted);
+  font-style: italic;
+}
+
+.agent-comment__quote svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.agent-comment__quote-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-comment__row {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-2);
+}
+
+.agent-comment__hint {
+  flex: 1;
+  font-size: var(--tm-font-size-xs);
+  color: var(--tm-text-muted);
 }

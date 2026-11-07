@@ -19,7 +19,7 @@ export function Heatmap(props: {
   total: number
 }): React.JSX.Element {
   return (
-    <div>
+    <div className="ct-map">
       <div className="ct-map-head">
         <h2>{props.weeks ? `${props.total} contributions in the last year` : '—'}</h2>
         <span className="ct-sp" />
@@ -41,7 +41,10 @@ function HeatmapGrid(props: { weeks: ContributionsDay[][]; total: number }): Rea
         <WeekdayColumn />
         <div className="ct-year">
           <MonthRow weeks={props.weeks} />
-          <div className="ct-grid">
+          <div
+            className="ct-weeks"
+            style={{ gridTemplateColumns: `repeat(${props.weeks.length}, minmax(0, 1fr))` }}
+          >
             {props.weeks.map((week, index) => (
               <WeekColumn key={week[0]?.date ?? index} week={week} />
             ))}
@@ -74,12 +77,17 @@ function WeekdayColumn(): React.JSX.Element {
   )
 }
 
-/** One month name above the first column that starts in it, one week's pitch per column. */
+/** One month name above the first column that starts in it; a column is 1/weeks of the width. */
 function MonthRow({ weeks }: { weeks: ContributionsDay[][] }): React.JSX.Element {
   return (
     <div className="ct-months" aria-hidden="true">
       {monthLabels(weeks).map((month) => (
-        <span key={month.column} style={{ left: `calc(${month.column} * var(--ct-pitch))` }}>
+        <span
+          key={month.column}
+          style={
+            { '--ct-month-at': `${(month.column / weeks.length) * 100}%` } as React.CSSProperties
+          }
+        >
           {month.label}
         </span>
       ))}

@@ -261,6 +261,17 @@ export class TerminalInstance {
     )
   }
 
+  /** Every row in the buffer, scrollback included, each trimmed on the right, with no empty rows at the end. */
+  readAllRows(): string[] {
+    const buffer = this.terminal.buffer.active
+    const rows = Array.from(
+      { length: buffer.length },
+      (_, i) => buffer.getLine(i)?.translateToString(true) ?? ''
+    )
+    while (rows.length > 0 && rows[rows.length - 1] === '') rows.pop()
+    return rows
+  }
+
   /** The cursor's row on screen, 0 at the top. */
   cursorRow(): number {
     return this.terminal.buffer.active.cursorY

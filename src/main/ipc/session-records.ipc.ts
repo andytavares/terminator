@@ -11,6 +11,7 @@ import {
 } from '../../shared/schemas/session-records.schema.js'
 import { pruneRecords } from '../../shared/session-records/retention.js'
 import {
+  closedRetentionMs,
   forget,
   listRecords,
   onRecordChange,
@@ -54,7 +55,7 @@ const recordReadChannels: ChannelSpec[] = [
     schema: noPayload,
     invalid: validationError,
     run: () => ({
-      data: pruneRecords(listRecords(), Date.now())
+      data: pruneRecords(listRecords(), Date.now(), closedRetentionMs())
         .sort(byCloseTime)
         .map((record) => listing(record)!),
     }),

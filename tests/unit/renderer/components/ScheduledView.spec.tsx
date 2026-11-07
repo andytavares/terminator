@@ -12,6 +12,7 @@ import type { Workspace } from '../../../../src/shared/types/index'
 import { useScheduledRunSessions } from '../../../../src/renderer/components/home/scheduled-run-sessions'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { terminalSessionOf } from '../../../support/renderer-stores'
+import { SESSION_DRAG_TYPE } from '../../../../src/renderer/components/agent/session-drag'
 
 const revealSession = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({ revealSession }))
@@ -282,5 +283,23 @@ describe('ScheduledView — a run that has finished', () => {
     useSessionStore.setState({ sessions: new Map() })
     await shown()
     expect(within(rowOf('Triage the inbox')).queryByRole('button', { name: 'View' })).toBeNull()
+  })
+})
+
+describe('ScheduledView — dragging a run to an agent tab', () => {
+  it('carries the session of a run that is open, without editing the run', async () => {
+    live('working')
+    await shown()
+    const lastRun = within(rowOf('Triage the inbox')).getByText('Running').closest('[draggable]')!
+    const dataTransfer = { setData: vi.fn(), effectAllowed: '' }
+    fireEvent.dragStart(lastRun, { dataTransfer })
+    expect(dataTransfer.setData).toHaveBeenCalledWith(SESSION_DRAG_TYPE, 'run-1')
+    expect(dataTransfer.effectAllowed).toBe('copy')
+    expect(useStartWorkStore.getState().open).toBe(false)
+  })
+
+  it('offers nothing to drag for a run with no open session', async () => {
+    await shown()
+    expect(rowOf('Triage the inbox').querySelector('[draggable="true"]')).toBeNull()
   })
 })

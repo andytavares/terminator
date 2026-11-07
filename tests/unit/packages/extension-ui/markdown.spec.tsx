@@ -392,3 +392,67 @@ describe('inline Markdown', () => {
     ).toBeNull()
   })
 })
+
+// An agent's reply: raw HTML is drawn, but nothing is fetched from the network.
+describe('offline Markdown', () => {
+  setUpMarkdownRawHTML()
+
+  it('renders raw HTML but keeps no src, so no image or video loads', () => {
+    const el = render(
+      <Markdown onOpenLink={onOpenLink} offline>
+        {[
+          '<details><summary>Logs</summary>body</details>',
+          '<img src="https://x.example/b.png">',
+          '<video src="https://x.example/v.mp4"></video>',
+          '![a](https://x.example/a.png)',
+        ].join('\n\n')}
+      </Markdown>
+    ).container
+    expect(el.querySelector('details > summary')?.textContent).toBe('Logs')
+    expect(el.querySelector('img')).toBeNull()
+    expect(el.querySelectorAll('[src]')).toHaveLength(0)
+    expect(el.innerHTML).not.toContain('x.example')
+  })
+})
+
+describe('Markdown raw HTML — inline SVG', () => {
+  setUpMarkdownRawHTML()
+
+  it('draws a chart made of shapes and text', () => {
+    const el = renderBody(
+      '<svg viewBox="0 0 100 50" width="100" height="50"><rect x="0" y="10" width="40" height="40" fill="teal"></rect><text x="2" y="8">Q1</text></svg>'
+    )
+    const rect = el.querySelector('svg rect')
+    expect(el.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 100 50')
+    expect(rect?.getAttribute('height')).toBe('40')
+    expect(rect?.getAttribute('fill')).toBe('teal')
+    expect(el.querySelector('svg text')?.textContent).toBe('Q1')
+  })
+
+  it('drops scripts, handlers, javascript: links, foreign objects and styles from an SVG', () => {
+    const el = renderBody(
+      '<svg onload="alert(1)" style="x"><script>alert(2)</script><a href="javascript:alert(3)"><circle r="4"></circle></a><foreignObject><div>html</div></foreignObject><use href="#x"></use></svg>'
+    )
+    expect(el.querySelector('svg')).not.toBeNull()
+    expect(el.querySelector('svg script, svg foreignObject, svg use')).toBeNull()
+    expect(el.innerHTML).not.toContain('javascript:')
+    expect(el.querySelector('svg')?.getAttribute('onload')).toBeNull()
+    expect(el.querySelector('svg')?.getAttribute('style')).toBeNull()
+    expect(el.textContent).not.toContain('alert')
+  })
+})
+
+describe('Markdown — an HTML title is never kept', () => {
+  it('drops every title, so a body cannot rename the window', async () => {
+    const view = render(
+      <Markdown offline onOpenLink={() => {}}>
+        {'<title>Hijack</title>\n\n<svg viewBox="0 0 10 10"><title>Chart</title></svg>'}
+      </Markdown>
+    )
+    // The HTML plugins load lazily: until the SVG exists, the body is still plain text.
+    await waitFor(() => expect(view.container.querySelector('svg')).not.toBeNull())
+    // React moves a title outside an SVG into document.head, so look at the whole document.
+    const titles = [...document.querySelectorAll('title')].map((t) => t.textContent)
+    expect(titles).not.toContain('Hijack')
+  })
+})

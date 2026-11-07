@@ -7,7 +7,7 @@ import type {
   SessionSnapshot,
   WorkItemRef,
 } from '../../shared/types/index.js'
-import { pruneRecords } from '../../shared/session-records/retention.js'
+import { pruneRecords, RETENTION_MS } from '../../shared/session-records/retention.js'
 import { DESCRIPTION_MAX_LENGTH } from '../../shared/session-description.js'
 import { deleteSessionContext } from '../integrations/session-context.js'
 import { writeJsonAtomic } from '@terminator/extension-sdk/node'
@@ -37,6 +37,18 @@ class SessionRecordError extends Error {
 
 const records = new Map<string, SessionRecord>()
 const handlers = new Set<RecordChangeHandler>()
+const PURGE_EVERY_MS = 60 * 60 * 1000
+// The longest retention until main reads the operator's setting, so nothing goes early.
+let retentionMs: () => number = () => RETENTION_MS
+
+/** Reads how long a closed record is kept from `retention`, each time it prunes. */
+export function configureRetention(retention: () => number): void {
+  retentionMs = retention
+}
+
+export function closedRetentionMs(): number {
+  return retentionMs()
+}
 
 function filePath(): string {
   return path.join(app.getPath('userData'), FILE_NAME)
@@ -49,13 +61,31 @@ function announce(sessionId: string): void {
 
 async function persist(): Promise<void> {
   const before = new Set(records.keys())
-  const kept = pruneRecords([...records.values()], Date.now())
+  const kept = pruneRecords([...records.values()], Date.now(), retentionMs())
   records.clear()
   for (const record of kept) records.set(record.sessionId, record)
-  for (const id of before) {
-    if (!records.has(id)) await deleteSessionContext(id)
-  }
+  const pruned = [...before].filter((id) => !records.has(id))
+  for (const id of pruned) announce(id)
+  for (const id of pruned) await deleteSessionContext(id)
   await writeJsonAtomic(filePath(), kept)
+}
+
+/** Drops the closed records past their retention; writes only when one goes. */
+async function purgeClosedRecords(): Promise<void> {
+  const all = [...records.values()]
+  if (pruneRecords(all, Date.now(), retentionMs()).length === all.length) return
+  try {
+    await persist()
+  } catch (error) {
+    logger.error('could not purge closed session records', { error: String(error) })
+  }
+}
+
+/** Purges every hour, so a closed record goes without a restart. Returns the stop. */
+export function startPurging(schedule: typeof setInterval = setInterval): () => void {
+  const timer = schedule(() => void purgeClosedRecords(), PURGE_EVERY_MS)
+  timer.unref?.()
+  return () => clearInterval(timer)
 }
 
 const stringOrNull = (value: unknown): string | null => (typeof value === 'string' ? value : null)
@@ -145,7 +175,7 @@ export async function loadRecords(): Promise<void> {
   const loaded = (await readStoredEntries())
     .map(parseStoredRecord)
     .filter((record): record is SessionRecord => record !== null)
-  const kept = pruneRecords(loaded, Date.now())
+  const kept = pruneRecords(loaded, Date.now(), retentionMs())
   for (const record of kept) records.set(record.sessionId, record)
   const keptIds = new Set(kept.map((r) => r.sessionId))
   for (const record of loaded) {

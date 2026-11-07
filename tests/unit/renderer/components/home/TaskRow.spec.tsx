@@ -1,10 +1,12 @@
 import React from 'react'
+import { readFileSync } from 'node:fs'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { makeTempDir } from '../../../../support/temp-dir'
 import { wireMainTaskStore } from '../../../../support/main-task-store'
 import { TaskRow } from '../../../../../src/renderer/components/home/TaskRow'
 import { useToastStore } from '../../../../../src/renderer/stores/toast.store'
+import { SESSION_DRAG_TYPE } from '../../../../../src/renderer/components/agent/session-drag'
 import type { WorkThread } from '../../../../../src/renderer/home/work-threads'
 import type { TaskLane } from '../../../../../src/shared/schemas/tasks.schema'
 
@@ -71,6 +73,8 @@ describe('TaskRow — drop one row on another to merge', () => {
     fireEvent.drop(rate, { dataTransfer: dataTransfer() })
     await waitFor(() => expect(main.listTasks()).toHaveLength(1))
     expect(main.listTasks()[0]).toMatchObject({ title: 'Rate limits', lanes: [api, web] })
+    // The toast follows the merge's own promise, which can settle after the store shows the merge.
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1))
     const [toast] = useToastStore.getState().toasts
     expect(toast).toMatchObject({ message: 'Moved "Web side" into "Rate limits"' })
     expect(toast.action?.label).toBe('Undo')
@@ -121,5 +125,76 @@ describe('TaskRow — lane chips', () => {
     render(<TaskRow thread={thread} now={Date.now()} selected={false} />)
     const chips = Array.from(document.querySelectorAll('.task-lane')).map((c) => c.textContent)
     expect(chips).toEqual(['api', 'web · rate-limits', 'web · usage-page'])
+  })
+})
+
+/** A Home row whose two lanes hold sessions s1, s2 and s3. */
+function threadWithSessions(taskId: string): WorkThread {
+  const thread = rowThread('Web side', web, taskId)
+  const [lane] = thread.lanes
+  return {
+    ...thread,
+    lanes: [
+      { ...lane, sessionIds: ['s1', 's2'] },
+      { ...lane, sessionIds: ['s3'] },
+    ],
+  }
+}
+
+describe('TaskRow — dragging it to an agent tab', () => {
+  it('carries every session of every lane, and still merges when dropped on a row', async () => {
+    const rate = await main.createTask({ title: 'Rate limits', lanes: [api] })
+    const webSide = await main.createTask({ title: 'Web side', lanes: [web] })
+    render(
+      <>
+        <TaskRow
+          thread={rowThread('Rate limits', api, rate.id)}
+          now={Date.now()}
+          selected={false}
+        />
+        <TaskRow thread={threadWithSessions(webSide.id)} now={Date.now()} selected={false} />
+      </>
+    )
+    const transfer = dataTransfer()
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Web side' }), {
+      dataTransfer: transfer,
+    })
+    expect(transfer.setData).toHaveBeenCalledWith(SESSION_DRAG_TYPE, 's1\ns2\ns3')
+    expect(transfer.effectAllowed).toBe('copyMove')
+    fireEvent.drop(screen.getByRole('button', { name: 'Rate limits' }), {
+      dataTransfer: dataTransfer(),
+    })
+    await waitFor(() => expect(main.listTasks()).toHaveLength(1))
+  })
+})
+
+describe('TaskRow — the age and the actions button each have their own space', () => {
+  const tasksCss = readFileSync('src/renderer/components/home/Tasks.css', 'utf8')
+  const ruleFor = (selector: string) =>
+    tasksCss.match(
+      new RegExp(`(?:^|\\n)${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)
+    )?.[1] ?? ''
+
+  it("puts the age and then the button side by side in the row's last cell", async () => {
+    const created = await main.createTask({ title: 'Rate limits', lanes: [api] })
+    render(
+      <TaskRow
+        thread={rowThread('Rate limits', api, created.id)}
+        now={Date.now()}
+        selected={false}
+      />
+    )
+    const end = screen.getByRole('button', { name: 'Rate limits' }).querySelector('.task-row__end')
+    const age = end?.querySelector('.task-row__last')
+    const actions = screen.getByRole('button', { name: 'Work actions' })
+    expect(age?.textContent).toBe('now')
+    expect(end?.contains(actions)).toBe(true)
+    expect(age!.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('lays the cell out as a row and keeps the button in the flow, not over the age', () => {
+    expect(ruleFor('.task-row__end')).toMatch(/display:\s*flex/)
+    expect(ruleFor('.task-row__end .desk-tr__controls')).toMatch(/position:\s*static/)
+    expect(ruleFor('.task-row__end .desk-tr__menu')).toMatch(/position:\s*static/)
   })
 })

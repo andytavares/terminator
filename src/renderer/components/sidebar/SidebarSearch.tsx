@@ -9,6 +9,14 @@ interface SidebarSearchProps {
   inputRef?: React.RefObject<HTMLInputElement | null>
 }
 
+/** The placeholder alone is not an accessible name, so the field carries one. */
+const FIELD = {
+  type: 'text',
+  className: 'sidebar-search__input',
+  placeholder: 'Search…',
+  'aria-label': 'Search',
+} as const
+
 /** The first character of a search counts as one use; the rest of the typing does not. */
 function typeInto(query: string, value: string, onChange: (value: string) => void): void {
   if (query === '') recordUse('core.sidebar.search')
@@ -29,10 +37,8 @@ export function SidebarSearch({
       <span className="sidebar-search__icon">⌕</span>
       <input
         ref={ref}
-        type="text"
-        className="sidebar-search__input"
+        {...FIELD}
         value={query}
-        placeholder="Search…"
         onChange={(e) => typeInto(query, e.target.value, onChange)}
         onKeyDown={(e) => {
           if (e.key === 'Escape') onClear()

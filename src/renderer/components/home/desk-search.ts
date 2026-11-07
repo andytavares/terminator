@@ -31,17 +31,21 @@ const sessionHit = (f: SessionFacts): SearchHit => ({
   detail: f.branch ?? '',
 })
 
+/** True when the text matches the thread's title, ticket, repos or branches. */
+export function threadMatches(t: WorkThread, text: string): boolean {
+  return matchesText(
+    [t.title, t.ticketKey, ...t.lanes.flatMap((l) => [l.repoName, l.branch])],
+    text
+  )
+}
+
 /** Threads, open sessions, and your tickets that no thread has yet, that match the text. */
 export function searchWork(input: SearchInput): SearchHit[] {
   const { text, threads, facts, tickets } = input
   if (text.trim() === '') return []
   const threadTickets = new Set(threads.map((t) => t.ticketKey))
   return [
-    ...threads
-      .filter((t) =>
-        matchesText([t.title, t.ticketKey, ...t.lanes.flatMap((l) => [l.repoName, l.branch])], text)
-      )
-      .map(threadHit),
+    ...threads.filter((t) => threadMatches(t, text)).map(threadHit),
     ...facts
       .filter((f) => !f.isClosed && matchesText([f.name, f.branch, f.description], text))
       .map(sessionHit),

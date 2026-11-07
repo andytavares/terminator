@@ -31,6 +31,7 @@ const setHideOnHome = (hideSidebarOnHome: boolean) =>
           hideSidebarOnHome,
           showUsageTab: true,
           homeLayout: 'tasks',
+          sidebarMode: 'tree',
         },
       },
     })

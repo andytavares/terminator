@@ -104,6 +104,21 @@ Projects live inside a workspace. A project holds one or more terminal sessions 
 - **Open in your editor:** Right-click a branch and choose **Open in ‹editor›** to open the branch's working copy. This is its own worktree when it has one, otherwise the repo it was checked out from. A repo's header has the same item, and it opens the repo folder. Terminator finds your editor itself. It looks for Cursor, VS Code, Windsurf, Zed, Sublime Text, WebStorm, IntelliJ and Xcode. It prefers an editor whose command-line launcher is installed, because that opens the folder in a window you already have. To pin one editor, set `ui.editor` in settings to its id (`cursor`, `vscode`, `windsurf`, `zed`, `sublime`, `webstorm`, `intellij`, `xcode`). Leave it empty to keep detecting. The menu item is hidden when no editor is found, and in the browser remote, which has no local editor to launch.
 - **Per-workspace settings:** You can override the theme, scrollback limit and default shell for each workspace in Settings.
 
+### The Inbox sidebar
+
+The sidebar has a second mode, **Inbox**. It lists your work as cards in place of the repo tree. Turn it on in **Settings → Interface → Sidebar → Inbox**, or run **Switch sidebar: Tree / Inbox** from Quick Actions (`⌘P`). The change shows at once. **Tree** is the default and does not change.
+
+- **Order:** Work that needs you is first, then pinned work, then the rest, newest first. A card shows the title, repo and branch, the state glyph (the same five as Home), how long since it last did something, and the question when an agent asks one.
+- **Open:** Click a card or press `Enter` to show its most recent terminal. Work with no open terminal opens its task drawer on Home.
+- **Settle:** Hover a card and click **Settle** (✓) when you are done with it. It moves into **N settled** at the bottom, which starts folded. A settled card comes back to the top when its agent ends a turn or asks something.
+- **Snooze:** Click the alarm clock and choose **1 hour**, **This afternoon** or **Tomorrow**. The card is settled until then.
+- **Pin:** Click the pin. A pinned card stays at the top, under the work that needs you, and never settles on its own.
+- **Auto-settle:** Work with no activity for 24 hours settles on its own. An unanswered question never does.
+- **Search and repo filter:** The search field matches title, ticket, repo and branch. **All repos** narrows the list to one repo.
+- **Keyboard:** From the search field, `↓` moves onto the first card. `↑` and `↓` move between cards.
+
+Terminator keeps settled, pinned and snoozed work for each profile on this machine. It forgets an entry 30 days after its work is gone.
+
 ---
 
 ## 5. Terminal Sessions
@@ -241,14 +256,14 @@ Open Settings with **`Cmd+,`** or **View → Open Settings**.
 
 ### Global settings
 
-| Section            | Options                                                                       |
-| ------------------ | ----------------------------------------------------------------------------- |
-| **Interface**      | Theme (dark/light), show CPU/Memory/Network bar, hide the branch tree on Home |
-| **Terminal**       | Default shell, scrollback limit                                               |
-| **Agents**         | Default agent and your own ACP agents — see below                             |
-| **Integrations**   | Connect Linear and Claude Code — see below                                    |
-| **Extensions**     | Enable/disable individual extensions                                          |
-| **Remote Control** | Enable local server, port, ngrok tunnel, session password                     |
+| Section            | Options                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------ |
+| **Interface**      | Theme (dark/light), show CPU/Memory/Network bar, hide the branch tree on Home, Sidebar (Tree or Inbox) |
+| **Terminal**       | Default shell, scrollback limit                                                                        |
+| **Agents**         | Default agent and your own ACP agents — see below                                                      |
+| **Integrations**   | Connect Linear and Claude Code — see below                                                             |
+| **Extensions**     | Enable/disable individual extensions                                                                   |
+| **Remote Control** | Enable local server, port, ngrok tunnel, session password                                              |
 
 ### Integrations — connecting an issue tracker
 
@@ -410,7 +425,7 @@ The drawer holds:
 - the terminals on the task, how long they have run and their tokens, and a timeline;
 - the buttons **Open all lanes**, **Link a ticket**, **Rename**, **Mark done** and **Archive**.
 
-**Mark done** finishes a task that will never have a pull request. **Archive** hides a task without finishing it. Both keep the task's records and list it under **Archived tasks** in the footer. There, **Restore** (or **Undo done**) brings it back. `Esc` closes the drawer. Right-click a row for the same actions and for **Dismiss**, which hides a row from Home. The toast has **Undo**.
+**Mark done** finishes a task that will never have a pull request. **Archive** hides a task without finishing it. Both keep the task's records and list it under **Archived tasks** in the footer. There, **Restore** (or **Undo done**) brings it back. `Esc` closes the drawer. Right-click a row for the same actions and for **Dismiss**, which takes a row off Home for good. The toast has **Undo**, which brings the row back. Dismiss deletes the record of every session on the row that has ended, and of each one still running as soon as it ends. Undo cannot bring a deleted record back. A row that only an extension shows, such as a pull request, stays hidden and nothing is deleted.
 
 #### Making a task
 
@@ -499,7 +514,7 @@ A line under the columns says how many agents already run, across how many tasks
 
 ### Saying what a session is for
 
-A session with no ticket can say what it is for. Right-click its tab and choose **Add description…** (or press `Cmd+I`). Type an answer and press `Enter`. On Overview, the tile asks **What is this session doing?** in place. Terminator saves the description at once and keeps it after a restart. On Home, the description names the work: the row and its drawer show your words when no ticket does. Terminator keeps a described or linked session for 30 days after it ends.
+A session with no ticket can say what it is for. Right-click its tab and choose **Add description…** (or press `Cmd+I`). Type an answer and press `Enter`. On Overview, the tile asks **What is this session doing?** in place. Terminator saves the description at once and keeps it after a restart. On Home, the description names the work: the row and its drawer show your words when no ticket does. When a session ends, it leaves Home at once. Terminator keeps its record only so you can resume it, for the time that **Delete closed sessions after** sets in **Settings → Appearance & Terminal** (24 hours by default, from 1 hour to 30 days). Then the record is deleted, without a restart.
 
 **New terminal** on Overview and **Start work** on Home start a session on any branch, or a scratch terminal, without a trip to the sidebar. When you close a session, the terminal ends exactly as it does when you close its tab.
 
@@ -533,6 +548,10 @@ Terminator starts agents over the Agent Client Protocol (ACP) and shows each age
 
 The text box stays open while the agent works. Press **Enter** to queue a message. Queued messages show above the box; edit or remove one before it goes. They send one by one as each turn ends. **Stop** keeps the queue. Press **Cmd+Enter** (or **Steer**) to steer: Claude Code takes the message into the running turn; another agent stops the turn and gets the message as the next prompt.
 
+#### Rich replies
+
+The agent's replies render as GitHub-flavoured Markdown: headings, lists, tables, task lists and code blocks. Simple HTML renders too, such as `<details>`, `<table>`, `<kbd>` and an inline SVG chart made of shapes and text. Scripts, event handlers, iframes, forms and styles are removed. No image loads from the network. Links open in your browser. A fenced `mermaid` block draws as a diagram (flowchart, sequence, pie, bar chart, Gantt) in the app's light or dark theme. A diagram that does not parse shows its source with the error. Your own messages stay plain text. While the find bar has a query, replies show as plain text so each match can be marked.
+
 #### What a turn changed
 
 Each edit shows as a diff, open, with the path relative to the worktree. A **Changed in this turn** card ends each turn with its files and their added and removed lines.
@@ -540,6 +559,20 @@ Each edit shows as a diff, open, with the path relative to the worktree. A **Cha
 #### Find and images
 
 **Cmd+F** in an agent tab opens a find bar over the transcript: **Enter** and **Shift+Enter** move, **Esc** closes. Paste or drop an image into the text box, or use the paperclip. PNG, JPEG, GIF and WebP up to 5 MB each are sent with your next message, to agents that read images.
+
+#### Attach sessions and cite replies
+
+Drag a session onto the agent's text box to give the agent that session as context. You can drag a session row in the sidebar, a tab, a task row on Home, or a running Scheduled run. The box says **Drop to attach this session as context**, and the session shows as a chip above the box. What the agent gets depends on the session:
+
+- A Claude Code session: the path of its transcript file, which the agent reads when it needs it.
+- Another agent tab: the text of its conversation.
+- A shell: the output on its screen and in its scrollback.
+
+A session with nothing to send shows the toast **This session has no conversation to attach.**
+
+To cite part of a reply, select the text in the agent's reply and choose **Cite**. Type a comment and press **Enter** to save it, or **Cmd+Enter** to save it and send at once. The citation shows as a chip above the box; the pencil edits its comment and **×** removes it.
+
+Attached sessions and citations go with your next message, after the text you typed. Your message bubble shows only your text, with the attached items as chips under it. Click a citation chip to find the cited passage in the transcript.
 
 ### Agent wakes
 
@@ -617,9 +650,9 @@ A Move takes a Claude Code session from another app into a Terminator terminal t
 
 ### Picking a Claude Code conversation back up
 
-When a Claude Code session ends (you typed `/exit`, the terminal closed, or you quit Terminator), the conversation stays on disk. A **Resume** button appears on that session wherever it shows: its work thread's drawer on Home, and its Overview tile. Press it, and Terminator opens the conversation on the same branch, in the same folder. A conversation that ran in a terminal opens a terminal that runs `claude --resume`. A conversation that ran in an agent tab opens an agent tab. The new terminal takes over the old one's description and ticket link, and the exited tab closes, so there is one terminal per conversation.
+When a Claude Code session ends (you typed `/exit`, the terminal closed, or you quit Terminator), the conversation stays on disk. A **Resume** button appears on its Overview tile, and **Resume a conversation…** in Quick Actions reopens the one that ended most recently. An ended session is not on Home. Press it, and Terminator opens the conversation on the same branch, in the same folder. A conversation that ran in a terminal opens a terminal that runs `claude --resume`. A conversation that ran in an agent tab opens an agent tab. The new terminal takes over the old one's description and ticket link, and the exited tab closes, so there is one terminal per conversation.
 
-After a restart, conversations from the last run wait with their Resume button. Terminator resumes nothing for you. A restart never starts agents on its own, so you choose which threads to pick up. The one exception is an agent wake for a pull request event after start-up (see [Agent wakes](#agent-wakes)). A thread whose sessions have all ended stays in the task list until its pull request merges or closes, you archive it, or Terminator drops its records after 30 days. **Resume a conversation…** in Quick actions (`Cmd+P`) opens the drawer of the thread that holds the most recent conversation.
+After a restart, **Resume a conversation…** in Quick Actions reopens the conversation from the last run that ended most recently. Terminator resumes nothing for you. A restart never starts agents on its own, so you choose which threads to pick up. The one exception is an agent wake for a pull request event after start-up (see [Agent wakes](#agent-wakes)). A thread whose sessions have all ended leaves the task list, unless a stored task or an open pull request keeps it there. Terminator deletes the ended records after the time that **Delete closed sessions after** sets.
 
 Resume appears only where it can work:
 

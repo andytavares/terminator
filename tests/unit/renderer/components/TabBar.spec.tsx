@@ -9,6 +9,7 @@ import { useTabDragStore } from '../../../../src/renderer/terminal/tab-drag'
 import { TabBar } from '../../../../src/renderer/components/terminal/TabBar'
 import { projectFixture, seedStore, workspaceFixture } from '../../../support/renderer-stores'
 import { partialFake } from '../../../support/fakes'
+import { eventually } from '../../../support/eventually'
 
 const records = {
   setDescription: vi.fn().mockResolvedValue(true),
@@ -59,6 +60,8 @@ const breakOut = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/terminal/breakout', () => ({ breakOut }))
 const recordUse = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+const attachSessions = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/stores/attached-context.store', () => ({ attachSessions }))
 
 const mockCloseSession = vi.fn()
 const mockSetActive = vi.fn()
@@ -113,7 +116,12 @@ beforeEach(() => {
   vi.clearAllMocks()
   seedStore(useSessionRecordsStore, records)
   seedStore(useBreakoutStore, { windows: new Map() })
-  useTabDragStore.setState({ sessionId: null, overSessionId: null, overMainWindow: false })
+  useTabDragStore.setState({
+    sessionId: null,
+    overSessionId: null,
+    overMainWindow: false,
+    overContextDrop: null,
+  })
   seedStore(useSessionStore, {
     getSessionsForProject: mockGetSessions,
     closeSession: mockCloseSession,
@@ -835,6 +843,8 @@ describe('TabBar — the drop target', () => {
     document.elementFromPoint = () => null
     pointerAt('pointermove', { x: 600, y: 300 })
     expect(tabs[1].classList.contains('tab-bar__tab--dnd-over')).toBe(false)
+    // An unreleased drag keeps listening on the document and would take a later test's release.
+    pointerAt('pointerup', { x: 600, y: 300 })
   })
 
   it('unmarks it, and moves nothing, when Escape cancels the drag', () => {
@@ -933,5 +943,21 @@ describe('TabBar — a tab let go somewhere it does not leave from', () => {
     dragTab(tab, null, OUTSIDE_WINDOW)
     fireEvent.click(tab)
     expect(mockSetActive).not.toHaveBeenCalled()
+  })
+})
+
+describe('TabBar — a tab let go on an agent composer', () => {
+  beforeEach(() => mockGetSessions.mockReturnValue(threeTabs))
+
+  it('attaches its session to that agent tab, and neither reorders nor breaks out', async () => {
+    renderTabBar()
+    const composer = document.createElement('div')
+    composer.dataset.contextDrop = 'agent-1'
+    document.body.append(composer)
+    dragTab(document.querySelectorAll('.tab-bar__tab--session')[1], composer)
+    await eventually(() => expect(attachSessions).toHaveBeenCalledWith('agent-1', ['ses-2']))
+    expect(mockReorderSessions).not.toHaveBeenCalled()
+    expect(breakOut).not.toHaveBeenCalled()
+    composer.remove()
   })
 })

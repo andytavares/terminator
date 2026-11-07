@@ -55,6 +55,7 @@ export interface CoreActionDeps {
   onOverview(): void
   onUsage(): void
   onToggleSidebar(): void
+  onToggleSidebarMode(): void
   onOpenSettings(): void
   onToggleLog(): void
   canGoBack: boolean
@@ -365,6 +366,12 @@ const TOP_ACTIONS: CoreActionSpec[] = [
     mnemonic: 'b',
     shortcut: '⌘B',
     run: (d) => d.onToggleSidebar(),
+  },
+  {
+    id: 'core.toggle-sidebar-inbox',
+    label: 'Switch sidebar: Tree / Inbox',
+    group: 'top',
+    run: (d) => d.onToggleSidebarMode(),
   },
   {
     id: 'core.open-settings',

@@ -25,6 +25,7 @@ describe('useDragReorder', () => {
   it('marks the hovered index on drag over and prevents the default', () => {
     const { result } = renderHook(() => useDragReorder(items, onReorder))
     const e = dragEvent()
+    act(() => result.current.getItemProps(0).onDragStart())
     act(() => result.current.getItemProps(1).onDragOver(e))
     expect(result.current.dragOverIndex).toBe(1)
     expect(e.preventDefault).toHaveBeenCalled()
@@ -32,6 +33,7 @@ describe('useDragReorder', () => {
 
   it('clears the hovered index on drag leave', () => {
     const { result } = renderHook(() => useDragReorder(items, onReorder))
+    act(() => result.current.getItemProps(0).onDragStart())
     act(() => result.current.getItemProps(1).onDragOver(dragEvent()))
     act(() => result.current.getItemProps(1).onDragLeave())
     expect(result.current.dragOverIndex).toBeNull()
@@ -98,5 +100,15 @@ describe('useDragReorder — clears state on drag end so an abandoned drag canno
     rerender({ list: ['a', 'b', 'c', 'd'] })
     act(() => result.current.getItemProps(3).onDrop())
     expect(onReorder).toHaveBeenCalledWith(['b', 'c', 'd', 'a'])
+  })
+})
+
+describe('useDragReorder — a drag from outside the list', () => {
+  it('does not mark a row as a drop target for a session dragged in from elsewhere', () => {
+    const { result } = renderHook(() => useDragReorder(items, onReorder))
+    const e = dragEvent()
+    act(() => result.current.getItemProps(1).onDragOver(e))
+    expect(result.current.dragOverIndex).toBeNull()
+    expect(e.preventDefault).not.toHaveBeenCalled()
   })
 })

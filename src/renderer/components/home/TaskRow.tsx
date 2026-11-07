@@ -110,8 +110,10 @@ function TaskRowCells({ thread, now, controls }: CellsInput): React.JSX.Element 
         ))}
       </div>
       <div className="task-row__now">{thread.nowLine}</div>
-      <span className="task-row__last">{compactAge(now - thread.lastActivity)}</span>
-      <InFlightMenu thread={thread} onStartRename={rename.begin} workMenu={workMenu} />
+      <div className="task-row__end">
+        <span className="task-row__last">{compactAge(now - thread.lastActivity)}</span>
+        <InFlightMenu thread={thread} onStartRename={rename.begin} workMenu={workMenu} />
+      </div>
     </>
   )
 }

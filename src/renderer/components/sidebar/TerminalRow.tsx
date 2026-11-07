@@ -4,6 +4,7 @@ import { useBreakoutStore } from '../../stores/breakout.store'
 import { StateChip } from '../session/StateChip'
 import type { BranchTerminal } from '../../sidebar/branch-rows'
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
+import { SESSION_DRAG_TYPE } from '../agent/session-drag'
 import { activateOnKey, afterClosing, clickOnly } from './row-events'
 import './TerminalRow.css'
 
@@ -48,18 +49,18 @@ export function TerminalRow(props: TerminalRowProps): React.JSX.Element {
   const { terminal, nested = false, selected, onSelect, onClose, onLinkIssue } = props
   const { menu, closeMenu, openMenu } = useLinkMenu(onLinkIssue !== undefined)
   const key = ownKey(terminal)
+  const drag = useSessionDrag(terminal.sessionId)
 
   return (
     <div
-      className={`terminal-row${nested ? ' terminal-row--nested' : ''}${
-        selected ? ' terminal-row--selected' : ''
-      }`}
+      className={terminalRowClass({ nested, selected, dragging: drag.dragging })}
       role="button"
       tabIndex={0}
       aria-current={selected ? 'true' : undefined}
       onClick={onSelect}
       onKeyDown={activateOnKey(onSelect)}
       onContextMenu={openMenu}
+      {...drag.props}
     >
       <TerminalRowContent terminal={terminal} linkKey={key} onClose={onClose} />
       {menu && (
@@ -72,6 +73,40 @@ export function TerminalRow(props: TerminalRowProps): React.JSX.Element {
       )}
     </div>
   )
+}
+
+/** Puts this row's session on the drag, for an agent tab to attach. */
+function terminalRowClass(flags: {
+  nested: boolean
+  selected: boolean
+  dragging: boolean
+}): string {
+  const { nested, selected, dragging } = flags
+  const classes = [
+    'terminal-row',
+    nested && 'terminal-row--nested',
+    selected && 'terminal-row--selected',
+  ]
+  return [...classes, dragging && 'terminal-row--dragging'].filter(Boolean).join(' ')
+}
+
+/** The row's drag: it carries its session to an agent tab and fades while it is held. */
+function useSessionDrag(sessionId: string) {
+  const [dragging, setDragging] = useState(false)
+  const props = {
+    draggable: true,
+    onDragStart: (e: React.DragEvent) => {
+      carrySession(e, sessionId)
+      setDragging(true)
+    },
+    onDragEnd: () => setDragging(false),
+  }
+  return { dragging, props }
+}
+
+function carrySession(e: React.DragEvent, sessionId: string): void {
+  e.dataTransfer.setData(SESSION_DRAG_TYPE, sessionId)
+  e.dataTransfer.effectAllowed = 'copy'
 }
 
 /** Where the link menu is open, if it is; no menu at all when nothing can link. */

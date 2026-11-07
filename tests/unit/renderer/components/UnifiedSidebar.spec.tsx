@@ -210,6 +210,28 @@ const branchNames = (c: HTMLElement) =>
 const recordUse = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
 
+describe('UnifiedSidebar — the Sidebar setting', () => {
+  const setSidebarMode = (sidebarMode: 'tree' | 'inbox') =>
+    act(() => {
+      const defaults = DEFAULT_GLOBAL_SETTINGS
+      useSettingsStore.setState({
+        globalSettings: { ...defaults, ui: { ...defaults.ui, sidebarMode } },
+      })
+    })
+
+  it('swaps the branch tree for the Inbox and back without a restart', async () => {
+    const { container } = renderSidebar()
+    expect(branchNames(container)).toEqual(['main', 'Jobs', 'Web'])
+    setSidebarMode('inbox')
+    expect(branchRows(container)).toEqual([])
+    expect(await screen.findByRole('list', { name: 'Inbox' })).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: 'Search' })).toBeTruthy()
+    setSidebarMode('tree')
+    expect(screen.queryByRole('list', { name: 'Inbox' })).toBeNull()
+    expect(branchNames(container)).toEqual(['main', 'Jobs', 'Web'])
+  })
+})
+
 describe('UnifiedSidebar — the list is branches, not terminals (US1)', () => {
   it('lists one row per branch and no terminals at all', () => {
     const { container } = renderSidebar()

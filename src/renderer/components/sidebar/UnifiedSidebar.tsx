@@ -1,5 +1,5 @@
 import type React from 'react'
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import type { Workspace } from '../../../shared/types/index'
 import { useExtensionRegistry } from '../../extensions/registry'
@@ -24,7 +24,11 @@ import { ScratchSection } from './ScratchSection'
 import { useSidebarData, useSidebarRows, type SidebarData } from './useSidebarRows'
 import { useSidebarViews, type SidebarViews } from './useSidebarViews'
 import { useSidebarWidth } from './useSidebarWidth'
+import { useSidebarMode } from './sidebar-mode'
 import './UnifiedSidebar.css'
+
+// Its own chunk: the app shell has a size budget (electron.vite.config.ts).
+const InboxSidebar = lazy(() => import('./InboxSidebar').then((m) => ({ default: m.InboxSidebar })))
 
 interface UnifiedSidebarProps {
   activeWorkspaceTabId: string | null
@@ -53,12 +57,7 @@ export function UnifiedSidebar(props: UnifiedSidebarProps): React.JSX.Element {
         style={{ width }}
         {...dismissSurfaceHandlers}
       >
-        <SidebarControls
-          views={views}
-          rows={rows}
-          onAddWorkspace={() => dialogs.open({ kind: 'create-workspace' })}
-        />
-        <SidebarListBody props={props} rows={rows} ctx={ctx} searchQuery={views.searchQuery} />
+        <SidebarContent props={props} views={views} rows={rows} ctx={ctx} dialogs={dialogs} />
         <ResizeHandle onMouseDown={onResizeMouseDown} onDoubleClick={onResizeDoubleClick} />
       </div>
       <IssueDialogs {...data} />
@@ -67,6 +66,35 @@ export function UnifiedSidebar(props: UnifiedSidebarProps): React.JSX.Element {
         close={dialogs.close}
         factsBySessionId={links.factsBySessionId}
       />
+    </>
+  )
+}
+
+interface ContentProps {
+  props: UnifiedSidebarProps
+  views: SidebarViews
+  rows: Rows
+  ctx: RowContext
+  dialogs: ReturnType<typeof useSidebarDialog>
+}
+
+/** The Inbox, or the tree's controls and list, as the Sidebar setting says. */
+function SidebarContent({ props, views, rows, ctx, dialogs }: ContentProps): React.JSX.Element {
+  if (useSidebarMode() === 'inbox') {
+    return (
+      <Suspense fallback={null}>
+        <InboxSidebar now={props.now} />
+      </Suspense>
+    )
+  }
+  return (
+    <>
+      <SidebarControls
+        views={views}
+        rows={rows}
+        onAddWorkspace={() => dialogs.open({ kind: 'create-workspace' })}
+      />
+      <SidebarListBody props={props} rows={rows} ctx={ctx} searchQuery={views.searchQuery} />
     </>
   )
 }

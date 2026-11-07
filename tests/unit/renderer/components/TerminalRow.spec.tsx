@@ -4,6 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { TerminalRow } from '../../../../src/renderer/components/sidebar/TerminalRow'
 import { useBreakoutStore } from '../../../../src/renderer/stores/breakout.store'
 import { resetStore } from '../../../support/renderer-stores'
+import { SESSION_DRAG_TYPE } from '../../../../src/renderer/components/agent/session-drag'
 import type { BranchTerminal } from '../../../../src/renderer/sidebar/branch-rows'
 
 const terminal = (patch: Partial<BranchTerminal> = {}): BranchTerminal => ({
@@ -171,5 +172,26 @@ describe('TerminalRow — a terminal in its own window', () => {
     const { container } = renderRow()
     expect(screen.queryByTitle('In its own window')).toBeNull()
     expect(container.querySelector('.terminal-row__gutter .state-chip')).not.toBeNull()
+  })
+})
+
+describe('TerminalRow — dragging it out', () => {
+  it('carries its session id, as a copy, so an agent tab can attach it', () => {
+    const { container } = renderRow()
+    const row = container.querySelector<HTMLElement>('.terminal-row')!
+    const dataTransfer = { setData: vi.fn(), effectAllowed: '' }
+    expect(row.draggable).toBe(true)
+    fireEvent.dragStart(row, { dataTransfer })
+    expect(dataTransfer.setData).toHaveBeenCalledWith(SESSION_DRAG_TYPE, 'ses-1')
+    expect(dataTransfer.effectAllowed).toBe('copy')
+  })
+
+  it('fades while it is dragged and comes back when the drag ends', () => {
+    const { container } = renderRow()
+    const row = container.querySelector<HTMLElement>('.terminal-row')!
+    fireEvent.dragStart(row, { dataTransfer: { setData: vi.fn(), effectAllowed: '' } })
+    expect(row.classList.contains('terminal-row--dragging')).toBe(true)
+    fireEvent.dragEnd(row)
+    expect(row.classList.contains('terminal-row--dragging')).toBe(false)
   })
 })

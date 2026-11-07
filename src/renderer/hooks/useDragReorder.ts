@@ -34,19 +34,22 @@ export function moved<T>(items: T[], from: number, to: number): T[] {
   return reordered
 }
 
-/**
- * HTML5 drag-to-reorder for a flat list. `onReorder` receives the reordered
- * array and is responsible for persisting it.
- */
-export function useDragReorder<T>(items: T[], onReorder: (reordered: T[]) => void): DragReorder {
+/** Where the drag in this list started and which row it is over; `reset` forgets both. */
+function useReorderDragState() {
   const fromIndexRef = useRef<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
-  const itemsRef = useCurrentItems(items)
-
   const reset = useCallback(() => {
     fromIndexRef.current = null
     setDragOverIndex(null)
   }, [])
+  return { fromIndexRef, dragOverIndex, setDragOverIndex, reset }
+}
+
+/** HTML5 drag-to-reorder for a flat list; `onReorder` persists the new order. A drag from
+ * outside the list (a session on its way to an agent tab) is not a reorder, so no row takes it. */
+export function useDragReorder<T>(items: T[], onReorder: (reordered: T[]) => void): DragReorder {
+  const { fromIndexRef, dragOverIndex, setDragOverIndex, reset } = useReorderDragState()
+  const itemsRef = useCurrentItems(items)
 
   const getItemProps = useCallback(
     (index: number): DragItemProps => ({
@@ -55,6 +58,7 @@ export function useDragReorder<T>(items: T[], onReorder: (reordered: T[]) => voi
         fromIndexRef.current = index
       },
       onDragOver: (e) => {
+        if (fromIndexRef.current === null) return
         e.preventDefault()
         setDragOverIndex(index)
       },
@@ -66,7 +70,7 @@ export function useDragReorder<T>(items: T[], onReorder: (reordered: T[]) => voi
       },
       onDragEnd: reset,
     }),
-    [onReorder, reset, itemsRef]
+    [onReorder, reset, itemsRef, fromIndexRef, setDragOverIndex]
   )
 
   return { dragOverIndex, getItemProps }

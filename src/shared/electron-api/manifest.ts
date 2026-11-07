@@ -1626,7 +1626,11 @@ export const ELECTRON_API_MANIFEST = [
       description: 'Tells which agent sessions are in a turn.',
       readOnly: true,
     },
-    signature: signature<() => Promise<{ data: Array<{ sessionId: string; inTurn: boolean }> }>>(),
+    signature: signature<
+      () => Promise<{
+        data: Array<{ sessionId: string; inTurn: boolean; endedAt: number | null }>
+      }>
+    >(),
     remote: 'omit',
   }),
   method({

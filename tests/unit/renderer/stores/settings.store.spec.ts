@@ -32,8 +32,10 @@ const DEFAULT_SETTINGS: GlobalSettings = {
     hideSidebarOnHome: true,
     showUsageTab: true,
     homeLayout: 'tasks',
+    sidebarMode: 'tree',
   },
   sidebar: { staleAfterMs: 2 * 60 * 60 * 1000 },
+  sessions: { deleteClosedAfterHours: 24 },
   notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },
   quickActions: { pins: [], usage: [], directUse: [], custom: [] },
   agents: { default: 'claude', custom: [] },
@@ -322,6 +324,19 @@ describe('useSettingsStore — updateHomeLayout', () => {
       ui: { homeLayout: 'classic' },
     })
     expect(useSettingsStore.getState().globalSettings?.ui?.homeLayout).toBe('classic')
+  })
+})
+
+describe('useSettingsStore — updateSidebarMode', () => {
+  it('writes ui.sidebarMode and keeps the saved settings', async () => {
+    const updated = { ...DEFAULT_SETTINGS, ui: { hasSeenWelcome: false, sidebarMode: 'inbox' } }
+    mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+
+    await useSettingsStore.getState().updateSidebarMode('inbox')
+    expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+      ui: { sidebarMode: 'inbox' },
+    })
+    expect(useSettingsStore.getState().globalSettings?.ui?.sidebarMode).toBe('inbox')
   })
 })
 

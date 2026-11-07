@@ -16,24 +16,31 @@ const MINUTE_MS = 60_000
 
 const isState = (id: string): id is TaskState => (TASK_STATES as readonly string[]).includes(id)
 
-/** The group's name and count, with Show or Hide when the group folds to one line. */
+/** The group's name and count, with Show or Hide when the group folds to one line: then the
+ *  whole header is the one button that folds it, by click, Enter or Space. */
 function GroupHeading({ group }: { group: DeskGroup }): React.JSX.Element {
   const expanded = useDeskSelection((s) => s.expandedGroupIds.includes(group.id))
   const toggleGroup = useDeskSelection((s) => s.toggleGroup)
+  const toggle = group.collapsible && {
+    role: 'button',
+    tabIndex: 0,
+    'aria-expanded': expanded,
+    'aria-label': `${expanded ? 'Hide' : 'Show'} ${group.label}`,
+    onClick: () => toggleGroup(group.id),
+    onKeyDown: (event: React.KeyboardEvent) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return
+      event.preventDefault()
+      toggleGroup(group.id)
+    },
+  }
   return (
-    <div className="task-group">
+    <div className={toggle ? 'task-group task-group--toggle' : 'task-group'} {...toggle}>
       {isState(group.id) && <StateGlyph state={group.id} />}
       <h3>{`${group.label} · ${group.threads.length}`}</h3>
-      {group.collapsible && (
-        <button
-          type="button"
-          className="task-group__toggle"
-          aria-expanded={expanded}
-          aria-label={`${expanded ? 'Hide' : 'Show'} ${group.label}`}
-          onClick={() => toggleGroup(group.id)}
-        >
+      {toggle && (
+        <span className="task-group__toggle" aria-hidden="true">
           {expanded ? 'Hide ▾' : 'Show ▸'}
-        </button>
+        </span>
       )}
     </div>
   )
