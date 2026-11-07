@@ -25,8 +25,9 @@ describe('deskKeyCommand', () => {
     expect(deskKeyCommand(key(pressed), false)).toEqual(command)
   })
 
-  it('reads G then I as Insights and G then D as the Desk', () => {
+  it('reads G then I as Insights, G then D as the Desk and G then S as Scheduled', () => {
     expect(deskKeyCommand(key('g'), false)).toEqual({ kind: 'go-to' })
+    expect(deskKeyCommand(key('s'), true)).toEqual({ kind: 'view', view: 'scheduled' })
     expect(deskKeyCommand(key('i'), true)).toEqual({ kind: 'view', view: 'insights' })
     expect(deskKeyCommand(key('d'), true)).toEqual({ kind: 'view', view: 'desk' })
   })

@@ -18,6 +18,9 @@ import './HomeScreen.css'
 
 // Shown on demand, so each is its own chunk (https://react.dev/reference/react/lazy).
 const Insights = lazy(() => import('./Insights').then((m) => ({ default: m.Insights })))
+const ScheduledView = lazy(() =>
+  import('./ScheduledView').then((m) => ({ default: m.ScheduledView }))
+)
 const PlanTheDay = lazy(() => import('./PlanTheDay').then((m) => ({ default: m.PlanTheDay })))
 
 export interface HomeScreenProps {
@@ -52,7 +55,13 @@ export function HomeScreen(_props: HomeScreenProps = {}): React.JSX.Element {
     <section className="desk" aria-label="Home" tabIndex={-1} ref={rootRef} onKeyDown={onKeyDown}>
       <DeskHeader ref={searchRef} now={desk.now} />
       <Suspense fallback={null}>
-        {view === 'insights' ? <Insights /> : <Body desk={desk} controller={controller} />}
+        {view === 'insights' ? (
+          <Insights />
+        ) : view === 'scheduled' ? (
+          <ScheduledView />
+        ) : (
+          <Body desk={desk} controller={controller} />
+        )}
       </Suspense>
     </section>
   )

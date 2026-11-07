@@ -67,7 +67,7 @@ describe('the schedules table', () => {
     await s.init()
     const created = await s.create(daily)
     expect(await s.list()).toEqual([
-      { ...daily, id: created.id, lastRunAt: null, createdAt: clock.toISOString() },
+      { ...daily, id: created.id, lastRunAt: null, createdAt: clock.toISOString(), paused: false },
     ])
     await s.remove(created.id)
     expect(await s.list()).toEqual([])
@@ -182,6 +182,7 @@ describe('answering a missed run', () => {
     await s.act(asks[0].id, 'skip')
     expect(started).not.toHaveBeenCalled()
     expect(asks).toEqual([])
+    expect(await s.list()).toMatchObject([{ lastRunAt: null }])
     clock = at('2026-11-05T09:00:00')
     await s.tick()
     expect(started).toHaveBeenCalledTimes(1)
@@ -276,5 +277,168 @@ describe('a repeat missed while the app was closed', () => {
     await s.tick()
     expect(asks).toHaveLength(1)
     expect(asks[0].where).toBe('repo · every day at 09:00')
+  })
+})
+
+const tomorrowAtNine: ScheduleInput = {
+  ...daily,
+  kind: 'once',
+  repeat: null,
+  branch: null,
+  date: '2026-11-05',
+}
+
+describe('pausing a scheduled run', () => {
+  it('does not start a paused repeat at its time', async () => {
+    const s = await withSchedule(daily)
+    const [{ id }] = await s.list()
+    await s.pauseRun(id, true)
+    expect(await s.list()).toMatchObject([{ paused: true }])
+    clock = at('2026-11-04T09:00:00')
+    await s.tick()
+    expect(started).not.toHaveBeenCalled()
+  })
+
+  it('raises no missed ask for a time that passed while paused', async () => {
+    const s = await withSchedule(daily)
+    const [{ id }] = await s.list()
+    await s.pauseRun(id, true)
+    clock = at('2026-11-04T13:00:00')
+    await s.pauseRun(id, false)
+    await s.checkMissed()
+    expect(asks).toEqual([])
+    expect(await s.list()).toMatchObject([{ paused: false }])
+    clock = at('2026-11-05T09:00:00')
+    await s.tick()
+    expect(started).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('pausing and resuming a scheduled run', () => {
+  it('keeps Last run at never after a pause and a resume', async () => {
+    const s = await withSchedule(daily)
+    const [{ id }] = await s.list()
+    await s.pauseRun(id, true)
+    await s.pauseRun(id, false)
+    expect(await s.list()).toMatchObject([{ lastRunAt: null }])
+  })
+
+  it('drops the missed ask of a run it pauses', async () => {
+    const s = await closedOverNine()
+    const [{ id }] = await s.list()
+    await s.pauseRun(id, true)
+    expect(asks).toEqual([])
+  })
+})
+
+describe('running a scheduled run now', () => {
+  it('starts a repeat and keeps its next time', async () => {
+    const s = await withSchedule(daily)
+    const [{ id }] = await s.list()
+    clock = at('2026-11-04T08:30:00')
+    await s.runNow(id)
+    expect(started).toHaveBeenCalledTimes(1)
+    expect((await s.list())[0].lastRunAt).toBe(clock.toISOString())
+    clock = at('2026-11-04T09:00:00')
+    await s.tick()
+    expect(started).toHaveBeenCalledTimes(2)
+  })
+
+  it('starts a one-time run and removes it', async () => {
+    const s = await withSchedule(tomorrowAtNine)
+    const [{ id }] = await s.list()
+    await s.runNow(id)
+    expect(started).toHaveBeenCalledWith(expect.objectContaining({ id }))
+    expect(await s.list()).toEqual([])
+  })
+
+  it('clears the missed ask of the run it starts', async () => {
+    const s = await closedOverNine()
+    await s.runNow((await s.list())[0].id)
+    expect(asks).toEqual([])
+  })
+})
+
+describe('running a scheduled run now, then the tick', () => {
+  it('does not raise the missed ask again on the next tick', async () => {
+    const s = await closedOverNine()
+    await s.runNow((await s.list())[0].id)
+    clock = at('2026-11-04T13:01:00')
+    await s.tick()
+    expect(asks).toEqual([])
+    expect(started).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not start the same occurrence again when run just after its time', async () => {
+    const s = await withSchedule(daily)
+    clock = at('2026-11-04T09:00:20')
+    await s.runNow((await s.list())[0].id)
+    clock = at('2026-11-04T09:01:00')
+    await s.tick()
+    expect(started).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('a scheduled run that was deleted', () => {
+  it('refuses to run, pause or edit it', async () => {
+    const s = await withSchedule(daily)
+    await expect(s.runNow('gone')).rejects.toThrow('That scheduled run no longer exists.')
+    await expect(s.pauseRun('gone', true)).rejects.toThrow('That scheduled run no longer exists.')
+    await expect(s.update('gone', daily)).rejects.toThrow('That scheduled run no longer exists.')
+  })
+})
+
+describe('editing a scheduled run', () => {
+  it('moves the time, keeps the id, and raises no ask for the old time', async () => {
+    const s = await withSchedule(daily)
+    const [before] = await s.list()
+    clock = at('2026-11-04T09:30:00')
+    const edited = await s.update(before.id, { ...daily, time: '10:00' })
+    expect(edited).toMatchObject({ id: before.id, createdAt: before.createdAt, time: '10:00' })
+    await s.checkMissed()
+    expect(asks).toEqual([])
+    clock = at('2026-11-04T10:00:00')
+    await s.tick()
+    expect(started).toHaveBeenCalledTimes(1)
+    expect(await s.list()).toMatchObject([{ id: before.id, time: '10:00' }])
+  })
+})
+
+describe('editing a scheduled run, its marks', () => {
+  it('keeps Last run at never after an edit', async () => {
+    const s = await withSchedule(daily)
+    const [{ id }] = await s.list()
+    await s.update(id, { ...daily, time: '10:00' })
+    expect(await s.list()).toMatchObject([{ lastRunAt: null }])
+  })
+
+  it('drops the missed ask of the run it edits', async () => {
+    const s = await closedOverNine()
+    await s.update((await s.list())[0].id, { ...daily, time: '18:00' })
+    expect(asks).toEqual([])
+  })
+
+  it('refuses a one-time run whose time has passed', async () => {
+    const s = await withSchedule(tomorrowAtNine)
+    const [{ id }] = await s.list()
+    await expect(
+      s.update(id, { ...tomorrowAtNine, date: '2026-11-04', time: '07:00' })
+    ).rejects.toThrow('That time has passed')
+    expect(await s.list()).toMatchObject([{ date: '2026-11-05' }])
+  })
+})
+
+const globalRun: ScheduleInput = { ...daily, repoRoot: null, branch: null, newWorktree: false }
+
+describe('a global scheduled run', () => {
+  it('reads back with no repo root, beside a run that has one', async () => {
+    await withSchedule(globalRun)
+    const s = await withSchedule(daily)
+    expect((await s.list()).map((r) => r.repoRoot)).toEqual([null, '/repo'])
+  })
+
+  it('says Global in its missed ask', async () => {
+    await closedOverNine(globalRun)
+    expect(asks[0].where).toBe('Global · every day at 09:00')
   })
 })

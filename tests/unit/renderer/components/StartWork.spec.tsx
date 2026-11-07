@@ -9,6 +9,8 @@ import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useDismissedThreads } from '../../../../src/renderer/components/home/dismissed-threads'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
+import { useStartWorkStore } from '../../../../src/renderer/components/home/start-work'
+import type { Schedule } from '../../../../src/shared/schemas/schedules.schema'
 import userEvent from '@testing-library/user-event'
 import { installElectronApi } from '../../../support/electron-api'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
@@ -23,12 +25,15 @@ const launched = vi.hoisted(() => ({
   inBranch: vi.fn(),
   agentInBranch: vi.fn(),
   scratch: vi.fn(),
+  global: vi.fn(),
   createFromDraft: vi.fn(),
 }))
-vi.mock('../../../../src/renderer/terminal/start-session', () => ({
+vi.mock('../../../../src/renderer/terminal/start-session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   startSessionInBranch: launched.inBranch,
   startAgentInBranch: launched.agentInBranch,
   startScratchSession: launched.scratch,
+  startGlobalPrompt: launched.global,
 }))
 vi.mock('../../../../src/renderer/components/sidebar/create-project', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -118,6 +123,7 @@ const executeCommand = vi.fn<ElectronAPI['extension']['executeCommand']>()
 const agentsList = vi.fn<ElectronAPI['agents']['list']>()
 const nameBranch = vi.fn<ElectronAPI['homeBranchName']['get']>()
 const createSchedule = vi.fn<ElectronAPI['schedules']['create']>()
+const updateSchedule = vi.fn<ElectronAPI['schedules']['update']>()
 
 function seedStartWorkStores(): void {
   useWorkspaceStore.setState({
@@ -151,7 +157,11 @@ beforeEach(() => {
     git,
     agents: { list: agentsList },
     homeBranchName: { get: nameBranch },
-    schedules: { create: createSchedule, list: async () => ({ data: [] }) },
+    schedules: {
+      create: createSchedule,
+      update: updateSchedule,
+      list: async () => ({ data: [] }),
+    },
     extension: {
       executeCommand,
       getCommands: vi.fn(async () => ({ commands: [] })),
@@ -159,12 +169,20 @@ beforeEach(() => {
       list: vi.fn(async () => ({ extensions: [] })),
     },
   })
+  stubStarts()
+  seedStartWorkStores()
+  useStartWorkStore.getState().closeLauncher()
+})
+
+/** Every start succeeds, the agent names fix/dev-build, and the launcher opens blank. */
+function stubStarts(): void {
   nameBranch.mockResolvedValue({ text: 'fix/dev-build' })
   launched.inBranch.mockResolvedValue('s-new')
   launched.agentInBranch.mockResolvedValue('s-new')
   launched.createFromDraft.mockResolvedValue('p-new')
-  seedStartWorkStores()
-})
+  launched.global.mockResolvedValue('g-1')
+  useStartWorkStore.setState({ prefill: '', editing: null })
+}
 
 /** The field the person types in: the search row, or the Prompt tab's own box. */
 const searchBox = () =>
@@ -1053,5 +1071,311 @@ describe('StartWork — an extension option on a repeat', () => {
     expect(screen.getByText('Foundry order cannot repeat. Pick Once or Now.')).toBeTruthy()
     const button = screen.getByRole('button', { name: /^Schedule/ }) as HTMLButtonElement
     expect(button.disabled).toBe(true)
+  })
+})
+
+const runAsNames = () =>
+  within(screen.getByRole('radiogroup', { name: 'Run it as' }))
+    .getAllByRole('radio')
+    .map((r) => r.getAttribute('aria-label'))
+const pickGlobal = () => {
+  fireEvent.click(pickerButton())
+  fireEvent.click(within(listbox()).getByRole('option', { name: /Global/ }))
+}
+
+describe('StartWork — Global in the workspace picker', () => {
+  beforeEach(seedTwoWorkspaces)
+
+  it('offers Global first on the Prompt tab, with where it runs', async () => {
+    await open()
+    goToTab('Prompt')
+    fireEvent.click(pickerButton())
+    const options = within(listbox()).getAllByRole('option')
+    expect(options.map((o) => o.textContent)).toEqual([
+      expect.stringMatching(/^Globalno workspace~ · shows in Scratch$/),
+      expect.stringContaining('terminator'),
+      expect.stringContaining('atlas'),
+    ])
+  })
+
+  it('does not offer Global on My tickets', async () => {
+    await open()
+    fireEvent.click(pickerButton())
+    expect(within(listbox()).queryByRole('option', { name: /Global/ })).toBeNull()
+  })
+
+  it('filters Global out with the workspaces, and picks it with Enter', async () => {
+    await open()
+    goToTab('Prompt')
+    fireEvent.click(pickerButton())
+    const filter = screen.getByRole('textbox', { name: 'Filter workspaces' })
+    fireEvent.change(filter, { target: { value: 'atl' } })
+    expect(within(listbox()).queryByRole('option', { name: /Global/ })).toBeNull()
+    fireEvent.change(filter, { target: { value: 'glo' } })
+    fireEvent.keyDown(filter, { key: 'Enter' })
+    expect(pickerButton().getAttribute('aria-label')).toBe('Workspace: Global')
+  })
+})
+
+describe('StartWork — Global chosen', () => {
+  beforeEach(seedTwoWorkspaces)
+
+  it('runs only as the agent tab or Claude in a terminal, and says where it runs', async () => {
+    await open()
+    typePrompt('sum up the PRs')
+    fireEvent.click(screen.getByRole('radio', { name: 'Terminal only' }))
+    pickGlobal()
+    expect(pickerButton().textContent).toMatch(/Global/)
+    expect(runAsNames()).toEqual(['Claude Code in an agent tab', 'Claude in a terminal'])
+    expect(screen.getByRole('radio', { checked: true, name: /agent tab/ })).toBeTruthy()
+    const where = screen.getByRole('group', { name: 'Where it runs' })
+    expect(where.textContent).toBe('Runs in~ (your home folder)Shows inScratch')
+    expect(screen.queryByRole('checkbox', { name: 'Use the repo folder' })).toBeNull()
+  })
+
+  it('goes back to the suggested workspace on another tab', async () => {
+    await open()
+    goToTab('Prompt')
+    pickGlobal()
+    goToTab('My tickets')
+    expect(pickerButton().getAttribute('aria-label')).toBe('Workspace: terminator')
+  })
+})
+
+describe('StartWork — Global, starting', () => {
+  beforeEach(seedTwoWorkspaces)
+
+  it('starts the prompt in Scratch on Enter with When Now, and closes', async () => {
+    const onClose = await open()
+    typePrompt('sum up the PRs')
+    pickGlobal()
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(launched.global).toHaveBeenCalledWith({ text: 'sum up the PRs', runAs: 'agent' })
+    expect(launched.agentInBranch).not.toHaveBeenCalled()
+  })
+
+  it('says why when it does not start', async () => {
+    launched.global.mockResolvedValue(null)
+    const onClose = await open()
+    typePrompt('x'.repeat(2000))
+    pickGlobal()
+    fireEvent.click(screen.getByRole('radio', { name: 'Claude in a terminal' }))
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'That prompt is too long to start an agent with. Shorten it.'
+    )
+    expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
+describe('StartWork — Global, scheduling', () => {
+  beforeEach(seedTwoWorkspaces)
+
+  it('saves with no workspace, no branch and no worktree', async () => {
+    createSchedule.mockResolvedValue({ data: {} as never })
+    const onClose = await open()
+    typePrompt('sum up the PRs')
+    pickGlobal()
+    fireEvent.click(screen.getByRole('radio', { name: 'Repeat' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Schedule/ }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(createSchedule).toHaveBeenCalledWith(
+      expect.objectContaining({ repoRoot: null, branch: null, newWorktree: false, runAs: 'agent' })
+    )
+    expect(nameBranch).not.toHaveBeenCalled()
+  })
+})
+
+const savedRun: Schedule = {
+  id: 'sch-1',
+  repoRoot: '/repo',
+  prompt: 'Triage new Sentry errors',
+  runAs: 'agent',
+  kind: 'repeat',
+  repeat: { every: 1, unit: 'day', days: [1, 2, 3, 4, 5], between: null, overlap: 'skip' },
+  branch: 'feat/triage',
+  time: '09:00',
+  date: null,
+  newWorktree: true,
+  agentId: null,
+  lastRunAt: null,
+  createdAt: '2026-11-04T10:00:00',
+  paused: false,
+}
+
+const openEditing = async (editing: Schedule, onClose = vi.fn()) => {
+  useStartWorkStore.getState().openLauncher('', editing)
+  render(<StartWork onClose={onClose} />)
+  await screen.findByRole('heading', { name: 'Edit scheduled run' })
+  return onClose
+}
+const whenNames = () =>
+  within(screen.getByRole('radiogroup', { name: 'When' }))
+    .getAllByRole('radio')
+    .map((r) => r.textContent)
+
+describe('useStartWorkStore — editing', () => {
+  it('opens with the schedule to edit and forgets it on close', () => {
+    useStartWorkStore.getState().openLauncher('', savedRun)
+    expect(useStartWorkStore.getState()).toMatchObject({ open: true, editing: savedRun })
+    useStartWorkStore.getState().closeLauncher()
+    expect(useStartWorkStore.getState()).toMatchObject({ open: false, editing: null })
+  })
+})
+
+describe('StartWork — a new scheduled run', () => {
+  beforeEach(seedTwoWorkspaces)
+
+  it('opens on the Prompt tab with When set to Repeat', async () => {
+    useStartWorkStore.getState().openScheduledRun()
+    render(<StartWork onClose={vi.fn()} />)
+    expect((await screen.findByRole('tab', { name: 'Prompt' })).getAttribute('aria-selected')).toBe(
+      'true'
+    )
+    expect(screen.getByRole('radio', { name: 'Repeat' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.queryByRole('heading', { name: 'Edit scheduled run' })).toBeNull()
+  })
+
+  it('opens plainly again after it closes', () => {
+    useStartWorkStore.getState().openScheduledRun()
+    useStartWorkStore.getState().closeLauncher()
+    useStartWorkStore.getState().openLauncher()
+    expect(useStartWorkStore.getState().repeat).toBe(false)
+  })
+})
+
+describe('StartWork — editing a scheduled run', () => {
+  beforeEach(seedTwoWorkspaces)
+
+  it('shows the title, the saved prompt and its repeat, with no tabs and no Now', async () => {
+    await openEditing(savedRun)
+    expect(screen.queryByRole('tab')).toBeNull()
+    expect((searchBox() as HTMLTextAreaElement).value).toBe('Triage new Sentry errors')
+    expect(whenNames()).toEqual(['Once', 'Repeat'])
+    expect(screen.getByRole('radio', { name: 'Repeat' }).getAttribute('aria-checked')).toBe('true')
+    expect(pickerButton().getAttribute('aria-label')).toBe('Workspace: terminator')
+    expect(
+      screen.getByText(
+        /^Created Wed 4 Nov 10:00 · last run never · next run \w{3} \d+ \w{3} 09:00$/
+      )
+    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy()
+  })
+})
+
+describe('StartWork — editing a scheduled run, saving', () => {
+  beforeEach(seedTwoWorkspaces)
+
+  it('saves the changes on the same id and keeps the branch, then closes', async () => {
+    updateSchedule.mockResolvedValue({ data: {} as never })
+    const onClose = await openEditing(savedRun)
+    fireEvent.change(searchBox(), { target: { value: 'Triage new errors' } })
+    fireEvent.click(screen.getByRole('button', { name: /^Save changes/ }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(updateSchedule).toHaveBeenCalledWith({
+      id: 'sch-1',
+      repoRoot: '/repo',
+      prompt: 'Triage new errors',
+      runAs: 'agent',
+      kind: 'repeat',
+      repeat: savedRun.repeat,
+      branch: 'feat/triage',
+      time: '09:00',
+      date: null,
+      newWorktree: true,
+      agentId: null,
+    })
+    expect(createSchedule).not.toHaveBeenCalled()
+  })
+})
+
+describe('StartWork — editing a scheduled run, another workspace or a refusal', () => {
+  beforeEach(seedTwoWorkspaces)
+
+  it('names the branch again when the workspace changes', async () => {
+    updateSchedule.mockResolvedValue({ data: {} as never })
+    const onClose = await openEditing(savedRun)
+    fireEvent.click(pickerButton())
+    fireEvent.click(within(listbox()).getByRole('option', { name: /atlas/ }))
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(updateSchedule).toHaveBeenCalledWith(
+      expect.objectContaining({ repoRoot: '/atlas', branch: 'fix/dev-build' })
+    )
+  })
+})
+
+describe('StartWork — editing a scheduled run, guards', () => {
+  beforeEach(seedTwoWorkspaces)
+
+  it('drops the branch when the run no longer runs on one', async () => {
+    updateSchedule.mockResolvedValue({ data: {} as never })
+    const onClose = await openEditing(savedRun)
+    fireEvent.click(screen.getByRole('radio', { name: 'Terminal only' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Save changes/ }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(updateSchedule).toHaveBeenCalledWith(
+      expect.objectContaining({ runAs: 'terminal', branch: null, newWorktree: false })
+    )
+  })
+
+  it('refuses to move a run whose workspace is gone to the suggested one', async () => {
+    const onClose = await openEditing({ ...savedRun, repoRoot: '/removed' })
+    fireEvent.click(screen.getByRole('button', { name: /^Save changes/ }))
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Its workspace is no longer in the sidebar. Pick a workspace or Global.'
+    )
+    expect(updateSchedule).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('shows the refusal and stays open', async () => {
+    updateSchedule.mockResolvedValue({ error: 'failed', message: 'No such schedule.' })
+    const onClose = await openEditing(savedRun)
+    fireEvent.click(screen.getByRole('button', { name: /^Save changes/ }))
+    expect((await screen.findByRole('alert')).textContent).toBe('No such schedule.')
+    expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
+/** A one-time global scheduled run that ran once. */
+const globalOnce: Schedule = {
+  ...savedRun,
+  repoRoot: null,
+  branch: null,
+  newWorktree: false,
+  kind: 'once',
+  repeat: null,
+  date: '2099-01-02',
+  lastRunAt: '2026-11-05T09:00:00',
+}
+
+describe('StartWork — editing other scheduled runs', () => {
+  beforeEach(seedTwoWorkspaces)
+
+  it('opens a one-time global run on Once, its date and Global', async () => {
+    await openEditing(globalOnce)
+    expect(screen.getByRole('radio', { name: 'Once' }).getAttribute('aria-checked')).toBe('true')
+    expect((screen.getByLabelText('Date') as HTMLInputElement).value).toBe('2099-01-02')
+    expect(pickerButton().getAttribute('aria-label')).toBe('Workspace: Global')
+    expect(
+      screen.getByText(
+        'Created Wed 4 Nov 10:00 · last run Thu 5 Nov 09:00 · next run Fri 2 Jan 09:00'
+      )
+    ).toBeTruthy()
+  })
+
+  it('counts the next runs from when the run was created, as the scheduler does', async () => {
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const everyOtherDay = { ...savedRun.repeat!, every: 2, days: [] }
+    await openEditing({ ...savedRun, repeat: everyOtherDay, createdAt: yesterday.toISOString() })
+    const month = tomorrow.toLocaleDateString('en-GB', { month: 'short' })
+    expect(screen.getByText(/^Next: /).textContent).toMatch(
+      new RegExp(`^Next: \\w+ ${tomorrow.getDate()} ${month} 09:00`)
+    )
   })
 })

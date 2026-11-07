@@ -1,0 +1,33 @@
+/* Home's Scheduled view. DataTable, Chip, Menu and EmptyState bring their own styles. */
+.scheduled {
+  /* Fills Home under its header and scrolls on its own, as Insights does. */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: var(--tm-space-3);
+  padding: 16px 18px 20px;
+}
+
+.scheduled__summary {
+  margin: 0;
+  color: var(--tm-text-secondary);
+}
+
+.scheduled__summary b {
+  color: var(--tm-text-primary);
+}
+
+.scheduled__prompt {
+  display: block;
+  max-width: 48ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scheduled__menu {
+  display: flex;
+  justify-content: flex-end;
+}

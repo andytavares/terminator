@@ -37,7 +37,8 @@ describe('stopRunningCommands', () => {
 
     await stopRunningCommands()
 
-    expect(isProcessAlive(grandchild)).toBe(false)
+    // The group is signalled before stop settles, but the grandchild's death lands a moment later.
+    await expectProcessGone(grandchild)
     expect((await run).exitCode).not.toBe(0)
   })
 
@@ -51,7 +52,8 @@ describe('stopRunningCommands', () => {
 
     await stopRunningCommands()
 
-    expect(isProcessAlive(grandchild)).toBe(false)
+    // The group is signalled before stop settles, but the grandchild's death lands a moment later.
+    await expectProcessGone(grandchild)
     expect((await run).exitCode).not.toBe(0)
   })
 

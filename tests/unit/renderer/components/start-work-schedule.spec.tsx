@@ -1,14 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook } from '@testing-library/react'
+import { renderHook, waitFor } from '@testing-library/react'
 import { useScheduledRuns } from '../../../../src/renderer/components/home/start-work-schedule'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
+import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import { installElectronApi } from '../../../support/electron-api'
 import type { Schedule } from '../../../../src/shared/schemas/schedules.schema'
 import type { Project, TerminalSession, Workspace } from '../../../../src/shared/types/index'
 
 const started = vi.hoisted(() => vi.fn())
-vi.mock('../../../../src/renderer/components/home/start-work', () => ({ startWork: started }))
+vi.mock('../../../../src/renderer/components/home/start-work', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  startWork: started,
+}))
+const startedGlobal = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/terminal/start-session', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  startGlobalPrompt: startedGlobal,
+}))
 
 const workspace = { id: 'ws-1', name: 'terminator', folderPath: '/repo' } as Workspace
 const project = { id: 'p-1', workspaceId: 'ws-1', gitBranch: 'feat/triage' } as Project
@@ -27,12 +36,14 @@ const triage: Schedule = {
   newWorktree: true,
   agentId: null,
   lastRunAt: null,
+  paused: false,
   createdAt: '',
 }
 
 let due: (schedule: Schedule) => void
 beforeEach(() => {
   started.mockReset().mockResolvedValue(null)
+  startedGlobal.mockReset().mockResolvedValue('g-1')
   installElectronApi({
     schedules: {
       onRun: (callback: (schedule: Schedule) => void) => {
@@ -83,5 +94,64 @@ describe('useScheduledRuns, overlap', () => {
     renderHook(() => useScheduledRuns())
     due(triage)
     expect(started).toHaveBeenCalled()
+  })
+})
+
+const summary: Schedule = {
+  ...triage,
+  id: 'g1',
+  repoRoot: null,
+  branch: null,
+  newWorktree: false,
+  prompt: 'Sum up the PRs',
+}
+
+describe('useScheduledRuns, a global scheduled run', () => {
+  it('starts it in the home folder under Scratch, not in a workspace', () => {
+    renderHook(() => useScheduledRuns())
+    due({ ...summary, agentId: 'opencode' })
+    expect(startedGlobal).toHaveBeenCalledWith({
+      text: 'Sum up the PRs',
+      runAs: 'agent',
+      agentId: 'opencode',
+    })
+    expect(started).not.toHaveBeenCalled()
+  })
+})
+
+describe('useScheduledRuns, a global scheduled run, overlap', () => {
+  it('skips the next run while the session the last one opened is still open', async () => {
+    renderHook(() => useScheduledRuns())
+    due(summary)
+    // The launcher awaited this promise first, so it has noted the session once it settles.
+    await startedGlobal.mock.results[0].value
+    useSessionStore.setState({ sessions: new Map([['g-1', { ...session, id: 'g-1' }]]) })
+    due(summary)
+    expect(startedGlobal).toHaveBeenCalledTimes(1)
+  })
+
+  it('starts the next run once that session is closed', async () => {
+    renderHook(() => useScheduledRuns())
+    due({ ...summary, id: 'g2' })
+    await startedGlobal.mock.results[0].value
+    useSessionStore.setState({
+      sessions: new Map([['g-1', { ...session, id: 'g-1', status: 'closed' as const }]]),
+    })
+    due({ ...summary, id: 'g2' })
+    await waitFor(() => expect(startedGlobal).toHaveBeenCalledTimes(2))
+  })
+})
+
+describe('useScheduledRuns, a global scheduled run that fails', () => {
+  it('says so in a toast when it does not start', async () => {
+    startedGlobal.mockResolvedValue(null)
+    useToastStore.setState({ toasts: [] })
+    renderHook(() => useScheduledRuns())
+    due({ ...summary, id: 'g3' })
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual([
+        'A scheduled run did not start. The agent could not be started.',
+      ])
+    )
   })
 })

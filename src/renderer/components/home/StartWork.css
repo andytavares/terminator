@@ -259,6 +259,32 @@
   border-radius: 50%;
 }
 
+.start-work__title {
+  margin: 0;
+  color: var(--tm-text-primary);
+  font-size: var(--tm-font-size-sm);
+  font-weight: 600;
+}
+
+.start-work__created {
+  margin: var(--tm-space-2) 12px 0;
+  padding: var(--tm-space-1) var(--tm-space-2);
+  border-radius: 6px;
+  background: var(--tm-bg-input);
+  color: var(--tm-text-secondary);
+  font-size: var(--tm-font-size-xs);
+}
+
+.workspace-picker__ring {
+  border: 1.5px solid var(--tm-text-muted);
+}
+
+.workspace-picker__global {
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--tm-border);
+  border-radius: 6px 6px 0 0;
+}
+
 .workspace-picker__popover {
   width: 280px;
 }
@@ -345,37 +371,6 @@
   font-size: var(--tm-font-size-xs);
 }
 
-.start-work__scheduled {
-  display: grid;
-  gap: var(--tm-space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.start-work__scheduled li {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  column-gap: var(--tm-space-2);
-}
-
-.start-work__scheduled small {
-  grid-column: 1;
-  color: var(--tm-text-muted);
-}
-
-.start-work__scheduled-prompt {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.start-work__scheduled .tmui-icon-button {
-  grid-row: 1 / span 2;
-  grid-column: 2;
-}
-
 .start-work__prompt {
   display: grid;
   gap: var(--tm-space-2);
@@ -444,4 +439,11 @@
   margin: 0;
   color: var(--tm-warning);
   font-size: var(--tm-font-size-xs);
+}
+
+/* The count and its link on one line: the link is a button, taller than the note text. */
+.start-work__saved {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-1);
 }

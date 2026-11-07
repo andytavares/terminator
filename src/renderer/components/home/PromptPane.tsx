@@ -1,5 +1,10 @@
 import React from 'react'
-import { ScheduledRuns, WhenChoices, type WhenValue } from './WhenChoices'
+import { Button } from '@terminator/extension-ui'
+import { WhenChoices, type WhenValue } from './WhenChoices'
+import { scheduledRunCount, useSavedRuns } from './scheduled-runs'
+import { useStartWorkStore } from './start-work'
+import { useHomeView } from './home-view'
+import { useExtensionRegistry } from '../../extensions/registry'
 
 interface PromptPaneProps {
   query: string
@@ -8,8 +13,9 @@ interface PromptPaneProps {
   onWhen: (value: WhenValue) => void
 }
 
-/** The Prompt tab: the task in a box that grows lines, when to run it, and what is already saved. */
+/** The Prompt tab: the task in a box that grows lines, when to run it, and how many are saved. */
 export function PromptPane({ query, onType, when, onWhen }: PromptPaneProps): React.JSX.Element {
+  const editing = useStartWorkStore((s) => s.editing !== null)
   return (
     <div className="start-work__list start-work__prompt">
       <div className="start-work__label">What should it do?</div>
@@ -23,7 +29,27 @@ export function PromptPane({ query, onType, when, onWhen }: PromptPaneProps): Re
       />
       <p className="start-work__hint">↵ start · ⇧↵ new line</p>
       <WhenChoices value={when} onChange={onWhen} />
-      {when.when !== 'now' && <ScheduledRuns />}
+      {when.when !== 'now' && !editing && <SavedCount />}
     </div>
+  )
+}
+
+function manageOnHome(): void {
+  useStartWorkStore.getState().closeLauncher()
+  useHomeView.getState().show('scheduled')
+  useExtensionRegistry.getState().setActiveGlobalTab('core.home')
+}
+
+/** "2 scheduled runs · Manage on Home"; nothing when none is saved. */
+function SavedCount(): React.JSX.Element | null {
+  const count = useSavedRuns().runs?.length ?? 0
+  if (count === 0) return null
+  return (
+    <p className="start-work__note start-work__saved">
+      {scheduledRunCount(count)} ·
+      <Button variant="ghost" size="sm" onClick={manageOnHome}>
+        Manage on Home
+      </Button>
+    </p>
   )
 }

@@ -12,6 +12,7 @@ const viewsFor = (layout: HomeLayout) =>
   [
     { value: 'desk', label: layout === 'tasks' ? 'Today' : 'Desk' },
     { value: 'insights', label: 'Insights' },
+    { value: 'scheduled', label: 'Scheduled' },
   ] as const
 
 /** "Saturday 18 October". */
@@ -24,10 +25,21 @@ function deskDate(now: number): string {
 
 const openStartWork = (): void => useStartWorkStore.getState().openLauncher()
 
-/** Search and Start work on the Desk; the time window and repo filter on Insights. */
+/** Search and Start work on the Desk; the time window and repo filter on Insights; a new run on
+ * Scheduled. */
 const DeskHeaderTools = forwardRef<HTMLInputElement, { view: HomeViewName }>(
   function DeskHeaderTools({ view }, searchRef) {
     if (view === 'insights') return <InsightsBar />
+    if (view === 'scheduled')
+      return (
+        <Button
+          variant="primary"
+          icon={Plus}
+          onClick={() => useStartWorkStore.getState().openScheduledRun()}
+        >
+          New scheduled run
+        </Button>
+      )
     return (
       <>
         <DeskSearch ref={searchRef} />
@@ -39,7 +51,7 @@ const DeskHeaderTools = forwardRef<HTMLInputElement, { view: HomeViewName }>(
   }
 )
 
-/** Home's title and date, the Desk | Insights switch, and the view's own tools. */
+/** Home's title and date, the Desk | Insights | Scheduled switch, and the view's own tools. */
 export const DeskHeader = forwardRef<HTMLInputElement, { now: number }>(function DeskHeader(
   { now },
   searchRef

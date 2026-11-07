@@ -1,14 +1,9 @@
-import React, { useEffect, useState } from 'react'
-import { Clock, X } from 'lucide-react'
-import { Button, IconButton, SegmentedControl } from '@terminator/extension-ui'
-import {
-  describeRepeat,
-  nextRuns,
-  type RepeatRule,
-  type RepeatUnit,
-} from '../../../shared/recurrence'
+import React from 'react'
+import { Clock } from 'lucide-react'
+import { Button, SegmentedControl } from '@terminator/extension-ui'
+import { nextRuns, type RepeatRule, type RepeatUnit } from '../../../shared/recurrence'
 import type { When } from './start-work-schedule'
-import type { Schedule } from '../../../shared/schemas/schedules.schema'
+import { useStartWorkStore } from './start-work'
 
 const OPTIONS: Array<{ value: When; label: string }> = [
   { value: 'now', label: 'Now' },
@@ -50,12 +45,15 @@ export const runTime = ({ when, rule, time }: WhenValue): string =>
 const pad = (n: number): string => String(n).padStart(2, '0')
 const clockOf = (date: Date): string => `${pad(date.getHours())}:${pad(date.getMinutes())}`
 
-/** "Thu 7 Nov 09:30" */
-function runLabel(date: Date): string {
+/** "Thu 7 Nov" */
+export function dayLabel(date: Date): string {
   const weekday = date.toLocaleDateString('en-GB', { weekday: 'short' })
   const month = date.toLocaleDateString('en-GB', { month: 'short' })
-  return `${weekday} ${date.getDate()} ${month} ${clockOf(date)}`
+  return `${weekday} ${date.getDate()} ${month}`
 }
+
+/** "Thu 7 Nov 09:30" */
+export const runLabel = (date: Date): string => `${dayLabel(date)} ${clockOf(date)}`
 
 const onceAt = ({ date, time }: WhenValue): Date => new Date(`${date}T${time}`)
 
@@ -79,6 +77,9 @@ function repeatProblem(value: WhenValue): string | null {
 
 /** The "When" row: start now, or save the prompt to run once, or on a repeat. */
 export function WhenChoices({ value, onChange }: WhenChoicesProps): React.JSX.Element {
+  // An edited scheduled run stays scheduled, so Now is not offered.
+  const editing = useStartWorkStore((s) => s.editing !== null)
+  const options = editing ? OPTIONS.filter((o) => o.value !== 'now') : OPTIONS
   return (
     <>
       <div className="start-work__label">When</div>
@@ -87,7 +88,7 @@ export function WhenChoices({ value, onChange }: WhenChoicesProps): React.JSX.El
         className="start-work__when"
         value={value.when}
         onChange={(when) => onChange({ ...value, when })}
-        options={OPTIONS.map((o) => ({ value: o.value, label: o.label, accessibleName: o.label }))}
+        options={options.map((o) => ({ value: o.value, label: o.label, accessibleName: o.label }))}
       />
       {value.when === 'once' && <OnceFields value={value} onChange={onChange} />}
       {value.when === 'repeat' && <RepeatFields value={value} onChange={onChange} />}
@@ -366,7 +367,10 @@ function runsADay({ every, unit, between }: RepeatRule): number {
 function NextRuns({ value }: { value: WhenValue }): React.JSX.Element {
   const { rule } = value
   const now = new Date()
-  const runs = nextRuns({ rule, time: runTime(value), anchor: now }, now, 3)
+  // The scheduler counts a repeat from when it was created, so an edit previews from there too.
+  const createdAt = useStartWorkStore((s) => s.editing?.createdAt)
+  const anchor = createdAt === undefined ? now : new Date(createdAt)
+  const runs = nextRuns({ rule, time: runTime(value), anchor }, now, 3)
   const perDay = isClockUnit(rule.unit) ? ` · ${runsADay(rule)} runs a day` : ''
   return (
     <>
@@ -376,59 +380,6 @@ function NextRuns({ value }: { value: WhenValue }): React.JSX.Element {
       {rule.unit === 'minute' && rule.every < 5 && (
         <p className="start-work__warning">Runs 288 times a day or more.</p>
       )}
-    </>
-  )
-}
-
-/** When a saved run runs, and in which repository. */
-function whenOf(schedule: Schedule): string {
-  const when =
-    schedule.repeat === null
-      ? `on ${schedule.date} at ${schedule.time}`
-      : describeRepeat(schedule.repeat, schedule.time)
-  const repo = schedule.repoRoot.split('/').pop() ?? schedule.repoRoot
-  return `${when} · ${repo}`
-}
-
-/** The saved runs, read once, and a remove that reads them again. */
-function useSavedRuns(): [Schedule[], (id: string) => Promise<void>] {
-  const [saved, setSaved] = useState<Schedule[]>([])
-  const read = (): Promise<void> =>
-    window.electronAPI.schedules.list().then((answer) => {
-      if ('data' in answer) setSaved(answer.data)
-    })
-  useEffect(() => {
-    void window.electronAPI.schedules.list().then((answer) => {
-      if ('data' in answer) setSaved(answer.data)
-    })
-  }, [])
-  const remove = async (id: string): Promise<void> => {
-    await window.electronAPI.schedules.delete({ id })
-    await read()
-  }
-  return [saved, remove]
-}
-
-/** The runs already saved, so one can be removed; nothing when there are none. @internal */
-export function ScheduledRuns(): React.JSX.Element | null {
-  const [saved, remove] = useSavedRuns()
-  if (saved.length === 0) return null
-  return (
-    <>
-      <div className="start-work__label">Scheduled · {saved.length}</div>
-      <ul className="start-work__scheduled" aria-label="Scheduled runs">
-        {saved.map((schedule) => (
-          <li key={schedule.id}>
-            <span className="start-work__scheduled-prompt">{schedule.prompt}</span>
-            <small>{whenOf(schedule)}</small>
-            <IconButton
-              icon={X}
-              label={`Remove ${schedule.prompt}`}
-              onClick={() => void remove(schedule.id)}
-            />
-          </li>
-        ))}
-      </ul>
     </>
   )
 }

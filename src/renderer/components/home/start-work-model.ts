@@ -124,8 +124,14 @@ export function useRows(source: RowSource): { groups: TicketGroup[]; rows: Launc
   }, [tab, query, issues, git])
 }
 
+/** A filter that keeps names holding `text`, ignoring case and surrounding spaces. */
+export const holdsText =
+  (text: string) =>
+  (name: string): boolean =>
+    name.toLowerCase().includes(text.trim().toLowerCase())
+
 function branchChoices(git: RepoGit, text: string): LauncherRow[] {
-  const matches = (name: string): boolean => name.toLowerCase().includes(text.toLowerCase())
+  const matches = holdsText(text)
   return [
     ...git.worktreeBranches
       .filter(matches)
@@ -136,9 +142,14 @@ function branchChoices(git: RepoGit, text: string): LauncherRow[] {
   ]
 }
 
+/** The picker's choice of no workspace: a global scheduled run, offered on the Prompt tab only. */
+export const GLOBAL_CHOICE = 'global'
+
 export type ChosenRepo = {
   workspace: Workspace | null
   reason: 'picked' | SuggestionReason
+  /** True when the person picked Global: the work belongs to no workspace. */
+  global: boolean
 }
 
 /** The repo the work goes to: the person's pick, else the best guess for the selected ticket. */
@@ -147,9 +158,10 @@ export function useChosenRepo(
   pickedId: string | null
 ): ChosenRepo {
   const workspaces = useWorkspaceStore((s) => s.workspaces)
+  if (pickedId === GLOBAL_CHOICE) return { workspace: null, reason: 'picked', global: true }
   const issue = selected?.kind === 'ticket' ? selected.issue : null
   const suggestion = defaultWorkspaceId(issue)
   const id = pickedId ?? suggestion.id
   const reason = pickedId === null ? suggestion.reason : 'picked'
-  return { workspace: workspaces.find((w) => w.id === id) ?? null, reason }
+  return { workspace: workspaces.find((w) => w.id === id) ?? null, reason, global: false }
 }

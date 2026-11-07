@@ -7,14 +7,16 @@ import { AcrossRepos } from './AcrossRepos'
 import { RunAsChoices } from './RunAsChoices'
 import { promptBranch } from '../../../shared/home/branch-name'
 import { PromptPane } from './PromptPane'
-import { runTime, startingWhen, whenProblem, type WhenValue } from './WhenChoices'
+import { runLabel, whenProblem, type WhenValue } from './WhenChoices'
 import { agentLabel, useAgentChoices } from './agent-choices'
-import { startScratchSession } from '../../terminal/start-session'
+import { startGlobalPrompt, startScratchSession } from '../../terminal/start-session'
 import { recordUse } from '../../usage/record'
+import { saveSchedule, startingFields } from './start-work-edit'
+import { nextRunOf } from './scheduled-runs'
 import {
-  askBranchName,
   branchOf,
   cycleRunAs,
+  globalStartFailure,
   isAgentRun,
   startWork,
   useRunAsOptions,
@@ -35,6 +37,7 @@ import {
 } from './start-work-model'
 import type { TicketGroup } from './start-work'
 import type { IssueSummary, Workspace } from '../../../shared/types/index'
+import type { Schedule } from '../../../shared/schemas/schedules.schema'
 import './StartWork.css'
 
 const TABS: Array<{ id: LauncherTab; label: string }> = [
@@ -45,29 +48,25 @@ const TABS: Array<{ id: LauncherTab; label: string }> = [
   { id: 'scratch', label: 'Scratch terminal' },
 ]
 
-/** Today as 'YYYY-MM-DD', local. */
-/** Today, or tomorrow once `time` has passed: the first day a one-time run can still happen. */
-const firstDayFor = (time: string): string => {
-  const now = new Date()
-  const [hours, minutes] = time.split(':').map(Number)
-  const passed = now.getHours() * 60 + now.getMinutes() >= hours * 60 + minutes
-  if (passed) now.setDate(now.getDate() + 1)
-  return now.toLocaleDateString('sv-SE')
-}
-
 /** What the person has typed, picked and been told so far. */
 function useLauncherFields() {
-  const prefill = useStartWorkStore.getState().prefill
-  const [tab, setTab] = useState<LauncherTab>('tickets')
-  const [query, setQuery] = useState(prefill)
-  const [runAs, setRunAs] = useState<RunAs>('agent')
-  const [agentId, setAgentId] = useState<string | null>(null)
+  const { prefill, editing, repeat } = useStartWorkStore.getState()
+  const [start] = useState(() => {
+    const fields = startingFields(prefill, editing)
+    // Home's "New scheduled run" opens on a repeating prompt.
+    if (!repeat) return fields
+    return { ...fields, tab: 'prompt' as const, when: { ...fields.when, when: 'repeat' as const } }
+  })
+  const [tab, setTab] = useState<LauncherTab>(start.tab)
+  const [query, setQuery] = useState(start.query)
+  const [runAs, setRunAs] = useState<RunAs>(start.runAs)
+  const [agentId, setAgentId] = useState<string | null>(start.agentId)
   const [selectedIndex, setSelectedIndex] = useState(0)
-  const [pickedRepoId, setPickedRepoId] = useState<string | null>(null)
+  const [pickedRepoId, setPickedRepoId] = useState<string | null>(start.pickedRepoId)
   const [picking, setPicking] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [when, setWhen] = useState<WhenValue>(startingWhen(firstDayFor('09:00')))
-  const [useRepoFolder, setUseRepoFolder] = useState(false)
+  const [when, setWhen] = useState<WhenValue>(start.when)
+  const [useRepoFolder, setUseRepoFolder] = useState(start.useRepoFolder)
   return {
     ...{ tab, query, runAs, agentId, selectedIndex, pickedRepoId, picking, error },
     ...{ setTab, setQuery, setRunAs, setAgentId, setSelectedIndex, setPickedRepoId },
@@ -82,16 +81,18 @@ function useLauncherData(fields: Fields) {
   const { tab, query, selectedIndex, pickedRepoId } = fields
   const issues = useMyTickets()
   const ticketRows = useRows({ tab, query, issues, git: NO_GIT }).rows
-  const { workspace: repo, reason: repoReason } = useChosenRepo(
-    ticketRows[selectedIndex],
-    pickedRepoId
-  )
+  const {
+    workspace: repo,
+    reason: repoReason,
+    global,
+  } = useChosenRepo(ticketRows[selectedIndex], pickedRepoId)
   const git = useRepoGit(repo)
   const { groups, rows } = useRows({ tab, query, issues, git })
   const index = Math.max(0, Math.min(selectedIndex, rows.length - 1))
   return {
     repo,
     repoReason,
+    global,
     git,
     groups,
     rows,
@@ -100,19 +101,29 @@ function useLauncherData(fields: Fields) {
   }
 }
 
+/** The ways to run it: a global run has no workspace, so only the agent tab and Claude in a terminal. */
+function useRunAs(fields: Fields, global: boolean) {
+  const choices = useAgentChoices()
+  const all = useRunAsOptions(agentLabel(choices, fields.agentId))
+  const runAsOptions = global ? all.filter((o) => isAgentRun(o.value)) : all
+  const allowed = runAsOptions.some((o) => o.value === fields.runAs)
+  return { choices, runAsOptions, runAs: allowed ? fields.runAs : 'agent' }
+}
+
 function useLauncher(onClose: () => void) {
   const fields = useLauncherFields()
   const data = useLauncherData(fields)
-  const { tab, query, runAs, agentId, picking, error } = fields
-  const choices = useAgentChoices()
-  const runAsOptions = useRunAsOptions(agentLabel(choices, agentId))
+  const editing = useStartWorkStore((s) => s.editing)
+  const { tab, query, agentId, picking, error } = fields
+  const { choices, runAsOptions, runAs } = useRunAs(fields, data.global)
   const { when, useRepoFolder } = fields
   const isPrompt = tab === 'prompt' || data.selected?.kind === 'prompt'
   // A prompt run by an agent gets a branch of its own unless the person chose the repo folder.
-  const ownBranch = isPrompt && isAgentRun(runAs) && !useRepoFolder
+  const ownBranch = isPrompt && isAgentRun(runAs) && !useRepoFolder && !data.global
   const agentBranch = useAgentBranchName(query.trim(), ownBranch)
   const view = { tab, query, runAs, agentId, choices, picking, error, runAsOptions, ...data }
-  const promptView = { when, useRepoFolder, isPrompt, ownBranch, agentBranch }
+  const repoPicked = fields.pickedRepoId !== null
+  const promptView = { when, useRepoFolder, isPrompt, ownBranch, agentBranch, editing, repoPicked }
   const actions = launcherActions({ fields, view: { ...view, ...promptView }, onClose })
   return { view: { ...view, ...promptView }, actions, selectedIndex: data.index }
 }
@@ -126,11 +137,14 @@ interface ActionsInput {
     agentId: string | null
     selected?: LauncherRow
     repo: Workspace | null
+    global: boolean
+    editing: Schedule | null
     when: WhenValue
     useRepoFolder: boolean
     isPrompt: boolean
     ownBranch: boolean
     agentBranch: string | null
+    repoPicked: boolean
   }
   onClose: () => void
 }
@@ -140,8 +154,9 @@ function launcherActions({ fields, view, onClose }: ActionsInput) {
   return {
     setTab: (next: LauncherTab) => {
       fields.setTab(next)
-      // Scheduling is chosen on the Prompt tab only.
+      // Scheduling and Global are chosen on the Prompt tab only.
       if (next !== 'prompt') fields.setWhen({ ...view.when, when: 'now' })
+      if (next !== 'prompt' && view.global) fields.setPickedRepoId(null)
       fresh()
     },
     typeQuery: (next: string) => {
@@ -184,18 +199,36 @@ function requestFor(view: ActionsInput['view'], repo: Workspace): WorkRequest | 
   return null
 }
 
+/** Starts or saves the choice: null when done, the reason when not, undefined when nothing was typed. */
+async function launch(view: ActionsInput['view']): Promise<string | null | undefined> {
+  if (view.isPrompt && view.query.trim() === '') return undefined
+  if (view.when.when !== 'now') return saveSchedule(view)
+  if (view.global) return startGlobal(view)
+  const request = view.repo === null ? null : requestFor(view, view.repo)
+  return request === null ? undefined : startWork(request)
+}
+
+async function startGlobal({
+  query,
+  runAs,
+  agentId,
+}: ActionsInput['view']): Promise<string | null> {
+  const text = query.trim()
+  const agent = agentId === null ? {} : { agentId }
+  const sessionId = await startGlobalPrompt({ text, runAs, ...agent })
+  return sessionId === null ? globalStartFailure(text, runAs) : null
+}
+
 async function submit({ view, onClose, setError }: SubmitInput): Promise<void> {
   if (view.tab === 'scratch') {
     onClose()
     return void startScratchSession()
   }
-  if (view.repo === null) return setError('Add a workspace in the sidebar first.')
+  if (view.repo === null && !view.global) return setError('Add a workspace in the sidebar first.')
   const problem = scheduleProblem(view)
   if (problem !== null) return setError(problem)
-  const request = requestFor(view, view.repo)
-  if (request === null) return
-  const message =
-    view.when.when === 'now' ? await startWork(request) : await schedule(view, request)
+  const message = await launch(view)
+  if (message === undefined) return
   if (message === null) {
     recordUse(view.when.when === 'now' ? 'core.start-work.launch' : SCHEDULE_FEATURE, 'click', {
       declare: view.when.when === 'now' ? undefined : SCHEDULE_DECLARATION,
@@ -211,32 +244,6 @@ const SCHEDULE_DECLARATION = {
   source: 'core',
 }
 
-/** The one branch a repeat runs on, named once on save; null when it runs in the repo folder. */
-async function repeatBranch(request: WorkRequest & { kind: 'prompt' }): Promise<string | null> {
-  if (request.newWorktree !== true) return null
-  const text = request.text.trim()
-  return request.branch ?? (await askBranchName(text)) ?? promptBranch(text)
-}
-
-/** Saves the prompt to run later. Null when saved; otherwise what to tell the person. */
-async function schedule(view: ActionsInput['view'], request: WorkRequest): Promise<string | null> {
-  if (request.kind !== 'prompt') return 'Only a typed prompt can be scheduled.'
-  const repeating = view.when.when === 'repeat'
-  const result = await window.electronAPI.schedules.create({
-    repoRoot: request.workspace.folderPath,
-    prompt: request.text.trim(),
-    runAs: request.runAs,
-    kind: repeating ? 'repeat' : 'once',
-    repeat: repeating ? view.when.rule : null,
-    branch: repeating ? await repeatBranch(request) : null,
-    time: runTime(view.when),
-    date: repeating ? null : view.when.date,
-    newWorktree: request.newWorktree === true,
-    agentId: request.agentId ?? null,
-  })
-  return 'data' in result ? null : result.message
-}
-
 /** The launcher: pick a ticket, a prompt or a branch, choose how to run it, press Enter. */
 export function StartWork({ onClose }: { onClose: () => void }): React.JSX.Element {
   const launcher = useLauncher(onClose)
@@ -245,7 +252,11 @@ export function StartWork({ onClose }: { onClose: () => void }): React.JSX.Eleme
     <ModalShell label="Start work" placement="top" onDismiss={actions.dismiss}>
       <div className="start-work" onKeyDown={(e) => handleKey(e, launcher)}>
         {(view.tab === 'tickets' || view.tab === 'branch') && <SearchRow {...{ view, actions }} />}
-        <TabRow {...{ view, actions }} />
+        {view.editing === null ? (
+          <TabRow {...{ view, actions }} />
+        ) : (
+          <EditHead {...{ view, actions }} editing={view.editing} />
+        )}
         {view.tab === 'across' ? <AcrossRepos onClose={onClose} /> : <LauncherBody {...launcher} />}
       </div>
     </ModalShell>
@@ -334,7 +345,6 @@ function SearchRow({ view, actions }: PartProps): React.JSX.Element {
 }
 
 function TabRow({ view, actions }: PartProps): React.JSX.Element {
-  const ticketKey = view.selected?.kind === 'ticket' ? view.selected.issue.key : null
   return (
     <TabsRoot selectedId={view.tab} onSelect={actions.setTab}>
       <TabList label="Start work from" className="start-work__tabs">
@@ -343,19 +353,44 @@ function TabRow({ view, actions }: PartProps): React.JSX.Element {
             {tab.label}
           </Tab>
         ))}
-        {view.tab !== 'scratch' && view.tab !== 'across' && (
-          <WorkspacePicker
-            current={view.repo}
-            reason={view.repoReason}
-            ticketKey={ticketKey}
-            open={view.picking}
-            onToggle={actions.togglePicker}
-            onPick={actions.pickRepo}
-            onClose={() => actions.dismiss()}
-          />
-        )}
+        {view.tab !== 'scratch' && view.tab !== 'across' && <Picker {...{ view, actions }} />}
       </TabList>
     </TabsRoot>
+  )
+}
+
+function Picker({ view, actions }: PartProps): React.JSX.Element {
+  const ticketKey = view.selected?.kind === 'ticket' ? view.selected.issue.key : null
+  return (
+    <WorkspacePicker
+      current={view.repo}
+      global={view.global}
+      offerGlobal={view.tab === 'prompt'}
+      reason={view.repoReason}
+      ticketKey={ticketKey}
+      open={view.picking}
+      onToggle={actions.togglePicker}
+      onPick={actions.pickRepo}
+      onClose={() => actions.dismiss()}
+    />
+  )
+}
+
+/** Edit mode's top: its title and the workspace in place of the tabs, then when it was made and run. */
+function EditHead({ view, actions, editing }: PartProps & { editing: Schedule }) {
+  const lastRun = editing.lastRunAt === null ? 'never' : runLabel(new Date(editing.lastRunAt))
+  const nextRun = nextRunOf(editing, new Date())
+  return (
+    <>
+      <div className="start-work__tabs">
+        <h2 className="start-work__title">Edit scheduled run</h2>
+        <Picker {...{ view, actions }} />
+      </div>
+      <p className="start-work__created">
+        Created {runLabel(new Date(editing.createdAt))} · last run {lastRun} · next run{' '}
+        {nextRun === null ? 'none' : runLabel(nextRun)}
+      </p>
+    </>
   )
 }
 
@@ -494,8 +529,10 @@ function RunAsPanel({ view, actions }: Launcher): React.JSX.Element {
       <div className="start-work__label">Run it as</div>
       <RunAsChoices options={view.runAsOptions} runAs={view.runAs} onPick={actions.setRunAs} />
       <AgentPicker view={view} actions={actions} />
-      {view.isPrompt && isAgentRun(view.runAs) && <RepoFolderChoice {...{ view, actions }} />}
-      <Summary {...{ view, actions }} />
+      {view.isPrompt && isAgentRun(view.runAs) && !view.global && (
+        <RepoFolderChoice {...{ view, actions }} />
+      )}
+      {view.global ? <GlobalSummary /> : <Summary {...{ view, actions }} />}
     </div>
   )
 }
@@ -567,7 +604,20 @@ function Summary({ view }: PartProps): React.JSX.Element {
   )
 }
 
+/** Where a global run runs: the home folder, shown under Scratch. */
+function GlobalSummary(): React.JSX.Element {
+  return (
+    <dl className="start-work__summary" role="group" aria-label="Where it runs">
+      <dt>Runs in</dt>
+      <dd>~ (your home folder)</dd>
+      <dt>Shows in</dt>
+      <dd>Scratch</dd>
+    </dl>
+  )
+}
+
 function startLabel(view: Launcher['view']): string {
+  if (view.editing !== null) return 'Save changes'
   if (view.tab === 'scratch') return 'Start terminal'
   if (view.isPrompt && view.when.when !== 'now') return 'Schedule'
   if (view.selected?.kind === 'ticket') return `Start ${view.selected.issue.key}`
@@ -590,6 +640,11 @@ function Footer({ view, actions }: Launcher): React.JSX.Element {
         <Kbd>⌘R</Kbd> workspace
       </span>
       <FooterError view={view} />
+      {view.editing !== null && (
+        <Button size="sm" onClick={actions.dismiss}>
+          Cancel
+        </Button>
+      )}
       <StartButton {...{ view, actions }} />
     </div>
   )
