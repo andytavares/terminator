@@ -1,0 +1,33 @@
+src/main/agents/acp/agent-connection.ts
+  s_56e599e17e5b82::t_f0f7490d9ebf42 3-8,12,45,53-74
+src/main/agents/acp/agent-service.ts
+  s_56e599e17e5b82::t_cdeabd5df3b700 3,21-22,45-46,62-67,79,330
+tests/e2e/fixtures/acp-stub-agent.mjs
+  s_56e599e17e5b82::t_c36eca8ea0d8d8 10-11,15,149-151,154-177
+tests/unit/agents/acp/agent-connection.spec.ts
+  s_56e599e17e5b82::t_469454eca448d5 3,14
+tests/unit/agents/acp/agent-queue.spec.ts
+  s_56e599e17e5b82::t_237cc92c22b05f 2
+tests/unit/agents/acp/agent-service.spec.ts
+  s_56e599e17e5b82::t_ce23232b1b937e 2
+tests/unit/agents/acp/agent-steer.spec.ts
+  s_56e599e17e5b82::t_625451759018f1 2
+tests/unit/agents/acp/fake-agent.ts
+  s_56e599e17e5b82::t_fd85982c981815 2-3,5-6,9-11,14,16-23,29,93-98,102-159,161-162,183,185,188,202,209,216
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9e3301ad1047c2f57d57d937cebbb462c682447b",
+  "prompts": {},
+  "sessions": {
+    "s_56e599e17e5b82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6c95cc7-f1de-49bf-a858-16efb95c5329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
