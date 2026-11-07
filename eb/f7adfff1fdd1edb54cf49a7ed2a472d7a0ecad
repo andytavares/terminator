@@ -1,0 +1,21 @@
+src/renderer/components/agent/attached-context.ts
+  s_07e7aef877c5aa::t_ba571712b0fe39 14
+src/renderer/components/agent/cite.tsx
+  s_07e7aef877c5aa::t_ba571712b0fe39 8,33,43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ebf7adfff1fdd1edb54cf49a7ed2a472d7a0ecad",
+  "prompts": {},
+  "sessions": {
+    "s_07e7aef877c5aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "633c8d12-7dd7-4254-9663-67bc2d4d51f5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
