@@ -30,7 +30,6 @@
   inset: 0 !important;
   margin: auto !important;
   transform: none !important;
-  translate: none !important;
 }
 
 /* A launcher: horizontally centred, 92px from the top, still unmovable by a caller's class. */
@@ -39,6 +38,12 @@
   inset: 92px 0 auto 0 !important;
   margin: 0 auto !important;
   transform: none !important;
+}
+
+/* Its own selector: Lightning CSS (Vite 8's minifier) merges `transform: none` and
+   `translate: none` in one rule into `transform: translate(0, 0)`. A transform makes the modal
+   the containing block of a fixed toast portalled into it, so the toast moved inside the modal. */
+dialog.tmui-modal:not(.tmui-drawer) {
   translate: none !important;
 }
 
