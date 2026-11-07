@@ -106,6 +106,7 @@ export const CORE_SPECS = [
   'home-tasks.spec.ts',
   'issue-trackers.spec.ts',
   'live-preview-spacing.spec.ts',
+  'mcp.spec.ts',
   'menus-keyboard.spec.ts',
   'monitor-wall.spec.ts',
   'navigation.spec.ts',
