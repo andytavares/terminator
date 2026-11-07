@@ -1,5 +1,4 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { execSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -17,8 +16,8 @@ function folder(): string {
 }
 
 interface Settings {
-  permissions: { ask: string[]; deny: string[] }
-  hooks: { PreToolUse: Array<{ matcher: string; hooks: Array<{ command: string }> }> }
+  permissions: { ask: string[]; deny: string[]; defaultMode?: string }
+  hooks?: unknown
 }
 
 async function written() {
@@ -29,17 +28,13 @@ async function written() {
 }
 
 describe('writeUnattendedFiles', () => {
-  it('approves every tool call through a PreToolUse hook that prints allow', async () => {
+  it('starts in auto mode: no routine prompts, a classifier blocks risky calls', async () => {
     const { settings } = await written()
-    const [entry] = settings.hooks.PreToolUse
-    expect(entry.matcher).toBe('*')
-    const output = JSON.parse(execSync(entry.hooks[0].command, { encoding: 'utf8' }))
-    expect(output).toEqual({
-      hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'allow' },
-    })
+    expect(settings.permissions.defaultMode).toBe('auto')
+    expect(settings.hooks).toBeUndefined()
   })
 
-  it('keeps ask rules for destructive commands, which win over the hook', async () => {
+  it('keeps ask rules for destructive commands, which auto mode still asks', async () => {
     const { settings } = await written()
     expect(settings.permissions.ask).toEqual(
       expect.arrayContaining([
