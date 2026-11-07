@@ -13,6 +13,7 @@ import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import { ToastContainer } from '../../../../src/renderer/components/ToastContainer'
 import { useHomeFeedStore } from '../../../../src/renderer/stores/home-feed.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
+import { useChangeStatsStore } from '../../../../src/renderer/stores/change-stats.store'
 import { installElectronApi } from '../../../support/electron-api'
 import { FACTS, REPO_ROOT, seedDesk, sendToAgentAsk, ticket } from '../home/desk-world'
 import { fact } from '../sidebar/fixtures/facts'
@@ -89,7 +90,9 @@ function resetDesk(): void {
   useDeskSelection.setState({ expandedGroupIds: [] })
   useParkedThreads.setState({ keys: [] })
   useTaskStore.setState({ tasks: [] })
-  useDismissedThreads.setState({ dismissed: {} })
+  useDismissedThreads.setState({ dismissed: {}, deletesSessions: {} })
+  // Change stats are cached per project; a test that mocks other stats must not leak them.
+  useChangeStatsStore.setState({ entries: new Map() })
 }
 
 beforeEach(() => {
