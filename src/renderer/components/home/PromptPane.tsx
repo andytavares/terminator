@@ -45,8 +45,8 @@ function SavedCount(): React.JSX.Element | null {
   const count = useSavedRuns().runs?.length ?? 0
   if (count === 0) return null
   return (
-    <p className="start-work__note">
-      {scheduledRunCount(count)} ·{' '}
+    <p className="start-work__note start-work__saved">
+      {scheduledRunCount(count)} ·
       <Button variant="ghost" size="sm" onClick={manageOnHome}>
         Manage on Home
       </Button>

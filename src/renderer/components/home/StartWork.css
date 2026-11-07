@@ -440,3 +440,10 @@
   color: var(--tm-warning);
   font-size: var(--tm-font-size-xs);
 }
+
+/* The count and its link on one line: the link is a button, taller than the note text. */
+.start-work__saved {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-1);
+}
