@@ -15,6 +15,7 @@ import { toolMarks, type McpCaller, type McpToolDef, type ToolProvider } from '.
 const SOURCE = 'claude-moves'
 const TITLE = 'A Claude session is moving here'
 
+/** @internal What the move needs from the machine; specs pass fakes. */
 export interface MoveDeps {
   /** `~/.claude/projects`: one folder per project, one `<id>.jsonl` transcript per session. */
   projectsRoot: string
@@ -173,6 +174,7 @@ const MOVE_TOOL = {
   },
 }
 
+/** @internal The move tool over `deps`; the app uses `moveSessionTool`. */
 export function createMoveSession(deps: MoveDeps): ToolProvider {
   const moves: Moves = new Map()
   setActionHandler(SOURCE, (askId, actionId) => actOnMove(moves, askId, actionId))

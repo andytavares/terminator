@@ -16,7 +16,7 @@ import { loginShellPathReady } from '../shell/login-shell-path.js'
 
 const STATE_FILE_NAME = 'registered.json'
 
-/** Runs `claude` with `args`. */
+/** @internal Runs `claude` with `args`; specs pass a fake. */
 export type ClaudeRun = (args: string[]) => Promise<{ exitCode: number; stderr: string }>
 
 export interface RegistrationOptions {
