@@ -53,7 +53,7 @@ export function TerminalRow(props: TerminalRowProps): React.JSX.Element {
 
   return (
     <div
-      className={rowClass({ nested, selected, dragging: drag.dragging })}
+      className={terminalRowClass({ nested, selected, dragging: drag.dragging })}
       role="button"
       tabIndex={0}
       aria-current={selected ? 'true' : undefined}
@@ -76,7 +76,11 @@ export function TerminalRow(props: TerminalRowProps): React.JSX.Element {
 }
 
 /** Puts this row's session on the drag, for an agent tab to attach. */
-function rowClass(flags: { nested: boolean; selected: boolean; dragging: boolean }): string {
+function terminalRowClass(flags: {
+  nested: boolean
+  selected: boolean
+  dragging: boolean
+}): string {
   const { nested, selected, dragging } = flags
   const classes = [
     'terminal-row',
