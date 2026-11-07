@@ -1,0 +1,29 @@
+src/main/index.ts
+  s_c3147c7a3f2e3c::t_850ffcccbe5369 428
+src/main/ipc/schedules.ipc.ts
+  s_c3147c7a3f2e3c::t_40b9177f7063ae 125-127,146-152
+src/renderer/terminal/start-session.ts
+  s_c3147c7a3f2e3c::t_fdf8f15b4068b8 126
+tests/unit/home/scheduled-alerts.spec.ts
+  s_c3147c7a3f2e3c::t_b93e2216a97519 2,68-72,74-78
+tests/unit/home/unattended-run.spec.ts
+  s_c3147c7a3f2e3c::t_ad97ed7de03a7c 1,3,8-15
+tests/unit/ipc/schedules.ipc.spec.ts
+  s_c3147c7a3f2e3c::t_7b0d22a04adac6 1,3,55-56,65-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d59467cc8897db1f6083bfc1e52878340b7cfd6c",
+  "prompts": {},
+  "sessions": {
+    "s_c3147c7a3f2e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6643d25-b995-4f50-b4d6-9e2f055e3cbe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
