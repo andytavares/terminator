@@ -1,0 +1,19 @@
+tests/unit/agents/acp/agent-service.spec.ts
+  s_56e599e17e5b82::t_def59c86f97ed8 162-169
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1a78ba4426d006d5024e85dc95b944be92a0e590",
+  "prompts": {},
+  "sessions": {
+    "s_56e599e17e5b82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6c95cc7-f1de-49bf-a858-16efb95c5329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
