@@ -177,6 +177,18 @@ describe('Composer — citation chips', () => {
     expect(onShowSource).toHaveBeenCalledWith(citation.quote)
   })
 
+  it('edits the comment from the pencil and shows it on the chip', async () => {
+    await mountComposer()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit comment' }))
+    const comment = screen.getByLabelText<HTMLTextAreaElement>('Comment on this quote')
+    expect(comment.value).toBe('Also retry on 429')
+    fireEvent.change(comment, { target: { value: 'Wait for Retry-After' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(attached().citations).toEqual([{ ...citation, comment: 'Wait for Retry-After' }])
+    expect(screen.getByRole('button', { name: /Wait for Retry-After/ })).toBeTruthy()
+    expect(agents.prompt).not.toHaveBeenCalled()
+  })
+
   it('removes a citation', async () => {
     await mountComposer()
     fireEvent.click(screen.getByRole('button', { name: 'Remove citation' }))

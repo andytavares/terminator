@@ -129,6 +129,7 @@
 }
 
 .agent-composer__input,
+.agent-comment__input,
 .agent-find__input {
   flex: 1;
   background: var(--tm-bg-input);
@@ -138,12 +139,14 @@
   font: inherit;
 }
 
-.agent-composer__input {
+.agent-composer__input,
+.agent-comment__input {
   resize: none;
   padding: var(--tm-space-2) var(--tm-space-3);
 }
 
-.agent-composer__input:focus-visible {
+.agent-composer__input:focus-visible,
+.agent-comment__input:focus-visible {
   outline: 2px solid var(--tm-accent);
   outline-offset: 1px;
 }
@@ -316,4 +319,62 @@
   outline: 1px solid var(--tm-warning);
   background: var(--tm-warning);
   color: var(--tm-bg-base);
+}
+
+.agent-message-context {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-self: flex-end;
+  gap: var(--tm-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-cite {
+  min-width: 0;
+  padding: var(--tm-space-1);
+  translate: -50% calc(-100% - var(--tm-space-1));
+}
+
+.agent-comment {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-2);
+  width: 400px;
+  max-width: calc(100vw - var(--tm-space-4));
+}
+
+.agent-comment__quote {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-2);
+  margin: 0;
+  color: var(--tm-text-muted);
+  font-style: italic;
+}
+
+.agent-comment__quote svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.agent-comment__quote-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-comment__row {
+  display: flex;
+  align-items: center;
+  gap: var(--tm-space-2);
+}
+
+.agent-comment__hint {
+  flex: 1;
+  font-size: var(--tm-font-size-xs);
+  color: var(--tm-text-muted);
 }

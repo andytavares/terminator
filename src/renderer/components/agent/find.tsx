@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import { IconButton } from '@terminator/extension-ui'
 import { recordUse } from '../../usage/record'
 import type { Transcript, TranscriptEntry } from './fold-updates'
+import { splitAttachedContext } from './attached-context'
 
 export interface FindState {
   query: string
@@ -37,6 +38,12 @@ export function Highlighted(props: {
 const countMatches = (text: string, query: string): number =>
   query ? text.toLowerCase().split(query.toLowerCase()).length - 1 : 0
 
+type MessageEntry = Extract<TranscriptEntry, { kind: 'message' }>
+
+/** The text a message shows: a sent message without the context that went after it. */
+export const shownText = (entry: MessageEntry): string =>
+  entry.role === 'user' ? splitAttachedContext(entry.text).text : entry.text
+
 /** For each message, the global index of its first match. */
 export function firstMatches(
   entries: TranscriptEntry[],
@@ -47,7 +54,7 @@ export function firstMatches(
   for (const entry of entries) {
     if (entry.kind !== 'message') continue
     first.set(entry, seen)
-    seen += countMatches(entry.text, query)
+    seen += countMatches(shownText(entry), query)
   }
   return first
 }
@@ -66,7 +73,7 @@ export function useFind(transcript: Transcript): FindControls {
   const [find, setFind] = useState<FindState | null>(null)
   const total = find
     ? transcript.entries.reduce(
-        (sum, e) => sum + (e.kind === 'message' ? countMatches(e.text, find.query) : 0),
+        (sum, e) => sum + (e.kind === 'message' ? countMatches(shownText(e), find.query) : 0),
         0
       )
     : 0

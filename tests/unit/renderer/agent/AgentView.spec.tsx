@@ -5,6 +5,7 @@ import type { AgentPermissionAsk, AgentUpdate } from '@terminator/extension-sdk'
 
 import { AgentView } from '../../../../src/renderer/components/agent/AgentView'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
+import { promptWithContext } from '../../../../src/renderer/components/agent/attached-context'
 import { installElectronApi, pushedEvent } from '../../../support/electron-api'
 import { terminalSessionOf } from '../../../support/renderer-stores'
 
@@ -389,5 +390,54 @@ describe('AgentView turn and exit', () => {
     act(() => ends.deliver({ sessionId: 'agent-1', exitCode: 1 }))
     expect(screen.getByText(/agent exited/i)).toBeTruthy()
     expect(box().disabled).toBe(true)
+  })
+})
+
+const quote = 'only on network errors and 5xx responses'
+const sentWithContext = promptWithContext('Use the same backoff', {
+  sessions: [
+    {
+      sessionId: 'login',
+      title: 'Fix the login test',
+      branch: null,
+      source: { kind: 'transcript', agentId: 'claude', path: '/t/login.jsonl' },
+    },
+  ],
+  citations: [{ entryIndex: 0, quote, comment: 'Also retry on 429' }],
+})
+
+function seedSentWithContext(): void {
+  agents.history.mockResolvedValue({
+    data: [
+      text('agent_message_chunk', `It retries ${quote}.`),
+      text('user_message_chunk', sentWithContext),
+    ],
+  })
+}
+
+describe('AgentView sent message with attached context', () => {
+  beforeEach(seedSentWithContext)
+
+  it('shows only the typed text, with the attached items as chips under it', async () => {
+    await mountView()
+    const log = screen.getByRole('log')
+    expect(log.querySelector('.agent-message--user')?.textContent).toBe('Use the same backoff')
+    expect(log.textContent).not.toContain('<citations>')
+    expect(within(log).getByText('Fix the login test')).toBeTruthy()
+    expect(within(log).queryByRole('button', { name: /Remove/ })).toBeNull()
+  })
+})
+
+describe('AgentView citation chip in a sent message', () => {
+  beforeEach(seedSentWithContext)
+
+  it('opens find on the quote when a citation chip is clicked', async () => {
+    await mountView()
+    const log = screen.getByRole('log')
+    fireEvent.click(within(log).getByRole('button', { name: /only on network errors/ }))
+    const find = screen.getByLabelText<HTMLInputElement>('Find in the transcript')
+    expect(find.value).toBe(quote)
+    expect(screen.getByText('1 of 1')).toBeTruthy()
+    expect(recordUse).toHaveBeenCalledWith('core.agent.cite-source', 'click')
   })
 })

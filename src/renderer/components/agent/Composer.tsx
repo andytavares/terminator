@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { CornerDownLeft, MessagesSquare, Paperclip, Pencil, Quote, Square, X } from 'lucide-react'
 import { Button, Chip, IconButton } from '@terminator/extension-ui'
 import { useFollowUpQueue } from './use-agent-transcript'
@@ -18,6 +18,7 @@ import {
   useAttachedContextStore,
 } from '../../stores/attached-context.store'
 import { useTabDragStore } from '../../terminal/tab-drag'
+import { CitationCommentPopover } from './cite'
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -119,35 +120,77 @@ const SOURCE_KIND = { agent: 'agent transcript', terminal: 'terminal output' } a
 const sourceKind = ({ source }: SessionContext): string =>
   source.kind === 'transcript' ? 'session' : SOURCE_KIND[source.origin]
 
-function SessionChip(props: { context: SessionContext; onRemove: () => void }) {
-  const { context } = props
+/** A session sent, or to be sent, as context; removable while it waits in the composer. */
+export function SessionChip(props: { context: SessionContext; onRemove?: () => void }) {
+  const { context, onRemove } = props
   return (
     <li className="agent-context-chip">
       <Chip icon={<MessagesSquare aria-hidden />}>
         {context.title}
         <span className="agent-context-chip__meta">{sourceKind(context)}</span>
-        <IconButton icon={X} size="sm" label={`Remove ${context.title}`} onClick={props.onRemove} />
+        {onRemove && (
+          <IconButton icon={X} size="sm" label={`Remove ${context.title}`} onClick={onRemove} />
+        )}
       </Chip>
     </li>
   )
 }
 
-function CitationChip(props: {
+type SaveComment = (comment: string, send: boolean) => void
+
+function EditComment(props: { citation: Citation; onSave: SaveComment }) {
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null)
+  const open = (e: React.MouseEvent<HTMLButtonElement>): void => {
+    const { left, bottom } = e.currentTarget.getBoundingClientRect()
+    setAt({ x: left, y: bottom })
+  }
+  const save: SaveComment = (comment, send) => {
+    props.onSave(comment, send)
+    setAt(null)
+  }
+  const { quote, comment } = props.citation
+  return (
+    <>
+      <IconButton icon={Pencil} size="sm" label="Edit comment" onClick={open} />
+      {at && (
+        <CitationCommentPopover
+          {...{ quote, comment, at }}
+          onSave={save}
+          onClose={() => setAt(null)}
+        />
+      )}
+    </>
+  )
+}
+
+/** A citation; its comment can be edited and the citation removed while it waits in the composer. */
+export function CitationChip(props: {
   citation: Citation
   onShowSource: (quote: string) => void
-  onRemove: () => void
+  onEdit?: SaveComment
+  onRemove?: () => void
 }) {
-  const { quote, comment } = props.citation
+  const { citation, onEdit, onRemove } = props
+  const { quote, comment } = citation
   return (
     <li className="agent-context-chip agent-context-chip--citation">
       <Button variant="ghost" size="sm" icon={Quote} onClick={() => props.onShowSource(quote)}>
         {cutQuote(quote)}
         {comment && <span className="agent-context-chip__meta">{comment}</span>}
       </Button>
-      <IconButton icon={X} size="sm" label="Remove citation" onClick={props.onRemove} />
+      {onEdit && <EditComment citation={citation} onSave={onEdit} />}
+      {onRemove && <IconButton icon={X} size="sm" label="Remove citation" onClick={onRemove} />}
     </li>
   )
 }
+
+const editCitation =
+  (tabId: string, index: number): SaveComment =>
+  (comment, send) => {
+    const { updateCitation, requestSend } = useAttachedContextStore.getState()
+    updateCitation(tabId, index, comment)
+    if (send) requestSend(tabId)
+  }
 
 function ContextChips(props: { sessionId: string; onShowSource: (quote: string) => void }) {
   const { sessionId } = props
@@ -167,6 +210,7 @@ function ContextChips(props: { sessionId: string; onShowSource: (quote: string) 
           key={i}
           citation={citation}
           onShowSource={props.onShowSource}
+          onEdit={editCitation(sessionId, i)}
           onRemove={() => removeCitation(sessionId, i)}
         />
       ))}
@@ -393,11 +437,23 @@ function useDraft(sessionId: string): Draft {
   return { text, set, attached, setAttached }
 }
 
+/** Sends the draft, as Enter would, each time something outside asks this tab to send now. */
+function useSendRequests(sessionId: string, submit: (steer: boolean) => void): void {
+  const requests = useAttachedContextStore((s) => s.sendRequests.get(sessionId) ?? 0)
+  const handled = useRef(requests)
+  useEffect(() => {
+    if (requests === handled.current) return
+    handled.current = requests
+    submit(false)
+  })
+}
+
 export function Composer(props: ComposerProps): React.JSX.Element {
   const { sessionId, disabled, running } = props
   const draft = useDraft(sessionId)
   const attachments = useAttachments()
   const { queue, submit, remove, edit } = useSender(props, attachments, draft)
+  useSendRequests(sessionId, submit)
   const takeFiles = (files: File[]): void => void attachments.add(files)
   return (
     <ContextDropZone sessionId={sessionId}>

@@ -62,6 +62,19 @@ export const CORE_FEATURES: FeatureDeclaration[] = [
     kind: 'control',
     source: 'core',
   },
+  { id: 'core.agent.cite', label: 'Cite an agent reply', kind: 'control', source: 'core' },
+  {
+    id: 'core.agent.cite-source',
+    label: 'Show a citation in the transcript',
+    kind: 'control',
+    source: 'core',
+  },
+  {
+    id: 'core.agent.attach-session',
+    label: 'Attach a session as context',
+    kind: 'control',
+    source: 'core',
+  },
   {
     id: 'core.settings.agents.add-known',
     label: 'Add a known agent',
