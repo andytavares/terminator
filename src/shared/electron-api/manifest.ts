@@ -2033,7 +2033,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'schedules.create',
     kind: 'invoke',
     channel: 'schedules:create',
-    // A scheduled run's prompt runs later with every tool allowed (ADR 144), so saving one asks.
+    // A scheduled run's prompt runs later in auto mode with nobody there (ADR 144), so saving one asks.
     mcp: { tool: 'create_schedule', description: 'Creates a scheduled run.', destructive: true },
     signature:
       signature<

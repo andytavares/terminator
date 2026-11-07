@@ -4,9 +4,9 @@ import type { UnattendedLaunch } from '../../shared/schemas/schedules.schema.js'
 import { mcpToolSpecs } from '../../shared/electron-api/manifest.js'
 import { RENDERER_TOOLS } from '../../shared/mcp/renderer-tools.js'
 
-// A PreToolUse hook approves every call of a scheduled run; ask rules still prompt for destructive
-// commands, because deny and ask rules win over a hook's allow
-// (https://code.claude.com/docs/en/permissions#precedence-among-rules-hooks-and-mods).
+// A scheduled run starts in auto mode: no routine prompts, and a classifier blocks risky calls.
+// Explicit ask rules still prompt, so destructive commands keep asking
+// (https://code.claude.com/docs/en/permission-modes#eliminate-prompts-with-auto-mode).
 
 /** Destructive Terminator MCP tools under `server`, the name the server is registered as;
  * `install_update` lives in src/main/mcp/app-tools.ts. */
@@ -35,19 +35,11 @@ const DESTRUCTIVE_COMMANDS = [
   'Bash(git push -f*)',
 ]
 
-const ALLOW_OUTPUT = JSON.stringify({
-  hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'allow' },
-})
-
 const unattendedSettings = (server: string) => ({
   permissions: {
+    defaultMode: 'auto',
     ask: [...DESTRUCTIVE_COMMANDS, ...destructiveTerminatorTools(server)],
     deny: ['AskUserQuestion'],
-  },
-  hooks: {
-    PreToolUse: [
-      { matcher: '*', hooks: [{ type: 'command', command: `printf '%s' '${ALLOW_OUTPUT}'` }] },
-    ],
   },
 })
 

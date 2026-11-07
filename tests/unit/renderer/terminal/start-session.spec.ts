@@ -313,6 +313,34 @@ describe('a scheduled run starts with its settings and system prompt', () => {
   })
 })
 
+describe('a scheduled run starts in the background', () => {
+  setUpAgentStubs()
+
+  it('leaves the screen alone for an agent on a branch', async () => {
+    await startAgentInBranch({ projectId: 'p2', title: 'Agent', prompt: 'x', unattended })
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it('leaves Scratch and the screen alone for a global agent', async () => {
+    useWorkspaceStore.setState({ scratchActive: false })
+    expect(await startGlobalPrompt({ text: 'Sum up', runAs: 'agent', unattended })).toBe('agent-1')
+    expect(useWorkspaceStore.getState().scratchActive).toBe(false)
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it('opens a global terminal without making it the active tab', async () => {
+    await startGlobalPrompt({ text: 'Sum up', runAs: 'claude-terminal', unattended })
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ background: true }))
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it('opens a terminal on a branch without showing it', async () => {
+    await startSessionInBranch('p2', 'claude x', true)
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ background: true }))
+    expect(navigate).not.toHaveBeenCalled()
+  })
+})
+
 describe('startAgentInBranch — without a prompt or an agent', () => {
   setUpAgentStubs()
 
