@@ -7,7 +7,7 @@ import {
   type WorkspaceSettings,
 } from '../../shared/schemas/settings.schema.js'
 
-interface StoreSchema {
+type StoreSchema = {
   global: GlobalSettings
   workspaces: Record<string, WorkspaceSettings>
 }

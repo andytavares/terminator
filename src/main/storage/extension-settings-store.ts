@@ -8,7 +8,7 @@ import {
 import type { ExtensionSettingsSnapshot } from '../extensions/setting-scope.js'
 import type { WorkspaceSettings } from '../../shared/schemas/settings.schema.js'
 
-interface ExtensionSettingsStoreSchema {
+type ExtensionSettingsStoreSchema = {
   values: Record<string, unknown>
 }
 
