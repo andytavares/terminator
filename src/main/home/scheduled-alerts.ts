@@ -75,11 +75,15 @@ function readAlert(file: string, receive: (id: string, raw: unknown) => void): v
   fs.rmSync(file, { force: true })
 }
 
+/** A folder that cannot be read, for example one deleted while watched, holds no alerts. */
 function readFolder(folder: string, receive: (id: string, raw: unknown) => void): void {
-  for (const name of fs
-    .readdirSync(folder)
-    .filter((n) => n.endsWith('.json'))
-    .sort())
+  let names: string[]
+  try {
+    names = fs.readdirSync(folder)
+  } catch {
+    return
+  }
+  for (const name of names.filter((n) => n.endsWith('.json')).sort())
     readAlert(path.join(folder, name), receive)
 }
 
