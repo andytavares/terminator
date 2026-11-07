@@ -1,0 +1,26 @@
+tests/e2e/fixtures/acp-stub-agent.mjs
+  s_07e7aef877c5aa::t_15ca48e55cb03c 135
+tests/e2e/agent-tab.spec.ts
+  s_07e7aef877c5aa::t_acbab1ce754c66 1,14,28-29,75,84,91,95,124-125,127-128,131-140,145,148-181,194,224-225
+  s_07e7aef877c5aa::t_2ef7a7682798b6 126,129-130,141-142,144,146-147,182-193,195-223,226-231
+  s_07e7aef877c5aa::t_a23774eea9476b 143
+  s_07e7aef877c5aa::t_a2bc7523bf5278 232
+docs/user-guide/USER-GUIDE.md
+  s_07e7aef877c5aa::t_59634f6dd6f453 544-557
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "df137c0f93bc5949245c9d4430ee6cdb3c095cc4",
+  "prompts": {},
+  "sessions": {
+    "s_07e7aef877c5aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "633c8d12-7dd7-4254-9663-67bc2d4d51f5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
