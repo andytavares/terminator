@@ -39,7 +39,7 @@ const ALLOW_OUTPUT = JSON.stringify({
   hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'allow' },
 })
 
-const settingsFor = (server: string) => ({
+const unattendedSettings = (server: string) => ({
   permissions: {
     ask: [...DESTRUCTIVE_COMMANDS, ...destructiveTerminatorTools(server)],
     deny: ['AskUserQuestion'],
@@ -73,7 +73,11 @@ export async function writeUnattendedFiles(
     systemPrompt: systemPromptFor(server),
   }
   await fs.mkdir(folder, { recursive: true })
-  await fs.writeFile(launch.settingsPath, JSON.stringify(settingsFor(server), null, 2), 'utf8')
+  await fs.writeFile(
+    launch.settingsPath,
+    JSON.stringify(unattendedSettings(server), null, 2),
+    'utf8'
+  )
   await fs.writeFile(launch.systemPromptPath, launch.systemPrompt, 'utf8')
   return launch
 }
