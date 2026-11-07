@@ -1059,7 +1059,7 @@ The **new item dialog** offers three types:
 | Type        | Description                                                                                                                                   |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Note**    | Markdown document with title, body, and tags. Saved as `.md` and included in bulk export.                                                     |
-| **Diagram** | Freehand Excalidraw canvas (shapes, arrows, sticky notes, freehand drawing). Opens in a pop-out window via the ↗ button.                     |
+| **Diagram** | Freehand Excalidraw canvas (shapes, arrows, sticky notes, freehand drawing). Opens in a pop-out window via the ↗ button.                      |
 | **Folder**  | Named container to organise notes and diagrams. Create from the sidebar header; rename or delete via right-click; drag items between folders. |
 
 ### Note features

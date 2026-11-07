@@ -49,9 +49,8 @@ describe('settings-store', () => {
   })
 
   it('updateGlobalSettings replaces the notifications default targets', async () => {
-    const { getGlobalSettings, updateGlobalSettings } = await import(
-      '../../../src/main/storage/settings-store'
-    )
+    const { getGlobalSettings, updateGlobalSettings } =
+      await import('../../../src/main/storage/settings-store')
     updateGlobalSettings({ notifications: { defaultTargets: ['toast'] } })
     const settings = getGlobalSettings()
     expect(settings.notifications.defaultTargets).toEqual(['toast'])
@@ -63,9 +62,8 @@ describe('settings-store — notification overrides and merging', () => {
   useEmptyStores()
 
   it('updateGlobalSettings patches a single core notification override without clobbering others', async () => {
-    const { getGlobalSettings, updateGlobalSettings } = await import(
-      '../../../src/main/storage/settings-store'
-    )
+    const { getGlobalSettings, updateGlobalSettings } =
+      await import('../../../src/main/storage/settings-store')
     updateGlobalSettings({
       notifications: { overrides: { terminalBell: ['system'] } },
     })
@@ -80,9 +78,8 @@ describe('settings-store — notification overrides and merging', () => {
   })
 
   it('updateGlobalSettings merges patch', async () => {
-    const { getGlobalSettings, updateGlobalSettings } = await import(
-      '../../../src/main/storage/settings-store'
-    )
+    const { getGlobalSettings, updateGlobalSettings } =
+      await import('../../../src/main/storage/settings-store')
     updateGlobalSettings({ appearance: { theme: 'light' } })
     const settings = getGlobalSettings()
     expect(settings.appearance.theme).toBe('light')
@@ -93,18 +90,16 @@ describe('settings-store — refused values', () => {
   useEmptyStores()
 
   it('updateGlobalSettings refuses a value the settings schema rejects and keeps what was stored', async () => {
-    const { getGlobalSettings, updateGlobalSettings } = await import(
-      '../../../src/main/storage/settings-store'
-    )
+    const { getGlobalSettings, updateGlobalSettings } =
+      await import('../../../src/main/storage/settings-store')
     const before = getGlobalSettings().terminal.scrollbackLimit
     expect(() => updateGlobalSettings({ terminal: { scrollbackLimit: 5 } })).toThrow()
     expect(getGlobalSettings().terminal.scrollbackLimit).toBe(before)
   })
 
   it('updateWorkspaceSettings refuses an override the settings schema rejects', async () => {
-    const { getWorkspaceSettings, updateWorkspaceSettings } = await import(
-      '../../../src/main/storage/settings-store'
-    )
+    const { getWorkspaceSettings, updateWorkspaceSettings } =
+      await import('../../../src/main/storage/settings-store')
     expect(() => updateWorkspaceSettings('ws-bad', { appearance: { theme: 'purple' } })).toThrow()
     expect(getWorkspaceSettings('ws-bad').overrides).toEqual({})
   })
@@ -121,9 +116,8 @@ describe('settings-store — workspace overrides', () => {
   })
 
   it('updateWorkspaceSettings stores workspace-scoped override', async () => {
-    const { updateWorkspaceSettings, getWorkspaceSettings } = await import(
-      '../../../src/main/storage/settings-store'
-    )
+    const { updateWorkspaceSettings, getWorkspaceSettings } =
+      await import('../../../src/main/storage/settings-store')
     updateWorkspaceSettings('ws-1', { appearance: { theme: 'light' } })
     const ws = getWorkspaceSettings('ws-1')
     expect(ws.overrides?.appearance?.theme).toBe('light')
@@ -134,9 +128,8 @@ describe('settings-store — handing a workspace override back', () => {
   useEmptyStores()
 
   it('"Use global default" drops the override it names, and keeps the others', async () => {
-    const { updateWorkspaceSettings, getWorkspaceSettings } = await import(
-      '../../../src/main/storage/settings-store'
-    )
+    const { updateWorkspaceSettings, getWorkspaceSettings } =
+      await import('../../../src/main/storage/settings-store')
     updateWorkspaceSettings('ws-reset', {
       appearance: { theme: 'light' },
       terminal: { scrollbackLimit: 2000, defaultShell: '/bin/fish' },
@@ -158,13 +151,11 @@ describe('settings-store — a settings file that still has the removed `extensi
   it('loads, and the next write leaves the field out of the file', async () => {
     const Store = (await import('electron-store')).default
     const file = new Store<Record<string, unknown>>({ name: 'settings', defaults: {} })
-    const { DEFAULT_GLOBAL_SETTINGS, GlobalSettingsSchema } = await import(
-      '../../../src/shared/schemas/settings.schema'
-    )
+    const { DEFAULT_GLOBAL_SETTINGS, GlobalSettingsSchema } =
+      await import('../../../src/shared/schemas/settings.schema')
     file.set('global', { ...DEFAULT_GLOBAL_SETTINGS, extensions: { 'com.old': { on: true } } })
-    const { getGlobalSettings, updateGlobalSettings } = await import(
-      '../../../src/main/storage/settings-store'
-    )
+    const { getGlobalSettings, updateGlobalSettings } =
+      await import('../../../src/main/storage/settings-store')
 
     expect(GlobalSettingsSchema.safeParse(getGlobalSettings()).success).toBe(true)
     updateGlobalSettings({ appearance: { theme: 'light' } })

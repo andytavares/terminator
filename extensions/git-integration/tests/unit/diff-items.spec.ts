@@ -90,9 +90,11 @@ describe('buildDiffItems()', () => {
 
 describe('buildDiffItems() — moved blocks', () => {
   it('drops the lines of a collapsed moved block but keeps the line that opens it', () => {
-    const lines = [1, 2, 3].map(
-      (n): DiffLine => ({ ...contextLine(n), type: 'add', oldLineNumber: null })
-    )
+    const lines = [1, 2, 3].map((n): DiffLine => ({
+      ...contextLine(n),
+      type: 'add',
+      oldLineNumber: null,
+    }))
     const source = diffItemSource([hunkOf('@@ a', lines)], {
       movedMark: (n) => collapsedMark(n === 1),
     })

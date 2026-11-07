@@ -53,14 +53,12 @@ export function appTools(deps: AppToolDeps): ToolProvider {
   }
   return {
     tools: () =>
-      APP_TOOLS.map(
-        ({ name, description, destructive }): McpToolDef => ({
-          name,
-          description,
-          inputSchema: EMPTY_OBJECT_SCHEMA,
-          ...toolMarks({ destructive, readOnly: false }),
-          call: calls[name],
-        })
-      ),
+      APP_TOOLS.map(({ name, description, destructive }): McpToolDef => ({
+        name,
+        description,
+        inputSchema: EMPTY_OBJECT_SCHEMA,
+        ...toolMarks({ destructive, readOnly: false }),
+        call: calls[name],
+      })),
   }
 }

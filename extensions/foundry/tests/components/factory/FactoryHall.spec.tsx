@@ -715,8 +715,7 @@ function towerCalloutsTests() {
 
   it('keeps a callout pinned to the tower while checks are pending, and drops it when they land', async () => {
     const pending = [...Array(12).fill('pass'), ...Array(7).fill('pending')] as (
-      | 'pass'
-      | 'pending'
+      'pass' | 'pending'
     )[]
     mount({ view: shipView(pending) })
     await waitFor(() =>

@@ -131,14 +131,12 @@ export function freshFoundryStorage(): string {
 
 /** The parts of a host a spec reads back: every call lands in one of these. */
 function hostParts() {
-  const gh = vi.fn(
-    async (..._options: Parameters<ShellExec>): Promise<ExecResult> => ({
-      exitCode: 1,
-      stdout: '',
-      stderr: 'gh is not available here',
-      timedOut: false,
-    })
-  )
+  const gh = vi.fn(async (..._options: Parameters<ShellExec>): Promise<ExecResult> => ({
+    exitCode: 1,
+    stdout: '',
+    stderr: 'gh is not available here',
+    timedOut: false,
+  }))
   return {
     settings: new Map<string, unknown>(),
     commands: new Map<string, (context?: unknown, args?: unknown) => void>(),

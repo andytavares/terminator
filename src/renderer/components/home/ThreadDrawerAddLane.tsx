@@ -16,7 +16,8 @@ export function AddLaneControls({ thread }: { thread: WorkThread }): React.JSX.E
   const taskId = thread.taskId
   const inTask = new Set(thread.lanes.map((l) => l.repoRoot))
   const done = (message: string | null): void => (
-    setError(message), setOffer(message === null ? null : offer)
+    setError(message),
+    setOffer(message === null ? null : offer)
   )
   return (
     <div className="task-add-lane">

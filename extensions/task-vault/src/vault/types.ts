@@ -1,11 +1,5 @@
 export type TaskStatus =
-  | 'open'
-  | 'done'
-  | 'migrated'
-  | 'cancelled'
-  | 'in-progress'
-  | 'in-review'
-  | 'blocked'
+  'open' | 'done' | 'migrated' | 'cancelled' | 'in-progress' | 'in-review' | 'blocked'
 
 export type ProjectStatus = 'active' | 'someday' | 'done' | 'archived'
 

@@ -4,9 +4,7 @@ import type { ThreadSummaryInput } from '../../../shared/schemas/agent-usage.sch
 import { pullRequestOf } from './thread-format'
 
 export type ThreadSummary =
-  | { status: 'loading' }
-  | { status: 'ready'; text: string }
-  | { status: 'error' }
+  { status: 'loading' } | { status: 'ready'; text: string } | { status: 'error' }
 
 /** What the model is told: the renderer holds each session's latest line and note, not its transcript.
  * @internal */

@@ -99,8 +99,7 @@ export function installUpdateNow(): void {
 }
 
 export type QuietUpdateCheck =
-  | { status: 'up-to-date' | 'downloaded'; version: string }
-  | { status: 'off'; reason: string }
+  { status: 'up-to-date' | 'downloaded'; version: string } | { status: 'off'; reason: string }
 
 /** The check behind the MCP check_for_update tool: no dialog, and a failed check rejects. */
 export async function checkForUpdatesQuietly(): Promise<QuietUpdateCheck> {

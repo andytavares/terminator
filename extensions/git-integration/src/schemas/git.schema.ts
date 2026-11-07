@@ -1,13 +1,7 @@
 import { z } from 'zod'
 
 type FileStatus =
-  | 'modified'
-  | 'added'
-  | 'deleted'
-  | 'renamed'
-  | 'untracked'
-  | 'conflicted'
-  | 'ignored'
+  'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflicted' | 'ignored'
 
 export interface GitFileStatus {
   path: string

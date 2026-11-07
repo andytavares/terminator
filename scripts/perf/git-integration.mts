@@ -49,9 +49,8 @@ if (!Number.isInteger(prNumber) || prNumber <= 0) {
 }
 const repoRoot = process.argv[3] ?? process.cwd()
 
-const { registerGithubHandlers } = await import(
-  '../../extensions/git-integration/src/ipc/github.ipc.ts'
-)
+const { registerGithubHandlers } =
+  await import('../../extensions/git-integration/src/ipc/github.ipc.ts')
 interface HandlerResult {
   error?: string
   pr?: { chapters?: { files: { path: string }[] }[]; baseRefName: string; headSHA: string }
