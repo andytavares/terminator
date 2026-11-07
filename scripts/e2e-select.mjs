@@ -110,6 +110,7 @@ export const CORE_SPECS = [
   'monitor-wall.spec.ts',
   'navigation.spec.ts',
   'resume-session.spec.ts',
+  'scheduled-runs.spec.ts',
   'session-home.spec.ts',
   'session-surfaces.spec.ts',
   'settings.spec.ts',
