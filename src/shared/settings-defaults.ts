@@ -14,6 +14,7 @@ export function defaultGlobalSettings(defaultShell: string): GlobalSettings {
       hideSidebarOnHome: true,
       showUsageTab: true,
       homeLayout: 'tasks',
+      sidebarMode: 'tree',
     },
     sidebar: { staleAfterMs: 2 * 60 * 60 * 1000 },
     notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },

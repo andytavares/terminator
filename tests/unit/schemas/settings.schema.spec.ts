@@ -30,6 +30,7 @@ describe('GlobalSettingsSchema defaults for fields an older file lacks', () => {
       hideSidebarOnHome: true,
       showUsageTab: true,
       homeLayout: 'tasks',
+      sidebarMode: 'tree',
     })
   })
 

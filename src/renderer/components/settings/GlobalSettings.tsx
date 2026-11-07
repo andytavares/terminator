@@ -4,13 +4,14 @@ import type {
   GlobalSettings as GlobalSettingsValue,
   NotificationTarget,
 } from '../../../shared/types/index'
-import type { HomeLayout } from '../../../shared/schemas/settings.schema'
+import type { HomeLayout, SidebarMode } from '../../../shared/schemas/settings.schema'
 import { parsePatterns, PATTERNS_PLACEHOLDER } from './patterns'
 import { AgentsSettings } from './AgentsSettings'
 import { QuickActionsSettings } from './QuickActionsSettings'
 import '@terminator/extension-ui/settings-fields.css'
 import './SettingsPanel.css'
 import { ThemeChoices } from './ThemeChoices'
+import { useSidebarMode } from '../sidebar/sidebar-mode'
 import { recordUse } from '../../usage/record'
 import { useFieldChangeCounter } from '../../usage/use-field-change-counter'
 
@@ -179,6 +180,7 @@ function InterfaceFields({ settings }: { settings: Settings }): React.JSX.Elemen
       <HideSidebarOnHomeField hide={settings.ui?.hideSidebarOnHome ?? true} />
       <ShowUsageTabField show={settings.ui?.showUsageTab ?? true} />
       <HomeLayoutField layout={settings.ui?.homeLayout ?? 'tasks'} />
+      <SidebarModeField />
       <StaleAfterField staleAfterMs={settings.sidebar.staleAfterMs} />
     </>
   )
@@ -243,6 +245,30 @@ function HomeLayoutField({ layout }: { layout: HomeLayout }): React.JSX.Element 
       </select>
       <span className="settings-section__hint">
         Tasks shows what needs you, then your tasks. Classic keeps the Desk as it was.
+      </span>
+    </div>
+  )
+}
+
+function SidebarModeField(): React.JSX.Element {
+  const mode = useSidebarMode()
+  const updateSidebarMode = useSettingsStore((s) => s.updateSidebarMode)
+  return (
+    <div className="settings-section__field">
+      <label className="settings-section__label" htmlFor="sidebar-mode">
+        Sidebar
+      </label>
+      <select
+        id="sidebar-mode"
+        className="settings-section__input"
+        value={mode}
+        onChange={(e) => void updateSidebarMode(e.target.value as SidebarMode)}
+      >
+        <option value="tree">Tree</option>
+        <option value="inbox">Inbox</option>
+      </select>
+      <span className="settings-section__hint">
+        Inbox lists your work as cards, what needs you first. Tree lists repos and branches.
       </span>
     </div>
   )

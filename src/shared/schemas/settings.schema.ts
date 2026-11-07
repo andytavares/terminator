@@ -46,6 +46,10 @@ const AgentsSettingsSchema = z
 const HomeLayoutSchema = z.enum(['classic', 'tasks'])
 export type HomeLayout = z.infer<typeof HomeLayoutSchema>
 
+/** Tree is the repo → branch list; Inbox is the flat list of work threads (ADR 148). */
+const SidebarModeSchema = z.enum(['tree', 'inbox'])
+export type SidebarMode = z.infer<typeof SidebarModeSchema>
+
 export const GlobalSettingsSchema = z.object({
   appearance: z.object({
     theme: ThemeSchema,
@@ -67,6 +71,7 @@ export const GlobalSettingsSchema = z.object({
       hideSidebarOnHome: z.boolean().default(true),
       showUsageTab: z.boolean().default(true),
       homeLayout: HomeLayoutSchema.default('tasks'),
+      sidebarMode: SidebarModeSchema.default('tree'),
       /**
        * Which editor "Open in editor" launches, by id. Empty means detect —
        * the common case, and why this is not a required choice buried in
@@ -80,6 +85,7 @@ export const GlobalSettingsSchema = z.object({
       hideSidebarOnHome: true,
       showUsageTab: true,
       homeLayout: 'tasks',
+      sidebarMode: 'tree',
     }),
   // Bounded 1 minute to 30 days so "zero" or "a year" is a validation failure
   // rather than a view that shows everything or nothing.
