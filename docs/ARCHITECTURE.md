@@ -544,6 +544,21 @@ ADR 134. The core counts each use of each feature, per local day and path, in `u
 
 ---
 
+## The Terminator MCP server
+
+ADR 145. Any Claude Code session on this Mac reaches Terminator through one MCP server in the main process. At start, `startTerminatorMcpServer` (`src/main/index.ts`) wires it:
+
+1. Claude Code starts the relay, `<userData>/mcp/mcp-relay.cjs`, as a stdio MCP server. Terminator writes the relay at every start (`src/main/mcp/relay-script.ts`) and registers it with `claude mcp add-json --scope user terminator` (`terminator-dev` in a development build). It also adds the allow rule `mcp__terminator` to `~/.claude/settings.json` (`src/main/mcp/registration.ts`).
+2. The relay connects to the Unix socket `<userData>/mcp.sock` (mode `0600`). Its first line names the caller: the Claude session id, the `claude` process id and the project folder. Every byte after it is MCP.
+3. `startMcpServer` (`src/main/mcp/mcp-server.ts`) serves one MCP session per connection. It lists and calls the tools of its providers:
+   - **Manifest tools** (`src/main/mcp/manifest-tools.ts`): manifest methods that declare an `mcp` field (`mcpToolSpecs()` in `src/shared/electron-api/manifest.ts`). A call runs the method's handler from `ipcInvokeRegistry`.
+   - **App tools**: `alert` (`alert-tool.ts`), `check_for_update`, `install_update` and `show_window` (`app-tools.ts`), and `move_session_here` (`move-session.ts`).
+   - **Renderer tools** (`src/shared/mcp/renderer-tools.ts`): Start work, sessions, quick actions and extension commands. Main pushes an `McpCall` over `mcp:call` (`src/main/mcp/renderer-tools.ts`). `McpHost` (`src/renderer/mcp/`) runs it and answers over `mcp:answer` with the same id.
+
+A destructive tool carries `anthropic/requiresUserInteraction` (`toolMarks` in `src/main/mcp/tool-types.ts`), so Claude Code asks on every call, over allow rules. Quick actions and extension commands have a plain tool and a destructive tool. The plain tool refuses a destructive target. Scheduled runs add every destructive Terminator tool to their ask rules (`src/main/home/unattended-run.ts`). The remote client has no `claudeCode` API: the server is for this Mac only.
+
+---
+
 ## Issue tracker integrations
 
 One core-owned service reaches Linear. Nothing else in the application holds a tracker credential or contacts a tracker. See [ADR-029](adr/029-core-issue-tracker-service.md).
