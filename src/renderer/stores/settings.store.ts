@@ -9,7 +9,7 @@ import type {
   WorkspaceSettings,
 } from '../../shared/types/index'
 import { defaultGlobalSettings } from '../../shared/settings-defaults'
-import type { HomeLayout } from '../../shared/schemas/settings.schema'
+import type { HomeLayout, SidebarMode } from '../../shared/schemas/settings.schema'
 
 interface SettingsState {
   globalSettings: GlobalSettings | null
@@ -35,6 +35,7 @@ interface SettingsState {
   updateHideSidebarOnHome: (hide: boolean) => Promise<void>
   updateShowUsageTab: (show: boolean) => Promise<void>
   updateHomeLayout: (layout: HomeLayout) => Promise<void>
+  updateSidebarMode: (mode: SidebarMode) => Promise<void>
   updatePromptForName: (enabled: boolean) => Promise<void>
   updateNotificationDefaultTargets: (targets: NotificationTarget[]) => Promise<void>
   updateNotificationOverride: (key: string, targets: NotificationTarget[]) => Promise<void>
@@ -181,6 +182,7 @@ function preferenceSlice(
   | 'updateHideSidebarOnHome'
   | 'updateShowUsageTab'
   | 'updateHomeLayout'
+  | 'updateSidebarMode'
   | 'updateNotificationDefaultTargets'
   | 'updateNotificationOverride'
   | 'updateQuickActions'
@@ -192,6 +194,7 @@ function preferenceSlice(
     updateHideSidebarOnHome: (hide) => saveGlobal(set, { ui: { hideSidebarOnHome: hide } }),
     updateShowUsageTab: (show) => saveGlobal(set, { ui: { showUsageTab: show } }),
     updateHomeLayout: (layout) => saveGlobal(set, { ui: { homeLayout: layout } }),
+    updateSidebarMode: (mode) => saveGlobal(set, { ui: { sidebarMode: mode } }),
     updateNotificationDefaultTargets: (targets) =>
       saveGlobal(set, { notifications: { defaultTargets: targets } }),
     updateNotificationOverride: (key, targets) =>

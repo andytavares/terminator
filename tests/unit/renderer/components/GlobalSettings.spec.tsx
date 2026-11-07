@@ -33,6 +33,7 @@ const globalSettings: GlobalSettingsValue = {
     hideSidebarOnHome: true,
     showUsageTab: true,
     homeLayout: 'tasks',
+    sidebarMode: 'tree',
   },
   sidebar: { staleAfterMs: 7_200_000 },
 }
@@ -41,6 +42,7 @@ const mockUpdateQuickActions = vi.fn()
 const mockUpdateHideSidebarOnHome = vi.fn()
 const mockUpdateHomeLayout = vi.fn()
 const mockUpdateShowUsageTab = vi.fn()
+const mockUpdateSidebarMode = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -54,6 +56,7 @@ beforeEach(() => {
     updateHideSidebarOnHome: mockUpdateHideSidebarOnHome,
     updateHomeLayout: mockUpdateHomeLayout,
     updateShowUsageTab: mockUpdateShowUsageTab,
+    updateSidebarMode: mockUpdateSidebarMode,
     updateBranchExcludePatterns: mockUpdateBranchExclude,
     updatePromptForName: mockUpdatePromptForName,
     updateNotificationDefaultTargets: mockUpdateNotificationDefaultTargets,
@@ -92,6 +95,21 @@ describe('GlobalSettings — Home layout', () => {
     expect(layout.value).toBe('tasks')
     fireEvent.change(layout, { target: { value: 'classic' } })
     expect(mockUpdateHomeLayout).toHaveBeenCalledWith('classic')
+  })
+})
+
+describe('GlobalSettings — Sidebar', () => {
+  it('offers Tree and Inbox, starts on Tree, and saves a change', () => {
+    render(<GlobalSettings />)
+    const mode = screen.getByRole('combobox', { name: 'Sidebar' }) as HTMLSelectElement
+    expect(
+      within(mode)
+        .getAllByRole('option')
+        .map((o) => o.textContent)
+    ).toEqual(['Tree', 'Inbox'])
+    expect(mode.value).toBe('tree')
+    fireEvent.change(mode, { target: { value: 'inbox' } })
+    expect(mockUpdateSidebarMode).toHaveBeenCalledWith('inbox')
   })
 })
 

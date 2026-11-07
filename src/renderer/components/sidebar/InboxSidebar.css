@@ -1,0 +1,184 @@
+.inbox {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Search and the repo filter: the same band the tree's header draws. */
+.inbox__controls {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 14px 10px 13px;
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.inbox__repo {
+  height: var(--tm-control-height-sm);
+  max-width: 40%;
+  padding: 0 6px;
+  border: 1px solid var(--tm-border);
+  border-radius: 5px;
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  font: inherit;
+  font-size: var(--tm-font-size-xs);
+}
+
+.inbox__scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px 0;
+}
+
+.inbox__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  list-style: none;
+}
+
+.inbox__empty {
+  padding: 12px 10px;
+  font-size: var(--tm-font-size-xs);
+  color: var(--tm-text-muted);
+  text-align: center;
+}
+
+.inbox-card {
+  position: relative;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  background: var(--tm-bg-card);
+}
+
+.inbox-card:hover,
+.inbox-card:focus-within {
+  background: var(--tm-bg-card-hover);
+}
+
+.inbox-card--pinned {
+  border-color: var(--tm-border-strong);
+}
+
+/* The card itself is the open button; the actions sit over its top-right corner. */
+.inbox-card__open {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  column-gap: 6px;
+  row-gap: 2px;
+  align-items: center;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--tm-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--tm-radius-sm);
+}
+
+.inbox-card__open:focus-visible {
+  outline: 1px solid var(--tm-accent);
+  outline-offset: -1px;
+}
+
+.inbox-card__open .state-glyph {
+  width: 14px;
+  height: 14px;
+}
+
+.inbox-card__title {
+  overflow: hidden;
+  font-size: var(--tm-font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-card__age {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--tm-text-muted);
+  font-size: var(--tm-font-size-xs);
+}
+
+.inbox-card__age svg {
+  width: 11px;
+  height: 11px;
+}
+
+.inbox-card__where,
+.inbox-card__ask {
+  grid-column: 2 / 4;
+  overflow: hidden;
+  font-size: var(--tm-font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-card__where {
+  color: var(--tm-text-muted);
+}
+
+.inbox-card__ask {
+  color: var(--tm-text-secondary);
+}
+
+.inbox-card__actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: none;
+  gap: 2px;
+  border-radius: var(--tm-radius-xs);
+  background: var(--tm-bg-card-hover);
+}
+
+.inbox-card:hover .inbox-card__actions,
+.inbox-card:focus-within .inbox-card__actions {
+  display: flex;
+}
+
+.inbox-card__snooze {
+  position: relative;
+}
+
+.inbox__settled {
+  margin-top: 8px;
+}
+
+.inbox__settled-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: var(--tm-control-height-sm);
+  margin-bottom: 4px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--tm-text-muted);
+  font: inherit;
+  font-size: var(--tm-font-size-xs);
+  cursor: pointer;
+}
+
+.inbox__settled-toggle:hover {
+  color: var(--tm-text-primary);
+}
+
+.inbox__settled-toggle svg {
+  width: 12px;
+  height: 12px;
+}
+
+.inbox__chevron--open {
+  transform: rotate(90deg);
+}

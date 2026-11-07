@@ -62,6 +62,7 @@ function coreActionHandlers() {
     onOverview: vi.fn(),
     onUsage: vi.fn(),
     onToggleSidebar: vi.fn(),
+    onToggleSidebarMode: vi.fn(),
     onOpenSettings: vi.fn(),
     onToggleLog: vi.fn(),
   }
@@ -252,6 +253,7 @@ const HANDLED_BY: [string, keyof CoreActionDeps, unknown[]][] = [
   ['core.open-usage', 'onUsage', []],
   ['core.next-waiting-top', 'onNextWaiting', []],
   ['core.toggle-sidebar', 'onToggleSidebar', []],
+  ['core.toggle-sidebar-inbox', 'onToggleSidebarMode', []],
   ['core.open-settings', 'onOpenSettings', []],
   ['core.toggle-log', 'onToggleLog', []],
 ]
@@ -365,6 +367,7 @@ const DESTRUCTIVE_BY_ID: Record<string, boolean> = {
   'core.open-usage': false,
   'core.next-waiting-top': false,
   'core.toggle-sidebar': false,
+  'core.toggle-sidebar-inbox': false,
   'core.open-settings': false,
   'core.toggle-log': false,
   'session:s1': false,

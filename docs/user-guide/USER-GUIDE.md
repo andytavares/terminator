@@ -104,6 +104,21 @@ Projects live inside a workspace. A project holds one or more terminal sessions 
 - **Open in your editor:** Right-click a branch and choose **Open in ‹editor›** to open the branch's working copy. This is its own worktree when it has one, otherwise the repo it was checked out from. A repo's header has the same item, and it opens the repo folder. Terminator finds your editor itself. It looks for Cursor, VS Code, Windsurf, Zed, Sublime Text, WebStorm, IntelliJ and Xcode. It prefers an editor whose command-line launcher is installed, because that opens the folder in a window you already have. To pin one editor, set `ui.editor` in settings to its id (`cursor`, `vscode`, `windsurf`, `zed`, `sublime`, `webstorm`, `intellij`, `xcode`). Leave it empty to keep detecting. The menu item is hidden when no editor is found, and in the browser remote, which has no local editor to launch.
 - **Per-workspace settings:** You can override the theme, scrollback limit and default shell for each workspace in Settings.
 
+### The Inbox sidebar
+
+The sidebar has a second mode, **Inbox**. It lists your work as cards in place of the repo tree. Turn it on in **Settings → Interface → Sidebar → Inbox**, or run **Switch sidebar: Tree / Inbox** from Quick Actions (`⌘P`). The change shows at once. **Tree** is the default and does not change.
+
+- **Order:** Work that needs you is first, then pinned work, then the rest, newest first. A card shows the title, repo and branch, the state glyph (the same five as Home), how long since it last did something, and the question when an agent asks one.
+- **Open:** Click a card or press `Enter` to show its most recent terminal. Work with no open terminal opens its task drawer on Home.
+- **Settle:** Hover a card and click **Settle** (✓) when you are done with it. It moves into **N settled** at the bottom, which starts folded. A settled card comes back to the top when its agent ends a turn or asks something.
+- **Snooze:** Click the alarm clock and choose **1 hour**, **This afternoon** or **Tomorrow**. The card is settled until then.
+- **Pin:** Click the pin. A pinned card stays at the top, under the work that needs you, and never settles on its own.
+- **Auto-settle:** Work with no activity for 24 hours settles on its own. An unanswered question never does.
+- **Search and repo filter:** The search field matches title, ticket, repo and branch. **All repos** narrows the list to one repo.
+- **Keyboard:** From the search field, `↓` moves onto the first card. `↑` and `↓` move between cards.
+
+Terminator keeps settled, pinned and snoozed work for each profile on this machine. It forgets an entry 30 days after its work is gone.
+
 ---
 
 ## 5. Terminal Sessions
@@ -241,14 +256,14 @@ Open Settings with **`Cmd+,`** or **View → Open Settings**.
 
 ### Global settings
 
-| Section            | Options                                                                       |
-| ------------------ | ----------------------------------------------------------------------------- |
-| **Interface**      | Theme (dark/light), show CPU/Memory/Network bar, hide the branch tree on Home |
-| **Terminal**       | Default shell, scrollback limit                                               |
-| **Agents**         | Default agent and your own ACP agents — see below                             |
-| **Integrations**   | Connect Linear and Claude Code — see below                                    |
-| **Extensions**     | Enable/disable individual extensions                                          |
-| **Remote Control** | Enable local server, port, ngrok tunnel, session password                     |
+| Section            | Options                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------ |
+| **Interface**      | Theme (dark/light), show CPU/Memory/Network bar, hide the branch tree on Home, Sidebar (Tree or Inbox) |
+| **Terminal**       | Default shell, scrollback limit                                                                        |
+| **Agents**         | Default agent and your own ACP agents — see below                                                      |
+| **Integrations**   | Connect Linear and Claude Code — see below                                                             |
+| **Extensions**     | Enable/disable individual extensions                                                                   |
+| **Remote Control** | Enable local server, port, ngrok tunnel, session password                                              |
 
 ### Integrations — connecting an issue tracker
 

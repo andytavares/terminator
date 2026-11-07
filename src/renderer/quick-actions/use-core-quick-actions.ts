@@ -23,6 +23,7 @@ import { cycleTab, reopenClosedTab } from './shortcut-behaviors'
 import { useNavigationStore } from '../stores/navigation.store'
 import { goBack, goForward } from '../stores/navigation-sync'
 import { toggleBreakout } from '../terminal/breakout'
+import { toggleSidebarMode } from '../components/sidebar/sidebar-mode'
 
 /** What the app shell does on behalf of an action: its own dialogs, panes and toggles. */
 export interface ShellCommands {
@@ -281,6 +282,7 @@ function coreActionDeps(
     ...workspaceHandlers(c),
     ...issueHandlers(c),
     ...shellHandlers(c.shell),
+    onToggleSidebarMode: toggleSidebarMode,
     onStartWork: () => useStartWorkStore.getState().openLauncher(),
     onTaskSwitcher: () => useTaskSwitcher.getState().show(),
   }
