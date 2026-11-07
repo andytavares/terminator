@@ -390,9 +390,11 @@ describe('a failed prompt', () => {
     service.onUpdate(sessionId, (update) => heard.push(update))
     agent.onPrompt = () => Promise.reject(new Error('Internal error: query closed'))
     await service.prompt(sessionId, 'hello')
-    expect(heard).toHaveLength(1)
-    expect(heard[0].sessionUpdate).toBe('agent_message_chunk')
-    const text = (heard[0].content as { text: string }).text
+    expect(heard.map((update) => update.sessionUpdate)).toEqual([
+      'user_message_chunk',
+      'agent_message_chunk',
+    ])
+    const text = (heard[1].content as { text: string }).text
     expect(text).toContain('The agent stopped with an error')
     expect(text).not.toContain('query closed')
   })
@@ -708,5 +710,76 @@ describe('an agent that exits before its session opens', () => {
     expect(await service.runOnce({ cwd: '/w', prompt: 'x' })).toMatchObject({
       error: 'AGENT_UNAVAILABLE',
     })
+  })
+})
+
+const sent = (text: string) => ({
+  sessionUpdate: 'user_message_chunk',
+  content: { type: 'text', text },
+})
+const userMessages = (service: Started['service'], sessionId: string) =>
+  service.readHistory(sessionId).filter((update) => update.sessionUpdate === 'user_message_chunk')
+
+describe('the sent message', () => {
+  it('is published once, to the log and the windows, before the agent gets the prompt', async () => {
+    const { service, agent, broadcast, sessionId } = await started()
+    const loggedAtPrompt: AgentUpdate[][] = []
+    agent.onPrompt = async () => {
+      loggedAtPrompt.push(service.readHistory(sessionId))
+      return { stopReason: 'end_turn' }
+    }
+    await service.prompt(sessionId, 'hello')
+    expect(loggedAtPrompt).toEqual([[sent('hello')]])
+    expect(service.readHistory(sessionId)).toEqual([sent('hello')])
+    expect(broadcast).toHaveBeenCalledWith('agents:update', { sessionId, update: sent('hello') })
+  })
+})
+
+describe('a steer that joins the running turn', () => {
+  it('is published as the operator sent it', async () => {
+    const { service, agent, sessionId } = await started()
+    let release: () => void = () => undefined
+    agent.onPrompt = () =>
+      new Promise((resolve) => (release = () => resolve({ stopReason: 'end_turn' })))
+    const running = service.prompt(sessionId, 'first')
+    await eventually(() => expect(agent.calls.map((call) => call.method)).toContain('prompt'))
+    await service.steer(sessionId, 'actually, this')
+    expect(userMessages(service, sessionId)).toEqual([sent('first'), sent('actually, this')])
+    release()
+    await running
+  })
+})
+
+describe('a steer handed back as a prompt', () => {
+  it('is published once, with the prompt it becomes', async () => {
+    const { service, agent, sessionId } = await started()
+    agent.onSteer = async () => ({ outcome: 'promptRequired' })
+    await service.steer(sessionId, 'now')
+    await eventually(() => expect(userMessages(service, sessionId)).toEqual([sent('now')]))
+  })
+})
+
+describe('a queued message', () => {
+  it('is published when it is sent after end_turn', async () => {
+    const { service, agent, sessionId } = await started()
+    const loggedAtPrompt: AgentUpdate[][] = []
+    agent.onPrompt = async () => {
+      loggedAtPrompt.push(userMessages(service, sessionId))
+      return { stopReason: 'end_turn' }
+    }
+    service.queueSet(sessionId, ['next'])
+    await eventually(() => expect(loggedAtPrompt).toEqual([[sent('next')]]))
+  })
+})
+
+describe('images the agent cannot read', () => {
+  it('publish only the notice, not the message', async () => {
+    const fakes = fakeConnector({}, { image: false, steering: false })
+    const service = serviceWith(fakes.connect)
+    const result = await service.start({ cwd: '/work' })
+    if (!result) throw new Error('the fake agent did not start')
+    await service.prompt(result.sessionId, 'look', [{ mimeType: 'image/png', data: 'AA==' }])
+    const history = service.readHistory(result.sessionId)
+    expect(history.map((update) => update.sessionUpdate)).toEqual(['agent_message_chunk'])
   })
 })

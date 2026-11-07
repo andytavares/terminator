@@ -279,6 +279,12 @@ function noticeOf(text: string): AgentUpdate {
   return { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } } as AgentUpdate
 }
 
+/** The message as the conversation shows it: the adapter drops its own echo of what was sent. */
+function sentOf(content: PromptRequest['prompt']): AgentUpdate {
+  const text = content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('')
+  return { sessionUpdate: 'user_message_chunk', content: { type: 'text', text } } as AgentUpdate
+}
+
 function capabilitiesOf(response: InitializeResponse): AgentCapabilities {
   const steering = (response._meta?.steering as { supported?: unknown } | undefined)?.supported
   return {
@@ -550,7 +556,7 @@ class AcpAgentService implements AgentService {
     const session = this.live(sessionId)
     if (!session) return
     const outcome = session.capabilities.steering ? await this.steered(session, text) : 'failed'
-    if (outcome === 'joined') return
+    if (outcome === 'joined') return this.publishUpdate(session, sentOf(textPrompt(text)))
     // A failed request may leave a turn running; a prompt beside it is not allowed.
     if (outcome === 'failed') this.cancelSession(session)
     void this.promptSession(session, textPrompt(text))
@@ -621,6 +627,7 @@ class AcpAgentService implements AgentService {
     await asked.cancelling
     if (session.ended) return { stopReason: 'error' }
     if (session.cancels !== cancelsAtAsk) return { stopReason: 'cancelled' }
+    this.publishUpdate(session, sentOf(content))
     setTurn(session.id, true)
     try {
       const first = await this.send(session, content)
