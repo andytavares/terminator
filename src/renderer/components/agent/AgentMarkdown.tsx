@@ -27,6 +27,18 @@ function themeVariables(dark: boolean): Record<string, unknown> {
   }
 }
 
+// An init directive can set themeCSS, which mermaid's strict mode does not check.
+const withoutDirectives = (code: string): string =>
+  code
+    .split('\n')
+    .filter((line) => !/^\s*%%\{.*\}%%\s*$/.test(line))
+    .join('\n')
+
+// A CSS url() in a style or classDef line would load from the network when the diagram draws, and
+// the renderer has no content security policy. Only fragment references (url(#id)) stay.
+const withoutRemoteCss = (svg: string): string =>
+  svg.replace(/@import[^;]*;?/gi, '').replace(/url\(\s*(['"]?)(?!#)[^)]*\1\s*\)/gi, 'none')
+
 // Mermaid is loaded on the first diagram, into its own chunk. 'strict' keeps a
 // diagram's labels from carrying HTML or click handlers.
 async function drawDiagram(id: string, code: string, dark: boolean): Promise<Drawing> {
@@ -38,11 +50,13 @@ async function drawDiagram(id: string, code: string, dark: boolean): Promise<Dra
     themeVariables: themeVariables(dark),
   })
   try {
-    return { svg: (await mermaid.render(id, code)).svg }
+    return { svg: withoutRemoteCss((await mermaid.render(id, withoutDirectives(code))).svg) }
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) }
   }
 }
+
+const DRAW_AFTER_MS = 250
 
 function MermaidDiagram({ code }: { code: string }): React.JSX.Element {
   const id = `agent-mermaid-${useId().replace(/[^\w-]/g, '')}`
@@ -50,9 +64,13 @@ function MermaidDiagram({ code }: { code: string }): React.JSX.Element {
   const [drawing, setDrawing] = useState<Drawing>(null)
   useEffect(() => {
     let current = true
-    void drawDiagram(id, code, dark).then((next) => current && setDrawing(next))
+    // A streaming reply changes the fence on every chunk: draw once it holds still.
+    const timer = setTimeout(() => {
+      void drawDiagram(id, code, dark).then((next) => current && setDrawing(next))
+    }, DRAW_AFTER_MS)
     return () => {
       current = false
+      clearTimeout(timer)
     }
   }, [id, code, dark])
   // Mermaid's own sanitiser has already cleaned this SVG ('strict').

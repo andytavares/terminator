@@ -441,3 +441,18 @@ describe('Markdown raw HTML — inline SVG', () => {
     expect(el.textContent).not.toContain('alert')
   })
 })
+
+describe('Markdown — an HTML title is never kept', () => {
+  it('drops every title, so a body cannot rename the window', async () => {
+    const view = render(
+      <Markdown offline onOpenLink={() => {}}>
+        {'<title>Hijack</title>\n\n<svg viewBox="0 0 10 10"><title>Chart</title></svg>'}
+      </Markdown>
+    )
+    await view.findByText('Chart')
+    // React moves a title outside an SVG into document.head, so look at the whole document.
+    const titles = [...document.querySelectorAll('title')].map((t) => t.textContent)
+    expect(titles).not.toContain('Hijack')
+    expect(view.container.querySelector('svg')).not.toBeNull()
+  })
+})

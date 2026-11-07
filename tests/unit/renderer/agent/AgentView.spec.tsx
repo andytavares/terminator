@@ -4,6 +4,7 @@ import { render, screen, fireEvent, act, within } from '@testing-library/react'
 import type { AgentPermissionAsk, AgentUpdate } from '@terminator/extension-sdk'
 
 import { AgentView } from '../../../../src/renderer/components/agent/AgentView'
+import { AgentMarkdown } from '../../../../src/renderer/components/agent/AgentMarkdown'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { installElectronApi, pushedEvent } from '../../../support/electron-api'
 import { terminalSessionOf } from '../../../support/renderer-stores'
@@ -363,6 +364,36 @@ describe('AgentView mermaid diagrams', () => {
     expect(await within(log).findByText(/diagram could not be drawn/i)).toBeTruthy()
     expect(within(log).getByText(/Parse error on line 1/)).toBeTruthy()
     expect(log.querySelector('pre code')?.textContent).toBe('not a diagram')
+  })
+})
+
+describe('AgentView mermaid diagrams fetch nothing', () => {
+  it('drops init directives and every remote url() from a drawn diagram', async () => {
+    const evil = 'url(https://evil.example/t.png)'
+    mermaid.render.mockResolvedValue({
+      svg: `<svg><style>@import url(https://evil.example/a.css); div{background:${evil}}</style><g style="fill:${evil}"><text>Drawn</text></g><path fill="url(#grad)"/></svg>`,
+    })
+    const log = await reply('```mermaid\n%%{init: {"themeCSS": "x"}}%%\npie\n  "A": 1\n```')
+    expect(await within(log).findByText('Drawn')).toBeTruthy()
+    expect(mermaid.render).toHaveBeenCalledWith(expect.any(String), 'pie\n  "A": 1')
+    expect(log.innerHTML).not.toContain('evil.example')
+    expect(log.innerHTML).toContain('url(#grad)')
+  })
+})
+
+describe('AgentView mermaid diagrams while a reply streams', () => {
+  it('draws once the fence stops changing, not on every chunk', async () => {
+    vi.useFakeTimers()
+    try {
+      mermaid.render.mockResolvedValue({ svg: '<svg><text>Done</text></svg>' })
+      const view = render(<AgentMarkdown text={'```mermaid\npie\n'} />)
+      view.rerender(<AgentMarkdown text={'```mermaid\npie\n  "A"'} />)
+      view.rerender(<AgentMarkdown text={'```mermaid\npie\n  "A": 1\n```'} />)
+      await act(async () => vi.advanceTimersByTimeAsync(300))
+      expect(mermaid.render.mock.calls.map(([, code]) => code)).toEqual(['pie\n  "A": 1'])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

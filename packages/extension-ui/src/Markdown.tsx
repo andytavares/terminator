@@ -10,7 +10,8 @@ type Schema = typeof import('rehype-sanitize').defaultSchema
 // Shapes and text only, for a chart drawn as inline SVG: no `style`, `href`, `use`,
 // `foreignObject` or animation, so an SVG can neither run code nor fetch anything.
 const SVG_SHAPES = ['svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']
-const SVG_TAGS = [...SVG_SHAPES, 'text', 'tspan', 'title']
+// No <title>: React moves one into the document head, where a body would rename the window.
+const SVG_TAGS = [...SVG_SHAPES, 'text', 'tspan']
 const SVG_ATTRIBUTES = [
   ...['viewBox', 'width', 'height', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'rx', 'ry'],
   ...['d', 'points', 'transform', 'fill', 'stroke', 'strokeWidth', 'opacity', 'fillOpacity'],
