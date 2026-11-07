@@ -1,0 +1,21 @@
+src/main/mcp/registration.ts
+  s_c3147c7a3f2e3c::t_bc3fab7ffcbb98 19
+src/main/mcp/move-session.ts
+  s_c3147c7a3f2e3c::t_bc3fab7ffcbb98 18,177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "111370c159ea85f4d86369ef043564e84a190843",
+  "prompts": {},
+  "sessions": {
+    "s_c3147c7a3f2e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6643d25-b995-4f50-b4d6-9e2f055e3cbe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
