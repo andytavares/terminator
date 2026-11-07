@@ -128,3 +128,8 @@
   width: 12px;
   height: 12px;
 }
+
+/* Held on its way to an agent tab. */
+.terminal-row--dragging {
+  opacity: 0.45;
+}

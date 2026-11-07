@@ -275,6 +275,30 @@ describe('Composer — the queue list', () => {
   })
 })
 
+describe('Composer — editing a queued message beside attached chips', () => {
+  it('keeps the chips already above the box and adds the queued ones', async () => {
+    const quote: Citation = { entryIndex: 2, quote: 'only on 5xx', comment: 'and 429' }
+    const queued = promptWithContext('Then lint', { sessions: [], citations: [quote] })
+    agents.queueGet.mockResolvedValue({ data: [queued] })
+    await mountComposer(true)
+    await dropSession()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Then lint' }))
+    expect(attached().sessions.map((s) => s.sessionId)).toEqual(['login'])
+    expect(attached().citations).toEqual([quote])
+  })
+})
+
+describe('Composer — a send asked for from outside', () => {
+  it('sends nothing once the agent has exited', async () => {
+    render(<Composer sessionId="agent-1" disabled running={false} onShowSource={onShowSource} />)
+    await act(async () => {})
+    await dropSession()
+    act(() => useAttachedContextStore.getState().requestSend('agent-1'))
+    expect(agents.prompt).not.toHaveBeenCalled()
+    expect(attached().sessions).toHaveLength(1)
+  })
+})
+
 describe('Composer — images', () => {
   it('still takes an image dropped on the text box', async () => {
     await mountComposer()

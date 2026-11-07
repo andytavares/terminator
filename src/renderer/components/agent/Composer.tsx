@@ -260,7 +260,7 @@ interface Draft {
   text: string
   set: (text: string) => void
   attached: AttachedContext
-  setAttached: (attached: AttachedContext) => void
+  addAttached: (attached: AttachedContext) => void
 }
 
 /** What Enter does: send the prompt, or during a turn queue it (steer with Cmd or Ctrl). */
@@ -305,7 +305,7 @@ function draftActions(
   const edit = (index: number): void => {
     const { text, attached } = splitAttachedContext(queue[index])
     draft.set(text)
-    if (hasAttachedContext(attached)) draft.setAttached(attached)
+    draft.addAttached(attached)
     remove(index)
   }
   return { submit, remove, edit }
@@ -432,19 +432,22 @@ function ContextDropZone(props: { sessionId: string; children: React.ReactNode }
 function useDraft(sessionId: string): Draft {
   const [text, set] = useState('')
   const attached = useAttachedContextStore(attachedOf(sessionId))
-  const setAttached = (next: AttachedContext): void =>
-    useAttachedContextStore.getState().set(sessionId, next)
-  return { text, set, attached, setAttached }
+  const addAttached = (more: AttachedContext): void => {
+    const store = useAttachedContextStore.getState()
+    store.addSessions(sessionId, more.sessions)
+    more.citations.forEach((citation) => store.addCitation(sessionId, citation))
+  }
+  return { text, set, attached, addAttached }
 }
 
 /** Sends the draft, as Enter would, each time something outside asks this tab to send now. */
-function useSendRequests(sessionId: string, submit: (steer: boolean) => void): void {
+function useSendRequests(sessionId: string, submit: (steer: boolean) => void, disabled: boolean) {
   const requests = useAttachedContextStore((s) => s.sendRequests.get(sessionId) ?? 0)
   const handled = useRef(requests)
   useEffect(() => {
     if (requests === handled.current) return
     handled.current = requests
-    submit(false)
+    if (!disabled) submit(false)
   })
 }
 
@@ -453,7 +456,7 @@ export function Composer(props: ComposerProps): React.JSX.Element {
   const draft = useDraft(sessionId)
   const attachments = useAttachments()
   const { queue, submit, remove, edit } = useSender(props, attachments, draft)
-  useSendRequests(sessionId, submit)
+  useSendRequests(sessionId, submit, disabled)
   const takeFiles = (files: File[]): void => void attachments.add(files)
   return (
     <ContextDropZone sessionId={sessionId}>

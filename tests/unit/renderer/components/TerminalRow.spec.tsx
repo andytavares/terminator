@@ -185,4 +185,13 @@ describe('TerminalRow — dragging it out', () => {
     expect(dataTransfer.setData).toHaveBeenCalledWith(SESSION_DRAG_TYPE, 'ses-1')
     expect(dataTransfer.effectAllowed).toBe('copy')
   })
+
+  it('fades while it is dragged and comes back when the drag ends', () => {
+    const { container } = renderRow()
+    const row = container.querySelector<HTMLElement>('.terminal-row')!
+    fireEvent.dragStart(row, { dataTransfer: { setData: vi.fn(), effectAllowed: '' } })
+    expect(row.classList.contains('terminal-row--dragging')).toBe(true)
+    fireEvent.dragEnd(row)
+    expect(row.classList.contains('terminal-row--dragging')).toBe(false)
+  })
 })

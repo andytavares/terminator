@@ -82,7 +82,8 @@ function locationOf(update: Json): string | null {
 
 function withChunk(entries: TranscriptEntry[], role: MessageRole, text: string) {
   const last = entries[entries.length - 1]
-  if (last?.kind === 'message' && last.role === role) {
+  // Main publishes each sent message as one chunk, so user chunks never join.
+  if (last?.kind === 'message' && last.role === role && role !== 'user') {
     return [...entries.slice(0, -1), { ...last, text: last.text + text }]
   }
   return [...entries, { kind: 'message' as const, role, text }]

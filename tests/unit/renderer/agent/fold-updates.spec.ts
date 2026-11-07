@@ -24,6 +24,17 @@ describe('foldUpdates', () => {
     expect(entries).toEqual([{ kind: 'message', role: 'agent', text: 'Hello' }])
   })
 
+  it('keeps each sent message apart, since main publishes one chunk per message', () => {
+    const { entries } = foldAll([
+      chunk('user_message_chunk', 'first'),
+      chunk('user_message_chunk', 'actually, this'),
+    ])
+    expect(entries).toEqual([
+      { kind: 'message', role: 'user', text: 'first' },
+      { kind: 'message', role: 'user', text: 'actually, this' },
+    ])
+  })
+
   it('starts a new message when the kind changes', () => {
     const { entries } = foldAll([
       chunk('user_message_chunk', 'hi'),
