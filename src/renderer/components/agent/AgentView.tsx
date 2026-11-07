@@ -27,6 +27,7 @@ import {
   type FindState,
 } from './find'
 import { useAgentTranscript } from './use-agent-transcript'
+import { AgentMarkdown } from './AgentMarkdown'
 import { recordUse } from '../../usage/record'
 import './AgentView.css'
 
@@ -152,11 +153,17 @@ function SentContext({ message, marks }: { message: MessageEntry; marks: Transcr
 
 function Message({ entry, marks }: { entry: MessageEntry; marks: TranscriptMarks }) {
   const text = shownText(entry)
+  const className = `agent-message agent-message--${entry.role}`
+  const entryIndex = entry.role === 'agent' ? marks.entryIndex.get(entry) : undefined
+  if (text && entry.role !== 'user' && !marks.find.query)
+    return (
+      <div className={className} data-entry-index={entryIndex}>
+        <AgentMarkdown text={text} />
+      </div>
+    )
+  // While finding, the plain text shows so every match can be marked.
   const bubble = text && (
-    <p
-      className={`agent-message agent-message--${entry.role}`}
-      data-entry-index={entry.role === 'agent' ? marks.entryIndex.get(entry) : undefined}
-    >
+    <p className={className} data-entry-index={entryIndex}>
       <Highlighted
         text={text}
         query={marks.find.query}

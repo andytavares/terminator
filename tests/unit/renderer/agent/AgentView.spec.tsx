@@ -4,6 +4,7 @@ import { render, screen, fireEvent, act, within } from '@testing-library/react'
 import type { AgentPermissionAsk, AgentUpdate } from '@terminator/extension-sdk'
 
 import { AgentView } from '../../../../src/renderer/components/agent/AgentView'
+import { AgentMarkdown } from '../../../../src/renderer/components/agent/AgentMarkdown'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { promptWithContext } from '../../../../src/renderer/components/agent/attached-context'
 import { installElectronApi, pushedEvent } from '../../../support/electron-api'
@@ -44,10 +45,20 @@ const agents = {
   queueGet: vi.fn(),
 }
 const queues = pushedEvent<[{ sessionId: string; messages: string[] }]>()
+const shell = { openExternal: vi.fn(async (_url: string) => ({ ok: true as const })) }
 
 async function mountView(): Promise<void> {
   render(<AgentView sessionId="agent-1" />)
   await act(async () => {})
+}
+
+const agentsApi = {
+  ...agents,
+  onUpdate: updates.addListener,
+  onPermission: permissions.addListener,
+  onPermissionSettled: settled.addListener,
+  onEnd: ends.addListener,
+  onQueueChanged: queues.addListener,
 }
 
 const box = (): HTMLTextAreaElement => screen.getByLabelText('Message the agent')
@@ -62,16 +73,7 @@ beforeEach(() => {
   agents.steer.mockResolvedValue({ data: true })
   agents.queueSet.mockResolvedValue({ data: true })
   agents.queueGet.mockResolvedValue({ data: [] })
-  installElectronApi({
-    agents: {
-      ...agents,
-      onUpdate: updates.addListener,
-      onPermission: permissions.addListener,
-      onPermissionSettled: settled.addListener,
-      onEnd: ends.addListener,
-      onQueueChanged: queues.addListener,
-    },
-  })
+  installElectronApi({ shell, agents: agentsApi })
   useSessionStore.setState(useSessionStore.getInitialState())
   useSessionStore.setState({
     sessions: new Map([
@@ -85,6 +87,9 @@ beforeEach(() => {
 
 const recordUse = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+
+const mermaid = vi.hoisted(() => ({ initialize: vi.fn(), render: vi.fn() }))
+vi.mock('mermaid', () => ({ default: mermaid }))
 
 describe('AgentView transcript', () => {
   it('shows the history, then a live update, in a polite log', async () => {
@@ -292,6 +297,104 @@ describe('AgentView queue list', () => {
     await mountView()
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
     expect(agents.cancel).toHaveBeenCalledWith({ sessionId: 'agent-1' })
+  })
+})
+
+async function reply(body: string): Promise<HTMLElement> {
+  agents.history.mockResolvedValue({
+    data: [text('user_message_chunk', '# not a heading'), text('agent_message_chunk', body)],
+  })
+  await mountView()
+  return screen.getByRole('log')
+}
+
+describe('AgentView rich replies', () => {
+  it('renders an agent reply as Markdown and keeps the user message plain', async () => {
+    const log = await reply('## Plan\n\n- one\n- two\n\n| Name | Value |\n| --- | --- |\n| a | 1 |')
+    expect(log.querySelector('h2')?.textContent).toBe('Plan')
+    expect(log.querySelectorAll('li')).toHaveLength(2)
+    expect(log.querySelectorAll('tbody td')).toHaveLength(2)
+    expect(within(log).getByText('# not a heading')).toBeTruthy()
+    expect(log.querySelector('h1')).toBeNull()
+  })
+
+  it('opens a link through the shell, not the view', async () => {
+    const log = await reply('[docs](https://example.com/docs)')
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+    log.querySelector('a')!.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+    expect(shell.openExternal).toHaveBeenCalledWith('https://example.com/docs')
+  })
+})
+
+describe('AgentView raw HTML in replies', () => {
+  it('renders raw HTML, sanitised, and loads no remote image', async () => {
+    const log = await reply(
+      [
+        '<details><summary>Logs</summary>body</details>',
+        '<table><tr><td>cell</td></tr></table>',
+        '<script>window.__pwned = 1</script>',
+        '<img src="https://x.example/p.png" onerror="window.__pwned = 2">',
+        '<a href="javascript:alert(3)">bad</a>',
+        '<iframe src="https://x.example"></iframe>',
+      ].join('\n\n')
+    )
+    expect((await within(log).findByText('Logs')).closest('details')).not.toBeNull()
+    expect(log.querySelector('table td')?.textContent).toBe('cell')
+    expect(log.querySelector('script, iframe, img')).toBeNull()
+    expect(log.innerHTML).not.toContain('javascript:')
+    expect(log.innerHTML).not.toContain('onerror')
+    expect(log.textContent).not.toContain('__pwned')
+  })
+})
+
+describe('AgentView mermaid diagrams', () => {
+  it('draws a mermaid fence as a diagram, strictly', async () => {
+    mermaid.render.mockResolvedValue({ svg: '<svg><text>Pie drawn</text></svg>' })
+    const log = await reply('```mermaid\npie\n  "A": 1\n```')
+    expect(await within(log).findByText('Pie drawn')).toBeTruthy()
+    expect(mermaid.render).toHaveBeenCalledWith(expect.any(String), 'pie\n  "A": 1')
+    expect(mermaid.initialize).toHaveBeenCalledWith(
+      expect.objectContaining({ securityLevel: 'strict', startOnLoad: false })
+    )
+  })
+
+  it('shows a mermaid fence that does not parse as code with the error', async () => {
+    mermaid.render.mockRejectedValue(new Error('Parse error on line 1'))
+    const log = await reply('```mermaid\nnot a diagram\n```')
+    expect(await within(log).findByText(/diagram could not be drawn/i)).toBeTruthy()
+    expect(within(log).getByText(/Parse error on line 1/)).toBeTruthy()
+    expect(log.querySelector('pre code')?.textContent).toBe('not a diagram')
+  })
+})
+
+describe('AgentView mermaid diagrams fetch nothing', () => {
+  it('drops init directives and every remote url() from a drawn diagram', async () => {
+    const evil = 'url(https://evil.example/t.png)'
+    mermaid.render.mockResolvedValue({
+      svg: `<svg><style>@import url(https://evil.example/a.css); div{background:${evil}}</style><g style="fill:${evil}"><text>Drawn</text></g><path fill="url(#grad)"/></svg>`,
+    })
+    const log = await reply('```mermaid\n%%{init: {"themeCSS": "x"}}%%\npie\n  "A": 1\n```')
+    expect(await within(log).findByText('Drawn')).toBeTruthy()
+    expect(mermaid.render).toHaveBeenCalledWith(expect.any(String), 'pie\n  "A": 1')
+    expect(log.innerHTML).not.toContain('evil.example')
+    expect(log.innerHTML).toContain('url(#grad)')
+  })
+})
+
+describe('AgentView mermaid diagrams while a reply streams', () => {
+  it('draws once the fence stops changing, not on every chunk', async () => {
+    vi.useFakeTimers()
+    try {
+      mermaid.render.mockResolvedValue({ svg: '<svg><text>Done</text></svg>' })
+      const view = render(<AgentMarkdown text={'```mermaid\npie\n'} />)
+      view.rerender(<AgentMarkdown text={'```mermaid\npie\n  "A"'} />)
+      view.rerender(<AgentMarkdown text={'```mermaid\npie\n  "A": 1\n```'} />)
+      await act(async () => vi.advanceTimersByTimeAsync(300))
+      expect(mermaid.render.mock.calls.map(([, code]) => code)).toEqual(['pie\n  "A": 1'])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
