@@ -49,13 +49,20 @@ export interface SaveView {
   agentBranch: string | null
   useRepoFolder: boolean
   editing: Schedule | null
+  /** False while the workspace is the launcher's suggestion, not one the person chose. */
+  repoPicked: boolean
 }
 
-/** An edit keeps its branch while it stays in the same workspace and the same kind of checkout. */
-function keptBranch({ editing, repo, useRepoFolder }: SaveView): string | null {
-  if (editing === null) return null
-  const sameRepo = (repo?.folderPath ?? null) === editing.repoRoot
-  return sameRepo && useRepoFolder === !editing.newWorktree ? editing.branch : null
+/** An edit keeps its branch while it stays in the same workspace and still runs on a branch. */
+function keptBranch({ editing, repo, ownBranch }: SaveView): string | null {
+  if (editing === null || !ownBranch || !editing.newWorktree) return null
+  return (repo?.folderPath ?? null) === editing.repoRoot ? editing.branch : null
+}
+
+/** An edited run whose workspace was removed must not move to the suggested one unasked. */
+function lostWorkspace({ editing, repoPicked }: SaveView): boolean {
+  if (editing === null || editing.repoRoot === null || repoPicked) return false
+  return !useWorkspaceStore.getState().workspaces.some((w) => w.folderPath === editing.repoRoot)
 }
 
 /** The one branch a repeat runs on, named once on save; null when it runs in the repo folder. */
@@ -86,6 +93,8 @@ async function scheduleInput(view: SaveView): Promise<ScheduleInput> {
 
 /** Saves the prompt to run later, or the edit of a saved one. Null when saved; else what to say. */
 export async function saveSchedule(view: SaveView): Promise<string | null> {
+  if (lostWorkspace(view))
+    return 'Its workspace is no longer in the sidebar. Pick a workspace or Global.'
   const input = await scheduleInput(view)
   const { schedules } = window.electronAPI
   const result =

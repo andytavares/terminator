@@ -93,6 +93,14 @@ async function editChangesTheTime(): Promise<void> {
   await expect(runRow()).toContainText('every day at 14:30')
 }
 
+async function resumeShowsTheNextAndLastRun(): Promise<void> {
+  await rowAction('Resume')
+  const cells = runRow().getByRole('cell')
+  await expect(cells.nth(2)).toContainText('14:30')
+  // Run now ran it earlier in this flow, so Last run is a time, not Never.
+  await expect(cells.nth(3)).not.toHaveText('Never')
+}
+
 async function removeAsksThenEmptiesTheView(): Promise<void> {
   const { page } = handle
   await rowAction('Remove…')
@@ -110,5 +118,6 @@ test('a global scheduled run is run, paused, edited and removed from Home', asyn
   )
   await test.step('Pause shows the Paused chip', pauseShowsThePausedChip)
   await test.step('Edit… saves a new time', editChangesTheTime)
+  await test.step('Resume shows the new next run and the last run', resumeShowsTheNextAndLastRun)
   await test.step('Remove… asks, then the view is empty', removeAsksThenEmptiesTheView)
 })

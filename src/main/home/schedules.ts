@@ -14,10 +14,10 @@ const START_GRACE_MS = 2 * 60_000
 const SCHEMA = `CREATE TABLE IF NOT EXISTS schedules (
   id TEXT PRIMARY KEY, repo_root TEXT NOT NULL, prompt TEXT NOT NULL, run_as TEXT NOT NULL,
   kind TEXT NOT NULL, time TEXT NOT NULL, date TEXT, last_run_at TEXT, created_at TEXT NOT NULL,
-  new_worktree INTEGER NOT NULL, agent_id TEXT, repeat TEXT, branch TEXT, paused_at TEXT)`
+  new_worktree INTEGER NOT NULL, agent_id TEXT, repeat TEXT, branch TEXT, paused_at TEXT, settled_at TEXT)`
 
 /** Columns added after the first release; CREATE TABLE IF NOT EXISTS leaves old tables without them. */
-const ADDED_COLUMNS = ['repeat', 'branch', 'paused_at']
+const ADDED_COLUMNS = ['repeat', 'branch', 'paused_at', 'settled_at']
 
 interface Row extends Record<string, unknown> {
   id: string
@@ -35,6 +35,8 @@ interface Row extends Record<string, unknown> {
   repeat: string | null
   branch: string | null
   paused_at: string | null
+  /** When the last occurrence was run, skipped, or set aside by an edit or a resume. */
+  settled_at: string | null
 }
 
 const EVERY_DAY: RepeatRule = { every: 1, unit: 'day', days: [], between: null, overlap: 'skip' }
@@ -63,6 +65,11 @@ const toSchedule = (row: Row): Schedule => ({
   paused: row.paused_at !== null,
 })
 
+/** A saved run plus the moment its occurrences up to then count as handled. */
+type StoredSchedule = Schedule & { settledAt: string | null }
+
+const toStored = (row: Row): StoredSchedule => ({ ...toSchedule(row), settledAt: row.settled_at })
+
 export interface SchedulerDeps {
   db: ExtensionDB
   now: () => Date
@@ -85,9 +92,10 @@ function latestOccurrence(schedule: Schedule, now: Date): Date | null {
 }
 
 /** The occurrence nobody has run or skipped yet. */
-function dueOccurrence(schedule: Schedule, now: Date): Date | null {
+function dueOccurrence(schedule: StoredSchedule, now: Date): Date | null {
   const occurrence = latestOccurrence(schedule, now)
-  const handled = new Date(schedule.lastRunAt ?? schedule.createdAt)
+  // Rows saved before settled_at existed record a skip in last_run_at.
+  const handled = new Date(schedule.settledAt ?? schedule.lastRunAt ?? schedule.createdAt)
   return occurrence !== null && occurrence > handled ? occurrence : null
 }
 
@@ -128,19 +136,24 @@ function hasPassed(input: ScheduleInput, now: Date): boolean {
   return new Date(year, month - 1, day, hours, minutes).getTime() <= now.getTime()
 }
 
+interface RowMarks {
+  pausedAt: string | null
+  settledAt: string | null
+}
+
 /** Writes the whole row; an edit replaces the row it keeps the id of. */
-function writeSchedule(db: ExtensionDB, schedule: Schedule, pausedAt: string | null) {
+function writeSchedule(db: ExtensionDB, schedule: Schedule, marks: RowMarks) {
   const columns =
-    'id, repo_root, prompt, run_as, kind, time, date, last_run_at, created_at, new_worktree, agent_id, repeat, branch, paused_at'
+    'id, repo_root, prompt, run_as, kind, time, date, last_run_at, created_at, new_worktree, agent_id, repeat, branch, paused_at, settled_at'
   return db.run(
-    `INSERT OR REPLACE INTO schedules (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT OR REPLACE INTO schedules (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       // repo_root is NOT NULL and SQLite cannot drop that without a table rebuild: '' is a global run.
       ...[schedule.id, schedule.repoRoot ?? '', schedule.prompt, schedule.runAs, schedule.kind],
       ...[schedule.time, schedule.date, schedule.lastRunAt, schedule.createdAt],
       ...[schedule.newWorktree ? 1 : 0, schedule.agentId],
       ...[schedule.repeat === null ? null : JSON.stringify(schedule.repeat), schedule.branch],
-      pausedAt,
+      ...[marks.pausedAt, marks.settledAt],
     ]
   )
 }
@@ -152,6 +165,9 @@ async function findRow(db: ExtensionDB, id: string): Promise<Row> {
   if (row === undefined) throw new Error(GONE)
   return row
 }
+
+const selectAll = (db: ExtensionDB): Promise<Row[]> =>
+  db.query<Row>('SELECT * FROM schedules ORDER BY created_at')
 
 async function addMissingColumns(db: ExtensionDB): Promise<void> {
   await db.exec(SCHEMA)
@@ -168,16 +184,16 @@ function createScheduleEdits({ db, now }: Pick<SchedulerDeps, 'db' | 'now'>) {
     async update(id: string, input: ScheduleInput): Promise<Schedule> {
       const row = await findRow(db, id)
       if (hasPassed(input, now())) throw new Error('That time has passed. Pick a later time.')
-      const { createdAt, paused } = toSchedule(row)
-      const schedule: Schedule = { ...input, id, createdAt, paused, lastRunAt: now().toISOString() }
-      await writeSchedule(db, schedule, row.paused_at)
+      const { createdAt, paused, lastRunAt } = toSchedule(row)
+      const schedule: Schedule = { ...input, id, createdAt, paused, lastRunAt }
+      await writeSchedule(db, schedule, { pausedAt: row.paused_at, settledAt: now().toISOString() })
       return schedule
     },
     /** A resume counts the occurrences during the pause as handled. */
     async setPaused(id: string, paused: boolean): Promise<void> {
       const changed = paused
         ? await db.run('UPDATE schedules SET paused_at = ? WHERE id = ?', [now().toISOString(), id])
-        : await db.run('UPDATE schedules SET paused_at = NULL, last_run_at = ? WHERE id = ?', [
+        : await db.run('UPDATE schedules SET paused_at = NULL, settled_at = ? WHERE id = ?', [
             now().toISOString(),
             id,
           ])
@@ -190,8 +206,8 @@ function createScheduleStore({ db, now }: Pick<SchedulerDeps, 'db' | 'now'>) {
   return {
     ...createScheduleEdits({ db, now }),
     init: () => addMissingColumns(db),
-    list: async (): Promise<Schedule[]> =>
-      (await db.query<Row>('SELECT * FROM schedules ORDER BY created_at')).map(toSchedule),
+    list: async (): Promise<Schedule[]> => (await selectAll(db)).map(toSchedule),
+    stored: async (): Promise<StoredSchedule[]> => (await selectAll(db)).map(toStored),
     async create(input: ScheduleInput): Promise<Schedule> {
       if (hasPassed(input, now())) throw new Error('That time has passed. Pick a later time.')
       const schedule: Schedule = {
@@ -201,19 +217,19 @@ function createScheduleStore({ db, now }: Pick<SchedulerDeps, 'db' | 'now'>) {
         createdAt: now().toISOString(),
         paused: false,
       }
-      await writeSchedule(db, schedule, null)
+      await writeSchedule(db, schedule, { pausedAt: null, settledAt: null })
       return schedule
     },
     remove: async (id: string): Promise<void> =>
       void (await db.run('DELETE FROM schedules WHERE id = ?', [id])),
     /** A run or a skip ends this occurrence: a one-time schedule is gone, the others wait for the next. */
-    async settle(schedule: Schedule): Promise<void> {
-      if (schedule.kind === 'once') await this.remove(schedule.id)
-      else
-        await db.run('UPDATE schedules SET last_run_at = ? WHERE id = ?', [
-          now().toISOString(),
-          schedule.id,
-        ])
+    async settle(schedule: Schedule, ran: boolean): Promise<void> {
+      if (schedule.kind === 'once') return this.remove(schedule.id)
+      const at = now().toISOString()
+      await db.run(
+        'UPDATE schedules SET settled_at = ?, last_run_at = CASE WHEN ? THEN ? ELSE last_run_at END WHERE id = ?',
+        [at, ran ? 1 : 0, at, schedule.id]
+      )
     },
   }
 }
@@ -245,14 +261,14 @@ interface ScanDeps extends SchedulerDeps {
 /** Starts what is due within `graceMs`; what came due longer ago waits for the person. */
 async function scanSchedules(deps: ScanDeps, graceMs: number): Promise<void> {
   const { now, start, store, missed } = deps
-  for (const schedule of await store.list()) {
+  for (const schedule of await store.stored()) {
     const waiting = schedule.paused || missed.has(schedule.id)
     const occurrence = waiting ? null : dueOccurrence(schedule, now())
     if (occurrence === null) continue
     if (now().getTime() - occurrence.getTime() <= graceMs) {
-      await store.settle(schedule)
+      await store.settle(schedule, true)
       start(schedule)
-    } else if (settlesSilently(schedule)) await store.settle(schedule)
+    } else if (settlesSilently(schedule)) await store.settle(schedule, false)
     else missed.add(schedule, occurrence)
   }
   missed.publishAll()
@@ -277,7 +293,8 @@ function createScheduleControls({
     /** Starts it out of turn: a one-time run is used up, a repeat keeps its next time. */
     async runNow(id: string): Promise<void> {
       const schedule = await store.find(id)
-      if (schedule.kind === 'once') await store.remove(id)
+      // Settling also stops the tick starting this occurrence again, or raising its missed ask.
+      await store.settle(schedule, true)
       start(schedule)
       if (missed.drop(id)) missed.publishAll()
     },
@@ -306,7 +323,7 @@ export function createScheduler(deps: SchedulerDeps) {
     async act(askId: string, actionId: string): Promise<void> {
       const schedule = missed.take(askId)
       if (schedule === undefined) return
-      await store.settle(schedule)
+      await store.settle(schedule, actionId === 'run')
       if (actionId === 'run') deps.start(schedule)
       missed.publishAll()
     },

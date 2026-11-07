@@ -1304,6 +1304,31 @@ describe('StartWork — editing a scheduled run, another workspace or a refusal'
       expect.objectContaining({ repoRoot: '/atlas', branch: 'fix/dev-build' })
     )
   })
+})
+
+describe('StartWork — editing a scheduled run, guards', () => {
+  beforeEach(seedTwoWorkspaces)
+
+  it('drops the branch when the run no longer runs on one', async () => {
+    updateSchedule.mockResolvedValue({ data: {} as never })
+    const onClose = await openEditing(savedRun)
+    fireEvent.click(screen.getByRole('radio', { name: 'Terminal only' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Save changes/ }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(updateSchedule).toHaveBeenCalledWith(
+      expect.objectContaining({ runAs: 'terminal', branch: null, newWorktree: false })
+    )
+  })
+
+  it('refuses to move a run whose workspace is gone to the suggested one', async () => {
+    const onClose = await openEditing({ ...savedRun, repoRoot: '/removed' })
+    fireEvent.click(screen.getByRole('button', { name: /^Save changes/ }))
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Its workspace is no longer in the sidebar. Pick a workspace or Global.'
+    )
+    expect(updateSchedule).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+  })
 
   it('shows the refusal and stays open', async () => {
     updateSchedule.mockResolvedValue({ error: 'failed', message: 'No such schedule.' })

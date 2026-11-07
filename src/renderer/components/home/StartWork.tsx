@@ -122,7 +122,8 @@ function useLauncher(onClose: () => void) {
   const ownBranch = isPrompt && isAgentRun(runAs) && !useRepoFolder && !data.global
   const agentBranch = useAgentBranchName(query.trim(), ownBranch)
   const view = { tab, query, runAs, agentId, choices, picking, error, runAsOptions, ...data }
-  const promptView = { when, useRepoFolder, isPrompt, ownBranch, agentBranch, editing }
+  const repoPicked = fields.pickedRepoId !== null
+  const promptView = { when, useRepoFolder, isPrompt, ownBranch, agentBranch, editing, repoPicked }
   const actions = launcherActions({ fields, view: { ...view, ...promptView }, onClose })
   return { view: { ...view, ...promptView }, actions, selectedIndex: data.index }
 }
@@ -143,6 +144,7 @@ interface ActionsInput {
     isPrompt: boolean
     ownBranch: boolean
     agentBranch: string | null
+    repoPicked: boolean
   }
   onClose: () => void
 }

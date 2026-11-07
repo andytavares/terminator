@@ -182,6 +182,7 @@ describe('answering a missed run', () => {
     await s.act(asks[0].id, 'skip')
     expect(started).not.toHaveBeenCalled()
     expect(asks).toEqual([])
+    expect(await s.list()).toMatchObject([{ lastRunAt: null }])
     clock = at('2026-11-05T09:00:00')
     await s.tick()
     expect(started).toHaveBeenCalledTimes(1)
@@ -311,6 +312,16 @@ describe('pausing a scheduled run', () => {
     await s.tick()
     expect(started).toHaveBeenCalledTimes(1)
   })
+})
+
+describe('pausing and resuming a scheduled run', () => {
+  it('keeps Last run at never after a pause and a resume', async () => {
+    const s = await withSchedule(daily)
+    const [{ id }] = await s.list()
+    await s.setPaused(id, true)
+    await s.setPaused(id, false)
+    expect(await s.list()).toMatchObject([{ lastRunAt: null }])
+  })
 
   it('drops the missed ask of a run it pauses', async () => {
     const s = await closedOverNine()
@@ -327,7 +338,7 @@ describe('running a scheduled run now', () => {
     clock = at('2026-11-04T08:30:00')
     await s.runNow(id)
     expect(started).toHaveBeenCalledTimes(1)
-    expect((await s.list())[0].lastRunAt).toBeNull()
+    expect((await s.list())[0].lastRunAt).toBe(clock.toISOString())
     clock = at('2026-11-04T09:00:00')
     await s.tick()
     expect(started).toHaveBeenCalledTimes(2)
@@ -345,6 +356,26 @@ describe('running a scheduled run now', () => {
     const s = await closedOverNine()
     await s.runNow((await s.list())[0].id)
     expect(asks).toEqual([])
+  })
+})
+
+describe('running a scheduled run now, then the tick', () => {
+  it('does not raise the missed ask again on the next tick', async () => {
+    const s = await closedOverNine()
+    await s.runNow((await s.list())[0].id)
+    clock = at('2026-11-04T13:01:00')
+    await s.tick()
+    expect(asks).toEqual([])
+    expect(started).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not start the same occurrence again when run just after its time', async () => {
+    const s = await withSchedule(daily)
+    clock = at('2026-11-04T09:00:20')
+    await s.runNow((await s.list())[0].id)
+    clock = at('2026-11-04T09:01:00')
+    await s.tick()
+    expect(started).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -370,6 +401,15 @@ describe('editing a scheduled run', () => {
     await s.tick()
     expect(started).toHaveBeenCalledTimes(1)
     expect(await s.list()).toMatchObject([{ id: before.id, time: '10:00' }])
+  })
+})
+
+describe('editing a scheduled run, its marks', () => {
+  it('keeps Last run at never after an edit', async () => {
+    const s = await withSchedule(daily)
+    const [{ id }] = await s.list()
+    await s.update(id, { ...daily, time: '10:00' })
+    expect(await s.list()).toMatchObject([{ lastRunAt: null }])
   })
 
   it('drops the missed ask of the run it edits', async () => {
