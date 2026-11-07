@@ -29,8 +29,8 @@
     "test:visual": "playwright test --config playwright.visual.config.ts"
   },
   "dependencies": {
-    "@fontsource/ibm-plex-mono": "5.2.7",
-    "@fontsource/ibm-plex-sans": "5.2.8",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@fontsource/ibm-plex-sans": "5.3.0",
     "react-markdown": "10.1.0",
     "rehype-raw": "7.0.0",
     "rehype-sanitize": "6.0.0",
@@ -43,11 +43,11 @@
     "zustand": "4.5.5"
   },
   "devDependencies": {
-    "@playwright/test": "1.64.0",
+    "@playwright/test": "1.64.1",
     "@storybook/addon-vitest": "10.6.2",
     "@storybook/react-vite": "10.6.2",
     "@vitest/browser-playwright": "5.0.5",
-    "playwright": "1.64.0",
+    "playwright": "1.64.1",
     "storybook": "10.6.2"
   },
   "license": "MIT"
