@@ -16,6 +16,7 @@ import {
 import { Composer } from './Composer'
 import { FindBar, Highlighted, firstMatches, noFind, useFind, type FindState } from './find'
 import { useAgentTranscript } from './use-agent-transcript'
+import { AgentMarkdown } from './AgentMarkdown'
 import { recordUse } from '../../usage/record'
 import './AgentView.css'
 
@@ -113,6 +114,32 @@ function PlanList({ plan }: { plan: NonNullable<Transcript['plan']> }): React.JS
   )
 }
 
+function Message(props: {
+  entry: Extract<TranscriptEntry, { kind: 'message' }>
+  find: FindState
+  first: number
+}): React.JSX.Element {
+  const { entry, find } = props
+  const className = `agent-message agent-message--${entry.role}`
+  // While finding, the plain text shows so every match can be marked.
+  if (entry.role !== 'user' && !find.query)
+    return (
+      <div className={className}>
+        <AgentMarkdown text={entry.text} />
+      </div>
+    )
+  return (
+    <p className={className}>
+      <Highlighted
+        text={entry.text}
+        query={find.query}
+        first={props.first}
+        current={find.current}
+      />
+    </p>
+  )
+}
+
 function TurnView(props: {
   turn: Turn
   cwd: string
@@ -126,14 +153,7 @@ function TurnView(props: {
         entry.kind === 'tool' ? (
           <ToolCall key={entry.toolCallId} tool={entry} cwd={cwd} />
         ) : (
-          <p key={i} className={`agent-message agent-message--${entry.role}`}>
-            <Highlighted
-              text={entry.text}
-              query={find.query}
-              first={props.firstMatch.get(entry) ?? 0}
-              current={find.current}
-            />
-          </p>
+          <Message key={i} entry={entry} find={find} first={props.firstMatch.get(entry) ?? 0} />
         )
       )}
       {turn.changes.length > 0 && <ChangesCard turn={turn} cwd={cwd} />}

@@ -533,6 +533,10 @@ Terminator starts agents over the Agent Client Protocol (ACP) and shows each age
 
 The text box stays open while the agent works. Press **Enter** to queue a message. Queued messages show above the box; edit or remove one before it goes. They send one by one as each turn ends. **Stop** keeps the queue. Press **Cmd+Enter** (or **Steer**) to steer: Claude Code takes the message into the running turn; another agent stops the turn and gets the message as the next prompt.
 
+#### Rich replies
+
+The agent's replies render as GitHub-flavoured Markdown: headings, lists, tables, task lists and code blocks. Simple HTML renders too, such as `<details>`, `<table>`, `<kbd>` and an inline SVG chart made of shapes and text. Scripts, event handlers, iframes, forms and styles are removed. No image loads from the network. Links open in your browser. A fenced `mermaid` block draws as a diagram (flowchart, sequence, pie, bar chart, Gantt) in the app's light or dark theme. A diagram that does not parse shows its source with the error. Your own messages stay plain text. While the find bar has a query, replies show as plain text so each match can be marked.
+
 #### What a turn changed
 
 Each edit shows as a diff, open, with the path relative to the worktree. A **Changed in this turn** card ends each turn with its files and their added and removed lines.

@@ -36,7 +36,7 @@ defines a colour.
 | `EmptyState`                                     | heading, one line that says why, and the control that fills it                                                                                           |
 | `installIconTooltips`                            | call once per document: names every icon-only control, from its title or aria-label, on hover (after 500 ms) or keyboard focus                           |
 | `PushedToasts`                                   | draws the pushed notifications of the extension that go to a toast; mount one per view (`source`, `subscribe`)                                           |
-| `Markdown`                                       | react-markdown with GFM and sanitised raw HTML (ADR 091); `inline`, `fetchesNothing`                                                                     |
+| `Markdown`                                       | react-markdown with GFM and sanitised raw HTML (ADR 091); `inline`, `fetchesNothing`, `offline`                                                          |
 | `RelativeTime`, `formatRelativeTime`             | "5 minutes ago" through `Intl.RelativeTimeFormat`                                                                                                        |
 
 **Sizes** — every control of a size has one height: `--tm-control-height` (28px) for fields, selects, `Button` and `IconButton`, and `--tm-control-height-sm` (22px) for their `sm`. A control beside another control uses the same size. `tests/e2e/extension-smoke.spec.ts` fails on any two side-by-side controls that differ in height or centre.
@@ -131,7 +131,8 @@ that does not parse.
 `Markdown` takes `onOpenLink` for absolute http(s) and mailto addresses and an
 optional `renderCode` for fenced blocks (for example a syntax highlighter), so the
 package itself never sets inner HTML. Any other link cannot navigate the
-view. `Markdown` has two modes:
+view. Raw HTML may hold a chart as inline SVG made of shapes and text; `style`, `href`,
+`use` and `foreignObject` are removed. `Markdown` has three modes:
 
 - `inline` renders a `span` that holds only code, bold, italic, strikethrough and
   links, for one line inside a button or a label. The span takes its size and colour
@@ -140,6 +141,9 @@ view. `Markdown` has two modes:
   HTML without parsing it, and no image or other `src` survives, so
   opening the text fetches nothing (a remote image would be a tracking pixel). The core's
   issue drawer, Foundry and Task Vault render with it.
+- `offline` is for text that may hold HTML but must not reach the network, such as an
+  agent's reply. Raw HTML renders, sanitised, but no image or other `src` survives. The
+  core's agent tab renders with it.
 
 ## Storybook
 

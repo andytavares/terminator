@@ -74,6 +74,37 @@
   overflow-wrap: anywhere;
 }
 
+.agent-markdown {
+  white-space: normal;
+}
+
+/* A drawn diagram sits in the code block's pre; it needs no code chrome. */
+.agent-markdown pre:has(> .agent-mermaid) {
+  padding: 0;
+  overflow-x: auto;
+  background: none;
+}
+
+/* Mermaid sets an inline max-width on its SVG, so the cap goes on the wrapper. */
+.agent-mermaid {
+  display: block;
+  max-width: 560px;
+}
+
+.agent-mermaid svg {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  height: auto;
+}
+
+.agent-mermaid__error {
+  display: block;
+  margin-bottom: var(--tm-space-2);
+  font-family: var(--tm-font-ui);
+  color: var(--tm-danger);
+}
+
 .agent-message--thought {
   color: var(--tm-text-muted);
   font-style: italic;

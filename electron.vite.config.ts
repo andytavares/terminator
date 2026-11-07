@@ -37,6 +37,16 @@ export default defineConfig({
   },
   renderer: {
     plugins: [react()],
+    resolve: {
+      // Mermaid's ELK layout is one 1,477 kB chunk, past the budget below, for diagrams
+      // that ask for `layout: elk`; such a diagram shows as code with the error instead.
+      alias: [
+        {
+          find: /^\.\/elk-[A-Z0-9]+\.mjs$/,
+          replacement: resolve(__dirname, 'src/renderer/components/agent/no-elk-layout.ts'),
+        },
+      ],
+    },
     define: {
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'production'),
     },
