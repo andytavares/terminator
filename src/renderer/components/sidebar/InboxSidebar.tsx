@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { AlarmClock, Check, ChevronRight, Pin } from 'lucide-react'
+import { AlarmClock, Check, ChevronRight, Pin, Plus } from 'lucide-react'
 import { IconButton } from '@terminator/extension-ui'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useExtensionRegistry } from '../../extensions/registry'
@@ -7,6 +7,7 @@ import { revealSession } from '../../terminal/navigate-to-session'
 import { useNow } from '../session/useNow'
 import { useWorkThreads } from '../home/useWorkThreads'
 import { useDeskSelection } from '../home/desk-selection'
+import { useStartWorkStore } from '../home/start-work'
 import { leadSessionOf } from '../home/thread-actions'
 import { compactAge } from '../home/thread-format'
 import { StateGlyph } from '../home/StateGlyph'
@@ -130,6 +131,12 @@ function InboxControls({ filter, onChange, repos }: ControlsProps): React.JSX.El
           </option>
         ))}
       </select>
+      <IconButton
+        icon={Plus}
+        label="Start work"
+        description="Start work (⌘N)"
+        onClick={() => useStartWorkStore.getState().openLauncher()}
+      />
     </div>
   )
 }
