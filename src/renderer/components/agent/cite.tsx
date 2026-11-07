@@ -5,7 +5,7 @@ import { recordUse } from '../../usage/record'
 import { MAX_QUOTE_CHARS, type Citation } from './attached-context'
 import { useAttachedContextStore } from '../../stores/attached-context.store'
 
-export interface CiteTarget {
+interface CiteTarget {
   quote: string
   entryIndex: number
   rect: DOMRect
@@ -30,7 +30,7 @@ function citeTargetOf(log: HTMLElement | null, selection: Selection | null): Cit
   return { quote, entryIndex: Number(message.dataset.entryIndex), rect }
 }
 
-export function useCiteSelection(logRef: React.RefObject<HTMLElement | null>): CiteTarget | null {
+function useCiteSelection(logRef: React.RefObject<HTMLElement | null>): CiteTarget | null {
   const [target, setTarget] = useState<CiteTarget | null>(null)
   useEffect(() => {
     const update = (): void => setTarget(citeTargetOf(logRef.current, document.getSelection()))
@@ -40,7 +40,7 @@ export function useCiteSelection(logRef: React.RefObject<HTMLElement | null>): C
   return target
 }
 
-export function CiteButton(props: {
+function CiteButton(props: {
   target: CiteTarget
   onCite: () => void
   onDismiss: () => void

@@ -11,7 +11,7 @@ export const MAX_QUOTE_CHARS = 8000
 /** Embedded text keeps its last this many characters. */
 export const MAX_EMBEDDED_CHARS = 60000
 
-export type SessionSource =
+type SessionSource =
   | { kind: 'transcript'; agentId: string; path: string }
   | { kind: 'text'; origin: 'agent' | 'terminal'; text: string }
 
