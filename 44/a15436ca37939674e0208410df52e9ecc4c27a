@@ -1,0 +1,44 @@
+src/main/mcp/relay-script.ts
+  s_c3147c7a3f2e3c::t_375b84f8c89c41 1-38
+src/main/mcp/manifest-tools.ts
+  s_c3147c7a3f2e3c::t_371bfb579ee8ee 1-49,54-57
+  s_c3147c7a3f2e3c::t_bf58bca5011336 50-53
+src/main/mcp/registration.ts
+  s_c3147c7a3f2e3c::t_77e385add17f84 1-52,54-63
+  s_c3147c7a3f2e3c::t_f98938669b0c4c 53
+tests/unit/mcp/manifest-tools.spec.ts
+  s_c3147c7a3f2e3c::t_e2e1f5098a2296 39-41,59,61
+  s_c3147c7a3f2e3c::t_ba446ce062a04c 17,19,66-70
+  s_c3147c7a3f2e3c::t_ca883597463d6d 1-16,18,20-38,42-58,60,62-65,71-72
+tests/unit/mcp/server.spec.ts
+  s_c3147c7a3f2e3c::t_14504fcbb9e2a0 1-129
+src/main/mcp/tool-types.ts
+  s_c3147c7a3f2e3c::t_730b2935cd57a2 1-45
+src/main/mcp/mcp-server.ts
+  s_c3147c7a3f2e3c::t_bf58bca5011336 5-10,30-32,77-81
+  s_c3147c7a3f2e3c::t_4a575e9a63467a 1-4,11-29,33-76,82-139
+tests/unit/mcp/relay.spec.ts
+  s_c3147c7a3f2e3c::t_f69d8fa6f98f49 1-23
+tests/unit/mcp/registration.spec.ts
+  s_c3147c7a3f2e3c::t_e2e1f5098a2296 67-69,90,92
+  s_c3147c7a3f2e3c::t_2c4302381d1590 11-14
+  s_c3147c7a3f2e3c::t_1fbc855be4735d 1-10,15-66,70-89,91,93-124
+src/main/integrations/claude-settings.ts
+  s_c3147c7a3f2e3c::t_0d422fc21b8240 79-88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "44a15436ca37939674e0208410df52e9ecc4c27a",
+  "prompts": {},
+  "sessions": {
+    "s_c3147c7a3f2e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6643d25-b995-4f50-b4d6-9e2f055e3cbe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
