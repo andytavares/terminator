@@ -1,6 +1,7 @@
 import type React from 'react'
 import { useState } from 'react'
 import { create } from 'zustand'
+import { SESSION_DRAG_TYPE } from '../agent/attached-context'
 import { useToastStore } from '../../stores/toast.store'
 import { canMergeThreads, mergeThreads, undoMerge } from './task-actions'
 import type { WorkThread } from '../../home/work-threads'
@@ -53,7 +54,11 @@ export function useMergeDrop(thread: WorkThread, renaming: boolean): MergeDrop {
     draggable: thread.lanes.length > 0 && !renaming,
     onDragStart: (event) => {
       event.dataTransfer.setData(THREAD_TYPE, thread.key)
-      event.dataTransfer.effectAllowed = 'move'
+      event.dataTransfer.setData(
+        SESSION_DRAG_TYPE,
+        thread.lanes.flatMap((lane) => lane.sessionIds).join('\n')
+      )
+      event.dataTransfer.effectAllowed = 'copyMove'
       useDraggedThread.setState({ thread })
     },
     onDragEnd: () => useDraggedThread.setState({ thread: null }),

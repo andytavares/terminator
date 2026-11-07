@@ -5,6 +5,7 @@ import { makeTempDir } from '../../../../support/temp-dir'
 import { wireMainTaskStore } from '../../../../support/main-task-store'
 import { TaskRow } from '../../../../../src/renderer/components/home/TaskRow'
 import { useToastStore } from '../../../../../src/renderer/stores/toast.store'
+import { SESSION_DRAG_TYPE } from '../../../../../src/renderer/components/agent/attached-context'
 import type { WorkThread } from '../../../../../src/renderer/home/work-threads'
 import type { TaskLane } from '../../../../../src/shared/schemas/tasks.schema'
 
@@ -121,5 +122,45 @@ describe('TaskRow — lane chips', () => {
     render(<TaskRow thread={thread} now={Date.now()} selected={false} />)
     const chips = Array.from(document.querySelectorAll('.task-lane')).map((c) => c.textContent)
     expect(chips).toEqual(['api', 'web · rate-limits', 'web · usage-page'])
+  })
+})
+
+/** A Home row whose two lanes hold sessions s1, s2 and s3. */
+function threadWithSessions(taskId: string): WorkThread {
+  const thread = rowThread('Web side', web, taskId)
+  const [lane] = thread.lanes
+  return {
+    ...thread,
+    lanes: [
+      { ...lane, sessionIds: ['s1', 's2'] },
+      { ...lane, sessionIds: ['s3'] },
+    ],
+  }
+}
+
+describe('TaskRow — dragging it to an agent tab', () => {
+  it('carries every session of every lane, and still merges when dropped on a row', async () => {
+    const rate = await main.createTask({ title: 'Rate limits', lanes: [api] })
+    const webSide = await main.createTask({ title: 'Web side', lanes: [web] })
+    render(
+      <>
+        <TaskRow
+          thread={rowThread('Rate limits', api, rate.id)}
+          now={Date.now()}
+          selected={false}
+        />
+        <TaskRow thread={threadWithSessions(webSide.id)} now={Date.now()} selected={false} />
+      </>
+    )
+    const transfer = dataTransfer()
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Web side' }), {
+      dataTransfer: transfer,
+    })
+    expect(transfer.setData).toHaveBeenCalledWith(SESSION_DRAG_TYPE, 's1\ns2\ns3')
+    expect(transfer.effectAllowed).toBe('copyMove')
+    fireEvent.drop(screen.getByRole('button', { name: 'Rate limits' }), {
+      dataTransfer: dataTransfer(),
+    })
+    await waitFor(() => expect(main.listTasks()).toHaveLength(1))
   })
 })

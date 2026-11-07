@@ -4,6 +4,7 @@ import { useBreakoutStore } from '../../stores/breakout.store'
 import { StateChip } from '../session/StateChip'
 import type { BranchTerminal } from '../../sidebar/branch-rows'
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
+import { SESSION_DRAG_TYPE } from '../agent/attached-context'
 import { activateOnKey, afterClosing, clickOnly } from './row-events'
 import './TerminalRow.css'
 
@@ -60,6 +61,8 @@ export function TerminalRow(props: TerminalRowProps): React.JSX.Element {
       onClick={onSelect}
       onKeyDown={activateOnKey(onSelect)}
       onContextMenu={openMenu}
+      draggable
+      onDragStart={(e) => carrySession(e, terminal.sessionId)}
     >
       <TerminalRowContent terminal={terminal} linkKey={key} onClose={onClose} />
       {menu && (
@@ -72,6 +75,12 @@ export function TerminalRow(props: TerminalRowProps): React.JSX.Element {
       )}
     </div>
   )
+}
+
+/** Puts this row's session on the drag, for an agent tab to attach. */
+function carrySession(e: React.DragEvent, sessionId: string): void {
+  e.dataTransfer.setData(SESSION_DRAG_TYPE, sessionId)
+  e.dataTransfer.effectAllowed = 'copy'
 }
 
 /** Where the link menu is open, if it is; no menu at all when nothing can link. */

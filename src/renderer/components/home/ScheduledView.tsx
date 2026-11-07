@@ -30,6 +30,7 @@ import type { AgentState, Workspace } from '../../../shared/types/index'
 import { useSessionStore } from '../../stores/session.store'
 import { revealSession } from '../../terminal/navigate-to-session'
 import { useScheduledRunSessions } from './scheduled-run-sessions'
+import { SESSION_DRAG_TYPE } from '../agent/attached-context'
 import './ScheduledView.css'
 
 type SavedRuns = ReturnType<typeof useSavedRuns>
@@ -139,6 +140,14 @@ const LIVE_STATES: Partial<Record<AgentState, string>> = {
   'awaiting-input': 'Needs you',
 }
 
+/** Puts the run's open session on the drag, for an agent tab to attach. The row has drag
+ *  handlers of its own, so the drag stops here. */
+function carryRunSession(e: React.DragEvent, sessionId: string): void {
+  e.stopPropagation()
+  e.dataTransfer.setData(SESSION_DRAG_TYPE, sessionId)
+  e.dataTransfer.effectAllowed = 'copy'
+}
+
 /** When it last ran; while the session it opened is still open, how it is going and a way to it. */
 function LastRunCell({ schedule }: { schedule: Schedule }): React.JSX.Element {
   const sessionId = useScheduledRunSessions((s) => s.sessions.get(schedule.id))
@@ -147,7 +156,11 @@ function LastRunCell({ schedule }: { schedule: Schedule }): React.JSX.Element {
   if (session === undefined || session.status === 'closed') return <>{when}</>
   const live = LIVE_STATES[session.agentState]
   return (
-    <span className="scheduled__last-run">
+    <span
+      className="scheduled__last-run"
+      draggable
+      onDragStart={(e) => carryRunSession(e, session.id)}
+    >
       {live ? <Chip>{live}</Chip> : when}
       <Button
         size="sm"
