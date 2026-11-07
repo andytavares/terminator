@@ -4,6 +4,7 @@ import { useSessionStore } from '../../stores/session.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { globalStartFailure, startWork } from './start-work'
 import { startGlobalPrompt } from '../../terminal/start-session'
+import { useScheduledRunSessions } from './scheduled-run-sessions'
 import type { DueSchedule } from '../../../shared/schemas/schedules.schema'
 
 // A saved prompt coming due starts the way Start work starts a typed prompt.
@@ -20,12 +21,10 @@ function isStillRunning(workspaceId: string, branch: string): boolean {
   )
 }
 
-/** The session each global scheduled run last opened, by schedule id, to check overlap against. */
-const lastGlobalSessions = new Map<string, string>()
-
 /** Starts a global scheduled run in Scratch. Null when it started or was skipped; otherwise why not. */
 async function launchGlobal(schedule: DueSchedule): Promise<string | null> {
-  const last = useSessionStore.getState().sessions.get(lastGlobalSessions.get(schedule.id) ?? '')
+  const lastId = useScheduledRunSessions.getState().sessions.get(schedule.id) ?? ''
+  const last = useSessionStore.getState().sessions.get(lastId)
   if (schedule.repeat?.overlap === 'skip' && last !== undefined && last.status !== 'closed')
     return null
   const { prompt: text, runAs, unattended } = schedule
@@ -36,7 +35,7 @@ async function launchGlobal(schedule: DueSchedule): Promise<string | null> {
     ...(schedule.agentId === null ? {} : { agentId: schedule.agentId }),
   })
   if (sessionId === null) return globalStartFailure(text, runAs, unattended)
-  lastGlobalSessions.set(schedule.id, sessionId)
+  useScheduledRunSessions.getState().record(schedule.id, sessionId)
   return null
 }
 
@@ -70,6 +69,7 @@ async function launchInWorkspace(schedule: DueSchedule): Promise<string | null> 
         runAs: schedule.runAs,
         newWorktree: schedule.newWorktree,
         unattended: schedule.unattended,
+        onStarted: (sessionId) => useScheduledRunSessions.getState().record(schedule.id, sessionId),
         ...(schedule.branch === null ? {} : { branch: schedule.branch }),
         ...(schedule.agentId === null ? {} : { agentId: schedule.agentId }),
       })

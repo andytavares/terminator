@@ -44,8 +44,15 @@ describe('startWork for a scheduled run', () => {
     expect(await startWork({ ...onBranch, runAs: 'claude-terminal' })).toBeNull()
     expect(launched.inBranch).toHaveBeenCalledWith(
       'p-1',
-      "claude --settings '/data/settings.json' --append-system-prompt-file '/data/system-prompt.md' 'Triage'"
+      "claude --settings '/data/settings.json' --append-system-prompt-file '/data/system-prompt.md' 'Triage'",
+      true
     )
+  })
+
+  it('tells the caller which session the run opened', async () => {
+    const onStarted = vi.fn()
+    await startWork({ ...onBranch, runAs: 'agent', onStarted })
+    expect(onStarted).toHaveBeenCalledWith('s-1')
   })
 
   it('hands the files to an agent tab', async () => {

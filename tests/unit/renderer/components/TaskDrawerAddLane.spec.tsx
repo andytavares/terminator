@@ -132,7 +132,7 @@ describe('the task drawer — Add a repo', () => {
         draft: expect.objectContaining({ newBranchName: 'tav-20' }),
       })
     )
-    expect(launched.inBranch).toHaveBeenCalledWith('p-new', undefined)
+    expect(launched.inBranch).toHaveBeenCalledWith('p-new', undefined, false)
   })
 
   it('says why in plain words when the worktree cannot be made, and adds nothing', async () => {

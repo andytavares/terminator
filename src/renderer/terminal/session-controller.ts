@@ -151,6 +151,7 @@ export async function createTerminalSession(request: NewSessionRequest): Promise
   // Store the instance first, then activate — TerminalPane's effect fires after
   // both updates land so getTerminalInstance() is guaranteed to return the instance.
   store.setTerminalInstance(sessionId, instance)
+  if (request.background === true) return sessionId
   store.setActiveSessionForProject(request.projectId, sessionId)
   store.requestFocus(sessionId)
   return sessionId

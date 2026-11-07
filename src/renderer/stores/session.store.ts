@@ -164,6 +164,8 @@ export interface NewSessionRequest {
   parentSessionId?: string
   /** One line run in the terminal once it opens, for a terminal that resumes a conversation. */
   initialCommand?: string
+  /** Opens without becoming the active tab or taking focus: a scheduled run. */
+  background?: boolean
 }
 
 interface SessionState {
