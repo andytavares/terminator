@@ -1,9 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, realpathSync } from 'node:fs'
-import { PROTOCOL_VERSION } from '@agentclientprotocol/sdk'
+import { PROTOCOL_VERSION } from '@agentclientprotocol/sdk/unstable'
 import type {
   CancelNotification,
-  Client,
   InitializeRequest,
   InitializeResponse,
   LoadSessionRequest,
@@ -19,7 +18,8 @@ import type {
   RequestPermissionRequest,
   RequestPermissionResponse,
   SessionConfigOption,
-} from '@agentclientprotocol/sdk'
+  SessionNotification,
+} from '@agentclientprotocol/sdk/unstable'
 import type {
   AgentConfigOption,
   AgentDescriptor,
@@ -42,8 +42,8 @@ const logger = makeLogger('agent-service')
 const DEFAULT_TIMEOUT_MS = 300_000
 const DEFAULT_START_TIMEOUT_MS = 60_000
 
-/** The calls the service makes on an agent: a `ClientSideConnection` has them all. */
-interface AgentCalls {
+/** The calls the service makes on an agent, over the client's ACP connection. @internal */
+export interface AgentCalls {
   initialize(params: InitializeRequest): Promise<InitializeResponse>
   newSession(params: NewSessionRequest): Promise<NewSessionResponse>
   loadSession(params: LoadSessionRequest): Promise<LoadSessionResponse | void>
@@ -59,6 +59,12 @@ interface AgentCalls {
   readonly signal?: AbortSignal
 }
 
+/** What the client answers when the agent asks for permission or sends an update. */
+export interface AgentClient {
+  requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse>
+  sessionUpdate(params: SessionNotification): void
+}
+
 /** A started agent process: its ACP calls, and how to learn of and force its end. @internal */
 export interface AgentLink {
   agent: AgentCalls
@@ -70,7 +76,7 @@ export interface AgentLink {
 
 export interface AgentServiceDeps {
   /** Starts the agent's process. `client` receives the agent's requests and updates. */
-  connect(request: { agentId: string; client: Client }): Promise<AgentLink>
+  connect(request: { agentId: string; client: AgentClient }): Promise<AgentLink>
   listAgents(): AgentDescriptor[]
   defaultAgentId(): string
   log: AgentLog
@@ -321,7 +327,7 @@ class AcpAgentService implements AgentService {
 
   constructor(private readonly deps: AgentServiceDeps) {}
 
-  private readonly client: Client = {
+  private readonly client: AgentClient = {
     requestPermission: (params) => this.requestPermission(params),
     sessionUpdate: (params) => {
       const session = this.live(params.sessionId)

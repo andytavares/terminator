@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import type { PromptRequest } from '@agentclientprotocol/sdk'
+import type { PromptRequest } from '@agentclientprotocol/sdk/unstable'
 import { createAgentService } from '../../../../src/main/agents/acp/agent-service'
 import { createAgentLog } from '../../../../src/main/agents/acp/agent-log'
 import { makeTempDir } from '../../../support/temp-dir'
