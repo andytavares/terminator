@@ -98,6 +98,8 @@ async function aMessageTypedDuringATurnWaitsInTheQueue(): Promise<void> {
 async function anAttachedImageReachesTheAgent(): Promise<void> {
   const { page } = handle
   await page.getByRole('button', { name: 'Stop' }).click()
+  // Enter during a turn queues text only, so wait until the turn has ended.
+  await expect(page.getByRole('button', { name: 'Stop' })).toBeHidden()
   await page.getByLabel('Attach an image').setInputFiles({
     name: 'pixel.png',
     mimeType: 'image/png',
@@ -205,6 +207,7 @@ async function aCitedPassageWaitsInTheComposer(target: AgentTab) {
 async function theContextFollowsTheTypedText(dragged: AgentTab, target: AgentTab) {
   const { page } = handle
   await page.getByRole('button', { name: 'Stop' }).click()
+  await expect(page.getByRole('button', { name: 'Stop' })).toBeHidden()
   const box = page.getByLabel('Message the agent')
   await box.fill('Use the attached context')
   await box.press('Enter')
