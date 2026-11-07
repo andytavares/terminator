@@ -23,11 +23,8 @@ interface AlertDeps {
 
 type Alert = z.infer<typeof AlertSchema>
 
-/** Every alert with this place and title starts with it, so a later one can replace it. */
-const alertKey = (where: string, title: string): string => `alert-${where}: ${title}@`
-
 const homeAlert = (alert: Alert, where: string, since: Date): HomeAsk => ({
-  id: `${alertKey(where, alert.title)}${since.toISOString()}`,
+  id: `alert-${JSON.stringify([where, alert.title, since.toISOString()])}`,
   kind: 'finished',
   title: alert.title,
   detail: alert.message,
@@ -56,9 +53,10 @@ export function createAlerts({ now, notify, publish }: AlertDeps) {
       if (alert.notify) notify(alert.title, alert.message)
       if (!alert.home) return
       const ask = homeAlert(alert, alert.source ?? where, now())
-      const key = alertKey(ask.where!, alert.title)
       const sameWithinADay = (old: HomeAsk) =>
-        old.id.startsWith(key) && Date.parse(ask.since) - Date.parse(old.since) < DAY_MS
+        old.where === ask.where &&
+        old.title === ask.title &&
+        Date.parse(ask.since) - Date.parse(old.since) < DAY_MS
       shown = [...shown.filter((old) => !sameWithinADay(old)), ask]
       publish(shown)
     },

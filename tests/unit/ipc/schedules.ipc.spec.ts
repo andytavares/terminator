@@ -120,7 +120,7 @@ function expectedLaunch() {
   return {
     settingsPath: join(folder, 'settings.json'),
     systemPromptPath: join(folder, 'system-prompt.md'),
-    systemPrompt: expect.stringContaining('mcp__terminator__alert'),
+    systemPrompt: expect.stringContaining('mcp__terminator-dev__alert'),
   }
 }
 

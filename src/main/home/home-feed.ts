@@ -1,5 +1,6 @@
 import {
   HomeFeedSchema,
+  type HomeAsk,
   type HomeFeed,
   type MergedHomeFeed,
   type Sourced,
@@ -50,6 +51,12 @@ export function publishFeed(extensionId: string, feed: HomeFeed): void {
 
 export function clearFeed(extensionId: string): void {
   if (feeds.delete(extensionId)) notifyChange()
+}
+
+/** Shows `asks` as the whole feed of a core source, or clears it when there are none. */
+export function publishAsks(source: string, asks: HomeAsk[]): void {
+  if (asks.length === 0) clearFeed(source)
+  else publishFeed(source, { asks, facets: [], measures: [] })
 }
 
 /** One handler per extension; a second registration replaces the first. Returns its disposer. */

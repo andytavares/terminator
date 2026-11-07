@@ -6,6 +6,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 import { closeApp, e2eTempDir, launchApp, openSettingsSection, type AppHandle } from './helpers'
 import { sealedAppEnvironment } from './e2e-environment'
 import { openHome } from './session-views'
+import { mcpSocketPath } from '../../src/main/mcp/socket-path'
 
 // The Terminator MCP server (ADR 145): a client starts the relay as Claude Code would, over the
 // app's own Electron in node mode, and each tool it calls shows on screen.
@@ -31,7 +32,8 @@ test.afterAll(async () => {
 /** Starts the relay the way Claude Code's registration does, once the app has written it. */
 async function connectLikeClaudeCode(): Promise<Client> {
   const relayPath = join(handle.userDataDir, 'mcp', 'mcp-relay.cjs')
-  const socketPath = join(handle.userDataDir, 'mcp.sock')
+  const appTemp = await handle.app.evaluate(({ app }) => app.getPath('temp'))
+  const socketPath = mcpSocketPath(handle.userDataDir, appTemp)
   await expect.poll(() => existsSync(relayPath) && existsSync(socketPath)).toBe(true)
   const electronBinary = await handle.app.evaluate(() => process.execPath)
   const environment = sealedAppEnvironment({

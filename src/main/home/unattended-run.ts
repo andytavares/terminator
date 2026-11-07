@@ -8,8 +8,9 @@ import { RENDERER_TOOLS } from '../../shared/mcp/renderer-tools.js'
 // commands, because deny and ask rules win over a hook's allow
 // (https://code.claude.com/docs/en/permissions#precedence-among-rules-hooks-and-mods).
 
-/** Destructive Terminator MCP tools; `install_update` lives in src/main/mcp/app-tools.ts. */
-const destructiveTerminatorTools = (): string[] =>
+/** Destructive Terminator MCP tools under `server`, the name the server is registered as;
+ * `install_update` lives in src/main/mcp/app-tools.ts. */
+const destructiveTerminatorTools = (server: string): string[] =>
   [
     ...mcpToolSpecs()
       .filter((spec) => spec.destructive)
@@ -18,9 +19,9 @@ const destructiveTerminatorTools = (): string[] =>
       .filter(([, tool]) => 'destructive' in tool)
       .map(([name]) => name),
     'install_update',
-  ].map((tool) => `mcp__terminator__${tool}`)
+  ].map((tool) => `mcp__${server}__${tool}`)
 
-const DESTRUCTIVE_ASKS = [
+const DESTRUCTIVE_COMMANDS = [
   'Bash(rm -rf *)',
   'Bash(rm -fr *)',
   'Bash(sudo *)',
@@ -32,39 +33,47 @@ const DESTRUCTIVE_ASKS = [
   'Bash(git branch -D *)',
   'Bash(git push --force*)',
   'Bash(git push -f*)',
-  ...destructiveTerminatorTools(),
 ]
 
 const ALLOW_OUTPUT = JSON.stringify({
   hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'allow' },
 })
 
-const SETTINGS = {
-  permissions: { ask: DESTRUCTIVE_ASKS, deny: ['AskUserQuestion'] },
+const settingsFor = (server: string) => ({
+  permissions: {
+    ask: [...DESTRUCTIVE_COMMANDS, ...destructiveTerminatorTools(server)],
+    deny: ['AskUserQuestion'],
+  },
   hooks: {
     PreToolUse: [
       { matcher: '*', hooks: [{ type: 'command', command: `printf '%s' '${ALLOW_OUTPUT}'` }] },
     ],
   },
-}
+})
 
-const SYSTEM_PROMPT = `This is a scheduled run. Nobody is watching it, and nobody reads this tab.
+const systemPromptFor = (
+  server: string
+): string => `This is a scheduled run. Nobody is watching it, and nobody reads this tab.
 Do not ask questions. Make the most reasonable choice and continue. Commands that destroy data still ask the person.
 
-Anything the person must see goes through the \`alert\` tool of the \`terminator\` MCP server (\`mcp__terminator__alert\`).
+Anything the person must see goes through the \`alert\` tool of the \`${server}\` MCP server (\`mcp__${server}__alert\`).
 Call it once for each item that needs the person. Do not call it when nothing does.
 Set \`source\` to "Scheduled run · " followed by the task in at most six words.
 `
 
-/** Writes the settings and the prompt into `folder`, overwriting the copies of an earlier start. */
-export async function writeUnattendedFiles(folder: string): Promise<UnattendedLaunch> {
+/** Writes the settings and the prompt into `folder`, overwriting the copies of an earlier start.
+ * `server` is the name the Terminator MCP server is registered as in Claude Code. */
+export async function writeUnattendedFiles(
+  folder: string,
+  server: string
+): Promise<UnattendedLaunch> {
   const launch = {
     settingsPath: path.join(folder, 'settings.json'),
     systemPromptPath: path.join(folder, 'system-prompt.md'),
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt: systemPromptFor(server),
   }
   await fs.mkdir(folder, { recursive: true })
-  await fs.writeFile(launch.settingsPath, JSON.stringify(SETTINGS, null, 2), 'utf8')
+  await fs.writeFile(launch.settingsPath, JSON.stringify(settingsFor(server), null, 2), 'utf8')
   await fs.writeFile(launch.systemPromptPath, launch.systemPrompt, 'utf8')
   return launch
 }

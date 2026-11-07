@@ -81,7 +81,7 @@ export async function callRendererTool(tool: RendererToolName, args: unknown): P
   return answer
 }
 
-function toolFor(name: RendererToolName): McpToolDef {
+function rendererTool(name: RendererToolName): McpToolDef {
   const spec = RENDERER_TOOLS[name]
   return {
     name,
@@ -96,5 +96,5 @@ function toolFor(name: RendererToolName): McpToolDef {
 }
 
 export const rendererTools: ToolProvider = {
-  tools: () => (Object.keys(RENDERER_TOOLS) as RendererToolName[]).map(toolFor),
+  tools: () => (Object.keys(RENDERER_TOOLS) as RendererToolName[]).map(rendererTool),
 }

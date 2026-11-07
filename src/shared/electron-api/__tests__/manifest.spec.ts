@@ -289,18 +289,25 @@ const EXPECTED_MCP_TOOLS = [
 ]
 
 const EXPECTED_DESTRUCTIVE_MCP_TOOLS = [
+  'answer_agent',
   'close_agent',
   'close_all_terminals',
   'close_terminal',
+  'create_schedule',
   'delete_project',
   'delete_schedule',
   'delete_task',
   'delete_workspace',
   'forget_session_record',
   'git_checkout',
+  'install_extension',
+  'open_path',
   'remove_task_lane',
   'remove_worktree',
+  'run_home_feed_action',
+  'trigger_notification_action',
   'uninstall_extension',
+  'update_schedule',
 ]
 
 describe('mcpToolSpecs()', () => {

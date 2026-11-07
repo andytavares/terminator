@@ -41,7 +41,7 @@ import { ShellOverlays } from './shell/ShellOverlays'
 import { useTrackSurfaces } from './usage/track-surfaces'
 
 export function App(): JSX.Element {
-  const { windows, palette, launch, note, quickActions, paletteInputs } = useShellParts()
+  const { windows, palette, launch, note, overlays } = useShellParts()
   const showMetricsBar = useMetricsBar()
   return (
     <ErrorBoundary>
@@ -57,12 +57,7 @@ export function App(): JSX.Element {
             onOpenSettings={windows.openSettings}
             editNoteSessionId={note.editNoteSessionId}
           />
-          <ShellOverlays
-            {...windows}
-            {...launch}
-            quickActions={quickActions}
-            paletteInputs={paletteInputs}
-          />
+          <ShellOverlays {...overlays} />
         </div>
         {showMetricsBar && <GlobalMetricsBar />}
       </div>
@@ -85,7 +80,8 @@ function useShellParts() {
   const shell = useShellCommands({ windows, launch, note })
   const paletteInputs = { surfaces, activateSurface: showSurface, shell }
   const quickActions = palette.isOpen ? { ...palette.host, ...paletteInputs } : null
-  return { windows, palette, launch, note, quickActions, paletteInputs }
+  const overlays = { ...windows, ...launch, quickActions, paletteInputs }
+  return { windows, palette, launch, note, overlays }
 }
 
 /** Whether the metrics bar is on, polling system metrics while it is. */

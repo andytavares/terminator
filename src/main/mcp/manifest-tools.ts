@@ -29,7 +29,7 @@ function inputFor(schema: z.ZodType | undefined): {
   }
 }
 
-function toolFor(spec: McpToolSpec, entry: IpcRegistryEntry): McpToolDef {
+function manifestTool(spec: McpToolSpec, entry: IpcRegistryEntry): McpToolDef {
   const { inputSchema, payloadOf } = inputFor(entry.schema)
   return {
     name: spec.tool,
@@ -44,7 +44,7 @@ export const manifestTools: ToolProvider = {
   tools: () =>
     mcpToolSpecs().flatMap((spec) => {
       const entry = ipcInvokeRegistry.get(spec.channel)
-      if (entry) return [toolFor(spec, entry)]
+      if (entry) return [manifestTool(spec, entry)]
       if (!reportedMissing.has(spec.channel)) {
         reportedMissing.add(spec.channel)
         logger.warn('MCP tool has no registered channel', {

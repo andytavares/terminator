@@ -30,6 +30,8 @@ export const RENDERER_TOOLS = {
       command: z.string().min(1).optional(),
       workspace: z.string().min(1).optional().describe('Workspace name or id'),
     }),
+    // The command runs in a shell outside Claude Code's permission rules.
+    destructive: true,
   },
   open_in_window: {
     description: 'Moves a Terminator session into its own window.',

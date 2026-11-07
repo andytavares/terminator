@@ -23,7 +23,7 @@ interface Settings {
 
 async function written() {
   const dir = folder()
-  const launch = await writeUnattendedFiles(dir)
+  const launch = await writeUnattendedFiles(dir, 'terminator')
   const settings = JSON.parse(readFileSync(launch.settingsPath, 'utf8')) as Settings
   return { dir, launch, settings, prompt: readFileSync(launch.systemPromptPath, 'utf8') }
 }
@@ -85,7 +85,17 @@ describe('writeUnattendedFiles, the prompt and the questions', () => {
 
   it('writes the same files again on the next start', async () => {
     const dir = folder()
-    const first = await writeUnattendedFiles(dir)
-    expect(await writeUnattendedFiles(dir)).toEqual(first)
+    const first = await writeUnattendedFiles(dir, 'terminator')
+    expect(await writeUnattendedFiles(dir, 'terminator')).toEqual(first)
+  })
+})
+
+describe('writeUnattendedFiles, under a dev build’s server name', () => {
+  it('names the tools and the ask rules after the server it is given', async () => {
+    const launch = await writeUnattendedFiles(folder(), 'terminator-dev')
+    const settings = JSON.parse(readFileSync(launch.settingsPath, 'utf8')) as Settings
+    expect(launch.systemPrompt).toContain('mcp__terminator-dev__alert')
+    expect(settings.permissions.ask).toContain('mcp__terminator-dev__install_update')
+    expect(settings.permissions.ask.join(' ')).not.toContain('mcp__terminator__')
   })
 })

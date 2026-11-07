@@ -1,6 +1,6 @@
 import * as path from 'node:path'
 import { z } from 'zod'
-import { clearFeed, publishFeed, setActionHandler } from '../home/home-feed.js'
+import { publishAsks, setActionHandler } from '../home/home-feed.js'
 import { AlertSchema, createAlerts } from '../home/scheduled-alerts.js'
 import { notificationManager } from '../notifications/notification-manager.js'
 import { toolMarks, type McpToolDef, type ToolProvider } from './tool-types.js'
@@ -18,10 +18,7 @@ function homeAlerts(): ReturnType<typeof createAlerts> {
     now: () => new Date(),
     notify: (title, message) =>
       void notificationManager.create({ type: 'info', title, message, key: 'claudeAlert' }),
-    publish: (asks) =>
-      asks.length === 0
-        ? clearFeed(SOURCE)
-        : publishFeed(SOURCE, { asks, facets: [], measures: [] }),
+    publish: (asks) => publishAsks(SOURCE, asks),
   })
   setActionHandler(SOURCE, async (askId, actionId) => created.act(askId, actionId))
   alerts = created

@@ -50,6 +50,21 @@ export function ShellOverlays(state: ShellOverlayState): React.JSX.Element {
   return (
     <>
       <NotificationPanel />
+      <ShellDialogs {...state} />
+      <QuickActionHosts quickActions={state.quickActions} paletteInputs={state.paletteInputs} />
+      <WorkDialogs />
+      <HomeBadge />
+      <ToastContainer />
+      <ExtensionOverlays />
+      <BreakoutWindows />
+    </>
+  )
+}
+
+/** The shell's own dialogs and windows, each shown while its state says so. */
+function ShellDialogs(state: ShellOverlayState): React.JSX.Element {
+  return (
+    <>
       {state.settingsOpen && (
         <Suspense fallback={null}>
           <SettingsPanel onClose={state.closeSettings} />
@@ -67,12 +82,6 @@ export function ShellOverlays(state: ShellOverlayState): React.JSX.Element {
       {state.linkSessionId !== null && (
         <SessionLinkHost sessionId={state.linkSessionId} onClose={state.closeLink} />
       )}
-      <QuickActionHosts quickActions={state.quickActions} paletteInputs={state.paletteInputs} />
-      <WorkDialogs />
-      <HomeBadge />
-      <ToastContainer />
-      <ExtensionOverlays />
-      <BreakoutWindows />
     </>
   )
 }

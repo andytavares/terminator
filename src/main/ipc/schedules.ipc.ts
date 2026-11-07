@@ -7,10 +7,11 @@ import { logger } from '../logger.js'
 import { getAppDb } from '../db/index.js'
 import { agentService } from '../agents/acp/agent-service-instance.js'
 import { loginShellPathReady } from '../shell/login-shell-path.js'
-import { clearFeed, publishFeed, setActionHandler } from '../home/home-feed.js'
+import { publishAsks, setActionHandler } from '../home/home-feed.js'
 import { createBranchNamer } from '../home/branch-name.js'
 import { createScheduler } from '../home/schedules.js'
 import { writeUnattendedFiles } from '../home/unattended-run.js'
+import { mcpServerName } from '../mcp/registration.js'
 import {
   BranchNameInputSchema,
   ScheduleIdInputSchema,
@@ -18,7 +19,6 @@ import {
   SchedulePauseInputSchema,
   ScheduleUpdateInputSchema,
 } from '../../shared/schemas/schedules.schema.js'
-import type { HomeAsk } from '../../shared/schemas/home-feed.schema.js'
 
 // Core-only. Saved prompts that run later, and the branch name an agent gives a typed prompt.
 
@@ -104,14 +104,11 @@ const branchNameChannel = defineChannel({
   onError: () => ({ error: 'FAILED' }),
 })
 
-const publisherFor = (source: string) => (asks: HomeAsk[]) =>
-  asks.length === 0 ? clearFeed(source) : publishFeed(source, { asks, facets: [], measures: [] })
-
 /** Opens the table, raises what was missed while closed, then checks once a minute.
  * Resolves once the scheduled-run files are written. */
 export function registerScheduleHandlers(getWindow: () => BrowserWindow | null): Promise<void> {
   const folder = path.join(app.getPath('userData'), 'scheduled-runs')
-  const launch = writeUnattendedFiles(folder)
+  const launch = writeUnattendedFiles(folder, mcpServerName())
   const scheduler = createScheduler({
     db: getAppDb(),
     now: () => new Date(),
@@ -120,7 +117,7 @@ export function registerScheduleHandlers(getWindow: () => BrowserWindow | null):
       void launch.then((unattended) =>
         sendToWindow(getWindow(), 'schedules:run', { ...schedule, unattended })
       ),
-    publish: publisherFor(SOURCE),
+    publish: (asks) => publishAsks(SOURCE, asks),
   })
   setActionHandler(SOURCE, (askId, actionId) => scheduler.act(askId, actionId))
   registerInvokeTable([

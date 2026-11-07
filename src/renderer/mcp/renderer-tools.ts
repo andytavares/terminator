@@ -33,7 +33,7 @@ export const QUICK_ACTION_TOOLS: ReadonlySet<string> = new Set([
 
 const HANDLERS: ToolHandlers = {
   start_work: startWorkTool,
-  open_session: ({ sessionId }) => showSession(sessionId),
+  open_session: ({ sessionId }) => revealToolSession(sessionId),
   open_terminal: openTerminal,
   open_in_window: ({ sessionId }) => openInWindow(sessionId),
   list_quick_actions: (_args, actions) => actions.map(describeAction),
@@ -82,7 +82,7 @@ function requireSession(sessionId: string): void {
     throw new Error(`No session has the id ${sessionId}.`)
 }
 
-function showSession(sessionId: string): { sessionId: string } {
+function revealToolSession(sessionId: string): { sessionId: string } {
   requireSession(sessionId)
   revealSession(sessionId)
   return { sessionId }

@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { HomeAsk } from '../../shared/schemas/home-feed.schema.js'
 import { SESSION_ID } from '../../shared/session-id.js'
-import { clearFeed, publishFeed, setActionHandler } from '../home/home-feed.js'
+import { publishAsks, setActionHandler } from '../home/home-feed.js'
 import { notificationManager } from '../notifications/notification-manager.js'
 import { callRendererTool } from './renderer-tools.js'
 import { toolMarks, type McpCaller, type McpToolDef, type ToolProvider } from './tool-types.js'
@@ -108,9 +108,10 @@ function refuseWithoutId(caller: McpCaller): string {
 type Moves = Map<string, Move>
 
 function publishMoves(moves: Moves): void {
-  const asks = [...moves.values()].map((move) => move.ask)
-  if (asks.length === 0) clearFeed(SOURCE)
-  else publishFeed(SOURCE, { asks, facets: [], measures: [] })
+  publishAsks(
+    SOURCE,
+    [...moves.values()].map((move) => move.ask)
+  )
 }
 
 function endMove(moves: Moves, move: Move): void {
@@ -127,7 +128,10 @@ async function openMove(moves: Moves, move: Move, fork: boolean): Promise<void> 
     await callRendererTool('open_terminal', { cwd: move.cwd, command, workspace: move.workspace })
     endMove(moves, move)
   } catch (error) {
-    move.ask = { ...move.ask, detail: `The terminal tab did not open: ${(error as Error).message}` }
+    const detail = `The terminal tab did not open: ${(error as Error).message}`
+    // The session has ended, so nothing watches for it any more: Try again resumes it by hand.
+    const actions = fork ? move.ask.actions : [RETRY, ...move.ask.actions]
+    move.ask = { ...move.ask, detail, actions: dropRepeats(actions) }
     publishMoves(moves)
   }
 }
@@ -142,8 +146,15 @@ function startMove(moves: Moves, target: MoveTarget, watch: (move: Move) => () =
   return move
 }
 
+const RETRY = { id: 'retry', label: 'Try again', primary: true }
+const dropRepeats = (actions: HomeAsk['actions']): HomeAsk['actions'] =>
+  actions
+    .filter((action, index) => actions.findIndex((other) => other.id === action.id) === index)
+    .map((action) => (action.id === RETRY.id ? action : { ...action, primary: false }))
+
 async function actOnMove(moves: Moves, askId: string, actionId: string): Promise<void> {
   const move = [...moves.values()].find((candidate) => candidate.ask.id === askId)
+  if (move && actionId === 'retry') await openMove(moves, move, false)
   if (move && actionId === 'open-copy') await openMove(moves, move, true)
   if (move && actionId === 'cancel') endMove(moves, move)
 }

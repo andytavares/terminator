@@ -466,10 +466,10 @@ function startIntegrationsAndRecords(): void {
   // One hook script reports sessions, asks and turns for every Claude Code conversation (ADR 055).
   // Written at startup rather than shipped beside the bundle (ADR-026); project hooks share it.
   startAskWatcher()
-  void ensureHookScript()
+  const userHooks = ensureHookScript()
     .then((scriptPath) => installUserHooks({ execPath: process.execPath, scriptPath }))
     .catch((error) => logger.error('could not install the Claude hook', { error: String(error) }))
-  startTerminatorMcpServer()
+  startTerminatorMcpServer(userHooks)
   void loadAttentionLog().catch((error) =>
     logger.error('could not read the attention log', { error: String(error) })
   )
@@ -486,8 +486,10 @@ function showMainWindow(): BrowserWindow {
   return window
 }
 
-/** The Terminator MCP server, its relay, and the relay's entry in Claude Code (ADR 145). */
-function startTerminatorMcpServer(): void {
+/** The Terminator MCP server, its relay, and the relay's entry in Claude Code (ADR 145).
+ * Registration waits for `userHooks`: both rewrite ~/.claude/settings.json, and two writers at
+ * once lose one change. */
+function startTerminatorMcpServer(userHooks: Promise<void>): void {
   const userData = app.getPath('userData')
   const socketPath = mcpSocketPath(userData, app.getPath('temp'))
   const directory = join(userData, 'mcp')
@@ -507,8 +509,8 @@ function startTerminatorMcpServer(): void {
     ([relayPath]) => ({ relayPath, socketPath, directory })
   )
   registerClaudeCodeHandlers(registration)
-  void registration
-    .then(registerWithClaude)
+  void Promise.all([registration, userHooks])
+    .then(([options]) => registerWithClaude(options))
     .catch((error) =>
       logger.error('could not start the Terminator MCP server', { error: String(error) })
     )

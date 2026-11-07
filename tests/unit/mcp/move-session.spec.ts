@@ -145,6 +145,28 @@ describe('move_session_here, opening the tab', () => {
   })
 })
 
+describe('move_session_here, a failed open after the session ended', () => {
+  it('offers Try again, which resumes the session itself, not a copy', async () => {
+    callRendererTool.mockRejectedValueOnce(new Error('Terminator did not answer in time'))
+    const { feed, tool } = await load()
+    await tool.call({}, caller)
+    running.delete(4242)
+    await secondPasses()
+    const [ask] = feed.getMergedFeed().asks
+    expect(ask.actions.map((action) => action.label)).toEqual([
+      'Try again',
+      'Open a copy now',
+      'Cancel',
+    ])
+    await feed.runAction('claude-moves', ask.id, 'retry')
+    expect(callRendererTool).toHaveBeenLastCalledWith('open_terminal', {
+      cwd: '/Users/me/repos/shop/api',
+      command: `claude --resume ${ID}`,
+    })
+    expect(feed.getMergedFeed().asks).toEqual([])
+  })
+})
+
 describe('move_session_here, Open a copy now', () => {
   it('Open a copy now stops watching and opens a fork of the session', async () => {
     const { feed, tool } = await load()

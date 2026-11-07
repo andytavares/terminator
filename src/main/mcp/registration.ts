@@ -49,8 +49,11 @@ interface RegistrationRecord extends Registration {
   reason?: string
 }
 
+/** The name Claude Code knows the server by; a dev build's never collides with the app's. */
+export const mcpServerName = (): string => (app.isPackaged ? 'terminator' : 'terminator-dev')
+
 function currentRegistration(options: RegistrationOptions): Registration {
-  const name = app.isPackaged ? 'terminator' : 'terminator-dev'
+  const name = mcpServerName()
   const config = JSON.stringify({
     type: 'stdio',
     command: process.execPath,
@@ -73,7 +76,7 @@ async function writeRecord(options: RegistrationOptions, record: RegistrationRec
   await fs.writeFile(stateFile(options), JSON.stringify(record), 'utf8')
 }
 
-function failureReason(added: { exitCode: number; stderr: string }): string {
+function registrationFailure(added: { exitCode: number; stderr: string }): string {
   if (added.exitCode === 127) {
     return 'Claude Code is not installed: Terminator cannot find the claude command.'
   }
@@ -99,7 +102,11 @@ export async function registerWithClaude(options: RegistrationOptions): Promise<
   const added = await run(['mcp', 'add-json', '--scope', 'user', current.name, current.config])
   if (added.exitCode !== 0) {
     logger.warn('could not register the Terminator MCP server', { stderr: added.stderr })
-    await writeRecord(options, { ...current, state: 'unavailable', reason: failureReason(added) })
+    await writeRecord(options, {
+      ...current,
+      state: 'unavailable',
+      reason: registrationFailure(added),
+    })
     return
   }
   await writeRecord(options, { ...current, state: 'connected' })

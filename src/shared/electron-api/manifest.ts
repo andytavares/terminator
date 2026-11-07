@@ -778,7 +778,11 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.install',
     kind: 'invoke',
     channel: 'extension:install',
-    mcp: { tool: 'install_extension', description: 'Installs a Terminator extension.' },
+    mcp: {
+      tool: 'install_extension',
+      description: 'Installs a Terminator extension, which runs its code.',
+      destructive: true,
+    },
     signature: signature<(directoryPath: string) => Promise<{ extension: Extension } | Failure>>(),
     toPayload: (directoryPath) => ({ directoryPath }),
     extensionView: 'shared',
@@ -992,7 +996,12 @@ export const ELECTRON_API_MANIFEST = [
     path: 'shell.openPath',
     kind: 'invoke',
     channel: 'shell:open-path',
-    mcp: { tool: 'open_path', description: 'Opens a file or folder with its default macOS app.' },
+    mcp: {
+      tool: 'open_path',
+      description:
+        'Opens a file or folder with its default macOS app, which runs an app or script.',
+      destructive: true,
+    },
     signature: signature<(filePath: string) => Promise<{ ok: true } | Failure>>(),
     toPayload: (filePath) => ({ filePath }),
     extensionView: 'shared',
@@ -1311,6 +1320,8 @@ export const ELECTRON_API_MANIFEST = [
     mcp: {
       tool: 'trigger_notification_action',
       description: 'Runs an action button of a notification.',
+      // Notification buttons include Restart now, which installs an update.
+      destructive: true,
     },
     signature: signature<(notifId: string, actionId: string) => Promise<{ ok: true } | Failure>>(),
     toPayload: (notifId, actionId) => ({ notifId, actionId }),
@@ -1743,6 +1754,8 @@ export const ELECTRON_API_MANIFEST = [
     mcp: {
       tool: 'answer_agent',
       description: 'Answers a permission question of an agent session.',
+      // An answer can approve a held destructive command.
+      destructive: true,
     },
     signature:
       signature<
@@ -1984,7 +1997,12 @@ export const ELECTRON_API_MANIFEST = [
     path: 'homeFeed.action',
     kind: 'invoke',
     channel: 'home:feed-action',
-    mcp: { tool: 'run_home_feed_action', description: 'Runs an action of a Home feed item.' },
+    // Home actions include answering a held permission.
+    mcp: {
+      tool: 'run_home_feed_action',
+      description: 'Runs an action of a Home feed item.',
+      destructive: true,
+    },
     signature:
       signature<
         (
@@ -2015,7 +2033,8 @@ export const ELECTRON_API_MANIFEST = [
     path: 'schedules.create',
     kind: 'invoke',
     channel: 'schedules:create',
-    mcp: { tool: 'create_schedule', description: 'Creates a scheduled run.' },
+    // A scheduled run's prompt runs later with every tool allowed (ADR 144), so saving one asks.
+    mcp: { tool: 'create_schedule', description: 'Creates a scheduled run.', destructive: true },
     signature:
       signature<
         (
@@ -2041,7 +2060,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'schedules.update',
     kind: 'invoke',
     channel: 'schedules:update',
-    mcp: { tool: 'update_schedule', description: 'Changes a scheduled run.' },
+    mcp: { tool: 'update_schedule', description: 'Changes a scheduled run.', destructive: true },
     signature:
       signature<
         (

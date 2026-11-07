@@ -68,6 +68,15 @@ describe('createAlerts, the same alert again', () => {
     ])
   })
 
+  it('keeps alerts whose title or source only starts like another one', () => {
+    const { store, asks } = alerts()
+    store.receive({ ...red, title: 'CI@main' }, 'Claude · shop')
+    store.receive({ ...red, title: 'CI' }, 'Claude · shop')
+    store.receive({ ...red, title: 'x' }, 'Claude: a')
+    store.receive({ ...red, title: 'a: x' }, 'Claude')
+    expect(asks().map((a) => a.title)).toEqual(['CI@main', 'CI', 'x', 'a: x'])
+  })
+
   it('keeps yesterday’s alert and adds a new one after a day', () => {
     const { store, asks, later } = alerts()
     store.receive(red, 'Claude · shop')
