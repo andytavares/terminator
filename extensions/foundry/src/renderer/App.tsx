@@ -8,7 +8,7 @@ import type { FoundryApi } from '../ipc/foundry-api.js'
 import type { FactoryOrderRow } from '../components/factory/FactorySite.js'
 
 // The window shows one view under the queue, so each is its own chunk and the
-// first script stays under the renderer's chunk budget (vite.renderer.config.ts;
+// first script stays under the renderer's chunk budget (vite.renderer.config.mts;
 // https://react.dev/reference/react/lazy, https://vite.dev/guide/features#dynamic-import).
 const Orders = lazy(() => import('../components/Orders.js').then((m) => ({ default: m.Orders })))
 const Ledger = lazy(() => import('../components/Ledger.js').then((m) => ({ default: m.Ledger })))

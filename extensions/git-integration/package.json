@@ -4,7 +4,7 @@
   "private": true,
   "description": "Git & GitHub integration extension for Terminator",
   "scripts": {
-    "build:renderer": "vite build --config vite.renderer.config.ts"
+    "build:renderer": "vite build --config vite.renderer.config.mts"
   },
   "dependencies": {
     "@codemirror/commands": "6.11.1",

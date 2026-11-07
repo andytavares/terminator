@@ -48,11 +48,11 @@ task-vault/
 │       ├── main.tsx         view entry: mountExtension(<App />)
 │       └── App.tsx          routes on the ?view= parameter
 ├── index.html               view document with <div id="app">
-├── vite.renderer.config.ts  builds the view into dist/
+├── vite.renderer.config.mts  builds the view into dist/
 └── dist/index.html          the built view, named by manifest.renderer
 ```
 
-`npm run build:extensions` (`scripts/build-extensions.cjs`) builds both halves of every extension. esbuild bundles `src/index.ts` into the file that the manifest's `main` names (CommonJS, `platform: 'node'`). When `vite.renderer.config.ts` exists, the script runs the extension's own `npm run build:renderer`. `npm run dev` and `npm run build` run the script first. The compiled `src/index.js` is a build artifact. Git ignores it and nobody edits it (Constitution X).
+`npm run build:extensions` (`scripts/build-extensions.cjs`) builds both halves of every extension. esbuild bundles `src/index.ts` into the file that the manifest's `main` names (CommonJS, `platform: 'node'`). When `vite.renderer.config.mts` exists, the script runs the extension's own `npm run build:renderer`. `npm run dev` and `npm run build` run the script first. The compiled `src/index.js` is a build artifact. Git ignores it and nobody edits it (Constitution X).
 
 ---
 
@@ -181,7 +181,7 @@ Declare every npm package that the extension needs in its own `package.json`. `e
   "name": "@terminator/extension-my-extension",
   "version": "0.1.0",
   "private": true,
-  "scripts": { "build:renderer": "vite build --config vite.renderer.config.ts" },
+  "scripts": { "build:renderer": "vite build --config vite.renderer.config.mts" },
   "dependencies": {
     "@terminator/extension-sdk": "5.0.0",
     "@terminator/extension-ui": "1.0.0",
@@ -245,7 +245,7 @@ export function App(): JSX.Element {
 </html>
 ```
 
-`vite.renderer.config.ts`:
+`vite.renderer.config.mts`:
 
 ```typescript
 import { resolve } from 'path'

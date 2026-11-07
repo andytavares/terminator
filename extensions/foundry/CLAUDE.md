@@ -122,7 +122,7 @@ the owning module, never back into `index.ts`.
 | The Floor's state (`useFloor`) and its panels                                                                | `src/components/Floor.tsx`                                                                        |
 | The factory hall's state (`useFactoryHall`), what it draws (`hallModel`), its parts                          | `src/components/factory/FactoryHall.tsx`                                                          |
 | The signal dock's shared query and promotion, used by the Inbox and the factory site                         | `src/renderer/use-signals.ts`                                                                     |
-| The window's chrome; each view loaded with `React.lazy` as its own chunk (budget: `vite.renderer.config.ts`) | `src/renderer/App.tsx`                                                                            |
+| The window's chrome; each view loaded with `React.lazy` as its own chunk (budget: `vite.renderer.config.mts`) | `src/renderer/App.tsx`                                                                            |
 
 ## Extension Isolation (MANDATORY)
 

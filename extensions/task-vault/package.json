@@ -4,7 +4,7 @@
   "private": true,
   "description": "Task Vault: GTD+BuJo+PARA daily productivity system backed by the shared SQLite database",
   "scripts": {
-    "build:renderer": "vite build --config vite.renderer.config.ts"
+    "build:renderer": "vite build --config vite.renderer.config.mts"
   },
   "dependencies": {
     "@terminator/extension-sdk": "6.3.0",

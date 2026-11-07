@@ -57,7 +57,7 @@ async function buildExtension(name) {
   })
 
   // Build the renderer (webview bundle) when a vite renderer config is present.
-  if (existsSync(resolve(extDir, 'vite.renderer.config.ts'))) {
+  if (existsSync(resolve(extDir, 'vite.renderer.config.mts'))) {
     console.log(`Building renderer for ${name}...`)
     await run('npm', ['run', 'build:renderer'], extDir)
   }

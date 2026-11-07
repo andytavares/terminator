@@ -167,7 +167,7 @@ Main window renderer                              Main process
 `scripts/build-extensions.cjs` (`npm run build:extensions`, run first by `npm run dev`, `npm run build` and `npm run package`) builds every extension in parallel:
 
 - **Backend:** esbuild bundles `extensions/*/src/index.ts` into the file the manifest's `main` names (CommonJS, `platform: 'node'`). Packages that must be resolved from `node_modules` at run time stay outside the bundle: `electron-store`, `zod`, `fastify`, `web-tree-sitter` and others in its `external` list. A `?raw` import plugin lets the design system's stylesheet be read as text. The output is gitignored and never edited (Constitution X).
-- **View:** when `vite.renderer.config.ts` exists, the extension's own `npm run build:renderer` builds `index.html` into `dist/`.
+- **View:** when `vite.renderer.config.mts` exists, the extension's own `npm run build:renderer` builds `index.html` into `dist/`.
 
 ### Shell execution
 

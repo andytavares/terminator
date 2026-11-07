@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react'
 
 // A page shows one view, so each is its own chunk and the first script stays
-// under the renderer's chunk budget (vite.renderer.config.ts;
+// under the renderer's chunk budget (vite.renderer.config.mts;
 // https://react.dev/reference/react/lazy, https://vite.dev/guide/features#dynamic-import).
 const GitFullView = lazy(() =>
   import('../components/GitFullView').then((m) => ({ default: m.GitFullView }))

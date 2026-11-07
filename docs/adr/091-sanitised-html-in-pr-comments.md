@@ -41,6 +41,6 @@ An `id` or `name` in the page becomes a property of `document` or `window`, and 
 ## Consequences
 
 - Two new pinned dependencies in `extensions/git-integration/package.json`, from the same unified collective as `react-markdown`.
-- `rehype-raw` brings an HTML parser (parse5) of about 170 kB. This would push the single chunk of the review UI (1,184 kB) past its 1,200 kB budget in `vite.renderer.config.ts`. `RichContent` imports both plugins dynamically on first render, so they build into their own chunk. The first body to render shows without its HTML for the moment that the chunk takes to load from disk.
+- `rehype-raw` brings an HTML parser (parse5) of about 170 kB. This would push the single chunk of the review UI (1,184 kB) past its 1,200 kB budget in `vite.renderer.config.mts`. `RichContent` imports both plugins dynamically on first render, so they build into their own chunk. The first body to render shows without its HTML for the moment that the chunk takes to load from disk.
 - An allowed `<img src>` fetches from its host, just as markdown `![](…)` already did. The extension view has no content-security policy. Adding one is a separate decision.
 - Core `IssueMarkdown.tsx` keeps `skipHtml`, and the `marked` preview of `PrDialog` is unchanged. Both are out of scope here.

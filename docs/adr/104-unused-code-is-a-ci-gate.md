@@ -11,7 +11,7 @@ Unused files, exports and dependencies fail the build. The check is [knip](https
 Entry points come from the plugins of knip wherever one exists: electron-vite, Vite, Vitest, Playwright and Storybook.
 
 - electron-vite covers the main, preload and renderer inputs, and the extension host among them.
-- Vite covers the `vite.renderer.config.ts` and `vite.config.remote.ts` of each extension.
+- Vite covers the `vite.renderer.config.mts` and `vite.config.remote.ts` of each extension.
 
 The SDK and the design system are entered through the `exports` in their `package.json`. So their exports are an API, and knip never reports them.
 
