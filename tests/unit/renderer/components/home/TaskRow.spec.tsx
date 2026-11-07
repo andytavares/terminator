@@ -72,6 +72,8 @@ describe('TaskRow — drop one row on another to merge', () => {
     fireEvent.drop(rate, { dataTransfer: dataTransfer() })
     await waitFor(() => expect(main.listTasks()).toHaveLength(1))
     expect(main.listTasks()[0]).toMatchObject({ title: 'Rate limits', lanes: [api, web] })
+    // The toast follows the merge's own promise, which can settle after the store shows the merge.
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1))
     const [toast] = useToastStore.getState().toasts
     expect(toast).toMatchObject({ message: 'Moved "Web side" into "Rate limits"' })
     expect(toast.action?.label).toBe('Undo')
