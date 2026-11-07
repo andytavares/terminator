@@ -53,19 +53,21 @@ export interface RunAsOption {
   hint: string
 }
 
-const builtInRunAs = (agentName: string): RunAsOption[] => [
-  {
-    value: 'agent',
-    label: `${agentName} in an agent tab`,
-    hint: 'The ticket is its first prompt. Its questions show in the tab and on the Desk.',
-  },
-  {
-    value: 'claude-terminal',
-    label: 'Claude in a terminal',
-    hint: 'The claude program in a shell, as before.',
-  },
-  { value: 'terminal', label: 'Terminal only', hint: 'A shell in the new worktree.' },
-]
+function builtInRunAs(agentName: string): RunAsOption[] {
+  return [
+    {
+      value: 'agent',
+      label: `${agentName} in an agent tab`,
+      hint: 'The ticket or prompt is its first message. Its questions show in the tab and on the Desk.',
+    },
+    {
+      value: 'claude-terminal',
+      label: 'Claude in a terminal',
+      hint: 'The claude program in a shell, as before.',
+    },
+    { value: 'terminal', label: 'Terminal only', hint: 'A shell in the new worktree.' },
+  ]
+}
 
 /** The agent tab, Claude in a terminal and Terminal only, then every option an extension declared. */
 export function useRunAsOptions(agentName: string): RunAsOption[] {
