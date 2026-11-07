@@ -560,6 +560,10 @@ A scheduled run starts what Start work would start, while Terminator is open. A 
 
 ![Start work: a prompt with Global chosen, set to repeat on weekdays](screenshots/11e-start-work-global.png)
 
+A scheduled run needs nobody. When it runs as an agent tab or as Claude in a terminal, Claude starts with settings that approve every tool call and refuse clarifying questions. Commands that destroy data still ask you: `rm -rf`, `sudo`, `git reset --hard`, `git checkout --`, `git restore`, `git clean`, `git stash drop`, `git branch -D` and a force push. The ask shows in **Needs you**. Another agent, or an extension's run-as, keeps its own permission rules.
+
+Ask a scheduled run to alert you, for example "Check CI on main and alert me if it is red". The agent can show an alert in **Needs you**, with **Dismiss**, and send a notification. **Settings → Notifications → Alert from a scheduled run** sets where the notification goes. Alerts on Home are gone after Terminator quits.
+
 Manage saved runs in **Scheduled** on Home (the header switch, or `g` then `s`). Start work shows only a count, for example **4 scheduled runs · Manage on Home**. The table groups runs under **Global** first, then by workspace, with **Prompt**, **When**, **Next run**, **Last run** and **Run as**. **New scheduled run** opens Start work on **Prompt**, with **When** set to **Repeat**. Press a row to edit it: Start work opens as **Edit scheduled run**, and **Save changes** saves it. The row's **…** menu has:
 
 - **Run now** starts it at once. A repeat keeps its next run; a one-time run is removed.

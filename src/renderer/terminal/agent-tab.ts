@@ -9,6 +9,8 @@ export interface AgentTabRequest {
   agentId?: string
   /** The agent's session to continue. */
   resume?: string
+  /** Sent as the `_meta` of `session/new`. */
+  agentMeta?: Record<string, unknown>
 }
 
 /** Starts an agent as a tab of the project; null when the agent did not start. */

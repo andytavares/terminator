@@ -4,7 +4,7 @@ import { useSessionStore } from '../../stores/session.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { globalStartFailure, startWork } from './start-work'
 import { startGlobalPrompt } from '../../terminal/start-session'
-import type { Schedule } from '../../../shared/schemas/schedules.schema'
+import type { DueSchedule } from '../../../shared/schemas/schedules.schema'
 
 // A saved prompt coming due starts the way Start work starts a typed prompt.
 
@@ -24,22 +24,23 @@ function isStillRunning(workspaceId: string, branch: string): boolean {
 const lastGlobalSessions = new Map<string, string>()
 
 /** Starts a global scheduled run in Scratch. Null when it started or was skipped; otherwise why not. */
-async function launchGlobal(schedule: Schedule): Promise<string | null> {
+async function launchGlobal(schedule: DueSchedule): Promise<string | null> {
   const last = useSessionStore.getState().sessions.get(lastGlobalSessions.get(schedule.id) ?? '')
   if (schedule.repeat?.overlap === 'skip' && last !== undefined && last.status !== 'closed')
     return null
-  const { prompt: text, runAs } = schedule
+  const { prompt: text, runAs, unattended } = schedule
   const sessionId = await startGlobalPrompt({
     text,
     runAs,
+    unattended,
     ...(schedule.agentId === null ? {} : { agentId: schedule.agentId }),
   })
-  if (sessionId === null) return globalStartFailure(text, runAs)
+  if (sessionId === null) return globalStartFailure(text, runAs, unattended)
   lastGlobalSessions.set(schedule.id, sessionId)
   return null
 }
 
-async function launchScheduled(schedule: Schedule): Promise<void> {
+async function launchScheduled(schedule: DueSchedule): Promise<void> {
   const message =
     schedule.repoRoot === null ? await launchGlobal(schedule) : await launchInWorkspace(schedule)
   if (message !== null)
@@ -49,7 +50,7 @@ async function launchScheduled(schedule: Schedule): Promise<void> {
 }
 
 /** Starts a scheduled run in its workspace. Null when it started or was skipped; otherwise why not. */
-async function launchInWorkspace(schedule: Schedule): Promise<string | null> {
+async function launchInWorkspace(schedule: DueSchedule): Promise<string | null> {
   const workspace = useWorkspaceStore
     .getState()
     .workspaces.find((w) => w.folderPath === schedule.repoRoot)
@@ -68,6 +69,7 @@ async function launchInWorkspace(schedule: Schedule): Promise<string | null> {
         workspace,
         runAs: schedule.runAs,
         newWorktree: schedule.newWorktree,
+        unattended: schedule.unattended,
         ...(schedule.branch === null ? {} : { branch: schedule.branch }),
         ...(schedule.agentId === null ? {} : { agentId: schedule.agentId }),
       })

@@ -45,9 +45,28 @@ describe('agentCommand run by sh', () => {
     expect(line).not.toBeNull()
     expect(argvOf(line as string)).toEqual(['1', expected])
   })
+})
 
+describe('agentCommand run by sh, without a prompt and with flags', () => {
   it('starts claude with no arguments when there is no prompt', () => {
     expect(argvOf(agentCommand(null) as string)).toEqual(['0'])
+  })
+
+  it('starts a scheduled run with its settings file and system prompt, paths with spaces intact', () => {
+    const unattended = {
+      settingsPath: '/Users/me/Library/Application Support/Terminator/scheduled-runs/settings.json',
+      systemPromptPath:
+        '/Users/me/Library/Application Support/Terminator/scheduled-runs/system-prompt.md',
+      systemPrompt: 'Nobody is watching.',
+    }
+    expect(argvOf(agentCommand('Triage the inbox', unattended) as string)).toEqual([
+      '5',
+      '--settings',
+      unattended.settingsPath,
+      '--append-system-prompt-file',
+      unattended.systemPromptPath,
+      'Triage the inbox',
+    ])
   })
 
   it('refuses a prompt whose line would pass the terminal limit', () => {

@@ -90,6 +90,7 @@ import type { HomeFeedActionInputSchema, MergedHomeFeed } from '../schemas/home-
 import type {
   BranchNameInputSchema,
   Schedule,
+  DueSchedule,
   ScheduleIdInputSchema,
   ScheduleInputSchema,
   SchedulePauseInputSchema,
@@ -1739,7 +1740,7 @@ export const ELECTRON_API_MANIFEST = [
     path: 'schedules.onRun',
     kind: 'event',
     channel: 'schedules:run',
-    signature: signature<(handler: (schedule: Schedule) => void) => Unsubscribe>(),
+    signature: signature<(handler: (schedule: DueSchedule) => void) => Unsubscribe>(),
     remote: 'omit',
   }),
   method({
