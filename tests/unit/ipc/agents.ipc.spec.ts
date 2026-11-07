@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { homedir } from 'node:os'
 
 type Handler = (event: unknown, payload?: unknown) => Promise<unknown>
 const handlers = vi.hoisted(() => new Map<string, Handler>())
@@ -79,6 +80,11 @@ describe('agents start and prompt', () => {
     const answer = await invoke('agents:start', { cwd: '/work', mode: 'default' })
     expect(service.start).toHaveBeenCalledWith({ cwd: '/work', mode: 'default' })
     expect(answer).toEqual({ data: { sessionId: 's1', agentId: 'claude', configOptions: [] } })
+  })
+
+  it('starts an agent asked for in ~ in the home folder', async () => {
+    await invoke('agents:start', { cwd: '~' })
+    expect(service.start).toHaveBeenCalledWith({ cwd: homedir() })
   })
 
   it('refuses a payload that does not match, without calling the service', async () => {

@@ -1,3 +1,4 @@
+import { homedir } from 'node:os'
 import { defineChannel, validationError, type ChannelSpec } from '@terminator/extension-sdk'
 import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { knownAgentStatuses } from '../agents/acp/agent-registry.js'
@@ -32,7 +33,9 @@ const agentChannels: ChannelSpec[] = [
     channel: 'agents:start',
     schema: AgentStartInputSchema,
     invalid: validationError,
-    run: async (input) => ({ data: await agentService().start(input) }),
+    run: async (input) => ({
+      data: await agentService().start(input.cwd === '~' ? { ...input, cwd: homedir() } : input),
+    }),
   }),
   defineChannel({
     channel: 'agents:prompt',

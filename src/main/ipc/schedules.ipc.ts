@@ -13,6 +13,8 @@ import {
   BranchNameInputSchema,
   ScheduleIdInputSchema,
   ScheduleInputSchema,
+  SchedulePauseInputSchema,
+  ScheduleUpdateInputSchema,
 } from '../../shared/schemas/schedules.schema.js'
 
 // Core-only. Saved prompts that run later, and the branch name an agent gives a typed prompt.
@@ -61,6 +63,36 @@ function scheduleChannels(scheduler: Scheduler): ChannelSpec[] {
   ]
 }
 
+/** The changes to a saved run: edit, pause or resume, and run now. */
+function scheduleEditChannels(scheduler: Scheduler): ChannelSpec[] {
+  return [
+    defineChannel({
+      channel: 'schedules:update',
+      schema: ScheduleUpdateInputSchema,
+      invalid: validationError,
+      run: async ({ id, ...input }) => ({ data: await scheduler.update(id, input) }),
+      onError: failed,
+    }),
+    defineChannel({
+      channel: 'schedules:pause',
+      schema: SchedulePauseInputSchema,
+      invalid: validationError,
+      run: ({ id, paused }) => scheduler.setPaused(id, paused).then(() => ({ data: true })),
+      onError: failed,
+    }),
+    defineChannel({
+      channel: 'schedules:run-now',
+      schema: ScheduleIdInputSchema,
+      invalid: validationError,
+      run: async ({ id }) => {
+        await scheduler.runNow(id)
+        return { data: true }
+      },
+      onError: failed,
+    }),
+  ]
+}
+
 const branchNameChannel = defineChannel({
   channel: 'home:branch-name',
   schema: BranchNameInputSchema,
@@ -82,7 +114,11 @@ export function registerScheduleHandlers(getWindow: () => BrowserWindow | null):
         : publishFeed(SOURCE, { asks, facets: [], measures: [] }),
   })
   setActionHandler(SOURCE, (askId, actionId) => scheduler.act(askId, actionId))
-  registerInvokeTable([...scheduleChannels(scheduler), branchNameChannel])
+  registerInvokeTable([
+    ...scheduleChannels(scheduler),
+    ...scheduleEditChannels(scheduler),
+    branchNameChannel,
+  ])
   const tick = (check: () => Promise<void>) => () =>
     void check().catch((error) => logger.error('schedule check failed', { error: String(error) }))
   void scheduler

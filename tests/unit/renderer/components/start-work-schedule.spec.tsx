@@ -27,6 +27,7 @@ const triage: Schedule = {
   newWorktree: true,
   agentId: null,
   lastRunAt: null,
+  paused: false,
   createdAt: '',
 }
 

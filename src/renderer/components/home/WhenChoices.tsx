@@ -386,7 +386,10 @@ function whenOf(schedule: Schedule): string {
     schedule.repeat === null
       ? `on ${schedule.date} at ${schedule.time}`
       : describeRepeat(schedule.repeat, schedule.time)
-  const repo = schedule.repoRoot.split('/').pop() ?? schedule.repoRoot
+  const repo =
+    schedule.repoRoot === null
+      ? 'Global'
+      : (schedule.repoRoot.split('/').pop() ?? schedule.repoRoot)
   return `${when} · ${repo}`
 }
 

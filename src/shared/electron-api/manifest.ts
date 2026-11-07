@@ -92,6 +92,8 @@ import type {
   Schedule,
   ScheduleIdInputSchema,
   ScheduleInputSchema,
+  SchedulePauseInputSchema,
+  ScheduleUpdateInputSchema,
 } from '../schemas/schedules.schema'
 import type { AgentAsk } from '../agent-sessions/ask'
 import type { AttentionInterval, AttentionMeasures } from '../home/attention-measures'
@@ -1689,6 +1691,42 @@ export const ELECTRON_API_MANIFEST = [
     path: 'schedules.delete',
     kind: 'invoke',
     channel: 'schedules:delete',
+    signature:
+      signature<
+        (
+          input: z.input<typeof ScheduleIdInputSchema>
+        ) => Promise<{ data: true } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'schedules.update',
+    kind: 'invoke',
+    channel: 'schedules:update',
+    signature:
+      signature<
+        (
+          input: z.input<typeof ScheduleUpdateInputSchema>
+        ) => Promise<{ data: Schedule } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'schedules.pause',
+    kind: 'invoke',
+    channel: 'schedules:pause',
+    signature:
+      signature<
+        (
+          input: z.input<typeof SchedulePauseInputSchema>
+        ) => Promise<{ data: true } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'schedules.runNow',
+    kind: 'invoke',
+    channel: 'schedules:run-now',
     signature:
       signature<
         (

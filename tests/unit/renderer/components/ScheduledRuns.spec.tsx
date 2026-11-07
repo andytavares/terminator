@@ -18,6 +18,7 @@ const triage: Schedule = {
   newWorktree: true,
   agentId: null,
   lastRunAt: null,
+  paused: false,
   createdAt: '2026-11-04T08:00:00.000Z',
 }
 
@@ -36,6 +37,13 @@ describe('ScheduledRuns', () => {
     await act(async () => {})
     expect(screen.getByText('Triage the inbox')).toBeTruthy()
     expect(screen.getByText('every day at 09:00 · payments-api')).toBeTruthy()
+  })
+
+  it('says Global for a run that belongs to no workspace', async () => {
+    schedules.list.mockResolvedValue({ data: [{ ...triage, repoRoot: null, newWorktree: false }] })
+    render(<ScheduledRuns />)
+    await act(async () => {})
+    expect(screen.getByText('every day at 09:00 · Global')).toBeTruthy()
   })
 
   it('removes a saved run', async () => {

@@ -14,10 +14,10 @@ const START_GRACE_MS = 2 * 60_000
 const SCHEMA = `CREATE TABLE IF NOT EXISTS schedules (
   id TEXT PRIMARY KEY, repo_root TEXT NOT NULL, prompt TEXT NOT NULL, run_as TEXT NOT NULL,
   kind TEXT NOT NULL, time TEXT NOT NULL, date TEXT, last_run_at TEXT, created_at TEXT NOT NULL,
-  new_worktree INTEGER NOT NULL, agent_id TEXT, repeat TEXT, branch TEXT)`
+  new_worktree INTEGER NOT NULL, agent_id TEXT, repeat TEXT, branch TEXT, paused_at TEXT)`
 
 /** Columns added after the first release; CREATE TABLE IF NOT EXISTS leaves old tables without them. */
-const ADDED_COLUMNS = ['repeat', 'branch']
+const ADDED_COLUMNS = ['repeat', 'branch', 'paused_at']
 
 interface Row extends Record<string, unknown> {
   id: string
@@ -34,6 +34,7 @@ interface Row extends Record<string, unknown> {
   agent_id: string | null
   repeat: string | null
   branch: string | null
+  paused_at: string | null
 }
 
 const EVERY_DAY: RepeatRule = { every: 1, unit: 'day', days: [], between: null, overlap: 'skip' }
@@ -47,7 +48,7 @@ const repeatOf = (row: Row): RepeatRule | null =>
 
 const toSchedule = (row: Row): Schedule => ({
   id: row.id,
-  repoRoot: row.repo_root,
+  repoRoot: row.repo_root === '' ? null : row.repo_root,
   prompt: row.prompt,
   runAs: row.run_as,
   kind: row.kind === 'once' ? 'once' : 'repeat',
@@ -59,6 +60,7 @@ const toSchedule = (row: Row): Schedule => ({
   agentId: row.agent_id,
   repeat: repeatOf(row),
   branch: row.branch,
+  paused: row.paused_at !== null,
 })
 
 export interface SchedulerDeps {
@@ -104,7 +106,7 @@ function missedAsk(schedule: Schedule, occurrence: Date): HomeAsk {
     kind: 'task',
     title: 'Scheduled run missed',
     detail: schedule.prompt,
-    where: `${basename(schedule.repoRoot)} · ${whenWords(schedule)}`,
+    where: `${schedule.repoRoot === null ? 'Global' : basename(schedule.repoRoot)} · ${whenWords(schedule)}`,
     facts: [`Was due ${occurrence.toLocaleString()}, while Terminator was closed`],
     workKey: null,
     since: occurrence.toISOString(),
@@ -126,18 +128,29 @@ function hasPassed(input: ScheduleInput, now: Date): boolean {
   return new Date(year, month - 1, day, hours, minutes).getTime() <= now.getTime()
 }
 
-function insertSchedule(db: ExtensionDB, schedule: Schedule): Promise<unknown> {
+/** Writes the whole row; an edit replaces the row it keeps the id of. */
+function writeSchedule(db: ExtensionDB, schedule: Schedule, pausedAt: string | null) {
   const columns =
-    'id, repo_root, prompt, run_as, kind, time, date, last_run_at, created_at, new_worktree, agent_id, repeat, branch'
+    'id, repo_root, prompt, run_as, kind, time, date, last_run_at, created_at, new_worktree, agent_id, repeat, branch, paused_at'
   return db.run(
-    `INSERT INTO schedules (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT OR REPLACE INTO schedules (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      ...[schedule.id, schedule.repoRoot, schedule.prompt, schedule.runAs, schedule.kind],
-      ...[schedule.time, schedule.date, null, schedule.createdAt],
+      // repo_root is NOT NULL and SQLite cannot drop that without a table rebuild: '' is a global run.
+      ...[schedule.id, schedule.repoRoot ?? '', schedule.prompt, schedule.runAs, schedule.kind],
+      ...[schedule.time, schedule.date, schedule.lastRunAt, schedule.createdAt],
       ...[schedule.newWorktree ? 1 : 0, schedule.agentId],
       ...[schedule.repeat === null ? null : JSON.stringify(schedule.repeat), schedule.branch],
+      pausedAt,
     ]
   )
+}
+
+const GONE = 'That scheduled run no longer exists.'
+
+async function findRow(db: ExtensionDB, id: string): Promise<Row> {
+  const [row] = await db.query<Row>('SELECT * FROM schedules WHERE id = ?', [id])
+  if (row === undefined) throw new Error(GONE)
+  return row
 }
 
 async function addMissingColumns(db: ExtensionDB): Promise<void> {
@@ -147,8 +160,35 @@ async function addMissingColumns(db: ExtensionDB): Promise<void> {
     if (!have.includes(column)) await db.exec(`ALTER TABLE schedules ADD COLUMN ${column} TEXT`)
 }
 
+/** Changes the person makes to a saved run after it was created. */
+function createScheduleEdits({ db, now }: Pick<SchedulerDeps, 'db' | 'now'>) {
+  return {
+    find: async (id: string): Promise<Schedule> => toSchedule(await findRow(db, id)),
+    /** Occurrences before the edit count as handled, so the edit raises no missed ask. */
+    async update(id: string, input: ScheduleInput): Promise<Schedule> {
+      const row = await findRow(db, id)
+      if (hasPassed(input, now())) throw new Error('That time has passed. Pick a later time.')
+      const { createdAt, paused } = toSchedule(row)
+      const schedule: Schedule = { ...input, id, createdAt, paused, lastRunAt: now().toISOString() }
+      await writeSchedule(db, schedule, row.paused_at)
+      return schedule
+    },
+    /** A resume counts the occurrences during the pause as handled. */
+    async setPaused(id: string, paused: boolean): Promise<void> {
+      const changed = paused
+        ? await db.run('UPDATE schedules SET paused_at = ? WHERE id = ?', [now().toISOString(), id])
+        : await db.run('UPDATE schedules SET paused_at = NULL, last_run_at = ? WHERE id = ?', [
+            now().toISOString(),
+            id,
+          ])
+      if (changed === 0) throw new Error(GONE)
+    },
+  }
+}
+
 function createScheduleStore({ db, now }: Pick<SchedulerDeps, 'db' | 'now'>) {
   return {
+    ...createScheduleEdits({ db, now }),
     init: () => addMissingColumns(db),
     list: async (): Promise<Schedule[]> =>
       (await db.query<Row>('SELECT * FROM schedules ORDER BY created_at')).map(toSchedule),
@@ -159,8 +199,9 @@ function createScheduleStore({ db, now }: Pick<SchedulerDeps, 'db' | 'now'>) {
         id: randomUUID(),
         lastRunAt: null,
         createdAt: now().toISOString(),
+        paused: false,
       }
-      await insertSchedule(db, schedule)
+      await writeSchedule(db, schedule, null)
       return schedule
     },
     remove: async (id: string): Promise<void> =>
@@ -205,7 +246,8 @@ interface ScanDeps extends SchedulerDeps {
 async function scanSchedules(deps: ScanDeps, graceMs: number): Promise<void> {
   const { now, start, store, missed } = deps
   for (const schedule of await store.list()) {
-    const occurrence = missed.has(schedule.id) ? null : dueOccurrence(schedule, now())
+    const waiting = schedule.paused || missed.has(schedule.id)
+    const occurrence = waiting ? null : dueOccurrence(schedule, now())
     if (occurrence === null) continue
     if (now().getTime() - occurrence.getTime() <= graceMs) {
       await store.settle(schedule)
@@ -216,6 +258,37 @@ async function scanSchedules(deps: ScanDeps, graceMs: number): Promise<void> {
   missed.publishAll()
 }
 
+/** What the person does to a saved run; each drops the missed ask it would leave behind. */
+function createScheduleControls({
+  store,
+  missed,
+  start,
+}: Omit<ScanDeps, keyof SchedulerDeps> & Pick<SchedulerDeps, 'start'>) {
+  return {
+    async update(id: string, input: ScheduleInput): Promise<Schedule> {
+      const schedule = await store.update(id, input)
+      if (missed.drop(id)) missed.publishAll()
+      return schedule
+    },
+    async setPaused(id: string, paused: boolean): Promise<void> {
+      await store.setPaused(id, paused)
+      if (missed.drop(id)) missed.publishAll()
+    },
+    /** Starts it out of turn: a one-time run is used up, a repeat keeps its next time. */
+    async runNow(id: string): Promise<void> {
+      const schedule = await store.find(id)
+      if (schedule.kind === 'once') await store.remove(id)
+      start(schedule)
+      if (missed.drop(id)) missed.publishAll()
+    },
+    async remove(id: string): Promise<void> {
+      missed.drop(id)
+      await store.remove(id)
+      missed.publishAll()
+    },
+  }
+}
+
 export function createScheduler(deps: SchedulerDeps) {
   const store = createScheduleStore(deps)
   const missed = createMissedRuns(deps.publish)
@@ -224,11 +297,7 @@ export function createScheduler(deps: SchedulerDeps) {
     init: store.init,
     list: store.list,
     create: store.create,
-    async remove(id: string): Promise<void> {
-      missed.drop(id)
-      await store.remove(id)
-      missed.publishAll()
-    },
+    ...createScheduleControls({ store, missed, start: deps.start }),
     /** Once a minute while the app runs. */
     tick: () => scan(START_GRACE_MS),
     /** Once at start-up: whatever came due while the app was closed waits for the person. */

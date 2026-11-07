@@ -18,7 +18,8 @@ const RepeatSchema = z
   })
 
 const ScheduleFields = {
-  repoRoot: z.string().min(1),
+  /** null for a global scheduled run: it belongs to no workspace and starts in the home folder. */
+  repoRoot: z.string().min(1).nullable(),
   prompt: z.string().trim().min(1),
   runAs: z.string().min(1),
   kind: z.enum(['once', 'repeat']),
@@ -38,18 +39,40 @@ const ScheduleFields = {
   agentId: z.string().min(1).nullable(),
 }
 
-export const ScheduleInputSchema = z
-  .object(ScheduleFields)
-  .refine((s) => (s.kind === 'once') === (s.date !== null), {
-    message: 'A one-time schedule needs a date; a repeat has none',
-  })
-  .refine((s) => (s.kind === 'repeat') === (s.repeat !== null), {
-    message: 'A repeat schedule needs a repeat rule; a one-time run has none',
-  })
+type ScheduleShape = z.infer<z.ZodObject<typeof ScheduleFields>>
+
+/** The rules every saved schedule follows, for a new one and an edit alike. */
+const withScheduleRules = <T extends z.ZodType<ScheduleShape>>(schema: T) =>
+  schema
+    .refine((s) => (s.kind === 'once') === (s.date !== null), {
+      message: 'A one-time schedule needs a date; a repeat has none',
+    })
+    .refine((s) => (s.kind === 'repeat') === (s.repeat !== null), {
+      message: 'A repeat schedule needs a repeat rule; a one-time run has none',
+    })
+    .refine((s) => s.repoRoot !== null || (s.branch === null && !s.newWorktree), {
+      message: 'A global scheduled run has no branch or worktree',
+    })
+    .refine((s) => s.repoRoot !== null || s.runAs === 'agent' || s.runAs === 'claude-terminal', {
+      message: 'A global scheduled run runs as an agent or Claude in a terminal',
+    })
+
+export const ScheduleInputSchema = withScheduleRules(z.object(ScheduleFields))
+
+export const ScheduleUpdateInputSchema = withScheduleRules(
+  z.object({ id: z.string().min(1), ...ScheduleFields })
+)
 
 export const ScheduleIdInputSchema = z.object({ id: z.string().min(1) })
+
+export const SchedulePauseInputSchema = z.object({ id: z.string().min(1), paused: z.boolean() })
 
 export const BranchNameInputSchema = z.object({ prompt: z.string().trim().min(1) })
 
 export type ScheduleInput = z.infer<typeof ScheduleInputSchema>
-export type Schedule = ScheduleInput & { id: string; lastRunAt: string | null; createdAt: string }
+export type Schedule = ScheduleInput & {
+  id: string
+  lastRunAt: string | null
+  createdAt: string
+  paused: boolean
+}
