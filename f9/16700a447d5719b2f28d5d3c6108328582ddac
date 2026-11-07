@@ -1,0 +1,40 @@
+tests/unit/renderer/terminal/tab-drag.spec.ts
+  s_07e7aef877c5aa::t_0f839a3800e2c8 63-68,166,177,186-218
+tests/unit/renderer/agent/Composer.spec.tsx
+  s_07e7aef877c5aa::t_a19045e3d88a69 1-139,141,143-147,149-182,184-274
+  s_07e7aef877c5aa::t_5f8f6650ee567f 148,183
+  s_07e7aef877c5aa::t_ef9224722920f4 140,142
+src/renderer/components/agent/Composer.tsx
+  s_07e7aef877c5aa::t_cb7dfff77f0ddb 2-3,6-20,73-87,102-111,117-128,130-146,148-177,199,209-210,218-219,236,256,258,262-264,334,338,343-368,371,384-395,398,405-407
+  s_07e7aef877c5aa::t_8087fa4f144943 129,147
+  s_07e7aef877c5aa::t_ef9224722920f4 369-370,372-383,403,419
+tests/unit/renderer/components/TabBar.spec.tsx
+  s_07e7aef877c5aa::t_6ac5b6bf5722e1 62-63,118-123,945-959
+  s_07e7aef877c5aa::t_0f1249f8e81d50 960
+src/renderer/components/agent/AgentView.tsx
+  s_07e7aef877c5aa::t_2d8d72bb15b1f1 17-25,184-192,199,218
+src/renderer/components/agent/AgentView.css
+  s_07e7aef877c5aa::t_8087fa4f144943 156,161-208
+  s_07e7aef877c5aa::t_c38963216c9431 209
+src/renderer/terminal/tab-drag.ts
+  s_07e7aef877c5aa::t_35c4d7e651f78d 25-26,29-34,58-69,71-72,84-88,99,101,129,145-146
+src/renderer/components/terminal/TabBar.tsx
+  s_07e7aef877c5aa::t_ef9224722920f4 306
+  s_07e7aef877c5aa::t_1fa5f5d4a9987b 32,245-246,249-253
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f916700a447d5719b2f28d5d3c6108328582ddac",
+  "prompts": {},
+  "sessions": {
+    "s_07e7aef877c5aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "633c8d12-7dd7-4254-9663-67bc2d4d51f5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
