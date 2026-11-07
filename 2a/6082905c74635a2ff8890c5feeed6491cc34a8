@@ -1,0 +1,63 @@
+docs/ARCHITECTURE.md
+  s_56e599e17e5b82::t_bec52cf6bc1750 170
+extensions/foundry/package.json
+  s_56e599e17e5b82::t_bec52cf6bc1750 7
+extensions/remote-control/package.json
+  s_56e599e17e5b82::t_bec52cf6bc1750 7
+vite.config.remote.ts
+  s_56e599e17e5b82::t_0f8df1f62c4d8f 6,9,13-16
+extensions/git-integration/package.json
+  s_56e599e17e5b82::t_bec52cf6bc1750 7
+docs/adr/091-sanitised-html-in-pr-comments.md
+  s_56e599e17e5b82::t_bec52cf6bc1750 44
+packages/extension-sdk/README.md
+  s_56e599e17e5b82::t_bec52cf6bc1750 68,131-132,134
+extensions/git-integration/src/renderer/App.tsx
+  s_56e599e17e5b82::t_bec52cf6bc1750 4
+extensions/foundry/src/renderer/App.tsx
+  s_56e599e17e5b82::t_bec52cf6bc1750 11
+extensions/remote-control/vite.renderer.config.mts
+  s_56e599e17e5b82::t_783feaee3565ba 1-5
+extensions/git-integration/vite.renderer.config.mts
+  s_56e599e17e5b82::t_783feaee3565ba 1-10
+extensions/notepad/package.json
+  s_56e599e17e5b82::t_bec52cf6bc1750 7
+extensions/task-vault/package.json
+  s_56e599e17e5b82::t_bec52cf6bc1750 7
+extensions/foundry/CLAUDE.md
+  s_56e599e17e5b82::t_bec52cf6bc1750 125
+knip.jsonc
+  s_56e599e17e5b82::t_bec52cf6bc1750 62,67,75
+extensions/foundry/vite.renderer.config.mts
+  s_56e599e17e5b82::t_783feaee3565ba 1-10
+extensions/git-integration/README.md
+  s_56e599e17e5b82::t_bec52cf6bc1750 83
+docs/adr/104-unused-code-is-a-ci-gate.md
+  s_56e599e17e5b82::t_bec52cf6bc1750 14
+extensions/notepad/vite.renderer.config.mts
+  s_56e599e17e5b82::t_783feaee3565ba 1-10
+scripts/build-extensions.cjs
+  s_56e599e17e5b82::t_bec52cf6bc1750 60
+extensions/task-vault/vite.renderer.config.mts
+  s_56e599e17e5b82::t_783feaee3565ba 1-7
+docs/EXTENSION-DEVELOPMENT.md
+  s_56e599e17e5b82::t_bec52cf6bc1750 51,55,184,248
+codecov.yml
+  s_56e599e17e5b82::t_bec52cf6bc1750 39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2a6082905c74635a2ff8890c5feeed6491cc34a8",
+  "prompts": {},
+  "sessions": {
+    "s_56e599e17e5b82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6c95cc7-f1de-49bf-a858-16efb95c5329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
