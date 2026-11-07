@@ -5,7 +5,7 @@ import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import { installElectronApi } from '../../../support/electron-api'
-import type { Schedule } from '../../../../src/shared/schemas/schedules.schema'
+import type { DueSchedule, Schedule } from '../../../../src/shared/schemas/schedules.schema'
 import type { Project, TerminalSession, Workspace } from '../../../../src/shared/types/index'
 
 const started = vi.hoisted(() => vi.fn())
@@ -40,14 +40,20 @@ const triage: Schedule = {
   createdAt: '',
 }
 
-let due: (schedule: Schedule) => void
+const unattended = {
+  settingsPath: '/data/scheduled-runs/settings.json',
+  systemPromptPath: '/data/scheduled-runs/system-prompt.md',
+  systemPrompt: 'Nobody is watching.',
+}
+let deliver: (schedule: DueSchedule) => void
+const due = (schedule: Schedule) => deliver({ ...schedule, unattended })
 beforeEach(() => {
   started.mockReset().mockResolvedValue(null)
   startedGlobal.mockReset().mockResolvedValue('g-1')
   installElectronApi({
     schedules: {
-      onRun: (callback: (schedule: Schedule) => void) => {
-        due = callback
+      onRun: (callback: (schedule: DueSchedule) => void) => {
+        deliver = callback
         return () => {}
       },
     },
@@ -69,6 +75,12 @@ describe('useScheduledRuns', () => {
     renderHook(() => useScheduledRuns())
     due(triage)
     expect(started).toHaveBeenCalledWith(expect.objectContaining({ branch: 'feat/triage' }))
+  })
+
+  it('starts the run with the files that let it run with nobody watching', () => {
+    renderHook(() => useScheduledRuns())
+    due(triage)
+    expect(started).toHaveBeenCalledWith(expect.objectContaining({ unattended }))
   })
 })
 
@@ -114,6 +126,7 @@ describe('useScheduledRuns, a global scheduled run', () => {
       text: 'Sum up the PRs',
       runAs: 'agent',
       agentId: 'opencode',
+      unattended,
     })
     expect(started).not.toHaveBeenCalled()
   })

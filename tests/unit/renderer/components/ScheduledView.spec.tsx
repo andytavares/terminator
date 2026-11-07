@@ -7,7 +7,7 @@ import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.sto
 import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { installElectronApi, pushedEvent } from '../../../support/electron-api'
-import type { Schedule } from '../../../../src/shared/schemas/schedules.schema'
+import type { DueSchedule, Schedule } from '../../../../src/shared/schemas/schedules.schema'
 import type { Workspace } from '../../../../src/shared/types/index'
 
 const triage: Schedule = {
@@ -54,7 +54,7 @@ const schedules = {
   pause: vi.fn(),
   runNow: vi.fn(),
 }
-const ran = pushedEvent<[Schedule]>()
+const ran = pushedEvent<[DueSchedule]>()
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -187,7 +187,12 @@ describe('ScheduledView — the row menu, editing and failures', () => {
   it('reads the list again after a run comes due', async () => {
     await shown()
     schedules.list.mockResolvedValue({ data: [summarise] })
-    await act(async () => ran.deliver(triage))
+    await act(async () =>
+      ran.deliver({
+        ...triage,
+        unattended: { settingsPath: '', systemPromptPath: '', systemPrompt: '' },
+      })
+    )
     expect(screen.queryByText('Triage the inbox')).toBeNull()
   })
 })

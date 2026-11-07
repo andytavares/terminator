@@ -279,6 +279,40 @@ describe('startAgentInBranch', () => {
   })
 })
 
+const unattended = {
+  settingsPath: '/data/scheduled-runs/settings.json',
+  systemPromptPath: '/data/scheduled-runs/system-prompt.md',
+  systemPrompt: 'Nobody is watching.',
+}
+const unattendedMeta = {
+  systemPrompt: { append: 'Nobody is watching.' },
+  claudeCode: { options: { settings: '/data/scheduled-runs/settings.json' } },
+}
+
+describe('a scheduled run starts with its settings and system prompt', () => {
+  setUpAgentStubs()
+
+  it('hands them to an agent on a branch as session meta', async () => {
+    await startAgentInBranch({ projectId: 'p2', title: 'Agent', prompt: 'x', unattended })
+    expect(startAgent).toHaveBeenCalledWith(expect.objectContaining({ agentMeta: unattendedMeta }))
+  })
+
+  it('hands them to a global agent as session meta', async () => {
+    await startGlobalPrompt({ text: 'Sum up', runAs: 'agent', unattended })
+    expect(startAgent).toHaveBeenCalledWith(expect.objectContaining({ agentMeta: unattendedMeta }))
+  })
+
+  it('types them as flags for global Claude in a terminal', async () => {
+    await startGlobalPrompt({ text: 'Sum up', runAs: 'claude-terminal', unattended })
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        initialCommand:
+          "claude --settings '/data/scheduled-runs/settings.json' --append-system-prompt-file '/data/scheduled-runs/system-prompt.md' 'Sum up'",
+      })
+    )
+  })
+})
+
 describe('startAgentInBranch — without a prompt or an agent', () => {
   setUpAgentStubs()
 

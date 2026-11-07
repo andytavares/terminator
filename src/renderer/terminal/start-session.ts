@@ -11,6 +11,7 @@ import type { SessionFacts } from '../sidebar/session-facts'
 import { singleQuoted } from './typed-input'
 import { MAX_TYPED_LINE_BYTES } from '../quick-actions/custom-actions'
 import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
+import type { UnattendedLaunch } from '../../shared/schemas/schedules.schema'
 
 // Starting work from Home. The sidebar starts a terminal by selecting the
 // branch it belongs to; Home has no selection, so it names the branch instead.
@@ -65,6 +66,8 @@ export interface AgentInBranch {
   prompt: string | null
   /** Absent: the default agent. */
   agentId?: string
+  /** A scheduled run's files; absent for work a person started. */
+  unattended?: UnattendedLaunch
 }
 
 /** Starts an agent as a tab on a branch, tells it the prompt and shows it; null when none started. */
@@ -76,6 +79,9 @@ export async function startAgentInBranch(request: AgentInBranch): Promise<string
     projectId: request.projectId,
     title: request.title,
     agentId: request.agentId,
+    ...(request.unattended === undefined
+      ? {}
+      : { agentMeta: unattendedAgentMeta(request.unattended) }),
   })
   if (started === null) return null
   if (request.prompt !== null) promptAgentTab(started.sessionId, request.prompt)
@@ -104,12 +110,23 @@ export async function startScratchSession(): Promise<void> {
   }
 }
 
+/** The flags a scheduled run's `claude` starts with, so it needs nobody (ADR 144). */
+const unattendedFlags = ({ settingsPath, systemPromptPath }: UnattendedLaunch): string =>
+  `--settings ${singleQuoted(settingsPath)} --append-system-prompt-file ${singleQuoted(systemPromptPath)} `
+
 /** `claude '<prompt>'`, or plain `claude` for none; null when the line would be too long to type. */
-export function agentCommand(prompt: string | null): string | null {
+export function agentCommand(prompt: string | null, unattended?: UnattendedLaunch): string | null {
   if (prompt === null) return 'claude'
-  const command = `claude ${singleQuoted(prompt.replace(/\s+/g, ' ').trim())}`
+  const flags = unattended === undefined ? '' : unattendedFlags(unattended)
+  const command = `claude ${flags}${singleQuoted(prompt.replace(/\s+/g, ' ').trim())}`
   return new TextEncoder().encode(command).length > MAX_TYPED_LINE_BYTES ? null : command
 }
+
+/** What the Claude agent reads from `session/new`: the same settings file and system prompt. */
+const unattendedAgentMeta = ({ settingsPath, systemPrompt }: UnattendedLaunch) => ({
+  systemPrompt: { append: systemPrompt },
+  claudeCode: { options: { settings: settingsPath } },
+})
 
 export interface GlobalPrompt {
   text: string
@@ -117,10 +134,13 @@ export interface GlobalPrompt {
   runAs: string
   /** Absent: the default agent. */
   agentId?: string
+  /** A scheduled run's files; absent for a prompt a person started. */
+  unattended?: UnattendedLaunch
 }
 
 /** The session a global prompt runs in, in the home folder under Scratch; null when none opened. */
-async function openGlobalSession({ text, runAs, agentId }: GlobalPrompt): Promise<string | null> {
+async function openGlobalSession(prompt: GlobalPrompt): Promise<string | null> {
+  const { text, runAs, agentId, unattended } = prompt
   const cwd = '~'
   if (runAs === 'agent') {
     const started = await startAgentTab({
@@ -128,11 +148,12 @@ async function openGlobalSession({ text, runAs, agentId }: GlobalPrompt): Promis
       projectId: SCRATCH_PROJECT_ID,
       title: 'Agent',
       agentId,
+      ...(unattended === undefined ? {} : { agentMeta: unattendedAgentMeta(unattended) }),
     })
     if (started !== null) promptAgentTab(started.sessionId, text)
     return started?.sessionId ?? null
   }
-  const initialCommand = agentCommand(text)
+  const initialCommand = agentCommand(text, unattended)
   if (initialCommand === null) return null
   const { scrollbackLimit } = useSettingsStore
     .getState()

@@ -17,7 +17,7 @@ import { useDismissedThreads } from './dismissed-threads'
 import { workKeyId } from '../../home/work-threads'
 import { promptBranch, semanticBranch } from '../../../shared/home/branch-name'
 import type { IssueSummary, Workspace } from '../../../shared/types/index'
-import type { Schedule } from '../../../shared/schemas/schedules.schema'
+import type { Schedule, UnattendedLaunch } from '../../../shared/schemas/schedules.schema'
 
 // What the Start work launcher decides and does, apart from how it is drawn.
 
@@ -173,15 +173,25 @@ export const isAgentRun = (runAs: RunAs): boolean =>
 const PROMPT_TOO_LONG = 'That prompt is too long to start an agent with. Shorten it.'
 
 /** Why a global prompt did not start, in plain words. */
-export const globalStartFailure = (text: string, runAs: RunAs): string =>
-  runAs === 'claude-terminal' && agentCommand(text) === null
+export const globalStartFailure = (
+  text: string,
+  runAs: RunAs,
+  unattended?: UnattendedLaunch
+): string =>
+  runAs === 'claude-terminal' && agentCommand(text, unattended) === null
     ? PROMPT_TOO_LONG
     : 'The agent could not be started.'
 
 const ticketPrompt = (issue: IssueSummary): string =>
   `Work on ${issue.key}: ${issue.title} (${issue.url})`
 
-export type WorkRequest = { workspace: Workspace; runAs: RunAs; agentId?: string } & (
+export type WorkRequest = {
+  workspace: Workspace
+  runAs: RunAs
+  agentId?: string
+  /** A scheduled run's files; absent for work a person started. */
+  unattended?: UnattendedLaunch
+} & (
   | { kind: 'ticket'; issue: IssueSummary }
   /** `newWorktree` runs it on a branch of its own: `branch` when given, else one the agent names. */
   | { kind: 'prompt'; text: string; newWorktree?: boolean; branch?: string }
@@ -255,7 +265,7 @@ function promptOf(request: WorkRequest): string | null {
 /** The line to type in the new terminal: nothing for a plain shell or an agent tab. */
 function commandFor(request: WorkRequest): string | undefined | Error {
   if (request.runAs !== 'claude-terminal') return undefined
-  const command = agentCommand(promptOf(request))
+  const command = agentCommand(promptOf(request), request.unattended)
   return command ?? new Error(PROMPT_TOO_LONG)
 }
 
@@ -318,6 +328,7 @@ export async function startWork(request: WorkRequest): Promise<Outcome> {
           title: request.kind === 'ticket' ? request.issue.key : 'Agent',
           prompt: promptOf(request),
           agentId: request.agentId,
+          unattended: request.unattended,
         })
       : await startSessionInBranch(projectId, command)
   if (sessionId === null)

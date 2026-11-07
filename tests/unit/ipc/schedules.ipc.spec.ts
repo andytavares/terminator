@@ -1,5 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { wrapDb } from '../../../src/main/db/index'
 
 type Handler = (event: unknown, payload?: unknown) => unknown
@@ -7,11 +10,20 @@ const handlers = vi.hoisted(() => new Map<string, Handler>())
 const runOnce = vi.hoisted(() => vi.fn())
 const database = vi.hoisted(() => ({ current: null as unknown }))
 const sendToWindow = vi.hoisted(() => vi.fn())
+const userData = vi.hoisted(() => ({ current: '' }))
+const notified = vi.hoisted(() => vi.fn())
 
 vi.mock('electron', () => ({
   ipcMain: { handle: (channel: string, handler: Handler) => handlers.set(channel, handler) },
+  app: { getPath: () => userData.current },
 }))
-vi.mock('../../../src/main/logger', () => ({ logger: { error: vi.fn() } }))
+vi.mock('../../../src/main/notifications/notification-manager', () => ({
+  notificationManager: { create: notified },
+}))
+vi.mock('../../../src/main/logger', () => ({
+  logger: { error: vi.fn() },
+  makeLogger: () => ({ error: vi.fn() }),
+}))
 vi.mock('../../../src/main/safe-send', () => ({ sendToWindow }))
 vi.mock('../../../src/main/db/index', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -40,13 +52,22 @@ const daily = {
 
 const global = { ...daily, repoRoot: null, newWorktree: false }
 
+let started: Promise<void>
+
 beforeEach(async () => {
   vi.resetModules()
   sendToWindow.mockReset()
+  notified.mockReset()
   handlers.clear()
+  userData.current = mkdtempSync(join(tmpdir(), 'user-data-'))
   database.current = wrapDb(new DatabaseSync(':memory:'))
   const ipc = await import('../../../src/main/ipc/schedules.ipc')
-  ipc.registerScheduleHandlers(() => null)
+  started = ipc.registerScheduleHandlers(() => null)
+})
+
+afterEach(async () => {
+  await started
+  rmSync(userData.current, { recursive: true, force: true })
 })
 
 describe('schedule channels', () => {
@@ -88,12 +109,41 @@ describe('global scheduled runs and edits', () => {
     })
     expect(await call('schedules:pause', { id: data.id, paused: true })).toEqual({ data: true })
     expect(await call('schedules:list')).toMatchObject({ data: [{ paused: true }] })
+    const sent = new Promise((resolve) => sendToWindow.mockImplementation(resolve))
     expect(await call('schedules:run-now', { id: data.id })).toEqual({ data: true })
+    await sent
     expect(sendToWindow).toHaveBeenCalledWith(
       null,
       'schedules:run',
-      expect.objectContaining({ id: data.id })
+      expect.objectContaining({ id: data.id, unattended: expectedLaunch() })
     )
+  })
+})
+
+function expectedLaunch() {
+  const folder = join(userData.current, 'scheduled-runs')
+  return {
+    settingsPath: join(folder, 'settings.json'),
+    systemPromptPath: join(folder, 'system-prompt.md'),
+    systemPrompt: expect.stringContaining(join(folder, 'alerts')),
+  }
+}
+
+describe('scheduled run alerts', () => {
+  it('shows an alert file on Home, sends a notification, and dismisses it', async () => {
+    const feed = await import('../../../src/main/home/home-feed')
+    const shown = new Promise((resolve) => feed.onFeedChange(resolve))
+    // Read on the watch event, or by the first scan when the watch starts after this write.
+    const alerts = join(userData.current, 'scheduled-runs', 'alerts')
+    mkdirSync(alerts, { recursive: true })
+    writeFileSync(join(alerts, 'ci.json'), JSON.stringify({ title: 'CI red' }))
+    await shown
+    expect(feed.getMergedFeed().asks).toEqual([
+      expect.objectContaining({ id: 'alert-ci', title: 'CI red', source: 'scheduled-alerts' }),
+    ])
+    expect(notified).toHaveBeenCalledWith(expect.objectContaining({ title: 'CI red' }))
+    await feed.runAction('scheduled-alerts', 'alert-ci', 'dismiss')
+    expect(feed.getMergedFeed().asks).toEqual([])
   })
 })
 

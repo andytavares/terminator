@@ -76,3 +76,14 @@ export type Schedule = ScheduleInput & {
   createdAt: string
   paused: boolean
 }
+
+/** The files a scheduled run's Claude session starts with, so it needs nobody (ADR 144). */
+export interface UnattendedLaunch {
+  settingsPath: string
+  systemPromptPath: string
+  /** The text of the system prompt file, for an agent that takes it as text. */
+  systemPrompt: string
+}
+
+/** A schedule that came due, with what its run starts with. */
+export type DueSchedule = Schedule & { unattended: UnattendedLaunch }
