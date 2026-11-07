@@ -449,10 +449,10 @@ describe('Markdown — an HTML title is never kept', () => {
         {'<title>Hijack</title>\n\n<svg viewBox="0 0 10 10"><title>Chart</title></svg>'}
       </Markdown>
     )
-    await view.findByText('Chart')
+    // The HTML plugins load lazily: until the SVG exists, the body is still plain text.
+    await waitFor(() => expect(view.container.querySelector('svg')).not.toBeNull())
     // React moves a title outside an SVG into document.head, so look at the whole document.
     const titles = [...document.querySelectorAll('title')].map((t) => t.textContent)
     expect(titles).not.toContain('Hijack')
-    expect(view.container.querySelector('svg')).not.toBeNull()
   })
 })
