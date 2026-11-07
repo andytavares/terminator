@@ -1,0 +1,19 @@
+tests/unit/renderer/components/home/TaskRow.spec.tsx
+  s_4377d979fc39bb::t_5ec0d2271ed5d8 75-76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4e074d30df5f80e39dc5c5791c88c184345c9c4d",
+  "prompts": {},
+  "sessions": {
+    "s_4377d979fc39bb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e47ff45-9e45-4ac0-90ba-7480b1e3856b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
