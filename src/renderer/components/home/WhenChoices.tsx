@@ -8,6 +8,7 @@ import {
   type RepeatUnit,
 } from '../../../shared/recurrence'
 import type { When } from './start-work-schedule'
+import { useStartWorkStore } from './start-work'
 import type { Schedule } from '../../../shared/schemas/schedules.schema'
 
 const OPTIONS: Array<{ value: When; label: string }> = [
@@ -51,7 +52,7 @@ const pad = (n: number): string => String(n).padStart(2, '0')
 const clockOf = (date: Date): string => `${pad(date.getHours())}:${pad(date.getMinutes())}`
 
 /** "Thu 7 Nov 09:30" */
-function runLabel(date: Date): string {
+export function runLabel(date: Date): string {
   const weekday = date.toLocaleDateString('en-GB', { weekday: 'short' })
   const month = date.toLocaleDateString('en-GB', { month: 'short' })
   return `${weekday} ${date.getDate()} ${month} ${clockOf(date)}`
@@ -79,6 +80,9 @@ function repeatProblem(value: WhenValue): string | null {
 
 /** The "When" row: start now, or save the prompt to run once, or on a repeat. */
 export function WhenChoices({ value, onChange }: WhenChoicesProps): React.JSX.Element {
+  // An edited scheduled run stays scheduled, so Now is not offered.
+  const editing = useStartWorkStore((s) => s.editing !== null)
+  const options = editing ? OPTIONS.filter((o) => o.value !== 'now') : OPTIONS
   return (
     <>
       <div className="start-work__label">When</div>
@@ -87,7 +91,7 @@ export function WhenChoices({ value, onChange }: WhenChoicesProps): React.JSX.El
         className="start-work__when"
         value={value.when}
         onChange={(when) => onChange({ ...value, when })}
-        options={OPTIONS.map((o) => ({ value: o.value, label: o.label, accessibleName: o.label }))}
+        options={options.map((o) => ({ value: o.value, label: o.label, accessibleName: o.label }))}
       />
       {value.when === 'once' && <OnceFields value={value} onChange={onChange} />}
       {value.when === 'repeat' && <RepeatFields value={value} onChange={onChange} />}
@@ -366,7 +370,10 @@ function runsADay({ every, unit, between }: RepeatRule): number {
 function NextRuns({ value }: { value: WhenValue }): React.JSX.Element {
   const { rule } = value
   const now = new Date()
-  const runs = nextRuns({ rule, time: runTime(value), anchor: now }, now, 3)
+  // The scheduler counts a repeat from when it was created, so an edit previews from there too.
+  const createdAt = useStartWorkStore((s) => s.editing?.createdAt)
+  const anchor = createdAt === undefined ? now : new Date(createdAt)
+  const runs = nextRuns({ rule, time: runTime(value), anchor }, now, 3)
   const perDay = isClockUnit(rule.unit) ? ` · ${runsADay(rule)} runs a day` : ''
   return (
     <>

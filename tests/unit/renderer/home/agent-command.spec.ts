@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { agentCommand } from '../../../../src/renderer/components/home/start-work'
+import { agentCommand } from '../../../../src/renderer/terminal/start-session'
 
 // The line Start work types into a terminal is run by a real shell here, with a `claude` that
 // prints one argument per line, so quoting that only looks right cannot pass.

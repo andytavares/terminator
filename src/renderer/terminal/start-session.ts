@@ -8,6 +8,8 @@ import { revealSession } from './navigate-to-session'
 import { planResume, type ResumePlan } from '../sidebar/resume'
 import { promptAgentTab, startAgentTab } from './agent-tab'
 import type { SessionFacts } from '../sidebar/session-facts'
+import { singleQuoted } from './typed-input'
+import { MAX_TYPED_LINE_BYTES } from '../quick-actions/custom-actions'
 import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
 
 // Starting work from Home. The sidebar starts a terminal by selecting the
@@ -100,6 +102,53 @@ export async function startScratchSession(): Promise<void> {
   } catch {
     // Nothing started, so there is nothing to show.
   }
+}
+
+/** `claude '<prompt>'`, or plain `claude` for none; null when the line would be too long to type. */
+export function agentCommand(prompt: string | null): string | null {
+  if (prompt === null) return 'claude'
+  const command = `claude ${singleQuoted(prompt.replace(/\s+/g, ' ').trim())}`
+  return new TextEncoder().encode(command).length > MAX_TYPED_LINE_BYTES ? null : command
+}
+
+export interface GlobalPrompt {
+  text: string
+  /** 'agent' or 'claude-terminal': a global scheduled run has no workspace for the others. */
+  runAs: string
+  /** Absent: the default agent. */
+  agentId?: string
+}
+
+/** The session a global prompt runs in, in the home folder under Scratch; null when none opened. */
+async function openGlobalSession({ text, runAs, agentId }: GlobalPrompt): Promise<string | null> {
+  const cwd = '~'
+  if (runAs === 'agent') {
+    const started = await startAgentTab({
+      cwd,
+      projectId: SCRATCH_PROJECT_ID,
+      title: 'Agent',
+      agentId,
+    })
+    if (started !== null) promptAgentTab(started.sessionId, text)
+    return started?.sessionId ?? null
+  }
+  const initialCommand = agentCommand(text)
+  if (initialCommand === null) return null
+  const { scrollbackLimit } = useSettingsStore
+    .getState()
+    .resolveSettings(useWorkspaceStore.getState().activeWorkspaceId ?? null).terminal
+  const opened = { projectId: SCRATCH_PROJECT_ID, type: 'human' as const, title: '', cwd }
+  return createTerminalSession({ ...opened, scrollbackLimit, initialCommand }).catch(() => null)
+}
+
+/** Starts a prompt that belongs to no workspace and shows it in Scratch; null when none started. */
+export async function startGlobalPrompt(prompt: GlobalPrompt): Promise<string | null> {
+  const sessionId = await openGlobalSession(prompt)
+  if (sessionId === null) return null
+  useWorkspaceStore.getState().setScratchActive(true)
+  useExtensionRegistry.getState().setActiveGlobalTab(null)
+  revealSession(sessionId)
+  return sessionId
 }
 
 /**

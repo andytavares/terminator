@@ -2,7 +2,8 @@ import { useEffect } from 'react'
 import { useToastStore } from '../../stores/toast.store'
 import { useSessionStore } from '../../stores/session.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
-import { startWork } from './start-work'
+import { globalStartFailure, startWork } from './start-work'
+import { startGlobalPrompt } from '../../terminal/start-session'
 import type { Schedule } from '../../../shared/schemas/schedules.schema'
 
 // A saved prompt coming due starts the way Start work starts a typed prompt.
@@ -19,7 +20,36 @@ function isStillRunning(workspaceId: string, branch: string): boolean {
   )
 }
 
+/** The session each global scheduled run last opened, by schedule id, to check overlap against. */
+const lastGlobalSessions = new Map<string, string>()
+
+/** Starts a global scheduled run in Scratch. Null when it started or was skipped; otherwise why not. */
+async function launchGlobal(schedule: Schedule): Promise<string | null> {
+  const last = useSessionStore.getState().sessions.get(lastGlobalSessions.get(schedule.id) ?? '')
+  if (schedule.repeat?.overlap === 'skip' && last !== undefined && last.status !== 'closed')
+    return null
+  const { prompt: text, runAs } = schedule
+  const sessionId = await startGlobalPrompt({
+    text,
+    runAs,
+    ...(schedule.agentId === null ? {} : { agentId: schedule.agentId }),
+  })
+  if (sessionId === null) return globalStartFailure(text, runAs)
+  lastGlobalSessions.set(schedule.id, sessionId)
+  return null
+}
+
 async function launchScheduled(schedule: Schedule): Promise<void> {
+  const message =
+    schedule.repoRoot === null ? await launchGlobal(schedule) : await launchInWorkspace(schedule)
+  if (message !== null)
+    useToastStore
+      .getState()
+      .addToast({ type: 'error', message: `A scheduled run did not start. ${message}` })
+}
+
+/** Starts a scheduled run in its workspace. Null when it started or was skipped; otherwise why not. */
+async function launchInWorkspace(schedule: Schedule): Promise<string | null> {
   const workspace = useWorkspaceStore
     .getState()
     .workspaces.find((w) => w.folderPath === schedule.repoRoot)
@@ -29,23 +59,18 @@ async function launchScheduled(schedule: Schedule): Promise<void> {
     schedule.branch !== null &&
     schedule.repeat?.overlap === 'skip' &&
     isStillRunning(workspace.id, schedule.branch)
-  if (overlaps) return
-  const message =
-    workspace === undefined
-      ? `${schedule.repoRoot} is not a workspace any more.`
-      : await startWork({
-          kind: 'prompt',
-          text: schedule.prompt,
-          workspace,
-          runAs: schedule.runAs,
-          newWorktree: schedule.newWorktree,
-          ...(schedule.branch === null ? {} : { branch: schedule.branch }),
-          ...(schedule.agentId === null ? {} : { agentId: schedule.agentId }),
-        })
-  if (message !== null)
-    useToastStore
-      .getState()
-      .addToast({ type: 'error', message: `A scheduled run did not start. ${message}` })
+  if (overlaps) return null
+  return workspace === undefined
+    ? `${schedule.repoRoot} is not a workspace any more.`
+    : startWork({
+        kind: 'prompt',
+        text: schedule.prompt,
+        workspace,
+        runAs: schedule.runAs,
+        newWorktree: schedule.newWorktree,
+        ...(schedule.branch === null ? {} : { branch: schedule.branch }),
+        ...(schedule.agentId === null ? {} : { agentId: schedule.agentId }),
+      })
 }
 
 /** Main says a schedule is due; this window starts it. */

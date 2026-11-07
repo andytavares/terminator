@@ -6,15 +6,18 @@ import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry, type StartWorkOptionRegistration } from '../../extensions/registry'
 import { registeredCommandKey } from '../../stores/extension-commands.store'
-import { startAgentInBranch, startSessionInBranch } from '../../terminal/start-session'
-import { singleQuoted } from '../../terminal/typed-input'
-import { MAX_TYPED_LINE_BYTES } from '../../quick-actions/custom-actions'
+import {
+  agentCommand,
+  startAgentInBranch,
+  startSessionInBranch,
+} from '../../terminal/start-session'
 import { openSnapshot } from '../../sidebar/session-facts'
 import { createFromDraft } from '../sidebar/create-project'
 import { useDismissedThreads } from './dismissed-threads'
 import { workKeyId } from '../../home/work-threads'
 import { promptBranch, semanticBranch } from '../../../shared/home/branch-name'
 import type { IssueSummary, Workspace } from '../../../shared/types/index'
+import type { Schedule } from '../../../shared/schemas/schedules.schema'
 
 // What the Start work launcher decides and does, apart from how it is drawn.
 
@@ -23,13 +26,16 @@ export const useStartWorkStore = create<{
   open: boolean
   /** Text the launcher opens with in its prompt box. */
   prefill: string
-  openLauncher: (prefill?: string) => void
+  /** The scheduled run the launcher edits; null when it starts new work. */
+  editing: Schedule | null
+  openLauncher: (prefill?: string, editing?: Schedule | null) => void
   closeLauncher: () => void
 }>((set) => ({
   open: false,
   prefill: '',
-  openLauncher: (prefill = '') => set({ open: true, prefill }),
-  closeLauncher: () => set({ open: false, prefill: '' }),
+  editing: null,
+  openLauncher: (prefill = '', editing = null) => set({ open: true, prefill, editing }),
+  closeLauncher: () => set({ open: false, prefill: '', editing: null }),
 }))
 
 /** 'agent', 'claude-terminal', 'terminal', or the key of an extension's start-work option. */
@@ -158,13 +164,11 @@ export const isAgentRun = (runAs: RunAs): boolean =>
 
 const PROMPT_TOO_LONG = 'That prompt is too long to start an agent with. Shorten it.'
 
-/** `claude '<prompt>'`, or plain `claude` for none; null when the line would be too long to type.
- *  @internal */
-export function agentCommand(prompt: string | null): string | null {
-  if (prompt === null) return 'claude'
-  const command = `claude ${singleQuoted(prompt.replace(/\s+/g, ' ').trim())}`
-  return new TextEncoder().encode(command).length > MAX_TYPED_LINE_BYTES ? null : command
-}
+/** Why a global prompt did not start, in plain words. */
+export const globalStartFailure = (text: string, runAs: RunAs): string =>
+  runAs === 'claude-terminal' && agentCommand(text) === null
+    ? PROMPT_TOO_LONG
+    : 'The agent could not be started.'
 
 const ticketPrompt = (issue: IssueSummary): string =>
   `Work on ${issue.key}: ${issue.title} (${issue.url})`

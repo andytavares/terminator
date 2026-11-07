@@ -14,6 +14,7 @@ import {
   startSessionInBranch,
   startScratchSession,
   startAgentInBranch,
+  startGlobalPrompt,
   resumeSession,
 } from '../../../../src/renderer/terminal/start-session'
 import { electronApiOf } from '../../../support/electron-api'
@@ -290,6 +291,57 @@ describe('startAgentInBranch — without a prompt or an agent', () => {
     startAgent.mockResolvedValue({ data: null })
     expect(await startAgentInBranch({ projectId: 'p1', title: 'Agent', prompt: 'x' })).toBeNull()
     expect(navigate).not.toHaveBeenCalled()
+  })
+})
+
+describe('startGlobalPrompt — an agent', () => {
+  setUpAgentStubs()
+
+  it('starts the agent in the home folder as a Scratch tab, prompts it and shows Scratch', async () => {
+    const sessionId = await startGlobalPrompt({ text: 'Sum up the PRs', runAs: 'agent' })
+    expect(startAgent).toHaveBeenCalledWith({
+      cwd: '~',
+      tab: { projectId: SCRATCH_PROJECT_ID, title: 'Agent' },
+    })
+    expect(promptAgent).toHaveBeenCalledWith({ sessionId: 'agent-1', text: 'Sum up the PRs' })
+    expect(useWorkspaceStore.getState().scratchActive).toBe(true)
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
+    expect(navigate).toHaveBeenCalledWith('agent-1')
+    expect(sessionId).toBe('agent-1')
+  })
+
+  it('shows nothing when the agent does not start', async () => {
+    startAgent.mockResolvedValue({ data: null })
+    expect(await startGlobalPrompt({ text: 'x', runAs: 'agent', agentId: 'opencode' })).toBeNull()
+    expect(useWorkspaceStore.getState().scratchActive).toBe(false)
+    expect(navigate).not.toHaveBeenCalled()
+  })
+})
+
+describe('startGlobalPrompt — Claude in a terminal', () => {
+  it('types the claude line in a Scratch terminal in the home folder', async () => {
+    const sessionId = await startGlobalPrompt({ text: 'Sum up', runAs: 'claude-terminal' })
+    expect(create).toHaveBeenCalledWith({
+      projectId: SCRATCH_PROJECT_ID,
+      type: 'human',
+      title: '',
+      cwd: '~',
+      scrollbackLimit: REPO_SCROLLBACK,
+      initialCommand: "claude 'Sum up'",
+    })
+    expect(navigate).toHaveBeenCalledWith('new-session')
+    expect(sessionId).toBe('new-session')
+  })
+
+  it('starts nothing when the line would be too long to type', async () => {
+    expect(await startGlobalPrompt({ text: 'x'.repeat(2000), runAs: 'claude-terminal' })).toBeNull()
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('stays put when the terminal cannot start', async () => {
+    create.mockRejectedValueOnce(new Error('nope'))
+    expect(await startGlobalPrompt({ text: 'Sum up', runAs: 'claude-terminal' })).toBeNull()
+    expect(useWorkspaceStore.getState().scratchActive).toBe(false)
   })
 })
 

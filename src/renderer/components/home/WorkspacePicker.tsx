@@ -3,10 +3,14 @@ import { ChevronDown } from 'lucide-react'
 import { Kbd, Popover } from '@terminator/extension-ui'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import type { Workspace } from '../../../shared/types/index'
-import type { ChosenRepo } from './start-work-model'
+import { GLOBAL_CHOICE, type ChosenRepo } from './start-work-model'
 
 export interface WorkspacePickerProps {
   current: Workspace | null
+  /** True when Global is chosen: the work belongs to no workspace. */
+  global: boolean
+  /** Global is offered on the Prompt tab only. */
+  offerGlobal: boolean
   reason: ChosenRepo['reason']
   /** The key of the ticket the suggestion was made for, if any. */
   ticketKey: string | null
@@ -31,6 +35,13 @@ const Swatch = ({ color }: { color: string }): React.JSX.Element => (
   <span className="workspace-picker__swatch" style={{ background: color }} aria-hidden="true" />
 )
 
+/** The choice of no workspace, in place of a workspace's colour. */
+const Ring = (): React.JSX.Element => (
+  <span className="workspace-picker__swatch workspace-picker__ring" aria-hidden="true" />
+)
+
+const GLOBAL_NAME = 'Global'
+
 /** Where the work goes: the workspace, shown at the end of the tab row, changed in a popover. */
 export function WorkspacePicker(props: WorkspacePickerProps): React.JSX.Element {
   const { open, onClose } = props
@@ -51,20 +62,22 @@ export function WorkspacePicker(props: WorkspacePickerProps): React.JSX.Element 
   )
 }
 
-function PickerButton({ current, open, onToggle }: WorkspacePickerProps): React.JSX.Element {
+function PickerButton(props: WorkspacePickerProps): React.JSX.Element {
+  const { current, global, open, onToggle } = props
+  const name = global ? GLOBAL_NAME : (current?.name ?? 'none')
   return (
     <button
       type="button"
       tabIndex={-1}
       className="workspace-picker__button"
-      aria-label={`Workspace: ${current?.name ?? 'none'}`}
+      aria-label={`Workspace: ${name}`}
       aria-haspopup="listbox"
       aria-expanded={open}
       onClick={onToggle}
     >
       <span className="workspace-picker__label">Workspace</span>
-      {current !== null && <Swatch color={current.color} />}
-      <span>{current?.name ?? 'none'}</span>
+      {global ? <Ring /> : current !== null && <Swatch color={current.color} />}
+      <span>{name}</span>
       <ChevronDown aria-hidden="true" />
       <Kbd>⌘R</Kbd>
     </button>
@@ -72,19 +85,20 @@ function PickerButton({ current, open, onToggle }: WorkspacePickerProps): React.
 }
 
 interface ChoiceKeys {
-  shown: Workspace[]
+  /** The ids listed, top to bottom: GLOBAL_CHOICE first when Global is shown. */
+  ids: string[]
   at: number
   setCursor: (index: number) => void
   onPick: (id: string) => void
 }
 
 /** Arrow keys and Enter; Escape is left to the popover, and the launcher behind must not also act. */
-function choiceKeyHandler({ shown, at, setCursor, onPick }: ChoiceKeys) {
+function choiceKeyHandler({ ids, at, setCursor, onPick }: ChoiceKeys) {
   return (e: React.KeyboardEvent): void => {
     const moves: Record<string, () => void> = {
-      ArrowDown: () => setCursor(Math.min(at + 1, shown.length - 1)),
+      ArrowDown: () => setCursor(Math.min(at + 1, ids.length - 1)),
       ArrowUp: () => setCursor(Math.max(at - 1, 0)),
-      Enter: () => shown[at] !== undefined && onPick(shown[at].id),
+      Enter: () => ids[at] !== undefined && onPick(ids[at]),
     }
     const run = moves[e.key]
     if (run === undefined) return
@@ -99,10 +113,14 @@ function WorkspaceChoices(props: WorkspacePickerProps): React.JSX.Element {
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const [filter, setFilter] = useState('')
   const [cursor, setCursor] = useState(0)
-  const shown = workspaces.filter((w) => w.name.toLowerCase().includes(filter.trim().toLowerCase()))
-  const at = Math.min(cursor, shown.length - 1)
+  const matches = (name: string): boolean =>
+    name.toLowerCase().includes(filter.trim().toLowerCase())
+  const shown = workspaces.filter((w) => matches(w.name))
+  const showGlobal = props.offerGlobal && matches(GLOBAL_NAME)
+  const ids = [...(showGlobal ? [GLOBAL_CHOICE] : []), ...shown.map((w) => w.id)]
+  const at = Math.min(cursor, ids.length - 1)
   return (
-    <div onKeyDown={choiceKeyHandler({ shown, at, setCursor, onPick })}>
+    <div onKeyDown={choiceKeyHandler({ ids, at, setCursor, onPick })}>
       <input
         autoFocus
         className="workspace-picker__filter"
@@ -114,22 +132,29 @@ function WorkspaceChoices(props: WorkspacePickerProps): React.JSX.Element {
           setCursor(0)
         }}
       />
-      <WorkspaceList {...props} shown={shown} at={at} />
+      <WorkspaceList {...props} shown={shown} showGlobal={showGlobal} at={at} />
     </div>
   )
 }
 
-type WorkspaceListProps = WorkspacePickerProps & { shown: Workspace[]; at: number }
+type WorkspaceListProps = WorkspacePickerProps & {
+  shown: Workspace[]
+  showGlobal: boolean
+  at: number
+}
 
-function WorkspaceList({ shown, at, current, reason, ticketKey, onPick }: WorkspaceListProps) {
+function WorkspaceList(props: WorkspaceListProps) {
+  const { shown, showGlobal, at, current, reason, ticketKey, onPick } = props
   const note = suggestionNote({ reason, ticketKey })
+  const first = showGlobal ? 1 : 0
   return (
     <div role="listbox" aria-label="Workspace" className="workspace-picker__list">
+      {showGlobal && <GlobalItem active={at === 0} selected={props.global} onPick={onPick} />}
       {shown.map((w, i) => (
         <WorkspaceItem
           key={w.id}
           {...{ workspace: w, onPick }}
-          active={i === at}
+          active={i + first === at}
           note={w.id === current?.id ? note : null}
           selected={w.id === current?.id}
         />
@@ -159,6 +184,25 @@ function WorkspaceItem({ workspace, active, selected, note, onPick }: WorkspaceI
       <span className="workspace-picker__name">{workspace.name}</span>
       {note !== null && <span className="workspace-picker__note">suggested · {note}</span>}
       <span className="workspace-picker__path">{workspace.folderPath}</span>
+    </div>
+  )
+}
+
+type GlobalItemProps = Pick<WorkspaceItemProps, 'active' | 'selected' | 'onPick'>
+
+function GlobalItem({ active, selected, onPick }: GlobalItemProps) {
+  return (
+    <div
+      role="option"
+      aria-selected={selected}
+      data-active={active}
+      className="workspace-picker__item workspace-picker__global"
+      onClick={() => onPick(GLOBAL_CHOICE)}
+    >
+      <Ring />
+      <span className="workspace-picker__name">{GLOBAL_NAME}</span>
+      <span className="workspace-picker__note">no workspace</span>
+      <span className="workspace-picker__path">~ · shows in Scratch</span>
     </div>
   )
 }
