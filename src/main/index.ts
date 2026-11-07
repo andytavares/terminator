@@ -51,9 +51,11 @@ import { startMcpServer } from './mcp/mcp-server.js'
 import { installRelayScript } from './mcp/relay-script.js'
 import { manifestTools } from './mcp/manifest-tools.js'
 import { alertTool } from './mcp/alert-tool.js'
+import { moveSessionTool } from './mcp/move-session.js'
 import { registerRendererTools, rendererTools } from './mcp/renderer-tools.js'
 import { appTools } from './mcp/app-tools.js'
 import { registerWithClaude } from './mcp/registration.js'
+import { registerClaudeCodeHandlers } from './ipc/claude-code.ipc.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
 import { startAdoptingLoginShellPath } from './shell/login-shell-path.js'
 import { stopRunningCommands } from './shell/command-runner.js'
@@ -497,11 +499,15 @@ function startTerminatorMcpServer(): void {
   })
   mcpServer = startMcpServer({
     socketPath,
-    providers: [manifestTools, alertTool, rendererTools, updateTools],
+    providers: [manifestTools, alertTool, rendererTools, updateTools, moveSessionTool],
     version: app.getVersion(),
   })
-  void Promise.all([installRelayScript(directory), mcpServer])
-    .then(([relayPath]) => registerWithClaude({ relayPath, socketPath, directory }))
+  const registration = Promise.all([installRelayScript(directory), mcpServer]).then(
+    ([relayPath]) => ({ relayPath, socketPath, directory })
+  )
+  registerClaudeCodeHandlers(registration)
+  void registration
+    .then(registerWithClaude)
     .catch((error) =>
       logger.error('could not start the Terminator MCP server', { error: String(error) })
     )
@@ -608,7 +614,8 @@ app.whenReady().then(async () => {
   })
   onWorkspacesChanged(() => extensionHostProcess.pushWorkspaces(workspacesOf(coreView.workspace)))
   setupMenu()
-  createWindow()
+  // A renderer tool called while startup ran may have made the window already.
+  if (!mainWindow) createWindow()
   startAppUpdates(() => mainWindow && revealWindow(mainWindow))
 
   app.on('activate', () => {

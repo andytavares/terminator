@@ -33,6 +33,7 @@ const CORE_NOTIFICATION_KEYS: Array<{ key: string; label: string }> = [
   { key: 'remoteTunnelDisconnected', label: 'Remote tunnel disconnected' },
   { key: 'updateReady', label: 'Update ready to install' },
   { key: 'claudeAlert', label: 'Alert from Claude' },
+  { key: 'sessionMoving', label: 'A Claude session is moving here' },
   { key: 'extensionInstalled', label: 'Extension installed' },
   { key: 'extensionInstallFailed', label: 'Extension install failed' },
   { key: 'extensionReloaded', label: 'Extension reloaded' },

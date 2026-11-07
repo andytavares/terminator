@@ -1,4 +1,4 @@
-import type { AgentConversation } from '../../shared/types/index'
+import { SESSION_ID, type AgentConversation } from '../../shared/types/index'
 import type { SessionFacts } from './session-facts'
 
 /** What resuming one conversation needs. */
@@ -15,18 +15,11 @@ export interface ResumePlan {
   conversationId: string
 }
 
-/**
- * An id, and nothing else.
- *
- * The command is typed into a shell, so the id is checked rather than escaped:
- * anything that is not one is a report this application should not have kept,
- * and refusing it costs a Resume that could not have worked anyway.
- */
-const ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
-
 /** Whether the conversation can be carried on: an agent tab takes the id as data, a terminal as text. */
 function canResume(agent: AgentConversation): boolean {
-  return agent.transport === 'acp' || (agent.agentId === 'claude' && ID.test(agent.sessionId))
+  return (
+    agent.transport === 'acp' || (agent.agentId === 'claude' && SESSION_ID.test(agent.sessionId))
+  )
 }
 
 /**
