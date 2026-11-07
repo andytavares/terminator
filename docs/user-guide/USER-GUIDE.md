@@ -541,6 +541,20 @@ Each edit shows as a diff, open, with the path relative to the worktree. A **Cha
 
 **Cmd+F** in an agent tab opens a find bar over the transcript: **Enter** and **Shift+Enter** move, **Esc** closes. Paste or drop an image into the text box, or use the paperclip. PNG, JPEG, GIF and WebP up to 5 MB each are sent with your next message, to agents that read images.
 
+#### Attach sessions and cite replies
+
+Drag a session onto the agent's text box to give the agent that session as context. You can drag a session row in the sidebar, a tab, a task row on Home, or a running Scheduled run. The box says **Drop to attach this session as context**, and the session shows as a chip above the box. What the agent gets depends on the session:
+
+- A Claude Code session: the path of its transcript file, which the agent reads when it needs it.
+- Another agent tab: the text of its conversation.
+- A shell: the output on its screen and in its scrollback.
+
+A session with nothing to send shows the toast **This session has no conversation to attach.**
+
+To cite part of a reply, select the text in the agent's reply and choose **Cite**. Type a comment and press **Enter** to save it, or **Cmd+Enter** to save it and send at once. The citation shows as a chip above the box; the pencil edits its comment and **×** removes it.
+
+Attached sessions and citations go with your next message, after the text you typed. Your message bubble shows only your text, with the attached items as chips under it. Click a citation chip to find the cited passage in the transcript.
+
 ### Agent wakes
 
 When one of your pull requests gets a failed check, a new review or comment, or a merge conflict, the Git extension prompts the agent on that branch. The message starts "Sent by Terminator · pull request #N · wake k of 10" and holds the check name and the last lines of its log, or the comment text. With no agent running, a recorded conversation for that worktree resumes once. Rules: nothing happens on the first poll after start-up; at most 10 wakes per pull request, then **Wakes stopped** asks you to answer yourself; at most one resume per pull request; a worktree with uncommitted changes and no running agent is skipped. Each wake shows as **Agent woken** in **Needs you**. Turn it off with **Wake an agent when its pull request needs it** in Git Integration's settings.
