@@ -59,6 +59,8 @@ const breakOut = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/terminal/breakout', () => ({ breakOut }))
 const recordUse = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
+const attachSessions = vi.hoisted(() => vi.fn())
+vi.mock('../../../../src/renderer/stores/attached-context.store', () => ({ attachSessions }))
 
 const mockCloseSession = vi.fn()
 const mockSetActive = vi.fn()
@@ -113,7 +115,12 @@ beforeEach(() => {
   vi.clearAllMocks()
   seedStore(useSessionRecordsStore, records)
   seedStore(useBreakoutStore, { windows: new Map() })
-  useTabDragStore.setState({ sessionId: null, overSessionId: null, overMainWindow: false })
+  useTabDragStore.setState({
+    sessionId: null,
+    overSessionId: null,
+    overMainWindow: false,
+    overContextDrop: null,
+  })
   seedStore(useSessionStore, {
     getSessionsForProject: mockGetSessions,
     closeSession: mockCloseSession,
@@ -933,5 +940,21 @@ describe('TabBar — a tab let go somewhere it does not leave from', () => {
     dragTab(tab, null, OUTSIDE_WINDOW)
     fireEvent.click(tab)
     expect(mockSetActive).not.toHaveBeenCalled()
+  })
+})
+
+describe('TabBar — a tab let go on an agent composer', () => {
+  beforeEach(() => mockGetSessions.mockReturnValue(threeTabs))
+
+  it('attaches its session to that agent tab, and neither reorders nor breaks out', () => {
+    renderTabBar()
+    const composer = document.createElement('div')
+    composer.dataset.contextDrop = 'agent-1'
+    document.body.append(composer)
+    dragTab(document.querySelectorAll('.tab-bar__tab--session')[1], composer)
+    expect(attachSessions).toHaveBeenCalledWith('agent-1', ['ses-2'])
+    expect(mockReorderSessions).not.toHaveBeenCalled()
+    expect(breakOut).not.toHaveBeenCalled()
+    composer.remove()
   })
 })

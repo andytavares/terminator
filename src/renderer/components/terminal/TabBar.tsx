@@ -29,6 +29,7 @@ import { moved } from '../../hooks/useDragReorder'
 import type { SessionFacts } from '../../sidebar/session-facts'
 import type { TerminalSession } from '../../../shared/types/index'
 import { recordUse } from '../../usage/record'
+import { attachSessions } from '../../stores/attached-context.store'
 
 /**
  * Past this many terminals the row scrolls, and it says so. Overflow being
@@ -241,11 +242,15 @@ function orderKeepingHidden(all: TerminalSession[], reorderedDrawn: TerminalSess
   return all.map((s) => (drawnIds.has(s.id) ? remaining.shift()! : s).id)
 }
 
-/** A tab let go over another tab takes its place; let go over no Terminator window, it opens in
- * a window of its own there. */
+/** A tab let go on an agent composer attaches its session there; over another tab it takes its
+ * place; over no Terminator window, it opens in a window of its own there. */
 function dropSessionTab(projectId: string, all: TerminalSession[], drawn: TerminalSession[]) {
   return (sessionId: string) =>
-    (point: ScreenPoint, overSessionId: string | null): void => {
+    (point: ScreenPoint, overSessionId: string | null, overContextDrop: string | null): void => {
+      if (overContextDrop !== null) {
+        void attachSessions(overContextDrop, [sessionId])
+        return
+      }
       if (overSessionId === null) {
         if (isOverTerminatorWindow(point)) return
         breakOut(sessionId, point)
@@ -298,7 +303,7 @@ function ScopeLabel({ projectId }: { projectId: string }): React.JSX.Element | n
 
 interface SessionTabProps extends SessionTabsProps {
   session: TerminalSession
-  onDrop: (point: ScreenPoint, overSessionId: string | null) => void
+  onDrop: (point: ScreenPoint, overSessionId: string | null, overContextDrop: string | null) => void
 }
 
 /** The tab's class: active, being dragged, or the one a dragged tab would land on. */

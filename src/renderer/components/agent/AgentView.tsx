@@ -14,7 +14,15 @@ import {
   type Usage,
 } from './fold-updates'
 import { Composer } from './Composer'
-import { FindBar, Highlighted, firstMatches, noFind, useFind, type FindState } from './find'
+import {
+  FindBar,
+  Highlighted,
+  firstMatches,
+  noFind,
+  useFind,
+  type FindControls,
+  type FindState,
+} from './find'
 import { useAgentTranscript } from './use-agent-transcript'
 import { recordUse } from '../../usage/record'
 import './AgentView.css'
@@ -173,12 +181,22 @@ function isFindKey(e: React.KeyboardEvent): boolean {
   return (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f'
 }
 
+/** A citation chip's click: the find bar opens on the quoted passage. */
+const showSourceWith =
+  (controls: FindControls) =>
+  (quote: string): void => {
+    controls.open()
+    controls.setQuery(quote)
+    recordUse('core.agent.cite-source', 'click')
+  }
+
 export function AgentView({ sessionId }: { sessionId: string }): React.JSX.Element {
   const { transcript, asks, exited } = useAgentTranscript(sessionId)
   const running = useSessionStore((s) => s.sessions.get(sessionId)?.agentTurn === true)
   const cwd = useSessionStore((s) => s.sessions.get(sessionId)?.cwd ?? '')
   const controls = useFind(transcript)
   useEffect(() => recordUse('core.agent.view', 'shown'), [sessionId])
+  const composer = { sessionId, running, disabled: exited, onShowSource: showSourceWith(controls) }
   const answer = (requestId: string, optionId: string): void =>
     void window.electronAPI.agents.answer({ sessionId, requestId, optionId })
   const onKeyDown = (e: React.KeyboardEvent): void => {
@@ -197,7 +215,7 @@ export function AgentView({ sessionId }: { sessionId: string }): React.JSX.Eleme
       )}
       <TranscriptLog transcript={transcript} cwd={cwd} find={controls.find ?? noFind} />
       {exited && <p className="agent-view__exited">The agent exited.</p>}
-      <Composer sessionId={sessionId} disabled={exited} running={running} />
+      <Composer {...composer} />
     </section>
   )
 }

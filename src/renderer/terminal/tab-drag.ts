@@ -22,9 +22,16 @@ interface TabDrag {
   /** The tab under the pointer, in the window the drag started in. */
   overSessionId: string | null
   overMainWindow: boolean
+  /** The agent composer under the pointer, named by its tab's session id. */
+  overContextDrop: string | null
 }
 
-const IDLE: TabDrag = { sessionId: null, overSessionId: null, overMainWindow: false }
+const IDLE: TabDrag = {
+  sessionId: null,
+  overSessionId: null,
+  overMainWindow: false,
+  overContextDrop: null,
+}
 
 export const useTabDragStore = create<TabDrag>(() => IDLE)
 
@@ -48,11 +55,21 @@ function screenPointOf(event: PointerEvent): ScreenPoint {
   return { x: event.screenX, y: event.screenY }
 }
 
-function tabUnder(event: PointerEvent, doc: Document): string | null {
-  const tab = doc
+const MARK_SELECTORS = {
+  sessionTab: '[data-session-tab]',
+  contextDrop: '[data-context-drop]',
+} as const
+
+/** The session id an element under the pointer is marked with: a tab, or an agent composer. */
+function markUnder(
+  event: PointerEvent,
+  doc: Document,
+  mark: keyof typeof MARK_SELECTORS
+): string | null {
+  const marked = doc
     .elementFromPoint(event.clientX, event.clientY)
-    ?.closest<HTMLElement>('[data-session-tab]')
-  return tab?.dataset.sessionTab ?? null
+    ?.closest<HTMLElement>(MARK_SELECTORS[mark])
+  return marked?.dataset[mark] ?? null
 }
 
 /** The release ends the drag on the tab, so the browser then clicks it: that click is not one. */
@@ -64,7 +81,11 @@ function swallowNextClick(tab: HTMLElement): void {
   )
 }
 
-type OnDrop = (point: ScreenPoint, overSessionId: string | null) => void
+type OnDrop = (
+  point: ScreenPoint,
+  overSessionId: string | null,
+  overContextDrop: string | null
+) => void
 
 interface Press {
   tab: HTMLElement
@@ -75,8 +96,9 @@ interface Press {
 function showDragAt(sessionId: string, e: PointerEvent, doc: Document): void {
   useTabDragStore.setState({
     sessionId,
-    overSessionId: tabUnder(e, doc),
+    overSessionId: markUnder(e, doc, 'sessionTab'),
     overMainWindow: windowContains(window, screenPointOf(e)),
+    overContextDrop: markUnder(e, doc, 'contextDrop'),
   })
 }
 
@@ -104,7 +126,7 @@ function followPress(press: Press, onDrop: OnDrop): void {
       stop()
       if (!dragging) return
       swallowNextClick(tab)
-      onDrop(screenPointOf(e), tabUnder(e, doc))
+      onDrop(screenPointOf(e), markUnder(e, doc, 'sessionTab'), markUnder(e, doc, 'contextDrop'))
     },
     pointercancel: () => stop(),
     keydown: (e: KeyboardEvent) => {
@@ -120,7 +142,8 @@ function followPress(press: Press, onDrop: OnDrop): void {
 }
 
 /** Follows a press on a terminal's tab. Once it moves far enough it is a drag, and its release
- * calls `onDrop` with where it was let go and the tab under it, if any. Escape cancels it. */
+ * calls `onDrop` with where it was let go and the tab or agent composer under it, if any. Escape
+ * cancels it. */
 export function beginTabDrag(
   press: React.PointerEvent<HTMLElement>,
   sessionId: string,

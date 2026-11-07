@@ -60,7 +60,12 @@ function pressOn(tab: HTMLElement, { onDrop = vi.fn(), button = 0 } = {}) {
 beforeEach(() => {
   placeMainWindow()
   resetStore(useBreakoutStore, { windows: new Map() })
-  useTabDragStore.setState({ sessionId: null, overSessionId: null, overMainWindow: false })
+  useTabDragStore.setState({
+    sessionId: null,
+    overSessionId: null,
+    overMainWindow: false,
+    overContextDrop: null,
+  })
   underPointer = null
   document.elementFromPoint = () => underPointer
   HTMLElement.prototype.setPointerCapture = vi.fn()
@@ -158,7 +163,7 @@ describe('beginTabDrag — the pointer', () => {
     const onDrop = pressOn(first)
     pointer('pointermove', document.body, { x: 400, y: 90 })
     pointer('pointerup', document.body, { x: 20, y: 400 })
-    expect(onDrop).toHaveBeenCalledWith({ x: 20, y: 400 }, null)
+    expect(onDrop).toHaveBeenCalledWith({ x: 20, y: 400 }, null, null)
   })
 })
 
@@ -169,7 +174,7 @@ describe('beginTabDrag — the release', () => {
     pointer('pointermove', first, { x: 400, y: 70 })
     underPointer = second
     pointer('pointerup', first, { x: 410, y: 72 })
-    expect(onDrop).toHaveBeenCalledWith({ x: 410, y: 72 }, 's2')
+    expect(onDrop).toHaveBeenCalledWith({ x: 410, y: 72 }, 's2', null)
     expect(useTabDragStore.getState()).toMatchObject({ sessionId: null, overSessionId: null })
   })
 
@@ -178,7 +183,39 @@ describe('beginTabDrag — the release', () => {
     const onDrop = pressOn(first)
     pointer('pointermove', first, { x: 40, y: 300 })
     pointer('pointerup', first, { x: 20, y: 400 })
-    expect(onDrop).toHaveBeenCalledWith({ x: 20, y: 400 }, null)
+    expect(onDrop).toHaveBeenCalledWith({ x: 20, y: 400 }, null, null)
+  })
+})
+
+/** An agent composer that takes dropped sessions as context, inside the tab's document. */
+function composerOf(sessionId: string): HTMLElement {
+  const composer = document.createElement('div')
+  composer.dataset.contextDrop = sessionId
+  composer.innerHTML = '<textarea></textarea>'
+  document.body.append(composer)
+  return composer.querySelector('textarea')!
+}
+
+describe('beginTabDrag — over an agent composer', () => {
+  it('names the composer under the pointer while dragging, and forgets it off the composer', () => {
+    const { first } = tabStrip()
+    pressOn(first)
+    underPointer = composerOf('agent-1')
+    pointer('pointermove', first, { x: 400, y: 300 })
+    expect(useTabDragStore.getState().overContextDrop).toBe('agent-1')
+    underPointer = null
+    pointer('pointermove', first, { x: 400, y: 600 })
+    expect(useTabDragStore.getState().overContextDrop).toBeNull()
+  })
+
+  it('drops with the composer under the release, and goes idle', () => {
+    const { first } = tabStrip()
+    const onDrop = pressOn(first)
+    pointer('pointermove', first, { x: 400, y: 70 })
+    underPointer = composerOf('agent-1')
+    pointer('pointerup', first, { x: 400, y: 300 })
+    expect(onDrop).toHaveBeenCalledWith({ x: 400, y: 300 }, null, 'agent-1')
+    expect(useTabDragStore.getState().overContextDrop).toBeNull()
   })
 })
 
