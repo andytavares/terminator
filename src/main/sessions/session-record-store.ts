@@ -71,7 +71,7 @@ async function persist(): Promise<void> {
 }
 
 /** Drops the closed records past their retention; writes only when one goes. */
-export async function purgeClosedRecords(): Promise<void> {
+async function purgeClosedRecords(): Promise<void> {
   const all = [...records.values()]
   if (pruneRecords(all, Date.now(), retentionMs()).length === all.length) return
   try {
