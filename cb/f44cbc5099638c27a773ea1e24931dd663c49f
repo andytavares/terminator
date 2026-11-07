@@ -1,0 +1,19 @@
+tests/unit/renderer/components/HomeScreen.spec.tsx
+  s_56e599e17e5b82::t_5c47cb9eb85005 539-540
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cbf44cbc5099638c27a773ea1e24931dd663c49f",
+  "prompts": {},
+  "sessions": {
+    "s_56e599e17e5b82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6c95cc7-f1de-49bf-a858-16efb95c5329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
