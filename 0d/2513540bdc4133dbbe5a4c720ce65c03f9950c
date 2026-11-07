@@ -1,0 +1,27 @@
+extensions/git-integration/src/components/contributions/contributions.css
+  s_c3147c7a3f2e3c::t_6b7b14e25f831f 207-208
+  s_c3147c7a3f2e3c::t_ada79987e454db 182-186,188-190,193,198,203,205-206,211,230-231,250-254,261
+  s_c3147c7a3f2e3c::t_eb61edd3901136 243,246
+extensions/git-integration/tests/unit/ContributionsSection.spec.tsx
+  s_c3147c7a3f2e3c::t_c5f2636fca09c3 124-129,133-135
+  s_c3147c7a3f2e3c::t_eb61edd3901136 130-132
+extensions/git-integration/src/components/contributions/Heatmap.tsx
+  s_c3147c7a3f2e3c::t_eb61edd3901136 85-90
+  s_c3147c7a3f2e3c::t_abeca92ae11b2d 22,44-47,80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0d2513540bdc4133dbbe5a4c720ce65c03f9950c",
+  "prompts": {},
+  "sessions": {
+    "s_c3147c7a3f2e3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6643d25-b995-4f50-b4d6-9e2f055e3cbe",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
