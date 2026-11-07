@@ -86,3 +86,13 @@ export async function putAllowRule(file: string, rule: string): Promise<void> {
   settings.permissions = { ...permissions, allow: [...allow, rule] }
   await writeClaudeSettings(file, settings)
 }
+
+/** Removes `rule` from `permissions.allow`; every other key and entry survives. */
+export async function removeAllowRule(file: string, rule: string): Promise<void> {
+  const settings = await readClaudeSettings(file)
+  const permissions = (settings?.permissions ?? {}) as { allow?: unknown }
+  const allow = Array.isArray(permissions.allow) ? permissions.allow : []
+  if (settings === null || !allow.includes(rule)) return
+  settings.permissions = { ...permissions, allow: allow.filter((entry) => entry !== rule) }
+  await writeClaudeSettings(file, settings)
+}

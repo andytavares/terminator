@@ -1,8 +1,10 @@
 import { useShallow } from 'zustand/react/shallow'
-import React, { useEffect, useState } from 'react'
-import { Check, Link2, RefreshCw, X } from 'lucide-react'
+import React, { useCallback, useEffect, useState } from 'react'
+import { Check, Copy, Link2, Plug, RefreshCw, X } from 'lucide-react'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { recordUse } from '../../usage/record'
+import { useToastStore } from '../../stores/toast.store'
+import type { ClaudeCodeStatus } from '../../../shared/electron-api/manifest'
 import type { TrackerConnection, TrackerId } from '../../../shared/types/index'
 import './IntegrationsSettings.css'
 
@@ -222,6 +224,90 @@ function TrackerRow({ tracker }: { tracker: TrackerId }): React.JSX.Element {
   )
 }
 
+const CLAUDE_CODE_DOT: Record<ClaudeCodeStatus['state'], string> = {
+  connected: 'on',
+  disconnected: 'off',
+  unavailable: 'error',
+}
+
+function claudeCodeText(status: ClaudeCodeStatus): string {
+  if (status.state === 'connected') {
+    return 'Connected. Claude sessions on this Mac can use Terminator tools.'
+  }
+  if (status.state === 'disconnected') {
+    return 'Disconnected. Claude sessions cannot use Terminator tools.'
+  }
+  return status.reason ?? 'Claude Code is unavailable.'
+}
+
+/** The Terminator MCP server's entry in Claude Code, read again by `reload`. Stays null where
+ * the API does not exist: the remote client omits it, since the server is for this Mac only. */
+function useClaudeCodeStatus() {
+  const [status, setStatus] = useState<ClaudeCodeStatus | null>(null)
+  const reload = useCallback(
+    () =>
+      (window.electronAPI.claudeCode?.status() ?? Promise.resolve(undefined)).then((result) => {
+        if (result !== undefined && 'data' in result) setStatus(result.data)
+      }),
+    []
+  )
+  useEffect(() => {
+    void reload()
+  }, [reload])
+  return { status, reload }
+}
+
+interface ClaudeCodeActionsProps {
+  status: ClaudeCodeStatus
+  reload: () => Promise<void>
+}
+
+function ClaudeCodeActions({ status, reload }: ClaudeCodeActionsProps): React.JSX.Element {
+  const claudeCode = window.electronAPI.claudeCode
+  const copyCommand = async (): Promise<void> => {
+    await navigator.clipboard.writeText(status.command)
+    useToastStore.getState().addToast({ type: 'success', message: 'Copied' })
+  }
+  const change = (action: () => Promise<unknown>) => () => void action().then(reload)
+  return (
+    <div className="integrations__actions">
+      <button className="ext-btn" onClick={() => void copyCommand()}>
+        <Copy />
+        <span>Copy server command</span>
+      </button>
+      {status.state === 'connected' ? (
+        <button className="ext-btn ext-btn--danger" onClick={change(claudeCode.disconnect)}>
+          <X />
+          <span>Disconnect</span>
+        </button>
+      ) : (
+        <button className="ext-btn" onClick={change(claudeCode.connect)}>
+          <Plug />
+          <span>Connect</span>
+        </button>
+      )}
+    </div>
+  )
+}
+
+function ClaudeCodeRow(): React.JSX.Element | null {
+  const { status, reload } = useClaudeCodeStatus()
+  if (status === null) return null
+  return (
+    <div className="integrations__tracker">
+      <div className="integrations__header">
+        <span
+          className={`integrations__dot integrations__dot--${CLAUDE_CODE_DOT[status.state]}`}
+          aria-hidden="true"
+        />
+        <span className="integrations__name">Claude Code</span>
+        <span className="integrations__status">{claudeCodeText(status)}</span>
+      </div>
+      <ClaudeCodeActions status={status} reload={reload} />
+    </div>
+  )
+}
+
 export function IntegrationsSettings(): React.JSX.Element {
   const { loadConnections, subscribe } = useIntegrationsStore(
     useShallow((s) => ({ loadConnections: s.loadConnections, subscribe: s.subscribe }))
@@ -242,6 +328,7 @@ export function IntegrationsSettings(): React.JSX.Element {
         Credentials are verified before they are stored, encrypted with your OS keychain, and never
         leave this machine. Every part of the app reads this one connection.
       </p>
+      <ClaudeCodeRow />
       <TrackerRow tracker="linear" />
     </div>
   )

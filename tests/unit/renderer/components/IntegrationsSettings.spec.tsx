@@ -3,7 +3,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { IntegrationsSettings } from '../../../../src/renderer/components/settings/IntegrationsSettings'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
+import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import type { TrackerConnection } from '../../../../src/shared/types/index'
+import type { ClaudeCodeStatus } from '../../../../src/shared/electron-api/manifest'
 
 const api = {
   status: vi.fn(),
@@ -11,6 +13,12 @@ const api = {
   disconnect: vi.fn(),
   setMine: vi.fn(),
   onStatusChanged: vi.fn((_handler: (payload: unknown) => void): (() => void) => () => {}),
+}
+
+const claudeCode = {
+  status: vi.fn<() => Promise<unknown>>(),
+  connect: vi.fn(),
+  disconnect: vi.fn(),
 }
 
 function connection(over: Partial<TrackerConnection> = {}): TrackerConnection {
@@ -33,8 +41,10 @@ async function renderWith(connections: TrackerConnection[]) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Pending, so the Claude Code block stays empty in the tracker tests.
+  claudeCode.status.mockReturnValue(new Promise(() => {}))
   Object.defineProperty(window, 'electronAPI', {
-    value: { integrations: api },
+    value: { integrations: api, claudeCode },
     writable: true,
     configurable: true,
   })
@@ -265,5 +275,90 @@ describe('IntegrationsSettings — the less common answers — stores a cleared 
         mine: { kind: 'assignee', email: null },
       })
     )
+  })
+})
+
+const command = `claude mcp add-json --scope user terminator '{"type":"stdio"}'`
+const claudeStatus = (over: Partial<ClaudeCodeStatus>): { data: ClaudeCodeStatus } => ({
+  data: { state: 'connected', name: 'terminator', command, ...over },
+})
+
+async function renderClaudeCode(status: Partial<ClaudeCodeStatus>) {
+  claudeCode.status.mockResolvedValue(claudeStatus(status))
+  api.status.mockResolvedValue({ connections: [connection()] })
+  render(<IntegrationsSettings />)
+  await screen.findByText('Claude Code')
+}
+
+describe('IntegrationsSettings — Claude Code', () => {
+  it('says connected sessions can use Terminator tools, and offers Disconnect', async () => {
+    await renderClaudeCode({ state: 'connected' })
+    expect(
+      screen.getByText('Connected. Claude sessions on this Mac can use Terminator tools.')
+    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Disconnect' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Copy server command' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Connect' })).toBeNull()
+  })
+
+  it('says disconnected sessions cannot, and offers Connect', async () => {
+    await renderClaudeCode({ state: 'disconnected' })
+    expect(
+      screen.getByText('Disconnected. Claude sessions cannot use Terminator tools.')
+    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Connect' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Disconnect' })).toBeNull()
+  })
+
+  it('shows the reason when Claude Code is unavailable, and offers Connect to try again', async () => {
+    const reason = 'Claude Code is not installed: Terminator cannot find the claude command.'
+    await renderClaudeCode({ state: 'unavailable', reason })
+    expect(screen.getByText(reason)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Connect' })).toBeTruthy()
+  })
+})
+
+describe('IntegrationsSettings — Claude Code actions', () => {
+  it('disconnects, then shows the status it reads again', async () => {
+    await renderClaudeCode({ state: 'connected' })
+    claudeCode.disconnect.mockResolvedValue({ data: true })
+    claudeCode.status.mockResolvedValue(claudeStatus({ state: 'disconnected' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }))
+    await screen.findByText('Disconnected. Claude sessions cannot use Terminator tools.')
+    expect(claudeCode.disconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('connects, then shows the status it reads again', async () => {
+    await renderClaudeCode({ state: 'disconnected' })
+    claudeCode.connect.mockResolvedValue({ data: true })
+    claudeCode.status.mockResolvedValue(claudeStatus({ state: 'connected' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    await screen.findByText('Connected. Claude sessions on this Mac can use Terminator tools.')
+    expect(claudeCode.connect).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('IntegrationsSettings — Claude Code server command', () => {
+  it('copies the server command and says so', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    useToastStore.setState({ toasts: [] })
+    await renderClaudeCode({ state: 'connected' })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Copy server command' }))
+    })
+    expect(writeText).toHaveBeenCalledWith(command)
+    expect(useToastStore.getState().toasts).toContainEqual(
+      expect.objectContaining({ type: 'success', message: 'Copied' })
+    )
+  })
+})
+
+describe('IntegrationsSettings — Claude Code on the remote client', () => {
+  it('leaves the block out where the app gives no Claude Code API', async () => {
+    window.electronAPI = { integrations: api } as never
+    await renderWith([connection()])
+    await screen.findByText('Linear')
+    expect(screen.queryByText('Claude Code')).toBeNull()
   })
 })

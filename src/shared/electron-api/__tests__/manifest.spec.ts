@@ -171,6 +171,16 @@ describe('remoteAccessibleCoreChannels()', () => {
     expect(derived.has('integrations:disconnect')).toBe(false)
   })
 
+  it('keeps the Claude Code registration off the remote bridge', () => {
+    // A LAN-reachable surface must not change what every Claude session on this Mac can call.
+    const channels = ELECTRON_API_MANIFEST.map((spec) => spec.channel)
+    const derived = remoteAccessibleCoreChannels()
+    for (const channel of ['claude-code:status', 'claude-code:connect', 'claude-code:disconnect']) {
+      expect(channels).toContain(channel)
+      expect(derived.has(channel)).toBe(false)
+    }
+  })
+
   it('keeps internal-only channels unreachable (default-deny holds)', () => {
     const derived = remoteAccessibleCoreChannels()
     for (const internal of INTERNAL_ONLY_CHANNELS) {

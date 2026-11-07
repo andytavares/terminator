@@ -13,8 +13,14 @@ vi.mock('../../../src/main/logger', () => ({
   makeLogger: () => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }))
 
-import { registerWithClaude, type ClaudeRun } from '../../../src/main/mcp/registration'
-import { putAllowRule } from '../../../src/main/integrations/claude-settings'
+import {
+  connect,
+  disconnect,
+  registerWithClaude,
+  registrationStatus,
+  type ClaudeRun,
+} from '../../../src/main/mcp/registration'
+import { putAllowRule, removeAllowRule } from '../../../src/main/integrations/claude-settings'
 
 let directory: string
 let settingsFile: string
@@ -32,14 +38,14 @@ const config = JSON.stringify({
   args: ['/data/mcp/mcp-relay.cjs', '/data/mcp.sock'],
   env: { ELECTRON_RUN_AS_NODE: '1' },
 })
-const register = () =>
-  registerWithClaude({
-    relayPath: '/data/mcp/mcp-relay.cjs',
-    socketPath: '/data/mcp.sock',
-    directory,
-    settingsFile,
-    run,
-  })
+const options = () => ({
+  relayPath: '/data/mcp/mcp-relay.cjs',
+  socketPath: '/data/mcp.sock',
+  directory,
+  settingsFile,
+  run,
+})
+const register = () => registerWithClaude(options())
 const settings = () => JSON.parse(fs.readFileSync(settingsFile, 'utf8'))
 
 beforeEach(() => {
@@ -120,5 +126,95 @@ describe('putAllowRule', () => {
       model: 'opus',
       permissions: { allow: ['Bash(ls)', 'mcp__terminator'], deny: ['Read(.env)'] },
     })
+  })
+})
+
+describe('registrationStatus', () => {
+  it('is connected once the current server is registered, with the exact command to copy', async () => {
+    await register()
+    const status = await registrationStatus(options())
+    expect(status).toEqual({
+      state: 'connected',
+      name: 'terminator-dev',
+      command: `claude mcp add-json --scope user terminator-dev '${config}'`,
+    })
+  })
+
+  it('is disconnected before anything was registered', async () => {
+    expect((await registrationStatus(options())).state).toBe('disconnected')
+  })
+
+  it('is unavailable, in plain words, when claude is missing', async () => {
+    exitCode = 127
+    await register()
+    expect(await registrationStatus(options())).toMatchObject({
+      state: 'unavailable',
+      reason: 'Claude Code is not installed: Terminator cannot find the claude command.',
+    })
+  })
+
+  it('is unavailable with what claude said when the add fails', async () => {
+    exitCode = 1
+    await register()
+    expect((await registrationStatus(options())).reason).toBe(
+      'Claude Code could not add the server: claude: not found'
+    )
+  })
+})
+
+describe('disconnect', () => {
+  it('removes the server and its allow rule, and says disconnected', async () => {
+    await register()
+    runs = []
+    await disconnect(options())
+    expect(runs).toEqual([['mcp', 'remove', '--scope', 'user', 'terminator-dev']])
+    expect(settings().permissions.allow).toEqual([])
+    expect((await registrationStatus(options())).state).toBe('disconnected')
+  })
+
+  it('stays disconnected on the next start', async () => {
+    await register()
+    await disconnect(options())
+    runs = []
+    await register()
+    expect(runs).toEqual([])
+    expect(settings().permissions.allow).toEqual([])
+  })
+})
+
+describe('connect', () => {
+  it('registers again after a disconnect', async () => {
+    await register()
+    await disconnect(options())
+    runs = []
+    await connect(options())
+    expect(runs.map((args) => args[1])).toEqual(['remove', 'add-json'])
+    expect(settings().permissions.allow).toEqual(['mcp__terminator-dev'])
+    expect((await registrationStatus(options())).state).toBe('connected')
+  })
+
+  it('clears an earlier failure once the add works', async () => {
+    exitCode = 127
+    await register()
+    exitCode = 0
+    await connect(options())
+    expect((await registrationStatus(options())).state).toBe('connected')
+  })
+})
+
+describe('removeAllowRule', () => {
+  it('removes only that rule and keeps every other key', async () => {
+    fs.mkdirSync(path.dirname(settingsFile), { recursive: true })
+    fs.writeFileSync(
+      settingsFile,
+      JSON.stringify({ model: 'opus', permissions: { allow: ['Bash(ls)', 'mcp__terminator'] } })
+    )
+    await removeAllowRule(settingsFile, 'mcp__terminator')
+    expect(settings()).toEqual({ model: 'opus', permissions: { allow: ['Bash(ls)'] } })
+  })
+
+  it('leaves a missing settings file missing', async () => {
+    await removeAllowRule(settingsFile, 'mcp__terminator')
+    expect(fs.existsSync(settingsFile)).toBe(false)
   })
 })

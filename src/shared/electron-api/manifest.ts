@@ -188,6 +188,14 @@ function extensionIdEvent<const Path extends string>(path: Path, channel: string
   })
 }
 type Failure = { error: string }
+/** The Terminator MCP server's entry in Claude Code (ADR 145). */
+export interface ClaudeCodeStatus {
+  state: 'connected' | 'disconnected' | 'unavailable'
+  name: string
+  /** The `claude mcp add-json` line, shell-quoted, for a person to run by hand. */
+  command: string
+  reason?: string
+}
 type DetailedFailure = { error: string; message?: string }
 type SessionRecordResult<Data> = Promise<{ data: Data } | { error: string; message: string }>
 type TaskResult = Promise<{ data: Task } | { error: string; message: string }>
@@ -1887,6 +1895,33 @@ export const ELECTRON_API_MANIFEST = [
       signature<
         (input: z.input<typeof MeasuresInputSchema>) => Promise<{ data: AttentionInterval[] }>
       >(),
+    remote: 'omit',
+  }),
+
+  // ── Claude Code (the Terminator MCP server's entry, in Settings › Integrations) ──
+  method({
+    path: 'claudeCode.status',
+    kind: 'invoke',
+    channel: 'claude-code:status',
+    mcp: false,
+    signature:
+      signature<() => Promise<{ data: ClaudeCodeStatus } | { error: string; message: string }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'claudeCode.connect',
+    kind: 'invoke',
+    channel: 'claude-code:connect',
+    mcp: false,
+    signature: signature<() => Promise<{ data: true } | { error: string; message: string }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'claudeCode.disconnect',
+    kind: 'invoke',
+    channel: 'claude-code:disconnect',
+    mcp: false,
+    signature: signature<() => Promise<{ data: true } | { error: string; message: string }>>(),
     remote: 'omit',
   }),
 
