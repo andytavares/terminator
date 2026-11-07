@@ -1,0 +1,22 @@
+tests/e2e/inbox-sidebar.spec.ts
+  s_56e599e17e5b82::t_ba44d91882681a 3-7,9-12,14,47-56,58,71
+  s_56e599e17e5b82::t_ae389a15e35a16 39
+  s_56e599e17e5b82::t_edfdeb359e3c73 24-34
+  s_56e599e17e5b82::t_d345b5b9aae6d3 1-2,8,13,15-23,35-38,40-46,57,59-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5e3f00d697c06cf47dff603d01461cff820ac9ba",
+  "prompts": {},
+  "sessions": {
+    "s_56e599e17e5b82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6c95cc7-f1de-49bf-a858-16efb95c5329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
