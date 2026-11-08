@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { screen, cleanup, fireEvent, within } from '@testing-library/react'
 import { installVaultBridge, eventually, task, dayFromToday } from './helpers/bridge'
+import { setLocalClock } from '../support/clock'
 import { buttonNamed, lastNotice, renderDailyLog } from './helpers/daily-log'
 
 vi.mock('../../src/utils/notify', () => ({ notify: vi.fn() }))
@@ -14,6 +15,7 @@ let bridge: ReturnType<typeof installVaultBridge>
 const modal = () => document.querySelector('.daily-log__block-modal') as HTMLElement
 
 beforeEach(() => {
+  setLocalClock('UTC', '2026-01-15T12:00:00.000Z')
   vi.mocked(notify).mockClear()
   bridge = installVaultBridge()
 })

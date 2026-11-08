@@ -2,6 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
 import { installVaultBridge, eventually, task, dayFromToday } from './helpers/bridge'
+import { setLocalClock } from '../support/clock'
 
 /** The props each stubbed view was last rendered with. */
 const seen: Record<string, Record<string, unknown>> = {}
@@ -37,13 +38,14 @@ import { partialFake } from '../../../../tests/support/fakes'
 let bridge: ReturnType<typeof installVaultBridge>
 
 const LOG = {
-  date: dayFromToday(),
+  date: '2026-01-15',
   filePath: 'daily',
   tasks: [task('t1', 'Write'), task('t2', 'Read')],
   exists: true,
 }
 
 beforeEach(() => {
+  setLocalClock('UTC', '2026-01-15T12:00:00.000Z')
   vi.mocked(notify).mockClear()
   for (const key of Object.keys(seen)) delete seen[key]
   bridge = installVaultBridge({

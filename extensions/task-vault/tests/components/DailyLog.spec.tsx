@@ -2,6 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
 import { installVaultBridge, eventually, task, dayFromToday } from './helpers/bridge'
+import { setLocalClock } from '../support/clock'
 import type { IndexedTask } from '../../src/vault/types'
 
 vi.mock('../../src/utils/notify', () => ({ notify: vi.fn() }))
@@ -35,6 +36,7 @@ const taskRowElements = () =>
   )
 
 beforeEach(() => {
+  setLocalClock('UTC', '2026-01-15T12:00:00.000Z')
   bridge = installVaultBridge()
 })
 
