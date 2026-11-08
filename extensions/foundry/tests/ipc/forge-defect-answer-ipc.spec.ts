@@ -136,16 +136,24 @@ function cleanOrder(): WorkOrder {
     redTeam: [regression('RT-inspector-6', 'footnote links stop working')],
   }
 }
-function architectAmends(): void {
+function eachTurnRegisters(): void {
   theRunner.start.mockImplementation(async (...args: unknown[]) => {
     const input = args[0] as StartInput
     const sessionId = `${input.phase}-session`
     input.onRegistered?.({ sessionId })
-    if (input.phase === 'architect') {
-      setTimeout(() => input.onStructuredOutput?.(AMENDMENT), 0)
-    }
     return { sessionId }
   })
+}
+/** Once the architect's turn has started, it answers with the amended plan. */
+async function architectAmends(): Promise<void> {
+  const architect = await eventually(() => {
+    const started = theRunner.start.mock.calls
+      .map((call) => call[0] as StartInput)
+      .find((input) => input.phase === 'architect')
+    if (started === undefined) throw new Error('the architect has not started yet')
+    return started
+  })
+  architect.onStructuredOutput?.(AMENDMENT)
 }
 async function seed(released: boolean): Promise<void> {
   dataDir = makeTempDir('fdry-amended-')
@@ -163,7 +171,7 @@ async function seed(released: boolean): Promise<void> {
     })
   }
   await saveGate(forgeDefectGate())
-  architectAmends()
+  eachTurnRegisters()
 }
 
 function startingTheArchitectTests() {
@@ -242,6 +250,7 @@ function agreeingAgainTests() {
   it('agrees the released order again and starts its run', async () => {
     await seed(true)
     await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
+    await architectAmends()
 
     await eventually(() => expect(ledgerFileText(dataDir)).toContain('"action":"run.started"'))
     const lines = ledgerFileText(dataDir)
@@ -259,6 +268,7 @@ function theInboxTests() {
   it('lists an order nobody released on the Inbox, and counts it on the badge', async () => {
     await seed(false)
     await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
+    await architectAmends()
 
     await eventually(() => expect(ledgerFileText(dataDir)).toContain('order.redrafted'))
     await eventually(async () => {
@@ -284,6 +294,7 @@ function theOrderBeforeTests() {
   it('never puts the order from before the amendment back', async () => {
     await seed(true)
     await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
+    await architectAmends()
     await eventually(() =>
       expect(ledgerFileText(dataDir)).toMatch(/"action":"run\.(started|refused)"/)
     )

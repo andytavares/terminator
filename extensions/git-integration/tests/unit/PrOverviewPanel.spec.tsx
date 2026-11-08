@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { PrOverviewPanel } from '../../src/components/pr-review/PrOverviewPanel'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
+import { githubAPI } from '../../src/api/github'
 
 vi.mock('../../src/stores/pr-review.store', () => ({ usePrReviewStore: vi.fn() }))
 
@@ -148,6 +149,8 @@ const basePr: PrReviewDetail = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // clearAllMocks keeps implementations: a stacked plan one test set would reach the next.
+  vi.mocked(githubAPI.mergeStackPlan).mockResolvedValue({ into: 'main', stack: [] })
   pane.width = null
   mockPreparePrWorktree.mockResolvedValue({ hasConflicts: true })
   mockCreateProject.mockResolvedValue({ project: { id: 'proj-conflict' } })

@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { existsSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { join } from 'node:path'
 import { readTimeline } from '../../src/factory/timeline-store.js'
 import { observationAt, replayClock, momentsOf } from '../../src/factory/replay.js'
 import type { Timeline } from '../../src/factory/replay.js'
@@ -10,7 +9,8 @@ import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
 import { partialFake } from '../../../../tests/support/fakes'
 import { pullRequestChecks } from '../helpers/hall-views.js'
 
-const REAL_TIMELINE = '/Users/atavares/repos/orders/WO-1006-6b5/run-timeline.jsonl'
+/** An order folder holding a short recorded run: a quiet lead-in, then two steps with tool calls. */
+const RECORDED_RUN = join(__dirname, 'fixtures', 'recorded-run')
 
 function node(id: string, over: Partial<RunNode> = {}): RunNode {
   return {
@@ -181,9 +181,9 @@ describe('momentsOf', () => {
   })
 })
 
-describe.skipIf(!existsSync(REAL_TIMELINE))('momentsOf on a recorded run', () => {
+describe('momentsOf on a recorded run', () => {
   it('plays far shorter than every recorded moment would, with no quiet lead-in', async () => {
-    const recorded = await readTimeline(dirname(REAL_TIMELINE))
+    const recorded = await readTimeline(RECORDED_RUN)
     const all = new Set([...recorded.frames.map((f) => f.at), ...recorded.tools.map((t) => t.at)])
     const kept = momentsOf(recorded, [])
     expect(kept.length).toBeLessThan(all.size)
@@ -259,9 +259,9 @@ function ciMomentsTests() {
   })
 }
 
-describe.skipIf(!existsSync(REAL_TIMELINE))('a recorded run', () => {
+describe('a recorded run', () => {
   it('has no CI line to replay yet, which is not an error', async () => {
-    const recorded = await readTimeline(dirname(REAL_TIMELINE))
+    const recorded = await readTimeline(RECORDED_RUN)
     expect(observationAt({ timeline: recorded, gates: [], base }, Date.now()).ci).toBeNull()
   })
 })

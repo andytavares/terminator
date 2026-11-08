@@ -295,6 +295,9 @@ describe('a turn that has started', () => {
   })
 })
 
+/** What the console lists as held, waiting on the operator. */
+const heldCalls = () => host.call('foundry:permissions-list')
+
 describe('a question the architect asks', () => {
   it('waits on the console for the operator, and is gone once answered', async () => {
     let answer: (requestId: string) => void = () => undefined
@@ -306,7 +309,7 @@ describe('a question the architect asks', () => {
     await orderStoreAt(dataDir).save(readyDraft(repo))
     await host.call('foundry:order.converge', { id: 'WO-1', message: 'go' })
 
-    const listed = (await host.call('foundry:permissions-list')) as {
+    const listed = (await heldCalls()) as {
       pending: Array<{ requestId: string; summary: string }>
     }
     expect(listed.pending).toEqual([
@@ -317,7 +320,7 @@ describe('a question the architect asks', () => {
       'refused Edit: the architect proposes; it does not edit'
     )
     answer('ask-1')
-    expect(await host.call('foundry:permissions-list')).toEqual({ pending: [] })
+    await eventually(async () => expect(await heldCalls()).toEqual({ pending: [] }))
     // The session goes onto the order in a save nobody awaits. Waiting for it
     // keeps that save from landing after the spec file's records are removed.
     await eventually(async () =>
