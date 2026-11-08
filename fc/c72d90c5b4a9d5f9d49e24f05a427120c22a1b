@@ -1,0 +1,19 @@
+tests/unit/renderer/components/TabBar.spec.tsx
+  s_f53906548e22f9::t_cf487bacb8a3dc 385-386,388-389
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fcc72d90c5b4a9d5f9d49e24f05a427120c22a1b",
+  "prompts": {},
+  "sessions": {
+    "s_f53906548e22f9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dff2918-ea06-4902-ae79-8fcf4b2e763c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
