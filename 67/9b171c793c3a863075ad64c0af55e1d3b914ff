@@ -1,0 +1,86 @@
+docs/adr/070-e2e-is-deterministic-and-selective.md
+  s_7a27f124c1e8e3::t_3876205fc318a3 3
+docs/adr/107-production-only-unused-code-is-a-ci-gate.md
+  s_7a27f124c1e8e3::t_19695a686a8512 3
+docs/adr/151-ci-runs-everything-once-with-nothing-fancy.md
+  s_7a27f124c1e8e3::t_5064a9ace316fc 15
+  s_7a27f124c1e8e3::t_19695a686a8512 7,11,19
+  s_7a27f124c1e8e3::t_3876205fc318a3 1-6,8-10,12-14,16-18
+docs/adr/124-flaky-tests-are-caught-before-merge-and-quarantined-with-an-expiry.md
+  s_7a27f124c1e8e3::t_3876205fc318a3 3
+docs/adr/125-a-security-fix-skips-the-release-age-cooldown.md
+  s_7a27f124c1e8e3::t_19695a686a8512 3
+scripts/check-single-copies.mjs
+  s_7a27f124c1e8e3::t_4288d72b58c0e0 8-10
+docs/adr/139-the-pre-push-hook-trusts-foundry.md
+  s_7a27f124c1e8e3::t_3876205fc318a3 3
+scripts/test-env.mjs
+  s_7a27f124c1e8e3::t_2be23cf67293d8 1-2
+docs/CONSTITUTION.md
+  s_7a27f124c1e8e3::t_528b3d9536f2d8 2-26,320,439-443,457-461,465-467,497
+README.md
+  s_7a27f124c1e8e3::t_43046ba0b1ca61 185-201,203-209
+  s_7a27f124c1e8e3::t_3b02639403c71a 202
+docs/adr/134-ci-releases-each-merge.md
+  s_7a27f124c1e8e3::t_1448e055e57f32 3
+package.json
+  s_7a27f124c1e8e3::t_4f612a270ad2d4 24,52
+  s_7a27f124c1e8e3::t_93d4e862056b96 32,36
+tests/e2e/global-setup.ts
+  s_7a27f124c1e8e3::t_68a1034c96d3a9 15
+docs/adr/071-ci-is-sharded-by-duration-and-warns-nothing.md
+  s_7a27f124c1e8e3::t_3876205fc318a3 3
+docs/adr/123-tests-run-once-sealed-and-selected.md
+  s_7a27f124c1e8e3::t_3876205fc318a3 3
+.husky/pre-commit
+  s_7a27f124c1e8e3::t_4f612a270ad2d4 2
+tests/unit/scripts/workflow-lint.spec.ts
+  s_7a27f124c1e8e3::t_c2105232d6fabd 26
+  s_7a27f124c1e8e3::t_49cdc7f774ed04 89-91
+  s_7a27f124c1e8e3::t_744336eee15b59 49-80,82-84
+  s_7a27f124c1e8e3::t_484ca6b7c5793b 92
+docs/adr/133-paved-path-cleanup.md
+  s_7a27f124c1e8e3::t_3876205fc318a3 3
+docs/adr/150-tests-run-in-enforced-tiers.md
+  s_7a27f124c1e8e3::t_3876205fc318a3 3
+scripts/typecheck.mjs
+  s_7a27f124c1e8e3::t_2be23cf67293d8 3
+knip.jsonc
+  s_7a27f124c1e8e3::t_2c2defa9c66b85 15,31,47,52-53,57-58,65-66
+docs/ARCHITECTURE.md
+  s_7a27f124c1e8e3::t_0def8a1b74a6bb 979,982-984
+docs/adr/129-ci-jobs-have-no-time-limit.md
+  s_7a27f124c1e8e3::t_8bc2ad9e78bfcf 15
+docs/CONTRIBUTING.md
+  s_7a27f124c1e8e3::t_93d4e862056b96 64,133
+  s_7a27f124c1e8e3::t_3a0e5287d51ad1 62,69,77,79,114,117,139,298
+docs/adr/132-ci-finishes-in-five-minutes.md
+  s_7a27f124c1e8e3::t_3876205fc318a3 3
+docs/adr/136-a-real-order-runs-before-foundry-changes-ship.md
+  s_7a27f124c1e8e3::t_3876205fc318a3 3
+.github/workflows/ci.yml
+  s_7a27f124c1e8e3::t_7007cf2fdfe2cb 17,22-24,44,65,105-106,133-134,159,173,175-178,181,237-238,271-273,276,301
+  s_7a27f124c1e8e3::t_93d4e862056b96 48-50
+  s_7a27f124c1e8e3::t_f0406a6871094d 179
+scripts/workflow-lint.mjs
+  s_7a27f124c1e8e3::t_6e85d69321df81 143-144,146-148
+  s_7a27f124c1e8e3::t_f9e1077e61679e 101-106,113
+  s_7a27f124c1e8e3::t_f0406a6871094d 145,192-193
+  s_7a27f124c1e8e3::t_2f16d8b148a7e6 13,22,95,114,174,186-189
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "679b171c793c3a863075ad64c0af55e1d3b914ff",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
