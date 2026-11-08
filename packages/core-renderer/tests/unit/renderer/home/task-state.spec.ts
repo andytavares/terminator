@@ -6,7 +6,7 @@ import {
   type LaneFacts,
 } from '../../../../src/home/task-state'
 import { fact } from '../sidebar/fixtures/facts'
-import { facet } from '../../../../../core-shared/tests/unit/renderer/home/fixtures'
+import { facet } from './fixtures'
 
 const lane = (patch: Partial<LaneFacts> = {}): LaneFacts => ({ sessions: [], facets: [], ...patch })
 const MERGED = { closedAt: '2026-10-18T10:00:00.000Z', whoseMove: 'agents' as const }

@@ -19,7 +19,7 @@ declare module 'vitest' {
 // Electron 42 downloads its binary on the first require('electron'), which specs reach through
 // externalised dependencies vi.mock cannot intercept. No unit test runs the binary; the override
 // makes the require a path join.
-const ELECTRON_DIST = resolve(__dirname, '../node_modules/electron/dist')
+const ELECTRON_DIST = resolve(__dirname, '../../node_modules/electron/dist')
 
 // The home is fresh and empty. XDG_CONFIG_HOME sits inside it, empty too: git reads
 // GIT_CONFIG_GLOBAL (packages/test-support/fixtures/git/gitconfig) and never the developer's config.

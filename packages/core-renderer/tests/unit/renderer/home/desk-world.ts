@@ -2,7 +2,7 @@ import { useWorkspaceStore } from '../../../../src/stores/workspace.store'
 import { useHomeFeedStore } from '../../../../src/stores/home-feed.store'
 import { useIntegrationsStore } from '../../../../src/stores/integrations.store'
 import { fact } from '../sidebar/fixtures/facts'
-import { facet } from '../../../../../core-shared/tests/unit/renderer/home/fixtures'
+import { facet } from './fixtures'
 import type { MergedHomeFeed } from '../../../../../core-shared/src/schemas/home-feed.schema'
 import type { Issue, Project, Workspace } from '../../../../../core-shared/src/types/index'
 

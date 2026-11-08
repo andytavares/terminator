@@ -1,5 +1,5 @@
-import type { Sourced, ThreadFacet } from '../../../../src/schemas/home-feed.schema'
-import type { Task } from '../../../../src/schemas/tasks.schema'
+import type { Sourced, ThreadFacet } from '../../../../../core-shared/src/schemas/home-feed.schema'
+import type { Task } from '../../../../../core-shared/src/schemas/tasks.schema'
 
 /** A pull-request facet with every field present, for specs to vary one at a time. */
 export function facet(patch: Partial<ThreadFacet> = {}): Sourced<ThreadFacet> {

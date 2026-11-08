@@ -10,7 +10,7 @@ import { useParkedThreads } from '../../../../src/components/home/parked-threads
 import { useDismissedThreads } from '../../../../src/components/home/dismissed-threads'
 import { installElectronApi } from '../../../../../test-support/src/electron-api'
 import { FACTS, REPO_ROOT, seedDesk } from '../home/desk-world'
-import { task } from '../../../../../core-shared/tests/unit/renderer/home/fixtures'
+import { task } from '../home/fixtures'
 import type { TaskLane } from '../../../../../core-shared/src/schemas/tasks.schema'
 import type { Project, Workspace } from '../../../../../core-shared/src/types/index'
 

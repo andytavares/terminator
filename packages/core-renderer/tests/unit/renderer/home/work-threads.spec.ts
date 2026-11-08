@@ -7,7 +7,7 @@ import {
   type WorkThreadInput,
 } from '../../../../src/home/work-threads'
 import { fact } from '../sidebar/fixtures/facts'
-import { facet, task } from '../../../../../core-shared/tests/unit/renderer/home/fixtures'
+import { facet, task } from './fixtures'
 import { ticket } from './desk-world'
 import type { IssueSummary } from '../../../../../core-shared/src/types/index'
 import type { SessionFacts } from '../../../../src/sidebar/session-facts'

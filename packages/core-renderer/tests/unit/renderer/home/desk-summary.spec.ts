@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { deskCounts } from '../../../../src/home/desk-summary'
 import { buildWorkThreads } from '../../../../src/home/work-threads'
 import { fact } from '../sidebar/fixtures/facts'
-import { facet } from '../../../../../core-shared/tests/unit/renderer/home/fixtures'
+import { facet } from './fixtures'
 
 const NOW = Date.parse('2026-10-18T12:00:00.000Z')
 

@@ -7,7 +7,7 @@ import { openAddToTask } from '../../../../../src/components/tasks/add-to-task'
 import { useTaskStore } from '../../../../../src/stores/task.store'
 import { useWorkspaceStore } from '../../../../../src/stores/workspace.store'
 import { installElectronApi } from '../../../../../../test-support/src/electron-api'
-import { task } from '../../../../../../core-shared/tests/unit/renderer/home/fixtures'
+import { task } from '../../home/fixtures'
 import type { Task, TaskLane } from '../../../../../../core-shared/src/schemas/tasks.schema'
 import type { Project, Workspace } from '../../../../../../core-shared/src/types/index'
 

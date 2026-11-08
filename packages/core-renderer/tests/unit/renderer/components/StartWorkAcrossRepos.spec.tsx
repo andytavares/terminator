@@ -8,7 +8,7 @@ import { useExtensionRegistry } from '../../../../src/extensions/registry'
 import { useTaskStore } from '../../../../src/stores/task.store'
 import { useWorkspaceStore } from '../../../../src/stores/workspace.store'
 import { installElectronApi } from '../../../../../test-support/src/electron-api'
-import { task } from '../../../../../core-shared/tests/unit/renderer/home/fixtures'
+import { task } from '../home/fixtures'
 import type { ElectronAPI } from '../../../../../core-shared/src/electron-api/api-type'
 import type { Project, Workspace } from '../../../../../core-shared/src/types/index'
 

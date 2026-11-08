@@ -148,14 +148,16 @@ const TEST_PROJECTS = [
     files: [
       'tests/**/*.ts',
       'tests/**/*.tsx',
-      'packages/core-*/tests/**/*.ts',
-      'packages/core-*/tests/**/*.tsx',
       'packages/extension-ui/tests/**/*.ts',
       'packages/extension-ui/tests/**/*.tsx',
       'packages/test-support/**/*.ts',
     ],
     project: './tsconfig.test.json',
   },
+  ...['core-main', 'core-renderer', 'core-renderer-remote', 'core-shared'].map((name) => ({
+    files: [`packages/${name}/tests/**/*.ts`, `packages/${name}/tests/**/*.tsx`],
+    project: `./packages/${name}/tsconfig.test.json`,
+  })),
   {
     files: ['packages/core-main/src/**/*.spec.ts', 'packages/core-shared/src/**/*.spec.ts'],
     project: './packages/core-main/tsconfig.json',

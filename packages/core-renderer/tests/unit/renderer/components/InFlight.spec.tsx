@@ -15,7 +15,7 @@ import { useChangeStatsStore } from '../../../../src/stores/change-stats.store'
 import { installElectronApi } from '../../../../../test-support/src/electron-api'
 import { FACTS, REPO_ROOT, seedDesk, sendToAgentAsk, ticket } from '../home/desk-world'
 import { fact } from '../sidebar/fixtures/facts'
-import { task } from '../../../../../core-shared/tests/unit/renderer/home/fixtures'
+import { task } from '../home/fixtures'
 
 const spies = vi.hoisted(() => ({
   open: vi.fn(),

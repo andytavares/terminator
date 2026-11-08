@@ -8,7 +8,7 @@ import { useFocusStore } from '../../../../src/home/focus-store'
 import { localDateKey } from '../../../../src/home/focus'
 import { useHomeFeedStore } from '../../../../src/stores/home-feed.store'
 import { installElectronApi } from '../../../../../test-support/src/electron-api'
-import { facet } from '../../../../../core-shared/tests/unit/renderer/home/fixtures'
+import { facet } from '../home/fixtures'
 import { FACETS, FACTS, NOW, REPO_ROOT, seedDesk } from '../home/desk-world'
 
 const world = vi.hoisted(() => ({ facts: [] as unknown[] }))

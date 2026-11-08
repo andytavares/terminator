@@ -23,12 +23,14 @@
     "tests/integration/**/*",
     "tests/e2e/**/*",
     "tests/live/**/*",
-    "packages/core-*/tests/**/*",
     "packages/extension-ui/tests/**/*",
     "packages/test-support/src/**/*",
     "packages/test-support/tests/**/*",
+    "packages/test-support/fixtures/**/*.ts",
     "packages/test-support/setup.ts",
     "packages/test-support/global-setup.ts",
-    "packages/core-renderer/src/electron-api.d.ts"
+    "packages/core-renderer/src/electron-api.d.ts",
+    // Declares window.terminatorE2E, which the e2e helpers read.
+    "packages/core-renderer/src/terminal/terminal-rows.ts"
   ]
 }

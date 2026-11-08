@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { FRAME_PORT_MESSAGE, type FrameReply } from '../../../src/frame-wire'
-import type { FrameElectronAPI } from '../../../src/electron-api/api-type'
+import { FRAME_PORT_MESSAGE, type FrameReply } from '../../../../core-shared/src/frame-wire'
+import type { FrameElectronAPI } from '../../../../core-shared/src/electron-api/api-type'
 
 /** window.electronAPI as the frame shim builds it (a different surface than
  * the app renderer's ElectronAPI global). */
@@ -17,7 +17,7 @@ interface FakePort {
   postMessage: (message: unknown) => void
 }
 
-const SHIM_PATH = '../../../../core-renderer/extension-frame/frame-shim'
+const SHIM_PATH = '../../../extension-frame/frame-shim'
 
 function deliverPort(port: MessagePort, source: unknown = window.parent) {
   window.dispatchEvent(

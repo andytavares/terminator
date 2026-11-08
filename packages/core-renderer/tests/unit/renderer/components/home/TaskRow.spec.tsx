@@ -8,7 +8,7 @@ import type { WorkThread } from '../../../../../src/home/work-threads'
 import type { TaskLane } from '../../../../../../core-shared/src/schemas/tasks.schema'
 import { useTaskStore } from '../../../../../src/stores/task.store'
 import { installElectronApi } from '../../../../../../test-support/src/electron-api'
-import { task } from '../../../../../../core-shared/tests/unit/renderer/home/fixtures'
+import { task } from '../../home/fixtures'
 
 const api = { repoRoot: '/code/api', branch: 'rate-limits' }
 const web = { repoRoot: '/code/web', branch: 'rate-limits' }

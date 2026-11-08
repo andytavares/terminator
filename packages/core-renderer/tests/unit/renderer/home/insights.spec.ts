@@ -18,7 +18,7 @@ import type {
   HomeMeasure,
   ThreadFacet,
 } from '../../../../../core-shared/src/schemas/home-feed.schema'
-import { facet } from '../../../../../core-shared/tests/unit/renderer/home/fixtures'
+import { facet } from './fixtures'
 
 const NOW = Date.parse('2026-10-18T12:00:00.000Z')
 const DAY = 86_400_000

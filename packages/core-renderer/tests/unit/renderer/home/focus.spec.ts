@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { carriedOver, focusDone, localDateKey, type FocusItem } from '../../../../src/home/focus'
 import { allWorkThreads } from '../../../../src/home/work-threads'
-import { facet } from '../../../../../core-shared/tests/unit/renderer/home/fixtures'
+import { facet } from './fixtures'
 
 const NOW = Date.parse('2026-10-18T12:00:00.000Z')
 const focusItem = (patch: Partial<FocusItem> = {}): FocusItem => ({
