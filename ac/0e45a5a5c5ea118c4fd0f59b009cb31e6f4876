@@ -1,0 +1,22 @@
+scripts/e2e-shard.mjs
+  s_7a27f124c1e8e3::t_eb5a7e078a99f7 136-137,146
+  s_7a27f124c1e8e3::t_4951c6d1b3e3b0 139-141
+tests/integration/scripts/e2e-shard.spec.ts
+  s_7a27f124c1e8e3::t_9658f71d36dfb5 70-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ac0e45a5a5c5ea118c4fd0f59b009cb31e6f4876",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
