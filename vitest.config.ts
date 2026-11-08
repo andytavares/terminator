@@ -41,9 +41,9 @@ const NODE_INCLUDE = [
 export default defineConfig({
   test: {
     globals: true,
-    // Vitest 5 clears mocks before each test by default; specs here register IPC handlers once
-    // per file and read them back from the mock's calls.
-    clearMocks: false,
+    // Each test starts with its mocks reset, calls and implementations alike: a test that reads a
+    // mock another test or a beforeAll set up depends on the order (T-CLEAN-SLATE).
+    mockReset: true,
     globalSetup: ['tests/global-setup.ts'],
     setupFiles: ['tests/setup.ts'],
     // Vitest turns every stylesheet into an empty string, `?raw` imports included.
@@ -72,6 +72,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'node',
+          provide: { testTier: 'unit' },
           environment: 'node',
           include: NODE_INCLUDE,
           exclude: [
@@ -85,9 +86,6 @@ export default defineConfig({
             // they would report "skipped", and a skip in a green suite is a
             // check nobody notices is missing.
             'extensions/*/tests/live/**',
-            // Wall-clock budgets run alone, in `npm run test:perf`
-            // (vitest.perf.config.ts): beside every other spec they measure the load.
-            '**/*.perf.spec.ts',
           ],
         },
       },
@@ -95,6 +93,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'jsdom',
+          provide: { testTier: 'unit' },
           environment: 'jsdom',
           include: JSDOM_INCLUDE,
           exclude: [...configDefaults.exclude, ...HAPPY_DOM_INCLUDE, ...INTEGRATION_INCLUDE],
@@ -104,6 +103,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'happy-dom',
+          provide: { testTier: 'unit' },
           environment: 'happy-dom',
           include: HAPPY_DOM_INCLUDE,
           exclude: [...configDefaults.exclude, ...INTEGRATION_INCLUDE],
@@ -113,9 +113,10 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'integration',
+          provide: { testTier: 'integration' },
           environment: 'node',
           include: INTEGRATION_INCLUDE,
-          exclude: [...configDefaults.exclude, '**/*.perf.spec.ts'],
+          exclude: configDefaults.exclude,
         },
       },
     ],
@@ -134,7 +135,6 @@ export default defineConfig({
       exclude: [
         'vitest.config.ts',
         'vitest.live.config.ts',
-        'vitest.perf.config.ts',
         'playwright.config.ts',
         'packages/*/vite.config.ts',
         'src/renderer/index.tsx',

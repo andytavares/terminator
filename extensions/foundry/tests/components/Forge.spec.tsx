@@ -93,10 +93,9 @@ beforeEach(() => {
 
 /** Puts `invoke` and the change bus behind the bridge the Forge reads. */
 function installForgeBridge(): void {
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke, on: bus.on }, usage: { record: vi.fn() } },
-    configurable: true,
-    writable: true,
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: { invoke, on: bus.on },
+    usage: { record: vi.fn() },
   })
 }
 

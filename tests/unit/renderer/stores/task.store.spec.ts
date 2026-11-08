@@ -18,9 +18,8 @@ const api = {
   }),
 }
 
-Object.defineProperty(globalThis, 'window', {
-  value: { electronAPI: { tasks: api } },
-  writable: true,
+beforeEach(() => {
+  vi.stubGlobal('window', { electronAPI: { tasks: api } })
 })
 
 import { useTaskStore } from '../../../../src/renderer/stores/task.store'

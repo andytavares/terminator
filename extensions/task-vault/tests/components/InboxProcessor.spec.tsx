@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, act, fireEvent } from '@testing-library/react'
+import { render, screen, cleanup, act } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { installVaultBridge, eventually, indexedProject, task } from './helpers/bridge'
 import { FileToPicker } from '../../src/components/FileToPicker'
@@ -138,8 +138,8 @@ function inboxProcessorClarifyingTests() {
   it('walks each item through the clarify questions', async () => {
     const user = userEvent.setup()
     renderProcessor()
-    expect(screen.queryByText('1 of 2')).not.toBeNull()
-    expect(screen.queryByText('@Home')).not.toBeNull()
+    expect(screen.getByText('1 of 2')).toBeTruthy()
+    expect(screen.getByText('@Home')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Yes' }))
     await user.click(screen.getByRole('button', { name: 'Do now — Today' }))
     await screen.findByText('2 of 2')
@@ -163,7 +163,7 @@ function inboxProcessorFinishingTests() {
       expect(bridge.recordUsage).toHaveBeenCalledWith('inbox-process', { failed: true })
     )
     await act(async () => undefined)
-    expect(screen.queryByText('1 of 2')).not.toBeNull()
+    expect(screen.getByText('1 of 2')).toBeTruthy()
   })
 
   it('moves on from an item the vault no longer has, and finishes after the last', async () => {
@@ -178,7 +178,7 @@ function inboxProcessorFinishingTests() {
 
   it('says when there is nothing to process', () => {
     render(<InboxProcessor items={[]} onDone={vi.fn()} />)
-    expect(screen.queryByText('All items processed!')).not.toBeNull()
+    expect(screen.getByText('All items processed!')).toBeTruthy()
   })
 }
 
@@ -243,16 +243,14 @@ function inboxProcessorFilingLeavingTests() {
     renderProcessor()
     await openDestination(user)
     await user.click(screen.getByRole('button', { name: 'Back' }))
-    expect(screen.queryByText('Can it be done in <2 minutes?')).not.toBeNull()
+    expect(screen.getByText('Can it be done in <2 minutes?')).toBeTruthy()
   })
 
   it('sends the item to the backlog from the destination step', async () => {
     const user = userEvent.setup()
     renderProcessor()
     await openDestination(user)
-    // A real press closes the picker first (useCloseOnOutsidePress), which unmounts Backlog
-    // before the click lands; reported as an app defect.
-    fireEvent.click(screen.getByRole('button', { name: 'Backlog' }))
+    await user.click(screen.getByRole('button', { name: 'Backlog' }))
     await screen.findByText('2 of 2')
     expect(bridge.calls('task-vault:vault:process-inbox-item')[0]).toMatchObject({
       action: 'someday',
@@ -273,7 +271,7 @@ function inboxProcessorReloadTests() {
     // What InboxView does when the vault broadcasts that the index changed.
     rerender(<InboxProcessor items={[SECOND, THIRD]} onDone={onDone} />)
     await screen.findByText(/^2 of/)
-    expect(screen.queryByText('Write a novel')).not.toBeNull()
+    expect(screen.getByText('Write a novel')).toBeTruthy()
   })
 
   it('finishes after the last item it was opened with', async () => {

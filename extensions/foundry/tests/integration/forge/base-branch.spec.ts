@@ -61,7 +61,8 @@ describe('seedOrder', () => {
       { now: () => '2026-09-06T10:00:00.000Z', newId: () => 'WO-0906-abc' }
     )
     fs.rmSync(other, { recursive: true, force: true })
-    if (!('order' in seeded)) throw new Error('expected an order')
-    expect(seeded.order.context.repos.map((r) => r.baseBranch)).toEqual(['master', 'main'])
+    expect(seeded).toMatchObject({
+      order: { context: { repos: [{ baseBranch: 'master' }, { baseBranch: 'main' }] } },
+    })
   })
 })

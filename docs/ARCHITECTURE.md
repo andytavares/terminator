@@ -422,7 +422,7 @@ Each row is handed one `RowContext` with those actions, the collapse state and t
 
 ### The view-model layer
 
-`src/renderer/sidebar/` holds the pure core. **These modules import nothing but types**: no React, no store, no `Date.now()`. `now` is always a parameter. `tests/unit/renderer/sidebar/purity.spec.ts` guards the directory and not any one module, so a file added here inherits the rule.
+`src/renderer/sidebar/` holds the pure core. **These modules import nothing but types**: no React, no store, no `Date.now()`. `now` is always a parameter. `npm run lint` guards the directory and not any one module (`pureLayers` in `eslint.config.mjs`), so a file added here inherits the rule.
 
 | Module                                                    | Role                                                                                     |
 | --------------------------------------------------------- | ---------------------------------------------------------------------------------------- |

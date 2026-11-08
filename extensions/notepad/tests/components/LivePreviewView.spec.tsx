@@ -24,9 +24,12 @@ let view: EditorView | null = null
 function deferSelectionChange(event: Event): void {
   if ('deferred' in event) return
   event.stopImmediatePropagation()
-  setTimeout(() =>
+  const task = new MessageChannel()
+  task.port1.onmessage = () => {
+    task.port1.close()
     document.dispatchEvent(Object.assign(new Event('selectionchange'), { deferred: true }))
-  )
+  }
+  task.port2.postMessage(null)
 }
 
 beforeEach(() => window.addEventListener('selectionchange', deferSelectionChange, true))
@@ -58,11 +61,7 @@ function mountPreview(doc: string, extensions: Extension[] = []): EditorView {
 
 function installShell() {
   const openExternal = vi.fn(async () => ({ ok: true }))
-  Object.defineProperty(window, 'electronAPI', {
-    value: { shell: { openExternal } },
-    writable: true,
-    configurable: true,
-  })
+  vi.stubGlobal('electronAPI', { shell: { openExternal } })
   return openExternal
 }
 

@@ -47,11 +47,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   // Pending, so the Claude Code block stays empty in the tracker tests.
   claudeCode.status.mockReturnValue(new Promise(() => {}))
-  Object.defineProperty(window, 'electronAPI', {
-    value: { integrations: api, claudeCode },
-    writable: true,
-    configurable: true,
-  })
+  vi.stubGlobal('electronAPI', { integrations: api, claudeCode })
   // The component imports this same store instance; zustand state is
   // module-level and would otherwise leak into the next test.
   useIntegrationsStore.setState({ connections: [], connectError: {}, loading: false })

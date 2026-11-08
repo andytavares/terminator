@@ -2,11 +2,11 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { PrDialog } from '../../../extensions/git-integration/src/components/PrDialog'
-import type { PullRequest } from '../../../extensions/git-integration/src/schemas/git.schema'
-import type { ElectronAPI } from '../../../src/shared/electron-api/api-type'
-import { installElectronApi } from '../../support/electron-api'
-import { pressOutside } from '../../support/modal'
+import { PrDialog } from '../../src/components/PrDialog'
+import type { PullRequest } from '../../src/schemas/git.schema'
+import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
+import { installElectronApi } from '../../../../tests/support/electron-api'
+import { pressOutside } from '../../../../tests/support/modal'
 
 const mockShellExec = vi.fn<ElectronAPI['shell']['exec']>()
 const mockListBranches = vi.fn<ElectronAPI['git']['listBranches']>()

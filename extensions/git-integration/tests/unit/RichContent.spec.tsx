@@ -4,17 +4,15 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RichContent } from '../../src/components/pr-review/RichContent'
 
-const mockOpenExternal = vi.fn().mockResolvedValue({ ok: true })
-
-Object.defineProperty(window, 'electronAPI', {
-  writable: true,
-  value: { shell: { openExternal: mockOpenExternal } },
-})
+const mockOpenExternal = vi.fn()
 
 // The sanitising, link and HTML behaviour belongs to the design system's
 // Markdown and is specified in tests/unit/packages/extension-ui/markdown.spec.tsx;
 // this file covers what the review UI adds to it.
-beforeEach(() => mockOpenExternal.mockClear())
+beforeEach(() => {
+  mockOpenExternal.mockResolvedValue({ ok: true })
+  vi.stubGlobal('electronAPI', { shell: { openExternal: mockOpenExternal } })
+})
 
 describe('RichContent', () => {
   it('keeps the rich-content class the review stylesheet targets', () => {

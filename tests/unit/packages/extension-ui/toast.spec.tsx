@@ -134,7 +134,7 @@ describe('ToastRegion — while a modal shell is open', () => {
 
   it('renders in the page when none is open', () => {
     render(<AppWithToast modals={[]} />)
-    expect(screen.getByRole('status').closest('dialog')).toBeNull()
+    expect(holderOf(screen.getByRole('status'))).toBeUndefined()
   })
 
   it('renders inside the shell opened last', () => {
@@ -147,6 +147,6 @@ describe('ToastRegion — while a modal shell is open', () => {
     rerender(<AppWithToast modals={['Settings']} />)
     expect(holderOf(screen.getByRole('status'))).toBe('Settings')
     rerender(<AppWithToast modals={[]} />)
-    expect(screen.getByRole('status').closest('dialog')).toBeNull()
+    expect(holderOf(screen.getByRole('status'))).toBeUndefined()
   })
 })

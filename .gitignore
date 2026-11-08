@@ -31,3 +31,4 @@ playwright-report/
 .vitest/
 storybook-static/
 
+.stryker-tmp/

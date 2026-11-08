@@ -29,7 +29,7 @@ vi.mock('../../../../src/renderer/components/sidebar/CreateProjectDialog', () =>
 vi.mock('../../../../src/renderer/components/sidebar/CreateWorkspaceDialog', () => ({
   CreateWorkspaceDialog: () => null,
 }))
-const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
+const mockCreateSession = vi.fn()
 vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
   useTerminalSession: () => ({ createSession: mockCreateSession }),
 }))
@@ -119,7 +119,7 @@ function seedRegistry(): void {
 }
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  mockCreateSession.mockResolvedValue('ses-1')
   localStorage.clear()
   seedStores()
   seedRegistry()

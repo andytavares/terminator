@@ -10,11 +10,7 @@ const mockInvoke = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke: mockInvoke } },
-    configurable: true,
-    writable: true,
-  })
+  vi.stubGlobal('electronAPI', { extensionBridge: { invoke: mockInvoke } })
 })
 
 function emptyDay(date: string, future = false): ContributionsDay {

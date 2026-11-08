@@ -126,7 +126,7 @@ describe('a hidden page', () => {
   })
 
   function setPageHidden(hidden: boolean): void {
-    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden })
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(hidden)
     document.dispatchEvent(new Event('visibilitychange'))
   }
 

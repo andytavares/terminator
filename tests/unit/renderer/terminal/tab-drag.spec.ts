@@ -15,7 +15,7 @@ const mainWindow = { screenX: 100, screenY: 50, outerWidth: 1280, outerHeight: 8
 
 function placeMainWindow(): void {
   for (const [key, value] of Object.entries(mainWindow)) {
-    Object.defineProperty(window, key, { value, configurable: true })
+    vi.stubGlobal(key, value)
   }
 }
 

@@ -46,11 +46,7 @@ const storedLinkOf = (sessionId: string) =>
 
 beforeEach(() => {
   vi.clearAllMocks()
-  Object.defineProperty(window, 'electronAPI', {
-    value: { sessionRecords: { setLink } },
-    writable: true,
-    configurable: true,
-  })
+  vi.stubGlobal('electronAPI', { sessionRecords: { setLink } })
   useIntegrationsStore.setState({
     ...useIntegrationsStore.getInitialState(),
     connections: [trackerConnectionOf()],

@@ -163,10 +163,7 @@ describe('credentials', () => {
 
   it('sends the user back to the login page on 401', async () => {
     const replace = vi.fn()
-    Object.defineProperty(window, 'location', {
-      value: { ...window.location, replace },
-      writable: true,
-    })
+    vi.stubGlobal('location', { ...window.location, replace })
     const { listWorkspaces } = await import('../../../src/renderer-remote/api/remote-client')
     mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
     await expect(listWorkspaces()).rejects.toThrow('401')

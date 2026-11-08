@@ -76,11 +76,7 @@ beforeEach(() => {
   metricsApi.getProcesses.mockResolvedValue({
     data: [{ pid: 42, cpuPercent: 12.5, rssBytes: 1_048_576 }],
   })
-  Object.defineProperty(window, 'electronAPI', {
-    value: { metrics: metricsApi, sessionRecords: { setDescription } },
-    writable: true,
-    configurable: true,
-  })
+  vi.stubGlobal('electronAPI', { metrics: metricsApi, sessionRecords: { setDescription } })
   resetStore(useSessionRecordsStore)
   useMetricsStore.setState(useMetricsStore.getInitialState(), true)
   useExtensionRegistry.setState(useExtensionRegistry.getInitialState(), true)

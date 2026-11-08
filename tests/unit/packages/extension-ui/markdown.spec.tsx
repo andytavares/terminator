@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
-import { render, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Markdown } from '../../../../packages/extension-ui/src/Markdown'
 
@@ -463,18 +463,18 @@ describe('Markdown when the view around it re-renders', () => {
     const first = vi.fn()
     const latest = vi.fn()
     const body = '[docs](https://e.example/d)'
-    const view = render(
+    const { rerender } = render(
       <Markdown onOpenLink={first} fetchesNothing>
         {body}
       </Markdown>
     )
-    const link = view.getByRole('link', { name: 'docs' })
-    view.rerender(
+    const link = screen.getByRole('link', { name: 'docs' })
+    rerender(
       <Markdown onOpenLink={latest} fetchesNothing>
         {body}
       </Markdown>
     )
-    expect(view.getByRole('link', { name: 'docs' })).toBe(link)
+    expect(screen.getByRole('link', { name: 'docs' })).toBe(link)
     await userEvent.setup().click(link)
     expect(latest).toHaveBeenCalledWith('https://e.example/d')
     expect(first).not.toHaveBeenCalled()

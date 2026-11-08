@@ -63,10 +63,9 @@ function mountLive(read: () => unknown) {
     'foundry:run.activity': () => ({ activity: {} }),
   }
   invoke = vi.fn(async (channel: string) => (channel in replies ? replies[channel]() : {}))
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke, on: bus.on }, usage: { record: vi.fn() } },
-    configurable: true,
-    writable: true,
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: { invoke, on: bus.on },
+    usage: { record: vi.fn() },
   })
   render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
   return bus
@@ -446,7 +445,7 @@ function replayingTests() {
     })) as HTMLInputElement
     expect(invoke).toHaveBeenCalledWith('foundry:run.timeline', { id: 'WO-1' })
     expect(plateText()).toContain('Working')
-    // user-event cannot move a range input to a value.
+    // eslint-disable-next-line testing-library/prefer-user-event -- user-event cannot move a range input to a value
     fireEvent.change(position, { target: { value: position.max } })
     await waitFor(() => expect(plateText()).toContain('Done'))
     await user.click(screen.getByRole('button', { name: 'Back to live' }))
@@ -490,7 +489,7 @@ function replayingCiTests() {
         'Waiting on checks · 1 of 2 done'
       )
     )
-    // user-event cannot move a range input to a value.
+    // eslint-disable-next-line testing-library/prefer-user-event -- user-event cannot move a range input to a value
     fireEvent.change(position, { target: { value: position.max } })
     await waitFor(() =>
       expect(document.querySelector('.fdry-callout[data-pinned="true"]')).toBeNull()
@@ -610,11 +609,11 @@ function readingTheTranscriptTests() {
     mount({ lines })
     freshLinesOnEveryRead()
     const station = await screen.findByRole('button', { name: /Build the thing/ })
-    vi.useFakeTimers()
+    // shouldAdvanceTime: Testing Library's async wrapper waits on a timer, or user-event hangs.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     try {
-      // fireEvent: under vi fake timers Testing Library's async wrapper waits on a
-      // real setTimeout that never fires, so user-event hangs here.
-      fireEvent.click(station)
+      await user.click(station)
       await act(() => vi.advanceTimersByTimeAsync(0))
 
       const reads = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:run-transcript')
@@ -627,7 +626,7 @@ function readingTheTranscriptTests() {
       expect(reads().length).toBe(2)
       expect(screen.getByRole('log', { name: 'Transcript' }).textContent).toContain('second')
 
-      fireEvent.click(screen.getByRole('button', { name: 'Close monitor' }))
+      await user.click(screen.getByRole('button', { name: 'Close monitor' }))
       await act(() => vi.advanceTimersByTimeAsync(300))
       expect(screen.queryByRole('log', { name: 'Transcript' })).toBeNull()
       await act(() => vi.advanceTimersByTimeAsync(6000))

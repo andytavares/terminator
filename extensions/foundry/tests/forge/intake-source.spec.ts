@@ -31,6 +31,12 @@ function deps(over: Partial<SeedDeps> = {}): SeedDeps {
   }
 }
 
+async function seedAnOrder(...args: Parameters<typeof seedOrder>) {
+  const result = await seedOrder(...args)
+  if (!('order' in result)) throw new Error(`expected an order, got: ${result.error}`)
+  return result
+}
+
 beforeEach(() => {
   repo = makeTempDir('foundry-intake-')
   write('package.json', JSON.stringify({ scripts: { test: 'vitest run', lint: 'eslint .' } }))
@@ -56,12 +62,10 @@ const issue = {
 
 function aCompleteDraftTests() {
   it('produces a complete draft without asking anything first', async () => {
-    const r = await seedOrder(
+    const r = await seedAnOrder(
       { kind: 'typed', text: 'the greeting should say hello, not hi', repoPaths: [repo] },
       deps()
     )
-    expect('order' in r).toBe(true)
-    if (!('order' in r)) return
     expect(r.order.status).toBe('draft')
     expect(r.order.title).toContain('hello')
     expect(r.order.intent.problem).toContain('hello')
@@ -69,8 +73,7 @@ function aCompleteDraftTests() {
   })
 
   it('fills the toolchain from the repository before anything else happens', async () => {
-    const r = await seedOrder({ kind: 'typed', text: 'x', repoPaths: [repo] }, deps())
-    if (!('order' in r)) throw new Error('expected an order')
+    const r = await seedAnOrder({ kind: 'typed', text: 'x', repoPaths: [repo] }, deps())
     expect(r.order.context.toolchain.test).toEqual({
       command: 'npm run test',
       source: 'hint',
@@ -82,16 +85,14 @@ function aCompleteDraftTests() {
 
 function whatTheRepositorySaysTests() {
   it('records the checks this repository cannot run, so the gap is known up front', async () => {
-    const r = await seedOrder({ kind: 'typed', text: 'x', repoPaths: [repo] }, deps())
-    if (!('order' in r)) throw new Error('expected an order')
+    const r = await seedAnOrder({ kind: 'typed', text: 'x', repoPaths: [repo] }, deps())
     expect(r.unavailableChecks).toEqual(expect.arrayContaining(['coverage', 'e2e']))
   })
 
   it('picks up whatever the project says about itself', async () => {
     write('CLAUDE.md', '# rules')
     write('.specify/memory/constitution.md', '# constitution')
-    const r = await seedOrder({ kind: 'typed', text: 'x', repoPaths: [repo] }, deps())
-    if (!('order' in r)) throw new Error('expected an order')
+    const r = await seedAnOrder({ kind: 'typed', text: 'x', repoPaths: [repo] }, deps())
     expect(r.order.context.houseDocs).toEqual(
       expect.arrayContaining(['CLAUDE.md', '.specify/memory/constitution.md'])
     )
@@ -99,9 +100,8 @@ function whatTheRepositorySaysTests() {
 
   it('completes in a repository that says nothing about itself', async () => {
     const bare = makeTempDir('foundry-bare-')
-    const r = await seedOrder({ kind: 'typed', text: 'x', repoPaths: [bare] }, deps())
+    const r = await seedAnOrder({ kind: 'typed', text: 'x', repoPaths: [bare] }, deps())
     fs.rmSync(bare, { recursive: true, force: true })
-    if (!('order' in r)) throw new Error('expected an order')
     expect(r.order.context.houseDocs).toEqual([])
     expect(r.unavailableChecks).toHaveLength(6)
   })
@@ -110,9 +110,8 @@ function whatTheRepositorySaysTests() {
 function lanesAndIssuesTests() {
   it('opens one lane per repository', async () => {
     const second = makeTempDir('foundry-second-')
-    const r = await seedOrder({ kind: 'typed', text: 'x', repoPaths: [repo, second] }, deps())
+    const r = await seedAnOrder({ kind: 'typed', text: 'x', repoPaths: [repo, second] }, deps())
     fs.rmSync(second, { recursive: true, force: true })
-    if (!('order' in r)) throw new Error('expected an order')
     expect(r.order.plan.lanes).toHaveLength(2)
   })
 
@@ -151,11 +150,10 @@ const signal = {
 
 function theTicketBranchTests() {
   it("still pushes to the ticket's branch after an architect blanks the lane branch", async () => {
-    const r = await seedOrder(
+    const r = await seedAnOrder(
       { kind: 'tracker', tracker: 'linear', key: 'TAV-42', repoPaths: [repo] },
       deps({ readIssue: vi.fn(async () => issue) })
     )
-    if (!('order' in r)) throw new Error('expected an order')
     const lane = r.order.plan.lanes[0]
     const proposal = parseProposal({ plan: { lanes: [{ ...lane, branch: '' }] } })
     const converged = applyProposal(r.order, proposal, '2026-09-06T12:00:00.000Z')
@@ -165,11 +163,10 @@ function theTicketBranchTests() {
 
 function whatIsSeededTests() {
   it('seeds title, intent and provenance from the issue', async () => {
-    const r = await seedOrder(
+    const r = await seedAnOrder(
       { kind: 'tracker', tracker: 'linear', key: 'TAV-42', repoPaths: [repo] },
       deps({ readIssue: vi.fn(async () => issue) })
     )
-    if (!('order' in r)) throw new Error('expected an order')
     expect(r.order.title).toBe(issue.title)
     expect(r.order.intent.problem).toContain('overflow')
     expect(r.order.source).toEqual({
@@ -182,11 +179,10 @@ function whatIsSeededTests() {
   })
 
   it('uses the branch name the tracker suggests rather than inventing one', async () => {
-    const r = await seedOrder(
+    const r = await seedAnOrder(
       { kind: 'tracker', tracker: 'linear', key: 'TAV-42', repoPaths: [repo] },
       deps({ readIssue: vi.fn(async () => issue) })
     )
-    if (!('order' in r)) throw new Error('expected an order')
     expect(r.order.plan.lanes[0].branch).toBe('andrew/tav-42-row-clipping')
   })
 }
@@ -203,7 +199,7 @@ function unreadableIssuesTests() {
 
 function theStatedOutcomeTests() {
   it('states the outcome the ticket already gives under its acceptance heading', async () => {
-    const r = await seedOrder(
+    const r = await seedAnOrder(
       { kind: 'tracker', tracker: 'linear', key: 'TAV-15', repoPaths: [repo] },
       deps({
         readIssue: vi.fn(async () => ({
@@ -220,7 +216,6 @@ function theStatedOutcomeTests() {
         })),
       })
     )
-    if (!('order' in r)) throw new Error('expected an order')
     expect(r.order.intent.outcome).toBe(
       '- Filters only list tickets in an open state\n- A text search matches tickets in any state'
     )
@@ -229,16 +224,15 @@ function theStatedOutcomeTests() {
 
 function noHeadingAndABareTitleTests() {
   it('leaves the outcome unstated when the ticket gives no acceptance heading', async () => {
-    const r = await seedOrder(
+    const r = await seedAnOrder(
       { kind: 'tracker', tracker: 'linear', key: 'TAV-42', repoPaths: [repo] },
       deps({ readIssue: vi.fn(async () => issue) })
     )
-    if (!('order' in r)) throw new Error('expected an order')
     expect(r.order.intent.outcome).toBe('')
   })
 
   it('seeds an issue with nothing but a title', async () => {
-    const r = await seedOrder(
+    const r = await seedAnOrder(
       { kind: 'tracker', tracker: 'linear', key: 'TAV-7', repoPaths: [repo] },
       deps({
         readIssue: vi.fn(async () => ({
@@ -250,7 +244,6 @@ function noHeadingAndABareTitleTests() {
         })),
       })
     )
-    if (!('order' in r)) throw new Error('expected an order')
     expect(r.order.title).toBe('Just a title')
     expect(r.order.intent.problem).toBe('Just a title')
   })
@@ -264,22 +257,20 @@ describe('seedOrder from a signal (ADR-066)', () => {
 
 function seedingFromTheSignalTests() {
   it('seeds title and one problem line per piece of evidence', async () => {
-    const r = await seedOrder(
+    const r = await seedAnOrder(
       { kind: 'signal', signalId: 'sig-1', repoPaths: [repo] },
       deps({ readSignal: vi.fn(async () => signal) })
     )
-    if (!('order' in r)) throw new Error('expected an order')
     expect(r.order.title).toBe('CI is flaky on main')
     expect(r.order.intent.problem).toContain('- run 1 (https://x/1)')
     expect(r.order.intent.problem).toContain('- run 2 (https://x/2)')
   })
 
   it('sources the order from the signal, with the first evidence url', async () => {
-    const r = await seedOrder(
+    const r = await seedAnOrder(
       { kind: 'signal', signalId: 'sig-1', repoPaths: [repo] },
       deps({ readSignal: vi.fn(async () => signal) })
     )
-    if (!('order' in r)) throw new Error('expected an order')
     expect(r.order.source).toEqual({
       kind: 'signal',
       tracker: null,
@@ -291,11 +282,10 @@ function seedingFromTheSignalTests() {
 
 function aSignalWithNoEvidenceTests() {
   it('seeds a signal that carries no evidence, with no url to point at', async () => {
-    const r = await seedOrder(
+    const r = await seedAnOrder(
       { kind: 'signal', signalId: 'sig-1', repoPaths: [repo] },
       deps({ readSignal: vi.fn(async () => ({ ...signal, evidence: [] })) })
     )
-    if (!('order' in r)) throw new Error('expected an order')
     expect(r.order.intent.problem).toBe('CI is flaky on main')
     expect(r.order.source.url).toBeNull()
   })

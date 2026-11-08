@@ -117,7 +117,7 @@ async function workProjectTasks(): Promise<void> {
 
 /** Completing the task moves it to the done list; reopening puts it back on today's log. */
 async function completeAndReopenTask(card: Locator): Promise<void> {
-  await card.getByTitle('Complete').click()
+  await card.getByRole('button', { name: 'Complete', exact: true }).click()
   await expect(card.locator('.projects-browser__done-tasks summary')).toHaveText(
     '1 completed/cancelled'
   )
@@ -126,7 +126,7 @@ async function completeAndReopenTask(card: Locator): Promise<void> {
     .toMatchObject({ status: 'done' })
 
   await card.locator('.projects-browser__done-tasks summary').click()
-  await pressRowAction(card.getByTitle("Reopen on today's log"))
+  await pressRowAction(card.getByRole('button', { name: "Reopen on today's log", exact: true }))
   await expect(card.locator('.projects-browser__done-tasks')).toHaveCount(0)
   await expect
     .poll(() => storedTask(vault, 'Write the hero copy'))
@@ -153,18 +153,18 @@ async function renameMoveAndDeadline(): Promise<void> {
     .poll(() => storedProject('Launch the new website'))
     .toMatchObject({ area: 'Engineering' })
 
-  await renamed.getByTitle('Edit deadline').click()
+  await renamed.getByRole('button', { name: /^due: / }).click()
   await renamed.getByRole('button', { name: 'Clear', exact: true }).click()
-  await expect(renamed.getByTitle('Set deadline')).toBeVisible()
+  await expect(renamed.getByRole('button', { name: '+ due date', exact: true })).toBeVisible()
   await expect
     .poll(() => storedProject('Launch the new website'))
     .toHaveProperty('deadline', undefined)
 
-  await renamed.getByTitle('Set deadline').click()
+  await renamed.getByRole('button', { name: '+ due date', exact: true }).click()
   await renamed.getByRole('button', { name: 'Pick a date' }).click()
   await vault.locator('.dtp__popover').getByRole('button', { name: '1 week' }).click()
   await renamed.getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(renamed.getByTitle('Edit deadline')).toBeVisible()
+  await expect(renamed.getByRole('button', { name: /^due: / })).toBeVisible()
   expect((await storedProject('Launch the new website'))?.deadline).toMatch(/^\d{4}-\d{2}-\d{2}$/)
 }
 
@@ -225,7 +225,7 @@ async function editAndCompleteAreaTask(): Promise<void> {
   await expect(vault.locator('.area-detail__task-text')).toHaveText(['Book a dental check-up'])
 
   // The area lists what is still to do: a finished task leaves it for History.
-  await vault.getByTitle('Complete').click()
+  await vault.getByRole('button', { name: 'Complete', exact: true }).click()
   await expect(vault.locator('.area-detail__task-text')).toHaveCount(0)
   await expect
     .poll(() => storedTask(vault, 'Book a dental check-up'))

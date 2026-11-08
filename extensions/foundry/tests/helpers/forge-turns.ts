@@ -17,6 +17,8 @@ export interface ForgeTurnInput {
   onTurnEnd?: () => void
   onStructuredOutput?: (answer: unknown) => void
   onEnd: (exitCode: number | null) => void
+  /** Runs `end` once Foundry took in the session `start` answered (`supervision-mocks.ts`). */
+  whenStarted: (end: () => void) => void
 }
 
 /** What the scripted agents do, read at each turn: the records, what each role writes on its
@@ -89,12 +91,12 @@ export function scriptedTurns(script: () => TurnScript) {
     input.onRegistered({ sessionId, transcriptFrom: 0 })
     const wait = heldTurn?.phase === input.phase ? heldTurn.release : Promise.resolve()
     void wait.then(() =>
-      setTimeout(() => {
+      input.whenStarted(() => {
         // The architect hands its proposal back as structured output, not a file.
         if (input.phase === 'architect' && written !== undefined)
           input.onStructuredOutput?.(written)
         endTurn(input, written !== undefined)
-      }, 0)
+      })
     )
     return { sessionId, transcriptFrom: 0, terminalSessionId: 't', transcriptPath: '/none' }
   }

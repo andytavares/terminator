@@ -30,22 +30,14 @@ async function expectSubscribedToWorkspaceChanges(): Promise<(data: unknown) => 
 
 function setSearch(params: Record<string, string>): void {
   const search = '?' + new URLSearchParams(params).toString()
-  Object.defineProperty(window, 'location', {
-    value: { search },
-    configurable: true,
-    writable: true,
-  })
+  vi.stubGlobal('location', { search })
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
   const unsubscribe = vi.fn()
   mockBridgeOn.mockReturnValue(unsubscribe)
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { on: mockBridgeOn } },
-    configurable: true,
-    writable: true,
-  })
+  vi.stubGlobal('electronAPI', { extensionBridge: { on: mockBridgeOn } })
 })
 
 describe('git-integration renderer App', () => {

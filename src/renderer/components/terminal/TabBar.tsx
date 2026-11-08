@@ -284,7 +284,12 @@ function SessionTabs(props: SessionTabsProps): React.JSX.Element {
       {sessions.map((session) => (
         <SessionTab key={session.id} {...props} session={session} onDrop={dropOf(session.id)} />
       ))}
-      <button className="tab-bar__new-tab" onClick={props.onNewTab} title="New tab (⌘T)">
+      <button
+        className="tab-bar__new-tab"
+        onClick={props.onNewTab}
+        title="New tab (⌘T)"
+        aria-label="New tab"
+      >
         +
       </button>
     </div>

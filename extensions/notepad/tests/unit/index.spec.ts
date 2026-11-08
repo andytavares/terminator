@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
@@ -114,6 +114,37 @@ function notepadActivateGlobalShortcutRegistrationsViewMenuTests() {
     expect(channels).toContain('extension:activate-global-tab')
   })
 }
+
+/** The view asks for a New Note made before it existed: what it is answered. */
+async function consumePending(api: ExtensionAPI): Promise<unknown> {
+  const specs = vi.mocked(api.ipc.registerHandler).mock.calls.map((c) => c[0])
+  const consume = specs.find(
+    (spec) => spec.channel === 'terminator.notepad:ui.consumePendingQuickCreate'
+  )
+  return consume?.run(undefined)
+}
+
+describe('notepad New Note made while its view is still loading', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('waits for the view however long it takes to load', async () => {
+    vi.useFakeTimers()
+    const { api } = makeApi()
+    const { activate } = await import('../../src/index.ts')
+    await activate(api)
+    const item = vi
+      .mocked(api.nativeMenu.addViewMenuItem)
+      .mock.calls.map((c) => c[0])
+      .find((i) => i.id === 'notepad-new-note')
+    item?.onClick()
+
+    vi.advanceTimersByTime(60_000)
+
+    await expect(consumePending(api)).resolves.toEqual({ data: { pending: true } })
+  })
+})
 
 function notepadActivateQuickActionsCommandTests() {
   beforeEach(() => {

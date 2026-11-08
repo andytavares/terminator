@@ -81,10 +81,9 @@ function mount(profile: ProfileFacts, order = orderWithUnit()): void {
     if (channel === 'foundry:profile-read' || channel === 'foundry:profile-save') return profile
     return CONVERGING.has(channel) ? answer() : {}
   })
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke, on: bus.on }, usage: { record: recordUsage } },
-    configurable: true,
-    writable: true,
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: { invoke, on: bus.on },
+    usage: { record: recordUsage },
   })
   render(<Forge orderId="WO-1" />)
 }
@@ -111,10 +110,9 @@ describe('the Checks step rows', () => {
 describe('the Checks step moves', () => {
   it('says a missing command will report not measured, and offers to add one', async () => {
     await openChecks()
-    const lint = rowNamed('Lint')
-    expect(lint.getByText('No command')).toBeTruthy()
-    expect(lint.getByText('Will report “not measured”')).toBeTruthy()
-    expect(lint.getByRole('button', { name: 'Add a command' })).toBeTruthy()
+    expect(rowNamed('Lint').getByText('No command')).toBeTruthy()
+    expect(rowNamed('Lint').getByText('Will report “not measured”')).toBeTruthy()
+    expect(rowNamed('Lint').getByRole('button', { name: 'Add a command' })).toBeTruthy()
   })
 
   it('offers the moves for a command that failed on main, and none for a passing one', async () => {
@@ -406,10 +404,9 @@ describe('removing a command Foundry found', () => {
     const profile = glyphProfile({ removed: ['format'] })
     profile.checks.format = null
     await openChecks(profile)
-    const format = rowNamed('Format')
-    expect(format.getByText('No command')).toBeTruthy()
-    expect(format.getByText('You removed the one Foundry found')).toBeTruthy()
-    await user.click(format.getByRole('button', { name: 'Restore' }))
+    expect(rowNamed('Format').getByText('No command')).toBeTruthy()
+    expect(rowNamed('Format').getByText('You removed the one Foundry found')).toBeTruthy()
+    await user.click(rowNamed('Format').getByRole('button', { name: 'Restore' }))
     await waitFor(() =>
       expect(payloadsSentOn(invoke, 'foundry:profile-save')).toEqual([
         { repoPath: '/repos/app', checks: { format: null } },

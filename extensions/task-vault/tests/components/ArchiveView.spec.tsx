@@ -5,15 +5,6 @@ import userEvent from '@testing-library/user-event'
 
 const mockInvoke = vi.fn()
 
-Object.defineProperty(window, 'electronAPI', {
-  value: {
-    extensionBridge: { invoke: mockInvoke, on: vi.fn(() => () => {}) },
-    usage: { record: vi.fn() },
-  },
-  writable: true,
-  configurable: true,
-})
-
 import { ArchiveView } from '../../src/components/ArchiveView'
 
 const ARCHIVE = {
@@ -34,8 +25,11 @@ const ARCHIVE = {
 }
 
 beforeEach(() => {
-  mockInvoke.mockReset()
   mockInvoke.mockResolvedValue(ARCHIVE)
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: { invoke: mockInvoke, on: () => () => {} },
+    usage: { record: vi.fn() },
+  })
 })
 
 afterEach(() => cleanup())

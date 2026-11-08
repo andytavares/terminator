@@ -7,18 +7,21 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } 
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import { fakeHost, seededRepository, temporaryDirectory } from '../helpers/foundry-host.js'
-import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
-import type { FoundryHost } from '../helpers/foundry-host.js'
-import { createOrderStore } from '../../src/order/store.js'
-import { orderStoreAt } from '../../src/state/live-index.js'
-import { draftOrder } from '../../src/order/draft.js'
-import { orderDir } from '../../src/data-root.js'
-import { priorArtInRecords } from '../../src/ipc/forge-registration.js'
-import type { WorkOrder } from '../../src/order/schema.js'
-import { theRunner } from '../helpers/supervision-mocks.js'
+import { fakeHost, seededRepository, temporaryDirectory } from '../../helpers/foundry-host.js'
+import { activateFoundry, deactivate, settleFoundryWork } from '../../helpers/foundry-activation.js'
+import type { FoundryHost } from '../../helpers/foundry-host.js'
+import { createOrderStore } from '../../../src/order/store.js'
+import { orderStoreAt } from '../../../src/state/live-index.js'
+import { draftOrder } from '../../../src/order/draft.js'
+import { orderDir } from '../../../src/data-root.js'
+import { priorArtInRecords } from '../../../src/ipc/forge-registration.js'
+import type { WorkOrder } from '../../../src/order/schema.js'
+import { theRunner } from '../../helpers/supervision-mocks.js'
 
-vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock(
+  '../../../src/runtime/supervised-runner.js',
+  () => import('../../helpers/supervision-mocks.js')
+)
 
 let dataDir = ''
 let parent = ''

@@ -6,11 +6,10 @@ import { useNotesStore } from '../../src/stores/notes.store'
 import { useFilterStore } from '../../src/stores/filter.store'
 import type { NoteListItem } from '../../src/db/types'
 
-const mockInvoke = vi.fn().mockResolvedValue({ data: [] })
-Object.defineProperty(window, 'electronAPI', {
-  value: { extensionBridge: { invoke: mockInvoke } },
-  writable: true,
-  configurable: true,
+const mockInvoke = vi.fn()
+beforeEach(() => {
+  mockInvoke.mockResolvedValue({ data: [] })
+  vi.stubGlobal('electronAPI', { extensionBridge: { invoke: mockInvoke } })
 })
 
 import { NoteList } from '../../src/components/NoteList'
@@ -231,7 +230,7 @@ function noteListTagFilterDropdownClosingTests() {
     render(<NoteList />)
     const dropdown = await openTagFilter(user)
     await user.click(dropdown)
-    expect(screen.queryByRole('group', { name: 'Filter by tag' })).not.toBeNull()
+    expect(screen.getByRole('group', { name: 'Filter by tag' })).toBeTruthy()
   })
 
   it('closes the dropdown on a click outside it', async () => {

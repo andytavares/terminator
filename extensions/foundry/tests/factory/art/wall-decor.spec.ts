@@ -30,6 +30,14 @@ function fixtureSpans(map: HallMap): [number, number][] {
 const overlaps = (a: readonly [number, number], b: readonly [number, number]): boolean =>
   a[0] < b[1] && b[0] < a[1]
 
+/** Whether the vending machine meets each fixture and the whiteboard; none when the hall has no room for it. */
+function vendingClashes(map: HallMap, boardSpan: [number, number]): boolean[] {
+  const vending = vendingDecorX(map)
+  if (vending === null) return []
+  const vendingSpan: [number, number] = [vending, vending + VENDING_W]
+  return [...fixtureSpans(map), boardSpan].map((span) => overlaps(vendingSpan, span))
+}
+
 describe('the whiteboard and the vending machine on the wall', () => {
   it('hangs the narrow real hall (27 tiles) at 86 px, clear of its shelves and racks', () => {
     const narrow = graphs.find(([file]) => file.includes('narrow'))![1]
@@ -41,14 +49,10 @@ describe('the whiteboard and the vending machine on the wall', () => {
   it.each(graphs)('%s: neither item meets a fixture or the other', (_file, graph) => {
     const map = layoutHall(graph)
     const board = whiteboardX(map)
-    const vending = vendingDecorX(map)
     expect(board).not.toBeNull()
     const boardSpan: [number, number] = [board as number, (board as number) + WHITEBOARD_W]
     for (const span of fixtureSpans(map)) expect(overlaps(boardSpan, span)).toBe(false)
-    if (vending === null) return
-    const vendingSpan: [number, number] = [vending, vending + VENDING_W]
-    for (const span of fixtureSpans(map)) expect(overlaps(vendingSpan, span)).toBe(false)
-    expect(overlaps(vendingSpan, boardSpan)).toBe(false)
+    expect(vendingClashes(map, boardSpan)).not.toContain(true)
   })
 
   it('scans every x when no preferred spot is clear, and gives null when none is', () => {

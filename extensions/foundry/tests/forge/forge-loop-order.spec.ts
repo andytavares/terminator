@@ -6,9 +6,9 @@
  *
  * Deterministic: the architect's turn ends before `convergeOnce` even
  * answers, every ledger write but a start lands in a microtask, and a start
- * lands only when the fake clock reaches it — the slow write, made certain.
+ * lands only when the test releases it — the slow write, made certain.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 import type { ArchitectTurn } from '../../src/forge/intake-turn.js'
 import { eventually } from '../../../../tests/support/eventually'
@@ -16,23 +16,20 @@ import { eventually } from '../../../../tests/support/eventually'
 const ledger = vi.hoisted(() => ({
   entries: [] as { action: string }[],
   turnEnds: [] as Promise<void>[],
+  heldStarts: [] as (() => void)[],
 }))
 
 const STARTS = new Set(['converge.started', 'converge.followed_up'])
-const SLOW_WRITE_MS = 50
 
-/** A write that lands when the fake clock reaches it. */
-function landsLater(): Promise<void> {
-  let land: () => void = () => undefined
-  const landed = new Promise<void>((resolve) => (land = resolve))
-  setTimeout(land, SLOW_WRITE_MS)
-  return landed
+/** A write that lands when the test releases it. */
+function landsWhenReleased(): Promise<void> {
+  return new Promise<void>((resolve) => ledger.heldStarts.push(resolve))
 }
 
 vi.mock('../../src/state/live-index.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/state/live-index.js')>()
   const recordEntry = async (entry: { action: string }): Promise<void> => {
-    if (STARTS.has(entry.action)) await landsLater()
+    if (STARTS.has(entry.action)) await landsWhenReleased()
     ledger.entries.push(entry)
   }
   return {
@@ -66,13 +63,11 @@ const { createDeciding } = await import('../../src/ipc/standing.js')
 const showToast = vi.fn()
 
 beforeEach(() => {
-  vi.useFakeTimers()
   ledger.entries = []
   ledger.turnEnds = []
+  ledger.heldStarts = []
   showToast.mockClear()
 })
-
-afterEach(() => vi.useRealTimers())
 
 function loop() {
   const api = { notifications: { showToast } } as never
@@ -91,6 +86,11 @@ describe('a turn that ends before its start is written', () => {
       message: 'draft it',
       autoTurns: 0,
     })
+    // Each follow-up's turn has ended, and waits, before its start is written.
+    await eventually(() => expect(ledger.heldStarts).toHaveLength(1))
+    ledger.heldStarts[0]()
+    await eventually(() => expect(ledger.heldStarts).toHaveLength(2))
+    ledger.heldStarts[1]()
     await eventually(() =>
       expect(showToast).toHaveBeenCalledWith(
         'warning',

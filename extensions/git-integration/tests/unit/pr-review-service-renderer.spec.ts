@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { buildThreads } from '../../../extensions/git-integration/src/github/pr-review-service-renderer'
-import type { InlineComment } from '../../../extensions/git-integration/src/schemas/pr-review.schema'
+import { buildThreads } from '../../src/github/pr-review-service-renderer'
+import type { InlineComment } from '../../src/schemas/pr-review.schema'
 
 function makeComment(overrides: Partial<InlineComment> = {}): InlineComment {
   return {

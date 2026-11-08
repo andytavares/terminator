@@ -22,6 +22,8 @@ vi.mock('../../../src/runtime/supervised-runner.js', () => ({
 let dataDir = ''
 let repo = ''
 let host: FoundryHost
+// Activation toasts once, in beforeAll; mockReset clears the calls before each test.
+let toastsAtActivation: unknown[][] = []
 
 async function toastShown(): Promise<void> {
   await eventually(() => expect(host.showToast).toHaveBeenCalled())
@@ -34,6 +36,7 @@ beforeAll(async () => {
   host = fakeHost(() => dataDir)
   activate(host.api)
   await toastShown()
+  toastsAtActivation = [...host.showToast.mock.calls]
 })
 
 // `unstubEnvs` resets env before each test, so the stub goes here, not in beforeAll.
@@ -53,11 +56,11 @@ describe('a supervision runtime that could not start', () => {
 
 function sayingSoTests() {
   it('is said out loud: phases would approve their own tool calls', () => {
-    expect(host.showToast).toHaveBeenCalledWith(
+    expect(toastsAtActivation).toContainEqual([
       'error',
       'Supervision could not start — phases will run unsupervised, approving their own tool calls',
-      'foundry.runtime.unavailable'
-    )
+      'foundry.runtime.unavailable',
+    ])
   })
 
   it('leaves the console reading empty rather than failing', async () => {

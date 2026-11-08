@@ -8,13 +8,9 @@ const mockFetch = vi.fn()
 global.fetch = mockFetch
 
 const mockReplace = vi.fn()
-Object.defineProperty(window, 'location', {
-  value: { ...window.location, replace: mockReplace },
-  writable: true,
-})
-
 beforeEach(() => {
-  Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1024 })
+  vi.stubGlobal('location', { ...window.location, replace: mockReplace })
+  vi.stubGlobal('innerWidth', 1024)
   mockFetch.mockReset()
   mockReplace.mockReset()
   localStorage.clear()
@@ -47,7 +43,7 @@ describe('App — says why a login failed', () => {
 
 describe('App — logs in once with the password in the body, keeps nothing, and redirects on success', () => {
   it('logs in once with the password in the body, keeps nothing, and redirects on success', async () => {
-    Object.defineProperty(window, 'innerWidth', { value: 1440, configurable: true })
+    vi.stubGlobal('innerWidth', 1440)
     mockFetch.mockResolvedValueOnce({ status: 200, ok: true }).mockResolvedValueOnce({
       status: 201,
       ok: true,
@@ -87,7 +83,7 @@ describe('App — forgets passwords an older version kept', () => {
 
 describe('App — redirects to /mobile/ when viewport is narrower than 1400px', () => {
   it('redirects to /mobile/ when viewport is narrower than 1400px', async () => {
-    Object.defineProperty(window, 'innerWidth', { value: 375, configurable: true })
+    vi.stubGlobal('innerWidth', 375)
     mockFetch.mockResolvedValueOnce({ status: 200, ok: true }).mockResolvedValueOnce({
       status: 201,
       ok: true,

@@ -45,7 +45,7 @@ export function agreedLineOrder(repo: string, over: Partial<WorkOrder> = {}): Wo
   } as WorkOrder
 }
 
-/** Every agent ends its turn at once. A builder leaves `<order id>.css` in its checkout, so each
+/** Every agent ends its turn once Foundry took in its session. A builder leaves `<order id>.css` in its checkout, so each
  * order's change is its own. */
 export function agentsAnswer(runner: ReturnType<typeof fakeRunner>, transcripts: string): void {
   runner.start.mockImplementation((async (input: {
@@ -54,6 +54,7 @@ export function agentsAnswer(runner: ReturnType<typeof fakeRunner>, transcripts:
     worktreePath: string
     onRegistered: (run: { sessionId: string; transcriptFrom: number }) => void
     onTurnEnd: (turns: number) => void
+    whenStarted: (end: () => void) => void
   }) => {
     const sessionId = `${input.phase}-${Math.random().toString(36).slice(2, 8)}`
     if (input.phase === 'builder') {
@@ -61,7 +62,7 @@ export function agentsAnswer(runner: ReturnType<typeof fakeRunner>, transcripts:
       fs.writeFileSync(path.join(input.worktreePath, file), 'a { color: red }\n')
     }
     input.onRegistered({ sessionId, transcriptFrom: 0 })
-    setTimeout(() => input.onTurnEnd(1), 0)
+    input.whenStarted(() => input.onTurnEnd(1))
     return {
       sessionId,
       transcriptFrom: 0,

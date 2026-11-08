@@ -247,7 +247,7 @@ function commentCard(body: string) {
 /** Comments on `text` as first written, through the selection's Add comment button. */
 async function commentOn(text: string, body: string): Promise<void> {
   await selectRange(REVIEW_BODY.indexOf(text), text.length)
-  await notepad.getByTitle('Add comment').dispatchEvent('mousedown')
+  await notepad.getByRole('button', { name: 'Add comment', exact: true }).dispatchEvent('mousedown')
   await notepad.getByPlaceholder('Add a comment…').fill(body)
   await notepad.getByRole('button', { name: 'Add comment' }).click()
   await expect(commentCard(body)).toBeVisible()

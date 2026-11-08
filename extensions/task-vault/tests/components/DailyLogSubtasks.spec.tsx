@@ -83,7 +83,7 @@ function subtaskTests() {
     const done = subtask('Step two')
     expect(done.className).toContain('daily-log__subtask--done')
     expect(screen.getByText('Step two').className).toContain('daily-log__task-text--strikethrough')
-    expect(within(done).queryByRole('button', { name: 'Delete' })).not.toBeNull()
+    expect(within(done).getByRole('button', { name: 'Delete' })).toBeTruthy()
     expect(within(done).queryByRole('button', { name: 'Edit' })).toBeNull()
   })
 
@@ -155,7 +155,7 @@ function subtaskEditTestsPart2() {
     await user.clear(screen.getByLabelText('Task text'))
     await user.type(screen.getByLabelText('Task text'), ' ')
     await user.click(buttonNamed('Save'))
-    expect(screen.queryByLabelText('Task text')).not.toBeNull()
+    expect(screen.getByLabelText('Task text')).toBeTruthy()
     expect(bridge.calls('task-vault:vault:edit-task')).toEqual([])
   })
 
@@ -188,7 +188,7 @@ function ghostTests() {
     renderDailyLog(withSubtasks('blocked'))
     await user.click(buttonNamed('· + Add subtask…'))
     await user.type(screen.getByLabelText('Subtask…'), '{Enter}')
-    expect(screen.queryByLabelText('Subtask…')).not.toBeNull()
+    expect(screen.getByLabelText('Subtask…')).toBeTruthy()
     expect(bridge.calls('task-vault:vault:add-subtask')).toEqual([])
   })
 }
@@ -203,7 +203,7 @@ function ghostTestsPart2() {
     await user.click(buttonNamed('· + Add subtask…'))
     await close(user)
     expect(screen.queryByLabelText('Subtask…')).toBeNull()
-    expect(screen.queryByRole('button', { name: '· + Add subtask…' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: '· + Add subtask…' })).toBeTruthy()
   })
 
   it.each(['in-progress', 'done'] as const)('offers no ghost row under a %s task', (status) => {
@@ -232,7 +232,7 @@ function linkTests() {
     ])
     expect(bridge.recordUsage).toHaveBeenCalledWith('session-link')
     expect(screen.queryByRole('combobox')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Jump to linked terminal' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Jump to linked terminal' })).toBeTruthy()
   })
 }
 
@@ -253,7 +253,7 @@ function linkTestsPart2() {
     )
     expect(bridge.recordUsage).toHaveBeenCalledWith('session-link', { failed: true })
     expect(screen.queryByRole('combobox')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Link to terminal session' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Link to terminal session' })).toBeTruthy()
   })
 }
 

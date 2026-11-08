@@ -5,15 +5,19 @@ import userEvent from '@testing-library/user-event'
 import { useNotificationStore } from '../../../../src/renderer/stores/notification.store'
 import type { Notification } from '../../../../src/renderer/stores/notification.store'
 
-const mockTriggerAction = vi.fn().mockResolvedValue({ ok: true })
-const mockDismiss = vi.fn().mockResolvedValue({ ok: true })
+const mockTriggerAction = vi.fn()
+const mockDismiss = vi.fn()
 
-// In jsdom, globalThis === window, so setting globalThis.electronAPI sets window.electronAPI
-installElectronApi({
-  notifications: {
-    dismiss: mockDismiss,
-    triggerAction: mockTriggerAction,
-  },
+// Per test: vitest.config.ts unstubs globals and resets mocks after each one.
+beforeEach(() => {
+  mockTriggerAction.mockResolvedValue({ ok: true })
+  mockDismiss.mockResolvedValue({ ok: true })
+  installElectronApi({
+    notifications: {
+      dismiss: mockDismiss,
+      triggerAction: mockTriggerAction,
+    },
+  })
 })
 
 import { NotificationPanel } from '../../../../src/renderer/components/NotificationPanel'

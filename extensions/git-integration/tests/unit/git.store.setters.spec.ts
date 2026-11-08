@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useGitStore } from '../../../extensions/git-integration/src/stores/git.store'
-import type {
-  GitStatus,
-  FileDiff,
-} from '../../../extensions/git-integration/src/schemas/git.schema'
+import { useGitStore } from '../../src/stores/git.store'
+import type { GitStatus, FileDiff } from '../../src/schemas/git.schema'
 
 function resetStore() {
   useGitStore.setState({

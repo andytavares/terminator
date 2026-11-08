@@ -94,8 +94,7 @@ import {
   getPanelMenuItemId,
 } from '../../../src/main/extensions/api'
 import { ipcInvokeRegistry } from '../../../src/main/remote/ipc-registry'
-import { registerAdminIpcHandlers } from '../../../extensions/task-vault/src/ipc/admin.ipc'
-import { defineChannel, type ExtensionDB } from '@terminator/extension-sdk'
+import { defineChannel } from '@terminator/extension-sdk'
 import { z } from 'zod'
 import * as shellExecutor from '../../../src/main/shell/shell-executor'
 import { notificationManager } from '../../../src/main/notifications/notification-manager'
@@ -528,23 +527,6 @@ describe('api.ipc.registerHandler — remote access', () => {
     })
     expect(ipcInvokeRegistry.get('test.ext:opted-in')?.remoteAccessible).toBe(true)
     disposable.dispose()
-  })
-
-  it('keeps the task-vault SQL console and its admin channels out of the remote bridge', async () => {
-    const api = createExtensionAPI('terminator.task-vault', {
-      bridge: {
-        invokeRegistry: ipcInvokeRegistry,
-        sendRegistry: new Map(),
-        eventBus: new EventEmitter(),
-      },
-    })
-    const dispose = registerAdminIpcHandlers(api, {} as ExtensionDB)
-
-    for (const channel of ['task-vault:admin:run-query', 'task-vault:admin:table-stats']) {
-      expect(ipcInvokeRegistry.has(channel)).toBe(true)
-      expect(await api.ipc.isRemoteAccessible(channel)).toBe(false)
-    }
-    dispose()
   })
 })
 

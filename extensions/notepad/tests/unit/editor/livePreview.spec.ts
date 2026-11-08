@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
-import { buildDecorations } from '../../../src/editor/livePreview'
+import { EditorView } from '@codemirror/view'
+import type { EditorState } from '@codemirror/state'
+import { buildDecorations, livePreviewPlugin } from '../../../src/editor/livePreview'
 import { parsedState } from '../support/parsed-state'
 
 function makeState(doc: string) {
@@ -255,3 +257,24 @@ function buildDecorationsListItemsTests() {
     expect(found).toBe(true)
   })
 }
+
+// SC-002 as a count, not a time: a 5,000-line note is decorated again only when something the
+// preview shows changed, so a transaction that changes nothing costs no rebuild.
+describe('the live preview on a 5,000-line note', () => {
+  const note = Array.from({ length: 5000 }, (_, line) => `Line ${line}: **bold** and _italic_`)
+  const previewed = () =>
+    parsedState({ doc: note.join('\n'), extensions: [markdown(), livePreviewPlugin] })
+  const decorationsOf = (state: EditorState) => state.facet(EditorView.decorations)[0]
+
+  it('keeps its decorations, not rebuilt, through a transaction that changes nothing it shows', () => {
+    const before = previewed()
+    expect(decorationsOf(before.update({}).state)).toBe(decorationsOf(before))
+  })
+
+  it('builds them again when the caret moves', () => {
+    const before = previewed()
+    expect(decorationsOf(before.update({ selection: { anchor: 3 } }).state)).not.toBe(
+      decorationsOf(before)
+    )
+  })
+})

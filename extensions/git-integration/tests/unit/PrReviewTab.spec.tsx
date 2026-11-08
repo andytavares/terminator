@@ -5,24 +5,30 @@ import userEvent from '@testing-library/user-event'
 import { PrReviewTab } from '../../src/components/pr-review/PrReviewTab'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import * as githubModule from '../../src/api/github'
+import {
+  useFetchFileMetrics,
+  useLoadIssueComments,
+  useLoadPrDetail,
+  useLoadPrQueue,
+} from '../../src/hooks/usePrReview'
 import type { Chapter, PrChangedFile, PrReviewDetail } from '../../src/schemas/pr-review.schema'
 import { partialFake } from '../../../../tests/support/fakes'
 
 vi.mock('../../src/api/github', () => ({
   githubAPI: {
-    sessionGet: vi.fn().mockResolvedValue({ session: null }),
-    sessionSet: vi.fn().mockResolvedValue({}),
-    saveActiveReview: vi.fn().mockResolvedValue({ ok: true }),
-    removeActiveReview: vi.fn().mockResolvedValue({ ok: true }),
-    prCompare: vi.fn().mockResolvedValue({ rewritten: false, commits: 0, files: [] }),
+    sessionGet: vi.fn(),
+    sessionSet: vi.fn(),
+    saveActiveReview: vi.fn(),
+    removeActiveReview: vi.fn(),
+    prCompare: vi.fn(),
   },
 }))
 
 vi.mock('../../src/hooks/usePrReview', () => ({
-  useLoadPrQueue: vi.fn(() => vi.fn().mockResolvedValue(undefined)),
-  useLoadPrDetail: vi.fn(() => vi.fn().mockResolvedValue(undefined)),
-  useFetchFileMetrics: vi.fn(() => vi.fn().mockResolvedValue(undefined)),
-  useLoadIssueComments: vi.fn(() => vi.fn().mockResolvedValue(undefined)),
+  useLoadPrQueue: vi.fn(),
+  useLoadPrDetail: vi.fn(),
+  useFetchFileMetrics: vi.fn(),
+  useLoadIssueComments: vi.fn(),
 }))
 
 vi.mock('../../src/components/pr-review/ReviewQueue', () => ({
@@ -87,18 +93,20 @@ vi.mock('../../src/components/pr-review/PrOverviewPanel', () => ({
   ),
 }))
 
-const mockInvoke = vi.fn().mockResolvedValue({ ok: true })
-const mockOn = vi.fn().mockReturnValue(() => {})
+const mockInvoke = vi.fn()
+const mockOn = vi.fn()
 
 beforeEach(() => {
-  vi.clearAllMocks()
-  ;(githubModule.githubAPI.sessionGet as ReturnType<typeof vi.fn>).mockResolvedValue({
-    session: null,
-  })
-  ;(githubModule.githubAPI.sessionSet as ReturnType<typeof vi.fn>).mockResolvedValue({})
-  ;(githubModule.githubAPI.saveActiveReview as ReturnType<typeof vi.fn>).mockResolvedValue({
-    ok: true,
-  })
+  mockInvoke.mockResolvedValue({ ok: true })
+  mockOn.mockReturnValue(() => {})
+  vi.mocked(useLoadPrQueue).mockReturnValue(async () => {})
+  vi.mocked(useLoadPrDetail).mockReturnValue(async () => {})
+  vi.mocked(useFetchFileMetrics).mockReturnValue(async () => {})
+  vi.mocked(useLoadIssueComments).mockReturnValue(async () => {})
+  vi.mocked(githubModule.githubAPI.sessionGet).mockResolvedValue({ session: null })
+  vi.mocked(githubModule.githubAPI.sessionSet).mockResolvedValue({})
+  vi.mocked(githubModule.githubAPI.saveActiveReview).mockResolvedValue({ ok: true })
+  vi.mocked(githubModule.githubAPI.removeActiveReview).mockResolvedValue({ ok: true })
   vi.mocked(githubModule.githubAPI.prCompare).mockResolvedValue({
     rewritten: false,
     commits: 0,
@@ -147,7 +155,6 @@ function storeSessionAt(key: string, headSHA: string) {
 
 /** Renders the tab and opens PR 1, whose detail loads at `headSHA`. */
 async function openPrAtHead(headSHA: string) {
-  const { useLoadPrDetail } = await import('../../src/hooks/usePrReview')
   vi.mocked(useLoadPrDetail).mockReturnValue(async (_n, onSuccess) =>
     onSuccess(partialFake<PrReviewDetail>({ number: 1, headSHA }))
   )
@@ -158,12 +165,12 @@ async function openPrAtHead(headSHA: string) {
 describe('PrReviewTab', () => {
   it('shows empty message when repoRoot is null', () => {
     render(<PrReviewTab repoRoot={null} />)
-    expect(screen.queryByText('Open a project to view pull requests.')).not.toBeNull()
+    expect(screen.getByText('Open a project to view pull requests.')).toBeTruthy()
   })
 
   it('renders ReviewQueue when repoRoot is provided and no active PR', () => {
     render(<PrReviewTab repoRoot="/repo" />)
-    expect(screen.queryByTestId('review-queue')).not.toBeNull()
+    expect(screen.getByTestId('review-queue')).toBeTruthy()
   })
 
   it('shows the review, not the overview, for a PR that is already active', () => {
@@ -171,7 +178,7 @@ describe('PrReviewTab', () => {
       activePr: partialFake<PrReviewDetail>({ number: 1, title: 'My PR' }),
     })
     render(<PrReviewTab repoRoot="/repo" />)
-    expect(screen.queryByTestId('pr-review-view')).not.toBeNull()
+    expect(screen.getByTestId('pr-review-view')).toBeTruthy()
     expect(screen.queryByTestId('pr-overview-panel')).toBeNull()
   })
 })
@@ -204,7 +211,7 @@ describe('PrReviewTab — starting from the overview', () => {
       currentChapterId: 'c2',
       currentFilePath: 'b.ts',
     })
-    expect(screen.queryByTestId('pr-review-view')).not.toBeNull()
+    expect(screen.getByTestId('pr-review-view')).toBeTruthy()
   })
 
   it('keeps the saved chapter when the review starts from the header button', async () => {
@@ -215,7 +222,7 @@ describe('PrReviewTab — starting from the overview', () => {
       currentChapterId: 'c1',
       currentFilePath: 'a.ts',
     })
-    expect(screen.queryByTestId('pr-review-view')).not.toBeNull()
+    expect(screen.getByTestId('pr-review-view')).toBeTruthy()
   })
 })
 
@@ -359,7 +366,6 @@ describe('PrReviewTab — reconciles with all when the compare says history was 
 describe('PrReviewTab — a review submitted in another window', () => {
   it('reloads the queue, so the pull request shows its new approval and review state', async () => {
     const loadQueue = vi.fn().mockResolvedValue(undefined)
-    const { useLoadPrQueue } = await import('../../src/hooks/usePrReview')
     vi.mocked(useLoadPrQueue).mockReturnValue(loadQueue)
     render(<PrReviewTab repoRoot="/repo" />)
     const onReviewsChanged = mockOn.mock.calls.find(([channel]) => channel === 'reviews:changed')

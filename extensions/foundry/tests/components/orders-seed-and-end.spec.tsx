@@ -19,10 +19,9 @@ function mount(answers: Record<string, Answer>, props: Record<string, unknown> =
     const answer = answers[channel]
     return answer === undefined ? new Promise(() => {}) : answer(payload)
   })
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke, on: vi.fn(() => vi.fn()) }, usage: { record: vi.fn() } },
-    configurable: true,
-    writable: true,
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    usage: { record: vi.fn() },
   })
   render(<Orders repoRoot="/repos/app" {...props} />)
 }

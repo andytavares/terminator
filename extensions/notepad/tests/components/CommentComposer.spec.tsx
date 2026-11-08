@@ -3,13 +3,15 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 
-const mockInvoke = vi.fn().mockResolvedValue({ data: { id: 'c-new' } })
+const mockInvoke = vi.fn()
 const mockRecord = vi.fn()
 
-Object.defineProperty(window, 'electronAPI', {
-  value: { extensionBridge: { invoke: mockInvoke }, usage: { record: mockRecord } },
-  writable: true,
-  configurable: true,
+beforeEach(() => {
+  mockInvoke.mockResolvedValue({ data: { id: 'c-new' } })
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: { invoke: mockInvoke },
+    usage: { record: mockRecord },
+  })
 })
 
 // CommentComposer does not exist yet — these tests will fail at import
@@ -27,11 +29,6 @@ const baseAnchor = {
 describe('CommentComposer', commentComposerTests)
 
 function commentComposerTests() {
-  beforeEach(() => {
-    mockInvoke.mockClear()
-    mockRecord.mockClear()
-  })
-
   describe('editing', commentComposerEditingTests)
   describe('submitting', commentComposerSubmittingTests)
   describe('cancelling', commentComposerCancellingTests)

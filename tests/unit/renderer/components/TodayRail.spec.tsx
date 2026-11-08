@@ -114,7 +114,7 @@ async function openFocusEditor(user: ReturnType<typeof userEvent.setup>) {
   })
   render(<TodayRail />)
   await user.click(screen.getByRole('button', { name: 'Edit' }))
-  return within(screen.getByRole('list', { name: "Choose today's focus" }))
+  return screen.getByRole('list', { name: "Choose today's focus" })
 }
 
 const pickedToday = () => useFocusStore.getState().days[localDateKey(Date.now())] ?? []
@@ -123,9 +123,9 @@ describe("Today's focus — choosing", () => {
   it('picks a Task Vault candidate and a thread with its work key', async () => {
     const user = userEvent.setup()
     const editor = await openFocusEditor(user)
-    await user.click(editor.getByRole('checkbox', { name: 'Write the report' }))
+    await user.click(within(editor).getByRole('checkbox', { name: 'Write the report' }))
     await user.click(
-      editor.getByRole('checkbox', { name: 'PR overview shows status before story' })
+      within(editor).getByRole('checkbox', { name: 'PR overview shows status before story' })
     )
     expect(pickedToday()).toMatchObject([
       { title: 'Write the report' },
@@ -141,15 +141,15 @@ describe("Today's focus — the cap", () => {
   it('ignores a fourth pick', async () => {
     const user = userEvent.setup()
     const editor = await openFocusEditor(user)
-    await user.click(editor.getByRole('checkbox', { name: 'Write the report' }))
+    await user.click(within(editor).getByRole('checkbox', { name: 'Write the report' }))
     await user.click(
-      editor.getByRole('checkbox', { name: 'PR overview shows status before story' })
+      within(editor).getByRole('checkbox', { name: 'PR overview shows status before story' })
     )
     await user.click(
-      editor.getByRole('checkbox', { name: 'Reproduce staging 429s before release' })
+      within(editor).getByRole('checkbox', { name: 'Reproduce staging 429s before release' })
     )
     const fourth = 'Make all text in the app scale with settings'
-    await user.click(editor.getByRole('checkbox', { name: fourth }))
+    await user.click(within(editor).getByRole('checkbox', { name: fourth }))
     expect(pickedToday().map((item) => item.title)).not.toContain(fourth)
     expect(pickedToday()).toHaveLength(3)
   })
@@ -159,8 +159,8 @@ describe("Today's focus — unticking", () => {
   it('drops a pick when it is unticked', async () => {
     const user = userEvent.setup()
     const editor = await openFocusEditor(user)
-    await user.click(editor.getByRole('checkbox', { name: 'Write the report' }))
-    await user.click(editor.getByRole('checkbox', { name: 'Write the report' }))
+    await user.click(within(editor).getByRole('checkbox', { name: 'Write the report' }))
+    await user.click(within(editor).getByRole('checkbox', { name: 'Write the report' }))
     expect(pickedToday()).toEqual([])
   })
 })

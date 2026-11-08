@@ -5,7 +5,7 @@ import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { installNotepadBridge, listItem, eventually } from './helpers/note-surface'
 import type { DiagramListItem, Folder, NoteListItem } from '../../src/db/types'
 
-const bridge = installNotepadBridge()
+let bridge: ReturnType<typeof installNotepadBridge>
 
 import { NoteList } from '../../src/components/NoteList'
 import { useNotesStore } from '../../src/stores/notes.store'
@@ -35,8 +35,7 @@ function folder(id: string, name: string): Folder {
 }
 
 beforeEach(() => {
-  for (const key of Object.keys(bridge.responses)) delete bridge.responses[key]
-  bridge.invoke.mockClear()
+  bridge = installNotepadBridge()
   useNotesStore.setState({
     notes: [],
     diagrams: [],

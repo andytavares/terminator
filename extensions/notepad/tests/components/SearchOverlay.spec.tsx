@@ -4,17 +4,17 @@ import { render, screen, cleanup, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { pressOutside } from '../../../../tests/support/modal'
 
-const mockInvoke = vi.fn().mockResolvedValue({ data: [] })
+const mockInvoke = vi.fn()
 const mockRecord = vi.fn()
-const mockOn = vi.fn().mockReturnValue(vi.fn())
+const mockOn = vi.fn()
 
-Object.defineProperty(window, 'electronAPI', {
-  value: {
+beforeEach(() => {
+  mockInvoke.mockResolvedValue({ data: [] })
+  mockOn.mockReturnValue(vi.fn())
+  vi.stubGlobal('electronAPI', {
     extensionBridge: { invoke: mockInvoke, on: mockOn },
     usage: { record: mockRecord },
-  },
-  writable: true,
-  configurable: true,
+  })
 })
 
 import { SearchOverlay } from '../../src/components/SearchOverlay'

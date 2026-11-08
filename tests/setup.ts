@@ -1,13 +1,14 @@
 // Global test setup — runs before every test file regardless of environment.
 // CSS modules are not processed in tests; mock them to return an empty object.
 import './support/seal-worker-environment'
-import { afterAll, afterEach, beforeEach, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, inject, vi } from 'vitest'
 import { configure } from '@testing-library/dom'
 import { WAIT_BOUND_MS } from './support/bounds'
 import { installNativeDialog } from './support/native-dialog'
 import { removeTempDirs } from './support/temp-dir'
 import { forgetGitHookEnvironment } from './support/git-hook-env'
 import { installNetworkGuard } from './support/network-guard'
+import { installUnitIoGuard } from './support/unit-io-guard'
 import { createLeakGuard } from './support/leak-guard'
 
 forgetGitHookEnvironment()
@@ -16,9 +17,13 @@ forgetGitHookEnvironment()
 // https://vitest.dev/config/sequence#sequence-hooks): they close what is inside first.
 afterAll(removeTempDirs)
 
-// Node project only: the DOM projects reach neither the network nor handles of their own.
+// The tier the project declares (vitest.config.ts): a unit test opens no socket and does no I/O;
+// an integration test may reach this machine only.
+const tier = inject('testTier')
+installNetworkGuard(tier)
+if (tier === 'unit') installUnitIoGuard()
+
 if (typeof window === 'undefined') {
-  installNetworkGuard()
   // Registered before every other afterEach, so it runs after all of them (hooks run in reverse).
   const leakGuard = createLeakGuard()
   beforeEach(leakGuard.begin)

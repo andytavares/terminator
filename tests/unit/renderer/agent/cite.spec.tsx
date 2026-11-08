@@ -148,10 +148,17 @@ describe('Cite — a selection over the limit', () => {
   })
 })
 
+/** Presses Cite. user-event clears the document selection on its pointer press, which a real
+ * press on Cite does not (it prevents the mousedown), so only the click is dispatched. */
+function pressCite(): void {
+  // eslint-disable-next-line testing-library/prefer-user-event
+  fireEvent.click(citeButton()!)
+}
+
 async function openComment(): Promise<void> {
   await mountView()
   selectQuote()
-  fireEvent.click(citeButton()!) // a user-event press would move the selection it cites
+  pressCite()
 }
 
 describe('Cite — saving a comment', () => {
@@ -185,7 +192,7 @@ describe('Cite — cancelling a comment', () => {
     await user.type(commentBox(), '{Escape}')
     expect(screen.queryByLabelText('Comment on this quote')).toBeNull()
     selectQuote()
-    fireEvent.click(citeButton()!) // a user-event press would move the selection it cites
+    pressCite()
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByLabelText('Comment on this quote')).toBeNull()
     expect(attached()).toEqual(noAttachedContext)
@@ -197,7 +204,7 @@ describe('Cite — save and send', () => {
     const user = userEvent.setup()
     await mountView()
     selectQuote()
-    fireEvent.click(citeButton()!) // a user-event press would move the selection it cites
+    pressCite()
     await user.type(commentBox(), 'Also retry on 429')
     await user.keyboard('{Meta>}{Enter}{/Meta}')
     const citation = { entryIndex: 1, quote: QUOTE, comment: 'Also retry on 429' }

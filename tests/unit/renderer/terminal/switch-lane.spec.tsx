@@ -24,11 +24,7 @@ const rateLimits: Task = {
 }
 
 beforeEach(() => {
-  Object.defineProperty(window, 'electronAPI', {
-    configurable: true,
-    writable: true,
-    value: { project: { list: vi.fn(async () => ({ projects: [] })) } },
-  })
+  vi.stubGlobal('electronAPI', { project: { list: vi.fn(async () => ({ projects: [] })) } })
   useWorkspaceStore.setState({
     ...useWorkspaceStore.getInitialState(),
     workspaces: [backend, frontend],

@@ -151,7 +151,7 @@ describe('TaskList — a folded group header is one button', () => {
     act(() => quietHeader().focus())
     expect(document.activeElement).toBe(quietHeader())
     await user.keyboard('{Enter}')
-    expect(screen.queryByRole('button', { name: 'Scratch shell' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Scratch shell' })).toBeTruthy()
     await user.keyboard(' ')
     expect(screen.queryByRole('button', { name: 'Scratch shell' })).toBeNull()
   })

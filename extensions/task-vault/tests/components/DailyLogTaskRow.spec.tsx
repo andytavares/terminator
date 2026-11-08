@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { screen, cleanup, act, fireEvent } from '@testing-library/react'
+import { screen, cleanup, act } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { installVaultBridge, eventually, task } from './helpers/bridge'
 import { buttonNamed, lastNotice, renderDailyLog } from './helpers/daily-log'
@@ -55,12 +55,11 @@ function selectTests() {
     expect(props.onTaskComplete).toHaveBeenCalledWith('t1')
   })
 
-  it('selects an open task a moment after a single click', () => {
-    vi.useFakeTimers()
+  it('selects an open task a moment after a single click', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
-    // user-event hangs here: Testing Library's asyncWrapper waits on a setTimeout(0) that
-    // vitest's fake clock never fires.
-    fireEvent.click(screen.getByText('Write'))
+    await user.click(screen.getByText('Write'))
     expect(props.onSelectTask).not.toHaveBeenCalled()
     act(() => void vi.advanceTimersByTime(220))
     expect(props.onSelectTask).toHaveBeenCalledWith('t1')
@@ -84,12 +83,11 @@ function selectTestsPart2() {
     expect(screen.getByText('Write').className).toContain('daily-log__task-text--strikethrough')
   })
 
-  it('cancels a pending select when unmounted', () => {
-    vi.useFakeTimers()
+  it('cancels a pending select when unmounted', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
-    // user-event hangs here: Testing Library's asyncWrapper waits on a setTimeout(0) that
-    // vitest's fake clock never fires.
-    fireEvent.click(screen.getByText('Write'))
+    await user.click(screen.getByText('Write'))
     cleanup()
     act(() => void vi.advanceTimersByTime(500))
     expect(props.onSelectTask).not.toHaveBeenCalled()
@@ -129,7 +127,7 @@ function editTestsPart2() {
     await user.dblClick(screen.getByText('Write'))
     await user.clear(screen.getByLabelText('Task text'))
     await user.type(screen.getByLabelText('Task text'), ' {Enter}')
-    expect(screen.queryByLabelText('Task text')).not.toBeNull()
+    expect(screen.getByLabelText('Task text')).toBeTruthy()
     expect(bridge.calls('task-vault:vault:edit-task')).toEqual([])
   })
 
@@ -142,7 +140,7 @@ function editTestsPart2() {
     await user.dblClick(screen.getByText('Write'))
     await close(user)
     expect(screen.queryByLabelText('Task text')).toBeNull()
-    expect(screen.queryByText('Write')).not.toBeNull()
+    expect(screen.getByText('Write')).toBeTruthy()
   })
 }
 
@@ -189,7 +187,7 @@ function firstSubtaskTests() {
     renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
     await user.click(buttonNamed('Add subtask'))
     await user.type(screen.getByLabelText('Subtask…'), '{Enter}')
-    expect(screen.queryByLabelText('Subtask…')).not.toBeNull()
+    expect(screen.getByLabelText('Subtask…')).toBeTruthy()
     expect(bridge.calls('task-vault:vault:add-subtask')).toEqual([])
   })
 }
@@ -344,6 +342,6 @@ function metaTestsPart2() {
       { onSelectTask: vi.fn() }
     )
     expect(screen.getByTitle('Repeats: yearly')).toBeTruthy()
-    expect(screen.getByText('⊘ r').getAttribute('title')).toBeNull()
+    expect(screen.getByText('⊘ r').hasAttribute('title')).toBe(false)
   })
 }

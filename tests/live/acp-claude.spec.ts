@@ -89,7 +89,7 @@ describe('Claude Code over ACP — cancel and resume', () => {
     const running = new Promise<void>((resolve) => {
       service.onUpdate(sessionId, (update) => update.sessionUpdate === 'tool_call' && resolve())
     })
-    const turn = service.prompt(sessionId, 'Run `sleep 20` with the Bash tool and wait for it.')
+    const turn = service.prompt(sessionId, 'Run `tail -f /dev/null` with the Bash tool, and wait.')
     await running
     service.cancel(sessionId)
     expect(await turn).toEqual({ stopReason: 'cancelled' })

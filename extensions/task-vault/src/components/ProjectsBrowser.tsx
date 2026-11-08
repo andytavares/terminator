@@ -616,6 +616,7 @@ function DoneTasks({ done, tasks }: { done: IndexedTask[]; tasks: ProjectTasks }
               size="sm"
               onClick={() => void tasks.restore(t.id)}
               title="Reopen on today's log"
+              aria-label="Reopen on today's log"
             >
               ↩
             </Button>

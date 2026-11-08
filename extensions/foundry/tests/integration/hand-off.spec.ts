@@ -14,16 +14,16 @@ import {
   temporaryDirectory,
   toastsShown,
   type FoundryHost,
-} from './helpers/foundry-host.js'
-import { activateFoundry, deactivate, settleFoundryWork } from './helpers/foundry-activation.js'
-import { convergeOrder, readyDraft, scriptedTurns } from './helpers/forge-turns.js'
-import { ledgerActions, untilLedgerHas } from './helpers/order-ledger.js'
-import { theRunner } from './helpers/supervision-mocks.js'
-import { executingOrders } from '../src/line/run-control.js'
-import { settleBackground } from '../src/background.js'
-import { eventually } from '../../../tests/support/eventually'
+} from '../helpers/foundry-host.js'
+import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
+import { convergeOrder, readyDraft, scriptedTurns } from '../helpers/forge-turns.js'
+import { ledgerActions, untilLedgerHas } from '../helpers/order-ledger.js'
+import { theRunner } from '../helpers/supervision-mocks.js'
+import { executingOrders } from '../../src/line/run-control.js'
+import { settleBackground } from '../../src/background.js'
+import { eventually } from '../../../../tests/support/eventually'
 
-vi.mock('../src/runtime/supervised-runner.js', () => import('./helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 
 let dataDir = ''
 let host: FoundryHost

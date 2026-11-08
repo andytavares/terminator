@@ -25,15 +25,9 @@ function answerInvokes(hasPassword: boolean, updatePassword: unknown = { ok: tru
 beforeEach(() => {
   invoke.mockReset()
   record.mockClear()
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { on: () => () => {}, invoke }, usage: { record } },
-    configurable: true,
-    writable: true,
-  })
-  // user-event's setup replaces navigator.clipboard with a getter, so assigning it would throw.
-  Object.defineProperty(navigator, 'clipboard', {
-    value: { writeText: vi.fn() },
-    configurable: true,
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: { on: () => () => {}, invoke },
+    usage: { record },
   })
 })
 

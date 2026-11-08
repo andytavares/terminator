@@ -21,8 +21,15 @@ function useQuickCreateRequests(): void {
   const { setShowQuickCreate } = useNotesStore()
 
   useEffect(() => {
-    const off = window.electronAPI.extensionBridge.on('terminator.notepad:ui.openQuickCreate', () =>
-      setShowQuickCreate(true)
+    const off = window.electronAPI.extensionBridge.on(
+      'terminator.notepad:ui.openQuickCreate',
+      () => {
+        setShowQuickCreate(true)
+        // Taken here, so the next time this view loads it does not open the overlay again.
+        void window.electronAPI.extensionBridge
+          .invoke('terminator.notepad:ui.consumePendingQuickCreate')
+          .catch(() => {})
+      }
     )
     return off
   }, [setShowQuickCreate])

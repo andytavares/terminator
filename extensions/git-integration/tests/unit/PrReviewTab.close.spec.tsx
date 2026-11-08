@@ -94,6 +94,6 @@ describe('closing a PR under review', () => {
     expect(saved.drafts.map((d) => d.body)).toEqual(['rename this'])
     expect(saved.notes.map((n) => n.body)).toEqual(['why?'])
     expect(saved.viewedAt).toEqual({ 'src/a.ts': 'abc123' })
-    expect(screen.queryByTestId('review-queue')).not.toBeNull()
+    expect(screen.getByTestId('review-queue')).toBeTruthy()
   })
 })

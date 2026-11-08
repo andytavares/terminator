@@ -34,14 +34,12 @@ const mockLocalStorage = {
   }),
 }
 
-Object.defineProperty(globalThis, 'window', {
-  value: { electronAPI: mockElectronAPI },
-  writable: true,
+beforeEach(() => {
+  vi.stubGlobal('window', { electronAPI: mockElectronAPI })
 })
 
-Object.defineProperty(globalThis, 'localStorage', {
-  value: mockLocalStorage,
-  writable: true,
+beforeEach(() => {
+  vi.stubGlobal('localStorage', mockLocalStorage)
 })
 
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'

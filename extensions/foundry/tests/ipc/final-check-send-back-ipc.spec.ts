@@ -12,7 +12,7 @@ import * as path from 'node:path'
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 
 import { makeTempDir } from '../../../../tests/support/temp-dir'
-import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
+import { execSucceeded, fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import { builderUnit } from '../helpers/order-parts.js'
 import { agentNode } from '../helpers/run-nodes.js'
@@ -110,7 +110,7 @@ const nodeIn = (graph: RunGraph, id: string): RunNode | undefined =>
 
 beforeAll(async () => {
   host = fakeHost(() => dataDir)
-  host.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
+  host.exec.mockResolvedValue(execSucceeded(''))
   await activateFoundry(host)
 })
 
@@ -125,6 +125,8 @@ afterAll(async () => {
 let runnerStarted: Promise<void> = Promise.resolve()
 
 beforeEach(() => {
+  // mockReset clears what beforeAll set: no real git in a unit spec.
+  host.exec.mockResolvedValue(execSucceeded(''))
   orderId = `WO-${++orders}`
   theRunner.start.mockReset()
   runnerStarted = new Promise((started) => {

@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SplitContainer } from '../../../../src/renderer/components/terminal/SplitContainer'
 
@@ -59,9 +59,9 @@ async function dragDivider(divider: HTMLElement, to: { clientX: number; clientY?
 
 describe('SplitContainer', () => {
   it('renders both children', () => {
-    const { getByTestId } = renderSplit('vertical', 0.5)
-    expect(getByTestId('first')).toBeTruthy()
-    expect(getByTestId('second')).toBeTruthy()
+    renderSplit('vertical', 0.5)
+    expect(screen.getByTestId('first')).toBeTruthy()
+    expect(screen.getByTestId('second')).toBeTruthy()
   })
 
   it.each(['vertical', 'horizontal'] as const)(

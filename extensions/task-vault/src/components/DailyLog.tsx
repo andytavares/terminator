@@ -276,6 +276,20 @@ function DayTitle({ day }: DayProps): React.JSX.Element {
   )
 }
 
+function BackToToday({ onGoToToday }: { onGoToToday: () => void }): React.JSX.Element {
+  return (
+    <Button
+      size="sm"
+      icon={CornerUpLeft}
+      onClick={onGoToToday}
+      title="Back to today"
+      aria-label="Back to today"
+    >
+      Today
+    </Button>
+  )
+}
+
 function DayHeader({ day }: DayProps): React.JSX.Element {
   return (
     <div className="daily-log__date">
@@ -288,11 +302,7 @@ function DayHeader({ day }: DayProps): React.JSX.Element {
         disabled={!day.onPrevDay}
       />
       <DayTitle day={day} />
-      {!day.isToday && day.onGoToToday && (
-        <Button size="sm" icon={CornerUpLeft} onClick={day.onGoToToday} title="Back to today">
-          Today
-        </Button>
-      )}
+      {!day.isToday && day.onGoToToday && <BackToToday onGoToToday={day.onGoToToday} />}
       <IconButton
         icon={ChevronRight}
         label="Next day"

@@ -257,6 +257,7 @@ function ConfigureButton({ open, onClick }: { open: boolean; onClick: () => void
       className={`ext-btn ext-btn--settings${open ? ' ext-btn--settings-open' : ''}`}
       onClick={onClick}
       title="Configure"
+      aria-label="Configure"
     >
       ⚙
     </button>

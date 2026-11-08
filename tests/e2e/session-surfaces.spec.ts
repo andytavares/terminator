@@ -21,7 +21,7 @@ import {
 
 /** Starts a second and third terminal on the branch already showing. */
 async function addTwoMoreTabs(page: Page): Promise<void> {
-  const newTab = page.getByTitle('New tab (⌘T)')
+  const newTab = page.getByRole('button', { name: 'New tab', exact: true })
   await newTab.click()
   await expect(page.locator('.tab-bar__tab--session')).toHaveCount(2)
   await newTab.click()

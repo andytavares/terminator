@@ -19,10 +19,11 @@ vi.mock('electron-store', () => ({
     store: Record<string, unknown> = {}
   },
 }))
+// Plain functions, not mocks: mockReset would clear a mock's answer before each test.
 vi.mock('fs/promises', () => ({
-  readFile: vi.fn().mockRejectedValue(new Error('no file')),
-  writeFile: vi.fn().mockResolvedValue(undefined),
-  unlink: vi.fn().mockResolvedValue(undefined),
+  readFile: () => Promise.reject(new Error('no file')),
+  writeFile: () => Promise.resolve(undefined),
+  unlink: () => Promise.resolve(undefined),
 }))
 
 // ── import after mocks ────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@ import type { LedgerEntry } from '../../../src/ledger/append.js'
 import { draftOrder } from '../../../src/order/draft.js'
 import { createOrderStore } from '../../../src/order/store.js'
 import type { OrderStore } from '../../../src/order/store.js'
+import type { WorkOrder } from '../../../src/order/schema.js'
 import { readProfile, writeProfile } from '../../../src/profile/store.js'
 import { emptyProfile } from '../../../src/profile/schema.js'
 import { seededRepository, temporaryDirectory } from '../../helpers/foundry-host.js'
@@ -18,20 +19,21 @@ let parent: string
 let repo: string
 let root: string
 let store: OrderStore
+let drafted: WorkOrder
 
 beforeEach(async () => {
   parent = temporaryDirectory('scout-commands')
   repo = await seededRepository(parent)
   root = path.join(parent, 'data')
   store = createOrderStore(root)
-  const order = draftOrder({
+  drafted = draftOrder({
     id: 'WO-1',
     title: 'x',
     source: { kind: 'typed', tracker: null, key: null, url: null },
     repoPaths: [repo],
     now: '2026-09-06T10:00:00.000Z',
   })
-  await store.save(order)
+  await store.save(drafted)
 })
 
 afterEach(() => {
@@ -101,12 +103,10 @@ describe('keepScoutCommands beside a draft written at the same time', () => {
 
 describe('keepScoutCommands beside commands already given', () => {
   it('never replaces a command the order already has, and does not run the proposal', async () => {
-    const order = await store.load('WO-1')
-    if (order === null) throw new Error('no order')
     const given = { command: 'npm run lint', source: 'repository' as const }
     await store.save({
-      ...order,
-      context: { ...order.context, toolchain: { ...order.context.toolchain, lint: given } },
+      ...drafted,
+      context: { ...drafted.context, toolchain: { ...drafted.context.toolchain, lint: given } },
     })
     await keepScoutCommands('WO-1', [lintProposal], keepDeps())
     expect((await store.load('WO-1'))?.context.toolchain.lint).toEqual(given)

@@ -73,8 +73,7 @@ describe('PropertiesRail — linked issues', () => {
 
   it('copies the branch name and says so', async () => {
     const user = userEvent.setup()
-    const writeText = vi.fn().mockResolvedValue(undefined)
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText')
     render(<PropertiesRail pr={buildPr()} />)
     await user.click(rail().getByRole('button', { name: 'Copy branch name' }))
     await rail().findByText('Copied')

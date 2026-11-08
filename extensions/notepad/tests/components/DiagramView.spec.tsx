@@ -38,7 +38,7 @@ vi.mock('@excalidraw/excalidraw', async () => {
   return { Excalidraw }
 })
 
-const bridge = installNotepadBridge()
+let bridge: ReturnType<typeof installNotepadBridge>
 
 import { DiagramView } from '../../src/components/DiagramView'
 import { useNotesStore } from '../../src/stores/notes.store'
@@ -74,8 +74,7 @@ const LISTED: DiagramListItem = {
 }
 
 beforeEach(() => {
-  for (const key of Object.keys(bridge.responses)) delete bridge.responses[key]
-  bridge.invoke.mockClear()
+  bridge = installNotepadBridge()
   canvas.onChange = null
   useNotesStore.setState({ diagrams: [LISTED], diagramCache: {} })
 })

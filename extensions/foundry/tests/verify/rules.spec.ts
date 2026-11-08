@@ -63,6 +63,7 @@ afterEach(() => {
 
 describe('accepting a proposal', () => {
   describe('writing', rulesWritingTests)
+  describe('where it came from', rulesOriginTests)
   describe('rungs and later work', rungsAndLaterWorkTests)
 })
 
@@ -78,8 +79,10 @@ function rulesWritingTests() {
     const p = { ...proposal(), asserts: 'first line\n  second: line # kept' }
     await acceptProposal(root, p)
     const resolved = resolveRule(p.id, sources())
-    if (!resolved.ok) throw new Error(resolved.reason)
-    expect(resolved.resolved.value.asserts).toBe('first line second: line # kept')
+    expect(resolved).toMatchObject({
+      ok: true,
+      resolved: { value: { asserts: 'first line second: line # kept' } },
+    })
   })
 
   it('puts it on the data-root rung, so it applies to every repository', async () => {
@@ -88,14 +91,19 @@ function rulesWritingTests() {
     const resolved = resolveRule(p.id, sources())
     expect(resolved.ok && resolved.resolved.rung).toBe('data-root')
   })
+}
 
+function rulesOriginTests() {
   it('records what it was derived from, on the rule itself', async () => {
     const p = proposal()
     await acceptProposal(root, p)
     const resolved = resolveRule(p.id, sources())
-    if (!resolved.ok) throw new Error(resolved.reason)
-    expect(resolved.resolved.value.origin).toMatch(/^curator:/)
-    expect(resolved.resolved.value.origin).toContain('2026-09-01T10:00:00.000Z/U-1')
+    expect(resolved).toMatchObject({
+      ok: true,
+      resolved: {
+        value: { origin: expect.stringMatching(/^curator:.*2026-09-01T10:00:00\.000Z\/U-1/) },
+      },
+    })
   })
 }
 

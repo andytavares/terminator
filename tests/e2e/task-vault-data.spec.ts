@@ -127,7 +127,7 @@ async function taskVaultSettingsAction(label: string): Promise<void> {
     has: page.locator('.extension-item__name', { hasText: 'Task Vault' }),
   })
   if ((await row.locator('.extension-settings-panel').count()) === 0) {
-    await row.getByTitle('Configure').click()
+    await row.getByRole('button', { name: 'Configure', exact: true }).click()
   }
   await row.getByRole('button', { name: label, exact: true }).click()
 }

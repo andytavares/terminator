@@ -23,7 +23,7 @@ function savedSettings(theme: GlobalSettings['appearance']['theme']): void {
 }
 
 function openedWith(search: string): void {
-  Object.defineProperty(window, 'location', { value: { search }, writable: true })
+  vi.stubGlobal('location', { search })
 }
 
 beforeEach(() => {

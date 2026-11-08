@@ -1,20 +1,19 @@
 import React from 'react'
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, waitFor } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 
 const CREATED = { data: { id: 'n1', title: 'Test', createdAt: '2026-01-01T00:00:00Z' } }
-const mockInvoke = vi.fn().mockResolvedValue(CREATED)
+const mockInvoke = vi.fn()
 const mockRecord = vi.fn()
 
-Object.defineProperty(window, 'electronAPI', {
-  value: {
+beforeEach(() => {
+  mockInvoke.mockResolvedValue(CREATED)
+  vi.stubGlobal('electronAPI', {
     extensionBridge: { invoke: mockInvoke },
     extension: { getSettingsValues: vi.fn().mockResolvedValue({ values: {} }) },
     usage: { record: mockRecord },
-  },
-  writable: true,
-  configurable: true,
+  })
 })
 
 import { QuickCreateOverlay } from '../../src/components/QuickCreateOverlay'
@@ -22,8 +21,6 @@ import { useNotesStore } from '../../src/stores/notes.store'
 
 afterEach(() => {
   cleanup()
-  mockInvoke.mockReset().mockResolvedValue(CREATED)
-  mockRecord.mockClear()
   useNotesStore.setState({ showQuickCreate: false })
 })
 

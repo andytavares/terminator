@@ -12,17 +12,15 @@ const mockInvoke = vi.fn()
 
 // Track registered extensionBridge.on handlers so tests can trigger them
 const bridgeHandlers = new Map<string, (data: unknown) => void>()
-const mockOn = vi.fn((channel: string, handler: (data: unknown) => void) => {
-  bridgeHandlers.set(channel, handler)
-  return () => bridgeHandlers.delete(channel)
-})
+const mockOn = vi.fn()
 
-Object.defineProperty(window, 'electronAPI', {
-  value: {
-    extensionBridge: { invoke: mockInvoke, on: mockOn },
-  },
-  writable: true,
-  configurable: true,
+beforeEach(() => {
+  bridgeHandlers.clear()
+  mockOn.mockImplementation((channel: string, handler: (data: unknown) => void) => {
+    bridgeHandlers.set(channel, handler)
+    return () => bridgeHandlers.delete(channel)
+  })
+  vi.stubGlobal('electronAPI', { extensionBridge: { invoke: mockInvoke, on: mockOn } })
 })
 
 vi.mock('../../src/components/task-vault.css', () => ({}))

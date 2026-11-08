@@ -97,10 +97,9 @@ function mountForgeOver(
     }
     return {}
   })
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke, on: createChangeBus().on }, ...usageStub },
-    configurable: true,
-    writable: true,
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: { invoke, on: createChangeBus().on },
+    ...usageStub,
   })
   render(<Forge orderId="WO-1" onStarted={onStarted} />)
   return onStarted

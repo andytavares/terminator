@@ -64,6 +64,8 @@ interface TurnInput {
   onStructuredOutput?: (answer: unknown) => void
   onEnd: (exitCode: number | null) => void
   onAutoDenied: (tool: string, reason: string) => void
+  /** Runs `end` once Foundry took in the session `start` answered (`helpers/supervision-mocks.ts`). */
+  whenStarted: (end: () => void) => void
 }
 
 /** What a turn hands back once it is running. */
@@ -138,10 +140,9 @@ describe('an architect that answers in structured output', () => {
       return startedTurn('architect-1')
     }) as never)
     expect((await convergeOrder(host, dataDir, readyDraft(repo))).converging).toBe('architect-1')
-    const architect = seen.turn
-    if (architect === undefined) throw new Error('the architect never started')
+    expect(seen.turn, 'the architect never started').toBeDefined()
     expect(await ledgerActions(dataDir)).not.toContain('order.redrafted')
-    architect.onStructuredOutput?.({ note: 'thought about it' })
+    seen.turn?.onStructuredOutput?.({ note: 'thought about it' })
     expect((await untilLedgerHas(dataDir, 'order.redrafted')).reason).toBe('thought about it')
     expect(fs.existsSync(path.join(orderDir(dataDir, 'WO-1'), 'proposal.json'))).toBe(false)
   })
@@ -162,7 +163,7 @@ function architectEndsWith(exitCode: number | null, proposal?: unknown) {
   return (async (input: TurnInput) => {
     input.onRegistered({ sessionId: 'architect-1', transcriptFrom: 0 })
     if (proposal !== undefined) input.onStructuredOutput?.(proposal)
-    setTimeout(() => input.onEnd(exitCode), 0)
+    input.whenStarted(() => input.onEnd(exitCode))
     return startedTurn('architect-1')
   }) as never
 }
@@ -211,7 +212,7 @@ function turns(redTeam: Turn) {
   return (async (input: TurnInput) => {
     if (input.phase === 'red-team') return redTeam(input)
     input.onRegistered({ sessionId: 'architect-1', transcriptFrom: 0 })
-    setTimeout(() => input.onStructuredOutput?.({ note: 'tightened' }), 0)
+    input.whenStarted(() => input.onStructuredOutput?.({ note: 'tightened' }))
     return startedTurn('architect-1')
   }) as never
 }
@@ -222,7 +223,7 @@ function redTeamWriting(output: unknown, before?: (input: TurnInput) => void): T
     before?.(input)
     writeFileWithDirs(reviewPath(1), output)
     input.onRegistered({ sessionId: 'red-team-1', transcriptFrom: 0 })
-    setTimeout(() => input.onTurnEnd?.(), 0)
+    input.whenStarted(() => input.onTurnEnd?.())
     return startedTurn('red-team-1')
   }
 }

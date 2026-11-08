@@ -10,10 +10,7 @@ function setUpUseReconnect(): void {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useFakeTimers()
-    Object.defineProperty(document, 'visibilityState', {
-      configurable: true,
-      get: () => 'visible',
-    })
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
   })
 
   afterEach(() => {

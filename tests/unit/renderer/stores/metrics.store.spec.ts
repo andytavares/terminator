@@ -4,8 +4,8 @@ const mockGetSystem = vi.fn()
 const mockGetProcesses = vi.fn()
 const mockGetPids = vi.fn()
 
-Object.defineProperty(globalThis, 'window', {
-  value: {
+beforeEach(() => {
+  vi.stubGlobal('window', {
     electronAPI: {
       metrics: {
         getSystem: mockGetSystem,
@@ -13,8 +13,7 @@ Object.defineProperty(globalThis, 'window', {
         getPids: mockGetPids,
       },
     },
-  },
-  writable: true,
+  })
 })
 
 import { useMetricsStore } from '../../../../src/renderer/stores/metrics.store'

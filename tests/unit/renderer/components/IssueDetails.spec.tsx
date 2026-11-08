@@ -44,11 +44,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   api.getIssue.mockResolvedValue({ issue: issue() })
   useStartWorkStore.setState({ open: false, prefill: '', openLauncher })
-  Object.defineProperty(window, 'electronAPI', {
-    value: { integrations: api, shell: { openExternal } },
-    writable: true,
-    configurable: true,
-  })
+  vi.stubGlobal('electronAPI', { integrations: api, shell: { openExternal } })
 })
 
 describe('IssueDetails — the issue', () => {

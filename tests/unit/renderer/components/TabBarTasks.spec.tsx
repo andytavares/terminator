@@ -54,11 +54,7 @@ const TWO_LANES = [
 beforeEach(() => {
   vi.clearAllMocks()
   useAddToTaskStore.getState().close()
-  Object.defineProperty(window, 'electronAPI', {
-    configurable: true,
-    writable: true,
-    value: { project: { list: vi.fn(async () => ({ projects: [] })) } },
-  })
+  vi.stubGlobal('electronAPI', { project: { list: vi.fn(async () => ({ projects: [] })) } })
   useWorkspaceStore.setState({
     ...useWorkspaceStore.getInitialState(),
     workspaces: [backend, frontend],
@@ -139,9 +135,8 @@ describe('TabBar — lane switcher — switching', () => {
     renderTabBar()
     const lane = screen.getByRole('button', { name: /Frontend/ })
     expect(lane.querySelector('[aria-label="Needs you"]')).not.toBeNull()
-    expect(
-      screen.getByRole('button', { name: 'Backend' }).querySelector('[aria-label="Needs you"]')
-    ).toBeNull()
+    const backend = screen.getByRole('button', { name: 'Backend' })
+    expect(backend.querySelector('[aria-label="Needs you"]')).toBeNull()
   })
 })
 

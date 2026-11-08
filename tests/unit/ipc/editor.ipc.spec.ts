@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { corruptStoreFile } from '../../support/stores'
 
 const { mockHandle, detectEditor, openInEditor, recordUse } = vi.hoisted(() => ({
-  recordUse: vi.fn(() => Promise.resolve()),
+  recordUse: vi.fn(),
   mockHandle: vi.fn(),
   detectEditor: vi.fn(),
   openInEditor: vi.fn(),
@@ -24,8 +24,6 @@ vi.mock('../../../src/main/editor/open-in-editor.js', () => ({
 import { updateGlobalSettings } from '../../../src/main/storage/settings-store.js'
 import { registerEditorHandlers } from '../../../src/main/ipc/editor.ipc.js'
 
-registerEditorHandlers()
-
 function handlerFor(channel: string): (event: unknown, payload?: unknown) => unknown {
   const match = mockHandle.mock.calls.find(([ch]) => ch === channel)
   if (!match) throw new Error(`No handler registered for: ${channel}`)
@@ -37,11 +35,12 @@ function chooseEditor(editor: string): void {
 }
 
 beforeEach(() => {
-  recordUse.mockReset()
+  recordUse.mockResolvedValue(undefined)
   detectEditor.mockReset().mockResolvedValue({ id: 'cursor', name: 'Cursor' })
   openInEditor.mockReset().mockResolvedValue({ ok: true, editor: 'Cursor' })
   corruptStoreFile(null)
   chooseEditor('')
+  registerEditorHandlers()
 })
 
 describe('editor:detect', () => {

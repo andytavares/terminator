@@ -24,12 +24,21 @@ export function assertLoopback(args: ConnectArguments): void {
   }
 }
 
-/** Makes every TCP and TLS connection (net.connect, tls.connect, http, fetch's agents all end in
- * net.Socket.prototype.connect) to another machine throw. Returns what restores it. */
-export function installNetworkGuard(): () => void {
+/** Throws unless a `connect` call with these arguments is a Unix socket or pipe: a unit test opens
+ * no TCP socket at all, loopback included. */
+export function assertNoTcp(args: ConnectArguments): void {
+  const host = hostOf(args)
+  if (host !== null) throw new Error(`A unit test may open no TCP socket (T-BOUNDARY): ${host}`)
+}
+
+/** Makes TCP and TLS connections (net.connect, tls.connect, http, fetch's agents all end in
+ * net.Socket.prototype.connect) throw: every one in a unit test, any to another machine in an
+ * integration test. Returns what restores it. */
+export function installNetworkGuard(tier: 'unit' | 'integration'): () => void {
   const original = net.Socket.prototype.connect
+  const check = tier === 'unit' ? assertNoTcp : assertLoopback
   net.Socket.prototype.connect = function guardedConnect(this: net.Socket, ...args: unknown[]) {
-    assertLoopback(args)
+    check(args)
     return (original as (...rest: unknown[]) => net.Socket).apply(this, args)
   } as typeof net.Socket.prototype.connect
   return () => {

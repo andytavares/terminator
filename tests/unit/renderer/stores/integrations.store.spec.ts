@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import type { TrackerConnection } from '../../../../src/shared/types/index'
 
 const api = {
@@ -18,9 +18,8 @@ const api = {
 
 // A .spec.ts under tests/unit runs in the node project, which has no DOM — the
 // store only ever touches window.electronAPI, so that is all it needs.
-Object.defineProperty(globalThis, 'window', {
-  value: { electronAPI: { integrations: api } },
-  writable: true,
+beforeEach(() => {
+  vi.stubGlobal('window', { electronAPI: { integrations: api } })
 })
 
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
@@ -336,37 +335,22 @@ describe('integrations store — links — ignores a malformed link push', () =>
 
 /** The remote /app/ shim deliberately omits connect and disconnect. */
 function withoutCredentialWrites(): void {
-  Object.defineProperty(globalThis, 'window', {
-    value: {
-      electronAPI: {
-        integrations: {
-          status: api.status,
-          linkGet: api.linkGet,
-          onStatusChanged: api.onStatusChanged,
-        },
+  vi.stubGlobal('window', {
+    electronAPI: {
+      integrations: {
+        status: api.status,
+        linkGet: api.linkGet,
+        onStatusChanged: api.onStatusChanged,
       },
     },
-    writable: true,
   })
 }
 
 function withNoIntegrationsAtAll(): void {
-  Object.defineProperty(globalThis, 'window', {
-    value: { electronAPI: {} },
-    writable: true,
-  })
-}
-
-function restore(): void {
-  Object.defineProperty(globalThis, 'window', {
-    value: { electronAPI: { integrations: api } },
-    writable: true,
-  })
+  vi.stubGlobal('window', { electronAPI: {} })
 }
 
 describe('integrations store — partial transports', () => {
-  afterEach(restore)
-
   it('reports failure rather than crashing when connect is not carried', async () => {
     withoutCredentialWrites()
     const ok = await useIntegrationsStore.getState().connect({ tracker: 'linear', apiKey: 'k' })
@@ -387,8 +371,6 @@ describe('integrations store — partial transports', () => {
 })
 
 describe('integrations store — partial transports — survives an electronAPI with no integrations surface at all', () => {
-  afterEach(restore)
-
   const P = '11111111-1111-4111-8111-111111111111'
 
   it('survives an electronAPI with no integrations surface at all', async () => {

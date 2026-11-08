@@ -312,7 +312,7 @@ async function addTaskDaysAgo(text: string, daysAgo: number): Promise<void> {
   }
   await expect(vault.locator('.daily-log__today-badge')).toHaveCount(0)
   await addTaskToToday(text)
-  await vault.getByTitle('Back to today').click()
+  await vault.getByRole('button', { name: 'Back to today', exact: true }).click()
 }
 
 /** "Stale Task Threshold", set on the settings page, decides when a rolled-over task is stale. */

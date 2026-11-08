@@ -71,10 +71,9 @@ beforeEach(() => {
     if (channel === 'git:unstage') return mockUnstage(payload)
     return Promise.resolve({})
   })
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke: mockInvoke }, usage: { record: mockRecordUsage } },
-    writable: true,
-    configurable: true,
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: { invoke: mockInvoke },
+    usage: { record: mockRecordUsage },
   })
 })
 

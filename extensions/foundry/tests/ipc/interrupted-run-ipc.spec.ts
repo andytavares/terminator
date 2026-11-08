@@ -13,7 +13,7 @@ import * as path from 'node:path'
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 
 import { makeTempDir } from '../../../../tests/support/temp-dir'
-import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
+import { execSucceeded, fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate, settleFoundryWork } from '../helpers/foundry-activation.js'
 import { builderUnit } from '../helpers/order-parts.js'
 import { createOrderStore } from '../../src/order/store.js'
@@ -110,7 +110,7 @@ function graphOnDisk(): RunGraph {
 
 beforeAll(async () => {
   host = fakeHost(() => dataDir)
-  host.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
+  host.exec.mockResolvedValue(execSucceeded(''))
   await activateFoundry(host)
 })
 
@@ -135,6 +135,8 @@ async function previousExecutorWoundDown(): Promise<void> {
 }
 
 beforeEach(async () => {
+  // mockReset clears what beforeAll set: no real git in a unit spec.
+  host.exec.mockResolvedValue(execSucceeded(''))
   // A previous test's resume leaves its executor winding down; while it is marked executing,
   // no node of the order counts as orphaned.
   await previousExecutorWoundDown()

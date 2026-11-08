@@ -60,6 +60,41 @@ describe('installIconTooltips — pointer', () => {
   })
 })
 
+describe('installIconTooltips — the title it holds back', () => {
+  it('keeps the name of a control that only a title names while it holds the title back', () => {
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<button id="close" title="Close"><svg></svg></button>'
+    )
+    const control = hover('close')
+    vi.advanceTimersByTime(TOOLTIP_DELAY_MS)
+    expect(control.hasAttribute('title')).toBe(false)
+    expect(control.getAttribute('aria-label')).toBe('Close')
+
+    control.dispatchEvent(new PointerEvent('pointerout', { bubbles: true }))
+    expect(control.getAttribute('title')).toBe('Close')
+    expect(control.hasAttribute('aria-label')).toBe(false)
+  })
+
+  it('leaves the name of a control whose text names it, such as a glyph', () => {
+    document.body.insertAdjacentHTML('beforeend', '<button id="gear" title="Configure">⚙</button>')
+    const control = hover('gear')
+    vi.advanceTimersByTime(TOOLTIP_DELAY_MS)
+    expect(tooltip()?.textContent).toBe('Configure')
+    expect(control.hasAttribute('aria-label')).toBe(false)
+  })
+
+  // React reuses a button for the next state and sets its new title while the tooltip holds the old.
+  it('keeps a title the page set while the tooltip showed, and does not write back the old one', () => {
+    const control = hover('archive')
+    vi.advanceTimersByTime(TOOLTIP_DELAY_MS)
+    control.setAttribute('title', 'Restore task')
+
+    control.dispatchEvent(new PointerEvent('pointerout', { bubbles: true }))
+    expect(control.getAttribute('title')).toBe('Restore task')
+  })
+})
+
 describe('installIconTooltips — which controls', () => {
   it('leaves a control alone when its visible text already says its name', () => {
     hover('save')

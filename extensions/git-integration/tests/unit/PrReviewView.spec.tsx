@@ -149,7 +149,7 @@ beforeAll(async () => {
 describe('PrReviewView', () => {
   it('renders the diff pane when chapter and file are available', async () => {
     await renderView()
-    expect(screen.queryByTestId('review-diff-pane')).not.toBeNull()
+    expect(screen.getByTestId('review-diff-pane')).toBeTruthy()
   })
 
   it('shows chapter nav for multi-chapter PRs in guided mode', async () => {
@@ -159,7 +159,7 @@ describe('PrReviewView', () => {
       { currentChapterId: 'ch-1', currentFilePath: 'src/foo.ts' }
     )
     await user.click(screen.getByRole('radio', { name: 'Chapters' }))
-    expect(screen.queryByTestId('chapter-nav')).not.toBeNull()
+    expect(screen.getByTestId('chapter-nav')).toBeTruthy()
   })
 })
 
@@ -167,13 +167,13 @@ describe('PrReviewView — single-chapter PRs', () => {
   it('offers no file list mode toggle and labels the list "Files" for a single-chapter PR', async () => {
     await renderView()
     expect(screen.queryByRole('radiogroup', { name: 'File list mode' })).toBeNull()
-    expect(screen.queryByText('Files')).not.toBeNull()
+    expect(screen.getByText('Files')).toBeTruthy()
   })
 
   it('opens the submit panel from Submit review and hides it on CloseSubmit', async () => {
     const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
     await user.click(screen.getByRole('button', { name: /^Submit review/ }))
-    expect(screen.queryByTestId('submit-panel')).not.toBeNull()
+    expect(screen.getByTestId('submit-panel')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'CloseSubmit' }))
     expect(screen.queryByTestId('submit-panel')).toBeNull()
   })
@@ -190,7 +190,7 @@ describe('PrReviewView — pausing', () => {
 
   it('shows review progress once, in the header, with the unviewed files estimate', async () => {
     await renderView({}, { currentFilePath: 'src/foo.ts' })
-    expect(screen.queryByText('0 of 1 viewed · about 3 min left')).not.toBeNull()
+    expect(screen.getByText('0 of 1 viewed · about 3 min left')).toBeTruthy()
     expect(screen.queryByText(/files reviewed/)).toBeNull()
   })
 
@@ -204,8 +204,8 @@ describe('PrReviewView — opens the Agent tab of the inspector from Ask agent, 
   it('opens the Agent tab of the inspector from Ask agent, and closes it', async () => {
     const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
     await user.click(screen.getByRole('button', { name: 'Ask agent about this PR' }))
-    expect(screen.queryByRole('tab', { name: /Agent/, selected: true })).not.toBeNull()
-    expect(screen.queryByTestId('agent-panel')).not.toBeNull()
+    expect(screen.getByRole('tab', { name: /Agent/, selected: true })).toBeTruthy()
+    expect(screen.getByTestId('agent-panel')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Close inspector' }))
     expect(screen.queryByTestId('agent-panel')).toBeNull()
     expect(screen.queryByRole('tablist', { name: 'Inspector' })).toBeNull()
@@ -213,13 +213,13 @@ describe('PrReviewView — opens the Agent tab of the inspector from Ask agent, 
 
   it('hides and restores the file list from the more menu', async () => {
     const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
-    expect(screen.queryByTestId('full-file-list')).not.toBeNull()
+    expect(screen.getByTestId('full-file-list')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'More review actions' }))
     await user.click(screen.getByRole('menuitem', { name: /^Hide file list/ }))
     expect(screen.queryByTestId('full-file-list')).toBeNull()
     await user.click(screen.getByRole('button', { name: 'More review actions' }))
     await user.click(screen.getByRole('menuitem', { name: /^Hide file list/ }))
-    expect(screen.queryByTestId('full-file-list')).not.toBeNull()
+    expect(screen.getByTestId('full-file-list')).toBeTruthy()
   })
 })
 
@@ -227,14 +227,14 @@ describe('PrReviewView — shows risk panel when ShowRisk is clicked', () => {
   it('shows risk panel when ShowRisk is clicked', async () => {
     const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
     await user.click(screen.getByRole('button', { name: 'ShowRisk' }))
-    expect(screen.queryByRole('tab', { name: 'Why this file', selected: true })).not.toBeNull()
-    expect(screen.queryByTestId('risk-panel')).not.toBeNull()
+    expect(screen.getByRole('tab', { name: 'Why this file', selected: true })).toBeTruthy()
+    expect(screen.getByTestId('risk-panel')).toBeTruthy()
   })
 
   it('opens submit panel when FinishChapter is clicked on the last (only) chapter', async () => {
     const { user } = await renderView({}, { currentFilePath: 'src/foo.ts' })
     await user.click(screen.getByRole('button', { name: /^Viewed, submit review/ }))
-    expect(screen.queryByTestId('submit-panel')).not.toBeNull()
+    expect(screen.getByTestId('submit-panel')).toBeTruthy()
   })
 })
 
@@ -293,11 +293,11 @@ describe('PrReviewView — shows full-file-list by default, restores it after sw
       { chapters: [mockChapter, ch2] },
       { currentFilePath: 'src/foo.ts', currentChapterId: 'ch-1' }
     )
-    expect(screen.queryByTestId('full-file-list')).not.toBeNull()
+    expect(screen.getByTestId('full-file-list')).toBeTruthy()
     await user.click(screen.getByRole('radio', { name: 'Chapters' }))
-    expect(screen.queryByTestId('chapter-file-list')).not.toBeNull()
+    expect(screen.getByTestId('chapter-file-list')).toBeTruthy()
     await user.click(screen.getByRole('radio', { name: 'Files' }))
-    expect(screen.queryByTestId('full-file-list')).not.toBeNull()
+    expect(screen.getByTestId('full-file-list')).toBeTruthy()
   })
 })
 
@@ -313,7 +313,7 @@ describe('PrReviewView — refresh', () => {
 describe('PrReviewView — shows empty state message when no active file', () => {
   it('shows empty state message when no active file', async () => {
     await renderView({ chapters: [] }, { currentFilePath: null })
-    expect(screen.queryByText('Select a file to review.')).not.toBeNull()
+    expect(screen.getByText('Select a file to review.')).toBeTruthy()
   })
 })
 
@@ -334,7 +334,7 @@ describe('PrReviewView (continued) — large-PR warning', () => {
   it('shows large-PR banner when PR exceeds 400 LOC', async () => {
     const { user } = await renderLargePr()
     await user.click(screen.getByRole('button', { name: /500 LOC/ }))
-    expect(screen.queryByText(/Large PR — 500 LOC, estimated 125 min to review/)).not.toBeNull()
+    expect(screen.getByText(/Large PR — 500 LOC, estimated 125 min to review/)).toBeTruthy()
   })
 
   it('does not show large-PR banner when PR is under 400 LOC', async () => {
@@ -526,6 +526,6 @@ describe('PrReviewView (continued) — chapter keyboard navigation — marking t
     )
     expect(screen.queryByText('Chapter 2 of 3')).toBeNull()
     await user.click(screen.getByRole('radio', { name: 'Chapters' }))
-    expect(screen.queryByText('Chapter 2 of 3')).not.toBeNull()
+    expect(screen.getByText('Chapter 2 of 3')).toBeTruthy()
   })
 })

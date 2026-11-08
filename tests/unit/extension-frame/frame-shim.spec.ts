@@ -33,9 +33,9 @@ async function loadShimInFrame(): Promise<{ port: FakePort }> {
   vi.resetModules()
   const port = fakeFramePort()
   // happy-dom has window.top === window by default; pretend this is a frame.
-  Object.defineProperty(window, 'top', { value: {}, configurable: true })
+  vi.stubGlobal('top', {})
   // happy-dom reports "X11; Darwin arm64"; a real mac reads "MacIntel".
-  Object.defineProperty(navigator, 'platform', { value: 'MacIntel', configurable: true })
+  vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
   await import(SHIM_PATH)
   return { port }
 }
@@ -50,7 +50,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  Object.defineProperty(window, 'top', { value: window, configurable: true })
   vi.resetModules()
 })
 
@@ -307,14 +306,8 @@ function createFitContentSpies() {
 /** Loads the shim as if the frame's page were at `url`, embedded by the page at `referrer`. */
 async function loadShimAt(url: string, referrer = 'http://localhost:5173/home'): Promise<void> {
   const realLocation = window.location
-  Object.defineProperty(window, 'location', {
-    value: { ...realLocation, search: new URL(url).search },
-    configurable: true,
-  })
-  Object.defineProperty(document, 'referrer', {
-    value: referrer,
-    configurable: true,
-  })
+  vi.stubGlobal('location', { ...realLocation, search: new URL(url).search })
+  vi.spyOn(document, 'referrer', 'get').mockReturnValue(referrer)
   await loadShimInFrame()
 }
 

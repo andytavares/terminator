@@ -7,7 +7,9 @@ const localStorageStub = {
   removeItem: (k: string) => void store.delete(k),
   clear: () => store.clear(),
 }
-Object.defineProperty(globalThis, 'localStorage', { value: localStorageStub, writable: true })
+beforeEach(() => {
+  vi.stubGlobal('localStorage', localStorageStub)
+})
 
 import {
   COLLAPSE_STORAGE_KEY,

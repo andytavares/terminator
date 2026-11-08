@@ -1,6 +1,6 @@
 # ADR 098: One design system, documented in Storybook
 
-**Status**: Accepted
+**Status**: Accepted, amended by ADR 150
 **Date**: 2026-10-12
 **Extends**: ADR-039 (one UI layer, published outward)
 **Relates to**: Constitution Principle XIII (2.0.0)

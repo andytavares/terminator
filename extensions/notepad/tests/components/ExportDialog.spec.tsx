@@ -7,15 +7,15 @@ import type { NoteListItem } from '../../src/db/types'
 
 const mockInvoke = vi.fn()
 const mockRecord = vi.fn()
-const mockSettings = vi.fn().mockResolvedValue({ values: {} })
-Object.defineProperty(window, 'electronAPI', {
-  value: {
+const mockSettings = vi.fn()
+
+beforeEach(() => {
+  mockSettings.mockResolvedValue({ values: {} })
+  vi.stubGlobal('electronAPI', {
     extensionBridge: { invoke: mockInvoke },
     extension: { getSettingsValues: mockSettings },
     usage: { record: mockRecord },
-  },
-  writable: true,
-  configurable: true,
+  })
 })
 
 import { ExportDialog } from '../../src/components/ExportDialog'
@@ -37,8 +37,6 @@ describe('ExportDialog settings', exportDialogSettingsTests)
 
 function exportDialogTests() {
   beforeEach(() => {
-    mockInvoke.mockClear()
-    mockRecord.mockClear()
     useNotesStore.setState({
       notes: [],
       selectedNoteId: null,
@@ -169,7 +167,7 @@ function exportDialogRunningTests() {
 
 function exportDialogSettingsTests() {
   beforeEach(() => {
-    mockInvoke.mockReset().mockResolvedValue({ data: { exported: 1, diagrams: 0 } })
+    mockInvoke.mockResolvedValue({ data: { exported: 1, diagrams: 0 } })
     useNotesStore.setState({ notes: [dummyNote], diagrams: [] })
   })
   describe('chosen in Settings', exportDialogSettingsChosenTests)

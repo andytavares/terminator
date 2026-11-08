@@ -257,7 +257,7 @@ function startupFileTests(startup: StartupShell) {
   // exits 1. Either way a check nobody let finish is never a pass.
   it(`(${shell}) never passes a check whose tab was closed while it ran`, async () => {
     withStartupShell(startup)
-    await expect(checkOrTimeOut('echo hang-up-"now"; sleep 30')).resolves.not.toBe(0)
+    await expect(checkOrTimeOut('echo hang-up-"now"; read -r line')).resolves.not.toBe(0)
   })
 
   it(`(${shell}) keeps both through the log file`, async () => {

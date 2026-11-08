@@ -11,6 +11,7 @@ import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Gate } from '../../src/gates/rules.js'
+import { requiredLiveEnv } from '../../../../tests/support/live-env'
 
 // The one thing the whole suite could never prove: that `git push` and
 // `gh pr create --draft` do what this code believes they do.
@@ -22,7 +23,7 @@ import type { Gate } from '../../src/gates/rules.js'
 // Excluded from the default run — it needs `gh` authenticated and a repository
 // on GitHub. `FOUNDRY_LIVE_REPO` points at a checkout with a remote.
 
-const LIVE = process.env.FOUNDRY_LIVE_REPO ?? ''
+const LIVE = requiredLiveEnv('FOUNDRY_LIVE_REPO', 'it names a checkout with a GitHub remote')
 
 /**
  * The same shape the core shell executor hands the extension: an exit code and
@@ -284,7 +285,7 @@ async function expectDraftMarkedReady(): Promise<void> {
   await exec({ command: 'gh', args: ['pr', 'ready', pull.url, '--undo'], cwd: LIVE })
 }
 
-describe.skipIf(LIVE === '')('shipping, for real', () => {
+describe('shipping, for real', () => {
   afterAll(removeTheLiveRecords)
   beforeAll(commitTheChangeInAWorktree)
 

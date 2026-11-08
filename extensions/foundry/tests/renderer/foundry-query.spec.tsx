@@ -15,16 +15,13 @@ beforeEach(() => {
   const switched: ((data: unknown) => void)[] = []
   pushChange = (change) => changed.forEach((handler) => handler(change))
   switchWorkspace = () => switched.forEach((handler) => handler({}))
-  Object.defineProperty(window, 'electronAPI', {
-    configurable: true,
-    value: {
-      extensionBridge: {
-        on: vi.fn((channel: string, handler: (data: unknown) => void) => {
-          if (channel === 'foundry:changed') changed.push(handler)
-          if (channel === 'workspace:changed') switched.push(handler)
-          return unsubscribe
-        }),
-      },
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: {
+      on: vi.fn((channel: string, handler: (data: unknown) => void) => {
+        if (channel === 'foundry:changed') changed.push(handler)
+        if (channel === 'workspace:changed') switched.push(handler)
+        return unsubscribe
+      }),
     },
   })
 })

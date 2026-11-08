@@ -80,6 +80,13 @@ function refusalOf(answer: unknown): string {
   return outcome.reason
 }
 
+/** The architect's answer as the real parser accepts it. */
+function acceptanceOf(answer: unknown, at: string) {
+  const outcome = applyArchitectAnswer(seeded(), answer, at)
+  if (!outcome.ok) throw new Error(`the corrected proposal was refused: ${outcome.reason}`)
+  return outcome
+}
+
 /** One architect line in the ledger, as `afterRefusedProposal`/`afterRedraft` write it. */
 async function architectLine(at: string, action: string, reason: string): Promise<void> {
   await store.record({
@@ -150,8 +157,7 @@ function theCorrectedProposalTests() {
   it('accepts the corrected proposal and clears the refusal', async () => {
     await architectLine('2026-09-09T19:33:21.000Z', 'converge.refused', refusalOf(BAD_PROPOSAL))
     await architectLine('2026-09-09T19:40:00.000Z', 'converge.started', 'proposal was refused')
-    const corrected = applyArchitectAnswer(seeded(), GOOD_PROPOSAL, '2026-09-09T19:41:00.000Z')
-    if (!corrected.ok) throw new Error(`the corrected proposal was refused: ${corrected.reason}`)
+    const corrected = acceptanceOf(GOOD_PROPOSAL, '2026-09-09T19:41:00.000Z')
     await store.save(corrected.order)
     await architectLine('2026-09-09T19:41:00.000Z', 'order.redrafted', corrected.note)
 

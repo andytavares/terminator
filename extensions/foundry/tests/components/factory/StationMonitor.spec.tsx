@@ -210,13 +210,13 @@ function keysTests() {
 function poweringOffAndOnTests() {
   it('plays the power-off before closing when motion is allowed', async () => {
     setReducedMotion(false)
-    vi.useFakeTimers()
+    // shouldAdvanceTime: Testing Library's async wrapper waits on a timer, or user-event hangs.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const { onClose } = mount()
     const root = document.querySelector('.fdry-crt') as HTMLElement
     expect(root.classList.contains('is-on')).toBe(true)
-    // fireEvent: under vi fake timers Testing Library's async wrapper waits on a
-    // real setTimeout that never fires, so user-event hangs here.
-    fireEvent.click(screen.getByRole('button', { name: 'Close monitor' }))
+    await user.click(screen.getByRole('button', { name: 'Close monitor' }))
     expect(root.classList.contains('is-off')).toBe(true)
     expect(onClose).not.toHaveBeenCalled()
     act(() => {

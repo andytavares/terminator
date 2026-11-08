@@ -32,11 +32,7 @@ function mountHall(shown: unknown, answers: Record<string, () => unknown> = {}):
     ...answers,
   }
   invoke = vi.fn(async (channel: string) => (channel in replies ? replies[channel]() : {}))
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke, on: vi.fn(() => vi.fn()) } },
-    configurable: true,
-    writable: true,
-  })
+  vi.stubGlobal('electronAPI', { extensionBridge: { invoke, on: vi.fn(() => vi.fn()) } })
   render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
 }
 
@@ -63,7 +59,7 @@ describe('playing a replay', () => {
       const position = (await screen.findByRole('slider', {
         name: 'Replay position',
       })) as HTMLInputElement
-      // user-event cannot move a range input to a value.
+      // eslint-disable-next-line testing-library/prefer-user-event -- user-event cannot move a range input to a value
       fireEvent.change(position, { target: { value: position.max } })
       await waitFor(() => expect(position.value).toBe(position.max))
       expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy()

@@ -74,11 +74,7 @@ beforeEach(() => {
   api.getIssue.mockResolvedValue({ issue: issue() })
   api.comment.mockResolvedValue({ ok: true })
   api.setInjectContext.mockResolvedValue({ ok: true })
-  Object.defineProperty(window, 'electronAPI', {
-    value: { integrations: api, shell: { openExternal } },
-    writable: true,
-    configurable: true,
-  })
+  vi.stubGlobal('electronAPI', { integrations: api, shell: { openExternal } })
 })
 
 describe('IssueDrawer — the issue', () => {

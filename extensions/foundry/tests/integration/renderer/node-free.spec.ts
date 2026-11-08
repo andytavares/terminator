@@ -12,7 +12,7 @@ describe('the Foundry renderer bundle', () => {
     const reached: string[] = []
 
     await build({
-      entryPoints: [resolve(__dirname, '../../src/renderer/main.tsx')],
+      entryPoints: [resolve(__dirname, '../../../src/renderer/main.tsx')],
       bundle: true,
       write: false,
       logLevel: 'silent',

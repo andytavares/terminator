@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { GlobalSettings } from '../../../../src/renderer/components/settings/GlobalSettings'
@@ -101,26 +101,28 @@ describe('GlobalSettings', () => {
     expect(mockUpdateGlobal).toHaveBeenCalledWith({ appearance: { theme: 'light' } })
   })
 
-  it('saves a scrollback limit inside the allowed range', () => {
+  it('saves a scrollback limit inside the allowed range', async () => {
+    const user = userEvent.setup()
     render(<GlobalSettings />)
-    const input = screen.getByDisplayValue('5000')
     // The field is controlled and drops out-of-range values, so typing key by
-    // key never reaches 8000 (8, 80, 800 snap back): set the whole value.
-    fireEvent.change(input, { target: { value: '8000' } })
+    // key never reaches 8000 (8, 80, 800 snap back): paste the whole value.
+    await user.tripleClick(screen.getByDisplayValue('5000'))
+    await user.paste('8000')
     expect(mockUpdateGlobal).toHaveBeenCalledWith({ terminal: { scrollbackLimit: 8000 } })
   })
 })
 
 // The scrollback field is controlled and drops out-of-range values, so these
-// set the whole value with fireEvent.change rather than type key by key.
+// paste the whole value rather than type key by key.
 describe('GlobalSettings — scrollback range and text fields', () => {
   it.each([
     ['below the minimum', '500'],
     ['above the maximum', '200000'],
-  ])('does not save a scrollback limit %s', (_case, limit) => {
+  ])('does not save a scrollback limit %s', async (_case, limit) => {
+    const user = userEvent.setup()
     render(<GlobalSettings />)
-    const input = screen.getByDisplayValue('5000')
-    fireEvent.change(input, { target: { value: limit } })
+    await user.tripleClick(screen.getByDisplayValue('5000'))
+    await user.paste(limit)
     expect(mockUpdateGlobal).not.toHaveBeenCalled()
   })
 

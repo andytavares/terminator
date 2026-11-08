@@ -434,8 +434,7 @@ function checksAndRunningOrdersTests() {
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
     })) as OrderView
-    const loaded = await store.load(seeded.order.id)
-    if (loaded === null) throw new Error('the order this test needs was not saved')
+    const loaded = await savedOrder(seeded.order.id)
     await store.save({ ...loaded, status: 'running' })
 
     const r = (await c.list()) as { orders: { standing: Standing }[] }
@@ -460,8 +459,7 @@ function haltedOrdersTests() {
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
     })) as OrderView
-    const loaded = await store.load(seeded.order.id)
-    if (loaded === null) throw new Error('the order this test needs was not saved')
+    const loaded = await savedOrder(seeded.order.id)
     await store.save({ ...loaded, status: 'running' })
 
     const r = (await c.list()) as { orders: { standing: Standing }[] }
@@ -481,8 +479,7 @@ function forgeChannelsOpenQuestionsTests() {
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
     })) as OrderView
-    const loaded = await store.load(seeded.order.id)
-    if (loaded === null) throw new Error('the order this test needs was not saved')
+    const loaded = await savedOrder(seeded.order.id)
     await store.save({
       ...loaded,
       openQuestions: [openQuestion('Q-1', { text: 'a?', options: ['x', 'y'], recommended: 0 })],
@@ -523,10 +520,16 @@ function watchingThreeChecks(url: string) {
   }
 }
 
-/** Puts the order in a run that opened the pull request at `url`. */
-async function runningWithPull(orderId: string, url: string): Promise<void> {
+/** The order as saved, for a test that goes on to change it. */
+async function savedOrder(orderId: string): Promise<WorkOrder> {
   const loaded = await store.load(orderId)
   if (loaded === null) throw new Error('the order this test needs was not saved')
+  return loaded
+}
+
+/** Puts the order in a run that opened the pull request at `url`. */
+async function runningWithPull(orderId: string, url: string): Promise<void> {
+  const loaded = await savedOrder(orderId)
   await store.save({ ...loaded, status: 'running' })
   const dir = path.join(root, 'orders', orderId)
   fs.mkdirSync(dir, { recursive: true })
@@ -571,8 +574,7 @@ function theOpenGateTests() {
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
     })) as OrderView
-    const loaded = await store.load(seeded.order.id)
-    if (loaded === null) throw new Error('the order this test needs was not saved')
+    const loaded = await savedOrder(seeded.order.id)
     await store.save({ ...loaded, status: 'shipped' })
 
     const r = (await c.list()) as {

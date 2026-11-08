@@ -72,14 +72,10 @@ function inventory(rows: LocalInventoryRow[], sessions: unknown[] = []) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  Object.defineProperty(window, 'electronAPI', {
-    value: {
-      extensionBridge: { invoke: mockInvoke, on: () => () => {} },
-      terminal: { listSessions: mockListSessions },
-      usage: { record: mockRecordUsage },
-    },
-    configurable: true,
-    writable: true,
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: { invoke: mockInvoke, on: () => () => {} },
+    terminal: { listSessions: mockListSessions },
+    usage: { record: mockRecordUsage },
   })
 })
 

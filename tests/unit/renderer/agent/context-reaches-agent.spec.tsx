@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { AgentUpdate } from '@terminator/extension-sdk'
 
 import { AgentView } from '../../../../src/renderer/components/agent/AgentView'
@@ -96,7 +97,16 @@ async function dropSessionOnComposer(sessionId: string): Promise<void> {
   await screen.findByText(DRAGGED_TITLE)
 }
 
-function citeInReply(quote: string, comment: string): void {
+/** Puts `text` in the field and presses Enter. A paste is one input event, so the test does not
+ *  pay for a keystroke per character. */
+async function enter(label: string, text: string): Promise<void> {
+  const user = userEvent.setup()
+  await user.click(screen.getByLabelText(label))
+  await user.paste(text)
+  await user.keyboard('{Enter}')
+}
+
+async function citeInReply(quote: string, comment: string): Promise<void> {
   const node = screen.getByText(REPLY).firstChild!
   const start = REPLY.indexOf(quote)
   const range = document.createRange()
@@ -105,10 +115,10 @@ function citeInReply(quote: string, comment: string): void {
   document.getSelection()!.removeAllRanges()
   document.getSelection()!.addRange(range)
   act(() => void document.dispatchEvent(new Event('selectionchange')))
+  // user-event clears the selection on its pointer press; a real press on Cite does not.
+  // eslint-disable-next-line testing-library/prefer-user-event
   fireEvent.click(screen.getByRole('button', { name: 'Cite' }))
-  const commentBox = screen.getByLabelText('Comment on this quote')
-  fireEvent.change(commentBox, { target: { value: comment } })
-  fireEvent.keyDown(commentBox, { key: 'Enter' })
+  await enter('Comment on this quote', comment)
 }
 
 describe('An agent tab with a dropped session and a citation', () => {
@@ -116,10 +126,8 @@ describe('An agent tab with a dropped session and a citation', () => {
     render(<AgentView sessionId="agent-1" />)
     await screen.findByText(REPLY)
     await dropSessionOnComposer('rename')
-    citeInReply('acp-stub', 'Say this more plainly')
-    const box = screen.getByLabelText('Message the agent')
-    fireEvent.change(box, { target: { value: 'Use the attached context' } })
-    fireEvent.keyDown(box, { key: 'Enter' })
+    await citeInReply('acp-stub', 'Say this more plainly')
+    await enter('Message the agent', 'Use the attached context')
 
     expect(agents.prompt).toHaveBeenCalledTimes(1)
     const [{ sessionId, text: sent }] = agents.prompt.mock.calls[0]

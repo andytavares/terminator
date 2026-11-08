@@ -1,4 +1,21 @@
 <!--
+SYNC IMPACT REPORT (10.0.0)
+===========================
+Version change: 9.0.0 → 10.0.0 (MAJOR: Principles XIII and XIV redefined by the test audit, ADR 150)
+
+Modified principles:
+  - XIII: a story is a test only when its play function asserts something; a screenshot test
+    first asserts the story rendered and is never the only check of behaviour.
+  - XIV: tests run in tiers that tests/setup.ts enforces (a unit test opens no socket, starts no
+    process, watches no file, opens no database; an integration test reaches only this machine);
+    every mock is reset before each test; a skip that depends on the machine is forbidden too.
+  Approved by the maintainer on 2026-11-07 ("Apply and amend": the audit's rules win).
+Added sections: none
+Removed sections: none
+Templates requiring updates: none
+Follow-up TODOs: none
+-->
+<!--
 SYNC IMPACT REPORT (9.0.0)
 ==========================
 Version change: 8.0.0 → 9.0.0 (MAJOR: Principle XIV's CI rules removed and redefined, ADR 151)
@@ -387,9 +404,12 @@ today) is published outward. The core consumes it exactly as an extension does.
   They MUST NOT build their own equivalent. Add a missing component to the design system first,
   then use it.
 - Every exported component MUST have Storybook stories that cover its states in both
-  themes. The stories are the component's documentation and run as tests.
+  themes. The stories are the component's documentation. A story whose play function asserts
+  behaviour runs as a test; a story that only renders is pictured by the screenshot tests and is
+  not a test of its own (ADR 150).
 - Fonts MUST ship with the app. The app fetches nothing at runtime to render the UI.
-- Screenshot tests at the supported window sizes, in both themes, MUST guard the
+- Screenshot tests at the supported window sizes, in both themes, first assert that the story
+  rendered and MUST guard the
   layout of every core and extension surface.
 
 ### XIV. Deterministic Tests (NON-NEGOTIABLE)
@@ -399,7 +419,13 @@ test, and on nothing else: not the order, the machine, the time, the developer's
 environment, an outside service, or another test. A test that fails and passes on the same
 code has no value. It is a defect. ADR 123 records the reasoning.
 
-- **No test depends on another.** A test MUST NOT read anything another test did: module
+- **Each check in the lowest tier that proves it.** A unit test is one behaviour in one process
+  with no I/O: it opens no socket, loopback included, starts no process, watches no file and opens
+  no database, and `tests/setup.ts` refuses each. An integration test (`tests/integration`,
+  `extensions/*/tests/integration`) reaches one boundary the code owns, through a private instance
+  it makes, and only on this machine. An end-to-end test is one user journey (ADR 115, ADR 150).
+- **No test depends on another.** `vitest.config.ts` resets every mock, calls and implementation
+  alike, before each test. A test MUST NOT read anything another test did: module
   state, a mock or stub, a timer, an environment variable, a file, a database row, a
   registered handler, or its position in the run. Each test sets up what it needs and
   undoes what it changed.
@@ -411,7 +437,9 @@ code has no value. It is a defect. ADR 123 records the reasoning.
 - **One run decides.** A check's verdict is its first run. Never retry or rerun a failing test into a pass, in CI, locally, or in Foundry's final check. Fix it
   at its cause, or delete it together with the behavior it claimed to cover. Nothing repeats a
   test: every CI run runs every test once (ADR 151).
-- **No skipped test.** Skipping a test (`skip`, `fixme`, `todo`) is forbidden.
+- **No skipped test.** Skipping a test (`skip`, `fixme`, `todo`, `skipIf`, a `test.skip` that
+  depends on the machine) is forbidden. A live spec whose credentials or checkout are missing
+  fails and says which.
 - **Signals, never time.** A test waits only on a signal from the code under test: an
   awaited promise, an event, a locator assertion, or `eventually()`
   (`tests/support/eventually.ts`). It never sleeps and never waits a tick. A test MUST await the work it
@@ -422,7 +450,8 @@ code has no value. It is a defect. ADR 123 records the reasoning.
 - **One sealed environment.** Every test process runs in the environment
   `scripts/test-env.mjs` builds: fixed time zone and locale, a fresh `HOME` and `TMPDIR`,
   the fixture git config, stubs first on `PATH`. Nothing of the developer's environment
-  reaches a test. A spec connects only to loopback. A stub that has no answer fails. It
+  reaches a test. A unit spec opens no socket; an integration or end-to-end spec connects only to
+  loopback. A stub that has no answer fails. It
   never falls through to the real tool.
 - **Local checks and CI run the same npm scripts.** The pre-commit hook runs `npm run check`:
   every lint script, `format:check`, `typecheck` and `npm test`. `.github/workflows/ci.yml` runs
@@ -464,4 +493,4 @@ This constitution supersedes all other practices, conventions, and ad-hoc guidan
 - The constitution version and amendment history are the authoritative record of governance
   decisions that affect this project.
 
-**Version**: 9.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-11-08
+**Version**: 10.0.0 | **Ratified**: 2026-05-05 | **Last Amended**: 2026-11-08

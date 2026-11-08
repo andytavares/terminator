@@ -19,20 +19,16 @@ type LaneInput = { id: string; lane: TaskLane }
 export async function wireMainTaskStore(): Promise<Main> {
   vi.resetModules()
   const main: Main = await import('../../src/main/tasks/task-store')
-  Object.defineProperty(window, 'electronAPI', {
-    configurable: true,
-    writable: true,
-    value: {
-      ...window.electronAPI,
-      tasks: {
-        create: (input: never) => answer(() => main.createTask(input)),
-        update: (input: never) => answer(() => main.updateTask(input)),
-        addLane: ({ id, lane }: LaneInput) => answer(() => main.addLane(id, lane)),
-        removeLane: ({ id, lane }: LaneInput) => answer(() => main.removeLane(id, lane)),
-        delete: ({ id }: { id: string }) => answer(() => main.deleteTask(id)),
-        merge: ({ from, into }: { from: string; into: string }) =>
-          answer(() => main.mergeTasks(from, into)),
-      },
+  vi.stubGlobal('electronAPI', {
+    ...window.electronAPI,
+    tasks: {
+      create: (input: never) => answer(() => main.createTask(input)),
+      update: (input: never) => answer(() => main.updateTask(input)),
+      addLane: ({ id, lane }: LaneInput) => answer(() => main.addLane(id, lane)),
+      removeLane: ({ id, lane }: LaneInput) => answer(() => main.removeLane(id, lane)),
+      delete: ({ id }: { id: string }) => answer(() => main.deleteTask(id)),
+      merge: ({ from, into }: { from: string; into: string }) =>
+        answer(() => main.mergeTasks(from, into)),
     },
   })
   useTaskStore.setState({ tasks: [] })

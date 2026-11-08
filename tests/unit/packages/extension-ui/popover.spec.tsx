@@ -165,7 +165,7 @@ describe('Popover after a press whose release was missed', () => {
   it('opens at once after a click, which only comes once the button is up', async () => {
     const user = userEvent.setup()
     await user.pointer({ keys: '[MouseLeft>]', target: document.body })
-    // The click alone, with no release before it: a release the window never saw.
+    // eslint-disable-next-line testing-library/prefer-user-event -- a click with no press before it: a release the window never saw
     fireEvent.click(document.body)
     renderPopover()
     expect(screen.getByRole('group').matches(':popover-open')).toBe(true)

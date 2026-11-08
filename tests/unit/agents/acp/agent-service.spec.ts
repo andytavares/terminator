@@ -819,8 +819,7 @@ describe('images the agent cannot read', () => {
   it('publish only the notice, not the message', async () => {
     const fakes = fakeConnector({}, { image: false, steering: false })
     const service = serviceWith(fakes.connect)
-    const result = await service.start({ cwd: '/work' })
-    if (!result) throw new Error('the fake agent did not start')
+    const result = await startedOn(service, { cwd: '/work' })
     await service.prompt(result.sessionId, 'look', [{ mimeType: 'image/png', data: 'AA==' }])
     const history = service.readHistory(result.sessionId)
     expect(history.map((update) => update.sessionUpdate)).toEqual(['agent_message_chunk'])

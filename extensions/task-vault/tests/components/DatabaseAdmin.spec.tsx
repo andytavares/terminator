@@ -77,7 +77,7 @@ describe('DatabaseAdmin reloading the vault', reloadTests)
 function tablesTests() {
   it('shows Loading… until the table counts arrive', async () => {
     renderAdmin()
-    expect(screen.queryByText('Loading…')).not.toBeNull()
+    expect(screen.getByText('Loading…')).toBeTruthy()
     await screen.findByTitle('Browse tasks')
     expect(screen.queryByText('Loading…')).toBeNull()
   })
@@ -152,7 +152,7 @@ function queryQuickActionsTests() {
     await user.click(screen.getByRole('button', { name: 'Count tasks by status' }))
     await shows(/^1 row /)
     expect(screen.queryByRole('button', { name: 'Delete this row' })).toBeNull()
-    expect(screen.queryByText('open')).not.toBeNull()
+    expect(screen.getByText('open')).toBeTruthy()
   })
 }
 
@@ -161,7 +161,7 @@ function confirmTests() {
     const user = userEvent.setup()
     renderAdmin()
     await user.click(screen.getByRole('button', { name: 'Delete all cancelled tasks' }))
-    expect(screen.queryByRole('dialog', { name: 'Run destructive query?' })).not.toBeNull()
+    expect(screen.getByRole('dialog', { name: 'Run destructive query?' })).toBeTruthy()
     expect(queriesRun()).toEqual([])
   })
 
@@ -202,7 +202,7 @@ function rowDeleteTests() {
     await user.click(await screen.findByTitle('Browse tasks'))
     await shows(/^2 rows/)
     await user.click(screen.getAllByRole('button', { name: 'Delete this row' })[1])
-    expect(screen.queryByText('DELETE FROM tasks WHERE id = 2')).not.toBeNull()
+    expect(screen.getByText('DELETE FROM tasks WHERE id = 2')).toBeTruthy()
   })
 }
 

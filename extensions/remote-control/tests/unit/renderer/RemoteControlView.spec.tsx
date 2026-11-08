@@ -39,24 +39,15 @@ beforeEach(() => {
   invoke.mockReset()
   record.mockClear()
   invoke.mockResolvedValue(SETTINGS)
-  Object.defineProperty(window, 'electronAPI', {
-    value: {
-      extensionBridge: {
-        on: (channel: string, handler: (data: unknown) => void) => {
-          handlers.set(channel, handler)
-          return () => handlers.delete(channel)
-        },
-        invoke,
+  vi.stubGlobal('electronAPI', {
+    extensionBridge: {
+      on: (channel: string, handler: (data: unknown) => void) => {
+        handlers.set(channel, handler)
+        return () => handlers.delete(channel)
       },
-      usage: { record },
+      invoke,
     },
-    configurable: true,
-    writable: true,
-  })
-  // user-event's setup replaces navigator.clipboard with a getter, so assigning it would throw.
-  Object.defineProperty(navigator, 'clipboard', {
-    value: { writeText: vi.fn() },
-    configurable: true,
+    usage: { record },
   })
 })
 

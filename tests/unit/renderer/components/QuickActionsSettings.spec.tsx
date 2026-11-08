@@ -66,10 +66,7 @@ function mockStore(custom: CustomAction[], workspaceCustom: CustomAction[] = [])
 beforeEach(() => {
   vi.clearAllMocks()
   installElectronApi({ settings: { updateGlobal, updateWorkspace } })
-  Object.defineProperty(globalThis, 'crypto', {
-    value: { randomUUID: () => 'new-uuid' },
-    configurable: true,
-  })
+  vi.stubGlobal('crypto', { randomUUID: () => 'new-uuid' })
 })
 
 describe('QuickActionsSettings — the empty state', () => {

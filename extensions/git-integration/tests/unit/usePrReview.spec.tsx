@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useEffect } from 'react'
 import { renderHook, act } from '@testing-library/react'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
+import { computeRiskScore } from '../../src/github/pr-review-service'
+import { buildThreads } from '../../src/github/pr-review-service-renderer'
 import { reviewQueuePr } from './support/review-queue-pr'
 import {
   PrReviewDetailSchema,
@@ -21,10 +23,10 @@ const mockPrReviewDetailAPI = vi.fn()
 const mockFileMetricsAPI = vi.fn()
 const mockFilesMetricsAPI = vi.fn()
 const mockPrInlineCommentsAPI = vi.fn()
-const mockSessionsForRepoAPI = vi.fn().mockResolvedValue({ sessions: [] })
-const mockActiveReviewsForRepoAPI = vi.fn().mockResolvedValue({ error: 'NOT_FOUND' })
-const mockPruneActiveReviewsAPI = vi.fn().mockResolvedValue({ openNumbers: [] })
-const mockCurrentUserAPI = vi.fn().mockResolvedValue({ login: 'testuser' })
+const mockSessionsForRepoAPI = vi.fn()
+const mockActiveReviewsForRepoAPI = vi.fn()
+const mockPruneActiveReviewsAPI = vi.fn()
+const mockCurrentUserAPI = vi.fn()
 
 const mockPrIssueCommentsAPI = vi.fn()
 
@@ -57,30 +59,12 @@ vi.mock('../../src/github/pr-review-service', async (importActual) => {
     // Keep the real queueRiskLevel + thresholds so the size-floor logic runs for real;
     // only computeRiskScore (the per-file scorer) is stubbed to a fixed low result.
     ...actual,
-    computeRiskScore: vi.fn().mockReturnValue({
-      level: 'low',
-      composite: 10,
-      dominantDriver: 'changeSize',
-      topImporters: [],
-      importerCount: 0,
-      metrics: {
-        changeSize: 5,
-        churn90d: null,
-        blastRadius: null,
-        testFilePresent: null,
-        complexityDelta: null,
-        patchCoverage: null,
-      },
-    }),
+    computeRiskScore: vi.fn(),
   }
 })
 
 vi.mock('../../src/github/pr-review-service-renderer', () => ({
-  buildThreads: vi
-    .fn()
-    .mockReturnValue([
-      { id: 'thread-1', path: 'src/foo.ts', line: 10, startLine: null, comments: [] },
-    ]),
+  buildThreads: vi.fn(),
 }))
 
 // Aliases so test assertions work without changes
@@ -268,8 +252,24 @@ function threadOf(comment: ReturnType<typeof reviewComment>) {
   return { ...place, comments: [comment], collapsed: false, resolved: false }
 }
 
+const LOW_RISK = {
+  level: 'low' as const,
+  composite: 10,
+  dominantDriver: 'changeSize' as const,
+  topImporters: [],
+  importerCount: 0,
+  metrics: { ...NO_METRICS, changeSize: 5 },
+}
+
 beforeEach(() => {
-  vi.clearAllMocks()
+  mockSessionsForRepoAPI.mockResolvedValue({ sessions: [] })
+  mockActiveReviewsForRepoAPI.mockResolvedValue({ error: 'NOT_FOUND' })
+  mockPruneActiveReviewsAPI.mockResolvedValue({ openNumbers: [] })
+  mockCurrentUserAPI.mockResolvedValue({ login: 'testuser' })
+  vi.mocked(computeRiskScore).mockReturnValue(LOW_RISK)
+  vi.mocked(buildThreads).mockReturnValue([
+    { id: 'thread-1', path: 'src/foo.ts', line: 10, startLine: null, comments: [] },
+  ] as never)
   usePrReviewStore.setState(usePrReviewStore.getInitialState(), true)
   Object.assign(globalThis, {
     electronAPI: {
@@ -489,7 +489,6 @@ describe('useLoadInlineComments — a failed load', () => {
 describe('useLoadInlineComments — marks a thread resolved when its first comment id is in resolvedCommentIds', () => {
   it('marks a thread resolved when its first comment id is in resolvedCommentIds', async () => {
     withActivePr(validActivePr)
-    const { buildThreads } = await import('../../src/github/pr-review-service-renderer')
     const comment = reviewComment(1, 't1', 'src/foo.ts')
     const otherComment = reviewComment(2, 't2', 'src/bar.ts')
     vi.mocked(buildThreads).mockReturnValueOnce([threadOf(comment), threadOf(otherComment)])

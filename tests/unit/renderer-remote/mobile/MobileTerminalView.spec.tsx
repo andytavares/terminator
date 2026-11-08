@@ -35,13 +35,13 @@ const mockTerm = {
 
 // Mock xterm — it does not work in jsdom
 vi.mock('@xterm/xterm', () => ({
-  Terminal: vi.fn().mockImplementation(function () {
+  Terminal: vi.fn(function () {
     return mockTerm
   }),
 }))
 
 vi.mock('@xterm/addon-fit', () => ({
-  FitAddon: vi.fn().mockImplementation(function () {
+  FitAddon: vi.fn(function () {
     return {
       fit: vi.fn(),
       activate: vi.fn(),
@@ -50,7 +50,7 @@ vi.mock('@xterm/addon-fit', () => ({
 }))
 
 vi.mock('@xterm/addon-attach', () => ({
-  AttachAddon: vi.fn().mockImplementation(function () {
+  AttachAddon: vi.fn(function () {
     return {
       activate: vi.fn(),
     }
@@ -97,9 +97,9 @@ beforeEach(() => {
   mockTermBuffer.baseY = 76 // default: at bottom (76 + 24 >= 100)
   mockTermBuffer.length = 100
   mockGetWsTicket.mockResolvedValue('ticket-abc')
+  mockResizeTerminal.mockResolvedValue(undefined)
   mockWs.close.mockReset()
   mockWs.readyState = 1
-  vi.clearAllMocks()
   vi.mocked(useReconnect).mockReturnValue({
     status: 'connected',
     retry: vi.fn(),

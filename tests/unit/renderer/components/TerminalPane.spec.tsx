@@ -459,7 +459,8 @@ describe('TerminalPane — split mode (layout present) — renders split contain
 })
 
 describe('TerminalPane — split mode (layout present) — dragging the divider', () => {
-  it('stores the new split ratio of the layout', () => {
+  it('stores the new split ratio of the layout', async () => {
+    const user = userEvent.setup()
     seedRealSessions({
       sessions: [{ id: 'ses-1' }, { id: 'ses-2' }],
       activeSessionId: 'ses-1',
@@ -469,9 +470,11 @@ describe('TerminalPane — split mode (layout present) — dragging the divider'
     const divider = container.querySelector('.split-container__divider') as HTMLElement
     const outerContainer = container.querySelector('.split-container') as HTMLElement
     outerContainer.getBoundingClientRect = () => new DOMRect(0, 0, 400, 300)
-    fireEvent.mouseDown(divider, { clientX: 200 })
-    fireEvent.mouseMove(document, { clientX: 300 })
-    fireEvent.mouseUp(document)
+    await user.pointer([
+      { keys: '[MouseLeft>]', target: divider, coords: { clientX: 200 } },
+      { coords: { clientX: 300 } },
+      { keys: '[/MouseLeft]' },
+    ])
     expect(useSessionStore.getState().getPaneLayout('proj-1')).toMatchObject({ ratio: 0.75 })
   })
 })

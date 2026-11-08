@@ -48,14 +48,14 @@ function notepadRendererAppMainViewTests() {
   it('renders NotepadView for ?view=main', () => {
     setView('main')
     render(<App />)
-    expect(screen.queryByTestId('notepad-view')).not.toBeNull()
+    expect(screen.getByTestId('notepad-view')).toBeTruthy()
     expect(screen.queryByTestId('note-window-view')).toBeNull()
   })
 
   it('renders NotepadView when no view param', () => {
     setView(null)
     render(<App />)
-    expect(screen.queryByTestId('notepad-view')).not.toBeNull()
+    expect(screen.getByTestId('notepad-view')).toBeTruthy()
   })
 }
 
@@ -63,14 +63,14 @@ function notepadRendererAppWindowViewsTests() {
   it('renders NoteWindowView for ?view=note', () => {
     setView('note')
     render(<App />)
-    expect(screen.queryByTestId('note-window-view')).not.toBeNull()
+    expect(screen.getByTestId('note-window-view')).toBeTruthy()
     expect(screen.queryByTestId('notepad-view')).toBeNull()
   })
 
   it('renders DiagramWindowView for ?view=diagram', () => {
     setView('diagram')
     render(<App />)
-    expect(screen.queryByTestId('diagram-window-view')).not.toBeNull()
+    expect(screen.getByTestId('diagram-window-view')).toBeTruthy()
   })
 }
 
@@ -82,6 +82,17 @@ function notepadRendererAppQuickCreateCommandTests() {
     act(() => bridge.push(OPEN_QUICK_CREATE, undefined))
 
     expect(showQuickCreate()).toBe(true)
+  })
+
+  // Otherwise the request stays pending, and the next time the view loads it opens the overlay.
+  it('tells the extension the request is handled when the open view shows quick create', () => {
+    setView('main')
+    render(<App />)
+    const asksBeforeTheCommand = bridge.calls(CONSUME_PENDING).length
+
+    act(() => bridge.push(OPEN_QUICK_CREATE, undefined))
+
+    expect(bridge.calls(CONSUME_PENDING)).toHaveLength(asksBeforeTheCommand + 1)
   })
 }
 

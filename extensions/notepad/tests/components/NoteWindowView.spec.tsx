@@ -14,7 +14,7 @@ import {
 // The window reads its note id from the URL once, when the module loads.
 vi.hoisted(() => window.history.replaceState({}, '', '/?noteId=n1'))
 
-const bridge = installNotepadBridge()
+let bridge: ReturnType<typeof installNotepadBridge>
 
 import { NoteWindowView } from '../../src/components/NoteWindowView'
 import { useEditorStore } from '../../src/stores/editor.store'
@@ -27,8 +27,7 @@ const BODY = '# Plan\nhello world'
 const NOTE = { id: 'n1', title: 'Plan', body: BODY, tags: ['work'] }
 
 beforeEach(() => {
-  for (const key of Object.keys(bridge.responses)) delete bridge.responses[key]
-  bridge.invoke.mockClear()
+  bridge = installNotepadBridge()
   useEditorStore.setState({ bodyDraft: '', isDirty: false, saveStatus: 'idle', previewMode: true })
   useCommentsStore.setState({ comments: [] })
 })

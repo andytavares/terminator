@@ -10,9 +10,8 @@ const mockElectronAPI = {
   },
 }
 
-Object.defineProperty(globalThis, 'window', {
-  value: { electronAPI: mockElectronAPI },
-  writable: true,
+beforeEach(() => {
+  vi.stubGlobal('window', { electronAPI: mockElectronAPI })
 })
 
 import { useNavigationStore } from '../../../../src/renderer/stores/navigation.store'

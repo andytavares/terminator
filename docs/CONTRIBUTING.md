@@ -69,7 +69,6 @@ The pre-commit hook (`.husky/pre-commit`) runs `npx lint-staged` (Prettier and E
 npm test                # Every unit + integration spec (Vitest)
 npm run test:watch      # Watch mode
 npm run test:e2e        # E2E — launches real Electron app (Playwright)
-npm run test:perf       # Wall-clock budgets (*.perf.spec.ts), one file at a time
 npm run test:coverage   # Coverage report in coverage/
 npm run test:stories    # The design system's Storybook stories, run as tests
 npm run test:visual     # The design system's screenshot tests
@@ -79,7 +78,7 @@ npm run test:visual     # The design system's screenshot tests
 
 **Temporary directories.** A spec makes a temporary directory with `makeTempDir(prefix)` from `tests/support/temp-dir.ts`, never with `mkdtempSync` in `os.tmpdir()`. `tests/setup.ts` removes every one after the spec file ends, passed or failed. An E2E spec uses `e2eTempDir(prefix)` from `tests/e2e/helpers.ts`. `tests/e2e/global-teardown.ts` removes it with the run's root. CI runs the suite through `node scripts/check-temp-leaks.mjs`. That script points `TMPDIR` at an empty directory (read by [`os.tmpdir()`](https://nodejs.org/api/os.html#ostmpdir), git, sh and mktemp) and fails if anything is left in it. Run it locally the same way: `node scripts/check-temp-leaks.mjs npx vitest run`. Specs that skipped this once left ~22,000 folders in `/tmp` in a day and filled the disk.
 
-Name a spec that asserts a wall-clock budget `*.perf.spec.ts`. `npm test` leaves it out, because beside every other spec in parallel it measures the load. `npm run test:perf` (`vitest.perf.config.ts`) runs it alone. CI's `Stories` job runs that command after the Storybook build.
+A spec never asserts a time budget: it passes or fails with the speed and load of the machine ([ADR 150](adr/150-tests-run-in-enforced-tiers.md)). Assert by count the property the budget stood for, for example that a transaction that changes nothing builds no new decorations (`extensions/notepad/tests/unit/editor/livePreview.spec.ts`).
 
 The DOM specs of Notepad and git-integration run in [happy-dom](https://vitest.dev/guide/environment), not jsdom (`HAPPY_DOM_INCLUDE` in `vitest.config.ts`). They mount CodeMirror and the design system, which inject stylesheets. jsdom validates every declaration it parses (cssstyle, css-tree, css-color), and no option turns that off. CodeMirror's 5 KB of theme CSS took 150-250 ms on the first view of each file. The first test of a file took 1-2 s, which went past the five-second timeout on a busy machine. happy-dom parses the same CSS in a few milliseconds, and every spec in both extensions passes unchanged.
 

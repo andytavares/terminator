@@ -31,7 +31,7 @@ function makeMockBuffer() {
 const mockRenderDispose = vi.fn()
 
 vi.mock('@xterm/xterm', () => {
-  const Terminal = vi.fn().mockImplementation(function () {
+  const Terminal = vi.fn(function () {
     return {
       loadAddon: vi.fn(),
       attachCustomKeyEventHandler: vi.fn(),
@@ -56,7 +56,7 @@ vi.mock('@xterm/xterm', () => {
 })
 
 vi.mock('@xterm/addon-fit', () => {
-  const FitAddon = vi.fn().mockImplementation(function () {
+  const FitAddon = vi.fn(function () {
     return {
       fit: vi.fn(),
     }
@@ -66,7 +66,7 @@ vi.mock('@xterm/addon-fit', () => {
 
 const webglAddons = vi.hoisted(() => [] as { dispose: () => void; loseContext: () => void }[])
 vi.mock('@xterm/addon-webgl', () => {
-  const WebglAddon = vi.fn().mockImplementation(function () {
+  const WebglAddon = vi.fn(function () {
     let onLoss: () => void = () => {}
     const addon = {
       onContextLoss: (listener: () => void) => {
@@ -119,7 +119,6 @@ const mockFakeCtx = partialFake<CanvasRenderingContext2D>({
   fillStyle: '',
   measureText: mockMeasureText,
 })
-vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => mockFakeCtx)
 
 const mockSubscribe = vi.fn()
 const mockAttach = vi.fn()
@@ -131,7 +130,6 @@ const mockOpenPath = vi.fn().mockResolvedValue({ ok: true })
 
 // Default to macOS so metaKey-based tests work; override per test as needed.
 let mockPlatform = 'MacIntel'
-Object.defineProperty(navigator, 'platform', { get: () => mockPlatform, configurable: true })
 
 beforeEach(async () => {
   mockResizeObserver.mockImplementation(function () {
@@ -142,7 +140,8 @@ beforeEach(async () => {
     await import('../../../../src/renderer/terminal/webgl-contexts')
   budgetHolder.current = new WebglContextBudget(MAX_WEBGL_CONTEXTS)
   mockPlatform = 'MacIntel'
-  vi.clearAllMocks()
+  vi.spyOn(navigator, 'platform', 'get').mockImplementation(() => mockPlatform)
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => mockFakeCtx)
   mockSubscribe.mockReturnValue(mockUnsubscribe)
   mockAttach.mockResolvedValue({ released: false })
   mockOpenExternal.mockResolvedValue({ ok: true })

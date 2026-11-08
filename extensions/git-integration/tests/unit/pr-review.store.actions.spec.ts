@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { usePrReviewStore } from '../../../extensions/git-integration/src/stores/pr-review.store'
+import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import {
   PrReviewDetailSchema,
   ReviewSessionSchema,
   ThreadSchema,
   type PrReviewDetail,
   type RiskScore,
-} from '../../../extensions/git-integration/src/schemas/pr-review.schema'
-import { reviewQueuePr } from '../../../extensions/git-integration/tests/unit/support/review-queue-pr'
+} from '../../src/schemas/pr-review.schema'
+import { reviewQueuePr } from './support/review-queue-pr'
 
 // persistSession checks `typeof window === 'undefined'` and returns early in Node
 // so all state-mutation tests work cleanly without a DOM mock.

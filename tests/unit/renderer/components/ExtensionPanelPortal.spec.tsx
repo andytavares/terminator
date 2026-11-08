@@ -19,46 +19,28 @@ vi.mock('../../../../src/renderer/lib/focus-terminal', () => ({
   focusActiveTerminal: vi.fn(),
 }))
 
-const originalElectronAPI = window.electronAPI
-
 function stubDesktopApi(): void {
-  Object.defineProperty(window, 'electronAPI', {
-    value: {
-      extension: {
-        openFramePort: mockOpenFramePort,
-      },
-      extensionEvents: {
-        onExtensionRendererReload: (handler: (extensionId: string) => void) => {
-          reloadHandler = handler
-          return () => {
-            reloadHandler = null
-          }
-        },
+  vi.stubGlobal('electronAPI', {
+    extension: {
+      openFramePort: mockOpenFramePort,
+    },
+    extensionEvents: {
+      onExtensionRendererReload: (handler: (extensionId: string) => void) => {
+        reloadHandler = handler
+        return () => {
+          reloadHandler = null
+        }
       },
     },
-    configurable: true,
-    writable: true,
   })
 }
 
 function stubRemoteApi(): void {
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extension: {} },
-    configurable: true,
-    writable: true,
-  })
+  vi.stubGlobal('electronAPI', { extension: {} })
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
-})
-
-afterEach(() => {
-  Object.defineProperty(window, 'electronAPI', {
-    value: originalElectronAPI,
-    configurable: true,
-    writable: true,
-  })
 })
 
 function firstIframe(container: HTMLElement): HTMLIFrameElement {

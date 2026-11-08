@@ -4,9 +4,7 @@ import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminato
 import { partialFake } from '../../../../../tests/support/fakes'
 import { makeTempDir } from '../../../../../tests/support/temp-dir'
 
-const showOpenDialog = vi
-  .fn()
-  .mockResolvedValue({ canceled: false, filePaths: ['/tmp/export-test'] })
+const showOpenDialog = vi.fn()
 
 // Adapter: registerHandler forwards to the electron ipcMain mocks so existing
 // capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
@@ -388,7 +386,7 @@ function registerExportIpcHandlersTests() {
 
 function registerExportIpcHandlersPickingFolderTests() {
   it('dispatches pickFolder through the dialog, including the cancel path', async () => {
-    vi.mocked(ipcMain.handle).mockClear()
+    showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/tmp/export-test'] })
     const dispose = registerExportIpcHandlers(mockApi, db)
     const get = (ch: string) =>
       vi.mocked(ipcMain.handle).mock.calls.find(([c]) => c === ch)![1] as (

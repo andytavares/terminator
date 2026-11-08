@@ -16,11 +16,7 @@ export function installExtensionBridge(fallback: unknown, extra: Record<string, 
     subscribers.set(channel, handler)
     return () => subscribers.delete(channel)
   })
-  Object.defineProperty(window, 'electronAPI', {
-    value: { extensionBridge: { invoke, on }, ...extra },
-    writable: true,
-    configurable: true,
-  })
+  vi.stubGlobal('electronAPI', { extensionBridge: { invoke, on }, ...extra })
   const pushToSubscriber = (channel: string, data: unknown) => subscribers.get(channel)?.(data)
   const payloadsSentTo = (channel: string) =>
     invoke.mock.calls.filter(([ch]) => ch === channel).map((call) => (call as unknown[])[1])

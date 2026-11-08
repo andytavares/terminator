@@ -6,9 +6,8 @@ const homeFeed = {
   action: vi.fn(),
   onChanged: vi.fn(),
 }
-Object.defineProperty(globalThis, 'window', {
-  value: { electronAPI: { homeFeed } },
-  writable: true,
+beforeEach(() => {
+  vi.stubGlobal('window', { electronAPI: { homeFeed } })
 })
 
 import { useHomeFeedStore } from '../../../../src/renderer/stores/home-feed.store'

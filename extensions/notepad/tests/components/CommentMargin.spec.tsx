@@ -5,12 +5,11 @@ import React from 'react'
 import { useCommentsStore } from '../../src/stores/comments.store'
 import type { Comment } from '../../src/db/types'
 
-const mockInvoke = vi.fn().mockResolvedValue({ data: { ok: true, status: 'resolved' } })
+const mockInvoke = vi.fn()
 
-Object.defineProperty(window, 'electronAPI', {
-  value: { extensionBridge: { invoke: mockInvoke } },
-  writable: true,
-  configurable: true,
+beforeEach(() => {
+  mockInvoke.mockResolvedValue({ data: { ok: true, status: 'resolved' } })
+  vi.stubGlobal('electronAPI', { extensionBridge: { invoke: mockInvoke } })
 })
 
 import { CommentMargin } from '../../src/components/CommentMargin'
@@ -162,6 +161,6 @@ function commentMarginRepliesTests() {
     useCommentsStore.setState({ comments: [baseComment], loading: false })
     render(<CommentMargin noteId="n1" anchorTops={{}} />)
     await user.click(screen.getByText('Reply'))
-    expect(screen.queryByPlaceholderText('Write a reply…')).not.toBeNull()
+    expect(screen.getByPlaceholderText('Write a reply…')).toBeTruthy()
   })
 }

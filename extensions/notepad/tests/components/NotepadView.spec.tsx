@@ -19,7 +19,7 @@ vi.mock('../../src/components/DiagramView', () => ({
   DiagramView: ({ diagramId }: { diagramId: string }) => <div>diagram {diagramId}</div>,
 }))
 
-const bridge = installNotepadBridge()
+let bridge: ReturnType<typeof installNotepadBridge>
 
 import { NotepadView } from '../../src/components/NotepadView'
 import { useNotesStore } from '../../src/stores/notes.store'
@@ -32,8 +32,7 @@ import { notepadSettingsFrom } from '../../src/notepad-settings'
 const BODY = '# Plan\nhello world'
 
 beforeEach(() => {
-  for (const key of Object.keys(bridge.responses)) delete bridge.responses[key]
-  bridge.invoke.mockClear()
+  bridge = installNotepadBridge()
   useNotesStore.setState({
     notes: [],
     diagrams: [],

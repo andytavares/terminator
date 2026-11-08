@@ -4,6 +4,7 @@ import type {
   StoredCredential,
   TrackerStateOption,
 } from '../../../../src/main/integrations/providers/provider'
+import { requiredLiveEnv } from '../../../../tests/support/live-env'
 
 // ADR-041, against the real Linear API.
 //
@@ -18,11 +19,10 @@ import type {
 //
 //   LINEAR_API_KEY=lin_api_… LINEAR_TEST_ISSUE=TEAM-123 npm run test:live
 //
-// Without both, the whole file is skipped rather than passing on nothing.
+// Without both, the file fails and names the one that is missing.
 
-const KEY = process.env.LINEAR_API_KEY ?? ''
-const ISSUE = process.env.LINEAR_TEST_ISSUE ?? ''
-const RUNNABLE = KEY !== '' && ISSUE !== ''
+const KEY = requiredLiveEnv('LINEAR_API_KEY', 'it is the Linear API key the provider calls with')
+const ISSUE = requiredLiveEnv('LINEAR_TEST_ISSUE', 'it names a scratch issue this spec may move')
 
 const cred: StoredCredential = { tracker: 'linear', apiKey: KEY }
 const provider = createLinearProvider()
@@ -31,7 +31,7 @@ let states: TrackerStateOption[] = []
 /** Where the issue was before this file touched it. */
 let original: string | null = null
 
-describe.skipIf(!RUNNABLE)('the Linear provider, against the real API', () => {
+describe('the Linear provider, against the real API', () => {
   beforeAll(async () => {
     if (provider.states === undefined) throw new Error('the Linear provider must implement states')
     states = await provider.states(cred, ISSUE)

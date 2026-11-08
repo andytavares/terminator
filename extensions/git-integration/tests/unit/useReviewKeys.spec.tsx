@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, onTestFinished, type Mock } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { useReviewKeys, type ReviewKeyHandlers } from '../../src/hooks/useReviewKeys'
 import { useReviewUiStore, REVIEW_KEY_EVENTS } from '../../src/stores/review-ui.store'
 
@@ -181,8 +181,8 @@ describe('useReviewKeys — calls an explicit toggleFileList handler on t when g
   })
 
   it('ignores keydown while typing in an input, textarea or contenteditable', () => {
-    const { getByTestId } = render(<TestHarness handlers={handlers} />)
-    const input = getByTestId('text-input')
+    render(<TestHarness handlers={handlers} />)
+    const input = screen.getByTestId('text-input')
     fireKey('v', {}, input)
     expect(handlers.markViewed).not.toHaveBeenCalled()
   })

@@ -356,7 +356,7 @@ describe('MobileTerminalList — backdrop touchStart does not close context menu
     const backdrop = document.querySelector('.mobile-context-menu-backdrop') as HTMLElement
     expect(backdrop).not.toBeNull()
     fireEvent.touchStart(backdrop)
-    expect(screen.queryByText('Move to workspace')).not.toBeNull()
+    expect(screen.getByText('Move to workspace')).toBeTruthy()
 
     // click on backdrop closes it
     await user.click(backdrop)

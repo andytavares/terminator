@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, fireEvent } from '@testing-library/react'
+import { render, fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
@@ -68,13 +68,13 @@ const pathsByFileName: Record<string, string> = {
 
 describe('LeafPane', () => {
   it('shows the session tab title in the title bar', () => {
-    const { getByText } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    expect(getByText('Terminal 1')).toBeTruthy()
+    render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    expect(screen.getByText('Terminal 1')).toBeTruthy()
   })
 
   it('falls back to sessionId in title bar when session not found', () => {
-    const { getByText } = render(<LeafPane sessionId="unknown-sess" projectId="proj-1" />)
-    expect(getByText('unknown-sess')).toBeTruthy()
+    render(<LeafPane sessionId="unknown-sess" projectId="proj-1" />)
+    expect(screen.getByText('unknown-sess')).toBeTruthy()
   })
 
   it('adds focused class when session is focused', () => {
@@ -197,8 +197,8 @@ describe('LeafPane — closing one pane', () => {
         ],
       ]),
     })
-    const { getByRole } = render(<LeafPane sessionId="sess-2" projectId="proj-1" />)
-    await user.click(getByRole('button', { name: 'Close Terminal 2' }))
+    render(<LeafPane sessionId="sess-2" projectId="proj-1" />)
+    await user.click(screen.getByRole('button', { name: 'Close Terminal 2' }))
     expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
     await eventually(() => expect(useSessionStore.getState().sessions.has('sess-2')).toBe(false))
     expect(useSessionStore.getState().sessions.has('sess-1')).toBe(true)

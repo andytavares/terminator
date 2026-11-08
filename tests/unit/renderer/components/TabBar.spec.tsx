@@ -111,9 +111,13 @@ function tabTitles(): string[] {
   )
 }
 
-function pointerAt(type: string, at: { x: number; y: number }): void {
+function pointerAt(
+  type: string,
+  at: { x: number; y: number },
+  target: EventTarget = document
+): void {
   act(() => {
-    document.dispatchEvent(
+    target.dispatchEvent(
       new PointerEvent(type, { bubbles: true, pointerId: 1, screenX: at.x, screenY: at.y })
     )
   })
@@ -123,8 +127,8 @@ function pointerAt(type: string, at: { x: number; y: number }): void {
 function startTabDrag(tab: Element, over: Element | null = null): void {
   document.elementFromPoint = () => over
   HTMLElement.prototype.setPointerCapture = vi.fn()
-  // user-event sets no screenX/screenY, and the drag measures from them.
-  fireEvent.pointerDown(tab, { button: 0, pointerId: 1, screenX: 290, screenY: 20 })
+  // The drag measures from screenX/screenY, like the moves pointerAt sends after the press.
+  pointerAt('pointerdown', { x: 290, y: 20 }, tab)
   pointerAt('pointermove', IN_WINDOW)
 }
 
@@ -876,6 +880,7 @@ describe('TabBar — a tab let go somewhere it does not leave from', () => {
     const tab = sessionTabs()[1]
     dragTab(tab, null, OUTSIDE_WINDOW)
     // The click a browser fires after a drag; a user-event press would start a new gesture.
+    // eslint-disable-next-line testing-library/prefer-user-event
     fireEvent.click(tab)
     expect(isActive(tab)).toBe(false)
     expect(useSessionStore.getState().focusRequest).toBeNull()

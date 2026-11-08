@@ -2,15 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockDismiss = vi.fn().mockResolvedValue({ ok: true })
 
-Object.defineProperty(globalThis, 'window', {
-  value: {
+beforeEach(() => {
+  vi.stubGlobal('window', {
     electronAPI: {
       notifications: {
         dismiss: mockDismiss,
       },
     },
-  },
-  writable: true,
+  })
 })
 
 import { useNotificationStore } from '../../../../src/renderer/stores/notification.store'

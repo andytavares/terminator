@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { LinkIssueDialog } from '../../../../src/renderer/components/integrations/LinkIssueDialog'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
@@ -91,13 +91,17 @@ describe('LinkIssueDialog — partial failures', () => {
   })
 })
 
-// user-event hangs under this file's fake timers (with or without advanceTimers),
-// so the search tests set the field value with fireEvent.change.
+/** Fake timers that user-event can wait through: it pauses between keys on the clock. */
+function typingUnderFakeTimers() {
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  return userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+}
+
 describe('LinkIssueDialog — searching', () => {
   it('debounces before searching', async () => {
-    vi.useFakeTimers()
+    const user = typingUnderFakeTimers()
     open()
-    fireEvent.change(screen.getByPlaceholderText(/Search/), { target: { value: 'sidebar' } })
+    await user.type(screen.getByPlaceholderText(/Search/), 'sidebar')
 
     expect(searchIssues).not.toHaveBeenCalled()
     await act(async () => {
@@ -107,9 +111,9 @@ describe('LinkIssueDialog — searching', () => {
   })
 
   it('switches the heading once searching', async () => {
-    vi.useFakeTimers()
+    const user = typingUnderFakeTimers()
     open()
-    fireEvent.change(screen.getByPlaceholderText(/Search/), { target: { value: 'x' } })
+    await user.type(screen.getByPlaceholderText(/Search/), 'x')
     await act(async () => {
       vi.advanceTimersByTime(300)
     })
@@ -119,15 +123,15 @@ describe('LinkIssueDialog — searching', () => {
 
 describe('LinkIssueDialog — searching — goes back to assigned issues when the search is cleared', () => {
   it('goes back to assigned issues when the search is cleared', async () => {
-    vi.useFakeTimers()
+    const user = typingUnderFakeTimers()
     open()
     const input = screen.getByPlaceholderText(/Search/)
-    fireEvent.change(input, { target: { value: 'x' } })
+    await user.type(input, 'x')
     await act(async () => {
       vi.advanceTimersByTime(300)
     })
     expect(screen.queryByText('Assigned to you')).toBeNull()
-    fireEvent.change(input, { target: { value: '' } })
+    await user.clear(input)
     await act(async () => {
       vi.advanceTimersByTime(300)
     })

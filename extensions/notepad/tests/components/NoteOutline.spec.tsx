@@ -6,10 +6,8 @@ import { useEditorStore } from '../../src/stores/editor.store'
 import { NoteOutline } from '../../src/components/NoteOutline'
 
 const mockRecord = vi.fn()
-Object.defineProperty(window, 'electronAPI', {
-  value: { usage: { record: mockRecord } },
-  writable: true,
-  configurable: true,
+beforeEach(() => {
+  vi.stubGlobal('electronAPI', { usage: { record: mockRecord } })
 })
 
 const BODY = ['# Title', 'intro', '## Setup', '### Install', '## Usage'].join('\n')

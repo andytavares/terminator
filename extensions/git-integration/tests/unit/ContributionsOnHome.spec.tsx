@@ -10,20 +10,16 @@ const changeListeners = new Set<() => void>()
 beforeEach(() => {
   vi.clearAllMocks()
   changeListeners.clear()
-  Object.defineProperty(window, 'electronAPI', {
-    value: {
-      // The section's own load never answers: these tests are about whether it shows at all.
-      extensionBridge: { invoke: vi.fn(() => new Promise(() => {})) },
-      extension: {
-        getSettingsValues,
-        onSettingsChanged: (handler: () => void) => {
-          changeListeners.add(handler)
-          return () => void changeListeners.delete(handler)
-        },
+  vi.stubGlobal('electronAPI', {
+    // The section's own load never answers: these tests are about whether it shows at all.
+    extensionBridge: { invoke: vi.fn(() => new Promise(() => {})) },
+    extension: {
+      getSettingsValues,
+      onSettingsChanged: (handler: () => void) => {
+        changeListeners.add(handler)
+        return () => void changeListeners.delete(handler)
       },
     },
-    configurable: true,
-    writable: true,
   })
 })
 

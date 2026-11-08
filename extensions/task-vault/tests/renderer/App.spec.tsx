@@ -16,12 +16,7 @@ vi.mock('../../src/components/CalendarDrawer', () => ({
 }))
 
 function setSearch(params: Record<string, string>): void {
-  const search = '?' + new URLSearchParams(params).toString()
-  Object.defineProperty(window, 'location', {
-    value: { search },
-    configurable: true,
-    writable: true,
-  })
+  window.history.replaceState(null, '', '?' + new URLSearchParams(params).toString())
 }
 
 beforeEach(() => {

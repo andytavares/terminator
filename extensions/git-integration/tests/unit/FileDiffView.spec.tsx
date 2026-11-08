@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, beforeAll, beforeEach, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { FileDiff } from '../../src/schemas/git.schema'
 
@@ -162,19 +162,19 @@ describe('FileDiffView — split view of an add-only hunk', () => {
   })
 })
 
-// The divider drag listens for mouse moves on window with clientX; user-event cannot aim
-// pointer moves at window, so these drags keep fireEvent calls.
+// The divider drag listens on window; user-event's moves bubble there from the divider.
 describe('FileDiffView — split divider', () => {
   it('keeps the split position when the divider is pressed and released without moving', async () => {
     const user = userEvent.setup()
     const { container } = await renderDiff()
     await user.click(screen.getByRole('radio', { name: 'Split' }))
     const scrollEl = container.querySelector('.file-diff-view__scroll') as HTMLElement
-    fireEvent.mouseDown(container.querySelector('.diff-table__split-divider') as Element, {
-      clientX: 300,
-    })
-    fireEvent.mouseUp(window)
-    fireEvent.mouseMove(window, { clientX: 500 })
+    const divider = container.querySelector('.diff-table__split-divider') as Element
+    await user.pointer([
+      { keys: '[MouseLeft>]', target: divider, coords: { clientX: 300 } },
+      { keys: '[/MouseLeft]' },
+      { coords: { clientX: 500 } },
+    ])
     expect(scrollEl.style.getPropertyValue('--split-left')).toBe('50%')
   })
 })
@@ -196,11 +196,12 @@ describe('FileDiffView — moves split position on mousemove while dragging', ()
       y: 0,
       toJSON: () => ({}),
     })
-    fireEvent.mouseDown(container.querySelector('.diff-table__split-divider') as Element, {
-      clientX: 400,
-    })
-    fireEvent.mouseMove(window, { clientX: 450 })
-    fireEvent.mouseUp(window)
+    const divider = container.querySelector('.diff-table__split-divider') as Element
+    await user.pointer([
+      { keys: '[MouseLeft>]', target: divider, coords: { clientX: 400 } },
+      { coords: { clientX: 450 } },
+      { keys: '[/MouseLeft]' },
+    ])
     expect(scrollEl.style.getPropertyValue('--split-left')).toBe('56.25%')
   })
 })

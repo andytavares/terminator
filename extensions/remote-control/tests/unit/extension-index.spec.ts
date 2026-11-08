@@ -16,7 +16,7 @@ vi.mock('../../src/server/remote-server', () => ({
   createRemoteServer: mockCreateRemoteServer,
 }))
 
-const mockNgrokStart = vi.hoisted(() => vi.fn().mockResolvedValue('https://example.ngrok.app'))
+const mockNgrokStart = vi.hoisted(() => vi.fn())
 const mockNgrokStop = vi.hoisted(() => vi.fn())
 const mockNgrokSetOnCrash = vi.hoisted(() => vi.fn())
 
@@ -329,6 +329,7 @@ function startServerSuccessTests() {
 /** Starts the server with a tunnel open, then forgets the broadcasts that start made. */
 async function startWithTunnel(): Promise<void> {
   mockNgrokIsInstalled.mockReturnValue(true)
+  mockNgrokStart.mockResolvedValue('https://example.ngrok.app')
   const toggleHandler = await setupAndGetToggleHandler(makeServerHandle())
   await toggleHandler({ enabled: true })
   // The start opens the tunnel last, so its crash handler marks the start as done.

@@ -6,6 +6,7 @@ import { PrOverviewPanel } from '../../src/components/pr-review/PrOverviewPanel'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
 import { githubAPI } from '../../src/api/github'
+import { reviewAgentAPI } from '../../src/api/review-agent'
 
 vi.mock('../../src/stores/pr-review.store', () => ({ usePrReviewStore: vi.fn() }))
 
@@ -26,17 +27,17 @@ vi.mock('../../src/hooks/usePaneWidth', () => ({
 }))
 
 vi.mock('../../src/hooks/usePrReview', () => ({
-  useLoadIssueComments: vi.fn(() => vi.fn()),
+  useLoadIssueComments: () => async () => {},
 }))
 
 vi.mock('../../src/api/github', () => ({
   githubAPI: {
-    prMarkReady: vi.fn().mockResolvedValue({}),
-    prIssueCommentAdd: vi.fn().mockResolvedValue({}),
-    prUpdateBranch: vi.fn().mockResolvedValue({ ok: true }),
-    mergeStackPlan: vi.fn().mockResolvedValue({ into: 'main', stack: [] }),
-    mergeStack: vi.fn().mockResolvedValue({ merged: [41, 42] }),
-    revert: vi.fn().mockResolvedValue({ number: 43, url: 'https://github.com/o/r/pull/43' }),
+    prMarkReady: vi.fn(),
+    prIssueCommentAdd: vi.fn(),
+    prUpdateBranch: vi.fn(),
+    mergeStackPlan: vi.fn(),
+    mergeStack: vi.fn(),
+    revert: vi.fn(),
   },
 }))
 
@@ -62,7 +63,7 @@ vi.mock('../../../../src/renderer/stores/toast.store', () => ({
 }))
 
 vi.mock('../../src/api/review-agent', () => ({
-  reviewAgentAPI: { summarize: vi.fn().mockResolvedValue({ summary: 'A summary.' }) },
+  reviewAgentAPI: { summarize: vi.fn() },
 }))
 
 vi.mock('../../src/components/pr-review/RichContent', () => ({
@@ -149,9 +150,16 @@ const basePr: PrReviewDetail = {
 }
 
 beforeEach(() => {
-  vi.clearAllMocks()
-  // clearAllMocks keeps implementations: a stacked plan one test set would reach the next.
+  vi.mocked(githubAPI.prMarkReady).mockResolvedValue({})
+  vi.mocked(githubAPI.prIssueCommentAdd).mockResolvedValue({ comment: {} })
+  vi.mocked(githubAPI.prUpdateBranch).mockResolvedValue({ ok: true })
   vi.mocked(githubAPI.mergeStackPlan).mockResolvedValue({ into: 'main', stack: [] })
+  vi.mocked(githubAPI.mergeStack).mockResolvedValue({ merged: [41, 42] })
+  vi.mocked(githubAPI.revert).mockResolvedValue({
+    number: 43,
+    url: 'https://github.com/o/r/pull/43',
+  })
+  vi.mocked(reviewAgentAPI.summarize).mockResolvedValue({ summary: 'A summary.' })
   pane.width = null
   mockPreparePrWorktree.mockResolvedValue({ hasConflicts: true })
   mockCreateProject.mockResolvedValue({ project: { id: 'proj-conflict' } })

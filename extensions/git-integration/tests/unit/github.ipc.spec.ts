@@ -21,15 +21,12 @@ vi.mock('fs/promises', () => ({
   readFile: vi.fn().mockRejectedValue(new Error('not found')),
 }))
 
-import { registerGithubHandlers } from '../../../extensions/git-integration/src/ipc/github.ipc'
-import { bindWorkspaceRoots } from '../../../extensions/git-integration/src/ipc/repo-root'
-import { bindShell } from '../../../extensions/git-integration/src/shell/run-git'
-import {
-  execOverPromisedStub,
-  githubOverPromisedStub,
-} from '../../../extensions/git-integration/tests/unit/support/shell'
-import { channelRegistry } from '../../../extensions/git-integration/tests/unit/support/channels'
-import { reviewQueuePr } from '../../../extensions/git-integration/tests/unit/support/review-queue-pr'
+import { registerGithubHandlers } from '../../src/ipc/github.ipc'
+import { bindWorkspaceRoots } from '../../src/ipc/repo-root'
+import { bindShell } from '../../src/shell/run-git'
+import { execOverPromisedStub, githubOverPromisedStub } from './support/shell'
+import { channelRegistry } from './support/channels'
+import { reviewQueuePr } from './support/review-queue-pr'
 
 type Handler = (payload: unknown) => Promise<unknown>
 let registry = channelRegistry()

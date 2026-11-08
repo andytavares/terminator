@@ -7,6 +7,7 @@ import userEvent from '@testing-library/user-event'
 // test that imported it paid that against its own five-second timeout.
 import { ReviewDiffPane } from '../../src/components/pr-review/ReviewDiffPane'
 import { PrReviewDetailSchema, type PrChangedFile } from '../../src/schemas/pr-review.schema'
+import { measureDiffComplexity } from '../../src/review/insights'
 
 // The pane reads both stores through selectors; these resolve them against the state each test sets.
 const { prStoreMock, uiStoreMock, highlightSpy, rowRenderSpy } = vi.hoisted(() => ({
@@ -33,7 +34,6 @@ vi.mock('../../src/stores/review-ui.store', async (importOriginal) => {
 })
 vi.mock('../../src/utils/syntax', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/utils/syntax')>()
-  highlightSpy.mockImplementation(actual.highlight)
   return { ...actual, highlight: highlightSpy }
 })
 // Counts renders inside each row's memo boundary, keeping the real component and its comparison.
@@ -89,7 +89,7 @@ vi.mock('../../src/components/pr-review/CommentComposer', () => ({
   ),
 }))
 vi.mock('../../src/review/insights', () => ({
-  measureDiffComplexity: vi.fn().mockResolvedValue(null),
+  measureDiffComplexity: vi.fn(),
 }))
 
 const mockPatchFileComplexity = vi.fn()
@@ -250,8 +250,12 @@ afterAll(() => {
   Reflect.deleteProperty(HTMLElement.prototype, 'scrollHeight')
 })
 
-beforeEach(() => {
-  vi.clearAllMocks()
+beforeEach(async () => {
+  // mockReset clears implementations before each test, so the spies get theirs back here.
+  const syntax =
+    await vi.importActual<typeof import('../../src/utils/syntax')>('../../src/utils/syntax')
+  highlightSpy.mockImplementation(syntax.highlight)
+  vi.mocked(measureDiffComplexity).mockResolvedValue(null)
   layOut(4000)
   mockPrFileDiff.mockResolvedValue({ diff: { hunks: [] } })
   mockPrCompare.mockResolvedValue({ rewritten: false, commits: [], files: [] })

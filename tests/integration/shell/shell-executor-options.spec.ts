@@ -128,7 +128,7 @@ describe('execShell per-call options — limits and timeouts', () => {
   })
 
   it('reports a timeout as a failure with exit code 124', async () => {
-    fakeGh('sleep 5')
+    fakeGh('exec tail -f /dev/null')
 
     const result = await execShell({ command: 'gh', args: [], cwd: scratch, timeoutMs: 100 })
 

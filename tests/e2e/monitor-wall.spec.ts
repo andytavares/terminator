@@ -81,7 +81,7 @@ async function fullscreenProgramLineShows(page: Page, folder: string): Promise<v
 async function liveOutputArrives(page: Page): Promise<void> {
   // A sidebar click leaves the wall for the branch's terminals.
   await projectGroup(page, 'live').click()
-  await page.getByTitle('New tab (⌘T)').click()
+  await page.getByRole('button', { name: 'New tab', exact: true }).click()
   await expect(page.locator('.tab-bar__tab--session')).toHaveCount(2)
   await runInVisibleTerminal(page, 'for i in $(seq 1 80); do echo tick-$i; sleep 0.1; done')
   await openOverview(page)

@@ -86,7 +86,7 @@ function headingTests() {
     const onGoToToday = vi.fn()
     renderLog({ onGoToToday })
     expect(document.querySelector('.daily-log__today-badge')).toBeNull()
-    await user.click(screen.getByRole('button', { name: 'Today' }))
+    await user.click(screen.getByRole('button', { name: 'Back to today' }))
     expect(onGoToToday).toHaveBeenCalledOnce()
   })
 }

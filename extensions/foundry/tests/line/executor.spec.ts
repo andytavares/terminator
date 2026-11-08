@@ -99,6 +99,13 @@ function recipe(text = RECIPE): Recipe {
   return parsed.value
 }
 
+/** The gate a test goes on to decide, or a failure naming the question that was not asked. */
+function gateWhere(gates: readonly Gate[], matches: (gate: Gate) => boolean, what: string): Gate {
+  const gate = gates.find(matches)
+  if (gate === undefined) throw new Error(`expected ${what} to be asked about`)
+  return gate
+}
+
 function unit(id: string, over: Record<string, unknown> = {}) {
   return {
     id,
@@ -1582,8 +1589,7 @@ function anApprovedRegradeTests() {
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
-    const asked = first.gates.find((g) => g.rule === 'risk.p0')
-    if (asked === undefined) throw new Error('expected the regrade to be asked about')
+    const asked = gateWhere(first.gates, (g) => g.rule === 'risk.p0', 'the regrade')
     const approved = decide(asked, { option: 'approve', note: '', at: '2026-09-28T19:12:26.193Z' })
 
     const resumed = await execute(
@@ -1608,8 +1614,7 @@ function aHeldRegradeTests() {
       ...deps(vi.fn(ok)),
       runStep: async () => 0,
     })
-    const asked = first.gates.find((g) => g.rule === 'risk.p0')
-    if (asked === undefined) throw new Error('expected the regrade to be asked about')
+    const asked = gateWhere(first.gates, (g) => g.rule === 'risk.p0', 'the regrade')
     const held = decide(asked, { option: 'hold', note: '', at: '2026-09-28T19:12:26.193Z' })
 
     const resumed = await execute(
@@ -2796,8 +2801,11 @@ describe('an accepted debt on a node', () => {
     const o = order([unit('U-1')])
     const failing = deps(async (i) => ({ sessionId: `s-${i.node.id}`, exitCode: 1 }))
     const first = await execute(planOf(o), failing)
-    const asked = first.gates.find((g) => g.summary.endsWith('cannot go any further on its own'))
-    if (asked === undefined) throw new Error('expected the stall to be asked about')
+    const asked = gateWhere(
+      first.gates,
+      (g) => g.summary.endsWith('cannot go any further on its own'),
+      'the stall'
+    )
     const accepted = decide(asked, {
       option: 'accept_debt',
       note: '',
@@ -2843,7 +2851,7 @@ describe('skillsFor', () => {
 
 function unionOfSkillsTests() {
   it("is the union of the role's and the step's skills, de-duplicated", () => {
-    const withStep = parseRecipe(
+    const withStep = recipe(
       `
 schemaVersion: 1
 id: direct
@@ -2852,20 +2860,18 @@ steps:
     kind: agent
     role: builder
     skills: [ci-fix, extra]
-`,
-      'direct.yaml'
+`
     )
-    if (!withStep.ok) throw new Error(withStep.reason)
-    const graph = buildRunGraph(order([unit('U-1')]), withStep.value)
+    const graph = buildRunGraph(order([unit('U-1')]), withStep)
     const node = graph.nodes.find((n) => n.id === 'build')!
     // The builder role already declares `ci-fix`; the step adds `extra`.
-    expect(skillsFor(withStep.value, node, roles).sort()).toEqual(['ci-fix', 'extra'])
+    expect(skillsFor(withStep, node, roles).sort()).toEqual(['ci-fix', 'extra'])
   })
 }
 
 function innerStepsAndNoneTests() {
   it('reads a skill declared on a fan-out’s inner step', () => {
-    const fanned = parseRecipe(
+    const fanned = recipe(
       `
 schemaVersion: 1
 id: direct
@@ -2874,13 +2880,11 @@ steps:
     kind: fanout
     over: plan.units
     step: { kind: agent, role: builder, skills: [extra] }
-`,
-      'direct.yaml'
+`
     )
-    if (!fanned.ok) throw new Error(fanned.reason)
-    const graph = buildRunGraph(order([unit('U-1')]), fanned.value)
+    const graph = buildRunGraph(order([unit('U-1')]), fanned)
     const node = graph.nodes.find((n) => n.id === 'build:U-1')!
-    expect(skillsFor(fanned.value, node, roles).sort()).toEqual(['ci-fix', 'extra'])
+    expect(skillsFor(fanned, node, roles).sort()).toEqual(['ci-fix', 'extra'])
   })
 
   it('is empty for a role and a step that declare none', () => {

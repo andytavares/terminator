@@ -1,10 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import {
-  roleSettings,
-  type RoleFacts,
-} from '../../../../extensions/foundry/src/runtime/role-settings'
-import { AUTONOMY_LEVELS } from '../../../../extensions/foundry/src/gates/autonomy'
-import { availableAdapterModes } from '../../../support/acp-modes'
+import { roleSettings, type RoleFacts } from '../../src/runtime/role-settings'
+import { AUTONOMY_LEVELS } from '../../src/gates/autonomy'
+import { availableAdapterModes } from '../../../../tests/support/acp-modes'
 
 // Foundry once asked for `dontAsk`, which the adapter never offers, and every read-only role failed
 // to start. The fakes now share the adapter's list; this proves Foundry only asks for those modes.

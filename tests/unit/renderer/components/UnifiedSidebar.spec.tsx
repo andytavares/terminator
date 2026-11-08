@@ -172,10 +172,10 @@ beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
   mockUseSessionFacts.mockReturnValue([])
-  Object.defineProperty(window, 'electronAPI', {
-    configurable: true,
-    writable: true,
-    value: { project: projectApi, workspace: workspaceApi, sessionRecords: sessionRecordsApi },
+  vi.stubGlobal('electronAPI', {
+    project: projectApi,
+    workspace: workspaceApi,
+    sessionRecords: sessionRecordsApi,
   })
   sessions = new Map([
     ['s1', sidebarSession('s1', 'p1', { tabTitle: 'api-shell' })],
@@ -681,12 +681,15 @@ describe('UnifiedSidebar — shell behaviour preserved — opens at the stored w
 })
 
 describe('UnifiedSidebar — shell behaviour preserved — persists a new width after a resize drag', () => {
-  it('persists a new width after a resize drag', () => {
+  it('persists a new width after a resize drag', async () => {
+    const user = userEvent.setup()
     const { container } = renderSidebar()
     const handle = container.querySelector('.unified-sidebar__resize-handle')!
-    fireEvent.mouseDown(handle, { clientX: 100 })
-    fireEvent.mouseMove(document, { clientX: 150 })
-    fireEvent.mouseUp(document, { clientX: 150 })
+    await user.pointer([
+      { keys: '[MouseLeft>]', target: handle, coords: { clientX: 100 } },
+      { coords: { clientX: 150 } },
+      { keys: '[/MouseLeft]' },
+    ])
     // 50px of drag from the 300px default.
     expect(localStorage.getItem('terminator.sidebar.width')).toBe('350')
   })
@@ -865,13 +868,10 @@ describe('UnifiedSidebar — two menus replace four bands of chrome (US5) — di
 
 describe('UnifiedSidebar — what the branch-first sidebar draws', () => {
   it('names a repo folder under home from ~ on the name tooltip', async () => {
-    Object.defineProperty(window, 'electronAPI', {
-      configurable: true,
-      value: {
-        project: projectApi,
-        app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
-        editor: { detect: vi.fn().mockResolvedValue({ editor: null }), open: vi.fn() },
-      },
+    vi.stubGlobal('electronAPI', {
+      project: projectApi,
+      app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
+      editor: { detect: vi.fn().mockResolvedValue({ editor: null }), open: vi.fn() },
     })
     setWorkspaces([{ ...ws1, folderPath: '/Users/me/repos/backend' }, ws2])
     const { container } = renderSidebar()
@@ -963,14 +963,7 @@ function openBranchMenu(): void {
 function setUpUnifiedSidebarIssueActionsOn(): void {
   beforeEach(() => {
     useIntegrationsStore.setState({ links: new Map([['p1', link]]) })
-    Object.defineProperty(window, 'electronAPI', {
-      configurable: true,
-      value: { shell: { openExternal: vi.fn() } },
-    })
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText: vi.fn() },
-    })
+    vi.stubGlobal('electronAPI', { shell: { openExternal: vi.fn() } })
   })
 }
 
@@ -1054,16 +1047,13 @@ function setUpUnifiedSidebarOpeningABranch(): void {
     // undefined, which is not the contract — and it is what let a `.then` on
     // undefined reach CI as an unhandled error while every test still passed.
     openEditor.mockResolvedValue({ ok: true, editor: 'Cursor' })
-    Object.defineProperty(window, 'electronAPI', {
-      configurable: true,
-      value: {
-        app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
-        editor: {
-          detect: vi.fn().mockResolvedValue({ editor: { id: 'cursor', name: 'Cursor' } }),
-          open: openEditor,
-        },
-        shell: { openExternal: vi.fn() },
+    vi.stubGlobal('electronAPI', {
+      app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
+      editor: {
+        detect: vi.fn().mockResolvedValue({ editor: { id: 'cursor', name: 'Cursor' } }),
+        open: openEditor,
       },
+      shell: { openExternal: vi.fn() },
     })
   })
 }
@@ -1127,13 +1117,10 @@ describe('UnifiedSidebar — opening in the editor reports back', () => {
 
   beforeEach(() => {
     openEditor.mockClear()
-    Object.defineProperty(window, 'electronAPI', {
-      configurable: true,
-      value: {
-        app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
-        editor: { detect: vi.fn().mockResolvedValue({ editor: null }), open: openEditor },
-        shell: { openExternal: vi.fn() },
-      },
+    vi.stubGlobal('electronAPI', {
+      app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
+      editor: { detect: vi.fn().mockResolvedValue({ editor: null }), open: openEditor },
+      shell: { openExternal: vi.fn() },
     })
   })
 
@@ -1152,13 +1139,10 @@ describe('UnifiedSidebar — opening in the editor reports back — explains in 
 
   beforeEach(() => {
     openEditor.mockClear()
-    Object.defineProperty(window, 'electronAPI', {
-      configurable: true,
-      value: {
-        app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
-        editor: { detect: vi.fn().mockResolvedValue({ editor: null }), open: openEditor },
-        shell: { openExternal: vi.fn() },
-      },
+    vi.stubGlobal('electronAPI', {
+      app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
+      editor: { detect: vi.fn().mockResolvedValue({ editor: null }), open: openEditor },
+      shell: { openExternal: vi.fn() },
     })
   })
 
@@ -1183,13 +1167,10 @@ describe('UnifiedSidebar — opening in the editor reports back — passes an un
 
   beforeEach(() => {
     openEditor.mockClear()
-    Object.defineProperty(window, 'electronAPI', {
-      configurable: true,
-      value: {
-        app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
-        editor: { detect: vi.fn().mockResolvedValue({ editor: null }), open: openEditor },
-        shell: { openExternal: vi.fn() },
-      },
+    vi.stubGlobal('electronAPI', {
+      app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
+      editor: { detect: vi.fn().mockResolvedValue({ editor: null }), open: openEditor },
+      shell: { openExternal: vi.fn() },
     })
   })
 
@@ -1210,13 +1191,10 @@ describe('UnifiedSidebar — opening in the editor reports back — survives the
 
   beforeEach(() => {
     openEditor.mockClear()
-    Object.defineProperty(window, 'electronAPI', {
-      configurable: true,
-      value: {
-        app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
-        editor: { detect: vi.fn().mockResolvedValue({ editor: null }), open: openEditor },
-        shell: { openExternal: vi.fn() },
-      },
+    vi.stubGlobal('electronAPI', {
+      app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
+      editor: { detect: vi.fn().mockResolvedValue({ editor: null }), open: openEditor },
+      shell: { openExternal: vi.fn() },
     })
   })
 
@@ -1236,12 +1214,9 @@ describe('UnifiedSidebar — where there is no editor API at all', () => {
   // which is what CI caught and the local suite did not, because every local
   // mock happened to supply `open`.
   beforeEach(() => {
-    Object.defineProperty(window, 'electronAPI', {
-      configurable: true,
-      value: {
-        app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
-        shell: { openExternal: vi.fn() },
-      },
+    vi.stubGlobal('electronAPI', {
+      app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
+      shell: { openExternal: vi.fn() },
     })
   })
 
@@ -1402,10 +1377,7 @@ function setUpABusyTerminalAnd(): void {
     useChangeStatsStore.getState().invalidateAll()
     changeStats.mockReset()
     changeStats.mockResolvedValue({ filesChanged: 1, insertions: 1, deletions: 0 })
-    Object.defineProperty(window, 'electronAPI', {
-      configurable: true,
-      value: { git: { changeStats } },
-    })
+    vi.stubGlobal('electronAPI', { git: { changeStats } })
   })
 }
 
@@ -1650,12 +1622,9 @@ describe('UnifiedSidebar — odds and ends', () => {
 
 describe('UnifiedSidebar — odds and ends — names no editor and abbreviates no path when main cannot say', () => {
   it('names no editor and abbreviates no path when main cannot say', async () => {
-    Object.defineProperty(window, 'electronAPI', {
-      configurable: true,
-      value: {
-        app: { getInfo: vi.fn().mockRejectedValue(new Error('gone')) },
-        editor: { detect: vi.fn().mockRejectedValue(new Error('gone')), open: vi.fn() },
-      },
+    vi.stubGlobal('electronAPI', {
+      app: { getInfo: vi.fn().mockRejectedValue(new Error('gone')) },
+      editor: { detect: vi.fn().mockRejectedValue(new Error('gone')), open: vi.fn() },
     })
     const { container } = renderSidebar()
     await waitFor(() => expect(window.electronAPI.editor.detect).toHaveBeenCalled())
