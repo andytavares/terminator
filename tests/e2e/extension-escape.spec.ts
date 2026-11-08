@@ -88,10 +88,39 @@ async function pressEscape(part: string): Promise<void> {
   await expect.poll(() => escapeDecision(frame)).not.toBeNull()
 }
 
+type PairingClock = Performance & { realNow?: () => number }
+
+/**
+ * Stops both pairing clocks for the length of `act`, so two presses are always inside the gesture
+ * window however long the focus and decision checks between them take on a loaded machine. */
+async function withPairingClocksStopped(part: string, act: () => Promise<void>): Promise<void> {
+  const stop = () => {
+    const clock = performance as PairingClock
+    clock.realNow ??= clock.now.bind(clock)
+    const at = clock.now()
+    clock.now = () => at
+  }
+  const restart = () => {
+    const clock = performance as PairingClock
+    if (clock.realNow) clock.now = clock.realNow
+    delete clock.realNow
+  }
+  await handle.page.evaluate(stop)
+  await inView(part, `(${stop})()`)
+  try {
+    await act()
+  } finally {
+    await handle.page.evaluate(restart)
+    await inView(part, `(${restart})()`).catch(() => undefined)
+  }
+}
+
 /** Two Escapes inside the gesture window. */
 async function pressEscapeTwice(part: string): Promise<void> {
-  await pressEscape(part)
-  await pressEscape(part)
+  await withPairingClocksStopped(part, async () => {
+    await pressEscape(part)
+    await pressEscape(part)
+  })
 }
 
 /** The extension whose panel is on screen, or null. The panel div outlives the exit (it stays
@@ -142,11 +171,13 @@ async function exitsToTheTerminal(surface: Surface, why: string): Promise<void> 
 /** Two Escapes, then the exit. The second key hides the frame it went to, and Chromium can drop
  * that key's acknowledgement (CI run 40594749096 waited out 180 s), so the exit is the signal. */
 async function leavesWithTwoEscapes(surface: Surface, why: string): Promise<void> {
-  await pressEscape(surface.part)
-  await focusedFrame(surface.part)
-  const press = handle.page.keyboard.press('Escape')
-  const exited = exitsToTheTerminal(surface, why)
-  await Promise.race([Promise.all([press, exited]), exited])
+  await withPairingClocksStopped(surface.part, async () => {
+    await pressEscape(surface.part)
+    await focusedFrame(surface.part)
+    const press = handle.page.keyboard.press('Escape')
+    const exited = exitsToTheTerminal(surface, why)
+    await Promise.race([Promise.all([press, exited]), exited])
+  })
 }
 
 // ── Leaving with two Escapes ─────────────────────────────────────────────────
