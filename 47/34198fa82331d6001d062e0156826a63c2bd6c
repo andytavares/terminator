@@ -1,0 +1,27 @@
+tests/unit/renderer/components/WorkspaceSettings.spec.tsx
+  s_7a27f124c1e8e3::t_335032a8eb93ea 127-128,130-131,135,138-139,143,146-147,149
+tests/unit/renderer/components/GlobalSettings.spec.tsx
+  s_7a27f124c1e8e3::t_335032a8eb93ea 103,105-106,109-114,121,124-127,129,131,133
+src/renderer/components/settings/ScrollbackInput.tsx
+  s_7a27f124c1e8e3::t_335032a8eb93ea 1-51
+src/renderer/components/settings/GlobalSettings.tsx
+  s_7a27f124c1e8e3::t_335032a8eb93ea 14,108
+src/renderer/components/settings/WorkspaceSettings.tsx
+  s_7a27f124c1e8e3::t_335032a8eb93ea 8,144,146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4734198fa82331d6001d062e0156826a63c2bd6c",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
