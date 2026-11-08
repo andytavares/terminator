@@ -1,0 +1,74 @@
+docs/CONTRIBUTING.md
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 62,64,69,77,79,114,117,133,139,298
+package.json
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 24,32,36,52
+tests/e2e/global-setup.ts
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 15
+docs/adr/139-the-pre-push-hook-trusts-foundry.md
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 3
+scripts/typecheck.mjs
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 3
+docs/adr/134-ci-releases-each-merge.md
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 3
+docs/adr/124-flaky-tests-are-caught-before-merge-and-quarantined-with-an-expiry.md
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 3
+scripts/check-single-copies.mjs
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 8-10
+tests/unit/scripts/workflow-lint.spec.ts
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 26,49-80,82-84,89-91
+  s_7a27f124c1e8e3::t_abed9244ed414c 92
+docs/adr/107-production-only-unused-code-is-a-ci-gate.md
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 3
+docs/adr/136-a-real-order-runs-before-foundry-changes-ship.md
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 3
+docs/ARCHITECTURE.md
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 979,982-984
+docs/adr/133-paved-path-cleanup.md
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 3
+knip.jsonc
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 15,31,47,52-53,57-58,65-66
+.husky/pre-commit
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 2
+docs/CONSTITUTION.md
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 24-32,34-41,319,438-439,456-460,464-466
+  s_7a27f124c1e8e3::t_aa1d0fb9ee90cd 2-3,440-442,496
+  s_7a27f124c1e8e3::t_5bee6b6b8d1657 4,11,16-23,33
+docs/adr/070-e2e-is-deterministic-and-selective.md
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 3
+scripts/workflow-lint.mjs
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 13,22,95,101-106,113-114,143-148,174,186-189,192-193
+README.md
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 185-209
+scripts/test-env.mjs
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 1-2
+docs/adr/071-ci-is-sharded-by-duration-and-warns-nothing.md
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 3
+docs/adr/129-ci-jobs-have-no-time-limit.md
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 15
+docs/adr/132-ci-finishes-in-five-minutes.md
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 3
+.github/workflows/ci.yml
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 17,22-24,44,48-50,65,105-106,133-134,159,173,175-179,181,237-238,271-273,276,301
+docs/adr/123-tests-run-once-sealed-and-selected.md
+  s_7a27f124c1e8e3::t_aa1d0fb9ee90cd 3
+docs/adr/125-a-security-fix-skips-the-release-age-cooldown.md
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 3
+docs/adr/151-ci-runs-everything-once-with-nothing-fancy.md
+  s_7a27f124c1e8e3::t_e91e514dfce3c2 1-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3d71607b8a86d9115adce8670473280a6f5bb0aa",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
