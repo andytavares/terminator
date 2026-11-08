@@ -1,5 +1,7 @@
 scripts/test-select.mjs
   s_7a27f124c1e8e3::t_335032a8eb93ea 189,192-198,272-278,292,298
+tests/unit/scripts/test-select.spec.ts
+  s_7a27f124c1e8e3::t_3264dcae786548 2,255-270
 ---
 {
   "schema_version": "authorship/3.0.0",
