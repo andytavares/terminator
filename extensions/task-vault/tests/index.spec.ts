@@ -21,10 +21,10 @@ vi.mock('../src/vault/db.js', () => ({
 vi.mock('../src/vault/ensure-next-occurrence.js', () => ({
   backfillRecurringTasks: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('../src/notifications/task-scheduler.js', () => ({
+vi.mock('../src/notifications/task-scheduler.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/notifications/task-scheduler.js')>()),
   startTaskScheduler: vi.fn(() => ({ dispose: vi.fn(), tick: vi.fn() })),
   setSchedulerTick: vi.fn(),
-  bindBroadcast: vi.fn(),
 }))
 vi.mock('../src/navigation.js', () => ({
   openInVault: vi.fn(),
@@ -177,20 +177,28 @@ function taskVaultActivateQuickActionsDisposingTests() {
 }
 
 describe('task-vault activate() Home feed', () => {
-  it('publishes 500 ms after the vault says its index changed, and registers the open command', async () => {
-    const { api, commandsRegister } = makeApi()
+  it('publishes 500 ms after the vault says its index changed', async () => {
+    const { api } = makeApi()
     const { activate } = await import('../src/index.ts')
-    const { bindBroadcast } = await import('../src/notifications/task-scheduler.js')
+    const { broadcast } = await import('../src/notifications/task-scheduler.js')
     await activate(api)
     const publish = vi.mocked(api.home.publish)
     await vi.advanceTimersByTimeAsync(500)
     publish.mockClear()
 
-    const send = vi.mocked(bindBroadcast).mock.calls.at(-1)![0]
-    send('task-vault:push:index-updated', {})
-    await vi.advanceTimersByTimeAsync(500)
+    broadcast('task-vault:push:index-updated', {})
+    await vi.advanceTimersByTimeAsync(499)
+    expect(publish).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
 
     expect(publish).toHaveBeenCalledTimes(1)
+  })
+
+  it('registers the open command', async () => {
+    const { api, commandsRegister } = makeApi()
+    const { activate } = await import('../src/index.ts')
+    await activate(api)
+
     expect(commandsRegister).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'task-vault:open' }),
       expect.any(Function)

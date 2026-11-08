@@ -1,17 +1,13 @@
 import React from 'react'
 import { describe, it, beforeAll, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { GitFullView } from '../../src/components/GitFullView'
 import { useGitStore } from '../../src/stores/git.store'
 import type { GitStatus } from '../../src/schemas/git.schema'
-import { partialFake } from '../../../../tests/support/fakes'
 
 type GitState = ReturnType<typeof useGitStore.getState>
 
-vi.mock('../../src/stores/git.store', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../src/stores/git.store')>()),
-  useGitStore: vi.fn(),
-}))
 vi.mock('../../src/hooks/useGitStatus', () => ({ useGitStatus: vi.fn() }))
 vi.mock('../../src/components/StagingArea', () => ({
   StagingArea: ({ onFileSelect }: { onFileSelect: (path: string, staged: boolean) => void }) => (
@@ -55,9 +51,6 @@ vi.mock('../../src/components/PrDialog', () => ({
 vi.mock('./git-integration.css', () => ({}))
 vi.mock('../../src/components/git-integration.css', () => ({}))
 
-const mockSetSelectedFile = vi.fn()
-const mockSetDiff = vi.fn()
-const mockSetLoading = vi.fn()
 const mockGitCommit = vi.fn()
 const mockGitPush = vi.fn()
 const mockDraftChange = vi.fn()
@@ -81,22 +74,10 @@ function featureWithStagedFile(): GitStatus {
   return { branch: 'feature', files: [stagedFile], hasConflicts: false, truncated: false }
 }
 
+const CLEAN: GitStatus = { branch: 'feature', files: [], hasConflicts: false, truncated: false }
+
 function setupStore(overrides: Partial<GitState> = {}) {
-  {
-    const state: Partial<GitState> = {
-      status: { branch: 'feature', files: [], hasConflicts: false, truncated: false },
-      selectedFile: null,
-      diffCache: new Map(),
-      setSelectedFile: mockSetSelectedFile,
-      setDiff: mockSetDiff,
-      setLoading: mockSetLoading,
-      clearDiffCache: vi.fn(),
-      ...overrides,
-    }
-    vi.mocked(useGitStore).mockImplementation((sel?: (s: GitState) => unknown) =>
-      sel ? sel(partialFake<GitState>(state)) : state
-    )
-  }
+  useGitStore.setState({ ...useGitStore.getInitialState(), status: CLEAN, ...overrides }, true)
 }
 
 const mockRecordUsage = vi.fn()
@@ -140,9 +121,11 @@ async function renderView(
 
 /** Renders the view for /repo and opens the PR dialog. */
 async function renderWithPrDialogOpen() {
+  const user = userEvent.setup()
   await renderView()
-  fireEvent.click(screen.getByText('Open PR'))
+  await user.click(screen.getByRole('button', { name: 'Open PR' }))
   await screen.findByTestId('pr-dialog')
+  return user
 }
 
 // The first import compiles the component tree, which on a loaded machine takes longer
@@ -153,9 +136,10 @@ beforeAll(async () => {
 
 describe('GitFullView', () => {
   it('opens the first changed file from the empty diff pane', async () => {
+    const user = userEvent.setup()
     await renderView('/repo', { status: featureWithStagedFile() })
-    fireEvent.click(screen.getByText('OpenFirstChange'))
-    expect(mockSetSelectedFile).toHaveBeenCalledWith('src/foo.ts')
+    await user.click(screen.getByRole('button', { name: 'OpenFirstChange' }))
+    expect(useGitStore.getState().selectedFile).toBe('src/foo.ts')
   })
 
   it('offers no first change when the branch has none', async () => {
@@ -188,12 +172,16 @@ describe('GitFullView empty diff pane while a diff is not in hand', () => {
 })
 
 describe('GitFullView empty diff pane once status is read', () => {
-  it('offers a pick when changes exist and none is selected, and a refresh when none exist', async () => {
-    const { unmount } = await renderView('/repo', { status: featureWithStagedFile() })
-    expect(emptyCase()).toBe('pick')
-    unmount()
-    await renderView()
-    expect(emptyCase()).toBe('clean')
+  it.each([
+    {
+      changes: 'changes exist and none is selected',
+      status: featureWithStagedFile(),
+      shown: 'pick',
+    },
+    { changes: 'nothing changed', status: CLEAN, shown: 'clean' },
+  ])('shows "$shown" when $changes', async ({ status, shown }) => {
+    await renderView('/repo', { status })
+    expect(emptyCase()).toBe(shown)
   })
 
   it('shows "No project selected" when repoRoot is null', async () => {
@@ -216,19 +204,18 @@ describe('GitFullView — shows Enter a commit message hint when files staged bu
 
   it('disables Commit button when no staged files', async () => {
     await renderView()
-    const btn = screen.getByText('Commit')
+    const btn = screen.getByRole('button', { name: 'Commit' })
     expect(btn).toHaveProperty('disabled', true)
   })
 })
 
 describe('GitFullView — calls commit when Commit is clicked with staged files and message', () => {
   it('calls commit when Commit is clicked with staged files and message', async () => {
+    const user = userEvent.setup()
     setupStore({ status: featureWithStagedFile() })
     render(<GitFullView repoRoot="/repo" />)
-    fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
-      target: { value: 'fix: something' },
-    })
-    fireEvent.click(screen.getByText('Commit'))
+    await user.type(screen.getByPlaceholderText('Commit message…'), 'fix: something')
+    await user.click(screen.getByRole('button', { name: 'Commit' }))
     await waitFor(() =>
       expect(mockGitCommit).toHaveBeenCalledWith({
         repoRoot: '/repo',
@@ -242,13 +229,12 @@ describe('GitFullView — calls commit when Commit is clicked with staged files 
 
 describe('GitFullView — shows commit error message when commit returns error', () => {
   it('shows commit error message when commit returns error', async () => {
+    const user = userEvent.setup()
     mockGitCommit.mockResolvedValue({ error: 'NOTHING_TO_COMMIT' })
     setupStore({ status: featureWithStagedFile() })
     render(<GitFullView repoRoot="/repo" />)
-    fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
-      target: { value: 'fix: something' },
-    })
-    fireEvent.click(screen.getByText('Commit'))
+    await user.type(screen.getByPlaceholderText('Commit message…'), 'fix: something')
+    await user.click(screen.getByRole('button', { name: 'Commit' }))
     expect(
       await screen.findByText('Nothing staged to commit. Stage at least one file first.')
     ).toBeTruthy()
@@ -258,24 +244,27 @@ describe('GitFullView — shows commit error message when commit returns error',
 
 describe('GitFullView — closes PR dialog when ClosePrDialog is clicked', () => {
   it('closes PR dialog when ClosePrDialog is clicked', async () => {
-    await renderWithPrDialogOpen()
-    fireEvent.click(screen.getByText('ClosePrDialog'))
+    const user = await renderWithPrDialogOpen()
+    await user.click(screen.getByRole('button', { name: 'ClosePrDialog' }))
     expect(screen.queryByTestId('pr-dialog')).toBeNull()
   })
 
-  it('closes PR dialog and dispatches event when PR is created', async () => {
+  it('closes the PR dialog and announces the created pull request in git:pr-created', async () => {
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
-    await renderWithPrDialogOpen()
-    fireEvent.click(screen.getByText('CreatePr'))
+    const user = await renderWithPrDialogOpen()
+    await user.click(screen.getByRole('button', { name: 'CreatePr' }))
     expect(screen.queryByTestId('pr-dialog')).toBeNull()
-    expect(dispatchSpy).toHaveBeenCalled()
-    dispatchSpy.mockRestore()
+    const created = dispatchSpy.mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.type === 'git:pr-created')
+    expect(created.map((event) => (event as CustomEvent).detail.pr.number)).toEqual([42])
   })
 
   it('shows char count when commit message exceeds 50 chars', async () => {
+    const user = userEvent.setup()
     await renderView()
     const msg = 'a'.repeat(51)
-    fireEvent.change(screen.getByPlaceholderText('Commit message…'), { target: { value: msg } })
+    await user.type(screen.getByPlaceholderText('Commit message…'), msg)
     expect(screen.getByText('51 chars')).toBeTruthy()
   })
 })
@@ -286,10 +275,10 @@ describe('GitFullView — the pull request Open PR created', () => {
     Object.assign(window.electronAPI, {
       shell: { openExternal },
     })
-    await renderWithPrDialogOpen()
-    fireEvent.click(screen.getByText('CreatePr'))
+    const user = await renderWithPrDialogOpen()
+    await user.click(screen.getByRole('button', { name: 'CreatePr' }))
 
-    fireEvent.click(await screen.findByRole('link', { name: '#42 PR' }))
+    await user.click(await screen.findByRole('link', { name: '#42 PR' }))
     expect(openExternal).toHaveBeenCalledWith('http://example.com/pull/42')
     expect(mockInvoke).toHaveBeenCalledWith(
       'git:notify',
@@ -300,8 +289,9 @@ describe('GitFullView — the pull request Open PR created', () => {
 
 describe('GitFullView — fetches diff when file is selected', () => {
   it('fetches diff when file is selected', async () => {
+    const user = userEvent.setup()
     await renderView()
-    fireEvent.click(screen.getByText('SelectFile'))
+    await user.click(screen.getByRole('button', { name: 'SelectFile' }))
     await waitFor(() =>
       expect(mockGitDiffFile).toHaveBeenCalledWith({
         repoRoot: '/repo',
@@ -313,30 +303,34 @@ describe('GitFullView — fetches diff when file is selected', () => {
   })
 
   it('caches the fetched diff under its staged/unstaged key', async () => {
+    const user = userEvent.setup()
     await renderView()
-    fireEvent.click(screen.getByText('SelectFile'))
+    await user.click(screen.getByRole('button', { name: 'SelectFile' }))
     await waitFor(() =>
-      expect(mockSetDiff).toHaveBeenCalledWith('unstaged:src/foo.ts', { hunks: [] })
+      expect(useGitStore.getState().diffCache.get('unstaged:src/foo.ts')).toEqual({ hunks: [] })
     )
   })
 })
 
 describe('GitFullView — does not refetch when the same side of the file is already cached', () => {
   it('does not refetch when the same side of the file is already cached', async () => {
+    const user = userEvent.setup()
     await renderView('/repo', { diffCache: new Map([['unstaged:src/foo.ts', { hunks: [] }]]) })
-    fireEvent.click(screen.getByText('SelectFile'))
+    await user.click(screen.getByRole('button', { name: 'SelectFile' }))
     expect(mockGitDiffFile).not.toHaveBeenCalled()
   })
 
   it('refetches when only the other side of the file is cached', async () => {
+    const user = userEvent.setup()
     await renderView('/repo', { diffCache: new Map([['staged:src/foo.ts', { hunks: [] }]]) })
-    fireEvent.click(screen.getByText('SelectFile'))
+    await user.click(screen.getByRole('button', { name: 'SelectFile' }))
     await waitFor(() => expect(mockGitDiffFile).toHaveBeenCalledTimes(1))
   })
 })
 
 describe('GitFullView — shows hook output when commit fails due to hook failure', () => {
   it('shows hook output when commit fails due to hook failure', async () => {
+    const user = userEvent.setup()
     mockGitCommit.mockResolvedValue({
       error: 'HOOK_FAILED',
       hookOutput: 'eslint found 3 errors',
@@ -344,10 +338,8 @@ describe('GitFullView — shows hook output when commit fails due to hook failur
     })
     setupStore({ status: featureWithStagedFile() })
     render(<GitFullView repoRoot="/repo" />)
-    fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
-      target: { value: 'fix: something' },
-    })
-    fireEvent.click(screen.getByText('Commit'))
+    await user.type(screen.getByPlaceholderText('Commit message…'), 'fix: something')
+    await user.click(screen.getByRole('button', { name: 'Commit' }))
     await screen.findByText('Pre-commit hooks failed.')
     expect(screen.getByText('Hook output')).toBeTruthy()
     expect(screen.getByText('Commit without hooks')).toBeTruthy()
@@ -356,6 +348,7 @@ describe('GitFullView — shows hook output when commit fails due to hook failur
 
 describe('GitFullView — commits with --no-verify when Commit without hooks is clicked', () => {
   it('commits with --no-verify when Commit without hooks is clicked', async () => {
+    const user = userEvent.setup()
     mockGitCommit
       .mockResolvedValueOnce({
         error: 'HOOK_FAILED',
@@ -365,11 +358,9 @@ describe('GitFullView — commits with --no-verify when Commit without hooks is 
       .mockResolvedValueOnce({ commitHash: 'def456' })
     setupStore({ status: featureWithStagedFile() })
     render(<GitFullView repoRoot="/repo" />)
-    fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
-      target: { value: 'fix: skip hooks' },
-    })
-    fireEvent.click(screen.getByText('Commit'))
-    fireEvent.click(await screen.findByText('Commit without hooks'))
+    await user.type(screen.getByPlaceholderText('Commit message…'), 'fix: skip hooks')
+    await user.click(screen.getByRole('button', { name: 'Commit' }))
+    await user.click(await screen.findByRole('button', { name: 'Commit without hooks' }))
     await waitFor(() =>
       expect(mockGitCommit).toHaveBeenCalledWith({
         repoRoot: '/repo',
@@ -382,6 +373,7 @@ describe('GitFullView — commits with --no-verify when Commit without hooks is 
 
 describe('GitFullView — shows running hooks status text while committing', () => {
   it('shows running hooks status text while committing', async () => {
+    const user = userEvent.setup()
     let resolve: (v: unknown) => void
     mockGitCommit.mockImplementation(
       () =>
@@ -391,10 +383,8 @@ describe('GitFullView — shows running hooks status text while committing', () 
     )
     setupStore({ status: featureWithStagedFile() })
     render(<GitFullView repoRoot="/repo" />)
-    fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
-      target: { value: 'wip' },
-    })
-    fireEvent.click(screen.getByText('Commit'))
+    await user.type(screen.getByPlaceholderText('Commit message…'), 'wip')
+    await user.click(screen.getByRole('button', { name: 'Commit' }))
     await screen.findByText(/Running pre-commit hooks/)
     resolve!({ commitHash: 'abc' })
   })
@@ -402,13 +392,12 @@ describe('GitFullView — shows running hooks status text while committing', () 
 
 describe('GitFullView — shows push error when push fails after commit & push', () => {
   it('shows push error when push fails after commit & push', async () => {
+    const user = userEvent.setup()
     mockGitPush.mockResolvedValue({ error: 'REJECTED' })
     setupStore({ status: featureWithStagedFile() })
     render(<GitFullView repoRoot="/repo" />)
-    fireEvent.change(screen.getByPlaceholderText('Commit message…'), {
-      target: { value: 'feat: add x' },
-    })
-    fireEvent.click(screen.getByText('Commit & Push'))
+    await user.type(screen.getByPlaceholderText('Commit message…'), 'feat: add x')
+    await user.click(screen.getByRole('button', { name: 'Commit & Push' }))
     expect(
       await screen.findByText('Committed but push rejected — pull changes first.')
     ).toBeTruthy()
@@ -451,18 +440,19 @@ describe('GitFullView — ignores git:focus-commit-message for a different repo'
   it('ignores git:open-pr-dialog for a different repo', async () => {
     await renderView('/repo')
     channelHandlers.get('git:open-pr-dialog')?.({ repoRoot: '/other-repo' })
-    expect(screen.queryByTestId('pr-dialog')).toBeNull()
+    // Opening the dialog starts with this request, before any await.
+    expect(mockGitPrStatus).not.toHaveBeenCalled()
   })
 })
 
-/** Answers git:ui.consume-pending-request with `request`, the rest as beforeEach does. */
+/** Answers git:ui.consume-pending-request with `request` (returned as `consumed`), the rest as beforeEach does. */
 function leavePendingRequest(request: { kind: string; repoRoot: string } | null) {
   const answer = mockInvoke.getMockImplementation()!
+  const consumed = Promise.resolve({ request })
   mockInvoke.mockImplementation((channel: string, payload: unknown) =>
-    channel === 'git:ui.consume-pending-request'
-      ? Promise.resolve({ request })
-      : answer(channel, payload)
+    channel === 'git:ui.consume-pending-request' ? consumed : answer(channel, payload)
   )
+  return { consumed }
 }
 
 describe('GitFullView — a Commit… or Create PR… run before the view existed', () => {
@@ -491,12 +481,11 @@ describe('GitFullView — a pending Create PR… and the pull request a branch h
   })
 
   it("leaves another repository's pending request alone", async () => {
-    leavePendingRequest({ kind: 'pull-request', repoRoot: '/other-repo' })
+    const { consumed } = leavePendingRequest({ kind: 'pull-request', repoRoot: '/other-repo' })
     await renderView('/repo')
-    await waitFor(() =>
-      expect(mockInvoke).toHaveBeenCalledWith('git:ui.consume-pending-request', {})
-    )
-    expect(screen.queryByTestId('pr-dialog')).toBeNull()
+    // The view handles the answer in a .then registered before this await.
+    await act(() => consumed)
+    expect(mockGitPrStatus).not.toHaveBeenCalled()
   })
 })
 
@@ -504,11 +493,12 @@ describe('GitFullView — Write message', () => {
   const draft = { branch: 'b', commitMessage: 'Add foo', title: 't', body: '' }
 
   it('fills the commit message from the draft and counts the use', async () => {
+    const user = userEvent.setup()
     mockDraftChange.mockResolvedValue({ draft })
     setupStore({ status: featureWithStagedFile() })
     render(<GitFullView repoRoot="/repo" />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Write message' }))
+    await user.click(screen.getByRole('button', { name: 'Write message' }))
 
     await waitFor(() =>
       expect((screen.getByPlaceholderText('Commit message…') as HTMLTextAreaElement).value).toBe(
@@ -520,11 +510,12 @@ describe('GitFullView — Write message', () => {
   })
 
   it('shows the plain reason and leaves the message alone when drafting fails', async () => {
+    const user = userEvent.setup()
     mockDraftChange.mockResolvedValue({ error: 'The agent is not signed in.' })
     setupStore({ status: featureWithStagedFile() })
     render(<GitFullView repoRoot="/repo" />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Write message' }))
+    await user.click(screen.getByRole('button', { name: 'Write message' }))
 
     expect(await screen.findByText('The agent is not signed in.')).toBeTruthy()
     expect((screen.getByPlaceholderText('Commit message…') as HTMLTextAreaElement).value).toBe('')

@@ -323,11 +323,13 @@ describe('TerminalInstance — reads the whole buffer', () => {
   })
 })
 
-describe('TerminalInstance — accepts an optional onBell hook', () => {
-  it('accepts an optional onBell hook', () => {
+describe('TerminalInstance — the onBell hook', () => {
+  it('runs the onBell hook when the terminal rings its bell', () => {
     const onBell = vi.fn()
     const instance = new TerminalInstance('ses-1', 1000, { onBell })
-    expect(instance.terminal.onBell).toHaveBeenCalledWith(onBell)
+    const ringBell = vi.mocked(instance.terminal.onBell).mock.calls[0][0] as () => void
+    ringBell()
+    expect(onBell).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -1116,9 +1118,12 @@ describe('taking over a terminal that was already running', () => {
   })
 
   it('subscribes before attaching, so nothing arrives with nowhere to go', () => {
-    new TerminalInstance('agent-session', 1000)
-    expect(mockSubscribe.mock.invocationCallOrder[0]).toBeLessThan(
-      mockAttach.mock.invocationCallOrder[0]
-    )
+    // Main releases the held output as soon as attach reaches it.
+    mockAttach.mockImplementation(async () => {
+      mockSubscribe.mock.calls[0]?.[1]('launch command', vi.fn())
+      return { released: true }
+    })
+    const instance = new TerminalInstance('agent-session', 1000)
+    expect(instance.terminal.write).toHaveBeenCalledWith('launch command', expect.any(Function))
   })
 })

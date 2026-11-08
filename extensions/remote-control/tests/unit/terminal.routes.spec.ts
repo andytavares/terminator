@@ -11,6 +11,7 @@ import { ConnectedDeviceRegistry } from '../../src/server/connected-devices'
 import { HEARTBEAT_INTERVAL_MS } from '../../src/server/heartbeat'
 import { createFakePtyManager, type FakePtyManager } from './helpers/fake-pty-manager'
 import { eventually } from '../../../../tests/support/eventually'
+import { partialFake } from '../../../../tests/support/fakes'
 
 let ptyManager: FakePtyManager
 let ticketStore: WsTicketStore
@@ -18,9 +19,11 @@ let subscriberManager: WsSubscriberManager
 let app: FastifyInstance
 let routes: { cleanup: () => Promise<void> }
 let deviceRegistry: ConnectedDeviceRegistry
+let maxSubscribers: number
 
 beforeEach(async () => {
   vi.clearAllMocks()
+  maxSubscribers = 5
   ptyManager = createFakePtyManager()
   ticketStore = new WsTicketStore()
   subscriberManager = new WsSubscriberManager()
@@ -32,7 +35,7 @@ beforeEach(async () => {
     ticketStore,
     subscriberManager,
     deviceRegistry,
-    getMaxSubscribers: () => 5,
+    getMaxSubscribers: () => maxSubscribers,
   })
   await app.ready()
 })
@@ -48,6 +51,13 @@ async function createSession(payload: Record<string, unknown> = {}): Promise<str
     ...payload,
   })
   return JSON.parse(res.body).sessionId
+}
+
+/** An open viewer socket on `sessionId`, held by the real subscriber manager. */
+function fakeViewer(sessionId: string) {
+  const viewer = { readyState: WebSocket.OPEN, send: vi.fn(), close: vi.fn() }
+  subscriberManager.addSubscriber(sessionId, partialFake<WebSocket>(viewer), 5)
+  return viewer
 }
 
 function injectTerminalRoute(method: 'POST' | 'PATCH', url: string, payload: unknown) {
@@ -207,11 +217,12 @@ describe('cleanup()', () => {
     expect(await ptyManager.getSession('app-keep')).toBeDefined()
   })
 
-  it('destroys subscriber state for streamed sessions', async () => {
+  it('closes the viewers of streamed sessions', async () => {
     const sessionId = await createSession()
-    const destroy = vi.spyOn(subscriberManager, 'destroySession')
+    const viewer = fakeViewer(sessionId)
     await routes.cleanup()
-    expect(destroy).toHaveBeenCalledWith(sessionId)
+    expect(viewer.close).toHaveBeenCalledWith(1000, 'session destroyed')
+    expect(subscriberManager.getCount(sessionId)).toBe(0)
   })
 })
 
@@ -263,18 +274,19 @@ function createTerminalRejectionTests() {
 }
 
 function createTerminalStreamingTests() {
-  it('attaches an output broadcast that reaches subscribers', async () => {
+  it('sends the PTY output to its viewers', async () => {
     const sessionId = await createSession()
-    const broadcast = vi.spyOn(subscriberManager, 'broadcast')
+    const viewer = fakeViewer(sessionId)
     ptyManager.emitData(sessionId, 'hello from pty')
-    expect(broadcast).toHaveBeenCalledWith(sessionId, 'hello from pty')
+    expect(viewer.send).toHaveBeenCalledWith('hello from pty')
   })
 
-  it('destroys subscribers when the PTY exits', async () => {
+  it('closes its viewers when the PTY exits', async () => {
     const sessionId = await createSession()
-    const destroy = vi.spyOn(subscriberManager, 'destroySession')
+    const viewer = fakeViewer(sessionId)
     ptyManager.emitExit(sessionId)
-    expect(destroy).toHaveBeenCalledWith(sessionId)
+    expect(viewer.close).toHaveBeenCalledWith(1000, 'session destroyed')
+    expect(subscriberManager.getCount(sessionId)).toBe(0)
   })
 }
 
@@ -430,13 +442,12 @@ function terminalSocketSubscribeTests() {
 }
 
 function terminalSocketBroadcastTests() {
-  it('attaches the output broadcast on first connect to an app-origin session', async () => {
+  it('streams an app-origin session to the first client that connects', async () => {
     ptyManager.addSession({ sessionId: 'app-stream', origin: 'app' })
     const ws = await connect('app-stream', await ticketFor('app-stream'))
-    expect(ptyManager.onData).toHaveBeenCalledWith('app-stream', expect.any(Function))
-    const broadcast = vi.spyOn(subscriberManager, 'broadcast')
+    const received = new Promise<string>((resolve) => ws.once('message', (d) => resolve(String(d))))
     ptyManager.emitData('app-stream', 'native output')
-    expect(broadcast).toHaveBeenCalledWith('app-stream', 'native output')
+    expect(await received).toBe('native output')
     await closed(ws)
   })
 
@@ -455,8 +466,10 @@ function terminalSocketListenerTests() {
     // App-owned session: POST hasn't attached a broadcast, so a rejected first
     // viewer must leave zero listeners behind (the pre-refactor rollback guarantee).
     ptyManager.addSession({ sessionId: 'app-full', origin: 'app' })
-    vi.spyOn(subscriberManager, 'addSubscriber').mockReturnValueOnce(false)
-    await connect('app-full', await ticketFor('app-full'))
+    maxSubscribers = 0
+    const ws = await connect('app-full', await ticketFor('app-full'))
+    const closeCode = new Promise<number>((resolve) => ws.on('close', (code) => resolve(code)))
+    expect(await closeCode).toBe(4003)
     expect(await ptyManager.getSession('app-full')).toBeDefined()
     expect(ptyManager.kill).not.toHaveBeenCalled()
     expect(ptyManager.dataListenerCount('app-full')).toBe(0)
@@ -467,10 +480,7 @@ function terminalSocketListenerTests() {
     const ws = await connect('app-redel', await ticketFor('app-redel'))
     await app.inject({ method: 'DELETE', url: '/api/terminals/app-redel' })
     const ws2 = await connect('app-redel', await ticketFor('app-redel'))
-    const destroy = vi.spyOn(subscriberManager, 'destroySession')
-    ptyManager.emitExit('app-redel')
-    // One live broadcast means exactly one exit-driven teardown
-    expect(destroy).toHaveBeenCalledTimes(1)
+    expect(ptyManager.exitListenerCount('app-redel')).toBe(1)
     await closed(ws2)
     ws.terminate()
   })
@@ -514,19 +524,20 @@ function terminalSocketAppTeardownTests() {
 
 function terminalSocketReconnectTests() {
   it('cancels the grace-period teardown when a client reconnects in time', async () => {
-    vi.useFakeTimers()
+    const sessionId = await createSession()
+    const first = await connect(sessionId, await ticketFor(sessionId))
+    // Faked before the close, so the 30s teardown timer lands on the fake clock.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     try {
-      vi.useRealTimers()
-      const sessionId = await createSession()
-      const first = await connect(sessionId, await ticketFor(sessionId))
       await closed(first)
-      // Reconnect before the 30s window expires
+      await eventually(() => expect(subscriberManager.getCount(sessionId)).toBe(0))
       const second = await connect(sessionId, await ticketFor(sessionId))
-      vi.useFakeTimers()
-      vi.advanceTimersByTime(31_000)
-      expect(ptyManager.kill).not.toHaveBeenCalled()
-      vi.useRealTimers()
+      await vi.advanceTimersByTimeAsync(20_000)
+      // The second leave starts a new 30s window; the first one's timer would fire 10s from now.
       await closed(second)
+      await eventually(() => expect(subscriberManager.getCount(sessionId)).toBe(0))
+      await vi.advanceTimersByTimeAsync(15_000)
+      expect(ptyManager.kill).not.toHaveBeenCalled()
     } finally {
       vi.useRealTimers()
     }
@@ -575,9 +586,10 @@ function terminalSocketCleanupTests() {
       await closed(ws)
       await eventually(() => expect(subscriberManager.getCount(sessionId)).toBe(0))
       await routes.cleanup()
-      const lookups = ptyManager.getSession.mock.calls.length
+      // A session under the same id that the dropped timer would kill if it still fired.
+      ptyManager.addSession({ sessionId, origin: 'remote' })
       await vi.advanceTimersByTimeAsync(30_000)
-      expect(ptyManager.getSession).toHaveBeenCalledTimes(lookups)
+      expect(await ptyManager.getSession(sessionId)).toMatchObject({ sessionId })
     } finally {
       vi.useRealTimers()
     }
@@ -589,11 +601,9 @@ function terminalSocketPtyExitTests() {
     ptyManager.addSession({ sessionId: 'app-exit', origin: 'app' })
     const ws = await connect('app-exit', await ticketFor('app-exit'))
     // destroySession closes the socket, so track its close instead of initiating one
-    const wsClosed = new Promise<void>((resolve) => ws.on('close', () => resolve()))
-    const destroy = vi.spyOn(subscriberManager, 'destroySession')
+    const closeCode = new Promise<number>((resolve) => ws.on('close', (code) => resolve(code)))
     ptyManager.emitExit('app-exit')
-    expect(destroy).toHaveBeenCalledWith('app-exit')
-    await wsClosed
+    expect(await closeCode).toBe(1000)
     // A later session with the same id gets a fresh broadcast attached
     ptyManager.addSession({ sessionId: 'app-exit', origin: 'app' })
     const ws2 = await connect('app-exit', await ticketFor('app-exit'))

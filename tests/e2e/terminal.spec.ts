@@ -17,7 +17,7 @@ import {
 } from './helpers'
 import { recordShellOpens, shellOpens } from './main-stubs'
 import { expectCentredInWindow } from './modal-centre'
-import { expectTerminalFocused } from './session-views'
+import { expectTerminalFocused, runInVisibleTerminal } from './session-views'
 
 // Terminals from an operator's side: opened, navigated, split, followed and closed. The three
 // flows share one app; each makes its own workspace, so none depends on another having run.
@@ -65,9 +65,7 @@ async function terminalFollowsOutput(): Promise<void> {
   const { page } = handle
   await workspaceWithBranch('WS-Persist-A', 'Proj-A')
   await expect(page.locator('.terminal-pane').first()).toBeVisible()
-  await page.locator('.terminal-pane').click()
-  await page.keyboard.type('seq 1 300')
-  await page.keyboard.press('Enter')
+  await runInVisibleTerminal(page, 'seq 1 300')
   await expect.poll(viewportAtBottom).toBe(true)
 }
 

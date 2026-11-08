@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { InlineCommentThread } from '../../src/components/pr-review/InlineCommentThread'
 import type { Thread } from '../../src/schemas/pr-review.schema'
 
@@ -79,10 +80,11 @@ describe('InlineCommentThread', () => {
 })
 
 describe('InlineCommentThread — calls onReply with thread id when reply button clicked', () => {
-  it('calls onReply with thread id when reply button clicked', () => {
+  it('calls onReply with thread id when reply button clicked', async () => {
+    const user = userEvent.setup()
     const onReply = vi.fn()
     render(<InlineCommentThread thread={makeThread()} onReply={onReply} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Reply' }))
+    await user.click(screen.getByRole('button', { name: 'Reply' }))
     expect(onReply).toHaveBeenCalledWith('thread-1')
   })
 
@@ -120,7 +122,8 @@ describe('InlineCommentThread — shows show more replies button when thread is 
 })
 
 describe('InlineCommentThread — expands collapsed thread when show more is clicked', () => {
-  it('expands collapsed thread when show more is clicked', () => {
+  it('expands collapsed thread when show more is clicked', async () => {
+    const user = userEvent.setup()
     const thread = makeThread({
       collapsed: true,
       comments: [
@@ -135,7 +138,8 @@ describe('InlineCommentThread — expands collapsed thread when show more is cli
       ],
     })
     render(<InlineCommentThread thread={thread} />)
-    fireEvent.click(screen.getByText(/Show 1 more reply/))
+    expect(screen.queryByText('Second')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Show 1 more reply' }))
     expect(screen.getByText('Second')).toBeTruthy()
   })
 })

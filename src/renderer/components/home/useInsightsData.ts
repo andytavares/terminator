@@ -14,9 +14,17 @@ export interface InsightsData {
   usage: AgentUsage | null
   /** The log's intervals back to the retention limit: a ticket merged this week began earlier. */
   intervals: AttentionInterval[]
+  /** False until the first reads have answered, so a screen can say it is still reading. */
+  loaded: boolean
 }
 
-const NOTHING: InsightsData = { attention: null, attentionBefore: null, usage: null, intervals: [] }
+const NOTHING: InsightsData = {
+  attention: null,
+  attentionBefore: null,
+  usage: null,
+  intervals: [],
+  loaded: false,
+}
 
 type Range = { from: number; to: number }
 
@@ -59,7 +67,7 @@ export function useInsightsData(chosen: InsightsWindow): InsightsData {
       readUsage(range),
       readIntervals(range),
     ]).then(([attention, attentionBefore, usage, intervals]) => {
-      if (current) setData({ attention, attentionBefore, usage, intervals })
+      if (current) setData({ attention, attentionBefore, usage, intervals, loaded: true })
     })
     return () => {
       current = false

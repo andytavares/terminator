@@ -73,37 +73,22 @@ function seeded(): WorkOrder {
   return { ...base, intent: { ...base.intent, problem: 'text is not red' } }
 }
 
-/**
- * The runtime's own callback, as `index.ts` writes it.
- *
- * Copied rather than imported because it lives in the extension's activation,
- * which needs an Electron host. What it does is two lines, and both of them
- * matter: a refusal records and returns without saving, which is the whole
- * reason nothing downstream could see it.
- */
-async function finish(order: WorkOrder, answer: unknown): Promise<void> {
-  const outcome = applyArchitectAnswer(order, answer, '2026-09-09T19:33:21.000Z')
-  const at = '2026-09-09T19:33:21.000Z'
-  if (!outcome.ok) {
-    await store.record({
-      at,
-      orderId: order.id,
-      actor: 'role:architect',
-      action: 'converge.refused',
-      subject: order.id,
-      reason: outcome.reason,
-      evidence: [],
-    })
-    return
-  }
-  await store.save(outcome.order)
+/** The reason the architect's answer is refused, from the real parser. */
+function refusalOf(answer: unknown): string {
+  const outcome = applyArchitectAnswer(seeded(), answer, '2026-09-09T19:33:21.000Z')
+  if (outcome.ok) throw new Error('the proposal this test needs refused was accepted')
+  return outcome.reason
+}
+
+/** One architect line in the ledger, as `afterRefusedProposal`/`afterRedraft` write it. */
+async function architectLine(at: string, action: string, reason: string): Promise<void> {
   await store.record({
     at,
-    orderId: order.id,
+    orderId: 'WO-0909-6db',
     actor: 'role:architect',
-    action: 'order.redrafted',
-    subject: order.id,
-    reason: outcome.note,
+    action,
+    subject: 'WO-0909-6db',
+    reason,
     evidence: [],
   })
 }
@@ -135,21 +120,16 @@ describe('a proposal refused after the turn ended', () => {
 })
 
 function refusedTurnRefusingTests() {
-  it('refuses a file path where an evidence kind belongs, and names the field', async () => {
-    await finish(seeded(), BAD_PROPOSAL)
-
-    const refusal = lastIntake(await store.entries('WO-0909-6db'))
-    expect(refusal.kind).toBe('refused')
-    expect(refusal.kind === 'refused' && refusal.reason).toContain('evidence')
-    expect(refusal.kind === 'refused' && refusal.reason).toContain(
-      'Invalid option: expected one of "exit_code"'
-    )
+  it('refuses a file path where an evidence kind belongs, and names the field', () => {
+    const reason = refusalOf(BAD_PROPOSAL)
+    expect(reason).toContain('evidence')
+    expect(reason).toContain('Invalid option: expected one of "exit_code"')
   })
 }
 
 function theSurfaceTests() {
   it('reaches the surface that has to say so', async () => {
-    await finish(seeded(), BAD_PROPOSAL)
+    await architectLine('2026-09-09T19:33:21.000Z', 'converge.refused', refusalOf(BAD_PROPOSAL))
     const c = createForgeChannels({
       store,
       now: () => '2026-09-09T19:34:00.000Z',
@@ -177,21 +157,14 @@ function theSurfaceTests() {
 function theCorrectedProposalTests() {
   // The correction the operator's next turn asks for, all the way through.
   it('accepts the corrected proposal and clears the refusal', async () => {
-    await finish(seeded(), BAD_PROPOSAL)
-    await store.record({
-      at: '2026-09-09T19:40:00.000Z',
-      orderId: 'WO-0909-6db',
-      actor: 'role:architect',
-      action: 'converge.started',
-      subject: 'sess-arch-2',
-      reason: 'Your last proposal was refused',
-      evidence: [],
-    })
-    await finish(seeded(), GOOD_PROPOSAL)
+    await architectLine('2026-09-09T19:33:21.000Z', 'converge.refused', refusalOf(BAD_PROPOSAL))
+    await architectLine('2026-09-09T19:40:00.000Z', 'converge.started', 'proposal was refused')
+    const corrected = applyArchitectAnswer(seeded(), GOOD_PROPOSAL, '2026-09-09T19:41:00.000Z')
+    if (!corrected.ok) throw new Error(`the corrected proposal was refused: ${corrected.reason}`)
+    await store.save(corrected.order)
+    await architectLine('2026-09-09T19:41:00.000Z', 'order.redrafted', corrected.note)
 
-    const after = lastIntake(await store.entries('WO-0909-6db'))
-    expect(after.kind).toBe('redrafted')
-    expect((await store.load('WO-0909-6db'))?.acceptance).toHaveLength(1)
+    expect(lastIntake(await store.entries('WO-0909-6db')).kind).toBe('redrafted')
 
     const c = createForgeChannels({
       store,

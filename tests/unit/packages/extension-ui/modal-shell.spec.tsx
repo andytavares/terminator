@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ModalShell } from '../../../../packages/extension-ui/src/ModalShell'
 import { isSurfaceOpen } from '../../../../src/shared/double-escape'
 import { pressOutside } from '../../../support/modal'
@@ -30,12 +31,14 @@ describe('ModalShell — what it is', () => {
 
   it('is named by its label', () => {
     renderShell({ label: 'Quick actions' })
-    expect(screen.getByRole('dialog', { name: 'Quick actions' })).toBeTruthy()
+    expect(screen.getByRole('dialog').getAttribute('aria-label')).toBe('Quick actions')
   })
 
   it('is named by a visible title when given its id', () => {
     renderShell({ label: undefined, labelledBy: 'heading', children: <h2 id="heading">Logs</h2> })
-    expect(screen.getByRole('dialog', { name: 'Logs' })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'Logs' }).getAttribute('aria-labelledby')).toBe(
+      'heading'
+    )
   })
 
   it('carries the caller’s class', () => {
@@ -46,15 +49,17 @@ describe('ModalShell — what it is', () => {
 })
 
 describe('ModalShell — dismissal', () => {
-  it('dismisses on Escape', () => {
+  it('dismisses on Escape', async () => {
+    const user = userEvent.setup()
     const { onDismiss } = renderShell()
-    fireEvent.keyDown(document.body, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 
-  it('stays open after Escape until the caller removes it', () => {
+  it('stays open after Escape until the caller removes it', async () => {
+    const user = userEvent.setup()
     const { dialog } = renderShell()
-    fireEvent.keyDown(document.body, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(dialog.hasAttribute('open')).toBe(true)
   })
 
@@ -63,24 +68,34 @@ describe('ModalShell — dismissal', () => {
     pressOutside(dialog)
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
+})
 
-  it('ignores a press on its own content', () => {
+describe('ModalShell — presses inside it', () => {
+  it('ignores a press on its own content', async () => {
+    const user = userEvent.setup()
     const { onDismiss } = renderShell()
-    fireEvent.mouseDown(screen.getByRole('button', { name: 'Appearance' }))
+    await user.pointer({
+      keys: '[MouseLeft>]',
+      target: screen.getByRole('button', { name: 'Appearance' }),
+    })
     expect(onDismiss).not.toHaveBeenCalled()
   })
 
-  it('ignores a press on its own padding', () => {
+  it('ignores a press on its own padding', async () => {
+    const user = userEvent.setup()
     const { onDismiss, dialog } = renderShell()
-    fireEvent.mouseDown(dialog, { clientX: 0, clientY: 0 })
+    await user.pointer({ keys: '[MouseLeft>]', target: dialog, coords: { clientX: 0, clientY: 0 } })
     expect(onDismiss).not.toHaveBeenCalled()
   })
 })
 
 describe('ModalShell — dismissal — when dismissible is false', () => {
-  it('ignores Escape', () => {
+  it('ignores Escape', async () => {
+    const user = userEvent.setup()
     const { onDismiss } = renderShell({ dismissible: false })
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Appearance' }), { key: 'Escape' })
+    await user.click(screen.getByRole('button', { name: 'Appearance' }))
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Appearance' }))
+    await user.keyboard('{Escape}')
     expect(onDismiss).not.toHaveBeenCalled()
   })
 
@@ -98,11 +113,14 @@ describe('ModalShell — dismissal — when dismissible is false', () => {
 })
 
 describe('ModalShell — a caller with its own Escape', () => {
-  it('is not dismissed when the caller prevents the key’s default', () => {
+  it('is not dismissed when the caller prevents the key’s default', async () => {
+    const user = userEvent.setup()
     const { onDismiss } = renderShell({
       children: <input aria-label="Search" onKeyDown={(e) => e.preventDefault()} />,
     })
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'Escape' })
+    await user.click(screen.getByRole('textbox', { name: 'Search' }))
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Search' }))
+    await user.keyboard('{Escape}')
     expect(onDismiss).not.toHaveBeenCalled()
   })
 })
@@ -132,11 +150,14 @@ function NestedShells({ onOuter, onInner }: { onOuter: () => void; onInner: () =
 }
 
 describe('ModalShell — nested', () => {
-  it('dismisses only the inner shell on Escape', () => {
+  it('dismisses only the inner shell on Escape', async () => {
+    const user = userEvent.setup()
     const onOuter = vi.fn()
     const onInner = vi.fn()
     render(<NestedShells onOuter={onOuter} onInner={onInner} />)
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Inside' }), { key: 'Escape' })
+    await user.click(screen.getByRole('button', { name: 'Inside' }))
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Inside' }))
+    await user.keyboard('{Escape}')
     expect(onInner).toHaveBeenCalledTimes(1)
     expect(onOuter).not.toHaveBeenCalled()
   })
@@ -149,8 +170,11 @@ describe('ModalShell — nested', () => {
     expect(onInner).toHaveBeenCalledTimes(1)
     expect(onOuter).not.toHaveBeenCalled()
   })
+})
 
-  it('lets Escape reach a dismissible shell inside one that is not', () => {
+describe('ModalShell — nested inside one that is not dismissible', () => {
+  it('lets Escape reach a dismissible shell inside one that is not', async () => {
+    const user = userEvent.setup()
     const onInner = vi.fn()
     render(
       <ModalShell label="Outer" dismissible={false} onDismiss={() => {}}>
@@ -159,7 +183,9 @@ describe('ModalShell — nested', () => {
         </ModalShell>
       </ModalShell>
     )
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Inside' }), { key: 'Escape' })
+    await user.click(screen.getByRole('button', { name: 'Inside' }))
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Inside' }))
+    await user.keyboard('{Escape}')
     expect(onInner).toHaveBeenCalledTimes(1)
   })
 })

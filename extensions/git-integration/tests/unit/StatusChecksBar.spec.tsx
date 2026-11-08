@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { GroupedCheckList, StatusChecksBar } from '../../src/components/pr-review/StatusChecksBar'
 import type { StatusCheck } from '../../src/schemas/pr-review.schema'
 
@@ -54,9 +55,10 @@ describe('StatusChecksBar — prioritises fail over pending in summary', () => {
     expect(screen.queryByRole('list')).toBeNull()
   })
 
-  it('expands to show individual checks on click', () => {
+  it('expands to show individual checks on click', async () => {
+    const user = userEvent.setup()
     render(<StatusChecksBar checks={passing} />)
-    fireEvent.click(screen.getByRole('button'))
+    await user.click(screen.getByRole('button'))
     expect(screen.getByRole('list')).toBeTruthy()
     expect(screen.getByText('build / test')).toBeTruthy()
     expect(screen.getByText('lint')).toBeTruthy()
@@ -64,15 +66,19 @@ describe('StatusChecksBar — prioritises fail over pending in summary', () => {
 })
 
 describe('StatusChecksBar — collapses again on second click', () => {
-  it('collapses again on second click', () => {
+  it('collapses again on second click', async () => {
+    const user = userEvent.setup()
     render(<StatusChecksBar checks={passing} />)
     const btn = screen.getByRole('button')
-    fireEvent.click(btn)
-    fireEvent.click(btn)
+    await user.click(btn)
+    await user.click(btn)
     expect(screen.queryByRole('list')).toBeNull()
   })
+})
 
-  it('shows correct icon for each state in expanded list', () => {
+describe('StatusChecksBar — one icon per check state', () => {
+  it('shows the icon of its state on each check in the expanded list', async () => {
+    const user = userEvent.setup()
     const mixed: StatusCheck[] = [
       { name: 'pass-check', state: 'pass' },
       { name: 'fail-check', state: 'fail' },
@@ -81,33 +87,45 @@ describe('StatusChecksBar — collapses again on second click', () => {
       { name: 'unknown-check', state: 'unknown' },
     ]
     render(<StatusChecksBar checks={mixed} />)
-    fireEvent.click(screen.getByRole('button'))
-    const items = screen.getAllByRole('listitem')
-    expect(items).toHaveLength(5)
+    await user.click(screen.getByRole('button'))
+    const icons = screen.getAllByRole('listitem').map((item) => {
+      const icon = item.querySelector('.pr-checks-icon')!
+      return [icon.getAttribute('title'), icon.querySelector('svg')!.getAttribute('class')]
+    })
+    expect(icons).toEqual([
+      ['pass', expect.stringContaining('lucide-check')],
+      ['fail', expect.stringContaining('lucide-x')],
+      ['pending', expect.stringContaining('lucide-circle-dashed')],
+      ['skipped', expect.stringContaining('lucide-minus')],
+      ['unknown', expect.stringContaining('lucide-circle-question-mark')],
+    ])
   })
 })
 
 describe('StatusChecksBar — renders link-out anchor when url is provided', () => {
-  it('renders link-out anchor when url is provided', () => {
+  it('renders link-out anchor when url is provided', async () => {
+    const user = userEvent.setup()
     const withUrl: StatusCheck[] = [{ name: 'ci', state: 'pass', url: 'https://example.com/run/1' }]
     render(<StatusChecksBar checks={withUrl} />)
-    fireEvent.click(screen.getByRole('button'))
+    await user.click(screen.getByRole('button'))
     const link = screen.getByRole('link')
     expect(link).toBeTruthy()
     expect(link.getAttribute('href')).toBe('https://example.com/run/1')
   })
 
-  it('does not render link-out anchor when url is absent', () => {
+  it('does not render link-out anchor when url is absent', async () => {
+    const user = userEvent.setup()
     render(<StatusChecksBar checks={passing} />)
-    fireEvent.click(screen.getByRole('button'))
+    await user.click(screen.getByRole('button'))
     expect(screen.queryByRole('link')).toBeNull()
   })
 
-  it('summary button has correct aria-expanded attribute', () => {
+  it('summary button has correct aria-expanded attribute', async () => {
+    const user = userEvent.setup()
     render(<StatusChecksBar checks={passing} />)
     const btn = screen.getByRole('button')
     expect(btn.getAttribute('aria-expanded')).toBe('false')
-    fireEvent.click(btn)
+    await user.click(btn)
     expect(btn.getAttribute('aria-expanded')).toBe('true')
   })
 })

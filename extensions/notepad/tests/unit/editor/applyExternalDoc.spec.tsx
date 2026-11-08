@@ -1,7 +1,9 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import React from 'react'
+import { cleanup, render } from '@testing-library/react'
 import { EditorState } from '@codemirror/state'
-import type { EditorView } from '@codemirror/view'
-import { applyExternalDoc } from '../../../src/editor/NoteEditor'
+import { EditorView } from '@codemirror/view'
+import { NoteEditor, applyExternalDoc } from '../../../src/editor/NoteEditor'
 import { partialFake } from '../../../../../tests/support/fakes'
 
 // A stand-in for EditorView that keeps real EditorState semantics (doc,
@@ -68,10 +70,16 @@ function applyExternalDocNothingChangeTests() {
 }
 
 function applyExternalDocLocalEditsTests() {
-  it('marks the transaction so it is not reported as a local edit', () => {
-    const view = makeView('before')
+  afterEach(cleanup)
+
+  it('is not reported to the editor owner as a local edit', () => {
+    const onChange = vi.fn()
+    const { container } = render(<NoteEditor initialDoc="before" onChange={onChange} />)
+    const view = EditorView.findFromDOM(container.querySelector<HTMLElement>('.cm-editor')!)!
+
     applyExternalDoc(view, 'after')
-    const spec = vi.mocked(view.dispatch).mock.calls[0][0] as { annotations?: unknown }
-    expect(spec.annotations).toBeDefined()
+
+    expect(view.state.doc.toString()).toBe('after')
+    expect(onChange).not.toHaveBeenCalled()
   })
 }

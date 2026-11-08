@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 import { ErrorBoundary } from '../../../../src/renderer/components/ErrorBoundary'
 import { useLogStore } from '../../../../src/renderer/stores/log.store'
@@ -64,7 +65,8 @@ describe('ErrorBoundary — writes the error to the application log', () => {
     )
   })
 
-  it('renders the children again once recovery is asked for', () => {
+  it('renders the children again once recovery is asked for', async () => {
+    const user = userEvent.setup()
     fault.present = true
     render(
       <ErrorBoundary>
@@ -72,7 +74,7 @@ describe('ErrorBoundary — writes the error to the application log', () => {
       </ErrorBoundary>
     )
     fault.present = false
-    fireEvent.click(screen.getByRole('button', { name: /try to recover/i }))
+    await user.click(screen.getByRole('button', { name: /try to recover/i }))
     expect(screen.getByText('Content renders fine')).toBeTruthy()
     expect(screen.queryByText('Something went wrong')).toBeNull()
   })

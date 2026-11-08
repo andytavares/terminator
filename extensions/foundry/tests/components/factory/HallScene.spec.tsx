@@ -106,6 +106,7 @@ describe('components/factory/HallScene', () => {
   })
 
   describe('the frame loop', theFrameLoopTests)
+  describe('restarting the frame loop', restartingTheFrameLoopTests)
   describe('drawing', drawingTests)
   describe('drawOrderY', draworderyTests)
 
@@ -140,7 +141,9 @@ function theFrameLoopTests() {
     expect(cancelSpy).not.toHaveBeenCalled()
     expect(rafSpy).toHaveBeenCalledTimes(1)
   })
+}
 
+function restartingTheFrameLoopTests() {
   it('restarts its frame loop when a node changes state', () => {
     const map = fakeMap()
     const worldRef = { current: fakeWorld(map) }
@@ -150,6 +153,7 @@ function theFrameLoopTests() {
     rerender(<HallScene map={map} worldRef={worldRef} states={{ 'n-1': 'passed' }} />)
 
     expect(cancelSpy).toHaveBeenCalledTimes(1)
+    expect(rafSpy).toHaveBeenCalledTimes(2)
   })
 }
 

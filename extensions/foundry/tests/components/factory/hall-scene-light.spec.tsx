@@ -103,26 +103,28 @@ function drawOnce(on: HallMap, states: Record<string, 'running' | 'passed'>, cre
 }
 
 describe('the light a working station gives off', () => {
-  it('glows over a press whose step is running, and not once it has passed', () => {
-    drawOnce(emptyHallMap([PRESS]), { 'N-1': 'running' })
-    expect(stops).toContain('rgba(230,160,60,.35)')
-    cleanup()
-    stops = []
-    drawOnce(emptyHallMap([PRESS]), { 'N-1': 'passed' })
-    expect(stops).not.toContain('rgba(230,160,60,.35)')
+  it.each([
+    ['running', true],
+    ['passed', false],
+  ] as const)('over a press whose step is %s, glows: %s', (state, glows) => {
+    drawOnce(emptyHallMap([PRESS]), { 'N-1': state })
+    expect(stops.includes('rgba(230,160,60,.35)')).toBe(glows)
   })
 
-  it('glows over a crew member scanning, and not over one who has gone', () => {
-    drawOnce(emptyHallMap(), {}, [scanning])
-    expect(stops).toContain('rgba(140,230,120,.3)')
-    cleanup()
-    stops = []
-    drawOnce(emptyHallMap(), {}, [{ ...scanning, present: false }])
-    expect(stops).not.toContain('rgba(140,230,120,.3)')
+  it.each([
+    ['present', true, true],
+    ['gone', false, false],
+  ])('over a scanning crew member who is %s, glows: %s', (_who, present, glows) => {
+    drawOnce(emptyHallMap(), {}, [{ ...scanning, present }])
+    expect(stops.includes('rgba(140,230,120,.3)')).toBe(glows)
   })
 })
 
 describe('a hidden page', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(document, 'hidden')
+  })
+
   function setPageHidden(hidden: boolean): void {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden })
     document.dispatchEvent(new Event('visibilitychange'))
@@ -145,6 +147,5 @@ describe('a hidden page', () => {
     expect(raf).toHaveBeenCalledTimes(2)
     setPageHidden(false)
     expect(raf).toHaveBeenCalledTimes(2)
-    Reflect.deleteProperty(document, 'hidden')
   })
 })

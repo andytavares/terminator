@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ContextMenu } from '../../../../src/renderer/components/ContextMenu'
 
 let onDismiss: Mock<() => void>
@@ -28,9 +29,10 @@ describe('ContextMenu', () => {
     expect(screen.getAllByRole('menuitem')).toHaveLength(3)
   })
 
-  it('invokes onSelect when an item is clicked', () => {
+  it('invokes onSelect when an item is clicked', async () => {
+    const user = userEvent.setup()
     render(<ContextMenu x={0} y={0} items={items} onDismiss={onDismiss} />)
-    fireEvent.click(screen.getByText('Rename'))
+    await user.click(screen.getByRole('menuitem', { name: 'Rename' }))
     expect(items[0].onSelect).toHaveBeenCalledOnce()
   })
 
@@ -89,14 +91,18 @@ describe('ContextMenu — an item changed while open', () => {
 })
 
 describe('ContextMenu — keys stay in the menu', () => {
-  it('does not hand Enter on an item to the row that opened it', () => {
+  it('does not hand Enter on an item to the row that opened it', async () => {
+    const user = userEvent.setup()
     const rowKeyDown = vi.fn()
     render(
       <div onKeyDown={rowKeyDown}>
         <ContextMenu x={0} y={0} items={items} onDismiss={onDismiss} />
       </div>
     )
-    fireEvent.keyDown(screen.getByText('Rename'), { key: 'Enter' })
+    const rename = screen.getByRole('menuitem', { name: 'Rename' })
+    rename.focus()
+    expect(document.activeElement).toBe(rename)
+    await user.keyboard('{Enter}')
     expect(rowKeyDown).not.toHaveBeenCalled()
   })
 })

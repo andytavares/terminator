@@ -170,9 +170,9 @@ function triggersAndEvidenceTests() {
   // `risk.grade` and not for `risk.triggers`, so the architect wrote a
   // sentence into a closed enum and nine minutes of deep-tier work was refused
   // outright. An enum an agent is never shown is an enum it writes prose into.
-  it('names every value a risk trigger may take', () => {
+  it.each(RISK_TRIGGERS)('names the risk trigger "%s" in the brief', (trigger) => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    for (const trigger of RISK_TRIGGERS) expect(plan.prompt).toContain(trigger)
+    expect(plan.prompt).toContain(trigger)
   })
 
   // The same failure, one feature later and one field over. On WO-0909-6db the
@@ -180,9 +180,9 @@ function triggersAndEvidenceTests() {
   // the five things that list may hold; the architect wrote three file paths,
   // and six acceptance criteria and the only unit in the plan were refused
   // together on `Invalid enum value`.
-  it('names every value a judge’s evidence may take', () => {
+  it.each(EVIDENCE_KINDS)('names the judge evidence kind "%s" in the brief', (kind) => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    for (const kind of EVIDENCE_KINDS) expect(plan.prompt).toContain(kind)
+    expect(plan.prompt).toContain(kind)
   })
 }
 
@@ -191,9 +191,13 @@ function laneRolesAndClosedSetsTests() {
   // lane's `role` was shown as `null` and named neither value, three lines
   // under a *unit's* `role`, which is a free string whose example reads
   // "builder". The obvious wrong answer was on the same screen as the field.
-  it('names every value a lane’s role may take, and says it is not a unit’s', () => {
+  it.each(LANE_ROLES)('names the lane role "%s" in the brief', (role) => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    for (const role of LANE_ROLES) expect(plan.prompt).toContain(role)
+    expect(plan.prompt).toContain(role)
+  })
+
+  it('says a lane’s role is not a unit’s', () => {
+    const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
     expect(plan.prompt).toContain('not the same field as a unit')
   })
 
@@ -204,23 +208,21 @@ function laneRolesAndClosedSetsTests() {
   // because Zod refuses the document rather than the field. This is the list;
   // adding a closed set to a proposable part of the order means adding it
   // here and rendering it there.
-  it('names every closed set a proposal may carry', () => {
+  const closedSets: Record<string, readonly string[]> = {
+    'risk.grade': ['P0', 'P1', 'P2', 'P3'],
+    'risk.triggers': RISK_TRIGGERS,
+    'acceptance[].priority': ['P0', 'P1', 'P2'],
+    'acceptance[].verify.kind': ['test', 'command', 'judge', 'artifact', 'screenshot'],
+    'acceptance[].verify.evidence': EVIDENCE_KINDS,
+    'plan.lanes[].role': LANE_ROLES,
+  }
+  it.each(
+    Object.entries(closedSets).flatMap(([field, members]) =>
+      members.map((member) => [field, member] as const)
+    )
+  )('names %s member "%s" in the output schema', (_field, member) => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
-    const closedSets: Record<string, readonly string[]> = {
-      'risk.grade': ['P0', 'P1', 'P2', 'P3'],
-      'risk.triggers': RISK_TRIGGERS,
-      'acceptance[].priority': ['P0', 'P1', 'P2'],
-      'acceptance[].verify.kind': ['test', 'command', 'judge', 'artifact', 'screenshot'],
-      'acceptance[].verify.evidence': EVIDENCE_KINDS,
-      'plan.lanes[].role': LANE_ROLES,
-    }
-    const schema = JSON.stringify(plan.outputSchema)
-    for (const [field, members] of Object.entries(closedSets)) {
-      expect(members.length, `${field} has no members`).toBeGreaterThan(0)
-      for (const member of members) {
-        expect(schema, `${field} does not name ${member}`).toContain(`"${member}"`)
-      }
-    }
+    expect(JSON.stringify(plan.outputSchema)).toContain(`"${member}"`)
   })
 }
 

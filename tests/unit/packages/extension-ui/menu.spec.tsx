@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Menu, MenuItem } from '../../../../packages/extension-ui/src/Menu'
 
@@ -25,7 +25,7 @@ const names = () => screen.getAllByRole('menuitem').map((item) => item.textConte
 describe('Menu', () => {
   it('is a menu of menuitems', () => {
     renderMenu()
-    expect(screen.getByRole('menu', { name: 'Actions' })).toBeTruthy()
+    expect(screen.getByRole('menu').getAttribute('aria-label')).toBe('Actions')
     expect(names()).toEqual(['Rename', 'Move', 'Delete'])
   })
 
@@ -82,13 +82,22 @@ describe('Menu — activation and dismissal', () => {
     expect(onSelect.mock.calls).toEqual([['move'], ['delete']])
   })
 
-  it('closes on Escape and on a click outside', () => {
+  it('closes on Escape', async () => {
+    const user = userEvent.setup()
     const { onDismiss } = renderMenu()
-    fireEvent.keyDown(document, { key: 'Escape' })
-    fireEvent.click(document.body)
+    await user.keyboard('{Escape}')
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 
+  it('closes on a click outside it', async () => {
+    const user = userEvent.setup()
+    const { onDismiss } = renderMenu()
+    await user.click(document.body)
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Menu — disabled items', () => {
   it('skips a disabled item', async () => {
     render(
       <Menu label="Actions" onDismiss={vi.fn()}>

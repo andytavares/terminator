@@ -87,18 +87,18 @@ function runObservationReadingTests() {
     expect(invoke).toHaveBeenCalledWith('foundry:permissions-list', {})
   })
 
-  it('reads the observation again when a record of this order changes', async () => {
-    mockBridge(reply())
-    renderHook(() => useRunObservation('WO-1'))
-    await waitFor(() => expect(timesInvoked(invoke, 'foundry:run.observe')).toBe(1))
+  it.each(['order', 'graph', 'gates', 'ledger'] as const)(
+    'reads the observation again when this order’s %s changes',
+    async (kind) => {
+      mockBridge(reply())
+      renderHook(() => useRunObservation('WO-1'))
+      await waitFor(() => expect(timesInvoked(invoke, 'foundry:run.observe')).toBe(1))
 
-    for (const kind of ['order', 'graph', 'gates', 'ledger'] as const) {
-      const before = timesInvoked(invoke, 'foundry:run.observe')
       bus.emit({ kind, orderId: 'WO-1' })
       await settlePushedReads()
-      expect(timesInvoked(invoke, 'foundry:run.observe')).toBe(before + 1)
+      expect(timesInvoked(invoke, 'foundry:run.observe')).toBe(2)
     }
-  })
+  )
 }
 
 function liveChangesTests() {

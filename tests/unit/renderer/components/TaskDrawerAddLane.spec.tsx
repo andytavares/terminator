@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
+import { render, screen, within, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ThreadDrawer } from '../../../../src/renderer/components/home/ThreadDrawer'
 import { useDeskSelection } from '../../../../src/renderer/components/home/desk-selection'
 import { useTaskStore } from '../../../../src/renderer/stores/task.store'
@@ -104,9 +105,10 @@ const lanes = () => within(screen.getByRole('list', { name: 'Lanes' }))
 
 describe('the task drawer — Add a branch I already have', () => {
   it('offers branches in repos the task is not in, and a chosen one joins the lanes', async () => {
-    fireEvent.click(screen.getByRole('button', { name: 'Add a branch I already have…' }))
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Add a branch I already have…' }))
     expect(screen.queryByRole('button', { name: /terminator \/ tav-31/ })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'api-gateway / edge-cache' }))
+    await user.click(screen.getByRole('button', { name: 'api-gateway / edge-cache' }))
     expect(await lanes().findByRole('listitem', { name: /edge-cache lane/ })).toBeTruthy()
     expect(useTaskStore.getState().tasks[0].lanes).toContainEqual({
       repoRoot: '/repos/api-gateway',
@@ -117,15 +119,16 @@ describe('the task drawer — Add a branch I already have', () => {
 
 describe('the task drawer — Add a repo', () => {
   it('makes a worktree on the task’s branch in that repo, opens a terminal and adds the lane', async () => {
-    fireEvent.click(screen.getByRole('button', { name: '+ Add a repo' }))
-    fireEvent.click(screen.getByRole('button', { name: 'api-gateway' }))
-    expect(await lanes().findByRole('listitem', { name: /tav-20 lane.*|tav-20/ })).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: '+ Add a repo' }))
+    await userEvent.click(screen.getByRole('button', { name: 'api-gateway' }))
+    // The first lane is on tav-20 too.
     await waitFor(() =>
-      expect(useTaskStore.getState().tasks[0].lanes).toContainEqual({
-        repoRoot: '/repos/api-gateway',
-        branch: 'tav-20',
-      })
+      expect(lanes().getAllByRole('listitem', { name: 'tav-20 lane' })).toHaveLength(2)
     )
+    expect(useTaskStore.getState().tasks[0].lanes).toContainEqual({
+      repoRoot: '/repos/api-gateway',
+      branch: 'tav-20',
+    })
     expect(launched.createFromDraft).toHaveBeenCalledWith(
       expect.objectContaining({
         workspaceId: 'ws-2',
@@ -137,8 +140,8 @@ describe('the task drawer — Add a repo', () => {
 
   it('says why in plain words when the worktree cannot be made, and adds nothing', async () => {
     launched.createFromDraft.mockResolvedValue({ field: 'form', message: 'Worktree error: raw' })
-    fireEvent.click(screen.getByRole('button', { name: '+ Add a repo' }))
-    fireEvent.click(screen.getByRole('button', { name: 'api-gateway' }))
+    await userEvent.click(screen.getByRole('button', { name: '+ Add a repo' }))
+    await userEvent.click(screen.getByRole('button', { name: 'api-gateway' }))
     expect((await screen.findByRole('alert')).textContent).toMatch(
       /Could not set up tav-20 in api-gateway/
     )

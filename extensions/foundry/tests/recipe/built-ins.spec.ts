@@ -67,10 +67,8 @@ function stepsAndRolesTests() {
 }
 
 function requirementsTests() {
-  it('asks nothing of a repository for any shape', () => {
-    for (const file of recipeFiles) {
-      expect(recipe(file).requires).toEqual([])
-    }
+  it.each(recipeFiles)('%s asks nothing of a repository', (file) => {
+    expect(recipe(file).requires).toEqual([])
   })
 }
 

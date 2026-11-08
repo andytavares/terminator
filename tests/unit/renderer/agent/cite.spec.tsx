@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { AgentUpdate } from '@terminator/extension-sdk'
 
 import { AgentView } from '../../../../src/renderer/components/agent/AgentView'
@@ -150,14 +151,15 @@ describe('Cite — a selection over the limit', () => {
 async function openComment(): Promise<void> {
   await mountView()
   selectQuote()
-  fireEvent.click(citeButton()!)
+  fireEvent.click(citeButton()!) // a user-event press would move the selection it cites
 }
 
 describe('Cite — saving a comment', () => {
   it('saves the citation with its entry, quote and comment on Enter', async () => {
+    const user = userEvent.setup()
     await openComment()
-    fireEvent.change(commentBox(), { target: { value: 'Also retry on 429' } })
-    fireEvent.keyDown(commentBox(), { key: 'Enter' })
+    await user.type(commentBox(), 'Also retry on 429')
+    await user.keyboard('{Enter}')
     expect(attached().citations).toEqual([
       { entryIndex: 1, quote: QUOTE, comment: 'Also retry on 429' },
     ])
@@ -167,22 +169,24 @@ describe('Cite — saving a comment', () => {
   })
 
   it('keeps Shift+Enter as a newline and saves from the Save button', async () => {
+    const user = userEvent.setup()
     await openComment()
-    fireEvent.keyDown(commentBox(), { key: 'Enter', shiftKey: true })
+    await user.type(commentBox(), '{Shift>}{Enter}{/Shift}')
     expect(attached()).toEqual(noAttachedContext)
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(attached().citations).toEqual([{ entryIndex: 1, quote: QUOTE, comment: '' }])
   })
 })
 
 describe('Cite — cancelling a comment', () => {
   it('adds nothing on Escape or Cancel', async () => {
+    const user = userEvent.setup()
     await openComment()
-    fireEvent.keyDown(commentBox(), { key: 'Escape' })
+    await user.type(commentBox(), '{Escape}')
     expect(screen.queryByLabelText('Comment on this quote')).toBeNull()
     selectQuote()
-    fireEvent.click(citeButton()!)
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    fireEvent.click(citeButton()!) // a user-event press would move the selection it cites
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByLabelText('Comment on this quote')).toBeNull()
     expect(attached()).toEqual(noAttachedContext)
   })
@@ -190,11 +194,12 @@ describe('Cite — cancelling a comment', () => {
 
 describe('Cite — save and send', () => {
   it('adds the citation and sends it on Cmd+Enter', async () => {
+    const user = userEvent.setup()
     await mountView()
     selectQuote()
-    fireEvent.click(citeButton()!)
-    fireEvent.change(commentBox(), { target: { value: 'Also retry on 429' } })
-    fireEvent.keyDown(commentBox(), { key: 'Enter', metaKey: true })
+    fireEvent.click(citeButton()!) // a user-event press would move the selection it cites
+    await user.type(commentBox(), 'Also retry on 429')
+    await user.keyboard('{Meta>}{Enter}{/Meta}')
     const citation = { entryIndex: 1, quote: QUOTE, comment: 'Also retry on 429' }
     const sent = promptWithContext('', { sessions: [], citations: [citation] })
     expect(agents.prompt).toHaveBeenCalledWith({ sessionId: 'agent-1', text: sent })

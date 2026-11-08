@@ -30,9 +30,9 @@ describe('StateChip', () => {
 
   it('never colours the glyph inline', () => {
     const { container } = render(<StateChip state="awaiting-input" />)
-    for (const node of container.querySelectorAll('*')) {
-      expect((node as HTMLElement).style?.color ?? '').toBe('')
-      expect(node.getAttribute('stroke') ?? 'currentColor').toBe('currentColor')
-    }
+    const nodes = [...container.querySelectorAll<HTMLElement>('*')]
+    expect(nodes.map((node) => node.style?.color ?? '').filter(Boolean)).toEqual([])
+    const strokes = nodes.map((node) => node.getAttribute('stroke') ?? 'currentColor')
+    expect(strokes.filter((stroke) => stroke !== 'currentColor')).toEqual([])
   })
 })

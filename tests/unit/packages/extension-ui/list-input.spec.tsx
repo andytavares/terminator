@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ListInput, listItems } from '../../../../packages/extension-ui/src/ListInput'
 
 function ListInputHarness({
@@ -25,8 +26,6 @@ function ListInputHarness({
 
 const criticalPathsBox = () =>
   screen.getByRole('textbox', { name: 'Critical paths' }) as HTMLTextAreaElement
-const typeIntoBox = (text: string) =>
-  fireEvent.change(criticalPathsBox(), { target: { value: text } })
 
 describe('listItems', () => {
   it('reads one item per line, trimmed, and skips blank lines', () => {
@@ -45,16 +44,18 @@ describe('ListInput', () => {
     expect(criticalPathsBox().value).toBe('src/auth/**\nmigrations/**')
   })
 
-  it('hands back the items as they are typed', () => {
+  it('hands back the items as they are typed', async () => {
+    const user = userEvent.setup()
     const onItems = vi.fn()
     render(<ListInputHarness initial={[]} onItems={onItems} />)
-    typeIntoBox('src/auth/**\n  docs/** ')
+    await user.type(criticalPathsBox(), 'src/auth/**{Enter}  docs/** ')
     expect(onItems).toHaveBeenLastCalledWith(['src/auth/**', 'docs/**'])
   })
 
-  it('keeps a new empty line while the next item is being typed', () => {
+  it('keeps a new empty line while the next item is being typed', async () => {
+    const user = userEvent.setup()
     render(<ListInputHarness initial={['src/auth/**']} />)
-    typeIntoBox('src/auth/**\n')
+    await user.type(criticalPathsBox(), '{Enter}')
     expect(criticalPathsBox().value).toBe('src/auth/**\n')
   })
 

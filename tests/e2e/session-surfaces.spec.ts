@@ -45,6 +45,8 @@ function sidebarTerminalRow(page: Page, title: string) {
 /** Shows the branch's terminals in the sidebar, unless they already are. */
 async function showSidebarTerminals(page: Page): Promise<void> {
   const show = page.locator('.branch-row__disclosure[aria-label^="Show terminals in"]')
+  // Wait for the disclosure to draw (Show or Hide) before reading which one it is.
+  await expect(page.locator('.branch-row__disclosure').first()).toBeVisible()
   if ((await show.count()) > 0) await show.click()
   await expect(page.locator('.terminal-row').first()).toBeVisible()
 }
@@ -143,6 +145,7 @@ async function openFromHomeAndWall(page: Page): Promise<void> {
   await openHome(page)
   const row = tasks(page).getByRole('button', { name: /Wiring up the link/ })
   await row.focus()
+  await expect(row).toBeFocused()
   await page.keyboard.press('Enter')
   await page
     .getByRole('dialog', { name: /Wiring up the link/ })
@@ -174,10 +177,12 @@ async function openFromSidebarAndTabs(page: Page): Promise<void> {
 async function openFromQuickActions(page: Page): Promise<void> {
   await openHome(page)
   await page.keyboard.press('Meta+p')
+  // Keys sent before the panel owns focus land on the page underneath.
+  await expect(page.getByRole('dialog', { name: 'Quick actions' }).locator(':focus')).toHaveCount(1)
   await page.keyboard.press('/')
   const search = page.getByRole('combobox', { name: 'Search quick actions' })
-  await expect(search).toBeVisible()
   await search.fill('Terminal 2')
+  await expect(search).toBeFocused()
   await page.keyboard.press('Enter')
   await expectTerminalFocused(page)
   await expect(page.getByRole('heading', { name: 'Home' })).toBeHidden()

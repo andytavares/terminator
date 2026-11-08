@@ -265,24 +265,27 @@ function codeChangesTests() {
   })
 
   it('treats a markdown-looking name outside the checkout as code', () => {
-    const runnable = stepsFor(['../outside/a.md']).filter((s) => s.status === 'runnable')
-    expect(runnable.length).toBeGreaterThan(2)
+    const runnable = stepsFor(['../outside/a.md'])
+      .filter((s) => s.status === 'runnable')
+      .map((s) => s.name)
+    expect(runnable).toContain("The unit's own tests")
   })
 }
 
 function unknownChangesAndInspectionTests() {
-  it('runs the whole ladder when nothing is known about what changed', () => {
-    for (const files of [undefined, []] as const) {
-      const runnable = ladderFor({
-        toolchain: full,
-        risk: noRisk,
-        touchesUi: false,
-        changedFiles: files,
-      })
-        .filter((s) => s.status === 'runnable')
-        .map((s) => s.name)
-      expect(runnable).toContain("The unit's own tests")
-    }
+  it.each([
+    ['no list of changed files', undefined],
+    ['an empty list of changed files', []],
+  ])('runs the whole ladder when given %s', (_case, files: readonly string[] | undefined) => {
+    const runnable = ladderFor({
+      toolchain: full,
+      risk: noRisk,
+      touchesUi: false,
+      changedFiles: files,
+    })
+      .filter((s) => s.status === 'runnable')
+      .map((s) => s.name)
+    expect(runnable).toContain("The unit's own tests")
   })
 
   it('still reports the inspection a risk trigger asked for', () => {

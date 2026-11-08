@@ -65,14 +65,19 @@ describe('useWorkThreads', () => {
     )
   })
 
-  it('keeps the parked set across a reload', () => {
+  it('keeps the parked set, once per key, across a reload', async () => {
     act(() => useParkedThreads.getState().park('a'))
     act(() => useParkedThreads.getState().park('a'))
-    expect(JSON.parse(localStorage.getItem('terminator.home.parked-threads') as string)).toEqual({
-      a: expect.any(Number),
-    })
+    vi.resetModules()
+    const reloaded = await import('../../../../src/renderer/components/home/parked-threads')
+    expect(reloaded.useParkedThreads.getState().keys).toEqual(['a'])
+  })
+
+  it('forgets an unparked key for the next reload too', () => {
+    act(() => useParkedThreads.getState().park('a'))
     act(() => useParkedThreads.getState().unpark('a'))
     expect(useParkedThreads.getState().keys).toEqual([])
+    expect(JSON.parse(localStorage.getItem('terminator.home.parked-threads') as string)).toEqual({})
   })
 })
 

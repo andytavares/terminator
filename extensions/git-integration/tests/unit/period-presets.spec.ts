@@ -30,9 +30,13 @@ describe('periodRange month, year and last 30 days', () => {
     expect(periodRange('month', FRIDAY)).toEqual({ from: '2026-10-01', to: '2026-10-16' })
   })
 
-  it('this month starts in the previous year on 1 January', () => {
+  it('this month is the one day of 1 January on 1 January', () => {
     const newYear = new Date(2026, 0, 1)
     expect(periodRange('month', newYear)).toEqual({ from: '2026-01-01', to: '2026-01-01' })
+  })
+
+  it('this week starts in the previous year on 1 January', () => {
+    const newYear = new Date(2026, 0, 1)
     expect(periodRange('week', newYear)).toEqual({ from: '2025-12-29', to: '2026-01-01' })
   })
 

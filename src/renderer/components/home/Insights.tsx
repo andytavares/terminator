@@ -91,7 +91,7 @@ export function Insights(): React.JSX.Element {
   const data = useInsightsData(chosen)
   const feed = useFeedForInsights()
   return (
-    <section className="ins" aria-label="Insights">
+    <section className="ins" aria-label="Insights" aria-busy={!data.loaded}>
       <QuestionsRow {...{ chosen, data, feed }} />
       <TimeRow {...{ chosen, data, feed }} />
       <LookingBackRow data={data} feed={feed} />

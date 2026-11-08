@@ -50,9 +50,21 @@ describe('createComment', () => {
       prefix: 'Hello ',
       suffix: ' this',
     })
-    const data = (result as { data: { id: string; createdAt: string } }).data
-    expect(data.id).toBeTruthy()
-    expect(data.createdAt).toBeTruthy()
+    const id = (result as { data: { id: string } }).data.id
+
+    const listed = await listComments(db, { noteId })
+    expect((listed as { data: unknown[] }).data).toEqual([
+      expect.objectContaining({
+        id,
+        parentId: null,
+        body: 'test comment',
+        startOffset: 6,
+        endOffset: 11,
+        quote: 'world',
+        prefix: 'Hello ',
+        suffix: ' this',
+      }),
+    ])
   })
 })
 
@@ -70,8 +82,12 @@ describe('updateComment', () => {
       suffix: '',
     })
     const id = (c as { data: { id: string } }).data.id
-    const result = await updateComment(db, { id, body: 'updated body' })
-    expect((result as { data: { updatedAt: string } }).data.updatedAt).toBeTruthy()
+    await updateComment(db, { id, body: 'updated body' })
+
+    const listed = await listComments(db, { noteId })
+    expect((listed as { data: { body: string }[] }).data.map((c) => c.body)).toEqual([
+      'updated body',
+    ])
   })
 })
 

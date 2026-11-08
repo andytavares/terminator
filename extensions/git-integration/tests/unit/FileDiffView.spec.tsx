@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, beforeAll, beforeEach, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { FileDiff } from '../../src/schemas/git.schema'
 
 const CLEAN = { kind: 'clean', onRefreshStatus: (): void => undefined } as const
@@ -67,25 +68,28 @@ describe('FileDiffView', () => {
 
 describe('FileDiffView — Unified and Split toggle', () => {
   it('switches to split view when Split is clicked', async () => {
+    const user = userEvent.setup()
     const { container } = await renderDiff()
-    fireEvent.click(screen.getByText('Split'))
+    await user.click(screen.getByRole('radio', { name: 'Split' }))
     expect(container.querySelector('.diff-table--split')).toBeTruthy()
   })
 
   it('switches back to unified view from split', async () => {
+    const user = userEvent.setup()
     const { container } = await renderDiff()
-    fireEvent.click(screen.getByText('Split'))
-    fireEvent.click(screen.getByText('Unified'))
+    await user.click(screen.getByRole('radio', { name: 'Split' }))
+    await user.click(screen.getByRole('radio', { name: 'Unified' }))
     expect(container.querySelector('.diff-table:not(.diff-table--split)')).toBeTruthy()
   })
 })
 
 describe('FileDiffView — stale banner and notices', () => {
   it('shows the stale banner when isStale is true, and its Refresh calls onRefresh', async () => {
+    const user = userEvent.setup()
     const onRefresh = vi.fn()
     await renderDiff({ isStale: true, onRefresh })
     expect(screen.getByText(/File changed while viewing/)).toBeTruthy()
-    fireEvent.click(screen.getByText('Refresh'))
+    await user.click(screen.getByRole('button', { name: 'Refresh' }))
     expect(onRefresh).toHaveBeenCalledOnce()
   })
 
@@ -101,14 +105,16 @@ describe('FileDiffView — stale banner and notices', () => {
   })
 
   it('renders split view with hunk header', async () => {
+    const user = userEvent.setup()
     await renderDiff()
-    fireEvent.click(screen.getByText('Split'))
+    await user.click(screen.getByRole('radio', { name: 'Split' }))
     expect(screen.getByText('@@ -1,3 +1,3 @@')).toBeTruthy()
   })
 })
 
-describe('FileDiffView — renders a diff with only removes correctly in split view', () => {
-  it('renders a diff with only removes correctly in split view', async () => {
+describe('FileDiffView — split view of a remove-only hunk', () => {
+  it('puts a removed line on the old side of the split view, beside an empty new side', async () => {
+    const user = userEvent.setup()
     const diff = makeDiff({
       hunks: [
         {
@@ -120,29 +126,49 @@ describe('FileDiffView — renders a diff with only removes correctly in split v
       ],
     })
     await renderDiff({ diff })
-    fireEvent.click(screen.getByText('Split'))
-    expect(screen.getByText('@@ -1 +0,0 @@')).toBeTruthy()
+    await user.click(screen.getByRole('radio', { name: 'Split' }))
+    const oldSide = screen.getByText('deleted line').closest('td')
+    const newSide = oldSide?.parentElement?.querySelector('.diff-line__content--new-side')
+    expect(oldSide?.className).toBe(
+      'diff-line__content diff-line__content--remove diff-line__content--old-side'
+    )
+    expect(newSide?.className).toBe(
+      'diff-line__content diff-line__content--empty diff-line__content--new-side'
+    )
   })
 })
 
-describe('FileDiffView — renders a diff with only adds correctly in split view', () => {
-  it('renders a diff with only adds correctly in split view', async () => {
+describe('FileDiffView — split view of an add-only hunk', () => {
+  it('puts an added line on the new side of the split view, beside an empty old side', async () => {
+    const user = userEvent.setup()
     const diff = makeDiff({
       hunks: [
         {
           header: '@@ -0,0 +1 @@',
-          lines: [{ type: 'add', content: 'new line', oldLineNumber: null, newLineNumber: 1 }],
+          lines: [{ type: 'add', content: 'added line', oldLineNumber: null, newLineNumber: 1 }],
         },
       ],
     })
     await renderDiff({ diff })
-    fireEvent.click(screen.getByText('Split'))
-    expect(screen.getByText('@@ -0,0 +1 @@')).toBeTruthy()
+    await user.click(screen.getByRole('radio', { name: 'Split' }))
+    const newSide = screen.getByText('added line').closest('td')
+    const oldSide = newSide?.parentElement?.querySelector('.diff-line__content--old-side')
+    expect(newSide?.className).toBe(
+      'diff-line__content diff-line__content--add diff-line__content--new-side'
+    )
+    expect(oldSide?.className).toBe(
+      'diff-line__content diff-line__content--empty diff-line__content--old-side'
+    )
   })
+})
 
+// The divider drag listens for mouse moves on window with clientX; user-event cannot aim
+// pointer moves at window, so these drags keep fireEvent calls.
+describe('FileDiffView — split divider', () => {
   it('keeps the split position when the divider is pressed and released without moving', async () => {
+    const user = userEvent.setup()
     const { container } = await renderDiff()
-    fireEvent.click(screen.getByText('Split'))
+    await user.click(screen.getByRole('radio', { name: 'Split' }))
     const scrollEl = container.querySelector('.file-diff-view__scroll') as HTMLElement
     fireEvent.mouseDown(container.querySelector('.diff-table__split-divider') as Element, {
       clientX: 300,
@@ -155,8 +181,9 @@ describe('FileDiffView — renders a diff with only adds correctly in split view
 
 describe('FileDiffView — moves split position on mousemove while dragging', () => {
   it('moves split position on mousemove while dragging', async () => {
+    const user = userEvent.setup()
     const { container } = await renderDiff()
-    fireEvent.click(screen.getByText('Split'))
+    await user.click(screen.getByRole('radio', { name: 'Split' }))
     const scrollEl = container.querySelector('.file-diff-view__scroll') as HTMLElement
     vi.spyOn(scrollEl, 'getBoundingClientRect').mockReturnValue({
       width: 800,
@@ -197,6 +224,7 @@ describe('FileDiffView usage', () => {
 
 describe('FileDiffView empty state', () => {
   it('offers to open the first change when no file is selected', async () => {
+    const user = userEvent.setup()
     const { FileDiffView } = await import('../../src/components/FileDiffView')
     function Harness() {
       const [opened, setOpened] = React.useState(false)
@@ -209,17 +237,18 @@ describe('FileDiffView empty state', () => {
     }
     render(<Harness />)
     expect(screen.getByText('No file selected')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Open the first change' }))
+    await user.click(screen.getByRole('button', { name: 'Open the first change' }))
     expect(screen.getByText('src/foo.ts')).toBeTruthy()
     expect(screen.queryByText('No file selected')).toBeNull()
   })
 
   it('offers a refresh when nothing has changed', async () => {
+    const user = userEvent.setup()
     const { FileDiffView } = await import('../../src/components/FileDiffView')
     const onRefreshStatus = vi.fn()
     render(<FileDiffView diff={null} empty={{ kind: 'clean', onRefreshStatus }} />)
     expect(screen.getByText('No changes')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    await user.click(screen.getByRole('button', { name: 'Refresh' }))
     expect(onRefreshStatus).toHaveBeenCalledTimes(1)
   })
 })
@@ -233,11 +262,12 @@ describe('FileDiffView while no diff is shown for the selection', () => {
   })
 
   it('says the selected file cannot be shown and offers a refresh', async () => {
+    const user = userEvent.setup()
     const { FileDiffView } = await import('../../src/components/FileDiffView')
     const onRefreshStatus = vi.fn()
     render(<FileDiffView diff={null} empty={{ kind: 'unreadable', onRefreshStatus }} />)
     expect(screen.getByText("This file's changes cannot be shown")).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    await user.click(screen.getByRole('button', { name: 'Refresh' }))
     expect(onRefreshStatus).toHaveBeenCalledTimes(1)
   })
 })

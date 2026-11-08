@@ -1,7 +1,8 @@
 import { createChangeBus } from '../../helpers/change-bus.js'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { FactorySite } from '../../../src/components/factory/FactorySite.js'
 import type { FactoryOrderRow } from '../../../src/components/factory/FactorySite.js'
 import type { Signal } from '../../../src/sensors/types.js'
@@ -116,9 +117,10 @@ function theCardsTests() {
 
   // The List view is the parent's state, so the action's whole effect is the callback.
   it('offers a way to the List view when there are no orders', async () => {
+    const user = userEvent.setup()
     const { onShowList } = mount([])
     const action = await screen.findByRole('button', { name: 'Go to the list view' })
-    fireEvent.click(action)
+    await user.click(action)
     expect(onShowList).toHaveBeenCalledTimes(1)
   })
 
@@ -279,7 +281,7 @@ function factorySiteCiTests() {
   it('says nothing about CI for an order that has not shipped one', async () => {
     mount([{ id: 'WO-1', title: 'Fresh', status: 'running', ci: null }])
     await screen.findByText('Fresh')
-    expect(screen.queryByText(/CI \d/)).toBeNull()
+    expect(screen.queryByText(/^CI ·/)).toBeNull()
   })
 }
 
@@ -311,9 +313,10 @@ function theRefineryTrackTests() {
 
 function factorySiteOpeningTests() {
   it('opens the order it is given', async () => {
+    const user = userEvent.setup()
     const { onOpen } = mount([{ id: 'WO-1', title: 'Only one', status: 'running' }])
     await screen.findByText('Only one')
-    fireEvent.click(await screen.findByRole('button', { name: /Only one/ }))
+    await user.click(await screen.findByRole('button', { name: /Only one/ }))
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 'WO-1', title: 'Only one' }))
   })
 }
@@ -328,9 +331,10 @@ describe('FactorySite status wall', () => {
   })
 
   it('refetches with the chosen window when the toggle is switched', async () => {
+    const user = userEvent.setup()
     const { invoke } = mount([])
     await screen.findByText('Status wall')
-    fireEvent.click(await screen.findByRole('radio', { name: 'All time' }))
+    await user.click(await screen.findByRole('radio', { name: 'All time' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:factory.metrics', { window: 'all' })
     )
@@ -359,6 +363,7 @@ function factorySiteCratesTests() {
 
 function factorySitePromotingTests() {
   it('promotes a crate the same way the Inbox does', async () => {
+    const user = userEvent.setup()
     const { invoke } = mount([], METRICS, {
       signals: [dockSignal()],
       sensors: [
@@ -371,10 +376,10 @@ function factorySitePromotingTests() {
       ],
     })
     await screen.findByText('test-foo flakes on main')
-    fireEvent.click(await screen.findByRole('button', { name: 'Promote' }))
+    await user.click(await screen.findByRole('button', { name: 'Promote' }))
     const repoInput = screen.getByRole('textbox', { name: /repository/i }) as HTMLInputElement
     expect(repoInput.value).toBe('/repos/app')
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm promote' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm promote' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:signals.promote', {
         id: 'SIG-1',

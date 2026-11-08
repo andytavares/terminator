@@ -128,9 +128,11 @@ describe('buildBranchRows — carries the repo colour and folder path on the gro
 
   // BR-2. The count and the rows are the same number, or the header lies.
   it('reports a branch count equal to the branches it holds', () => {
-    for (const group of build([]).groups) {
-      expect(group.branchCount).toBe(group.branches.length)
-    }
+    const counts = build([]).groups.map((g) => [g.label, g.branchCount, g.branches.length])
+    expect(counts).toEqual([
+      ['kalli', 1, 1],
+      ['terminator', 2, 2],
+    ])
   })
 })
 
@@ -338,10 +340,12 @@ describe('buildBranchRows — order — sorts repos by name when asked', () => {
   // The repo headers are half the list: a sort that only reaches inside them reads as one
   // that does nothing.
   it('sorts repos by name when asked', () => {
-    expect(build([], view({ sortBy: 'name' })).groups.map((g) => g.label)).toEqual([
-      'kalli',
-      'terminator',
-    ])
+    // terminator is more recent, so only the name sort puts kalli first.
+    const result = build(
+      [session('a', 'p1', { lastActivityAt: 99 }), session('b', 'p3', { lastActivityAt: 10 })],
+      view({ sortBy: 'name' })
+    )
+    expect(result.groups.map((g) => g.label)).toEqual(['kalli', 'terminator'])
   })
 
   it('falls back to name when two repos are equally recent', () => {
@@ -350,10 +354,10 @@ describe('buildBranchRows — order — sorts repos by name when asked', () => {
 
   it('sorts repos by their most recent branch', () => {
     const result = build([
-      session('a', 'p1', { lastActivityAt: 10 }),
-      session('b', 'p3', { lastActivityAt: 99 }),
+      session('a', 'p1', { lastActivityAt: 99 }),
+      session('b', 'p3', { lastActivityAt: 10 }),
     ])
-    expect(result.groups.map((g) => g.label)).toEqual(['kalli', 'terminator'])
+    expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'kalli'])
   })
 
   it('sorts repos by their oldest branch when asked', () => {
@@ -369,12 +373,12 @@ describe('buildBranchRows — order — sorts repos by their most severe branch 
   it('sorts repos by their most severe branch when asked', () => {
     const result = build(
       [
-        session('a', 'p1', { agentState: 'idle' }),
-        session('b', 'p3', { agentState: 'awaiting-input' }),
+        session('a', 'p1', { agentState: 'awaiting-input' }),
+        session('b', 'p3', { agentState: 'idle' }),
       ],
       view({ sortBy: 'status' })
     )
-    expect(result.groups.map((g) => g.label)).toEqual(['kalli', 'terminator'])
+    expect(result.groups.map((g) => g.label)).toEqual(['terminator', 'kalli'])
   })
 
   // Manual is the user's own order, and the only place it is written down is

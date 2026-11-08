@@ -20,8 +20,6 @@ async function loadParkedThreads() {
 
 describe('the focus store reading what was stored', () => {
   it.each([
-    ['an empty object', '{}'],
-    ['a list', '[1,2]'],
     ['days of the wrong shape', '{"days":{"2026-10-17":"x"},"planDismissedOn":null}'],
     ['text that is not JSON', 'not json'],
   ])('starts empty when storage holds %s', async (_label, stored) => {

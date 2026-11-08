@@ -68,9 +68,13 @@ function posesTests() {
 }
 
 function rolesAndTypingTests() {
-  it('does not throw for an unknown role (neutral silhouette)', () => {
+  it('draws an unknown role in the neutral shirt, not the default builder look', () => {
+    const NEUTRAL_SHIRT = '#5d6674'
     const paint = createRecordingPaint()
-    expect(() => drawCrew(paint, crew({ role: 'unlisted' }), 0)).not.toThrow()
+    drawCrew(paint, crew({ role: 'unlisted' }), 0)
+    const styles = paint.calls.flatMap((call) => (call.op === 'fillRect' ? [call.style] : []))
+    expect(styles).toContain(NEUTRAL_SHIRT)
+    expect(styles).not.toContain(roleStyle('builder').shirt)
   })
 
   it('draws a visor for a visored role facing every direction', () => {

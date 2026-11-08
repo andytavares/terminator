@@ -126,11 +126,12 @@ function answeredAndStaleQuestionsTests() {
     expect(counts.byOrder).toEqual({})
   })
 
-  it('ignores questions on an order that is no longer being agreed', () => {
-    // Past draft the plan is fixed, so a leftover question is history rather
-    // than a request — badging it sends the operator to a screen with no
-    // control on it.
-    for (const status of ['agreed', 'running', 'shipped', 'cancelled'] as const) {
+  // Past draft the plan is fixed, so a leftover question is history rather
+  // than a request — badging it sends the operator to a screen with no
+  // control on it.
+  it.each(['agreed', 'running', 'shipped', 'cancelled'] as const)(
+    'ignores questions on an order that is %s',
+    (status) => {
       const counts = countAttention({
         gates: [],
         autonomy: 'standard',
@@ -140,7 +141,7 @@ function answeredAndStaleQuestionsTests() {
       })
       expect(counts.forge).toBe(0)
     }
-  })
+  )
 }
 
 function heldCallsAndSignalsTests() {

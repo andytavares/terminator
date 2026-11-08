@@ -25,6 +25,8 @@ for (const { id } of stories) {
     // A story with a play function is pictured after it has played.
     await openStory(page, id)
     await page.evaluate(() => document.fonts.ready)
+    // A blank or error page must not become a baseline.
+    await expect(page.locator('#storybook-root > *')).not.toHaveCount(0)
     await expect(page).toHaveScreenshot(`${id}.png`)
   })
 }

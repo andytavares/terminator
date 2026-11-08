@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ThreadDrawer } from '../../../../src/renderer/components/home/ThreadDrawer'
 import { useDeskSelection } from '../../../../src/renderer/components/home/desk-selection'
 import { useTaskStore } from '../../../../src/renderer/stores/task.store'
@@ -85,11 +86,12 @@ describe('the task drawer — lanes', () => {
     expect(within(laneRow(drawer, 'tav-31')).queryByText(/pull request|#\d+/i)).toBeNull()
   })
 
-  it('answers the asking lane and opens the running one', () => {
+  it('answers the asking lane and opens the running one', async () => {
+    const user = userEvent.setup()
     const drawer = openTask()
-    fireEvent.click(within(laneRow(drawer, 'tav-31')).getByRole('button', { name: 'Answer' }))
+    await user.click(within(laneRow(drawer, 'tav-31')).getByRole('button', { name: 'Answer' }))
     expect(spies.open).toHaveBeenCalledWith('asking')
-    fireEvent.click(within(laneRow(drawer, 'tav-20')).getByRole('button', { name: 'Open' }))
+    await user.click(within(laneRow(drawer, 'tav-20')).getByRole('button', { name: 'Open' }))
     expect(spies.open).toHaveBeenCalledWith('building')
   })
 
@@ -102,22 +104,25 @@ describe('the task drawer — lanes', () => {
 })
 
 describe('the task drawer — task actions', () => {
-  it('offers the task actions', () => {
-    const drawer = within(openTask())
-    for (const name of ['Open all lanes', 'Link a ticket', 'Rename', 'Mark done', 'Archive']) {
+  it.each(['Open all lanes', 'Link a ticket', 'Rename', 'Mark done', 'Archive'])(
+    'offers the task action %s',
+    (name) => {
+      const drawer = within(openTask())
       expect(drawer.getByRole('button', { name })).toBeTruthy()
     }
-  })
+  )
 
-  it('opens every lane that has a terminal', () => {
+  it('opens every lane that has a terminal', async () => {
+    const user = userEvent.setup()
     const drawer = within(openTask())
-    fireEvent.click(drawer.getByRole('button', { name: 'Open all lanes' }))
+    await user.click(drawer.getByRole('button', { name: 'Open all lanes' }))
     expect(spies.open.mock.calls.map(([id]) => id).sort()).toEqual(['asking', 'building'])
   })
 
   it('swaps Mark done for Undo done once the task is done', async () => {
+    const user = userEvent.setup()
     const drawer = within(openTask())
-    fireEvent.click(drawer.getByRole('button', { name: 'Mark done' }))
+    await user.click(drawer.getByRole('button', { name: 'Mark done' }))
     await drawer.findByRole('button', { name: 'Undo done' })
     expect(drawer.queryByRole('button', { name: 'Mark done' })).toBeNull()
   })

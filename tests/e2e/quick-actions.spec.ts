@@ -330,8 +330,10 @@ async function extensionCommandsOpenTheirOverlays(handle: AppHandle): Promise<vo
 /** Notes brought forward, its frame loaded and owning focus, so its listeners see the key. */
 async function notesViewFocused(handle: AppHandle): Promise<void> {
   const notesPanel = handle.page.locator('[data-extension-panel="terminator.notepad"]')
-  if ((await notesPanel.count()) === 0)
-    await handle.page.locator('button[aria-label="Notes"]').click()
+  const button = handle.page.locator('button[aria-label="Notes"]')
+  // The band draws its buttons before any panel it restores; wait for it before reading the panel.
+  await expect(button).toBeVisible()
+  if ((await notesPanel.count()) === 0) await button.click()
   await expect(notesPanel).toHaveCount(1)
   await expect
     .poll(

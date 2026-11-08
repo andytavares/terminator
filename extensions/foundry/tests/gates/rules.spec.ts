@@ -186,12 +186,13 @@ function liveRulesTests() {
 }
 
 function rulesSettingsTests() {
-  it('asks about a repeat failure at standard, and not at lights-out', () => {
-    for (const rule of ['verify.repeat-fail', 'verify.base-fail', 'forge-defect'] as GateRuleId[]) {
+  it.each<GateRuleId>(['verify.repeat-fail', 'verify.base-fail', 'forge-defect'])(
+    'asks about %s at standard, and not at lights-out',
+    (rule) => {
       expect(isLive(rule, 'standard')).toBe(true)
       expect(isLive(rule, 'lights-out')).toBe(false)
     }
-  })
+  )
 
   it('makes every rule live when escorted', () => {
     expect(liveRules('escorted').size).toBe(GATE_RULES.length)

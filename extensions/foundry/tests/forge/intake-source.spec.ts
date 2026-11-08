@@ -25,6 +25,8 @@ function deps(over: Partial<SeedDeps> = {}): SeedDeps {
     now: () => '2026-09-06T10:00:00.000Z',
     newId: () => 'WO-0906-abc',
     readIssue: vi.fn(async () => null),
+    // No git on the host: base-branch.spec.ts owns how the branch is read.
+    baseBranchOf: async () => 'main',
     ...over,
   }
 }

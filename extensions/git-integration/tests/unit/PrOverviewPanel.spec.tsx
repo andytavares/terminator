@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { PrOverviewPanel } from '../../src/components/pr-review/PrOverviewPanel'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
@@ -200,8 +201,8 @@ function readiness(): HTMLElement {
   return screen.getByRole('group', { name: 'Status' })
 }
 
-function openDiscussion() {
-  fireEvent.click(screen.getByRole('tab', { name: /Discussion/ }))
+async function openDiscussion(user: UserEvent) {
+  await user.click(screen.getByRole('tab', { name: /Discussion/ }))
 }
 
 const approval = (author: string) => ({
@@ -239,10 +240,11 @@ describe('PrOverviewPanel — the header', () => {
 })
 
 describe('PrOverviewPanel — the header actions', () => {
-  it('closes from the Close button', () => {
+  it('closes from the Close button', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     renderPanel({}, { onClose })
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await user.click(screen.getByRole('button', { name: 'Close' }))
     expect(onClose).toHaveBeenCalledOnce()
   })
 
@@ -251,22 +253,26 @@ describe('PrOverviewPanel — the header actions', () => {
     expect(screen.queryByRole('button', { name: 'Open in focused window' })).toBeNull()
   })
 
-  it('pops out when asked to', () => {
+  it('pops out when asked to', async () => {
+    const user = userEvent.setup()
     const onPopOut = vi.fn()
     renderPanel({}, { onPopOut })
-    fireEvent.click(screen.getByRole('button', { name: 'Open in focused window' }))
+    await user.click(screen.getByRole('button', { name: 'Open in focused window' }))
     expect(onPopOut).toHaveBeenCalledOnce()
   })
+})
 
+describe('PrOverviewPanel — marking a draft ready', () => {
   it('offers Mark as ready only on a draft', () => {
     renderPanel()
     expect(within(headerActions()).queryByRole('button', { name: 'Mark as ready' })).toBeNull()
   })
 
   it('marks a draft ready', async () => {
+    const user = userEvent.setup()
     const { githubAPI } = await import('../../src/api/github')
     renderPanel({ isDraft: true })
-    fireEvent.click(within(headerActions()).getByRole('button', { name: 'Mark as ready' }))
+    await user.click(within(headerActions()).getByRole('button', { name: 'Mark as ready' }))
     await waitFor(() => expect(githubAPI.prMarkReady).toHaveBeenCalledWith('/repo', 42))
   })
 })
@@ -294,17 +300,19 @@ describe('PrOverviewPanel — starting the review', () => {
     )
   })
 
-  it('starts at the first chapter when no chapter is chosen', () => {
+  it('starts at the first chapter when no chapter is chosen', async () => {
+    const user = userEvent.setup()
     const onStartReview = vi.fn()
     renderPanel({}, { onStartReview })
-    fireEvent.click(within(headerActions()).getByRole('button', { name: 'Start review' }))
+    await user.click(within(headerActions()).getByRole('button', { name: 'Start review' }))
     expect(onStartReview).toHaveBeenCalledWith()
   })
 
-  it('starts at the chapter whose plan row is clicked', () => {
+  it('starts at the chapter whose plan row is clicked', async () => {
+    const user = userEvent.setup()
     const onStartReview = vi.fn()
     renderPanel({}, { onStartReview })
-    fireEvent.click(screen.getByRole('button', { name: 'Start here: Core' }))
+    await user.click(screen.getByRole('button', { name: 'Start here: Core' }))
     expect(onStartReview).toHaveBeenCalledWith('ch1')
   })
 })
@@ -325,17 +333,19 @@ describe('PrOverviewPanel — the tabs', () => {
     expect(screen.getByRole('tabpanel', { name: 'Change' }).contains(rail)).toBe(false)
   })
 
-  it('keeps the properties rail beside the discussion', () => {
+  it('keeps the properties rail beside the discussion', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    openDiscussion()
+    await openDiscussion(user)
     const rail = screen.getByRole('complementary', { name: 'Pull request details' })
     expect(within(rail).getByRole('heading', { name: 'Signals' })).toBeTruthy()
   })
 
-  it('keeps only the selected tab in the document', () => {
+  it('keeps only the selected tab in the document', async () => {
+    const user = userEvent.setup()
     renderPanel()
     expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
-    openDiscussion()
+    await openDiscussion(user)
     expect(screen.queryByText('This PR adds feature X.')).toBeNull()
   })
 })
@@ -410,8 +420,9 @@ function stubDescriptionHeights(scrollHeight: number, clientHeight: number) {
 
 describe('PrOverviewPanel — clamping the description', () => {
   it('offers no expand button when the clamped description fits', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
+    await user.click(screen.getByRole('button', { name: 'Summarize' }))
     await screen.findByText('A summary.')
     expect(screen.queryByRole('button', { name: 'Show full description' })).toBeNull()
   })
@@ -419,91 +430,100 @@ describe('PrOverviewPanel — clamping the description', () => {
   it('offers the full description of a long one, and clamps it again on request', async () => {
     const restore = stubDescriptionHeights(900, 300)
     try {
-      await expectClampThenExpand()
+      await expectClampThenExpand(userEvent.setup())
     } finally {
       restore()
     }
   })
 
-  async function expectClampThenExpand() {
+  async function expectClampThenExpand(user: UserEvent) {
     renderPanel()
-    fireEvent.click(await screen.findByRole('button', { name: 'Show full description' }))
+    await user.click(await screen.findByRole('button', { name: 'Show full description' }))
     const reading = screen.getByTestId('rich-content').parentElement
     expect(reading?.classList.contains('pr-overview-reading--clamped')).toBe(false)
-    fireEvent.click(screen.getByRole('button', { name: 'Show less' }))
+    await user.click(screen.getByRole('button', { name: 'Show less' }))
     expect(reading?.classList.contains('pr-overview-reading--clamped')).toBe(true)
   }
 })
 
 describe('PrOverviewPanel — the summary and tabs', () => {
   it('keeps the summary across a tab switch', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
+    await user.click(screen.getByRole('button', { name: 'Summarize' }))
     await screen.findByText('A summary.')
-    openDiscussion()
+    await openDiscussion(user)
     expect(screen.queryByText('A summary.')).toBeNull()
-    fireEvent.click(screen.getByRole('tab', { name: 'Change' }))
+    await user.click(screen.getByRole('tab', { name: 'Change' }))
     expect(screen.getByText('A summary.')).toBeTruthy()
   })
 
   it('draws the description summary inside the Change panel', async () => {
+    const user = userEvent.setup()
     renderPanel()
     const change = screen.getByRole('tabpanel', { name: 'Change' })
-    fireEvent.click(within(change).getByRole('button', { name: 'Summarize' }))
+    await user.click(within(change).getByRole('button', { name: 'Summarize' }))
     expect(await within(change).findByText('A summary.')).toBeTruthy()
   })
+})
 
+describe('PrOverviewPanel — the discussion summary', () => {
   it('draws the discussion summary inside the Discussion panel only', async () => {
+    const user = userEvent.setup()
     withComments([bobsComment])
     renderPanel()
-    openDiscussion()
+    await openDiscussion(user)
     const discussion = screen.getByRole('tabpanel', { name: 'Discussion, 1' })
-    fireEvent.click(within(discussion).getByRole('button', { name: 'Summarize' }))
+    await user.click(within(discussion).getByRole('button', { name: 'Summarize' }))
     expect(await within(discussion).findByText('A summary.')).toBeTruthy()
-    fireEvent.click(screen.getByRole('tab', { name: 'Change' }))
+    await user.click(screen.getByRole('tab', { name: 'Change' }))
     const change = screen.getByRole('tabpanel', { name: 'Change' })
     expect(within(change).queryByText('A summary.')).toBeNull()
   })
 })
 
 describe('PrOverviewPanel — the discussion composer', () => {
-  it('shows no composer until the Discussion tab is selected', () => {
+  it('shows no composer until the Discussion tab is selected', async () => {
+    const user = userEvent.setup()
     renderPanel()
     expect(screen.queryByPlaceholderText('Leave a comment…')).toBeNull()
-    openDiscussion()
+    await openDiscussion(user)
     expect(screen.getByPlaceholderText('Leave a comment…')).toBeTruthy()
   })
 
-  it('counts the comments on the tab and lists them once it is selected', () => {
+  it('counts the comments on the tab and lists them once it is selected', async () => {
+    const user = userEvent.setup()
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set(),
       issueComments: [bobsComment],
       currentUserLogin: null,
     })
     renderPanel()
-    fireEvent.click(screen.getByRole('tab', { name: 'Discussion, 1' }))
+    await user.click(screen.getByRole('tab', { name: 'Discussion, 1' }))
     expect(screen.getByText('Looks off')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Reply' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Summarize' })).toBeTruthy()
   })
 
-  it('offers no Summarize on a discussion with no comments', () => {
+  it('offers no Summarize on a discussion with no comments', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    openDiscussion()
+    await openDiscussion(user)
     expect(screen.queryByRole('button', { name: 'Summarize' })).toBeNull()
   })
 })
 
 describe('PrOverviewPanel — replying and posting', () => {
-  it('quotes a comment into the composer on Reply', () => {
+  it('quotes a comment into the composer on Reply', async () => {
+    const user = userEvent.setup()
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set(),
       issueComments: [bobsComment],
       currentUserLogin: null,
     })
     renderPanel()
-    fireEvent.click(screen.getByRole('tab', { name: 'Discussion, 1' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Reply' }))
+    await user.click(screen.getByRole('tab', { name: 'Discussion, 1' }))
+    await user.click(screen.getByRole('button', { name: 'Reply' }))
     expect((screen.getByPlaceholderText('Leave a comment…') as HTMLTextAreaElement).value).toBe(
       '> Looks off\n\n'
     )
@@ -511,22 +531,22 @@ describe('PrOverviewPanel — replying and posting', () => {
 })
 
 describe('PrOverviewPanel — writing a comment', () => {
-  it('shows Write and Preview, and an empty preview', () => {
+  it('shows Write and Preview, and an empty preview', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    openDiscussion()
-    fireEvent.click(screen.getByText('Preview'))
+    await openDiscussion(user)
+    await user.click(screen.getByRole('tab', { name: 'Preview' }))
     expect(screen.getByText('Nothing to preview.')).toBeTruthy()
     expect(screen.queryByPlaceholderText('Leave a comment…')).toBeNull()
   })
 
   it('posts a comment from the composer', async () => {
+    const user = userEvent.setup()
     const { githubAPI } = await import('../../src/api/github')
     renderPanel()
-    openDiscussion()
-    fireEvent.change(screen.getByPlaceholderText('Leave a comment…'), {
-      target: { value: 'Ship it' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Comment' }))
+    await openDiscussion(user)
+    await user.type(screen.getByPlaceholderText('Leave a comment…'), 'Ship it')
+    await user.click(screen.getByRole('button', { name: 'Comment' }))
     await waitFor(() =>
       expect(githubAPI.prIssueCommentAdd).toHaveBeenCalledWith({
         repoRoot: '/repo',
@@ -547,10 +567,11 @@ describe('PrOverviewPanel — a branch that is behind', () => {
   })
 
   it('updates the branch, then refreshes the pull request', async () => {
+    const user = userEvent.setup()
     const { githubAPI } = await import('../../src/api/github')
     const onRefresh = vi.fn().mockResolvedValue(undefined)
     renderPanel(behind, { onRefresh })
-    fireEvent.click(screen.getByRole('button', { name: 'Update from main' }))
+    await user.click(screen.getByRole('button', { name: 'Update from main' }))
     await waitFor(() => {
       expect(githubAPI.prUpdateBranch).toHaveBeenCalledWith('/repo', 42)
       expect(onRefresh).toHaveBeenCalled()
@@ -558,10 +579,11 @@ describe('PrOverviewPanel — a branch that is behind', () => {
   })
 
   it('shows the error when GitHub refuses the update', async () => {
+    const user = userEvent.setup()
     const { githubAPI } = await import('../../src/api/github')
     vi.mocked(githubAPI.prUpdateBranch).mockResolvedValueOnce({ error: 'update failed' })
     renderPanel(behind)
-    fireEvent.click(screen.getByRole('button', { name: 'Update from main' }))
+    await user.click(screen.getByRole('button', { name: 'Update from main' }))
     expect(await screen.findByText('update failed')).toBeTruthy()
   })
 })
@@ -573,9 +595,10 @@ describe('PrOverviewPanel — a branch with conflicts', () => {
   })
 
   it('prepares a worktree, then opens the merge flow on it', async () => {
+    const user = userEvent.setup()
     const onStartMergeFlow = vi.fn()
     renderPanel({ mergeStateStatus: 'dirty' }, { onStartMergeFlow })
-    fireEvent.click(screen.getByRole('button', { name: 'Resolve conflicts' }))
+    await user.click(screen.getByRole('button', { name: 'Resolve conflicts' }))
     await waitFor(() => expect(onStartMergeFlow).toHaveBeenCalledWith('/tmp/worktree/branch'))
     expect(mockPreparePrWorktree).toHaveBeenCalledWith({
       repoRoot: '/repo',
@@ -612,21 +635,23 @@ describe('PrOverviewPanel — the clamp fade', () => {
   const fades = (element: Element | null) =>
     element?.classList.contains('pr-overview-reading--overflows')
 
-  it('draws no fade over text that fits', () => {
+  it('draws no fade over text that fits', async () => {
+    const user = userEvent.setup()
     withComments([bobsComment])
     renderPanel()
     expect(fades(screen.getByTestId('rich-content').parentElement)).toBe(false)
-    openDiscussion()
+    await openDiscussion(user)
     expect(fades(screen.getByText('Looks off').parentElement)).toBe(false)
   })
 
   it('fades text that overflows the clamp, and not once it is opened', async () => {
+    const user = userEvent.setup()
     const restore = stubDescriptionHeights(900, 300)
     try {
       renderPanel()
       const reading = screen.getByTestId('rich-content').parentElement
       expect(fades(reading)).toBe(true)
-      fireEvent.click(screen.getByRole('button', { name: 'Show full description' }))
+      await user.click(screen.getByRole('button', { name: 'Show full description' }))
       expect(fades(reading)).toBe(false)
     } finally {
       restore()
@@ -635,50 +660,55 @@ describe('PrOverviewPanel — the clamp fade', () => {
 })
 
 describe('PrOverviewPanel — earlier comments', () => {
-  it('shows the last three of five comments, and the rest on request', () => {
+  it('shows the last three of five comments, and the rest on request', async () => {
+    const user = userEvent.setup()
     withComments(commentsNumbered(5))
     renderPanel()
-    openDiscussion()
+    await openDiscussion(user)
     expect(shownCommentBodies()).toEqual(['Comment 3', 'Comment 4', 'Comment 5'])
-    fireEvent.click(screen.getByRole('button', { name: 'Show 2 earlier comments' }))
+    await user.click(screen.getByRole('button', { name: 'Show 2 earlier comments' }))
     expect(shownCommentBodies()).toEqual([1, 2, 3, 4, 5].map((n) => `Comment ${n}`))
     expect(screen.queryByRole('button', { name: /earlier comment/ })).toBeNull()
   })
 
-  it.each([0, 1, 3])('collapses nothing in a discussion of %i comments', (count) => {
+  it.each([0, 1, 3])('collapses nothing in a discussion of %i comments', async (count) => {
+    const user = userEvent.setup()
     withComments(commentsNumbered(count))
     renderPanel()
-    openDiscussion()
+    await openDiscussion(user)
     expect(shownCommentBodies()).toHaveLength(count)
     expect(screen.queryByRole('button', { name: /earlier comment/ })).toBeNull()
   })
 
-  it('names one earlier comment in the singular', () => {
+  it('names one earlier comment in the singular', async () => {
+    const user = userEvent.setup()
     withComments(commentsNumbered(4))
     renderPanel()
-    openDiscussion()
+    await openDiscussion(user)
     expect(screen.getByRole('button', { name: 'Show 1 earlier comment' })).toBeTruthy()
   })
 })
 
 describe('PrOverviewPanel — clamping a comment', () => {
-  it('clamps each comment body', () => {
+  it('clamps each comment body', async () => {
+    const user = userEvent.setup()
     withComments(commentsNumbered(2))
     renderPanel()
-    openDiscussion()
+    await openDiscussion(user)
     const bodies = screen.getAllByText(/^Comment \d$/).map((element) => element.parentElement)
     expect(bodies.every((body) => body?.classList.contains('pr-overview-reading--clamped'))).toBe(
       true
     )
   })
 
-  it('offers the full text of a long comment', () => {
+  it('offers the full text of a long comment', async () => {
+    const user = userEvent.setup()
     const restore = stubDescriptionHeights(900, 160)
     try {
       withComments([bobsComment])
       renderPanel()
-      openDiscussion()
-      fireEvent.click(screen.getByRole('button', { name: 'Show full comment' }))
+      await openDiscussion(user)
+      await user.click(screen.getByRole('button', { name: 'Show full comment' }))
       const body = screen.getByText('Looks off').parentElement
       expect(body?.classList.contains('pr-overview-reading--clamped')).toBe(false)
     } finally {
@@ -688,11 +718,12 @@ describe('PrOverviewPanel — clamping a comment', () => {
 })
 
 describe('PrOverviewPanel — a narrow pane', () => {
-  it('moves the properties rail into a third tab', () => {
+  it('moves the properties rail into a third tab', async () => {
+    const user = userEvent.setup()
     pane.width = 760
     renderPanel()
     expect(screen.queryByRole('complementary', { name: 'Pull request details' })).toBeNull()
-    fireEvent.click(screen.getByRole('tab', { name: 'Properties' }))
+    await user.click(screen.getByRole('tab', { name: 'Properties' }))
     const panel = screen.getByRole('tabpanel', { name: 'Properties' })
     expect(within(panel).getByRole('heading', { name: 'Signals' })).toBeTruthy()
     expect(within(panel).getByRole('heading', { name: 'Details' })).toBeTruthy()
@@ -707,10 +738,11 @@ describe('PrOverviewPanel — a narrow pane', () => {
 })
 
 describe('PrOverviewPanel — a pane that widens', () => {
-  it('goes back to Change when the pane widens on the Properties tab', () => {
+  it('goes back to Change when the pane widens on the Properties tab', async () => {
+    const user = userEvent.setup()
     pane.width = 760
     const { rerender } = renderPanel()
-    fireEvent.click(screen.getByRole('tab', { name: 'Properties' }))
+    await user.click(screen.getByRole('tab', { name: 'Properties' }))
     pane.width = 1180
     rerender(
       <PrOverviewPanel
@@ -749,12 +781,13 @@ describe('PrOverviewPanel — the state of the pull request', () => {
   })
 
   it('replaces Start review with Open revert PR on a merged pull request', async () => {
+    const user = userEvent.setup()
     const { githubAPI } = await import('../../src/api/github')
     window.electronAPI.shell = { openExternal: vi.fn().mockResolvedValue(undefined) } as never
     renderPanel({ state: 'merged' })
     expect(within(headerActions()).queryByRole('button', { name: /review/ })).toBeNull()
     expect(within(readiness()).getByText('Merged into main')).toBeTruthy()
-    fireEvent.click(within(headerActions()).getByRole('button', { name: 'Open revert PR' }))
+    await user.click(within(headerActions()).getByRole('button', { name: 'Open revert PR' }))
     await waitFor(() => expect(githubAPI.revert).toHaveBeenCalledWith('/repo', 42))
     expect(await screen.findByText('Opened revert pull request #43.')).toBeTruthy()
     // Says so in place: launching a browser unasked would take the operator out of the app.
@@ -781,9 +814,12 @@ describe('PrOverviewPanel — merging the stack', () => {
   beforeEach(mockStackedPlan)
 
   it('lists the steps, merges on confirm and reports the result', async () => {
+    const user = userEvent.setup()
     const { githubAPI } = await import('../../src/api/github')
     renderPanel({ baseRefName: 'feat/base' })
-    fireEvent.click(await within(headerActions()).findByRole('button', { name: 'Merge stack · 2' }))
+    await user.click(
+      await within(headerActions()).findByRole('button', { name: 'Merge stack · 2' })
+    )
     const confirm = screen.getAllByRole('group', { name: 'Merge stack' })[0]
     expect(confirm.textContent).toContain('Squash-merge into main')
     expect(confirm.textContent).toContain(
@@ -792,7 +828,7 @@ describe('PrOverviewPanel — merging the stack', () => {
     expect(confirm.textContent).toContain(
       'Stops at the first pull request that cannot merge and says why.'
     )
-    fireEvent.click(within(confirm).getByRole('button', { name: 'Merge 2 pull requests' }))
+    await user.click(within(confirm).getByRole('button', { name: 'Merge 2 pull requests' }))
     await waitFor(() => expect(githubAPI.mergeStack).toHaveBeenCalledWith('/repo', 42))
     expect(await screen.findByText('Merged 2 pull requests.')).toBeTruthy()
   })
@@ -802,14 +838,17 @@ describe('PrOverviewPanel — a stack that cannot merge', () => {
   beforeEach(mockStackedPlan)
 
   it('names the pull request and the reason when the stack stops', async () => {
+    const user = userEvent.setup()
     const { githubAPI } = await import('../../src/api/github')
     vi.mocked(githubAPI.mergeStack).mockResolvedValueOnce({
       merged: [41],
       failed: { number: 42, reason: '#42 has conflicts with main' },
     })
     renderPanel({ baseRefName: 'feat/base' })
-    fireEvent.click(await within(headerActions()).findByRole('button', { name: 'Merge stack · 2' }))
-    fireEvent.click(screen.getAllByRole('button', { name: 'Merge 2 pull requests' })[0])
+    await user.click(
+      await within(headerActions()).findByRole('button', { name: 'Merge stack · 2' })
+    )
+    await user.click(screen.getAllByRole('button', { name: 'Merge 2 pull requests' })[0])
     expect(
       await screen.findByText('Merged 1 pull request. Stopped at #42: #42 has conflicts with main')
     ).toBeTruthy()
@@ -817,8 +856,11 @@ describe('PrOverviewPanel — a stack that cannot merge', () => {
 })
 
 describe('PrOverviewPanel — a pull request that is not stacked', () => {
-  it('offers no Merge stack on a pull request that is not stacked', () => {
+  it('offers no Merge stack on a pull request that is not stacked', async () => {
     renderPanel()
+    // The plan shows nothing while it loads: wait for its reply before asserting the absence.
+    await act(() => vi.mocked(githubAPI.mergeStackPlan).mock.results[0].value)
+    expect(githubAPI.mergeStackPlan).toHaveBeenCalledWith('/repo', 42)
     expect(screen.queryByRole('button', { name: /Merge stack/ })).toBeNull()
   })
 })

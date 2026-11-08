@@ -23,12 +23,11 @@ describe('plural', () => {
 
 describe('validationError', () => {
   it("answers VALIDATION_ERROR with the schema's own message", () => {
-    const rejected = z.object({ id: z.string() }).safeParse({ id: 7 })
-    if (rejected.success) throw new Error('the payload should have been rejected')
+    const rejected = z.object({ id: z.string() }).safeParse({ id: 7 }).error!
 
-    expect(validationError(rejected.error)).toEqual({
+    expect(validationError(rejected)).toEqual({
       error: 'VALIDATION_ERROR',
-      message: rejected.error.message,
+      message: rejected.message,
     })
   })
 })
@@ -72,33 +71,48 @@ describe('createIpcRegistrar', () => {
     ])
     await expect(dispatchChannel(registered[1].spec, { id: 'a' })).resolves.toBe('note a')
   })
+})
 
-  it('answers a rejected payload with validationError unless told otherwise', async () => {
+describe('createIpcRegistrar with a rejected payload', () => {
+  it('answers a rejected payload with validationError by default', async () => {
     const { api, registered } = recordingApi()
     createIpcRegistrar(api).handle('notes:get', NoteId, () => 'never')
+
+    await expect(dispatchChannel(registered[0].spec, { id: 7 })).resolves.toMatchObject({
+      error: 'VALIDATION_ERROR',
+      message: expect.any(String),
+    })
+  })
+
+  it('answers a rejected payload with the invalid answer it is given', async () => {
+    const { api, registered } = recordingApi()
     createIpcRegistrar(api, { invalid: { error: 'BAD' } }).handle(
       'notes:get',
       NoteId,
       () => 'never'
     )
 
-    const answers = await Promise.all(registered.map((r) => dispatchChannel(r.spec, { id: 7 })))
-
-    expect(answers[0]).toMatchObject({ error: 'VALIDATION_ERROR', message: expect.any(String) })
-    expect(answers[1]).toEqual({ error: 'BAD' })
+    await expect(dispatchChannel(registered[0].spec, { id: 7 })).resolves.toEqual({
+      error: 'BAD',
+    })
   })
 })
 
 describe('createIpcRegistrar when a channel throws, and on cleanup', () => {
-  it('answers a throwing channel with onError when it has one, and rejects without', async () => {
+  it('answers a throwing channel with its onError answer', async () => {
     const { api, registered } = recordingApi()
     createIpcRegistrar(api, { onError: answerWithTheError }).handle('a', NoteId, throwDiskFull)
-    createIpcRegistrar(api).handle('b', NoteId, throwDiskFull)
 
     await expect(dispatchChannel(registered[0].spec, { id: 'a' })).resolves.toEqual({
       error: 'Error: disk full',
     })
-    await expect(dispatchChannel(registered[1].spec, { id: 'a' })).rejects.toThrow('disk full')
+  })
+
+  it('rejects with the error of a throwing channel that has no onError', async () => {
+    const { api, registered } = recordingApi()
+    createIpcRegistrar(api).handle('b', NoteId, throwDiskFull)
+
+    await expect(dispatchChannel(registered[0].spec, { id: 'a' })).rejects.toThrow('disk full')
   })
 
   it('unregisters every channel on cleanup', () => {

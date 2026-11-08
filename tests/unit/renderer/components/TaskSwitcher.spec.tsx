@@ -1,12 +1,12 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { type WorkThread } from '../../../../src/renderer/home/work-threads'
 import type { TaskState } from '../../../../src/renderer/home/task-state'
 import { fact } from '../sidebar/fixtures/facts'
 
 const state = vi.hoisted(() => ({ threads: [] as unknown[] }))
-const revealBranch = vi.hoisted(() => vi.fn())
 
 vi.mock('../../../../src/renderer/components/home/useWorkThreads', async () => {
   const work = await import('../../../../src/renderer/home/work-threads')
@@ -19,12 +19,22 @@ vi.mock('../../../../src/renderer/components/home/useWorkThreads', async () => {
     }),
   }
 })
-vi.mock('../../../../src/renderer/terminal/reveal-branch', () => ({ revealBranch }))
 
 import { TaskSwitcher } from '../../../../src/renderer/components/task-switcher/TaskSwitcher'
 import { useTaskSwitcher } from '../../../../src/renderer/components/task-switcher/task-switcher.store'
 import { useDeskSelection } from '../../../../src/renderer/components/home/desk-selection'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
+import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
+import { useSessionStore } from '../../../../src/renderer/stores/session.store'
+import { installElectronApi } from '../../../support/electron-api'
+import { projectFixture } from '../../../support/renderer-stores'
+
+// Each thread's branches, as projects of one workspace, so `revealBranch` can select them.
+const projects = ['checkout', 'login'].flatMap((key) => [
+  projectFixture({ id: `${key}-old-branch`, workspaceId: 'ws-1' }),
+  projectFixture({ id: `${key}-new-branch`, workspaceId: 'ws-1' }),
+])
+const activeProjectId = () => useWorkspaceStore.getState().activeProjectId
 
 function threadOf(key: string, title: string, patch: { state: TaskState; archived?: boolean }) {
   const lane = {
@@ -61,6 +71,12 @@ beforeEach(() => {
   useTaskSwitcher.setState({ open: true })
   useDeskSelection.setState({ openThreadKey: null, selectedThreadKey: null })
   useExtensionRegistry.setState(useExtensionRegistry.getInitialState(), true)
+  useSessionStore.setState(useSessionStore.getInitialState(), true)
+  installElectronApi({ project: { list: vi.fn(async () => ({ projects })) } })
+  useWorkspaceStore.setState({
+    ...useWorkspaceStore.getInitialState(),
+    projectsByWorkspaceId: new Map([['ws-1', projects]]),
+  })
 })
 
 const options = () =>
@@ -83,11 +99,10 @@ describe('TaskSwitcher — what it lists', () => {
     expect(within(first).getByText('api, web')).toBeTruthy()
   })
 
-  it('narrows the list as you type', () => {
+  it('narrows the list as you type', async () => {
+    const user = userEvent.setup()
     render(<TaskSwitcher />)
-    fireEvent.change(screen.getByRole('combobox', { name: 'Switch task' }), {
-      target: { value: 'check' },
-    })
+    await user.type(screen.getByRole('combobox', { name: 'Switch task' }), 'check')
     expect(options()).toEqual(['Checkout'])
   })
 
@@ -101,40 +116,45 @@ describe('TaskSwitcher — what it lists', () => {
 const field = () => screen.getByRole('combobox', { name: 'Switch task' })
 
 describe('TaskSwitcher — choosing with the keyboard', () => {
-  it('opens the most recently active lane’s terminal on Enter, and closes', () => {
+  it('opens the most recently active lane’s terminal on Enter, and closes', async () => {
+    const user = userEvent.setup()
     render(<TaskSwitcher />)
-    fireEvent.keyDown(field(), { key: 'Enter' })
-    expect(revealBranch).toHaveBeenCalledWith('login-new-branch')
+    await user.type(field(), '{Enter}')
+    expect(activeProjectId()).toBe('login-new-branch')
     expect(useTaskSwitcher.getState().open).toBe(false)
   })
 
-  it('moves the choice with the arrow keys', () => {
+  it('moves the choice with the arrow keys', async () => {
+    const user = userEvent.setup()
     render(<TaskSwitcher />)
-    fireEvent.keyDown(field(), { key: 'ArrowDown' })
-    fireEvent.keyDown(field(), { key: 'Enter' })
-    expect(revealBranch).toHaveBeenCalledWith('checkout-new-branch')
+    await user.type(field(), '{ArrowDown}')
+    await user.keyboard('{Enter}')
+    expect(activeProjectId()).toBe('checkout-new-branch')
   })
 
-  it('opens Home with the task’s drawer on ⌘Enter', () => {
+  it('opens Home with the task’s drawer on ⌘Enter', async () => {
+    const user = userEvent.setup()
     render(<TaskSwitcher />)
-    fireEvent.keyDown(field(), { key: 'Enter', metaKey: true })
+    await user.type(field(), '{Meta>}{Enter}{/Meta}')
     expect(useDeskSelection.getState().openThreadKey).toBe('login')
     expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.home')
-    expect(revealBranch).not.toHaveBeenCalled()
+    expect(activeProjectId()).toBeNull()
   })
 })
 
 describe('TaskSwitcher — choosing otherwise', () => {
-  it('opens a task on a click', () => {
+  it('opens a task on a click', async () => {
+    const user = userEvent.setup()
     render(<TaskSwitcher />)
-    fireEvent.click(screen.getByText('Checkout'))
-    expect(revealBranch).toHaveBeenCalledWith('checkout-new-branch')
+    await user.click(screen.getByText('Checkout'))
+    expect(activeProjectId()).toBe('checkout-new-branch')
   })
 
-  it('closes on Escape without choosing', () => {
+  it('closes on Escape without choosing', async () => {
+    const user = userEvent.setup()
     render(<TaskSwitcher />)
-    fireEvent.keyDown(field(), { key: 'Escape' })
+    await user.type(field(), '{Escape}')
     expect(useTaskSwitcher.getState().open).toBe(false)
-    expect(revealBranch).not.toHaveBeenCalled()
+    expect(activeProjectId()).toBeNull()
   })
 })

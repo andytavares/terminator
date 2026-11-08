@@ -18,10 +18,9 @@ const pr = (number: number, headRefName: string, baseRefName: string): StackPull
 })
 
 const STACK = [pr(1, 'feat/a', 'main'), pr(2, 'feat/b', 'feat/a'), pr(3, 'other', 'main')]
-const NO_WAIT: StackClock = {
-  sleep: vi.fn().mockResolvedValue(undefined),
-  pollMs: 3000,
-  timeoutMs: 9000,
+/** A clock that never waits; each test makes its own, so a sleep spy holds only its own calls. */
+function noWait(): StackClock {
+  return { sleep: vi.fn().mockResolvedValue(undefined), pollMs: 3000, timeoutMs: 9000 }
 }
 
 const AT_2 = { repoRoot: '/repo', number: 2 }
@@ -89,8 +88,11 @@ describe('stackOf', () => {
     expect(stackOf([fork, pr(1, 'feat/a', 'main')], 1).map((p) => p.number)).toEqual([1])
   })
 
-  it('returns nothing for a pull request that is not open, and stops on a loop', () => {
+  it('returns nothing for a pull request that is not open', () => {
     expect(stackOf(STACK, 9)).toEqual([])
+  })
+
+  it('stops walking when two pull requests stack on each other', () => {
     expect(stackOf([pr(1, 'a', 'b'), pr(2, 'b', 'a')], 1)).toHaveLength(2)
   })
 })
@@ -116,7 +118,8 @@ describe('withoutAgentCredits', () => {
 describe('mergeStack', () => {
   it('merges the bottom, retargets the next onto main, waits for GitHub, then merges it', async () => {
     const { ctx, calls } = fakeContext({ mergeable: ['UNKNOWN', 'MERGEABLE'] })
-    const result = await mergeStack(ctx, AT_2, NO_WAIT)
+    const clock = noWait()
+    const result = await mergeStack(ctx, AT_2, clock)
     expect(result).toEqual({ merged: [1, 2] })
     expect(calls.api.map((c) => `${c.method} ${c.path}`)).toEqual([
       'PUT repos/o/r/pulls/1/merge',
@@ -126,12 +129,12 @@ describe('mergeStack', () => {
     expect(calls.api[0].body).toEqual({ merge_method: 'squash', sha: 'sha1' })
     expect(calls.api[1].body).toEqual({ base: 'main' })
     expect(calls.views).toEqual(['2:mergeable', '2:mergeable'])
-    expect(NO_WAIT.sleep).toHaveBeenCalledWith(3000)
+    expect(clock.sleep).toHaveBeenCalledExactlyOnceWith(3000)
   })
 
   it('stops at a failure on the bottom and leaves the rest open, with the reason', async () => {
     const { ctx, calls } = fakeContext({ failMerge: 1 })
-    const result = await mergeStack(ctx, AT_2, NO_WAIT)
+    const result = await mergeStack(ctx, AT_2, noWait())
     expect(result).toEqual({
       merged: [],
       failed: { number: 1, reason: 'Head branch was modified.' },
@@ -143,7 +146,7 @@ describe('mergeStack', () => {
 describe('mergeStack — when it stops', () => {
   it('stops when the retargeted pull request conflicts', async () => {
     const { ctx, calls } = fakeContext({ mergeable: ['CONFLICTING'] })
-    const result = await mergeStack(ctx, AT_2, NO_WAIT)
+    const result = await mergeStack(ctx, AT_2, noWait())
     expect(result).toEqual({
       merged: [1],
       failed: { number: 2, reason: '#2 has conflicts with main' },
@@ -153,7 +156,7 @@ describe('mergeStack — when it stops', () => {
 
   it('gives up when GitHub stays UNKNOWN past the timeout', async () => {
     const { ctx } = fakeContext({ mergeable: Array(20).fill('UNKNOWN') })
-    const result = await mergeStack(ctx, AT_2, NO_WAIT)
+    const result = await mergeStack(ctx, AT_2, noWait())
     expect(result.failed).toEqual({
       number: 2,
       reason: 'GitHub did not finish checking #2 within a minute',
@@ -162,7 +165,7 @@ describe('mergeStack — when it stops', () => {
 
   it('sends the squash message without agent credits when the setting is on', async () => {
     const { ctx, calls } = fakeContext({ strip: true, open: [STACK[0]] })
-    await mergeStack(ctx, { repoRoot: '/repo', number: 1 }, NO_WAIT)
+    await mergeStack(ctx, { repoRoot: '/repo', number: 1 }, noWait())
     const merge = calls.api.find((c) => c.method === 'PUT')
     expect(merge?.body).toEqual({
       merge_method: 'squash',

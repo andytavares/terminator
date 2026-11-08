@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { render, screen, cleanup, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { DateTimePicker, type DateTimePickerProps } from '../../src/components/DateTimePicker'
 
 beforeEach(() => {
@@ -22,54 +23,74 @@ function renderOpen(props: Partial<DateTimePickerProps> & Pick<DateTimePickerPro
 const shownMonthLabel = () => document.querySelector('.dtp__cal-month-label')?.textContent
 const trigger = () => document.querySelector('.dtp__trigger') as HTMLElement
 const popover = () => document.querySelector('.dtp__popover')
+const calendarHeader = () => within(document.querySelector('.dtp__cal-header') as HTMLElement)
 
 describe('DateTimePicker halves and shortcuts', halvesTests)
 describe('DateTimePicker months and closing', monthsTests)
 
 function halvesTests() {
   describe('halves', halvesHalvesTests)
-  describe('shortcuts and labels', halvesShortcutsAndLabelsTests)
+  describe('shortcuts', halvesShortcutsAndLabelsTests)
+  describe('labels', halvesLabelsTests)
 }
 
 function halvesHalvesTests() {
-  it('mirrors a picked time into the other half of the day', () => {
+  it('mirrors a picked time into the PM half in time mode', async () => {
+    const user = userEvent.setup()
     const { onChange } = renderOpen({ mode: 'time', value: '09:30' })
-    fireEvent.click(screen.getByText('PM'))
+    await user.click(screen.getByRole('button', { name: 'PM' }))
     expect(onChange).toHaveBeenCalledWith('21:30')
-    const datetime = renderOpen({ mode: 'datetime', value: '2026-12-01T21:15' })
-    fireEvent.click(screen.getAllByText('AM')[1])
-    expect(datetime.onChange).toHaveBeenCalledWith('2026-12-01T09:15')
   })
 
-  it('switches halves without a change when no time is set, starting on the current half', () => {
+  it('mirrors a picked time into the AM half in datetime mode', async () => {
+    const user = userEvent.setup()
+    const { onChange } = renderOpen({ mode: 'datetime', value: '2026-12-01T21:15' })
+    await user.click(screen.getByRole('button', { name: 'AM' }))
+    expect(onChange).toHaveBeenCalledWith('2026-12-01T09:15')
+  })
+
+  it('switches halves without a change when no time is set, starting on the current half', async () => {
+    const user = userEvent.setup()
     const { onChange } = renderOpen({ mode: 'time' })
     expect(document.querySelector('.dtp__ampm-btn--active')?.textContent).toBe('PM')
-    fireEvent.click(screen.getByText('AM'))
+    await user.click(screen.getByRole('button', { name: 'AM' }))
     expect(onChange).not.toHaveBeenCalled()
     expect(document.querySelector('.dtp__ampm-btn--active')?.textContent).toBe('AM')
   })
 }
 
 function halvesShortcutsAndLabelsTests() {
-  it('applies a time shortcut, rounded to the next quarter hour', () => {
+  it('applies a time shortcut, rounded to the next quarter hour, and closes', async () => {
+    const user = userEvent.setup()
     const { onChange } = renderOpen({ mode: 'time' })
-    fireEvent.click(screen.getByText('30 min'))
+    await user.click(screen.getByRole('button', { name: '30 min' }))
     expect(onChange).toHaveBeenCalledWith('15:45')
     expect(popover()).toBeNull()
   })
 
-  it('keeps the time when a date shortcut is used in datetime mode, or uses noon', () => {
+  it('keeps the time when a date shortcut is used in datetime mode', async () => {
+    const user = userEvent.setup()
     const { onChange } = renderOpen({ mode: 'datetime', value: '2026-12-01T08:00' })
-    fireEvent.click(screen.getByText('Tomorrow'))
+    await user.click(screen.getByRole('button', { name: 'Tomorrow' }))
     expect(onChange).toHaveBeenCalledWith('2026-12-21T08:00')
-    cleanup()
-    const empty = renderOpen({ mode: 'datetime' })
-    fireEvent.click(screen.getByText('Today'))
-    expect(empty.onChange).toHaveBeenCalledWith('2026-12-20T12:00')
-    fireEvent.click(screen.getByText('3:00'))
-    expect(empty.onChange).toHaveBeenLastCalledWith('2026-12-20T15:00')
   })
 
+  it('uses noon when a date shortcut is used in datetime mode with no time', async () => {
+    const user = userEvent.setup()
+    const { onChange } = renderOpen({ mode: 'datetime' })
+    await user.click(screen.getByRole('button', { name: 'Today' }))
+    expect(onChange).toHaveBeenCalledWith('2026-12-20T12:00')
+  })
+
+  it('picks a time slot on today when datetime mode has no date', async () => {
+    const user = userEvent.setup()
+    const { onChange } = renderOpen({ mode: 'datetime' })
+    await user.click(screen.getByRole('button', { name: '3:00' }))
+    expect(onChange).toHaveBeenLastCalledWith('2026-12-20T15:00')
+  })
+}
+
+function halvesLabelsTests() {
   it('labels a datetime value with both parts, and a date-only one', () => {
     render(<DateTimePicker mode="datetime" value="2026-12-01T13:05" onChange={vi.fn()} />)
     expect(trigger().textContent).toBe('Dec 1, 2026  1:05 PM')
@@ -88,14 +109,19 @@ function monthsTests() {
 }
 
 function monthsMonthsTests() {
-  it('wraps the year forward from December and back from January', () => {
+  it('wraps the year forward from December', async () => {
+    const user = userEvent.setup()
     renderOpen({ mode: 'date' })
     expect(shownMonthLabel()).toBe('December 2026')
-    fireEvent.click(document.querySelector('.dtp__cal-header button:last-child') as HTMLElement)
+    await user.click(calendarHeader().getByRole('button', { name: 'Next month' }))
     expect(shownMonthLabel()).toBe('January 2027')
-    fireEvent.click(document.querySelector('.dtp__cal-header button') as HTMLElement)
-    fireEvent.click(document.querySelector('.dtp__cal-header button') as HTMLElement)
-    expect(shownMonthLabel()).toBe('November 2026')
+  })
+
+  it('wraps the year back from January', async () => {
+    const user = userEvent.setup()
+    renderOpen({ mode: 'date', value: '2027-01-10' })
+    await user.click(calendarHeader().getByRole('button', { name: 'Previous month' }))
+    expect(shownMonthLabel()).toBe('December 2026')
   })
 
   it('re-anchors the calendar when the value changes from outside', () => {
@@ -106,16 +132,28 @@ function monthsMonthsTests() {
 }
 
 function monthsClosingTests() {
-  it('closes with Done or the trigger, and on Escape', () => {
+  it('closes on Done', async () => {
+    const user = userEvent.setup()
     renderOpen({ mode: 'date' })
-    fireEvent.click(screen.getByText('Done'))
+    await user.click(screen.getByRole('button', { name: 'Done' }))
     expect(popover()).toBeNull()
-    fireEvent.click(trigger())
+  })
+
+  it('opens and closes with the trigger', async () => {
+    const user = userEvent.setup()
+    render(<DateTimePicker mode="date" value="" onChange={vi.fn()} />)
+    await user.click(trigger())
     expect(popover()).not.toBeNull()
-    fireEvent.click(trigger())
+    await user.click(trigger())
     expect(popover()).toBeNull()
-    fireEvent.click(trigger())
-    fireEvent.keyDown(document, { key: 'Escape' })
+  })
+
+  it('closes on Escape', async () => {
+    const user = userEvent.setup()
+    render(<DateTimePicker mode="date" value="" onChange={vi.fn()} />)
+    await user.click(trigger())
+    expect(popover()?.contains(document.activeElement)).toBe(true)
+    await user.keyboard('{Escape}')
     expect(popover()).toBeNull()
   })
 }

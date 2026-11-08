@@ -127,8 +127,8 @@ describe('buildCustomQuickActions — a prompt on an agent tab', () => {
   })
 })
 
-describe('buildCustomQuickActions — orders global actions before workspace ones, in the order given by the caller', () => {
-  it('orders global actions before workspace ones, in the order given by the caller', () => {
+describe('buildCustomQuickActions — keeps the order the caller gives', () => {
+  it('keeps the actions in the order the caller gives them', () => {
     const global = shellAction({ id: 'g1', label: 'Global' })
     const workspace = shellAction({ id: 'w1', label: 'Workspace' })
     const actions = buildCustomQuickActions([global, workspace], makeEnv(), makeDeps())

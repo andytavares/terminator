@@ -105,18 +105,28 @@ describe('findTestReferencesInRepo', () => {
     expect(args).toContain('computeRiskScore|shardByDuration|queueRiskLevel')
     expect(args).toContain('*.spec.*')
   })
+})
 
-  it('returns nothing for no symbols, an uncloned repo, or a grep with no match', async () => {
-    const runGit = vi.fn().mockRejectedValue(new Error('exit 1'))
-    expect((await findTestReferencesInRepo('/repo', [], runGit)).size).toBe(0)
-    expect((await findTestReferencesInRepo('gh:acme/widgets', ['a'], runGit)).size).toBe(0)
-    expect((await findTestReferencesInRepo('/repo', ['a'], runGit)).size).toBe(0)
-    expect(runGit).toHaveBeenCalledTimes(1)
-  })
+describe('findTestReferencesInRepo — symbols and repositories it cannot grep', () => {
+  it.each([
+    { name: 'no symbols', repoRoot: '/repo', symbols: [] as string[], gitRuns: 0 },
+    { name: 'an uncloned repo', repoRoot: 'gh:acme/widgets', symbols: ['a'], gitRuns: 0 },
+    { name: 'a grep with no match', repoRoot: '/repo', symbols: ['a'], gitRuns: 1 },
+  ])(
+    'returns nothing for $name, after $gitRuns git runs',
+    async ({ repoRoot, symbols, gitRuns }) => {
+      // git grep exits 1 when nothing matches.
+      const runGit = vi.fn().mockRejectedValue(new Error('exit 1'))
+      const found = await findTestReferencesInRepo(repoRoot, symbols, runGit)
+      expect([...found]).toEqual([])
+      expect(runGit).toHaveBeenCalledTimes(gitRuns)
+    }
+  )
 
-  it('ignores symbols that are not plain identifiers', async () => {
+  it('greps only for the symbols that are plain identifiers', async () => {
     const runGit = vi.fn().mockResolvedValue('')
     await findTestReferencesInRepo('/repo', ['ok_name', 'bad name', 'a|b'], runGit)
-    expect(runGit.mock.calls[0][1]).toContain('ok_name')
+    const args = runGit.mock.calls[0][1] as string[]
+    expect(args.slice(0, 7)).toEqual(['grep', '-h', '-o', '-w', '-E', 'ok_name', '--'])
   })
 })

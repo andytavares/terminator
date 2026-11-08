@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
+import { act, render, screen, within, waitFor } from '@testing-library/react'
 import { StartWork } from '../../../../src/renderer/components/home/StartWork'
 import { startingWhen, whenProblem } from '../../../../src/renderer/components/home/WhenChoices'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
@@ -11,7 +11,7 @@ import { useDismissedThreads } from '../../../../src/renderer/components/home/di
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useStartWorkStore } from '../../../../src/renderer/components/home/start-work'
 import type { Schedule } from '../../../../src/shared/schemas/schedules.schema'
-import userEvent from '@testing-library/user-event'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { installElectronApi } from '../../../support/electron-api'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 import type {
@@ -192,9 +192,25 @@ const open = async (onClose = vi.fn()) => {
   await screen.findByText('TAV-33')
   return onClose
 }
-const goToTab = (name: string) => fireEvent.click(screen.getByRole('tab', { name }))
-const useRepoFolder = () =>
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Use the repo folder' }))
+const goToTab = (user: UserEvent, name: string) => user.click(screen.getByRole('tab', { name }))
+const useRepoFolder = (user: UserEvent) =>
+  user.click(screen.getByRole('checkbox', { name: 'Use the repo folder' }))
+/** Puts the cursor in the field the person types in, checks it is there, and presses `keys`. */
+const pressInBox = async (user: UserEvent, keys: string) => {
+  await user.click(searchBox())
+  expect(document.activeElement).toBe(searchBox())
+  await user.keyboard(keys)
+}
+/** Replaces what a date or time field holds, as the person does by typing over it. */
+const setField = async (user: UserEvent, label: string, value: string) => {
+  await user.clear(screen.getByLabelText(label))
+  await user.type(screen.getByLabelText(label), value)
+}
+/** Pastes `text` into `field`: typing a long prompt key by key adds nothing to the test. */
+const pasteInto = async (user: UserEvent, field: HTMLElement, text: string) => {
+  await user.click(field)
+  await user.paste(text)
+}
 const rowKeys = () => screen.getAllByTestId('start-work-key').map((n) => n.textContent)
 
 /** A worktree git still has a checkout for. */
@@ -226,14 +242,16 @@ describe('StartWork — my tickets', () => {
   })
 
   it('filters by key', async () => {
+    const user = userEvent.setup()
     await open()
-    fireEvent.change(searchBox(), { target: { value: 'tav-35' } })
+    await user.type(searchBox(), 'tav-35')
     expect(rowKeys()).toEqual(['TAV-35'])
   })
 
   it('filters by title and offers what was typed as a prompt', async () => {
+    const user = userEvent.setup()
     await open()
-    fireEvent.change(searchBox(), { target: { value: 'tunnel' } })
+    await user.type(searchBox(), 'tunnel')
     expect(rowKeys()).toEqual(['TAV-36'])
     expect(screen.getByRole('heading', { name: 'Or start from what you typed' })).toBeTruthy()
     expect(screen.getByText(/"tunnel" as a new agent task, no ticket/)).toBeTruthy()
@@ -248,7 +266,7 @@ describe('StartWork — opening and closing', () => {
 
   it('closes on Escape', async () => {
     const onClose = await open()
-    fireEvent.keyDown(document, { key: 'Escape' })
+    await userEvent.setup().keyboard('{Escape}')
     expect(onClose).toHaveBeenCalled()
   })
 })
@@ -257,6 +275,7 @@ describe('StartWork — run it as', () => {
   const checked = () => screen.getByRole('radio', { checked: true }).getAttribute('aria-label')
 
   it('offers the agent tab, Claude in a terminal and Terminal only when no extension adds one', async () => {
+    const user = userEvent.setup()
     await open()
     expect(screen.getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
       'Claude Code in an agent tab',
@@ -264,7 +283,7 @@ describe('StartWork — run it as', () => {
       'Terminal only',
     ])
     expect(document.body.textContent).not.toMatch(/Foundry/)
-    for (let step = 0; step < 3; step++) fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    await pressInBox(user, '{Tab}{Tab}{Tab}')
     expect(checked()).toBe('Claude Code in an agent tab')
   })
 })
@@ -273,6 +292,7 @@ describe('StartWork — run it as, with an extension option', () => {
   const checked = () => screen.getByRole('radio', { checked: true }).getAttribute('aria-label')
 
   it('lists what an extension declared after the two built-in ones, and Tab reaches it', async () => {
+    const user = userEvent.setup()
     registerFoundryOption()
     await open()
     expect(screen.getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
@@ -281,38 +301,40 @@ describe('StartWork — run it as, with an extension option', () => {
       'Terminal only',
       'Foundry order',
     ])
-    for (let step = 0; step < 3; step++) fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    await pressInBox(user, '{Tab}{Tab}{Tab}')
     expect(checked()).toBe('Foundry order')
-    fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    await pressInBox(user, '{Tab}')
     expect(checked()).toBe('Claude Code in an agent tab')
   })
 
   it('summarises the branch and worktree of the selected ticket', async () => {
     await open()
     const summary = screen.getByRole('group', { name: 'Where it runs' })
-    await waitFor(() => expect(within(summary).getByText('main')).toBeTruthy())
+    expect(await within(summary).findByText('main')).toBeTruthy()
     expect(within(summary).getByText('tav-33-retry')).toBeTruthy()
     expect(within(summary).getByText('.worktrees/tav-33-retry')).toBeTruthy()
   })
 })
 
+/** The worktree Enter on TAV-33 asks for: a new branch named after the ticket. */
+const TAV_33_WORKTREE = {
+  workspaceId: 'ws-1',
+  gitRoot: '/repo',
+  draft: expect.objectContaining({
+    branchMode: 'worktree',
+    newBranchName: 'tav-33-retry',
+    worktreeIsNewBranch: true,
+    worktreePath: '/repo/.worktrees/tav-33-retry',
+  }),
+}
+
 describe('StartWork — Enter on a ticket', () => {
   it('creates the worktree on the ticket branch, starts Claude in it and links the ticket', async () => {
+    const user = userEvent.setup()
     const onClose = await open()
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
-    expect(launched.createFromDraft).toHaveBeenCalledWith(
-      expect.objectContaining({
-        workspaceId: 'ws-1',
-        gitRoot: '/repo',
-        draft: expect.objectContaining({
-          branchMode: 'worktree',
-          newBranchName: 'tav-33-retry',
-          worktreeIsNewBranch: true,
-          worktreePath: '/repo/.worktrees/tav-33-retry',
-        }),
-      })
-    )
+    expect(launched.createFromDraft).toHaveBeenCalledWith(expect.objectContaining(TAV_33_WORKTREE))
     expect(launched.agentInBranch).toHaveBeenCalledWith({
       projectId: 'p-new',
       title: 'TAV-33',
@@ -329,28 +351,31 @@ describe('StartWork — Enter on a ticket', () => {
 
 describe('StartWork — starting dismissed work', () => {
   it('brings a dismissed ticket back to In flight once it has started', async () => {
+    const user = userEvent.setup()
     useDismissedThreads.setState({ dismissed: { 'linear:TAV-33': 1, 'linear:TAV-99': 1 } })
     const onClose = await open()
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(Object.keys(useDismissedThreads.getState().dismissed)).toEqual(['linear:TAV-99'])
   })
 
   it('brings a dismissed branch back once a session started on it', async () => {
+    const user = userEvent.setup()
     useDismissedThreads.setState({ dismissed: { '/repo#main': 1 } })
     const onClose = await open()
-    goToTab('Branch')
+    await goToTab(user, 'Branch')
     await screen.findByRole('option', { name: /main/ })
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(useDismissedThreads.getState().dismissed).toEqual({})
   })
 
   it('leaves a dismissed ticket dismissed when starting it failed', async () => {
+    const user = userEvent.setup()
     useDismissedThreads.setState({ dismissed: { 'linear:TAV-33': 1 } })
     launched.createFromDraft.mockResolvedValue({ field: 'form', message: 'Worktree error: nope' })
     await open()
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(launched.createFromDraft).toHaveBeenCalled())
     expect(Object.keys(useDismissedThreads.getState().dismissed)).toEqual(['linear:TAV-33'])
   })
@@ -358,29 +383,33 @@ describe('StartWork — starting dismissed work', () => {
 
 describe('StartWork — Enter on a ticket, run another way', () => {
   it('starts a plain terminal for Terminal only', async () => {
+    const user = userEvent.setup()
     await open()
-    fireEvent.keyDown(searchBox(), { key: 'Tab' })
-    fireEvent.keyDown(searchBox(), { key: 'Tab' })
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await pressInBox(user, '{Tab}{Tab}')
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(launched.inBranch).toHaveBeenCalledWith('p-new', undefined, false))
     expect(setLink).toHaveBeenCalled()
   })
 
   it('moves the selection with the arrow keys before starting', async () => {
+    const user = userEvent.setup()
     await open()
-    fireEvent.keyDown(searchBox(), { key: 'ArrowDown' })
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await pressInBox(user, '{ArrowDown}')
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(launched.createFromDraft).toHaveBeenCalled())
     expect(launched.createFromDraft.mock.calls[0][0].draft.newBranchName).toBe('tav-35-quick')
   })
+})
 
+describe('StartWork — Enter on a ticket, run another way — a refused worktree', () => {
   it('says why in plain words, and stays open, when the worktree is refused', async () => {
+    const user = userEvent.setup()
     launched.createFromDraft.mockResolvedValue({
       field: 'form',
       message: 'Worktree error: fatal: 128 raw git output',
     })
     const onClose = await open()
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await pressInBox(user, '{Enter}')
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).not.toMatch(/fatal|128/)
     expect(alert.textContent).toMatch(/tav-33-retry/)
@@ -401,11 +430,12 @@ function registerFoundryOption(): void {
 
 describe('StartWork — an extension option', () => {
   it('runs the command the extension declared for it', async () => {
+    const user = userEvent.setup()
     registerFoundryOption()
     useExtensionCommandsRegistered()
     const onClose = await open()
-    for (let step = 0; step < 3; step++) fireEvent.keyDown(searchBox(), { key: 'Tab' })
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await pressInBox(user, '{Tab}{Tab}{Tab}')
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(executeCommand).toHaveBeenCalledWith(
       'x.command.new-order',
@@ -423,14 +453,15 @@ describe('StartWork — an extension option', () => {
 
 describe('StartWork — an extension option given a typed prompt', () => {
   it('passes the prompt and the repository', async () => {
+    const user = userEvent.setup()
     registerFoundryOption()
     useExtensionCommandsRegistered()
     const onClose = await open()
-    goToTab('Prompt')
-    useRepoFolder()
-    fireEvent.change(searchBox(), { target: { value: 'fix the build' } })
-    for (let step = 0; step < 3; step++) fireEvent.keyDown(searchBox(), { key: 'Tab' })
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await goToTab(user, 'Prompt')
+    await useRepoFolder(user)
+    await user.type(searchBox(), 'fix the build')
+    await pressInBox(user, '{Tab}{Tab}{Tab}')
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(executeCommand).toHaveBeenCalledWith('x.command.new-order', expect.anything(), {
       prompt: 'fix the build',
@@ -441,10 +472,11 @@ describe('StartWork — an extension option given a typed prompt', () => {
 
 describe('StartWork — an extension option whose command is not running', () => {
   it('says so in plain words and starts nothing', async () => {
+    const user = userEvent.setup()
     registerFoundryOption()
     const onClose = await open()
-    for (let step = 0; step < 3; step++) fireEvent.keyDown(searchBox(), { key: 'Tab' })
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await pressInBox(user, '{Tab}{Tab}{Tab}')
+    await pressInBox(user, '{Enter}')
     expect((await screen.findByRole('alert')).textContent).toBe(
       'Foundry order is not turned on, so it cannot take this.'
     )
@@ -470,11 +502,12 @@ function useExtensionCommandsRegistered(): void {
 
 describe('StartWork — other tabs', () => {
   it('Prompt tab starts an agent tab with the typed prompt and links nothing', async () => {
+    const user = userEvent.setup()
     const onClose = await open()
-    goToTab('Prompt')
-    useRepoFolder()
-    fireEvent.change(searchBox(), { target: { value: "fix the dev's build" } })
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await goToTab(user, 'Prompt')
+    await useRepoFolder(user)
+    await user.type(searchBox(), "fix the dev's build")
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(launched.agentInBranch).toHaveBeenCalledWith({
       projectId: 'p-main',
@@ -485,13 +518,16 @@ describe('StartWork — other tabs', () => {
     expect(launched.createFromDraft).not.toHaveBeenCalled()
     expect(setLink).not.toHaveBeenCalled()
   })
+})
 
+describe('StartWork — other tabs — a long prompt', () => {
   it('Prompt tab sends an agent tab a prompt of any length', async () => {
+    const user = userEvent.setup()
     const onClose = await open()
-    goToTab('Prompt')
-    useRepoFolder()
-    fireEvent.change(searchBox(), { target: { value: 'x'.repeat(1200) } })
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await goToTab(user, 'Prompt')
+    await useRepoFolder(user)
+    await pasteInto(user, searchBox(), 'x'.repeat(1200))
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(launched.agentInBranch).toHaveBeenCalledWith(
       expect.objectContaining({ prompt: 'x'.repeat(1200) })
@@ -501,12 +537,13 @@ describe('StartWork — other tabs', () => {
 
 describe('StartWork — other tabs, Claude in a terminal', () => {
   it('Prompt tab types the command for Claude in a terminal', async () => {
+    const user = userEvent.setup()
     const onClose = await open()
-    goToTab('Prompt')
-    useRepoFolder()
-    fireEvent.change(searchBox(), { target: { value: "fix the dev's build" } })
-    fireEvent.keyDown(searchBox(), { key: 'Tab' })
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await goToTab(user, 'Prompt')
+    await useRepoFolder(user)
+    await user.type(searchBox(), "fix the dev's build")
+    await pressInBox(user, '{Tab}')
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(launched.inBranch).toHaveBeenCalledWith(
       'p-main',
@@ -516,11 +553,12 @@ describe('StartWork — other tabs, Claude in a terminal', () => {
   })
 
   it('Prompt tab refuses a prompt too long to type for Claude in a terminal', async () => {
+    const user = userEvent.setup()
     await open()
-    goToTab('Prompt')
-    fireEvent.change(searchBox(), { target: { value: 'x'.repeat(1200) } })
-    fireEvent.keyDown(searchBox(), { key: 'Tab' })
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await goToTab(user, 'Prompt')
+    await pasteInto(user, searchBox(), 'x'.repeat(1200))
+    await pressInBox(user, '{Tab}')
+    await pressInBox(user, '{Enter}')
     expect((await screen.findByRole('alert')).textContent).toMatch(/too long/i)
     expect(launched.inBranch).not.toHaveBeenCalled()
   })
@@ -528,6 +566,7 @@ describe('StartWork — other tabs, Claude in a terminal', () => {
 
 describe('StartWork — other tabs, the agent picker', () => {
   it('passes the agent chosen in the picker to the agent tab', async () => {
+    const user = userEvent.setup()
     agentsList.mockResolvedValue({
       data: [
         { id: 'claude', label: 'Claude Code' },
@@ -535,13 +574,11 @@ describe('StartWork — other tabs, the agent picker', () => {
       ],
     })
     const onClose = await open()
-    goToTab('Prompt')
-    fireEvent.change(searchBox(), { target: { value: 'fix it' } })
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Agent' }), {
-      target: { value: 'opencode' },
-    })
+    await goToTab(user, 'Prompt')
+    await user.type(searchBox(), 'fix it')
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Agent' }), 'opencode')
     expect(screen.getByRole('radio', { name: 'OpenCode in an agent tab' })).toBeTruthy()
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(launched.agentInBranch).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: 'opencode', prompt: 'fix it' })
@@ -556,9 +593,11 @@ describe('StartWork — other tabs, the agent picker', () => {
 
 describe('StartWork — scratch and branch tabs', () => {
   it('Scratch terminal tab starts a scratch session', async () => {
+    const user = userEvent.setup()
     const onClose = await open()
-    goToTab('Scratch terminal')
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'Scratch terminal' }), { key: 'Enter' })
+    await goToTab(user, 'Scratch terminal')
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Scratch terminal' }))
+    await user.keyboard('{Enter}')
     await waitFor(() => expect(launched.scratch).toHaveBeenCalledTimes(1))
     expect(onClose).toHaveBeenCalled()
     expect(launched.inBranch).not.toHaveBeenCalled()
@@ -567,6 +606,7 @@ describe('StartWork — scratch and branch tabs', () => {
 
 describe('StartWork — branch tab', () => {
   it('Branch tab lists the repo worktrees and starts a session on the chosen one', async () => {
+    const user = userEvent.setup()
     git.listWorktrees.mockResolvedValue({
       worktrees: [DEV_WORKTREE],
     })
@@ -579,9 +619,9 @@ describe('StartWork — branch tab', () => {
       ]),
     })
     const onClose = await open()
-    goToTab('Branch')
+    await goToTab(user, 'Branch')
     await screen.findByRole('option', { name: /dev/ })
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(launched.agentInBranch).toHaveBeenCalledWith(
       expect.objectContaining({ projectId: 'p-dev', prompt: null })
@@ -612,19 +652,21 @@ describe('StartWork — workspace picker', () => {
   })
 
   it('opens the workspace list on click and on Command R', async () => {
+    const user = userEvent.setup()
     await open()
-    fireEvent.click(pickerButton())
+    await user.click(pickerButton())
     expect(listbox()).toBeTruthy()
     expect(pickerButton().getAttribute('aria-expanded')).toBe('true')
-    fireEvent.keyDown(searchBox(), { key: 'r', metaKey: true })
+    await user.keyboard('{Meta>}r{/Meta}')
     expect(screen.queryByRole('listbox', { name: 'Workspace' })).toBeNull()
-    fireEvent.keyDown(searchBox(), { key: 'r', metaKey: true })
+    await user.keyboard('{Meta>}r{/Meta}')
     expect(listbox()).toBeTruthy()
   })
 
   it('marks the current workspace and says the first one is suggested because it is open', async () => {
+    const user = userEvent.setup()
     await open()
-    fireEvent.click(pickerButton())
+    await user.click(pickerButton())
     const options = within(listbox()).getAllByRole('option')
     expect(options.map((o) => o.getAttribute('aria-selected'))).toEqual(['true', 'false'])
     expect(within(listbox()).getByText('/atlas')).toBeTruthy()
@@ -636,12 +678,13 @@ describe('StartWork — workspace picker, picking', () => {
   beforeEach(seedTwoWorkspaces)
 
   it('picking another workspace changes the button and the branches listed', async () => {
+    const user = userEvent.setup()
     await open()
-    fireEvent.click(pickerButton())
-    fireEvent.click(within(listbox()).getByRole('option', { name: /atlas/ }))
+    await user.click(pickerButton())
+    await user.click(within(listbox()).getByRole('option', { name: /atlas/ }))
     expect(screen.queryByRole('listbox', { name: 'Workspace' })).toBeNull()
     expect(pickerButton().getAttribute('aria-label')).toBe('Workspace: atlas')
-    goToTab('Branch')
+    await goToTab(user, 'Branch')
     expect(await screen.findByRole('option', { name: /atlas-main/ })).toBeTruthy()
   })
 })
@@ -650,11 +693,11 @@ describe('StartWork — workspace picker, the list', () => {
   beforeEach(seedTwoWorkspaces)
 
   it('closes only the list on Escape, and the launcher stays open', async () => {
+    const user = userEvent.setup()
     const onClose = await open()
-    fireEvent.click(pickerButton())
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Filter workspaces' }), {
-      key: 'Escape',
-    })
+    await user.click(pickerButton())
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Filter workspaces' }))
+    await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('listbox', { name: 'Workspace' })).toBeNull())
     expect(screen.getByRole('dialog', { name: 'Start work' })).toBeTruthy()
     expect(onClose).not.toHaveBeenCalled()
@@ -665,11 +708,10 @@ describe('StartWork — workspace picker, filtering', () => {
   beforeEach(seedTwoWorkspaces)
 
   it('filters by name as the person types', async () => {
+    const user = userEvent.setup()
     await open()
-    fireEvent.click(pickerButton())
-    fireEvent.change(screen.getByRole('textbox', { name: 'Filter workspaces' }), {
-      target: { value: 'atl' },
-    })
+    await user.click(pickerButton())
+    await user.type(screen.getByRole('textbox', { name: 'Filter workspaces' }), 'atl')
     expect(
       within(listbox())
         .getAllByRole('option')
@@ -678,11 +720,12 @@ describe('StartWork — workspace picker, filtering', () => {
   })
 
   it('moves with the arrow keys and picks with Enter without starting work', async () => {
+    const user = userEvent.setup()
     await open()
-    fireEvent.click(pickerButton())
+    await user.click(pickerButton())
     const filter = screen.getByRole('textbox', { name: 'Filter workspaces' })
-    fireEvent.keyDown(filter, { key: 'ArrowDown' })
-    fireEvent.keyDown(filter, { key: 'Enter' })
+    expect(document.activeElement).toBe(filter)
+    await user.keyboard('{ArrowDown}{Enter}')
     expect(pickerButton().getAttribute('aria-label')).toBe('Workspace: atlas')
     expect(launched.createFromDraft).not.toHaveBeenCalled()
   })
@@ -692,12 +735,14 @@ describe('StartWork — workspace picker, where it shows', () => {
   beforeEach(seedTwoWorkspaces)
 
   it('is not offered on the Scratch terminal tab', async () => {
+    const user = userEvent.setup()
     await open()
-    goToTab('Scratch terminal')
+    await goToTab(user, 'Scratch terminal')
     expect(screen.queryByRole('button', { name: /^Workspace:/ })).toBeNull()
   })
 
   it('names the team of a linked ticket as the reason', async () => {
+    const user = userEvent.setup()
     useWorkspaceStore.setState({
       activeWorkspaceId: 'ws-1',
       projectsByWorkspaceId: new Map([
@@ -710,7 +755,7 @@ describe('StartWork — workspace picker, where it shows', () => {
     } as never)
     await open()
     expect(pickerButton().getAttribute('aria-label')).toBe('Workspace: atlas')
-    fireEvent.click(pickerButton())
+    await user.click(pickerButton())
     expect(screen.getByText('suggested · TAV ticket linked here')).toBeTruthy()
   })
 })
@@ -722,16 +767,17 @@ const secondWorkspaceProject: Project = {
   gitBranch: 'tav-1',
 }
 
-const typePrompt = (text: string) => {
-  goToTab('Prompt')
-  fireEvent.change(searchBox(), { target: { value: text } })
+const typePrompt = async (user: UserEvent, text: string) => {
+  await goToTab(user, 'Prompt')
+  await pasteInto(user, searchBox(), text)
 }
 
 describe('StartWork — a prompt on a branch of its own', () => {
   it('runs an agent prompt in a new worktree on the branch the agent named', async () => {
+    const user = userEvent.setup()
     const onClose = await open()
-    typePrompt("fix the dev's build")
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await typePrompt(user, "fix the dev's build")
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(launched.createFromDraft).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -749,10 +795,11 @@ describe('StartWork — a prompt on a branch of its own', () => {
 
 describe('StartWork — a prompt on its own branch, failures', () => {
   it('falls back to prompt/ and the first four words when the agent fails', async () => {
+    const user = userEvent.setup()
     nameBranch.mockRejectedValue(new Error('no agent'))
     const onClose = await open()
-    typePrompt("fix the dev's build")
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await typePrompt(user, "fix the dev's build")
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(launched.createFromDraft).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -764,10 +811,11 @@ describe('StartWork — a prompt on its own branch, failures', () => {
 
 describe('StartWork — a prompt on its own branch, fallbacks', () => {
   it('falls back when the agent answers something that is not a branch name', async () => {
+    const user = userEvent.setup()
     nameBranch.mockResolvedValue({ text: 'Sure! Here you go' })
     const onClose = await open()
-    typePrompt('tidy the readme')
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await typePrompt(user, 'tidy the readme')
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(launched.createFromDraft).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -778,33 +826,44 @@ describe('StartWork — a prompt on its own branch, fallbacks', () => {
 })
 
 describe('StartWork — the branch summary of a prompt', () => {
+  afterEach(() => void vi.useRealTimers())
+
   it('shows the branch, who named it, and a new worktree', async () => {
+    const user = userEvent.setup()
     await open()
-    typePrompt("fix the dev's build")
+    await goToTab(user, 'Prompt')
+    await user.click(searchBox())
+    // Testing Library's own waits need the clock to move; the 800 ms naming pause is jumped below.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true })
+    await user.paste("fix the dev's build")
     const summary = screen.getByRole('group', { name: 'Where it runs' })
     expect(within(summary).getByText('a new worktree')).toBeTruthy()
     expect(within(summary).getByText('prompt/fix-the-dev-s')).toBeTruthy()
-    expect(await within(summary).findByText(/fix\/dev-build/, {}, { timeout: 3000 })).toBeTruthy()
+    await act(() => vi.advanceTimersByTimeAsync(800))
+    expect(within(summary).getByText(/fix\/dev-build/)).toBeTruthy()
     expect(within(summary).getByText('named by Claude')).toBeTruthy()
   })
+})
 
+describe('StartWork — the branch summary of a prompt — the repo folder', () => {
   it('keeps the repo folder, and asks for no name, when "Use the repo folder" is checked', async () => {
+    const user = userEvent.setup()
     await open()
-    typePrompt('tidy the readme')
-    useRepoFolder()
+    await typePrompt(user, 'tidy the readme')
+    await useRepoFolder(user)
     const summary = screen.getByRole('group', { name: 'Where it runs' })
     expect(within(summary).getByText('the repo folder')).toBeTruthy()
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(launched.agentInBranch).toHaveBeenCalled())
     expect(nameBranch).not.toHaveBeenCalled()
     expect(launched.createFromDraft).not.toHaveBeenCalled()
   })
 
   it('offers no worktree for Terminal only', async () => {
+    const user = userEvent.setup()
     await open()
-    typePrompt('tidy the readme')
-    fireEvent.keyDown(searchBox(), { key: 'Tab' })
-    fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    await typePrompt(user, 'tidy the readme')
+    await pressInBox(user, '{Tab}{Tab}')
     expect(screen.queryByRole('checkbox', { name: 'Use the repo folder' })).toBeNull()
   })
 })
@@ -813,8 +872,9 @@ describe('StartWork — When', () => {
   const choice = (name: string) => screen.getByRole('radio', { name })
 
   it('offers Now, Once and Repeat on a prompt, Now first', async () => {
+    const user = userEvent.setup()
     await open()
-    typePrompt('tidy the readme')
+    await typePrompt(user, 'tidy the readme')
     const group = screen.getByRole('radiogroup', { name: 'When' })
     expect(
       within(group)
@@ -835,10 +895,11 @@ describe('StartWork — When, scheduling', () => {
   const choice = (name: string) => screen.getByRole('radio', { name })
 
   it('shows the time, the note and a Schedule button once it is not Now', async () => {
+    const user = userEvent.setup()
     await open()
-    typePrompt('tidy the readme')
+    await typePrompt(user, 'tidy the readme')
     expect(screen.getByRole('button', { name: /^Start/ })).toBeTruthy()
-    fireEvent.click(choice('Repeat'))
+    await user.click(choice('Repeat'))
     expect((screen.getByLabelText('Time') as HTMLInputElement).value).toBe('09:00')
     expect(
       screen.getByText('Runs while Terminator is open. A missed run waits in Needs you.')
@@ -851,12 +912,13 @@ describe('StartWork — When, saving', () => {
   const choice = (name: string) => screen.getByRole('radio', { name })
 
   it('saves a repeat schedule instead of starting, counts it, and closes', async () => {
+    const user = userEvent.setup()
     createSchedule.mockResolvedValue({ data: {} as never })
     const onClose = await open()
-    typePrompt('tidy the readme')
-    fireEvent.click(choice('Repeat'))
-    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '07:30' } })
-    fireEvent.click(screen.getByRole('button', { name: /^Schedule/ }))
+    await typePrompt(user, 'tidy the readme')
+    await user.click(choice('Repeat'))
+    await setField(user, 'Time', '07:30')
+    await user.click(screen.getByRole('button', { name: /^Schedule/ }))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(createSchedule).toHaveBeenCalledWith({
       repoRoot: '/repo',
@@ -879,12 +941,13 @@ describe('StartWork — When, Once', () => {
   const choice = (name: string) => screen.getByRole('radio', { name })
 
   it('sends a date with Once, and shows a refusal in the dialog', async () => {
+    const user = userEvent.setup()
     createSchedule.mockResolvedValue({ error: 'failed', message: 'The date is in the past.' })
     const onClose = await open()
-    typePrompt('tidy the readme')
-    fireEvent.click(choice('Once'))
-    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2030-01-02' } })
-    fireEvent.click(screen.getByRole('button', { name: /^Schedule/ }))
+    await typePrompt(user, 'tidy the readme')
+    await user.click(choice('Once'))
+    await setField(user, 'Date', '2030-01-02')
+    await user.click(screen.getByRole('button', { name: /^Schedule/ }))
     expect((await screen.findByRole('alert')).textContent).toBe('The date is in the past.')
     expect(createSchedule).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'once', date: '2030-01-02' })
@@ -895,8 +958,9 @@ describe('StartWork — When, Once', () => {
 
 describe('StartWork — the Prompt tab', () => {
   it('has its own box and no field in the title bar', async () => {
+    const user = userEvent.setup()
     await open()
-    goToTab('Prompt')
+    await goToTab(user, 'Prompt')
     expect(screen.queryByRole('textbox', { name: 'Search tickets or type a prompt' })).toBeNull()
     expect(screen.getByRole('textbox', { name: 'What should it do?' })).toBeTruthy()
   })
@@ -904,8 +968,8 @@ describe('StartWork — the Prompt tab', () => {
   it('Shift+Enter adds a line and Enter starts', async () => {
     const user = userEvent.setup()
     const onClose = await open()
-    goToTab('Prompt')
-    useRepoFolder()
+    await goToTab(user, 'Prompt')
+    await useRepoFolder(user)
     const box = screen.getByRole('textbox', { name: 'What should it do?' }) as HTMLTextAreaElement
     await user.type(box, 'tidy{Shift>}{Enter}{/Shift}readme')
     expect(box.value).toBe('tidy\nreadme')
@@ -920,9 +984,10 @@ describe('StartWork — the Prompt tab', () => {
 
 describe('StartWork — My tickets with no match', () => {
   it('offers to write the text as a prompt and keeps it', async () => {
+    const user = userEvent.setup()
     await open()
-    fireEvent.change(searchBox(), { target: { value: 'zzz no such ticket' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Write it as a prompt' }))
+    await user.type(searchBox(), 'zzz no such ticket')
+    await user.click(screen.getByRole('button', { name: 'Write it as a prompt' }))
     const box = screen.getByRole('textbox', { name: 'What should it do?' }) as HTMLTextAreaElement
     expect(box.value).toBe('zzz no such ticket')
   })
@@ -932,10 +997,11 @@ describe('StartWork — When, Repeat', () => {
   const choice = (name: string) => screen.getByRole('radio', { name })
 
   it('shows three next times and how many runs a day', async () => {
+    const user = userEvent.setup()
     await open()
-    typePrompt('tidy the readme')
-    fireEvent.click(choice('Repeat'))
-    fireEvent.click(screen.getByRole('button', { name: 'Every 30 min' }))
+    await typePrompt(user, 'tidy the readme')
+    await user.click(choice('Repeat'))
+    await user.click(screen.getByRole('button', { name: 'Every 30 min' }))
     const next = screen.getByText(/^Next: /).textContent ?? ''
     expect(next).toMatch(/^Next: .+ · \d+ runs a day$/)
     expect(
@@ -951,14 +1017,15 @@ describe('StartWork — When, Repeat, saving', () => {
   const choice = (name: string) => screen.getByRole('radio', { name })
 
   it('saves Every 30 min with the default window and a toggled weekday', async () => {
+    const user = userEvent.setup()
     createSchedule.mockResolvedValue({ data: {} as never })
     const onClose = await open()
-    typePrompt('tidy the readme')
-    fireEvent.click(choice('Repeat'))
-    fireEvent.click(screen.getByRole('button', { name: 'Every 30 min' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Tue' }))
+    await typePrompt(user, 'tidy the readme')
+    await user.click(choice('Repeat'))
+    await user.click(screen.getByRole('button', { name: 'Every 30 min' }))
+    await user.click(screen.getByRole('button', { name: 'Tue' }))
     expect(screen.getByRole('button', { name: 'Tue' }).getAttribute('aria-pressed')).toBe('true')
-    fireEvent.click(screen.getByRole('button', { name: /^Schedule/ }))
+    await user.click(screen.getByRole('button', { name: /^Schedule/ }))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(createSchedule).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -980,11 +1047,13 @@ describe('StartWork — When, Repeat, warning', () => {
   const choice = (name: string) => screen.getByRole('radio', { name })
 
   it('warns when it runs more than every 5 minutes', async () => {
+    const user = userEvent.setup()
     await open()
-    typePrompt('tidy the readme')
-    fireEvent.click(choice('Repeat'))
-    fireEvent.click(screen.getByRole('button', { name: 'Every 30 min' }))
-    fireEvent.change(screen.getByLabelText('Every'), { target: { value: '2' } })
+    await typePrompt(user, 'tidy the readme')
+    await user.click(choice('Repeat'))
+    await user.click(screen.getByRole('button', { name: 'Every 30 min' }))
+    await user.tripleClick(screen.getByLabelText('Every'))
+    await user.keyboard('2')
     expect(screen.getByText('Runs 288 times a day or more.')).toBeTruthy()
   })
 })
@@ -993,25 +1062,26 @@ describe('StartWork — When, a time that cannot run', () => {
   it.each([
     [
       'a Repeat window that ends before it starts',
-      () => {
-        fireEvent.click(screen.getByRole('radio', { name: 'Repeat' }))
-        fireEvent.click(screen.getByRole('button', { name: 'Every 30 min' }))
-        fireEvent.change(screen.getByLabelText('To'), { target: { value: '08:00' } })
+      async (user: UserEvent) => {
+        await user.click(screen.getByRole('radio', { name: 'Repeat' }))
+        await user.click(screen.getByRole('button', { name: 'Every 30 min' }))
+        await setField(user, 'To', '08:00')
       },
       'The end time must be after the start time.',
     ],
     [
       'Once in the past',
-      () => {
-        fireEvent.click(screen.getByRole('radio', { name: 'Once' }))
-        fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2020-01-01' } })
+      async (user: UserEvent) => {
+        await user.click(screen.getByRole('radio', { name: 'Once' }))
+        await setField(user, 'Date', '2020-01-01')
       },
       'That time has passed.',
     ],
   ])('shows an error and disables Schedule for %s', async (_case, chooseWhen, error) => {
+    const user = userEvent.setup()
     await open()
-    typePrompt('tidy the readme')
-    chooseWhen()
+    await typePrompt(user, 'tidy the readme')
+    await chooseWhen(user)
     expect(screen.getByText(error)).toBeTruthy()
     const button = screen.getByRole('button', { name: /^Schedule/ }) as HTMLButtonElement
     expect(button.disabled).toBe(true)
@@ -1020,15 +1090,16 @@ describe('StartWork — When, a time that cannot run', () => {
 
 describe('StartWork — Once after a clock repeat', () => {
   it('saves the time shown, not the repeat window start', async () => {
+    const user = userEvent.setup()
     createSchedule.mockResolvedValue({ data: {} as never })
     await open()
-    typePrompt('cut the release notes')
-    fireEvent.click(screen.getByRole('radio', { name: 'Repeat' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Every 30 min' }))
-    fireEvent.click(screen.getByRole('radio', { name: 'Once' }))
-    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2099-01-01' } })
-    fireEvent.change(screen.getByLabelText('Time'), { target: { value: '17:00' } })
-    fireEvent.click(screen.getByRole('button', { name: /^Schedule/ }))
+    await typePrompt(user, 'cut the release notes')
+    await user.click(screen.getByRole('radio', { name: 'Repeat' }))
+    await user.click(screen.getByRole('button', { name: 'Every 30 min' }))
+    await user.click(screen.getByRole('radio', { name: 'Once' }))
+    await setField(user, 'Date', '2099-01-01')
+    await setField(user, 'Time', '17:00')
+    await user.click(screen.getByRole('button', { name: /^Schedule/ }))
     await waitFor(() => expect(createSchedule).toHaveBeenCalled())
     expect(createSchedule.mock.calls.at(-1)?.[0]).toMatchObject({ kind: 'once', time: '17:00' })
   })
@@ -1036,24 +1107,24 @@ describe('StartWork — Once after a clock repeat', () => {
 
 describe('StartWork — keys on a focused control', () => {
   it('Enter on a preset presses it and saves nothing', async () => {
-    await open()
-    typePrompt('tidy the readme')
-    fireEvent.click(screen.getByRole('radio', { name: 'Repeat' }))
-    // Not prevented: the browser turns it into a click on the preset.
-    expect(
-      fireEvent.keyDown(screen.getByRole('button', { name: 'Hourly' }), { key: 'Enter' })
-    ).toBe(true)
-    expect(fireEvent.keyDown(screen.getByRole('button', { name: 'Hourly' }), { key: 'Tab' })).toBe(
-      true
-    )
+    const user = userEvent.setup()
+    const onClose = await open()
+    await typePrompt(user, 'tidy the readme')
+    await user.click(screen.getByRole('radio', { name: 'Repeat' }))
+    screen.getByRole('button', { name: 'Hourly' }).focus()
+    await user.keyboard('{Enter}')
+    expect((screen.getByRole('combobox', { name: 'Unit' }) as HTMLSelectElement).value).toBe('hour')
+    expect(createSchedule).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
   })
 
   it('Enter in the prompt box does not save a schedule Schedule refuses', async () => {
+    const user = userEvent.setup()
     await open()
-    typePrompt('tidy the readme')
-    fireEvent.click(screen.getByRole('radio', { name: 'Once' }))
-    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2020-01-01' } })
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await typePrompt(user, 'tidy the readme')
+    await user.click(screen.getByRole('radio', { name: 'Once' }))
+    await setField(user, 'Date', '2020-01-01')
+    await pressInBox(user, '{Enter}')
     expect(createSchedule).not.toHaveBeenCalled()
   })
 })
@@ -1077,13 +1148,14 @@ describe('whenProblem — a repeat that never runs', () => {
 
 describe('StartWork — an extension option on a repeat', () => {
   it('is refused: each run would start a new order', async () => {
+    const user = userEvent.setup()
     registerFoundryOption()
     useExtensionCommandsRegistered()
     await open()
-    goToTab('Prompt')
-    fireEvent.change(searchBox(), { target: { value: 'fix the build' } })
-    for (let step = 0; step < 3; step++) fireEvent.keyDown(searchBox(), { key: 'Tab' })
-    fireEvent.click(screen.getByRole('radio', { name: 'Repeat' }))
+    await goToTab(user, 'Prompt')
+    await user.type(searchBox(), 'fix the build')
+    await pressInBox(user, '{Tab}{Tab}{Tab}')
+    await user.click(screen.getByRole('radio', { name: 'Repeat' }))
     expect(screen.getByText('Foundry order cannot repeat. Pick Once or Now.')).toBeTruthy()
     const button = screen.getByRole('button', { name: /^Schedule/ }) as HTMLButtonElement
     expect(button.disabled).toBe(true)
@@ -1094,18 +1166,19 @@ const runAsNames = () =>
   within(screen.getByRole('radiogroup', { name: 'Run it as' }))
     .getAllByRole('radio')
     .map((r) => r.getAttribute('aria-label'))
-const pickGlobal = () => {
-  fireEvent.click(pickerButton())
-  fireEvent.click(within(listbox()).getByRole('option', { name: /Global/ }))
+const pickGlobal = async (user: UserEvent) => {
+  await user.click(pickerButton())
+  await user.click(within(listbox()).getByRole('option', { name: /Global/ }))
 }
 
 describe('StartWork — Global in the workspace picker', () => {
   beforeEach(seedTwoWorkspaces)
 
   it('offers Global first on the Prompt tab, with where it runs', async () => {
+    const user = userEvent.setup()
     await open()
-    goToTab('Prompt')
-    fireEvent.click(pickerButton())
+    await goToTab(user, 'Prompt')
+    await user.click(pickerButton())
     const options = within(listbox()).getAllByRole('option')
     expect(options.map((o) => o.textContent)).toEqual([
       expect.stringMatching(/^Globalno workspace~ · shows in Scratch$/),
@@ -1115,20 +1188,26 @@ describe('StartWork — Global in the workspace picker', () => {
   })
 
   it('does not offer Global on My tickets', async () => {
+    const user = userEvent.setup()
     await open()
-    fireEvent.click(pickerButton())
+    await user.click(pickerButton())
     expect(within(listbox()).queryByRole('option', { name: /Global/ })).toBeNull()
   })
+})
+
+describe('StartWork — Global in the workspace picker — filtering', () => {
+  beforeEach(seedTwoWorkspaces)
 
   it('filters Global out with the workspaces, and picks it with Enter', async () => {
+    const user = userEvent.setup()
     await open()
-    goToTab('Prompt')
-    fireEvent.click(pickerButton())
+    await goToTab(user, 'Prompt')
+    await user.click(pickerButton())
     const filter = screen.getByRole('textbox', { name: 'Filter workspaces' })
-    fireEvent.change(filter, { target: { value: 'atl' } })
+    await user.type(filter, 'atl')
     expect(within(listbox()).queryByRole('option', { name: /Global/ })).toBeNull()
-    fireEvent.change(filter, { target: { value: 'glo' } })
-    fireEvent.keyDown(filter, { key: 'Enter' })
+    await user.clear(filter)
+    await user.type(filter, 'glo{Enter}')
     expect(pickerButton().getAttribute('aria-label')).toBe('Workspace: Global')
   })
 })
@@ -1137,10 +1216,11 @@ describe('StartWork — Global chosen', () => {
   beforeEach(seedTwoWorkspaces)
 
   it('runs only as the agent tab or Claude in a terminal, and says where it runs', async () => {
+    const user = userEvent.setup()
     await open()
-    typePrompt('sum up the PRs')
-    fireEvent.click(screen.getByRole('radio', { name: 'Terminal only' }))
-    pickGlobal()
+    await typePrompt(user, 'sum up the PRs')
+    await user.click(screen.getByRole('radio', { name: 'Terminal only' }))
+    await pickGlobal(user)
     expect(pickerButton().textContent).toMatch(/Global/)
     expect(runAsNames()).toEqual(['Claude Code in an agent tab', 'Claude in a terminal'])
     expect(screen.getByRole('radio', { checked: true, name: /agent tab/ })).toBeTruthy()
@@ -1150,10 +1230,11 @@ describe('StartWork — Global chosen', () => {
   })
 
   it('goes back to the suggested workspace on another tab', async () => {
+    const user = userEvent.setup()
     await open()
-    goToTab('Prompt')
-    pickGlobal()
-    goToTab('My tickets')
+    await goToTab(user, 'Prompt')
+    await pickGlobal(user)
+    await goToTab(user, 'My tickets')
     expect(pickerButton().getAttribute('aria-label')).toBe('Workspace: terminator')
   })
 })
@@ -1162,22 +1243,24 @@ describe('StartWork — Global, starting', () => {
   beforeEach(seedTwoWorkspaces)
 
   it('starts the prompt in Scratch on Enter with When Now, and closes', async () => {
+    const user = userEvent.setup()
     const onClose = await open()
-    typePrompt('sum up the PRs')
-    pickGlobal()
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await typePrompt(user, 'sum up the PRs')
+    await pickGlobal(user)
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(launched.global).toHaveBeenCalledWith({ text: 'sum up the PRs', runAs: 'agent' })
     expect(launched.agentInBranch).not.toHaveBeenCalled()
   })
 
   it('says why when it does not start', async () => {
+    const user = userEvent.setup()
     launched.global.mockResolvedValue(null)
     const onClose = await open()
-    typePrompt('x'.repeat(2000))
-    pickGlobal()
-    fireEvent.click(screen.getByRole('radio', { name: 'Claude in a terminal' }))
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await typePrompt(user, 'x'.repeat(2000))
+    await pickGlobal(user)
+    await user.click(screen.getByRole('radio', { name: 'Claude in a terminal' }))
+    await pressInBox(user, '{Enter}')
     expect((await screen.findByRole('alert')).textContent).toBe(
       'That prompt is too long to start an agent with. Shorten it.'
     )
@@ -1189,12 +1272,13 @@ describe('StartWork — Global, scheduling', () => {
   beforeEach(seedTwoWorkspaces)
 
   it('saves with no workspace, no branch and no worktree', async () => {
+    const user = userEvent.setup()
     createSchedule.mockResolvedValue({ data: {} as never })
     const onClose = await open()
-    typePrompt('sum up the PRs')
-    pickGlobal()
-    fireEvent.click(screen.getByRole('radio', { name: 'Repeat' }))
-    fireEvent.click(screen.getByRole('button', { name: /^Schedule/ }))
+    await typePrompt(user, 'sum up the PRs')
+    await pickGlobal(user)
+    await user.click(screen.getByRole('radio', { name: 'Repeat' }))
+    await user.click(screen.getByRole('button', { name: /^Schedule/ }))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(createSchedule).toHaveBeenCalledWith(
       expect.objectContaining({ repoRoot: null, branch: null, newWorktree: false, runAs: 'agent' })
@@ -1284,10 +1368,12 @@ describe('StartWork — editing a scheduled run, saving', () => {
   beforeEach(seedTwoWorkspaces)
 
   it('saves the changes on the same id and keeps the branch, then closes', async () => {
+    const user = userEvent.setup()
     updateSchedule.mockResolvedValue({ data: {} as never })
     const onClose = await openEditing(savedRun)
-    fireEvent.change(searchBox(), { target: { value: 'Triage new errors' } })
-    fireEvent.click(screen.getByRole('button', { name: /^Save changes/ }))
+    await user.clear(searchBox())
+    await user.type(searchBox(), 'Triage new errors')
+    await user.click(screen.getByRole('button', { name: /^Save changes/ }))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(updateSchedule).toHaveBeenCalledWith({
       id: 'sch-1',
@@ -1310,11 +1396,12 @@ describe('StartWork — editing a scheduled run, another workspace or a refusal'
   beforeEach(seedTwoWorkspaces)
 
   it('names the branch again when the workspace changes', async () => {
+    const user = userEvent.setup()
     updateSchedule.mockResolvedValue({ data: {} as never })
     const onClose = await openEditing(savedRun)
-    fireEvent.click(pickerButton())
-    fireEvent.click(within(listbox()).getByRole('option', { name: /atlas/ }))
-    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await user.click(pickerButton())
+    await user.click(within(listbox()).getByRole('option', { name: /atlas/ }))
+    await pressInBox(user, '{Enter}')
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(updateSchedule).toHaveBeenCalledWith(
       expect.objectContaining({ repoRoot: '/atlas', branch: 'fix/dev-build' })
@@ -1326,10 +1413,11 @@ describe('StartWork — editing a scheduled run, guards', () => {
   beforeEach(seedTwoWorkspaces)
 
   it('drops the branch when the run no longer runs on one', async () => {
+    const user = userEvent.setup()
     updateSchedule.mockResolvedValue({ data: {} as never })
     const onClose = await openEditing(savedRun)
-    fireEvent.click(screen.getByRole('radio', { name: 'Terminal only' }))
-    fireEvent.click(screen.getByRole('button', { name: /^Save changes/ }))
+    await user.click(screen.getByRole('radio', { name: 'Terminal only' }))
+    await user.click(screen.getByRole('button', { name: /^Save changes/ }))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(updateSchedule).toHaveBeenCalledWith(
       expect.objectContaining({ runAs: 'terminal', branch: null, newWorktree: false })
@@ -1337,19 +1425,25 @@ describe('StartWork — editing a scheduled run, guards', () => {
   })
 
   it('refuses to move a run whose workspace is gone to the suggested one', async () => {
+    const user = userEvent.setup()
     const onClose = await openEditing({ ...savedRun, repoRoot: '/removed' })
-    fireEvent.click(screen.getByRole('button', { name: /^Save changes/ }))
+    await user.click(screen.getByRole('button', { name: /^Save changes/ }))
     expect((await screen.findByRole('alert')).textContent).toBe(
       'Its workspace is no longer in the sidebar. Pick a workspace or Global.'
     )
     expect(updateSchedule).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
   })
+})
+
+describe('StartWork — editing a scheduled run, guards — a refusal', () => {
+  beforeEach(seedTwoWorkspaces)
 
   it('shows the refusal and stays open', async () => {
+    const user = userEvent.setup()
     updateSchedule.mockResolvedValue({ error: 'failed', message: 'No such schedule.' })
     const onClose = await openEditing(savedRun)
-    fireEvent.click(screen.getByRole('button', { name: /^Save changes/ }))
+    await user.click(screen.getByRole('button', { name: /^Save changes/ }))
     expect((await screen.findByRole('alert')).textContent).toBe('No such schedule.')
     expect(onClose).not.toHaveBeenCalled()
   })

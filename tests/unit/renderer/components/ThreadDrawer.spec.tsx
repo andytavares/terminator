@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ThreadDrawer } from '../../../../src/renderer/components/home/ThreadDrawer'
 import { useDeskSelection } from '../../../../src/renderer/components/home/desk-selection'
 import { useHomeFeedStore } from '../../../../src/renderer/stores/home-feed.store'
@@ -69,7 +70,7 @@ const recordUse = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
 
 describe('ThreadDrawer terminal section', () => {
-  it("shows the lead agent session's live terminal and opens it on click", () => {
+  it("shows the lead agent session's live terminal and opens it on click", async () => {
     const agent = {
       agentId: 'claude',
       transport: 'tui',
@@ -83,17 +84,24 @@ describe('ThreadDrawer terminal section', () => {
     expect(screen.getByText('LIVE TERMINAL · claude')).toBeTruthy()
     expect(screen.getByTestId('preview-s9')).toBeTruthy()
     expect(screen.getByText('Click the terminal to open it full size.')).toBeTruthy()
-    fireEvent.click(terminalBox())
+    await userEvent.click(terminalBox())
     expect(spies.open.mock.calls.map(([id]) => id)).toContain('s9')
   })
+})
 
-  it('opens the terminal on Enter from the terminal box', () => {
+describe('ThreadDrawer terminal section — the keyboard', () => {
+  it('opens the terminal on Enter from the terminal box', async () => {
+    const user = userEvent.setup()
     openDrawerFor([fact({ ...OPEN_SESSION })], 'linear:TAV-20')
     render(<ThreadDrawer />)
-    fireEvent.keyDown(terminalBox(), { key: 'Enter' })
+    terminalBox().focus()
+    expect(document.activeElement).toBe(terminalBox())
+    await user.keyboard('{Enter}')
     expect(spies.open.mock.calls.map(([id]) => id)).toContain('s9')
   })
+})
 
+describe('ThreadDrawer terminal section — the name', () => {
   it('names a shell session by its shell basename', () => {
     openDrawerFor([fact({ ...OPEN_SESSION, shell: '/bin/zsh' })], 'linear:TAV-20')
     render(<ThreadDrawer />)
@@ -111,7 +119,8 @@ describe('ThreadDrawer terminal section lifecycle', () => {
 })
 
 describe('ThreadDrawer links', () => {
-  it('shows a button for each link a facet publishes and opens its address', () => {
+  it('shows a button for each link a facet publishes and opens its address', async () => {
+    const user = userEvent.setup()
     const url = 'https://claude.ai/artifact/abc'
     useHomeFeedStore.setState({
       facets: [
@@ -126,7 +135,7 @@ describe('ThreadDrawer links', () => {
     })
     openDrawerFor([fact({ ...OPEN_SESSION })], 'linear:TAV-20')
     render(<ThreadDrawer />)
-    fireEvent.click(screen.getByRole('button', { name: 'Open artifact' }))
+    await user.click(screen.getByRole('button', { name: 'Open artifact' }))
     expect(openExternal).toHaveBeenCalledWith(url)
   })
 })

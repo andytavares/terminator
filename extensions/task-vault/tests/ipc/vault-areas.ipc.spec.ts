@@ -211,9 +211,9 @@ function taskVaultVaultArchiveAreaArchivingTests() {
 
     expect(await areaRow('Work')).toMatchObject({ status: 'archived' })
     expect(await projectRowById('p1')).toMatchObject({ status: 'archived' })
-    for (const id of ['project-task', 'project-sub', 'area-task']) {
-      expect(await selectTaskRow(db, id)).toMatchObject({ status: 'cancelled' })
-    }
+    expect(await selectTaskRow(db, 'project-task')).toMatchObject({ status: 'cancelled' })
+    expect(await selectTaskRow(db, 'project-sub')).toMatchObject({ status: 'cancelled' })
+    expect(await selectTaskRow(db, 'area-task')).toMatchObject({ status: 'cancelled' })
     expect(await selectTaskRow(db, 'finished')).toMatchObject({ status: 'done' })
     expect(await selectTaskRow(db, 'elsewhere')).toMatchObject({ status: 'open' })
   })
@@ -299,16 +299,17 @@ function taskVaultVaultArchiveAreaLegacyArchivesTests() {
     const archivedAt = '2026-02-01T10:00:00.000Z'
     await db.run(`UPDATE areas SET status='archived', updated_at=? WHERE id='a1'`, [archivedAt])
     await db.run(`UPDATE projects SET status='archived', updated_at=? WHERE id='p1'`, [archivedAt])
-    for (const id of ['project-task', 'project-sub', 'area-task']) {
-      await db.run(`UPDATE tasks SET status='cancelled', updated_at=? WHERE id=?`, [archivedAt, id])
-    }
+    await db.run(
+      `UPDATE tasks SET status='cancelled', updated_at=?
+       WHERE id IN ('project-task', 'project-sub', 'area-task')`,
+      [archivedAt]
+    )
 
     await harness.invoke('task-vault:vault:restore-area', { areaName: 'Work' })
 
     expect(await projectRowById('p1')).toMatchObject({ status: 'active' })
-    for (const id of ['project-task', 'area-task']) {
-      expect(await selectTaskRow(db, id)).toMatchObject({ status: 'open' })
-    }
+    expect(await selectTaskRow(db, 'project-task')).toMatchObject({ status: 'open' })
+    expect(await selectTaskRow(db, 'area-task')).toMatchObject({ status: 'open' })
     expect(await selectTaskRow(db, 'user-cancelled')).toMatchObject({ status: 'cancelled' })
   })
 }
@@ -397,9 +398,10 @@ function taskVaultVaultUpdateProjectUpdatingTests() {
   })
 
   it('falls back to the project id', async () => {
-    expect(await updateProjectStatusVia({ projectFilePath: 'proj-1', status: 'active' })).toEqual({
+    expect(await updateProjectStatusVia({ projectFilePath: 'proj-1', status: 'someday' })).toEqual({
       success: true,
     })
+    expect(await projectRowById('proj-1')).toMatchObject({ status: 'someday' })
   })
 }
 

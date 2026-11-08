@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { KeyboardHelp } from '../../src/components/pr-review/KeyboardHelp'
 
 vi.mock('@terminator/extension-ui', () => ({
@@ -32,10 +33,11 @@ describe('KeyboardHelp', () => {
     expect(screen.getByText('Peek definition')).toBeTruthy()
   })
 
-  it('calls onClose when dismissed', () => {
+  it('calls onClose when dismissed', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     render(<KeyboardHelp onClose={onClose} />)
-    fireEvent.click(screen.getByText('Dismiss'))
+    await user.click(screen.getByRole('button', { name: 'Dismiss' }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 })

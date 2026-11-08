@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
+import { render, screen, cleanup, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { installVaultBridge, eventually, task } from './helpers/bridge'
 import { invalidateSmartInputCache } from '../../src/components/SmartTaskInput'
 import { useVaultNavStore } from '../../src/stores/vault-nav.store'
@@ -59,25 +60,30 @@ function inboxListListingTests() {
 }
 
 function inboxListCapturingAndReloadingTests() {
-  it('captures a new item and reloads', async () => {
+  it('captures the trimmed text of a new item and reloads the inbox', async () => {
+    const user = userEvent.setup()
     render(<InboxView />)
     await screen.findByText('2 items')
-    const capture = screen.getByRole('button', { name: 'Capture' })
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: '  new thing ' } })
-    fireEvent.click(capture)
+    await user.type(screen.getByRole('textbox'), '  new thing ')
+    await user.click(screen.getByRole('button', { name: 'Capture' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:capture')).toEqual([{ text: 'new thing' }])
     )
     await eventually(() => expect(inboxLoads()).toBeGreaterThanOrEqual(3))
   })
 
-  it('shows the empty state, an error, and reloads on index changes', async () => {
+  it('shows the empty state when an index change leaves no items', async () => {
     bridge.responses['task-vault:vault:get-inbox'] = { tasks: [task('i9', 'solo')] }
     render(<InboxView />)
     expect(await screen.findByText('1 item')).toBeTruthy()
     bridge.responses['task-vault:vault:get-inbox'] = { tasks: [] }
     await act(async () => bridge.push('task-vault:push:index-updated', {}))
     expect(await screen.findByText('Inbox is empty.')).toBeTruthy()
+  })
+
+  it('shows the load error when the reload after an index change fails', async () => {
+    render(<InboxView />)
+    await screen.findByText('2 items')
     bridge.responses['task-vault:vault:get-inbox'] = { error: 'locked' }
     await act(async () => bridge.push('task-vault:push:index-updated', {}))
     expect(await screen.findByText('locked')).toBeTruthy()
@@ -87,16 +93,18 @@ function inboxListCapturingAndReloadingTests() {
 function inboxItemTests() {
   describe('editing', inboxItemEditingTests)
   describe('moving', inboxItemMovingTests)
+  describe('deleting', inboxItemDeletingTests)
 }
 
 function inboxItemEditingTests() {
-  it('edits an item from its raw tagged text on double-click', async () => {
+  it('edits an item from its raw tagged text on double-click and saves the new text', async () => {
+    const user = userEvent.setup()
     render(<InboxView />)
-    fireEvent.doubleClick(await screen.findByText('buy stamps'))
-    const field = screen.getAllByRole('textbox')[1] as HTMLInputElement
-    expect(field.value).toBe('buy stamps @Home-Admin +out #Life due:2026-02-01')
-    fireEvent.change(field, { target: { value: 'buy more stamps' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await user.dblClick(await screen.findByText('buy stamps'))
+    const field = screen.getByDisplayValue('buy stamps @Home-Admin +out #Life due:2026-02-01')
+    await user.clear(field)
+    await user.type(field, 'buy more stamps')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:edit-task')).toEqual([
         { taskId: 'i1', text: 'buy more stamps' },
@@ -104,33 +112,48 @@ function inboxItemEditingTests() {
     )
   })
 
-  it('cancels an edit', async () => {
+  it('closes the editor without saving when the edit is cancelled', async () => {
+    const user = userEvent.setup()
     render(<InboxView />)
-    fireEvent.doubleClick(await screen.findByText('idea'))
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancel edit' }))
+    await user.dblClick(await screen.findByText('idea'))
+    await user.click(await screen.findByRole('button', { name: 'Cancel edit' }))
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
+    expect(bridge.calls('task-vault:vault:edit-task')).toEqual([])
   })
 }
 
 function inboxItemMovingTests() {
-  it('moves an item to today, to the backlog, or deletes it', async () => {
+  it("files an item on today's log", async () => {
+    const user = userEvent.setup()
     render(<InboxView />)
     await screen.findByText('2 items')
-    fireEvent.click(screen.getAllByRole('button', { name: "Move to Today's log" })[0])
+    await user.click(screen.getAllByRole('button', { name: "Move to Today's log" })[0])
     await eventually(() =>
-      expect(bridge.calls('task-vault:vault:process-inbox-item')[0]).toMatchObject({
-        taskId: 'i1',
-        action: 'file',
-      })
+      expect(bridge.calls('task-vault:vault:process-inbox-item')).toEqual([
+        expect.objectContaining({ taskId: 'i1', action: 'file' }),
+      ])
     )
-    fireEvent.click(screen.getAllByRole('button', { name: 'Move to backlog' })[1])
+  })
+
+  it('moves an item to the backlog as someday', async () => {
+    const user = userEvent.setup()
+    render(<InboxView />)
+    await screen.findByText('2 items')
+    await user.click(screen.getAllByRole('button', { name: 'Move to backlog' })[1])
     await eventually(() =>
-      expect(bridge.calls('task-vault:vault:process-inbox-item')[1]).toEqual({
-        taskId: 'i2',
-        action: 'someday',
-      })
+      expect(bridge.calls('task-vault:vault:process-inbox-item')).toEqual([
+        { taskId: 'i2', action: 'someday' },
+      ])
     )
-    fireEvent.click(screen.getAllByRole('button', { name: 'Delete' })[0])
+  })
+}
+
+function inboxItemDeletingTests() {
+  it('deletes an item after confirming', async () => {
+    const user = userEvent.setup()
+    render(<InboxView />)
+    await screen.findByText('2 items')
+    await user.click(screen.getAllByRole('button', { name: 'Delete' })[0])
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:delete-task')).toEqual([{ taskId: 'i1' }])
     )
@@ -139,20 +162,22 @@ function inboxItemMovingTests() {
 
 function inboxProcessingTests() {
   it('processes the inbox and returns to the daily view when done', async () => {
+    const user = userEvent.setup()
     useVaultNavStore.setState({ activeView: 'inbox' })
     render(<InboxView />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Process inbox (GTD clarify)' }))
+    await user.click(await screen.findByRole('button', { name: 'Process inbox (GTD clarify)' }))
     expect(await screen.findByText('1 of 2')).toBeTruthy()
-    fireEvent.click(await screen.findByRole('button', { name: 'Trash it' }))
+    await user.click(await screen.findByRole('button', { name: 'Trash it' }))
     await screen.findByText('2 of 2')
-    fireEvent.click(await screen.findByRole('button', { name: 'Trash it' }))
+    await user.click(await screen.findByRole('button', { name: 'Trash it' }))
     await eventually(() => expect(useVaultNavStore.getState().activeView).toBe('daily'))
   })
 
   it('goes back to the list from processing', async () => {
+    const user = userEvent.setup()
     render(<InboxView />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Process inbox (GTD clarify)' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Back to list' }))
+    await user.click(await screen.findByRole('button', { name: 'Process inbox (GTD clarify)' }))
+    await user.click(await screen.findByRole('button', { name: 'Back to list' }))
     expect(await screen.findByRole('button', { name: 'Process inbox (GTD clarify)' })).toBeTruthy()
   })
 }

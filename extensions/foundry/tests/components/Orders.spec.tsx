@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { timesInvoked } from '../helpers/bridge-calls.js'
 import React from 'react'
 import { createChangeBus } from '../helpers/change-bus.js'
 import { Orders } from '../../src/components/Orders.js'
@@ -90,11 +92,10 @@ function refetchingTests() {
   it('refetches when Foundry says a gate changed, so an answer given elsewhere lands here', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const { invoke, bus } = mount([row({ openQuestions: 2 })])
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:order.list', {}))
-    const first = invoke.mock.calls.length
+    await waitFor(() => expect(timesInvoked(invoke, 'foundry:order.list')).toBe(1))
     bus.emit({ kind: 'gates', orderId: 'WO-1' })
     await vi.advanceTimersByTimeAsync(200)
-    expect(invoke.mock.calls.length).toBeGreaterThan(first)
+    expect(timesInvoked(invoke, 'foundry:order.list')).toBe(2)
   })
 
   it('does not refetch just because time passes', async () => {
@@ -117,10 +118,11 @@ describe('the New work order quick action', () => {
   })
 
   it('focuses the idea box when the signal changes, and switches away from ticket search', async () => {
+    const user = userEvent.setup()
     const { rerender } = mount([], { focusIdeaSignal: 0 })
     await screen.findByLabelText('Describe what you want built or fixed')
     // Leave the "typed" tab so the effect is proven to switch back to it.
-    screen.getByRole('radio', { name: 'Ticket' }).click()
+    await user.click(screen.getByRole('radio', { name: 'Ticket' }))
     await screen.findByLabelText('Search your tickets')
 
     rerender(<Orders repoRoot="/repos/app" focusIdeaSignal={1} />)
@@ -151,12 +153,9 @@ function mountWith(offer: unknown, created: unknown = { key: 'TAV-16' }) {
   return invoke
 }
 async function submitIdea(text = 'Only list open tickets') {
-  const { fireEvent } = await import('@testing-library/react')
-  fireEvent.change(screen.getByLabelText('Describe what you want built or fixed'), {
-    target: { value: text },
-  })
-  fireEvent.click(screen.getByRole('button', { name: /New order/ }))
-  return fireEvent
+  const user = userEvent.setup()
+  await user.type(screen.getByLabelText('Describe what you want built or fixed'), text)
+  await user.click(screen.getByRole('button', { name: /New order/ }))
 }
 const orderCreates = (invoke: ReturnType<typeof vi.fn>) =>
   invoke.mock.calls.filter(([c]) => c === 'foundry:order.create').map(([, p]) => p)
@@ -181,11 +180,12 @@ function seedingTests() {
 
   it('creates the ticket and seeds the order from it', async () => {
     const invoke = mountWith({ teams: [{ id: 't1', key: 'TAV', name: 'Team' }] })
-    const fire = await submitIdea()
+    const user = userEvent.setup()
+    await submitIdea()
     await screen.findByText(/Create a Linear ticket for this/)
     expect(orderCreates(invoke)).toHaveLength(0)
     expect(screen.queryByRole('combobox', { name: 'Linear team' })).toBeNull()
-    fire.click(screen.getByRole('button', { name: 'Create ticket' }))
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }))
     await waitFor(() => expect(orderCreates(invoke)).toHaveLength(1))
     expect(invoke).toHaveBeenCalledWith('foundry:ticket.create', {
       idea: 'Only list open tickets',
@@ -200,9 +200,10 @@ function seedingTests() {
 function decliningTests() {
   it('seeds a typed order when the operator declines', async () => {
     const invoke = mountWith({ teams: [{ id: 't1', key: 'TAV', name: 'Team' }] })
-    const fire = await submitIdea()
+    const user = userEvent.setup()
+    await submitIdea()
     await screen.findByText(/Create a Linear ticket for this/)
-    fire.click(screen.getByRole('button', { name: 'No ticket' }))
+    await user.click(screen.getByRole('button', { name: 'No ticket' }))
     await waitFor(() => expect(orderCreates(invoke)).toHaveLength(1))
     expect(orderCreates(invoke)[0]).toMatchObject({ source: { kind: 'typed' } })
     expect(invoke).not.toHaveBeenCalledWith('foundry:ticket.create', expect.anything())
@@ -217,10 +218,11 @@ function teamsTests() {
         { id: 't2', key: 'OPS', name: 'Ops' },
       ],
     })
-    const fire = await submitIdea()
+    const user = userEvent.setup()
+    await submitIdea()
     const picker = await screen.findByRole('combobox', { name: 'Linear team' })
-    fire.change(picker, { target: { value: 't2' } })
-    fire.click(screen.getByRole('button', { name: 'Create ticket' }))
+    await user.selectOptions(picker, 't2')
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:ticket.create', {
         idea: 'Only list open tickets',
@@ -236,9 +238,10 @@ function failureTests() {
       { teams: [{ id: 't1', key: 'TAV', name: 'Team' }] },
       { error: 'Linear refused' }
     )
-    const fire = await submitIdea()
+    const user = userEvent.setup()
+    await submitIdea()
     await screen.findByText(/Create a Linear ticket for this/)
-    fire.click(screen.getByRole('button', { name: 'Create ticket' }))
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }))
     await screen.findByText('Linear refused')
     expect(orderCreates(invoke)).toHaveLength(0)
   })
@@ -334,11 +337,12 @@ function linksTests() {
   const pull = { number: 233, url: 'https://github.com/andytavares/terminator/pull/233' }
 
   it('links the pull request and the ticket, and opens them outside the application', async () => {
+    const user = userEvent.setup()
     const { openExternal } = mount([row({ status: 'running', pulls: [pull], source: ticket })])
     const pullLink = await screen.findByRole('link', { name: '#233' })
     const ticketLink = screen.getByRole('link', { name: 'TAV-15' })
-    fireEvent.click(pullLink)
-    fireEvent.click(ticketLink)
+    await user.click(pullLink)
+    await user.click(ticketLink)
     expect(openExternal).toHaveBeenCalledWith(pull.url)
     expect(openExternal).toHaveBeenCalledWith(ticket.url)
     // A link is not the door: it must not open the order behind it.
@@ -377,6 +381,7 @@ function ciTests() {
 
 function answeringOnTheRowTests() {
   it('answers a shipped order open ready-for-review gate on the row', async () => {
+    const user = userEvent.setup()
     const { invoke } = mount([
       row({
         status: 'shipped',
@@ -389,7 +394,7 @@ function answeringOnTheRowTests() {
         gate: readyGate,
       }),
     ])
-    fireEvent.click(await screen.findByRole('button', { name: 'Mark ready' }))
+    await user.click(await screen.findByRole('button', { name: 'Mark ready' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
         gateId: 'G-1',
@@ -430,8 +435,9 @@ describe('the ticket picker beside the orders', () => {
 
 function theListsTests() {
   it('names each list and counts it', async () => {
+    const user = userEvent.setup()
     mountWithTickets([row()])
-    screen.getByRole('radio', { name: 'Ticket' }).click()
+    await user.click(screen.getByRole('radio', { name: 'Ticket' }))
     const tickets = await screen.findByRole('heading', { name: /Tickets/ })
     expect(tickets.textContent).toBe('Tickets2')
     expect(screen.getByRole('heading', { name: /Orders/ }).textContent).toBe('Orders1')
@@ -453,9 +459,10 @@ function theListsTests() {
 
 describe('the empty list', () => {
   it('offers to start from a ticket, and the Ticket search opens', async () => {
+    const user = userEvent.setup()
     mount([])
     await screen.findByRole('heading', { name: 'No orders yet' })
-    screen.getByRole('button', { name: 'Start from a ticket' }).click()
+    await user.click(screen.getByRole('button', { name: 'Start from a ticket' }))
     await screen.findByLabelText('Search your tickets')
   })
 })

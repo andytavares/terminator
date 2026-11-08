@@ -85,10 +85,11 @@ async function viewDrawn(part: string): Promise<boolean> {
 /** Opens the surface's panel, unless it is up (its band button toggles), and waits for it to draw. */
 async function openSurface({ id, label, part }: Surface): Promise<void> {
   const panel = handle.page.locator(`[data-extension-panel="${id}"]`)
-  if ((await panel.count()) === 0) {
-    // The band, or the repo header's action where the surface lives there; any repo will do.
-    await handle.page.locator(`button[aria-label="${label}"]`).first().click()
-  }
+  // The band, or the repo header's action where the surface lives there; any repo will do.
+  const button = handle.page.locator(`button[aria-label="${label}"]`).first()
+  // The band draws its buttons before any panel it restores; wait for it before reading the panel.
+  await expect(button).toBeVisible()
+  if ((await panel.count()) === 0) await button.click()
   await expect(panel).toHaveCount(1)
   await expect
     .poll(() => viewDrawn(part), {

@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { RichContent } from '../../src/components/pr-review/RichContent'
 
 const mockOpenExternal = vi.fn().mockResolvedValue({ ok: true })
@@ -21,9 +22,12 @@ describe('RichContent', () => {
     expect(container.querySelector('.rich-content.extra')).not.toBeNull()
   })
 
-  it('opens an absolute address through the shell, not in the view', () => {
-    const { container } = render(<RichContent>{'[PR](https://example.com/pr)'}</RichContent>)
-    fireEvent.click(container.querySelector('a')!)
+  it('opens an absolute address through the shell, not in the view', async () => {
+    const user = userEvent.setup()
+    render(<RichContent>{'<hr>\n\n[PR](https://example.com/pr)'}</RichContent>)
+    // Raw HTML draws once the sanitiser loads; that render replaces the link element.
+    await screen.findByRole('separator')
+    await user.click(screen.getByRole('link', { name: 'PR' }))
     expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com/pr')
   })
 

@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { RepoHeader } from '../../../../src/renderer/components/sidebar/RepoHeader'
 import type { RepoGroup } from '../../../../src/renderer/sidebar/branch-rows'
 
@@ -121,10 +122,11 @@ describe('RepoHeader — stays quiet when collapsed with nothing waiting', () =>
 })
 
 describe('RepoHeader — interaction', () => {
-  it('collapses on click', () => {
+  it('collapses on click', async () => {
+    const user = userEvent.setup()
     const onToggleCollapse = vi.fn()
     const { container } = renderHeader({}, { onToggleCollapse })
-    fireEvent.click(container.querySelector('.repo-header')!)
+    await user.click(container.querySelector('.repo-header')!)
     expect(onToggleCollapse).toHaveBeenCalled()
   })
 
@@ -134,18 +136,20 @@ describe('RepoHeader — interaction', () => {
   })
 
   // FR-005. Creating a branch moved here from an always-visible row.
-  it('offers a new branch without also collapsing the repo', () => {
+  it('offers a new branch without also collapsing the repo', async () => {
+    const user = userEvent.setup()
     const onAddBranch = vi.fn()
     const onToggleCollapse = vi.fn()
     renderHeader({}, { onAddBranch, onToggleCollapse })
-    fireEvent.click(screen.getByRole('button', { name: 'New branch in terminator' }))
+    await user.click(screen.getByRole('button', { name: 'New branch in terminator' }))
     expect(onAddBranch).toHaveBeenCalled()
     expect(onToggleCollapse).not.toHaveBeenCalled()
   })
 })
 
 describe('RepoHeader — interaction — hosts registered repo actions', () => {
-  it('hosts registered repo actions', () => {
+  it('hosts registered repo actions', async () => {
+    const user = userEvent.setup()
     const onSelectWorkspaceTab = vi.fn()
     renderHeader(
       {},
@@ -154,7 +158,7 @@ describe('RepoHeader — interaction — hosts registered repo actions', () => {
         onSelectWorkspaceTab,
       }
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Git' }))
+    await user.click(screen.getByRole('button', { name: 'Git' }))
     expect(onSelectWorkspaceTab).toHaveBeenCalledWith('git')
   })
 
@@ -171,21 +175,23 @@ describe('RepoHeader — interaction — hosts registered repo actions', () => {
 })
 
 describe('RepoHeader — interaction — edits and removes from the context menu', () => {
-  it('edits and removes from the context menu', () => {
+  it('edits and removes from the context menu', async () => {
+    const user = userEvent.setup()
     const onEdit = vi.fn()
     const onRemove = vi.fn()
     const { container } = renderHeader({}, { onEdit, onRemove })
-    fireEvent.contextMenu(container.querySelector('.repo-header')!)
-    fireEvent.click(screen.getByText('Edit workspace'))
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.repo-header')! })
+    await user.click(screen.getByText('Edit workspace'))
     expect(onEdit).toHaveBeenCalled()
-    fireEvent.contextMenu(container.querySelector('.repo-header')!)
-    fireEvent.click(screen.getByText('Remove workspace'))
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.repo-header')! })
+    await user.click(screen.getByText('Remove workspace'))
     expect(onRemove).toHaveBeenCalled()
   })
 
-  it('opens no menu when there is nothing to put in it', () => {
+  it('opens no menu when there is nothing to put in it', async () => {
+    const user = userEvent.setup()
     const { container } = renderHeader()
-    fireEvent.contextMenu(container.querySelector('.repo-header')!)
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.repo-header')! })
     expect(document.querySelector('.ctx-menu')).toBeNull()
   })
 })
@@ -227,43 +233,50 @@ describe('RepoHeader — hover reveals without moving anything (FR-031)', () => 
 })
 
 describe('RepoHeader — open in editor', () => {
-  it('offers the action named after the editor that will run', () => {
+  it('offers the action named after the editor that will run', async () => {
+    const user = userEvent.setup()
     const { container } = renderHeader({}, { onOpenInEditor: vi.fn(), editorName: 'Cursor' })
-    fireEvent.contextMenu(container.querySelector('.repo-header')!)
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.repo-header')! })
     expect(screen.getByText('Open in Cursor')).toBeTruthy()
   })
 
-  it('opens the repo folder without also collapsing it', () => {
+  it('opens the repo folder without also collapsing it', async () => {
+    const user = userEvent.setup()
     const onOpenInEditor = vi.fn()
     const onToggleCollapse = vi.fn()
     const { container } = renderHeader({}, { onOpenInEditor, onToggleCollapse })
-    fireEvent.contextMenu(container.querySelector('.repo-header')!)
-    fireEvent.click(screen.getByText('Open in editor'))
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.repo-header')! })
+    await user.click(screen.getByText('Open in editor'))
     expect(onOpenInEditor).toHaveBeenCalled()
     expect(onToggleCollapse).not.toHaveBeenCalled()
   })
 
-  it('opens a menu for it even when nothing else would', () => {
+  it('opens a menu for it even when nothing else would', async () => {
+    const user = userEvent.setup()
     const { container } = renderHeader({}, { onOpenInEditor: vi.fn() })
-    fireEvent.contextMenu(container.querySelector('.repo-header')!)
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.repo-header')! })
     expect(document.querySelector('.ctx-menu')).toBeTruthy()
   })
 
-  it('offers nothing when there is no way to open an editor', () => {
+  it('offers nothing when there is no way to open an editor', async () => {
+    const user = userEvent.setup()
     const { container } = renderHeader({}, { onEdit: vi.fn() })
-    fireEvent.contextMenu(container.querySelector('.repo-header')!)
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.repo-header')! })
     expect(screen.queryByText(/Open in/)).toBeNull()
   })
 })
 
 describe('RepoHeader — keyboard, drop target and a pathless repo', () => {
-  it.each(['Enter', ' '])('collapses on %s, and ignores other keys', (key) => {
+  it.each(['{Enter}', ' '])('collapses on %s, and ignores other keys', async (key) => {
+    const user = userEvent.setup()
     const onToggleCollapse = vi.fn()
     const { container } = renderHeader({}, { onToggleCollapse })
-    const header = container.querySelector('.repo-header')!
-    fireEvent.keyDown(header, { key: 'a' })
+    const header = container.querySelector<HTMLElement>('.repo-header')!
+    header.focus()
+    expect(document.activeElement).toBe(header)
+    await user.keyboard('a')
     expect(onToggleCollapse).not.toHaveBeenCalled()
-    fireEvent.keyDown(header, { key })
+    await user.keyboard(key)
     expect(onToggleCollapse).toHaveBeenCalledOnce()
   })
 

@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { render, screen, cleanup } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { installVaultBridge, eventually } from './helpers/bridge'
 
 import { TaskDetailPanel } from '../../src/components/TaskDetailPanel'
@@ -30,8 +31,10 @@ const editButtons = () => screen.getAllByRole('button', { name: 'Edit' })
 const textarea = () => screen.getByRole('textbox') as HTMLTextAreaElement
 
 describe('TaskDetailPanel loading', detailLoadingTests)
+describe('TaskDetailPanel load errors', detailLoadErrorTests)
 describe('TaskDetailPanel editing', editingTests)
-describe('TaskDetailPanel keys and cancelling', detailKeysTests)
+describe('TaskDetailPanel keys', detailKeysTests)
+describe('TaskDetailPanel cancelling', detailCancelTests)
 
 function detailLoadingTests() {
   it('shows each section, rendering markdown or the first line of the hint', async () => {
@@ -41,13 +44,21 @@ function detailLoadingTests() {
     expect(screen.getByText('- [ ] Criterion one')).toBeTruthy()
     expect(screen.getByText('Acceptance criteria')).toBeTruthy()
   })
+}
 
-  it('shows an error, and closes from its header', async () => {
+function detailLoadErrorTests() {
+  it('shows the load error', async () => {
+    bridge.responses['task-vault:vault:get-task-detail'] = { error: 'Task not found' }
+    renderDetailPanel()
+    expect(await screen.findByText('Task not found')).toBeTruthy()
+  })
+
+  it('closes from the header of the error view', async () => {
+    const user = userEvent.setup()
     bridge.responses['task-vault:vault:get-task-detail'] = { error: 'Task not found' }
     const { onClose } = renderDetailPanel()
-    expect(await screen.findByText('Task not found')).toBeTruthy()
-    fireEvent.click(await screen.findByRole('button', { name: 'Close detail panel' }))
-    expect(onClose).toHaveBeenCalled()
+    await user.click(await screen.findByRole('button', { name: 'Close detail panel' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('shows a thrown failure, and reloads for another task', async () => {
@@ -69,11 +80,13 @@ function editingTests() {
 
 function editingSavingTests() {
   it('edits a section and saves every field together', async () => {
+    const user = userEvent.setup()
     renderDetailPanel()
     await screen.findByText('it')
-    fireEvent.click(editButtons()[1])
-    fireEvent.change(textarea(), { target: { value: '- [x] done' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(editButtons()[1])
+    await user.clear(textarea())
+    await user.type(textarea(), '- [[x] done')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:save-task-detail')).toEqual([
         {
@@ -89,45 +102,70 @@ function editingSavingTests() {
 }
 
 function editingTogglingAndLinksTests() {
-  it('saves from the preview toggle, and starts editing by clicking the text', async () => {
+  it('starts editing the section when its text is clicked', async () => {
+    const user = userEvent.setup()
     renderDetailPanel()
-    fireEvent.click(await screen.findByText('it'))
-    fireEvent.click(await screen.findByRole('button', { name: 'Preview' }))
+    await user.click(await screen.findByText('it'))
+    expect(textarea().value).toBe('Ship **it**')
+  })
+
+  it('saves when the Preview toggle is pressed', async () => {
+    const user = userEvent.setup()
+    renderDetailPanel()
+    await user.click(await screen.findByText('it'))
+    await user.click(await screen.findByRole('button', { name: 'Preview' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:save-task-detail')).toHaveLength(1)
     )
   })
 
   it('opens a link in the text instead of editing', async () => {
+    const user = userEvent.setup()
     renderDetailPanel()
-    fireEvent.click(await screen.findByText('docs'))
+    await user.click(await screen.findByText('docs'))
     expect(openExternal).toHaveBeenCalledWith('https://example.com')
     expect(screen.queryByRole('textbox')).toBeNull()
   })
 }
 
 function detailKeysTests() {
-  it('saves with Cmd+Enter and cancels with Escape', async () => {
+  it('closes the editor without keeping the draft on Escape', async () => {
+    const user = userEvent.setup()
     renderDetailPanel()
     await screen.findByText('it')
-    fireEvent.click(editButtons()[0])
-    fireEvent.change(textarea(), { target: { value: 'changed' } })
-    fireEvent.keyDown(textarea(), { key: 'Escape' })
+    await user.click(editButtons()[0])
+    await user.clear(textarea())
+    await user.type(textarea(), 'changed')
+    expect(document.activeElement).toBe(textarea())
+    await user.keyboard('{Escape}')
     expect(screen.queryByRole('textbox')).toBeNull()
-    fireEvent.click(editButtons()[0])
+    await user.click(editButtons()[0])
     expect(textarea().value).toBe('Ship **it**')
-    fireEvent.keyDown(textarea(), { key: 'Enter', metaKey: true })
+  })
+
+  it('saves with Cmd+Enter', async () => {
+    const user = userEvent.setup()
+    renderDetailPanel()
+    await screen.findByText('it')
+    await user.click(editButtons()[0])
+    await user.click(textarea())
+    expect(document.activeElement).toBe(textarea())
+    await user.keyboard('{Meta>}{Enter}{/Meta}')
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:save-task-detail')).toHaveLength(1)
     )
   })
+}
 
+function detailCancelTests() {
   it('discards a draft with Cancel', async () => {
+    const user = userEvent.setup()
     renderDetailPanel()
     await screen.findByText('it')
-    fireEvent.click(editButtons()[2])
-    fireEvent.change(textarea(), { target: { value: 'nope' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(editButtons()[2])
+    await user.clear(textarea())
+    await user.type(textarea(), 'nope')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.getByText('docs')).toBeTruthy()
     expect(bridge.calls('task-vault:vault:save-task-detail')).toEqual([])
   })

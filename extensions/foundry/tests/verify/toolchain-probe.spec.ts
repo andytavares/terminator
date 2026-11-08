@@ -222,7 +222,7 @@ function precedenceAndE2eTests() {
     write('package.json', JSON.stringify({ scripts: { test: 'vitest run' } }))
     write('vitest.config.ts', 'export default {}')
     write('.github/workflows/ci.yml', 'jobs:\n  a:\n    steps:\n      - run: bun test\n')
-    expect(probeToolchain(repo).test?.source).toBe('hint')
+    expect(probeToolchain(repo).test?.command).toBe('npm run test')
   })
 
   it('finds an end-to-end command distinct from the unit test command', () => {

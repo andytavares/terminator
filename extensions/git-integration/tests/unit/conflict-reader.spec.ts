@@ -63,10 +63,10 @@ describe('readConflictBlocks', () => {
     expect(blocks[1].oursText).toContain('ours B')
   })
 
-  it('includes context lines before and after conflict', () => {
-    const blocks = readConflictBlocks('src/foo.ts', FILE_WITH_TWO_CONFLICTS)
-    expect(blocks[0].contextBefore.length).toBeGreaterThan(0)
-    expect(blocks[0].contextAfter.length).toBeGreaterThan(0)
+  it('includes up to four lines before and after the conflict as context', () => {
+    const [first] = readConflictBlocks('src/foo.ts', FILE_WITH_TWO_CONFLICTS)
+    expect(first.contextBefore).toEqual(['line before 1', 'line before 2'])
+    expect(first.contextAfter).toEqual(['line between', '<<<<<<< HEAD', 'ours B', '======='])
   })
 })
 

@@ -41,8 +41,13 @@ describe('resolveDiagramComment', () => {
 
     await resolveDiagramComment(db, { id: parentId })
 
-    const result = await listDiagramComments(db, { diagramId, includeResolved: false })
-    expect((result as { data: unknown[] }).data).toHaveLength(0)
+    const result = await listDiagramComments(db, { diagramId, includeResolved: true })
+    expect((result as { data: unknown[] }).data).toEqual([
+      expect.objectContaining({
+        status: 'resolved',
+        replies: [expect.objectContaining({ body: 'Reply', status: 'resolved' })],
+      }),
+    ])
   })
 
   it('returns COMMENT_NOT_FOUND for unknown id', async () => {

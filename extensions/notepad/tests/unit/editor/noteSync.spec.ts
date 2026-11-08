@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   NOTES_CHANGED_CHANNEL,
   ORIGIN_ID,
@@ -36,8 +36,6 @@ describe('isForeignChange', () => {
   })
 })
 
-const off = vi.fn()
-
 let handlers: Array<(data: unknown) => void>
 
 describe('onForeignNoteChange', onForeignNoteChangeTests)
@@ -45,24 +43,17 @@ describe('onForeignNoteChange', onForeignNoteChangeTests)
 function onForeignNoteChangeTests() {
   beforeEach(() => {
     handlers = []
-    off.mockClear()
-    Object.assign(globalThis, {
-      window: {
-        electronAPI: {
-          extensionBridge: {
-            on: vi.fn((channel: string, handler: (data: unknown) => void) => {
-              expect(channel).toBe(NOTES_CHANGED_CHANNEL)
-              handlers.push(handler)
-              return off
-            }),
+    vi.stubGlobal('window', {
+      electronAPI: {
+        extensionBridge: {
+          on: (channel: string, handler: (data: unknown) => void) => {
+            expect(channel).toBe(NOTES_CHANGED_CHANNEL)
+            handlers.push(handler)
+            return () => handlers.splice(handlers.indexOf(handler), 1)
           },
         },
       },
     })
-  })
-
-  afterEach(() => {
-    Reflect.deleteProperty(globalThis, 'window')
   })
 
   describe('delivering', onForeignNoteChangeDeliveringTests)
@@ -93,8 +84,12 @@ function onForeignNoteChangeIgnoringUnsubscribingTests() {
     expect(handler).not.toHaveBeenCalled()
   })
 
-  it('returns the unsubscribe function from the bridge', () => {
-    expect(onForeignNoteChange(vi.fn())).toBe(off)
+  it('removes its listener from the bridge when unsubscribed', () => {
+    const unsubscribe = onForeignNoteChange(vi.fn())
+
+    unsubscribe()
+
+    expect(handlers).toEqual([])
   })
 }
 

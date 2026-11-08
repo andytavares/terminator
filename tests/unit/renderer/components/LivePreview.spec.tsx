@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 import { LivePreview } from '../../../../src/renderer/components/session/LivePreview'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
@@ -68,9 +69,10 @@ describe('LivePreview — a terminal in its own window', () => {
     expect(screen.getByText('In its own window')).toBeTruthy()
   })
 
-  it('brings its window forward from the Show window button', () => {
+  it('brings its window forward from the Show window button', async () => {
+    const user = userEvent.setup()
     render(<LivePreview sessionId="s1" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Show window' }))
+    await user.click(screen.getByRole('button', { name: 'Show window' }))
     expect(revealSession).toHaveBeenCalledWith('s1')
   })
 

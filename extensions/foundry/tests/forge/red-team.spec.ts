@@ -153,7 +153,12 @@ function judgementsTests() {
 function untouchedFilesAndUnavailableChecksTests() {
   it('attacks a plan that touches a file no criterion could be about', () => {
     const o = order()
-    o.plan.units[0].touches = ['src/a.css', '.github/workflows/release.yml']
+    const first = { ...o.plan.units[0], touches: ['src/a.css', '.github/workflows/release.yml'] }
+    o.plan.units = [
+      first,
+      { ...first, id: 'U-2', dependsOn: [first.id], touches: [] },
+      { ...first, id: 'U-3', dependsOn: ['U-2'], touches: ['src/b.css'] },
+    ]
     expect(ids(o)).toContain('touches-release-machinery')
   })
 
@@ -181,11 +186,15 @@ function categoriesTests() {
     })
     o.acceptance[0].statement = 'it should be nicer'
     o.acceptance[0].verify = { kind: 'judge', rubric: 'looks right', evidence: ['screenshot'] }
-    o.plan.units[0].touches = ['src/a.css', '.github/workflows/release.yml']
+    const first = { ...o.plan.units[0], touches: ['src/a.css', '.github/workflows/release.yml'] }
+    o.plan.units = [
+      first,
+      { ...first, id: 'U-2', dependsOn: [first.id], touches: [] },
+      { ...first, id: 'U-3', dependsOn: ['U-2'], touches: ['src/b.css'] },
+    ]
     o.context.toolchain.test = null
-    for (const finding of structuralFindings(o)) {
-      expect(finding.category).toBe(expected[finding.rule])
-    }
+    const categories = structuralFindings(o).map((finding) => [finding.rule, finding.category])
+    expect(Object.fromEntries(categories)).toEqual(expected)
   })
 }
 

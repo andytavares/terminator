@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ReviewInspector } from '../../src/components/pr-review/ReviewInspector'
 import { makeRiskScore } from './risk-score-fixtures'
@@ -121,7 +121,8 @@ describe('ReviewInspector — falls back to the available tab when the requested
 })
 
 describe('ReviewInspector — calls onClose when the close button is clicked', () => {
-  it('calls onClose when the close button is clicked', () => {
+  it('calls onClose when the close button is clicked', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     render(
       <ReviewInspector
@@ -134,13 +135,14 @@ describe('ReviewInspector — calls onClose when the close button is clicked', (
         file={baseFile}
       />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Close inspector' }))
+    await user.click(screen.getByRole('button', { name: 'Close inspector' }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
 
 describe('ReviewInspector — moves to the File tab with the arrow keys', () => {
-  it('moves to the File tab with the arrow keys', () => {
+  it('moves to the File tab with the arrow keys', async () => {
+    const user = userEvent.setup()
     const onTabChange = vi.fn()
     render(
       <ReviewInspector
@@ -153,7 +155,12 @@ describe('ReviewInspector — moves to the File tab with the arrow keys', () => 
         file={baseFile}
       />
     )
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'Agent' }), { key: 'ArrowRight' })
+    const agentTab = screen.getByRole('tab', { name: 'Agent' })
+    act(() => agentTab.focus())
+    expect(document.activeElement).toBe(agentTab)
+
+    await user.keyboard('{ArrowRight}')
+
     expect(onTabChange).toHaveBeenCalledWith('file')
     expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Why this file' }))
   })
@@ -214,10 +221,12 @@ function DrawerHarness() {
 }
 
 describe('ReviewInspector — closes on Escape', () => {
-  it('leaves the DOM when Escape is pressed', () => {
+  it('leaves the DOM when Escape is pressed', async () => {
+    const user = userEvent.setup()
     render(<DrawerHarness />)
     expect(screen.getByRole('tablist', { name: 'Inspector' })).toBeTruthy()
-    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(document.activeElement).toBe(document.body)
+    await user.keyboard('{Escape}')
     expect(screen.queryByRole('tablist', { name: 'Inspector' })).toBeNull()
   })
 })

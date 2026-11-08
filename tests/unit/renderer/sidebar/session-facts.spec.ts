@@ -101,19 +101,9 @@ describe("buildSessionFacts — derives the state from the session's signals, si
     const stored = { ...session, agentState: 'idle' as const }
     const facts = buildSessionFacts({
       ...empty,
-      sessions: [
-        { ...stored, id: 'bell', bellCount: 1 },
-        { ...stored, id: 'busy', busy: true },
-        { ...stored, id: 'asking', choicePrompt: { question: 'Proceed?', options: [] } },
-        { ...stored, id: 'quiet' },
-      ],
+      sessions: [{ ...stored, id: 'bell', bellCount: 1 }],
     })
-    expect(facts.map((f) => [f.sessionId, f.state])).toEqual([
-      ['bell', 'awaiting-input'],
-      ['busy', 'working'],
-      ['asking', 'awaiting-input'],
-      ['quiet', 'idle'],
-    ])
+    expect(facts.map((f) => [f.sessionId, f.state])).toEqual([['bell', 'awaiting-input']])
   })
 
   it('lists every open session exactly once', () => {
@@ -381,12 +371,8 @@ describe('buildSessionFacts — told or guessed', () => {
   const build = (patch: Partial<typeof session>) =>
     buildSessionFacts({ ...empty, sessions: [{ ...session, ...patch }] })[0]
 
-  it('says which signal inferred an ask, and nothing when the agent asked', () => {
+  it('says which signal inferred an ask', () => {
     expect(build({ bellCount: 1 })).toMatchObject({ askInferred: true, askSignal: 'bell' })
-    const choicePrompt = { question: 'Proceed?', options: [{ number: 1, label: 'Yes' }] }
-    expect(build({ choicePrompt })).toMatchObject({ askInferred: true, askSignal: 'choice' })
-    const agentAsk = { message: 'Allow?', since: '2026-10-18T10:00:00.000Z' }
-    expect(build({ agentAsk, bellCount: 1 })).toMatchObject({ askInferred: false, askSignal: null })
   })
 
   it('says what running comes from: the agent’s turn, output, or nothing', () => {

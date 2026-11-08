@@ -3,7 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // This spec checks the IPC payload, so it runs the real recorder (tests/setup.ts mocks it).
 vi.unmock('../../../../src/renderer/usage/record')
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
 import {
   QuickActionsHost,
   paletteFeature,
@@ -52,7 +53,12 @@ const api = {
   input: vi.fn(),
 }
 const recordUse = vi.fn<ElectronAPI['usage']['recordUse']>(async () => ({ data: true as const }))
-const updateQuickActions = vi.fn(async () => {})
+/** Main's answer to a settings save: the stored settings with the quick actions patch applied. */
+const updateGlobal = vi.fn<ElectronAPI['settings']['updateGlobal']>(async (patch) => {
+  const current = useSettingsStore.getState().globalSettings ?? DEFAULT_GLOBAL_SETTINGS
+  const { quickActions } = patch as { quickActions: Partial<typeof current.quickActions> }
+  return { settings: { ...current, quickActions: { ...current.quickActions, ...quickActions } } }
+})
 const onClose = vi.fn()
 
 function withCustom(custom: CustomAction[], pins: string[] = []): void {
@@ -61,7 +67,6 @@ function withCustom(custom: CustomAction[], pins: string[] = []): void {
       ...DEFAULT_GLOBAL_SETTINGS,
       quickActions: { pins, usage: [], directUse: [], custom },
     },
-    updateQuickActions,
   })
 }
 
@@ -78,6 +83,7 @@ beforeEach(() => {
     },
     terminal: { input: api.input },
     usage: { recordUse, declare: vi.fn() },
+    settings: { updateGlobal },
   })
   resetStore(useSettingsStore)
   withCustom([])
@@ -106,11 +112,18 @@ function renderHost(): void {
   )
 }
 
-/** Searches the open palette and runs the first match, as Enter would. */
-function runFound(label: string): void {
-  fireEvent.keyDown(window, { key: '/' })
-  fireEvent.change(screen.getByRole('combobox'), { target: { value: label } })
-  fireEvent.keyDown(window, { key: 'Enter' })
+/** Presses / to search the open palette and types `label` there. */
+async function search(user: UserEvent, label: string): Promise<void> {
+  await user.keyboard('/')
+  await user.type(screen.getByRole('combobox'), label)
+}
+
+/** Searches the open palette and runs the first match with Enter. */
+async function runFound(label: string): Promise<void> {
+  const user = userEvent.setup()
+  await search(user, label)
+  expect(document.activeElement).toBe(screen.getByRole('combobox'))
+  await user.keyboard('{Enter}')
 }
 
 describe('QuickActionsHost — extension commands', () => {
@@ -120,7 +133,7 @@ describe('QuickActionsHost — extension commands', () => {
       .getState()
       .registerCommand({ id: 'x.ping', label: 'Ping the thing', category: 'X', action })
     renderHost()
-    runFound('Ping the thing')
+    await runFound('Ping the thing')
     expect(onClose).toHaveBeenCalled()
     await waitFor(() => expect(action).toHaveBeenCalled())
   })
@@ -129,11 +142,11 @@ describe('QuickActionsHost — extension commands', () => {
     api.getCommands.mockResolvedValue({
       commands: [{ key: 'ext:hello', extensionId: 'ext', id: 'hello', label: 'Say hello' }],
     })
+    const user = userEvent.setup()
     renderHost()
-    fireEvent.keyDown(window, { key: '/' })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Say hello' } })
+    await search(user, 'Say hello')
     await screen.findByText('Say hello')
-    fireEvent.keyDown(window, { key: 'Enter' })
+    await user.keyboard('{Enter}')
     await waitFor(() =>
       expect(api.executeCommand).toHaveBeenCalledWith(
         'ext:hello',
@@ -170,7 +183,7 @@ describe('QuickActionsHost — custom actions', () => {
   it('opens a new terminal on the branch for a new-tab action, then types into it', async () => {
     withCustom([runTests])
     renderHost()
-    runFound('Run the tests')
+    await runFound('Run the tests')
     await waitFor(() => expect(api.input).toHaveBeenCalledWith('new-session', expect.any(String)))
     expect(createSession).toHaveBeenCalledWith(
       expect.objectContaining({ projectId: 'p1', type: 'human', title: '' })
@@ -179,13 +192,13 @@ describe('QuickActionsHost — custom actions', () => {
 })
 
 describe('QuickActionsHost — pins', () => {
-  it('pins an action from its row', () => {
+  it('pins an action from its row', async () => {
+    const user = userEvent.setup()
     withCustom([runTests])
     renderHost()
-    fireEvent.keyDown(window, { key: '/' })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Run the tests' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Pin Run the tests' }))
-    expect(updateQuickActions).toHaveBeenCalledWith({ pins: ['custom:c1'] })
+    await search(user, 'Run the tests')
+    await user.click(screen.getByRole('button', { name: 'Pin Run the tests' }))
+    expect(await screen.findByRole('button', { name: 'Unpin Run the tests' })).toBeTruthy()
   })
 })
 
@@ -203,7 +216,7 @@ describe('QuickActionsHost — usage', () => {
 
   it('counts a core action run from the palette, with its label', async () => {
     renderHost()
-    runFound('Toggle sidebar')
+    await runFound('Toggle sidebar')
     await waitFor(() =>
       expect(recorded()).toContainEqual({
         feature: 'core.toggle-sidebar',
@@ -224,7 +237,7 @@ describe('QuickActionsHost — usage of runs', () => {
       },
     })
     renderHost()
-    runFound('Boom now')
+    await runFound('Boom now')
     await waitFor(() =>
       expect(recorded()).toContainEqual(
         expect.objectContaining({ feature: 'renderer:x.boom', via: 'palette', failed: true })
@@ -237,7 +250,7 @@ describe('QuickActionsHost — usage of custom actions and pins', () => {
   it('counts every custom action as one feature, without its name', async () => {
     withCustom([runTests])
     renderHost()
-    runFound('Run the tests')
+    await runFound('Run the tests')
     await waitFor(() => expect(api.input).toHaveBeenCalled())
     expect(recorded()).toContainEqual({
       feature: 'core.custom-action',
@@ -247,12 +260,12 @@ describe('QuickActionsHost — usage of custom actions and pins', () => {
     expect(JSON.stringify(recorded())).not.toContain('Run the tests')
   })
 
-  it('counts a pin', () => {
+  it('counts a pin', async () => {
+    const user = userEvent.setup()
     withCustom([runTests])
     renderHost()
-    fireEvent.keyDown(window, { key: '/' })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Run the tests' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Pin Run the tests' }))
+    await search(user, 'Run the tests')
+    await user.click(screen.getByRole('button', { name: 'Pin Run the tests' }))
     expect(recorded().map((r) => r.feature)).toContain('core.quick-actions.pin')
   })
 })

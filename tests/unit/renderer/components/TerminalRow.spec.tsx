@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { TerminalRow } from '../../../../src/renderer/components/sidebar/TerminalRow'
 import { useBreakoutStore } from '../../../../src/renderer/stores/breakout.store'
 import { resetStore } from '../../../support/renderer-stores'
@@ -41,22 +42,25 @@ describe('TerminalRow', () => {
    * shut except by a shortcut. Every terminal listed here carries its own way
    * out.
    */
-  it('closes from its own control, named after what it closes, without selecting it', () => {
+  it('closes from its own control, named after what it closes, without selecting it', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     const onClose = vi.fn()
     renderRow({}, { onSelect, onClose })
-    fireEvent.click(screen.getByRole('button', { name: 'Close Terminal 1' }))
+    await user.click(screen.getByRole('button', { name: 'Close Terminal 1' }))
     expect(onClose).toHaveBeenCalledOnce()
     expect(onSelect, 'the close control must not fall through to the row').not.toHaveBeenCalled()
   })
 
-  it('selects on click and on the keyboard', () => {
+  it('selects on click and on the keyboard', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     const { container } = renderRow({}, { onSelect })
     const row = container.querySelector('.terminal-row')!
-    fireEvent.click(row)
-    fireEvent.keyDown(row, { key: 'Enter' })
-    fireEvent.keyDown(row, { key: ' ' })
+    await user.click(row)
+    expect(document.activeElement).toBe(row)
+    await user.keyboard('{Enter}')
+    await user.keyboard(' ')
     expect(onSelect).toHaveBeenCalledTimes(3)
   })
 })
@@ -109,19 +113,21 @@ describe('TerminalRow — work item', () => {
     expect(container.querySelector('.terminal-row__key')).toBeNull()
   })
 
-  it('offers only "Link issue…" when the session has no link', () => {
+  it('offers only "Link issue…" when the session has no link', async () => {
+    const user = userEvent.setup()
     const onLinkIssue = vi.fn()
     const { container } = renderRow({}, { onLinkIssue })
     fireEvent.contextMenu(container.querySelector('.terminal-row')!)
     expect(screen.getByText('Link issue…')).toBeTruthy()
     expect(screen.queryByText('Change linked issue…')).toBeNull()
-    fireEvent.click(screen.getByText('Link issue…'))
+    await user.click(screen.getByText('Link issue…'))
     expect(onLinkIssue).toHaveBeenCalledOnce()
   })
 })
 
 describe('TerminalRow — work item — offers change and remove when the session has its own link', () => {
-  it('offers change and remove when the session has its own link', () => {
+  it('offers change and remove when the session has its own link', async () => {
+    const user = userEvent.setup()
     const onLinkIssue = vi.fn()
     const onRemoveLink = vi.fn()
     const { container } = renderRow(
@@ -130,7 +136,7 @@ describe('TerminalRow — work item — offers change and remove when the sessio
     )
     fireEvent.contextMenu(container.querySelector('.terminal-row')!)
     expect(screen.getByText('Change linked issue…')).toBeTruthy()
-    fireEvent.click(screen.getByText('Remove session link'))
+    await user.click(screen.getByText('Remove session link'))
     expect(onRemoveLink).toHaveBeenCalledOnce()
   })
 
@@ -142,12 +148,13 @@ describe('TerminalRow — work item — offers change and remove when the sessio
 })
 
 describe('TerminalRow — work item — dismissing the menu', () => {
-  it('closes the menu on a click elsewhere, linking nothing', () => {
+  it('closes the menu on a click elsewhere, linking nothing', async () => {
+    const user = userEvent.setup()
     const onLinkIssue = vi.fn()
     const { container } = renderRow({}, { onLinkIssue })
     fireEvent.contextMenu(container.querySelector('.terminal-row')!)
     expect(document.querySelector('.ctx-menu')).toBeTruthy()
-    fireEvent.click(document.body)
+    await user.click(document.body)
     expect(document.querySelector('.ctx-menu')).toBeNull()
     expect(onLinkIssue).not.toHaveBeenCalled()
   })

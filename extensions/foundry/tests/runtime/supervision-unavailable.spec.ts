@@ -2,7 +2,7 @@
  * Foundry with a supervision runtime that could not start: the operator is
  * told, and nothing that needs an agent pretends to have started one.
  */
-import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
 import { activate, deactivate } from '../../src/index.ts'
 import * as path from 'node:path'
 
@@ -29,12 +29,16 @@ async function toastShown(): Promise<void> {
 
 beforeAll(async () => {
   const parent = temporaryDirectory('fdry-no-runtime')
-  vi.stubEnv('HOME', path.join(parent, 'home'))
   dataDir = path.join(parent, 'records')
   repo = await seededRepository(parent)
   host = fakeHost(() => dataDir)
   activate(host.api)
   await toastShown()
+})
+
+// `unstubEnvs` resets env before each test, so the stub goes here, not in beforeAll.
+beforeEach(() => {
+  vi.stubEnv('HOME', path.join(temporaryDirectory('fdry-no-runtime-home'), 'home'))
 })
 
 afterAll(async () => {

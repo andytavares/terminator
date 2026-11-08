@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ChapterNav } from '../../src/components/pr-review/ChapterNav'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import type { Chapter } from '../../src/schemas/pr-review.schema'
@@ -52,10 +53,11 @@ describe('ChapterNav', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('calls setCurrentChapter when a tab is clicked', () => {
+  it('calls setCurrentChapter when a tab is clicked', async () => {
+    const user = userEvent.setup()
     const chapters = [makeChapter('c1', 'Core'), makeChapter('c2', 'Tests')]
     render(<ChapterNav chapters={chapters} />)
-    fireEvent.click(screen.getByText('Tests'))
+    await user.click(screen.getByRole('tab', { name: /^Tests/ }))
     expect(mockSetCurrentChapter).toHaveBeenCalledWith('c2')
   })
 })
@@ -70,11 +72,11 @@ describe('ChapterNav — marks active chapter with aria-selected=true', () => {
     expect(tabs[1].getAttribute('aria-selected')).toBe('false')
   })
 
-  it('shows complete checkmark when all files in chapter are viewed', () => {
+  it('shows a complete checkmark on each chapter whose files are all viewed', () => {
     setupStore({ currentChapterId: null, viewedFiles: new Set(['a.ts', 'b.ts']) })
     const chapters = [makeChapter('c1', 'Core', ['a.ts']), makeChapter('c2', 'Tests', ['b.ts'])]
     render(<ChapterNav chapters={chapters} />)
-    expect(screen.getAllByLabelText('complete').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByLabelText('complete')).toHaveLength(2)
   })
 
   it('shows file count and estimate time for each chapter', () => {
@@ -115,12 +117,14 @@ describe('ChapterNav (continued) — keyboard model', () => {
     expect(screen.getByRole('tablist').getAttribute('aria-orientation')).toBe('vertical')
   })
 
-  it('ArrowDown focuses and activates the next tab', () => {
+  it('ArrowDown focuses and activates the next tab', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     render(<ChapterNav chapters={three} onSelectChapter={onSelect} />)
     const tabs = screen.getAllByRole('tab')
     tabs[0].focus()
-    fireEvent.keyDown(tabs[0], { key: 'ArrowDown' })
+    expect(tabs[0]).toBe(document.activeElement)
+    await user.keyboard('{ArrowDown}')
     expect(document.activeElement).toBe(tabs[1])
     expect(mockSetCurrentChapter).toHaveBeenCalledWith('c2')
     expect(onSelect).toHaveBeenCalledWith('c2')
@@ -128,24 +132,28 @@ describe('ChapterNav (continued) — keyboard model', () => {
 })
 
 describe('ChapterNav (continued) — keyboard model — ArrowDown wraps from last to first and ArrowUp wraps from first to last', () => {
-  it('ArrowDown wraps from last to first and ArrowUp wraps from first to last', () => {
+  it('ArrowDown wraps from last to first and ArrowUp wraps from first to last', async () => {
+    const user = userEvent.setup()
     render(<ChapterNav chapters={three} />)
     const tabs = screen.getAllByRole('tab')
     tabs[2].focus()
-    fireEvent.keyDown(tabs[2], { key: 'ArrowDown' })
+    expect(tabs[2]).toBe(document.activeElement)
+    await user.keyboard('{ArrowDown}')
     expect(document.activeElement).toBe(tabs[0])
-    fireEvent.keyDown(tabs[0], { key: 'ArrowUp' })
+    await user.keyboard('{ArrowUp}')
     expect(document.activeElement).toBe(tabs[2])
     expect(mockSetCurrentChapter).toHaveBeenLastCalledWith('c3')
   })
 
-  it('Home and End go to the first and last tab', () => {
+  it('Home and End go to the first and last tab', async () => {
+    const user = userEvent.setup()
     render(<ChapterNav chapters={three} />)
     const tabs = screen.getAllByRole('tab')
     tabs[1].focus()
-    fireEvent.keyDown(tabs[1], { key: 'End' })
+    expect(tabs[1]).toBe(document.activeElement)
+    await user.keyboard('{End}')
     expect(document.activeElement).toBe(tabs[2])
-    fireEvent.keyDown(tabs[2], { key: 'Home' })
+    await user.keyboard('{Home}')
     expect(document.activeElement).toBe(tabs[0])
     expect(mockSetCurrentChapter).toHaveBeenLastCalledWith('c1')
   })

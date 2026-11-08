@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { SinceBanner } from '../../src/components/pr-review/SinceBanner'
 import { useReviewUiStore } from '../../src/stores/review-ui.store'
 
@@ -41,8 +42,9 @@ describe('SinceBanner — shows history-rewritten text instead of the commit cou
   })
 })
 
-describe('SinceBanner — calls setDiffRange when the seg buttons are clicked', () => {
-  it('calls setDiffRange when the seg buttons are clicked', () => {
+describe('SinceBanner — stores the diff range the reviewer picks', () => {
+  it('stores the diff range the reviewer picks', async () => {
+    const user = userEvent.setup()
     render(
       <SinceBanner
         commitCount={1}
@@ -52,9 +54,9 @@ describe('SinceBanner — calls setDiffRange when the seg buttons are clicked', 
         historyRewritten={false}
       />
     )
-    fireEvent.click(screen.getByText('Whole PR'))
+    await user.click(screen.getByRole('radio', { name: 'Whole PR' }))
     expect(useReviewUiStore.getState().diffRange).toBe('whole')
-    fireEvent.click(screen.getByText(/Since my review/))
+    await user.click(screen.getByRole('radio', { name: 'Since my review' }))
     expect(useReviewUiStore.getState().diffRange).toBe('since')
   })
 })

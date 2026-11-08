@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { FactoryHall } from '../../../src/components/factory/FactoryHall.js'
 import { hallNode, hallView } from '../../helpers/hall-views.js'
 
@@ -50,21 +51,23 @@ afterEach(() => {
 
 describe('playing a replay', () => {
   it('pauses where it is, and plays again from the start once it has ended', async () => {
+    const user = userEvent.setup()
     mountHall(hallView())
     // The replay's clock stands still: on a real one every step redraws the
     // hall, and every query waiting for a button reads the whole hall again.
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
     try {
-      fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
-      fireEvent.click(await screen.findByRole('button', { name: 'Pause' }))
+      await user.click(await screen.findByRole('button', { name: 'Replay' }))
+      await user.click(await screen.findByRole('button', { name: 'Pause' }))
       await screen.findByRole('button', { name: 'Play' })
       const position = (await screen.findByRole('slider', {
         name: 'Replay position',
       })) as HTMLInputElement
+      // user-event cannot move a range input to a value.
       fireEvent.change(position, { target: { value: position.max } })
       await waitFor(() => expect(position.value).toBe(position.max))
       expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy()
-      fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+      await user.click(screen.getByRole('button', { name: 'Play' }))
       await screen.findByRole('button', { name: 'Pause' })
       expect(Number(position.value)).toBeLessThan(Number(position.max))
     } finally {
@@ -75,12 +78,13 @@ describe('playing a replay', () => {
 
 describe('a held call on its card', () => {
   it('is denied there', async () => {
+    const user = userEvent.setup()
     mountHall(hallView(), {
       'foundry:permissions-list': () => ({ pending: [HELD] }),
       'foundry:permission-resolve': () => ({ ok: true }),
     })
     const card = await screen.findByRole('group', { name: 'Wants to run Bash' })
-    fireEvent.click(within(card).getByRole('button', { name: 'Deny' }))
+    await user.click(within(card).getByRole('button', { name: 'Deny' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:permission-resolve', {
         requestId: 'r-1',
@@ -90,33 +94,37 @@ describe('a held call on its card', () => {
   })
 
   it('says why an answer did not land, on the card it came from', async () => {
+    const user = userEvent.setup()
     mountHall(hallView(), {
       'foundry:permissions-list': () => ({ pending: [HELD] }),
       'foundry:permission-resolve': () => ({ ok: false }),
     })
     const card = await screen.findByRole('group', { name: 'Wants to run Bash' })
-    fireEvent.click(within(card).getByRole('button', { name: 'Allow' }))
+    await user.click(within(card).getByRole('button', { name: 'Allow' }))
     await within(card).findByText('That request is no longer waiting.')
   })
 })
 
 describe('a parked agent with no terminal left', () => {
   it('says so on its card', async () => {
+    const user = userEvent.setup()
     mountHall(hallView({ stranded: ['s-1'] }), { 'foundry:run-terminal': () => ({ ok: false }) })
     const card = await screen.findByRole('group', { name: 'Waiting in its agent tab' })
-    fireEvent.click(within(card).getByRole('button', { name: 'Go to agent tab' }))
+    await user.click(within(card).getByRole('button', { name: 'Go to agent tab' }))
     await within(card).findByText('That agent is no longer in an agent tab.')
   })
 })
 
 describe('what an open monitor says of its station', () => {
   it('says no agent for a station nothing is running', async () => {
+    const user = userEvent.setup()
     mountHall(hallView({ orphaned: ['N-1'] }))
-    fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
+    await user.click(await screen.findByRole('button', { name: /Build the thing/ }))
     await screen.findByRole('img', { name: 'No agent' })
   })
 
   it('says a failed station failed, with the run’s own headline', async () => {
+    const user = userEvent.setup()
     mountHall(
       hallView({
         graph: { orderId: 'WO-1', recipe: 'standard', nodes: [hallNode({ state: 'failed' })] },
@@ -132,7 +140,7 @@ describe('what an open monitor says of its station', () => {
         },
       })
     )
-    fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
+    await user.click(await screen.findByRole('button', { name: /Build the thing/ }))
     await screen.findByRole('img', { name: 'Failed' })
     expect(screen.getByText('FAILED: THE BUILD FAILED TWICE')).toBeTruthy()
   })

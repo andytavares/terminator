@@ -14,8 +14,7 @@ import type { DocumentHandBack, WorkOrder } from '../order/schema.js'
 // record becomes unreadable, and telling the operator at write time is telling
 // them too late to do anything about it.
 
-/** @internal */
-export type TransitionIntent = 'started' | 'in_review' | 'done'
+type TransitionIntent = 'started' | 'in_review' | 'done'
 
 interface TrackerStateOption {
   readonly id: string
@@ -41,8 +40,8 @@ export interface IssuesPort {
 type WriteBackEvent =
   'agreed' | 'amended' | 'started' | 'draft_opened' | 'document_ready' | 'merged'
 
-/** What each moment in an order's life means in the tracker's terms. @internal */
-export const INTENT_FOR_EVENT: Record<WriteBackEvent, TransitionIntent | null> = {
+/** What each moment in an order's life means in the tracker's terms. */
+const INTENT_FOR_EVENT: Record<WriteBackEvent, TransitionIntent | null> = {
   agreed: null,
   amended: null,
   started: 'started',

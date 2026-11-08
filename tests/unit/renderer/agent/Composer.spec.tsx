@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 import { Composer } from '../../../../src/renderer/components/agent/Composer'
 import {
@@ -92,10 +93,6 @@ async function dropSession(target: Element = composer()): Promise<void> {
   await screen.findByText('Fix the login test')
 }
 
-function type(text: string): void {
-  fireEvent.change(box(), { target: { value: text } })
-}
-
 describe('Composer — dragging a session over it', () => {
   it('shows the drop state and asks for a copy while a session is over it', async () => {
     await mountComposer()
@@ -141,9 +138,10 @@ describe('Composer — session chips', () => {
 
 describe('Composer — removing and naming session chips', () => {
   it('removes a chip', async () => {
+    const user = userEvent.setup()
     await mountComposer()
     await dropSession()
-    fireEvent.click(screen.getByRole('button', { name: 'Remove Fix the login test' }))
+    await user.click(screen.getByRole('button', { name: 'Remove Fix the login test' }))
     expect(screen.queryByText('Fix the login test')).toBeNull()
     expect(attached()).toEqual(noAttachedContext)
   })
@@ -170,39 +168,44 @@ describe('Composer — citation chips', () => {
   beforeEach(() => useAttachedContextStore.getState().addCitation('agent-1', citation))
 
   it('shows the quote cut short and the comment, and shows the source on click', async () => {
+    const user = userEvent.setup()
     await mountComposer()
     const chip = screen.getByRole('button', { name: /and only on network errors/ })
     expect(chip.textContent).toBe('and only on network errors and 5xx respo…Also retry on 429')
-    fireEvent.click(chip)
+    await user.click(chip)
     expect(onShowSource).toHaveBeenCalledWith(citation.quote)
   })
 
   it('edits the comment from the pencil and shows it on the chip', async () => {
+    const user = userEvent.setup()
     await mountComposer()
-    fireEvent.click(screen.getByRole('button', { name: 'Edit comment' }))
+    await user.click(screen.getByRole('button', { name: 'Edit comment' }))
     const comment = screen.getByLabelText<HTMLTextAreaElement>('Comment on this quote')
     expect(comment.value).toBe('Also retry on 429')
-    fireEvent.change(comment, { target: { value: 'Wait for Retry-After' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await user.clear(comment)
+    await user.type(comment, 'Wait for Retry-After')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(attached().citations).toEqual([{ ...citation, comment: 'Wait for Retry-After' }])
     expect(screen.getByRole('button', { name: /Wait for Retry-After/ })).toBeTruthy()
     expect(agents.prompt).not.toHaveBeenCalled()
   })
 
   it('removes a citation', async () => {
+    const user = userEvent.setup()
     await mountComposer()
-    fireEvent.click(screen.getByRole('button', { name: 'Remove citation' }))
+    await user.click(screen.getByRole('button', { name: 'Remove citation' }))
     expect(attached()).toEqual(noAttachedContext)
   })
 })
 
 describe('Composer — sending with attached context', () => {
   it('sends the typed text with the context after it, then empties the store', async () => {
+    const user = userEvent.setup()
     await mountComposer()
     await dropSession()
     const sent = promptWithContext('Use the same backoff', attached())
-    type('Use the same backoff')
-    fireEvent.keyDown(box(), { key: 'Enter' })
+    await user.type(box(), 'Use the same backoff')
+    await user.keyboard('{Enter}')
     expect(agents.prompt).toHaveBeenCalledWith({ sessionId: 'agent-1', text: sent })
     expect(sent).toContain(LOGIN_TRANSCRIPT)
     expect(attached()).toBe(noAttachedContext)
@@ -210,38 +213,42 @@ describe('Composer — sending with attached context', () => {
   })
 
   it('sends with an empty text box when a chip is attached', async () => {
+    const user = userEvent.setup()
     await mountComposer()
     await dropSession()
     const sent = promptWithContext('', attached())
-    fireEvent.keyDown(box(), { key: 'Enter' })
+    await user.type(box(), '{Enter}')
     expect(agents.prompt).toHaveBeenCalledWith({ sessionId: 'agent-1', text: sent })
     expect(sent.startsWith('<terminator_context>')).toBe(true)
   })
 
   it('still sends nothing for an empty box with nothing attached', async () => {
+    const user = userEvent.setup()
     await mountComposer()
-    fireEvent.keyDown(box(), { key: 'Enter' })
+    await user.type(box(), '{Enter}')
     expect(agents.prompt).not.toHaveBeenCalled()
   })
 })
 
 describe('Composer — steering and queueing with attached context', () => {
   it('steers with the context, then empties the store', async () => {
+    const user = userEvent.setup()
     await mountComposer(true)
     await dropSession()
     const sent = promptWithContext('Use vitest', attached())
-    type('Use vitest')
-    fireEvent.keyDown(box(), { key: 'Enter', metaKey: true })
+    await user.type(box(), 'Use vitest')
+    await user.keyboard('{Meta>}{Enter}{/Meta}')
     expect(agents.steer).toHaveBeenCalledWith({ sessionId: 'agent-1', text: sent })
     expect(attached()).toBe(noAttachedContext)
   })
 
   it('queues with the context, then empties the store', async () => {
+    const user = userEvent.setup()
     await mountComposer(true)
     await dropSession()
     const sent = promptWithContext('Then lint', attached())
-    type('Then lint')
-    fireEvent.keyDown(box(), { key: 'Enter' })
+    await user.type(box(), 'Then lint')
+    await user.keyboard('{Enter}')
     expect(agents.queueSet).toHaveBeenCalledWith({ sessionId: 'agent-1', messages: [sent] })
     expect(attached()).toBe(noAttachedContext)
   })
@@ -249,10 +256,11 @@ describe('Composer — steering and queueing with attached context', () => {
 
 describe('Composer — the queue list', () => {
   it('shows a queued message as its typed text and how many items it carries', async () => {
+    const user = userEvent.setup()
     await mountComposer(true)
     await dropSession()
-    type('Then lint')
-    fireEvent.keyDown(box(), { key: 'Enter' })
+    await user.type(box(), 'Then lint')
+    await user.keyboard('{Enter}')
     expect(screen.getByText('Then lint · 1 attached')).toBeTruthy()
   })
 
@@ -264,11 +272,12 @@ describe('Composer — the queue list', () => {
   })
 
   it('puts the text back in the box and the chip back above it on Edit', async () => {
+    const user = userEvent.setup()
     await mountComposer(true)
     await dropSession()
-    type('Then lint')
-    fireEvent.keyDown(box(), { key: 'Enter' })
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Then lint' }))
+    await user.type(box(), 'Then lint')
+    await user.keyboard('{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Edit Then lint' }))
     expect(box().value).toBe('Then lint')
     expect(attached().sessions.map((s) => s.sessionId)).toEqual(['login'])
     expect(screen.getByText('Fix the login test')).toBeTruthy()
@@ -278,12 +287,13 @@ describe('Composer — the queue list', () => {
 
 describe('Composer — editing a queued message beside attached chips', () => {
   it('keeps the chips already above the box and adds the queued ones', async () => {
+    const user = userEvent.setup()
     const quote: Citation = { entryIndex: 2, quote: 'only on 5xx', comment: 'and 429' }
     const queued = promptWithContext('Then lint', { sessions: [], citations: [quote] })
     agents.queueGet.mockResolvedValue({ data: [queued] })
     await mountComposer(true)
     await dropSession()
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Then lint' }))
+    await user.click(screen.getByRole('button', { name: 'Edit Then lint' }))
     expect(attached().sessions.map((s) => s.sessionId)).toEqual(['login'])
     expect(attached().citations).toEqual([quote])
   })

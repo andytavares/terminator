@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { IntegrationsSettings } from '../../../../src/renderer/components/settings/IntegrationsSettings'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { useToastStore } from '../../../../src/renderer/stores/toast.store'
@@ -32,10 +33,13 @@ function connection(over: Partial<TrackerConnection> = {}): TrackerConnection {
   }
 }
 
+/** The section is busy while it reads the connections from main. */
+const loadState = () => screen.getByText('Integrations').parentElement!.getAttribute('aria-busy')
+
 async function renderWith(connections: TrackerConnection[]) {
   api.status.mockResolvedValue({ connections })
   const view = render(<IntegrationsSettings />)
-  await waitFor(() => expect(api.status).toHaveBeenCalled())
+  await waitFor(() => expect(loadState()).toBe('false'))
   return view
 }
 
@@ -91,18 +95,19 @@ describe('IntegrationsSettings — rendering — says a working credential has s
 
   it('offers disconnect only once connected', async () => {
     await renderWith([connection({ connected: true, account: { name: 'A', email: 'a@b.co' } })])
-    await waitFor(() => expect(screen.getAllByText('Disconnect')).toHaveLength(1))
+    expect(await screen.findAllByText('Disconnect')).toHaveLength(1)
   })
 })
 
 describe('IntegrationsSettings — connecting', () => {
   it('sends the key and clears the field so no secret is left on screen', async () => {
+    const user = userEvent.setup()
     api.connect.mockResolvedValue({ connection: connection({ connected: true }) })
     await renderWith([connection()])
 
     const input = screen.getByLabelText('API key') as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'lin_api_secret' } })
-    fireEvent.click(screen.getByText('Connect Linear'))
+    await user.type(input, 'lin_api_secret')
+    await user.click(screen.getByText('Connect Linear'))
 
     await waitFor(() =>
       expect(api.connect).toHaveBeenCalledWith({
@@ -115,13 +120,14 @@ describe('IntegrationsSettings — connecting', () => {
   })
 
   it('masks the key and keeps it out of autofill history', async () => {
+    const user = userEvent.setup()
     // A React controlled input necessarily holds its value in the DOM, so the
     // achievable guarantee is: masked on screen, never autofilled, never
     // persisted, and cleared the moment it has been handed over (tested
     // above). It is never written anywhere by this component.
     await renderWith([connection()])
     const input = screen.getByLabelText('API key') as HTMLInputElement
-    fireEvent.change(input, { target: { value: 'lin_api_secret' } })
+    await user.type(input, 'lin_api_secret')
 
     expect(input.type).toBe('password')
     expect(input.getAttribute('autocomplete')).toBe('off')
@@ -132,19 +138,21 @@ describe('IntegrationsSettings — connecting', () => {
 
 describe('IntegrationsSettings — connecting — validation and rejection', () => {
   it('will not submit an empty key', async () => {
+    const user = userEvent.setup()
     await renderWith([connection()])
     const button = screen.getByText('Connect Linear') as HTMLButtonElement
     expect(button.disabled).toBe(true)
-    fireEvent.click(button)
+    await user.click(button)
     expect(api.connect).not.toHaveBeenCalled()
   })
 
   it('shows a rejection inline, beside the field that caused it', async () => {
+    const user = userEvent.setup()
     api.connect.mockResolvedValue({ error: 'auth-failed', message: 'Authentication required' })
     await renderWith([connection()])
 
-    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'bad' } })
-    fireEvent.click(screen.getByText('Connect Linear'))
+    await user.type(screen.getByLabelText('API key'), 'bad')
+    await user.click(screen.getByText('Connect Linear'))
 
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Authentication'))
   })
@@ -152,35 +160,37 @@ describe('IntegrationsSettings — connecting — validation and rejection', () 
 
 describe('IntegrationsSettings — connecting — clears the rejection as soon as the operator types again', () => {
   it('clears the rejection as soon as the operator types again', async () => {
+    const user = userEvent.setup()
     api.connect.mockResolvedValue({ error: 'auth-failed', message: 'Authentication required' })
     await renderWith([connection()])
 
-    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'bad' } })
-    fireEvent.click(screen.getByText('Connect Linear'))
+    await user.type(screen.getByLabelText('API key'), 'bad')
+    await user.click(screen.getByText('Connect Linear'))
     await screen.findByRole('alert')
 
-    fireEvent.change(await screen.findByLabelText('API key'), { target: { value: 'better' } })
+    await user.type(await screen.findByLabelText('API key'), 'better')
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
   })
 })
 
 describe('IntegrationsSettings — connected actions', () => {
   it('disconnects the tracker', async () => {
+    const user = userEvent.setup()
     api.disconnect.mockResolvedValue({ ok: true })
     await renderWith([connection({ connected: true, account: { name: 'A', email: 'a@b.co' } })])
 
-    await waitFor(() => expect(screen.getAllByText('Disconnect')).toHaveLength(1))
-    fireEvent.click(screen.getByText('Disconnect'))
+    await user.click(await screen.findByText('Disconnect'))
     await waitFor(() => expect(api.disconnect).toHaveBeenCalledWith({ tracker: 'linear' }))
   })
 
   it('stores an edited assignee lookup on blur', async () => {
+    const user = userEvent.setup()
     api.setMine.mockResolvedValue({ ok: true })
     await renderWith([connection({ connected: true, account: { name: 'A', email: 'a@b.co' } })])
 
     const input = await screen.findByLabelText('Assigned-issue lookup')
-    fireEvent.change(input, { target: { value: 'me@x.co' } })
-    fireEvent.blur(input)
+    await user.type(input, 'me@x.co')
+    await user.tab()
 
     await waitFor(() =>
       expect(api.setMine).toHaveBeenCalledWith({
@@ -193,6 +203,7 @@ describe('IntegrationsSettings — connected actions', () => {
 
 describe('IntegrationsSettings — connected actions — re-checks the connection when Test is pressed', () => {
   it('re-checks the connection when Test is pressed', async () => {
+    const user = userEvent.setup()
     await renderWith([connection({ connected: true, account: { name: 'A', email: 'a@b.co' } })])
     // The credential has been revoked since the page was drawn.
     api.status.mockResolvedValue({
@@ -204,7 +215,7 @@ describe('IntegrationsSettings — connected actions — re-checks the connectio
         }),
       ],
     })
-    fireEvent.click(await screen.findByText('Test'))
+    await user.click(await screen.findByText('Test'))
     await screen.findByText(/Credential rejected/)
   })
 })
@@ -232,7 +243,7 @@ describe('IntegrationsSettings — live updates', () => {
   it('survives a status call that fails', async () => {
     api.status.mockResolvedValue({ error: 'failed', message: 'nope' })
     render(<IntegrationsSettings />)
-    await waitFor(() => expect(api.status).toHaveBeenCalled())
+    await waitFor(() => expect(loadState()).toBe('false'))
     // Renders the section rather than blanking out.
     expect(screen.getByText('Linear')).toBeTruthy()
   })
@@ -247,13 +258,12 @@ describe('IntegrationsSettings — the less common answers', () => {
 
 describe('IntegrationsSettings — the less common answers — sends the optional assignee email, trimmed, and clears it once connected', () => {
   it('sends the optional assignee email, trimmed, and clears it once connected', async () => {
+    const user = userEvent.setup()
     api.connect.mockResolvedValue({ connection: connection({ connected: true }) })
     await renderWith([connection()])
-    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'k' } })
-    fireEvent.change(screen.getByLabelText('Assigned-issue lookup (optional)'), {
-      target: { value: '  me@x.co ' },
-    })
-    fireEvent.click(screen.getByText('Connect Linear'))
+    await user.type(screen.getByLabelText('API key'), 'k')
+    await user.type(screen.getByLabelText('Assigned-issue lookup (optional)'), '  me@x.co ')
+    await user.click(screen.getByText('Connect Linear'))
     await waitFor(() =>
       expect(api.connect).toHaveBeenCalledWith({ tracker: 'linear', apiKey: 'k', email: 'me@x.co' })
     )
@@ -262,13 +272,15 @@ describe('IntegrationsSettings — the less common answers — sends the optiona
 
 describe('IntegrationsSettings — the less common answers — stores a cleared assignee lookup as the key’s own account', () => {
   it('stores a cleared assignee lookup as the key’s own account', async () => {
+    const user = userEvent.setup()
     api.setMine.mockResolvedValue({ ok: true })
     await renderWith([
       connection({ connected: true, mine: { kind: 'assignee', email: 'old@x.co' } }),
     ])
     const input = await screen.findByLabelText('Assigned-issue lookup')
-    fireEvent.change(input, { target: { value: '  ' } })
-    fireEvent.blur(input)
+    await user.clear(input)
+    await user.type(input, '  ')
+    await user.tab()
     await waitFor(() =>
       expect(api.setMine).toHaveBeenCalledWith({
         tracker: 'linear',
@@ -320,19 +332,21 @@ describe('IntegrationsSettings — Claude Code', () => {
 
 describe('IntegrationsSettings — Claude Code actions', () => {
   it('disconnects, then shows the status it reads again', async () => {
+    const user = userEvent.setup()
     await renderClaudeCode({ state: 'connected' })
     claudeCode.disconnect.mockResolvedValue({ data: true })
     claudeCode.status.mockResolvedValue(claudeStatus({ state: 'disconnected' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }))
+    await user.click(screen.getByRole('button', { name: 'Disconnect' }))
     await screen.findByText('Disconnected. Claude sessions cannot use Terminator tools.')
     expect(claudeCode.disconnect).toHaveBeenCalledTimes(1)
   })
 
   it('connects, then shows the status it reads again', async () => {
+    const user = userEvent.setup()
     await renderClaudeCode({ state: 'disconnected' })
     claudeCode.connect.mockResolvedValue({ data: true })
     claudeCode.status.mockResolvedValue(claudeStatus({ state: 'connected' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    await user.click(screen.getByRole('button', { name: 'Connect' }))
     await screen.findByText('Connected. Claude sessions on this Mac can use Terminator tools.')
     expect(claudeCode.connect).toHaveBeenCalledTimes(1)
   })
@@ -340,14 +354,12 @@ describe('IntegrationsSettings — Claude Code actions', () => {
 
 describe('IntegrationsSettings — Claude Code server command', () => {
   it('copies the server command and says so', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined)
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    // userEvent.setup() puts a clipboard stub on navigator and removes it after the test.
+    const user = userEvent.setup()
     useToastStore.setState({ toasts: [] })
     await renderClaudeCode({ state: 'connected' })
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Copy server command' }))
-    })
-    expect(writeText).toHaveBeenCalledWith(command)
+    await user.click(screen.getByRole('button', { name: 'Copy server command' }))
+    expect(await navigator.clipboard.readText()).toBe(command)
     expect(useToastStore.getState().toasts).toContainEqual(
       expect.objectContaining({ type: 'success', message: 'Copied' })
     )

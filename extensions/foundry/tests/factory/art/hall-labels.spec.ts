@@ -273,33 +273,42 @@ function hallLabelsWallFixturesTests() {
   })
 }
 
+function hallWithStatuswall(): HallMap {
+  const width = 40
+  const height = 30
+  const grid = Array.from({ length: height }, () => Array(width).fill(false))
+  return partialFake<HallMap>({
+    width,
+    height,
+    solid: grid,
+    walk: grid,
+    props: [fixture('statuswall', { x: 24, y: 2, w: 3 })],
+    belts: [],
+    beltTiles: [],
+    crossovers: [],
+    breakroom: { x: 7, y: 20, w: 20, h: 5, door: [] },
+    restSeats: [],
+    lanes: [],
+    anchors: {
+      intake: { x: 0, y: 5 },
+      exit: { x: 39, y: 5 },
+      archive: { x: 3, y: 3 },
+      rack: { x: 4, y: 3 },
+      wait: { x: 5, y: 5 },
+    },
+    lights: [],
+  })
+}
+
 function bakingTests() {
-  it('bakes into a hall without throwing', () => {
-    const width = 40
-    const height = 30
-    const grid = Array.from({ length: height }, () => Array(width).fill(false))
-    const map = partialFake<HallMap>({
-      width,
-      height,
-      solid: grid,
-      walk: grid,
-      props: [fixture('statuswall', { x: 24, y: 2, w: 3 })],
-      belts: [],
-      beltTiles: [],
-      crossovers: [],
-      breakroom: { x: 7, y: 20, w: 20, h: 5, door: [] },
-      restSeats: [],
-      lanes: [],
-      anchors: {
-        intake: { x: 0, y: 5 },
-        exit: { x: 39, y: 5 },
-        archive: { x: 3, y: 3 },
-        rack: { x: 4, y: 3 },
-        wait: { x: 5, y: 5 },
-      },
-      lights: [],
-    })
-    expect(() => bakeHall(map, createRecordingPaint())).not.toThrow()
+  it('bakes the vending machine into the hall where vendingDecorX places it', () => {
+    const map = hallWithStatuswall()
+    const VENDING_BODY = '#8a2f2a'
+    const paint = createRecordingPaint()
+    bakeHall(map, paint)
+    expect(paint.calls).toContainEqual(
+      expect.objectContaining({ x: vendingDecorX(map), w: 14, h: 33, style: VENDING_BODY })
+    )
   })
 }
 

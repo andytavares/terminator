@@ -15,6 +15,11 @@ const STORES = [
   'pr-agent-reviews.json',
 ]
 
+/** Writes each store to `folder`, holding its own name. */
+function writeEveryStoreTo(folder: string) {
+  for (const store of STORES) writeFileSync(join(folder, store), `{"store":"${store}"}`)
+}
+
 let globalStorage: string
 const userData = () => dirname(dirname(globalStorage))
 
@@ -25,14 +30,14 @@ afterEach(() => {
 describe('the stores move from userData into its own folder', () => {
   it('moves each store on the first activation', () => {
     globalStorage = freshExtensionStorage()
-    for (const store of STORES) writeFileSync(join(userData(), store), `{"store":"${store}"}`)
+    writeEveryStoreTo(userData())
 
     const { warn } = activateCapturingChannels(undefined, globalStorage)
 
-    for (const store of STORES) {
-      expect(readFileSync(join(globalStorage, store), 'utf8')).toBe(`{"store":"${store}"}`)
-      expect(existsSync(join(userData(), store))).toBe(false)
-    }
+    expect(STORES.map((store) => readFileSync(join(globalStorage, store), 'utf8'))).toEqual(
+      STORES.map((store) => `{"store":"${store}"}`)
+    )
+    expect(STORES.filter((store) => existsSync(join(userData(), store)))).toEqual([])
     expect(warn).not.toHaveBeenCalled()
   })
 

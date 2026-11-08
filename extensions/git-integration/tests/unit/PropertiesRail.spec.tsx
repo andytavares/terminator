@@ -2,7 +2,8 @@ import React from 'react'
 import fs from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { PropertiesRail } from '../../src/components/pr-review/PropertiesRail'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
 import { buildPr } from './overview-fixtures'
@@ -71,11 +72,12 @@ describe('PropertiesRail — linked issues', () => {
   })
 
   it('copies the branch name and says so', async () => {
+    const user = userEvent.setup()
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     render(<PropertiesRail pr={buildPr()} />)
-    fireEvent.click(rail().getByRole('button', { name: 'Copy branch name' }))
-    await waitFor(() => expect(rail().getByText('Copied')).toBeTruthy())
+    await user.click(rail().getByRole('button', { name: 'Copy branch name' }))
+    await rail().findByText('Copied')
     expect(writeText).toHaveBeenCalledWith('feature/e2e-sharding')
   })
 })

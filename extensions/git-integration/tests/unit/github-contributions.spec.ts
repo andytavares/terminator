@@ -255,13 +255,19 @@ describe('github:contributions — starts each search a day early for GitHub, wh
 describe('github:contributions — stops splitting a one-day search that is still over the cap', () => {
   it('answers the nodes it has instead of searching the same day again', async () => {
     const handlers = captureHandlers()
+    // Every opened-PR window that ends today is over the cap, so the split runs down to today.
     mockContributions({
       'is:merged': searchReply([]),
       'reviewed-by:': searchReply([]),
-      'author:alice created:2026-10-16..2026-10-16': searchReply([], 1500),
+      '..2026-10-16': searchReply([], 1500),
+      'author:alice created:': searchReply([]),
     })
-    const payload = { from: '2026-10-16', to: '2026-10-16' }
-    await expect(invoke(handlers, payload)).resolves.toBeDefined()
+    const result = await invoke(handlers)
+    const searches = mockExecFile.mock.calls.map((c) => fieldsOf(c[1] as string[]).search)
+    expect(result.error).toBeUndefined()
+    expect(
+      searches.filter((search) => search?.endsWith('created:2026-10-16..2026-10-16'))
+    ).toHaveLength(1)
   })
 })
 

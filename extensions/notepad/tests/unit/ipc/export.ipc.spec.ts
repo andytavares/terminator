@@ -164,9 +164,16 @@ function exportNotesScopeTests() {
     const tagId = 'tag-00000000-0000-0000-0000-000000000001'
     await db.run('INSERT INTO tags (id, name) VALUES (?, ?)', [tagId, 'work'])
     await db.run('INSERT INTO note_tags (note_id, tag_id) VALUES (?, ?)', [noteId, tagId])
+    const now = new Date().toISOString()
+    await db.run(
+      'INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+      ['00000000-0000-0000-0000-000000000002', 'Untagged Note', 'body', now, now]
+    )
 
     const result = await exportNotes(db, { folder: exportDir, scope: 'tag', tagId })
+
     expect((result as { data: { exported: number } }).data.exported).toBe(1)
+    expect(fs.readdirSync(exportDir).filter((f) => f.endsWith('.md'))).toHaveLength(1)
   })
 }
 
@@ -438,13 +445,16 @@ function exportNotesSingleCommentFormatTests() {
 }
 
 function exportNotesBothOrNoCommentsTests() {
-  it('writes both for the both format, and neither for none', async () => {
+  it('writes the sidecar file and the inline comments for the both format', async () => {
     await exportNotes(db, { folder: exportDir, commentFormat: 'both' })
+
     expect(fs.existsSync(sidecarPath())).toBe(true)
     expect(exportedMarkdown()).toContain('Say more')
+  })
 
-    fs.rmSync(sidecarPath())
+  it('writes neither the sidecar file nor the inline comments for the none format', async () => {
     await exportNotes(db, { folder: exportDir, commentFormat: 'none' })
+
     expect(fs.existsSync(sidecarPath())).toBe(false)
     expect(exportedMarkdown()).not.toContain('Say more')
   })

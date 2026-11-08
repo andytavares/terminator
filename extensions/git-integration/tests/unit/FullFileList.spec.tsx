@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { FullFileList } from '../../src/components/pr-review/FullFileList'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import { PrReviewDetailSchema, type PrReviewDetail } from '../../src/schemas/pr-review.schema'
@@ -67,25 +68,34 @@ describe('FullFileList', () => {
     expect(screen.getByText('bar.ts')).toBeTruthy()
   })
 
-  it('shows file additions and deletions', () => {
-    render(<FullFileList {...defaultProps} />)
-    const additions = screen.getAllByText('+5')
-    expect(additions.length).toBeGreaterThan(0)
+  it("shows each file's additions on its own row", () => {
+    const files = [
+      changedFile('src/foo.ts', { additions: 5, riskScore: makeRiskScore() }),
+      changedFile('src/bar.ts', { additions: 9, riskScore: makeRiskScore() }),
+    ]
+    const pr = makePr([
+      { id: 'ch-1', name: 'Core', estimatedMinutes: 10, status: 'not-started', files },
+    ])
+    render(<FullFileList {...defaultProps} pr={pr} />)
+    expect(within(screen.getByTitle('src/foo.ts')).getByText('+5')).toBeTruthy()
+    expect(within(screen.getByTitle('src/bar.ts')).getByText('+9')).toBeTruthy()
   })
 
-  it('calls onSelectFile when file row is clicked', () => {
+  it('calls onSelectFile when file row is clicked', async () => {
+    const user = userEvent.setup()
     const onSelectFile = vi.fn()
     render(<FullFileList {...defaultProps} onSelectFile={onSelectFile} />)
-    fireEvent.click(screen.getByText('foo.ts'))
+    await user.click(screen.getByTitle('src/foo.ts'))
     expect(onSelectFile).toHaveBeenCalledWith('src/foo.ts', 'ch-1')
   })
 })
 
 describe('FullFileList — toggles chapter collapsed state when header is clicked', () => {
-  it('toggles chapter collapsed state when header is clicked', () => {
+  it('toggles chapter collapsed state when header is clicked', async () => {
+    const user = userEvent.setup()
     render(<FullFileList {...defaultProps} />)
     const chapterHeader = screen.getByRole('button', { name: /1 · Core/ })
-    fireEvent.click(chapterHeader)
+    await user.click(chapterHeader)
     expect(screen.queryByText('foo.ts')).toBeNull()
   })
 

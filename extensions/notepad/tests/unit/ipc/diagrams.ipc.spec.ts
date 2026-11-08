@@ -153,15 +153,18 @@ function listDiagramsListingTests() {
     expect((result as { data: unknown[] }).data).toEqual([])
   })
 
-  it('lists created diagrams sorted by updated_at desc', async () => {
-    await createDiagram(db, { title: 'First' })
+  it('lists the most recently updated diagram first', async () => {
+    const first = await createDiagram(db, { title: 'First' })
     await createDiagram(db, { title: 'Second' })
+    await db.run('UPDATE diagrams SET updated_at = ? WHERE id = ?', [
+      '2999-01-01T00:00:00.000Z',
+      (first as { data: { id: string } }).data.id,
+    ])
+
     const result = await listDiagrams(db, {})
+
     const data = (result as { data: { title: string }[] }).data
-    expect(data.length).toBe(2)
-    // Both exist; ordering by updated_at desc
-    expect(data.map((d) => d.title)).toContain('First')
-    expect(data.map((d) => d.title)).toContain('Second')
+    expect(data.map((d) => d.title)).toEqual(['First', 'Second'])
   })
 }
 

@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
+import { render, screen, cleanup, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { installVaultBridge, eventually, indexedProject, task } from './helpers/bridge'
 import { ArchiveView } from '../../src/components/ArchiveView'
 
@@ -28,8 +29,10 @@ afterEach(() => {
 })
 
 async function openArchiveTab(name: RegExp) {
+  const user = userEvent.setup()
   render(<ArchiveView />)
-  fireEvent.click(await screen.findByRole('tab', { name }))
+  await user.click(await screen.findByRole('tab', { name }))
+  return user
 }
 
 describe('ArchiveView usage', () => {
@@ -62,18 +65,20 @@ function archiveTasksGroupingTests() {
 
 function archiveTasksRestoringAndDeletingTests() {
   it('restores a task', async () => {
+    const user = userEvent.setup()
     render(<ArchiveView />)
     await screen.findByText('Completed (1)')
-    fireEvent.click(screen.getAllByRole('button', { name: 'Restore to open' })[0])
+    await user.click(screen.getAllByRole('button', { name: 'Restore to open' })[0])
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:restore-task')).toEqual([{ taskId: 'd1' }])
     )
   })
 
   it('deletes a task after confirming', async () => {
+    const user = userEvent.setup()
     render(<ArchiveView />)
     await screen.findByText('Completed (1)')
-    fireEvent.click(screen.getAllByRole('button', { name: 'Delete permanently' })[1])
+    await user.click(screen.getAllByRole('button', { name: 'Delete permanently' })[1])
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:delete-task')).toEqual([{ taskId: 'c1' }])
     )
@@ -82,9 +87,10 @@ function archiveTasksRestoringAndDeletingTests() {
 
   it('keeps a task when the delete is not confirmed', async () => {
     vi.mocked(window.confirm).mockReturnValue(false)
+    const user = userEvent.setup()
     render(<ArchiveView />)
     await screen.findByText('Completed (1)')
-    fireEvent.click(screen.getAllByRole('button', { name: 'Delete permanently' })[0])
+    await user.click(screen.getAllByRole('button', { name: 'Delete permanently' })[0])
     expect(bridge.calls('task-vault:vault:delete-task')).toEqual([])
   })
 }
@@ -95,17 +101,20 @@ function archiveProjectsAndAreasTests() {
 }
 
 function archiveProjectsAndAreasProjectsTests() {
-  it('restores and deletes an archived project', async () => {
-    await openArchiveTab(/Archived projects/)
+  it('restores an archived project to active', async () => {
+    const user = await openArchiveTab(/Archived projects/)
     expect(screen.getByText('#Work')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Restore to active' }))
+    await user.click(screen.getByRole('button', { name: 'Restore to active' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:update-project-status')).toEqual([
         { projectFilePath: 'Old launch', status: 'active' },
       ])
     )
-    fireEvent.click(await screen.findByRole('tab', { name: /Archived projects/ }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete permanently' }))
+  })
+
+  it('deletes an archived project', async () => {
+    const user = await openArchiveTab(/Archived projects/)
+    await user.click(screen.getByRole('button', { name: 'Delete permanently' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:projects:delete')).toEqual([
         { projectFilePath: 'Old launch' },
@@ -115,27 +124,35 @@ function archiveProjectsAndAreasProjectsTests() {
 }
 
 function archiveProjectsAndAreasAreasTests() {
-  it('restores and deletes an archived area', async () => {
-    await openArchiveTab(/Archived areas/)
-    fireEvent.click(screen.getByRole('button', { name: 'Restore to active' }))
+  it('restores an archived area', async () => {
+    const user = await openArchiveTab(/Archived areas/)
+    await user.click(screen.getByRole('button', { name: 'Restore to active' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:restore-area')).toEqual([{ areaName: 'Hobbies' }])
     )
-    fireEvent.click(await screen.findByRole('tab', { name: /Archived areas/ }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete permanently' }))
+  })
+
+  it('deletes an archived area', async () => {
+    const user = await openArchiveTab(/Archived areas/)
+    await user.click(screen.getByRole('button', { name: 'Delete permanently' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:delete-area')).toEqual([{ areaFilePath: 'Hobbies' }])
     )
   })
 
-  it('says when there is nothing archived', async () => {
+  it('says there are no completed tasks when the archive is empty', async () => {
     bridge.responses['task-vault:vault:list-archive'] = {}
     render(<ArchiveView />)
     expect(await screen.findByText('No completed tasks in the last 30 days.')).toBeTruthy()
-    fireEvent.click(await screen.findByRole('tab', { name: /Archived projects/ }))
-    expect(screen.getByText('No archived projects.')).toBeTruthy()
-    fireEvent.click(screen.getByRole('tab', { name: /Archived areas/ }))
-    expect(screen.getByText('No archived areas.')).toBeTruthy()
+  })
+
+  it.each([
+    { tab: /Archived projects/, message: 'No archived projects.' },
+    { tab: /Archived areas/, message: 'No archived areas.' },
+  ])('says "$message" on the $tab tab when the archive is empty', async ({ tab, message }) => {
+    bridge.responses['task-vault:vault:list-archive'] = {}
+    await openArchiveTab(tab)
+    expect(screen.getByText(message)).toBeTruthy()
   })
 }
 

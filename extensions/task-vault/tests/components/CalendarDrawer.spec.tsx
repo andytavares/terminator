@@ -1,37 +1,14 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, cleanup, act } from '@testing-library/react'
+import { render, screen, cleanup, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { setLocalClock } from '../support/clock'
+import { restoreLocalClock, setLocalClock } from '../support/clock'
+import { eventually } from './helpers/bridge'
+
+import { useVaultDataStore } from '../../src/stores/vault-data.store'
+import { useVaultNavStore } from '../../src/stores/vault-nav.store'
 
 const mockInvoke = vi.fn()
-const mockLoadDate = vi.fn()
-const mockLoadToday = vi.fn()
-const mockNavigateToTask = vi.fn()
-
-vi.mock('../../src/stores/vault.store', () => ({
-  useVaultStore: (
-    sel?: (s: {
-      loadDate: typeof mockLoadDate
-      loadToday: typeof mockLoadToday
-      calendarRefreshKey: number
-    }) => unknown
-  ) => {
-    const store = {
-      loadDate: mockLoadDate,
-      loadToday: mockLoadToday,
-      calendarRefreshKey: 0,
-    }
-    if (sel) return sel(store)
-    return store
-  },
-}))
-
-vi.mock('../../src/stores/vault-nav.store', () => ({
-  useVaultNavStore: {
-    getState: () => ({ navigateToTask: mockNavigateToTask }),
-  },
-}))
 
 // Track registered extensionBridge.on handlers so tests can trigger them
 const bridgeHandlers = new Map<string, (data: unknown) => void>()
@@ -54,6 +31,7 @@ afterEach(() => {
   cleanup()
   bridgeHandlers.clear()
   vi.clearAllMocks()
+  restoreLocalClock()
 })
 
 // Every test runs at noon on this day: setLocalClock in calendarDrawerTests.
@@ -63,11 +41,12 @@ function dayTask(id: string, text: string) {
   return { id, text, status: 'open', metadata: {}, terminatorLinks: [] }
 }
 
-/** Answers the month query with `days` and every daily query with `daily`. */
+/** Answers the month query with `days` and every daily or today query with `daily`. */
 function answerDays(days: unknown[], daily: unknown): void {
   mockInvoke.mockImplementation((channel: string) => {
     if (channel === 'task-vault:vault:get-calendar-month') return Promise.resolve({ days })
     if (channel === 'task-vault:vault:get-daily') return Promise.resolve(daily)
+    if (channel === 'task-vault:vault:get-today') return Promise.resolve(daily)
     return Promise.resolve({})
   })
 }
@@ -83,6 +62,8 @@ function calendarDrawerTests() {
   beforeEach(() => {
     setLocalClock('UTC', `${TODAY}T12:00:00.000Z`)
     mockInvoke.mockResolvedValue({ days: [] })
+    useVaultDataStore.setState({ todayLog: null })
+    useVaultNavStore.setState({ viewingDate: null })
   })
 
   describe('today', calendarDrawerTodayTests)
@@ -91,29 +72,24 @@ function calendarDrawerTests() {
 }
 
 function calendarDrawerTodayTests() {
-  it('navigates to today and shows task list when today cell is clicked', async () => {
+  it('loads today into the vault and lists its tasks when the today cell is clicked', async () => {
     const user = userEvent.setup()
-    const todayStr = TODAY
-
-    answerDays([{ date: todayStr, status: 'open', count: 1 }], {
-      date: todayStr,
+    const log = {
+      date: TODAY,
       tasks: [dayTask('t1', 'Test task')],
       events: [],
       notes: [],
       exists: true,
-    })
+    }
+    answerDays([{ date: TODAY, status: 'open', count: 1 }], log)
 
     await renderDrawer()
-    // The cell's label now says what the day is carrying, not just its date —
-    // a grid already shows the date.
-    const todayCell = () => screen.getByRole('button', { name: new RegExp(`^${todayStr}`) })
-    await waitFor(todayCell)
-    await user.click(todayCell())
+    // The cell's label says what the day is carrying; a grid already shows the date.
+    await user.click(await screen.findByRole('button', { name: new RegExp(`^${TODAY}`) }))
 
-    expect(mockLoadToday).toHaveBeenCalled()
-    await waitFor(() => {
-      expect(screen.getByText('Test task')).toBeTruthy()
-    })
+    await eventually(() => expect(useVaultNavStore.getState().viewingDate).toBe(TODAY))
+    expect(useVaultDataStore.getState().todayLog).toEqual(log)
+    expect(screen.getByText('Test task')).toBeTruthy()
   })
 }
 

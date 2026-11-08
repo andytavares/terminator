@@ -15,7 +15,6 @@ import type { LinearState } from './tracker-stub-linear'
 let handle: AppHandle
 let stub: TrackerStub
 let repo: string
-let credentialStore = false
 const BRANCH = 'main'
 
 type LinearIssue = LinearState['issues'][number]
@@ -54,9 +53,12 @@ test.beforeAll(async () => {
   stub = await startTrackerStub(linearState())
   handle = await launchApp(undefined, stub.env)
   await allowCredentialsWithoutKeychain(handle.app)
-  credentialStore = await handle.app.evaluate(({ safeStorage }) =>
+  // The core stores a tracker credential only with OS encryption: macOS gets it from
+  // --use-mock-keychain, Linux from allowCredentialsWithoutKeychain.
+  const encryptionAvailable = await handle.app.evaluate(({ safeStorage }) =>
     safeStorage.isEncryptionAvailable()
   )
+  expect(encryptionAvailable).toBe(true)
   await createWorkspace(handle.page, 'Trackers', repo)
   await projectGroup(handle.page, BRANCH).click()
 })
@@ -219,8 +221,5 @@ const TRACKER_STEPS: Steps = [
 ]
 
 test('Linear issues are linked to a branch, read, commented on and fed to sessions', async () => {
-  // The core stores a tracker credential only with OS encryption: macOS gets it from
-  // --use-mock-keychain, Linux from allowCredentialsWithoutKeychain. The skip is for neither.
-  test.skip(!credentialStore, 'safeStorage has no OS encryption under Playwright here')
   for (const [title, body] of TRACKER_STEPS) await test.step(title, body)
 })

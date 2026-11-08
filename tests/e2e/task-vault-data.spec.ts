@@ -18,15 +18,20 @@ let exportFile: string
 test.beforeAll(async () => {
   handle = await launchApp()
   vault = await openVault(handle)
+  // An empty day offers "Add task", which opens the add row; once the day has a task the row
+  // closes after each add and "+ Add task" opens it again.
   await vault.getByRole('button', { name: 'Add task', exact: true }).click()
-  for (const text of ['Water the plants', 'Back up the laptop']) {
-    const input = vault.locator('.daily-log__add-row input')
-    if (!(await input.isVisible())) await vault.locator('.daily-log__add-btn').click()
-    await input.fill(text)
-    await input.press('Enter')
-    await expect(vault.locator('.daily-log__add-row')).toHaveCount(0)
-  }
+  await addTaskInOpenRow('Water the plants')
+  await vault.getByRole('button', { name: '+ Add task', exact: true }).click()
+  await addTaskInOpenRow('Back up the laptop')
 })
+
+async function addTaskInOpenRow(text: string): Promise<void> {
+  const input = vault.locator('.daily-log__add-row input')
+  await input.fill(text)
+  await input.press('Enter')
+  await expect(vault.locator('.daily-log__add-row')).toHaveCount(0)
+}
 
 test.afterAll(async () => {
   await closeApp(handle)

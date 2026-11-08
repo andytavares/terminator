@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { MERGED_DAYS, mergedQuery, parseMerged } from '../../src/github/merged-search'
+import { mergedQuery, parseMerged } from '../../src/github/merged-search'
 
 const NOW = Date.parse('2026-10-18T12:00:00Z')
 const LOCAL_ROOTS = new Map([['acme/widgets', '/work/widgets']])
@@ -36,7 +36,6 @@ const parseMergedFixture = (node: unknown) =>
 describe('mergedQuery', () => {
   it('searches my merged pull requests of the last 90 days in one search', () => {
     const query = mergedQuery(NOW)
-    expect(MERGED_DAYS).toBe(90)
     expect(query).toContain('is:pr author:@me is:merged merged:>=2026-07-20')
     expect(query.match(/search\(/g)).toHaveLength(1)
     expect(query).toContain('first: 50')

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import {
   Tab,
   TabList,
@@ -34,7 +35,7 @@ const tabNamed = (name: string) => screen.getByRole('tab', { name })
 describe('Tabs', () => {
   it('names the tab list', () => {
     render(<TabsHarness />)
-    expect(screen.getByRole('tablist', { name: 'Pull request sections' })).toBeTruthy()
+    expect(screen.getByRole('tablist').getAttribute('aria-label')).toBe('Pull request sections')
   })
 
   it('selects one tab and shows only its panel', () => {
@@ -54,9 +55,10 @@ describe('Tabs — keys and clicks it does not act on', () => {
     expect(tabNamed('Files').getAttribute('aria-selected')).toBe('true')
   })
 
-  it('does not select a disabled tab by click', () => {
+  it('does not select a disabled tab by click', async () => {
+    const user = userEvent.setup()
     render(<TabsHarness />)
-    fireEvent.click(tabNamed('Notes'))
+    await user.click(tabNamed('Notes'))
     expect(tabNamed('Files').getAttribute('aria-selected')).toBe('true')
   })
 })
@@ -133,7 +135,9 @@ describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel', () => {
   it('lets the list share a row with other controls and the panel sit elsewhere', () => {
     render(<PartsHarness />)
     const toolbar = screen.getByRole('toolbar')
-    expect(within(toolbar).getByRole('tablist', { name: 'Dashboard sections' })).toBeTruthy()
+    expect(within(toolbar).getByRole('tablist').getAttribute('aria-label')).toBe(
+      'Dashboard sections'
+    )
     expect(within(toolbar).queryByRole('tabpanel')).toBeNull()
     expect(screen.getByRole('tabpanel').textContent).toBe('Needs rows')
   })
@@ -149,7 +153,9 @@ describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel', () => {
     expect(tabNamed('Needs you, 3').getAttribute('aria-controls')).toBe(panel.id)
     expect(panel.getAttribute('aria-labelledby')).toBe(tabNamed('Needs you, 3').id)
   })
+})
 
+describe('Tabs parts — aria-controls', () => {
   it('points aria-controls only at a panel that is in the document', () => {
     render(<PartsHarness />)
     const controlled = screen
@@ -168,9 +174,10 @@ describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel — leaves aria-controls 
     expect(tabNamed('Needs you, 3').hasAttribute('aria-controls')).toBe(false)
   })
 
-  it('moves the panel with the selection on click', () => {
+  it('moves the panel with the selection on click', async () => {
+    const user = userEvent.setup()
     render(<PartsHarness />)
-    fireEvent.click(tabNamed('My PRs'))
+    await user.click(tabNamed('My PRs'))
     expect(screen.getByRole('tabpanel').textContent).toBe('Mine rows')
     expect(tabNamed('My PRs').getAttribute('aria-controls')).toBe(screen.getByRole('tabpanel').id)
   })
@@ -180,35 +187,44 @@ describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel — leaves aria-controls 
     expect(screen.getAllByRole('tab').map((element) => element.tabIndex)).toEqual([-1, 0, -1, -1])
   })
 
-  it('moves focus and selection with Left and Right, skipping disabled tabs and wrapping', () => {
+  it('moves focus and selection with Left and Right, skipping disabled tabs and wrapping', async () => {
+    const user = userEvent.setup()
     render(<PartsHarness initial="mine" />)
-    fireEvent.keyDown(tabNamed('My PRs'), { key: 'ArrowRight' })
+    await user.tab()
+    expect(document.activeElement).toBe(tabNamed('My PRs'))
+    await user.keyboard('{ArrowRight}')
     expect(document.activeElement).toBe(tabNamed('Involved'))
     expect(tabNamed('Involved').getAttribute('aria-selected')).toBe('true')
-    fireEvent.keyDown(tabNamed('Involved'), { key: 'ArrowRight' })
+    await user.keyboard('{ArrowRight}')
     expect(document.activeElement).toBe(tabNamed('Needs you, 3'))
-    fireEvent.keyDown(tabNamed('Needs you, 3'), { key: 'ArrowLeft' })
+    await user.keyboard('{ArrowLeft}')
     expect(tabNamed('Involved').getAttribute('aria-selected')).toBe('true')
   })
 })
 
 describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel — jumps to the ends with Home and End', () => {
-  it('jumps to the ends with Home and End', () => {
+  it('jumps to the ends with Home and End', async () => {
+    const user = userEvent.setup()
     render(<PartsHarness initial="mine" />)
-    fireEvent.keyDown(tabNamed('My PRs'), { key: 'End' })
+    await user.tab()
+    expect(document.activeElement).toBe(tabNamed('My PRs'))
+    await user.keyboard('{End}')
     expect(document.activeElement).toBe(tabNamed('Involved'))
-    fireEvent.keyDown(tabNamed('Involved'), { key: 'Home' })
+    await user.keyboard('{Home}')
     expect(document.activeElement).toBe(tabNamed('Needs you, 3'))
   })
 
-  it('uses Up and Down, not Left and Right, in a vertical list', () => {
+  it('uses Up and Down, not Left and Right, in a vertical list', async () => {
+    const user = userEvent.setup()
     render(<PartsHarness orientation="vertical" />)
     expect(screen.getByRole('tablist').getAttribute('aria-orientation')).toBe('vertical')
-    fireEvent.keyDown(tabNamed('Needs you, 3'), { key: 'ArrowRight' })
+    await user.tab()
+    expect(document.activeElement).toBe(tabNamed('Needs you, 3'))
+    await user.keyboard('{ArrowRight}')
     expect(tabNamed('Needs you, 3').getAttribute('aria-selected')).toBe('true')
-    fireEvent.keyDown(tabNamed('Needs you, 3'), { key: 'ArrowDown' })
+    await user.keyboard('{ArrowDown}')
     expect(document.activeElement).toBe(tabNamed('My PRs'))
-    fireEvent.keyDown(tabNamed('My PRs'), { key: 'ArrowUp' })
+    await user.keyboard('{ArrowUp}')
     expect(tabNamed('Needs you, 3').getAttribute('aria-selected')).toBe('true')
   })
 
@@ -225,9 +241,10 @@ describe('Tabs with nothing selected', () => {
     expect(tabNamed('Files').getAttribute('tabindex')).toBe('0')
     expect(tabNamed('Checks').getAttribute('tabindex')).toBe('-1')
   })
-  it('moves the stop to a tab once it is selected', () => {
+  it('moves the stop to a tab once it is selected', async () => {
+    const user = userEvent.setup()
     render(<TabsHarness initial="" />)
-    fireEvent.click(tabNamed('Checks'))
+    await user.click(tabNamed('Checks'))
     expect(tabNamed('Checks').getAttribute('tabindex')).toBe('0')
     expect(tabNamed('Files').getAttribute('tabindex')).toBe('-1')
   })

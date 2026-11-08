@@ -275,11 +275,13 @@ function backfillRecurringTasksSpawningTests() {
 
   it('is idempotent when called twice', async () => {
     const id = await insertTask({ recurrence_rule: 'daily', due_date: '2020-01-01' })
+    const instanceCount = async () =>
+      (await db.query(`SELECT id FROM tasks WHERE recurrence_template_id=?`, [id])).length
     await backfillRecurringTasks(db)
-    const countAfterFirst = (
-      await db.query(`SELECT id FROM tasks WHERE recurrence_template_id=?`, [id])
-    ).length
+    const countAfterFirst = await instanceCount()
+    await backfillRecurringTasks(db)
     expect(countAfterFirst).toBeGreaterThan(0)
+    expect(await instanceCount()).toBe(countAfterFirst)
   })
 }
 

@@ -82,13 +82,15 @@ describe('task store writes', () => {
     expect(useTaskStore.getState().tasks.map((t) => t.focus)).toEqual([true, false])
   })
 
-  it('appends a created task and passes the lane to addLane as given', async () => {
+  it('appends a created task', async () => {
     api.create.mockResolvedValue({ data: task() })
     expect(await useTaskStore.getState().create({ title: 'Billing', lanes: task().lanes })).toBe(
       true
     )
-    expect(useTaskStore.getState().tasks).toHaveLength(1)
+    expect(useTaskStore.getState().tasks).toEqual([task()])
+  })
 
+  it('passes the lane to addLane as given', async () => {
     api.addLane.mockResolvedValue({ data: task() })
     await useTaskStore.getState().addLane('id-1', { repoRoot: '/r', branch: 'b' })
     expect(api.addLane).toHaveBeenCalledWith({ id: 'id-1', lane: { repoRoot: '/r', branch: 'b' } })

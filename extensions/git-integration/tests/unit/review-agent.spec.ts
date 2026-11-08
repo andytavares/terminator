@@ -76,6 +76,14 @@ describe('buildAgentPrompt — notes for the scope and diff', () => {
     expect(prompt).toMatch(/what the change is, then its consequences/i)
   })
 
+  it.each([
+    ['file', scopeOf('file', { path: 'src/foo.ts' })],
+    ['lines', scopeOf('lines', { path: 'a.ts', startLine: 1, endLine: 2, side: 'RIGHT' })],
+  ])('asks for no walkthrough when scope is %s', (_kind, scope) => {
+    const prompt = buildAgentPrompt({ scope, request: 'review', pr, diffText: 'diff' })
+    expect(prompt).not.toMatch(/walkthrough/i)
+  })
+
   it('says the diff was truncated only when it was', () => {
     const input = { scope: scopeOf('pr'), request: 'review' as const, pr, diffText: 'diff' }
     expect(buildAgentPrompt({ ...input, truncated: true })).toMatch(/diff below was truncated/i)

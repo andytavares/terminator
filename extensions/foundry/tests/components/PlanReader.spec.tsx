@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { PlanReader } from '../../src/components/PlanReader.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -30,12 +31,6 @@ const order: WorkOrder = {
   ],
 }
 
-const writeText = vi.fn(async (_text: string) => undefined)
-beforeEach(() => {
-  writeText.mockClear()
-  Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
-})
-
 describe('the plan reader', () => {
   it('reads the whole plan as formatted Markdown', () => {
     render(<PlanReader order={order} onClose={vi.fn()} />)
@@ -46,24 +41,37 @@ describe('the plan reader', () => {
   })
 
   it('copies the same text order.md holds', async () => {
+    const user = userEvent.setup()
     render(<PlanReader order={order} onClose={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Copy Markdown' }))
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith(renderOrder(order)))
+    await user.click(screen.getByRole('button', { name: 'Copy Markdown' }))
+    expect(await navigator.clipboard.readText()).toBe(renderOrder(order))
   })
 
   it('shows nothing broken when the clipboard refuses', async () => {
-    writeText.mockRejectedValueOnce(new Error('denied'))
+    const user = userEvent.setup()
+    vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValueOnce(new Error('denied'))
     render(<PlanReader order={order} onClose={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Copy Markdown' }))
-    await waitFor(() => expect(writeText).toHaveBeenCalled())
-    expect(screen.getByRole('dialog')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Copy Markdown' }))
+    expect(screen.getByRole('dialog', { name: 'Plan · WO-1' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: /Refuse an expired refresh token/ })).toBeTruthy()
   })
+})
 
-  it('closes from the close button and from Escape', () => {
+describe('closing the plan reader', () => {
+  it('closes from the close button', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     render(<PlanReader order={order} onClose={onClose} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
-    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
-    expect(onClose).toHaveBeenCalledTimes(2)
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('closes on Escape', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(<PlanReader order={order} onClose={onClose} />)
+    expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
+    await user.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })

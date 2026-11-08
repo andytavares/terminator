@@ -201,16 +201,25 @@ function lanesHoldsTests() {
 
   it('holds every consumer behind the producer', () => {
     const agreed = agreeOrder(withProducer(), '2026-09-06T12:00:00.000Z')
-    if (!agreed.ok) throw new Error('expected the order to agree')
-    expect(agreed.order.plan.lanes[0]).toMatchObject({ role: 'producer', blocks: [2] })
-    expect(agreed.order.plan.lanes[1]).toMatchObject({ role: 'consumer', blockedBy: [1] })
+    expect(agreed).toMatchObject({
+      ok: true,
+      order: {
+        plan: {
+          lanes: [
+            { role: 'producer', blocks: [2] },
+            { role: 'consumer', blockedBy: [1] },
+          ],
+        },
+      },
+    })
   })
 
   it('leaves a single-lane order with nothing to wait for', () => {
     const agreed = agreeOrder(single(), '2026-09-06T12:00:00.000Z')
-    if (!agreed.ok) throw new Error('expected the order to agree')
-    expect(agreed.order.plan.lanes[0]).toMatchObject({ blocks: [], blockedBy: [] })
-    expect(agreed.order.plan.sharedFiles).toEqual([])
+    expect(agreed).toMatchObject({
+      ok: true,
+      order: { plan: { lanes: [{ blocks: [], blockedBy: [] }], sharedFiles: [] } },
+    })
   })
 }
 
@@ -245,10 +254,10 @@ describe('what a surface shows', () => {
   })
 
   it('flags the shared file on every lane that touches it, not just the producer', () => {
-    expect(laneViews(planned).length).toBeGreaterThan(1)
-    for (const view of laneViews(planned)) {
-      expect(view.collisions).toEqual(['proto/session.proto'])
-    }
+    expect(laneViews(planned).map((view) => view.collisions)).toEqual([
+      ['proto/session.proto'],
+      ['proto/session.proto'],
+    ])
   })
 
   it('reports which lanes each one waits on', () => {

@@ -847,12 +847,29 @@ describe('offering shapes of work', () => {
   })
 
   it('observes with the order own budgets rather than a guessed default', async () => {
-    await store.save(order({ budgets: { agents: 1, wallClockMinutes: 5, tokens: null } }))
+    await store.save({
+      ...twoFreeLanes(),
+      budgets: { agents: 1, wallClockMinutes: 5, tokens: null },
+    })
     await freshRunChannels().start({ id: 'WO-1' })
     const r = (await freshRunChannels().observe({ id: 'WO-1' })) as { ready: string[] }
-    expect(r.ready.length).toBeLessThanOrEqual(2)
+    expect(r.ready).toHaveLength(1)
   })
 })
+
+/** Two lanes with nothing between them, so both lanes' builders can start at once. */
+function twoFreeLanes(): WorkOrder {
+  const lanes = twoLanes()
+  return {
+    ...lanes,
+    plan: {
+      ...lanes.plan,
+      sharedFiles: [],
+      lanes: lanes.plan.lanes.map((lane) => ({ ...lane, role: null, blocks: [], blockedBy: [] })),
+      units: lanes.plan.units.map((unit, at) => ({ ...unit, touches: [`src/${at}`] })),
+    },
+  }
+}
 
 function twoLanes(): WorkOrder {
   const base = order()
@@ -883,6 +900,7 @@ function twoLanes(): WorkOrder {
 }
 describe('what run.observe says about lanes (FR-067, FR-068)', () => {
   describe('lanes', runChannelsLanesTests)
+  describe('a single lane', aSingleLaneTests)
 })
 
 function runChannelsLanesTests() {
@@ -897,8 +915,10 @@ function runChannelsLanesTests() {
     await store.save(twoLanes())
     await freshRunChannels().start({ id: 'WO-1' })
     const r = answered(await freshRunChannels().observe({ id: 'WO-1' }))
-    expect(r.lanes.length).toBeGreaterThan(1)
-    for (const lane of r.lanes) expect(lane.collisions).toEqual(['proto/session.proto'])
+    expect(r.lanes.map((l) => l.collisions)).toEqual([
+      ['proto/session.proto'],
+      ['proto/session.proto'],
+    ])
   })
 
   it('gives the hold as a sentence, so the surface does not reassemble it', async () => {
@@ -909,7 +929,9 @@ function runChannelsLanesTests() {
     expect(r.lanes[1].hold).toContain('must merge first')
     expect(r.lanes[1].hold).toContain('proto/session.proto')
   })
+}
 
+function aSingleLaneTests() {
   it('reports one unremarkable lane for a single-repository order', async () => {
     await store.save(order())
     await freshRunChannels().start({ id: 'WO-1' })
@@ -1004,6 +1026,7 @@ function failuresAndRefusalsTests() {
 describe('foundry:run.resume', () => {
   describe('picking up', runChannelsPickingUpTests)
   describe('retrying', runChannelsRetryingTests)
+  describe('not retrying', runChannelsNotRetryingTests)
   describe('recording the resume', recordingTheResumeTests)
   describe('refusals', runChannelsRefusalsTests)
 })
@@ -1049,15 +1072,23 @@ function runChannelsRetryingTests() {
     const handed = execute.mock.calls[0][2] as RunGraph
     expect(handed.nodes.find((n) => n.id === nodeId)?.state).toBe('waiting')
   })
+}
 
-  it('leaves everything else where it was', async () => {
+function runChannelsNotRetryingTests() {
+  it('leaves a failed node it was not told to retry failed', async () => {
     const execute = vi.fn<RunDeps['execute']>(async () => undefined)
     const channels = await started(execute)
+    const file = path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json')
+    const graph = JSON.parse(fs.readFileSync(file, 'utf8')) as RunGraph
+    const twoFailed = graph.nodes.map((n) =>
+      ['build:lane-1', 'document'].includes(n.id) ? { ...n, state: 'failed', attempts: 1 } : n
+    )
+    fs.writeFileSync(file, JSON.stringify({ ...graph, nodes: twoFailed }))
     execute.mockClear()
 
-    await channels.resume({ id: 'WO-1', retry: [] })
+    await channels.resume({ id: 'WO-1', retry: ['build:lane-1'] })
     const handed = execute.mock.calls[0][2] as RunGraph
-    expect(handed.nodes.every((n) => n.state !== 'failed')).toBe(true)
+    expect(handed.nodes.find((n) => n.id === 'document')?.state).toBe('failed')
   })
 }
 

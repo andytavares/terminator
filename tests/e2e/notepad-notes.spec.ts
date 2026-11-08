@@ -5,6 +5,7 @@ import { openExtensionSettings, settingRow } from './extension-settings-page'
 import {
   createItem,
   deleteForGood,
+  focusEditor,
   noteRow,
   openNotepad,
   rowMenu,
@@ -69,6 +70,7 @@ async function tableCellEditSaves(): Promise<void> {
   await expect(table.locator('td')).toHaveText(['Bread', '1'])
 
   await table.locator('td', { hasText: '1' }).click()
+  await expect(notepad.locator('.notepad-view__editor .cm-content')).toBeFocused()
   // The click puts the caret at the start of the cell's text in the source.
   await notepad.keyboard.press('ArrowRight')
   await notepad.keyboard.type('2')
@@ -231,7 +233,7 @@ async function storedComments(): Promise<StoredComment[]> {
 
 /** Selects `length` characters from `start` with the keyboard, from the top of the note. */
 async function selectRange(start: number, length: number): Promise<void> {
-  await notepad.locator('.notepad-view__editor .cm-content').click()
+  await focusEditor(notepad)
   await notepad.keyboard.press('ControlOrMeta+Home')
   // Line 1 is the heading; the caret moves by characters across the newline.
   for (let i = 0; i < start; i++) await notepad.keyboard.press('ArrowRight')
@@ -294,7 +296,7 @@ async function commentEditedRepliedResolved(): Promise<void> {
 
 async function anchorFollowsEdits(): Promise<void> {
   await commentOn('jumps over', 'Over what?')
-  await notepad.locator('.notepad-view__editor .cm-content').click()
+  await focusEditor(notepad)
   await notepad.keyboard.press('ControlOrMeta+Home')
   await notepad.keyboard.press('ArrowDown')
   await notepad.keyboard.press('Home')
@@ -466,9 +468,8 @@ async function fontSizeApplies(): Promise<void> {
 
 async function debounceDelaysSave(): Promise<void> {
   await changeNotepadSetting('Autosave debounce', '3000')
-  await notepad.keyboard.press('ControlOrMeta+End')
   // A note's title follows its first heading, so the body opens with one.
-  await notepad.keyboard.type('# Settings\nwaited')
+  await typeInEditor(notepad, '# Settings\nwaited')
 
   // The save waits for the pause: until it lands the note shows as unsaved and the store lacks the text.
   await expect(notepad.locator('.notepad-view__save-status')).toHaveText('Unsaved')

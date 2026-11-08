@@ -1,6 +1,7 @@
 import React from 'react'
-import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, fireEvent, screen, cleanup, act } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
+import { render, screen, cleanup, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { pressOutside } from '../../../../tests/support/modal'
 
 const mockInvoke = vi.fn().mockResolvedValue({ data: [] })
@@ -18,14 +19,40 @@ Object.defineProperty(window, 'electronAPI', {
 
 import { SearchOverlay } from '../../src/components/SearchOverlay'
 import { useNotesStore } from '../../src/stores/notes.store'
-import { eventually } from './helpers/note-surface'
+
+const SEARCH_DEBOUNCE_MS = 200
+
+function searchResult(id: string, title: string) {
+  return {
+    id,
+    title,
+    snippet: 'snippet',
+    tags: [],
+    updatedAt: '2026-01-01T00:00:00Z',
+    archivedAt: null,
+  }
+}
+
+beforeEach(() => {
+  // shouldAdvanceTime: Testing Library's async wrapper waits on a real setTimeout(0).
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true })
+  mockInvoke.mockReset().mockResolvedValue({ data: [] })
+  mockRecord.mockClear()
+})
 
 afterEach(() => {
   cleanup()
-  mockInvoke.mockClear()
-  mockRecord.mockClear()
-  vi.clearAllTimers()
+  vi.useRealTimers()
 })
+
+/** Opens the overlay, types `query` and lets the debounced search run and answer. */
+async function search(query: string, onClose = vi.fn()) {
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+  render(<SearchOverlay onClose={onClose} />)
+  await user.type(screen.getByPlaceholderText(/search across all notes/i), query)
+  await act(() => vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS))
+  return user
+}
 
 describe('SearchOverlay', searchOverlayTests)
 
@@ -37,10 +64,12 @@ function searchOverlayTests() {
 }
 
 function searchOverlayClosingTests() {
-  it('calls onClose on Escape key', () => {
+  it('calls onClose on Escape key', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const onClose = vi.fn()
     render(<SearchOverlay onClose={onClose} />)
-    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(document.activeElement).toBe(screen.getByPlaceholderText(/search across all notes/i))
+    await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -54,84 +83,42 @@ function searchOverlayClosingTests() {
 
 function searchOverlayResultsTests() {
   it('shows result count label when results exist', async () => {
-    mockInvoke.mockResolvedValueOnce({
-      data: [
-        {
-          id: 'n1',
-          title: 'Auth retry',
-          snippet: '…retry budget…',
-          tags: ['infra'],
-          updatedAt: new Date().toISOString(),
-          archivedAt: null,
-        },
-      ],
-    })
-    vi.useFakeTimers()
-    render(<SearchOverlay onClose={vi.fn()} />)
-    fireEvent.change(screen.getByPlaceholderText(/search across all notes/i), {
-      target: { value: 'retry' },
-    })
-    await act(async () => {
-      vi.runAllTimers()
-    })
-    vi.useRealTimers()
-    await eventually(() => expect(screen.getByText(/1 result/)).toBeTruthy())
+    mockInvoke.mockResolvedValue({ data: [searchResult('n1', 'Auth retry')] })
+    await search('retry')
+    expect(screen.getByText('1 result · ranked').textContent).toBe('1 result · ranked')
   })
 }
 
 function searchOverlayUsageTests() {
-  async function typeQuery(value: string) {
-    vi.useFakeTimers()
+  it('does not count the list shown on open as a search', async () => {
+    mockInvoke.mockResolvedValue({ data: [searchResult('n1', 'Recent')] })
     render(<SearchOverlay onClose={vi.fn()} />)
-    fireEvent.change(screen.getByPlaceholderText(/search across all notes/i), {
-      target: { value },
-    })
-    await act(async () => {
-      vi.runAllTimers()
-    })
-    vi.useRealTimers()
-  }
-
-  it('counts a search for typed text, not the empty list shown on open', async () => {
-    await typeQuery('')
+    await act(() => vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS))
+    // The count shows once the opening search has answered, so a record would have happened.
+    expect(screen.getByText('1 result').textContent).toBe('1 result')
     expect(mockRecord).not.toHaveBeenCalled()
-    cleanup()
-    await typeQuery('retry')
-    await eventually(() => expect(mockRecord).toHaveBeenCalledWith('search'))
+  })
+
+  it('counts a search for typed text', async () => {
+    await search('retry')
+    expect(mockRecord).toHaveBeenCalledWith('search')
   })
 
   it('counts a search that failed as failed', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
-    mockInvoke.mockRejectedValueOnce(new Error('index down'))
-    await typeQuery('retry')
-    await eventually(() => expect(mockRecord).toHaveBeenCalledWith('search', { failed: true }))
-    error.mockRestore()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockInvoke.mockRejectedValue(new Error('index down'))
+    await search('retry')
+    expect(mockRecord).toHaveBeenCalledWith('search', { failed: true })
   })
 }
 
 function searchOverlayOpeningResultTests() {
   it('selects note and closes on Enter', async () => {
-    const result = {
-      id: 'note-x',
-      title: 'My Note',
-      snippet: 'snippet',
-      tags: [],
-      updatedAt: new Date().toISOString(),
-      archivedAt: null,
-    }
-    mockInvoke.mockResolvedValueOnce({ data: [result] })
-    vi.useFakeTimers()
+    mockInvoke.mockResolvedValue({ data: [searchResult('note-x', 'My Note')] })
     const onClose = vi.fn()
-    render(<SearchOverlay onClose={onClose} />)
-    fireEvent.change(screen.getByPlaceholderText(/search across all notes/i), {
-      target: { value: 'my note' },
-    })
-    await act(async () => {
-      vi.runAllTimers()
-    })
-    vi.useRealTimers()
-    await eventually(() => expect(screen.getByText(/1 result/)).toBeTruthy())
-    fireEvent.keyDown(document, { key: 'Enter' })
+    const user = await search('my note', onClose)
+    expect(screen.getByText('1 result · ranked').textContent).toBe('1 result · ranked')
+    await user.keyboard('{Enter}')
     expect(useNotesStore.getState().selectedNoteId).toBe('note-x')
     expect(onClose).toHaveBeenCalled()
   })

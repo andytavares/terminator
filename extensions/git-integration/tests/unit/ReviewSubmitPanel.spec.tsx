@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import { ReviewSubmitPanel } from '../../src/components/pr-review/ReviewSubmitPanel'
 
@@ -29,7 +30,7 @@ const defaultProps = {
 describe('ReviewSubmitPanel', () => {
   it('renders submit review heading', () => {
     render(<ReviewSubmitPanel {...defaultProps} />)
-    expect(screen.getAllByText('Submit review').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Submit review')
   })
 
   it('defaults to Comment radio option', () => {
@@ -41,13 +42,11 @@ describe('ReviewSubmitPanel', () => {
 })
 
 describe('ReviewSubmitPanel — changes radio selection when clicking Approve', () => {
-  it('changes radio selection when clicking Approve', () => {
+  it('changes radio selection when clicking Approve', async () => {
+    const user = userEvent.setup()
     render(<ReviewSubmitPanel {...defaultProps} />)
-    const approveLabel = screen.getByText('Approve')
-    fireEvent.click(approveLabel.closest('label')!)
-    const radios = screen.getAllByRole('radio')
-    const approveRadio = radios.find((r) => r.getAttribute('value') === 'APPROVE')
-    expect((approveRadio as HTMLInputElement).checked).toBe(true)
+    await user.click(screen.getByLabelText('Approve'))
+    expect(screen.getByRole('radio', { name: 'Approve' })).toHaveProperty('checked', true)
   })
 
   it('renders a textarea for review body', () => {
@@ -63,30 +62,32 @@ describe('ReviewSubmitPanel — changes radio selection when clicking Approve', 
 })
 
 describe('ReviewSubmitPanel — calls onClose when Cancel is clicked', () => {
-  it('calls onClose when Cancel is clicked', () => {
+  it('calls onClose when Cancel is clicked', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     render(<ReviewSubmitPanel {...defaultProps} onClose={onClose} />)
-    fireEvent.click(screen.getByText('Cancel'))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onClose).toHaveBeenCalled()
   })
 
   it('shows success state after successful submission', async () => {
+    const user = userEvent.setup()
     mockPrReviewSubmit.mockResolvedValue({ success: true })
     render(<ReviewSubmitPanel {...defaultProps} />)
     // Switch to APPROVE so no body is required
-    fireEvent.click(screen.getByText('Approve').closest('label')!)
-    const submitBtn = screen.getByRole('button', { name: 'Submit approval' })
-    fireEvent.click(submitBtn)
+    await user.click(screen.getByLabelText('Approve'))
+    await user.click(screen.getByRole('button', { name: 'Submit approval' }))
     await screen.findByText('Review submitted successfully.')
     expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('review-comment')
   })
 
   it('hands back to the caller once an approval lands', async () => {
+    const user = userEvent.setup()
     mockPrReviewSubmit.mockResolvedValue({ success: true })
     const onApproved = vi.fn()
     render(<ReviewSubmitPanel {...defaultProps} onApproved={onApproved} />)
-    fireEvent.click(screen.getByText('Approve').closest('label')!)
-    fireEvent.click(screen.getByRole('button', { name: 'Submit approval' }))
+    await user.click(screen.getByLabelText('Approve'))
+    await user.click(screen.getByRole('button', { name: 'Submit approval' }))
     await waitFor(() => expect(onApproved).toHaveBeenCalledTimes(1))
     expect(screen.queryByText('Review submitted successfully.')).toBeNull()
   })
@@ -94,46 +95,44 @@ describe('ReviewSubmitPanel — calls onClose when Cancel is clicked', () => {
 
 describe('ReviewSubmitPanel — stays on the success screen after a comment review', () => {
   it('stays on the success screen after a comment review', async () => {
+    const user = userEvent.setup()
     mockPrReviewSubmit.mockResolvedValue({ success: true })
     const onApproved = vi.fn()
     render(<ReviewSubmitPanel {...defaultProps} onApproved={onApproved} />)
-    fireEvent.change(screen.getByPlaceholderText(/Leave a summary comment/), {
-      target: { value: 'looks fine' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Submit comment' }))
+    await user.type(screen.getByPlaceholderText(/Leave a summary comment/), 'looks fine')
+    await user.click(screen.getByRole('button', { name: 'Submit comment' }))
     await screen.findByText('Review submitted successfully.')
     expect(onApproved).not.toHaveBeenCalled()
   })
 
   it('shows close button after successful submission', async () => {
+    const user = userEvent.setup()
     mockPrReviewSubmit.mockResolvedValue({ success: true })
     const onClose = vi.fn()
     render(<ReviewSubmitPanel {...defaultProps} onClose={onClose} />)
-    fireEvent.click(screen.getByText('Approve').closest('label')!)
-    const submitBtn = screen.getByRole('button', { name: 'Submit approval' })
-    fireEvent.click(submitBtn)
-    fireEvent.click(await screen.findByText('Close'))
+    await user.click(screen.getByLabelText('Approve'))
+    await user.click(screen.getByRole('button', { name: 'Submit approval' }))
+    await user.click(await screen.findByRole('button', { name: 'Close' }))
     expect(onClose).toHaveBeenCalled()
   })
 })
 
 describe('ReviewSubmitPanel — shows error when submission fails', () => {
   it('shows error when submission fails', async () => {
+    const user = userEvent.setup()
     mockPrReviewSubmit.mockRejectedValue(new Error('API error'))
     render(<ReviewSubmitPanel {...defaultProps} />)
-    fireEvent.click(screen.getByText('Approve').closest('label')!)
-    const submitBtn = screen.getByRole('button', { name: 'Submit approval' })
-    fireEvent.click(submitBtn)
-    await screen.findByText(/API error/)
-    expect(screen.getByText(/API error/)).toBeTruthy()
+    await user.click(screen.getByLabelText('Approve'))
+    await user.click(screen.getByRole('button', { name: 'Submit approval' }))
+    expect((await screen.findByText(/API error/)).className).toBe('rs-error')
   })
 
   it('shows error when result contains error field', async () => {
+    const user = userEvent.setup()
     mockPrReviewSubmit.mockResolvedValue({ error: 'UNAUTHORIZED' })
     render(<ReviewSubmitPanel {...defaultProps} />)
-    fireEvent.click(screen.getByText('Approve').closest('label')!)
-    const submitBtn = screen.getByRole('button', { name: 'Submit approval' })
-    fireEvent.click(submitBtn)
+    await user.click(screen.getByLabelText('Approve'))
+    await user.click(screen.getByRole('button', { name: 'Submit approval' }))
     await screen.findByText(/UNAUTHORIZED/)
     expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith('review-comment', { failed: true })
     expect(screen.getByText(/UNAUTHORIZED/)).toBeTruthy()
@@ -142,21 +141,20 @@ describe('ReviewSubmitPanel — shows error when submission fails', () => {
 
 describe('ReviewSubmitPanel — shows validation error when submitting COMMENT with empty body', () => {
   it('shows validation error when submitting COMMENT with empty body', async () => {
+    const user = userEvent.setup()
     render(<ReviewSubmitPanel {...defaultProps} />)
     // COMMENT is the default event
-    const submitBtn = screen.getByRole('button', { name: 'Submit comment' })
-    fireEvent.click(submitBtn)
+    await user.click(screen.getByRole('button', { name: 'Submit comment' }))
     await screen.findByText(/A comment body is required/)
     expect(mockPrReviewSubmit).not.toHaveBeenCalled()
   })
 
   it('calls prReviewSubmit with correct args', async () => {
+    const user = userEvent.setup()
     mockPrReviewSubmit.mockResolvedValue({ success: true })
     render(<ReviewSubmitPanel {...defaultProps} />)
-    const textarea = screen.getByPlaceholderText(/Leave a summary comment/)
-    fireEvent.change(textarea, { target: { value: 'LGTM' } })
-    const submitBtn = screen.getByRole('button', { name: 'Submit comment' })
-    fireEvent.click(submitBtn)
+    await user.type(screen.getByPlaceholderText(/Leave a summary comment/), 'LGTM')
+    await user.click(screen.getByRole('button', { name: 'Submit comment' }))
     await waitFor(() =>
       expect(mockPrReviewSubmit).toHaveBeenCalledWith({
         repoRoot: '/repo',
@@ -209,9 +207,10 @@ describe('ReviewSubmitPanel — verdict cards', () => {
     ['Comment', 'Submit comment'],
     ['Approve', 'Submit approval'],
     ['Request changes', 'Submit changes request'],
-  ])('names the submit button after the %s verdict', (verdict, buttonName) => {
+  ])('names the submit button after the %s verdict', async (verdict, buttonName) => {
+    const user = userEvent.setup()
     render(<ReviewSubmitPanel {...defaultProps} />)
-    fireEvent.click(screen.getByLabelText(verdict))
+    await user.click(screen.getByLabelText(verdict))
     expect(screen.getByRole('button', { name: buttonName })).toBeTruthy()
   })
 })

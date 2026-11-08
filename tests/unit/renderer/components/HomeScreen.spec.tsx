@@ -1,9 +1,11 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { fact } from '../sidebar/fixtures/facts'
 import { isoMinutesBefore } from '../home/desk-world'
 import { installElectronApi } from '../../../support/electron-api'
+import { resetStore } from '../../../support/renderer-stores'
 import type { SessionFacts } from '../../../../src/renderer/sidebar/session-facts'
 import type { HomeAsk } from '../../../../src/shared/schemas/home-feed.schema'
 
@@ -123,6 +125,7 @@ beforeEach(() => {
   useDismissalsStore.setState({ entries: {} })
   useStartWorkStore.setState({ open: false })
   useFocusStore.setState({ days: {} })
+  resetStore(useExtensionRegistry)
   // These specs cover the Classic Desk; the Tasks layout has its own spec.
   const defaults = defaultGlobalSettings('/bin/zsh')
   useSettingsStore.setState({
@@ -149,11 +152,13 @@ describe('HomeScreen — the Quiet desk', () => {
     expect(document.body.textContent).not.toMatch(/Foundry/)
   })
 
-  it('opens the Start work launcher from the header and from the quiet line', () => {
+  it.each([
+    ['the header', 0],
+    ['the quiet line', 1],
+  ])('opens the Start work launcher from %s', async (_place, buttonIndex) => {
+    const user = userEvent.setup()
     render(<HomeScreen />)
-    const [header, quiet] = screen.getAllByRole('button', { name: /Start work/ })
-    fireEvent.click(header)
-    fireEvent.click(quiet)
+    await user.click(screen.getAllByRole('button', { name: /Start work/ })[buttonIndex])
     expect(useStartWorkStore.getState().open).toBe(true)
   })
 })
@@ -186,24 +191,27 @@ describe('HomeScreen — the Your move band', () => {
 })
 
 describe('HomeScreen — acting on an ask', () => {
-  it('answers a numbered choice in the session that asked', () => {
+  it('answers a numbered choice in the session that asked', async () => {
+    const user = userEvent.setup()
     state.facts = [asking()]
     render(<HomeScreen />)
-    fireEvent.click(screen.getByRole('button', { name: /No, stop here/ }))
+    await user.click(screen.getByRole('button', { name: /No, stop here/ }))
     expect(answer).toHaveBeenCalledWith('a', 2)
   })
 
-  it('runs an extension ask action against the extension that published it', () => {
+  it('runs an extension ask action against the extension that published it', async () => {
+    const user = userEvent.setup()
     const runAction = vi.fn().mockResolvedValue(true)
     useHomeFeedStore.setState({ asks: [homeFeedAsk({ id: 'r1' })], runAction })
     render(<HomeScreen />)
-    fireEvent.click(screen.getByRole('button', { name: 'Start review' }))
+    await user.click(screen.getByRole('button', { name: 'Start review' }))
     expect(runAction).toHaveBeenCalledWith('git-integration', 'r1', 'start-review')
   })
 })
 
 describe('HomeScreen — dismissing an ask', () => {
-  it('marks an ask done with E and drops its row, counting it in Done today', () => {
+  it('marks an ask done with E and drops its row, counting it in Done today', async () => {
+    const user = userEvent.setup()
     useHomeFeedStore.setState({
       asks: [
         homeFeedAsk({ id: 'r1' }),
@@ -211,49 +219,56 @@ describe('HomeScreen — dismissing an ask', () => {
       ],
     })
     render(<HomeScreen />)
-    fireEvent.keyDown(home(), { key: 'e' })
+    expect(home().contains(document.activeElement)).toBe(true)
+    await user.keyboard('e')
     expect(askRows()).toHaveLength(1)
     expect(screen.queryByText('Review requested')).toBeNull()
     expect(screen.getByText('Done today: 1')).toBeTruthy()
   })
 
-  it('snoozes with H and the chosen time, and says how many are snoozed', () => {
+  it('snoozes with H and the chosen time, and says how many are snoozed', async () => {
+    const user = userEvent.setup()
     useHomeFeedStore.setState({
       asks: [homeFeedAsk({ id: 'r1' }), homeFeedAsk({ id: 'r2', title: 'Other' })],
     })
     render(<HomeScreen />)
-    fireEvent.keyDown(home(), { key: 'h' })
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Tomorrow' }))
+    expect(home().contains(document.activeElement)).toBe(true)
+    await user.keyboard('h')
+    await user.click(screen.getByRole('menuitem', { name: 'Tomorrow' }))
     expect(askRows()).toHaveLength(1)
     expect(screen.getByText(/1 snoozed until 9 AM/)).toBeTruthy()
   })
 })
 
 describe('HomeScreen — answering in place', () => {
-  it('opens the ask on Enter with the terminal excerpt, and sends a reply with Enter', () => {
+  it('opens the ask on Enter with the terminal excerpt, and sends a reply with Enter', async () => {
+    const user = userEvent.setup()
     state.facts = [asking()]
     render(<HomeScreen />)
-    fireEvent.keyDown(home(), { key: 'Enter' })
+    expect(home().contains(document.activeElement)).toBe(true)
+    await user.keyboard('{Enter}')
     expect(screen.getByLabelText('Terminal excerpt').textContent).toContain('❯ 1. Yes')
     const reply = screen.getByRole('textbox', { name: 'Reply in your own words' })
-    fireEvent.change(reply, { target: { value: 'use staging' } })
-    fireEvent.keyDown(reply, { key: 'Enter' })
+    await user.type(reply, 'use staging{Enter}')
     expect(input).toHaveBeenCalledWith('a', '\x1b[200~use staging\x1b[201~\r')
   })
 
-  it('answers with a number key and closes with Escape', () => {
+  it('answers with a number key and closes with Escape', async () => {
+    const user = userEvent.setup()
     state.facts = [asking()]
     render(<HomeScreen />)
-    fireEvent.keyDown(home(), { key: 'Enter' })
-    fireEvent.keyDown(home(), { key: 'Escape' })
+    expect(home().contains(document.activeElement)).toBe(true)
+    await user.keyboard('{Enter}')
+    await user.keyboard('{Escape}')
     expect(screen.queryByLabelText('Terminal excerpt')).toBeNull()
-    fireEvent.keyDown(home(), { key: '1' })
+    await user.keyboard('1')
     expect(answer).toHaveBeenCalledWith('a', 1)
   })
 })
 
 describe('HomeScreen — a finished agent', () => {
-  it('shows what it changed, read from its branch', () => {
+  it('shows what it changed, read from its branch', async () => {
+    const user = userEvent.setup()
     state.facts = [
       fact({
         sessionId: 'f',
@@ -271,13 +286,14 @@ describe('HomeScreen — a finished agent', () => {
     render(<HomeScreen />)
     expect(within(askRows()[0]).getByText('Agent finished')).toBeTruthy()
     expect(within(askRows()[0]).getByText(/4 files · \+210 −8/)).toBeTruthy()
-    fireEvent.click(within(askRows()[0]).getByRole('button', { name: 'Review changes' }))
+    await user.click(within(askRows()[0]).getByRole('button', { name: 'Review changes' }))
     expect(reveal).toHaveBeenCalledWith('f')
   })
 })
 
 describe('HomeScreen — keys', () => {
-  it('moves the selection with J and K', () => {
+  it('moves the selection with J and K', async () => {
+    const user = userEvent.setup()
     useHomeFeedStore.setState({
       asks: [
         homeFeedAsk({ id: 'r1' }),
@@ -287,22 +303,28 @@ describe('HomeScreen — keys', () => {
     render(<HomeScreen />)
     const selectedRowIndex = () => askRows().findIndex((row) => row.querySelector('[aria-current]'))
     expect(selectedRowIndex()).toBe(0)
-    fireEvent.keyDown(home(), { key: 'j' })
+    expect(home().contains(document.activeElement)).toBe(true)
+    await user.keyboard('j')
     expect(selectedRowIndex()).toBe(1)
-    fireEvent.keyDown(home(), { key: 'k' })
+    await user.keyboard('k')
     expect(selectedRowIndex()).toBe(0)
   })
 
-  it('ignores single-letter keys typed in a field', () => {
+  it('ignores single-letter keys typed in a field', async () => {
+    const user = userEvent.setup()
     useHomeFeedStore.setState({ asks: [homeFeedAsk({ id: 'r1' })] })
     render(<HomeScreen />)
-    fireEvent.keyDown(screen.getByRole('searchbox', { name: 'Search work' }), { key: 'e' })
+    await user.type(screen.getByRole('searchbox', { name: 'Search work' }), 'e')
     expect(askRows()).toHaveLength(1)
   })
+})
 
-  it('moves focus to the search field on Command K', () => {
+describe('HomeScreen — keys — search', () => {
+  it('moves focus to the search field on Command K', async () => {
+    const user = userEvent.setup()
     render(<HomeScreen />)
-    fireEvent.keyDown(home(), { key: 'k', metaKey: true })
+    expect(home().contains(document.activeElement)).toBe(true)
+    await user.keyboard('{Meta>}k{/Meta}')
     expect(document.activeElement).toBe(screen.getByRole('searchbox', { name: 'Search work' }))
   })
 })
@@ -357,10 +379,11 @@ describe('HomeScreen — the summary line, right side', () => {
     expect(await screen.findByText('14 min')).toBeTruthy()
   })
 
-  it('narrows to the band when its count is pressed', () => {
+  it('narrows to the band when its count is pressed', async () => {
+    const user = userEvent.setup()
     useHomeFeedStore.setState({ asks: [homeFeedAsk({ id: 'r1' })] })
     render(<HomeScreen />)
-    fireEvent.click(screen.getByRole('button', { name: '1 your move' }))
+    await user.click(screen.getByRole('button', { name: '1 your move' }))
     expect(screen.queryByText('In flight rows')).toBeNull()
     expect(askRows()).toHaveLength(1)
   })
@@ -368,15 +391,17 @@ describe('HomeScreen — the summary line, right side', () => {
 
 describe('HomeScreen — Desk and Insights', () => {
   it('shows Insights in place of the Desk, and G then D brings the Desk back', async () => {
+    const user = userEvent.setup()
     useHomeFeedStore.setState({ asks: [homeFeedAsk({ id: 'r1' })] })
     render(<HomeScreen />)
-    fireEvent.click(screen.getByRole('radio', { name: 'Insights' }))
+    await user.click(screen.getByRole('radio', { name: 'Insights' }))
     expect(await screen.findByText('Insights view')).toBeTruthy()
     expect(screen.getByText('Insights window')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Start work/ })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Your move' })).toBeNull()
-    fireEvent.keyDown(home(), { key: 'g' })
-    fireEvent.keyDown(home(), { key: 'd' })
+    expect(home().contains(document.activeElement)).toBe(true)
+    await user.keyboard('g')
+    await user.keyboard('d')
     expect(screen.queryByText('Insights view')).toBeNull()
     expect(askRows()).toHaveLength(1)
   })
@@ -384,22 +409,25 @@ describe('HomeScreen — Desk and Insights', () => {
 
 describe('HomeScreen — Scheduled', () => {
   it('shows the Scheduled view from its segment and from G then S', async () => {
+    const user = userEvent.setup()
     render(<HomeScreen />)
-    fireEvent.click(screen.getByRole('radio', { name: 'Scheduled' }))
+    await user.click(screen.getByRole('radio', { name: 'Scheduled' }))
     expect(await screen.findByText('Scheduled view')).toBeTruthy()
     expect(screen.queryByRole('searchbox', { name: 'Search work' })).toBeNull()
-    fireEvent.keyDown(home(), { key: 'g' })
-    fireEvent.keyDown(home(), { key: 'd' })
+    expect(home().contains(document.activeElement)).toBe(true)
+    await user.keyboard('g')
+    await user.keyboard('d')
     expect(screen.queryByText('Scheduled view')).toBeNull()
-    fireEvent.keyDown(home(), { key: 'g' })
-    fireEvent.keyDown(home(), { key: 's' })
+    await user.keyboard('g')
+    await user.keyboard('s')
     expect(await screen.findByText('Scheduled view')).toBeTruthy()
   })
 
-  it('opens Start work for a new scheduled run on a repeat from the header', () => {
+  it('opens Start work for a new scheduled run on a repeat from the header', async () => {
+    const user = userEvent.setup()
     useHomeView.setState({ view: 'scheduled' })
     render(<HomeScreen />)
-    fireEvent.click(screen.getByRole('button', { name: 'New scheduled run' }))
+    await user.click(screen.getByRole('button', { name: 'New scheduled run' }))
     expect(useStartWorkStore.getState()).toMatchObject({ open: true, repeat: true, editing: null })
   })
 })
@@ -421,13 +449,15 @@ describe('HomeBadge', () => {
   })
 })
 
-const type = (text: string) =>
-  fireEvent.change(screen.getByRole('searchbox', { name: 'Search work' }), {
-    target: { value: text },
-  })
+const searchFor = async (user: ReturnType<typeof userEvent.setup>, text: string) => {
+  const searchbox = screen.getByRole('searchbox', { name: 'Search work' })
+  await user.clear(searchbox)
+  await user.type(searchbox, text)
+}
 
 describe('HomeScreen — search', () => {
-  it('narrows the band to the asks that match what was typed', () => {
+  it('narrows the band to the asks that match what was typed', async () => {
+    const user = userEvent.setup()
     useHomeFeedStore.setState({
       asks: [
         homeFeedAsk({ id: 'r1' }),
@@ -435,79 +465,107 @@ describe('HomeScreen — search', () => {
       ],
     })
     render(<HomeScreen />)
-    type('offline')
+    await searchFor(user, 'offline')
     expect(askRows()).toHaveLength(1)
     expect(screen.getByText('Add offline cache')).toBeTruthy()
   })
 })
 
+function seedRateMatches(): void {
+  state.threads = [
+    {
+      ...bareThread,
+      key: 't1',
+      title: 'Rate limit',
+      ticketKey: 'TAV-31',
+      lanes: [{ repoName: 'cli', branch: 'rl' }],
+    },
+  ]
+  state.facts = [fact({ sessionId: 's9', name: 'rate shell', branch: 'rl' })]
+  state.tickets = [{ key: 'TAV-40', title: 'Rate card', tracker: 'linear' }]
+}
+
+const pickResult = async (user: ReturnType<typeof userEvent.setup>, name: RegExp) => {
+  const results = within(screen.getByRole('listbox', { name: 'Search results' }))
+  await user.click(results.getByRole('button', { name }))
+}
+
 describe('HomeScreen — search results', () => {
-  it('lists matching threads, sessions and tickets, and opens each', () => {
-    state.threads = [
-      {
-        ...bareThread,
-        key: 't1',
-        title: 'Rate limit',
-        ticketKey: 'TAV-31',
-        lanes: [{ repoName: 'cli', branch: 'rl' }],
-      },
-    ]
-    state.facts = [fact({ sessionId: 's9', name: 'rate shell', branch: 'rl' })]
-    state.tickets = [{ key: 'TAV-40', title: 'Rate card', tracker: 'linear' }]
+  it('opens a matching session in its terminal', async () => {
+    const user = userEvent.setup()
+    seedRateMatches()
     render(<HomeScreen />)
-    type('rate')
-    const results = within(screen.getByRole('listbox', { name: 'Search results' }))
-    fireEvent.click(results.getByRole('button', { name: /rate shell/ }))
+    await searchFor(user, 'rate')
+    await pickResult(user, /rate shell/)
     expect(reveal).toHaveBeenCalledWith('s9')
-    type('rate')
-    fireEvent.click(within(screen.getByRole('listbox')).getByRole('button', { name: /Rate limit/ }))
+  })
+
+  it('opens a matching thread on the Desk', async () => {
+    const user = userEvent.setup()
+    seedRateMatches()
+    render(<HomeScreen />)
+    await searchFor(user, 'rate')
+    await pickResult(user, /Rate limit/)
     expect(useDeskSelection.getState().openThreadKey).toBe('t1')
-    type('rate')
-    fireEvent.click(within(screen.getByRole('listbox')).getByRole('button', { name: /Rate card/ }))
+  })
+
+  it('starts work on a matching ticket', async () => {
+    const user = userEvent.setup()
+    seedRateMatches()
+    render(<HomeScreen />)
+    await searchFor(user, 'rate')
+    await pickResult(user, /Rate card/)
     expect(useStartWorkStore.getState().prefill).toBe('TAV-40')
   })
 })
 
 describe('HomeScreen — search results, continued', () => {
-  it('leaves out a ticket a thread already covers', () => {
+  it('leaves out a ticket a thread already covers', async () => {
+    const user = userEvent.setup()
     state.threads = [{ ...bareThread, key: 't1', title: 'Rate limit', ticketKey: 'TAV-31' }]
     state.tickets = [{ key: 'TAV-31', title: 'Rate limit ticket', tracker: 'linear' }]
     render(<HomeScreen />)
-    type('rate')
+    await searchFor(user, 'rate')
     expect(screen.queryByRole('button', { name: /Rate limit ticket/ })).toBeNull()
   })
 
-  it('offers Start work on the text as the last row, and Enter takes it when nothing matches', () => {
+  it('offers Start work on the text as the last row, and Enter takes it when nothing matches', async () => {
+    const user = userEvent.setup()
     render(<HomeScreen />)
-    type('zzz nothing')
-    fireEvent.keyDown(screen.getByRole('searchbox', { name: 'Search work' }), { key: 'Enter' })
+    await searchFor(user, 'zzz nothing')
+    await user.type(screen.getByRole('searchbox', { name: 'Search work' }), '{Enter}')
     expect(useStartWorkStore.getState().open).toBe(true)
     expect(useStartWorkStore.getState().prefill).toBe('zzz nothing')
   })
 })
 
 // Home loads lazily, so it can mount after the person has already reached for a menu.
+const outsideHome: HTMLElement[] = []
+
+afterEach(() => {
+  outsideHome.splice(0).forEach((element) => element.remove())
+})
+
 function focusedOutside(attributes: Record<string, string>): HTMLElement {
   const button = Object.assign(document.createElement('button'), { textContent: 'Display' })
   for (const [name, value] of Object.entries(attributes)) button.setAttribute(name, value)
   document.body.append(button)
+  outsideHome.push(button)
   button.focus()
   return button
 }
 
 describe('focus when Home mounts', () => {
   it('takes focus from a plain button, so its keys work at once', () => {
-    const button = focusedOutside({})
+    focusedOutside({})
     render(<HomeScreen />)
     expect(document.activeElement).toBe(home())
-    button.remove()
   })
 
   it('leaves focus on a menu button', () => {
     const trigger = focusedOutside({ 'aria-haspopup': 'menu' })
     render(<HomeScreen />)
     expect(document.activeElement).toBe(trigger)
-    trigger.remove()
   })
 })
 
@@ -518,11 +576,11 @@ describe('focus when Home mounts inside a popover', () => {
     // jsdom has no showPopover() and hides a closed popover, whose content cannot take focus.
     surface.style.display = 'block'
     document.body.append(surface)
+    outsideHome.push(surface)
     const item = document.createElement('button')
     surface.append(item)
     item.focus()
     render(<HomeScreen />)
     expect(document.activeElement).toBe(item)
-    surface.remove()
   })
 })

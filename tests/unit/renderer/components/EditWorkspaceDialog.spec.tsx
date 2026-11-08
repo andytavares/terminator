@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { EditWorkspaceDialog } from '../../../../src/renderer/components/sidebar/EditWorkspaceDialog'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
@@ -45,41 +46,52 @@ describe('EditWorkspaceDialog', () => {
   })
 
   it('saves the new name to the workspace', async () => {
+    const user = userEvent.setup()
     render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
-    fireEvent.change(screen.getByDisplayValue('My Work'), { target: { value: 'New Name' } })
-    fireEvent.click(screen.getByText('Save'))
+    const nameField = screen.getByDisplayValue('My Work')
+    await user.clear(nameField)
+    await user.type(nameField, 'New Name')
+    await user.click(screen.getByText('Save'))
     await eventually(() =>
       expect(useWorkspaceStore.getState().workspaces).toEqual([
         expect.objectContaining({ id: WS_ID, name: 'New Name', folderPath: '/home/work' }),
       ])
     )
   })
+})
 
-  it('shows error when duplicate name on blur', () => {
+describe('EditWorkspaceDialog — duplicate name', () => {
+  it('shows error when duplicate name on blur', async () => {
+    const user = userEvent.setup()
     useWorkspaceStore.setState({
       workspaces: [ws, workspaceFixture({ id: 'ws-2', name: 'Other' })],
     })
     render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
     const nameInput = screen.getByDisplayValue('My Work')
-    fireEvent.change(nameInput, { target: { value: 'Other' } })
-    fireEvent.blur(nameInput)
+    await user.clear(nameInput)
+    await user.type(nameInput, 'Other')
+    await user.tab()
     expect(screen.getByText('A workspace with this name already exists')).toBeTruthy()
   })
 })
 
 describe('EditWorkspaceDialog — closes after successful save', () => {
   it('closes after successful save', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     render(<EditWorkspaceDialog workspace={ws} onClose={onClose} />)
-    fireEvent.click(screen.getByText('Save'))
+    await user.click(screen.getByText('Save'))
     await eventually(() => expect(onClose).toHaveBeenCalled())
     expect(recordUse).toHaveBeenCalledWith('core.sidebar.workspace-edit')
   })
 
   it('does not call updateWorkspace when submitted with an empty name', async () => {
+    const user = userEvent.setup()
     render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
-    fireEvent.change(screen.getByDisplayValue('My Work'), { target: { value: '   ' } })
-    fireEvent.click(screen.getByText('Save'))
+    const nameField = screen.getByDisplayValue('My Work')
+    await user.clear(nameField)
+    await user.type(nameField, '   ')
+    await user.click(screen.getByText('Save'))
     await screen.findByText('Name is required')
     expect(mockUpdateWorkspace).not.toHaveBeenCalled()
   })
@@ -87,10 +99,13 @@ describe('EditWorkspaceDialog — closes after successful save', () => {
 
 describe('EditWorkspaceDialog — surfaces a generic error when updateWorkspace fails for another reason', () => {
   it('surfaces a generic error when updateWorkspace fails for another reason', async () => {
+    const user = userEvent.setup()
     mockUpdateWorkspace.mockResolvedValueOnce({ error: 'BACKEND_DOWN' })
     render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
-    fireEvent.change(screen.getByDisplayValue('My Work'), { target: { value: 'Renamed' } })
-    fireEvent.click(screen.getByText('Save'))
+    const nameField = screen.getByDisplayValue('My Work')
+    await user.clear(nameField)
+    await user.type(nameField, 'Renamed')
+    await user.click(screen.getByText('Save'))
     await screen.findByText('Failed to update workspace')
   })
 })

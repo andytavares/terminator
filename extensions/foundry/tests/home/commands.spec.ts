@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 import { fakeHost } from '../helpers/foundry-host.js'
@@ -13,23 +13,19 @@ let host: FoundryHost
 
 type Command = (context: object, args?: object) => void
 
-beforeAll(async () => {
+// Each test activates its own host over its own data folder: a shared one carried queued
+// `issues.get` answers and the orders an earlier test created into the next.
+beforeEach(async () => {
   dataDir = makeTempDir('fdry-cmd-')
   host = fakeHost(() => dataDir)
   host.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
   await activateFoundry(host)
 })
 
-// Each test's proofs and runs end before the next test, or the spec's folder, goes.
-afterEach(settleFoundryWork)
-
-afterAll(async () => {
+afterEach(async () => {
+  // Each test's proofs and runs end before the host goes.
+  await settleFoundryWork()
   await deactivate()
-})
-
-beforeEach(() => {
-  host.broadcast.mockClear()
-  host.showToast.mockClear()
 })
 
 const newOrder = (): Command => host.commands.get('start-order') as unknown as Command

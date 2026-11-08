@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ReviewPlan } from '../../src/components/pr-review/ReviewPlan'
 import { makeFile } from './overview-fixtures'
 import type { Chapter, PrChangedFile } from '../../src/schemas/pr-review.schema'
@@ -45,10 +46,11 @@ describe('ReviewPlan', () => {
     expect(row.textContent).toContain('5 files')
   })
 
-  it('starts at the chapter whose row is clicked', () => {
+  it('starts at the chapter whose row is clicked', async () => {
+    const user = userEvent.setup()
     const started: string[] = []
     render(<ReviewPlan chapters={chapters} onStartAt={(id) => started.push(id)} />)
-    fireEvent.click(screen.getByRole('button', { name: /Start here: Panel layout/ }))
+    await user.click(screen.getByRole('button', { name: /Start here: Panel layout/ }))
     expect(started).toEqual(['c2'])
   })
 })

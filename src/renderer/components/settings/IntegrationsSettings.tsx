@@ -312,6 +312,7 @@ export function IntegrationsSettings(): React.JSX.Element {
   const { loadConnections, subscribe } = useIntegrationsStore(
     useShallow((s) => ({ loadConnections: s.loadConnections, subscribe: s.subscribe }))
   )
+  const loading = useIntegrationsStore((s) => s.loading)
 
   useEffect(() => {
     void loadConnections()
@@ -319,7 +320,7 @@ export function IntegrationsSettings(): React.JSX.Element {
   }, [loadConnections, subscribe])
 
   return (
-    <div className="settings-section">
+    <div className="settings-section" aria-busy={loading}>
       <h3 className="settings-section__title">
         <Link2 className="integrations__title-icon" />
         Integrations

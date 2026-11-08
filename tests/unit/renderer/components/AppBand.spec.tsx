@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { AppBand } from '../../../../src/renderer/components/sidebar/AppBand'
 
 const noop = () => null
@@ -37,25 +38,24 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
 
   it('hides the icon from assistive technology — the label carries it', () => {
     const { container } = renderBand()
-    for (const icon of container.querySelectorAll('.app-band__icon')) {
-      expect(icon.getAttribute('aria-hidden')).toBe('true')
-    }
+    const hidden = [...container.querySelectorAll('.app-band__icon')].map((icon) =>
+      icon.getAttribute('aria-hidden')
+    )
+    expect(hidden).toEqual(['true', 'true', 'true'])
   })
 
-  it('falls back to a neutral glyph when a contribution supplies no icon', () => {
+  it('draws the puzzle glyph when a contribution supplies no icon', () => {
     renderBand()
-    // Renders something, and does not throw — an extension must not be able to
-    // break the sidebar by omitting an icon.
-    expect(
-      screen.getByRole('button', { name: 'Task Vault' }).querySelector('.app-band__icon')
-    ).toBeTruthy()
+    const icon = screen.getByRole('button', { name: 'Task Vault' }).querySelector('svg')
+    expect(icon?.classList.contains('lucide-puzzle')).toBe(true)
   })
 })
 
 describe('AppBand — selection', () => {
-  it('selects a global tab by id', () => {
+  it('selects a global tab by id', async () => {
+    const user = userEvent.setup()
     renderBand()
-    fireEvent.click(screen.getByRole('button', { name: 'Notes' }))
+    await user.click(screen.getByRole('button', { name: 'Notes' }))
     expect(onSelect).toHaveBeenCalledWith('notes')
   })
 
@@ -87,10 +87,11 @@ describe('AppBand — quick actions', () => {
     expect(screen.getByRole('button', { name: 'Quick actions (⌘P)' })).toBeTruthy()
   })
 
-  it('calls the handler on click', () => {
+  it('calls the handler on click', async () => {
+    const user = userEvent.setup()
     const onOpenQuickActions = vi.fn()
     renderBand({ onOpenQuickActions })
-    fireEvent.click(screen.getByRole('button', { name: 'Quick actions (⌘P)' }))
+    await user.click(screen.getByRole('button', { name: 'Quick actions (⌘P)' }))
     expect(onOpenQuickActions).toHaveBeenCalledOnce()
   })
 

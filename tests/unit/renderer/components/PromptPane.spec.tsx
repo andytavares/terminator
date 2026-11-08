@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { PromptPane } from '../../../../src/renderer/components/home/PromptPane'
 import { startingWhen, type WhenValue } from '../../../../src/renderer/components/home/WhenChoices'
 import { useStartWorkStore } from '../../../../src/renderer/components/home/start-work'
@@ -44,9 +45,10 @@ const shown = async (when: WhenValue) => {
 
 describe('PromptPane — the scheduled runs line', () => {
   it('counts the saved runs and its link opens them on Home', async () => {
+    const user = userEvent.setup()
     await shown(once)
     expect(screen.getByText(/2 scheduled runs ·/)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Manage on Home' }))
+    await user.click(screen.getByRole('button', { name: 'Manage on Home' }))
     expect(useStartWorkStore.getState().open).toBe(false)
     expect(useHomeView.getState().view).toBe('scheduled')
     expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.home')

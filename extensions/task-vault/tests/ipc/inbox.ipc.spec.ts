@@ -83,13 +83,9 @@ function taskVaultVaultProcessInboxSomedayTests() {
       success: true,
     })
 
-    for (const id of [TASK_ID, SUBTASK_ID]) {
-      expect(await selectTaskRow(db, id)).toMatchObject({
-        source: 'someday',
-        source_ref: null,
-        today_since: null,
-      })
-    }
+    const filedSomeday = { source: 'someday', source_ref: null, today_since: null }
+    expect(await selectTaskRow(db, TASK_ID)).toMatchObject(filedSomeday)
+    expect(await selectTaskRow(db, SUBTASK_ID)).toMatchObject(filedSomeday)
   })
 }
 

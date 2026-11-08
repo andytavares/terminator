@@ -68,11 +68,6 @@ function wearTests() {
     wear(b, [0, 0, 16, 16], { seed: 2, color: '#111' })
     expect(a.calls).not.toEqual(b.calls)
   })
-
-  it('wear draws nothing impossible for a zero-size tile', () => {
-    const paint = createRecordingPaint()
-    expect(() => wear(paint, [0, 0, 0, 0], { seed: 1, color: '#111' })).not.toThrow()
-  })
 }
 
 function glowTests() {

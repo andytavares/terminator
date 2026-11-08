@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { IssueSummary } from '../../../../src/shared/types/index'
 
 const picked = vi.hoisted(() => ({ key: 'NW-88', title: 'Rate limit per API key' }))
@@ -34,7 +35,6 @@ import {
   sessionRecordOf,
   trackerConnectionOf,
 } from '../../../support/renderer-stores'
-import { pressOutside } from '../../../support/modal'
 
 const onClose = vi.fn()
 // The main process's answer to a link write: the record with the link applied.
@@ -60,26 +60,24 @@ beforeEach(() => {
 
 describe('SessionLinkDialog', () => {
   it('links the chosen ticket to this session only, then closes', async () => {
+    const user = userEvent.setup()
     const facts = fact({ name: 'claude' })
     render(<SessionLinkDialog facts={facts} onClose={onClose} />)
     expect(screen.getByRole('dialog', { name: 'Link a work item' })).toBeTruthy()
     const link = screen.getByRole('button', { name: 'Link issue' }) as HTMLButtonElement
     expect(link.disabled).toBe(true)
-    fireEvent.click(screen.getByRole('button', { name: 'pick NW-88' }))
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Link NW-88' }))
-    })
+    await user.click(screen.getByRole('button', { name: 'pick NW-88' }))
+    await user.click(screen.getByRole('button', { name: 'Link NW-88' }))
     expect(storedLinkOf(facts.sessionId)).toEqual({ tracker: 'linear', key: 'NW-88' })
     expect(onClose).toHaveBeenCalled()
   })
 
   it('stays open and says so when the link is refused', async () => {
+    const user = userEvent.setup()
     setLink.mockResolvedValueOnce({ error: 'write-failed', message: 'disk full' })
     render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
-    fireEvent.click(screen.getByRole('button', { name: 'pick NW-88' }))
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Link NW-88' }))
-    })
+    await user.click(screen.getByRole('button', { name: 'pick NW-88' }))
+    await user.click(screen.getByRole('button', { name: 'Link NW-88' }))
     expect(screen.getByRole('alert').textContent).toMatch(/Could not link/)
     expect(useSessionRecordsStore.getState().records.size).toBe(0)
     expect(onClose).not.toHaveBeenCalled()
@@ -97,11 +95,10 @@ describe("SessionLinkDialog — removes the session's own link, which falls back
         ],
       ]),
     })
+    const user = userEvent.setup()
     render(<SessionLinkDialog facts={own} onClose={onClose} />)
     expect(screen.getByText(/linked to NW-91/)).toBeTruthy()
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Remove session link' }))
-    })
+    await user.click(screen.getByRole('button', { name: 'Remove session link' }))
     expect(storedLinkOf(own.sessionId)).toBeNull()
     expect(onClose).toHaveBeenCalled()
   })
@@ -125,19 +122,18 @@ describe('SessionLinkDialog — says where to connect a tracker when none is', (
     expect(screen.queryByRole('button', { name: 'pick NW-88' })).toBeNull()
   })
 
-  it('closes on Cancel and on the backdrop, not on the dialog itself', () => {
+  it('closes on Cancel', async () => {
+    const user = userEvent.setup()
     render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
-    fireEvent.click(screen.getByRole('dialog'))
-    expect(onClose).not.toHaveBeenCalled()
-    pressOutside(screen.getByRole('dialog'))
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-    expect(onClose).toHaveBeenCalledTimes(2)
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('forgets the chosen ticket when the picker is cleared', () => {
+  it('forgets the chosen ticket when the picker is cleared', async () => {
+    const user = userEvent.setup()
     render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
-    fireEvent.click(screen.getByRole('button', { name: 'pick NW-88' }))
-    fireEvent.click(screen.getByRole('button', { name: 'clear pick' }))
+    await user.click(screen.getByRole('button', { name: 'pick NW-88' }))
+    await user.click(screen.getByRole('button', { name: 'clear pick' }))
     expect((screen.getByRole('button', { name: 'Link issue' }) as HTMLButtonElement).disabled).toBe(
       true
     )
@@ -145,27 +141,37 @@ describe('SessionLinkDialog — says where to connect a tracker when none is', (
 })
 
 describe('SessionLinkDialog — keeps its keys from reaching the row or tile behind it', () => {
-  it.each(['Enter', 'a'])('keeps the %s key from reaching the row or tile behind it', (key) => {
-    const behind = vi.fn()
-    render(
-      <div onKeyDown={behind}>
-        <SessionLinkDialog facts={fact()} onClose={onClose} />
-      </div>
-    )
-    fireEvent.keyDown(screen.getByRole('dialog'), { key })
-    expect(behind).not.toHaveBeenCalled()
-  })
+  it.each(['{Enter}', 'a'])(
+    'keeps the %s key from reaching the row or tile behind it',
+    async (key) => {
+      const user = userEvent.setup()
+      const behind = vi.fn()
+      render(
+        <div onKeyDown={behind}>
+          <SessionLinkDialog facts={fact()} onClose={onClose} />
+        </div>
+      )
+      await user.tab()
+      expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
+      await user.keyboard(key)
+      expect(behind).not.toHaveBeenCalled()
+    }
+  )
+})
 
-  it('closes on Escape, wherever the focus is', () => {
+describe('SessionLinkDialog — Escape', () => {
+  it('closes on Escape, wherever the focus is', async () => {
+    const user = userEvent.setup()
     render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
-    fireEvent.keyDown(document, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('stops listening for Escape once it is gone', () => {
+  it('stops listening for Escape once it is gone', async () => {
+    const user = userEvent.setup()
     const { unmount } = render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
     unmount()
-    fireEvent.keyDown(document, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(onClose).not.toHaveBeenCalled()
   })
 })

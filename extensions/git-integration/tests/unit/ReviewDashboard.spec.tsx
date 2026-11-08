@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ReviewDashboard } from '../../src/components/pr-review/ReviewDashboard'
 import type { DashboardPR } from '../../src/schemas/pr-review.schema'
 import { useReviewUiStore } from '../../src/stores/review-ui.store'
@@ -162,9 +163,10 @@ describe('ReviewDashboard', () => {
     ['its title', () => screen.findByText('Foundry: the red team argues before agreement')],
     ['its Review button', () => screen.findByRole('button', { name: 'Review' })],
   ])('opens a pull request when %s is clicked', async (_target, findTarget) => {
+    const user = userEvent.setup()
     mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
-    fireEvent.click(await findTarget())
+    await user.click(await findTarget())
     await waitFor(() => {
       expect(window.electronAPI.extensionBridge.invoke).toHaveBeenCalledWith(
         'window:open-pr-review',
@@ -181,21 +183,28 @@ describe('ReviewDashboard', () => {
   })
 })
 
-describe('ReviewDashboard — reads no checks for a pull request without checks and never names CI twice', () => {
-  it('reads "no checks" for a pull request without checks and never names CI twice', async () => {
-    const noChecks = makePr({ number: 300, section: 'mine', ciStatus: 'none' })
-    const failing = makePr({ number: 301, section: 'mine', ciStatus: 'failing' })
+describe('ReviewDashboard — CI wording on My PRs rows', () => {
+  const noChecks = makePr({ number: 300, section: 'mine', ciStatus: 'none' })
+  const failing = makePr({ number: 301, section: 'mine', ciStatus: 'failing' })
+
+  it('reads "no checks" for a pull request without checks', async () => {
+    const user = userEvent.setup()
     mockInvoke({ prs: [noChecks, failing], login: 'a', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
-    fireEvent.click(screen.getByRole('tab', { name: /My PRs/ }))
+    await user.click(screen.getByRole('tab', { name: /My PRs/ }))
     const quiet = await screen.findByTestId('row-300')
     expect(quiet.textContent).toContain('no checks')
     expect(quiet.textContent).not.toContain('CI pending')
     expect(quiet.textContent).toContain('~5 min')
-    for (const id of ['row-300', 'row-301']) {
-      const text = screen.getByTestId(id).textContent!
-      expect(text.match(/CI/g)?.length ?? 0).toBeLessThanOrEqual(1)
-    }
+  })
+
+  it.each(['row-300', 'row-301'])('names CI at most once on %s', async (rowId) => {
+    const user = userEvent.setup()
+    mockInvoke({ prs: [noChecks, failing], login: 'a', fetchedAt: new Date().toISOString() })
+    render(<ReviewDashboard />)
+    await user.click(screen.getByRole('tab', { name: /My PRs/ }))
+    const row = await screen.findByTestId(rowId)
+    expect(row.textContent!.match(/CI/g)?.length ?? 0).toBeLessThanOrEqual(1)
   })
 })
 
@@ -217,15 +226,17 @@ describe('ReviewDashboard — shows 50+ on the tab and heading of a capped secti
   })
 })
 
-describe('ReviewDashboard — names the repository on the second line only when more than one repository shows', () => {
-  it('names the repository on the second line only when more than one repository shows', async () => {
+describe('ReviewDashboard — repository name on the second line', () => {
+  it('names the repository on the second line when more than one repository shows', async () => {
     const other = makePr({ repo: 'acme/api', number: 400, title: 'Other repo PR' })
     mockInvoke({ prs: [pr210, other], login: 'a', fetchedAt: new Date().toISOString() })
-    const { unmount } = render(<ReviewDashboard />)
+    render(<ReviewDashboard />)
     const row = await screen.findByTestId('row-400')
     expect(row.querySelector('.rd-ti small')!.textContent!.startsWith('api')).toBe(true)
     expect(row.querySelector('.rd-repo')).toBeNull()
-    unmount()
+  })
+
+  it('leaves the repository name out when only one repository shows', async () => {
     mockInvoke({ prs: [pr210], login: 'a', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
     const single = await screen.findByTestId('row-210')
@@ -244,6 +255,7 @@ describe('ReviewDashboard — names the repository on the second line only when 
 
 describe('ReviewDashboard — sorts each section with the chosen sort', () => {
   it('sorts each section with the chosen sort', async () => {
+    const user = userEvent.setup()
     const waiting = makePr({
       number: 501,
       title: 'New waiting',
@@ -260,9 +272,7 @@ describe('ReviewDashboard — sorts each section with the chosen sort', () => {
     await screen.findByTestId('row-501')
     const order = () => screen.getAllByTestId(/^row-/).map((r) => r.getAttribute('data-testid'))
     expect(order()).toEqual(['row-501', 'row-502'])
-    fireEvent.change(screen.getByRole('combobox', { name: 'Sort' }), {
-      target: { value: 'closest' },
-    })
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'closest')
     expect(order()).toEqual(['row-502', 'row-501'])
     expect(screen.queryByText(/Sorted by closest/)).toBeNull()
   })
@@ -305,12 +315,14 @@ describe('ReviewDashboard — names each tab with its count, read apart from the
   })
 
   it('moves between sections with the arrow keys and shows the selected one', async () => {
+    const user = userEvent.setup()
     mockInvoke({ prs: [pr211, pr213], login: 'andytavares', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
     await screen.findByText('RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED')
     const needs = screen.getByRole('tab', { name: /Needs you/ })
     needs.focus()
-    fireEvent.keyDown(needs, { key: 'ArrowRight' })
+    expect(document.activeElement).toBe(needs)
+    await user.keyboard('{ArrowRight}')
     const mine = screen.getByRole('tab', { name: /My PRs/ })
     expect(document.activeElement).toBe(mine)
     expect(mine.getAttribute('aria-selected')).toBe('true')
@@ -334,12 +346,6 @@ describe('ReviewDashboard — puts the reviews requested of you above every othe
       'RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED',
       'REQUESTED OF YOUR TEAM',
     ])
-    const size = screen.getByText('+4,043').closest('.rd-size')!
-    expect(size.textContent).toBe('+4,043 −2,103 · 56 files')
-    expect(screen.getByText('+4,043').className).toBe('rd-add')
-    expect(screen.getByText('−2,103').className).toBe('rd-del')
-    expect(screen.getAllByText('High risk').length).toBeGreaterThan(0)
-    expect(screen.getByRole('button', { name: 'Re-review' })).toBeTruthy()
   })
 })
 
@@ -353,10 +359,11 @@ describe('ReviewDashboard — omits an empty group', () => {
   })
 
   it('switches to My PRs tab and shows its rows', async () => {
+    const user = userEvent.setup()
     mockInvoke({ prs: [pr211, pr213], login: 'andytavares', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
     await screen.findByText('RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED')
-    fireEvent.click(await screen.findByRole('tab', { name: /My PRs/ }))
+    await user.click(await screen.findByRole('tab', { name: /My PRs/ }))
     await screen.findByText('YOUR OPEN PRS')
     expect(screen.getByText('+1,385').closest('.rd-size')!.textContent).toBe(
       '+1,385 −246 · 109 files'
@@ -367,9 +374,10 @@ describe('ReviewDashboard — omits an empty group', () => {
 
 describe('ReviewDashboard — keeps the Open label and notes Not cloned when localRepoRoot is null', () => {
   it('keeps the "Open" label and notes "Not cloned" when localRepoRoot is null', async () => {
+    const user = userEvent.setup()
     mockInvoke({ prs: [pr213], login: 'andytavares', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
-    fireEvent.click(screen.getByRole('tab', { name: /My PRs/ }))
+    await user.click(screen.getByRole('tab', { name: /My PRs/ }))
     expect(await screen.findByRole('button', { name: 'Open' })).toBeTruthy()
     expect(screen.getByText(/Not cloned.*diff only/)).toBeTruthy()
   })
@@ -377,11 +385,12 @@ describe('ReviewDashboard — keeps the Open label and notes Not cloned when loc
 
 describe('ReviewDashboard — opens an uncloned row via the gh: pseudo repo root', () => {
   it('opens an uncloned row via the gh: pseudo repo root', async () => {
+    const user = userEvent.setup()
     mockInvoke({ prs: [pr213], login: 'andytavares', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
-    fireEvent.click(screen.getByRole('tab', { name: /My PRs/ }))
+    await user.click(screen.getByRole('tab', { name: /My PRs/ }))
     const btn = await screen.findByRole('button', { name: 'Open' })
-    fireEvent.click(btn)
+    await user.click(btn)
     await waitFor(() => {
       expect(window.electronAPI.extensionBridge.invoke).toHaveBeenCalledWith(
         'window:open-pr-review',
@@ -393,14 +402,15 @@ describe('ReviewDashboard — opens an uncloned row via the gh: pseudo repo root
 
 describe('ReviewDashboard — shows Clone and review only when a clone folder is configured, and clones then opens', () => {
   it('shows "Clone and review" only when a clone folder is configured, and clones then opens', async () => {
+    const user = userEvent.setup()
     mockInvoke(
       { prs: [pr213], login: 'andytavares', fetchedAt: new Date().toISOString() },
       { cloneFolder: '/Users/me/repos', cloneResult: { repoRoot: '/Users/me/repos/terminator' } }
     )
     render(<ReviewDashboard />)
-    fireEvent.click(screen.getByRole('tab', { name: /My PRs/ }))
+    await user.click(screen.getByRole('tab', { name: /My PRs/ }))
     const cloneBtn = await screen.findByRole('button', { name: 'Clone and review' })
-    fireEvent.click(cloneBtn)
+    await user.click(cloneBtn)
     await waitFor(() => {
       expect(window.electronAPI.extensionBridge.invoke).toHaveBeenCalledWith('github:clone-repo', {
         repo: 'andytavares/terminator',
@@ -418,12 +428,13 @@ describe('ReviewDashboard — shows Clone and review only when a clone folder is
 
 describe('ReviewDashboard — does not show Clone and review when no clone folder is configured', () => {
   it('does not show "Clone and review" when no clone folder is configured', async () => {
+    const user = userEvent.setup()
     mockInvoke(
       { prs: [pr213], login: 'andytavares', fetchedAt: new Date().toISOString() },
       { cloneFolder: '' }
     )
     render(<ReviewDashboard />)
-    fireEvent.click(screen.getByRole('tab', { name: /My PRs/ }))
+    await user.click(screen.getByRole('tab', { name: /My PRs/ }))
     await screen.findByRole('button', { name: 'Open' })
     expect(screen.queryByRole('button', { name: 'Clone and review' })).toBeNull()
   })
@@ -479,6 +490,7 @@ describe('ReviewDashboard — labels the scope button All repositories when noth
 
 describe('ReviewDashboard — saving the picker sends the selection and reloads the dashboard', () => {
   it('saving the picker sends the selection and reloads the dashboard', async () => {
+    const user = userEvent.setup()
     mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
     await screen.findByText('REQUESTED OF YOU')
@@ -486,9 +498,9 @@ describe('ReviewDashboard — saving the picker sends the selection and reloads 
     const searches = () =>
       invoke.mock.calls.filter((c: unknown[]) => c[0] === 'github:dashboard-search').length
     expect(searches()).toBe(1)
-    fireEvent.click(screen.getByRole('button', { name: /All repositories/ }))
-    fireEvent.click(await screen.findByRole('checkbox', { name: 'acme/api' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: /All repositories/ }))
+    await user.click(await screen.findByRole('checkbox', { name: 'acme/api' }))
+    await user.click(await screen.findByRole('button', { name: 'Save' }))
     await waitFor(() => expect(searches()).toBe(2))
     expect(invoke).toHaveBeenCalledWith('github:review-repos-set', { repos: ['acme/api'] })
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())

@@ -758,30 +758,28 @@ describe('github:pr-review-detail — maps mergeStateStatus', () => {
   })
 })
 
-describe('github:pr-review-detail — exercises computeCoChangeAffinityFromGit when PR has 2+ files', () => {
+describe('github:pr-review-detail — co-change affinity', () => {
   const handlers = freshHandlers()
 
-  it('exercises computeCoChangeAffinityFromGit when PR has 2+ files', async () => {
+  it('puts two files in different folders in one chapter when one commit changed both', async () => {
     const twoFiles = [
       { filename: 'src/foo.ts', additions: 3, deletions: 1, patch: '@@ -1 +1 @@' },
-      { filename: 'src/bar.ts', additions: 1, deletions: 0, patch: '@@ -1 +1 @@' },
+      { filename: 'lib/bar.ts', additions: 1, deletions: 0, patch: '@@ -1 +1 @@' },
     ]
     // mockPrDetail uses 5 gh calls (ownerAndName + meta + files + reviews + reviewers)
     mockPrDetail(
       { ...PR_META, statusCheckRollup: [{ name: 'ci', conclusion: 'SUCCESS' }] },
       twoFiles
     )
-    // 6th call: git log --name-only for co-change affinity (fired when filePaths.length >= 2)
-    // Provide a commit that touched both files so the prFilesInCommit.length >= 2 branch is hit
-    const gitHash = 'a'.repeat(40)
-    mockGitSuccess(`${gitHash}\nsrc/foo.ts\nsrc/bar.ts\n`)
+    // 6th call: git log --name-only, with one commit that touched both files.
+    mockGitSuccess(`${'a'.repeat(40)}\nsrc/foo.ts\nlib/bar.ts\n`)
 
     const result = (await handlers['github:pr-review-detail']({
       repoRoot: '/repo',
       prNumber: 6,
-    })) as { pr: { chapters: unknown[] } }
-    // chapters should be built (non-empty because we have 2 files)
-    expect(result.pr.chapters).toBeDefined()
+    })) as { pr: { chapters: Array<{ files: Array<{ path: string }> }> } }
+    const chapterPaths = result.pr.chapters.map((c) => c.files.map((f) => f.path).sort())
+    expect(chapterPaths).toEqual([['lib/bar.ts', 'src/foo.ts']])
   })
 })
 
@@ -1671,46 +1669,41 @@ describe('github:current-user', () => {
 describe('github:remove-active-review — store side-effects', () => {
   const handlers = freshHandlers()
 
+  beforeEach(() => {
+    Object.keys(sessionData).forEach((key) => Reflect.deleteProperty(sessionData, key))
+    keepStoreWrites()
+  })
+
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('deletes matching session-store keys when a session key shares the repoRoot+prNumber prefix', async () => {
-    // Make set/delete functional so the store records the session
-    const deleteSpy = keepStoreWrites()
-    await handlers['github:session-set']({ key: '/repo:::42:::abc123', session: storedSession() })
+  it.each([
+    ['legacy', '/repo:::42:::abc123'],
+    ['current', '/repo:::42'],
+  ])(
+    "deletes the pull request's %s session key, so a refresh does not bring it back as paused",
+    async (_format, key) => {
+      const paused = (prNumber: number) =>
+        storedSession({ prNumber, pausedAt: '2026-01-01T00:00:00Z' })
+      await handlers['github:session-set']({ key, session: paused(42) })
+      await handlers['github:session-set']({ key: '/repo:::420', session: paused(420) })
 
-    const result = (await handlers['github:remove-active-review']({
-      repoRoot: '/repo',
-      prNumber: 42,
-    })) as { ok: boolean }
-    expect(result.ok).toBe(true)
-    // Verify sessionStore.delete was called for the matching session key (line 842)
-    expect(deleteSpy).toHaveBeenCalledWith('/repo:::42:::abc123')
-  })
+      await handlers['github:remove-active-review']({ repoRoot: '/repo', prNumber: 42 })
+
+      const { sessions } = (await handlers['github:sessions-for-repo']({ repoRoot: '/repo' })) as {
+        sessions: Array<{ prNumber: number }>
+      }
+      expect(sessions.map((s) => s.prNumber)).toEqual([420])
+    }
+  )
 })
 
-describe('github:remove-active-review — store side-effects — returns { error } when activeReviewStore.delete throws (line 846)', () => {
+describe('github:remove-active-review — store failure', () => {
   const handlers = freshHandlers()
 
   afterEach(() => {
     vi.restoreAllMocks()
-  })
-
-  it("deletes the pull request's own session key, so a refresh does not bring it back as paused", async () => {
-    keepStoreWrites()
-    const paused = (prNumber: number) =>
-      storedSession({ prNumber, pausedAt: '2026-01-01T00:00:00Z' })
-    await handlers['github:session-set']({ key: '/repo:::42', session: paused(42) })
-    await handlers['github:session-set']({ key: '/repo:::420', session: paused(420) })
-
-    await handlers['github:remove-active-review']({ repoRoot: '/repo', prNumber: 42 })
-
-    const { sessions } = (await handlers['github:sessions-for-repo']({ repoRoot: '/repo' })) as {
-      sessions: Array<{ prNumber: number }>
-    }
-    expect(sessions.map((s) => s.prNumber)).toEqual([420])
-    delete sessionData['/repo:::420']
   })
 
   it('returns { error } when activeReviewStore.delete throws (line 846)', async () => {

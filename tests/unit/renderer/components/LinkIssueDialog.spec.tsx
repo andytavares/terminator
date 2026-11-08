@@ -1,9 +1,12 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { LinkIssueDialog } from '../../../../src/renderer/components/integrations/LinkIssueDialog'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { issueSummaryOf, trackerConnectionOf } from '../../../support/renderer-stores'
+import { installElectronApi } from '../../../support/electron-api'
+import type { IssueLink } from '../../../../src/shared/types/index'
 
 const P = '11111111-1111-4111-8111-111111111111'
 
@@ -88,6 +91,8 @@ describe('LinkIssueDialog — partial failures', () => {
   })
 })
 
+// user-event hangs under this file's fake timers (with or without advanceTimers),
+// so the search tests set the field value with fireEvent.change.
 describe('LinkIssueDialog — searching', () => {
   it('debounces before searching', async () => {
     vi.useFakeTimers()
@@ -121,12 +126,12 @@ describe('LinkIssueDialog — searching — goes back to assigned issues when th
     await act(async () => {
       vi.advanceTimersByTime(300)
     })
-    listMine.mockClear()
+    expect(screen.queryByText('Assigned to you')).toBeNull()
     fireEvent.change(input, { target: { value: '' } })
     await act(async () => {
-      await listMine.mock.results[0].value
+      vi.advanceTimersByTime(300)
     })
-    expect(listMine).toHaveBeenCalled()
+    expect(screen.getByText('Assigned to you')).toBeTruthy()
   })
 })
 
@@ -138,41 +143,55 @@ describe('LinkIssueDialog — linking', () => {
   })
 
   it('names the issue on the button once picked', async () => {
+    const user = userEvent.setup()
     open()
-    fireEvent.click(await screen.findByText('TAV-42'))
+    await user.click(await screen.findByText('TAV-42'))
     expect(screen.getByText('Link TAV-42')).toBeTruthy()
   })
+})
 
-  it('links the picked issue and closes', async () => {
+describe('LinkIssueDialog — linking — the write', () => {
+  it('asks main to link the picked issue, keeps the link it reads back, and closes', async () => {
+    const user = userEvent.setup()
+    const link: IssueLink = {
+      projectId: P,
+      tracker: 'linear',
+      key: 'TAV-42',
+      injectContext: true,
+      linkedAt: '2026-11-07T09:00:00.000Z',
+    }
+    const linkSet = vi.fn(async () => ({ link }))
+    const linkGet = vi.fn(async () => ({ link, issue: null }))
+    installElectronApi({ integrations: { linkSet, linkGet } })
+    useIntegrationsStore.setState({ linkIssue: useIntegrationsStore.getInitialState().linkIssue })
     const onClose = vi.fn()
     open({ onClose })
-    fireEvent.click(await screen.findByText('TAV-42'))
-    fireEvent.click(await screen.findByText('Link TAV-42'))
+    await user.click(await screen.findByText('TAV-42'))
+    await user.click(await screen.findByText('Link TAV-42'))
 
-    await waitFor(() =>
-      expect(linkIssue).toHaveBeenCalledWith(P, { tracker: 'linear', key: 'TAV-42' })
-    )
     await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(linkSet).toHaveBeenCalledWith({ projectId: P, tracker: 'linear', key: 'TAV-42' })
+    expect(useIntegrationsStore.getState().links.get(P)).toEqual(link)
   })
 })
 
 describe('LinkIssueDialog — linking — reports a failure and stays open rather than pretending', () => {
   it('reports a failure and stays open rather than pretending', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     linkIssue.mockResolvedValue(false)
     open({ onClose })
-    fireEvent.click(await screen.findByText('TAV-42'))
-    fireEvent.click(await screen.findByText('Link TAV-42'))
+    await user.click(await screen.findByText('TAV-42'))
+    await user.click(await screen.findByText('Link TAV-42'))
 
-    await waitFor(() =>
-      expect(screen.getByRole('alert').textContent).toContain('Nothing was changed')
-    )
+    expect((await screen.findByRole('alert')).textContent).toContain('Nothing was changed')
     expect(onClose).not.toHaveBeenCalled()
   })
 
   it('warns that linking replaces the issue already attached (FR-033)', async () => {
+    const user = userEvent.setup()
     open({ currentKey: 'TAV-9' })
-    fireEvent.click(await screen.findByText('TAV-42'))
+    await user.click(await screen.findByText('TAV-42'))
 
     const warning = screen.getByRole('alert')
     expect(warning.textContent).toContain('TAV-9')
@@ -180,16 +199,18 @@ describe('LinkIssueDialog — linking — reports a failure and stays open rathe
   })
 
   it('does not warn when the picked issue is the one already attached', async () => {
+    const user = userEvent.setup()
     open({ currentKey: 'TAV-42' })
-    fireEvent.click(await screen.findByText('TAV-42'))
+    await user.click(await screen.findByText('TAV-42'))
     expect(screen.queryByRole('alert')).toBeNull()
   })
 })
 
 describe('LinkIssueDialog — linking — does not warn for a project that has no issue yet', () => {
   it('does not warn for a project that has no issue yet', async () => {
+    const user = userEvent.setup()
     open()
-    fireEvent.click(await screen.findByText('TAV-42'))
+    await user.click(await screen.findByText('TAV-42'))
     expect(screen.queryByRole('alert')).toBeNull()
   })
 })
@@ -208,24 +229,26 @@ describe('LinkIssueDialog — not connected', () => {
 
 describe('LinkIssueDialog — dismissal', () => {
   it('closes on Cancel', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     open({ onClose })
     // Let the initial load settle first, or its state update lands after the
     // test and React warns about an unwrapped update.
     await screen.findByText('TAV-42')
-    fireEvent.click(await screen.findByText('Cancel'))
+    await user.click(await screen.findByText('Cancel'))
     expect(onClose).toHaveBeenCalled()
   })
 })
 
 describe('LinkIssueDialog — shortcuts and odd failures', () => {
   it('links a row on double click, and tells the caller', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     const onLinked = vi.fn()
     open({ onClose, onLinked })
     const row = await screen.findByText('TAV-42')
-    fireEvent.click(row)
-    fireEvent.doubleClick(row)
+    await user.click(row)
+    await user.dblClick(row)
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(linkIssue).toHaveBeenCalledWith(P, { tracker: 'linear', key: 'TAV-42' })
     expect(onLinked).toHaveBeenCalledWith(expect.objectContaining({ key: 'TAV-42' }))

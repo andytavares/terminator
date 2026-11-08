@@ -1,13 +1,16 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useTerminalOpenErrorStore } from '../../../../src/renderer/stores/terminal-open-error.store'
 import { TerminalPane } from '../../../../src/renderer/components/terminal/TerminalPane'
 import { useBreakoutStore } from '../../../../src/renderer/stores/breakout.store'
-import { seedStore } from '../../../support/renderer-stores'
+import { seedStore, terminalSessionOf } from '../../../support/renderer-stores'
 import type { PaneNode } from '../../../../src/shared/types/index'
+import type { TerminalInstance } from '../../../../src/renderer/components/terminal/TerminalSession'
 import { installElectronApi } from '../../../support/electron-api'
+import { partialFake } from '../../../support/fakes'
 
 vi.mock('../../../../src/renderer/components/terminal/LeafPane', () => ({
   LeafPane: ({ sessionId }: { sessionId: string }) => (
@@ -66,12 +69,13 @@ describe('TerminalPane', () => {
     expect(screen.getByText('Open a terminal tab to get started')).toBeTruthy()
   })
 
-  it('shows why the terminal failed to open, and Try again asks the app to open it again', () => {
+  it('shows why the terminal failed to open, and Try again asks the app to open it again', async () => {
+    const user = userEvent.setup()
     useTerminalOpenErrorStore.getState().setError('proj-1', 'spawn EBADF')
     render(<TerminalPane projectId="proj-1" />)
     expect(screen.getByRole('alert').textContent).toContain("Couldn't open a terminal: spawn EBADF")
     expect(screen.queryByText('Open a terminal tab to get started')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect(useTerminalOpenErrorStore.getState().retries['proj-1']).toBe(1)
     expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.getByText('Open a terminal tab to get started')).toBeTruthy()
@@ -101,16 +105,16 @@ describe('TerminalPane — renders container when sessions exist', () => {
     expect(container.querySelector('.terminal-pane__container')).toBeTruthy()
   })
 
-  it('clears bell count when active session changes', () => {
-    mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
-    mockGetActive.mockReturnValue('ses-1')
+  it('clears the bell count of the session it shows', () => {
+    seedRealSessions({ sessions: [{ id: 'ses-1', bellCount: 3 }], activeSessionId: 'ses-1' })
     render(<TerminalPane projectId="proj-1" />)
-    expect(mockClearBell).toHaveBeenCalledWith('ses-1')
+    expect(useSessionStore.getState().getBellCountForSession('ses-1')).toBe(0)
   })
 })
 
 describe('TerminalPane — calls terminal focus when pane is clicked with an active session', () => {
-  it('calls terminal focus when pane is clicked with an active session', () => {
+  it('calls terminal focus when pane is clicked with an active session', async () => {
+    const user = userEvent.setup()
     const mockFocus = vi.fn()
     const mockScrollToBottom = vi.fn()
     mockGetSessions.mockReturnValue([{ id: 'ses-1', tabTitle: 'T', type: 'human' }])
@@ -121,7 +125,7 @@ describe('TerminalPane — calls terminal focus when pane is clicked with an act
       unmount: vi.fn(),
     })
     const { container } = render(<TerminalPane projectId="proj-1" />)
-    fireEvent.mouseDown(container.querySelector('.terminal-pane')!, { button: 0 })
+    await user.click(container.querySelector('.terminal-pane')!)
     expect(mockFocus).toHaveBeenCalled()
   })
 })
@@ -218,9 +222,9 @@ describe('TerminalPane — the active tab lives in its own window', () => {
   })
 })
 
-/** ses-1 and ses-2 side by side, ses-1 the active tab. */
-function withTwoPaneSplit(): PaneNode {
-  const layout: PaneNode = {
+/** ses-1 and ses-2 side by side. */
+function twoPaneLayout(): PaneNode {
+  return {
     type: 'split',
     id: 'split-1',
     direction: 'vertical',
@@ -228,6 +232,34 @@ function withTwoPaneSplit(): PaneNode {
     first: { type: 'leaf', sessionId: 'ses-1' },
     second: { type: 'leaf', sessionId: 'ses-2' },
   }
+}
+
+/** The real session store, holding `sessions` in proj-1 with the given view. */
+function seedRealSessions(seed: {
+  sessions: Array<{ id: string; bellCount?: number }>
+  activeSessionId: string
+  paneLayouts?: PaneNode[]
+}): void {
+  const sessions = seed.sessions.map((s) => terminalSessionOf({ ...s, projectId: 'proj-1' }))
+  useSessionStore.setState(useSessionStore.getInitialState(), true)
+  useSessionStore.setState({
+    sessions: new Map(sessions.map((s) => [s.id, s])),
+    projectViews: new Map([
+      [
+        'proj-1',
+        {
+          activeSessionId: seed.activeSessionId,
+          paneLayouts: seed.paneLayouts,
+          terminalCounter: 2,
+        },
+      ],
+    ]),
+  })
+}
+
+/** ses-1 and ses-2 side by side, ses-1 the active tab. */
+function withTwoPaneSplit(): PaneNode {
+  const layout = twoPaneLayout()
   mockGetPaneLayout.mockReturnValue(layout)
   mockGetSessions.mockReturnValue([
     { id: 'ses-1', tabTitle: 'T1', type: 'human' },
@@ -300,11 +332,26 @@ describe('TerminalPane — focusRequest — sets the focused leaf and focuses it
   it('sets the focused leaf and focuses its instance in split mode', () => {
     withRaf()
     const mockFocus = vi.fn()
-    withTwoPaneSplit()
-    mockGetInstance.mockReturnValue(instanceFocusing(mockFocus))
-    seedWithFocusRequest({ sessionId: 'ses-2', nonce: 1 })
+    seedRealSessions({
+      sessions: [{ id: 'ses-1' }, { id: 'ses-2' }],
+      activeSessionId: 'ses-1',
+      paneLayouts: [twoPaneLayout()],
+    })
+    useSessionStore.setState({
+      terminalInstances: new Map([
+        [
+          'ses-2',
+          partialFake<TerminalInstance>({
+            terminal: partialFake<TerminalInstance['terminal']>({ focus: mockFocus }),
+            mount: vi.fn(),
+            unmount: vi.fn(),
+          }),
+        ],
+      ]),
+      focusRequest: { sessionId: 'ses-2', nonce: 1 },
+    })
     render(<TerminalPane projectId="proj-1" />)
-    expect(mockSetFocusedSession).toHaveBeenCalledWith('proj-1', 'ses-2')
+    expect(useSessionStore.getState().getFocusedSession('proj-1')).toBe('ses-2')
     expect(mockFocus).toHaveBeenCalled()
   })
 })
@@ -411,19 +458,13 @@ describe('TerminalPane — split mode (layout present) — renders split contain
   })
 })
 
-describe('TerminalPane — split mode (layout present) — calls setSplitRatio when ratio changes in split mode', () => {
-  it('calls setSplitRatio when ratio changes in split mode', () => {
-    const mockSetSplitRatio = vi.fn()
-    seedStore(useSessionStore, {
-      getSessionsForProject: mockGetSessions,
-      getActiveSessionForProject: mockGetActive,
-      getTerminalInstance: mockGetInstance,
-      clearBellCount: mockClearBell,
-      getPaneLayout: mockGetPaneLayout,
-      setSplitRatio: mockSetSplitRatio,
-      setFocusedSession: vi.fn(),
+describe('TerminalPane — split mode (layout present) — dragging the divider', () => {
+  it('stores the new split ratio of the layout', () => {
+    seedRealSessions({
+      sessions: [{ id: 'ses-1' }, { id: 'ses-2' }],
+      activeSessionId: 'ses-1',
+      paneLayouts: [twoPaneLayout()],
     })
-    withTwoPaneSplit()
     const { container } = render(<TerminalPane projectId="proj-1" />)
     const divider = container.querySelector('.split-container__divider') as HTMLElement
     const outerContainer = container.querySelector('.split-container') as HTMLElement
@@ -431,6 +472,6 @@ describe('TerminalPane — split mode (layout present) — calls setSplitRatio w
     fireEvent.mouseDown(divider, { clientX: 200 })
     fireEvent.mouseMove(document, { clientX: 300 })
     fireEvent.mouseUp(document)
-    expect(mockSetSplitRatio).toHaveBeenCalledWith('proj-1', 'split-1', 0.75)
+    expect(useSessionStore.getState().getPaneLayout('proj-1')).toMatchObject({ ratio: 0.75 })
   })
 })

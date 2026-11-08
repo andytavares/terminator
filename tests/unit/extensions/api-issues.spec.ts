@@ -68,28 +68,36 @@ describe('api.issues — delegation', () => {
     expect(result[0]).toMatchObject({ tracker: 'linear', connected: true })
   })
 
-  it('answers listMine, search and get with what the one service answered', async () => {
-    const mine = { issues: [], failures: [{ tracker: 'linear', error: 'not-connected' }] }
-    const found = { issues: [], failures: [] }
-    service.listMine.mockResolvedValue(mine)
-    service.search.mockResolvedValue(found)
-    service.get.mockResolvedValue(null)
-    const api = await makeApi()
-
-    await expect(api.issues.listMine({ tracker: 'linear' })).resolves.toBe(mine)
-    await expect(api.issues.search('sidebar', { limit: 5 })).resolves.toBe(found)
-    await expect(api.issues.get('linear', 'TAV-7', { refresh: true })).resolves.toBeNull()
-
-    expect(service.listMine).toHaveBeenCalledWith({ tracker: 'linear' })
-    expect(service.search).toHaveBeenCalledWith('sidebar', { limit: 5 })
-    expect(service.get).toHaveBeenCalledWith('linear', 'TAV-7', { refresh: true })
-  })
-
   it('rejects a failed comment rather than swallowing it (FR-034a)', async () => {
     service.comment.mockRejectedValue(new Error('no permission'))
     const api = await makeApi()
     await expect(api.issues.comment('linear', 'TAV-42', 'hi')).rejects.toThrow('no permission')
   })
+})
+
+type ExtensionApi = Awaited<ReturnType<typeof makeApi>>
+
+describe('api.issues — reads go to the one service', () => {
+  it.each([
+    { method: 'listMine', call: (api: ExtensionApi) => api.issues.listMine(), args: [{}] },
+    {
+      method: 'search',
+      call: (api: ExtensionApi) => api.issues.search('sidebar'),
+      args: ['sidebar', {}],
+    },
+    {
+      method: 'get',
+      call: (api: ExtensionApi) => api.issues.get('linear', 'TAV-7'),
+      args: ['linear', 'TAV-7', {}],
+    },
+  ] as const)(
+    'asks the service for $method, with empty options when none are given',
+    async ({ method, call, args }) => {
+      const api = await makeApi()
+      await call(api)
+      expect(service[method]).toHaveBeenCalledWith(...args)
+    }
+  )
 })
 
 describe('api.issues — workflow moves (v2.3.0)', () => {

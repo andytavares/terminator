@@ -34,18 +34,14 @@ describe('notepad remote access', () => {
     ])
   })
 
-  it('lets the remote browser read and edit notes and diagrams', () => {
-    const channels = remoteAccessByChannel(REGISTRARS)
-
-    for (const channel of [
-      'terminator.notepad:notes.list',
-      'terminator.notepad:notes.autosave',
-      'terminator.notepad:diagrams.get',
-      'terminator.notepad:folders.list',
-      'terminator.notepad:search.query',
-      'terminator.notepad:tags.list',
-    ]) {
-      expect(channels.get(channel)).toBe(true)
-    }
+  it.each([
+    'terminator.notepad:notes.list',
+    'terminator.notepad:notes.autosave',
+    'terminator.notepad:diagrams.get',
+    'terminator.notepad:folders.list',
+    'terminator.notepad:search.query',
+    'terminator.notepad:tags.list',
+  ])('lets the remote browser use %s', (channel) => {
+    expect(remoteAccessByChannel(REGISTRARS).get(channel)).toBe(true)
   })
 })

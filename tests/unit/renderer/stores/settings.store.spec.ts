@@ -124,9 +124,11 @@ describe('useSettingsStore — updateGlobalTheme', () => {
 
 describe('useSettingsStore — resolveSettings', () => {
   it('returns defaults merged with global settings when no workspace', () => {
-    useSettingsStore.setState({ globalSettings: DEFAULT_SETTINGS })
+    useSettingsStore.setState({
+      globalSettings: { ...DEFAULT_SETTINGS, appearance: { theme: 'light' } },
+    })
     const resolved = useSettingsStore.getState().resolveSettings()
-    expect(resolved.appearance.theme).toBe('dark')
+    expect(resolved.appearance.theme).toBe('light')
   })
 
   it('merges workspace overrides over global settings', () => {

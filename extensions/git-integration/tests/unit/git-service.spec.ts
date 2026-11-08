@@ -55,10 +55,10 @@ describe('getStatus', () => {
   })
 })
 
-describe('getStatus — falls back to HEAD when the branch cannot be read (e.g. detached HEAD)', () => {
-  it('falls back to HEAD when the branch cannot be read (e.g. detached HEAD)', async () => {
+describe('getStatus — a detached HEAD', () => {
+  it('reports the branch as HEAD when git names no current branch', async () => {
     mockExecSuccess('') // no changes
-    mockExecError('fatal: ref HEAD is not a symbolic ref') // git branch --show-current fails
+    mockExecSuccess('') // git branch --show-current prints nothing on a detached HEAD
 
     const result = await getStatus('/repo')
 

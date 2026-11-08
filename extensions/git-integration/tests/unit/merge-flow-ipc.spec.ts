@@ -381,7 +381,7 @@ describe('git:session-persist', () => {
     }
     const result = await bridge.invoke('git:session-persist', { repoRoot: '/repo', session })
     expect(result).toEqual({ success: true })
-    expect(mockStoreSet).toHaveBeenCalledOnce()
+    expect(mockStoreSet.mock.calls).toEqual([['mergeflow:session:/repo', session]])
   })
 })
 
@@ -391,7 +391,7 @@ describe('git:session-clear', () => {
     mockStoreDel.mockReturnValueOnce(undefined)
     const result = await bridge.invoke('git:session-clear', { repoRoot: '/repo' })
     expect(result).toEqual({ success: true })
-    expect(mockStoreDel).toHaveBeenCalledOnce()
+    expect(mockStoreDel.mock.calls).toEqual([['mergeflow:session:/repo']])
   })
 
   it('returns success even when store.delete throws', async () => {
@@ -414,7 +414,7 @@ describe('git:session-reset', () => {
       files: [{ filePath: 'src/foo.ts' }, { filePath: 'src/bar.ts' }],
     })
     expect(result).toEqual({ success: true })
-    expect(mockStoreDel).toHaveBeenCalledOnce()
+    expect(mockStoreDel.mock.calls).toEqual([['mergeflow:session:/repo']])
     // git called twice — once per file
     expect(mockExecFile).toHaveBeenCalledTimes(2)
     const firstCall = mockExecFile.mock.calls[0]

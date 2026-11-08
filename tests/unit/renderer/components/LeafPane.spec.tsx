@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { LeafPane } from '../../../../src/renderer/components/terminal/LeafPane'
@@ -88,11 +89,12 @@ describe('LeafPane', () => {
     expect(container.querySelector('.leaf-pane--focused')).toBeNull()
   })
 
-  it('becomes the focused pane and focuses its terminal on click', () => {
+  it('becomes the focused pane and focuses its terminal on click', async () => {
+    const user = userEvent.setup()
     const instance = makeInstance()
     withInstance(instance)
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
+    await user.click(container.querySelector('.leaf-pane')!)
     expect(focusedIn('proj-1')).toBe('sess-1')
     expect(container.querySelector('.leaf-pane--focused')).toBeTruthy()
     expect(instance.terminal.focus).toHaveBeenCalled()
@@ -100,9 +102,10 @@ describe('LeafPane', () => {
 })
 
 describe('LeafPane — clears the unseen bells on mousedown', () => {
-  it('clears the unseen bells on mousedown', () => {
+  it('clears the unseen bells on mousedown', async () => {
+    const user = userEvent.setup()
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 0 })
+    await user.click(container.querySelector('.leaf-pane')!)
     expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(0)
   })
 
@@ -157,9 +160,10 @@ describe('LeafPane — calls mount with just the container element', () => {
     expect(instance.mount).toHaveBeenCalledTimes(1)
   })
 
-  it('ignores non-left-button mousedown (button !== 0)', () => {
+  it('ignores non-left-button mousedown (button !== 0)', async () => {
+    const user = userEvent.setup()
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
-    fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 2 })
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.leaf-pane')! })
     expect(focusedIn('proj-1')).toBe('sess-2')
     expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(2)
   })
@@ -177,6 +181,7 @@ describe('LeafPane — calls mount with just the container element', () => {
 
 describe('LeafPane — closing one pane', () => {
   it('closes this pane alone: it leaves the split and its terminal ends', async () => {
+    const user = userEvent.setup()
     installElectronApi({
       terminal: { input: mockTerminalInput, close: vi.fn(async () => ({ success: true })) },
     })
@@ -193,7 +198,7 @@ describe('LeafPane — closing one pane', () => {
       ]),
     })
     const { getByRole } = render(<LeafPane sessionId="sess-2" projectId="proj-1" />)
-    fireEvent.click(getByRole('button', { name: 'Close Terminal 2' }))
+    await user.click(getByRole('button', { name: 'Close Terminal 2' }))
     expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
     await eventually(() => expect(useSessionStore.getState().sessions.has('sess-2')).toBe(false))
     expect(useSessionStore.getState().sessions.has('sess-1')).toBe(true)

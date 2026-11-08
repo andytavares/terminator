@@ -215,14 +215,22 @@ function deps(overrides: Partial<ClosePaneDeps> = {}): ClosePaneDeps {
 }
 
 describe('closeFocusedPane', () => {
-  it('closes the focused leaf of a split and reports a failed close', async () => {
+  it('closes the focused leaf of a split', () => {
+    const d = deps({ getPaneLayout: () => ({}), getFocusedSession: () => 's2' })
+    closeFocusedPane('p1', d)
+    expect(d.closeSplitLeaf).toHaveBeenCalledWith('p1', 's2')
+    expect(d.closeSession).toHaveBeenCalledWith('s2')
+  })
+})
+
+describe('closeFocusedPane — a failed close', () => {
+  it('reports a close of the focused leaf that failed', async () => {
     const d = deps({
       getPaneLayout: () => ({}),
       getFocusedSession: () => 's2',
       closeSession: vi.fn(() => Promise.reject(new Error('x'))),
     })
     closeFocusedPane('p1', d)
-    expect(d.closeSplitLeaf).toHaveBeenCalledWith('p1', 's2')
     await eventually(() =>
       expect(createNotification).toHaveBeenCalledWith(
         expect.objectContaining({ key: 'closeTerminalFailed' })

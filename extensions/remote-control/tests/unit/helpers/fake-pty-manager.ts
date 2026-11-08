@@ -79,6 +79,9 @@ function fakePtyControls(state: FakePtyState) {
     dataListenerCount(sessionId: string): number {
       return state.dataListeners.get(sessionId)?.size ?? 0
     },
+    exitListenerCount(sessionId: string): number {
+      return state.exitListeners.get(sessionId)?.size ?? 0
+    },
   }
 }
 

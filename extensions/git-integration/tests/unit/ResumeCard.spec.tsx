@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ResumeCard } from '../../src/components/pr-review/ResumeCard'
 import { useReviewUiStore } from '../../src/stores/review-ui.store'
 import type {
@@ -145,10 +146,11 @@ describe('ResumeCard — shows notes with the question quoted and an Ask agent b
 })
 
 describe('ResumeCard — opens the agent panel for the question note line when Ask agent is clicked', () => {
-  it('opens the agent panel for the question note line when Ask agent is clicked', () => {
+  it('opens the agent panel for the question note line when Ask agent is clicked', async () => {
+    const user = userEvent.setup()
     const note = makeNote()
     renderCard({ notes: [note] })
-    fireEvent.click(screen.getByText('Ask agent'))
+    await user.click(screen.getByRole('button', { name: 'Ask agent' }))
     expect(useReviewUiStore.getState().agentPanelScope).toEqual({
       kind: 'lines',
       path: note.path,
@@ -186,10 +188,11 @@ describe('ResumeCard — shows draft comments with a Review drafts button', () =
 })
 
 describe('ResumeCard — opens the drafts for review from Review drafts', () => {
-  it('opens the drafts for review from Review drafts', () => {
+  it('opens the drafts for review from Review drafts', async () => {
+    const user = userEvent.setup()
     const onReviewDrafts = vi.fn()
     renderCard({ drafts: [makeDraft()], onReviewDrafts })
-    fireEvent.click(screen.getByRole('button', { name: 'Review drafts' }))
+    await user.click(screen.getByRole('button', { name: 'Review drafts' }))
     expect(onReviewDrafts).toHaveBeenCalledOnce()
   })
 })
@@ -212,10 +215,11 @@ describe('ResumeCard — omits empty rows entirely', () => {
 })
 
 describe('ResumeCard — calls onContinue when Continue is clicked', () => {
-  it('calls onContinue when Continue is clicked', () => {
+  it('calls onContinue when Continue is clicked', async () => {
+    const user = userEvent.setup()
     const onContinue = vi.fn()
     renderCard({ onContinue })
-    fireEvent.click(screen.getByText('Continue'))
+    await user.click(screen.getByRole('button', { name: /^Continue/ }))
     expect(onContinue).toHaveBeenCalledTimes(1)
   })
 })

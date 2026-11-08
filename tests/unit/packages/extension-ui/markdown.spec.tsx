@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Markdown } from '../../../../packages/extension-ui/src/Markdown'
 
 const onOpenLink = vi.fn()
@@ -454,5 +455,28 @@ describe('Markdown — an HTML title is never kept', () => {
     // React moves a title outside an SVG into document.head, so look at the whole document.
     const titles = [...document.querySelectorAll('title')].map((t) => t.textContent)
     expect(titles).not.toContain('Hijack')
+  })
+})
+
+describe('Markdown when the view around it re-renders', () => {
+  it('keeps the same link element, which then opens through the newest onOpenLink', async () => {
+    const first = vi.fn()
+    const latest = vi.fn()
+    const body = '[docs](https://e.example/d)'
+    const view = render(
+      <Markdown onOpenLink={first} fetchesNothing>
+        {body}
+      </Markdown>
+    )
+    const link = view.getByRole('link', { name: 'docs' })
+    view.rerender(
+      <Markdown onOpenLink={latest} fetchesNothing>
+        {body}
+      </Markdown>
+    )
+    expect(view.getByRole('link', { name: 'docs' })).toBe(link)
+    await userEvent.setup().click(link)
+    expect(latest).toHaveBeenCalledWith('https://e.example/d')
+    expect(first).not.toHaveBeenCalled()
   })
 })

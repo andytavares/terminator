@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { App } from '../../../src/renderer-remote/App'
 
@@ -12,10 +13,8 @@ Object.defineProperty(window, 'location', {
   writable: true,
 })
 
-// Allow tests to override innerWidth for mobile/desktop detection
-Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1024 })
-
 beforeEach(() => {
+  Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1024 })
   mockFetch.mockReset()
   mockReplace.mockReset()
   localStorage.clear()
@@ -38,9 +37,10 @@ describe('App — says why a login failed', () => {
     ],
   ])('names the failure on %s', async (_response, respond, message) => {
     mockFetch.mockImplementationOnce(respond)
+    const user = userEvent.setup()
     render(<App />)
-    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    await user.type(screen.getByPlaceholderText('Password'), 'pw')
+    await user.click(screen.getByRole('button', { name: 'Connect' }))
     await screen.findByText(message)
   })
 })
@@ -54,8 +54,8 @@ describe('App — logs in once with the password in the body, keeps nothing, and
       json: () => Promise.resolve({ ticket: 'tok-abc' }),
     })
     render(<App />)
-    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'correct' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    await userEvent.type(screen.getByPlaceholderText('Password'), 'correct')
+    await userEvent.click(screen.getByRole('button', { name: 'Connect' }))
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/app/?t=tok-abc'))
     expect(mockFetch.mock.calls[1][0]).toBe('/api/app-ticket')
 
@@ -64,14 +64,20 @@ describe('App — logs in once with the password in the body, keeps nothing, and
     expect(loginInit.method).toBe('POST')
     expect(JSON.parse(loginInit.body as string)).toEqual({ password: 'correct' })
 
-    for (const [, init] of mockFetch.mock.calls as [string, RequestInit][]) {
-      expect(new Headers(init?.headers).has('Authorization')).toBe(false)
-      expect(init?.credentials).toBe('same-origin')
-    }
+    const sent = (mockFetch.mock.calls as [string, RequestInit][]).map(([, init]) => ({
+      authorization: new Headers(init.headers).has('Authorization'),
+      credentials: init.credentials,
+    }))
+    expect(sent).toEqual([
+      { authorization: false, credentials: 'same-origin' },
+      { authorization: false, credentials: 'same-origin' },
+    ])
     expect(JSON.stringify({ ...localStorage })).not.toContain('correct')
     expect(localStorage.length).toBe(0)
   })
+})
 
+describe('App — forgets passwords an older version kept', () => {
   it('removes a password an older version left in localStorage', () => {
     localStorage.setItem('remote_token', 'old-password')
     render(<App />)
@@ -87,12 +93,12 @@ describe('App — redirects to /mobile/ when viewport is narrower than 1400px', 
       ok: true,
       json: () => Promise.resolve({ ticket: 'mob-tok' }),
     })
+    const user = userEvent.setup()
     render(<App />)
-    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    await user.type(screen.getByPlaceholderText('Password'), 'pw')
+    await user.click(screen.getByRole('button', { name: 'Connect' }))
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/mobile/?t=mob-tok'))
     expect(mockFetch.mock.calls[1][0]).toBe('/api/mobile-ticket')
-    Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true })
   })
 })
 
@@ -100,14 +106,13 @@ describe('App — disables button and shows "Connecting…" while loading', () =
   it('disables button and shows "Connecting…" while loading', async () => {
     let resolvePromise: (v: unknown) => void
     mockFetch.mockReturnValueOnce(new Promise((r) => (resolvePromise = r)))
+    const user = userEvent.setup()
     render(<App />)
-    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Connecting…' }).hasAttribute('disabled')).toBe(
-        true
-      )
-    )
+    await user.type(screen.getByPlaceholderText('Password'), 'pw')
+    await user.click(screen.getByRole('button', { name: 'Connect' }))
+    const button = await screen.findByRole<HTMLButtonElement>('button', { name: 'Connecting…' })
+    expect(button.disabled).toBe(true)
     resolvePromise!({ status: 401 })
+    await screen.findByText('Wrong password')
   })
 })

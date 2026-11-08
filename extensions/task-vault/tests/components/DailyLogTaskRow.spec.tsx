@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { screen, cleanup, fireEvent, act } from '@testing-library/react'
+import { screen, cleanup, act, fireEvent } from '@testing-library/react'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { installVaultBridge, eventually, task } from './helpers/bridge'
 import { buttonNamed, lastNotice, renderDailyLog } from './helpers/daily-log'
 
@@ -28,54 +29,66 @@ describe('DailyLog task row: usage', completeUsageTests)
 describe('DailyLog task row: editing', editTests)
 describe('DailyLog task row: editing, continued', editTestsPart2)
 describe('DailyLog task row: open task actions', openActionTests)
-describe('DailyLog task row: open task actions, continued', openActionTestsPart2)
+describe('DailyLog task row: first subtask', firstSubtaskTests)
+describe('DailyLog task row: first subtask, continued', firstSubtaskTestsPart2)
 describe('DailyLog task row: migrating', migrateTests)
-describe('DailyLog task row: blocked and finished tasks', finishedTests)
-describe('DailyLog task row: blocked and finished tasks, continued', finishedTestsPart2)
+describe('DailyLog task row: blocked tasks', blockedTests)
+describe('DailyLog task row: blocked tasks, continued', blockedTestsPart2)
+describe('DailyLog task row: finished tasks', finishedTests)
 describe('DailyLog task row: tags', metaTests)
 describe('DailyLog task row: tags, continued', metaTestsPart2)
 
 function completeUsageTests() {
   it('counts a completed task', async () => {
+    const user = userEvent.setup()
     renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
-    fireEvent.click(screen.getByTitle('Complete task'))
+    await user.click(screen.getByTitle('Complete task'))
     await eventually(() => expect(bridge.recordUsage).toHaveBeenCalledWith('task-complete'))
   })
 }
 
 function selectTests() {
-  it('completes an open task from its checkbox', () => {
+  it('completes an open task from its checkbox', async () => {
+    const user = userEvent.setup()
     const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
-    fireEvent.click(screen.getByTitle('Complete task'))
+    await user.click(screen.getByTitle('Complete task'))
     expect(props.onTaskComplete).toHaveBeenCalledWith('t1')
   })
 
   it('selects an open task a moment after a single click', () => {
     vi.useFakeTimers()
     const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
+    // user-event hangs here: Testing Library's asyncWrapper waits on a setTimeout(0) that
+    // vitest's fake clock never fires.
     fireEvent.click(screen.getByText('Write'))
     expect(props.onSelectTask).not.toHaveBeenCalled()
     act(() => void vi.advanceTimersByTime(220))
     expect(props.onSelectTask).toHaveBeenCalledWith('t1')
   })
 
-  it('selects a finished task at once, and marks the selected row', () => {
+  it('selects a finished task at once on a click', async () => {
+    const user = userEvent.setup()
     const { props } = renderDailyLog(task('t1', 'Write', { status: 'done' }), {
       onSelectTask: vi.fn(),
-      ...{ selectedTaskId: 't1' },
     })
-    expect(screen.getByTitle('Click to open detail')).toBeTruthy()
-    fireEvent.click(screen.getByText('Write'))
+    expect(screen.getByText('Write').title).toBe('Click to open detail')
+    await user.click(screen.getByText('Write'))
     expect(props.onSelectTask).toHaveBeenCalledWith('t1')
-    expect(document.querySelector('.daily-log__task--selected')).toBeTruthy()
-    expect(document.querySelector('.daily-log__task-text--strikethrough')).toBeTruthy()
   })
 }
 
 function selectTestsPart2() {
+  it('marks the selected finished row, its text struck through', () => {
+    renderDailyLog(task('t1', 'Write', { status: 'done' }), { selectedTaskId: 't1' })
+    expect(document.querySelector('.daily-log__task--selected')).not.toBeNull()
+    expect(screen.getByText('Write').className).toContain('daily-log__task-text--strikethrough')
+  })
+
   it('cancels a pending select when unmounted', () => {
     vi.useFakeTimers()
     const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
+    // user-event hangs here: Testing Library's asyncWrapper waits on a setTimeout(0) that
+    // vitest's fake clock never fires.
     fireEvent.click(screen.getByText('Write'))
     cleanup()
     act(() => void vi.advanceTimersByTime(500))
@@ -84,22 +97,24 @@ function selectTestsPart2() {
 }
 
 function editTests() {
-  it('edits on a double click, starting from the raw text', async () => {
-    const { props } = renderDailyLog(
-      task('t1', 'Write', {
-        project: 'big job',
-        context: 'desk',
-        area: 'work',
-        dueDate: '2026-02-01',
-      }),
-      { onSelectTask: vi.fn() }
+  it('opens the editor on a double click, holding the raw text with its tags', async () => {
+    const user = userEvent.setup()
+    const tagged = { project: 'big job', context: 'desk', area: 'work', dueDate: '2026-02-01' }
+    renderDailyLog(task('t1', 'Write', tagged), { onSelectTask: vi.fn() })
+    await user.dblClick(screen.getByText('Write'))
+    expect(screen.getByLabelText('Task text')).toHaveProperty(
+      'value',
+      'Write @big-job +desk #work due:2026-02-01'
     )
-    fireEvent.click(screen.getByText('Write'))
-    fireEvent.click(screen.getByText('Write'))
-    const input = screen.getByLabelText('Task text') as HTMLInputElement
-    expect(input.value).toBe('Write @big-job +desk #work due:2026-02-01')
-    fireEvent.change(input, { target: { value: ' Rewrite ' } })
-    fireEvent.click(buttonNamed('Save'))
+  })
+
+  it('saves the trimmed edit without selecting the task', async () => {
+    const user = userEvent.setup()
+    const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
+    await user.dblClick(screen.getByText('Write'))
+    await user.clear(screen.getByLabelText('Task text'))
+    await user.type(screen.getByLabelText('Task text'), ' Rewrite ')
+    await user.click(buttonNamed('Save'))
     await eventually(() => expect(screen.queryByLabelText('Task text')).toBeNull())
     expect(bridge.calls('task-vault:vault:edit-task')).toEqual([{ taskId: 't1', text: 'Rewrite' }])
     expect(props.onRefresh).toHaveBeenCalled()
@@ -108,25 +123,34 @@ function editTests() {
 }
 
 function editTestsPart2() {
-  it('ignores a blank edit, and cancels by button or Escape', () => {
+  it('saves nothing when a blank edit is submitted with Enter', async () => {
+    const user = userEvent.setup()
     renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
-    fireEvent.click(screen.getByText('Write'))
-    fireEvent.click(screen.getByText('Write'))
-    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: ' ' } })
-    fireEvent.keyDown(screen.getByLabelText('Task text'), { key: 'Enter' })
-    fireEvent.click(buttonNamed('Cancel edit'))
-    fireEvent.click(screen.getByText('Write'))
-    fireEvent.click(screen.getByText('Write'))
-    fireEvent.keyDown(screen.getByLabelText('Task text'), { key: 'Escape' })
-    expect(screen.getByText('Write')).toBeTruthy()
+    await user.dblClick(screen.getByText('Write'))
+    await user.clear(screen.getByLabelText('Task text'))
+    await user.type(screen.getByLabelText('Task text'), ' {Enter}')
+    expect(screen.queryByLabelText('Task text')).not.toBeNull()
     expect(bridge.calls('task-vault:vault:edit-task')).toEqual([])
+  })
+
+  it.each([
+    ['the Cancel edit button', (user: UserEvent) => user.click(buttonNamed('Cancel edit'))],
+    ['Escape', (user: UserEvent) => user.type(screen.getByLabelText('Task text'), '{Escape}')],
+  ])('closes the editor on %s, showing the text again', async (_how, close) => {
+    const user = userEvent.setup()
+    renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
+    await user.dblClick(screen.getByText('Write'))
+    await close(user)
+    expect(screen.queryByLabelText('Task text')).toBeNull()
+    expect(screen.queryByText('Write')).not.toBeNull()
   })
 }
 
 function openActionTests() {
   it('sends a task to the backlog', async () => {
+    const user = userEvent.setup()
     const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
-    fireEvent.click(buttonNamed('Send to backlog'))
+    await user.click(buttonNamed('Send to backlog'))
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
     expect(bridge.calls('task-vault:vault:process-inbox-item')).toEqual([
       { taskId: 't1', action: 'someday' },
@@ -135,8 +159,9 @@ function openActionTests() {
   })
 
   it('archives a task with a notice that leads back to it', async () => {
+    const user = userEvent.setup()
     const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
-    fireEvent.click(buttonNamed('Archive task'))
+    await user.click(buttonNamed('Archive task'))
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
     expect(bridge.calls('task-vault:vault:cancel-task')).toEqual([{ taskId: 't1' }])
     const [type, message, options] = lastNotice()!
@@ -146,108 +171,133 @@ function openActionTests() {
   })
 }
 
-function openActionTestsPart2() {
+function firstSubtaskTests() {
   it('adds the first subtask inline', async () => {
+    const user = userEvent.setup()
     const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
-    fireEvent.click(buttonNamed('Add subtask'))
+    await user.click(buttonNamed('Add subtask'))
     expect(buttonNamed('Add')).toHaveProperty('disabled', true)
-    fireEvent.change(screen.getByLabelText('Subtask…'), { target: { value: ' step ' } })
-    fireEvent.click(buttonNamed('Add'))
+    await user.type(screen.getByLabelText('Subtask…'), ' step ')
+    await user.click(buttonNamed('Add'))
     await eventually(() => expect(screen.queryByLabelText('Subtask…')).toBeNull())
     expect(bridge.calls('task-vault:vault:add-subtask')).toEqual([{ taskId: 't1', text: 'step' }])
     expect(props.onRefresh).toHaveBeenCalled()
   })
 
-  it('cancels the first subtask by button or Escape, and ignores a blank one', () => {
+  it('adds nothing when Enter is pressed on a blank first subtask', async () => {
+    const user = userEvent.setup()
     renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
-    fireEvent.click(buttonNamed('Add subtask'))
-    fireEvent.keyDown(screen.getByLabelText('Subtask…'), { key: 'Enter' })
-    fireEvent.click(buttonNamed('Cancel'))
-    fireEvent.click(buttonNamed('Add subtask'))
-    fireEvent.keyDown(screen.getByLabelText('Subtask…'), { key: 'Escape' })
-    expect(screen.queryByLabelText('Subtask…')).toBeNull()
+    await user.click(buttonNamed('Add subtask'))
+    await user.type(screen.getByLabelText('Subtask…'), '{Enter}')
+    expect(screen.queryByLabelText('Subtask…')).not.toBeNull()
     expect(bridge.calls('task-vault:vault:add-subtask')).toEqual([])
+  })
+}
+
+function firstSubtaskTestsPart2() {
+  it.each([
+    ['the Cancel button', (user: UserEvent) => user.click(buttonNamed('Cancel'))],
+    ['Escape', (user: UserEvent) => user.type(screen.getByLabelText('Subtask…'), '{Escape}')],
+  ])('closes the first subtask row on %s', async (_how, close) => {
+    const user = userEvent.setup()
+    renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
+    await user.click(buttonNamed('Add subtask'))
+    await close(user)
+    expect(screen.queryByLabelText('Subtask…')).toBeNull()
   })
 }
 
 function migrateTests() {
   it('migrates to a chosen day', async () => {
+    const user = userEvent.setup()
     const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
-    fireEvent.click(buttonNamed('Migrate to another day'))
+    await user.click(buttonNamed('Migrate to another day'))
     expect(buttonNamed('Move')).toHaveProperty('disabled', true)
-    fireEvent.change(screen.getByLabelText('date picker'), { target: { value: '2026-01-09' } })
-    fireEvent.click(buttonNamed('Move'))
+    await user.type(screen.getByLabelText('date picker'), '2026-01-09')
+    await user.click(buttonNamed('Move'))
     await eventually(() => expect(screen.queryByLabelText('date picker')).toBeNull())
     expect(props.onTaskMigrate).toHaveBeenCalledWith('t1', '2026-01-09')
   })
 
-  it('closes the migrate picker without moving', () => {
+  it('closes the migrate picker without moving', async () => {
+    const user = userEvent.setup()
     const { props } = renderDailyLog(task('t1', 'Write'), { onSelectTask: vi.fn() })
-    fireEvent.click(buttonNamed('Migrate to another day'))
-    fireEvent.click(buttonNamed('Cancel move'))
+    await user.click(buttonNamed('Migrate to another day'))
+    await user.click(buttonNamed('Cancel move'))
     expect(screen.queryByLabelText('date picker')).toBeNull()
     expect(props.onTaskMigrate).not.toHaveBeenCalled()
   })
 }
 
-function finishedTests() {
-  it('unblocks or archives a blocked task, and shows why it is blocked', async () => {
-    const blocked = task('t1', 'Write', {
-      status: 'blocked',
-      blockedReason: 'waiting',
-      blockedCheckInterval: '2-day',
-    })
-    const { props } = renderDailyLog(blocked, { onSelectTask: vi.fn() })
+const blockedTask = () =>
+  task('t1', 'Write', {
+    status: 'blocked',
+    blockedReason: 'waiting',
+    blockedCheckInterval: '2-day',
+  })
+
+function blockedTests() {
+  it('shows why a blocked task is blocked, with no checkbox', () => {
+    renderDailyLog(blockedTask(), { onSelectTask: vi.fn() })
     expect(screen.getByTitle('Check in: 2 days').textContent).toBe('⊘ waiting')
-    expect(document.querySelector('.daily-log__task--blocked')).toBeTruthy()
+    expect(document.querySelector('.daily-log__task--blocked')).not.toBeNull()
     expect(screen.queryByTitle('Complete task')).toBeNull()
-    fireEvent.click(buttonNamed('Unblock'))
+  })
+
+  it('unblocks a blocked task with a notice', async () => {
+    const user = userEvent.setup()
+    const { props } = renderDailyLog(blockedTask(), { onSelectTask: vi.fn() })
+    await user.click(buttonNamed('Unblock'))
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
     expect(bridge.calls('task-vault:vault:unblock-task')).toEqual([{ taskId: 't1' }])
     expect(lastNotice()?.slice(0, 2)).toEqual(['success', 'Unblocked: Write'])
   })
+}
 
-  it('adds a subtask to, or archives, a blocked task', async () => {
+function blockedTestsPart2() {
+  it('opens the subtask row under a blocked task', async () => {
+    const user = userEvent.setup()
+    renderDailyLog(task('t1', 'Write', { status: 'blocked' }), { onSelectTask: vi.fn() })
+    await user.click(buttonNamed('Add subtask'))
+    expect(screen.getByLabelText('Subtask…')).toHaveProperty('value', '')
+  })
+
+  it('archives a blocked task', async () => {
+    const user = userEvent.setup()
     const { props } = renderDailyLog(task('t1', 'Write', { status: 'blocked' }), {
       onSelectTask: vi.fn(),
     })
-    fireEvent.click(buttonNamed('Add subtask'))
-    expect(screen.getByLabelText('Subtask…')).toBeTruthy()
-    fireEvent.click(buttonNamed('Archive task'))
+    await user.click(buttonNamed('Archive task'))
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
     expect(bridge.calls('task-vault:vault:cancel-task')).toEqual([{ taskId: 't1' }])
   })
 }
 
-function finishedTestsPart2() {
+function finishedTests() {
   it('restores a finished task', async () => {
+    const user = userEvent.setup()
     const { props } = renderDailyLog(task('t1', 'Write', { status: 'done' }), {
       onSelectTask: vi.fn(),
     })
     expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
-    fireEvent.click(buttonNamed('Restore to open'))
+    await user.click(buttonNamed('Restore to open'))
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
     expect(bridge.calls('task-vault:vault:reopen-task')).toEqual([{ taskId: 't1' }])
     expect(lastNotice()?.slice(0, 2)).toEqual(['info', 'Reopened: Write'])
   })
 
-  it('removes a cancelled or migrated task', async () => {
-    const { props } = renderDailyLog(task('t1', 'Write', { status: 'cancelled' }), {
-      onSelectTask: vi.fn(),
-    })
-    expect(document.querySelector('.daily-log__task--cancelled')).toBeTruthy()
-    expect(document.querySelector('.daily-log__task-text--cancelled')).toBeTruthy()
-    fireEvent.click(buttonNamed('Remove'))
+  it('shows a cancelled task with the cancelled row and text styles', () => {
+    renderDailyLog(task('t1', 'Write', { status: 'cancelled' }), { onSelectTask: vi.fn() })
+    expect(document.querySelector('.daily-log__task--cancelled')).not.toBeNull()
+    expect(screen.getByText('Write').className).toContain('daily-log__task-text--cancelled')
+  })
+
+  it.each(['cancelled', 'migrated'] as const)('removes a %s task', async (status) => {
+    const user = userEvent.setup()
+    const { props } = renderDailyLog(task('t1', 'Write', { status }), { onSelectTask: vi.fn() })
+    await user.click(buttonNamed('Remove'))
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
-    cleanup()
-    renderDailyLog(task('t2', 'Moved', { status: 'migrated' }), { onSelectTask: vi.fn() })
-    fireEvent.click(buttonNamed('Remove'))
-    await eventually(() =>
-      expect(bridge.calls('task-vault:vault:delete-task')).toEqual([
-        { taskId: 't1' },
-        { taskId: 't2' },
-      ])
-    )
+    expect(bridge.calls('task-vault:vault:delete-task')).toEqual([{ taskId: 't1' }])
   })
 }
 

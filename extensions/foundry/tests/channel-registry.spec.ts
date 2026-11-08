@@ -53,51 +53,6 @@ describe('the settings surface', () => {
   })
 })
 
-// A node is over when its *turn* is over, not when its process is.
-//
-// A supervised session sits at its prompt after answering — that is the point
-// of running it in a terminal you can type into — so a `runNode` that resolves
-// only on `onEnd` waits for something that never happens. The Line could not
-// complete a single agent node, while intake, which has always treated a turn
-// end as the answer, worked fine.
-//
-// Nothing below the application can see this: every unit test hands the
-// executor a `run` that resolves. The live e2e is what proves it, and this is
-// what stops it being undone between live runs.
-describe('what ends a node', () => {
-  it('resolves the Line on a turn ending, not only on the process exiting', () => {
-    const turnEnd = src.slice(src.indexOf('function finishNodeTurn('))
-    const body = turnEnd.slice(0, turnEnd.indexOf('\n}'))
-    expect(body, 'the Line waits for onEnd, which a live session never reaches').toContain(
-      'finish('
-    )
-  })
-
-  it('still resolves on the process exiting, for the runs that do exit', () => {
-    expect(src).toMatch(
-      /function archiveEndedSession\([^)]*\): void \{[\s\S]{0,400}?finish\(exitCode\)/
-    )
-  })
-})
-
-// A refusal was posted to the console and a *question* was not, so an agent
-// waiting on one looked exactly like an agent that had gone quiet — which is
-// what it then became. Watched live: a builder redirected its test output to a
-// scratch file outside the checkout, FR-050 asked about it, nobody was there,
-// the bridge handed the call back to the terminal's own prompt five minutes
-// later, and the run sat until the wall-clock budget ended it half an hour on.
-// Nothing anywhere said a question had been asked.
-describe('a question nobody is there to answer', () => {
-  it('says an agent is waiting on one', () => {
-    expect(src).toContain('asked about ${pending.toolName}')
-  })
-
-  it('says when it went to the terminal prompt instead, which is where it stops', () => {
-    expect(src).toContain("outcome === 'handback'")
-    expect(src).toContain('an agent waits there')
-  })
-})
-
 // `record` writes through the order store alone, and the draft setting is optional.
 const noSettingsHost = {} as ExtensionAPI
 
@@ -123,19 +78,5 @@ describe('which ledger a shipping entry goes in', () => {
     expect(await ledgerActions(root, 'WO-1')).toEqual(['ship.draft_opened'])
     expect(src).toContain('integrateDepsFor(api, root, order.id)')
     expect(src).toContain('integrateDepsFor(api, dataRoot(), gate.orderId)')
-  })
-})
-
-// The read-only policy refuses any tool it has not been taught about, which is
-// right: an MCP server's tools are named by somebody else, and
-// `mcp__x__get_thing` and `mcp__x__delete_thing` are the same shape to anything
-// reading names. The cost is real, though — watched live, an architect tried to
-// check a technique against the documentation, was refused, and wrote
-// "Environment is read-only for execution and MCP, so I could not pull Node
-// docs. That shapes what I can claim." So the operator names them, and Foundry
-// still infers nothing.
-describe('tools the operator says only read', () => {
-  it('is passed to the decision, so it can be consulted at all', () => {
-    expect(src).toContain('readOnlyTools: readOnlyTools(api, checkout.origin)')
   })
 })

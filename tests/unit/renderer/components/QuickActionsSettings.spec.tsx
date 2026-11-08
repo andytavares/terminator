@@ -1,16 +1,51 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { QuickActionsSettings } from '../../../../src/renderer/components/settings/QuickActionsSettings'
 import type { CustomAction } from '../../../../src/shared/types'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
-import { seedStore, type SeededStore } from '../../../support/renderer-stores'
+import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
+import type { WorkspaceSettings } from '../../../../src/shared/types'
+import { installElectronApi } from '../../../support/electron-api'
+import { resetStore, seedStore } from '../../../support/renderer-stores'
 
-let settings: SeededStore<typeof useSettingsStore>
+/** Main's answer to a global settings save: the stored settings with the patch applied. */
+const updateGlobal = vi.fn<ElectronAPI['settings']['updateGlobal']>(async (patch) => {
+  const current = useSettingsStore.getState().globalSettings ?? DEFAULT_GLOBAL_SETTINGS
+  const { quickActions } = patch as { quickActions: Partial<typeof current.quickActions> }
+  return { settings: { ...current, quickActions: { ...current.quickActions, ...quickActions } } }
+})
+/** Main's answer to a workspace settings save: that workspace's overrides with the patch applied. */
+const updateWorkspace = vi.fn<ElectronAPI['settings']['updateWorkspace']>(
+  async (workspaceId, patch) => {
+    const current = useSettingsStore.getState().workspaceSettings.get(workspaceId)
+    const overrides = {
+      ...current?.overrides,
+      ...(patch as object),
+    } as WorkspaceSettings['overrides']
+    return { settings: { workspaceId, overrides, extensions: {} } }
+  }
+)
+
+const savedGlobal = () => useSettingsStore.getState().globalSettings?.quickActions.custom
+
+/** Fills the action form's text fields the person types in. */
+async function fillAction(user: UserEvent, fields: { label: string; key: string; body: string }) {
+  await typeInto(user, 'Label', fields.label)
+  await typeInto(user, 'Key', fields.key)
+  await typeInto(user, 'Body', fields.body)
+}
+
+/** Replaces what a field holds; an empty `text` leaves it empty. */
+async function typeInto(user: UserEvent, label: string, text: string) {
+  await user.clear(screen.getByLabelText(label))
+  if (text !== '') await user.type(screen.getByLabelText(label), text)
+}
 
 function mockStore(custom: CustomAction[], workspaceCustom: CustomAction[] = []) {
-  settings = seedStore(useSettingsStore, {
+  resetStore(useSettingsStore, {
     globalSettings: {
       ...DEFAULT_GLOBAL_SETTINGS,
       quickActions: { ...DEFAULT_GLOBAL_SETTINGS.quickActions, custom },
@@ -30,6 +65,7 @@ function mockStore(custom: CustomAction[], workspaceCustom: CustomAction[] = [])
 
 beforeEach(() => {
   vi.clearAllMocks()
+  installElectronApi({ settings: { updateGlobal, updateWorkspace } })
   Object.defineProperty(globalThis, 'crypto', {
     value: { randomUUID: () => 'new-uuid' },
     configurable: true,
@@ -75,66 +111,57 @@ describe('QuickActionsSettings — global scope', () => {
   })
 })
 
-describe('QuickActionsSettings — global scope — adds a new action and saves it via updateQuickActions', () => {
-  it('adds a new action and saves it via updateQuickActions', () => {
+describe('QuickActionsSettings — global scope — adds a new action', () => {
+  it('saves a new action and lists it', async () => {
+    const user = userEvent.setup()
     mockStore([])
     render(<QuickActionsSettings scope="global" />)
-    fireEvent.click(screen.getByText('Add action'))
+    await user.click(screen.getByText('Add action'))
 
-    fireEvent.change(screen.getByLabelText('Label'), { target: { value: 'Run tests' } })
-    fireEvent.change(screen.getByLabelText('Key'), { target: { value: 't' } })
-    fireEvent.change(screen.getByLabelText('Body'), { target: { value: 'npx vitest run' } })
-    fireEvent.click(screen.getByText('Save'))
+    await fillAction(user, { label: 'Run tests', key: 't', body: 'npx vitest run' })
+    await user.click(screen.getByText('Save'))
 
-    expect(settings.updateQuickActions).toHaveBeenCalledWith({
-      custom: [
-        {
-          id: 'new-uuid',
-          label: 'Run tests',
-          mnemonic: 't',
-          kind: 'shell',
-          target: 'focused',
-          body: 'npx vitest run',
-        },
-      ],
-    })
-  })
-})
-
-describe('QuickActionsSettings — global scope — edits an existing action in place', () => {
-  it('edits an existing action in place', () => {
-    mockStore([
+    expect(await screen.findByText('Run tests')).toBeTruthy()
+    expect(savedGlobal()).toEqual([
       {
-        id: 'a1',
+        id: 'new-uuid',
         label: 'Run tests',
         mnemonic: 't',
         kind: 'shell',
         target: 'focused',
-        body: 'npx vitest',
+        body: 'npx vitest run',
       },
     ])
-    render(<QuickActionsSettings scope="global" />)
-    fireEvent.click(screen.getByText('Edit'))
-    fireEvent.change(screen.getByLabelText('Label'), { target: { value: 'Run all tests' } })
-    fireEvent.click(screen.getByText('Save'))
+  })
+})
 
-    expect(settings.updateQuickActions).toHaveBeenCalledWith({
-      custom: [
-        {
-          id: 'a1',
-          label: 'Run all tests',
-          mnemonic: 't',
-          kind: 'shell',
-          target: 'focused',
-          body: 'npx vitest',
-        },
-      ],
-    })
+const runTests: CustomAction = {
+  id: 'a1',
+  label: 'Run tests',
+  mnemonic: 't',
+  kind: 'shell',
+  target: 'focused',
+  body: 'npx vitest',
+}
+
+describe('QuickActionsSettings — global scope — edits an existing action in place', () => {
+  it('edits an existing action in place', async () => {
+    const user = userEvent.setup()
+    mockStore([runTests])
+    render(<QuickActionsSettings scope="global" />)
+    await user.click(screen.getByText('Edit'))
+    await typeInto(user, 'Label', 'Run all tests')
+    await user.click(screen.getByText('Save'))
+
+    expect(await screen.findByText('Run all tests')).toBeTruthy()
+    expect(screen.queryByText('Run tests')).toBeNull()
+    expect(savedGlobal()).toEqual([{ ...runTests, label: 'Run all tests' }])
   })
 })
 
 describe('QuickActionsSettings — global scope — deletes an action', () => {
-  it('deletes an action', () => {
+  it('deletes an action', async () => {
+    const user = userEvent.setup()
     mockStore([
       {
         id: 'a1',
@@ -146,8 +173,9 @@ describe('QuickActionsSettings — global scope — deletes an action', () => {
       },
     ])
     render(<QuickActionsSettings scope="global" />)
-    fireEvent.click(screen.getByText('Delete'))
-    expect(settings.updateQuickActions).toHaveBeenCalledWith({ custom: [] })
+    await user.click(screen.getByText('Delete'))
+    expect(await screen.findByText('No custom actions yet.')).toBeTruthy()
+    expect(savedGlobal()).toEqual([])
   })
 })
 
@@ -171,53 +199,57 @@ describe('QuickActionsSettings — global scope — validation', () => {
       body: 'echo new',
       error: 'Key already used by Existing',
     },
-  ])('refuses to save $reason', (row) => {
+  ])('refuses to save $reason', async (row) => {
+    const user = userEvent.setup()
     mockStore([existing])
     render(<QuickActionsSettings scope="global" />)
-    fireEvent.click(screen.getByText('Add action'))
-    fireEvent.change(screen.getByLabelText('Label'), { target: { value: row.label } })
-    fireEvent.change(screen.getByLabelText('Key'), { target: { value: row.key } })
-    fireEvent.change(screen.getByLabelText('Body'), { target: { value: row.body } })
-    fireEvent.click(screen.getByText('Save'))
+    await user.click(screen.getByText('Add action'))
+    await fillAction(user, row)
+    await user.click(screen.getByText('Save'))
     expect(screen.getByText(row.error)).toBeTruthy()
-    expect(settings.updateQuickActions).not.toHaveBeenCalled()
+    expect(updateGlobal).not.toHaveBeenCalled()
   })
 })
 
 describe('QuickActionsSettings — global scope — the Key field', () => {
-  it('keeps only the first character typed into Key', () => {
+  it('keeps only the first character typed into Key', async () => {
+    const user = userEvent.setup()
     mockStore([])
     render(<QuickActionsSettings scope="global" />)
-    fireEvent.click(screen.getByText('Add action'))
+    await user.click(screen.getByText('Add action'))
     const keyInput = screen.getByLabelText('Key') as HTMLInputElement
-    fireEvent.change(keyInput, { target: { value: 'ab' } })
+    await user.type(keyInput, 'ab')
     expect(keyInput.value).toBe('a')
   })
 })
 
 describe('QuickActionsSettings — global scope — resets target to the first valid option when kind changes', () => {
-  it('resets target to the first valid option when kind changes', () => {
+  it('resets target to the first valid option when kind changes', async () => {
+    const user = userEvent.setup()
     mockStore([])
     render(<QuickActionsSettings scope="global" />)
-    fireEvent.click(screen.getByText('Add action'))
-    fireEvent.change(screen.getByLabelText('Target'), { target: { value: 'new-tab' } })
-    fireEvent.change(screen.getByLabelText('Kind'), { target: { value: 'prompt' } })
+    await user.click(screen.getByText('Add action'))
+    await user.selectOptions(screen.getByLabelText('Target'), 'new-tab')
+    await user.selectOptions(screen.getByLabelText('Kind'), 'prompt')
     expect((screen.getByLabelText('Target') as HTMLSelectElement).value).toBe('agent')
   })
 
-  it('cancel discards the draft without saving', () => {
+  it('cancel discards the draft without saving', async () => {
+    const user = userEvent.setup()
     mockStore([])
     render(<QuickActionsSettings scope="global" />)
-    fireEvent.click(screen.getByText('Add action'))
-    fireEvent.change(screen.getByLabelText('Label'), { target: { value: 'Draft' } })
-    fireEvent.click(screen.getByText('Cancel'))
+    await user.click(screen.getByText('Add action'))
+    await user.type(screen.getByLabelText('Label'), 'Draft')
+    await user.click(screen.getByText('Cancel'))
     expect(screen.queryByLabelText('Label')).toBeNull()
-    expect(settings.updateQuickActions).not.toHaveBeenCalled()
+    expect(screen.getByText('No custom actions yet.')).toBeTruthy()
+    expect(updateGlobal).not.toHaveBeenCalled()
   })
 })
 
 describe('QuickActionsSettings — workspace scope', () => {
-  it('reads workspace overrides and writes via updateWorkspaceQuickActions', () => {
+  it('lists the workspace overrides and deletes from them, leaving the global actions alone', async () => {
+    const user = userEvent.setup()
     mockStore(
       [],
       [{ id: 'w1', label: 'Workspace action', kind: 'shell', target: 'focused', body: 'ls' }]
@@ -225,9 +257,11 @@ describe('QuickActionsSettings — workspace scope', () => {
     render(<QuickActionsSettings scope="workspace" workspaceId="ws-1" />)
     expect(screen.getByText('Workspace action')).toBeTruthy()
 
-    fireEvent.click(screen.getByText('Delete'))
-    expect(settings.updateWorkspaceQuickActions).toHaveBeenCalledWith('ws-1', [])
-    expect(settings.updateQuickActions).not.toHaveBeenCalled()
+    await user.click(screen.getByText('Delete'))
+    expect(await screen.findByText('No custom actions yet.')).toBeTruthy()
+    const workspace = useSettingsStore.getState().workspaceSettings.get('ws-1')
+    expect(workspace?.overrides.quickActions?.custom).toEqual([])
+    expect(updateGlobal).not.toHaveBeenCalled()
   })
 })
 
@@ -247,14 +281,15 @@ describe('QuickActionsSettings — actions without a key, and scopes with nothin
     expect(document.querySelector('.qa-settings-list__key')!.textContent).toBe('')
   })
 
-  it('edits a keyless action with an empty Key field, and keeps it keyless', () => {
+  it('edits a keyless action with an empty Key field, and keeps it keyless', async () => {
+    const user = userEvent.setup()
     mockStore([askClaude])
     render(<QuickActionsSettings scope="global" />)
-    fireEvent.click(screen.getByText('Edit'))
+    await user.click(screen.getByText('Edit'))
     expect((screen.getByLabelText('Key') as HTMLInputElement).value).toBe('')
-    fireEvent.click(screen.getByText('Save'))
-    expect(settings.updateQuickActions).toHaveBeenCalledWith({
-      custom: [{ ...askClaude, mnemonic: undefined }],
-    })
+    await user.click(screen.getByText('Save'))
+    await waitFor(() => expect(updateGlobal).toHaveBeenCalledTimes(1))
+    expect(document.querySelector('.qa-settings-list__key')!.textContent).toBe('')
+    expect(savedGlobal()).toEqual([{ ...askClaude, mnemonic: undefined }])
   })
 })

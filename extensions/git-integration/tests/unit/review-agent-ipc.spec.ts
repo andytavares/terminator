@@ -177,52 +177,55 @@ describe('review-agent IPC — a second start with the same scope while running 
   })
 })
 
+/** Starts one review with `settings` applied and `payload` merged in; answers what runReview got. */
+async function startedWith(
+  settingValues: Record<string, string | undefined>,
+  payload: Record<string, unknown> = {}
+) {
+  const runReview = vi.fn<RunReview>(() => ({
+    runId: 'x',
+    done: Promise.resolve(makeDoneRun()),
+    cancel: vi.fn(),
+  }))
+  const ensureWorktree = vi.fn(async () => '/wt')
+  const { handlers, settings } = captureAgentHandlers({ ensureWorktree, runReview })
+  Object.assign(settings, settingValues)
+  await handlers['review-agent:start'](startPayload(payload))
+  await eventually(() => expect(runReview).toHaveBeenCalledTimes(1))
+  return runReview.mock.calls[0][0]
+}
+
 describe('review-agent IPC — uses the model override when given, else the setting, else sonnet', () => {
-  it('uses the model override when given, else the setting, else sonnet', async () => {
-    const runReview = vi.fn<RunReview>(() => ({
-      runId: 'x',
-      done: Promise.resolve(makeDoneRun()),
-      cancel: vi.fn(),
-    }))
-    const ensureWorktree = vi.fn(async () => '/wt')
-    const { handlers, settings } = captureAgentHandlers({ ensureWorktree, runReview })
+  const MODEL = 'terminator.git-integration.review.agentModel'
 
-    await handlers['review-agent:start'](startPayload())
-    await eventually(() => expect(runReview).toHaveBeenCalledTimes(1))
-    expect(runReview.mock.calls[0][0].model).toBe('sonnet')
-
-    settings['terminator.git-integration.review.agentModel'] = 'opus'
-    await handlers['review-agent:start'](startPayload({ prNumber: 2, headSHA: 'sha2' }))
-    await eventually(() => expect(runReview).toHaveBeenCalledTimes(2))
-    expect(runReview.mock.calls[1][0].model).toBe('opus')
-
-    await handlers['review-agent:start'](
-      startPayload({ prNumber: 3, headSHA: 'sha3', model: 'sonnet' })
-    )
-    await eventually(() => expect(runReview).toHaveBeenCalledTimes(3))
-    expect(runReview.mock.calls[2][0].model).toBe('sonnet')
+  it.each([
+    {
+      name: 'sonnet with no override and no setting',
+      setting: undefined,
+      override: {},
+      model: 'sonnet',
+    },
+    { name: 'the setting with no override', setting: 'opus', override: {}, model: 'opus' },
+    {
+      name: 'the override over the setting',
+      setting: 'opus',
+      override: { model: 'sonnet' },
+      model: 'sonnet',
+    },
+  ])('uses $name', async ({ setting, override, model }) => {
+    const run = await startedWith({ [MODEL]: setting }, override)
+    expect(run.model).toBe(model)
   })
 })
 
 describe('review-agent IPC — passes no effort for the Default choice or an unset one, else the chosen level', () => {
-  it('passes no effort for the Default choice or an unset one, else the chosen level', async () => {
-    const runReview = vi.fn<RunReview>(() => ({
-      runId: 'x',
-      done: Promise.resolve(makeDoneRun()),
-      cancel: vi.fn(),
-    }))
-    const ensureWorktree = vi.fn(async () => '/wt')
-    const { handlers, settings } = captureAgentHandlers({ ensureWorktree, runReview })
-    const start = (prNumber: number) =>
-      handlers['review-agent:start'](startPayload({ prNumber, headSHA: `sha${prNumber}` }))
-
-    for (const [i, value] of (['default', '', 'high'] as const).entries()) {
-      settings['terminator.git-integration.review.agentEffort'] = value
-      await start(i + 1)
-      await eventually(() => expect(runReview).toHaveBeenCalledTimes(i + 1))
-    }
-
-    expect(runReview.mock.calls.map((c) => c[0].effort)).toEqual([undefined, undefined, 'high'])
+  it.each([
+    ['default', undefined],
+    ['', undefined],
+    ['high', 'high'],
+  ])('for the effort setting %j, passes effort %j', async (setting, expected) => {
+    const run = await startedWith({ 'terminator.git-integration.review.agentEffort': setting })
+    expect(run.effort).toBe(expected)
   })
 })
 

@@ -179,6 +179,7 @@ async function resumeFromKeyboard(page: Page, run: Conversations): Promise<void>
   expect(
     await resume.evaluate((el) => getComputedStyle(el, ':focus-visible').outlineWidth)
   ).not.toBe('0px')
+  await expect(resume).toBeFocused()
   await page.keyboard.press('Enter')
   // The terminal that took the conversation over carries its description.
   await expect(page.locator('.tab-bar__tab--session[title="resume test"]')).toBeVisible()

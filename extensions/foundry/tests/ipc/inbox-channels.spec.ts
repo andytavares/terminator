@@ -17,7 +17,6 @@ import { makeTempDir } from '../../../../tests/support/temp-dir'
 // having produced it.
 
 let root: string
-let record: ReturnType<typeof vi.fn>
 
 function inboxDeps(over: Partial<InboxDeps> = {}): InboxDeps {
   return {
@@ -34,10 +33,21 @@ function inboxDeps(over: Partial<InboxDeps> = {}): InboxDeps {
   }
 }
 
+/** Writes each inbox line to the order's ledger, as `inbox-registration.ts` does. */
+async function recordInLedger(orderId: string, line: Parameters<InboxDeps['record']>[1]) {
+  const entry = { at: '2026-09-06T12:00:00.000Z', orderId, actor: 'operator', evidence: [] }
+  await createOrderStore(root).record({ ...entry, ...line })
+}
+
+/** The action, subject and reason of each line in WO-1's ledger, oldest first. */
+async function ledgerLines() {
+  const entries = await createOrderStore(root).entries('WO-1')
+  return entries.map(({ action, subject, reason }) => ({ action, subject, reason }))
+}
+
 function channels(autonomy: Autonomy = 'standard', act?: InboxDeps['act']) {
-  record = vi.fn(async () => undefined)
   return createInboxChannels(
-    inboxDeps({ autonomy: () => autonomy, record: record as never, ...(act ? { act } : {}) })
+    inboxDeps({ autonomy: () => autonomy, record: recordInLedger, ...(act ? { act } : {}) })
   )
 }
 
@@ -159,19 +169,14 @@ function silencedAndUnconditionalRulesTests() {
     expect(((await channels('escorted').list()) as { gates: Gate[] }).gates).toHaveLength(1)
   })
 
-  it('never hides the unconditional rules at any setting', async () => {
-    const store = createGateStore(root)
-    for (const rule of [
-      'risk.p0',
-      'budget.exceeded',
-      'run.interrupted',
-      'ready-for-review',
-    ] as const) {
-      await store.save(gate({ id: `G-${rule}`, rule }))
+  it.each(['risk.p0', 'budget.exceeded', 'run.interrupted', 'ready-for-review'] as const)(
+    'never hides a %s gate, even when lights-out',
+    async (rule) => {
+      await createGateStore(root).save(gate({ id: `G-${rule}`, rule }))
+      const r = (await channels('lights-out').list()) as { gates: Gate[] }
+      expect(r.gates.map((g) => g.rule)).toEqual([rule])
     }
-    const r = (await channels('lights-out').list()) as { gates: Gate[] }
-    expect(r.gates).toHaveLength(4)
-  })
+  )
 }
 
 function inboxChannelsDeadlinesTests() {
@@ -180,11 +185,9 @@ function inboxChannelsDeadlinesTests() {
     const c = channels()
     const r = (await c.list()) as { gates: Gate[] }
     expect(r.gates).toHaveLength(0)
-    expect(record).toHaveBeenCalledWith('WO-1', {
-      action: 'gate.default',
-      subject: 'G-late',
-      reason: expect.stringContaining('no answer'),
-    })
+    expect(await ledgerLines()).toEqual([
+      { action: 'gate.default', subject: 'G-late', reason: expect.stringContaining('no answer') },
+    ])
     expect((await createGateStore(root).get('G-late'))?.decision?.by).toBe('default')
   })
 
@@ -219,7 +222,7 @@ function undefaultedGatesAndFailuresTests() {
     })
     const r = (await c.list()) as { gates: Gate[] }
     expect(r.gates).toHaveLength(0)
-    expect(record).toHaveBeenCalledWith('WO-1', {
+    expect((await ledgerLines()).at(-1)).toEqual({
       action: 'gate.action_failed',
       subject: 'G-late',
       reason: 'gh: not authenticated',
@@ -283,15 +286,20 @@ function inboxChannelsRecordingTests() {
 
   it('writes the decision to the ledger before acting on it', async () => {
     await createGateStore(root).save(gate())
-    const c = channels()
-    await c.decide({ gateId: 'G-1', option: 'approve' })
-    expect(record).toHaveBeenCalledWith('WO-1', {
-      action: 'gate.decided',
-      subject: 'G-1',
-      reason: expect.stringContaining(
-        'changes that turn out to be riskier than planned -> approve'
-      ),
+    let ledgerWhenActed: unknown = null
+    const c = channels('standard', async () => {
+      ledgerWhenActed = await ledgerLines()
     })
+    await c.decide({ gateId: 'G-1', option: 'approve' })
+    expect(ledgerWhenActed).toEqual([
+      {
+        action: 'gate.decided',
+        subject: 'G-1',
+        reason: expect.stringContaining(
+          'changes that turn out to be riskier than planned -> approve'
+        ),
+      },
+    ])
   })
 }
 
@@ -426,7 +434,7 @@ function settingTheLimitTests() {
     expect(r).toMatchObject({ ok: true })
     expect(act).toHaveBeenCalledWith(expect.objectContaining({ id: 'G-1' }), 'raise')
     expect(budgetsWhenActed).toMatchObject({ wallClockMinutes: 60, agents: 3 })
-    expect(record).toHaveBeenCalledWith('WO-1', {
+    expect(await ledgerLines()).toContainEqual({
       action: 'budget.raised',
       subject: 'wall_clock',
       reason: '10 -> 60',
@@ -437,7 +445,7 @@ function settingTheLimitTests() {
     await halted()
     await channels().decide({ gateId: 'G-1', option: 'raise', limit: null })
     expect((await createOrderStore(root).load('WO-1'))?.budgets.wallClockMinutes).toBeNull()
-    expect(record).toHaveBeenCalledWith('WO-1', {
+    expect(await ledgerLines()).toContainEqual({
       action: 'budget.raised',
       subject: 'wall_clock',
       reason: '10 -> no limit',
@@ -539,9 +547,8 @@ describe('what this setting is not asking about', () => {
 
   it('never silences the unconditional rules at any setting', async () => {
     const r = (await channels('lights-out').list()) as { silenced: string[] }
-    for (const rule of ['risk.p0', 'budget.exceeded', 'run.interrupted', 'ready-for-review']) {
-      expect(r.silenced).not.toContain(rule)
-    }
+    const unconditional = ['risk.p0', 'budget.exceeded', 'run.interrupted', 'ready-for-review']
+    expect(r.silenced.filter((rule) => unconditional.includes(rule))).toEqual([])
   })
 })
 

@@ -114,20 +114,25 @@ describe('initExtensions — manifest-driven (contributes) registration — regi
 })
 
 describe('initExtensions — manifest-driven (contributes) registration — does not call any registry method when extension has no contributes', () => {
-  it('does not call any registry method when extension has no contributes', async () => {
+  it('registers no surface when extension has no contributes', async () => {
     await callInit([{ id: 'com.test.ext' }])
     const { globalTabs, workspaceTabs, projectTabs, sidebarPanels, windowViews, insightsSections } =
       registryState()
-    for (const surfaces of [
-      globalTabs,
-      workspaceTabs,
-      projectTabs,
-      sidebarPanels,
-      windowViews,
-      insightsSections,
-    ]) {
-      expect(surfaces.size).toBe(0)
-    }
+    expect({
+      globalTabs: globalTabs.size,
+      workspaceTabs: workspaceTabs.size,
+      projectTabs: projectTabs.size,
+      sidebarPanels: sidebarPanels.size,
+      windowViews: windowViews.size,
+      insightsSections: insightsSections.size,
+    }).toEqual({
+      globalTabs: 0,
+      workspaceTabs: 0,
+      projectTabs: 0,
+      sidebarPanels: 0,
+      windowViews: 0,
+      insightsSections: 0,
+    })
   })
 
   it('skips disabled extensions', async () => {

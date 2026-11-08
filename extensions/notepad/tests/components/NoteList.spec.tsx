@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, fireEvent, screen, cleanup, act } from '@testing-library/react'
+import { render, fireEvent, screen, cleanup, act, within } from '@testing-library/react'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
 import React from 'react'
 import { useNotesStore } from '../../src/stores/notes.store'
 import { useFilterStore } from '../../src/stores/filter.store'
@@ -55,11 +56,16 @@ const note3: NoteListItem = {
 
 describe('NoteList tag filter dropdown', noteListTagFilterDropdownTests)
 
-function openEditDialog(): HTMLElement {
+async function openEditDialog(user: UserEvent): Promise<HTMLElement> {
   render(<NoteList />)
-  fireEvent.contextMenu(screen.getByText('First Note'))
-  fireEvent.click(screen.getByText('Edit title & tags'))
+  await user.pointer({ keys: '[MouseRight]', target: screen.getByText('First Note') })
+  await user.click(screen.getByText('Edit title & tags'))
   return screen.getByRole('dialog', { name: 'Edit note' })
+}
+
+async function openTagFilter(user: UserEvent): Promise<HTMLElement> {
+  await user.click(screen.getByRole('button', { name: 'Tags' }))
+  return screen.getByRole('group', { name: 'Filter by tag' })
 }
 
 describe('NoteList edit dialog', noteListEditDialogTests)
@@ -78,11 +84,12 @@ describe('NoteList archived section', () => {
     useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
   })
 
-  it('says whether the archived section is open', () => {
+  it('says whether the archived section is open', async () => {
+    const user = userEvent.setup()
     render(<NoteList />)
     const toggle = screen.getByRole('button', { name: /Archived \(1\)/ })
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    fireEvent.click(toggle)
+    await user.click(toggle)
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
   })
 })
@@ -107,19 +114,21 @@ function noteListRenderingTests() {
     expect(screen.getByText(/Tip:/i)).toBeDefined()
   })
 
-  it('opens the composer when New note is chosen in the empty state', () => {
+  it('opens the composer when New note is chosen in the empty state', async () => {
+    const user = userEvent.setup()
     useNotesStore.setState({ showQuickCreate: false })
     render(<NoteList />)
-    fireEvent.click(screen.getByRole('button', { name: /^New note/ }))
+    await user.click(screen.getByRole('button', { name: /^New note/ }))
     expect(useNotesStore.getState().showQuickCreate).toBe(true)
   })
 }
 
 function noteListSelectingTests() {
-  it('calls setSelected when a note is clicked', () => {
+  it('selects the note that is clicked', async () => {
+    const user = userEvent.setup()
     useNotesStore.setState({ notes: [note1], selectedNoteId: null, archivedVisible: false })
     render(<NoteList />)
-    fireEvent.click(screen.getByText('First Note'))
+    await user.click(screen.getByText('First Note'))
     expect(useNotesStore.getState().selectedNoteId).toBe('n1')
   })
 
@@ -133,7 +142,7 @@ function noteListSelectingTests() {
 function noteListSearchBarTests() {
   beforeEach(() => {
     cleanup()
-    mockInvoke.mockClear()
+    mockInvoke.mockReset().mockResolvedValue({ data: [] })
     useNotesStore.setState({
       notes: [note1, note2],
       folders: [],
@@ -148,9 +157,9 @@ function noteListSearchBarTests() {
 
 function noteListSearchBarSearchInputTests() {
   it('typing in search bar updates filter.store searchQuery', async () => {
+    const user = userEvent.setup()
     render(<NoteList />)
-    const input = screen.getByPlaceholderText(/search/i)
-    fireEvent.change(input, { target: { value: 'hello' } })
+    await user.type(screen.getByPlaceholderText(/search/i), 'hello')
     expect(useFilterStore.getState().searchQuery).toBe('hello')
   })
 }
@@ -172,79 +181,75 @@ function noteListTagFilterDropdownTests() {
   describe('adding a tag', noteListTagFilterDropdownAddingTagTests)
   describe('removing a tag', noteListTagFilterDropdownRemovingTagTests)
   describe('closing', noteListTagFilterDropdownClosingTests)
+  describe('closing a context menu', noteListContextMenuClosingTests)
 }
 
 function noteListTagFilterDropdownListingTagsTests() {
-  it('opens dropdown and shows tag names on button click', () => {
+  it('opens dropdown and shows tag names on button click', async () => {
+    const user = userEvent.setup()
     render(<NoteList />)
-    fireEvent.click(screen.getByText('Tags'))
-    expect(screen.getAllByText('work').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText('infra').length).toBeGreaterThanOrEqual(1)
+    const dropdown = await openTagFilter(user)
+    expect(within(dropdown).getByRole('button', { name: /work/ }).textContent).toBe('#work1')
+    expect(within(dropdown).getByRole('button', { name: /infra/ }).textContent).toBe('#infra1')
   })
 }
 
 function noteListTagFilterDropdownAddingTagTests() {
-  it('clicking a tag in the dropdown adds it to activeTagIds', async () => {
+  it('clicking a tag in the dropdown shows only the notes with that tag', async () => {
+    const user = userEvent.setup()
     render(<NoteList />)
-    fireEvent.click(screen.getByText('Tags'))
-    const infraOptions = screen
-      .getAllByRole('button')
-      .filter((b) => b.textContent?.includes('infra'))
-    // The dropdown option is inside the dropdown (not the note row tag)
-    const dropdownOption = infraOptions.find((b) =>
-      b.className.includes('notepad-tag-filter__option')
-    )
-    expect(dropdownOption).toBeDefined()
-    await act(async () => {
-      fireEvent.click(dropdownOption!)
-    })
-    expect(useFilterStore.getState().activeTagIds.length).toBe(1)
+    const dropdown = await openTagFilter(user)
+    await user.click(within(dropdown).getByRole('button', { name: /infra/ }))
+    expect(screen.queryByText('First Note')).toBeNull()
+    expect(screen.getByText('Infra Note').textContent).toBe('Infra Note')
   })
 }
 
 function noteListTagFilterDropdownRemovingTagTests() {
-  it('clicking the same tag again removes it from activeTagIds', async () => {
+  it('clicking the same tag again shows every note again', async () => {
+    const user = userEvent.setup()
     render(<NoteList />)
-    fireEvent.click(screen.getByText('Tags'))
-    const infraOptions = screen
-      .getAllByRole('button')
-      .filter((b) => b.textContent?.includes('infra'))
-    const dropdownOption = infraOptions.find((b) =>
-      b.className.includes('notepad-tag-filter__option')
-    )
-    await act(async () => {
-      fireEvent.click(dropdownOption!)
-    })
-    await act(async () => {
-      fireEvent.click(dropdownOption!)
-    })
+    const dropdown = await openTagFilter(user)
+    await user.click(within(dropdown).getByRole('button', { name: /infra/ }))
+    await user.click(within(dropdown).getByRole('button', { name: /infra/ }))
     expect(useFilterStore.getState().activeTagIds).toEqual([])
+    expect(screen.getByText('First Note').textContent).toBe('First Note')
   })
 }
 
 function noteListTagFilterDropdownClosingTests() {
-  it('closes the dropdown on Escape', () => {
+  it('closes the dropdown on Escape', async () => {
+    const user = userEvent.setup()
     render(<NoteList />)
-    fireEvent.click(screen.getByText('Tags'))
-    expect(document.querySelector('.notepad-tag-filter__dropdown')).not.toBeNull()
-    fireEvent.keyDown(document, { key: 'Escape' })
-    expect(document.querySelector('.notepad-tag-filter__dropdown')).toBeNull()
+    await openTagFilter(user)
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('group', { name: 'Filter by tag' })).toBeNull()
   })
 
-  it('closes the dropdown on a click outside it, and keeps it open for one inside', async () => {
+  it('keeps the dropdown open for a click inside it', async () => {
+    const user = userEvent.setup()
     render(<NoteList />)
-    fireEvent.click(screen.getByText('Tags'))
-    fireEvent.click(document.querySelector('.notepad-tag-filter__dropdown')!)
-    expect(document.querySelector('.notepad-tag-filter__dropdown')).not.toBeNull()
-    fireEvent.click(document.body)
-    expect(document.querySelector('.notepad-tag-filter__dropdown')).toBeNull()
+    const dropdown = await openTagFilter(user)
+    await user.click(dropdown)
+    expect(screen.queryByRole('group', { name: 'Filter by tag' })).not.toBeNull()
   })
 
-  it('closes a note context menu on Escape', () => {
+  it('closes the dropdown on a click outside it', async () => {
+    const user = userEvent.setup()
     render(<NoteList />)
-    fireEvent.contextMenu(screen.getByText('First Note'))
+    await openTagFilter(user)
+    await user.click(document.body)
+    expect(screen.queryByRole('group', { name: 'Filter by tag' })).toBeNull()
+  })
+}
+
+function noteListContextMenuClosingTests() {
+  it('closes a note context menu on Escape', async () => {
+    const user = userEvent.setup()
+    render(<NoteList />)
+    await user.pointer({ keys: '[MouseRight]', target: screen.getByText('First Note') })
     expect(document.querySelector('.notepad-context-menu')).not.toBeNull()
-    fireEvent.keyDown(document, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(document.querySelector('.notepad-context-menu')).toBeNull()
   })
 }
@@ -269,19 +274,19 @@ function noteListEditDialogTests() {
 }
 
 function noteListEditDialogOpeningSavingTests() {
-  it('is a modal dialog named for what it edits, with the title field focused', () => {
-    const dialog = openEditDialog()
+  it('is a modal dialog named for what it edits, with the title field focused', async () => {
+    const dialog = await openEditDialog(userEvent.setup())
     expect(dialog.tagName).toBe('DIALOG')
     expect(document.activeElement).toBe(screen.getByPlaceholderText('Title'))
   })
 
   it('saves the new title when Enter is pressed in the title field', async () => {
-    openEditDialog()
+    const user = userEvent.setup()
+    await openEditDialog(user)
     const title = screen.getByPlaceholderText('Title')
-    fireEvent.change(title, { target: { value: 'Renamed' } })
-    await act(async () => {
-      fireEvent.submit(title.closest('form')!)
-    })
+    expect(document.activeElement).toBe(title)
+    await user.clear(title)
+    await user.type(title, 'Renamed{Enter}')
     expect(mockInvoke).toHaveBeenCalledWith(
       'terminator.notepad:notes.autosave',
       expect.objectContaining({ id: 'n1', title: 'Renamed', tags: ['work'], titleSetByHand: true })
@@ -292,11 +297,10 @@ function noteListEditDialogOpeningSavingTests() {
 
 function noteListEditDialogTitleDerivingTests() {
   it('leaves the title deriving from the body when only the tags change', async () => {
-    openEditDialog()
-    const title = screen.getByPlaceholderText('Title')
-    await act(async () => {
-      fireEvent.submit(title.closest('form')!)
-    })
+    const user = userEvent.setup()
+    await openEditDialog(user)
+    expect(document.activeElement).toBe(screen.getByPlaceholderText('Title'))
+    await user.keyboard('{Enter}')
     expect(mockInvoke).toHaveBeenCalledWith(
       'terminator.notepad:notes.autosave',
       expect.objectContaining({ id: 'n1', title: 'First Note', titleSetByHand: false })
@@ -305,9 +309,10 @@ function noteListEditDialogTitleDerivingTests() {
 }
 
 function noteListEditDialogKeyboardTests() {
-  it('closes on Escape without saving', () => {
-    openEditDialog()
-    fireEvent.keyDown(document, { key: 'Escape' })
+  it('closes on Escape without saving', async () => {
+    const user = userEvent.setup()
+    await openEditDialog(user)
+    await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(mockInvoke).not.toHaveBeenCalledWith(
       'terminator.notepad:notes.autosave',

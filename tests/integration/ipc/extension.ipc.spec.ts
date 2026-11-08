@@ -229,14 +229,15 @@ describe('extension IPC handlers — a workspace value', () => {
 describe('extension IPC handlers — a workspace value for another key', () => {
   useExtensionHandlers()
 
-  it('refuses a key no extension declared workspaceScoped', async () => {
-    registerSignOff()
-    const update = captureHandle('extension:update-workspace-setting')
+  it.each(['com.test.token', 'com.other.unknown'])(
+    'refuses %s, a key no extension declared workspaceScoped',
+    async (key) => {
+      registerSignOff()
+      const update = captureHandle('extension:update-workspace-setting')
 
-    for (const key of ['com.test.token', 'com.other.unknown']) {
       expect(await update({}, { workspaceId: WORKSPACE_ID, key, value: 'x' })).toEqual({
         error: 'NOT_WORKSPACE_SCOPED',
       })
     }
-  })
+  )
 })

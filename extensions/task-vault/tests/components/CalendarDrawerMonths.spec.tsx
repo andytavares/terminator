@@ -1,22 +1,20 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { render, screen, cleanup } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { installVaultBridge, eventually } from './helpers/bridge'
 
-const store = {
-  loadDate: vi.fn(),
-  loadToday: vi.fn(),
-  calendarRefreshKey: 0,
-}
-vi.mock('../../src/stores/vault.store', () => ({ useVaultStore: () => store }))
-
 import { CalendarDrawer, statusDotClass } from '../../src/components/CalendarDrawer'
+import { useVaultDataStore } from '../../src/stores/vault-data.store'
+import { useVaultNavStore } from '../../src/stores/vault-nav.store'
 
 let bridge: ReturnType<typeof installVaultBridge>
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 0, 15, 12))
+  useVaultDataStore.setState({ todayLog: null })
+  useVaultNavStore.setState({ viewingDate: null })
   bridge = installVaultBridge()
   bridge.responses['task-vault:vault:get-calendar-month'] = (payload: unknown) => {
     const { month } = payload as { month: number }
@@ -47,17 +45,17 @@ afterEach(() => {
 const monthLabel = () => document.querySelector('.cal-drawer__month-label')?.textContent
 
 describe('CalendarDrawer months', monthTests)
+describe('CalendarDrawer day marks', dayMarkTests)
 describe('CalendarDrawer days', dayTests)
+describe('CalendarDrawer empty days', emptyDayTests)
 
 function monthTests() {
-  it('wraps the year going back from January and forward from December', async () => {
+  it('wraps the year going back from January', async () => {
+    const user = userEvent.setup()
     render(<CalendarDrawer />)
     expect(monthLabel()).toBe('January 2026')
-    fireEvent.click(screen.getByRole('button', { name: 'Previous month' }))
+    await user.click(screen.getByRole('button', { name: 'Previous month' }))
     expect(monthLabel()).toBe('December 2025')
-    fireEvent.click(screen.getByRole('button', { name: 'Next month' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Next month' }))
-    expect(monthLabel()).toBe('February 2026')
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:get-calendar-month')).toContainEqual({
         year: 2025,
@@ -66,6 +64,17 @@ function monthTests() {
     )
   })
 
+  it('wraps the year going forward from December', async () => {
+    const user = userEvent.setup()
+    render(<CalendarDrawer />)
+    await user.click(screen.getByRole('button', { name: 'Previous month' }))
+    await user.click(screen.getByRole('button', { name: 'Next month' }))
+    await user.click(screen.getByRole('button', { name: 'Next month' }))
+    expect(monthLabel()).toBe('February 2026')
+  })
+}
+
+function dayMarkTests() {
   it('marks overdue days and colours dots by status', async () => {
     render(<CalendarDrawer />)
     const late = await screen.findByRole('button', { name: '2026-01-10 · 1 of 2 still open' })
@@ -79,24 +88,42 @@ function monthTests() {
 
 function dayTests() {
   it('loads another day into the vault and lists its tasks with due dates', async () => {
+    const user = userEvent.setup()
     render(<CalendarDrawer />)
-    fireEvent.click(await screen.findByRole('button', { name: '2026-01-10 · 1 of 2 still open' }))
-    expect(store.loadDate).toHaveBeenCalledWith('2026-01-10')
+    await user.click(await screen.findByRole('button', { name: '2026-01-10 · 1 of 2 still open' }))
+    await eventually(() => expect(useVaultNavStore.getState().viewingDate).toBe('2026-01-10'))
+    expect(useVaultDataStore.getState().todayLog?.tasks.map((t) => t.text)).toEqual(['Late'])
     expect(await screen.findByText('Late')).toBeTruthy()
     expect(screen.getByText('2026-01-09')).toBeTruthy()
     expect(screen.getByText('2026-01-10', { selector: '.cal-drawer__day-title' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Open in Task Vault' }))
+  })
+
+  it('opens the chosen day in Task Vault', async () => {
+    const user = userEvent.setup()
+    render(<CalendarDrawer />)
+    await user.click(await screen.findByRole('button', { name: '2026-01-10 · 1 of 2 still open' }))
+    await user.click(await screen.findByRole('button', { name: 'Open in Task Vault' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:open-panel')).toEqual([
         { date: '2026-01-10', taskId: undefined },
       ])
     )
   })
+}
 
-  it('says a day has no tasks, including when loading it fails', async () => {
+function emptyDayTests() {
+  it('says a day has no tasks', async () => {
     render(<CalendarDrawer />)
     expect(await screen.findByText('No tasks')).toBeTruthy()
-    fireEvent.click(await screen.findByRole('button', { name: '2026-01-11 · nothing' }))
-    expect(await screen.findByText('No tasks')).toBeTruthy()
+  })
+
+  it('says a day has no tasks when loading it fails', async () => {
+    const user = userEvent.setup()
+    render(<CalendarDrawer />)
+    await user.click(await screen.findByRole('button', { name: '2026-01-11 · nothing' }))
+    expect(
+      await screen.findByText('2026-01-11', { selector: '.cal-drawer__day-title' })
+    ).toBeTruthy()
+    expect(screen.getByText('No tasks')).toBeTruthy()
   })
 }

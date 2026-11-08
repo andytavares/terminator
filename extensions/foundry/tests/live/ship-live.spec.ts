@@ -306,10 +306,8 @@ describe.skipIf(LIVE === '')('shipping, for real', () => {
   afterAll(removeTheLiveRecords)
   beforeAll(commitTheChangeInAWorktree)
 
-  it('pushes the branch and opens a draft pull request GitHub can show back', async () => {
+  it('opens a draft pull request GitHub shows back, and marks it ready when the operator says so', async () => {
     await expectDraftOpenedAndShownBack()
-  })
-  it('turns the draft into a review request when the operator says so', async () => {
     await expectDraftMarkedReady()
   })
   it("records the draft in the order's own ledger, and nowhere else", async () => {

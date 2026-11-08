@@ -1,15 +1,11 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { AgentPanel } from '../../src/components/pr-review/AgentPanel'
 import { useReviewUiStore } from '../../src/stores/review-ui.store'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
 import type { AgentRun, AgentScope } from '../../src/schemas/review-agent.schema'
-import { partialFake } from '../../../../tests/support/fakes'
-
-type ReviewUiState = ReturnType<typeof useReviewUiStore.getState>
-
-vi.mock('../../src/stores/review-ui.store', () => ({ useReviewUiStore: vi.fn() }))
 
 const mockStart = vi.fn()
 const mockCancel = vi.fn()
@@ -26,10 +22,6 @@ vi.mock('../../src/api/review-agent', () => ({
     settings: (...args: unknown[]) => mockSettings(...args),
   },
 }))
-
-const mockOpenAgentPanel = vi.fn()
-const mockUpsertAgentRun = vi.fn()
-const mockRequestComposer = vi.fn()
 
 function makePr(overrides: Partial<PrReviewDetail> = {}): PrReviewDetail {
   return {
@@ -93,20 +85,11 @@ function makeRun(overrides: Partial<AgentRun> = {}): AgentRun {
   }
 }
 
-function setStoreState(overrides: Record<string, unknown>) {
-  const state = {
-    agentPanelScope: null as AgentScope | null,
-    agentPanelRequest: 'review' as const,
-    agentPanelAutoStart: false,
-    agentRuns: [] as AgentRun[],
-    openAgentPanel: mockOpenAgentPanel,
-    upsertAgentRun: mockUpsertAgentRun,
-    requestComposer: mockRequestComposer,
-    ...overrides,
-  }
-  vi.mocked(useReviewUiStore).mockImplementation((selector: (s: ReviewUiState) => unknown) =>
-    selector(partialFake<ReviewUiState>(state))
-  )
+type ReviewUiState = ReturnType<typeof useReviewUiStore.getState>
+
+function setStoreState(overrides: Partial<ReviewUiState>) {
+  useReviewUiStore.setState(useReviewUiStore.getInitialState(), true)
+  useReviewUiStore.setState(overrides)
 }
 
 const finding1 = {
@@ -173,13 +156,14 @@ describe('AgentPanel', () => {
 })
 
 describe('AgentPanel — shows the running state and cancels the run', () => {
-  it('shows the running state and cancels the run', () => {
+  it('shows the running state and cancels the run', async () => {
+    const user = userEvent.setup()
     const run = makeRun({ status: 'running', activity: [] })
     setStoreState({ agentPanelScope: linesScope, agentRuns: [run] })
     render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />)
 
     expect(screen.getByText(/Reviewing lines 309–317/)).toBeTruthy()
-    fireEvent.click(screen.getByText('Cancel'))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(mockCancel).toHaveBeenCalledWith('run-1')
   })
 
@@ -212,15 +196,15 @@ describe('AgentPanel — renders a finding body as markdown, so code reads as co
 })
 
 describe('AgentPanel — posts a finding as a comment with fromFindingId and the finding line', () => {
-  it('posts a finding as a comment with fromFindingId and the finding line', () => {
+  it('posts a finding as a comment with fromFindingId and the finding line', async () => {
+    const user = userEvent.setup()
     const run = makeRun({ status: 'done', findings: [finding1, finding2] })
     setStoreState({ agentPanelScope: linesScope, agentRuns: [run] })
     render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />)
 
-    const postButtons = screen.getAllByText('Post as comment')
-    fireEvent.click(postButtons[0])
+    await user.click(screen.getAllByRole('button', { name: 'Post as comment' })[0])
 
-    expect(mockRequestComposer).toHaveBeenCalledWith(
+    expect(useReviewUiStore.getState().composerRequest).toEqual(
       expect.objectContaining({
         fromFindingId: 'f1',
         line: 317,
@@ -231,14 +215,14 @@ describe('AgentPanel — posts a finding as a comment with fromFindingId and the
 })
 
 describe('AgentPanel — dismisses a finding and hides its card', () => {
-  it('dismisses a finding and hides its card', () => {
+  it('dismisses a finding and hides its card', async () => {
+    const user = userEvent.setup()
     const run = makeRun({ status: 'done', findings: [finding1, finding2] })
     setStoreState({ agentPanelScope: linesScope, agentRuns: [run] })
     render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />)
 
     expect(screen.getByText('Risk scored twice per file')).toBeTruthy()
-    const dismissButtons = screen.getAllByText('Dismiss')
-    fireEvent.click(dismissButtons[0])
+    await user.click(screen.getAllByRole('button', { name: 'Dismiss' })[0])
 
     expect(screen.queryByText('Risk scored twice per file')).toBeNull()
     expect(mockDismiss).toHaveBeenCalledWith(
@@ -246,11 +230,15 @@ describe('AgentPanel — dismisses a finding and hides its card', () => {
     )
   })
 
-  it('closes the panel', () => {
+  it('closes the panel', async () => {
+    const user = userEvent.setup()
     setStoreState({ agentPanelScope: linesScope })
-    render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />)
-    fireEvent.click(screen.getByLabelText('Close agent panel'))
-    expect(mockOpenAgentPanel).toHaveBeenCalledWith(null)
+    const { container } = render(
+      <AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />
+    )
+    await user.click(screen.getByRole('button', { name: 'Close agent panel' }))
+    expect(useReviewUiStore.getState().agentPanelScope).toBeNull()
+    expect(container.firstChild).toBeNull()
   })
 })
 
@@ -266,28 +254,35 @@ const prScope: AgentScope = {
 const CURRENT_FILE = 'extensions/git-integration/src/hooks/usePrReview.ts'
 
 describe('AgentPanel — choosing between the current file and the whole PR', () => {
-  it('points the panel at the current file, keeping the request', () => {
+  it('points the panel at the current file, keeping the request', async () => {
+    const user = userEvent.setup()
     setStoreState({ agentPanelScope: prScope, agentPanelRequest: 'explain' })
     render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={CURRENT_FILE} />)
 
-    fireEvent.click(screen.getByRole('radio', { name: 'This file' }))
+    await user.click(screen.getByRole('radio', { name: 'This file' }))
 
-    expect(mockOpenAgentPanel).toHaveBeenCalledWith(
-      { ...prScope, kind: 'file', path: CURRENT_FILE },
-      'explain'
-    )
+    expect(useReviewUiStore.getState()).toMatchObject({
+      agentPanelScope: { ...prScope, kind: 'file', path: CURRENT_FILE },
+      agentPanelRequest: 'explain',
+    })
   })
 
-  it('points a file-scoped panel back at the whole PR', () => {
+  it('points a file-scoped panel back at the whole PR', async () => {
+    const user = userEvent.setup()
     const fileScope = { ...prScope, kind: 'file' as const, path: CURRENT_FILE }
     setStoreState({ agentPanelScope: fileScope })
     render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={CURRENT_FILE} />)
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Whole PR' }))
+    await user.click(screen.getByRole('radio', { name: 'Whole PR' }))
 
-    expect(mockOpenAgentPanel).toHaveBeenCalledWith(prScope, 'review')
+    expect(useReviewUiStore.getState()).toMatchObject({
+      agentPanelScope: prScope,
+      agentPanelRequest: 'review',
+    })
   })
+})
 
+describe('AgentPanel — no scope choice', () => {
   it('offers no choice for a selection of lines', () => {
     setStoreState({ agentPanelScope: linesScope })
     render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={CURRENT_FILE} />)

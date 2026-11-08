@@ -69,7 +69,9 @@ async function questionAppearsInYourMove(page: Page): Promise<void> {
 }
 
 async function pressingOneAnswersIt(page: Page): Promise<void> {
-  await page.getByRole('region', { name: 'Home' }).focus()
+  const home = page.getByRole('region', { name: 'Home' })
+  await home.focus()
+  await expect(home).toBeFocused()
   await page.keyboard.press('1')
   await expect(needsYou(page)).toHaveCount(0)
   await expect(page.getByText('Nothing needs you.')).toBeVisible()
@@ -131,7 +133,9 @@ async function startWorkBeginsScratchTerminal(page: Page): Promise<void> {
   await page.keyboard.press('ControlOrMeta+n')
   const launcher = page.getByRole('dialog', { name: 'Start work' })
   await expect(launcher).toBeVisible()
-  await launcher.getByRole('tab', { name: 'Scratch terminal' }).click()
+  const scratchTab = launcher.getByRole('tab', { name: 'Scratch terminal' })
+  await scratchTab.click()
+  await expect(scratchTab).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(launcher).toBeHidden()
   await expect(page.getByRole('heading', { name: 'Home' })).toBeHidden()

@@ -2,7 +2,8 @@ import React from 'react'
 import fs from 'node:fs'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, it, expect } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ReadinessStrip } from '../../src/components/pr-review/ReadinessStrip'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
 import { buildPr } from './overview-fixtures'
@@ -37,15 +38,18 @@ describe('ReadinessStrip checks', () => {
     { name: 'build', state: 'pass' as const },
   ]
 
-  it('names the failing checks and opens them failing-first', () => {
+  it('names the failing checks and opens them failing-first', async () => {
+    const user = userEvent.setup()
     renderStrip({ statusChecks: checks })
     const cell = screen.getByRole('button', { name: /2 of 3 checks failing/ })
     expect(cell.getAttribute('aria-expanded')).toBe('false')
-    fireEvent.click(cell)
+    await user.click(cell)
     const headings = screen.getAllByRole('heading', { level: 4 }).map((h) => h.textContent)
     expect(headings).toEqual(['Failing · 2', 'Passing · 1'])
   })
+})
 
+describe('ReadinessStrip checks without a failure', () => {
   it('says so when there are no checks', () => {
     renderStrip({ statusChecks: [] })
     expect(screen.getByText('No checks')).toBeTruthy()
@@ -93,11 +97,12 @@ describe('ReadinessStrip merge', () => {
     expect(screen.getByText('No conflicts with main')).toBeTruthy()
   })
 
-  it('offers resolving when conflicting', () => {
+  it('offers resolving when conflicting', async () => {
+    const user = userEvent.setup()
     const calls: string[] = []
     renderStrip({ mergeStateStatus: 'dirty' }, { ...idleBranch, onResolve: () => calls.push('r') })
     expect(screen.getByText('Conflicts with main')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Resolve conflicts' }))
+    await user.click(screen.getByRole('button', { name: 'Resolve conflicts' }))
     expect(calls).toEqual(['r'])
   })
 
@@ -109,18 +114,19 @@ describe('ReadinessStrip merge', () => {
 })
 
 describe('ReadinessStrip branch actions', () => {
-  it('offers updating when behind, busy while updating', () => {
+  it('offers updating when behind', async () => {
+    const user = userEvent.setup()
     const calls: string[] = []
-    const view = renderStrip(
-      { mergeStateStatus: 'behind' },
-      { ...idleBranch, onUpdate: () => calls.push('u') }
-    )
+    renderStrip({ mergeStateStatus: 'behind' }, { ...idleBranch, onUpdate: () => calls.push('u') })
     expect(screen.getByText('Behind main')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Update from main' }))
+    await user.click(screen.getByRole('button', { name: 'Update from main' }))
     expect(calls).toEqual(['u'])
-    view.unmount()
+  })
+
+  it('shows the busy label while updating', () => {
     renderStrip({ mergeStateStatus: 'behind' }, { ...idleBranch, updating: true })
-    expect(screen.getByRole('button', { name: 'Updating…' })).toBeTruthy()
+    const busy = screen.getByRole('button', { name: 'Updating…' }) as HTMLButtonElement
+    expect(busy.disabled).toBe(true)
   })
 
   it('says when the merge state is not reported', () => {

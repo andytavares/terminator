@@ -4,7 +4,6 @@ import { partialFake } from '../../../../tests/support/fakes'
 import { createVaultDb, seedTask, selectTaskRow } from '../support/vault-db'
 import { startHomePublisher } from '../../src/home/publisher'
 
-vi.mock('../../src/navigation.js', () => ({ openInVault: vi.fn() }))
 vi.mock('../../src/notifications/task-scheduler.js', () => ({ broadcast: vi.fn() }))
 
 const NOW = new Date(2026, 9, 18, 10, 0, 0) // Sunday 18 October 2026, local time
@@ -12,7 +11,9 @@ const NOW = new Date(2026, 9, 18, 10, 0, 0) // Sunday 18 October 2026, local tim
 function fakeVaultApi() {
   const published: HomeFeed[] = []
   let actionHandler: (itemId: string, actionId: string) => Promise<void> = async () => {}
+  const broadcast = vi.fn()
   const api = partialFake<ExtensionAPI>({
+    window: partialFake<ExtensionAPI['window']>({ focusSelf: vi.fn(), broadcast }),
     home: {
       publish: (feed) => void published.push(feed),
       onAction: (handler) => {
@@ -24,6 +25,7 @@ function fakeVaultApi() {
   return {
     api,
     published,
+    broadcast,
     pressHomeAction: (item: string, action: string) => actionHandler(item, action),
   }
 }
@@ -78,12 +80,11 @@ describe('the Home publisher actions', () => {
   })
 
   it('opens the vault on the task for "open"', async () => {
-    const { openInVault } = await import('../../src/navigation.js')
-    const { api, pressHomeAction } = fakeVaultApi()
+    const { api, broadcast, pressHomeAction } = fakeVaultApi()
     startHomePublisher(api, db)
 
     await pressHomeAction('task:a', 'open')
-    expect(openInVault).toHaveBeenCalledWith(api, { taskId: 'a' })
+    expect(broadcast).toHaveBeenCalledWith('task-vault:navigate', { taskId: 'a' })
   })
 })
 

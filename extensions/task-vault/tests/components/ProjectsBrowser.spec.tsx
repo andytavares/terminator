@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, act, within } from '@testing-library/react'
+import { render, screen, cleanup, act, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { installVaultBridge, eventually, indexedProject, task } from './helpers/bridge'
 import { invalidateSmartInputCache } from '../../src/components/SmartTaskInput'
 import { useVaultNavStore } from '../../src/stores/vault-nav.store'
@@ -57,9 +58,14 @@ const projectCardNamed = (name: string) =>
     .closest('.projects-browser__card') as HTMLElement
 
 async function renderBrowser() {
+  const user = userEvent.setup()
   render(<ProjectsBrowser />)
   await screen.findByText('Launch', { selector: '.projects-browser__name' })
+  return user
 }
+
+const cardButton = (card: string, name: string) =>
+  within(projectCardNamed(card)).getByRole('button', { name })
 
 describe('ProjectsBrowser usage', () => {
   it('counts one view of the projects as it opens', async () => {
@@ -68,27 +74,49 @@ describe('ProjectsBrowser usage', () => {
   })
 })
 
-describe('ProjectsBrowser list', projectListTests)
-describe('ProjectsBrowser creating', projectCreateTests)
-describe('ProjectsBrowser renaming and deadlines', renameTests)
-describe('ProjectsBrowser areas and links', areaTests)
-describe('ProjectsBrowser tasks', taskTests)
+describe('ProjectsBrowser list', () => {
+  describe('cards', listCardTests)
+  describe('status changes', listStatusTests)
+  describe('filters', listFilterTests)
+  describe('empty states', listEmptyTests)
+})
+describe('ProjectsBrowser creating', () => {
+  describe('the form', createFormTests)
+  describe('the area list', createAreaListTests)
+  describe('cancelling', createCancelTests)
+})
+describe('ProjectsBrowser renaming', () => {
+  describe('errors', renameErrorTests)
+  describe('saving and cancelling', renameSaveTests)
+})
+describe('ProjectsBrowser deadlines', () => {
+  describe('clearing and setting', deadlineSetTests)
+  describe('cancelling', deadlineCancelTests)
+})
+describe('ProjectsBrowser areas', () => {
+  describe('going and changing', areaChangeTests)
+  describe('assigning and cancelling', areaAssignTests)
+})
+describe('ProjectsBrowser terminal links', linkTests)
+describe('ProjectsBrowser tasks', () => {
+  describe('listing', taskListTests)
+  describe('completing', taskCompleteTests)
+  describe('adding and editing', taskAddTests)
+  describe('hiding', taskHideTests)
+})
 
-function projectListTests() {
-  describe('marks stale someday', listMarksStaleSomedayTests)
-  describe('archives a project', listArchivesAProjectTests)
-}
-
-function listMarksStaleSomedayTests() {
+function listCardTests() {
   it('marks stale, someday and selected projects and counts next actions', async () => {
     await renderBrowser()
     expect(projectCardNamed('Launch').className).toContain('--selected')
     expect(projectCardNamed('Launch').textContent).toContain('2 next actions')
     expect(within(projectCardNamed('Garden')).getByText('no next action')).toBeTruthy()
     expect(within(projectCardNamed('Boat')).getByText('someday')).toBeTruthy()
-    fireEvent.click(
-      within(projectCardNamed('Boat')).getByRole('button', { name: 'Promote to active' })
-    )
+  })
+
+  it('promotes a someday project to active', async () => {
+    const user = await renderBrowser()
+    await user.click(cardButton('Boat', 'Promote to active'))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:update-project-status')).toEqual([
         { projectFilePath: 'Boat', status: 'active' },
@@ -97,54 +125,67 @@ function listMarksStaleSomedayTests() {
   })
 }
 
-function listArchivesAProjectTests() {
-  it('archives a project, and deletes an archived one after confirming', async () => {
-    await renderBrowser()
-    fireEvent.click(
-      within(projectCardNamed('Garden')).getByRole('button', { name: 'Archive project' })
-    )
+function listStatusTests() {
+  it('archives a project', async () => {
+    const user = await renderBrowser()
+    await user.click(cardButton('Garden', 'Archive project'))
     await eventually(() =>
-      expect(bridge.calls('task-vault:vault:update-project-status')).toHaveLength(1)
+      expect(bridge.calls('task-vault:vault:update-project-status')).toEqual([
+        { projectFilePath: 'Garden', status: 'archived' },
+      ])
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Archived' }))
+  })
+
+  it('deletes an archived project after confirming', async () => {
+    const user = await renderBrowser()
+    await user.click(screen.getByRole('button', { name: 'Archived' }))
     await screen.findByText('archived')
-    fireEvent.click(within(projectCardNamed('Old')).getByRole('button', { name: 'Delete project' }))
+    await user.click(cardButton('Old', 'Delete project'))
     await eventually(() =>
       expect(bridge.calls('task-vault:projects:delete')).toEqual([{ projectFilePath: 'Old' }])
     )
   })
+}
 
-  it('shows every status under All, empty states, and reloads on index changes', async () => {
-    await renderBrowser()
-    fireEvent.click(screen.getByRole('button', { name: 'All' }))
+function listFilterTests() {
+  it('shows every status under All', async () => {
+    const user = await renderBrowser()
+    await user.click(screen.getByRole('button', { name: 'All' }))
+    expect(await screen.findByText('Old', { selector: '.projects-browser__name' })).toBeTruthy()
+  })
+}
+
+function listEmptyTests() {
+  it('reloads under All on an index change and says when no projects are found', async () => {
+    const user = await renderBrowser()
+    await user.click(screen.getByRole('button', { name: 'All' }))
     await screen.findByText('Old', { selector: '.projects-browser__name' })
     bridge.responses['task-vault:projects:list'] = { projects: [] }
     await act(async () => bridge.push('task-vault:push:index-updated', {}))
     expect(await screen.findByText('No projects found.')).toBeTruthy()
-    fireEvent.click(await screen.findByRole('button', { name: 'Active' }))
+  })
+
+  it('says when the Active filter, the default, has no projects', async () => {
+    bridge.responses['task-vault:projects:list'] = { projects: [] }
+    render(<ProjectsBrowser />)
     expect(await screen.findByText('No active projects.')).toBeTruthy()
   })
 }
 
-function projectCreateTests() {
-  describe('creates a project', createCreatesAProjectTests)
-  describe('picks an existing', createPicksAnExistingTests)
+async function openCreateForm() {
+  const user = await renderBrowser()
+  await user.click(screen.getByRole('button', { name: '+ New project' }))
+  return user
 }
 
-function createCreatesAProjectTests() {
-  it('creates a project in a new area through the combobox', async () => {
-    await renderBrowser()
-    fireEvent.click(screen.getByRole('button', { name: '+ New project' }))
-    fireEvent.change(screen.getByPlaceholderText('Project name'), { target: { value: ' Move ' } })
-    fireEvent.change(screen.getByPlaceholderText('What does done look like?'), {
-      target: { value: 'Boxes gone' },
-    })
-    const area = screen.getByPlaceholderText('e.g. work')
-    fireEvent.change(area, { target: { value: 'Home' } })
-    fireEvent.keyDown(area, { key: 'ArrowDown' })
-    fireEvent.keyDown(area, { key: 'ArrowUp' })
-    fireEvent.keyDown(area, { key: 'Enter' })
-    fireEvent.click(screen.getByRole('button', { name: 'Create project' }))
+function createFormTests() {
+  it('creates a project in a new area through the combobox keys', async () => {
+    const user = await openCreateForm()
+    await user.type(screen.getByPlaceholderText('Project name'), ' Move ')
+    await user.type(screen.getByPlaceholderText('What does done look like?'), 'Boxes gone')
+    await user.type(screen.getByPlaceholderText('e.g. work'), 'Home')
+    await user.keyboard('{ArrowDown}{ArrowUp}{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Create project' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:projects:create')).toEqual([
         { name: 'Move', area: 'Home', deadline: undefined, outcome: 'Boxes gone' },
@@ -153,171 +194,184 @@ function createCreatesAProjectTests() {
     expect(bridge.calls('task-vault:vault:create-area')).toEqual([{ name: 'Home' }])
     await eventually(() => expect(screen.queryByPlaceholderText('Project name')).toBeNull())
   })
-}
 
-function createPicksAnExistingTests() {
-  describe('picks an existing', createPicksAnExistingPicksAnExistingTests)
-  describe('closes the area', createPicksAnExistingClosesTheAreaTests)
-}
-
-function createPicksAnExistingPicksAnExistingTests() {
-  it('picks an existing area with the mouse, and reports a taken name', async () => {
+  it('reports a project name that is taken', async () => {
     bridge.responses['task-vault:projects:create'] = { error: 'PROJECT_EXISTS' }
-    await renderBrowser()
-    fireEvent.click(screen.getByRole('button', { name: '+ New project' }))
-    const area = screen.getByPlaceholderText('e.g. work')
-    fireEvent.focus(area)
-    fireEvent.mouseEnter(await screen.findByText('Work', { selector: 'li' }))
-    fireEvent.mouseDown(await screen.findByText('Work', { selector: 'li' }))
-    expect((area as HTMLInputElement).value).toBe('Work')
-    fireEvent.change(screen.getByPlaceholderText('Project name'), { target: { value: 'Launch' } })
-    fireEvent.keyDown(screen.getByPlaceholderText('Project name'), { key: 'Enter' })
+    const user = await openCreateForm()
+    await user.type(screen.getByPlaceholderText('Project name'), 'Launch{Enter}')
     expect(await screen.findByText('A project with that name already exists.')).toBeTruthy()
-    expect(bridge.calls('task-vault:vault:create-area')).toEqual([])
   })
 }
 
-function createPicksAnExistingClosesTheAreaTests() {
-  it('closes the area list with Escape, and the form with Cancel', async () => {
-    await renderBrowser()
-    fireEvent.click(screen.getByRole('button', { name: '+ New project' }))
-    const area = screen.getByPlaceholderText('e.g. work')
-    fireEvent.change(area, { target: { value: 'W' } })
-    fireEvent.keyDown(area, { key: 'Escape' })
+function createAreaListTests() {
+  it('picks an existing area with the mouse and creates no new area', async () => {
+    const user = await openCreateForm()
+    const area = screen.getByPlaceholderText('e.g. work') as HTMLInputElement
+    await user.click(area)
+    await user.hover(await screen.findByText('Work', { selector: 'li' }))
+    await user.click(screen.getByText('Work', { selector: 'li' }))
+    expect(area.value).toBe('Work')
+    await user.type(screen.getByPlaceholderText('Project name'), 'Move{Enter}')
+    await eventually(() =>
+      expect(bridge.calls('task-vault:projects:create')).toEqual([
+        expect.objectContaining({ name: 'Move', area: 'Work' }),
+      ])
+    )
+    expect(bridge.calls('task-vault:vault:create-area')).toEqual([])
+  })
+
+  it('closes the area list with Escape and opens it again with Enter', async () => {
+    const user = await openCreateForm()
+    await user.type(screen.getByPlaceholderText('e.g. work'), 'W{Escape}')
     expect(document.querySelector('.area-combobox__dropdown')).toBeNull()
-    fireEvent.keyDown(area, { key: 'Enter' })
+    await user.keyboard('{Enter}')
     expect(document.querySelector('.area-combobox__dropdown')).not.toBeNull()
-    fireEvent.keyDown(area, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(document.querySelector('.area-combobox__dropdown')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+  })
+}
+
+function createCancelTests() {
+  it('closes the form with Cancel', async () => {
+    const user = await openCreateForm()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByPlaceholderText('Project name')).toBeNull()
   })
 }
 
-function renameTests() {
-  describe('renames a project', renameRenamesAProjectTests)
-  describe('saves a new', renameSavesANewTests)
+async function startRename(name: string, newName: string) {
+  const user = await renderBrowser()
+  await user.click(cardButton(name, 'Rename project'))
+  const input = screen.getByDisplayValue(name)
+  await user.clear(input)
+  await user.type(input, newName)
+  return user
 }
 
-function renameRenamesAProjectTests() {
-  it('renames a project, reporting a taken name, and cancels', async () => {
-    await renderBrowser()
-    fireEvent.click(
-      within(projectCardNamed('Launch')).getByRole('button', { name: 'Rename project' })
-    )
-    const input = screen.getByDisplayValue('Launch')
+function renameErrorTests() {
+  it('reports a project name that is taken', async () => {
     bridge.responses['task-vault:projects:rename'] = { error: 'PROJECT_EXISTS' }
-    fireEvent.change(input, { target: { value: 'Garden' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
+    const user = await startRename('Launch', 'Garden')
+    await user.keyboard('{Enter}')
     expect(await screen.findByText('A project with that name already exists.')).toBeTruthy()
+  })
+
+  it('shows a thrown rename failure', async () => {
     bridge.responses['task-vault:projects:rename'] = () => {
       throw new Error('boom')
     }
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    const user = await startRename('Launch', 'Garden')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByText('Error: boom')).toBeTruthy()
-    fireEvent.keyDown(input, { key: 'Escape' })
-    expect(screen.queryByDisplayValue('Garden')).toBeNull()
   })
 }
 
-function renameSavesANewTests() {
-  describe('saves a new', renameSavesANewSavesANewTests)
-  describe('edits clears and', renameSavesANewEditsClearsAndTests)
-}
-
-function renameSavesANewSavesANewTests() {
+function renameSaveTests() {
   it('saves a new name and closes the editor', async () => {
-    await renderBrowser()
-    fireEvent.click(
-      within(projectCardNamed('Garden')).getByRole('button', { name: 'Rename project' })
-    )
-    fireEvent.change(screen.getByDisplayValue('Garden'), { target: { value: 'Yard' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    const user = await startRename('Garden', 'Yard')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:projects:rename')).toEqual([
         { projectFilePath: 'Garden', newName: 'Yard' },
       ])
     )
-    fireEvent.click(
-      within(projectCardNamed('Launch')).getByRole('button', { name: 'Rename project' })
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel rename' }))
+    await eventually(() => expect(screen.queryByDisplayValue('Yard')).toBeNull())
+  })
+
+  it('cancels a rename with Escape or the cancel button without saving', async () => {
+    const user = await startRename('Launch', 'Garden')
+    await user.keyboard('{Escape}')
+    expect(screen.queryByDisplayValue('Garden')).toBeNull()
+    await user.click(cardButton('Launch', 'Rename project'))
+    await user.click(screen.getByRole('button', { name: 'Cancel rename' }))
     expect(screen.queryByRole('button', { name: 'Cancel rename' })).toBeNull()
+    expect(bridge.calls('task-vault:projects:rename')).toEqual([])
   })
 }
 
-function renameSavesANewEditsClearsAndTests() {
-  it('edits, clears and sets deadlines', async () => {
-    await renderBrowser()
-    fireEvent.click(screen.getByText('due: 2026-03-01'))
-    fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
+function deadlineSetTests() {
+  it('clears a deadline', async () => {
+    const user = await renderBrowser()
+    await user.click(screen.getByText('due: 2026-03-01'))
+    await user.click(screen.getByRole('button', { name: 'Clear' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:projects:update-deadline')).toEqual([
         { projectFilePath: 'Launch', deadline: null },
       ])
     )
-    fireEvent.click(within(projectCardNamed('Garden')).getByTitle('Set deadline'))
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+  })
+
+  it('saves a deadline for a project without one', async () => {
+    const user = await renderBrowser()
+    await user.click(within(projectCardNamed('Garden')).getByTitle('Set deadline'))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
     await eventually(() =>
-      expect(bridge.calls('task-vault:projects:update-deadline')).toHaveLength(2)
+      expect(bridge.calls('task-vault:projects:update-deadline')).toEqual([
+        expect.objectContaining({ projectFilePath: 'Garden' }),
+      ])
     )
-    await eventually(() => within(projectCardNamed('Garden')).getByTitle('Set deadline'))
-    fireEvent.click(within(projectCardNamed('Garden')).getByTitle('Set deadline'))
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel deadline edit' }))
-    expect(screen.queryByRole('button', { name: 'Cancel deadline edit' })).toBeNull()
   })
 }
 
-function areaTests() {
-  describe('goes to a', areaGoesToATests)
-  describe('links a project', areaLinksAProjectTests)
+function deadlineCancelTests() {
+  it('cancels a deadline edit without saving', async () => {
+    const user = await renderBrowser()
+    await user.click(within(projectCardNamed('Garden')).getByTitle('Set deadline'))
+    await user.click(screen.getByRole('button', { name: 'Cancel deadline edit' }))
+    expect(screen.queryByRole('button', { name: 'Cancel deadline edit' })).toBeNull()
+    expect(bridge.calls('task-vault:projects:update-deadline')).toEqual([])
+  })
 }
 
-function areaGoesToATests() {
-  describe('goes to a', areaGoesToAGoesToATests)
-  describe('cancels an area', areaGoesToACancelsAnAreaTests)
-}
-
-function areaGoesToAGoesToATests() {
-  it('goes to a project area, changes it, and assigns one', async () => {
-    await renderBrowser()
-    fireEvent.click(screen.getByTitle('Go to Work area'))
+function areaChangeTests() {
+  it('goes to the area of a project', async () => {
+    const user = await renderBrowser()
+    await user.click(screen.getByTitle('Go to Work area'))
     expect(useVaultNavStore.getState().selectedAreaName).toBe('Work')
-    fireEvent.click(within(projectCardNamed('Launch')).getByRole('button', { name: 'Change area' }))
-    fireEvent.change(await screen.findByDisplayValue('Work'), { target: { value: 'Ops' } })
-    fireEvent.click(await screen.findByRole('button', { name: 'Save area' }))
+  })
+
+  it('changes the area of a project, creating the new area', async () => {
+    const user = await renderBrowser()
+    await user.click(cardButton('Launch', 'Change area'))
+    const field = await screen.findByDisplayValue('Work')
+    await user.clear(field)
+    await user.type(field, 'Ops')
+    await user.click(await screen.findByRole('button', { name: 'Save area' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:projects:update-area')).toEqual([
         { projectFilePath: 'Launch', area: 'Ops' },
       ])
     )
     expect(bridge.calls('task-vault:vault:create-area')).toEqual([{ name: 'Ops' }])
-    fireEvent.click(within(projectCardNamed('Garden')).getByTitle('Assign to area'))
-    fireEvent.click(screen.getByRole('button', { name: 'Save area' }))
-    await eventually(() =>
-      expect(bridge.calls('task-vault:projects:update-area')[1]).toEqual({
-        projectFilePath: 'Garden',
-        area: null,
-      })
-    )
   })
 }
 
-function areaGoesToACancelsAnAreaTests() {
+function areaAssignTests() {
+  it('saves no area for a project when none is typed', async () => {
+    const user = await renderBrowser()
+    await user.click(within(projectCardNamed('Garden')).getByTitle('Assign to area'))
+    await user.click(screen.getByRole('button', { name: 'Save area' }))
+    await eventually(() =>
+      expect(bridge.calls('task-vault:projects:update-area')).toEqual([
+        { projectFilePath: 'Garden', area: null },
+      ])
+    )
+  })
+
   it('cancels an area change', async () => {
-    await renderBrowser()
-    fireEvent.click(within(projectCardNamed('Garden')).getByTitle('Assign to area'))
-    fireEvent.click(within(projectCardNamed('Garden')).getByRole('button', { name: 'Cancel' }))
+    const user = await renderBrowser()
+    await user.click(within(projectCardNamed('Garden')).getByTitle('Assign to area'))
+    await user.click(cardButton('Garden', 'Cancel'))
     expect(within(projectCardNamed('Garden')).getByTitle('Assign to area')).toBeTruthy()
   })
 }
 
-function areaLinksAProjectTests() {
+function linkTests() {
   it('links a project to a terminal session named by workspace and project', async () => {
-    await renderBrowser()
-    fireEvent.click(within(projectCardNamed('Launch')).getByTitle('Link to terminal session'))
+    const user = await renderBrowser()
+    await user.click(within(projectCardNamed('Launch')).getByTitle('Link to terminal session'))
     const option = await screen.findByRole('option', { name: 'Home › terminator › zsh' })
-    fireEvent.change(option.closest('select')!, { target: { value: 'sess-12345678' } })
+    await user.selectOptions(option.closest('select')!, 'sess-12345678')
     await eventually(() =>
       expect(bridge.calls('task-vault:links:create')).toEqual([
         { projectFilePath: 'Launch', targetId: 'sess-12345678' },
@@ -326,31 +380,33 @@ function areaLinksAProjectTests() {
     expect(await within(projectCardNamed('Launch')).findByTitle('Linked')).toBeTruthy()
   })
 
-  it('says when there is no session to link, and closes the picker', async () => {
+  it('says when there is no session to link', async () => {
     listSessions.mockResolvedValue([])
-    await renderBrowser()
-    fireEvent.click(within(projectCardNamed('Garden')).getByTitle('Link to terminal session'))
+    const user = await renderBrowser()
+    await user.click(within(projectCardNamed('Garden')).getByTitle('Link to terminal session'))
     expect(await screen.findByText('No active sessions')).toBeTruthy()
-    fireEvent.click(within(projectCardNamed('Garden')).getByRole('button', { name: 'Close' }))
+  })
+
+  it('closes the session picker', async () => {
+    listSessions.mockResolvedValue([])
+    const user = await renderBrowser()
+    await user.click(within(projectCardNamed('Garden')).getByTitle('Link to terminal session'))
+    await user.click(
+      await within(projectCardNamed('Garden')).findByRole('button', { name: 'Close' })
+    )
     expect(within(projectCardNamed('Garden')).getByTitle('Link to terminal session')).toBeTruthy()
   })
 }
 
 async function openTasks(name = 'Launch') {
-  await renderBrowser()
-  fireEvent.click(
-    within(projectCardNamed(name)).getByRole('button', { name: `Show tasks tagged @${name}` })
-  )
+  const user = await renderBrowser()
+  await user.click(cardButton(name, `Show tasks tagged @${name}`))
   await within(projectCardNamed(name)).findByText(/tagged @/, { selector: 'span' })
+  return user
 }
 
-function taskTests() {
-  describe('lists open and', taskListsOpenAndTests)
-  describe('adds a task', taskAddsATaskTests)
-}
-
-function taskListsOpenAndTests() {
-  it('lists open and finished tasks, completes and reopens them', async () => {
+function taskListTests() {
+  it('lists the tasks tagged with the project and the file each comes from', async () => {
     await openTasks()
     expect(within(projectCardNamed('Launch')).getByText('2 tasks tagged @Launch')).toBeTruthy()
     expect(
@@ -358,37 +414,48 @@ function taskListsOpenAndTests() {
         selector: '.projects-browser__task-file',
       })
     ).toBeTruthy()
-    fireEvent.click(within(projectCardNamed('Launch')).getByTitle('Complete'))
+  })
+}
+
+function taskCompleteTests() {
+  it('completes an open task', async () => {
+    const user = await openTasks()
+    await user.click(within(projectCardNamed('Launch')).getByTitle('Complete'))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:complete-task')).toEqual([{ taskId: 't1' }])
     )
-    fireEvent.click(within(projectCardNamed('Launch')).getByTitle("Reopen on today's log"))
+  })
+
+  it("reopens a finished task on today's log", async () => {
+    const user = await openTasks()
+    await user.click(within(projectCardNamed('Launch')).getByTitle("Reopen on today's log"))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:restore-task')).toEqual([{ taskId: 't2' }])
     )
   })
 }
 
-function taskAddsATaskTests() {
-  describe('adds a task', taskAddsATaskAddsATaskTests)
-  describe('hides the list', taskAddsATaskHidesTheListTests)
-}
-
-function taskAddsATaskAddsATaskTests() {
-  it('adds a task tagged with the project, and edits one', async () => {
-    await openTasks()
-    const field = within(projectCardNamed('Launch')).getByPlaceholderText('Add task to @Launch…')
-    fireEvent.change(field, { target: { value: 'email team' } })
-    fireEvent.click(within(projectCardNamed('Launch')).getByRole('button', { name: 'Add' }))
+function taskAddTests() {
+  it('adds a task tagged with the project', async () => {
+    const user = await openTasks()
+    const card = within(projectCardNamed('Launch'))
+    await user.type(card.getByPlaceholderText('Add task to @Launch…'), 'email team')
+    await user.click(card.getByRole('button', { name: 'Add' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:add-task')).toEqual([
         { filePath: 'projects/Launch.md', text: 'email team @Launch' },
       ])
     )
-    fireEvent.doubleClick(within(projectCardNamed('Launch')).getByText('Write brief'))
-    const edit = within(projectCardNamed('Launch')).getByDisplayValue('Write brief #Work')
-    fireEvent.change(edit, { target: { value: 'Write the brief' } })
-    fireEvent.click(within(projectCardNamed('Launch')).getByRole('button', { name: 'Save' }))
+  })
+
+  it('edits a task from its raw tagged text on double-click', async () => {
+    const user = await openTasks()
+    const card = within(projectCardNamed('Launch'))
+    await user.dblClick(card.getByText('Write brief'))
+    const edit = card.getByDisplayValue('Write brief #Work')
+    await user.clear(edit)
+    await user.type(edit, 'Write the brief')
+    await user.click(card.getByRole('button', { name: 'Save' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:edit-task')).toEqual([
         { taskId: 't1', text: 'Write the brief' },
@@ -397,14 +464,17 @@ function taskAddsATaskAddsATaskTests() {
   })
 }
 
-function taskAddsATaskHidesTheListTests() {
-  it('hides the list, shows the count after, and an empty project', async () => {
+function taskHideTests() {
+  it('says when no task is tagged with the project', async () => {
     bridge.responses['task-vault:projects:get-tasks'] = { tasks: [] }
     await openTasks('Garden')
     expect(within(projectCardNamed('Garden')).getByText('No tasks tagged @Garden.')).toBeTruthy()
-    fireEvent.click(within(projectCardNamed('Garden')).getByRole('button', { name: 'Hide tasks' }))
-    expect(
-      within(projectCardNamed('Garden')).getByRole('button', { name: '0 tasks tagged @Garden' })
-    ).toBeTruthy()
+  })
+
+  it('hides the task list and shows the task count on its toggle', async () => {
+    bridge.responses['task-vault:projects:get-tasks'] = { tasks: [] }
+    const user = await openTasks('Garden')
+    await user.click(cardButton('Garden', 'Hide tasks'))
+    expect(cardButton('Garden', '0 tasks tagged @Garden')).toBeTruthy()
   })
 }

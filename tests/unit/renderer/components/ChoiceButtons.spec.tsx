@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ChoiceButtons } from '../../../../src/renderer/components/session/ChoiceButtons'
 
 const prompt = {
@@ -27,7 +28,8 @@ describe('ChoiceButtons', () => {
     ).toEqual(['1. Yes', '2. Yes, and switch to accept edits', '3. No'])
   })
 
-  it('answers with the option number, without opening the tile it sits on', () => {
+  it('answers with the option number, without opening the tile it sits on', async () => {
+    const user = userEvent.setup()
     const onAnswer = vi.fn()
     const tile = vi.fn()
     render(
@@ -35,21 +37,25 @@ describe('ChoiceButtons', () => {
         <ChoiceButtons prompt={prompt} onAnswer={onAnswer} />
       </div>
     )
-    fireEvent.click(screen.getByRole('button', { name: '3. No' }))
+    await user.click(screen.getByRole('button', { name: '3. No' }))
     expect(onAnswer).toHaveBeenCalledWith(3)
     expect(tile).not.toHaveBeenCalled()
   })
 })
 
 describe('ChoiceButtons — does not bubble Enter to a tile that would open on it', () => {
-  it('does not bubble Enter to a tile that would open on it', () => {
+  it('does not bubble Enter to a tile that would open on it', async () => {
+    const user = userEvent.setup()
     const tileKey = vi.fn()
     render(
       <div onKeyDown={tileKey}>
         <ChoiceButtons prompt={prompt} onAnswer={vi.fn()} />
       </div>
     )
-    fireEvent.keyDown(screen.getByRole('button', { name: '1. Yes' }), { key: 'Enter' })
+    const yes = screen.getByRole('button', { name: '1. Yes' })
+    yes.focus()
+    expect(document.activeElement).toBe(yes)
+    await user.keyboard('{Enter}')
     expect(tileKey).not.toHaveBeenCalled()
   })
 })

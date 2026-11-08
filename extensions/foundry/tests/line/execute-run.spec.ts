@@ -30,8 +30,6 @@ let transcripts = ''
 let host: FoundryHost
 
 beforeAll(async () => {
-  const parent = temporaryDirectory('fdry-execute')
-  vi.stubEnv('HOME', path.join(parent, 'home'))
   host = fakeHost(() => dataDir)
   await activateFoundry(host)
 })
@@ -76,6 +74,7 @@ async function gateIdFor(rule: string): Promise<string> {
 
 beforeEach(async () => {
   const parent = temporaryDirectory('fdry-execute-order')
+  vi.stubEnv('HOME', path.join(parent, 'home'))
   dataDir = path.join(parent, 'records')
   repo = await repositoryWithRemote(parent)
   theRunner.runCommand.mockReset().mockResolvedValue(0)

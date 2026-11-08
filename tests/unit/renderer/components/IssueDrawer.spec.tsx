@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { IssueDrawer } from '../../../../src/renderer/components/integrations/IssueDrawer'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import type { Issue, IssueLink } from '../../../../src/shared/types/index'
@@ -115,6 +116,7 @@ describe('IssueDrawer — the issue — fetches nothing a description names, and
   // Anyone who can comment on a ticket writes this text: a remote image in it
   // is a tracking pixel aimed at whoever opens the drawer.
   it('fetches nothing a description names, and opens its links in the browser', async () => {
+    const user = userEvent.setup()
     const { container } = await setupSettled({
       issue: issue({
         description: '![pixel](https://evil.example/p.png) <b>raw</b> [docs](https://e.example/d)',
@@ -122,7 +124,7 @@ describe('IssueDrawer — the issue — fetches nothing a description names, and
     })
     const body = container.querySelector('.issue-markdown') as Element
     expect(body.querySelector('img, [src], b')).toBeNull()
-    fireEvent.click(screen.getByRole('link', { name: 'docs' }))
+    await user.click(screen.getByRole('link', { name: 'docs' }))
     expect(openExternal).toHaveBeenCalledWith('https://e.example/d')
   })
 
@@ -153,14 +155,16 @@ describe('IssueDrawer — the issue — renders nothing for a project with no li
 
 describe('IssueDrawer — actions', () => {
   it('opens the issue in its tracker', async () => {
+    const user = userEvent.setup()
     await setupSettled()
-    fireEvent.click(screen.getByTitle('Open in Linear'))
+    await user.click(screen.getByTitle('Open in Linear'))
     expect(openExternal).toHaveBeenCalledWith('https://linear.app/tav/issue/TAV-42')
   })
 
   it('refresh bypasses the cache', async () => {
+    const user = userEvent.setup()
     await setupSettled()
-    fireEvent.click(screen.getByTitle('Refresh'))
+    await user.click(screen.getByTitle('Refresh'))
     await waitFor(() =>
       expect(api.getIssue).toHaveBeenCalledWith({
         tracker: 'linear',
@@ -174,10 +178,11 @@ describe('IssueDrawer — actions', () => {
 
 describe('IssueDrawer — actions — posts a comment and clears the box', () => {
   it('posts a comment and clears the box', async () => {
+    const user = userEvent.setup()
     await setupSettled()
     const box = screen.getByPlaceholderText(/Add a comment/)
-    fireEvent.change(box, { target: { value: 'Verified against v3.' } })
-    fireEvent.click(screen.getByText('Post comment'))
+    await user.type(box, 'Verified against v3.')
+    await user.click(screen.getByText('Post comment'))
 
     await waitFor(() =>
       expect(api.comment).toHaveBeenCalledWith({
@@ -193,15 +198,18 @@ describe('IssueDrawer — actions — posts a comment and clears the box', () =>
     await setupSettled()
     expect((screen.getByText('Post comment') as HTMLButtonElement).disabled).toBe(true)
   })
+})
 
+describe('IssueDrawer — actions — a failed comment', () => {
   it('reports a failed comment and keeps what was typed (FR-034a)', async () => {
+    const user = userEvent.setup()
     api.comment.mockResolvedValue({ error: 'auth-failed', message: 'no permission' })
     await setupSettled()
     const box = screen.getByPlaceholderText(/Add a comment/)
-    fireEvent.change(box, { target: { value: 'important note' } })
-    fireEvent.click(screen.getByText('Post comment'))
+    await user.type(box, 'important note')
+    await user.click(screen.getByText('Post comment'))
 
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('no permission'))
+    expect((await screen.findByRole('alert')).textContent).toContain('no permission')
     // Losing what someone just typed because a token expired is the worst
     // possible response to a failed write.
     expect((box as HTMLTextAreaElement).value).toBe('important note')
@@ -210,18 +218,22 @@ describe('IssueDrawer — actions — posts a comment and clears the box', () =>
 
 describe('IssueDrawer — actions — unlinks and closes', () => {
   it('unlinks and closes', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
+    const linkClear = vi.fn(async () => ({ ok: true }))
+    window.electronAPI.integrations = { ...api, linkClear } as never
     useIntegrationsStore.setState({
       links: new Map([[P, link()]]),
       issues: new Map([[P, issue()]]),
       loadLink,
-      unlinkIssue,
+      unlinkIssue: useIntegrationsStore.getInitialState().unlinkIssue,
     } as never)
     render(<IssueDrawer projectId={P} projectName="terminator" onClose={onClose} />)
     await waitFor(() => expect(api.contextPreview).toHaveBeenCalled())
 
-    fireEvent.click(screen.getByText('Unlink TAV-42'))
-    expect(unlinkIssue).toHaveBeenCalledWith(P)
+    await user.click(screen.getByText('Unlink TAV-42'))
+    expect(linkClear).toHaveBeenCalledWith({ projectId: P })
+    await waitFor(() => expect(useIntegrationsStore.getState().links.get(P)).toBeNull())
     expect(onClose).toHaveBeenCalled()
   })
 })
@@ -242,7 +254,8 @@ describe('IssueDrawer — agent context (FR-023)', () => {
       context: { markdown: 'x', chars: 9_000, truncated: false },
     })
     setup()
-    await waitFor(() => expect(document.querySelector('.issue-drawer__counter--warn')).toBeTruthy())
+    const counter = await screen.findByText('9,000 / 10,000')
+    expect(counter.classList.contains('issue-drawer__counter--warn')).toBe(true)
   })
 
   it('does not warn while there is room', async () => {
@@ -274,18 +287,22 @@ describe('IssueDrawer — agent context (FR-023) — says plainly when nothing i
   })
 
   it('toggles injection for the project', async () => {
+    const user = userEvent.setup()
     await setupSettled()
-    fireEvent.click(screen.getByRole('checkbox'))
+    await user.click(screen.getByRole('checkbox'))
     await waitFor(() =>
       expect(api.setInjectContext).toHaveBeenCalledWith({ projectId: P, injectContext: false })
     )
   })
+})
 
+describe('IssueDrawer — agent context (FR-023) — a failed toggle', () => {
   it('reports a failed toggle rather than lying about the state', async () => {
+    const user = userEvent.setup()
     api.setInjectContext.mockResolvedValue({ error: 'failed', message: 'read-only' })
     await setupSettled()
-    fireEvent.click(screen.getByRole('checkbox'))
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('read-only'))
+    await user.click(screen.getByRole('checkbox'))
+    expect((await screen.findByRole('alert')).textContent).toContain('read-only')
   })
 
   it('reflects injection being off', async () => {
@@ -296,22 +313,20 @@ describe('IssueDrawer — agent context (FR-023) — says plainly when nothing i
 
 describe('IssueDrawer — failures that say nothing of their own', () => {
   it('reports a failed comment in its own words when the tracker gives none', async () => {
+    const user = userEvent.setup()
     api.comment.mockResolvedValue({ error: 'failed' })
     await setupSettled()
-    fireEvent.change(screen.getByPlaceholderText(/Add a comment/), { target: { value: 'note' } })
-    fireEvent.click(screen.getByText('Post comment'))
-    await waitFor(() =>
-      expect(screen.getByRole('alert').textContent).toBe('Could not post that comment.')
-    )
+    await user.type(screen.getByPlaceholderText(/Add a comment/), 'note')
+    await user.click(screen.getByText('Post comment'))
+    expect((await screen.findByRole('alert')).textContent).toBe('Could not post that comment.')
   })
 
   it('reports a failed toggle in its own words when main gives none', async () => {
+    const user = userEvent.setup()
     api.setInjectContext.mockResolvedValue({ error: 'failed' })
     await setupSettled()
-    fireEvent.click(screen.getByRole('checkbox'))
-    await waitFor(() =>
-      expect(screen.getByRole('alert').textContent).toBe('Could not change that setting.')
-    )
+    await user.click(screen.getByRole('checkbox'))
+    expect((await screen.findByRole('alert')).textContent).toBe('Could not change that setting.')
   })
 
   it('survives a preview that rejects outright', async () => {

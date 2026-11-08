@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { act, render, screen, fireEvent } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SidebarSearch } from '../../../../src/renderer/components/sidebar/SidebarSearch'
 import { ResumeButton } from '../../../../src/renderer/components/session/ResumeButton'
@@ -24,16 +24,20 @@ beforeEach(() => {
   useInsightsWindow.setState({ chosen: 'week' })
 })
 
-describe('feature usage: searches, resumes and renames', () => {
-  it('counts the first keystroke of a sidebar search, not each one', () => {
+describe('feature usage: searches', () => {
+  it('counts the first keystroke of a sidebar search, not each one', async () => {
+    const user = userEvent.setup()
     const { rerender } = render(<SidebarSearch query="" onChange={vi.fn()} onClear={vi.fn()} />)
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'a' } })
+    await user.type(screen.getByRole('textbox'), 'a')
     rerender(<SidebarSearch query="a" onChange={vi.fn()} onClear={vi.fn()} />)
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'ab' } })
+    await user.type(screen.getByRole('textbox'), 'b')
     expect(recordUse.mock.calls).toEqual([['core.sidebar.search']])
   })
+})
 
-  it('counts a resume click as the resume action', () => {
+describe('feature usage: resumes', () => {
+  it('counts a resume click as the resume action', async () => {
+    const user = userEvent.setup()
     const exited = fact({
       name: 'claude',
       state: 'exited',
@@ -48,7 +52,7 @@ describe('feature usage: searches, resumes and renames', () => {
       },
     })
     render(<ResumeButton facts={exited} onResume={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Resume claude' }))
+    await user.click(screen.getByRole('button', { name: 'Resume claude' }))
     expect(recordUse).toHaveBeenCalledWith('core.resume', 'click', {
       declare: { label: 'Resume a session', kind: 'action', source: 'core' },
     })
@@ -56,19 +60,21 @@ describe('feature usage: searches, resumes and renames', () => {
 })
 
 describe('feature usage: settings, snooze and run-as choices', () => {
-  it('counts a pressed choice of an agent ask', () => {
+  it('counts a pressed choice of an agent ask', async () => {
+    const user = userEvent.setup()
     const prompt = {
       question: 'Proceed?',
       options: [{ number: 1, label: 'Yes' }],
     } as React.ComponentProps<typeof ChoiceButtons>['prompt']
     render(<ChoiceButtons prompt={prompt} onAnswer={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: '1. Yes' }))
+    await user.click(screen.getByRole('button', { name: '1. Yes' }))
     expect(recordUse.mock.calls).toEqual([['core.agent.answer-ask']])
   })
 
-  it('counts a theme change', () => {
+  it('counts a theme change', async () => {
+    const user = userEvent.setup()
     render(<ThemeChoices checked="dark" onChange={vi.fn()} />)
-    fireEvent.click(screen.getByRole('radio', { name: 'Light' }))
+    await user.click(screen.getByRole('radio', { name: 'Light' }))
     expect(recordUse.mock.calls).toEqual([['core.settings.theme']])
   })
 })
@@ -94,14 +100,16 @@ describe('feature usage: Home choices', () => {
 })
 
 describe('feature usage: failures and Home views', () => {
-  it('counts a terminal rename only when a name is saved', () => {
+  it('counts a terminal rename only when a name is saved', async () => {
+    const user = userEvent.setup()
     const { unmount } = render(
       <NameTerminalDialog defaultName="zsh" onConfirm={vi.fn()} onCancel={vi.fn()} />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Open' }))
+    await user.click(screen.getByRole('button', { name: 'Open' }))
     expect(recordUse).not.toHaveBeenCalled()
-    fireEvent.change(screen.getByLabelText('Terminal name'), { target: { value: 'build' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Open' }))
+    await user.clear(screen.getByLabelText('Terminal name'))
+    await user.type(screen.getByLabelText('Terminal name'), 'build')
+    await user.click(screen.getByRole('button', { name: 'Open' }))
     expect(recordUse.mock.calls).toEqual([['core.terminal.rename']])
     unmount()
   })

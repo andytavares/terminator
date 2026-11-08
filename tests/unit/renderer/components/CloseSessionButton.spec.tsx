@@ -1,15 +1,17 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { CloseSessionButton } from '../../../../src/renderer/components/session/CloseSessionButton'
 import { fact } from '../sidebar/fixtures/facts'
 
 describe('CloseSessionButton', () => {
-  it('ends the session it names', () => {
+  it('ends the session it names', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     const facts = fact({ name: 'claude' })
     render(<CloseSessionButton facts={facts} onClose={onClose} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Close claude' }))
+    await user.click(screen.getByRole('button', { name: 'Close claude' }))
     expect(onClose).toHaveBeenCalledWith(facts)
   })
 
@@ -21,30 +23,33 @@ describe('CloseSessionButton', () => {
   })
 
   // The same control, answering the same question: take this off my list.
-  it('removes a closed session from the list rather than ending it', () => {
+  it('removes a closed session from the list rather than ending it', async () => {
+    const user = userEvent.setup()
     const onForget = vi.fn()
     const onClose = vi.fn()
     const facts = fact({ isClosed: true, name: 'pnpm build' })
     render(<CloseSessionButton facts={facts} onClose={onClose} onForget={onForget} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Remove pnpm build from the list' }))
+    await user.click(screen.getByRole('button', { name: 'Remove pnpm build from the list' }))
     expect(onForget).toHaveBeenCalledWith(facts)
     expect(onClose).not.toHaveBeenCalled()
   })
 })
 
 describe('CloseSessionButton — still ends a live session when removing is also possible', () => {
-  it('still ends a live session when removing is also possible', () => {
+  it('still ends a live session when removing is also possible', async () => {
+    const user = userEvent.setup()
     const onForget = vi.fn()
     const onClose = vi.fn()
     render(
       <CloseSessionButton facts={fact({ name: 'zsh' })} onClose={onClose} onForget={onForget} />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Close zsh' }))
+    await user.click(screen.getByRole('button', { name: 'Close zsh' }))
     expect(onClose).toHaveBeenCalled()
     expect(onForget).not.toHaveBeenCalled()
   })
 
-  it('does not open the row or tile it sits on', () => {
+  it('does not open the row or tile it sits on', async () => {
+    const user = userEvent.setup()
     const behind = vi.fn()
     render(
       <div onClick={behind} onKeyDown={behind}>
@@ -52,8 +57,9 @@ describe('CloseSessionButton — still ends a live session when removing is also
       </div>
     )
     const button = screen.getByRole('button', { name: 'Close zsh' })
-    fireEvent.click(button)
-    fireEvent.keyDown(button, { key: 'Enter' })
+    await user.click(button)
+    expect(document.activeElement).toBe(button)
+    await user.keyboard('{Enter}')
     expect(behind).not.toHaveBeenCalled()
   })
 })

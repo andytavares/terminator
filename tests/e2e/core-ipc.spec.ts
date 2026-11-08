@@ -40,7 +40,10 @@ test.afterAll(async () => closeApp(handle))
 /** Opens Notes, so its view is loaded, and waits for its bridge. */
 async function openNotesView(): Promise<void> {
   const panel = handle.page.locator(`[data-extension-panel="${NOTES}"]`)
-  if ((await panel.count()) === 0) await handle.page.locator('button[aria-label="Notes"]').click()
+  const button = handle.page.locator('button[aria-label="Notes"]')
+  // The band draws its buttons before any panel it restores; wait for it before reading the panel.
+  await expect(button).toBeVisible()
+  if ((await panel.count()) === 0) await button.click()
   await expect(panel).toHaveCount(1)
   await expect
     .poll(() => inExtensionView<boolean>(handle, NOTES, '!!window.electronAPI').catch(() => false))

@@ -23,8 +23,8 @@ const REJECTION_ACTIONS = [
 /** Gate outcomes that are a rejection rather than an approval. */
 const REJECTING_OPTIONS = ['send_back', 'skip', 'stop', 'accept_debt']
 
-/** Twice is a coincidence; a third time is a pattern worth a rule. @internal */
-export const REPETITION_THRESHOLD = 3
+/** Twice is a coincidence; a third time is a pattern worth a rule. */
+const REPETITION_THRESHOLD = 3
 
 interface Citation {
   /** `<timestamp>/<subject>` — the ledger is append-only, so this is stable. */

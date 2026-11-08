@@ -253,7 +253,7 @@ async function noRunWithoutAgreement(): Promise<void> {
   const started = (await foundryChannel(handle, 'foundry:run.start', { id })) as {
     error?: string
   }
-  expect(started.error).toBeDefined()
+  expect(started).toEqual({ error: 'Only an agreed order can be started; this one is draft.' })
 }
 
 async function ledgerIsAttributable(): Promise<void> {

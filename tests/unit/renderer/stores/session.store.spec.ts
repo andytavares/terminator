@@ -538,8 +538,9 @@ describe('useSessionStore — busy state', () => {
   })
 
   it('setSessionIdle is a no-op when session is not busy', () => {
+    useSessionStore.setState({ sessions: new Map([['sess-1', makeSession()]]) })
     const before = useSessionStore.getState().sessions
-    useSessionStore.getState().setSessionIdle('not-busy')
+    useSessionStore.getState().setSessionIdle('sess-1')
     expect(useSessionStore.getState().sessions).toBe(before)
   })
 
@@ -635,13 +636,13 @@ describe('useSessionStore — split pane actions — activateSplit creates a spl
     useSessionStore
       .getState()
       .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
-    const layout = useSessionStore.getState().getPaneLayout('proj-1')
-    expect(layout?.type).toBe('split')
-    if (layout?.type !== 'split') return
-    expect(layout.direction).toBe('vertical')
-    expect(layout.first).toEqual({ type: 'leaf', sessionId: 'sess-a' })
-    expect(layout.second).toEqual({ type: 'leaf', sessionId: 'sess-b' })
-    expect(layout.ratio).toBe(0.5)
+    expect(useSessionStore.getState().getPaneLayout('proj-1')).toMatchObject({
+      type: 'split',
+      direction: 'vertical',
+      first: { type: 'leaf', sessionId: 'sess-a' },
+      second: { type: 'leaf', sessionId: 'sess-b' },
+      ratio: 0.5,
+    })
   })
 
   it('activateSplit sets the new session as focused', () => {
@@ -683,12 +684,14 @@ describe('useSessionStore — split pane actions — setSplitRatio updates the r
     useSessionStore
       .getState()
       .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
-    const layout = useSessionStore.getState().getPaneLayout('proj-1')
-    if (!layout || layout.type !== 'split') throw new Error('expected split')
-    useSessionStore.getState().setSplitRatio('proj-1', layout.id, 0.7)
-    const updated = useSessionStore.getState().getPaneLayout('proj-1')
-    if (!updated || updated.type !== 'split') throw new Error('expected split')
-    expect(updated.ratio).toBe(0.7)
+    const layout = useSessionStore.getState().getPaneLayout('proj-1')!
+    const id = layout.type === 'split' ? layout.id : 'not a split'
+    useSessionStore.getState().setSplitRatio('proj-1', id, 0.7)
+    expect(useSessionStore.getState().getPaneLayout('proj-1')).toMatchObject({
+      type: 'split',
+      id,
+      ratio: 0.7,
+    })
   })
 
   it('setSplitRatio is no-op when no layout exists', () => {
@@ -774,32 +777,43 @@ describe('useSessionStore — split pane actions — closeSession clears the lay
 describe('useSessionStore — split pane actions — closing the active pane keeps the rest of its split on screen', () => {
   setUpUseSessionStoreSplitPaneActions()
 
-  it('closing the active pane keeps the rest of its split on screen', async () => {
-    mockElectronAPI.terminal.close.mockResolvedValue({})
-    useSessionStore
-      .getState()
-      .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
-    useSessionStore
-      .getState()
-      .activateSplit('proj-1', { targetId: 'sess-b', newId: 'sess-c', direction: 'horizontal' })
-    useSessionStore.setState((s) => {
-      const sessions = new Map(s.sessions)
-      for (const id of ['sess-a', 'sess-b', 'sess-c', 'sess-z'])
-        sessions.set(id, makeSession({ id, projectId: 'proj-1' }))
-      return { sessions }
-    })
-    useSessionStore.getState().reorderSessions('proj-1', ['sess-z', 'sess-a', 'sess-b', 'sess-c'])
-    useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-c')
+  it('closing the active pane keeps the rest of its split on screen', () => {
+    seedThreeWaySplit()
     useSessionStore.getState().closeSplitLeaf('proj-1', 'sess-c')
     expect(leafIds(useSessionStore.getState().getPaneLayout('proj-1')!)).toEqual([
       'sess-a',
       'sess-b',
     ])
+  })
+
+  it('ending the active pane of a split activates the pane left on screen', async () => {
+    seedThreeWaySplit()
+    useSessionStore.getState().closeSplitLeaf('proj-1', 'sess-c')
     useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-b')
     await useSessionStore.getState().closeSession('sess-b')
     expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('sess-a')
   })
 })
+
+/** sess-a | (sess-b / sess-c) on screen, sess-z off it in front, sess-c active. */
+function seedThreeWaySplit(): void {
+  mockElectronAPI.terminal.close.mockResolvedValue({})
+  useSessionStore
+    .getState()
+    .activateSplit('proj-1', { targetId: 'sess-a', newId: 'sess-b', direction: 'vertical' })
+  useSessionStore
+    .getState()
+    .activateSplit('proj-1', { targetId: 'sess-b', newId: 'sess-c', direction: 'horizontal' })
+  const sessions = new Map(
+    ['sess-a', 'sess-b', 'sess-c', 'sess-z'].map((id) => [
+      id,
+      makeSession({ id, projectId: 'proj-1' }),
+    ])
+  )
+  useSessionStore.setState((s) => ({ sessions: new Map([...s.sessions, ...sessions]) }))
+  useSessionStore.getState().reorderSessions('proj-1', ['sess-z', 'sess-a', 'sess-b', 'sess-c'])
+  useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-c')
+}
 
 const leavesOnScreen = () => {
   const layout = sessionState().getPaneLayout('proj-1')

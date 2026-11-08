@@ -4,7 +4,6 @@ import * as path from 'node:path'
 import { createOrderStore, createLiveOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-import { SCHEMA_VERSION } from '../../src/order/schema.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 let root: string
@@ -59,12 +58,13 @@ function concurrentUpdateTests() {
 
   it('serialises updates across stores that resolve the same root', async () => {
     await createOrderStore(root).save(order({ status: 'running' }))
-    const live = createLiveOrderStore(() => root)
+    const renaming = createLiveOrderStore(() => root)
+    const cancelling = createLiveOrderStore(() => root)
     await Promise.all([
-      live.update('WO-0913-c71', (o) => ({ ...o, title: 'Renamed while running' })),
-      live.update('WO-0913-c71', (o) => ({ ...o, status: 'cancelled' })),
+      renaming.update('WO-0913-c71', (o) => ({ ...o, title: 'Renamed while running' })),
+      cancelling.update('WO-0913-c71', (o) => ({ ...o, status: 'cancelled' })),
     ])
-    expect(await live.load('WO-0913-c71')).toMatchObject({
+    expect(await createOrderStore(root).load('WO-0913-c71')).toMatchObject({
       status: 'cancelled',
       title: 'Renamed while running',
     })
@@ -113,10 +113,9 @@ function theRenderingTests() {
 
   it('reads back exactly what it wrote', async () => {
     const store = createOrderStore(root)
-    await store.save(order())
-    const loaded = await store.load('WO-0913-c71')
-    expect(loaded?.id).toBe('WO-0913-c71')
-    expect(loaded?.schemaVersion).toBe(SCHEMA_VERSION)
+    const saved = order()
+    await store.save(saved)
+    expect(await store.load('WO-0913-c71')).toEqual(saved)
   })
 
   it('regenerates the rendering on every save rather than leaving it stale', async () => {
@@ -225,8 +224,8 @@ describe('a store whose root follows the workspace', () => {
 
 function storeWritingTests() {
   it('writes wherever the resolver points, on each call', async () => {
-    const a = makeTempDir('fdry-live-a-')
-    const b = makeTempDir('fdry-live-b-')
+    const a = path.join(root, 'a')
+    const b = path.join(root, 'b')
     let here = a
     const store = createLiveOrderStore(() => here)
 
@@ -238,41 +237,15 @@ function storeWritingTests() {
     // exists and pinning the answer there sent every order to one place.
     expect((await createOrderStore(a).list()).map((o) => o.id)).toEqual(['WO-A'])
     expect((await createOrderStore(b).list()).map((o) => o.id)).toEqual(['WO-B'])
-
-    for (const dir of [a, b]) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
   })
 }
 
 function readingThroughTheResolverTests() {
-  it('reads, lists, finds and records through the same resolver', async () => {
-    const dir = makeTempDir('fdry-live-c-')
-    const store = createLiveOrderStore(() => dir)
-
-    await store.save(
-      order({
-        id: 'WO-1',
-        source: { kind: 'tracker', tracker: 'linear', key: 'TAV-42', url: 'https://x' },
-      })
-    )
-    await store.record({
-      at: '2026-09-06T10:00:00.000Z',
-      orderId: 'WO-1',
-      actor: 'operator',
-      action: 'order.seeded',
-      subject: 'WO-1',
-      reason: 'typed',
-      evidence: [],
-    })
-
-    expect((await store.load('WO-1'))?.id).toBe('WO-1')
-    expect(await store.list()).toHaveLength(1)
-    expect(await store.findByIssue('linear', 'TAV-42')).toMatchObject({ id: 'WO-1' })
-    expect(fs.readFileSync(path.join(dir, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')).toContain(
-      'order.seeded'
-    )
-    expect((await store.entries('WO-1')).map((e) => e.action)).toEqual(['order.seeded'])
-
-    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
+  // `createLiveOrderStore` passes each call through to a store at the resolved root.
+  it('reads through the resolver what a store at that root wrote', async () => {
+    const saved = order({ id: 'WO-1' })
+    await createOrderStore(root).save(saved)
+    expect(await createLiveOrderStore(() => root).load('WO-1')).toEqual(saved)
   })
 }
 
@@ -282,32 +255,26 @@ function storeTheLedgerTests() {
   // `order.json` — so a store that could only append was a store no surface
   // could ask what had happened.
   it('reads back the ledger it wrote, oldest first', async () => {
-    const dir = makeTempDir('fdry-entries-')
-    const store = createOrderStore(dir)
-
-    for (const action of ['converge.started', 'converge.refused']) {
-      await store.record({
-        at: '2026-09-09T19:33:00.000Z',
-        orderId: 'WO-9',
-        actor: 'role:architect',
-        action,
-        subject: 'WO-9',
-        reason: action === 'converge.refused' ? 'Invalid enum value.' : '',
-        evidence: [],
-      })
+    const store = createOrderStore(root)
+    const line = {
+      at: '2026-09-09T19:33:00.000Z',
+      orderId: 'WO-9',
+      actor: 'role:architect',
+      subject: 'WO-9',
+      evidence: [],
     }
+    await store.record({ ...line, action: 'converge.started', reason: '' })
+    await store.record({ ...line, action: 'converge.refused', reason: 'Invalid enum value.' })
 
     const entries = await store.entries('WO-9')
-    expect(entries.map((e) => e.action)).toEqual(['converge.started', 'converge.refused'])
-    expect(entries[1].reason).toBe('Invalid enum value.')
-
-    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
+    expect(entries.map((e) => [e.action, e.reason])).toEqual([
+      ['converge.started', ''],
+      ['converge.refused', 'Invalid enum value.'],
+    ])
   })
 
   // An order nothing has happened to yet is not an error.
   it('reads an empty ledger as no entries', async () => {
-    const dir = makeTempDir('fdry-noledger-')
-    expect(await createOrderStore(dir).entries('WO-nothing')).toEqual([])
-    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
+    expect(await createOrderStore(root).entries('WO-nothing')).toEqual([])
   })
 }

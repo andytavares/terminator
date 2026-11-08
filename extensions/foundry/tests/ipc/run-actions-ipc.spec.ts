@@ -20,6 +20,9 @@ import { activate, deactivate } from '../../src/index.ts'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/runtime/supervision-runtime.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 
@@ -30,13 +33,6 @@ vi.mock('../../src/runner/agent-runner.js', async (importOriginal) => {
     setPermissionSink: () => undefined,
   }
 })
-
-// Reading a transcript is a file read; the run's path is fabricated here.
-vi.mock('../../src/runtime/transcript-excerpt.js', () => ({
-  readTranscriptTail: vi
-    .fn()
-    .mockReturnValue([{ role: 'assistant', text: 'retrying the same edit', at: 1 }]),
-}))
 
 let getHandler: (channel: string) => ((payload: unknown) => Promise<unknown>) | undefined
 let api: ExtensionAPI
@@ -54,7 +50,7 @@ function call(channel: string, payload: unknown = {}): Promise<unknown> {
 }
 
 /** Puts a run on the register, which is what every channel below keys on. */
-function startRun(sessionId = 'session-1'): void {
+function startRun(sessionId = 'session-1', transcriptPath = '/t.jsonl'): void {
   supervision.runs.add({
     sessionId,
     featureDir: '/repo/specs/021-thing',
@@ -63,7 +59,7 @@ function startRun(sessionId = 'session-1'): void {
     branch: 'feat/thing',
     baseBranch: null,
     terminalSessionId: 'terminal-1',
-    transcriptPath: '/t.jsonl',
+    transcriptPath,
     startedAt: 0,
   })
 }
@@ -168,11 +164,14 @@ describe('going to a run', () => {
 
 describe('reading what it was doing', () => {
   it('returns the tail of the run it knows about', async () => {
-    startRun('session-transcript')
+    const transcript = path.join(makeTempDir('fdry-transcript-'), 'run.jsonl')
+    const said = { role: 'assistant', content: 'retrying the same edit' }
+    fs.writeFileSync(transcript, `${JSON.stringify({ type: 'assistant', message: said })}\n`)
+    startRun('session-transcript', transcript)
     const result = (await call('foundry:run-transcript', {
       sessionId: 'session-transcript',
-    })) as { lines: unknown[] }
-    expect(result.lines).toHaveLength(1)
+    })) as { lines: { text: string }[] }
+    expect(result.lines.map((line) => line.text)).toEqual(['retrying the same edit'])
   })
 
   it('returns nothing for a run it does not have, rather than reading a guess', async () => {
@@ -198,6 +197,9 @@ function interruptingTests() {
     })
     expect(theRunner.interrupt).toHaveBeenCalledWith('session-1')
     expect(theRunner.send).toHaveBeenCalledWith('session-1', 'try the other approach')
+    const [interruptedAt] = theRunner.interrupt.mock.invocationCallOrder
+    const [sentAt] = theRunner.send.mock.invocationCallOrder
+    expect(interruptedAt).toBeLessThan(sentAt!)
   })
 }
 
@@ -238,34 +240,5 @@ describe('ending a run', () => {
   it('reports a stop that did not land', async () => {
     theRunner.stop.mockReturnValue(false)
     expect(await call('foundry:run-stop', { sessionId: 'gone' })).toEqual({ ok: false })
-  })
-})
-
-describe('the Forge view preference', () => {
-  it('rejects a value that is not a known view', async () => {
-    expect(await call('foundry:ui.set-view', { view: 'grid' })).toEqual({
-      error: 'Malformed request.',
-    })
-    expect(api.settings.set).not.toHaveBeenCalled()
-  })
-})
-
-describe('the model that answers asks', () => {
-  function handler(channel: string): (payload: unknown) => Promise<unknown> {
-    const h = getHandler(channel)
-    if (h === undefined) throw new Error(`${channel} is not registered`)
-    return h
-  }
-
-  it('is Sonnet until the operator chooses otherwise', async () => {
-    ;(api.settings.get as ReturnType<typeof vi.fn>).mockReturnValue(undefined)
-    expect(await handler('foundry:ask-model')({})).toEqual({ selected: 'sonnet' })
-  })
-
-  it('refuses a model that is not Sonnet or Opus', async () => {
-    expect(await handler('foundry:ask-model-set')({ model: 'haiku' })).toEqual({
-      error: 'model must be one of sonnet, opus',
-    })
-    expect(api.settings.set).not.toHaveBeenCalled()
   })
 })

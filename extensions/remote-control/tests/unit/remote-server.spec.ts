@@ -29,17 +29,28 @@ vi.mock('fs', async (importOriginal) => {
 })
 
 const mockTicketStore = vi.hoisted(() => ({
-  createTicket: vi.fn(() => 'a'.repeat(64)),
-  consumeTicket: vi.fn(() => null as string | null),
+  createTicket: vi.fn<(sessionId: string, purpose: string) => string>(),
+  consumeTicket: vi.fn<(ticket: string, purpose: string) => string | null>(),
   startCleanup: vi.fn(),
   stopCleanup: vi.fn(),
 }))
 
-vi.mock('../../src/server/ws-ticket-store', () => ({
-  WsTicketStore: vi.fn().mockImplementation(function () {
-    return mockTicketStore
-  }),
-}))
+// Tickets are real unless a test answers consumeTicket itself; the cleanup timer stays off.
+vi.mock('../../src/server/ws-ticket-store', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/server/ws-ticket-store')>()
+  return {
+    WsTicketStore: vi.fn().mockImplementation(function () {
+      const real = new actual.WsTicketStore()
+      mockTicketStore.createTicket.mockImplementation((id, purpose) =>
+        real.createTicket(id, purpose)
+      )
+      mockTicketStore.consumeTicket.mockImplementation((ticket, purpose) =>
+        real.consumeTicket(ticket, purpose)
+      )
+      return mockTicketStore
+    }),
+  }
+})
 
 const mockSubscriberManager = vi.hoisted(() => ({
   addSubscriber: vi.fn(),
@@ -329,7 +340,7 @@ describe('RemoteServer POST /api/mobile-ticket and /api/app-ticket', () => {
     expect(body.ticket.length).toBeGreaterThan(0)
   })
 
-  it('issues an app ticket to an authenticated client', async () => {
+  it('issues an authenticated client an app ticket that opens /app/', async () => {
     const cookie = await loginCookie()
     const res = await remoteServer.inject({
       method: 'POST',
@@ -337,7 +348,11 @@ describe('RemoteServer POST /api/mobile-ticket and /api/app-ticket', () => {
       headers: { cookie },
     })
     expect(res.statusCode).toBe(201)
-    expect(mockTicketStore.createTicket).toHaveBeenCalledWith('__app__', 'app')
+    const { ticket } = JSON.parse(res.body) as { ticket: string }
+    vi.mocked(readFileSync).mockReturnValueOnce('<html><head></head></html>')
+    const app = await getWithCookie(`/app/?t=${ticket}`)
+    expect(app.statusCode).toBe(200)
+    expect(allSetCookies(app)).toMatch(/app-session=/)
   })
 })
 
@@ -458,7 +473,10 @@ describe('RemoteServer /ext/* extensions without a renderer', () => {
 describe('RemoteServer /ext/* extensions it cannot serve', () => {
   afterEach(restoreFs)
 
-  it('serves no route for an extension whose manifest is malformed, rendererless or unbuilt', async () => {
+  it.each([
+    { kind: 'rendererless', id: 'com.headless' },
+    { kind: 'unbuilt', id: 'com.unbuilt' },
+  ])('serves no route for a $kind extension beside a malformed one', async ({ id }) => {
     mockInstalledExtensions(['broken', 'headless', 'unbuilt', 'bare'], {
       [`${EXT_ROOT}/broken/manifest.json`]: '{ not json',
       [`${EXT_ROOT}/headless/manifest.json`]: JSON.stringify({ id: 'com.headless' }),
@@ -468,10 +486,8 @@ describe('RemoteServer /ext/* extensions it cannot serve', () => {
       }),
     })
     const extServer = await createServerOnPort(ANY_PORT)
-    for (const id of ['com.headless', 'com.unbuilt']) {
-      const res = await extServer.inject({ method: 'GET', url: `/ext/${id}/` })
-      expect(res.statusCode).toBe(404)
-    }
+    const res = await extServer.inject({ method: 'GET', url: `/ext/${id}/` })
+    expect(res.statusCode).toBe(404)
   })
 
   it('serves no extension routes when the extensions folder cannot be read', async () => {

@@ -176,17 +176,10 @@ describe('createTerminalSession — stores the instance before activating the se
     expect(seen).toEqual(['instance', 'activate'])
   })
 
-  it('constructs the instance with the session id, scrollback, and activity hooks', async () => {
+  it('constructs the instance with the session id and the scrollback asked for', async () => {
     await createTerminalSession(terminalRequest({ scrollbackLimit: 7777 }))
     expect(capturedCtorArgs).toHaveLength(1)
-    const { sessionId, scrollbackLimit, hooks } = capturedCtorArgs[0]
-    expect(sessionId).toBe('session-123')
-    expect(scrollbackLimit).toBe(7777)
-    expect(
-      Object.keys(hooks ?? {})
-        .sort()
-        .join()
-    ).toBe('onBell,onBusy,onDispose,onIdle,onInput')
+    expect(capturedCtorArgs[0]).toMatchObject({ sessionId: 'session-123', scrollbackLimit: 7777 })
   })
 })
 

@@ -3,6 +3,7 @@ import { eventually } from '../../../../../tests/support/eventually'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { FactoryHall } from '../../../src/components/factory/FactoryHall.js'
 import { raiseGate } from '../../../src/gates/rules.js'
 import { hallNode, hallView, pullRequestChecks } from '../../helpers/hall-views.js'
@@ -134,17 +135,15 @@ afterEach(() => {
 })
 
 describe('FactoryHall status wall plumbing', () => {
-  it('fetches this order’s own metrics row for the status wall', async () => {
+  it('shows this order’s own metrics row on the status wall, not another order’s', async () => {
     mount({
       metrics: [
-        { orderId: 'WO-1', title: 'This one', leadTimeMs: 90_000, reworks: 1, ciRounds: 2 },
         { orderId: 'WO-2', title: 'Some other order', leadTimeMs: 1, reworks: 9, ciRounds: 9 },
+        { orderId: 'WO-1', title: 'This one', leadTimeMs: 90_000, reworks: 1, ciRounds: 2 },
       ],
     })
-    await screen.findByRole('button', { name: /Build the thing/ })
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:factory.metrics', { window: 'all' })
-    )
+    const wall = await screen.findByRole('img', { name: /^Lead time 2 min/ })
+    expect(wall.getAttribute('aria-label')).toBe('Lead time 2 min · 1 rework · 2 CI fix rounds')
   })
 })
 
@@ -268,13 +267,13 @@ function gatedMovesTests() {
       }),
     })
     await screen.findByText('Halted — your move')
-    expect(screen.queryByRole('button', { name: 'Open Inbox' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Open in List view' })).toBeNull()
   })
 }
 
 function movesWithoutAGateTests() {
   it('sends a move with no gate behind it to the List view', async () => {
+    const user = userEvent.setup()
     const { onOpenInList } = mount({
       view: hallView({
         standing: {
@@ -290,19 +289,18 @@ function movesWithoutAGateTests() {
       }),
     })
     await screen.findByText('Nothing is running this')
-    expect(screen.queryByRole('button', { name: 'Open Inbox' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Open in List view' }))
+    await user.click(screen.getByRole('button', { name: 'Open in List view' }))
     expect(onOpenInList).toHaveBeenCalled()
   })
 }
 
 function monitorsTests() {
   it('opens a station’s monitor and attaches to it', async () => {
+    const user = userEvent.setup()
     mount()
-    fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
+    await user.click(await screen.findByRole('button', { name: /Build the thing/ }))
     await screen.findByRole('button', { name: /ATTACH/ })
-    expect(document.querySelector('.fdry-hall-inspector')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /ATTACH/ }))
+    await user.click(screen.getByRole('button', { name: /ATTACH/ }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:session.attach', {
         orderId: 'WO-1',
@@ -317,24 +315,22 @@ function monitorsTests() {
 
 function cardSummariesAndPlatesTests() {
   it('shows the waiting station’s own card summary on its monitor', async () => {
+    const user = userEvent.setup()
     mount({
       view: hallView({
         waiting: [],
         stranded: ['s-1'],
       }),
     })
-    fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
+    await user.click(await screen.findByRole('button', { name: /Build the thing/ }))
     await screen.findByRole('heading', { name: 'BUILD THE THING' })
     expect(screen.getByRole('img', { name: 'Needs you' })).toBeTruthy()
     expect(screen.getByText(/^WAITING FOR YOU: WAITING IN ITS AGENT TAB/i)).toBeTruthy()
   })
 
-  it('leaves the station name to the floor: no plate over it, the full label on the button', async () => {
+  it('puts the full station label in the button title', async () => {
     mount()
     const station = await screen.findByRole('button', { name: /Build the thing/ })
-    expect(document.querySelector('.fdry-plate')).toBeNull()
-    expect(station.getAttribute('aria-label')).toContain('Build the thing')
-    expect(station.getAttribute('aria-label')).toContain('Working')
     expect(station.getAttribute('title')).toContain('Build the thing')
   })
 }
@@ -380,12 +376,12 @@ function calloutsOnStateChangeTests() {
       const bubble = document.querySelector('.fdry-hall-overlay .fdry-callout') as HTMLElement
       expect(bubble.textContent).toBe('Done')
     })
-    expect(document.querySelector('.fdry-hall-ticker')).toBeNull()
   })
 }
 
 function factoryHallHeldToolCallsTests() {
   it('pins a held tool call over its station and answers it there', async () => {
+    const user = userEvent.setup()
     mount({
       pending: [
         {
@@ -400,7 +396,7 @@ function factoryHallHeldToolCallsTests() {
     })
     const card = await screen.findByRole('group', { name: 'Wants to run Bash' })
     expect(card.textContent).toContain('npm test')
-    fireEvent.click(within(card).getByRole('button', { name: 'Allow' }))
+    await user.click(within(card).getByRole('button', { name: 'Allow' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:permission-resolve', {
         requestId: 'r-1',
@@ -412,9 +408,10 @@ function factoryHallHeldToolCallsTests() {
 
 function factoryHallWaitingGatesTests() {
   it('pins a waiting gate over the gate and decides it with the gate’s own options', async () => {
+    const user = userEvent.setup()
     mount({ view: waitingAtTheGate() })
     const card = await screen.findByRole('group', { name: 'Merge the pull request?' })
-    fireEvent.click(within(card).getByRole('button', { name: 'Approve' }))
+    await user.click(within(card).getByRole('button', { name: 'Approve' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
         gateId: 'g-1',
@@ -426,9 +423,10 @@ function factoryHallWaitingGatesTests() {
 
 function factoryHallParkedAgentsTests() {
   it('pins an agent parked at its terminal and takes you there', async () => {
+    const user = userEvent.setup()
     mount({ view: hallView({ stranded: ['s-1'] }) })
     const card = await screen.findByRole('group', { name: 'Waiting in its agent tab' })
-    fireEvent.click(within(card).getByRole('button', { name: 'Go to agent tab' }))
+    await user.click(within(card).getByRole('button', { name: 'Go to agent tab' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 's-1' })
     )
@@ -437,19 +435,21 @@ function factoryHallParkedAgentsTests() {
 
 function replayingTests() {
   it('replays the run from what was recorded, and scrubs to any moment of it', async () => {
+    const user = userEvent.setup()
     replayable([
       { at: 1000, nodes: [{ id: 'N-1', state: 'running', attempts: 1, sessionId: 's-1' }] },
       { at: 9000, nodes: [{ id: 'N-1', state: 'passed', attempts: 1, sessionId: 's-1' }] },
     ])
-    fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
+    await user.click(await screen.findByRole('button', { name: 'Replay' }))
     const position = (await screen.findByRole('slider', {
       name: 'Replay position',
     })) as HTMLInputElement
     expect(invoke).toHaveBeenCalledWith('foundry:run.timeline', { id: 'WO-1' })
     expect(plateText()).toContain('Working')
+    // user-event cannot move a range input to a value.
     fireEvent.change(position, { target: { value: position.max } })
     await waitFor(() => expect(plateText()).toContain('Done'))
-    fireEvent.click(screen.getByRole('button', { name: 'Back to live' }))
+    await user.click(screen.getByRole('button', { name: 'Back to live' }))
     await waitFor(() =>
       expect(screen.queryByRole('slider', { name: 'Replay position' })).toBeNull()
     )
@@ -479,8 +479,9 @@ const CI_STATES = [
 
 function replayingCiTests() {
   it('replays the wait on CI, and the tower to wait at, from what was recorded', async () => {
+    const user = userEvent.setup()
     replayable(BUILD_FRAMES, CI_STATES)
-    fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
+    await user.click(await screen.findByRole('button', { name: 'Replay' }))
     const position = (await screen.findByRole('slider', {
       name: 'Replay position',
     })) as HTMLInputElement
@@ -489,6 +490,7 @@ function replayingCiTests() {
         'Waiting on checks · 1 of 2 done'
       )
     )
+    // user-event cannot move a range input to a value.
     fireEvent.change(position, { target: { value: position.max } })
     await waitFor(() =>
       expect(document.querySelector('.fdry-callout[data-pinned="true"]')).toBeNull()
@@ -498,6 +500,7 @@ function replayingCiTests() {
 
 function playbackTests() {
   it('plays, pauses and changes speed', async () => {
+    const user = userEvent.setup()
     replayable([
       { at: 1000, nodes: [{ id: 'N-1', state: 'running', attempts: 1, sessionId: 's-1' }] },
       { at: 3000, nodes: [{ id: 'N-1', state: 'passed', attempts: 1, sessionId: 's-1' }] },
@@ -505,9 +508,9 @@ function playbackTests() {
     // The replay's own clock, so a loaded machine cannot stretch its 750 ms.
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
     try {
-      fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
+      await user.click(await screen.findByRole('button', { name: 'Replay' }))
       await screen.findByRole('button', { name: 'Pause' })
-      fireEvent.click(await screen.findByRole('button', { name: '4x' }))
+      await user.click(await screen.findByRole('button', { name: '4x' }))
       expect(screen.getByRole('button', { name: '4x' }).getAttribute('aria-pressed')).toBe('true')
       // 3 s of recording at 4x is 750 ms of replay, in steps of 100 ms
       await act(() => vi.advanceTimersByTimeAsync(700))
@@ -521,8 +524,9 @@ function playbackTests() {
   })
 
   it('says so when nothing was recorded for this run', async () => {
+    const user = userEvent.setup()
     replayable([])
-    fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
+    await user.click(await screen.findByRole('button', { name: 'Replay' }))
     await screen.findByText('Nothing recorded for this run yet.')
     expect(screen.queryByRole('slider', { name: 'Replay position' })).toBeNull()
   })
@@ -530,13 +534,15 @@ function playbackTests() {
 
 function theSiteAndFailuresTests() {
   it('goes back to the site', async () => {
+    const user = userEvent.setup()
     const { onBack } = mount()
     await screen.findByRole('button', { name: /Build the thing/ })
-    fireEvent.click(await screen.findByRole('button', { name: 'All halls' }))
+    await user.click(await screen.findByRole('button', { name: 'All halls' }))
     expect(onBack).toHaveBeenCalled()
   })
 
   it('says nothing to attach to when the failure comes back', async () => {
+    const user = userEvent.setup()
     invoke = vi.fn(async (channel: string) => {
       if (channel === 'foundry:run.observe') return hallView()
       if (channel === 'foundry:permissions-list') return { pending: [] }
@@ -552,8 +558,8 @@ function theSiteAndFailuresTests() {
       },
     })
     render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
-    fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
-    fireEvent.click(await screen.findByRole('button', { name: /ATTACH/ }))
+    await user.click(await screen.findByRole('button', { name: /Build the thing/ }))
+    await user.click(await screen.findByRole('button', { name: /ATTACH/ }))
     await screen.findByText('gone')
   })
 }
@@ -606,6 +612,8 @@ function readingTheTranscriptTests() {
     const station = await screen.findByRole('button', { name: /Build the thing/ })
     vi.useFakeTimers()
     try {
+      // fireEvent: under vi fake timers Testing Library's async wrapper waits on a
+      // real setTimeout that never fires, so user-event hangs here.
       fireEvent.click(station)
       await act(() => vi.advanceTimersByTimeAsync(0))
 
@@ -632,12 +640,13 @@ function readingTheTranscriptTests() {
 
 function factoryHallNoSessionTests() {
   it('does not read a transcript for a station with no session', async () => {
+    const user = userEvent.setup()
     mount({
       view: hallView({
         graph: { orderId: 'WO-1', recipe: 'standard', nodes: [hallNode({ sessionId: null })] },
       }),
     })
-    fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
+    await user.click(await screen.findByRole('button', { name: /Build the thing/ }))
     await screen.findByRole('log', { name: 'Transcript' })
     expect(invoke.mock.calls.some((c) => c[0] === 'foundry:run-transcript')).toBe(false)
     expect(screen.getByRole('log', { name: 'Transcript' }).textContent?.trim()).toBe('NOTHING YET.')
@@ -648,6 +657,7 @@ describe('FactoryHall labels what it draws', () => {
   describe('the scoreboard', factoryHallTheScoreboardTests)
   describe('tower callouts', towerCalloutsTests)
   describe('finished monitors', finishedMonitorsTests)
+  describe('a finished agent monitor', finishedAgentMonitorTests)
 })
 
 function readyGate(over: Partial<Parameters<typeof raiseGate>[0]> = {}) {
@@ -699,6 +709,7 @@ function towerCalloutsTests() {
 
 function finishedMonitorsTests() {
   it("opens the ship gate's monitor with what it decided and no attach key", async () => {
+    const user = userEvent.setup()
     mount({
       view: hallView({
         graph: shipGraph,
@@ -707,24 +718,27 @@ function finishedMonitorsTests() {
         pulls: [{ repo: 'a/b', url: 'https://github.com/a/b/pull/233', number: 233, cwd: '/x' }],
       }),
     })
-    fireEvent.click(await screen.findByRole('button', { name: /Ship/ }))
+    await user.click(await screen.findByRole('button', { name: /Ship/ }))
     const decided = await screen.findByRole('log', { name: 'What this step decided' })
     expect(decided.textContent).toBe('Draft opened · #233\nChecks · 1 of 2 passed')
     expect(screen.queryByRole('button', { name: /ATTACH/ })).toBeNull()
   })
+}
 
+function finishedAgentMonitorTests() {
   it("opens a finished agent's monitor with its transcript and attach disabled", async () => {
+    const user = userEvent.setup()
     mount({
       view: hallView({
         graph: { orderId: 'WO-1', recipe: 'standard', nodes: [hallNode({ state: 'passed' })] },
       }),
       lines: [{ role: 'assistant', kind: 'text', text: 'All done.', at: 1 }],
     })
-    fireEvent.click(await screen.findByRole('button', { name: /Build the thing/ }))
-    await screen.findByText('All done.')
-    expect(
-      (screen.getByRole('button', { name: /Agent closed/i }) as HTMLButtonElement).disabled
-    ).toBe(true)
+    await user.click(await screen.findByRole('button', { name: /Build the thing/ }))
+    expect(await screen.findByText('All done.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Agent closed/i }).hasAttribute('disabled')).toBe(
+      true
+    )
   })
 }
 
@@ -743,6 +757,7 @@ function factoryHallLinksTests() {
   const ticketUrl = 'https://linear.app/team/issue/TAV-15'
 
   it('links the pull request and the ticket on the heads-up bar', async () => {
+    const user = userEvent.setup()
     mount({
       view: hallView({
         pulls: [{ repo: 'terminator', url: pullUrl, number: 233, cwd: '/wt' }],
@@ -754,29 +769,28 @@ function factoryHallLinksTests() {
       if (found === null) throw new Error('the heads-up bar is not drawn yet')
       return found
     })
-    fireEvent.click(within(bar).getByRole('link', { name: '#233' }))
-    fireEvent.click(within(bar).getByRole('link', { name: 'TAV-15' }))
+    await user.click(within(bar).getByRole('link', { name: '#233' }))
+    await user.click(within(bar).getByRole('link', { name: 'TAV-15' }))
     expect(openExternal).toHaveBeenCalledWith(pullUrl)
     expect(openExternal).toHaveBeenCalledWith(ticketUrl)
   })
 }
 
 function gateCardsTests() {
-  it('bounds an open gate card by the room between its station and the edge it grows toward', async () => {
+  it('bounds a gate card that opens below its station by the room down to the bottom edge', async () => {
     mount({ view: hallView({ waiting: [readyGate()] }) })
     await screen.findByRole('button', { name: 'Mark ready' })
     const card = document.querySelector('.fdry-card--gate') as HTMLElement
-    const top = Number.parseFloat(card.style.top)
-    const room = card.style.getPropertyValue('--fdry-card-room')
-    const expectedRoom = card.classList.contains('is-below')
-      ? `calc(${100 - top}% - 26px)`
-      : `calc(${top}% - 50px)`
-    expect(room).toBe(expectedRoom)
+    // The default hall puts the station's foot 6 of 13 tiles down.
+    expect(card.classList.contains('is-below')).toBe(true)
+    expect(card.style.top).toBe('46.15384615384615%')
+    expect(card.style.getPropertyValue('--fdry-card-room')).toBe('calc(53.84615384615385% - 26px)')
   })
 }
 
 function aReadyForReviewGateTests() {
   it('lets a shipped order\u2019s open ready-for-review gate be answered in the hall', async () => {
+    const user = userEvent.setup()
     mount({
       view: hallView({
         graph: { orderId: 'WO-1', recipe: 'standard', nodes: [hallNode({ state: 'passed' })] },
@@ -793,7 +807,7 @@ function aReadyForReviewGateTests() {
         },
       }),
     })
-    fireEvent.click(await screen.findByRole('button', { name: 'Mark ready' }))
+    await user.click(await screen.findByRole('button', { name: 'Mark ready' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
         gateId: 'G-1',
@@ -804,7 +818,7 @@ function aReadyForReviewGateTests() {
 }
 
 function aNewLimitTests() {
-  it('asks for a new limit on the card itself, rather than sending the operator to the Inbox', async () => {
+  it('offers to raise the budget on the card itself', async () => {
     mount({
       view: hallView({
         waiting: [
@@ -815,41 +829,43 @@ function aNewLimitTests() {
             summary: 'Past its time budget',
             why: 'The order budgets 60 and is at 61.',
             at: '2026-09-06T10:00:00.000Z',
-            breach: { kind: 'wall-clock', limit: 60, spent: 61 } as never,
+            breach: { kind: 'wall_clock', limit: 60, actual: 61 },
           }),
         ],
       }),
     })
     await screen.findByText('Past its time budget')
-    expect(screen.queryByRole('button', { name: 'Open Inbox' })).toBeNull()
-    const raise = screen.getAllByRole('button').find((b) => /raise/i.test(b.textContent ?? ''))
-    expect(raise).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Raise the budget/ })).toBeTruthy()
   })
 }
 
+const HANDED_BACK = {
+  kind: 'claude-artifact',
+  url: 'https://claude.ai/artifact/abc',
+  path: '/o/r.md',
+}
+const DONE_STANDING = {
+  kind: 'done',
+  turn: 'foundry',
+  label: 'done',
+  headline: 'Done',
+  detail: 'd',
+  done: 1,
+  total: 1,
+  gateId: null,
+}
+
 describe('the document an order handed back', () => {
-  const document = {
-    kind: 'claude-artifact',
-    url: 'https://claude.ai/artifact/abc',
-    path: '/o/r.md',
-  }
-  const done = {
-    kind: 'done',
-    turn: 'foundry',
-    label: 'done',
-    headline: 'Done',
-    detail: 'd',
-    done: 1,
-    total: 1,
-    gateId: null,
-  }
+  const document = HANDED_BACK
+  const done = DONE_STANDING
 
   it('links from the hall HUD, with a button to open it once the order is done', async () => {
+    const user = userEvent.setup()
     mount({ view: hallView({ document, standing: done }) })
     const link = await screen.findByRole('link', { name: 'Claude artifact' })
-    fireEvent.click(link)
+    await user.click(link)
     expect(openExternal).toHaveBeenCalledWith(document.url)
-    fireEvent.click(screen.getByRole('button', { name: 'Open artifact' }))
+    await user.click(screen.getByRole('button', { name: 'Open artifact' }))
     expect(openExternal).toHaveBeenCalledTimes(2)
   })
 

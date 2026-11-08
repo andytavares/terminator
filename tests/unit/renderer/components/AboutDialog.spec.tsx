@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { AboutDialog } from '../../../../src/renderer/components/AboutDialog'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 import { installElectronApi } from '../../../support/electron-api'
@@ -50,10 +51,11 @@ describe('AboutDialog', () => {
   })
 
   it('calls onClose when Close button is clicked', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
-    await screen.findByText('Close')
-    fireEvent.click(await screen.findByText('Close'))
+    // The dialog's corner X is also named Close; the footer button is the one with the word.
+    await user.click(await screen.findByText('Close'))
     expect(onClose).toHaveBeenCalled()
   })
 })
@@ -88,19 +90,21 @@ describe('AboutDialog — extension versions', () => {
 
 describe('AboutDialog — calls onClose when Escape is pressed', () => {
   it('calls onClose when Escape is pressed', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
     await screen.findByRole('dialog')
-    fireEvent.keyDown(document, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('shows placeholder dashes before data loads', () => {
+  it('shows a dash for each version before the app info loads', () => {
     mockGetInfo.mockReturnValue(new Promise(() => {}))
     render(<AboutDialog onClose={vi.fn()} />)
-    const dashes = document.querySelectorAll('.about-dialog__row dd')
-    expect(dashes.length).toBeGreaterThan(0)
-    dashes.forEach((dd) => expect(dd.textContent).toBe('—'))
+    const values = ['Electron', 'Node', 'Chrome', 'Platform'].map(
+      (label) => screen.getByText(label).nextElementSibling!.textContent
+    )
+    expect(values).toEqual(['—', '—', '—', '—'])
   })
 })
 

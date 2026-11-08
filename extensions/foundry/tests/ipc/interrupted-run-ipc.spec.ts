@@ -248,7 +248,7 @@ function interruptedRunIpcPickingUpTests() {
     await seedInterruptedRun()
     await host.call('foundry:attention')
     await host.call('foundry:inbox.decide', { gateId: 'WO-1-run.interrupted', option: 'resume' })
-    expect(graphOnDisk().nodes[0].sessionId).toBe('session-from-a-dead-process')
+    expect((await restarted()).nodes[0].sessionId).toBe('session-from-a-dead-process')
   })
 }
 
@@ -264,6 +264,7 @@ function stoppingAndHoldingTests() {
     await seedInterruptedRun()
     await host.call('foundry:attention')
     await host.call('foundry:inbox.decide', { gateId: 'WO-1-run.interrupted', option: 'hold' })
+    expect(gatesOnDisk()[0].decision?.option).toBe('hold')
     expect(graphOnDisk().nodes[0].state).toBe('running')
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('running')
   })

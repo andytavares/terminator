@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within, act } from '@testing-library/react'
+import { render, screen, within, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { fact } from '../sidebar/fixtures/facts'
 import type { SessionFacts } from '../../../../src/renderer/sidebar/session-facts'
 
@@ -53,7 +54,7 @@ import { OverviewScreen } from '../../../../src/renderer/components/overview/Ove
 import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
 import { useMetricsStore } from '../../../../src/renderer/stores/metrics.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
-import { seedStore, type SeededStore } from '../../../support/renderer-stores'
+import { resetStore } from '../../../support/renderer-stores'
 
 // The real metrics store polls these; the wall shows what it holds.
 const metricsApi = {
@@ -61,7 +62,7 @@ const metricsApi = {
   getSystem: vi.fn(),
   getProcesses: vi.fn(),
 }
-let records: SeededStore<typeof useSessionRecordsStore>
+const setDescription = vi.fn(async () => ({ data: null }))
 
 beforeEach(() => {
   state.threads = []
@@ -76,12 +77,11 @@ beforeEach(() => {
     data: [{ pid: 42, cpuPercent: 12.5, rssBytes: 1_048_576 }],
   })
   Object.defineProperty(window, 'electronAPI', {
-    value: { metrics: metricsApi },
+    value: { metrics: metricsApi, sessionRecords: { setDescription } },
     writable: true,
     configurable: true,
   })
-  records = seedStore(useSessionRecordsStore)
-  records.setDescription.mockResolvedValue(true)
+  resetStore(useSessionRecordsStore)
   useMetricsStore.setState(useMetricsStore.getInitialState(), true)
   useExtensionRegistry.setState(useExtensionRegistry.getInitialState(), true)
   state.facts = [
@@ -145,33 +145,41 @@ describe('OverviewScreen — the Monitor wall — keeps every tile in one grid, 
     expect(moved.getAttribute('data-band')).toBe('needs')
   })
 
-  it('stops pinning when the switch is turned off, and remembers it', () => {
+  it('stops pinning when the switch is turned off, and remembers it', async () => {
+    const user = userEvent.setup()
     render(<OverviewScreen />)
     const pin = screen.getByRole('switch', { name: 'Pin sessions that need you' })
     expect(pin.getAttribute('aria-checked')).toBe('true')
-    fireEvent.click(pin)
+    await user.click(pin)
     expect(screen.queryByRole('heading', { name: 'Needs you' })).toBeNull()
     expect(JSON.parse(localStorage.getItem('terminator.wall.prefs')!).pinNeeds).toBe(false)
   })
 })
 
 describe('OverviewScreen — the Monitor wall — changes tile size and remembers it', () => {
-  it('changes tile size and remembers it', () => {
+  it('changes tile size and remembers it', async () => {
+    const user = userEvent.setup()
     const { container } = render(<OverviewScreen />)
     const sizes = screen.getByRole('radiogroup', { name: 'Tile size' })
     expect(within(sizes).getByRole('radio', { name: 'Medium' }).getAttribute('aria-checked')).toBe(
       'true'
     )
-    fireEvent.click(within(sizes).getByRole('radio', { name: 'Large' }))
+    await user.click(within(sizes).getByRole('radio', { name: 'Large' }))
     expect(container.querySelector('.wall__grid')!.getAttribute('data-size')).toBe('l')
     expect(JSON.parse(localStorage.getItem('terminator.wall.prefs')!).size).toBe('l')
   })
+})
 
-  it('orders the rest as chosen and remembers it', () => {
+describe('OverviewScreen — the Monitor wall — order', () => {
+  it('orders the rest as chosen and remembers it', async () => {
+    const user = userEvent.setup()
+    state.facts = state.facts.map((f) => (f.sessionId === 'c' ? { ...f, lastAttendedAt: 10 } : f))
     render(<OverviewScreen />)
-    fireEvent.change(screen.getByRole('combobox', { name: 'Then by' }), {
-      target: { value: 'recent' },
-    })
+    const tileOrder = (name: string) => Number(overviewTileOf(name).style.order)
+    // By state the working vitest comes before the idle zsh.
+    expect(tileOrder('vitest')).toBeLessThan(tileOrder('zsh'))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Then by' }), 'Recently opened')
+    expect(tileOrder('zsh')).toBeLessThan(tileOrder('vitest'))
     expect(JSON.parse(localStorage.getItem('terminator.wall.prefs')!).thenBy).toBe('recent')
   })
 
@@ -187,49 +195,49 @@ describe('OverviewScreen — the Monitor wall — changes tile size and remember
 })
 
 describe('OverviewScreen — the Monitor wall — filters tiles by what is typed', () => {
-  it('filters tiles by what is typed', () => {
+  it('filters tiles by what is typed', async () => {
+    const user = userEvent.setup()
     render(<OverviewScreen />)
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter sessions' }), {
-      target: { value: 'ghostty' },
-    })
+    await user.type(screen.getByRole('searchbox', { name: 'Filter sessions' }), 'ghostty')
     expect(tiles()).toHaveLength(1)
     expect(tiles()[0].getAttribute('aria-label')).toContain('zsh')
   })
 
-  it('says when nothing matches the filter, and clears it', () => {
+  it('says when nothing matches the filter, and clears it', async () => {
+    const user = userEvent.setup()
     render(<OverviewScreen />)
     const search = screen.getByRole('searchbox', { name: 'Filter sessions' }) as HTMLInputElement
-    fireEvent.change(search, { target: { value: 'nothing like this' } })
+    await user.type(search, 'nothing like this')
     expect(screen.getByText('No sessions match')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }))
     expect(search.value).toBe('')
   })
 
-  it('opens a session from its tile', () => {
+  it('opens a session from its tile', async () => {
+    const user = userEvent.setup()
     render(<OverviewScreen />)
-    fireEvent.click(screen.getByRole('button', { name: 'Open zsh' }))
+    await user.click(screen.getByRole('button', { name: 'Open zsh' }))
     expect(navigate).toHaveBeenCalledWith('c')
   })
 })
 
 describe('OverviewScreen — the Monitor wall — saves a description typed on a tile', () => {
-  it('saves a description typed on a tile', () => {
+  it('saves a description typed on a tile', async () => {
+    const user = userEvent.setup()
     render(<OverviewScreen />)
-    const tile = tiles().find((t) => t.getAttribute('aria-label')?.endsWith('claude'))!
-    const box = within(tile).getByRole('textbox', { name: 'What is this session doing?' })
-    fireEvent.change(box, { target: { value: 'Session home view' } })
-    fireEvent.keyDown(box, { key: 'Enter' })
-    expect(records.setDescription).toHaveBeenCalledWith(
-      state.facts[0].snapshot,
-      'Session home view'
-    )
+    const box = within(overviewTileOf('claude')).getByRole('textbox', {
+      name: 'What is this session doing?',
+    })
+    await user.type(box, 'Session home view{Enter}')
+    expect(setDescription).toHaveBeenCalledWith({
+      session: state.facts[0].snapshot,
+      description: 'Session home view',
+    })
   })
 
   it('shows the process load of each session on the wall', async () => {
     render(<OverviewScreen />)
-    await act(async () => {})
-    expect(metricsApi.getPids).toHaveBeenCalledWith(['a', 'b', 'c'])
-    expect(overviewTileOf('vitest').textContent).toContain('12.5%')
+    expect(await within(overviewTileOf('vitest')).findByText(/12\.5%/)).toBeTruthy()
     expect(useMetricsStore.getState().processesBySessionId.has('a')).toBe(false)
   })
 })
@@ -258,45 +266,50 @@ describe('OverviewScreen — the Monitor wall — closing it, and with nothing o
   })
 
   it('says no terminals are open, and offers the way to them', async () => {
+    const user = userEvent.setup()
     state.facts = []
     useExtensionRegistry.getState().setActiveGlobalTab('core.overview')
     render(<OverviewScreen />)
     await act(async () => {})
     expect(screen.getByText('No terminals are open')).toBeTruthy()
     expect(metricsApi.getPids).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Go to terminals' }))
+    await user.click(screen.getByRole('button', { name: 'Go to terminals' }))
     expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
   })
 })
 
 describe('OverviewScreen — the Monitor wall — opens the link dialog for a session, and closes it', () => {
-  it('opens the link dialog for a session, and closes it', () => {
+  it('opens the link dialog for a session, and closes it', async () => {
+    const user = userEvent.setup()
     render(<OverviewScreen />)
     const host = tiles().find((t) => t.getAttribute('aria-label')?.endsWith('claude'))!
-    fireEvent.click(within(host).getByRole('button', { name: 'Link a work item' }))
+    await user.click(within(host).getByRole('button', { name: 'Link a work item' }))
     expect(screen.getByRole('dialog', { name: 'Link claude' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Close link' }))
+    await user.click(screen.getByRole('button', { name: 'Close link' }))
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   // Starting work and ending it both belong where the work is shown, not only
   // in the sidebar.
-  it('starts a scratch terminal from its bar', () => {
+  it('starts a scratch terminal from its bar', async () => {
+    const user = userEvent.setup()
     render(<OverviewScreen />)
-    fireEvent.click(screen.getByRole('button', { name: 'New terminal' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'New scratch terminal' }))
+    await user.click(screen.getByRole('button', { name: 'New terminal' }))
+    await user.click(screen.getByRole('menuitem', { name: 'New scratch terminal' }))
     expect(startScratch).toHaveBeenCalled()
   })
 
-  it('ends a session from its tile', () => {
+  it('ends a session from its tile', async () => {
+    const user = userEvent.setup()
     render(<OverviewScreen />)
-    fireEvent.click(screen.getAllByRole('button', { name: /^Close / })[0])
-    expect(closeFromFacts).toHaveBeenCalled()
+    await user.click(within(overviewTileOf('zsh')).getByRole('button', { name: /^Close / }))
+    expect(closeFromFacts).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'c' }))
   })
 })
 
 describe('OverviewScreen — starting and resuming from the wall', () => {
   it('starts a terminal in a branch from its bar', async () => {
+    const user = userEvent.setup()
     const { useWorkspaceStore } = await import('../../../../src/renderer/stores/workspace.store')
     const { startSessionInBranch } = await import('../../../../src/renderer/terminal/start-session')
     const { workspaceFixture: workspaceOf, projectFixture: projectOf } =
@@ -308,14 +321,15 @@ describe('OverviewScreen — starting and resuming from the wall', () => {
       ]),
     })
     render(<OverviewScreen />)
-    fireEvent.click(screen.getByRole('button', { name: 'New terminal' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'New terminal in repo / main' }))
+    await user.click(screen.getByRole('button', { name: 'New terminal' }))
+    await user.click(screen.getByRole('menuitem', { name: 'New terminal in repo / main' }))
     expect(startSessionInBranch).toHaveBeenCalledWith('p1')
   })
 })
 
 describe('OverviewScreen — starting and resuming from the wall — resumes a stopped session whose conversation is still there', () => {
   it('resumes a stopped session whose conversation is still there', async () => {
+    const user = userEvent.setup()
     const { resumeSession } = await import('../../../../src/renderer/terminal/start-session')
     const stopped = fact({
       sessionId: 'r',
@@ -333,13 +347,14 @@ describe('OverviewScreen — starting and resuming from the wall — resumes a s
     })
     state.facts = [stopped]
     render(<OverviewScreen />)
-    fireEvent.click(screen.getByRole('button', { name: 'Resume claude' }))
+    await user.click(screen.getByRole('button', { name: 'Resume claude' }))
     expect(resumeSession).toHaveBeenCalledWith(stopped)
   })
 })
 
 describe('OverviewScreen — ordered by task', () => {
-  it('bands the tiles under their task', () => {
+  it('bands the tiles under their task', async () => {
+    const user = userEvent.setup()
     state.threads = [
       {
         taskId: 'task-1',
@@ -349,9 +364,7 @@ describe('OverviewScreen — ordered by task', () => {
       },
     ]
     render(<OverviewScreen />)
-    fireEvent.change(screen.getByRole('combobox', { name: 'Then by' }), {
-      target: { value: 'task' },
-    })
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Then by' }), 'Task')
     const band = screen.getByRole('heading', { name: /Login rework/ })
     expect(band.textContent).toContain('1 repo · 1 terminal')
     expect(screen.getByRole('heading', { name: /Not in a task/ })).toBeTruthy()

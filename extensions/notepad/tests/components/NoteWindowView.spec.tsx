@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, act, fireEvent } from '@testing-library/react'
+import { render, screen, cleanup, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import {
   installNotepadBridge,
   anchoredComment,
@@ -126,22 +127,25 @@ describe('NoteWindowView with Notepad settings changed', () => {
 
 describe('NoteWindowView toolbar', () => {
   it('switches between the live note and its markdown source', async () => {
+    const user = userEvent.setup()
     await openWindow()
     const live = screen.getByRole('radio', { name: 'Live' })
     const source = screen.getByRole('radio', { name: 'Source' })
     expect(live.getAttribute('aria-checked')).toBe('true')
 
-    fireEvent.click(source)
+    await user.click(source)
     expect(source.getAttribute('aria-checked')).toBe('true')
     expect(useEditorStore.getState().previewMode).toBe(false)
   })
 
-  it('outline is a pressed toggle that hides and shows the outline', async () => {
+  it('outline is a pressed toggle that starts shown and hides the outline when pressed', async () => {
+    const user = userEvent.setup()
     await openWindow()
     const outline = screen.getByRole('button', { name: 'Outline' })
-    const before = outline.getAttribute('aria-pressed')
-    fireEvent.click(outline)
-    expect(outline.getAttribute('aria-pressed')).toBe(before === 'true' ? 'false' : 'true')
-    expect(document.querySelector('.notepad-outline') !== null).toBe(before !== 'true')
+    expect(outline.getAttribute('aria-pressed')).toBe('true')
+    expect(document.querySelector('.notepad-outline')).not.toBeNull()
+    await user.click(outline)
+    expect(outline.getAttribute('aria-pressed')).toBe('false')
+    expect(document.querySelector('.notepad-outline')).toBeNull()
   })
 })

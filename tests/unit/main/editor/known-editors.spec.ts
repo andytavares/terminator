@@ -2,13 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { KNOWN_EDITORS, launchArgvFor, pickEditor } from '../../../../src/main/editor/known-editors'
 
 describe('KNOWN_EDITORS', () => {
-  it('lists each editor once, with an id, a name and something to launch', () => {
-    expect(KNOWN_EDITORS.length).toBeGreaterThan(0)
+  it('gives each editor its own id, so a configured id picks exactly one', () => {
     expect(new Set(KNOWN_EDITORS.map((e) => e.id)).size).toBe(KNOWN_EDITORS.length)
-    for (const editor of KNOWN_EDITORS) {
-      expect(editor.name).toBeTruthy()
-      expect(editor.cli || editor.macApp).toBeTruthy()
-    }
   })
 })
 

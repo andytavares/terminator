@@ -83,18 +83,18 @@ describe('computeRiskScore() — all-null numeric metrics (except testFilePresen
 })
 
 describe('computeRiskScore() — topImporters', () => {
-  it('topImporters is capped at 5', () => {
+  it('keeps only the first 5 top importers', () => {
     const m = baseMetrics({
       topImporters: ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
       importerCount: 7,
     })
     const score = computeRiskScore(m, [m])
-    expect(score.topImporters.length).toBeLessThanOrEqual(5)
+    expect(score.topImporters).toEqual(['a', 'b', 'c', 'd', 'e'])
   })
 })
 
-describe('computeRiskScore() — composite is between 0 and 100', () => {
-  it('composite is between 0 and 100', () => {
+describe('computeRiskScore() — composite at the ends of the range', () => {
+  it('scores the riskiest file 90 (80 plus the missing-test penalty) and the safest 0', () => {
     const high = baseMetrics({
       churn90d: 200,
       blastRadius: 500,
@@ -135,12 +135,13 @@ const smaller = baseMetrics({
 })
 
 describe('computeRiskScore() — level comes from fixed thresholds, not from the neighbours', () => {
-  it('rates both files of a tiny two-file change low, with no "High" label', () => {
-    for (const file of [small, smaller]) {
-      const score = computeRiskScore(file, [small, smaller])
-      expect(score.level).toBe('low')
-      expect(score.dominantDriver).not.toMatch(/^(High|Wide|Large)/)
-    }
+  it.each([
+    ['the larger', small],
+    ['the smaller', smaller],
+  ])('rates %s file of a tiny two-file change low, with no "High" label', (_case, file) => {
+    const score = computeRiskScore(file, [small, smaller])
+    expect(score.level).toBe('low')
+    expect(score.dominantDriver).not.toMatch(/^(High|Wide|Large)/)
   })
 
   it('says no signal crossed its threshold when nothing is over a floor', () => {
@@ -163,15 +164,13 @@ describe('computeRiskScore() — level comes from fixed thresholds, not from the
 })
 
 describe('computeRiskScore() — absolute floors and wording', () => {
-  it('rates the blast radius and change size floors', () => {
-    expect(computeRiskScore(baseMetrics({ ...small, blastRadius: 10 }), [small]).level).toBe(
-      'medium'
-    )
-    expect(computeRiskScore(baseMetrics({ ...small, blastRadius: 20 }), [small]).level).toBe('high')
-    expect(computeRiskScore(baseMetrics({ ...small, additions: 150 }), [small]).level).toBe(
-      'medium'
-    )
-    expect(computeRiskScore(baseMetrics({ ...small, additions: 400 }), [small]).level).toBe('high')
+  it.each([
+    ['10 importers', { blastRadius: 10 }, 'medium'],
+    ['20 importers', { blastRadius: 20 }, 'high'],
+    ['150 added lines', { additions: 150 }, 'medium'],
+    ['400 added lines', { additions: 400 }, 'high'],
+  ])('rates a file with %s %s', (_case, change, level) => {
+    expect(computeRiskScore(baseMetrics({ ...small, ...change }), [small]).level).toBe(level)
   })
 
   it('words a single commit and a single importer in the singular', () => {

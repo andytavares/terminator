@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { createChangeBus } from '../helpers/change-bus.js'
 import { Forge } from '../../src/components/Forge.js'
@@ -119,13 +120,14 @@ const header = () => part('.fdry-wiz-head')
 
 describe('watching the architect at work', () => {
   it('goes to its terminal from the strip and from the header', async () => {
+    const user = userEvent.setup()
     mountForgeOver(compilableOrder(), {
       extra: { intake: RUNNING },
       answers: { 'foundry:run-terminal': () => ({ ok: true }) },
     })
     await waitFor(async () => expect((await strip()).textContent).toContain('your request'))
-    fireEvent.click(within(await strip()).getByRole('button', { name: 'Watch the architect' }))
-    fireEvent.click(within(await header()).getByRole('button', { name: 'Watch the architect' }))
+    await user.click(within(await strip()).getByRole('button', { name: 'Watch the architect' }))
+    await user.click(within(await header()).getByRole('button', { name: 'Watch the architect' }))
     await waitFor(() => expect(payloadsSentOn(invoke, 'foundry:run-terminal')).toHaveLength(2))
     expect(payloadsSentOn(invoke, 'foundry:run-terminal')).toEqual([
       { sessionId: 'sess-arch' },
@@ -134,11 +136,12 @@ describe('watching the architect at work', () => {
   })
 
   it('says so when the architect has no terminal to go to', async () => {
+    const user = userEvent.setup()
     mountForgeOver(compilableOrder(), {
       extra: { intake: RUNNING },
       answers: { 'foundry:run-terminal': () => ({ ok: false }) },
     })
-    fireEvent.click(
+    await user.click(
       await within(await header()).findByRole('button', { name: 'Watch the architect' })
     )
     await screen.findByText('that conversation no longer has an agent tab')
@@ -147,8 +150,9 @@ describe('watching the architect at work', () => {
 
 describe('redrafting a plan there is', () => {
   it('asks the architect for another turn, carrying nothing', async () => {
+    const user = userEvent.setup()
     mountForgeOver(compilableOrder(), {})
-    fireEvent.click(await within(await header()).findByRole('button', { name: /Redraft/ }))
+    await user.click(await within(await header()).findByRole('button', { name: /Redraft/ }))
     await waitFor(() =>
       expect(payloadsSentOn(invoke, 'foundry:order.converge')).toEqual([{ id: 'WO-1' }])
     )
@@ -158,24 +162,28 @@ describe('redrafting a plan there is', () => {
 
 describe('an order that has been handed off', () => {
   it('opens the run it started', async () => {
+    const user = userEvent.setup()
     const onStarted = mountForgeOver(
       compilableOrder({ status: 'running', agreedAt: '2026-09-09T19:00:00Z' }),
       {
         extra: { agreed: { at: '2026-09-09T19:00:00Z', by: 'you' } },
       }
     )
-    fireEvent.click(await within(await strip()).findByRole('button', { name: 'Open the run' }))
+    await user.click(await within(await strip()).findByRole('button', { name: 'Open the run' }))
     expect(onStarted).toHaveBeenCalledWith('WO-1')
   })
 })
 
 describe('a refused turn, from the row that failed', () => {
   it('says the rows are from before the refusal, and carries the reason back', async () => {
+    const user = userEvent.setup()
     mountForgeOver(compilableOrder(), { extra: { intake: REFUSED } })
     await openForgeStep('Hand off')
     await screen.findByText('These rows describe the order as it stood before the refused turn.')
     const rows = document.querySelector('.fdry-checks') as HTMLElement
-    fireEvent.click(within(rows).getByRole('button', { name: 'Tell the architect what was wrong' }))
+    await user.click(
+      within(rows).getByRole('button', { name: 'Tell the architect what was wrong' })
+    )
     const reason = expect.stringContaining('The reason: it named a status.')
     await waitFor(() =>
       expect(payloadsSentOn(invoke, 'foundry:order.converge')).toEqual([
@@ -213,6 +221,7 @@ describe('an agent Claude could not start', () => {
 
 describe('the moves out of an agent Claude could not start', () => {
   it('asks again with the same request from Try again, with no error line in the footer', async () => {
+    const user = userEvent.setup()
     const order = orderWithNoPlan()
     mountForgeOver(order, {
       extra: { intake: NOT_STARTED },
@@ -225,7 +234,7 @@ describe('the moves out of an agent Claude could not start', () => {
         }),
       },
     })
-    fireEvent.click(await within(await strip()).findByRole('button', { name: 'Try again' }))
+    await user.click(await within(await strip()).findByRole('button', { name: 'Try again' }))
     await waitFor(() =>
       expect(payloadsSentOn(invoke, 'foundry:order.converge')).toEqual([{ id: 'WO-1' }])
     )
@@ -233,16 +242,16 @@ describe('the moves out of an agent Claude could not start', () => {
   })
 
   it("copies Claude's reason from Copy the error", async () => {
-    const writeText = vi.fn(async () => undefined)
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const user = userEvent.setup()
     mountForgeOver(orderWithNoPlan(), { extra: { intake: NOT_STARTED } })
-    fireEvent.click(await within(await strip()).findByRole('button', { name: 'Copy the error' }))
-    expect(writeText).toHaveBeenCalledWith(NOT_STARTED.reason)
+    await user.click(await within(await strip()).findByRole('button', { name: 'Copy the error' }))
+    expect(await navigator.clipboard.readText()).toBe(NOT_STARTED.reason)
   })
 })
 
 describe('Try again after a red team that could not start', () => {
   it('picks the loop up from Try again when the red team could not start, with no new draft', async () => {
+    const user = userEvent.setup()
     const order = orderWithNoPlan()
     mountForgeOver(order, {
       extra: { intake: { ...NOT_STARTED, actor: 'red team' } },
@@ -250,7 +259,7 @@ describe('Try again after a red team that could not start', () => {
         'foundry:order.resume': () => ({ order, compile: compileOrder(order) }),
       },
     })
-    fireEvent.click(await within(await strip()).findByRole('button', { name: 'Try again' }))
+    await user.click(await within(await strip()).findByRole('button', { name: 'Try again' }))
     await waitFor(() =>
       expect(payloadsSentOn(invoke, 'foundry:order.resume')).toEqual([{ id: 'WO-1' }])
     )
@@ -271,6 +280,7 @@ describe('an order with no plan yet', () => {
 
 /** Hands the order off, with compile answering `committed` to the agreeing call. */
 async function handOffWith(committed: unknown) {
+  const user = userEvent.setup()
   const shown = compilableOrder()
   const onStarted = mountForgeOver(shown, {
     answers: {
@@ -279,7 +289,7 @@ async function handOffWith(committed: unknown) {
     },
   })
   await openForgeStep('Hand off')
-  fireEvent.click(await screen.findByRole('button', { name: /^Hand off with/ }))
+  await user.click(await screen.findByRole('button', { name: /^Hand off with/ }))
   const agreeing = { id: 'WO-1', commit: true }
   await waitFor(() =>
     expect(payloadsSentOn(invoke, 'foundry:order.compile')).toContainEqual(agreeing)

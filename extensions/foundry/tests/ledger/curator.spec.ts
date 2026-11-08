@@ -1,12 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import {
-  propose,
-  normaliseReason,
-  citationRef,
-  REPETITION_THRESHOLD,
-} from '../../src/ledger/curator.js'
+import { propose, normaliseReason, citationRef } from '../../src/ledger/curator.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
 
 // The factory learns from what you turn away — and only when you ask.
@@ -88,7 +83,6 @@ function theThresholdAndCitationsTests() {
 
   it('produces nothing below the threshold — twice is a coincidence', () => {
     expect(propose({ entries: threeOfTheSame().slice(0, 2) })).toEqual([])
-    expect(REPETITION_THRESHOLD).toBe(3)
   })
 
   it('proposes one rule for three rejections of the same thing', () => {

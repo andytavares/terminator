@@ -24,6 +24,7 @@ test('Run it as is chosen with the arrow keys alone', async () => {
   const first = choices.getByRole('radio').first()
   const second = choices.getByRole('radio').nth(1)
   await first.focus()
+  await expect(first).toBeFocused()
   await expect(first).toBeChecked()
   await page.keyboard.press('ArrowDown')
   await expect(second).toBeChecked()

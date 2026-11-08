@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { SidebarSearch } from '../../../../src/renderer/components/sidebar/SidebarSearch'
 
 beforeEach(() => {
@@ -11,18 +12,21 @@ const recordUse = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
 
 describe('SidebarSearch', () => {
-  it('calls onChange as user types', () => {
+  it('calls onChange as user types', async () => {
+    const user = userEvent.setup()
     const onChange = vi.fn()
     render(<SidebarSearch query="" onChange={onChange} onClear={vi.fn()} />)
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'api' } })
-    expect(onChange).toHaveBeenCalledWith('api')
+    await user.type(screen.getByRole('textbox'), 'a')
+    expect(onChange).toHaveBeenCalledWith('a')
     expect(recordUse).toHaveBeenCalledWith('core.sidebar.search')
   })
 
-  it('calls onClear on Escape keydown', () => {
+  it('calls onClear on Escape keydown', async () => {
+    const user = userEvent.setup()
     const onClear = vi.fn()
     render(<SidebarSearch query="api" onChange={vi.fn()} onClear={onClear} />)
-    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' })
+    await user.click(screen.getByRole('textbox'))
+    await user.keyboard('{Escape}')
     expect(onClear).toHaveBeenCalledOnce()
   })
 
@@ -33,10 +37,11 @@ describe('SidebarSearch', () => {
 })
 
 describe('SidebarSearch — clear button calls onClear', () => {
-  it('clear button calls onClear', () => {
+  it('clear button calls onClear', async () => {
+    const user = userEvent.setup()
     const onClear = vi.fn()
     render(<SidebarSearch query="something" onChange={vi.fn()} onClear={onClear} />)
-    fireEvent.click(screen.getByRole('button', { name: /clear/i }))
+    await user.click(screen.getByRole('button', { name: /clear/i }))
     expect(onClear).toHaveBeenCalledOnce()
   })
 

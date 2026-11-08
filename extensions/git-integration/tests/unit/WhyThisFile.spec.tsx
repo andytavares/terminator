@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { WhyThisFile } from '../../src/components/pr-review/WhyThisFile'
 import type { RiskScore } from '../../src/schemas/pr-review.schema'
 import { makeRiskScore } from './risk-score-fixtures'
@@ -137,9 +138,10 @@ describe('WhyThisFile — importers', () => {
     expect(screen.getByRole('button', { name: 'api.ts' })).toBeTruthy()
   })
 
-  it('opens an importer from the repository root', () => {
+  it('opens an importer from the repository root', async () => {
+    const user = userEvent.setup()
     renderFile()
-    fireEvent.click(screen.getByRole('button', { name: 'store.ts' }))
+    await user.click(screen.getByRole('button', { name: 'store.ts' }))
     expect(openPath).toHaveBeenCalledWith('/repo/src/store.ts')
   })
 

@@ -48,6 +48,7 @@ beforeEach(() => {
 describe('your tickets', () => {
   describe('nothing connected', nothingConnectedTests)
   describe('own and searched', ownAndSearchedTests)
+  describe('searched and unreadable', searchedAndUnreadableTests)
 })
 
 function nothingConnectedTests() {
@@ -59,8 +60,8 @@ function nothingConnectedTests() {
 }
 
 function ownAndSearchedTests() {
-  it('are the operator’s own, or a search when a term is typed, with each tracker’s failure said', async () => {
-    vi.mocked(host.issues.connections).mockResolvedValue([
+  it('are the operator’s own when no term is typed', async () => {
+    vi.mocked(host.issues.connections).mockResolvedValueOnce([
       { tracker: 'linear', account: 'andrew' },
     ] as never)
     vi.mocked(host.issues.listMine).mockResolvedValueOnce({
@@ -72,7 +73,14 @@ function ownAndSearchedTests() {
       issues: [{ tracker: 'linear', key: 'ENG-1', title: 'Slow login', status: 'Todo' }],
       failures: [],
     })
+  })
+}
 
+function searchedAndUnreadableTests() {
+  it('are a search for the trimmed term when one is typed, with each tracker’s failure said', async () => {
+    vi.mocked(host.issues.connections).mockResolvedValueOnce([
+      { tracker: 'linear', account: 'andrew' },
+    ] as never)
     vi.mocked(host.issues.search).mockResolvedValueOnce({
       issues: [],
       failures: [{ tracker: 'linear', message: 'linear is unreachable' }],
@@ -91,9 +99,7 @@ function ownAndSearchedTests() {
 }
 
 describe('a ticket for a typed idea', () => {
-  it('is offered only where the tracker can create one, and filed with the idea as its text', async () => {
-    expect(await host.call('foundry:ticket.offer')).toEqual({ offer: null })
-
+  it('is filed on the tracker with the idea as its text', async () => {
     vi.mocked(host.issues.create).mockResolvedValueOnce({ key: 'ENG-9' } as never)
     expect(
       await host.call('foundry:ticket.create', { idea: 'Export is broken', teamId: 'team-1' })
@@ -156,7 +162,7 @@ function capabilitiesAndUnknownTrackersTests() {
       source: { kind: 'tracker', tracker: 'linear', key: 'ENG-404' },
       repoPaths: ['/repos/app'],
     })) as { error?: string }
-    expect(created.error).toBeDefined()
+    expect(created.error).toBe('Could not read ENG-404 from linear.')
   })
 }
 

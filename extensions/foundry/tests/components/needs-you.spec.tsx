@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { Forge } from '../../src/components/Forge.js'
 import { Floor } from '../../src/components/Floor.js'
@@ -92,7 +93,8 @@ window.HTMLElement.prototype.scrollIntoView = vi.fn()
 beforeEach(() => vi.clearAllMocks())
 
 async function openPlan(): Promise<void> {
-  fireEvent.click(await screen.findByRole('button', { name: /^Plan/ }))
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: /^Plan/ }))
 }
 
 describe('the Forge puts its open questions on the Plan step', () => {
@@ -105,12 +107,10 @@ describe('the Forge puts its open questions on the Plan step', () => {
   })
 
   it('is inside the Plan step, not a band above every step', async () => {
-    const { container } = mountForge(QUESTIONS)
+    mountForge(QUESTIONS)
     await openPlan()
-    await screen.findByText('Needs your answer')
-    const group = screen.getByText('Needs your answer').closest('.fdry-group')
+    const group = (await screen.findByText('Needs your answer')).closest('.fdry-group')
     expect(group?.closest('.fdry-wizard'), 'the group is inside the steps').not.toBeNull()
-    expect(container.querySelector('.fdry-needs-you')).toBeNull()
   })
 
   it('takes no room at all when nothing is being asked', async () => {
@@ -128,7 +128,8 @@ describe('the Forge puts its open questions on the Plan step', () => {
 // the operator.
 
 async function openRedTeam(): Promise<void> {
-  fireEvent.click(await screen.findByRole('button', { name: /^Red team/ }))
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: /^Red team/ }))
 }
 
 function mountForgeWithOrder(over: Partial<WorkOrder>) {

@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { PlanTheDay } from '../../../../src/renderer/components/home/PlanTheDay'
 import { useFocusStore } from '../../../../src/renderer/home/focus-store'
 import { useHomeFeedStore } from '../../../../src/renderer/stores/home-feed.store'
@@ -115,14 +116,18 @@ describe('PlanTheDay: when it shows', () => {
 })
 
 describe('PlanTheDay: dismissing', () => {
-  it.each(['Start the day', 'Skip today'])('hides for the rest of the day after "%s"', (name) => {
-    const { rerender } = render(<PlanTheDay />)
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(name) }))
-    expect(screen.queryByRole('region', { name: 'Plan today' })).toBeNull()
-    expect(useFocusStore.getState().planDismissedOn).toBe(today)
-    rerender(<PlanTheDay />)
-    expect(screen.queryByRole('region', { name: 'Plan today' })).toBeNull()
-  })
+  it.each(['Start the day', 'Skip today'])(
+    'hides for the rest of the day after "%s"',
+    async (name) => {
+      const user = userEvent.setup()
+      const { rerender } = render(<PlanTheDay />)
+      await user.click(screen.getByRole('button', { name: new RegExp(name) }))
+      expect(screen.queryByRole('region', { name: 'Plan today' })).toBeNull()
+      expect(useFocusStore.getState().planDismissedOn).toBe(today)
+      rerender(<PlanTheDay />)
+      expect(screen.queryByRole('region', { name: 'Plan today' })).toBeNull()
+    }
+  )
 
   it('shows again on a later day', () => {
     seedStore({ planDismissedOn: yesterday })
@@ -130,32 +135,35 @@ describe('PlanTheDay: dismissing', () => {
     expect(band()).toBeTruthy()
   })
 
-  it('starts the day on Command+Enter', () => {
+  it('starts the day on Command+Enter', async () => {
+    const user = userEvent.setup()
     render(<PlanTheDay />)
-    fireEvent.keyDown(window, { key: 'Enter', metaKey: true })
+    await user.keyboard('{Meta>}{Enter}{/Meta}')
     expect(screen.queryByRole('region', { name: 'Plan today' })).toBeNull()
   })
 })
 
 describe('PlanTheDay: collapsing', () => {
-  it('hides the body but keeps the head, and says how much of the focus is picked', () => {
+  it('hides the body but keeps the head, and says how much of the focus is picked', async () => {
+    const user = userEvent.setup()
     seedStore({ days: { [today]: [{ id: 'x', title: 'Ship TAV-20', doneByHand: false }] } })
     render(<PlanTheDay />)
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse' }))
+    await user.click(screen.getByRole('button', { name: 'Collapse' }))
     expect(useFocusStore.getState().planCollapsed).toBe(true)
     expect(band().querySelector('.plan__body')).toBeNull()
     expect(within(band()).getByText(/1 of 3 focus picked/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Expand' })).toBeTruthy()
   })
 
-  it('stays collapsed across a remount, and Expand restores the body', () => {
+  it('stays collapsed across a remount, and Expand restores the body', async () => {
+    const user = userEvent.setup()
     seedStore({ planCollapsed: true })
     const { unmount } = render(<PlanTheDay />)
     expect(band().querySelector('.plan__body')).toBeNull()
     unmount()
     render(<PlanTheDay />)
     expect(band().querySelector('.plan__body')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Expand' }))
+    await user.click(screen.getByRole('button', { name: 'Expand' }))
     expect(band().querySelector('.plan__body')).not.toBeNull()
     expect(useFocusStore.getState().planCollapsed).toBe(false)
   })
@@ -206,9 +214,10 @@ describe('PlanTheDay: the tickets column lists mine', () => {
   })
 
   it('adds a ticket to the focus with its work key', async () => {
+    const user = userEvent.setup()
     seedTickets([issueRow('TAV-9', { title: 'Tidy the desk' })])
     render(<PlanTheDay />)
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: "Add TAV-9 Tidy the desk to today's focus" })
     )
     expect(useFocusStore.getState().days[today]).toEqual([
@@ -224,31 +233,35 @@ describe('PlanTheDay: the tickets column lists mine', () => {
 
 describe('PlanTheDay: searching the tickets column', () => {
   it('searches on a term and goes back to mine when it is cleared', async () => {
+    const user = userEvent.setup()
+    useIntegrationsStore.setState({
+      searchIssues: vi.fn(async (query: string) => ({
+        issues: query === 'auth' ? [issueRow('TAV-7', { title: 'Auth flow' })] : [],
+        failures: [],
+      })),
+    })
     render(<PlanTheDay />)
     expect(await within(band()).findByText('TICKETS · MINE')).toBeTruthy()
-    act(() => {
-      fireEvent.change(screen.getByPlaceholderText('Search all tickets…'), {
-        target: { value: 'auth' },
-      })
-    })
+    await user.type(screen.getByPlaceholderText('Search all tickets…'), 'auth')
     expect(await within(band()).findByText('TICKETS · SEARCH RESULTS')).toBeTruthy()
-    await waitFor(() =>
-      expect(useIntegrationsStore.getState().searchIssues).toHaveBeenCalledWith('auth')
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+    expect(
+      await screen.findByRole('button', { name: "Add TAV-7 Auth flow to today's focus" })
+    ).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Clear search' }))
     expect(await within(band()).findByText('TICKETS · MINE')).toBeTruthy()
   })
 })
 
 describe('PlanTheDay: the ticket details drawer', () => {
   it('opens the ticket details from the row, but not from its Add button', async () => {
+    const user = userEvent.setup()
     seedTickets([issueRow('TAV-4', { title: 'Openable' })])
     render(<PlanTheDay />)
-    fireEvent.click(
+    await user.click(
       await screen.findByRole('button', { name: "Add TAV-4 Openable to today's focus" })
     )
     expect(screen.queryByText(/StubTicketDetails/)).toBeNull()
-    fireEvent.click(screen.getByText('Openable'))
+    await user.click(screen.getByText('Openable'))
     expect(await screen.findByText('StubTicketDetails TAV-4')).toBeTruthy()
   })
 
@@ -283,13 +296,10 @@ describe('PlanTheDay: the tickets column limits', () => {
 
 describe('PlanTheDay: the tickets column when empty', () => {
   it('says when there are no tickets of mine and when nothing matches', async () => {
+    const user = userEvent.setup()
     const { rerender } = render(<PlanTheDay />)
     expect(await within(band()).findByText('No tickets assigned to you.')).toBeTruthy()
-    act(() => {
-      fireEvent.change(screen.getByPlaceholderText('Search all tickets…'), {
-        target: { value: 'zzz' },
-      })
-    })
+    await user.type(screen.getByPlaceholderText('Search all tickets…'), 'zzz')
     rerender(<PlanTheDay />)
     expect(await within(band()).findByText('No tickets match.')).toBeTruthy()
   })
@@ -315,11 +325,12 @@ const tasks = ['One', 'Two', 'Three', 'Four'].map((title, index) => ({
 }))
 
 describe('PlanTheDay: picking focus', () => {
-  it('fills the next free slot with each Add, and takes the item out of the list', () => {
+  it('fills the next free slot with each Add, and takes the item out of the list', async () => {
+    const user = userEvent.setup()
     useHomeFeedStore.setState({ focus: tasks })
     render(<PlanTheDay />)
-    fireEvent.click(screen.getByRole('button', { name: "Add One to today's focus" }))
-    fireEvent.click(screen.getByRole('button', { name: "Add Two to today's focus" }))
+    await user.click(screen.getByRole('button', { name: "Add One to today's focus" }))
+    await user.click(screen.getByRole('button', { name: "Add Two to today's focus" }))
     expect(useFocusStore.getState().days[today].map((i) => i.title)).toEqual(['One', 'Two'])
     expect(screen.queryByRole('button', { name: "Add One to today's focus" })).toBeNull()
     const slots = band().querySelectorAll('.plan__slot')
@@ -329,23 +340,25 @@ describe('PlanTheDay: picking focus', () => {
 })
 
 describe('PlanTheDay: the slot limit', () => {
-  it('allows at most three, and disables Add once the slots are full', () => {
+  it('allows at most three, and disables Add once the slots are full', async () => {
+    const user = userEvent.setup()
     useHomeFeedStore.setState({ focus: tasks })
     render(<PlanTheDay />)
-    for (const title of ['One', 'Two', 'Three']) {
-      fireEvent.click(screen.getByRole('button', { name: `Add ${title} to today's focus` }))
-    }
+    await user.click(screen.getByRole('button', { name: "Add One to today's focus" }))
+    await user.click(screen.getByRole('button', { name: "Add Two to today's focus" }))
+    await user.click(screen.getByRole('button', { name: "Add Three to today's focus" }))
     const fourth = screen.getByRole('button', { name: "Add Four to today's focus" })
     expect((fourth as HTMLButtonElement).disabled).toBe(true)
-    fireEvent.click(fourth)
+    await user.click(fourth)
     expect(useFocusStore.getState().days[today]).toHaveLength(3)
   })
 
-  it('removes an item with its ×', () => {
+  it('removes an item with its ×', async () => {
+    const user = userEvent.setup()
     useHomeFeedStore.setState({ focus: tasks })
     render(<PlanTheDay />)
-    fireEvent.click(screen.getByRole('button', { name: "Add One to today's focus" }))
-    fireEvent.click(screen.getByRole('button', { name: 'Remove One' }))
+    await user.click(screen.getByRole('button', { name: "Add One to today's focus" }))
+    await user.click(screen.getByRole('button', { name: 'Remove One' }))
     expect(useFocusStore.getState().days[today]).toEqual([])
     expect(screen.getByRole('button', { name: "Add One to today's focus" })).toBeTruthy()
   })

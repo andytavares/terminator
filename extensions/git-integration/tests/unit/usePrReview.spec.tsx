@@ -3,7 +3,11 @@ import { useEffect } from 'react'
 import { renderHook, act } from '@testing-library/react'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import { reviewQueuePr } from './support/review-queue-pr'
-import { PrReviewDetailSchema, type PrChangedFile } from '../../src/schemas/pr-review.schema'
+import {
+  PrReviewDetailSchema,
+  type PrChangedFile,
+  type PrReviewDetail,
+} from '../../src/schemas/pr-review.schema'
 import {
   useLoadPrQueue,
   useLoadPrDetail,
@@ -11,10 +15,6 @@ import {
   useLoadInlineComments,
   useLoadIssueComments,
 } from '../../src/hooks/usePrReview'
-
-vi.mock('../../src/stores/pr-review.store', () => ({
-  usePrReviewStore: vi.fn(),
-}))
 
 const mockListOpenPrsAPI = vi.fn()
 const mockPrReviewDetailAPI = vi.fn()
@@ -83,21 +83,6 @@ vi.mock('../../src/github/pr-review-service-renderer', () => ({
     ]),
 }))
 
-const mockSetQueue = vi.fn()
-const mockAppendQueue = vi.fn()
-const mockSetQueueLoading = vi.fn()
-const mockSetLoadingMorePrs = vi.fn()
-const mockSetQueueError = vi.fn()
-const mockSetRateLimitState = vi.fn()
-const mockSetHasMorePrs = vi.fn()
-const mockSetNextPrCursor = vi.fn()
-const mockSetActivePr = vi.fn()
-const mockSetThreads = vi.fn()
-const mockSetIssueComments = vi.fn()
-const mockUpdateFileRiskScores = vi.fn()
-const mockUpdateQueuePrRisk = vi.fn()
-const mockSetCurrentUserLogin = vi.fn()
-
 // Aliases so test assertions work without changes
 const mockListOpenPrs = mockListOpenPrsAPI
 const mockPrReviewDetail = mockPrReviewDetailAPI
@@ -160,7 +145,7 @@ function chapterWithFiles(id: string, files: ChangedFile[]) {
 }
 
 /** The active PR with one chapter of `files`. */
-function prWithFiles(files: ChangedFile[], overrides: Record<string, unknown> = {}) {
+function prWithFiles(files: ChangedFile[], overrides: Partial<PrReviewDetail> = {}) {
   return { ...validActivePr, ...overrides, chapters: [chapterWithFiles('ch-1', files)] }
 }
 
@@ -169,16 +154,23 @@ function makePrWithFile(ciStatus: 'passing' | 'failing' | 'pending' | 'none' = '
   return prWithFiles([file('src/foo.ts')], { ciStatus, coverageStatus: 'unknown' as const })
 }
 
-/** Serves `activePr` from the store, with the setters the hooks under test call. */
-function withActivePr(activePr: unknown) {
-  vi.mocked(usePrReviewStore).mockReturnValue({
-    ...vi.mocked(usePrReviewStore)(),
-    activePr,
-    setThreads: mockSetThreads,
-    setIssueComments: mockSetIssueComments,
-    updateFileRiskScores: mockUpdateFileRiskScores,
-    updateQueuePrRisk: mockUpdateQueuePrRisk,
-  })
+const store = () => usePrReviewStore.getState()
+
+/** PR 42's queue row, low risk, with every signal dot unknown except CI, which passes. */
+function queueRow42() {
+  const row = reviewQueuePr(42)
+  return { ...row, signalDots: { ...row.signalDots, ci: 'pass' as const } }
+}
+
+/** Opens `activePr` in the store, with PR 42 queued. */
+function withActivePr(activePr: PrReviewDetail | null) {
+  usePrReviewStore.setState({ activePr, prQueue: [queueRow42()] })
+}
+
+/** The risk score each of `paths` holds in the open PR. */
+function compositeOf(...paths: string[]) {
+  const files = store().activePr?.chapters.flatMap((c) => c.files) ?? []
+  return paths.map((path) => files.find((f) => f.path === path)?.riskScore.composite)
 }
 
 /** Every file's metrics: low churn and blast radius, a test file, and `extra`. */
@@ -206,9 +198,8 @@ async function loadQueueVia(options?: Parameters<ReturnType<typeof useLoadPrQueu
   await load(result.current, options)
 }
 
-/** The queue the last load set. */
-const queuedPrs = (): Array<{ number: number; sessionStatus?: string }> =>
-  mockSetQueue.mock.calls[0]?.[0] ?? []
+/** The queue the store holds. */
+const queuedPrs = () => store().prQueue
 
 /** A review row stored as active, not on the loaded page. */
 function orphanPr(number: number, overrides: Record<string, unknown> = {}) {
@@ -279,8 +270,7 @@ function threadOf(comment: ReturnType<typeof reviewComment>) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  // The hooks read the live PR through getState(); serve whatever the test configured.
-  Object.assign(usePrReviewStore, { getState: () => vi.mocked(usePrReviewStore)() })
+  usePrReviewStore.setState(usePrReviewStore.getInitialState(), true)
   Object.assign(globalThis, {
     electronAPI: {
       github: {
@@ -290,22 +280,6 @@ beforeEach(() => {
         prInlineComments: mockPrInlineComments,
       },
     },
-  })
-  vi.mocked(usePrReviewStore).mockReturnValue({
-    setQueue: mockSetQueue,
-    appendQueue: mockAppendQueue,
-    setQueueLoading: mockSetQueueLoading,
-    setLoadingMorePrs: mockSetLoadingMorePrs,
-    setQueueError: mockSetQueueError,
-    setRateLimitState: mockSetRateLimitState,
-    setHasMorePrs: mockSetHasMorePrs,
-    setNextPrCursor: mockSetNextPrCursor,
-    setActivePr: mockSetActivePr,
-    setThreads: mockSetThreads,
-    updateFileRiskScores: mockUpdateFileRiskScores,
-    updateQueuePrRisk: mockUpdateQueuePrRisk,
-    setCurrentUserLogin: mockSetCurrentUserLogin,
-    activePr: null,
   })
 })
 
@@ -326,21 +300,21 @@ describe('useLoadPrQueue — sets queue error when listOpenPrs returns error', (
     mockListOpenPrs.mockResolvedValue({ error: 'NETWORK_ERROR' })
     const { result } = renderHook(() => useLoadPrQueue('/repo'))
     await load(result.current)
-    expect(mockSetQueueError).toHaveBeenCalledWith('NETWORK_ERROR')
+    expect(store().queueError).toBe('NETWORK_ERROR')
   })
 
   it('sets rate limit state when RATE_LIMITED error', async () => {
     mockListOpenPrs.mockResolvedValue({ error: 'RATE_LIMITED', resetAt: 99999 })
     const { result } = renderHook(() => useLoadPrQueue('/repo'))
     await load(result.current)
-    expect(mockSetRateLimitState).toHaveBeenCalledWith({ resetAt: 99999 })
+    expect(store().rateLimitState).toEqual({ resetAt: 99999 })
   })
 
   it('sets queue error on exception', async () => {
     mockListOpenPrs.mockRejectedValue(new Error('crash'))
     const { result } = renderHook(() => useLoadPrQueue('/repo'))
     await load(result.current)
-    expect(mockSetQueueError).toHaveBeenCalledWith(expect.stringContaining('crash'))
+    expect(store().queueError).toContain('crash')
   })
 })
 
@@ -360,7 +334,7 @@ describe('useLoadPrQueue — includes orphan PRs when pruneActiveReviews confirm
     // pruneActiveReviews returns 99 → PR is still open (just on a later page)
     mockPruneActiveReviewsAPI.mockResolvedValue({ openNumbers: [99] })
     await loadQueueVia()
-    expect(queuedPrs().find((p) => p.number === 99)).toBeDefined()
+    expect(queuedPrs().map((p) => p.number)).toEqual([99])
   })
 })
 
@@ -400,12 +374,8 @@ describe('useLoadPrQueue — TAV-7: discards a stale response that resolves afte
     stale.resolve({ prs: [{ ...reviewQueuePr(50), sessionStatus: 'not-started' }], hasMore: false })
     await load(() => staleCall)
 
-    // setQueue must have been called exactly once, with the fresh result —
-    // the stale, later-arriving response must be discarded.
-    expect(mockSetQueue).toHaveBeenCalledTimes(1)
-    expect(mockSetQueue).toHaveBeenCalledWith(
-      expect.arrayContaining([expect.objectContaining({ number: 49 })])
-    )
+    // The stale, later-arriving response must not replace the fresh result.
+    expect(queuedPrs().map((p) => p.number)).toEqual([49])
   })
 })
 
@@ -436,8 +406,7 @@ describe('useLoadPrQueue — TAV-7: discards a stale currentUser response for a 
 
     // The superseded (stale) request's currentUser response must not overwrite
     // the newer request's login.
-    expect(mockSetCurrentUserLogin).not.toHaveBeenCalledWith('stale-user')
-    expect(mockSetCurrentUserLogin).toHaveBeenCalledWith('fresh-user')
+    expect(store().currentUserLogin).toBe('fresh-user')
   })
 })
 
@@ -471,7 +440,7 @@ describe('useLoadPrDetail — does not call onSuccess when result has error', ()
     mockPrReviewDetail.mockResolvedValue({ error: 'RATE_LIMITED', resetAt: 12345 })
     const { result } = renderHook(() => useLoadPrDetail('/repo'))
     await load(result.current, 1, vi.fn())
-    expect(mockSetRateLimitState).toHaveBeenCalledWith({ resetAt: 12345 })
+    expect(store().rateLimitState).toEqual({ resetAt: 12345 })
   })
 })
 
@@ -495,15 +464,12 @@ describe('useLoadInlineComments', () => {
 
 describe('useLoadInlineComments — calls prInlineComments and sets threads when activePr is set', () => {
   it('calls prInlineComments and sets threads when activePr is set', async () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: validActivePr,
-      setThreads: mockSetThreads,
-    })
+    withActivePr(validActivePr)
     mockPrInlineComments.mockResolvedValue({ comments: [] })
     const { result } = renderHook(() => useLoadInlineComments('/repo'))
     await load(result.current)
     expect(mockPrInlineComments).toHaveBeenCalledWith('/repo', 42)
+    expect(store().threads['src/foo.ts']).toEqual([expect.objectContaining({ id: 'thread-1' })])
   })
 })
 
@@ -516,7 +482,7 @@ describe('useLoadInlineComments — a failed load', () => {
     failLoad()
     const { result } = renderHook(() => useLoadInlineComments('/repo'))
     await load(result.current)
-    expect(mockSetThreads).not.toHaveBeenCalled()
+    expect(store().threads).toEqual({})
   })
 })
 
@@ -533,18 +499,14 @@ describe('useLoadInlineComments — marks a thread resolved when its first comme
     })
     const { result } = renderHook(() => useLoadInlineComments('/repo'))
     await load(result.current)
-    const calls = mockSetThreads.mock.calls
-    expect(calls.find((c) => c[0] === 'src/foo.ts')?.[1][0].resolved).toBe(true)
-    expect(calls.find((c) => c[0] === 'src/bar.ts')?.[1][0].resolved).toBe(false)
+    expect(store().threads['src/foo.ts'][0].resolved).toBe(true)
+    expect(store().threads['src/bar.ts'][0].resolved).toBe(false)
   })
 })
 
 describe('useFetchFileMetrics', () => {
   it('does nothing when repoRoot is null', async () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: validActivePr,
-    })
+    withActivePr(validActivePr)
     const { result } = renderHook(() => useFetchFileMetrics(null))
     await load(result.current)
     expect(mockFileMetrics).not.toHaveBeenCalled()
@@ -567,7 +529,7 @@ describe('useFetchFileMetrics — keeps a large but mechanically-simple PR at hi
     metricsAnswer({ churn90d: 1, blastRadius: 1 })
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
     await load(result.current)
-    expect(mockUpdateQueuePrRisk).toHaveBeenCalledWith(42, 'high', expect.anything())
+    expect(queuedPrs()[0].riskLevel).toBe('high')
   })
 })
 
@@ -590,9 +552,9 @@ describe('useFetchFileMetrics — handles fileMetrics returning an error object 
     mockFileMetrics.mockResolvedValue({ error: 'RATE_LIMITED' })
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
     await load(result.current)
-    // collected.length === 0 so no updateFileRiskScore or updateQueuePrRisk
-    expect(mockUpdateFileRiskScores).not.toHaveBeenCalled()
-    expect(mockUpdateQueuePrRisk).not.toHaveBeenCalled()
+    // No file was measured, so neither the file nor the queue row gets a score.
+    expect(compositeOf('src/foo.ts')).toEqual([null])
+    expect(queuedPrs()).toEqual([queueRow42()])
   })
 })
 
@@ -601,7 +563,7 @@ describe('useLoadPrQueue — NOT_AUTHENTICATED branch', () => {
     mockListOpenPrs.mockResolvedValue({ error: 'NOT_AUTHENTICATED' })
     const { result } = renderHook(() => useLoadPrQueue('/repo'))
     await load(result.current)
-    expect(mockSetQueueError).toHaveBeenCalledWith(expect.stringContaining('Not authenticated'))
+    expect(store().queueError).toContain('Not authenticated')
   })
 
   it('uses fallback resetAt when RATE_LIMITED has no resetAt', async () => {
@@ -609,9 +571,7 @@ describe('useLoadPrQueue — NOT_AUTHENTICATED branch', () => {
     mockListOpenPrs.mockResolvedValue({ error: 'RATE_LIMITED' })
     const { result } = renderHook(() => useLoadPrQueue('/repo'))
     await load(result.current)
-    expect(mockSetRateLimitState).toHaveBeenCalledWith({
-      resetAt: expect.any(Number),
-    })
+    expect(store().rateLimitState).toEqual({ resetAt: expect.any(Number) })
   })
 })
 
@@ -642,9 +602,7 @@ describe('useLoadPrDetail — additional branches', () => {
     mockPrReviewDetail.mockResolvedValue({ error: 'RATE_LIMITED' })
     const { result } = renderHook(() => useLoadPrDetail('/repo'))
     await load(result.current, 1, vi.fn())
-    expect(mockSetRateLimitState).toHaveBeenCalledWith({
-      resetAt: expect.any(Number),
-    })
+    expect(store().rateLimitState).toEqual({ resetAt: expect.any(Number) })
   })
 
   it('does not call onSuccess when parsed schema fails', async () => {
@@ -667,11 +625,7 @@ describe('useFetchFileMetrics — the queue row coverage dot', () => {
     metricsAnswer({ patchCoverage })
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
     await load(result.current)
-    expect(mockUpdateQueuePrRisk).toHaveBeenCalledWith(
-      42,
-      expect.any(String),
-      expect.objectContaining({ coverage: dot })
-    )
+    expect(queuedPrs()[0].signalDots.coverage).toBe(dot)
   })
 })
 
@@ -685,49 +639,25 @@ describe('useFetchFileMetrics — the queue row CI dot', () => {
     metricsAnswer()
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
     await load(result.current)
-    expect(mockUpdateQueuePrRisk).toHaveBeenCalledWith(
-      42,
-      expect.any(String),
-      expect.objectContaining({ ci: dot })
-    )
+    expect(queuedPrs()[0].signalDots.ci).toBe(dot)
   })
 })
 
 describe('useFetchFileMetrics — avgCoverage branches (lines 264-268) — accepts prDetail argument instead of activePr', () => {
   it('accepts prDetail argument instead of activePr', async () => {
-    // useFetchFileMetrics with explicit prDetail arg (prDetail ?? activePr branch)
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: null, // no activePr
-      updateFileRiskScores: mockUpdateFileRiskScores,
-      updateQueuePrRisk: mockUpdateQueuePrRisk,
-    })
-
-    const prDetail = makePrWithFile()
-
-    mockFileMetrics.mockResolvedValue({
-      churn90d: 5,
-      blastRadius: 2,
-      topImporters: [],
-      importerCount: 0,
-      testFilePresent: true,
-    })
-
+    withActivePr(null)
+    metricsAnswer()
     const { result } = renderHook(() => useFetchFileMetrics('/repo'))
-    await load(result.current, prDetail)
-
+    await load(result.current, makePrWithFile())
     expect(mockFileMetrics).toHaveBeenCalledWith('/repo', 'src/foo.ts')
-    expect(mockUpdateQueuePrRisk).toHaveBeenCalled()
+    // The queue row's tests dot moves from unknown: the given PR was scored.
+    expect(queuedPrs()[0].signalDots.tests).toBe('pass')
   })
 })
 
 describe('useLoadIssueComments', () => {
   beforeEach(() => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: validActivePr,
-      setIssueComments: mockSetIssueComments,
-    })
+    withActivePr(validActivePr)
   })
 
   it('does nothing when repoRoot is null', async () => {
@@ -739,20 +669,11 @@ describe('useLoadIssueComments', () => {
 
 describe('useLoadIssueComments — does nothing when no prNumber (no activePr and no override)', () => {
   beforeEach(() => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: validActivePr,
-      setIssueComments: mockSetIssueComments,
-    })
+    withActivePr(validActivePr)
   })
 
   it('does nothing when no prNumber (no activePr and no override)', async () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: null,
-      setIssueComments: mockSetIssueComments,
-    })
-
+    withActivePr(null)
     const { result } = renderHook(() => useLoadIssueComments('/repo'))
     await load(result.current)
     expect(mockPrIssueCommentsAPI).not.toHaveBeenCalled()
@@ -761,11 +682,7 @@ describe('useLoadIssueComments — does nothing when no prNumber (no activePr an
 
 describe('useLoadIssueComments — loads comments using activePr.number when no override given', () => {
   beforeEach(() => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: validActivePr,
-      setIssueComments: mockSetIssueComments,
-    })
+    withActivePr(validActivePr)
   })
 
   it('loads comments using activePr.number when no override given', async () => {
@@ -778,17 +695,13 @@ describe('useLoadIssueComments — loads comments using activePr.number when no 
     await load(result.current)
 
     expect(mockPrIssueCommentsAPI).toHaveBeenCalledWith('/repo', validActivePr.number)
-    expect(mockSetIssueComments).toHaveBeenCalledWith(comments)
+    expect(store().issueComments).toEqual(comments)
   })
 })
 
 describe('useLoadIssueComments — loads comments using prNumber override', () => {
   beforeEach(() => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: validActivePr,
-      setIssueComments: mockSetIssueComments,
-    })
+    withActivePr(validActivePr)
   })
 
   it('loads comments using prNumber override', async () => {
@@ -801,7 +714,7 @@ describe('useLoadIssueComments — loads comments using prNumber override', () =
     await load(result.current, 99)
 
     expect(mockPrIssueCommentsAPI).toHaveBeenCalledWith('/repo', 99)
-    expect(mockSetIssueComments).toHaveBeenCalledWith(comments)
+    expect(store().issueComments).toEqual(comments)
   })
 })
 
@@ -817,7 +730,7 @@ describe('useLoadIssueComments — a failed load', () => {
     failLoad()
     const { result } = renderHook(() => useLoadIssueComments('/repo'))
     await load(result.current)
-    expect(mockSetIssueComments).not.toHaveBeenCalled()
+    expect(store().issueComments).toEqual([])
   })
 })
 
@@ -837,21 +750,19 @@ describe('useFetchFileMetrics — one batched request', () => {
     await load(result.current)
     expect(mockFilesMetricsAPI).toHaveBeenCalledTimes(1)
     expect(mockFilesMetricsAPI).toHaveBeenCalledWith('/repo', ['src/a.ts', 'src/b.ts', 'src/c.ts'])
-    expect(mockUpdateFileRiskScores).toHaveBeenCalledTimes(1)
-    expect(Object.keys(mockUpdateFileRiskScores.mock.calls[0][0]).sort()).toEqual([
-      'src/a.ts',
-      'src/b.ts',
-      'src/c.ts',
+    // The stubbed scorer gives 10; the lock file is not scored.
+    expect(compositeOf('src/a.ts', 'src/b.ts', 'src/c.ts', 'package-lock.json')).toEqual([
+      10,
+      10,
+      10,
+      null,
     ])
   })
 })
 
-const setActive = (pr: typeof validActivePr | null) =>
-  vi.mocked(usePrReviewStore).mockReturnValue({
-    ...vi.mocked(usePrReviewStore)(),
-    activePr: pr,
-    setThreads: mockSetThreads,
-    setIssueComments: mockSetIssueComments,
+const setActive = (pr: PrReviewDetail | null) =>
+  act(() => {
+    usePrReviewStore.setState({ activePr: pr })
   })
 
 /** Mounts a hook that calls the loader it gets whenever the loader changes, and reports when every

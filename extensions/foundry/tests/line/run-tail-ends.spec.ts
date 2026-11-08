@@ -25,8 +25,6 @@ let repo = ''
 let host: FoundryHost
 
 beforeAll(async () => {
-  const parent = temporaryDirectory('fdry-document-run')
-  vi.stubEnv('HOME', path.join(parent, 'home'))
   host = fakeHost(() => dataDir)
   await activateFoundry(host)
 })
@@ -41,6 +39,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   const parent = temporaryDirectory('fdry-document-run-order')
+  vi.stubEnv('HOME', path.join(parent, 'home'))
   dataDir = path.join(parent, 'records')
   repo = await repositoryWithRemote(parent)
   theRunner.runCommand.mockReset().mockResolvedValue(0)

@@ -80,7 +80,7 @@ describe('answerQuestion', () => {
 
   it('ignores an answer to a question that does not exist rather than throwing', () => {
     const before = [q({ id: 'Q-1' })]
-    expect(() => answerQuestion(before, 'Q-9', 'No')).not.toThrow()
+    expect(answerQuestion(before, 'Q-9', 'No')).toEqual(before)
   })
 
   it('ignores an option index that is out of range', () => {

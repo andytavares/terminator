@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, within, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 vi.mock('../../../../src/renderer/components/session/LivePreview', () => ({
   LivePreview: ({ sessionId }: { sessionId: string }) => (
@@ -76,23 +77,28 @@ describe('WallTile — names a session with no project', () => {
     )
     expect(screen.getByRole('article', { name: 'No branch, claude' })).toBeTruthy()
   })
+})
 
-  it('opens the terminal from its button, a click, or Enter', () => {
+describe('WallTile — opening the terminal', () => {
+  it('opens the terminal from its button, a click, or Enter', async () => {
+    const user = userEvent.setup()
     render(<WallTile {...props} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Open claude' }))
-    fireEvent.click(screen.getByTestId('preview-s1'))
-    fireEvent.keyDown(screen.getByRole('article'), { key: 'Enter' })
+    await user.click(screen.getByRole('button', { name: 'Open claude' }))
+    await user.click(screen.getByTestId('preview-s1'))
+    act(() => screen.getByRole('article').focus())
+    expect(document.activeElement).toBe(screen.getByRole('article'))
+    await user.keyboard('{Enter}')
     expect(props.onOpen).toHaveBeenCalledTimes(3)
     expect(recordUse.mock.calls).toEqual(Array(3).fill(['core.overview.open-tile']))
     expect(props.onOpen).toHaveBeenCalledWith('s1')
   })
 
-  it('does not open the terminal while typing a description', () => {
+  it('does not open the terminal while typing a description', async () => {
+    const user = userEvent.setup()
     render(<WallTile {...props} />)
     const box = screen.getByRole('textbox', { name: 'What is this session doing?' })
-    fireEvent.click(box)
-    fireEvent.change(box, { target: { value: 'why' } })
-    fireEvent.keyDown(box, { key: 'Enter' })
+    await user.type(box, 'why')
+    await user.keyboard('{Enter}')
     expect(props.onOpen).not.toHaveBeenCalled()
     expect(props.onSaveDescription).toHaveBeenCalledWith(facts, 'why')
   })
@@ -130,17 +136,19 @@ describe('WallTile — draws answers in its footer when a prompt is waiting', ()
     expect(within(screen.getByRole('article')).getByRole('button', { name: '1. Yes' })).toBeTruthy()
   })
 
-  it('offers a link when linking is possible', () => {
+  it('offers a link when linking is possible', async () => {
+    const user = userEvent.setup()
     const onLink = vi.fn()
     render(<WallTile {...props} onLink={onLink} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Link a work item' }))
+    await user.click(screen.getByRole('button', { name: 'Link a work item' }))
     expect(onLink).toHaveBeenCalledWith(facts)
     expect(props.onOpen).not.toHaveBeenCalled()
   })
 })
 
 describe('WallTile — offers Resume on a stopped session whose conversation is still there', () => {
-  it('offers Resume on a stopped session whose conversation is still there', () => {
+  it('offers Resume on a stopped session whose conversation is still there', async () => {
+    const user = userEvent.setup()
     const onResume = vi.fn()
     render(
       <WallTile
@@ -161,7 +169,7 @@ describe('WallTile — offers Resume on a stopped session whose conversation is 
         onResume={onResume}
       />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Resume claude' }))
+    await user.click(screen.getByRole('button', { name: 'Resume claude' }))
     expect(onResume).toHaveBeenCalled()
     expect(props.onOpen).not.toHaveBeenCalled()
   })
@@ -194,10 +202,11 @@ describe('WallTile — says when a stopped session’s conversation has gone', (
 })
 
 describe('WallTile — ends the session from its tile without opening it', () => {
-  it('ends the session from its tile without opening it', () => {
+  it('ends the session from its tile without opening it', async () => {
+    const user = userEvent.setup()
     const onCloseSession = vi.fn()
     render(<WallTile {...props} onCloseSession={onCloseSession} />)
-    fireEvent.click(screen.getByRole('button', { name: /^Close / }))
+    await user.click(screen.getByRole('button', { name: /^Close / }))
     expect(onCloseSession).toHaveBeenCalled()
     expect(props.onOpen).not.toHaveBeenCalled()
   })
@@ -219,16 +228,19 @@ describe('WallTile — ends the session from its tile without opening it', () =>
 })
 
 describe('WallTile — what does not open it', () => {
-  it('ignores a click on the footer itself', () => {
+  it('ignores a click on the footer itself', async () => {
+    const user = userEvent.setup()
     const { container } = render(<WallTile {...props} />)
-    fireEvent.click(container.querySelector('.wall-tile__foot')!)
+    await user.click(container.querySelector('.wall-tile__foot')!)
     expect(props.onOpen).not.toHaveBeenCalled()
   })
 
-  it('ignores keys other than Enter, and Enter from inside the tile', () => {
+  it('ignores keys other than Enter', async () => {
+    const user = userEvent.setup()
     render(<WallTile {...props} />)
-    fireEvent.keyDown(screen.getByRole('article'), { key: ' ' })
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Open claude' }), { key: 'Enter' })
+    act(() => screen.getByRole('article').focus())
+    expect(document.activeElement).toBe(screen.getByRole('article'))
+    await user.keyboard(' ')
     expect(props.onOpen).not.toHaveBeenCalled()
   })
 
@@ -255,10 +267,11 @@ function seedNorthwind(): void {
 describe('WallTile — Add to task…', () => {
   beforeEach(seedNorthwind)
 
-  it('opens the picker for the tile’s repo and branch from its menu, without opening the tile', () => {
+  it('opens the picker for the tile’s repo and branch from its menu, without opening the tile', async () => {
+    const user = userEvent.setup()
     render(<WallTile {...props} facts={{ ...facts, projectId: 'p-nw' }} />)
     fireEvent.contextMenu(screen.getByRole('article'))
-    fireEvent.click(screen.getByText('Add to task…'))
+    await user.click(screen.getByText('Add to task…'))
     expect(useAddToTaskStore.getState().lane).toEqual({
       repoRoot: '/nw',
       branch: 'nw-88-rate-limits',

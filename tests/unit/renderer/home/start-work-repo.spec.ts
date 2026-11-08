@@ -42,21 +42,29 @@ describe('startWork on a branch — what git said about the repository', () => {
   })
 })
 
+/** Main's git API for a repository with one free branch, main. */
+const repoGit = {
+  isRepo: async () => ({ isRepo: true, root: '/repo' }) as never,
+  listBranches: async () => ({
+    branches: [{ name: 'main', isCurrent: true, isRemote: false }],
+  }),
+  listWorktrees: async () => ({ worktrees: [] }),
+}
+
 describe('the launcher reading a repository', () => {
-  it('shows the branches of a repository, and none when git could not answer', async () => {
-    const git = {
-      isRepo: async () => ({ isRepo: true, root: '/repo' }) as never,
-      listBranches: async () => ({
-        branches: [{ name: 'main', isCurrent: true, isRemote: false }],
-      }),
-      listWorktrees: async () => ({ worktrees: [] }),
-    }
-    installElectronApi({ git })
+  it('shows the branches of a repository', async () => {
+    installElectronApi({ git: repoGit })
+    const { result } = renderHook(() => useRepoGit(workspace))
+    await waitFor(() => expect(result.current.freeBranchNames).toEqual(['main']))
+  })
+
+  it('shows no branches for the next repository when git could not answer', async () => {
+    installElectronApi({ git: repoGit })
     const { result, rerender } = renderHook(({ ws }) => useRepoGit(ws), {
       initialProps: { ws: workspace },
     })
     await waitFor(() => expect(result.current.freeBranchNames).toEqual(['main']))
-    installElectronApi({ git: { ...git, isRepo: async () => ({ error: 'timed out' }) } })
+    installElectronApi({ git: { ...repoGit, isRepo: async () => ({ error: 'timed out' }) } })
     rerender({ ws: { ...workspace, id: 'ws-2', folderPath: '/other' } })
     await waitFor(() => expect(result.current.freeBranchNames).toEqual([]))
   })

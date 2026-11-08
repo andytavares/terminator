@@ -31,8 +31,15 @@ describe('useDismissedThreads', () => {
   it('a dismissed thread stays dismissed whatever its sessions print afterwards', () => {
     useDismissedThreads.getState().dismiss('session:scratch', 100, false)
     const dismissed = useDismissedThreads.getState().dismissed
+    const quiet = shown('session:scratch', [{ startedAt: 50, lastActivityAt: 90 }])
     const printedLater = shown('session:scratch', [{ startedAt: 50, lastActivityAt: 500 }])
+    expect(isDismissed(dismissed, quiet)).toBe(true)
     expect(isDismissed(dismissed, printedLater)).toBe(true)
+  })
+
+  it('a thread nobody dismissed is not dismissed', () => {
+    useDismissedThreads.getState().dismiss('session:scratch', 100, false)
+    const { dismissed } = useDismissedThreads.getState()
     expect(isDismissed(dismissed, shown('session:other', []))).toBe(false)
   })
 })

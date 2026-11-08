@@ -4,11 +4,11 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createLedgerChannels } from '../../src/ipc/ledger-channels.js'
+import { acceptedRulesIn } from '../../src/ipc/record-registration.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { resolveRule } from '../../src/recipe/resolve.js'
 import { declinedProposals } from '../../src/verify/rules.js'
-import { availableNames } from '../../src/recipe/resolve.js'
 import { createGateStore } from '../../src/gates/store.js'
 import { writeRunGraph } from '../../src/ipc/run-channels.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
@@ -28,24 +28,12 @@ const realBuiltIn = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 
 let root: string
 
-/**
- * The host reads accepted checks by rung — those that resolved from the
- * records location rather than shipping with the tool. Read here the same way,
- * so the test cannot pass on a list the application never produces.
- */
+/** The host's own reader of accepted checks, over a records location with no built-ins. */
 function acceptedRules() {
-  const sources = { dataRoot: root, repoPaths: [], builtInDir: path.resolve(root, 'nowhere') }
-  return availableNames('rules', sources).flatMap((name) => {
-    const resolved = resolveRule(name, sources)
-    if (!resolved.ok || resolved.resolved.rung !== 'data-root') return []
-    return [
-      {
-        id: resolved.resolved.value.id,
-        asserts: resolved.resolved.value.asserts,
-        rung: resolved.resolved.rung,
-        origin: resolved.resolved.value.origin,
-      },
-    ]
+  return acceptedRulesIn({
+    dataRoot: root,
+    repoPaths: [],
+    builtInDir: path.resolve(root, 'nowhere'),
   })
 }
 

@@ -291,7 +291,7 @@ describe('githubAPI bridge — leaves nodeId out of a batch viewed mark when the
       paths: ['a.ts'],
       viewed: false,
     })
-    expect(mockInvoke.mock.calls).toEqual([
+    expect(mockInvoke.mock.calls).toStrictEqual([
       [
         'github:files-viewed-set',
         { repoRoot: '/repo', prNumber: 211, paths: ['a.ts'], viewed: false },

@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { IssueDetails } from '../../../../src/renderer/components/integrations/IssueDetails'
 import { useStartWorkStore } from '../../../../src/renderer/components/home/start-work'
 import type { Issue } from '../../../../src/shared/types/index'
@@ -81,14 +82,16 @@ describe('IssueDetails — the issue', () => {
 
 describe('IssueDetails — actions', () => {
   it('opens the issue in its tracker', async () => {
+    const user = userEvent.setup()
     await setupAndSettle()
-    fireEvent.click(screen.getByText(/Open in Linear/))
+    await user.click(screen.getByText(/Open in Linear/))
     expect(openExternal).toHaveBeenCalledWith('https://linear.app/tav/issue/TAV-42')
   })
 
   it('refresh bypasses the cache', async () => {
+    const user = userEvent.setup()
     await setupAndSettle()
-    fireEvent.click(screen.getByText('Refresh'))
+    await user.click(screen.getByText('Refresh'))
     await waitFor(() =>
       expect(api.getIssue).toHaveBeenCalledWith({
         tracker: 'linear',
@@ -99,8 +102,9 @@ describe('IssueDetails — actions', () => {
   })
 
   it('start work opens the launcher with the key and closes', async () => {
+    const user = userEvent.setup()
     const onClose = await setupAndSettle()
-    fireEvent.click(screen.getByText('Start work'))
+    await user.click(screen.getByText('Start work'))
     expect(openLauncher).toHaveBeenCalledWith('TAV-42')
     expect(onClose).toHaveBeenCalled()
   })

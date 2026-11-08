@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
+import { render, screen, within, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { UsageScreen } from '../../../../src/renderer/components/usage/UsageScreen'
 import type { UsageFeatureRow, UsageReport } from '../../../../src/shared/usage/usage-types'
 
@@ -150,9 +151,10 @@ describe('UsageScreen — summary', () => {
   })
 
   it('narrows the table to one state when its chip is pressed', async () => {
+    const user = userEvent.setup()
     render(<UsageScreen />)
     await shown()
-    fireEvent.click(screen.getByRole('button', { name: /^Never used/ }))
+    await user.click(screen.getByRole('button', { name: /^Never used/ }))
     expect(screen.queryByRole('row', { name: /Start work/ })).toBeNull()
     expect(screen.getByRole('row', { name: /Export note/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /^Never used/ }).getAttribute('aria-pressed')).toBe(
@@ -163,21 +165,23 @@ describe('UsageScreen — summary', () => {
 
 describe('UsageScreen — filters', () => {
   it('narrows the table to one part from the part menu', async () => {
+    const user = userEvent.setup()
     render(<UsageScreen />)
     await shown()
-    fireEvent.click(screen.getByRole('button', { name: /All parts/ }))
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Notepad' }))
+    await user.click(screen.getByRole('button', { name: /All parts/ }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'Notepad' }))
     expect(screen.queryByRole('row', { name: /Start work/ })).toBeNull()
     expect(screen.getByRole('row', { name: /Notes/ })).toBeTruthy()
   })
 
   it('asks for the report from the first day of the period, and for all time with none', async () => {
+    const user = userEvent.setup()
     render(<UsageScreen />)
     await shown()
     expect(report).toHaveBeenLastCalledWith({ from: '2026-09-30' })
-    fireEvent.click(screen.getByRole('radio', { name: '7 days' }))
+    await user.click(screen.getByRole('radio', { name: '7 days' }))
     await waitFor(() => expect(report).toHaveBeenLastCalledWith({ from: '2026-10-23' }))
-    fireEvent.click(screen.getByRole('radio', { name: 'All time' }))
+    await user.click(screen.getByRole('radio', { name: 'All time' }))
     await waitFor(() => expect(report).toHaveBeenLastCalledWith({ from: null }))
   })
 })
@@ -205,9 +209,10 @@ describe('UsageScreen — states', () => {
 
 describe('UsageScreen — drawer', () => {
   it('opens a drawer for a row, with the controls inside a screen', async () => {
+    const user = userEvent.setup()
     render(<UsageScreen />)
     await shown()
-    fireEvent.click(screen.getByRole('row', { name: /Notes/ }))
+    await user.click(screen.getByRole('row', { name: /Notes/ }))
     const drawer = await screen.findByRole('dialog', { name: 'Notes' })
     expect(within(drawer).getByText('8 in 30 days · 8 all time')).toBeTruthy()
     expect(within(drawer).getByRole('heading', { name: 'Inside Notes' })).toBeTruthy()

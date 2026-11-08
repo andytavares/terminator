@@ -49,26 +49,32 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+/** Each quick action command: its id, label and mnemonic, in registration order. */
+const EXPECTED = [
+  ['commit', 'Commit…', 'c'],
+  ['push', 'Push', 'p'],
+  ['pull', 'Pull', 'l'],
+  ['create-pr', 'Create PR…', 'r'],
+  ['write-commit-message', 'Write commit message', 'w'],
+  ['commit-and-open-pr', 'Commit and open PR…', 'o'],
+]
+
 describe('registerQuickActionCommands', () => {
-  it('registers exactly commit, push, pull, create-pr, write-commit-message and commit-and-open-pr with mnemonics, labels, requires and category', () => {
+  it('registers exactly commit, push, pull, create-pr, write-commit-message and commit-and-open-pr', () => {
     const { api, registrations } = buildMockApi()
     registerQuickActionCommands(api as never)
-
-    expect(registrations).toHaveLength(6)
-    const byId = Object.fromEntries(registrations.map((r) => [r.command.id, r.command]))
-
-    const expected = [
-      ['commit', 'Commit…', 'c'],
-      ['push', 'Push', 'p'],
-      ['pull', 'Pull', 'l'],
-      ['create-pr', 'Create PR…', 'r'],
-      ['write-commit-message', 'Write commit message', 'w'],
-      ['commit-and-open-pr', 'Commit and open PR…', 'o'],
-    ]
-    for (const [id, label, mnemonic] of expected) {
-      expect(byId[id]).toMatchObject({ label, mnemonic, requires: 'repo', category: 'Git' })
-    }
+    expect(registrations.map((r) => r.command.id)).toEqual(EXPECTED.map(([id]) => id))
   })
+
+  it.each(EXPECTED)(
+    'registers %s as "%s" with mnemonic %s in the Git category, for a repo',
+    (id, label, mnemonic) => {
+      const { api, registrations } = buildMockApi()
+      registerQuickActionCommands(api as never)
+      const command = registrations.find((r) => r.command.id === id)?.command
+      expect(command).toMatchObject({ label, mnemonic, requires: 'repo', category: 'Git' })
+    }
+  )
 })
 
 describe('registerQuickActionCommands — disposing the returned disposables removes every command', () => {

@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { ContributionsSection } from '../../src/components/contributions/ContributionsSection'
 import { periodRange } from '../../src/components/contributions/period-presets'
 import type { ContributionsDay, ContributionsReply } from '../../src/schemas/contributions.schema'
@@ -78,11 +79,14 @@ async function renderSection(reply: unknown): Promise<ReturnType<typeof render>>
 }
 
 /** The period popover, on Custom range, with both dates typed. */
-async function openCustomRange(dates: { from: string; to: string }): Promise<void> {
-  fireEvent.click(screen.getByRole('button', { name: 'This year' }))
-  fireEvent.click(await screen.findByRole('radio', { name: 'Custom range…' }))
-  fireEvent.change(await screen.findByLabelText('From'), { target: { value: dates.from } })
-  fireEvent.change(await screen.findByLabelText('To'), { target: { value: dates.to } })
+async function openCustomRange(
+  user: UserEvent,
+  dates: { from: string; to: string }
+): Promise<void> {
+  await user.click(screen.getByRole('button', { name: 'This year' }))
+  await user.click(await screen.findByRole('radio', { name: 'Custom range…' }))
+  await user.type(await screen.findByLabelText('From'), dates.from)
+  await user.type(await screen.findByLabelText('To'), dates.to)
 }
 
 describe('ContributionsSection — renders the period stats and their change', () => {
@@ -162,9 +166,10 @@ describe('ContributionsSection — requests the default preset range on load', (
 
 describe('ContributionsSection — sends the chosen repository on the next request', () => {
   it('passes repo on the channel', async () => {
+    const user = userEvent.setup()
     await renderSection(makeReply())
-    fireEvent.click(screen.getByRole('button', { name: 'All repositories' }))
-    fireEvent.click(await screen.findByRole('radio', { name: 'klaviyo/amigo' }))
+    await user.click(screen.getByRole('button', { name: 'All repositories' }))
+    await user.click(await screen.findByRole('radio', { name: 'klaviyo/amigo' }))
     await waitFor(() =>
       expect(mockInvoke).toHaveBeenCalledWith('github:contributions', {
         ...defaultRange(),
@@ -176,9 +181,10 @@ describe('ContributionsSection — sends the chosen repository on the next reque
 
 describe('ContributionsSection — sends a chosen preset with its from and to', () => {
   it('passes the preset range on the channel', async () => {
+    const user = userEvent.setup()
     await renderSection(makeReply())
-    fireEvent.click(screen.getByRole('button', { name: 'This year' }))
-    fireEvent.click(await screen.findByRole('radio', { name: 'Last 30 days' }))
+    await user.click(screen.getByRole('button', { name: 'This year' }))
+    await user.click(await screen.findByRole('radio', { name: 'Last 30 days' }))
     await waitFor(() =>
       expect(mockInvoke).toHaveBeenCalledWith(
         'github:contributions',
@@ -190,10 +196,11 @@ describe('ContributionsSection — sends a chosen preset with its from and to', 
 
 describe('ContributionsSection — rejects a custom range whose from is after its to', () => {
   it('shows an alert and does not call the channel', async () => {
+    const user = userEvent.setup()
     await renderSection(makeReply())
-    await openCustomRange({ from: '2026-10-10', to: '2026-10-01' })
+    await openCustomRange(user, { from: '2026-10-10', to: '2026-10-01' })
     const callsBefore = mockInvoke.mock.calls.length
-    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    await user.click(screen.getByRole('button', { name: 'Apply' }))
     expect(await screen.findByRole('alert')).toBeDefined()
     expect(mockInvoke.mock.calls.length).toBe(callsBefore)
   })
@@ -201,9 +208,10 @@ describe('ContributionsSection — rejects a custom range whose from is after it
 
 describe('ContributionsSection — applies a valid custom range', () => {
   it('sends the custom from and to', async () => {
+    const user = userEvent.setup()
     await renderSection(makeReply())
-    await openCustomRange({ from: '2026-10-01', to: '2026-10-10' })
-    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    await openCustomRange(user, { from: '2026-10-01', to: '2026-10-10' })
+    await user.click(screen.getByRole('button', { name: 'Apply' }))
     await waitFor(() =>
       expect(mockInvoke).toHaveBeenCalledWith('github:contributions', {
         from: '2026-10-01',
@@ -215,8 +223,9 @@ describe('ContributionsSection — applies a valid custom range', () => {
 
 describe('ContributionsSection — asks for a refresh with refresh: true', () => {
   it('passes refresh on the channel', async () => {
+    const user = userEvent.setup()
     await renderSection(makeReply())
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh contributions' }))
+    await user.click(screen.getByRole('button', { name: 'Refresh contributions' }))
     await waitFor(() =>
       expect(mockInvoke).toHaveBeenCalledWith('github:contributions', {
         ...defaultRange(),
@@ -247,11 +256,12 @@ describe('ContributionsSection — RATE_LIMITED', () => {
 
 describe('ContributionsSection — another error', () => {
   it('shows it with a Retry button and recovers when the retry succeeds', async () => {
+    const user = userEvent.setup()
     answerWith({ error: 'boom' })
     render(<ContributionsSection />)
     expect(await screen.findByText('boom')).toBeDefined()
     answerWith(makeReply())
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
     expect(await screen.findByText('412 contributions in the last year')).toBeDefined()
   })
 })

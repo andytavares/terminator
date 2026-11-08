@@ -1,20 +1,17 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useTaskStore } from '../../../../src/renderer/stores/task.store'
+import { useAddToTaskStore } from '../../../../src/renderer/components/tasks/add-to-task'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { UnifiedSidebar } from '../../../../src/renderer/components/sidebar/UnifiedSidebar'
 import type { Task } from '../../../../src/shared/schemas/tasks.schema'
 import { projectFixture, workspaceFixture } from '../../../support/renderer-stores'
 
-const openAddToTask = vi.hoisted(() => vi.fn())
-vi.mock('../../../../src/renderer/components/tasks/add-to-task', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  openAddToTask,
-}))
 vi.mock('../../../../src/renderer/hooks/useBranchSync', () => ({ useBranchSync: vi.fn() }))
 vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
   useSessionFacts: () => [],
@@ -78,6 +75,7 @@ beforeEach(() => {
   useExtensionRegistry.setState(useExtensionRegistry.getInitialState(), true)
   useSettingsStore.setState(useSettingsStore.getInitialState(), true)
   useTaskStore.setState({ tasks: [loginTask] })
+  useAddToTaskStore.getState().close()
 })
 
 function renderSidebar() {
@@ -93,18 +91,19 @@ function renderSidebar() {
   )
 }
 
-function groupByTask(): void {
-  fireEvent.click(screen.getByRole('button', { name: 'Display' }))
-  fireEvent.click(screen.getByRole('menuitemradio', { name: 'Task' }))
+async function groupByTask(): Promise<void> {
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('button', { name: 'Display' }))
+  await user.click(screen.getByRole('menuitemradio', { name: 'Task' }))
 }
 
 const rowNames = (c: HTMLElement) =>
   Array.from(c.querySelectorAll('.branch-row__name')).map((r) => r.textContent)
 
 describe('UnifiedSidebar — grouped by task', () => {
-  it('shows the task with its three lanes, then the other branches under "Not in a task"', () => {
+  it('shows the task with its three lanes, then the other branches under "Not in a task"', async () => {
     const { container } = renderSidebar()
-    groupByTask()
+    await groupByTask()
     expect(screen.getByText('Login rework')).toBeTruthy()
     expect(screen.getByText('Not in a task')).toBeTruthy()
     expect(rowNames(container)).toEqual([
@@ -115,9 +114,9 @@ describe('UnifiedSidebar — grouped by task', () => {
     ])
   })
 
-  it('draws no repo header for a repo whose only branch is in the task', () => {
+  it('draws no repo header for a repo whose only branch is in the task', async () => {
     const { container } = renderSidebar()
-    groupByTask()
+    await groupByTask()
     const headers = Array.from(container.querySelectorAll('.repo-header__name')).map(
       (h) => h.textContent
     )
@@ -132,9 +131,9 @@ describe('UnifiedSidebar — grouped by task — the default', () => {
     expect(rowNames(container)).toEqual(['main', 'login', 'login', 'login'])
   })
 
-  it('remembers the choice across a reload', () => {
+  it('remembers the choice across a reload', async () => {
     const first = renderSidebar()
-    groupByTask()
+    await groupByTask()
     first.unmount()
     renderSidebar()
     expect(screen.getByText('Login rework')).toBeTruthy()
@@ -142,27 +141,28 @@ describe('UnifiedSidebar — grouped by task — the default', () => {
 })
 
 describe('UnifiedSidebar — Add to task…', () => {
-  it('is on a branch row’s menu and names that branch’s repo and branch', () => {
+  it('is on a branch row’s menu and names that branch’s repo and branch', async () => {
+    const user = userEvent.setup()
     const { container } = renderSidebar()
     fireEvent.contextMenu(container.querySelectorAll('.branch-row')[0])
-    fireEvent.click(screen.getByText('Add to task…'))
-    expect(openAddToTask).toHaveBeenCalledWith({ repoRoot: '/b', branch: 'main' })
+    await user.click(screen.getByText('Add to task…'))
+    expect(useAddToTaskStore.getState().lane).toEqual({ repoRoot: '/b', branch: 'main' })
   })
 })
 
 describe('UnifiedSidebar — grouped by task — the task’s state', () => {
   const header = () => screen.getByText('Login rework').closest('.repo-header') as HTMLElement
 
-  it('draws the task’s state glyph on its header', () => {
+  it('draws the task’s state glyph on its header', async () => {
     renderSidebar()
-    groupByTask()
+    await groupByTask()
     expect(within(header()).getByRole('img', { name: 'Quiet' })).toBeTruthy()
   })
 
-  it('says Done once the task is marked done', () => {
+  it('says Done once the task is marked done', async () => {
     useTaskStore.setState({ tasks: [{ ...loginTask, doneAt: '2026-10-20T00:00:00.000Z' }] })
     renderSidebar()
-    groupByTask()
+    await groupByTask()
     expect(within(header()).getByRole('img', { name: 'Done' })).toBeTruthy()
   })
 })

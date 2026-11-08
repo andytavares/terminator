@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ChapterFileList } from '../../src/components/pr-review/ChapterFileList'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import type { Chapter } from '../../src/schemas/pr-review.schema'
@@ -56,19 +57,23 @@ const defaultProps = {
 }
 
 describe('ChapterFileList', () => {
-  it('calls onSelectFile when file row is clicked', () => {
+  it('calls onSelectFile when file row is clicked', async () => {
+    const user = userEvent.setup()
     const onSelectFile = vi.fn()
     render(<ChapterFileList {...defaultProps} onSelectFile={onSelectFile} />)
-    fireEvent.click(screen.getByText('foo.ts'))
+    await user.click(screen.getByTitle('src/foo.ts'))
     expect(onSelectFile).toHaveBeenCalledWith('src/foo.ts')
   })
 
-  it('calls onSelectFile when Enter is pressed on file row', () => {
+  it("calls onSelectFile with the row's path when Enter is pressed on it", async () => {
+    const user = userEvent.setup()
     const onSelectFile = vi.fn()
     render(<ChapterFileList {...defaultProps} onSelectFile={onSelectFile} />)
-    const rows = screen.getAllByRole('button')
-    fireEvent.keyDown(rows[0], { key: 'Enter' })
-    expect(onSelectFile).toHaveBeenCalled()
+    const row = screen.getByTitle('src/foo.ts')
+    row.focus()
+    expect(row).toBe(document.activeElement)
+    await user.keyboard('{Enter}')
+    expect(onSelectFile).toHaveBeenCalledExactlyOnceWith('src/foo.ts')
   })
 })
 
@@ -117,6 +122,7 @@ describe('ChapterFileList — respects fileOrderOverrides for file order', () =>
 })
 
 describe('ChapterFileList — calls reorderFiles on drag and drop between rows', () => {
+  // user-event cannot drag and drop, so the drag tests below fire the drag events directly.
   it('calls reorderFiles on drag and drop between rows', () => {
     render(<ChapterFileList {...defaultProps} />)
     const rows = screen.getAllByRole('button')

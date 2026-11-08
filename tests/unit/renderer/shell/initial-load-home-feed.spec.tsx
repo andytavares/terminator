@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render } from '@testing-library/react'
+import { act, render } from '@testing-library/react'
 
 const noop = vi.hoisted(() => vi.fn())
 const stores = vi.hoisted(() => {
@@ -41,28 +41,40 @@ vi.mock('../../../../src/renderer/shell/agent-attention', () => ({ useAgentAtten
 
 import { useInitialLoad } from '../../../../src/renderer/shell/bootstrap'
 import { useHomeFeedStore } from '../../../../src/renderer/stores/home-feed.store'
-import { installElectronApi } from '../../../support/electron-api'
+import { installElectronApi, pushedEvent } from '../../../support/electron-api'
+import type { MergedHomeFeed } from '../../../../src/shared/schemas/home-feed.schema'
 
 function Shell(): null {
   useInitialLoad()
   return null
 }
 
+/** A feed holding one focus candidate, as main pushes it. */
+function feedFocusing(title: string): MergedHomeFeed {
+  const focus = { id: title, title, workKey: null, done: false, source: 'ext.focus' }
+  return { asks: [], facets: [], measures: [], focus: [focus] }
+}
+const focusTitles = () => useHomeFeedStore.getState().focus.map((item) => item.title)
+
 describe('useInitialLoad: the Home feed', () => {
-  it('reads what extensions published and follows later changes until the window closes', () => {
-    const unsubscribe = vi.fn()
-    const load = vi.fn().mockResolvedValue(undefined)
-    const subscribe = vi.fn(() => unsubscribe)
+  it('reads what extensions published and follows later changes until the window closes', async () => {
+    const feedChanged = pushedEvent<[MergedHomeFeed]>()
     installElectronApi({
       schedules: { onRun: () => () => {} },
       terminal: { onProcessExit: () => () => {} },
       extension: { onCommandsChanged: () => () => {} },
+      homeFeed: {
+        get: async () => ({ data: feedFocusing('Ship login') }),
+        onChanged: feedChanged.addListener,
+      },
     })
-    useHomeFeedStore.setState({ load, subscribe })
+    useHomeFeedStore.setState(useHomeFeedStore.getInitialState(), true)
     const { unmount } = render(<Shell />)
-    expect(load).toHaveBeenCalledOnce()
-    expect(subscribe).toHaveBeenCalledOnce()
+    await expect.poll(focusTitles).toEqual(['Ship login'])
+    act(() => feedChanged.deliver(feedFocusing('Fix CI')))
+    expect(focusTitles()).toEqual(['Fix CI'])
     unmount()
-    expect(unsubscribe).toHaveBeenCalledOnce()
+    feedChanged.deliver(feedFocusing('After close'))
+    expect(focusTitles()).toEqual(['Fix CI'])
   })
 })

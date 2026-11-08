@@ -41,8 +41,8 @@ describe('ContributionsOnHome', () => {
   it('shows nothing when "Show contributions on Insights" is off', async () => {
     getSettingsValues.mockResolvedValue({ values: { [SHOW_KEY]: false } })
     const { container } = render(<ContributionsOnHome />)
-    await waitFor(() => expect(getSettingsValues).toHaveBeenCalled())
-    await act(async () => {})
+    // The component reads the setting in a .then on this promise, registered before this await.
+    await act(() => getSettingsValues.mock.results[0].value)
     expect(container.innerHTML).toBe('')
   })
 })

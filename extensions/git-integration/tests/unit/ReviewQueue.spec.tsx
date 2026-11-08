@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ReviewQueue } from '../../src/components/pr-review/ReviewQueue'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import { useReviewUiStore } from '../../src/stores/review-ui.store'
@@ -115,7 +116,8 @@ describe('ReviewQueue — summarises the queue in one line instead of four tiles
 })
 
 describe('ReviewQueue — calls onOpenPr when PR row is clicked', () => {
-  it('calls onOpenPr when PR row is clicked', () => {
+  it('calls onOpenPr when PR row is clicked', async () => {
+    const user = userEvent.setup()
     const pr = makePr({ number: 7, title: 'My PR' })
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
@@ -123,14 +125,15 @@ describe('ReviewQueue — calls onOpenPr when PR row is clicked', () => {
     })
     const onOpenPr = vi.fn()
     render(<ReviewQueue {...defaultProps} onOpenPr={onOpenPr} />)
-    fireEvent.click(screen.getByText('My PR'))
+    await user.click(screen.getByText('My PR'))
     expect(onOpenPr).toHaveBeenCalledWith(pr)
   })
 
   it('calls onRefresh when refresh button is clicked', async () => {
+    const user = userEvent.setup()
     const onRefresh = vi.fn().mockResolvedValue(undefined)
     render(<ReviewQueue {...defaultProps} onRefresh={onRefresh} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh pull requests' }))
+    await user.click(screen.getByRole('button', { name: 'Refresh pull requests' }))
     expect(onRefresh).toHaveBeenCalled()
   })
 })
@@ -246,15 +249,14 @@ describe('ReviewQueue (continued) — one list, two lines per row — has one he
     expect(headings).toHaveLength(1)
     expect(headings[0].textContent).toContain('Open pull requests')
     expect(headings[0].textContent).toContain('47')
-    for (const old of [
+    const oldGroups = [
       'In progress',
       'Needs your review',
       'Read these first',
       'Quick wins',
       'Larger reviews',
-    ]) {
-      expect(screen.queryByText(old)).toBeNull()
-    }
+    ]
+    expect(oldGroups.filter((old) => screen.queryByText(old))).toEqual([])
     expect(screen.queryByText(/Open more than/)).toBeNull()
   })
 })
@@ -283,7 +285,8 @@ describe('ReviewQueue (continued) — one list, two lines per row — sorts newe
 })
 
 describe('ReviewQueue (continued) — one list, two lines per row — puts approved, passing pull requests first under Closest to merging', () => {
-  it('puts approved, passing pull requests first under Closest to merging', () => {
+  it('puts approved, passing pull requests first under Closest to merging', async () => {
+    const user = userEvent.setup()
     const { container } = renderMany([
       makePr({ number: 1, title: 'Waiting', openedAt: days(9) }),
       makePr({
@@ -294,23 +297,20 @@ describe('ReviewQueue (continued) — one list, two lines per row — puts appro
         approvedBy: ['bo'],
       }),
     ])
-    fireEvent.change(screen.getByRole('combobox', { name: 'Sort' }), {
-      target: { value: 'closest' },
-    })
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'closest')
     expect(titles(container)[0]).toContain('Ready')
     expect(useReviewUiStore.getState().queueSort).toBe('closest')
   })
 })
 
 describe('ReviewQueue (continued) — one list, two lines per row — puts a paused pull request first under Started by you', () => {
-  it('puts a paused pull request first under Started by you', () => {
+  it('puts a paused pull request first under Started by you', async () => {
+    const user = userEvent.setup()
     const { container } = renderMany([
       makePr({ number: 1, title: 'Untouched', openedAt: days(9) }),
       makePr({ number: 2, title: 'Paused one', openedAt: days(1), sessionStatus: 'paused' }),
     ])
-    fireEvent.change(screen.getByRole('combobox', { name: 'Sort' }), {
-      target: { value: 'started' },
-    })
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'started')
     expect(titles(container)[0]).toContain('Paused one')
   })
 })
@@ -359,7 +359,8 @@ describe('ReviewQueue (continued) — one list, two lines per row — leaves a q
     expect(row.querySelector('.rd-chip')).toBeNull()
   })
 
-  it('opens a row on Enter', () => {
+  it('opens a row on Enter', async () => {
+    const user = userEvent.setup()
     const pr = makePr({ title: 'Keyboard' })
     const onOpenPr = vi.fn()
     vi.mocked(usePrReviewStore).mockReturnValue({
@@ -367,7 +368,10 @@ describe('ReviewQueue (continued) — one list, two lines per row — leaves a q
       prQueue: [pr],
     })
     const { container } = render(<ReviewQueue {...defaultProps} onOpenPr={onOpenPr} />)
-    fireEvent.keyDown(container.querySelector('.rd-row')!, { key: 'Enter' })
+    const row = container.querySelector<HTMLElement>('.rd-row')!
+    row.focus()
+    expect(row).toBe(document.activeElement)
+    await user.keyboard('{Enter}')
     expect(onOpenPr).toHaveBeenCalledWith(pr)
   })
 })

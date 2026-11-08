@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Kbd } from '../../../../packages/extension-ui/src/Kbd'
 import { StatusDot } from '../../../../packages/extension-ui/src/StatusDot'
 import { Chip } from '../../../../packages/extension-ui/src/Chip'
@@ -20,7 +21,7 @@ describe('Kbd', () => {
 describe('StatusDot', () => {
   it('is announced by its label when it has one', () => {
     render(<StatusDot tone="waiting" label="Waiting for you" />)
-    expect(screen.getByRole('img', { name: 'Waiting for you' })).toBeTruthy()
+    expect(screen.getByRole('img').getAttribute('aria-label')).toBe('Waiting for you')
   })
 
   it('is hidden from assistive technology without a label', () => {
@@ -75,10 +76,12 @@ describe('StageBar', () => {
   })
 
   it('shows a caption under the compact bar only', () => {
-    const { rerender } = render(<StageBar stage="building" caption="Waiting on your review" />)
-    expect(screen.getByText('Waiting on your review')).toBeTruthy()
+    const { container, rerender } = render(
+      <StageBar stage="building" caption="Waiting on your review" />
+    )
+    expect(container.textContent).toContain('Waiting on your review')
     rerender(<StageBar stage="building" size="large" caption="Waiting on your review" />)
-    expect(screen.queryByText('Waiting on your review')).toBeNull()
+    expect(container.textContent).not.toContain('Waiting on your review')
   })
 })
 
@@ -104,7 +107,7 @@ describe('Sparkline', () => {
   it('draws a flat series in the middle and a single value without failing', () => {
     expect(sparklinePoints([3, 3, 3], 'sm').map((point) => point.y)).toEqual([11, 11, 11])
     const { container } = render(<Sparkline values={[7]} />)
-    expect(endpoint(container)).toBeTruthy()
+    expect(Number(endpoint(container).getAttribute('cy'))).toBe(sparklinePoints([7], 'md')[0].y)
   })
 })
 
@@ -118,7 +121,7 @@ describe('Sparkline — drawing', () => {
     const { container, rerender } = render(<Sparkline values={[]} />)
     expect(container.querySelector('svg')).toBeNull()
     rerender(<Sparkline values={[1, 2]} label="Merged per week" />)
-    expect(screen.getByRole('img', { name: 'Merged per week' })).toBeTruthy()
+    expect(screen.getByRole('img').getAttribute('aria-label')).toBe('Merged per week')
   })
 })
 
@@ -135,7 +138,7 @@ describe('MetricCard', () => {
     )
     expect(screen.getByText('Time in review').textContent).toContain('median')
     expect(screen.getByText('4.2').textContent).toBe('4.2h')
-    expect(screen.getByText('down 12%')).toBeTruthy()
+    expect(document.body.textContent).toContain('down 12%')
   })
 
   it('shows what it is given under the sub line', () => {
@@ -144,7 +147,7 @@ describe('MetricCard', () => {
         <p>chart here</p>
       </MetricCard>
     )
-    expect(screen.getByText('chart here')).toBeTruthy()
+    expect(document.body.textContent).toContain('chart here')
   })
 })
 
@@ -156,21 +159,24 @@ describe('Drawer', () => {
       </Drawer>
     )
     const dialog = screen.getByRole('dialog', { name: 'Fix the login redirect' })
-    expect(within(dialog).getByText('Timeline')).toBeTruthy()
+    expect(dialog.textContent).toContain('Timeline')
     expect(dialog.hasAttribute('open')).toBe(true)
   })
 
-  it('closes on Escape', () => {
+  it('closes on Escape', async () => {
+    const user = userEvent.setup()
     const onDismiss = vi.fn()
     render(
       <Drawer label="Fix the login redirect" onDismiss={onDismiss}>
         <p>Timeline</p>
       </Drawer>
     )
-    fireEvent.keyDown(document, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('Drawer — focus on open', () => {
   it('takes focus on open', () => {
     render(
       <Drawer label="Fix the login redirect" onDismiss={vi.fn()}>
@@ -193,10 +199,11 @@ describe('Drawer — focus', () => {
 })
 
 describe('Checkbox', () => {
-  it('reports the opposite state when pressed', () => {
+  it('reports the opposite state when pressed', async () => {
+    const user = userEvent.setup()
     const onChange = vi.fn()
     render(<Checkbox checked={false} label="Tests pass" onChange={onChange} />)
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Tests pass' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Tests pass' }))
     expect(onChange).toHaveBeenCalledWith(true)
   })
 
@@ -205,7 +212,7 @@ describe('Checkbox', () => {
     expect(screen.getByRole('checkbox', { name: 'Tests pass' }).getAttribute('aria-checked')).toBe(
       'true'
     )
-    expect(container.querySelector('svg')).toBeTruthy()
+    expect(container.querySelectorAll('svg')).toHaveLength(1)
     rerender(<Checkbox checked={false} label="Tests pass" />)
     expect(container.querySelector('svg')).toBeNull()
   })

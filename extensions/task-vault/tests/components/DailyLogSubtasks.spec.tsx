@@ -1,7 +1,8 @@
 import React from 'react'
 import { setImmediate as nextEventLoopTurn } from 'node:timers/promises'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { screen, cleanup, fireEvent, within } from '@testing-library/react'
+import { screen, cleanup, within } from '@testing-library/react'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { installVaultBridge, eventually, task } from './helpers/bridge'
 import { buttonNamed, renderDailyLog } from './helpers/daily-log'
 import type { IndexedTask } from '../../src/vault/types'
@@ -53,19 +54,22 @@ afterEach(() => {
 describe('DailyLog subtasks', subtaskTests)
 describe('DailyLog subtasks, continued', subtaskTestsPart2)
 describe('DailyLog subtask editing', subtaskEditTests)
+describe('DailyLog subtask editing, continued', subtaskEditTestsPart2)
 describe('DailyLog adding subtasks', ghostTests)
 describe('DailyLog adding subtasks, continued', ghostTestsPart2)
 describe('DailyLog terminal links', linkTests)
 describe('DailyLog terminal links, continued', linkTestsPart2)
+describe('DailyLog terminal links with no session open', noSessionTests)
 describe('DailyLog terminal links the app cannot list', unlistableTests)
+describe('DailyLog terminal links the app cannot list, continued', unlistableTestsPart2)
 describe('DailyLog jumping to a linked terminal', jumpTests)
 describe('DailyLog jumping to a linked terminal, continued', jumpTestsPart2)
 
 function subtaskTests() {
   it('completes an open subtask with a notice that leads back to it', async () => {
+    const user = userEvent.setup()
     const { props } = renderDailyLog(withSubtasks())
-    expect(screen.queryByRole('button', { name: 'Add subtask' })).toBeNull()
-    fireEvent.click(within(subtask('Step one')).getByTitle('Complete subtask'))
+    await user.click(within(subtask('Step one')).getByTitle('Complete subtask'))
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
     expect(bridge.calls('task-vault:vault:complete-task')).toEqual([{ taskId: 's1' }])
     const [type, message, options] = vi.mocked(notify).mock.calls.at(-1)!
@@ -74,111 +78,172 @@ function subtaskTests() {
     expect(useVaultNavStore.getState().pendingTaskId).toBe('s1')
   })
 
-  it('shows a finished subtask struck through, with only Delete', () => {
+  it('shows a finished subtask struck through, with Delete but no Edit', () => {
     renderDailyLog(withSubtasks())
     const done = subtask('Step two')
     expect(done.className).toContain('daily-log__subtask--done')
-    expect(done.querySelector('.daily-log__task-text--strikethrough')).toBeTruthy()
+    expect(screen.getByText('Step two').className).toContain('daily-log__task-text--strikethrough')
+    expect(within(done).queryByRole('button', { name: 'Delete' })).not.toBeNull()
     expect(within(done).queryByRole('button', { name: 'Edit' })).toBeNull()
-    fireEvent.doubleClick(screen.getByText('Step two'))
+  })
+
+  it('opens no editor when a finished subtask is double-clicked', async () => {
+    const user = userEvent.setup()
+    renderDailyLog(withSubtasks())
+    await user.dblClick(screen.getByText('Step two'))
     expect(screen.queryByLabelText('Task text')).toBeNull()
   })
 }
 
 function subtaskTestsPart2() {
-  it('deletes a subtask only once confirmed', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
-    const { props } = renderDailyLog(withSubtasks())
-    fireEvent.click(within(subtask('Step two')).getByRole('button', { name: 'Delete' }))
+  it('keeps a subtask when the delete is not confirmed', async () => {
+    const user = userEvent.setup()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    renderDailyLog(withSubtasks())
+    await user.click(within(subtask('Step two')).getByRole('button', { name: 'Delete' }))
     expect(confirm).toHaveBeenCalledWith('Delete subtask: "Step two"?')
-    fireEvent.click(within(subtask('Step one')).getByRole('button', { name: 'Delete' }))
+    expect(bridge.calls('task-vault:vault:delete-task')).toEqual([])
+  })
+
+  it('deletes a subtask once confirmed', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const { props } = renderDailyLog(withSubtasks())
+    await user.click(within(subtask('Step one')).getByRole('button', { name: 'Delete' }))
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
     expect(bridge.calls('task-vault:vault:delete-task')).toEqual([{ taskId: 's1' }])
   })
 }
 
 function subtaskEditTests() {
-  it('edits an open subtask by its button or a double click', async () => {
-    const { props } = renderDailyLog(withSubtasks())
-    fireEvent.click(within(subtask('Step one')).getByRole('button', { name: 'Edit' }))
-    fireEvent.click(buttonNamed('Cancel edit'))
-    fireEvent.doubleClick(screen.getByText('Step one'))
-    const input = screen.getByLabelText('Task text') as HTMLInputElement
-    expect(input.value).toBe('Step one')
-    fireEvent.change(input, { target: { value: ' ' } })
-    fireEvent.click(buttonNamed('Save'))
-    fireEvent.change(input, { target: { value: ' Step 1 ' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
-    await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
-    expect(bridge.calls('task-vault:vault:edit-task')).toEqual([{ taskId: 's1', text: 'Step 1' }])
+  it('opens the editor, holding the subtask text, from the Edit button', async () => {
+    const user = userEvent.setup()
+    renderDailyLog(withSubtasks())
+    await user.click(within(subtask('Step one')).getByRole('button', { name: 'Edit' }))
+    expect(screen.getByLabelText('Task text')).toHaveProperty('value', 'Step one')
   })
 
-  it('cancels an edit with Escape', () => {
+  it('opens the editor on a double click of an open subtask', async () => {
+    const user = userEvent.setup()
     renderDailyLog(withSubtasks())
-    fireEvent.doubleClick(screen.getByText('Step one'))
-    fireEvent.keyDown(screen.getByLabelText('Task text'), { key: 'Escape' })
+    await user.dblClick(screen.getByText('Step one'))
+    expect(screen.getByLabelText('Task text')).toHaveProperty('value', 'Step one')
+  })
+
+  it('closes the editor on Cancel edit', async () => {
+    const user = userEvent.setup()
+    renderDailyLog(withSubtasks())
+    await user.dblClick(screen.getByText('Step one'))
+    await user.click(buttonNamed('Cancel edit'))
     expect(screen.queryByLabelText('Task text')).toBeNull()
+  })
+
+  it('cancels an edit with Escape', async () => {
+    const user = userEvent.setup()
+    renderDailyLog(withSubtasks())
+    await user.dblClick(screen.getByText('Step one'))
+    await user.type(screen.getByLabelText('Task text'), '{Escape}')
+    expect(screen.queryByLabelText('Task text')).toBeNull()
+  })
+}
+
+function subtaskEditTestsPart2() {
+  it('saves nothing for blank text and keeps the editor open', async () => {
+    const user = userEvent.setup()
+    renderDailyLog(withSubtasks())
+    await user.dblClick(screen.getByText('Step one'))
+    await user.clear(screen.getByLabelText('Task text'))
+    await user.type(screen.getByLabelText('Task text'), ' ')
+    await user.click(buttonNamed('Save'))
+    expect(screen.queryByLabelText('Task text')).not.toBeNull()
+    expect(bridge.calls('task-vault:vault:edit-task')).toEqual([])
+  })
+
+  it('saves the trimmed text on Enter', async () => {
+    const user = userEvent.setup()
+    const { props } = renderDailyLog(withSubtasks())
+    await user.dblClick(screen.getByText('Step one'))
+    await user.clear(screen.getByLabelText('Task text'))
+    await user.type(screen.getByLabelText('Task text'), ' Step 1 {Enter}')
+    await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
+    expect(bridge.calls('task-vault:vault:edit-task')).toEqual([{ taskId: 's1', text: 'Step 1' }])
   })
 }
 
 function ghostTests() {
   it('adds another subtask from the ghost row', async () => {
+    const user = userEvent.setup()
     const { props } = renderDailyLog(withSubtasks())
-    fireEvent.click(screen.getByText('· + Add subtask…'))
+    await user.click(buttonNamed('· + Add subtask…'))
     expect(buttonNamed('Add')).toHaveProperty('disabled', true)
-    fireEvent.change(screen.getByLabelText('Subtask…'), { target: { value: ' three ' } })
-    fireEvent.click(buttonNamed('Add'))
-    await eventually(() => expect(screen.getByText('· + Add subtask…')).toBeTruthy())
+    await user.type(screen.getByLabelText('Subtask…'), ' three ')
+    await user.click(buttonNamed('Add'))
+    await screen.findByRole('button', { name: '· + Add subtask…' })
     expect(bridge.calls('task-vault:vault:add-subtask')).toEqual([{ taskId: 'p', text: 'three' }])
     expect(props.onRefresh).toHaveBeenCalled()
   })
 
-  it('cancels the ghost row by button or Escape, ignoring a blank submit', () => {
+  it('adds nothing when Enter is pressed on a blank ghost row', async () => {
+    const user = userEvent.setup()
     renderDailyLog(withSubtasks('blocked'))
-    fireEvent.click(screen.getByText('· + Add subtask…'))
-    fireEvent.keyDown(screen.getByLabelText('Subtask…'), { key: 'Enter' })
-    fireEvent.click(buttonNamed('Cancel'))
-    fireEvent.click(screen.getByText('· + Add subtask…'))
-    fireEvent.keyDown(screen.getByLabelText('Subtask…'), { key: 'Escape' })
-    expect(screen.queryByLabelText('Subtask…')).toBeNull()
+    await user.click(buttonNamed('· + Add subtask…'))
+    await user.type(screen.getByLabelText('Subtask…'), '{Enter}')
+    expect(screen.queryByLabelText('Subtask…')).not.toBeNull()
     expect(bridge.calls('task-vault:vault:add-subtask')).toEqual([])
   })
 }
 
 function ghostTestsPart2() {
-  it('offers no ghost row under an in-progress or finished task', () => {
-    renderDailyLog(withSubtasks('in-progress'))
-    expect(screen.queryByText('· + Add subtask…')).toBeNull()
-    cleanup()
-    renderDailyLog(withSubtasks('done'))
+  it.each([
+    ['the Cancel button', (user: UserEvent) => user.click(buttonNamed('Cancel'))],
+    ['Escape', (user: UserEvent) => user.type(screen.getByLabelText('Subtask…'), '{Escape}')],
+  ])('closes the ghost row on %s', async (_how, close) => {
+    const user = userEvent.setup()
+    renderDailyLog(withSubtasks('blocked'))
+    await user.click(buttonNamed('· + Add subtask…'))
+    await close(user)
+    expect(screen.queryByLabelText('Subtask…')).toBeNull()
+    expect(screen.queryByRole('button', { name: '· + Add subtask…' })).not.toBeNull()
+  })
+
+  it.each(['in-progress', 'done'] as const)('offers no ghost row under a %s task', (status) => {
+    renderDailyLog(withSubtasks(status))
     expect(screen.queryByText('· + Add subtask…')).toBeNull()
   })
 }
 
 function linkTests() {
   it('links a session chosen by workspace, project and tab', async () => {
+    const user = userEvent.setup()
     const { props } = renderDailyLog(task('t1', 'Write'))
-    fireEvent.click(buttonNamed('Link to terminal session'))
-    expect(await screen.findByRole('option', { name: 'Work › App › zsh' })).toBeTruthy()
-    expect(screen.getByRole('option', { name: 'sess-bbb' })).toBeTruthy()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'sess-aaaaaaaa1' } })
+    await user.click(buttonNamed('Link to terminal session'))
+    expect(await screen.findByRole('option', { name: 'Work › App › zsh' })).toHaveProperty(
+      'value',
+      'sess-aaaaaaaa1'
+    )
+    expect(screen.getByRole('option', { name: 'sess-bbb' })).toHaveProperty(
+      'value',
+      'sess-bbbbbbbb2'
+    )
+    await user.selectOptions(screen.getByRole('combobox'), 'sess-aaaaaaaa1')
     await eventually(() => expect(props.onRefresh).toHaveBeenCalled())
     expect(bridge.calls('task-vault:links:create')).toEqual([
       { taskId: 't1', targetId: 'sess-aaaaaaaa1' },
     ])
     expect(bridge.recordUsage).toHaveBeenCalledWith('session-link')
     expect(screen.queryByRole('combobox')).toBeNull()
-    expect(buttonNamed('Jump to linked terminal')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Jump to linked terminal' })).not.toBeNull()
   })
 }
 
 function linkTestsPart2() {
   it('reports a link the vault refused', async () => {
+    const user = userEvent.setup()
     bridge.responses['task-vault:links:create'] = { error: 'nope' }
     renderDailyLog(task('t1', 'Write'))
-    fireEvent.click(buttonNamed('Link to terminal session'))
+    await user.click(buttonNamed('Link to terminal session'))
     await screen.findByRole('option', { name: 'Work › App › zsh' })
-    fireEvent.change(await screen.findByRole('combobox'), { target: { value: 'sess-aaaaaaaa1' } })
+    await user.selectOptions(screen.getByRole('combobox'), 'sess-aaaaaaaa1')
     await eventually(() =>
       expect(vi.mocked(notify)).toHaveBeenCalledWith(
         'error',
@@ -188,23 +253,37 @@ function linkTestsPart2() {
     )
     expect(bridge.recordUsage).toHaveBeenCalledWith('session-link', { failed: true })
     expect(screen.queryByRole('combobox')).toBeNull()
-    expect(buttonNamed('Link to terminal session')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Link to terminal session' })).not.toBeNull()
   })
+}
 
-  it('says when no session is open, and closes', () => {
+function noSessionTests() {
+  it('says when no session is open', async () => {
+    const user = userEvent.setup()
     installTerminal([])
     renderDailyLog(task('t1', 'Write'))
-    fireEvent.click(buttonNamed('Link to terminal session'))
-    expect(screen.getByText('No active terminal sessions.')).toBeTruthy()
-    fireEvent.click(buttonNamed('Close'))
+    await user.click(buttonNamed('Link to terminal session'))
+    expect(await screen.findByText('No active terminal sessions.')).toHaveProperty(
+      'textContent',
+      'No active terminal sessions.'
+    )
+  })
+
+  it('closes the no-session notice on Close', async () => {
+    const user = userEvent.setup()
+    installTerminal([])
+    renderDailyLog(task('t1', 'Write'))
+    await user.click(buttonNamed('Link to terminal session'))
+    await user.click(await screen.findByRole('button', { name: 'Close' }))
     expect(screen.queryByText('No active terminal sessions.')).toBeNull()
   })
 }
 
 function jumpTests() {
   it('jumps to the linked session when it is still open', async () => {
+    const user = userEvent.setup()
     renderDailyLog(task('t1', 'Write', { terminatorLinks: ['sess-aaaaaaaa1'] }))
-    fireEvent.click(buttonNamed('Jump to linked terminal'))
+    await user.click(buttonNamed('Jump to linked terminal'))
     await eventually(() =>
       expect(bridge.calls('task-vault:navigate-to-terminal')).toEqual([
         { sessionId: 'sess-aaaaaaaa1', projectId: 'pr1' },
@@ -212,27 +291,33 @@ function jumpTests() {
     )
   })
 
-  it('offers to relink when the session is gone or the lookup fails', async () => {
+  it('offers to relink when the linked session is gone', async () => {
+    const user = userEvent.setup()
     renderDailyLog(task('t1', 'Write', { terminatorLinks: ['gone'] }))
-    fireEvent.click(buttonNamed('Jump to linked terminal'))
-    expect(await screen.findByRole('combobox')).toBeTruthy()
-    cleanup()
-    installTerminal().mockRejectedValueOnce(new Error('down'))
-    renderDailyLog(task('t1', 'Write', { terminatorLinks: ['gone'] }))
-    fireEvent.click(buttonNamed('Jump to linked terminal'))
-    await eventually(() => expect(document.querySelector('.daily-log__link-picker')).toBeTruthy())
+    await user.click(buttonNamed('Jump to linked terminal'))
+    expect(await screen.findByRole('combobox')).toHaveProperty('value', '')
     expect(bridge.calls('task-vault:navigate-to-terminal')).toEqual([])
   })
 }
 
 function jumpTestsPart2() {
+  it('offers to relink when the session lookup fails', async () => {
+    const user = userEvent.setup()
+    installTerminal().mockRejectedValueOnce(new Error('down'))
+    renderDailyLog(task('t1', 'Write', { terminatorLinks: ['gone'] }))
+    await user.click(buttonNamed('Jump to linked terminal'))
+    await eventually(() => expect(document.querySelector('.daily-log__link-picker')).not.toBeNull())
+    expect(bridge.calls('task-vault:navigate-to-terminal')).toEqual([])
+  })
+
   it('follows the links the task arrives with', async () => {
+    const user = userEvent.setup()
     const { view, props } = renderDailyLog(task('t1', 'Write'))
     const linked = task('t1', 'Write', { terminatorLinks: ['sess-aaaaaaaa1'] })
     view.rerender(
       React.createElement(DailyLog, { ...props, log: { ...props.log, tasks: [linked] } })
     )
-    fireEvent.click(buttonNamed('Jump to linked terminal'))
+    await user.click(buttonNamed('Jump to linked terminal'))
     await eventually(() => expect(bridge.calls('task-vault:navigate-to-terminal')).toHaveLength(1))
   })
 }
@@ -261,12 +346,17 @@ function unlistableTests() {
     })
     const reasons = await unhandledRejectionsDuring(async () => {
       renderDailyLog(task('t1', 'Write'))
-      fireEvent.click(buttonNamed('Link to terminal session'))
+      await userEvent.setup().click(buttonNamed('Link to terminal session'))
     })
     expect(reasons).toEqual([])
-    expect(screen.getByText('No active terminal sessions.')).toBeTruthy()
+    expect(await screen.findByText('No active terminal sessions.')).toHaveProperty(
+      'textContent',
+      'No active terminal sessions.'
+    )
   })
+}
 
+function unlistableTestsPart2() {
   it('still lists the sessions, by tab, when the workspaces cannot be read', async () => {
     bridge = installVaultBridge({
       terminal: { listSessions: vi.fn(async () => SESSIONS) },
@@ -275,9 +365,12 @@ function unlistableTests() {
     })
     const reasons = await unhandledRejectionsDuring(async () => {
       renderDailyLog(task('t1', 'Write'))
-      fireEvent.click(buttonNamed('Link to terminal session'))
+      await userEvent.setup().click(buttonNamed('Link to terminal session'))
     })
     expect(reasons).toEqual([])
-    expect(await screen.findByRole('option', { name: 'zsh' })).toBeTruthy()
+    expect(await screen.findByRole('option', { name: 'zsh' })).toHaveProperty(
+      'value',
+      'sess-aaaaaaaa1'
+    )
   })
 }

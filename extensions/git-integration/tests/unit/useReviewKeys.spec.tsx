@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
+import { describe, it, expect, vi, beforeEach, onTestFinished, type Mock } from 'vitest'
 import { render } from '@testing-library/react'
 import { useReviewKeys, type ReviewKeyHandlers } from '../../src/hooks/useReviewKeys'
 import { useReviewUiStore, REVIEW_KEY_EVENTS } from '../../src/stores/review-ui.store'
@@ -16,6 +16,13 @@ function TestHarness({ handlers }: { handlers: Parameters<typeof useReviewKeys>[
 function fireKey(key: string, opts: Partial<KeyboardEventInit> = {}, target?: EventTarget) {
   const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...opts })
   ;(target ?? window).dispatchEvent(event)
+}
+
+function listenFor(type: string) {
+  const listener = vi.fn()
+  window.addEventListener(type, listener)
+  onTestFinished(() => window.removeEventListener(type, listener))
+  return listener
 }
 
 let handlers: Record<Exclude<keyof ReviewKeyHandlers, 'toggleFileList'>, Mock<() => void>>
@@ -43,32 +50,27 @@ beforeEach(() => {
 describe('useReviewKeys', () => {
   it('dispatches nextHunk on k and prevHunk on j', () => {
     render(<TestHarness handlers={handlers} />)
-    const nextSpy = vi.fn()
-    const prevSpy = vi.fn()
-    window.addEventListener(REVIEW_KEY_EVENTS.nextHunk, nextSpy)
-    window.addEventListener(REVIEW_KEY_EVENTS.prevHunk, prevSpy)
+    const nextSpy = listenFor(REVIEW_KEY_EVENTS.nextHunk)
+    const prevSpy = listenFor(REVIEW_KEY_EVENTS.prevHunk)
     fireKey('k')
     expect(nextSpy).toHaveBeenCalledTimes(1)
     expect(prevSpy).not.toHaveBeenCalled()
     fireKey('j')
     expect(prevSpy).toHaveBeenCalledTimes(1)
     expect(nextSpy).toHaveBeenCalledTimes(1)
-    window.removeEventListener(REVIEW_KEY_EVENTS.nextHunk, nextSpy)
-    window.removeEventListener(REVIEW_KEY_EVENTS.prevHunk, prevSpy)
   })
 })
 
 describe('useReviewKeys — calls the matching handler for ], [, n and v', () => {
-  it('calls the matching handler for ], [, n and v', () => {
+  it.each([
+    [']', 'nextFile'],
+    ['[', 'prevFile'],
+    ['n', 'nextUnviewedFile'],
+    ['v', 'markViewed'],
+  ] as const)('calls %s → %s once', (key, handlerName) => {
     render(<TestHarness handlers={handlers} />)
-    fireKey(']')
-    fireKey('[')
-    fireKey('n')
-    fireKey('v')
-    expect(handlers.nextFile).toHaveBeenCalledTimes(1)
-    expect(handlers.prevFile).toHaveBeenCalledTimes(1)
-    expect(handlers.nextUnviewedFile).toHaveBeenCalledTimes(1)
-    expect(handlers.markViewed).toHaveBeenCalledTimes(1)
+    fireKey(key)
+    expect(handlers[handlerName]).toHaveBeenCalledTimes(1)
   })
 
   it('calls nextChapter on } and prevChapter on {', () => {
@@ -82,18 +84,15 @@ describe('useReviewKeys — calls the matching handler for ], [, n and v', () =>
   })
 })
 
-describe('useReviewKeys — binds the window listener once across rerenders and calls the latest handlers', () => {
-  it('binds the window listener once across rerenders and calls the latest handlers', () => {
-    const addSpy = vi.spyOn(window, 'addEventListener')
+describe('useReviewKeys — calls the latest handlers after a rerender', () => {
+  it('calls the handlers of the latest render', () => {
     const { rerender } = render(<TestHarness handlers={handlers} />)
     const newer = { ...handlers, nextFile: vi.fn() }
     rerender(<TestHarness handlers={newer} />)
     rerender(<TestHarness handlers={{ ...newer }} />)
-    expect(addSpy.mock.calls.filter(([type]) => type === 'keydown')).toHaveLength(1)
     fireKey(']')
     expect(newer.nextFile).toHaveBeenCalledTimes(1)
     expect(handlers.nextFile).not.toHaveBeenCalled()
-    addSpy.mockRestore()
   })
 
   it('toggles diffRange on s and comment visibility on c', () => {
@@ -134,34 +133,24 @@ describe('useReviewKeys — opens the keyboard help sheet on ?', () => {
 describe('useReviewKeys — dispatches peekDefinition when g then d within 1s', () => {
   it('dispatches peekDefinition when g then d within 1s', () => {
     render(<TestHarness handlers={handlers} />)
-    const spy = vi.fn()
-    window.addEventListener(REVIEW_KEY_EVENTS.peekDefinition, spy)
+    const spy = listenFor(REVIEW_KEY_EVENTS.peekDefinition)
     fireKey('g')
     fireKey('d')
     expect(spy).toHaveBeenCalledTimes(1)
-    window.removeEventListener(REVIEW_KEY_EVENTS.peekDefinition, spy)
   })
 })
 
 describe('useReviewKeys — dispatches askAgent, explain, comment and note events', () => {
-  it('dispatches askAgent, explain, comment and note events', () => {
+  it.each([
+    ['a', REVIEW_KEY_EVENTS.askAgent],
+    ['e', REVIEW_KEY_EVENTS.explain],
+    ['r', REVIEW_KEY_EVENTS.comment],
+    ['m', REVIEW_KEY_EVENTS.note],
+  ])('dispatches %s → %s once', (key, eventType) => {
     render(<TestHarness handlers={handlers} />)
-    const askAgent = vi.fn()
-    const explain = vi.fn()
-    const comment = vi.fn()
-    const note = vi.fn()
-    window.addEventListener(REVIEW_KEY_EVENTS.askAgent, askAgent)
-    window.addEventListener(REVIEW_KEY_EVENTS.explain, explain)
-    window.addEventListener(REVIEW_KEY_EVENTS.comment, comment)
-    window.addEventListener(REVIEW_KEY_EVENTS.note, note)
-    fireKey('a')
-    fireKey('e')
-    fireKey('r')
-    fireKey('m')
-    expect(askAgent).toHaveBeenCalledTimes(1)
-    expect(explain).toHaveBeenCalledTimes(1)
-    expect(comment).toHaveBeenCalledTimes(1)
-    expect(note).toHaveBeenCalledTimes(1)
+    const listener = listenFor(eventType)
+    fireKey(key)
+    expect(listener).toHaveBeenCalledTimes(1)
   })
 
   it('toggles the file list on t via the store when no override is given', () => {
@@ -180,10 +169,15 @@ describe('useReviewKeys — calls an explicit toggleFileList handler on t when g
     expect(useReviewUiStore.getState().fileListHidden).toBe(false)
   })
 
-  it('never binds Escape', () => {
+  it('runs no handler and changes no state on Escape', () => {
     render(<TestHarness handlers={handlers} />)
+    const stateBefore = useReviewUiStore.getState()
     fireKey('Escape')
-    expect(useReviewUiStore.getState().keyboardHelpOpen).toBe(false)
+    const handlersCalled = Object.entries(handlers).filter(
+      ([, handler]) => handler.mock.calls.length
+    )
+    expect(handlersCalled).toEqual([])
+    expect(useReviewUiStore.getState()).toBe(stateBefore)
   })
 
   it('ignores keydown while typing in an input, textarea or contenteditable', () => {

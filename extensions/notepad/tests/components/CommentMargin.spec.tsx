@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { useCommentsStore } from '../../src/stores/comments.store'
 import type { Comment } from '../../src/db/types'
@@ -47,12 +48,13 @@ const resolvedComment: Comment = {
 describe('CommentMargin', commentMarginTests)
 
 describe('CommentMargin resolved section', () => {
-  it('says whether the resolved comments are shown', () => {
+  it('says whether the resolved comments are shown', async () => {
+    const user = userEvent.setup()
     useCommentsStore.setState({ comments: [resolvedComment], loading: false })
     render(<CommentMargin noteId="n1" anchorTops={{}} />)
     const toggle = screen.getByRole('button', { name: /1 resolved/ })
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    fireEvent.click(toggle)
+    await user.click(toggle)
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
   })
 })
@@ -112,10 +114,10 @@ function commentMarginCommentCardsTests() {
 
 function commentMarginThreadActionsTests() {
   it('Resolve button calls comments.resolve IPC', async () => {
+    const user = userEvent.setup()
     useCommentsStore.setState({ comments: [baseComment], loading: false })
     render(<CommentMargin noteId="n1" anchorTops={{}} />)
-    const resolveBtn = screen.getByText('Resolve')
-    fireEvent.click(resolveBtn)
+    await user.click(screen.getByRole('button', { name: 'Resolve' }))
     await eventually(() =>
       expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:comments.resolve', {
         id: 'c1',
@@ -125,10 +127,10 @@ function commentMarginThreadActionsTests() {
   })
 
   it('Delete button calls comments.delete IPC', async () => {
+    const user = userEvent.setup()
     useCommentsStore.setState({ comments: [baseComment], loading: false })
     render(<CommentMargin noteId="n1" anchorTops={{}} />)
-    const deleteBtn = screen.getByTitle('Delete comment')
-    fireEvent.click(deleteBtn)
+    await user.click(screen.getByTitle('Delete comment'))
     await eventually(() =>
       expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:comments.delete', { id: 'c1' })
     )
@@ -155,10 +157,11 @@ function commentMarginRepliesTests() {
     expect(screen.getByText('Reply body text')).toBeDefined()
   })
 
-  it('Reply text link opens reply form', () => {
+  it('Reply text link opens reply form', async () => {
+    const user = userEvent.setup()
     useCommentsStore.setState({ comments: [baseComment], loading: false })
     render(<CommentMargin noteId="n1" anchorTops={{}} />)
-    fireEvent.click(screen.getByText('Reply'))
-    expect(screen.getByPlaceholderText('Write a reply…')).toBeDefined()
+    await user.click(screen.getByText('Reply'))
+    expect(screen.queryByPlaceholderText('Write a reply…')).not.toBeNull()
   })
 }

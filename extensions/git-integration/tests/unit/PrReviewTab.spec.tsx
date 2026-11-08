@@ -1,19 +1,12 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { PrReviewTab } from '../../src/components/pr-review/PrReviewTab'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import * as githubModule from '../../src/api/github'
 import type { Chapter, PrChangedFile, PrReviewDetail } from '../../src/schemas/pr-review.schema'
 import { partialFake } from '../../../../tests/support/fakes'
-
-vi.mock('../../src/stores/pr-review.store', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/stores/pr-review.store')>()
-  return {
-    ...actual,
-    usePrReviewStore: vi.fn(),
-  }
-})
 
 vi.mock('../../src/api/github', () => ({
   githubAPI: {
@@ -94,35 +87,6 @@ vi.mock('../../src/components/pr-review/PrOverviewPanel', () => ({
   ),
 }))
 
-const mockSetActivePr = vi.fn()
-const mockInitSession = vi.fn()
-const mockReconcileHead = vi.fn()
-const mockReset = vi.fn()
-const mockMarkPrInProgress = vi.fn()
-const mockDismissPr = vi.fn()
-const mockSetPaused = vi.fn()
-const mockSetCurrentChapter = vi.fn()
-const mockSetCurrentFile = vi.fn()
-
-const defaultStoreState = {
-  activePr: null,
-  setActivePr: mockSetActivePr,
-  initSession: mockInitSession,
-  reconcileHead: mockReconcileHead,
-  reset: mockReset,
-  markPrInProgress: mockMarkPrInProgress,
-  dismissPr: mockDismissPr,
-  setPaused: mockSetPaused,
-  setCurrentChapter: mockSetCurrentChapter,
-  setCurrentFile: mockSetCurrentFile,
-  nextPrCursor: null,
-  viewedFiles: new Set<string>(),
-  currentChapterId: null,
-  currentFilePath: null,
-  fileOrderOverrides: {},
-  scrollPosition: null,
-}
-
 const mockInvoke = vi.fn().mockResolvedValue({ ok: true })
 const mockOn = vi.fn().mockReturnValue(() => {})
 
@@ -135,6 +99,12 @@ beforeEach(() => {
   ;(githubModule.githubAPI.saveActiveReview as ReturnType<typeof vi.fn>).mockResolvedValue({
     ok: true,
   })
+  vi.mocked(githubModule.githubAPI.prCompare).mockResolvedValue({
+    rewritten: false,
+    commits: 0,
+    files: [],
+  })
+  usePrReviewStore.getState().reset()
   Object.assign(globalThis, {
     electronAPI: {
       extensionBridge: {
@@ -143,28 +113,25 @@ beforeEach(() => {
       },
     },
   })
-  vi.mocked(usePrReviewStore).mockReturnValue(defaultStoreState)
 })
 
 afterEach(() => {
   Reflect.deleteProperty(globalThis, 'electronAPI')
 })
 
-/** Opens the PR inside an async act, which returns once the open flow's awaits and their renders
- *  ran (https://react.dev/reference/react/act); left to cleanup, after electronAPI was gone, the
- *  subscribing effect threw on a busy machine and broke React for the rest of the file. */
+/** Opens the PR and waits for the overview, the open flow's last step; left to cleanup, after
+ *  electronAPI was gone, the subscribing effect threw and broke React for the rest of the file. */
 async function openPr() {
-  await act(async () => {
-    fireEvent.click(screen.getByText('Open PR'))
-  })
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Open PR' }))
+  await screen.findByTestId('pr-overview-panel')
 }
 
-/** PR 1's stored v2 session, viewed a.ts at oldSha. */
-function storeSessionAtOldSha() {
+/** PR 1's stored session under `key`, viewed a.ts at `headSHA`. */
+function storeSessionAt(key: string, headSHA: string) {
   const session = {
     repoRoot: '/repo',
     prNumber: 1,
-    headSHA: 'oldSha',
+    headSHA,
     currentChapterId: null,
     currentFilePath: null,
     viewedFiles: ['a.ts'],
@@ -173,8 +140,8 @@ function storeSessionAtOldSha() {
     pausedAt: null,
     lastAccessedAt: '2025-01-01T00:00:00Z',
   }
-  vi.mocked(githubModule.githubAPI.sessionGet).mockImplementation(async (key: string) =>
-    key === '/repo:::1' ? { session } : { session: null }
+  vi.mocked(githubModule.githubAPI.sessionGet).mockImplementation(async (sessionKey: string) =>
+    sessionKey === key ? { session } : { session: null }
   )
 }
 
@@ -191,57 +158,64 @@ async function openPrAtHead(headSHA: string) {
 describe('PrReviewTab', () => {
   it('shows empty message when repoRoot is null', () => {
     render(<PrReviewTab repoRoot={null} />)
-    expect(screen.getByText('Open a project to view pull requests.')).toBeTruthy()
+    expect(screen.queryByText('Open a project to view pull requests.')).not.toBeNull()
   })
 
   it('renders ReviewQueue when repoRoot is provided and no active PR', () => {
     render(<PrReviewTab repoRoot="/repo" />)
-    expect(screen.getByTestId('review-queue')).toBeTruthy()
+    expect(screen.queryByTestId('review-queue')).not.toBeNull()
   })
 
-  it('renders PrOverviewPanel when activePr is set', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
+  it('shows the review, not the overview, for a PR that is already active', () => {
+    usePrReviewStore.setState({
       activePr: partialFake<PrReviewDetail>({ number: 1, title: 'My PR' }),
     })
-    // showOverview starts false; we need to simulate opening a PR to get it to true
-    // Since activePr is pre-set here, showOverview stays false → PrReviewView shows
     render(<PrReviewTab repoRoot="/repo" />)
-    // With activePr set and showOverview=false, PrReviewView should render
-    expect(screen.getByTestId('pr-review-view')).toBeTruthy()
+    expect(screen.queryByTestId('pr-review-view')).not.toBeNull()
+    expect(screen.queryByTestId('pr-overview-panel')).toBeNull()
   })
 })
 
-describe('PrReviewTab — starting from the overview', () => {
-  function showOverviewOfOpenPr() {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      activePr: partialFake<PrReviewDetail>({
-        number: 1,
-        title: 'My PR',
-        chapters: [
-          partialFake<Chapter>({ id: 'c2', files: [partialFake<PrChangedFile>({ path: 'b.ts' })] }),
-        ],
-      }),
-    })
-    render(<PrReviewTab repoRoot="/repo" />)
-    fireEvent.click(screen.getByText('Show Overview'))
-  }
+/** PR 1 open on its overview, with chapter c2 holding b.ts and the reader saved at c1/a.ts. */
+async function showOverviewOfOpenPr() {
+  usePrReviewStore.setState({
+    activePr: partialFake<PrReviewDetail>({
+      number: 1,
+      title: 'My PR',
+      chapters: [
+        partialFake<Chapter>({ id: 'c2', files: [partialFake<PrChangedFile>({ path: 'b.ts' })] }),
+      ],
+    }),
+    currentChapterId: 'c1',
+    currentFilePath: 'a.ts',
+  })
+  const user = userEvent.setup()
+  render(<PrReviewTab repoRoot="/repo" />)
+  await user.click(screen.getByRole('button', { name: 'Show Overview' }))
+  return user
+}
 
-  it('opens the review at the chapter picked in the review plan', () => {
-    showOverviewOfOpenPr()
-    fireEvent.click(screen.getByText('Start at chapter 2'))
-    expect(mockSetCurrentChapter).toHaveBeenCalledWith('c2')
-    expect(mockSetCurrentFile).toHaveBeenCalledWith('b.ts')
-    expect(screen.getByTestId('pr-review-view')).toBeTruthy()
+describe('PrReviewTab — starting from the overview', () => {
+  it('opens the review at the chapter picked in the review plan', async () => {
+    const user = await showOverviewOfOpenPr()
+    await user.click(screen.getByRole('button', { name: 'Start at chapter 2' }))
+    const { currentChapterId, currentFilePath } = usePrReviewStore.getState()
+    expect({ currentChapterId, currentFilePath }).toEqual({
+      currentChapterId: 'c2',
+      currentFilePath: 'b.ts',
+    })
+    expect(screen.queryByTestId('pr-review-view')).not.toBeNull()
   })
 
-  it('keeps the saved chapter when the review starts from the header button', () => {
-    showOverviewOfOpenPr()
-    fireEvent.click(screen.getByText('Start Review'))
-    expect(mockSetCurrentChapter).not.toHaveBeenCalled()
-    expect(mockSetCurrentFile).not.toHaveBeenCalled()
-    expect(screen.getByTestId('pr-review-view')).toBeTruthy()
+  it('keeps the saved chapter when the review starts from the header button', async () => {
+    const user = await showOverviewOfOpenPr()
+    await user.click(screen.getByRole('button', { name: 'Start Review' }))
+    const { currentChapterId, currentFilePath } = usePrReviewStore.getState()
+    expect({ currentChapterId, currentFilePath }).toEqual({
+      currentChapterId: 'c1',
+      currentFilePath: 'a.ts',
+    })
+    expect(screen.queryByTestId('pr-review-view')).not.toBeNull()
   })
 })
 
@@ -253,21 +227,20 @@ describe('PrReviewTab (continued) — window title', () => {
 
   it('names the pop-out window after the PR it shows, so the Window menu can list it', () => {
     window.history.replaceState(null, '', '/?view=pr-review')
-    const { rerender } = render(<PrReviewTab repoRoot="/repo" />)
+    render(<PrReviewTab repoRoot="/repo" />)
     expect(document.title).toBe('Code Reviews')
 
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      activePr: partialFake<PrReviewDetail>({ number: 214, title: 'Code review revamp' }),
+    act(() => {
+      usePrReviewStore.setState({
+        activePr: partialFake<PrReviewDetail>({ number: 214, title: 'Code review revamp' }),
+      })
     })
-    rerender(<PrReviewTab repoRoot="/repo" />)
     expect(document.title).toBe('#214 Code review revamp — Review')
   })
 
   it('leaves the title alone when embedded in the main window', () => {
     document.title = 'Git Integration'
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
+    usePrReviewStore.setState({
       activePr: partialFake<PrReviewDetail>({ number: 214, title: 'Code review revamp' }),
     })
     render(<PrReviewTab repoRoot="/repo" />)
@@ -276,9 +249,10 @@ describe('PrReviewTab (continued) — window title', () => {
 })
 
 describe('PrReviewTab — pop out button', () => {
-  it('calls extensionBridge.invoke with window:open-pr-review when pop out button is clicked', () => {
+  it('calls extensionBridge.invoke with window:open-pr-review when pop out button is clicked', async () => {
+    const user = userEvent.setup()
     render(<PrReviewTab repoRoot="/repo" />)
-    fireEvent.click(screen.getByTitle('Open in new window'))
+    await user.click(screen.getByTitle('Open in new window'))
     expect(mockInvoke).toHaveBeenCalledWith(
       'window:open-pr-review',
       expect.objectContaining({ repoRoot: '/repo' })
@@ -288,18 +262,13 @@ describe('PrReviewTab — pop out button', () => {
 
 describe('PrReviewTab — includes prNumber and showOverview in popout payload when a PR is active', () => {
   it('includes prNumber and showOverview in popout payload when a PR is active', async () => {
-    const activePr = partialFake<PrReviewDetail>({
-      number: 42,
-      title: 'Active PR',
-      headSHA: 'sha123',
-    })
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      activePr,
+    const user = userEvent.setup()
+    usePrReviewStore.setState({
+      activePr: partialFake<PrReviewDetail>({ number: 42, title: 'Active PR', headSHA: 'sha123' }),
     })
     render(<PrReviewTab repoRoot="/repo" />)
     // activePr is set + showOverview defaults to false → PrReviewView renders
-    fireEvent.click(screen.getByTitle('Open in focused window'))
+    await user.click(screen.getByTitle('Open in focused window'))
     expect(mockInvoke).toHaveBeenCalledWith(
       'window:open-pr-review',
       expect.objectContaining({ repoRoot: '/repo', prNumber: '42', showOverview: 'false' })
@@ -318,52 +287,42 @@ describe('PrReviewTab (continued) — after an approval', () => {
   it('closes the pop-out so the review list behind it shows, and tells the list to reload', async () => {
     window.history.replaceState(null, '', '/?view=pr-review')
     const close = vi.spyOn(window, 'close').mockImplementation(() => {})
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      activePr: pr7,
-    })
+    usePrReviewStore.setState({ activePr: pr7 })
+    const user = userEvent.setup()
     render(<PrReviewTab repoRoot="/repo" />)
-    fireEvent.click(screen.getByText('Approved'))
-    await waitFor(() => expect(close).toHaveBeenCalled())
+    await user.click(screen.getByRole('button', { name: 'Approved' }))
+    expect(close).toHaveBeenCalled()
     expect(mockInvoke).toHaveBeenCalledWith('window:review-submitted', {})
     close.mockRestore()
   })
 })
 
 describe('PrReviewTab (continued) — after an approval — returns the docked panel to its queue', () => {
-  afterEach(() => {
-    window.history.replaceState(null, '', '/')
-  })
-
   it('returns the docked panel to its queue', async () => {
     const close = vi.spyOn(window, 'close').mockImplementation(() => {})
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...defaultStoreState,
-      activePr: pr7,
-    })
+    usePrReviewStore.setState({ activePr: pr7 })
+    const user = userEvent.setup()
     render(<PrReviewTab repoRoot="/repo" />)
-    fireEvent.click(screen.getByText('Approved'))
-    await waitFor(() => expect(mockSetActivePr).toHaveBeenCalledWith(null))
+    await user.click(screen.getByRole('button', { name: 'Approved' }))
+    expect(await screen.findByTestId('review-queue')).not.toBeNull()
     expect(mockInvoke).toHaveBeenCalledWith('window:review-submitted', {})
     expect(close).not.toHaveBeenCalled()
     close.mockRestore()
   })
 })
 
-describe('PrReviewTab — reads the v2 session key before falling back to the legacy key', () => {
-  it('reads the v2 session key before falling back to the legacy key', async () => {
-    vi.mocked(githubModule.githubAPI.sessionGet).mockImplementation(async (key: string) =>
-      key === '/repo:::1' ? { session: null } : { session: null }
-    )
+describe('PrReviewTab — restores a legacy session when the v2 key has none', () => {
+  it('restores the viewed files of the session stored under the legacy per-head key', async () => {
+    storeSessionAt('/repo:::1:::headA', 'headA')
     await openPrAtHead('headA')
-    expect(githubModule.githubAPI.sessionGet).toHaveBeenCalledWith('/repo:::1')
-    expect(githubModule.githubAPI.sessionGet).toHaveBeenCalledWith('/repo:::1:::headA')
+    expect([...usePrReviewStore.getState().viewedFiles]).toEqual(['a.ts'])
   })
 })
 
 describe('PrReviewTab — reconciles the stored session against the new head via prCompare', () => {
   it('reconciles the stored session against the new head via prCompare', async () => {
-    storeSessionAtOldSha()
+    storeSessionAt('/repo:::1', 'oldSha')
+    // PrCompareResult lacks the `status` the channel sends (PrReviewTab reads it as HeadCompare).
     ;(githubModule.githubAPI.prCompare as ReturnType<typeof vi.fn>).mockResolvedValue({
       rewritten: false,
       commits: 3,
@@ -374,28 +333,26 @@ describe('PrReviewTab — reconciles the stored session against the new head via
     })
     await openPrAtHead('newSha')
     expect(githubModule.githubAPI.prCompare).toHaveBeenCalledWith('/repo', 'oldSha', 'newSha')
-    expect(mockReconcileHead).toHaveBeenCalledWith(
-      { repoRoot: '/repo', prNumber: 1, headSHA: 'newSha' },
-      ['a.ts', 'scripts/e2e-burn-in.ts'],
-      ['scripts/e2e-burn-in.ts']
-    )
+    const { viewedFiles, changedSince, newSinceLook } = usePrReviewStore.getState()
+    expect([...viewedFiles]).toEqual([])
+    expect([...changedSince]).toEqual(['a.ts'])
+    expect([...newSinceLook]).toEqual(['scripts/e2e-burn-in.ts'])
   })
 })
 
 describe('PrReviewTab — reconciles with all when the compare says history was rewritten', () => {
-  it('reconciles with "all" when the compare says history was rewritten', async () => {
-    storeSessionAtOldSha()
-    ;(githubModule.githubAPI.prCompare as ReturnType<typeof vi.fn>).mockResolvedValue({
+  it('marks every viewed file changed when the compare says history was rewritten', async () => {
+    storeSessionAt('/repo:::1', 'oldSha')
+    vi.mocked(githubModule.githubAPI.prCompare).mockResolvedValue({
       rewritten: true,
       commits: 5,
       files: [],
     })
     await openPrAtHead('newSha')
-    expect(mockReconcileHead).toHaveBeenCalledWith(
-      { repoRoot: '/repo', prNumber: 1, headSHA: 'newSha' },
-      'all',
-      []
-    )
+    const { viewedFiles, changedSince, historyRewritten } = usePrReviewStore.getState()
+    expect([...viewedFiles]).toEqual([])
+    expect([...changedSince]).toEqual(['a.ts'])
+    expect(historyRewritten).toBe(true)
   })
 })
 

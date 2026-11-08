@@ -42,7 +42,8 @@ function registerLedger({ api, dataRoot }: ActivationContext): void {
   reg(api, ...ledgerChannelSpecs(ledger))
 }
 
-function acceptedRulesIn(
+/** The rules the operator accepted into the data root. @internal */
+export function acceptedRulesIn(
   sources: ReturnType<typeof resolveSources>
 ): ReturnType<Parameters<typeof createLedgerChannels>[0]['acceptedRules']> {
   return availableNames('rules', sources).flatMap((name) => {

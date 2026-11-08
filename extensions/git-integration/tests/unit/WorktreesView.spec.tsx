@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { WorktreesView } from '../../src/components/worktrees/WorktreesView'
 import type { LocalInventoryRow } from '../../src/git/local-inventory'
 
@@ -94,7 +95,8 @@ describe('WorktreesView — the header', () => {
   it('renders the header columns and a row per branch and worktree', async () => {
     inventory([MAIN, MERGED, DETACHED])
     await renderWorktrees()
-    for (const column of [
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+      '',
       'BRANCH',
       'WORKTREE',
       'SESSION',
@@ -103,9 +105,9 @@ describe('WorktreesView — the header', () => {
       'LAST COMMIT',
       'STATE',
     ])
-      expect(screen.getByText(column)).toBeDefined()
+    expect(screen.getAllByRole('row')).toHaveLength(4)
     expect(screen.getByText('feature-merged')).toBeDefined()
-    expect(screen.getByText('/repo/.worktrees/detached'.replace('/repo/', ''))).toBeDefined()
+    expect(screen.getByText('.worktrees/detached')).toBeDefined()
   })
 })
 
@@ -161,13 +163,14 @@ describe('WorktreesView — locked rows', () => {
 
 describe('WorktreesView — selection', () => {
   it('Select stale checks the merged, gone and prunable rows that are not locked', async () => {
+    const user = userEvent.setup()
     const prunable = inventoryRow({ branch: 'feature-old', prunable: true })
     inventory(
       [MAIN, MERGED, GONE, prunable, OPEN],
       [{ sessionId: 's1', projectId: 'p2', tabTitle: 'T', type: 'agent' }]
     )
     await renderWorktrees()
-    fireEvent.click(screen.getByRole('button', { name: 'Select stale' }))
+    await user.click(screen.getByRole('button', { name: 'Select stale' }))
     const isChecked = (name: string) =>
       screen.getByRole('checkbox', { name: `Select ${name}` }).getAttribute('aria-checked')
     expect(isChecked('feature-merged')).toBe('true')
@@ -188,10 +191,11 @@ describe('WorktreesView — selection', () => {
 
 describe('WorktreesView — the removal dialog', () => {
   it('lists the commands it will run, -D for an unmerged branch', async () => {
+    const user = userEvent.setup()
     inventory([MAIN, MERGED, GONE])
     await renderWorktrees()
-    fireEvent.click(screen.getByRole('button', { name: 'Select stale' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Remove selected · 2' }))
+    await user.click(screen.getByRole('button', { name: 'Select stale' }))
+    await user.click(screen.getByRole('button', { name: 'Remove selected · 2' }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('Remove 2 worktrees and branches?')).toBeDefined()
     expect(
@@ -220,12 +224,13 @@ function stubRemoval(result: { ok: boolean; reason?: string }): void {
 
 describe('WorktreesView — confirming a removal', () => {
   it('confirms with the danger button and calls git:remove-local', async () => {
+    const user = userEvent.setup()
     stubRemoval({ ok: true })
     await renderWorktrees()
-    fireEvent.click(screen.getByRole('button', { name: 'Select stale' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Remove selected · 1' }))
+    await user.click(screen.getByRole('button', { name: 'Select stale' }))
+    await user.click(screen.getByRole('button', { name: 'Remove selected · 1' }))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove 1' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Remove 1' }))
     await waitFor(() =>
       expect(mockInvoke).toHaveBeenCalledWith('git:remove-local', {
         repoRoot: '/repo',
@@ -244,6 +249,7 @@ describe('WorktreesView — confirming a removal', () => {
 
 describe('WorktreesView — confirming twice', () => {
   it('disables the confirm button while the removal is running', async () => {
+    const user = userEvent.setup()
     stubRemoval({ ok: true })
     mockInvoke.mockImplementation((channel: string) =>
       channel === 'git:remove-local'
@@ -251,25 +257,26 @@ describe('WorktreesView — confirming twice', () => {
         : Promise.resolve({ rows: [MAIN, MERGED] })
     )
     await renderWorktrees()
-    fireEvent.click(screen.getByRole('button', { name: 'Select stale' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Remove selected · 1' }))
+    await user.click(screen.getByRole('button', { name: 'Select stale' }))
+    await user.click(screen.getByRole('button', { name: 'Remove selected · 1' }))
     const confirm = within(await screen.findByRole('dialog')).getByRole('button', {
       name: 'Remove 1',
     })
-    fireEvent.click(confirm)
+    await user.click(confirm)
     await waitFor(() => expect((confirm as HTMLButtonElement).disabled).toBe(true))
-    fireEvent.click(confirm)
+    await user.click(confirm)
     expect(mockInvoke.mock.calls.filter(([c]) => c === 'git:remove-local')).toHaveLength(1)
   })
 })
 
 describe('WorktreesView — a failed removal', () => {
   it('shows a failed item’s reason in its row and keeps the row', async () => {
+    const user = userEvent.setup()
     stubRemoval({ ok: false, reason: 'branch is checked out' })
     await renderWorktrees()
-    fireEvent.click(screen.getByRole('button', { name: 'Select stale' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Remove selected · 1' }))
-    fireEvent.click(
+    await user.click(screen.getByRole('button', { name: 'Select stale' }))
+    await user.click(screen.getByRole('button', { name: 'Remove selected · 1' }))
+    await user.click(
       within(await screen.findByRole('dialog')).getByRole('button', { name: 'Remove 1' })
     )
     expect(await screen.findByText('branch is checked out')).toBeDefined()
@@ -286,10 +293,11 @@ describe('WorktreesView — empty and refresh', () => {
   })
 
   it('reloads from the refresh button', async () => {
+    const user = userEvent.setup()
     inventory([MAIN, MERGED])
     await renderWorktrees()
     const callsBefore = mockInvoke.mock.calls.filter(([c]) => c === 'git:local-inventory').length
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    await user.click(screen.getByRole('button', { name: 'Refresh' }))
     await waitFor(() =>
       expect(mockInvoke.mock.calls.filter(([c]) => c === 'git:local-inventory').length).toBe(
         callsBefore + 1
@@ -314,11 +322,12 @@ function stubCleanup(report: unknown) {
 
 describe('WorktreesView — cleanup report', () => {
   it('runs the rules on Clean up now, counts the use and lists each branch with its reason', async () => {
+    const user = userEvent.setup()
     stubCleanup({ removed: [], kept: [] })
     await renderWorktrees()
     expect(screen.queryByRole('region', { name: 'Cleanup report' })).toBeNull()
     stubCleanup(CLEANUP_REPORT)
-    fireEvent.click(screen.getByRole('button', { name: 'Clean up now' }))
+    await user.click(screen.getByRole('button', { name: 'Clean up now' }))
     const report = await screen.findByRole('region', { name: 'Cleanup report' })
     expect(within(report).getByText(/Cleanup removed 1 worktree and kept 1/)).toBeDefined()
     expect(within(report).getByText('feat/rate-limit')).toBeDefined()

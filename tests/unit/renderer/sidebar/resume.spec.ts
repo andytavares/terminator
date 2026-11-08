@@ -56,7 +56,7 @@ describe('planResume — which sessions', () => {
   })
 
   it('has no plan without a conversation', () => {
-    expect(planResume(exited({ agent: null, resumable: false }))).toBeNull()
+    expect(planResume(exited({ agent: null, resumable: true }))).toBeNull()
   })
 
   it('has no plan when the conversation can no longer be resumed', () => {

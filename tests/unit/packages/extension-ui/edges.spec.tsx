@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { FileText } from 'lucide-react'
 import { IconButton } from '../../../../packages/extension-ui/src/IconButton'
 import { Popover } from '../../../../packages/extension-ui/src/Popover'
@@ -61,20 +62,23 @@ describe('Popover edges', () => {
     expect(el.className).toContain('tv-picker')
   })
 
-  it('ignores keys other than Escape', () => {
+  it('ignores keys other than Escape', async () => {
+    const user = userEvent.setup()
     const onDismiss = vi.fn()
     render(
       <Popover label="Pick" onDismiss={onDismiss}>
         <button type="button">One</button>
       </Popover>
     )
-    fireEvent.keyDown(document, { key: 'Enter' })
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'One' }))
+    await user.keyboard('{Enter}')
     expect(onDismiss).not.toHaveBeenCalled()
   })
 })
 
 describe('Popover edges — leaves the outer surface alone when Escape reaches a nested one', () => {
-  it('leaves the outer surface alone when Escape reaches a nested one', () => {
+  it('leaves the outer surface alone when Escape reaches a nested one', async () => {
+    const user = userEvent.setup()
     const onOuter = vi.fn()
     const onInner = vi.fn()
     render(
@@ -87,7 +91,7 @@ describe('Popover edges — leaves the outer surface alone when Escape reaches a
         </Popover>
       </>
     )
-    fireEvent.keyDown(document, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(onInner).toHaveBeenCalledTimes(1)
     expect(onOuter).not.toHaveBeenCalled()
   })

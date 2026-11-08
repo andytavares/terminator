@@ -291,13 +291,14 @@ function proposalFindingsTests() {
 }
 
 function theMeasuredHalfTests() {
-  it('refuses the measured half — a probe result is not the agent to rewrite', () => {
-    // An agent that could rewrite the toolchain could tell the ladder a
-    // command exists that does not.
-    for (const field of ['repos', 'toolchain', 'houseDocs']) {
+  // An agent that could rewrite the toolchain could tell the ladder a
+  // command exists that does not.
+  it.each(['repos', 'toolchain', 'houseDocs'])(
+    'refuses findings.%s — a probe result is not the agent to rewrite',
+    (field) => {
       expect(() => parseProposal({ findings: { [field]: [] } })).toThrow(ProposalRejected)
     }
-  })
+  )
 }
 
 function leavingAloneTests() {

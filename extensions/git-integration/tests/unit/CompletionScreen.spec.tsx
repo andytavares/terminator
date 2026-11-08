@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import React from 'react'
 
@@ -90,9 +91,10 @@ describe('CompletionScreen', () => {
 describe('CompletionScreen — calls mergeCommit on commit button click', () => {
   it('calls mergeCommit on commit button click', async () => {
     mockMergeCommit.mockResolvedValueOnce({ commitHash: 'abc123' })
+    const user = userEvent.setup()
     const onExit = vi.fn()
     render(<CompletionScreen repoRoot="/repo" onBack={vi.fn()} onExit={onExit} />)
-    fireEvent.click(screen.getByText(/Commit merge/i))
+    await user.click(screen.getByRole('button', { name: 'Commit merge' }))
     await waitFor(() => {
       expect(mockMergeCommit).toHaveBeenCalledWith(
         '/repo',
@@ -104,9 +106,10 @@ describe('CompletionScreen — calls mergeCommit on commit button click', () => 
 
   it('calls onExit after successful commit', async () => {
     mockMergeCommit.mockResolvedValueOnce({ commitHash: 'abc123' })
+    const user = userEvent.setup()
     const onExit = vi.fn()
     render(<CompletionScreen repoRoot="/repo" onBack={vi.fn()} onExit={onExit} />)
-    fireEvent.click(screen.getByText(/Commit merge/i))
+    await user.click(screen.getByRole('button', { name: 'Commit merge' }))
     await waitFor(() => {
       expect(onExit).toHaveBeenCalledOnce()
     })
@@ -117,9 +120,10 @@ describe('CompletionScreen — calls mergeCommit on commit button click', () => 
 describe('CompletionScreen — shows error toast and stays on screen if commit fails', () => {
   it('shows error toast and stays on screen if commit fails', async () => {
     mockMergeCommit.mockResolvedValueOnce({ error: 'hook failed' })
+    const user = userEvent.setup()
     const onExit = vi.fn()
     render(<CompletionScreen repoRoot="/repo" onBack={vi.fn()} onExit={onExit} />)
-    fireEvent.click(screen.getByText(/Commit merge/i))
+    await user.click(screen.getByRole('button', { name: 'Commit merge' }))
     await waitFor(() => {
       expect(mockNotify).toHaveBeenCalledWith({
         type: 'error',

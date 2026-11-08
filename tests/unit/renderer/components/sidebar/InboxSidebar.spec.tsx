@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { InboxList } from '../../../../../src/renderer/components/sidebar/InboxSidebar'
 import { useInboxMarks } from '../../../../../src/renderer/components/sidebar/inbox-marks'
@@ -70,7 +70,8 @@ beforeEach(() => {
 })
 
 describe('InboxList — order', () => {
-  it('shows Needs you, then pinned, then active, and a collapsed settled section', () => {
+  it('shows Needs you, then pinned, then active, and a collapsed settled section', async () => {
+    const user = userEvent.setup()
     useInboxMarks.setState({ pinned: { pinned: 1 }, settled: { done: 1 } })
     renderInbox([
       threadOf('active', { startedAt: 3 }),
@@ -83,37 +84,41 @@ describe('InboxList — order', () => {
     const toggle = screen.getByRole('button', { name: '1 settled' })
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     expect(screen.queryByText('Work done')).toBeNull()
-    fireEvent.click(toggle)
+    await user.click(toggle)
     expect(settledTitles()).toEqual(['Work done'])
   })
 
-  it('pins a card to the top', () => {
+  it('pins a card to the top', async () => {
+    const user = userEvent.setup()
     renderInbox([threadOf('newer', { startedAt: 2 }), threadOf('older', { startedAt: 1 })])
-    fireEvent.click(within(cardFor('Work older')).getByRole('button', { name: 'Pin' }))
+    await user.click(within(cardFor('Work older')).getByRole('button', { name: 'Pin' }))
     expect(cardTitles()).toEqual(['Work older', 'Work newer'])
     expect(within(cardFor('Work older')).getByRole('button', { name: 'Unpin' })).toBeTruthy()
   })
 })
 
 describe('InboxList — settling', () => {
-  it('settles a card into the settled section', () => {
+  it('settles a card into the settled section', async () => {
+    const user = userEvent.setup()
     renderInbox([threadOf('a', { startedAt: 2 }), threadOf('b', { startedAt: 1 })])
-    fireEvent.click(within(cardFor('Work a')).getByRole('button', { name: 'Settle' }))
+    await user.click(within(cardFor('Work a')).getByRole('button', { name: 'Settle' }))
     expect(cardTitles()).toEqual(['Work b'])
     expect(screen.getByRole('button', { name: '1 settled' })).toBeTruthy()
   })
 
-  it('brings a settled card back when its agent ends a turn', () => {
+  it('brings a settled card back when its agent ends a turn', async () => {
+    const user = userEvent.setup()
     const { rerender } = renderInbox([threadOf('a', { state: 'running' })])
-    fireEvent.click(within(cardFor('Work a')).getByRole('button', { name: 'Settle' }))
+    await user.click(within(cardFor('Work a')).getByRole('button', { name: 'Settle' }))
     expect(cardTitles()).toEqual([])
     rerender(<InboxList threads={[threadOf('a', { state: 'quiet' })]} now={NOW} repos={repos} />)
     expect(cardTitles()).toEqual(['Work a'])
   })
 
-  it('brings a settled card back when it asks', () => {
+  it('brings a settled card back when it asks', async () => {
+    const user = userEvent.setup()
     const { rerender } = renderInbox([threadOf('a', { state: 'quiet' })])
-    fireEvent.click(within(cardFor('Work a')).getByRole('button', { name: 'Settle' }))
+    await user.click(within(cardFor('Work a')).getByRole('button', { name: 'Settle' }))
     rerender(
       <InboxList threads={[threadOf('a', { state: 'needs-you' })]} now={NOW} repos={repos} />
     )
@@ -122,10 +127,11 @@ describe('InboxList — settling', () => {
 })
 
 describe('InboxList — snoozing', () => {
-  it('snoozes a card into the settled section', () => {
+  it('snoozes a card into the settled section', async () => {
+    const user = userEvent.setup()
     renderInbox([threadOf('a')])
-    fireEvent.click(within(cardFor('Work a')).getByRole('button', { name: 'Snooze' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: '1 hour' }))
+    await user.click(within(cardFor('Work a')).getByRole('button', { name: 'Snooze' }))
+    await user.click(screen.getByRole('menuitem', { name: '1 hour' }))
     expect(cardTitles()).toEqual([])
     expect(useInboxMarks.getState().snoozed).toEqual({ a: NOW + HOUR_MS })
   })
@@ -137,19 +143,17 @@ describe('InboxList — search and repo filter', () => {
     threadOf('theme', { repoRoot: '/repos/web', repoName: 'web' }),
   ]
 
-  it('filters by the search text', () => {
+  it('filters by the search text', async () => {
+    const user = userEvent.setup()
     renderInbox(threads)
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), {
-      target: { value: 'theme-branch' },
-    })
+    await user.type(screen.getByRole('textbox', { name: 'Search' }), 'theme-branch')
     expect(cardTitles()).toEqual(['Work theme'])
   })
 
-  it('filters by repo', () => {
+  it('filters by repo', async () => {
+    const user = userEvent.setup()
     renderInbox(threads)
-    fireEvent.change(screen.getByRole('combobox', { name: 'Repo' }), {
-      target: { value: '/repos/api' },
-    })
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Repo' }), '/repos/api')
     expect(cardTitles()).toEqual(['Work login'])
   })
 })
@@ -178,9 +182,10 @@ describe('InboxList — starting work', () => {
 
 describe('InboxList — opening and the keyboard', () => {
   const threads = keyboardThreads
-  it('opens the most recent session of a card', () => {
+  it('opens the most recent session of a card', async () => {
+    const user = userEvent.setup()
     renderInbox(threads)
-    fireEvent.click(screen.getByRole('button', { name: /Work first/ }))
+    await user.click(screen.getByRole('button', { name: /Work first/ }))
     expect(revealSession).toHaveBeenCalledWith('recent')
   })
 

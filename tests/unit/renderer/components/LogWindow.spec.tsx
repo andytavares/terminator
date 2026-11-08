@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useLogStore } from '../../../../src/renderer/stores/log.store'
 import { LogWindow } from '../../../../src/renderer/components/LogWindow'
 
@@ -39,27 +40,30 @@ describe('LogWindow', () => {
 })
 
 describe('LogWindow — empties the log when Clear is clicked', () => {
-  it('empties the log when Clear is clicked', () => {
+  it('empties the log when Clear is clicked', async () => {
+    const user = userEvent.setup()
     useLogStore.setState({
       entries: [{ id: 1, level: 'info', message: 'started up', timestamp: '12:00:00' }],
     })
     render(<LogWindow onClose={vi.fn()} />)
-    fireEvent.click(screen.getByText('Clear'))
+    await user.click(screen.getByText('Clear'))
     expect(screen.queryByText('started up')).toBeNull()
     expect(screen.getByText('No log entries yet.')).toBeTruthy()
   })
 
-  it('calls onClose when close button is clicked', () => {
+  it('calls onClose when close button is clicked', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     render(<LogWindow onClose={onClose} />)
-    fireEvent.click(screen.getByText('✕'))
+    await user.click(screen.getByText('✕'))
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('calls onClose when Escape key is pressed', () => {
+  it('calls onClose when Escape key is pressed', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     render(<LogWindow onClose={onClose} />)
-    fireEvent.keyDown(window, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalled()
   })
 })

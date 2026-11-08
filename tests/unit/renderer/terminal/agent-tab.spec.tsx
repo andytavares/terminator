@@ -25,11 +25,21 @@ describe('startAgentTab — usage', () => {
     )
   })
 
-  it('counts the default agent, and a start that failed', async () => {
-    agentsStartAnswers({ error: 'SPAWN_FAILED' })
+  it('counts a start with no agent named under the default agent', async () => {
+    agentsStartAnswers({ data: { sessionId: 's1' } })
     await startAgentTab(REQUEST)
+    expect(recordUse).toHaveBeenCalledWith('core.agent.start.default', 'click', expect.anything())
+  })
+})
+
+describe('startAgentTab — usage of a failed start', () => {
+  beforeEach(() => recordUse.mockClear())
+
+  it('counts a start that failed as failed', async () => {
+    agentsStartAnswers({ error: 'SPAWN_FAILED' })
+    await startAgentTab({ ...REQUEST, agentId: 'gemini' })
     expect(recordUse).toHaveBeenCalledWith(
-      'core.agent.start.default',
+      'core.agent.start.gemini',
       'click',
       expect.objectContaining({ failed: true })
     )
@@ -45,11 +55,23 @@ describe('startAgentTab — usage', () => {
 describe('startAgentTab — usage ids from agent names', () => {
   beforeEach(() => recordUse.mockClear())
 
-  it('keeps a dotted name apart from a spaced one, and a long name within the label limit', async () => {
+  it.each([
+    ['my.agent', 'core.agent.start.my.agent'],
+    ['my agent', 'core.agent.start.my-agent'],
+  ])('counts agent %s under %s', async (agentId, featureId) => {
     agentsStartAnswers({ data: { sessionId: 's1' } })
-    await startAgentTab({ ...REQUEST, agentId: 'my.agent' })
+    await startAgentTab({ ...REQUEST, agentId })
+    expect(recordUse).toHaveBeenCalledWith(featureId, 'click', expect.anything())
+  })
+
+  it('caps a long agent name at the 120-character label limit', async () => {
+    agentsStartAnswers({ data: { sessionId: 's1' } })
     await startAgentTab({ ...REQUEST, agentId: 'x'.repeat(200) })
-    expect(recordUse.mock.calls[0][0]).toBe('core.agent.start.my.agent')
-    expect(recordUse.mock.calls[1][2].declare.label).toHaveLength(120)
+    const label = `Start ${'x'.repeat(114)}`
+    expect(recordUse).toHaveBeenCalledWith(
+      expect.any(String),
+      'click',
+      expect.objectContaining({ declare: expect.objectContaining({ label }) })
+    )
   })
 })

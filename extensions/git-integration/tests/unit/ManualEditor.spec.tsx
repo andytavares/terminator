@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
 import React from 'react'
 import { EditorView } from '@codemirror/view'
@@ -88,20 +89,22 @@ describe('ManualEditor — strips conflict markers from pre-populated content', 
     expect(documentText(container)).toBe('previously resolved text')
   })
 
-  it('passes the unedited pre-fill to onSave', () => {
+  it('passes the unedited pre-fill to onSave', async () => {
+    const user = userEvent.setup()
     const { onSave } = renderEditor(
       makeBlock({ oursText: 'short', theirsText: 'longer theirs text' })
     )
-    fireEvent.click(screen.getByRole('button', { name: /Save/i }))
+    await user.click(screen.getByRole('button', { name: /Save/i }))
     expect(onSave).toHaveBeenCalledWith('longer theirs text')
   })
 })
 
 describe('ManualEditor — passes the edited document to onSave', () => {
-  it('passes the edited document to onSave', () => {
+  it('passes the edited document to onSave', async () => {
+    const user = userEvent.setup()
     const { container, onSave } = renderEditor(makeBlock())
     replaceDocument(container, 'my custom edit')
-    fireEvent.click(screen.getByRole('button', { name: /Save/i }))
+    await user.click(screen.getByRole('button', { name: /Save/i }))
     expect(onSave).toHaveBeenCalledWith('my custom edit')
   })
 
@@ -122,9 +125,10 @@ describe('ManualEditor — passes the edited document to onSave', () => {
 })
 
 describe('ManualEditor — calls onCancel, and not onSave, when Cancel is clicked', () => {
-  it('calls onCancel, and not onSave, when Cancel is clicked', () => {
+  it('calls onCancel, and not onSave, when Cancel is clicked', async () => {
+    const user = userEvent.setup()
     const { onSave, onCancel } = renderEditor(makeBlock())
-    fireEvent.click(screen.getByText(/Cancel/i))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onCancel).toHaveBeenCalledOnce()
     expect(onSave).not.toHaveBeenCalled()
   })

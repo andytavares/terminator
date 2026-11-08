@@ -132,7 +132,11 @@ describe('Claude Code over ACP — a prompt right after a cancel', () => {
     await service.answer(sessionId, ask.requestId, reject!.optionId)
     if (afterTurnEnds) await turn
     service.cancel(sessionId)
-    const told = await service.prompt(sessionId, 'That was refused. Reply with the word PONG only.')
+    // The cancelled turn is awaited beside the next prompt, so it ends inside the test.
+    const [, told] = await Promise.all([
+      turn,
+      service.prompt(sessionId, 'That was refused. Reply with the word PONG only.'),
+    ])
     return { told, reply: text.join('') }
   }
 

@@ -131,49 +131,72 @@ describe('pr-review store — session v2 — unmarking forgets the viewed SHA an
 
 const HEAD_A = { repoRoot: REPO, prNumber: 211, headSHA: 'aaa111' }
 
-/** Adds a draft (then rewords it) and a private note to the session. */
-function addDraftAndNote(store: ReturnType<typeof usePrReviewStore.getState>) {
-  store.addDraft(HEAD_A, {
-    id: 'd1',
-    path: 'src/hooks/usePrReview.ts',
-    line: 317,
-    startLine: null,
-    side: 'RIGHT',
-    body: 'computeRiskScore runs twice per file here (312 and 317).',
-    fromFindingId: 'f1',
-  })
-  store.updateDraft(HEAD_A, 'd1', 'Keep the scores from the loop.')
-  store.addNote(HEAD_A, {
-    id: 'n1',
-    path: 'src/hooks/usePrReview.ts',
-    line: 312,
-    side: 'RIGHT',
-    body: 'why is this recomputed??',
-    createdAt: '2026-09-27T10:00:00.000Z',
-  })
+const DRAFT = {
+  id: 'd1',
+  path: 'src/hooks/usePrReview.ts',
+  line: 317,
+  startLine: null,
+  side: 'RIGHT' as const,
+  body: 'computeRiskScore runs twice per file here (312 and 317).',
+  fromFindingId: 'f1',
 }
 
+const NOTE = {
+  id: 'n1',
+  path: 'src/hooks/usePrReview.ts',
+  line: 312,
+  side: 'RIGHT' as const,
+  body: 'why is this recomputed??',
+  createdAt: '2026-09-27T10:00:00.000Z',
+}
+
+/** The session the store saved last. */
+const lastPersisted = () => sessionSet.mock.calls.at(-1)![1] as ReviewSession
+
 describe('pr-review store — session v2 — drafts and notes persist with the session', () => {
-  it('drafts and notes persist with the session', () => {
+  it('saves a reworded draft with the session', () => {
     const store = usePrReviewStore.getState()
     store.initSession(session())
-    addDraftAndNote(store)
-    let s = usePrReviewStore.getState()
-    expect(s.drafts[0].body).toBe('Keep the scores from the loop.')
-    expect(s.notes).toHaveLength(1)
-    const persisted = sessionSet.mock.calls.at(-1)![1] as ReviewSession
-    expect(persisted.drafts).toHaveLength(1)
-    expect(persisted.notes[0].body).toBe('why is this recomputed??')
+    store.addDraft(HEAD_A, DRAFT)
+    store.updateDraft(HEAD_A, 'd1', 'Keep the scores from the loop.')
+    expect(usePrReviewStore.getState().drafts.map((d) => d.body)).toEqual([
+      'Keep the scores from the loop.',
+    ])
+    expect(lastPersisted().drafts.map((d) => d.body)).toEqual(['Keep the scores from the loop.'])
+  })
 
+  it('saves a private note with the session', () => {
+    const store = usePrReviewStore.getState()
+    store.initSession(session())
+    store.addNote(HEAD_A, NOTE)
+    expect(usePrReviewStore.getState().notes).toEqual([NOTE])
+    expect(lastPersisted().notes).toEqual([NOTE])
+  })
+})
+
+describe('pr-review store — session v2 — removing drafts and notes persists with the session', () => {
+  it('removes a note from the session', () => {
+    const store = usePrReviewStore.getState()
+    store.initSession(session({ notes: [NOTE] }))
     store.removeNote(HEAD_A, 'n1')
-    store.removeDraft(HEAD_A, 'd1')
-    s = usePrReviewStore.getState()
-    expect(s.notes).toHaveLength(0)
-    expect(s.drafts).toHaveLength(0)
+    expect(usePrReviewStore.getState().notes).toEqual([])
+    expect(lastPersisted().notes).toEqual([])
+  })
 
-    store.addDraft(HEAD_A, { ...persisted.drafts[0], id: 'd2' })
+  it('removes a draft from the session', () => {
+    const store = usePrReviewStore.getState()
+    store.initSession(session({ drafts: [DRAFT, { ...DRAFT, id: 'd2' }] }))
+    store.removeDraft(HEAD_A, 'd1')
+    expect(usePrReviewStore.getState().drafts.map((d) => d.id)).toEqual(['d2'])
+    expect(lastPersisted().drafts.map((d) => d.id)).toEqual(['d2'])
+  })
+
+  it('clears every draft from the session', () => {
+    const store = usePrReviewStore.getState()
+    store.initSession(session({ drafts: [DRAFT, { ...DRAFT, id: 'd2' }] }))
     store.clearDrafts(HEAD_A)
-    expect(usePrReviewStore.getState().drafts).toHaveLength(0)
+    expect(usePrReviewStore.getState().drafts).toEqual([])
+    expect(lastPersisted().drafts).toEqual([])
   })
 })
 

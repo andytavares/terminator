@@ -23,11 +23,10 @@ describe('tunnelDropped', () => {
 
 function tunnelDropTests() {
   it('moves a running server to a named failure', () => {
-    const next = tunnelDropped(ON)
-    expect(next.kind).toBe('failed')
-    if (next.kind !== 'failed') throw new Error('unreachable')
-    expect(next.failure.reason).toBe('tunnel-dropped')
-    expect(next.failure.resolution).toBeTruthy()
+    expect(tunnelDropped(ON)).toMatchObject({
+      kind: 'failed',
+      failure: { reason: 'tunnel-dropped', resolution: expect.stringMatching(/\S/) },
+    })
   })
 
   it('leaves a status that was never on alone', () => {
@@ -114,10 +113,10 @@ function reduceStatusTunnelFailureTests() {
       lanUrl: 'http://192.168.1.4:7681',
       ngrokError: 'upstream refused the connection',
     })
-    expect(next.kind).toBe('failed')
-    if (next.kind !== 'failed') throw new Error('unreachable')
-    expect(next.failure.reason).toBe('tunnel-unreachable')
-    expect(next.failure.resolution).toBe('upstream refused the connection')
+    expect(next).toMatchObject({
+      kind: 'failed',
+      failure: { reason: 'tunnel-unreachable', resolution: 'upstream refused the connection' },
+    })
   })
 }
 
@@ -156,9 +155,10 @@ function reduceStatusPortInUseTests() {
     })
 
     it('remembers the port from the previous status when the error omits it', () => {
-      const next = reduceStatus(ON, { error: 'PORT_IN_USE' })
-      if (next.kind !== 'failed') throw new Error('unreachable')
-      expect(next.failure.message).toContain('7681')
+      expect(reduceStatus(ON, { error: 'PORT_IN_USE' })).toMatchObject({
+        kind: 'failed',
+        failure: { message: expect.stringContaining('7681') },
+      })
     })
   })
 }

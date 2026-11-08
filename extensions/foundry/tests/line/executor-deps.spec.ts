@@ -149,6 +149,7 @@ function runInput(over: Partial<Parameters<ExecutorDeps['run']>[0]> = {}) {
 type StartInput = {
   worktreePath: string
   model: string
+  settings: { permissions: { allow: string[] } }
   addDirs?: string[]
   autoDecide: (tool: string, input: unknown) => { allow: boolean } | null
   onRegistered: (run: { sessionId: string; transcriptFrom: number }) => void
@@ -182,6 +183,7 @@ describe('an agent node', () => {
   describe('failing and never starting', failingAndNeverStartingTests)
   describe('asking about a tool', askingAboutAToolTests)
   describe('refused tools', refusedToolsTests)
+  describe('tools the operator says only read', operatorReadOnlyToolsTests)
   describe('resuming', executorDepsResumingTests)
 })
 
@@ -204,8 +206,13 @@ function launchingTests() {
     expect(input.worktreePath).toBe(checkoutPath(root, order, 'app'))
     expect(onStarted).toHaveBeenCalledWith('builder-1')
 
+    // A live session waits at its prompt, so `onEnd` never comes: the turn's end is the node's.
     input.onTurnEnd(1)
-    expect(await running).toEqual({ sessionId: 'builder-1', exitCode: 0, transcriptFrom: 0 })
+    expect(await Promise.race([running, Promise.resolve('still waiting')])).toEqual({
+      sessionId: 'builder-1',
+      exitCode: 0,
+      transcriptFrom: 0,
+    })
     expect(runner.stop).toHaveBeenCalledWith('builder-1')
     // The lane's conversation is offered to the next node of the same role, never another.
     await eventually(() => expect(deps.sessionFor(1, 'builder')).toBe('builder-1'))
@@ -256,7 +263,9 @@ function failingAndNeverStartingTests() {
     const input = await started
     await eventually(() => expect(runtime.supervision?.runs.get('builder-2')).not.toBeNull())
     input.onEnd(3)
-    expect((await running).exitCode).toBe(3)
+    expect(await Promise.race([running, Promise.resolve('still waiting')])).toMatchObject({
+      exitCode: 3,
+    })
     expect(runtime.supervision?.snapshot().history[0]).toMatchObject({
       sessionId: 'builder-2',
       outcome: 'stopped',
@@ -301,6 +310,9 @@ function askingAboutAToolTests() {
     input.onResolved('req-1', 'handback')
     expect(pendingPermissions.sessionFor('req-1')).toBeNull()
     expect(strandedAgents.get('builder-3')).toMatchObject({ orderId: 'WO-1' })
+    expect(runtime.supervision?.feed.list().map((entry) => entry.summary)).toContain(
+      'nobody answered, so the question stays open in the agent tab — an agent waits there'
+    )
     input.onTurnEnd(1)
     await running
   })
@@ -316,6 +328,21 @@ function refusedToolsTests() {
     expect(runtime.supervision?.feed.list().map((entry) => entry.summary)).toContain(
       'refused Write: a verifier does not edit'
     )
+    input.onTurnEnd(1)
+    await running
+  })
+}
+
+// The read-only policy refuses any tool it was not taught about: an MCP server's
+// `get_thing` and `delete_thing` look alike. So the operator names the ones that only read.
+function operatorReadOnlyToolsTests() {
+  it('lets a read-only role call a tool the operator declared read-only', async () => {
+    host.settings.set('terminator.foundry.readOnlyTools', ['mcp__docs__search'])
+    const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
+    const { started } = agentStarts('architect-1')
+    const running = deps.run(runInput({ role: 'architect', readOnly: true }))
+    const input = await started
+    expect(input.settings.permissions.allow).toContain('mcp__docs__search')
     input.onTurnEnd(1)
     await running
   })

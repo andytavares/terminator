@@ -29,7 +29,9 @@ describe('ConfirmButton', () => {
 function armingTests() {
   it('shows only its own label until it is armed', () => {
     setup()
-    expect(screen.getByRole('button', { name: 'Start over' })).toBeTruthy()
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Start over',
+    ])
     expect(screen.queryByText(/removes the checkout/)).toBeNull()
   })
 
@@ -42,7 +44,7 @@ function armingTests() {
   it('names what will be destroyed once armed', async () => {
     const { user } = setup()
     await user.click(screen.getByRole('button', { name: 'Start over' }))
-    expect(screen.getByText(/removes the checkout and the branch wip/)).toBeTruthy()
+    expect(document.body.textContent).toContain('This removes the checkout and the branch wip.')
   })
 }
 
@@ -59,7 +61,9 @@ function actingAndBackingOutTests() {
     await user.click(screen.getByRole('button', { name: 'Start over' }))
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onConfirm).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: 'Start over' })).toBeTruthy()
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Start over',
+    ])
   })
 }
 
@@ -68,7 +72,9 @@ function afterFiringAndWhileBusyTests() {
     const { user } = setup()
     await user.click(screen.getByRole('button', { name: 'Start over' }))
     await user.click(screen.getByRole('button', { name: 'Destroy it and start over' }))
-    expect(screen.getByRole('button', { name: 'Start over' })).toBeTruthy()
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Start over',
+    ])
   })
 
   it('cannot be armed while something else is in flight', async () => {

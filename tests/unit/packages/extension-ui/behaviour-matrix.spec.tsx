@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ConfirmDialog } from '../../../../packages/extension-ui/src/ConfirmDialog'
 import { Popover } from '../../../../packages/extension-ui/src/Popover'
 import { pressOutside } from '../../../support/modal'
@@ -51,7 +52,9 @@ const openConfirmDialog = (onDismiss = vi.fn()) => {
 describe('behaviour matrix: ConfirmDialog', () => {
   it(CHECKS[1], () => {
     openConfirmDialog()
-    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'Delete this note?' }).textContent).toContain(
+      'It cannot be recovered.'
+    )
   })
   it(BY_THE_BROWSER, () => {
     openConfirmDialog()
@@ -78,12 +81,13 @@ function PopoverHarness({ onDismiss }: { onDismiss: () => void }) {
 }
 
 describe('behaviour matrix: Popover', () => {
-  it(`${CHECKS[4]}, and is not announced as modal`, () => {
+  it(`${CHECKS[4]}, and is not announced as modal`, async () => {
+    const user = userEvent.setup()
     const onDismiss = vi.fn()
     const { container } = render(<PopoverHarness onDismiss={onDismiss} />)
     const surface = container.querySelector('[data-tmui-surface]') as HTMLElement
     expect(surface.getAttribute('aria-modal')).toBeNull()
-    fireEvent.click(document.body)
+    await user.click(document.body)
     expect(onDismiss).toHaveBeenCalled()
   })
 })

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { createChangeBus } from '../helpers/change-bus.js'
 import { RepositoryChecks } from '../../src/components/SettingsProfiles.js'
@@ -64,9 +65,10 @@ describe('Repository checks in settings', () => {
 
 describe('looking at and forgetting a repository', () => {
   it('shows the commands of one repository, read only', async () => {
+    const user = userEvent.setup()
     render(<RepositoryChecks />)
     const glyph = within(await screen.findByRole('group', { name: 'glyph-compiler' }))
-    fireEvent.click(glyph.getByRole('button', { name: 'Show' }))
+    await user.click(glyph.getByRole('button', { name: 'Show' }))
     expect(await glyph.findByText('./glyph test')).toBeTruthy()
     expect(payloadsSentOn(invoke, 'foundry:profile-read')).toEqual([
       { repoPath: '/repos/glyph-compiler' },
@@ -75,9 +77,10 @@ describe('looking at and forgetting a repository', () => {
   })
 
   it('forgets a repository and drops it from the list', async () => {
+    const user = userEvent.setup()
     render(<RepositoryChecks />)
     const glyph = within(await screen.findByRole('group', { name: 'glyph-compiler' }))
-    fireEvent.click(glyph.getByRole('button', { name: 'Forget' }))
+    await user.click(glyph.getByRole('button', { name: 'Forget' }))
     await waitFor(() => expect(screen.queryByRole('group', { name: 'glyph-compiler' })).toBeNull())
     expect(payloadsSentOn(invoke, 'foundry:profile-forget')).toEqual([
       { repoPath: '/repos/glyph-compiler' },

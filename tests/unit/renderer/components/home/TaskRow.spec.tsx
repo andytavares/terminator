@@ -1,20 +1,30 @@
 import React from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
-import { makeTempDir } from '../../../../support/temp-dir'
-import { wireMainTaskStore } from '../../../../support/main-task-store'
 import { TaskRow } from '../../../../../src/renderer/components/home/TaskRow'
 import { useToastStore } from '../../../../../src/renderer/stores/toast.store'
 import { SESSION_DRAG_TYPE } from '../../../../../src/renderer/components/agent/session-drag'
 import type { WorkThread } from '../../../../../src/renderer/home/work-threads'
 import type { TaskLane } from '../../../../../src/shared/schemas/tasks.schema'
-
-let userData: string
-vi.mock('electron', () => ({ app: { getPath: () => userData } }))
+import { useTaskStore } from '../../../../../src/renderer/stores/task.store'
+import { installElectronApi } from '../../../../support/electron-api'
+import { task } from '../../home/fixtures'
 
 const api = { repoRoot: '/code/api', branch: 'rate-limits' }
 const web = { repoRoot: '/code/web', branch: 'rate-limits' }
-let main: Awaited<ReturnType<typeof wireMainTaskStore>>
+const rateTask = task({
+  id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  title: 'Rate limits',
+  lanes: [api],
+})
+const webTask = task({
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  title: 'Web side',
+  lanes: [web],
+})
+// Main's answer to a merge: the target task holding both tasks' lanes.
+const merge = vi.fn(async () => ({ data: { ...rateTask, lanes: [api, web] } }))
+const storedTitles = () => useTaskStore.getState().tasks.map((t) => t.title)
 
 function rowThread(title: string, lane: TaskLane, taskId: string): WorkThread {
   return {
@@ -42,13 +52,15 @@ function rowThread(title: string, lane: TaskLane, taskId: string): WorkThread {
 
 const dataTransfer = () => ({ setData: vi.fn(), effectAllowed: '', dropEffect: '' })
 
-async function twoRows() {
-  const rate = await main.createTask({ title: 'Rate limits', lanes: [api] })
-  const webSide = await main.createTask({ title: 'Web side', lanes: [web] })
+function twoRows() {
   render(
     <>
-      <TaskRow thread={rowThread('Rate limits', api, rate.id)} now={Date.now()} selected={false} />
-      <TaskRow thread={rowThread('Web side', web, webSide.id)} now={Date.now()} selected={false} />
+      <TaskRow
+        thread={rowThread('Rate limits', api, rateTask.id)}
+        now={Date.now()}
+        selected={false}
+      />
+      <TaskRow thread={rowThread('Web side', web, webTask.id)} now={Date.now()} selected={false} />
     </>
   )
   return {
@@ -57,21 +69,22 @@ async function twoRows() {
   }
 }
 
-beforeEach(async () => {
-  userData = makeTempDir('task-row-merge-')
-  main = await wireMainTaskStore()
+beforeEach(() => {
+  merge.mockClear()
+  installElectronApi({ tasks: { merge } })
+  useTaskStore.setState({ tasks: [rateTask, webTask] })
   useToastStore.setState({ toasts: [] })
 })
 
 describe('TaskRow — drop one row on another to merge', () => {
   it('merges the dragged task into the row it is dropped on, and says so with Undo', async () => {
-    const { rate, webSide } = await twoRows()
+    const { rate, webSide } = twoRows()
     fireEvent.dragStart(webSide, { dataTransfer: dataTransfer() })
     fireEvent.dragOver(rate, { dataTransfer: dataTransfer() })
     expect(rate.className).toContain('task-row--drop')
     fireEvent.drop(rate, { dataTransfer: dataTransfer() })
-    await waitFor(() => expect(main.listTasks()).toHaveLength(1))
-    expect(main.listTasks()[0]).toMatchObject({ title: 'Rate limits', lanes: [api, web] })
+    await waitFor(() => expect(storedTitles()).toEqual(['Rate limits']))
+    expect(merge).toHaveBeenCalledWith({ from: webTask.id, into: rateTask.id })
     // The toast follows the merge's own promise, which can settle after the store shows the merge.
     await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1))
     const [toast] = useToastStore.getState().toasts
@@ -80,20 +93,21 @@ describe('TaskRow — drop one row on another to merge', () => {
   })
 
   it('does not take a row dropped on itself', async () => {
-    const { webSide } = await twoRows()
+    const { webSide } = twoRows()
     fireEvent.dragStart(webSide, { dataTransfer: dataTransfer() })
     fireEvent.dragOver(webSide, { dataTransfer: dataTransfer() })
     expect(webSide.className).not.toContain('task-row--drop')
     fireEvent.drop(webSide, { dataTransfer: dataTransfer() })
     fireEvent.dragEnd(webSide)
-    expect(main.listTasks()).toHaveLength(2)
+    expect(merge).not.toHaveBeenCalled()
+    expect(storedTitles()).toEqual(['Rate limits', 'Web side'])
     expect(useToastStore.getState().toasts).toEqual([])
   })
 })
 
 describe('TaskRow — drag feedback', () => {
   it('stays marked as the drop target while the pointer moves onto one of its own chips', async () => {
-    const { rate, webSide } = await twoRows()
+    const { rate, webSide } = twoRows()
     fireEvent.dragStart(webSide, { dataTransfer: dataTransfer() })
     fireEvent.dragOver(rate, { dataTransfer: dataTransfer() })
     const chip = rate.querySelector('.task-lane') as HTMLElement
@@ -141,38 +155,22 @@ function threadWithSessions(taskId: string): WorkThread {
 }
 
 describe('TaskRow — dragging it to an agent tab', () => {
-  it('carries every session of every lane, and still merges when dropped on a row', async () => {
-    const rate = await main.createTask({ title: 'Rate limits', lanes: [api] })
-    const webSide = await main.createTask({ title: 'Web side', lanes: [web] })
-    render(
-      <>
-        <TaskRow
-          thread={rowThread('Rate limits', api, rate.id)}
-          now={Date.now()}
-          selected={false}
-        />
-        <TaskRow thread={threadWithSessions(webSide.id)} now={Date.now()} selected={false} />
-      </>
-    )
+  it('carries every session of every lane', () => {
+    render(<TaskRow thread={threadWithSessions(webTask.id)} now={Date.now()} selected={false} />)
     const transfer = dataTransfer()
     fireEvent.dragStart(screen.getByRole('button', { name: 'Web side' }), {
       dataTransfer: transfer,
     })
     expect(transfer.setData).toHaveBeenCalledWith(SESSION_DRAG_TYPE, 's1\ns2\ns3')
     expect(transfer.effectAllowed).toBe('copyMove')
-    fireEvent.drop(screen.getByRole('button', { name: 'Rate limits' }), {
-      dataTransfer: dataTransfer(),
-    })
-    await waitFor(() => expect(main.listTasks()).toHaveLength(1))
   })
 })
 
 describe('TaskRow — the age and the actions button each have their own space', () => {
-  it("puts the age and then the button side by side in the row's last cell", async () => {
-    const created = await main.createTask({ title: 'Rate limits', lanes: [api] })
+  it("puts the age and then the button side by side in the row's last cell", () => {
     render(
       <TaskRow
-        thread={rowThread('Rate limits', api, created.id)}
+        thread={rowThread('Rate limits', api, rateTask.id)}
         now={Date.now()}
         selected={false}
       />

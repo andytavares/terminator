@@ -1,6 +1,7 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
+import { render, screen, within, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { InFlight } from '../../../../src/renderer/components/home/InFlight'
 import { useDeskSelection } from '../../../../src/renderer/components/home/desk-selection'
 import { useTaskStore } from '../../../../src/renderer/stores/task.store'
@@ -10,7 +11,6 @@ import { useAddToTaskStore } from '../../../../src/renderer/components/tasks/add
 import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import { ToastContainer } from '../../../../src/renderer/components/ToastContainer'
 import { useHomeFeedStore } from '../../../../src/renderer/stores/home-feed.store'
-import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useChangeStatsStore } from '../../../../src/renderer/stores/change-stats.store'
 import { installElectronApi } from '../../../support/electron-api'
 import { FACTS, REPO_ROOT, seedDesk, sendToAgentAsk, ticket } from '../home/desk-world'
@@ -106,6 +106,8 @@ beforeEach(() => {
   })
 })
 
+type User = ReturnType<typeof userEvent.setup>
+
 const inFlightRowNamed = (title: string) => screen.getByRole('button', { name: title })
 
 describe('In flight rows', () => {
@@ -143,10 +145,11 @@ describe('In flight rows — grouping', () => {
     expect(screen.queryByText(/Parked/)).toBeNull()
   })
 
-  it('groups by repo from the Group menu', () => {
+  it('groups by repo from the Group menu', async () => {
+    const user = userEvent.setup()
     render(<InFlight />)
-    fireEvent.click(screen.getByRole('button', { name: 'Group: state' }))
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'repo' }))
+    await user.click(screen.getByRole('button', { name: 'Group: state' }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'repo' }))
     expect(screen.getByText('terminator · 3')).toBeTruthy()
     expect(screen.queryByText(/Running · /)).toBeNull()
   })
@@ -167,15 +170,16 @@ describe('In flight rows — grouping', () => {
 })
 
 /** The drawer is its own chunk, so it is there once the lazy import has resolved. */
-const openBuilding = () => {
+const openBuilding = async (user: User) => {
   render(<InFlight />)
-  fireEvent.click(inFlightRowNamed('PR overview shows status before story'))
+  await user.click(inFlightRowNamed('PR overview shows status before story'))
   return screen.findByRole('dialog', { name: 'PR overview shows status before story' })
 }
 
 describe('the work-thread drawer', () => {
   it('opens from a click with the title, state, agents and pull request checks', async () => {
-    const drawer = within(await openBuilding())
+    const user = userEvent.setup()
+    const drawer = within(await openBuilding(user))
     expect(drawer.getByRole('heading', { level: 4 }).textContent).toContain('TAV-20')
     expect(drawer.getByText('Running')).toBeTruthy()
     expect(drawer.getByText('AGENTS AND TERMINALS · 1')).toBeTruthy()
@@ -187,12 +191,14 @@ describe('the work-thread drawer', () => {
   })
 
   it('opens on Enter and returns focus to the row on Escape', async () => {
+    const user = userEvent.setup()
     render(<InFlight />)
     const target = inFlightRowNamed('PR overview shows status before story')
     target.focus()
-    fireEvent.keyDown(target, { key: 'Enter' })
+    expect(document.activeElement).toBe(target)
+    await user.keyboard('{Enter}')
     expect(await screen.findByRole('dialog')).toBeTruthy()
-    fireEvent.keyDown(document, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(document.activeElement).toBe(target)
   })
@@ -200,9 +206,10 @@ describe('the work-thread drawer', () => {
 
 describe('the work-thread drawer — summary', () => {
   it('shows Writing a summary, then the model text with its source', async () => {
+    const user = userEvent.setup()
     let answer: (value: { text: string; generatedAt: string }) => void = () => {}
     summaryGet.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
-    const drawer = within(await openBuilding())
+    const drawer = within(await openBuilding(user))
     expect(drawer.getByText('Writing a summary…')).toBeTruthy()
     answer({ text: 'Two agents are on this.', generatedAt: 'now' })
     expect(await drawer.findByText(/Two agents are on this\./)).toBeTruthy()
@@ -215,10 +222,11 @@ describe('the work-thread drawer — summary', () => {
   })
 
   it('says a failed summary in plain words and asks again on Retry', async () => {
+    const user = userEvent.setup()
     summaryGet.mockResolvedValueOnce({ error: 'model unavailable' })
-    const drawer = within(await openBuilding())
+    const drawer = within(await openBuilding(user))
     expect(await drawer.findByText(/Could not write a summary/)).toBeTruthy()
-    fireEvent.click(drawer.getByRole('button', { name: 'Retry' }))
+    await user.click(drawer.getByRole('button', { name: 'Retry' }))
     expect(await drawer.findByText(/Two agents are on this\./)).toBeTruthy()
     expect(summaryGet).toHaveBeenCalledTimes(2)
   })
@@ -226,49 +234,67 @@ describe('the work-thread drawer — summary', () => {
 
 describe('the work-thread drawer — checks', () => {
   it('sends a failed check to an agent through the extension that published it', async () => {
+    const user = userEvent.setup()
     const runAction = vi.fn().mockResolvedValue(true)
     useHomeFeedStore.setState({
       runAction,
       asks: [sendToAgentAsk],
     })
-    const drawer = within(await openBuilding())
-    fireEvent.click(drawer.getByRole('button', { name: 'Send to agent' }))
+    const drawer = within(await openBuilding(user))
+    await user.click(drawer.getByRole('button', { name: 'Send to agent' }))
     await waitFor(() =>
       expect(runAction).toHaveBeenCalledWith('git-integration', 'fix:o/r#275', 'send-to-agent')
     )
   })
 
   it('offers no Send to agent when no extension published one', async () => {
-    const drawer = within(await openBuilding())
+    const user = userEvent.setup()
+    const drawer = within(await openBuilding(user))
     expect(drawer.queryByRole('button', { name: 'Send to agent' })).toBeNull()
   })
 })
 
 describe('the work-thread drawer — actions', () => {
-  it('opens the terminal, the pull request and the ticket, and archives the work', async () => {
-    const drawer = within(await openBuilding())
-    fireEvent.click(drawer.getByRole('button', { name: 'Open terminal' }))
+  it('opens the terminal', async () => {
+    const user = userEvent.setup()
+    const drawer = within(await openBuilding(user))
+    await user.click(drawer.getByRole('button', { name: 'Open terminal' }))
     expect(spies.open).toHaveBeenCalledWith('building')
-    fireEvent.click(drawer.getByRole('button', { name: 'Open pull request #275' }))
-    expect(openExternal).toHaveBeenCalledWith('https://github.com/o/r/pull/275')
-    fireEvent.click(drawer.getByRole('button', { name: 'Open in Linear' }))
-    expect(openExternal).toHaveBeenCalledWith('https://linear.app/t/issue/TAV-20')
-    fireEvent.click(drawer.getByRole('button', { name: 'Archive' }))
+  })
+
+  it.each([
+    ['Open pull request #275', 'https://github.com/o/r/pull/275'],
+    ['Open in Linear', 'https://linear.app/t/issue/TAV-20'],
+  ])('"%s" opens %s in the browser', async (button, url) => {
+    const user = userEvent.setup()
+    const drawer = within(await openBuilding(user))
+    await user.click(drawer.getByRole('button', { name: button }))
+    expect(openExternal).toHaveBeenCalledWith(url)
+  })
+
+  it('archives the work and offers Restore', async () => {
+    const user = userEvent.setup()
+    const drawer = within(await openBuilding(user))
+    await user.click(drawer.getByRole('button', { name: 'Archive' }))
     expect(useParkedThreads.getState().keys).toEqual(['linear:TAV-20'])
     expect(drawer.getByRole('button', { name: 'Restore' })).toBeTruthy()
   })
+})
 
+describe('the work-thread drawer — agents and sessions', () => {
   it("starts an agent tab on the thread's branch", async () => {
-    const drawer = within(await openBuilding())
-    fireEvent.click(drawer.getByRole('button', { name: 'New agent on this branch' }))
+    const user = userEvent.setup()
+    const drawer = within(await openBuilding(user))
+    await user.click(drawer.getByRole('button', { name: 'New agent on this branch' }))
     expect(spies.startInBranch).toHaveBeenCalledWith(
       expect.objectContaining({ projectId: 'p20', prompt: expect.stringContaining('Work on') })
     )
   })
 
   it('opens a session from its row', async () => {
-    const drawer = within(await openBuilding())
-    fireEvent.click(drawer.getByRole('button', { name: 'Open Writing ReviewHeader tests' }))
+    const user = userEvent.setup()
+    const drawer = within(await openBuilding(user))
+    await user.click(drawer.getByRole('button', { name: 'Open Writing ReviewHeader tests' }))
     expect(spies.open).toHaveBeenCalledWith('building')
   })
 })
@@ -302,13 +328,16 @@ describe('filtering from the Desk header', () => {
   })
 })
 
-const rightClickRow = (title: string) => {
+const rightClickRow = async (user: User, title: string) => {
   const row = inFlightRowNamed(title)
-  fireEvent.contextMenu(within(row).getByRole('button', { name: 'Work actions' }))
+  await user.pointer({
+    keys: '[MouseRight]',
+    target: within(row).getByRole('button', { name: 'Work actions' }),
+  })
   return row
 }
 
-const openScratchRow = () => rightClickRow('Scratch shell')
+const openScratchRow = (user: User) => rightClickRow(user, 'Scratch shell')
 
 const contextMenuItemNames = () =>
   within(document.body)
@@ -336,22 +365,25 @@ const SCRATCH_MENU = [
 ]
 
 describe('the row menu — which items', () => {
-  it('opens on right click with the actions for a ticketed thread with sessions', () => {
+  it('opens on right click with the actions for a ticketed thread with sessions', async () => {
+    const user = userEvent.setup()
     render(<InFlight />)
-    rightClickRow('PR overview shows status before story')
+    await rightClickRow(user, 'PR overview shows status before story')
     expect(contextMenuItemNames()).toEqual(TICKETED_MENU)
   })
 
-  it('omits ticket-only actions for a scratch terminal and worktree removal for its session', () => {
+  it('omits ticket-only actions for a scratch terminal and worktree removal for its session', async () => {
+    const user = userEvent.setup()
     render(<InFlight />)
-    openScratchRow()
+    await openScratchRow(user)
     expect(contextMenuItemNames()).toEqual(SCRATCH_MENU)
   })
 
-  it('opens from the row’s ⋯ button without opening the drawer', () => {
+  it('opens from the row’s ⋯ button without opening the drawer', async () => {
+    const user = userEvent.setup()
     render(<InFlight />)
     const row = inFlightRowNamed('Make all text in the app scale with settings')
-    fireEvent.click(within(row).getByRole('button', { name: 'Work actions' }))
+    await user.click(within(row).getByRole('button', { name: 'Work actions' }))
     expect(contextMenuItemNames()).toEqual(['Add to task…', 'Archive', 'Dismiss'])
     expect(
       screen.queryByRole('dialog', { name: 'Make all text in the app scale with settings' })
@@ -359,37 +391,41 @@ describe('the row menu — which items', () => {
   })
 })
 
-const openRenameField = (title: string, text: string, key: string): HTMLElement => {
-  rightClickRow(title)
-  fireEvent.click(openMenuItem('Rename…'))
-  const field = screen.getByDisplayValue(title)
-  fireEvent.change(field, { target: { value: text } })
-  fireEvent.keyDown(field, { key })
-  return field
+const RENAMED_ROW = 'PR overview shows status before story'
+
+const openRenameField = async (user: User, text: string, key: string) => {
+  await rightClickRow(user, RENAMED_ROW)
+  await user.click(openMenuItem('Rename…'))
+  const field = screen.getByDisplayValue(RENAMED_ROW)
+  await user.clear(field)
+  await user.type(field, `${text}{${key}}`)
 }
 
 describe('the row menu — Add to task', () => {
-  it('opens the picker for the one branch the row is on', () => {
+  it('opens the picker for the one branch the row is on', async () => {
+    const user = userEvent.setup()
     useAddToTaskStore.setState({ lane: null })
     render(<InFlight />)
-    rightClickRow('PR overview shows status before story')
-    fireEvent.click(openMenuItem('Add to task…'))
+    await rightClickRow(user, 'PR overview shows status before story')
+    await user.click(openMenuItem('Add to task…'))
     expect(useAddToTaskStore.getState().lane).toEqual({ repoRoot: REPO_ROOT, branch: 'tav-20' })
   })
 })
 
 describe('the row menu — Open terminal and Close sessions', () => {
-  it('Open terminal reveals the thread’s lead session', () => {
+  it('Open terminal reveals the thread’s lead session', async () => {
+    const user = userEvent.setup()
     render(<InFlight />)
-    rightClickRow('PR overview shows status before story')
-    fireEvent.click(openMenuItem('Open terminal'))
+    await rightClickRow(user, 'PR overview shows status before story')
+    await user.click(openMenuItem('Open terminal'))
     expect(spies.open).toHaveBeenCalledWith('building')
   })
 
-  it('Close sessions closes each open session in the thread', () => {
+  it('Close sessions closes each open session in the thread', async () => {
+    const user = userEvent.setup()
     render(<InFlight />)
-    rightClickRow('PR overview shows status before story')
-    fireEvent.click(openMenuItem('Close sessions'))
+    await rightClickRow(user, 'PR overview shows status before story')
+    await user.click(openMenuItem('Close sessions'))
     expect(spies.closeSession).toHaveBeenCalledWith(
       expect.objectContaining({ sessionId: 'building' })
     )
@@ -397,11 +433,12 @@ describe('the row menu — Open terminal and Close sessions', () => {
 })
 
 describe('the row menu — Rename', () => {
-  it('Escape cancels; Enter saves the typed title as the lead session’s description', () => {
+  it('Escape cancels; Enter saves the typed title as the lead session’s description', async () => {
+    const user = userEvent.setup()
     render(<InFlight />)
-    openRenameField('PR overview shows status before story', 'PR overview', 'Escape')
+    await openRenameField(user, 'PR overview', 'Escape')
     expect(spies.saveDescription).not.toHaveBeenCalled()
-    openRenameField('PR overview shows status before story', 'PR overview', 'Enter')
+    await openRenameField(user, 'PR overview', 'Enter')
     expect(spies.saveDescription).toHaveBeenCalledWith(
       expect.objectContaining({ sessionId: 'building' }),
       'PR overview'
@@ -410,45 +447,54 @@ describe('the row menu — Rename', () => {
 })
 
 describe('the row menu — Link ticket', () => {
-  it('opens the link dialog for the scratch session', () => {
+  it('opens the link dialog for the scratch session', async () => {
+    const user = userEvent.setup()
     render(<InFlight />)
-    openScratchRow()
-    fireEvent.click(openMenuItem('Link ticket…'))
+    await openScratchRow(user)
+    await user.click(openMenuItem('Link ticket…'))
     expect(screen.getByRole('dialog', { name: 'Link a work item' })).toBeTruthy()
   })
 })
 
-const parkViaMenu = (title: string, item: string): void => {
-  rightClickRow(title)
-  fireEvent.click(openMenuItem(item))
+const parkViaMenu = async (user: User, title: string, item: string): Promise<void> => {
+  await rightClickRow(user, title)
+  await user.click(openMenuItem(item))
 }
 
 describe('the row menu — Archive and Dismiss', () => {
-  it('Archive takes work with no stored task out of the lists', () => {
+  it('Archive takes work with no stored task out of the lists', async () => {
+    const user = userEvent.setup()
     render(<InFlight />)
-    parkViaMenu('Reproduce staging 429s before release', 'Archive')
+    await parkViaMenu(user, 'Reproduce staging 429s before release', 'Archive')
     expect(useParkedThreads.getState().keys).toEqual(['linear:TAV-31'])
     expect(
       screen.queryByRole('button', { name: 'Reproduce staging 429s before release' })
     ).toBeNull()
   })
 
-  it('Archive on a stored task archives it through the task store', () => {
-    const archive = vi.fn().mockResolvedValue(true)
+  it('Archive on a stored task asks main to archive it and keeps the archived task', async () => {
+    const user = userEvent.setup()
     const stored = task({
       title: 'Rate limits',
       lanes: [{ repoRoot: REPO_ROOT, branch: 'tav-31' }],
     })
-    useTaskStore.setState({ tasks: [stored], archive })
+    const archivedAt = '2026-11-07T09:00:00.000Z'
+    const archive = vi.fn(async () => ({ data: { ...stored, archivedAt } }))
+    installElectronApi({ tasks: { archive } })
+    useTaskStore.setState({ tasks: [stored] })
     render(<InFlight />)
-    parkViaMenu('Rate limits', 'Archive')
-    expect(archive).toHaveBeenCalledWith(stored.id, true)
+    await parkViaMenu(user, 'Rate limits', 'Archive')
+    expect(archive).toHaveBeenCalledWith({ id: stored.id, archived: true })
+    await waitFor(() => expect(useTaskStore.getState().tasks[0].archivedAt).toBe(archivedAt))
     expect(useParkedThreads.getState().keys).toEqual([])
   })
+})
 
-  it('Dismiss hides the row and keeps it hidden while nothing new happens', () => {
+describe('the row menu — Dismiss', () => {
+  it('Dismiss hides the row and keeps it hidden while nothing new happens', async () => {
+    const user = userEvent.setup()
     render(<InFlight />)
-    parkViaMenu('Reproduce staging 429s before release', 'Dismiss')
+    await parkViaMenu(user, 'Reproduce staging 429s before release', 'Dismiss')
     expect(
       screen.queryByRole('button', { name: 'Reproduce staging 429s before release' })
     ).toBeNull()
@@ -460,7 +506,8 @@ describe('the row menu — a dismissed thread stays gone', () => {
   const TITLE = 'Reproduce staging 429s before release'
   const rowShown = (): boolean => screen.queryByRole('button', { name: TITLE }) !== null
 
-  it('stays hidden when its activity moves on, and Undo on the toast brings it back', () => {
+  it('stays hidden when its activity moves on, and Undo on the toast brings it back', async () => {
+    const user = userEvent.setup()
     useToastStore.setState({ toasts: [] })
     const { rerender } = render(
       <>
@@ -468,7 +515,7 @@ describe('the row menu — a dismissed thread stays gone', () => {
         <ToastContainer />
       </>
     )
-    parkViaMenu(TITLE, 'Dismiss')
+    await parkViaMenu(user, TITLE, 'Dismiss')
     expect(rowShown()).toBe(false)
     expect(screen.getByRole('status').textContent).toContain(`Dismissed "${TITLE}"`)
     spies.facts = FACTS.map((f: { sessionId: string }) =>
@@ -481,7 +528,7 @@ describe('the row menu — a dismissed thread stays gone', () => {
       </>
     )
     expect(rowShown()).toBe(false)
-    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
     expect(rowShown()).toBe(true)
   })
 })
@@ -498,7 +545,8 @@ describe('the row menu — Dismiss deletes the sessions it holds', () => {
     snapshot: { ...fact().snapshot, projectId: 'p31' },
   })
 
-  it('deletes the ended session record of a dismissed row, never the live one, and the row is gone', () => {
+  it('deletes the ended session record of a dismissed row, never the live one, and the row is gone', async () => {
+    const user = userEvent.setup()
     const forget = vi.fn().mockResolvedValue({ data: true })
     installElectronApi({
       homeThreadSummary: { get: summaryGet },
@@ -510,41 +558,42 @@ describe('the row menu — Dismiss deletes the sessions it holds', () => {
     spies.facts = [...FACTS, endedOnTav31]
     render(<InFlight />)
     expect(forget).not.toHaveBeenCalled()
-    parkViaMenu(TITLE, 'Dismiss')
+    await parkViaMenu(user, TITLE, 'Dismiss')
     expect(screen.queryByRole('button', { name: TITLE })).toBeNull()
     expect(forget.mock.calls.map(([input]) => input)).toEqual([{ sessionId: 'ended-31' }])
   })
 })
 
-const confirmRemoveWorktree = async (deleteProject: () => void): Promise<void> => {
-  rightClickRow('PR overview shows status before story')
-  fireEvent.click(openMenuItem('Remove worktree…'))
-  fireEvent.click(await screen.findByRole('button', { name: 'Remove' }))
+const confirmRemoveWorktree = async (user: User, deleteProject: Mock): Promise<void> => {
+  await rightClickRow(user, 'PR overview shows status before story')
+  await user.click(openMenuItem('Remove worktree…'))
+  await user.click(await screen.findByRole('button', { name: 'Remove' }))
   expect(deleteProject).toHaveBeenCalledWith('p20')
 }
 
 describe('the row menu — Remove worktree', () => {
   it('asks first, then deletes the lead project', async () => {
-    const deleteProject = vi.fn()
-    useWorkspaceStore.setState({ deleteProject })
+    const user = userEvent.setup()
+    const deleteProject = vi.fn(async () => ({ success: true }))
+    installElectronApi({ project: { delete: deleteProject } })
     render(<InFlight />)
-    rightClickRow('PR overview shows status before story')
-    fireEvent.click(openMenuItem('Remove worktree…'))
+    await rightClickRow(user, 'PR overview shows status before story')
+    await user.click(openMenuItem('Remove worktree…'))
     const confirm = await screen.findByRole('dialog', {
       name: 'Remove worktree for "PR overview shows status before story"?',
     })
-    fireEvent.click(within(confirm).getByRole('button', { name: 'Cancel' }))
+    await user.click(within(confirm).getByRole('button', { name: 'Cancel' }))
     expect(deleteProject).not.toHaveBeenCalled()
-    await confirmRemoveWorktree(deleteProject)
+    await confirmRemoveWorktree(user, deleteProject)
   })
 })
 
 describe('the row menu — Remove worktree with open terminals', () => {
   it('says the removal also closes the terminals open in the worktree', async () => {
-    useWorkspaceStore.setState({ deleteProject: vi.fn() })
+    const user = userEvent.setup()
     render(<InFlight />)
-    rightClickRow('PR overview shows status before story')
-    fireEvent.click(openMenuItem('Remove worktree…'))
+    await rightClickRow(user, 'PR overview shows status before story')
+    await user.click(openMenuItem('Remove worktree…'))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText(/This also closes \d+ open terminals?\./)).toBeTruthy()
   })

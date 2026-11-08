@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import React from 'react'
 
@@ -106,7 +107,8 @@ describe('ConflictHeader — progress dots', () => {
 })
 
 describe('ConflictHeader — calls onBack when Files button clicked', () => {
-  it('calls onBack when Files button clicked', () => {
+  it('calls onBack when Files button clicked', async () => {
+    const user = userEvent.setup()
     const onBack = vi.fn()
     render(
       <ConflictHeader
@@ -120,13 +122,14 @@ describe('ConflictHeader — calls onBack when Files button clicked', () => {
         canNext={true}
       />
     )
-    fireEvent.click(screen.getByText(/Files/i))
+    await user.click(screen.getByRole('button', { name: 'Back to file list' }))
     expect(onBack).toHaveBeenCalledOnce()
   })
 })
 
 describe('ConflictHeader — calls onUndo when Undo button clicked', () => {
-  it('calls onUndo when Undo button clicked', () => {
+  it('calls onUndo when Undo button clicked', async () => {
+    const user = userEvent.setup()
     const onUndo = vi.fn()
     render(
       <ConflictHeader
@@ -140,7 +143,7 @@ describe('ConflictHeader — calls onUndo when Undo button clicked', () => {
         canNext={true}
       />
     )
-    fireEvent.click(screen.getByText(/Undo/i))
+    await user.click(screen.getByRole('button', { name: 'Undo last decision' }))
     expect(onUndo).toHaveBeenCalledOnce()
   })
 })
@@ -168,7 +171,8 @@ describe('ConflictHeader — Undo button state', () => {
 })
 
 describe('ConflictHeader — calls onExit when exit button is clicked', () => {
-  it('calls onExit when exit button is clicked', () => {
+  it('calls onExit when exit button is clicked', async () => {
+    const user = userEvent.setup()
     const onExit = vi.fn()
     render(
       <ConflictHeader
@@ -183,7 +187,7 @@ describe('ConflictHeader — calls onExit when exit button is clicked', () => {
         onExit={onExit}
       />
     )
-    fireEvent.click(screen.getByLabelText(/exit merge flow/i))
+    await user.click(screen.getByRole('button', { name: 'Exit merge flow' }))
     expect(onExit).toHaveBeenCalledOnce()
   })
 })

@@ -1,76 +1,92 @@
 import React from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { AgentsSettings } from '../../../../src/renderer/components/settings/AgentsSettings'
 import type { AgentsSettings as AgentsValue } from '../../../../src/shared/types'
+import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
-import { seedStore, type SeededStore } from '../../../support/renderer-stores'
-
-let settings: SeededStore<typeof useSettingsStore>
+import { resetStore } from '../../../support/renderer-stores'
+import { installElectronApi } from '../../../support/electron-api'
 
 const OPENCODE = { id: 'opencode', label: 'OpenCode', command: 'opencode', args: ['acp'] }
-
-function seedAgents(agents: AgentsValue): void {
-  settings = seedStore(useSettingsStore, {
-    globalSettings: { ...DEFAULT_GLOBAL_SETTINGS, agents },
-  })
-}
-
-const fill = (label: string, value: string) =>
-  fireEvent.change(screen.getByLabelText(label), { target: { value } })
 
 const KNOWN = [
   { ...OPENCODE, installed: true },
   { id: 'cursor', label: 'Cursor', command: 'agent', args: ['acp'], installed: false },
 ]
 
+/** Main's answer to a settings save: the stored settings with the agents patch applied. */
+const updateGlobal = vi.fn<ElectronAPI['settings']['updateGlobal']>(async (patch) => {
+  const current = useSettingsStore.getState().globalSettings ?? DEFAULT_GLOBAL_SETTINGS
+  const { agents } = patch as { agents: Partial<AgentsValue> }
+  return { settings: { ...current, agents: { ...current.agents, ...agents } } }
+})
+
+function seedAgents(agents: AgentsValue): void {
+  resetStore(useSettingsStore, { globalSettings: { ...DEFAULT_GLOBAL_SETTINGS, agents } })
+}
+
+async function fill(user: UserEvent, label: string, value: string): Promise<void> {
+  await user.type(screen.getByLabelText(label), value)
+}
+
 beforeEach(() => {
+  updateGlobal.mockClear()
   seedAgents({ default: 'claude', custom: [] })
-  window.electronAPI = {
+  installElectronApi({
     agents: { known: vi.fn().mockResolvedValue({ data: KNOWN }) },
-  } as unknown as typeof window.electronAPI
+    settings: { updateGlobal },
+  })
 })
 
 describe('AgentsSettings', () => {
-  it('saves a new custom agent with its command line split into command and arguments', () => {
+  it('saves a new custom agent with its command line split into command and arguments', async () => {
+    const user = userEvent.setup()
     render(<AgentsSettings />)
-    fireEvent.click(screen.getByText('Add agent'))
-    fill('Id', 'opencode')
-    fill('Label', 'OpenCode')
-    fill('Command line', 'opencode acp --log  debug')
-    fireEvent.click(screen.getByText('Save'))
-    expect(settings.updateAgents).toHaveBeenCalledWith({
-      custom: [{ ...OPENCODE, args: ['acp', '--log', 'debug'] }],
+    await user.click(screen.getByRole('button', { name: 'Add agent' }))
+    await fill(user, 'Id', 'opencode')
+    await fill(user, 'Label', 'OpenCode')
+    await fill(user, 'Command line', 'opencode acp --log  debug')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(updateGlobal).toHaveBeenCalledWith({
+      agents: { custom: [{ ...OPENCODE, args: ['acp', '--log', 'debug'] }] },
     })
+    expect(await screen.findByText('opencode acp --log debug')).toBeTruthy()
   })
 
-  it('refuses an id already used and saves nothing', () => {
+  it('refuses an id already used and saves nothing', async () => {
+    const user = userEvent.setup()
     seedAgents({ default: 'claude', custom: [OPENCODE] })
     render(<AgentsSettings />)
-    fireEvent.click(screen.getByText('Add agent'))
-    fill('Id', 'opencode')
-    fill('Label', 'Other')
-    fill('Command line', 'other acp')
-    fireEvent.click(screen.getByText('Save'))
+    await user.click(screen.getByRole('button', { name: 'Add agent' }))
+    await fill(user, 'Id', 'opencode')
+    await fill(user, 'Label', 'Other')
+    await fill(user, 'Command line', 'other acp')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(screen.getByText('That id is already used')).toBeTruthy()
-    expect(settings.updateAgents).not.toHaveBeenCalled()
+    expect(updateGlobal).not.toHaveBeenCalled()
   })
 })
 
 describe('AgentsSettings — default agent', () => {
-  it('saves the default agent from the list of built-in and custom agents', () => {
+  it('saves the default agent from the list of built-in and custom agents', async () => {
+    const user = userEvent.setup()
     seedAgents({ default: 'claude', custom: [OPENCODE] })
     render(<AgentsSettings />)
-    fireEvent.change(screen.getByLabelText('Default agent'), { target: { value: 'opencode' } })
-    expect(settings.updateAgents).toHaveBeenCalledWith({ default: 'opencode' })
+    await user.selectOptions(screen.getByLabelText('Default agent'), 'opencode')
+    expect(updateGlobal).toHaveBeenCalledWith({ agents: { default: 'opencode' } })
+    expect(useSettingsStore.getState().globalSettings?.agents.default).toBe('opencode')
   })
 
-  it('returns the default to Claude Code when the default custom agent is removed', () => {
+  it('returns the default to Claude Code when the default custom agent is removed', async () => {
+    const user = userEvent.setup()
     seedAgents({ default: 'opencode', custom: [OPENCODE] })
     render(<AgentsSettings />)
-    fireEvent.click(screen.getByText('Delete'))
-    expect(settings.updateAgents).toHaveBeenCalledWith({ default: 'claude', custom: [] })
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(updateGlobal).toHaveBeenCalledWith({ agents: { default: 'claude', custom: [] } })
+    expect((screen.getByLabelText('Default agent') as HTMLSelectElement).value).toBe('claude')
   })
 })
 
@@ -86,19 +102,17 @@ describe('AgentsSettings — known agents', () => {
   })
 
   it('adds a preset as the same custom entry a typed agent writes', async () => {
+    const user = userEvent.setup()
     render(<AgentsSettings />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Add OpenCode' }))
-    expect(settings.updateAgents).toHaveBeenCalledWith({ custom: [OPENCODE] })
+    await user.click(await screen.findByRole('button', { name: 'Add OpenCode' }))
+    expect(updateGlobal).toHaveBeenCalledWith({ agents: { custom: [OPENCODE] } })
   })
 
   it('disables Add for a preset already added, and labels the added ones "Your agents"', async () => {
     seedAgents({ default: 'claude', custom: [OPENCODE] })
     render(<AgentsSettings />)
-    await waitFor(() =>
-      expect(
-        (screen.getByRole('button', { name: 'Add OpenCode' }) as HTMLButtonElement).disabled
-      ).toBe(true)
-    )
+    const add = (await screen.findByRole('button', { name: 'Add OpenCode' })) as HTMLButtonElement
+    expect(add.disabled).toBe(true)
     expect(screen.getByText('Your agents')).toBeTruthy()
   })
 

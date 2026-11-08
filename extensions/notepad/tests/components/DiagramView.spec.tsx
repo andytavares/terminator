@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, act, fireEvent } from '@testing-library/react'
+import { render, screen, cleanup, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { installNotepadBridge, eventually } from './helpers/note-surface'
 import type { DiagramComment, DiagramListItem } from '../../src/db/types'
 
@@ -156,11 +157,12 @@ function diagramViewSavingAutosaveTests() {
 
 function diagramViewSavingRenamingTests() {
   it('renames the diagram', async () => {
+    const user = userEvent.setup()
     await openDiagram()
-    fireEvent.click(screen.getByTitle('Click to rename'))
+    await user.click(screen.getByTitle('Click to rename'))
     const input = screen.getByDisplayValue('Flow')
-    fireEvent.change(input, { target: { value: '  Plan  ' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
+    await user.clear(input)
+    await user.type(input, '  Plan  {Enter}')
     await eventually(() =>
       expect(bridge.calls('terminator.notepad:diagrams.autosave')).toContainEqual({
         id: 'd1',
@@ -174,51 +176,65 @@ function diagramViewSavingRenamingTests() {
 
 function diagramViewCommentsTests() {
   describe('placing', diagramViewCommentsPlacingTests)
+  describe('replying', diagramViewCommentsReplyingTests)
   describe('thread actions', diagramViewCommentsThreadActionsTests)
 }
 
 function diagramViewCommentsPlacingTests() {
   it('places a comment where the canvas is clicked, in scene coordinates', async () => {
+    const user = userEvent.setup()
     await openDiagram()
-    fireEvent.click(screen.getByRole('button', { name: /comment/i }))
+    await user.click(screen.getByRole('button', { name: /comment/i }))
     const intercept = document.querySelector('.diagram-view__comment-intercept')!
-    fireEvent.click(intercept, { clientX: 100, clientY: 60 })
+    await user.pointer({
+      keys: '[MouseLeft]',
+      target: intercept,
+      coords: { clientX: 100, clientY: 60 },
+    })
     bridge.responses['terminator.notepad:diagram-comments.list'] = { data: [pin('p1', 'Look')] }
-    fireEvent.change(screen.getByPlaceholderText('Add a comment…'), { target: { value: 'Look' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-    await eventually(() => expect(screen.getByLabelText('Comment: Look')).toBeTruthy())
+    await user.type(screen.getByPlaceholderText('Add a comment…'), 'Look')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByLabelText('Comment: Look')).toBeTruthy()
     expect(bridge.calls('terminator.notepad:diagram-comments.create')).toEqual([
       { diagramId: 'd1', body: 'Look', sceneX: 40, sceneY: 10 },
     ])
   })
 }
 
-function diagramViewCommentsThreadActionsTests() {
-  it('opens a pin to reply to it, and resolving it removes the pin', async () => {
+function diagramViewCommentsReplyingTests() {
+  it('shows a reply on the pin once it is stored', async () => {
+    const user = userEvent.setup()
     await openDiagram([pin('p1', 'Look')])
-    await eventually(() => expect(screen.getByLabelText('Comment: Look')).toBeTruthy())
-    fireEvent.click(screen.getByLabelText('Comment: Look'))
+    await user.click(await screen.findByLabelText('Comment: Look'))
     const reply = { ...pin('r1', 'Agreed'), parentId: 'p1' }
     bridge.responses['terminator.notepad:diagram-comments.list'] = {
       data: [pin('p1', 'Look', [reply])],
     }
-    fireEvent.change(screen.getByPlaceholderText('Reply…'), { target: { value: 'Agreed' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Reply' }))
+    await user.type(screen.getByPlaceholderText('Reply…'), 'Agreed')
+    await user.click(screen.getByRole('button', { name: 'Reply' }))
     // The thread is re-read after a reply, so the reply shows once it is stored.
-    await eventually(() => expect(screen.getByText('Agreed')).toBeTruthy())
+    expect(await screen.findByText('Agreed')).toBeTruthy()
     expect(bridge.calls('terminator.notepad:diagram-comments.create')).toEqual([
       { diagramId: 'd1', parentId: 'p1', body: 'Agreed', sceneX: 0, sceneY: 0 },
     ])
-    fireEvent.click(screen.getByLabelText('Resolve thread'))
+  })
+}
+
+function diagramViewCommentsThreadActionsTests() {
+  it('removes the pin when its thread is resolved', async () => {
+    const user = userEvent.setup()
+    await openDiagram([pin('p1', 'Look')])
+    await user.click(await screen.findByLabelText('Comment: Look'))
+    await user.click(screen.getByLabelText('Resolve thread'))
     await eventually(() => expect(screen.queryByLabelText('Comment: Look')).toBeNull())
     expect(bridge.calls('terminator.notepad:diagram-comments.resolve')).toEqual([{ id: 'p1' }])
   })
 
   it('deletes a thread', async () => {
+    const user = userEvent.setup()
     await openDiagram([pin('p1', 'Look')])
-    await eventually(() => expect(screen.getByLabelText('Comment: Look')).toBeTruthy())
-    fireEvent.click(screen.getByLabelText('Comment: Look'))
-    fireEvent.click(screen.getByLabelText('Delete thread'))
+    await user.click(await screen.findByLabelText('Comment: Look'))
+    await user.click(screen.getByLabelText('Delete thread'))
     await eventually(() => expect(screen.queryByLabelText('Comment: Look')).toBeNull())
     expect(bridge.calls('terminator.notepad:diagram-comments.delete')).toEqual([{ id: 'p1' }])
   })

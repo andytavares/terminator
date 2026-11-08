@@ -236,7 +236,7 @@ describe('issue-service — search edge cases', () => {
 describe('issue-service — waiting without an injected sleep', () => {
   afterEach(() => vi.useRealTimers())
 
-  it('waits the stated period on a real timer before retrying', async () => {
+  it('waits the period the tracker stated before retrying', async () => {
     vi.useFakeTimers()
     const get = vi
       .fn()

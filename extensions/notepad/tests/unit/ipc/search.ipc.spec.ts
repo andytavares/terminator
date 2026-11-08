@@ -58,7 +58,7 @@ describe('searchNotes — archived filter', () => {
 
     const result = await searchNotes(db, { query: 'content' })
     const data = (result as { data: { id: string }[] }).data
-    expect(data.every((r) => r.id !== 'n2')).toBe(true)
+    expect(data.map((r) => r.id)).toEqual(['n1'])
   })
 
   it('includes archived notes when includeArchived=true', async () => {
@@ -151,7 +151,7 @@ function searchNotesTagFilterIncludingExcludingTests() {
 
     const result = await searchNotes(db, { query: '-tag:skip' })
     const data = (result as { data: { id: string }[] }).data
-    expect(data.every((r) => r.id !== 'n2')).toBe(true)
+    expect(data.map((r) => r.id)).toEqual(['n1'])
   })
 }
 

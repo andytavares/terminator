@@ -1,18 +1,21 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Check } from 'lucide-react'
 import { Button } from '../../../../packages/extension-ui/src/Button'
 
 describe('Button', () => {
-  it('runs its handler when pressed', () => {
+  it('runs its handler when pressed', async () => {
+    const user = userEvent.setup()
     const onClick = vi.fn()
     render(<Button onClick={onClick}>Save brief</Button>)
-    fireEvent.click(screen.getByRole('button', { name: 'Save brief' }))
+    await user.click(screen.getByRole('button', { name: 'Save brief' }))
     expect(onClick).toHaveBeenCalledTimes(1)
   })
 
-  it('does not run its handler while disabled, and says so to assistive technology', () => {
+  it('does not run its handler while disabled, and says so to assistive technology', async () => {
+    const user = userEvent.setup()
     const onClick = vi.fn()
     render(
       <Button disabled onClick={onClick}>
@@ -20,14 +23,15 @@ describe('Button', () => {
       </Button>
     )
     const button = screen.getByRole('button', { name: 'Save brief' })
-    fireEvent.click(button)
+    await user.click(button)
     expect(onClick).not.toHaveBeenCalled()
     expect((button as HTMLButtonElement).disabled).toBe(true)
   })
 })
 
 describe('Button — never submits a form it happens to sit in unless it is asked to', () => {
-  it('never submits a form it happens to sit in unless it is asked to', () => {
+  it('never submits a form it happens to sit in unless it is asked to', async () => {
+    const user = userEvent.setup()
     const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault())
     render(
       <form onSubmit={onSubmit}>
@@ -35,9 +39,9 @@ describe('Button — never submits a form it happens to sit in unless it is aske
         <Button type="submit">Save</Button>
       </form>
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onSubmit).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(onSubmit).toHaveBeenCalledTimes(1)
   })
 

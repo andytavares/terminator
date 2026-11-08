@@ -104,15 +104,16 @@ function gettingAndEmptyStateTests() {
     expect(await store.get('missing')).toBeNull()
   })
 
-  it('reads empty sensor state from a state file that is not an object of sensors', async () => {
-    const root = tempRoot()
-    const file = path.join(root, 'signals', 'state.json')
-    fs.mkdirSync(path.dirname(file), { recursive: true })
-    for (const content of ['[]', 'null', 'not json']) {
+  it.each(['[]', 'null', 'not json'])(
+    'reads empty sensor state from a state file holding %s',
+    async (content) => {
+      const root = tempRoot()
+      const file = path.join(root, 'signals', 'state.json')
+      fs.mkdirSync(path.dirname(file), { recursive: true })
       fs.writeFileSync(file, content)
       expect(await createSignalStore(root).sensorState()).toEqual({})
     }
-  })
+  )
 
   it('reads empty sensor state when nothing was stored', async () => {
     const root = tempRoot()

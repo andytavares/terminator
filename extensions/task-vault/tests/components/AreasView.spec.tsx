@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
+import { render, screen, cleanup, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { installVaultBridge, eventually, task } from './helpers/bridge'
 import { invalidateSmartInputCache } from '../../src/components/SmartTaskInput'
 import { useVaultNavStore } from '../../src/stores/vault-nav.store'
@@ -78,9 +79,18 @@ afterEach(() => {
 })
 
 async function openWorkArea() {
+  const user = userEvent.setup()
   render(<AreasView />)
-  fireEvent.click(await screen.findByText('Work'))
+  await user.click(await screen.findByText('Work'))
   await screen.findByRole('button', { name: 'Rename area' })
+  return user
+}
+
+async function openCreateForm() {
+  const user = userEvent.setup()
+  render(<AreasView />)
+  await user.click(await screen.findByRole('button', { name: '+ New area' }))
+  return { user, input: screen.getByPlaceholderText('Area name (e.g. health, finances, work)') }
 }
 
 describe('AreasView usage', () => {
@@ -98,15 +108,12 @@ describe('AreaDetail renaming and projects', detailRenameTests)
 
 function areaListTests() {
   describe('shows each area', listShowsEachAreaTests)
-  describe('shows an error', listShowsAnErrorTests)
+  describe('lists archived areas', listArchivedAreasTests)
+  describe('reloads', listReloadTests)
+  describe('opens an area', listOpensAnAreaTests)
 }
 
 function listShowsEachAreaTests() {
-  describe('shows each area', listShowsEachAreaShowsEachAreaTests)
-  describe('lists archived areas', listShowsEachAreaListsArchivedAreasTests)
-}
-
-function listShowsEachAreaShowsEachAreaTests() {
   it('shows each area with its counts, progress and first three projects', async () => {
     render(<AreasView />)
     await screen.findByText('Work')
@@ -123,157 +130,216 @@ function listShowsEachAreaShowsEachAreaTests() {
       '0%'
     )
   })
-}
 
-function listShowsEachAreaListsArchivedAreasTests() {
-  it('lists archived areas with a delete button, and an empty state', async () => {
-    render(<AreasView />)
-    await screen.findByText('Work')
-    fireEvent.click(await screen.findByRole('button', { name: 'Archived' }))
-    expect(await screen.findByText('Old')).toBeTruthy()
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete area permanently' }))
-    await eventually(() =>
-      expect(bridge.calls('task-vault:vault:delete-area')).toEqual([{ areaFilePath: 'Old' }])
-    )
+  it('says there are no areas when the list is empty', async () => {
     bridge.responses['task-vault:vault:list-areas'] = { areas: [] }
-    fireEvent.click(screen.getByRole('button', { name: 'Active' }))
+    render(<AreasView />)
     expect(await screen.findByText('No areas yet.')).toBeTruthy()
   })
 }
 
-function listShowsAnErrorTests() {
-  it('shows an error, and reloads quietly when the index changes', async () => {
+function listArchivedAreasTests() {
+  it('lists the archived areas when the Archived filter is chosen', async () => {
+    const user = userEvent.setup()
+    render(<AreasView />)
+    await screen.findByText('Work')
+    await user.click(screen.getByRole('button', { name: 'Archived' }))
+    expect(await screen.findByText('Old')).toBeTruthy()
+    expect(screen.queryByText('Work')).toBeNull()
+  })
+
+  it('deletes an archived area from its card', async () => {
+    const user = userEvent.setup()
+    render(<AreasView />)
+    await user.click(await screen.findByRole('button', { name: 'Archived' }))
+    await user.click(await screen.findByRole('button', { name: 'Delete area permanently' }))
+    await eventually(() =>
+      expect(bridge.calls('task-vault:vault:delete-area')).toEqual([{ areaFilePath: 'Old' }])
+    )
+  })
+}
+
+function listReloadTests() {
+  it('reloads the list quietly when the index changes', async () => {
     render(<AreasView />)
     await screen.findByText('Work')
     bridge.responses['task-vault:vault:list-areas'] = { areas: [HOME] }
     await act(async () => bridge.push('task-vault:push:index-updated', {}))
     await eventually(() => expect(screen.queryByText('Work')).toBeNull())
+    expect(screen.getByText('Home')).toBeTruthy()
+  })
+
+  it('shows the error a reload throws', async () => {
+    render(<AreasView />)
+    await screen.findByText('Work')
     bridge.responses['task-vault:vault:list-areas'] = () => {
       throw new Error('gone')
     }
     await act(async () => bridge.push('task-vault:push:index-updated', {}))
     expect(await screen.findByText('Error: gone')).toBeTruthy()
   })
+}
 
+function listOpensAnAreaTests() {
   it('opens the area named in the store', async () => {
     useVaultNavStore.setState({ selectedAreaName: 'Home' })
     render(<AreasView />)
     expect(await screen.findByText('No tasks in this area.')).toBeTruthy()
   })
 
-  it('opens a card with Enter and goes back to the list', async () => {
+  it('opens a focused card with Enter', async () => {
+    const user = userEvent.setup()
     render(<AreasView />)
-    fireEvent.keyDown(await screen.findByText('Work'), { key: 'Enter' })
+    const card = (await screen.findByText('Work')).closest('[role="button"]') as HTMLElement
+    act(() => card.focus())
+    expect(document.activeElement).toBe(card)
+    await user.keyboard('{Enter}')
     expect(await screen.findByText('Plan sprint')).toBeTruthy()
-    fireEvent.click(await screen.findByRole('button', { name: 'Areas' }))
+  })
+
+  it('goes back to the list from an open area', async () => {
+    const user = await openWorkArea()
+    await user.click(screen.getByRole('button', { name: 'Areas' }))
     expect(await screen.findByText('Home')).toBeTruthy()
   })
 }
 
 function areaCreateTests() {
   describe('creates an area', createCreatesAnAreaTests)
-  describe('cancels creating with', createCancelsCreatingWithTests)
+  describe('closes the create form', createClosesTheFormTests)
+  describe('archives an area', createArchivesAnAreaTests)
 }
 
 function createCreatesAnAreaTests() {
-  it('creates an area, and says when the name is taken', async () => {
-    render(<AreasView />)
-    fireEvent.click(await screen.findByRole('button', { name: '+ New area' }))
-    const input = screen.getByPlaceholderText('Area name (e.g. health, finances, work)')
-    bridge.responses['task-vault:vault:create-area'] = { error: 'AREA_EXISTS' }
-    fireEvent.change(input, { target: { value: 'Work' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
-    expect(await screen.findByText('An area with that name already exists.')).toBeTruthy()
-    bridge.responses['task-vault:vault:create-area'] = { error: 'other' }
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
-    expect(await screen.findByText('other')).toBeTruthy()
-    bridge.responses['task-vault:vault:create-area'] = { success: true }
-    fireEvent.change(input, { target: { value: ' Garden ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+  it('creates an area from the trimmed name and closes the form', async () => {
+    const { user, input } = await openCreateForm()
+    await user.type(input, ' Garden ')
+    await user.click(screen.getByRole('button', { name: 'Create' }))
     await eventually(() => expect(screen.queryByPlaceholderText(/Area name/)).toBeNull())
-    expect(bridge.calls('task-vault:vault:create-area').at(-1)).toEqual({ name: 'Garden' })
+    expect(bridge.calls('task-vault:vault:create-area')).toEqual([{ name: 'Garden' }])
+  })
+
+  it('says when the area name is taken', async () => {
+    bridge.responses['task-vault:vault:create-area'] = { error: 'AREA_EXISTS' }
+    const { user, input } = await openCreateForm()
+    await user.type(input, 'Work{Enter}')
+    expect(await screen.findByText('An area with that name already exists.')).toBeTruthy()
+  })
+
+  it('shows any other create failure as its text', async () => {
+    bridge.responses['task-vault:vault:create-area'] = { error: 'other' }
+    const { user, input } = await openCreateForm()
+    await user.type(input, 'Garden')
+    await user.click(screen.getByRole('button', { name: 'Create' }))
+    expect(await screen.findByText('other')).toBeTruthy()
   })
 }
 
-function createCancelsCreatingWithTests() {
-  it('cancels creating with the button or Escape', async () => {
-    render(<AreasView />)
-    fireEvent.click(await screen.findByRole('button', { name: '+ New area' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
-    fireEvent.click(await screen.findByRole('button', { name: '+ New area' }))
-    fireEvent.keyDown(screen.getByPlaceholderText(/Area name/), { key: 'Escape' })
+function createClosesTheFormTests() {
+  it('closes the create form with Cancel', async () => {
+    const { user } = await openCreateForm()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByPlaceholderText(/Area name/)).toBeNull()
   })
 
-  it('archives an area from its card after confirming, or not', async () => {
+  it('closes the create form with Escape', async () => {
+    const { user, input } = await openCreateForm()
+    expect(document.activeElement).toBe(input)
+    await user.keyboard('{Escape}')
+    expect(screen.queryByPlaceholderText(/Area name/)).toBeNull()
+  })
+}
+
+function createArchivesAnAreaTests() {
+  it('archives an area from its card after confirming', async () => {
+    const user = userEvent.setup()
     render(<AreasView />)
     await screen.findByText('Work')
-    vi.mocked(window.confirm).mockReturnValueOnce(false)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Archive area' })[0])
-    expect(bridge.calls('task-vault:vault:archive-area')).toEqual([])
-    fireEvent.click(screen.getAllByRole('button', { name: 'Archive area' })[0])
+    await user.click(screen.getAllByRole('button', { name: 'Archive area' })[0])
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:archive-area')).toEqual([{ areaName: 'Work' }])
     )
+  })
+
+  it('keeps an area when the archive is not confirmed', async () => {
+    vi.mocked(window.confirm).mockReturnValue(false)
+    const user = userEvent.setup()
+    render(<AreasView />)
+    await screen.findByText('Work')
+    await user.click(screen.getAllByRole('button', { name: 'Archive area' })[0])
+    expect(window.confirm).toHaveBeenCalled()
+    expect(bridge.calls('task-vault:vault:archive-area')).toEqual([])
   })
 }
 
 function detailTaskTests() {
   describe('adds a task', detailTaskAddsATaskTests)
-  describe('completes an open', detailTaskCompletesAnOpenTests)
+  describe('completes and restores', detailTaskCompletesTests)
+  describe('edits a task', detailTaskEditsTests)
 }
 
 function detailTaskAddsATaskTests() {
-  it('adds a task tagged with the area, unless already tagged', async () => {
-    await openWorkArea()
-    const input = screen.getAllByRole('textbox')[0]
-    fireEvent.change(input, { target: { value: 'call bob' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+  it('adds a task tagged with the area', async () => {
+    const user = await openWorkArea()
+    await user.type(screen.getByPlaceholderText('Add task to this area…'), 'call bob')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
     await eventually(() =>
-      expect(bridge.calls('task-vault:vault:add-task')[0]).toEqual({
-        filePath: 'areas/Work.md',
-        text: 'call bob #Work',
-      })
+      expect(bridge.calls('task-vault:vault:add-task')).toEqual([
+        { filePath: 'areas/Work.md', text: 'call bob #Work' },
+      ])
     )
-    const addField = () => screen.getAllByRole('textbox')[0] as HTMLInputElement
-    await eventually(() => expect(addField().disabled).toBe(false))
-    const again = addField()
-    fireEvent.change(again, { target: { value: 'pay #work' } })
-    fireEvent.keyDown(again, { key: 'Escape' })
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+  })
+
+  it('adds a task as typed when it already carries the area tag', async () => {
+    const user = await openWorkArea()
+    await user.type(screen.getByPlaceholderText('Add task to this area…'), 'pay #work')
+    await user.keyboard('{Escape}')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
     await eventually(() =>
-      expect(bridge.calls('task-vault:vault:add-task')[1]).toMatchObject({ text: 'pay #work' })
+      expect(bridge.calls('task-vault:vault:add-task')).toEqual([
+        { filePath: 'areas/Work.md', text: 'pay #work' },
+      ])
     )
   })
 }
 
-function detailTaskCompletesAnOpenTests() {
-  it('completes an open task and restores a finished one', async () => {
-    await openWorkArea()
-    fireEvent.click(screen.getByTitle('Complete'))
+function detailTaskCompletesTests() {
+  it('completes an open task', async () => {
+    const user = await openWorkArea()
+    await user.click(screen.getByTitle('Complete'))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:complete-task')).toEqual([{ taskId: 'w1' }])
     )
-    fireEvent.click(screen.getByTitle('Restore'))
+  })
+
+  it('restores a finished task', async () => {
+    const user = await openWorkArea()
+    await user.click(screen.getByTitle('Restore'))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:restore-task')).toEqual([{ taskId: 'w2' }])
     )
   })
+}
 
-  it('edits an open task from its tagged text, and cancels an edit', async () => {
-    await openWorkArea()
-    fireEvent.doubleClick(screen.getByText('Plan sprint'))
-    const field = screen.getAllByRole('textbox')[1] as HTMLInputElement
-    expect(field.value).toBe('Plan sprint @Launch +desk #Work due:2026-02-01')
-    fireEvent.change(field, { target: { value: 'Plan sprint 2' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+function detailTaskEditsTests() {
+  it('edits an open task from its tagged text', async () => {
+    const user = await openWorkArea()
+    await user.dblClick(screen.getByText('Plan sprint'))
+    const field = screen.getByDisplayValue('Plan sprint @Launch +desk #Work due:2026-02-01')
+    await user.clear(field)
+    await user.type(field, 'Plan sprint 2')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:edit-task')).toEqual([
         { taskId: 'w1', text: 'Plan sprint 2' },
       ])
     )
     await eventually(() => expect(screen.getAllByRole('textbox')).toHaveLength(1))
-    fireEvent.doubleClick(screen.getByText('Old thing'))
+  })
+
+  it('opens no editor for a finished task', async () => {
+    const user = await openWorkArea()
+    await user.dblClick(screen.getByText('Old thing'))
     expect(screen.getAllByRole('textbox')).toHaveLength(1)
   })
 }
@@ -281,49 +347,70 @@ function detailTaskCompletesAnOpenTests() {
 function detailRenameTests() {
   describe('renames the area', detailRenameRenamesTheAreaTests)
   describe('closes the rename', detailRenameClosesTheRenameTests)
+  describe('projects and archiving', detailProjectsTests)
 }
 
 function detailRenameRenamesTheAreaTests() {
-  it('renames the area, showing a failure, and cancels with Escape', async () => {
-    await openWorkArea()
-    fireEvent.click(screen.getByRole('button', { name: 'Rename area' }))
+  it('renames the area', async () => {
+    const user = await openWorkArea()
+    await user.click(screen.getByRole('button', { name: 'Rename area' }))
     const input = screen.getByDisplayValue('Work')
-    bridge.responses['task-vault:vault:rename-area'] = { error: 'AREA_EXISTS' }
-    fireEvent.change(input, { target: { value: 'Job' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
-    expect(await screen.findByText('AREA_EXISTS')).toBeTruthy()
-    fireEvent.keyDown(input, { key: 'Escape' })
-    expect(screen.queryByDisplayValue('Job')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Rename area' }))
-    bridge.responses['task-vault:vault:rename-area'] = { success: true }
-    fireEvent.change(screen.getByDisplayValue('Work'), { target: { value: 'Job' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await user.clear(input)
+    await user.type(input, 'Job')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
     await eventually(() =>
-      expect(bridge.calls('task-vault:vault:rename-area').at(-1)).toEqual({
-        areaFilePath: 'Work',
-        newName: 'Job',
-      })
+      expect(bridge.calls('task-vault:vault:rename-area')).toEqual([
+        { areaFilePath: 'Work', newName: 'Job' },
+      ])
     )
+  })
+
+  it('shows why a rename failed', async () => {
+    bridge.responses['task-vault:vault:rename-area'] = { error: 'AREA_EXISTS' }
+    const user = await openWorkArea()
+    await user.click(screen.getByRole('button', { name: 'Rename area' }))
+    await user.type(screen.getByDisplayValue('Work'), '2{Enter}')
+    expect(await screen.findByText('AREA_EXISTS')).toBeTruthy()
   })
 }
 
 function detailRenameClosesTheRenameTests() {
-  it('closes the rename without a call when the name is unchanged, or cancelled', async () => {
-    await openWorkArea()
-    fireEvent.click(screen.getByRole('button', { name: 'Rename area' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Rename area' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel rename' }))
+  it('drops a typed name with Escape', async () => {
+    const user = await openWorkArea()
+    await user.click(screen.getByRole('button', { name: 'Rename area' }))
+    await user.type(screen.getByDisplayValue('Work'), '2{Escape}')
+    expect(screen.queryByDisplayValue('Work2')).toBeNull()
     expect(bridge.calls('task-vault:vault:rename-area')).toEqual([])
   })
 
-  it('opens a project, and archives the area from its header', async () => {
+  it.each(['Save', 'Cancel rename'])(
+    'closes the rename without a call when %s is pressed on the unchanged name',
+    async (button) => {
+      const user = await openWorkArea()
+      await user.click(screen.getByRole('button', { name: 'Rename area' }))
+      await user.click(screen.getByRole('button', { name: button }))
+      expect(screen.queryByDisplayValue('Work')).toBeNull()
+      expect(bridge.calls('task-vault:vault:rename-area')).toEqual([])
+    }
+  )
+}
+
+function detailProjectsTests() {
+  it('lists the area projects with their progress', async () => {
     await openWorkArea()
     expect(screen.getByText('Projects (4)')).toBeTruthy()
     expect(screen.getByText('2 open · 50% done')).toBeTruthy()
-    fireEvent.click(screen.getByText('@Beta'))
+  })
+
+  it('opens a project from the area', async () => {
+    const user = await openWorkArea()
+    await user.click(screen.getByText('@Beta'))
     expect(useVaultNavStore.getState().selectedProjectName).toBe('Beta')
-    fireEvent.click(screen.getByTitle('Archive area'))
+  })
+
+  it('archives the area from its header', async () => {
+    const user = await openWorkArea()
+    await user.click(screen.getByTitle('Archive area'))
     await eventually(() =>
       expect(bridge.calls('task-vault:vault:archive-area')).toEqual([{ areaName: 'Work' }])
     )

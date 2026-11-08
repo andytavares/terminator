@@ -80,18 +80,30 @@ const load = async () => (await import('../../../../src/renderer/home/focus-stor
 const today = '2026-10-18'
 
 describe('focus store', () => {
-  it('picks up to three, ignores a duplicate and a fourth, and persists', async () => {
+  it('picks up to three and ignores a fourth', async () => {
     const store = await load()
-    for (const id of ['a', 'b', 'c', 'd', 'a']) store.getState().pickFocus({ id, title: id })
+    store.getState().pickFocus({ id: 'a', title: 'a' })
+    store.getState().pickFocus({ id: 'b', title: 'b' })
+    store.getState().pickFocus({ id: 'c', title: 'c' })
+    store.getState().pickFocus({ id: 'd', title: 'd' })
     expect(store.getState().days[today].map((i) => i.id)).toEqual(['a', 'b', 'c'])
-    expect(
-      (
-        await (async () => {
-          vi.resetModules()
-          return load()
-        })()
-      ).getState().days[today]
-    ).toHaveLength(3)
+  })
+
+  it('ignores a pick it already holds', async () => {
+    const store = await load()
+    store.getState().pickFocus({ id: 'a', title: 'a' })
+    store.getState().pickFocus({ id: 'a', title: 'a' })
+    expect(store.getState().days[today].map((i) => i.id)).toEqual(['a'])
+  })
+})
+
+describe('focus store — reloading', () => {
+  it('keeps the picks after a reload', async () => {
+    const store = await load()
+    store.getState().pickFocus({ id: 'a', title: 'a' })
+    vi.resetModules()
+    const reloaded = await load()
+    expect(reloaded.getState().days[today].map((i) => i.id)).toEqual(['a'])
   })
 
   it('removes and toggles done by hand', async () => {

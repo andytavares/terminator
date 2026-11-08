@@ -927,9 +927,8 @@ function taskVaultVaultListArchiveWindowTests() {
     await seedTask(db, { id: 'done', status: 'done', updatedAt: new Date().toISOString() })
 
     const answer = await harness.invoke('task-vault:vault:list-archive', { days: 1.5 })
-
-    expect(answer).not.toHaveProperty('tasks')
-    expect(answer).not.toMatchObject({ error: expect.stringContaining('RangeError') })
+    const notWholeDays = expect.stringMatching(/"expected": "int"[\s\S]*"days"/)
+    expect(answer).toEqual({ error: 'VALIDATION_ERROR', message: notWholeDays })
   })
 }
 

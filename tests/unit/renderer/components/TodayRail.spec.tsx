@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { TodayRail } from '../../../../src/renderer/components/home/TodayRail'
 import { useHomeView } from '../../../../src/renderer/components/home/home-view'
 import { useFocusStore } from '../../../../src/renderer/home/focus-store'
@@ -60,7 +61,8 @@ vi.mock('../../../../src/renderer/usage/record', () => ({ recordUse }))
 beforeEach(() => recordUse.mockClear())
 
 describe("Today's focus", () => {
-  it('ticks an item by itself when the work it points at shipped, and lets the operator tick the rest', () => {
+  it('ticks an item by itself when the work it points at shipped, and lets the operator tick the rest', async () => {
+    const user = userEvent.setup()
     pickToday([
       { id: 'a', title: 'Ship the streak widget', workKey: shipped.workKey, doneByHand: false },
       { id: 'b', title: 'Review Fluent #41', doneByHand: false },
@@ -70,7 +72,7 @@ describe("Today's focus", () => {
     const open = screen.getByRole('checkbox', { name: 'Review Fluent #41' })
     expect(ticked.getAttribute('aria-checked')).toBe('true')
     expect(open.getAttribute('aria-checked')).toBe('false')
-    fireEvent.click(open)
+    await user.click(open)
     expect(
       screen.getByRole('checkbox', { name: 'Review Fluent #41' }).getAttribute('aria-checked')
     ).toBe('true')
@@ -103,33 +105,63 @@ describe("Today's focus — Task Vault", () => {
   })
 })
 
+/** Opens the focus editor with one Task Vault candidate beside the threads. */
+async function openFocusEditor(user: ReturnType<typeof userEvent.setup>) {
+  useHomeFeedStore.setState({
+    focus: [
+      { source: 'task-vault', id: 'tv1', title: 'Write the report', workKey: null, done: false },
+    ],
+  })
+  render(<TodayRail />)
+  await user.click(screen.getByRole('button', { name: 'Edit' }))
+  return within(screen.getByRole('list', { name: "Choose today's focus" }))
+}
+
+const pickedToday = () => useFocusStore.getState().days[localDateKey(Date.now())] ?? []
+
 describe("Today's focus — choosing", () => {
-  it('picks from threads and Task Vault candidates, up to three', () => {
-    useHomeFeedStore.setState({
-      focus: [
-        { source: 'task-vault', id: 'tv1', title: 'Write the report', workKey: null, done: false },
-      ],
-    })
-    render(<TodayRail />)
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
-    const editor = within(screen.getByRole('list', { name: "Choose today's focus" }))
-    for (const name of [
-      'Write the report',
-      'PR overview shows status before story',
-      'Reproduce staging 429s before release',
-      'Make all text in the app scale with settings',
-    ]) {
-      fireEvent.click(editor.getByRole('checkbox', { name }))
-    }
-    const picked = useFocusStore.getState().days[localDateKey(Date.now())]
-    expect(picked.map((item) => item.title)).toEqual([
-      'Write the report',
-      'PR overview shows status before story',
-      'Reproduce staging 429s before release',
+  it('picks a Task Vault candidate and a thread with its work key', async () => {
+    const user = userEvent.setup()
+    const editor = await openFocusEditor(user)
+    await user.click(editor.getByRole('checkbox', { name: 'Write the report' }))
+    await user.click(
+      editor.getByRole('checkbox', { name: 'PR overview shows status before story' })
+    )
+    expect(pickedToday()).toMatchObject([
+      { title: 'Write the report' },
+      {
+        title: 'PR overview shows status before story',
+        workKey: { tracker: 'linear', key: 'TAV-20' },
+      },
     ])
-    expect(picked[1].workKey).toEqual({ tracker: 'linear', key: 'TAV-20' })
-    fireEvent.click(editor.getByRole('checkbox', { name: 'Write the report' }))
-    expect(useFocusStore.getState().days[localDateKey(Date.now())]).toHaveLength(2)
+  })
+})
+
+describe("Today's focus — the cap", () => {
+  it('ignores a fourth pick', async () => {
+    const user = userEvent.setup()
+    const editor = await openFocusEditor(user)
+    await user.click(editor.getByRole('checkbox', { name: 'Write the report' }))
+    await user.click(
+      editor.getByRole('checkbox', { name: 'PR overview shows status before story' })
+    )
+    await user.click(
+      editor.getByRole('checkbox', { name: 'Reproduce staging 429s before release' })
+    )
+    const fourth = 'Make all text in the app scale with settings'
+    await user.click(editor.getByRole('checkbox', { name: fourth }))
+    expect(pickedToday().map((item) => item.title)).not.toContain(fourth)
+    expect(pickedToday()).toHaveLength(3)
+  })
+})
+
+describe("Today's focus — unticking", () => {
+  it('drops a pick when it is unticked', async () => {
+    const user = userEvent.setup()
+    const editor = await openFocusEditor(user)
+    await user.click(editor.getByRole('checkbox', { name: 'Write the report' }))
+    await user.click(editor.getByRole('checkbox', { name: 'Write the report' }))
+    expect(pickedToday()).toEqual([])
   })
 })
 
@@ -170,9 +202,10 @@ describe('This week — edge cases', () => {
     expect(await screen.findByText('no waits')).toBeTruthy()
   })
 
-  it('switches Home to Insights', () => {
+  it('switches Home to Insights', async () => {
+    const user = userEvent.setup()
     render(<TodayRail />)
-    fireEvent.click(screen.getByRole('button', { name: /Open Insights/ }))
+    await user.click(screen.getByRole('button', { name: /Open Insights/ }))
     expect(useHomeView.getState().view).toBe('insights')
   })
 })

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { wrapDb } from '../../../src/main/db/index'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
@@ -48,22 +48,23 @@ async function activateCapturingChannels(): Promise<ChannelSpec[]> {
   return specs
 }
 
-afterEach(async () => {
-  await deactivate()
-})
+// Captured while the file is collected, so each channel gets a test of its own.
+const specs = await activateCapturingChannels()
+await deactivate()
 
 // ADR 096: whether a channel rejects bad input is its schema's job, so this
 // checks once, for every channel task-vault registers, that one is declared.
 describe('every task-vault channel', () => {
-  it('declares a schema that keeps a malformed payload from reaching run', async () => {
-    const specs = await activateCapturingChannels()
-
+  it('includes the capture channel, so the list below is the registered one', () => {
     expect(specs.map((spec) => spec.channel)).toContain('task-vault:vault:capture')
-    for (const spec of specs) {
-      expect(spec.schema, `${spec.channel} has no schema`).toBeDefined()
+  })
+
+  it.each(specs.map((spec) => [spec.channel, spec] as const))(
+    '%s keeps a malformed payload from reaching run',
+    async (_channel, spec) => {
       const run = vi.fn()
       await dispatchChannel({ ...spec, run }, 42)
-      expect(run, `${spec.channel} ran a malformed payload`).not.toHaveBeenCalled()
+      expect(run).not.toHaveBeenCalled()
     }
-  })
+  )
 })

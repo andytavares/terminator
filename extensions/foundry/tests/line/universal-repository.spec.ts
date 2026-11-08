@@ -27,7 +27,6 @@ let host: FoundryHost
 const finished: { command: string; where: string; exitCode: number | null }[] = []
 
 beforeAll(async () => {
-  vi.stubEnv('HOME', path.join(temporaryDirectory('universal-home'), 'home'))
   host = fakeHost(() => dataDir)
   await activateFoundry(host)
 })
@@ -63,6 +62,7 @@ function runForReal(input: unknown): Promise<number | null> {
 
 beforeEach(async () => {
   const parent = temporaryDirectory('universal-repository')
+  vi.stubEnv('HOME', path.join(parent, 'home'))
   dataDir = path.join(parent, 'records')
   control = path.join(parent, 'exit-codes')
   repo = await repositoryWithRemote(parent)

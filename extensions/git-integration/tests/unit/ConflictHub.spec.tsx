@@ -1,7 +1,7 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import React from 'react'
-import { act } from '@testing-library/react'
 
 let mockStoreState: Record<string, unknown> = {}
 
@@ -54,9 +54,15 @@ describe('ConflictHub', () => {
     expect(screen.getByText(/merge conflicts need resolving/i)).toBeTruthy()
   })
 
-  it('shows total conflict count', () => {
+  it('shows the conflicts of every file added up as the total', () => {
+    const files = [
+      makeFile({ filePath: 'src/alpha.ts', conflictCount: 2 }),
+      makeFile({ filePath: 'src/beta.ts', conflictCount: 1 }),
+    ]
+    mockStoreState = { session: makeSession(files), setActiveFile: mockSetActiveFile }
     render(<ConflictHub onSelectFile={vi.fn()} />)
-    expect(screen.getAllByText(/2/).length).toBeGreaterThan(0)
+    const totalStat = screen.getByText('Total conflicts').parentElement
+    expect(totalStat?.textContent).toBe('3Total conflicts')
   })
 
   it('lists each conflicted file', () => {
@@ -78,19 +84,16 @@ describe('ConflictHub', () => {
 })
 
 describe('ConflictHub — shows author names', () => {
-  it('shows author names', () => {
+  it('names both authors on the file row', () => {
     render(<ConflictHub onSelectFile={vi.fn()} />)
-    expect(screen.getAllByText(/Alice/).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/Bob/).length).toBeGreaterThan(0)
+    expect(screen.getByText('Modified by Alice · Bob')).toBeTruthy()
   })
 
-  it('calls onSelectFile when a file row is clicked', () => {
+  it('calls onSelectFile when a file row is clicked', async () => {
+    const user = userEvent.setup()
     const onSelectFile = vi.fn()
     render(<ConflictHub onSelectFile={onSelectFile} />)
-    const fileRow = screen.getAllByTestId('conflict-file-row')[0]
-    act(() => {
-      fireEvent.click(fileRow)
-    })
+    await user.click(screen.getAllByTestId('conflict-file-row')[0])
     expect(onSelectFile).toHaveBeenCalledWith(0)
   })
 
@@ -111,10 +114,11 @@ describe('ConflictHub — renders null when session is null', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('calls onExit when exit button is clicked', () => {
+  it('calls onExit when exit button is clicked', async () => {
+    const user = userEvent.setup()
     const onExit = vi.fn()
     render(<ConflictHub onSelectFile={vi.fn()} onExit={onExit} />)
-    fireEvent.click(screen.getByLabelText(/exit merge flow/i))
+    await user.click(screen.getByRole('button', { name: 'Exit merge flow' }))
     expect(onExit).toHaveBeenCalledOnce()
   })
 

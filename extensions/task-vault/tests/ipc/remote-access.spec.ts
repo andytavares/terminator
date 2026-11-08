@@ -32,17 +32,13 @@ describe('task-vault remote access', () => {
     ])
   })
 
-  it('lets the remote browser use the task views', () => {
-    const channels = remoteAccessByChannel(REGISTRARS)
-
-    for (const channel of [
-      'task-vault:vault:get-today',
-      'task-vault:vault:add-task',
-      'task-vault:vault:list-contexts',
-      'task-vault:projects:list',
-      'task-vault:links:create',
-    ]) {
-      expect(channels.get(channel)).toBe(true)
-    }
+  it.each([
+    'task-vault:vault:get-today',
+    'task-vault:vault:add-task',
+    'task-vault:vault:list-contexts',
+    'task-vault:projects:list',
+    'task-vault:links:create',
+  ])('lets the remote browser use %s', (channel) => {
+    expect(remoteAccessByChannel(REGISTRARS).get(channel)).toBe(true)
   })
 })

@@ -84,20 +84,18 @@ function makeFileMetrics(overrides: Partial<FileMetrics> = {}): FileMetrics {
 }
 
 describe('computeRiskScore() — patch coverage', () => {
-  it('includes patchCoverage in computation when provided', () => {
-    const metrics = makeFileMetrics({
-      churn90d: 5,
-      blastRadius: 2,
-      patchCoverage: 30, // low coverage
-    })
-    const allMetrics = [metrics, makeFileMetrics({ churn90d: 0, blastRadius: 0 })]
-    const score = computeRiskScore(metrics, allMetrics)
-    expect(score.metrics.patchCoverage).toBe(30)
+  it('scores an uncovered file higher than the same file fully covered', () => {
+    const other = makeFileMetrics({ churn90d: 0, blastRadius: 0 })
+    const scoreAt = (patchCoverage: number) => {
+      const metrics = makeFileMetrics({ churn90d: 5, blastRadius: 2, patchCoverage })
+      return computeRiskScore(metrics, [metrics, other]).composite
+    }
+    expect([scoreAt(0), scoreAt(100)]).toEqual([59, 53])
   })
 })
 
 describe('computeRiskScore() — includes complexity delta in contributions when > 0', () => {
-  it('includes complexity delta in contributions when > 0', () => {
+  it('names a complexity increase as the dominant driver when it outweighs the rest', () => {
     const metrics = makeFileMetrics({
       churn90d: 10,
       blastRadius: 5,
@@ -108,7 +106,7 @@ describe('computeRiskScore() — includes complexity delta in contributions when
       makeFileMetrics({ churn90d: 0, blastRadius: 0, complexityDelta: 0 }),
     ]
     const score = computeRiskScore(metrics, allMetrics)
-    expect(score.dominantDriver).not.toBe('No dominant risk signal')
+    expect(score.dominantDriver).toBe('Complexity increase — +8 decision points')
   })
 
   it('normalise returns 0 when all values are equal (max === min)', () => {
@@ -119,7 +117,7 @@ describe('computeRiskScore() — includes complexity delta in contributions when
     ]
     const score = computeRiskScore(metrics, allMetrics)
     // normalise returns 0 when all values equal — churn_n and blast_n are 0
-    expect(score.composite).not.toBeNull()
+    expect(score.composite).toBe(0)
   })
 })
 

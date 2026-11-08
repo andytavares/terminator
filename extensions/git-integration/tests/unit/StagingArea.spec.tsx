@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import React from 'react'
 
@@ -38,25 +39,14 @@ const makeFile = (status: Status, staged: boolean, path?: string): GitFileStatus
 // The badge used to carry git's porcelain letters — M, A, D, R, U, and a bare
 // "?" for an untracked file — with the raw status word as its tooltip. Both say
 // it in the reader's language now.
-const STATUSES = ['modified', 'added', 'deleted', 'renamed', 'untracked', 'conflicted'] as const
-
-const STATUS_TOOLTIP: Record<string, string> = {
-  modified: 'Changed since the last commit',
-  added: 'Staged as a new file',
-  deleted: 'Deleted',
-  renamed: 'Renamed',
-  untracked: 'New — not tracked by git yet',
-  conflicted: 'Conflicted — needs resolving before it can be committed',
-}
-
-const STATUS_BADGE_TEXT: Record<string, string> = {
-  modified: 'Changed',
-  added: 'Added',
-  deleted: 'Deleted',
-  renamed: 'Renamed',
-  untracked: 'New',
-  conflicted: 'Conflict',
-}
+const STATUS_BADGES: Array<[Status, string, string]> = [
+  ['modified', 'Changed since the last commit', 'Changed'],
+  ['added', 'Staged as a new file', 'Added'],
+  ['deleted', 'Deleted', 'Deleted'],
+  ['renamed', 'Renamed', 'Renamed'],
+  ['untracked', 'New — not tracked by git yet', 'New'],
+  ['conflicted', 'Conflicted — needs resolving before it can be committed', 'Conflict'],
+]
 
 function setupStore(status: GitStatus) {
   mockStore({
@@ -89,9 +79,9 @@ beforeEach(() => {
 })
 
 describe('StagingArea — file status badge tooltips', () => {
-  STATUSES.forEach((status) => {
-    const label = STATUS_TOOLTIP[status]
-    it(`badge for "${status}" has title="${label}"`, () => {
+  it.each(STATUS_BADGES)(
+    'a "%s" file shows the tooltip "%s" on a "%s" badge',
+    (status, tooltip, text) => {
       setupStore({
         branch: 'main',
         files: [makeFile(status, false)],
@@ -99,15 +89,14 @@ describe('StagingArea — file status badge tooltips', () => {
         hasConflicts: false,
       })
       render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
-      const badge = document.querySelector(`.staging-area__badge--${status}`)
-      expect(badge).not.toBeNull()
-      expect(badge?.getAttribute('title')).toBe(label)
-      // Never a porcelain letter: the panel knows the file is new and should
-      // say so rather than printing a punctuation mark.
-      expect(badge?.textContent).toBe(STATUS_BADGE_TEXT[status])
-    })
-  })
+      // Never a porcelain letter: the panel says what the file is in words.
+      expect(screen.getByTitle(tooltip).textContent).toBe(text)
+    }
+  )
 })
+
+const sectionTitled = (title: string) =>
+  screen.getByText(title).closest('.staging-area__section') as HTMLElement
 
 describe('StagingArea — states', () => {
   it('shows loading state when status is null', () => {
@@ -144,7 +133,7 @@ describe('StagingArea — states — shows truncation banner when truncated is t
     expect(screen.getByText('Showing first 10 files.')).toBeTruthy()
   })
 
-  it('renders staged and unstaged files in correct sections', () => {
+  it('lists a staged file under Staged and an unstaged file under Changes', () => {
     const files = [makeFile('modified', true, 'staged.ts'), makeFile('added', false, 'unstaged.ts')]
     mockStore({
       status: { branch: 'main', files, truncated: false, hasConflicts: false },
@@ -152,13 +141,14 @@ describe('StagingArea — states — shows truncation banner when truncated is t
       selectedFile: null,
     })
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
-    expect(screen.getByText('staged.ts')).toBeTruthy()
-    expect(screen.getByText('unstaged.ts')).toBeTruthy()
+    expect(within(sectionTitled('Staged (1)')).getByText('staged.ts')).toBeTruthy()
+    expect(within(sectionTitled('Changes (1)')).getByText('unstaged.ts')).toBeTruthy()
   })
 })
 
 describe('StagingArea — interactions', () => {
-  it('calls onFileSelect when a file row is clicked', () => {
+  it('calls onFileSelect when a file row is clicked', async () => {
+    const user = userEvent.setup()
     const onFileSelect = vi.fn()
     const files = [makeFile('modified', false, 'src/a.ts')]
     mockStore({
@@ -167,13 +157,14 @@ describe('StagingArea — interactions', () => {
       selectedFile: null,
     })
     render(<StagingArea repoRoot="/repo" onFileSelect={onFileSelect} />)
-    fireEvent.click(screen.getByText('src/a.ts'))
+    await user.click(screen.getByText('src/a.ts'))
     expect(onFileSelect).toHaveBeenCalledWith('src/a.ts', false)
   })
 })
 
 describe('StagingArea — interactions — calls git.stage and refreshes when unstaged checkbox is checked', () => {
   it('calls git.stage and refreshes when unstaged checkbox is checked', async () => {
+    const user = userEvent.setup()
     const files = [makeFile('modified', false, 'src/a.ts')]
     mockStore({
       status: { branch: 'main', files, truncated: false, hasConflicts: false },
@@ -181,8 +172,7 @@ describe('StagingArea — interactions — calls git.stage and refreshes when un
       selectedFile: null,
     })
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
-    const checkbox = screen.getByRole('checkbox')
-    fireEvent.click(checkbox)
+    await user.click(screen.getByRole('checkbox'))
     await waitFor(() =>
       expect(mockStage).toHaveBeenCalledWith({ repoRoot: '/repo', paths: ['src/a.ts'] })
     )
@@ -193,6 +183,7 @@ describe('StagingArea — interactions — calls git.stage and refreshes when un
 
 describe('StagingArea — interactions — calls git.unstage when staged checkbox is unchecked', () => {
   it('calls git.unstage when staged checkbox is unchecked', async () => {
+    const user = userEvent.setup()
     const files = [makeFile('modified', true, 'src/b.ts')]
     mockStore({
       status: { branch: 'main', files, truncated: false, hasConflicts: false },
@@ -200,8 +191,7 @@ describe('StagingArea — interactions — calls git.unstage when staged checkbo
       selectedFile: null,
     })
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
-    const checkbox = screen.getByRole('checkbox')
-    fireEvent.click(checkbox)
+    await user.click(screen.getByRole('checkbox'))
     await waitFor(() =>
       expect(mockUnstage).toHaveBeenCalledWith({ repoRoot: '/repo', paths: ['src/b.ts'] })
     )
@@ -210,6 +200,7 @@ describe('StagingArea — interactions — calls git.unstage when staged checkbo
 
 describe('StagingArea — interactions — calls git.stage for all unstaged files when Stage All is clicked', () => {
   it('calls git.stage for all unstaged files when Stage All is clicked', async () => {
+    const user = userEvent.setup()
     const files = [makeFile('modified', false, 'a.ts'), makeFile('added', false, 'b.ts')]
     mockStore({
       status: { branch: 'main', files, truncated: false, hasConflicts: false },
@@ -217,7 +208,7 @@ describe('StagingArea — interactions — calls git.stage for all unstaged file
       selectedFile: null,
     })
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
-    fireEvent.click(screen.getByText('Stage All'))
+    await user.click(screen.getByRole('button', { name: 'Stage All' }))
     await waitFor(() =>
       expect(mockStage).toHaveBeenCalledWith({ repoRoot: '/repo', paths: ['a.ts', 'b.ts'] })
     )
@@ -226,6 +217,7 @@ describe('StagingArea — interactions — calls git.stage for all unstaged file
 
 describe('StagingArea — interactions — calls git.unstage for all staged files when Unstage All is clicked', () => {
   it('calls git.unstage for all staged files when Unstage All is clicked', async () => {
+    const user = userEvent.setup()
     const files = [makeFile('modified', true, 'a.ts'), makeFile('added', true, 'b.ts')]
     mockStore({
       status: { branch: 'main', files, truncated: false, hasConflicts: false },
@@ -233,7 +225,7 @@ describe('StagingArea — interactions — calls git.unstage for all staged file
       selectedFile: null,
     })
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
-    fireEvent.click(screen.getByText('Unstage All'))
+    await user.click(screen.getByRole('button', { name: 'Unstage All' }))
     await waitFor(() =>
       expect(mockUnstage).toHaveBeenCalledWith({ repoRoot: '/repo', paths: ['a.ts', 'b.ts'] })
     )

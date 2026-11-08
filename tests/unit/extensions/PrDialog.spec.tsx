@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { PrDialog } from '../../../extensions/git-integration/src/components/PrDialog'
 import type { PullRequest } from '../../../extensions/git-integration/src/schemas/git.schema'
 import type { ElectronAPI } from '../../../src/shared/electron-api/api-type'
@@ -48,33 +49,38 @@ const defaultProps = {
   onCreated: vi.fn(),
 }
 
+// The Title and Description labels are not tied to their fields, so the placeholder names them.
+const titleBox = () => screen.getByPlaceholderText('Pull request title')
+const descriptionBox = () => screen.queryByPlaceholderText(/Describe your changes/)
+const createButton = () => screen.findByRole('button', { name: 'Create PR' })
+
 describe('PrDialog', () => {
-  it('renders the dialog with title input pre-filled from branch', async () => {
+  it('pre-fills the title from the branch, turning dashes into spaces', async () => {
     render(<PrDialog {...defaultProps} />)
     await screen.findByRole('dialog')
-    const input = screen.getByPlaceholderText('Pull request title') as HTMLInputElement
-    // feature/ prefix isn't stripped (only feat/fix/chore/docs/refactor), dashes become spaces
-    expect(input.value).toBe('feature/my feature')
+    // feature/ prefix isn't stripped (only feat/fix/chore/docs/refactor)
+    expect((titleBox() as HTMLInputElement).value).toBe('feature/my feature')
   })
 
-  it('calls onClose when overlay is clicked', async () => {
+  it('closes on a press outside the dialog', async () => {
     const onClose = vi.fn()
     render(<PrDialog {...defaultProps} onClose={onClose} />)
     await screen.findByRole('dialog')
     pressOutside(screen.getByRole('dialog'))
-    expect(onClose).toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('calls onClose when close button clicked', async () => {
+  it('closes from its Close button', async () => {
+    const user = userEvent.setup()
     const onClose = vi.fn()
     render(<PrDialog {...defaultProps} onClose={onClose} />)
-    fireEvent.click(await screen.findByLabelText('Close'))
-    expect(onClose).toHaveBeenCalled()
+    await user.click(await screen.findByRole('button', { name: 'Close' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
 
 describe('PrDialog — notices', () => {
-  it('shows existing PR notice when existingPr is set', async () => {
+  it('names the PR that already exists for the branch', async () => {
     const existingPr: PullRequest = {
       number: 42,
       title: 'Old PR',
@@ -86,51 +92,55 @@ describe('PrDialog — notices', () => {
       body: '',
     }
     render(<PrDialog {...defaultProps} existingPr={existingPr} />)
-    await screen.findByRole('dialog')
-    expect(screen.getByText(/A PR already exists/)).toBeTruthy()
-    expect(screen.getByText(/#42: Old PR/)).toBeTruthy()
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog.textContent).toMatch(/A PR already exists:\s*#42: Old PR/)
   })
 
-  it('shows default branch warning when branch is main', async () => {
+  it('warns when the PR would come from the default branch', async () => {
     render(<PrDialog {...defaultProps} branch="main" />)
-    await screen.findByRole('dialog')
-    expect(screen.getByText(/creating a PR from the default branch/)).toBeTruthy()
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog.textContent).toContain('Warning: creating a PR from the default branch (main).')
   })
 })
 
 describe('PrDialog — title, modes and draft', () => {
-  it('disables Create PR button when title is empty', async () => {
+  it('disables Create PR once the title is cleared', async () => {
+    const user = userEvent.setup()
     render(<PrDialog {...defaultProps} />)
     await screen.findByRole('dialog')
-    const input = screen.getByPlaceholderText('Pull request title') as HTMLInputElement
-    fireEvent.change(input, { target: { value: '' } })
-    const btn = screen.getByText('Create PR').closest('button') as HTMLButtonElement
-    expect(btn.disabled).toBe(true)
+    await user.clear(titleBox())
+    expect(((await createButton()) as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('switches between write and preview modes', async () => {
+  it('hides the description box in Preview and brings it back in Write', async () => {
+    const user = userEvent.setup()
     render(<PrDialog {...defaultProps} />)
     await screen.findByRole('dialog')
-    expect(screen.getByPlaceholderText(/Describe your changes/)).toBeTruthy()
-    fireEvent.click(screen.getByText('Preview'))
-    expect(screen.queryByPlaceholderText(/Describe your changes/)).toBeNull()
-    fireEvent.click(screen.getByText('Write'))
-    expect(screen.getByPlaceholderText(/Describe your changes/)).toBeTruthy()
+    expect(descriptionBox()).not.toBeNull()
+    await user.click(screen.getByRole('tab', { name: 'Preview' }))
+    expect(descriptionBox()).toBeNull()
+    await user.click(screen.getByRole('tab', { name: 'Write' }))
+    expect(descriptionBox()).not.toBeNull()
   })
+})
 
-  it('toggles draft checkbox', async () => {
+describe('PrDialog — draft', () => {
+  it('renames the create button when Draft is checked', async () => {
+    const user = userEvent.setup()
     render(<PrDialog {...defaultProps} />)
     await screen.findByRole('dialog')
-    const checkbox = screen.getByRole('checkbox') as HTMLInputElement
-    expect(checkbox.checked).toBe(false)
-    fireEvent.click(checkbox)
-    expect(checkbox.checked).toBe(true)
-    expect(screen.getByText('Create Draft PR')).toBeTruthy()
+    const draft = screen.getByRole('checkbox', { name: 'Draft' }) as HTMLInputElement
+    expect(draft.checked).toBe(false)
+    await user.click(draft)
+    expect(draft.checked).toBe(true)
+    expect(screen.getByRole('button', { name: 'Create Draft PR' }).textContent).toBe(
+      'Create Draft PR'
+    )
   })
 })
 
 describe('PrDialog — branches and template', () => {
-  it('loads branches and sets base branch', async () => {
+  it('lists the local branches and picks main as the base', async () => {
     mockListBranches.mockResolvedValue({
       branches: [
         { name: 'main', isCurrent: false, isRemote: false },
@@ -139,79 +149,99 @@ describe('PrDialog — branches and template', () => {
       ],
     })
     render(<PrDialog {...defaultProps} />)
-    await screen.findByRole('dialog')
-    await waitFor(() => {
-      const select = screen.getByRole('listbox') as HTMLSelectElement
-      expect(select.value).toBe('main')
-    })
+    await screen.findByRole('option', { name: 'develop' })
+    expect((screen.getByRole('listbox') as HTMLSelectElement).value).toBe('main')
   })
 
-  it('loads PR template from filesystem', async () => {
+  it('fills the description from the repo PR template', async () => {
     mockReadFile.mockResolvedValue({ content: '## Summary\n' })
     render(<PrDialog {...defaultProps} />)
-    await screen.findByRole('dialog')
-    await waitFor(() => {
-      const textarea = screen.getByPlaceholderText(/Describe your changes/) as HTMLTextAreaElement
-      expect(textarea.value).toBe('## Summary\n')
-    })
+    const description = (await screen.findByDisplayValue('## Summary')) as HTMLTextAreaElement
+    expect(description.value).toBe('## Summary\n')
   })
 })
 
-describe('PrDialog — creating', () => {
-  it('creates PR and calls onCreated on success', async () => {
-    const onCreated = vi.fn()
-    mockShellExec
-      .mockResolvedValueOnce(execResult(0, '5', '')) // checkCommitsAhead
-      .mockResolvedValueOnce(execResult(0, '', '')) // push
-    mockInvoke.mockResolvedValueOnce({ number: 99, url: 'https://github.com/foo/bar/pull/99' })
+/** Answers the commit count and the push, then GitHub's new PR #99. */
+function answerCreate(): void {
+  mockShellExec
+    .mockResolvedValueOnce(execResult(0, '5', '')) // checkCommitsAhead
+    .mockResolvedValueOnce(execResult(0, '', '')) // push
+  mockInvoke.mockResolvedValueOnce({ number: 99, url: 'https://github.com/foo/bar/pull/99' })
+}
 
-    render(<PrDialog {...defaultProps} onCreated={onCreated} />)
-    await screen.findByRole('dialog')
-    fireEvent.click(await screen.findByText('Create PR'))
-    await waitFor(() => expect(onCreated).toHaveBeenCalled())
-    const pr = onCreated.mock.calls[0][0] as PullRequest
-    expect(pr.number).toBe(99)
+describe('PrDialog — creating', () => {
+  it('asks the main process to open the PR from the form', async () => {
+    const user = userEvent.setup()
+    answerCreate()
+    render(<PrDialog {...defaultProps} />)
+    await user.click(await createButton())
     // The view asks the main process to open it; it never runs gh itself.
-    expect(mockInvoke).toHaveBeenCalledWith('github:pr-create', {
-      repoRoot: '/repo',
-      title: 'feature/my feature',
-      body: '',
-      base: 'main',
-      head: 'feature/my-feature',
-      draft: false,
-    })
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith('github:pr-create', {
+        repoRoot: '/repo',
+        title: 'feature/my feature',
+        body: '',
+        base: 'main',
+        head: 'feature/my-feature',
+        draft: false,
+      })
+    )
+  })
+})
+
+describe('PrDialog — created', () => {
+  it('hands back the new PR, built from the form and GitHub answer', async () => {
+    const user = userEvent.setup()
+    const onCreated = vi.fn()
+    answerCreate()
+    render(<PrDialog {...defaultProps} onCreated={onCreated} />)
+    await user.click(await createButton())
+    await waitFor(() =>
+      expect(onCreated).toHaveBeenCalledWith({
+        number: 99,
+        url: 'https://github.com/foo/bar/pull/99',
+        title: 'feature/my feature',
+        body: '',
+        state: 'open',
+        isDraft: false,
+        baseRefName: 'main',
+        headRefName: 'feature/my-feature',
+      })
+    )
   })
 })
 
 describe('PrDialog — creation errors', () => {
-  it('shows error when PR creation fails', async () => {
+  it('shows the error GitHub returned', async () => {
+    const user = userEvent.setup()
     mockShellExec
       .mockResolvedValueOnce(execResult(0, '3', ''))
       .mockResolvedValueOnce(execResult(0, '', ''))
     mockInvoke.mockResolvedValueOnce({ error: 'gh error' })
 
     render(<PrDialog {...defaultProps} />)
-    await screen.findByRole('dialog')
-    fireEvent.click(await screen.findByText('Create PR'))
-    await screen.findByText('gh error')
+    await user.click(await createButton())
+    expect((await screen.findByText('gh error')).textContent).toBe('gh error')
   })
 
-  it('shows error when no commits ahead of base', async () => {
+  it('refuses to open a PR with no commits ahead of the base', async () => {
+    const user = userEvent.setup()
     mockShellExec.mockResolvedValue(execResult(0, '0', ''))
     render(<PrDialog {...defaultProps} />)
-    await screen.findByRole('dialog')
-    fireEvent.click(await screen.findByText('Create PR'))
-    await screen.findByText(/No commits ahead/)
+    await user.click(await createButton())
+    expect((await screen.findByText(/No commits ahead/)).textContent).toBe(
+      'No commits ahead of "main". Commit your changes before opening a PR.'
+    )
   })
 
-  it('shows error when push fails', async () => {
+  it('shows what git printed when the push fails', async () => {
+    const user = userEvent.setup()
     mockShellExec
       .mockResolvedValueOnce(execResult(0, '2', ''))
       .mockResolvedValueOnce(execResult(1, '', 'push failed'))
 
     render(<PrDialog {...defaultProps} />)
-    await screen.findByRole('dialog')
-    fireEvent.click(await screen.findByText('Create PR'))
-    await screen.findByText('push failed')
+    await user.click(await createButton())
+    expect((await screen.findByText('push failed')).textContent).toBe('push failed')
   })
 })

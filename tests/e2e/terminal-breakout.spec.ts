@@ -9,6 +9,7 @@ import {
   readTerminalRowsIn,
   visibleTerminalScreen,
 } from './helpers'
+import { expectTerminalFocused } from './session-views'
 
 // A terminal moved to its own window and back: its scrollback travels with it both ways, and the
 // main window's tab strip gives up the tab while the terminal lives elsewhere.
@@ -40,6 +41,7 @@ async function rowsOf(page: Page): Promise<string> {
 
 async function echoInto(page: Page, marker: string): Promise<void> {
   await visibleTerminalScreen(page).click()
+  await expectTerminalFocused(page)
   await page.keyboard.type(`echo ${marker}`)
   await page.keyboard.press('Enter')
   await expect.poll(() => rowsOf(page)).toContain(`\n${marker}`)

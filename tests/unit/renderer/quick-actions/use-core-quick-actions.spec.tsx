@@ -127,10 +127,7 @@ describe('useCoreQuickActions — sessions waiting on you', () => {
 })
 
 describe('useCoreQuickActions — the global tabs', () => {
-  it('Resume and Home both open Home', async () => {
-    useExtensionRegistry.getState().setActiveGlobalTab(null)
-    await runCoreAction('core.resume')
-    expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.home')
+  it('Home opens Home', async () => {
     useExtensionRegistry.getState().setActiveGlobalTab(null)
     await runCoreAction('core.open-home')
     expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.home')

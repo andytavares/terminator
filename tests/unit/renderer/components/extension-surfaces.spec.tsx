@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
@@ -132,37 +133,43 @@ const renderSidebar = (groupBy: GroupKey) => {
   return render(<UnifiedSidebar {...sidebarProps} />)
 }
 
-describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupBy) => {
-  it('surface 2: the workspace tab is reachable and fires with the owning workspace id', () => {
+const renderWithWorkspaceTab = (groupBy: GroupKey, onSelectWorkspaceTab: () => void) => {
+  saveOpeningViewGrouping(groupBy)
+  return render(<UnifiedSidebar {...sidebarProps} onSelectWorkspaceTab={onSelectWorkspaceTab} />)
+}
+
+describe('surface 2: the workspace tab is reachable and fires with the owning workspace id', () => {
+  it('opens from the repo header when grouped by workspace', async () => {
+    const user = userEvent.setup()
     const onSelectWorkspaceTab = vi.fn()
-    saveOpeningViewGrouping(groupBy)
-    const { container } = render(
-      <UnifiedSidebar {...sidebarProps} onSelectWorkspaceTab={onSelectWorkspaceTab} />
-    )
-    const headerButton = container.querySelector('.repo-header__action')
-    if (headerButton) {
-      // Grouped by repo: the repo header is the host.
-      fireEvent.click(headerButton)
-    } else {
-      // Ungrouped: there is no repo header, so the branch row's own menu is
-      // the way in — a contributed surface has to be reachable either way.
-      fireEvent.contextMenu(container.querySelector('.branch-row')!)
-      fireEvent.click(screen.getByText('Fake Workspace Tab'))
-    }
+    const { container } = renderWithWorkspaceTab('workspace', onSelectWorkspaceTab)
+    await user.click(container.querySelector('.repo-header__action')!)
+    expect(onSelectWorkspaceTab).toHaveBeenCalledWith('ws-1', 'fake.wstab')
+  })
+
+  it('opens from the branch row menu when ungrouped, as there is no repo header', async () => {
+    const user = userEvent.setup()
+    const onSelectWorkspaceTab = vi.fn()
+    const { container } = renderWithWorkspaceTab('none', onSelectWorkspaceTab)
+    expect(container.querySelector('.repo-header__action')).toBeNull()
+    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    await user.click(screen.getByText('Fake Workspace Tab'))
     expect(onSelectWorkspaceTab).toHaveBeenCalledWith('ws-1', 'fake.wstab')
   })
 })
 
 describe.each(GROUPINGS)('the branch scope survives %s grouping', (groupBy) => {
-  it('surface 4: selecting a branch leaves activeProjectId resolved for the project tab', () => {
+  it('surface 4: selecting a branch leaves activeProjectId resolved for the project tab', async () => {
+    const user = userEvent.setup()
     const { container } = renderSidebar(groupBy)
-    fireEvent.click(container.querySelector('.branch-row')!)
+    await user.click(container.querySelector('.branch-row')!)
     expect(useWorkspaceStore.getState().activeProjectId).toBe('p1')
   })
 
-  it('a new terminal can be created for the branch scope', () => {
+  it('a new terminal can be created for the branch scope', async () => {
+    const user = userEvent.setup()
     const { container } = renderSidebar(groupBy)
-    fireEvent.click(container.querySelector('.branch-row__action')!)
+    await user.click(container.querySelector('.branch-row__action')!)
     expect(mockCreateSession).toHaveBeenCalledWith({
       projectId: 'p1',
       type: 'human',

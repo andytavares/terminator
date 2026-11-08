@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, fireEvent, screen, cleanup, act } from '@testing-library/react'
+import { render, screen, cleanup, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { useEditorStore } from '../../src/stores/editor.store'
 import { NoteOutline } from '../../src/components/NoteOutline'
@@ -60,18 +61,20 @@ function noteOutlineListingHeadingsTests() {
 }
 
 function noteOutlineSelectingTests() {
-  it('counts a click on a heading as one use of the outline', () => {
+  it('counts a click on a heading as one use of the outline', async () => {
+    const user = userEvent.setup()
     setBody(BODY)
     render(<NoteOutline onSelect={vi.fn()} onClose={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Setup' }))
+    await user.click(screen.getByRole('button', { name: 'Setup' }))
     expect(mockRecord).toHaveBeenCalledWith('outline')
   })
 
-  it('reports the heading offset when one is clicked', () => {
+  it('reports the heading offset when one is clicked', async () => {
+    const user = userEvent.setup()
     setBody(BODY)
     const onSelect = vi.fn()
     render(<NoteOutline onSelect={onSelect} onClose={vi.fn()} />)
-    fireEvent.click(screen.getByText('Usage'))
+    await user.click(screen.getByRole('button', { name: 'Usage' }))
     expect(onSelect).toHaveBeenCalledWith(BODY.indexOf('## Usage'))
   })
 
@@ -89,11 +92,12 @@ function noteOutlineSelectingTests() {
 }
 
 function noteOutlineUpdatingTests() {
-  it('closes from its own header, without reaching for the toolbar', () => {
+  it('closes from its own header, without reaching for the toolbar', async () => {
+    const user = userEvent.setup()
     setBody(BODY)
     const onClose = vi.fn()
     render(<NoteOutline onSelect={vi.fn()} onClose={onClose} />)
-    fireEvent.click(screen.getByRole('button', { name: /close outline/i }))
+    await user.click(screen.getByRole('button', { name: /close outline/i }))
     expect(onClose).toHaveBeenCalledOnce()
   })
 

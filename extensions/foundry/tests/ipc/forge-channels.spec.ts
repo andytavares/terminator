@@ -10,7 +10,7 @@ import { createForgeChannels, forgeChannelSpecs } from '../../src/ipc/forge-chan
 import type { ForgeDeps } from '../../src/ipc/forge-channels.js'
 import { quietForgeSeams } from './forge-deps.js'
 import { createOrderStore } from '../../src/order/store.js'
-import { raiseGate } from '../../src/gates/rules.js'
+import { decide, raiseGate } from '../../src/gates/rules.js'
 import { writeCiState } from '../../src/line/ci-state.js'
 import type { Standing } from '../../src/order/standing.js'
 import type { OrderStore } from '../../src/order/store.js'
@@ -537,7 +537,7 @@ function finishedChecksAndPullsTests() {
 }
 
 function theOpenGateTests() {
-  it('hands the row the open gate whose move is yours, and nothing for another', async () => {
+  it('hands the row the open gate whose move is yours, and nothing once it is decided', async () => {
     const held = raiseGate({
       id: 'G-1',
       rule: 'ready-for-review',
@@ -546,7 +546,8 @@ function theOpenGateTests() {
       why: 'the work shipped as drafts',
       at: '2026-09-06T11:30:00.000Z',
     })
-    const c = createForgeChannels(forgeDeps({ standingSources: { gatesFor: async () => [held] } }))
+    let gates = [held]
+    const c = createForgeChannels(forgeDeps({ standingSources: { gatesFor: async () => gates } }))
     const seeded = (await c.create({
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
@@ -561,9 +562,8 @@ function theOpenGateTests() {
     expect(r.orders[0].gate?.id).toBe('G-1')
     expect(r.orders[0].gate?.options[0].id).toBe('mark_ready')
 
-    await store.save({ ...loaded, status: 'running' })
-    const none = createForgeChannels(forgeDeps())
-    const again = (await none.list()) as { orders: { gate: unknown }[] }
+    gates = [decide(held, { option: 'mark_ready', note: '', at: '2026-09-06T11:40:00.000Z' })]
+    const again = (await c.list()) as { orders: { gate: unknown }[] }
     expect(again.orders[0].gate).toBeNull()
   })
 }
@@ -1336,12 +1336,8 @@ function reasonsAndRecordsTests() {
 function unblockingCompileTests() {
   it('unblocks the compile check once every finding is cleared', async () => {
     const o = await withFinding()
-    for (const finding of o.redTeam) {
-      await channels().turn({
-        id: o.id,
-        finding: { id: finding.id, decision: 'accepted', reason: 'priced in' },
-      })
-    }
+    const accepts = o.redTeam.map((finding) => ({ findingId: finding.id, reason: 'priced in' }))
+    await channels().converge({ id: o.id, settle: { accepts } })
     // The one check this used to fail for ever, because nothing could clear a
     // finding.
     const compiled = answered(await channels().compile(compiling(o.id, false)))
@@ -1720,8 +1716,7 @@ function statedCriteriaTests() {
       source: { kind: 'tracker', tracker: 'linear', key: 'TAV-14' },
       repoPaths: [repo],
     })) as OrderView
-    expect(r.order.intent.problem).toContain('# Dev Hints'.slice(0, 1))
-    expect(r.order.intent.problem).toContain('# Summary')
+    expect(r.order.intent.problem).toBe(DESCRIPTION)
   })
 }
 
@@ -1947,13 +1942,14 @@ describe('the base branch is assumed to pass (ADR 137)', () => {
 })
 
 function theMoveErrorsTests() {
-  it('refuses a move that no longer exists, and errors on an unknown order', async () => {
+  it.each(['skip', 'check', 'waive'])('refuses the retired move "%s"', async (move) => {
     const seed = await drafted()
-    for (const move of ['skip', 'check', 'waive']) {
-      expect(
-        await sendThroughSchema('foundry:forge.environment', { id: seed.order.id, move })
-      ).toEqual({ error: 'Malformed request.' })
-    }
+    expect(
+      await sendThroughSchema('foundry:forge.environment', { id: seed.order.id, move })
+    ).toEqual({ error: 'Malformed request.' })
+  })
+
+  it('errors on a move for an unknown order', async () => {
     const r = (await channels().environment({ id: 'WO-nope', move: 'decline-pictures' })) as {
       error?: string
     }

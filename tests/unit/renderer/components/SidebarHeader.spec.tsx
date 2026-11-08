@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { SidebarHeader } from '../../../../src/renderer/components/sidebar/SidebarHeader'
 
 const defaultProps = {
@@ -16,19 +17,19 @@ beforeEach(() => {
 })
 
 describe('SidebarHeader', () => {
-  it('calls onSearchChange when search input value changes', () => {
+  it('calls onSearchChange when search input value changes', async () => {
+    const user = userEvent.setup()
     const onSearchChange = vi.fn()
-    const { container } = render(
-      <SidebarHeader {...defaultProps} onSearchChange={onSearchChange} />
-    )
-    fireEvent.change(container.querySelector('input')!, { target: { value: 'test' } })
-    expect(onSearchChange).toHaveBeenCalledWith('test')
+    render(<SidebarHeader {...defaultProps} onSearchChange={onSearchChange} />)
+    await user.type(screen.getByRole('textbox'), 't')
+    expect(onSearchChange).toHaveBeenCalledWith('t')
   })
 
-  it('calls onAddWorkspace when + button is clicked', () => {
+  it('calls onAddWorkspace when + button is clicked', async () => {
+    const user = userEvent.setup()
     const onAdd = vi.fn()
     render(<SidebarHeader {...defaultProps} onAddWorkspace={onAdd} />)
-    fireEvent.click(screen.getByLabelText(/new repo/i))
+    await user.click(screen.getByLabelText(/new repo/i))
     expect(onAdd).toHaveBeenCalledOnce()
   })
 })

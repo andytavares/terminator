@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QuickActions } from '../../../../src/renderer/components/QuickActions'
 import type { QuickAction, QuickActionGroup } from '../../../../src/renderer/quick-actions/types'
 
@@ -107,57 +108,65 @@ describe('QuickActions — top level — omits the context section when there is
     renderPanel({ contextGroupId: 'git', contextLabel: 'in Git' })
     expect(screen.getByText('Git · here')).toBeTruthy()
     expect(screen.getByText('in Git')).toBeTruthy()
-    const groupLabels = [...screen.getAllByText(/^(Terminal|Git)$/)]
-    // First "Git"/"Terminal" text among the Groups section rows is Git, since
     // orderGroups puts the context group first.
-    const listboxes = screen.getAllByRole('listbox')
-    const groupsListbox = listboxes.find((el) => el.getAttribute('aria-label') === 'Groups')!
-    const firstOption = groupsListbox.querySelectorAll('[role="option"]')[0]
-    expect(firstOption.textContent).toContain('Git')
-    expect(groupLabels.length).toBeGreaterThan(0)
+    const groupOptions = within(screen.getByRole('listbox', { name: 'Groups' })).getAllByRole(
+      'option'
+    )
+    expect(groupOptions.map((option) => option.textContent)).toEqual([
+      expect.stringContaining('Git'),
+      expect.stringContaining('Terminal'),
+    ])
   })
 })
 
 describe('QuickActions — group mode', () => {
-  it('enters a group by its mnemonic and runs an action inside it', () => {
+  it('enters a group by its mnemonic and runs an action inside it', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    fireEvent.keyDown(window, { key: 't' })
+    await user.keyboard('t')
     expect(screen.getByText('Split right')).toBeTruthy()
-    fireEvent.keyDown(window, { key: 'd' })
+    await user.keyboard('d')
     expect(onRun).toHaveBeenCalledWith(expect.objectContaining({ id: 'terminal.split' }))
   })
 
-  it('is case-sensitive: "D" runs a different action than "d"', () => {
+  it('is case-sensitive: "D" runs a different action than "d"', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    fireEvent.keyDown(window, { key: 't' })
-    fireEvent.keyDown(window, { key: 'D' })
+    await user.keyboard('t')
+    await user.keyboard('D')
     expect(onRun).toHaveBeenCalledWith(expect.objectContaining({ id: 'terminal.split-down' }))
     expect(onRun).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'terminal.split' }))
   })
 
-  it('goes back to top level on Backspace', () => {
+  it('goes back to top level on Backspace', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    fireEvent.keyDown(window, { key: 't' })
+    await user.keyboard('t')
     expect(screen.queryByText('Groups')).toBeNull()
-    fireEvent.keyDown(window, { key: 'Backspace' })
+    await user.keyboard('{Backspace}')
     expect(screen.getByText('Groups')).toBeTruthy()
   })
+})
 
-  it('never runs a disabled action, and shows its reason in the footer status region', () => {
+describe('QuickActions — group mode — disabled actions', () => {
+  it('never runs a disabled action, and shows its reason in the footer status region', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    fireEvent.keyDown(window, { key: 'g' })
-    fireEvent.keyDown(window, { key: 'l' })
+    await user.keyboard('g')
+    await user.keyboard('l')
     expect(onRun).not.toHaveBeenCalled()
     expect(screen.getByRole('status').textContent).toContain('No repository focused')
   })
 })
 
 describe('QuickActions — search mode', () => {
-  it('switches to search on "/" and filters by typing', () => {
+  it('switches to search on "/" and filters by typing', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    fireEvent.keyDown(window, { key: '/' })
+    await user.keyboard('/')
     const input = screen.getByRole('combobox')
-    fireEvent.change(input, { target: { value: 'push' } })
+    await user.clear(input)
+    await user.type(input, 'push')
     expect(screen.getByText('Push')).toBeTruthy()
     expect(screen.queryByText('Split right')).toBeNull()
   })
@@ -185,65 +194,72 @@ describe('QuickActions — search mode — switches to search when searchSignal 
     expect(screen.getByRole('combobox')).toBeTruthy()
   })
 
-  it('runs the first match on Enter', () => {
+  it('runs the first match on Enter', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    fireEvent.keyDown(window, { key: '/' })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'push' } })
-    fireEvent.keyDown(window, { key: 'Enter' })
+    await user.keyboard('/')
+    await user.type(screen.getByRole('combobox'), 'push')
+    await user.keyboard('{Enter}')
     expect(onRun).toHaveBeenCalledWith(expect.objectContaining({ id: 'git.push' }))
   })
 })
 
 describe('QuickActions — search mode — puts the highlight back on the first match when the query changes', () => {
-  it('puts the highlight back on the first match when the query changes', () => {
+  it('puts the highlight back on the first match when the query changes', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    fireEvent.keyDown(window, { key: '/' })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p' } })
-    fireEvent.keyDown(window, { key: 'ArrowDown' })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'push' } })
-    fireEvent.keyDown(window, { key: 'Enter' })
+    await user.keyboard('/')
+    await user.type(screen.getByRole('combobox'), 'p')
+    await user.keyboard('{ArrowDown}')
+    await user.type(screen.getByRole('combobox'), 'ush')
+    await user.keyboard('{Enter}')
     expect(onRun).toHaveBeenCalledWith(expect.objectContaining({ id: 'git.push' }))
   })
 
-  it('goes back to top level on Backspace when the query is empty', () => {
+  it('goes back to top level on Backspace when the query is empty', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    fireEvent.keyDown(window, { key: '/' })
-    fireEvent.keyDown(window, { key: 'Backspace' })
+    await user.keyboard('/')
+    await user.keyboard('{Backspace}')
     expect(screen.getByText('Groups')).toBeTruthy()
   })
 
-  it('navigates results with arrow keys', () => {
+  it('navigates results with arrow keys', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    fireEvent.keyDown(window, { key: '/' })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'split' } })
-    fireEvent.keyDown(window, { key: 'ArrowDown' })
-    fireEvent.keyDown(window, { key: 'Enter' })
+    await user.keyboard('/')
+    await user.type(screen.getByRole('combobox'), 'split')
+    await user.keyboard('{ArrowDown}')
+    await user.keyboard('{Enter}')
     expect(onRun).toHaveBeenCalledWith(expect.objectContaining({ id: 'terminal.split-down' }))
   })
 })
 
 describe('QuickActions — pinning', () => {
-  it('toggles the pin on the highlighted row with cmd+.', () => {
+  it('toggles the pin on the highlighted row with cmd+.', async () => {
+    const user = userEvent.setup()
     renderPanel()
     // Highlight starts on the first pinned/recent row: Push.
-    fireEvent.keyDown(window, { key: '.', metaKey: true })
+    await user.keyboard('{Meta>}.{/Meta}')
     expect(onTogglePin).toHaveBeenCalledWith('git.push')
   })
 
   it.each([
     ['Unpin Push', 'git.push'],
     ['Pin Split right', 'terminal.split'],
-  ])('names a row\'s hover pin button "%s", and it toggles %s', (name, actionId) => {
+  ])('names a row\'s hover pin button "%s", and it toggles %s', async (name, actionId) => {
+    const user = userEvent.setup()
     renderPanel()
-    fireEvent.click(screen.getByRole('button', { name }))
+    await user.click(screen.getByRole('button', { name }))
     expect(onTogglePin).toHaveBeenCalledWith(actionId)
   })
 })
 
 describe('QuickActions — closing', () => {
-  it('closes on Escape', () => {
+  it('closes on Escape', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    fireEvent.keyDown(window, { key: 'Escape' })
+    await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledOnce()
   })
 })
@@ -283,113 +299,124 @@ describe('QuickActions — focus', () => {
 })
 
 describe('QuickActions — arrow navigation', () => {
-  it('moves the highlight and runs the highlighted row on Enter', () => {
+  it('moves the highlight and runs the highlighted row on Enter', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    fireEvent.keyDown(window, { key: 'ArrowDown' })
-    fireEvent.keyDown(window, { key: 'Enter' })
+    await user.keyboard('{ArrowDown}')
+    await user.keyboard('{Enter}')
     expect(onRun).toHaveBeenCalledWith(expect.objectContaining({ id: 'terminal.split' }))
   })
 
-  it('does not move the highlight past the first row on ArrowUp', () => {
+  it('does not move the highlight past the first row on ArrowUp', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    fireEvent.keyDown(window, { key: 'ArrowUp' })
-    fireEvent.keyDown(window, { key: 'Enter' })
+    await user.keyboard('{ArrowUp}')
+    await user.keyboard('{Enter}')
     expect(onRun).toHaveBeenCalledWith(expect.objectContaining({ id: 'git.push' }))
   })
 })
 
-const pressInPanel = (k: string, mods: Partial<KeyboardEventInit> = {}): void => {
-  fireEvent.keyDown(window, { key: k, ...mods })
-}
 const ranActionIds = (): string[] => onRun.mock.calls.map(([action]) => action.id)
 
 describe('QuickActions — group mode keys', () => {
-  it('moves through the group with the arrows and runs the highlighted action on Enter', () => {
+  it('moves through the group with the arrows and runs the highlighted action on Enter', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    pressInPanel('t')
-    pressInPanel('ArrowDown')
-    pressInPanel('ArrowDown')
-    pressInPanel('Enter')
-    pressInPanel('ArrowUp')
-    pressInPanel('Enter')
+    await user.keyboard('t')
+    await user.keyboard('{ArrowDown}')
+    await user.keyboard('{ArrowDown}')
+    await user.keyboard('{Enter}')
+    await user.keyboard('{ArrowUp}')
+    await user.keyboard('{Enter}')
     // The second ArrowDown stops at the last of the two.
     expect(ranActionIds()).toEqual(['terminal.split-down', 'terminal.split'])
   })
 
-  it('goes to search on "/"', () => {
+  it('goes to search on "/"', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    pressInPanel('t')
-    pressInPanel('/')
+    await user.keyboard('t')
+    await user.keyboard('/')
     expect(screen.getByRole('combobox')).toBeTruthy()
   })
 
-  it('ignores a letter no action has, and keys with a modifier', () => {
+  it('ignores a letter no action has, and keys with a modifier', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    pressInPanel('t')
-    pressInPanel('z')
-    pressInPanel('d', { altKey: true })
+    await user.keyboard('t')
+    await user.keyboard('z')
+    await user.keyboard('{Alt>}d{/Alt}')
     expect(onRun).not.toHaveBeenCalled()
     expect(screen.getByText('Split right')).toBeTruthy()
   })
 })
 
 describe('QuickActions — top level keys and pointer', () => {
-  it('runs a Go action by its letter, and ignores a letter nothing has', () => {
+  it('runs a Go action by its letter, and ignores a letter nothing has', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    pressInPanel('z')
+    await user.keyboard('z')
     expect(onRun).not.toHaveBeenCalled()
-    pressInPanel('h')
+    await user.keyboard('h')
     expect(ranActionIds()).toEqual(['top.home'])
   })
 
-  it('opens a group from its row with Enter', () => {
+  it('opens a group from its row with Enter', async () => {
+    const user = userEvent.setup()
     renderPanel()
     // Push and Split right (pinned and recent), then the Terminal group.
-    pressInPanel('ArrowDown')
-    pressInPanel('ArrowDown')
-    pressInPanel('Enter')
+    await user.keyboard('{ArrowDown}')
+    await user.keyboard('{ArrowDown}')
+    await user.keyboard('{Enter}')
     expect(screen.getByRole('listbox', { name: 'Terminal' })).toBeTruthy()
   })
+})
 
-  it('opens a group, and runs an action, with the pointer', () => {
+describe('QuickActions — pointer', () => {
+  it('opens a group, and runs an action, with the pointer', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    fireEvent.mouseDown(screen.getByText('Git').closest('.qa-row')!)
-    fireEvent.mouseEnter(screen.getByText('Push').closest('.qa-row')!)
-    fireEvent.mouseDown(screen.getByText('Push').closest('.qa-row')!)
+    await user.click(screen.getByText('Git').closest('.qa-row')!)
+    await user.hover(screen.getByText('Push').closest('.qa-row')!)
+    await user.click(screen.getByText('Push').closest('.qa-row')!)
     expect(ranActionIds()).toEqual(['git.push'])
   })
 
-  it('does not run a row when its pin button is pressed', () => {
+  it('does not run a row when its pin button is pressed', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    fireEvent.mouseDown(screen.getByRole('button', { name: 'Unpin Push' }))
+    await user.click(screen.getByRole('button', { name: 'Unpin Push' }))
     expect(onRun).not.toHaveBeenCalled()
   })
 })
 
 describe('QuickActions — top level keys and pointer — pins nothing when cmd+. lands on a group row', () => {
-  it('pins nothing when cmd+. lands on a group row', () => {
+  it('pins nothing when cmd+. lands on a group row', async () => {
+    const user = userEvent.setup()
     renderPanel({ pinned: [], recent: [] })
-    pressInPanel('.', { metaKey: true })
+    await user.keyboard('{Meta>}.{/Meta}')
     expect(onTogglePin).not.toHaveBeenCalled()
   })
 })
 
 describe('QuickActions — search keys', () => {
-  it('moves back up the results with ArrowUp', () => {
+  it('moves back up the results with ArrowUp', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    pressInPanel('/')
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'split' } })
-    pressInPanel('ArrowDown')
-    pressInPanel('ArrowUp')
-    pressInPanel('Enter')
+    await user.keyboard('/')
+    await user.type(screen.getByRole('combobox'), 'split')
+    await user.keyboard('{ArrowDown}')
+    await user.keyboard('{ArrowUp}')
+    await user.keyboard('{Enter}')
     expect(ranActionIds()).toEqual(['terminal.split'])
   })
 
-  it('keeps searching on Backspace while there is a query', () => {
+  it('keeps searching on Backspace while there is a query', async () => {
+    const user = userEvent.setup()
     renderPanel()
-    pressInPanel('/')
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p' } })
-    pressInPanel('Backspace')
+    await user.keyboard('/')
+    await user.type(screen.getByRole('combobox'), 'p')
+    await user.keyboard('{Backspace}')
     expect(screen.getByRole('combobox')).toBeTruthy()
   })
 })

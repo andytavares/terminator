@@ -119,10 +119,11 @@ describe('useWorkspaceStore', () => {
       expect(useWorkspaceStore.getState().workspaces[1]).toEqual(ws2)
     })
 
-    it('returns the api result directly (including errors)', async () => {
+    it('keeps the workspace list unchanged when main refuses the name', async () => {
+      useWorkspaceStore.setState({ workspaces: [ws1] })
       mockElectronAPI.workspace.create.mockResolvedValue({ error: 'DUPLICATE_NAME' })
-      const result = await useWorkspaceStore.getState().createWorkspace({ name: 'Dup' })
-      expect(result).toEqual({ error: 'DUPLICATE_NAME' })
+      await useWorkspaceStore.getState().createWorkspace({ name: 'Dup' })
+      expect(useWorkspaceStore.getState().workspaces).toEqual([ws1])
     })
   })
 })
@@ -202,10 +203,12 @@ describe('useWorkspaceStore — setActiveWorkspace', () => {
       expect(useWorkspaceStore.getState().activeProjectId).toBeNull()
     })
 
-    it('triggers loadProjects for the new workspace', () => {
+    it('loads the projects of the new workspace', async () => {
       mockElectronAPI.project.list.mockResolvedValue({ projects: [proj1] })
       useWorkspaceStore.getState().setActiveWorkspace('ws-1')
-      expect(mockElectronAPI.project.list).toHaveBeenCalledWith('ws-1')
+      await expect
+        .poll(() => useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-1'))
+        .toEqual([proj1])
     })
 
     it('sets activeWorkspaceId to null when called with null', () => {
@@ -214,6 +217,10 @@ describe('useWorkspaceStore — setActiveWorkspace', () => {
       expect(useWorkspaceStore.getState().activeWorkspaceId).toBeNull()
     })
   })
+})
+
+describe('useWorkspaceStore — loadProjects', () => {
+  setUpUseWorkspaceStore()
 
   describe('loadProjects', () => {
     it('stores projects under workspaceId key', async () => {

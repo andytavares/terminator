@@ -35,14 +35,14 @@ describe('parseReviewQueuePR()', () => {
   })
 })
 
-describe('parseReviewQueuePR() — sets estimatedMinutes to at least 1 for tiny PRs', () => {
-  it('sets estimatedMinutes to at least 1 for tiny PRs', () => {
+describe('parseReviewQueuePR() — estimates at least one minute', () => {
+  it('estimates 1 minute for a PR with no changed lines', () => {
     const pr = parseReviewQueuePR(
       makeRawPr({
-        files: [{ path: 'x.ts', additions: 1, deletions: 0, status: 'added' }],
+        files: [{ path: 'x.ts', additions: 0, deletions: 0, status: 'modified' }],
       })
     )
-    expect(pr.estimatedMinutes).toBeGreaterThanOrEqual(1)
+    expect(pr.estimatedMinutes).toBe(1)
   })
 })
 

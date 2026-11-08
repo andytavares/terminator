@@ -45,7 +45,7 @@ describe('navigation history — moving', () => {
   })
 
   it('drops the forward entries when a new one is recorded after going back', () => {
-    for (const id of ['a', 'b', 'c']) navigation().record(entry(id))
+    useNavigationStore.setState({ entries: [entry('a'), entry('b'), entry('c')], cursor: 2 })
     navigation().step(-1)
     navigation().step(-1)
     navigation().record(entry('d'))
@@ -53,9 +53,12 @@ describe('navigation history — moving', () => {
   })
 
   it('keeps the last 50 entries', () => {
-    for (let i = 0; i < 60; i++) navigation().record(entry(`p${i}`))
+    const full = Array.from({ length: 50 }, (_, i) => entry(`p${i}`))
+    useNavigationStore.setState({ entries: full, cursor: 49 })
+    navigation().record(entry('p50'))
     expect(navigation().entries).toHaveLength(50)
-    expect(navigation().entries[0].projectId).toBe('p10')
+    expect(navigation().entries[0].projectId).toBe('p1')
+    expect(navigation().entries[49].projectId).toBe('p50')
     expect(navigation().cursor).toBe(49)
   })
 })
@@ -72,8 +75,10 @@ describe('closed tabs', () => {
   })
 
   it('keeps the last 10', () => {
-    for (let i = 0; i < 12; i++) navigation().rememberClosed(closed(i))
+    useNavigationStore.setState({ closedTabs: Array.from({ length: 10 }, (_, i) => closed(i)) })
+    navigation().rememberClosed(closed(10))
     expect(navigation().closedTabs).toHaveLength(10)
-    expect(navigation().closedTabs[0].title).toBe('T2')
+    expect(navigation().closedTabs[0].title).toBe('T1')
+    expect(navigation().closedTabs[9].title).toBe('T10')
   })
 })

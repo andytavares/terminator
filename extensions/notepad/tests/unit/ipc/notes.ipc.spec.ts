@@ -123,7 +123,7 @@ describe('listNotes with tagId filter', () => {
     const tag = await db.get<{ id: string }>('SELECT id FROM tags WHERE name=?', ['filterable'])
     const result = await listNotes(db, { tagId: tag!.id })
     const data = (result as { data: { title: string }[] }).data
-    expect(data.every((n) => n.title === 'Tagged')).toBe(true)
+    expect(data.map((n) => n.title)).toEqual(['Tagged'])
   })
 
   it('sorts asc by title', async () => {
@@ -444,16 +444,28 @@ function listNotesArchivedNotesTests() {
 }
 
 function listNotesFieldsOrderTests() {
-  it('includes bodyPreview field', async () => {
-    const result = await listNotes(db, {})
+  it('includes the first 120 characters of the body as a preview', async () => {
+    await createNote(db, { title: 'Long', body: 'x'.repeat(150) })
+
+    const result = await listNotes(db, { sortBy: 'title', sortDir: 'asc' })
+
     const data = (result as { data: { bodyPreview: string }[] }).data
-    expect(data[0]).toHaveProperty('bodyPreview')
+    expect(data.map((n) => n.bodyPreview)).toEqual(['active note', 'x'.repeat(120)])
   })
 
-  it('sorts by updated_at desc by default', async () => {
+  it('lists the most recently updated note first by default', async () => {
+    await createNote(db, { title: 'Oldest', body: '' })
+    await createNote(db, { title: 'Newest', body: '' })
+    const setUpdatedAt = (title: string, updatedAt: string) =>
+      db.run('UPDATE notes SET updated_at = ? WHERE title = ?', [updatedAt, title])
+    await setUpdatedAt('Active', '2026-01-02T00:00:00.000Z')
+    await setUpdatedAt('Oldest', '2026-01-01T00:00:00.000Z')
+    await setUpdatedAt('Newest', '2026-01-03T00:00:00.000Z')
+
     const result = await listNotes(db, {})
+
     const data = (result as { data: { title: string }[] }).data
-    expect(data.length).toBeGreaterThan(0)
+    expect(data.map((n) => n.title)).toEqual(['Newest', 'Active', 'Oldest'])
   })
 }
 

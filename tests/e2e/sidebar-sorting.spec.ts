@@ -56,6 +56,7 @@ async function menuOpensUnderItsButton(name: string): Promise<void> {
   const trigger = page.getByRole('button', { name, exact: true }).first()
   await expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
   await trigger.focus()
+  await expect(trigger).toBeFocused()
   await page.keyboard.press('Enter')
   const opened = page.getByRole('menu', { name })
   await expect(opened).toBeVisible()

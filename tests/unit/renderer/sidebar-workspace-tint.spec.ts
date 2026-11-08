@@ -116,19 +116,14 @@ describe('the repo name is text, not colour (FR-043)', () => {
     )
   })
 
-  it.each(['dark', 'light'] as const)(
-    'the name still clears AA on the selected surface in the %s theme',
-    (theme) => {
-      const surface = hex(token('--tm-bg-card-hover', theme))
-      expect(contrast(hex(token('--tm-text-primary', theme)), surface)).toBeGreaterThanOrEqual(4.5)
-    }
-  )
+  // The dark theme rows live in design-tokens-contrast.spec.ts (every tier on card-hover).
+  it('the name still clears AA on the selected surface in the light theme', () => {
+    const surface = hex(token('--tm-bg-card-hover', 'light'))
+    expect(contrast(hex(token('--tm-text-primary', 'light')), surface)).toBeGreaterThanOrEqual(4.5)
+  })
 
-  it.each(['dark', 'light'] as const)(
-    'the muted meta text clears AA on the hover surface in the %s theme',
-    (theme) => {
-      const surface = hex(token('--tm-bg-elevated', theme))
-      expect(contrast(hex(token('--tm-text-muted', theme)), surface)).toBeGreaterThanOrEqual(4.5)
-    }
-  )
+  it('the muted meta text clears AA on the hover surface in the light theme', () => {
+    const surface = hex(token('--tm-bg-elevated', 'light'))
+    expect(contrast(hex(token('--tm-text-muted', 'light')), surface)).toBeGreaterThanOrEqual(4.5)
+  })
 })

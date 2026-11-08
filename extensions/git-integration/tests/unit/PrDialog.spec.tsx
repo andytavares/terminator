@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { PrDialog } from '../../src/components/PrDialog'
 import { githubAPI } from '../../src/api/github'
 
@@ -25,6 +26,7 @@ afterEach(() => {
 })
 
 async function previewOf(template: string): Promise<HTMLElement> {
+  const user = userEvent.setup()
   mockReadFile.mockResolvedValue({ content: template })
   render(
     <PrDialog
@@ -41,7 +43,7 @@ async function previewOf(template: string): Promise<HTMLElement> {
       (screen.getByPlaceholderText(/Describe your changes/) as HTMLTextAreaElement).value
     ).toBe(template)
   )
-  fireEvent.click(screen.getByText('Preview'))
+  await user.click(screen.getByRole('tab', { name: 'Preview' }))
   return document.querySelector('.pr-dialog__preview') as HTMLElement
 }
 
@@ -66,6 +68,7 @@ describe('PrDialog template preview', () => {
 })
 
 async function createWith(prCreate: () => ReturnType<typeof githubAPI.prCreate>) {
+  const user = userEvent.setup()
   mockReadFile.mockResolvedValue({ content: '' })
   mockExec.mockResolvedValue({ exitCode: 0, stdout: '2\n', stderr: '' })
   vi.spyOn(githubAPI, 'prCreate').mockImplementation(prCreate)
@@ -79,10 +82,8 @@ async function createWith(prCreate: () => ReturnType<typeof githubAPI.prCreate>)
       onCreated={vi.fn()}
     />
   )
-  fireEvent.change(screen.getByPlaceholderText('Pull request title'), {
-    target: { value: 'Add x' },
-  })
-  fireEvent.click(screen.getByRole('button', { name: /^Create (Draft )?PR$/ }))
+  await user.type(screen.getByPlaceholderText('Pull request title'), 'Add x')
+  await user.click(screen.getByRole('button', { name: /^Create (Draft )?PR$/ }))
 }
 
 describe('PrDialog usage', () => {

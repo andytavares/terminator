@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { BranchRow } from '../../../../src/renderer/components/sidebar/BranchRow'
 import type { BranchRow as BranchRowData } from '../../../../src/renderer/sidebar/branch-rows'
 
@@ -169,17 +170,25 @@ describe('BranchRow — carries the repo colour as one rail variable, not as a b
 })
 
 describe('BranchRow — interaction', () => {
-  it('selects on click', () => {
+  it('selects on click', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     const { container } = renderRow({}, { onSelect })
-    fireEvent.click(container.querySelector('.branch-row')!)
+    await user.click(container.querySelector('.branch-row')!)
     expect(onSelect).toHaveBeenCalled()
   })
 
-  it.each(['Enter', ' '])('selects on %s', (key) => {
+  it.each([
+    ['Enter', '{Enter}'],
+    ['Space', ' '],
+  ])('selects on %s', async (_name, keys) => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     const { container } = renderRow({}, { onSelect })
-    fireEvent.keyDown(container.querySelector('.branch-row')!, { key })
+    const row = container.querySelector<HTMLElement>('.branch-row')!
+    row.focus()
+    expect(document.activeElement).toBe(row)
+    await user.keyboard(keys)
     expect(onSelect).toHaveBeenCalled()
   })
 
@@ -189,100 +198,115 @@ describe('BranchRow — interaction', () => {
     expect(el.classList.contains('branch-row--selected')).toBe(true)
     expect(el.getAttribute('aria-current')).toBe('true')
   })
-
-  it('offers a new terminal on hover without shifting the row', () => {
-    const onAddTerminal = vi.fn()
-    renderRow({}, { onAddTerminal })
-    fireEvent.click(screen.getByRole('button', { name: /new terminal in 034-declutter/i }))
-    expect(onAddTerminal).toHaveBeenCalled()
-  })
 })
 
-describe('BranchRow — interaction — does not select the branch when the add button is used', () => {
-  it('does not select the branch when the add button is used', () => {
+describe('BranchRow — the add button', () => {
+  it('starts a new terminal in the branch from its add button', async () => {
+    const user = userEvent.setup()
+    const onAddTerminal = vi.fn()
+    renderRow({}, { onAddTerminal })
+    await user.click(screen.getByRole('button', { name: /new terminal in 034-declutter/i }))
+    expect(onAddTerminal).toHaveBeenCalled()
+  })
+
+  it('does not select the branch when the add button is used', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     const onAddTerminal = vi.fn()
     renderRow({}, { onSelect, onAddTerminal })
-    fireEvent.click(screen.getByRole('button', { name: /new terminal/i }))
+    await user.click(screen.getByRole('button', { name: /new terminal/i }))
     expect(onSelect).not.toHaveBeenCalled()
   })
 })
 
 describe('BranchRow — the context menu', () => {
-  it('offers rename only where the branch has no branch to be named by', () => {
+  it('offers rename only where the branch has no branch to be named by', async () => {
+    const user = userEvent.setup()
     const { container } = renderRow({}, { onRename: vi.fn() })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
     expect(screen.getByText('Rename')).toBeTruthy()
   })
 
-  it('offers no rename for a branch named by its branch', () => {
+  it('offers no rename for a branch named by its branch', async () => {
+    const user = userEvent.setup()
     const { container } = renderRow({}, { onRemove: vi.fn() })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
     expect(screen.queryByText('Rename')).toBeNull()
   })
 
-  it('renames through the callback', () => {
+  it('renames through the callback', async () => {
+    const user = userEvent.setup()
     const onRename = vi.fn()
     const { container } = renderRow({}, { onRename })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
-    fireEvent.click(screen.getByText('Rename'))
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    await user.click(screen.getByText('Rename'))
     const input = container.querySelector<HTMLInputElement>('.branch-row__rename')!
-    fireEvent.change(input, { target: { value: 'renamed' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
+    await user.clear(input)
+    await user.type(input, 'renamed')
+    await user.keyboard('{Enter}')
     expect(onRename).toHaveBeenCalledWith('renamed')
   })
 })
 
 describe('BranchRow — the context menu — abandons a rename on Escape', () => {
-  it('abandons a rename on Escape', () => {
+  it('abandons a rename on Escape', async () => {
+    const user = userEvent.setup()
     const onRename = vi.fn()
     const { container } = renderRow({}, { onRename })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
-    fireEvent.click(screen.getByText('Rename'))
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    await user.click(screen.getByText('Rename'))
     const input = container.querySelector<HTMLInputElement>('.branch-row__rename')!
-    fireEvent.change(input, { target: { value: 'nope' } })
-    fireEvent.keyDown(input, { key: 'Escape' })
+    await user.clear(input)
+    await user.type(input, 'nope')
+    await user.keyboard('{Escape}')
     expect(onRename).not.toHaveBeenCalled()
   })
 
-  it('carries the issue actions', () => {
+  it('carries the issue actions', async () => {
+    const user = userEvent.setup()
     const { container } = renderRow(
       {},
       { issueActions: { issueKey: 'TAV-14', onLinkIssue: vi.fn(), onOpenIssue: vi.fn() } }
     )
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
     expect(screen.getByText('Open TAV-14 in tracker')).toBeTruthy()
   })
+})
 
-  it('removes through the callback', () => {
+describe('BranchRow — the context menu — removing', () => {
+  it('removes through the callback', async () => {
+    const user = userEvent.setup()
     const onRemove = vi.fn()
     const { container } = renderRow({}, { onRemove })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
-    fireEvent.click(screen.getByText('Remove branch'))
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    await user.click(screen.getByText('Remove branch'))
     expect(onRemove).toHaveBeenCalled()
   })
 })
 
 describe('BranchRow — the context menu — opens no menu when there is nothing to put in it', () => {
-  it('opens no menu when there is nothing to put in it', () => {
+  it('opens no menu when there is nothing to put in it', async () => {
+    const user = userEvent.setup()
     const { container } = renderRow()
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
     expect(document.querySelector('.ctx-menu')).toBeNull()
   })
 })
 
 describe('BranchRow — the issue key keeps its behaviour without its badge', () => {
-  it('opens the issue drawer from the key', () => {
+  it('opens the issue drawer from the key', async () => {
+    const user = userEvent.setup()
     const onIssueClick = vi.fn()
     renderRow({}, { issueKey: 'TAV-14', onIssueClick })
-    fireEvent.click(screen.getByRole('button', { name: 'Open TAV-14' }))
+    await user.click(screen.getByRole('button', { name: 'Open TAV-14' }))
     expect(onIssueClick).toHaveBeenCalled()
   })
 
-  it('does not also select the branch when the key is clicked', () => {
+  it('does not also select the branch when the key is clicked', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     renderRow({}, { issueKey: 'TAV-14', onIssueClick: vi.fn(), onSelect })
-    fireEvent.click(screen.getByRole('button', { name: 'Open TAV-14' }))
+    await user.click(screen.getByRole('button', { name: 'Open TAV-14' }))
     expect(onSelect).not.toHaveBeenCalled()
   })
 })
@@ -292,102 +316,117 @@ describe('BranchRow — repo actions are reachable from the row', () => {
   // surface has to be reachable in every grouping.
   const repoActions = [{ id: 'git', label: 'Git', onSelect: vi.fn() }]
 
-  it('lists them in the row menu', () => {
+  it('lists them in the row menu', async () => {
+    const user = userEvent.setup()
     const { container } = renderRow({}, { repoActions })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
     expect(screen.getByText('Git')).toBeTruthy()
   })
 
-  it('fires one and closes the menu', () => {
+  it('fires one and closes the menu', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     const { container } = renderRow({}, { repoActions: [{ id: 'git', label: 'Git', onSelect }] })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
-    fireEvent.click(screen.getByText('Git'))
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    await user.click(screen.getByRole('menuitem', { name: 'Git' }))
     expect(onSelect).toHaveBeenCalled()
+    expect(screen.queryByRole('menuitem', { name: 'Git' })).toBeNull()
   })
 })
 
 describe('BranchRow — renaming', () => {
-  it('commits on blur', () => {
+  it('commits on blur', async () => {
+    const user = userEvent.setup()
     const onRename = vi.fn()
     const { container } = renderRow({}, { onRename })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
-    fireEvent.click(screen.getByText('Rename'))
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    await user.click(screen.getByText('Rename'))
     const input = container.querySelector<HTMLInputElement>('.branch-row__rename')!
-    fireEvent.change(input, { target: { value: 'blurred' } })
-    fireEvent.blur(input)
+    await user.clear(input)
+    await user.type(input, 'blurred')
+    await user.tab()
     expect(onRename).toHaveBeenCalledWith('blurred')
   })
 
-  it('ignores an empty name', () => {
+  it('ignores an empty name', async () => {
+    const user = userEvent.setup()
     const onRename = vi.fn()
     const { container } = renderRow({}, { onRename })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
-    fireEvent.click(screen.getByText('Rename'))
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    await user.click(screen.getByText('Rename'))
     const input = container.querySelector<HTMLInputElement>('.branch-row__rename')!
-    fireEvent.change(input, { target: { value: '   ' } })
-    fireEvent.blur(input)
+    await user.clear(input)
+    await user.type(input, '   ')
+    await user.tab()
     expect(onRename).not.toHaveBeenCalled()
   })
 })
 
 describe('BranchRow — renaming — ignores a name that did not change', () => {
-  it('ignores a name that did not change', () => {
+  it('ignores a name that did not change', async () => {
+    const user = userEvent.setup()
     const onRename = vi.fn()
     const { container } = renderRow({}, { onRename })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
-    fireEvent.click(screen.getByText('Rename'))
-    fireEvent.blur(container.querySelector('.branch-row__rename')!)
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    await user.click(screen.getByText('Rename'))
+    expect(document.activeElement).toBe(container.querySelector('.branch-row__rename'))
+    await user.tab()
     expect(onRename).not.toHaveBeenCalled()
   })
 
-  it('does not select the branch while typing in the editor', () => {
+  it('does not select the branch while typing in the editor', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     const { container } = renderRow({}, { onRename: vi.fn(), onSelect })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
-    fireEvent.click(screen.getByText('Rename'))
-    fireEvent.click(container.querySelector('.branch-row__rename')!)
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    await user.click(screen.getByText('Rename'))
+    await user.click(container.querySelector('.branch-row__rename')!)
     expect(onSelect).not.toHaveBeenCalled()
   })
 })
 
 describe('BranchRow — open in editor', () => {
-  it('offers the action named after the editor that will run', () => {
+  it('offers the action named after the editor that will run', async () => {
+    const user = userEvent.setup()
     const { container } = renderRow({}, { onOpenInEditor: vi.fn(), editorName: 'Cursor' })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
     expect(screen.getByText('Open in Cursor')).toBeTruthy()
   })
 
-  it('falls back to a generic label when the editor is not known yet', () => {
+  it('falls back to a generic label when the editor is not known yet', async () => {
+    const user = userEvent.setup()
     const { container } = renderRow({}, { onOpenInEditor: vi.fn() })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
     expect(screen.getByText('Open in editor')).toBeTruthy()
   })
 
-  it('opens the branch folder and closes the menu', () => {
+  it('opens the branch folder and closes the menu', async () => {
+    const user = userEvent.setup()
     const onOpenInEditor = vi.fn()
     const { container } = renderRow({}, { onOpenInEditor, editorName: 'Cursor' })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
-    fireEvent.click(screen.getByText('Open in Cursor'))
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    await user.click(screen.getByText('Open in Cursor'))
     expect(onOpenInEditor).toHaveBeenCalled()
     expect(document.querySelector('.ctx-menu')).toBeNull()
   })
 
   // Remote mode omits the editor API entirely, so the handler is absent and the
   // item must not appear — an action that cannot work should not be offered.
-  it('offers nothing when there is no way to open an editor', () => {
+  it('offers nothing when there is no way to open an editor', async () => {
+    const user = userEvent.setup()
     const { container } = renderRow({}, { onRemove: vi.fn() })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
     expect(screen.queryByText(/Open in/)).toBeNull()
   })
 })
 
 describe('BranchRow — open in editor — does not also select the branch', () => {
-  it('does not also select the branch', () => {
+  it('does not also select the branch', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     const { container } = renderRow({}, { onOpenInEditor: vi.fn(), onSelect })
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
-    fireEvent.click(screen.getByText('Open in editor'))
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    await user.click(screen.getByText('Open in editor'))
     expect(onSelect).not.toHaveBeenCalled()
   })
 })
@@ -437,11 +476,12 @@ describe('BranchRow — the disclosure for its terminals', () => {
     expect(screen.queryByRole('button', { name: /terminals in/ })).toBeNull()
   })
 
-  it('shows or hides them without selecting the branch', () => {
+  it('shows or hides them without selecting the branch', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     const onToggleExpanded = vi.fn()
     renderRow({ terminals: [TERMINAL] }, { onSelect, onToggleExpanded, expanded: false })
-    fireEvent.click(screen.getByRole('button', { name: 'Show terminals in 034-declutter' }))
+    await user.click(screen.getByRole('button', { name: 'Show terminals in 034-declutter' }))
     expect(onToggleExpanded).toHaveBeenCalledOnce()
     expect(onSelect).not.toHaveBeenCalled()
   })
@@ -454,22 +494,27 @@ describe('BranchRow — the disclosure for its terminals', () => {
 })
 
 describe('BranchRow — the menu and the keyboard', () => {
-  it('closes the menu before running an issue action', () => {
+  it('closes the menu before running an issue action', async () => {
+    const user = userEvent.setup()
     const onOpenIssue = vi.fn()
     const { container } = renderRow(
       {},
       { issueActions: { issueKey: 'TAV-14', onLinkIssue: vi.fn(), onOpenIssue } }
     )
-    fireEvent.contextMenu(container.querySelector('.branch-row')!)
-    fireEvent.click(screen.getByText('Open TAV-14 in tracker'))
+    await user.pointer({ keys: '[MouseRight]', target: container.querySelector('.branch-row')! })
+    await user.click(screen.getByText('Open TAV-14 in tracker'))
     expect(onOpenIssue).toHaveBeenCalledOnce()
     expect(document.querySelector('.ctx-menu')).toBeNull()
   })
 
-  it('ignores keys other than Enter and Space', () => {
+  it('ignores keys other than Enter and Space', async () => {
+    const user = userEvent.setup()
     const onSelect = vi.fn()
     const { container } = renderRow({}, { onSelect })
-    fireEvent.keyDown(container.querySelector('.branch-row')!, { key: 'a' })
+    const row = container.querySelector<HTMLElement>('.branch-row')!
+    row.focus()
+    expect(document.activeElement).toBe(row)
+    await user.keyboard('a')
     expect(onSelect).not.toHaveBeenCalled()
   })
 })

@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, within, waitFor, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { TaskList } from '../../../../src/renderer/components/home/TaskList'
 import { ArchivedTasks } from '../../../../src/renderer/components/home/ArchivedTasks'
 import { DismissedTasks } from '../../../../src/renderer/components/home/DismissedTasks'
@@ -120,10 +121,11 @@ describe('TaskList', () => {
     expect(building.getByRole('img', { name: 'Running' })).toBeTruthy()
   })
 
-  it('collapses Quiet to one line until Show is pressed', () => {
+  it('collapses Quiet to one line until Show is pressed', async () => {
+    const user = userEvent.setup()
     render(<TaskList />)
     expect(screen.queryByRole('button', { name: 'Scratch shell' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Show Quiet' }))
+    await user.click(screen.getByRole('button', { name: 'Show Quiet' }))
     expect(screen.getByRole('button', { name: 'Scratch shell' })).toBeTruthy()
   })
 })
@@ -131,22 +133,26 @@ describe('TaskList', () => {
 describe('TaskList — a folded group header is one button', () => {
   const quietHeader = () => screen.getByRole('button', { name: /^(Show|Hide) Quiet$/ })
 
-  it('opens and closes when the header row itself is clicked, not only its label', () => {
+  it('opens and closes when the header row itself is clicked, not only its label', async () => {
+    const user = userEvent.setup()
     render(<TaskList />)
-    fireEvent.click(screen.getByRole('heading', { level: 3, name: 'Quiet · 1' }))
+    await user.click(screen.getByRole('heading', { level: 3, name: 'Quiet · 1' }))
     expect(screen.getByRole('button', { name: 'Scratch shell' })).toBeTruthy()
     expect(quietHeader().getAttribute('aria-expanded')).toBe('true')
     expect(within(quietHeader()).getByText('Hide ▾')).toBeTruthy()
-    fireEvent.click(quietHeader())
+    await user.click(quietHeader())
     expect(screen.queryByRole('button', { name: 'Scratch shell' })).toBeNull()
     expect(quietHeader().getAttribute('aria-expanded')).toBe('false')
   })
 
-  it('toggles with Enter and with Space from the keyboard', () => {
+  it('toggles with Enter and with Space from the keyboard', async () => {
+    const user = userEvent.setup()
     render(<TaskList />)
-    fireEvent.keyDown(quietHeader(), { key: 'Enter' })
-    expect(screen.getByRole('button', { name: 'Scratch shell' })).toBeTruthy()
-    fireEvent.keyDown(quietHeader(), { key: ' ' })
+    act(() => quietHeader().focus())
+    expect(document.activeElement).toBe(quietHeader())
+    await user.keyboard('{Enter}')
+    expect(screen.queryByRole('button', { name: 'Scratch shell' })).not.toBeNull()
+    await user.keyboard(' ')
     expect(screen.queryByRole('button', { name: 'Scratch shell' })).toBeNull()
   })
 
@@ -166,10 +172,11 @@ describe('TaskList — pulse line', () => {
 })
 
 describe('TaskList — rows', () => {
-  it('draws a three-lane task as one row with three repo chips', () => {
+  it('draws a three-lane task as one row with three repo chips', async () => {
+    const user = userEvent.setup()
     useTaskStore.setState({ tasks: [task({ title: 'Rate limits', lanes: THREE_LANES })] })
     render(<TaskList />)
-    fireEvent.click(screen.getByRole('button', { name: 'Show Quiet' }))
+    await user.click(screen.getByRole('button', { name: 'Show Quiet' }))
     const row = within(screen.getAllByRole('button', { name: 'Rate limits' })[0])
     expect(row.getByText('terminator')).toBeTruthy()
     expect(row.getByText('api-gateway')).toBeTruthy()
@@ -184,20 +191,24 @@ describe('TaskList — rows', () => {
     expect(asking.getByRole('img', { name: 'Needs you, inferred' })).toBeTruthy()
   })
 
-  it('groups by repo and by none from the Group menu', () => {
+  it('groups by repo and by none from the Group menu', async () => {
+    const user = userEvent.setup()
     render(<TaskList />)
-    fireEvent.click(screen.getByRole('button', { name: 'Group: state' }))
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'none' }))
+    await user.click(screen.getByRole('button', { name: 'Group: state' }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'none' }))
     expect(screen.queryAllByRole('heading', { level: 3 })).toHaveLength(0)
     expect(screen.getByRole('button', { name: 'Scratch shell' })).toBeTruthy()
   })
 })
 
 describe('TaskList — selection and grouping', () => {
-  it('opens the drawer state on Enter, as the Classic rows do', () => {
+  it('opens the drawer state on Enter, as the Classic rows do', async () => {
+    const user = userEvent.setup()
     render(<TaskList />)
     const row = rowNamed('PR overview shows status before story')
-    fireEvent.keyDown(row, { key: 'Enter' })
+    act(() => row.focus())
+    expect(document.activeElement).toBe(row)
+    await user.keyboard('{Enter}')
     expect(useDeskSelection.getState().openThreadKey).toBe('linear:TAV-20')
   })
 
@@ -216,21 +227,25 @@ describe('TaskList — focus star', () => {
     const second = task({ id: 'b2222222-2222-4222-8222-222222222222', title: 'Beta', lanes: [] })
     spies.facts = []
     useWritableTasks([first, second])
+    const user = userEvent.setup()
     render(<TaskList />)
-    fireEvent.click(screen.getByRole('button', { name: 'Show Quiet' }))
+    await user.click(screen.getByRole('button', { name: 'Show Quiet' }))
     expect(screen.getByRole('button', { name: 'Focus on Beta' }).getAttribute('aria-pressed')).toBe(
       'false'
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Focus on Beta' }))
+    await user.click(screen.getByRole('button', { name: 'Focus on Beta' }))
     await screen.findByRole('button', { name: 'Focus on Beta', pressed: true })
     const titles = screen.getAllByRole('button', { name: /^(Alpha|Beta)$/ })
     expect(titles[0].getAttribute('aria-label')).toBe('Beta')
   })
+})
 
+describe('TaskList — focus star on an implicit thread', () => {
   it('stores an implicit thread as a task when its star is pressed', async () => {
+    const user = userEvent.setup()
     storeCreatedTasks()
     render(<TaskList />)
-    fireEvent.click(
+    await user.click(
       within(rowNamed('Reproduce staging 429s before release')).getByRole('button', {
         name: /Focus on/,
       })
@@ -244,6 +259,7 @@ describe('TaskList — focus star', () => {
 
 describe('TaskList — done and archived', () => {
   it('moves a task to Done when Mark done is chosen, collapsed like Quiet', async () => {
+    const user = userEvent.setup()
     const asking = task({
       title: 'Staging 429s',
       lanes: [{ repoRoot: REPO_ROOT, branch: 'tav-31' }],
@@ -252,11 +268,11 @@ describe('TaskList — done and archived', () => {
     render(<TaskList />)
     expect(groupHeadings()).toContain('Needs you · 1')
     fireEvent.contextMenu(rowNamed('Staging 429s'))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Mark done' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Mark done' }))
     await waitFor(() => expect(groupHeadings()).toContain('Done · 1'))
     expect(groupHeadings()).not.toContain('Needs you · 1')
     expect(screen.queryByRole('button', { name: 'Staging 429s' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Show Done' }))
+    await user.click(screen.getByRole('button', { name: 'Show Done' }))
     expect(within(rowNamed('Staging 429s')).getByRole('img', { name: 'Done' })).toBeTruthy()
   })
 })
@@ -268,10 +284,10 @@ describe('ArchivedTasks', () => {
     archivedAt: '2026-10-01T09:00:00.000Z',
   })
 
-  it('counts archived tasks and lists them in a popover', () => {
+  it('counts archived tasks and lists them in a popover', async () => {
     useWritableTasks([archived])
     render(<ArchivedTasks />)
-    fireEvent.click(screen.getByRole('button', { name: 'Archived tasks (1)' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Archived tasks (1)' }))
     expect(
       within(screen.getByRole('group', { name: 'Archived tasks' })).getByText('Old spike')
     ).toBeTruthy()
@@ -286,8 +302,8 @@ describe('ArchivedTasks', () => {
       </>
     )
     expect(groupHeadings()).toContain('Quiet · 1')
-    fireEvent.click(screen.getByRole('button', { name: 'Archived tasks (1)' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Restore Old spike' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Archived tasks (1)' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Restore Old spike' }))
     await screen.findByRole('button', { name: 'Archived tasks (0)' })
     expect(groupHeadings()).toContain('Quiet · 2')
   })
@@ -300,6 +316,7 @@ describe('DismissedTasks', () => {
   })
 
   it('lists a dismissed task and brings it back to the list when Restore is pressed', async () => {
+    const user = userEvent.setup()
     useWritableTasks([dismissedTask])
     useDismissedThreads.getState().dismiss(taskKeyOf(dismissedTask.id), Date.now(), false)
     render(
@@ -309,8 +326,8 @@ describe('DismissedTasks', () => {
       </>
     )
     expect(screen.queryByRole('button', { name: 'Flaky probe' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Dismissed (1)' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Restore Flaky probe' }))
+    await user.click(screen.getByRole('button', { name: 'Dismissed (1)' }))
+    await user.click(screen.getByRole('button', { name: 'Restore Flaky probe' }))
     await screen.findByRole('button', { name: 'Dismissed (0)' })
     expect(groupHeadings()).toContain('Quiet · 2')
   })
@@ -318,11 +335,12 @@ describe('DismissedTasks', () => {
 
 describe('ArchivedTasks — done tasks', () => {
   it('lists a done task and takes it out of the list when Undo done is pressed', async () => {
+    const user = userEvent.setup()
     const finished = task({ title: 'Shipped spike', doneAt: '2026-10-02T09:00:00.000Z' })
     useWritableTasks([finished])
     render(<ArchivedTasks />)
-    fireEvent.click(screen.getByRole('button', { name: 'Archived tasks (1)' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Undo done Shipped spike' }))
+    await user.click(screen.getByRole('button', { name: 'Archived tasks (1)' }))
+    await user.click(screen.getByRole('button', { name: 'Undo done Shipped spike' }))
     await screen.findByRole('button', { name: 'Archived tasks (0)' })
   })
 })
