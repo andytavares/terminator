@@ -1,0 +1,27 @@
+extensions/git-integration/tests/unit/PrDialog.form.spec.tsx
+  s_7a27f124c1e8e3::t_8fc71728c41cf6 54
+  s_7a27f124c1e8e3::t_809dee9ac61b31 53
+extensions/git-integration/tests/unit/PrDialog.spec.tsx
+  s_7a27f124c1e8e3::t_335032a8eb93ea 43,85,102-122
+  s_7a27f124c1e8e3::t_caba704fce747e 123-124
+extensions/git-integration/src/components/PrDialog.tsx
+  s_7a27f124c1e8e3::t_335032a8eb93ea 1,388,391-393,395,438,441-443,445,455-469,472,476,479,513,516-518,521,528
+extensions/git-integration/tests/unit/PrDialog.staged.spec.tsx
+  s_7a27f124c1e8e3::t_335032a8eb93ea 50-51,61,63,66,73,84,163,169-170,185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "41e7f589f6b0ee03e906f443e150dce8947d6461",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

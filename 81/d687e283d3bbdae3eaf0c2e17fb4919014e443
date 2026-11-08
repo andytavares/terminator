@@ -1,0 +1,23 @@
+tests/integration/git/is-git-repo.spec.ts
+  s_7a27f124c1e8e3::t_335032a8eb93ea 1-41
+tests/unit/git/git-repo-probe.spec.ts
+  s_7a27f124c1e8e3::t_335032a8eb93ea 11-15
+src/main/git/git-service.ts
+  s_7a27f124c1e8e3::t_335032a8eb93ea 1-2,63-81,84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "81d687e283d3bbdae3eaf0c2e17fb4919014e443",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
