@@ -1,0 +1,577 @@
+extensions/git-integration/tests/unit/ConflictHeader.spec.tsx
+  s_7a27f124c1e8e3::t_877ab8f9d8f7bb 101-103
+  s_7a27f124c1e8e3::t_6a7af84e0e2fee 89,104,168
+extensions/task-vault/src/components/DateTimePicker.tsx
+  s_7a27f124c1e8e3::t_abc3405a8149c2 360,365,393,437,454,459,512-517
+  s_7a27f124c1e8e3::t_6e2f536b4bb789 405
+extensions/git-integration/src/components/pr-review/VirtualDiffList.tsx
+  s_7a27f124c1e8e3::t_904739198c4401 56
+src/renderer/components/agent/AgentView.tsx
+  s_7a27f124c1e8e3::t_3cda61ad8caa70 72-86,97
+src/renderer/components/settings/GlobalSettings.tsx
+  s_7a27f124c1e8e3::t_3ae3afb7d3b4d6 428-433
+tests/unit/renderer/components/ResumeButton.spec.tsx
+  s_7a27f124c1e8e3::t_935bb82173104b 59
+tests/unit/renderer/components/IssuePicker.spec.tsx
+  s_7a27f124c1e8e3::t_a4804172803da6 129
+  s_7a27f124c1e8e3::t_84154d3608a770 140
+src/renderer/components/terminal/LeafPane.tsx
+  s_7a27f124c1e8e3::t_b103f1a7025572 72-91,102-104,109
+extensions/notepad/tests/components/NoteEditorView.spec.tsx
+  s_7a27f124c1e8e3::t_c1c2e8fe980e82 3,27,123,138-140,149-150
+tests/unit/packages/extension-ui/dialog.spec.tsx
+  s_7a27f124c1e8e3::t_c1c2e8fe980e82 132,277
+extensions/git-integration/tests/unit/RichContent.spec.tsx
+  s_7a27f124c1e8e3::t_eab727cbf40b96 33-37,41-44,50-53
+  s_7a27f124c1e8e3::t_b8b8e5792c4fee 20
+extensions/git-integration/tests/unit/ReviewDiffPane.spec.tsx
+  s_7a27f124c1e8e3::t_ef6fb5c5fd53c2 1020-1021,1038,1284,1287-1300,1312-1313,1318-1319,1322-1324,1329,1337-1339,1347,1354-1355,1364-1367,1395-1398,1401,1414-1423,1432-1434,1436,1450-1451,1461-1462,1466,1471-1472,1475,1484-1486,1492-1493,1497-1498,1502-1503,1508-1509,1633-1636,1650-1654,1660,1667-1670,1679-1680,1682,1685,1693-1695,1700,1710-1711,1718,1729-1730,1733,1746-1747,1749,1756-1758
+  s_7a27f124c1e8e3::t_172e0258c2ad50 3,317,321-343,626,628,659,661,664,666,670,688,690,695,699,701,703,883-884,971,973,1039,1063-1068,1085,1095
+  s_7a27f124c1e8e3::t_999c03bad3dee0 1022-1026,1252
+  s_7a27f124c1e8e3::t_047b19a4d4acbe 1027
+extensions/git-integration/src/components/pr-review/diff-pane/rows.tsx
+  s_7a27f124c1e8e3::t_904739198c4401 228-234,246,252,366-367,371-377,381-385
+src/renderer/components/sidebar/ScratchSection.tsx
+  s_7a27f124c1e8e3::t_c41d4df7359344 26
+src/renderer/ExtensionWindowView.tsx
+  s_7a27f124c1e8e3::t_35cb1a964240a6 36-41
+tests/unit/renderer/components/ScheduledView.spec.tsx
+  s_7a27f124c1e8e3::t_fe53f003c43566 89
+  s_7a27f124c1e8e3::t_6597a6ba1d2596 310,318-320
+src/renderer/components/overview/OverviewScreen.tsx
+  s_7a27f124c1e8e3::t_e2997bd0e70c44 314
+tests/unit/packages/extension-ui/tabs.spec.tsx
+  s_7a27f124c1e8e3::t_735d13ca649256 166-167
+  s_7a27f124c1e8e3::t_c1c2e8fe980e82 195,197,200,211,213,215,223,227
+extensions/git-integration/src/components/merge-flow/ConflictHub.tsx
+  s_7a27f124c1e8e3::t_877ab8f9d8f7bb 195
+tests/unit/renderer/components/ContextMenu.spec.tsx
+  s_7a27f124c1e8e3::t_4c811a15a8b73b 41-44,49,61,63,91,107,116,118
+tests/unit/renderer/components/MetricsBar.spec.tsx
+  s_7a27f124c1e8e3::t_f6ba0cf7779a0c 7-8,27,76,87
+  s_7a27f124c1e8e3::t_976ee704875205 9-11
+extensions/git-integration/tests/unit/ChapterNav.spec.tsx
+  s_7a27f124c1e8e3::t_522e0a0a8c9e32 53,126,128,140,142,144,153,155,157
+extensions/foundry/tests/components/Orders.spec.tsx
+  s_7a27f124c1e8e3::t_94e56706c7fe72 115-116,131-132
+  s_7a27f124c1e8e3::t_5ab906f7360237 82,86-87,355,365-366
+extensions/git-integration/tests/unit/PrOverviewPanel.spec.tsx
+  s_7a27f124c1e8e3::t_57afd427a08b1e 407,412-416,455,654,656,664,710-714,725
+  s_7a27f124c1e8e3::t_0109326fe3becf 408,456,458
+  s_7a27f124c1e8e3::t_7e2a5c8adada18 648
+tests/unit/renderer/components/LivePreview.spec.tsx
+  s_7a27f124c1e8e3::t_975ab42de5fde3 34,36,46-47,49,55-56,65,67
+extensions/git-integration/tests/unit/CommentComposer.spec.tsx
+  s_7a27f124c1e8e3::t_877ab8f9d8f7bb 81-84,91-94
+tests/unit/renderer/components/IntegrationsSettings.spec.tsx
+  s_7a27f124c1e8e3::t_9c8a8e7776d8c4 37-38
+extensions/git-integration/tests/unit/OverviewSummary.spec.tsx
+  s_7a27f124c1e8e3::t_a9cc969e3b50dc 69-70,174,183
+extensions/git-integration/tests/unit/WhyThisFile.spec.tsx
+  s_7a27f124c1e8e3::t_fa0318abfd4414 125-126,131-133
+tests/unit/renderer/components/TaskList.spec.tsx
+  s_7a27f124c1e8e3::t_8edc848e8a70a6 152,162,210
+tests/unit/renderer/components/TerminalRow.spec.tsx
+  s_7a27f124c1e8e3::t_b40d6c28adc906 32-34,61-63,72-73,76,80-84,88-92,96-97,108,111,117-118,131,135,142-144,152-154,156,164,166,172,174-175,181-185
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_7a27f124c1e8e3::t_9d654fdff7029c 203-204,209-211,222-224,340,354-357,372,484,490,689,699,760,772
+extensions/foundry/tests/components/Forge.spec.tsx
+  s_7a27f124c1e8e3::t_4dc2e73c7cfcd1 779-781,787-789
+  s_7a27f124c1e8e3::t_924ae1cedf5093 1690
+  s_7a27f124c1e8e3::t_6e2a7db08ff7a5 184-185,487,498,777,841,1102,1151,1245-1248,1275,1691-1692,1765,1922,2103
+extensions/git-integration/tests/unit/AgentPanel.spec.tsx
+  s_7a27f124c1e8e3::t_f34c0cddc5554b 135,189-191,238
+extensions/remote-control/tests/unit/renderer/RemoteControlSettings.spec.tsx
+  s_7a27f124c1e8e3::t_de03c58b5d2a08 81,83
+extensions/task-vault/tests/components/DateTimePickerHalves.spec.tsx
+  s_7a27f124c1e8e3::t_aa6992c344dc72 23-24,26-27,56,59-60,117,119,126,132,149,157
+  s_7a27f124c1e8e3::t_6e2f536b4bb789 25,118,125
+extensions/notepad/tests/components/NoteList.spec.tsx
+  s_7a27f124c1e8e3::t_0f948bb065bc93 250,252,323
+  s_7a27f124c1e8e3::t_de03c58b5d2a08 279,286,301
+src/renderer/components/settings/WorkspaceSettings.tsx
+  s_7a27f124c1e8e3::t_95a92ab926fd8e 117,142,166,187,209
+tests/unit/packages/extension-ui/markdown.spec.tsx
+  s_7a27f124c1e8e3::t_f0c4b69e725d5b 3,24-26,34,47-49,56,62,68-71,81-84,101,112,128,136-137,146,153,158-159,168-171,176,186,268,296,302,312-313,315,354-356,379-386,417-419,431-433,440-441,443-444,457,459
+  s_7a27f124c1e8e3::t_f812058ed17cc1 86-89,260-262,274-276,319-329,332-340,344-347,397-398
+extensions/task-vault/tests/components/CalendarDrawerMonths.spec.tsx
+  s_7a27f124c1e8e3::t_d8695d5638f766 3
+  s_7a27f124c1e8e3::t_b5e08df1825da7 54,56,71,81
+extensions/git-integration/tests/unit/ReviewQueue.spec.tsx
+  s_7a27f124c1e8e3::t_522e0a0a8c9e32 377
+  s_7a27f124c1e8e3::t_999c03bad3dee0 286-290,360
+  s_7a27f124c1e8e3::t_466404e8a9363c 3,217-219,222-227,246,277,308,321,347,356,361-363,374-375,392-393
+  s_7a27f124c1e8e3::t_242a101a7daa4f 245,273,297,316,327,355,391
+extensions/task-vault/tests/components/AreasView.spec.tsx
+  s_7a27f124c1e8e3::t_370ba863bd6fe6 3,120,123-125,127-128,190
+  s_7a27f124c1e8e3::t_de03c58b5d2a08 192,244
+tests/unit/renderer/components/BreakoutWindowView.spec.tsx
+  s_7a27f124c1e8e3::t_6545a12f9828bc 3,43-48,51,92-95
+extensions/git-integration/tests/unit/PrReviewView.spec.tsx
+  s_7a27f124c1e8e3::t_7ae3968ff3eb4e 400-401
+  s_7a27f124c1e8e3::t_24799d41e99181 3
+extensions/git-integration/src/components/FileDiffView.tsx
+  s_7a27f124c1e8e3::t_4aec705685bf13 106
+tests/unit/renderer/components/PlanTheDay.spec.tsx
+  s_7a27f124c1e8e3::t_7a78cec26bf27a 153,162,165,167,194,208-209,335-337
+extensions/foundry/tests/components/factory/RunLog.spec.tsx
+  s_7a27f124c1e8e3::t_c1c2e8fe980e82 81
+extensions/task-vault/src/components/DailyLogTaskRow.tsx
+  s_7a27f124c1e8e3::t_d7647619e24590 314,611-613
+  s_7a27f124c1e8e3::t_e0c77a188a36a4 616
+extensions/git-integration/tests/unit/FileDiffView.spec.tsx
+  s_7a27f124c1e8e3::t_4aec705685bf13 3,72,74,79,82,102-108,134-138,156-160,165-176,181,183-184,197,199,211
+tests/unit/packages/extension-ui/popover.spec.tsx
+  s_7a27f124c1e8e3::t_c1c2e8fe980e82 72,75,93
+extensions/git-integration/src/components/pr-review/ReviewHeader.tsx
+  s_7a27f124c1e8e3::t_7ae3968ff3eb4e 152
+src/renderer/components/home/TicketsColumn.tsx
+  s_7a27f124c1e8e3::t_7a78cec26bf27a 175
+tests/unit/renderer/components/ExtensionPanelPortal.spec.tsx
+  s_7a27f124c1e8e3::t_a312d5de6b115c 104,106
+  s_7a27f124c1e8e3::t_e94eea16689adc 3
+packages/extension-ui/src/MetricCard.tsx
+  s_7a27f124c1e8e3::t_2865880a7579b6 28
+src/renderer/components/sidebar/BranchSelect.tsx
+  s_7a27f124c1e8e3::t_34902f48c4df48 119
+  s_7a27f124c1e8e3::t_e72cd75ab1e339 28-33,158,178
+extensions/notepad/tests/components/QuickCreateOverlay.spec.tsx
+  s_7a27f124c1e8e3::t_de03c58b5d2a08 40,60,73,89,92
+  s_7a27f124c1e8e3::t_443ab56286d1f5 33,95
+  s_7a27f124c1e8e3::t_6d4d49474cb0e3 30
+src/renderer/components/sidebar/InboxSidebar.tsx
+  s_7a27f124c1e8e3::t_ca8abc777b0df3 162
+tests/unit/renderer/PrReviewWindow.spec.tsx
+  s_7a27f124c1e8e3::t_35cb1a964240a6 60-62,67-68
+tests/unit/renderer/App.spec.tsx
+  s_7a27f124c1e8e3::t_f6ba0cf7779a0c 903-904,1902-1908,1913-1919,1926,1932-1938
+  s_7a27f124c1e8e3::t_12c6f396a0f563 1928,1930
+  s_7a27f124c1e8e3::t_ac60585b512d92 1945
+tests/unit/renderer/components/NotificationPanel.spec.tsx
+  s_7a27f124c1e8e3::t_4866cee872dcab 63,100,182-190
+extensions/git-integration/tests/unit/ManualEditor.spec.tsx
+  s_7a27f124c1e8e3::t_4a7d7588493203 40-41
+  s_7a27f124c1e8e3::t_c67f03c94c3b94 44-45,48-49,67-68,75,81,85-86,102-103,109,111,113,118-119,135,144
+extensions/notepad/tests/components/CommentMargin.spec.tsx
+  s_7a27f124c1e8e3::t_5e2be083cf0353 75-76,106,108-110
+tests/unit/renderer/components/ChoiceButtons.spec.tsx
+  s_7a27f124c1e8e3::t_4c811a15a8b73b 57
+extensions/notepad/tests/components/DiagramView.spec.tsx
+  s_7a27f124c1e8e3::t_443ab56286d1f5 187
+tests/unit/renderer/components/CloseSessionButton.spec.tsx
+  s_7a27f124c1e8e3::t_4c811a15a8b73b 61
+extensions/task-vault/tests/components/DatabaseAdmin.spec.tsx
+  s_7a27f124c1e8e3::t_de03c58b5d2a08 129
+  s_7a27f124c1e8e3::t_9a91bd043c0da5 194
+extensions/notepad/tests/components/NoteOutline.spec.tsx
+  s_7a27f124c1e8e3::t_dffe28450c1087 104-106,109
+extensions/git-integration/src/components/merge-flow/ConflictHeader.tsx
+  s_7a27f124c1e8e3::t_877ab8f9d8f7bb 63-68
+tests/unit/renderer/components/RunAsChoices.spec.tsx
+  s_7a27f124c1e8e3::t_fe53f003c43566 31-33
+  s_7a27f124c1e8e3::t_935bb82173104b 28
+extensions/git-integration/src/components/merge-flow/ResultPreviewStrip.tsx
+  s_7a27f124c1e8e3::t_4a7d7588493203 14,16,18
+tests/unit/packages/extension-ui/relative-time.spec.tsx
+  s_7a27f124c1e8e3::t_735d13ca649256 69-70,86
+  s_7a27f124c1e8e3::t_7da7106e08665b 3
+extensions/task-vault/src/components/DailyLogSubtasks.tsx
+  s_7a27f124c1e8e3::t_9ca62ad3ac73eb 125-129
+tests/unit/packages/extension-ui/behaviour-matrix.spec.tsx
+  s_7a27f124c1e8e3::t_735d13ca649256 87-88
+src/renderer/components/AboutDialog.tsx
+  s_7a27f124c1e8e3::t_76522eb069c56f 1,57,60-61
+tests/unit/ConfirmDialog.spec.tsx
+  s_7a27f124c1e8e3::t_6597a6ba1d2596 22,28,34-37
+extensions/task-vault/tests/components/TaskVaultView.spec.tsx
+  s_7a27f124c1e8e3::t_8bab0cbac2fd2b 212,344
+tests/unit/renderer/components/QuickActionsHost.spec.tsx
+  s_7a27f124c1e8e3::t_a4804172803da6 125
+tests/unit/packages/extension-ui/segmented-control.spec.tsx
+  s_7a27f124c1e8e3::t_c1c2e8fe980e82 61,64,79,91
+extensions/git-integration/tests/unit/KeepBothModal.spec.tsx
+  s_7a27f124c1e8e3::t_4a7d7588493203 41-43,51-52,63-64
+extensions/task-vault/tests/components/DailyLogDialogs.spec.tsx
+  s_7a27f124c1e8e3::t_5dc27c075c8046 16
+extensions/git-integration/src/components/pr-review/ReviewDashboard.tsx
+  s_7a27f124c1e8e3::t_53de0bc75d67cb 446,595
+tests/unit/renderer/components/UnifiedSidebar.spec.tsx
+  s_7a27f124c1e8e3::t_e1d0ed53b943cc 3,208-215,218-223,225-227,242-243,245,250,256-257,262-263,267,276-277,284-285,290-291,302-303,307,311-312,323-324,339-340,350-351,361-362,369-370,378-381,386-387,389-390,396-398,406-407,414-415,423-424,429-430,436-437,448,450,452,459-460,470-471,480-481,488,490,495,497,502,504,522-523,527-530,534,561-562,572-573,578-580,586-587,592-593,599-600,605-606,612-613,620-621,632-633,640-641,648-649,668-669,673-674,681-682,693-694,702,705,713-714,727,730,739-740,804,851-852,864-865,873,876,883,886,910-911,935-936,987-988,1009,1036,1038,1045,1047,1054,1056,1066,1068,1075,1077,1098-1099,1124-1125,1148-1149,1172-1173,1193,1195,1225,1227,1229,1239-1242,1244,1251-1252,1264,1267,1277,1279,1292,1294,1312,1314,1372,1375,1385-1392,1400-1402,1410-1412,1414,1420-1422,1431-1433,1445-1446,1458-1460,1469-1471,1489-1491,1500-1502,1504,1525-1526,1534-1535,1543-1544,1553-1554,1573-1574,1576,1589,1591-1592
+  s_7a27f124c1e8e3::t_6ab78bc9b6011a 202-206,535-536,807,811,813,819-820,825,831
+  s_7a27f124c1e8e3::t_74131cc7612911 216-217,268-271,1413
+  s_7a27f124c1e8e3::t_edc50b8b386754 207
+tests/unit/renderer/components/sidebar/InboxSidebar.spec.tsx
+  s_7a27f124c1e8e3::t_ca8abc777b0df3 57,62,64,197,199,215
+tests/unit/packages/extension-ui/toast.spec.tsx
+  s_7a27f124c1e8e3::t_c1c2e8fe980e82 19
+  s_7a27f124c1e8e3::t_735d13ca649256 3,90,113,134-138,142,147,153,155
+tests/unit/renderer/components/WallTile.spec.tsx
+  s_7a27f124c1e8e3::t_9ca62ad3ac73eb 89,233-234,242
+src/renderer/components/sidebar/UnifiedSidebar.tsx
+  s_7a27f124c1e8e3::t_c41d4df7359344 53-54,146-148
+extensions/git-integration/tests/unit/FullFileList.spec.tsx
+  s_7a27f124c1e8e3::t_85c6a638298229 117-119
+extensions/git-integration/tests/unit/ReviewPlan.spec.tsx
+  s_7a27f124c1e8e3::t_eab727cbf40b96 61-65,75
+extensions/notepad/tests/unit/editor/applyExternalDoc.spec.tsx
+  s_7a27f124c1e8e3::t_592a61e535069a 3,77-78
+extensions/foundry/src/components/Forge.tsx
+  s_7a27f124c1e8e3::t_080e3ee4e1d45d 329-333,343-349,1744-1745,1751,1757-1772,1774
+  s_7a27f124c1e8e3::t_4dc2e73c7cfcd1 1230,1420-1423,1575,1578
+  s_7a27f124c1e8e3::t_f74df053159ecf 1027,1226-1229,1576-1577,1579-1581,1688-1692,1705-1709,1773,1775
+extensions/git-integration/tests/unit/ReviewDashboard.spec.tsx
+  s_7a27f124c1e8e3::t_4b7b3eb6b732f7 162,238,245
+  s_7a27f124c1e8e3::t_522e0a0a8c9e32 326,329
+  s_7a27f124c1e8e3::t_963aecff4d9f60 154-156,183,185,225,227,370
+extensions/notepad/tests/components/NoteListActions.spec.tsx
+  s_7a27f124c1e8e3::t_4f06f08db79261 3
+  s_7a27f124c1e8e3::t_64faba62cc4123 71-73
+  s_7a27f124c1e8e3::t_d15d5a54c0d5e9 167-168,180,195,364-366,382
+extensions/notepad/tests/components/NoteWindowView.spec.tsx
+  s_7a27f124c1e8e3::t_dffe28450c1087 145,148
+extensions/task-vault/tests/components/InboxProcessor.spec.tsx
+  s_7a27f124c1e8e3::t_de03c58b5d2a08 91,111
+extensions/git-integration/src/components/pr-review/DiffSize.tsx
+  s_7a27f124c1e8e3::t_53de0bc75d67cb 82-83
+  s_7a27f124c1e8e3::t_4b7b3eb6b732f7 39
+tests/unit/renderer/components/RepoHeader.spec.tsx
+  s_7a27f124c1e8e3::t_e9466a9e76fdf2 3,35,43-49,53-55,60-62,66-67,76-77,84-87,91-92,106-110,116-117,121-122,130-131,136-137,175,184-185,188,195-197,210-212,222,232,241-242,250-251,259-261,266-267,276-278,287-288,292-293
+  s_7a27f124c1e8e3::t_571201d2eb1ff4 168
+  s_7a27f124c1e8e3::t_a4804172803da6 279
+extensions/notepad/tests/components/CommentComposer.spec.tsx
+  s_7a27f124c1e8e3::t_de03c58b5d2a08 91
+tests/unit/renderer/components/SidebarDialogs.spec.tsx
+  s_7a27f124c1e8e3::t_fe53f003c43566 40-42
+  s_7a27f124c1e8e3::t_a9e0806876e029 58
+tests/unit/packages/extension-ui/data-table.spec.tsx
+  s_7a27f124c1e8e3::t_735d13ca649256 148-150,157
+  s_7a27f124c1e8e3::t_c1c2e8fe980e82 106
+  s_7a27f124c1e8e3::t_63961a3dd6af11 138
+extensions/foundry/tests/components/Ledger.spec.tsx
+  s_7a27f124c1e8e3::t_2865880a7579b6 471-473,500-502,523-524
+  s_7a27f124c1e8e3::t_eda0a6ae0dfa72 2
+extensions/task-vault/src/components/DailyLog.tsx
+  s_7a27f124c1e8e3::t_f0b444b80bc31e 322-327,369
+extensions/task-vault/src/components/CalendarDrawer.tsx
+  s_7a27f124c1e8e3::t_e237c3ba30c9d9 183
+extensions/git-integration/src/components/pr-review/StatusChecksBar.tsx
+  s_7a27f124c1e8e3::t_89856955c19a68 147,149-150
+extensions/git-integration/tests/unit/ConflictResolver.spec.tsx
+  s_7a27f124c1e8e3::t_4a7d7588493203 101,189,191,205,208,250,259-260,266,275-278
+extensions/git-integration/src/components/pr-review/ReadinessStrip.tsx
+  s_7a27f124c1e8e3::t_21346fb02e47af 58
+tests/unit/packages/extension-ui/edges.spec.tsx
+  s_7a27f124c1e8e3::t_c1c2e8fe980e82 73
+  s_7a27f124c1e8e3::t_735d13ca649256 56,61
+extensions/notepad/src/components/NotepadView.tsx
+  s_7a27f124c1e8e3::t_443ab56286d1f5 576,586-592,594-598,600-605,607-609
+  s_7a27f124c1e8e3::t_6ea9f51ccc8301 593,599,606
+  s_7a27f124c1e8e3::t_ba61d5cc36063f 610-611
+extensions/task-vault/tests/components/DateTimePicker.spec.tsx
+  s_7a27f124c1e8e3::t_49cb0beb5b30b2 74-75,79-80,86-87,93-94,98,149,249
+  s_7a27f124c1e8e3::t_85a5fc0ae365e6 252
+  s_7a27f124c1e8e3::t_cdc95f45cbb626 3,29-33,42,49,57,99,140,142,151,206,208,216,220-221,257,259,264,266
+extensions/task-vault/tests/components/DailyLog.spec.tsx
+  s_7a27f124c1e8e3::t_667195fa0dd7a1 35,75-77,85,114-116,118,123-125,146,163,238,324,331
+extensions/task-vault/tests/components/DailyLogSubtasks.spec.tsx
+  s_7a27f124c1e8e3::t_9ca62ad3ac73eb 26,308
+tests/unit/renderer/hooks/useSurfaceOpen.spec.tsx
+  s_7a27f124c1e8e3::t_a1bc5c3c51e3fa 2,15
+extensions/notepad/tests/components/SearchOverlay.spec.tsx
+  s_7a27f124c1e8e3::t_de03c58b5d2a08 71
+tests/unit/renderer/components/IssueDrawer.spec.tsx
+  s_7a27f124c1e8e3::t_7f13ee601e7399 92-93,105,119-120,146,257-258
+extensions/git-integration/tests/unit/PropertiesRail.spec.tsx
+  s_7a27f124c1e8e3::t_7ae3968ff3eb4e 110-117
+src/renderer/components/terminal/TabBar.tsx
+  s_7a27f124c1e8e3::t_ce51860bc19990 281,329-331,359
+extensions/foundry/tests/components/PlanReader.spec.tsx
+  s_7a27f124c1e8e3::t_94e56706c7fe72 73
+tests/unit/packages/extension-ui/menu.spec.tsx
+  s_7a27f124c1e8e3::t_c1c2e8fe980e82 34,43,45,47,54,56,70,72,112
+tests/unit/renderer/components/ThreadDrawer.spec.tsx
+  s_7a27f124c1e8e3::t_8edc848e8a70a6 98
+extensions/git-integration/tests/unit/StatusChecksBar.spec.tsx
+  s_7a27f124c1e8e3::t_89856955c19a68 3,23,92-93,182-185
+extensions/task-vault/src/components/SmartTaskInput.tsx
+  s_7a27f124c1e8e3::t_2117f00f9d75ec 297,354
+eslint.config.mjs
+  s_7a27f124c1e8e3::t_e46fe6947dbfd2 371-372
+tests/unit/renderer/components/SessionLinkDialog.spec.tsx
+  s_7a27f124c1e8e3::t_a9e0806876e029 151
+extensions/task-vault/tests/components/SmartTaskInput.spec.tsx
+  s_7a27f124c1e8e3::t_2117f00f9d75ec 57-60,130,175,177,209,229,258
+  s_7a27f124c1e8e3::t_3759d023b07d53 3
+extensions/git-integration/tests/unit/review-queue-ux.spec.tsx
+  s_7a27f124c1e8e3::t_466404e8a9363c 99
+tests/unit/renderer/components/QuickActionsSettings.spec.tsx
+  s_7a27f124c1e8e3::t_f7d8dd7bdf257a 278-279,290-291
+extensions/git-integration/tests/unit/ReviewHeader.spec.tsx
+  s_7a27f124c1e8e3::t_7ae3968ff3eb4e 165,173-175
+  s_7a27f124c1e8e3::t_273572fde11477 3
+extensions/foundry/src/components/factory/StationMonitor.tsx
+  s_7a27f124c1e8e3::t_3b88d82451e695 223,233-246
+  s_7a27f124c1e8e3::t_cab672a0a5bb8e 247-249,296
+extensions/git-integration/tests/unit/ReviewInspector.spec.tsx
+  s_7a27f124c1e8e3::t_522e0a0a8c9e32 160
+  s_7a27f124c1e8e3::t_491c42f9d3824f 165,227
+tests/unit/renderer/components/UnifiedSidebarTasks.spec.tsx
+  s_7a27f124c1e8e3::t_554e421112e005 108-111,115,119
+  s_7a27f124c1e8e3::t_e401c19bf0757f 96-107,123,125,131,133,148-149,156
+extensions/task-vault/tests/components/TaskDetailPanel.spec.tsx
+  s_7a27f124c1e8e3::t_de03c58b5d2a08 139,152
+tests/unit/packages/extension-ui/modal-shell.spec.tsx
+  s_7a27f124c1e8e3::t_c1c2e8fe980e82 98,123,160,188
+  s_7a27f124c1e8e3::t_735d13ca649256 16,19
+extensions/git-integration/src/components/pr-review/OverviewSummary.tsx
+  s_7a27f124c1e8e3::t_a9cc969e3b50dc 65,77,88,126-130
+extensions/git-integration/src/components/pr-review/PropertiesRail.tsx
+  s_7a27f124c1e8e3::t_7ae3968ff3eb4e 24
+src/renderer/components/NotificationPanel.tsx
+  s_7a27f124c1e8e3::t_4866cee872dcab 10-15,17-22
+tests/unit/renderer/components/GlobalSettings.spec.tsx
+  s_7a27f124c1e8e3::t_3ae3afb7d3b4d6 230-231
+extensions/git-integration/src/components/pr-review/PrOverviewPanel.tsx
+  s_7a27f124c1e8e3::t_57afd427a08b1e 422-426
+extensions/git-integration/src/components/StagingArea.tsx
+  s_7a27f124c1e8e3::t_89856955c19a68 6,57-59
+  s_7a27f124c1e8e3::t_efe99b7f00ff22 155,157
+tests/unit/renderer/components/QuickActions.spec.tsx
+  s_7a27f124c1e8e3::t_a4804172803da6 294
+  s_7a27f124c1e8e3::t_0a48545f062d54 47-50,95-96,277-278,296-298,382-384,435-436
+  s_7a27f124c1e8e3::t_da1a05b6814b0e 437,444
+extensions/git-integration/tests/unit/FileHeader.spec.tsx
+  s_7a27f124c1e8e3::t_85c6a638298229 4,75,78
+extensions/git-integration/tests/unit/GitFullView.spec.tsx
+  s_7a27f124c1e8e3::t_522e0a0a8c9e32 409,411,420,463
+extensions/task-vault/src/components/AreasView.tsx
+  s_7a27f124c1e8e3::t_370ba863bd6fe6 278-280,316-325
+src/renderer/components/session/LivePreview.tsx
+  s_7a27f124c1e8e3::t_975ab42de5fde3 60-66
+extensions/foundry/tests/components/needs-you.spec.tsx
+  s_7a27f124c1e8e3::t_e2997bd0e70c44 300-303,312-315
+  s_7a27f124c1e8e3::t_ba54956da07699 112-113,180,260-265
+  s_7a27f124c1e8e3::t_1e2616b7114254 2
+tests/unit/renderer/components/Insights.spec.tsx
+  s_7a27f124c1e8e3::t_9c8a8e7776d8c4 94
+tests/unit/renderer/components/TabBarTasks.spec.tsx
+  s_7a27f124c1e8e3::t_f2dabcdb8c3267 137,139
+  s_7a27f124c1e8e3::t_35cb1a964240a6 3
+tests/unit/renderer/usage/track-surfaces.spec.tsx
+  s_7a27f124c1e8e3::t_4c280cf7856b32 1
+  s_7a27f124c1e8e3::t_a1bc5c3c51e3fa 145
+extensions/git-integration/tests/unit/RepoPicker.spec.tsx
+  s_7a27f124c1e8e3::t_491c42f9d3824f 162
+extensions/git-integration/tests/unit/ConflictHub.spec.tsx
+  s_7a27f124c1e8e3::t_877ab8f9d8f7bb 64-65,114
+src/renderer/components/settings/IntegrationsSettings.tsx
+  s_7a27f124c1e8e3::t_9c8a8e7776d8c4 323
+tests/unit/renderer/components/home/HomeTasksLayout.spec.tsx
+  s_7a27f124c1e8e3::t_9ca62ad3ac73eb 112
+  s_7a27f124c1e8e3::t_fe53f003c43566 260
+tests/unit/renderer/components/MoveSessionDialog.spec.tsx
+  s_7a27f124c1e8e3::t_4866cee872dcab 176
+tests/unit/renderer/components/OverviewScreen.spec.tsx
+  s_7a27f124c1e8e3::t_e2997bd0e70c44 131-133,159,165,188-189
+extensions/foundry/tests/components/factory/FactorySite.spec.tsx
+  s_7a27f124c1e8e3::t_55ecc9aeb361f0 4
+  s_7a27f124c1e8e3::t_b20057c983059e 133,181,187,203,205-208,267-268,309
+extensions/foundry/tests/components/GateCard.spec.tsx
+  s_7a27f124c1e8e3::t_279ce2ec8bedd1 2
+  s_7a27f124c1e8e3::t_6227bf2417f315 131,133-136
+extensions/notepad/src/components/NoteOutline.tsx
+  s_7a27f124c1e8e3::t_dffe28450c1087 28
+tests/unit/renderer/components/ErrorBoundary.spec.tsx
+  s_7a27f124c1e8e3::t_c74382dd31cd8f 93-94
+tests/unit/renderer/components/InFlight.spec.tsx
+  s_7a27f124c1e8e3::t_a4804172803da6 198
+  s_7a27f124c1e8e3::t_2cc0bb2f8113bc 203
+src/renderer/components/QuickActions.tsx
+  s_7a27f124c1e8e3::t_0a48545f062d54 507
+extensions/notepad/src/editor/NoteEditor.tsx
+  s_7a27f124c1e8e3::t_443ab56286d1f5 183,185
+extensions/foundry/tests/components/orders-seed-and-end.spec.tsx
+  s_7a27f124c1e8e3::t_94e56706c7fe72 116
+  s_7a27f124c1e8e3::t_8773ccc2a7891f 101-103
+src/renderer/components/sidebar/RepoHeader.tsx
+  s_7a27f124c1e8e3::t_e9466a9e76fdf2 102-105,176
+  s_7a27f124c1e8e3::t_571201d2eb1ff4 112,123-131
+  s_7a27f124c1e8e3::t_7d0edf380cd35b 132-134
+tests/unit/renderer/components/WorkspaceSettings.spec.tsx
+  s_7a27f124c1e8e3::t_95a92ab926fd8e 53,103,269
+extensions/git-integration/src/components/pr-review/ReviewDiffPane.tsx
+  s_7a27f124c1e8e3::t_904739198c4401 380
+extensions/git-integration/tests/unit/InlineCommentThread.spec.tsx
+  s_7a27f124c1e8e3::t_85c6a638298229 63-65
+extensions/git-integration/tests/unit/ViewMenu.spec.tsx
+  s_7a27f124c1e8e3::t_fa0318abfd4414 76
+  s_7a27f124c1e8e3::t_ecd760da00c43c 3,80
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_7a27f124c1e8e3::t_34902f48c4df48 808-810
+  s_7a27f124c1e8e3::t_ab359e8a4f8054 3
+  s_7a27f124c1e8e3::t_7ed10da2226d8a 805-806,811
+extensions/git-integration/tests/unit/PrDialog.spec.tsx
+  s_7a27f124c1e8e3::t_a9cc969e3b50dc 47,54-55,63-67
+  s_7a27f124c1e8e3::t_872c7015576b61 3
+extensions/notepad/src/components/NoteList.tsx
+  s_7a27f124c1e8e3::t_d15d5a54c0d5e9 432-436,483,486
+extensions/git-integration/src/components/merge-flow/ConflictPanel.tsx
+  s_7a27f124c1e8e3::t_4a7d7588493203 180
+tests/unit/DiffView.spec.tsx
+  s_7a27f124c1e8e3::t_6597a6ba1d2596 1,20-28,31-37,41-46,65-66,70-72
+extensions/git-integration/tests/unit/StagingArea.spec.tsx
+  s_7a27f124c1e8e3::t_89856955c19a68 97,253-254
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_7a27f124c1e8e3::t_8bab0cbac2fd2b 239,661-665
+tests/unit/renderer/components/BranchRow.spec.tsx
+  s_7a27f124c1e8e3::t_963aecff4d9f60 37-43,59,63-64,73-75,82-86,98-99,104,108-109,113-115,123-124,131-133,137-139,146-147,162-163,169-170,178-179,189-190,192,198-199,225-226,232-233,240-241,243,255-256,258,267,271,280-281,290-292,321-322,329-330,341-342,344,354-355,357,369-370,372,380-381,383,391-392,398-399,406-407,410,417-418,427-428,436-437,441,449,452,456-457,471-472,497-498,501,507-508,510
+extensions/task-vault/tests/components/ArchiveView.spec.tsx
+  s_7a27f124c1e8e3::t_de03c58b5d2a08 50
+extensions/git-integration/src/components/pr-review/WhyThisFile.tsx
+  s_7a27f124c1e8e3::t_fa0318abfd4414 194-195
+extensions/foundry/tests/components/App.spec.tsx
+  s_7a27f124c1e8e3::t_94e56706c7fe72 445-446,477-478
+extensions/task-vault/tests/components/DailyLogTaskRow.spec.tsx
+  s_7a27f124c1e8e3::t_e79b9ea0770009 82,241,289,318-319,330
+src/renderer/components/home/PlanTheDay.tsx
+  s_7a27f124c1e8e3::t_7a78cec26bf27a 144,165
+tests/unit/renderer/components/home/TaskRow.spec.tsx
+  s_7a27f124c1e8e3::t_55ecc9aeb361f0 3
+  s_7a27f124c1e8e3::t_f640c0652c0234 113,179,181-183
+  s_7a27f124c1e8e3::t_0d2a12cd267896 139-140
+extensions/git-integration/src/components/merge-flow/KeepBothModal.tsx
+  s_7a27f124c1e8e3::t_4a7d7588493203 210-214
+extensions/git-integration/tests/unit/ReadinessStrip.spec.tsx
+  s_7a27f124c1e8e3::t_21346fb02e47af 61-62,181,189-191,194
+  s_7a27f124c1e8e3::t_73a216f009922e 5
+extensions/notepad/tests/components/NotepadView.spec.tsx
+  s_7a27f124c1e8e3::t_443ab56286d1f5 226
+  s_7a27f124c1e8e3::t_198e7417e71b50 120,196,198,279-281,291,301
+tests/unit/packages/extension-ui/desk.spec.tsx
+  s_7a27f124c1e8e3::t_c1c2e8fe980e82 199
+  s_7a27f124c1e8e3::t_9ee5fe26ea5b7f 44-46,56-57,68-71,91,118-119,123-124,213-215,217
+  s_7a27f124c1e8e3::t_94e56706c7fe72 188
+  s_7a27f124c1e8e3::t_5ce88fff01247e 212
+extensions/git-integration/tests/unit/ReviewFooter.spec.tsx
+  s_7a27f124c1e8e3::t_eab727cbf40b96 70-72,82
+extensions/git-integration/src/components/pr-review/DiffLineRows.tsx
+  s_7a27f124c1e8e3::t_904739198c4401 189,235
+extensions/foundry/src/components/Floor.tsx
+  s_7a27f124c1e8e3::t_190e4d54844a09 1045,1104-1105,1186,1334-1335
+extensions/foundry/src/components/factory/FactoryHall.tsx
+  s_7a27f124c1e8e3::t_dad56a9b18d0b7 892-896,990,997,1000,1022,1253
+extensions/foundry/src/components/factory/FactorySite.tsx
+  s_7a27f124c1e8e3::t_0ae86c07edf53a 125,142,160
+extensions/foundry/tests/components/Floor.spec.tsx
+  s_7a27f124c1e8e3::t_50c2ae70ed3da0 498-499,652-653,827,915-917,1035-1036,1041,1140,1148,1354-1355,1360-1361,1434-1435,1660-1661,1673,1724-1726,1766-1770,1781-1782,1791
+extensions/foundry/tests/components/GateEvidence.spec.tsx
+  s_7a27f124c1e8e3::t_0509460150f897 50,53
+extensions/foundry/tests/components/Inbox.spec.tsx
+  s_7a27f124c1e8e3::t_00b19fb9fbe4ae 364,448-450
+extensions/foundry/tests/components/ReasonButton.spec.tsx
+  s_7a27f124c1e8e3::t_e6a0ef70aa92bf 69-73,108-111
+extensions/foundry/tests/components/factory/HallScene.spec.tsx
+  s_7a27f124c1e8e3::t_e15501b46e8c13 176
+extensions/foundry/tests/components/factory/StationMonitor.spec.tsx
+  s_7a27f124c1e8e3::t_100d5460f8ce93 3,53-56,116,121,134,148,156,161,184-186,209,220,233,302
+extensions/foundry/tests/components/forge-moves.spec.tsx
+  s_7a27f124c1e8e3::t_db5f3804526d4d 108-109,173-174,229
+extensions/foundry/tests/components/order-document.spec.tsx
+  s_7a27f124c1e8e3::t_2b9c512376ab0d 165
+extensions/git-integration/src/components/contributions/Heatmap.tsx
+  s_7a27f124c1e8e3::t_65276b28574283 46,88,103,108
+extensions/git-integration/src/components/pr-review/ViewMenu.tsx
+  s_7a27f124c1e8e3::t_9f00cca7e73a35 161
+extensions/git-integration/tests/unit/ChapterFileList.spec.tsx
+  s_7a27f124c1e8e3::t_9b8ce35cbe77a3 74,82-84,149,153,157,162
+extensions/git-integration/tests/unit/CompletionScreen.spec.tsx
+  s_7a27f124c1e8e3::t_bdccc59ee81830 144
+extensions/git-integration/tests/unit/ContributionsSection.spec.tsx
+  s_7a27f124c1e8e3::t_9ac1938dfc3536 109-112,118-119,125-128,137-139
+extensions/git-integration/tests/unit/UsesPopover.spec.tsx
+  s_7a27f124c1e8e3::t_04158d8882e529 15
+extensions/task-vault/src/components/ProjectsBrowser.tsx
+  s_7a27f124c1e8e3::t_c90ec31ed115f6 212,216-217,273-278,993,995
+extensions/task-vault/tests/components/ProjectsBrowser.spec.tsx
+  s_7a27f124c1e8e3::t_44f0572f9d21b3 55,223,225,227,370-371
+src/renderer/components/ExtensionPanelPortal.tsx
+  s_7a27f124c1e8e3::t_2542fdb69b5c1b 212-213
+src/renderer/components/agent/Composer.tsx
+  s_7a27f124c1e8e3::t_5e203ca010e6f9 418-419
+src/renderer/components/home/WeekCard.tsx
+  s_7a27f124c1e8e3::t_4340a7970ae57d 75
+src/renderer/components/overview/MetricsBar.tsx
+  s_7a27f124c1e8e3::t_c9845fea254416 24,51,77-81
+src/renderer/components/sidebar/BranchRow.tsx
+  s_7a27f124c1e8e3::t_e33a399111e2c4 133,221
+src/renderer/components/sidebar/workspace-form.tsx
+  s_7a27f124c1e8e3::t_6f2bcd63b87cfb 190-191
+src/renderer/components/terminal/SplitContainer.tsx
+  s_7a27f124c1e8e3::t_624709a755b738 74-75
+src/renderer/components/terminal/TerminalPane.tsx
+  s_7a27f124c1e8e3::t_d3b5dcf2e33501 242
+tests/unit/packages/extension-ui/button.spec.tsx
+  s_7a27f124c1e8e3::t_a1486d8696b527 73
+tests/unit/packages/extension-ui/empty-state.spec.tsx
+  s_7a27f124c1e8e3::t_c7ad0ef0dc85cf 82,166
+tests/unit/renderer-remote/mobile/MobileTerminalList.spec.tsx
+  s_7a27f124c1e8e3::t_a554c7292e2abe 128,148,197,215,234,292-293,356
+tests/unit/renderer/agent/AgentView.spec.tsx
+  s_7a27f124c1e8e3::t_bb4cfdc0486d5d 146-148,310-312,314,320,338-340,363,416,423,530
+tests/unit/renderer/agent/Composer.spec.tsx
+  s_7a27f124c1e8e3::t_eabf8b46501386 81
+tests/unit/renderer/agent/cite.spec.tsx
+  s_7a27f124c1e8e3::t_8279acaff43bf9 88,174
+tests/unit/renderer/components/AboutDialog.spec.tsx
+  s_7a27f124c1e8e3::t_8469ca2f021205 79-80,105,118
+tests/unit/renderer/components/AlertBadge.spec.tsx
+  s_7a27f124c1e8e3::t_b713cc7731ba33 8-10,43-44
+tests/unit/renderer/components/AppBand.spec.tsx
+  s_7a27f124c1e8e3::t_fca6b1e37c9ca3 3,40-42,47,68,71,77,84,104,130
+tests/unit/renderer/components/BranchSelect.spec.tsx
+  s_7a27f124c1e8e3::t_0154b97f7557f9 85,149,153
+tests/unit/renderer/components/CreateWorkspaceDialog.spec.tsx
+  s_7a27f124c1e8e3::t_98954edb363608 130-134
+tests/unit/renderer/components/HomeScreen.spec.tsx
+  s_7a27f124c1e8e3::t_cf8cbc92be3151 222,235,248,260,304-305,307,327,329,403,418,563,569,585
+tests/unit/renderer/components/IssueDetails.spec.tsx
+  s_7a27f124c1e8e3::t_db34f8a0e9906a 58
+tests/unit/renderer/components/LeafPane.spec.tsx
+  s_7a27f124c1e8e3::t_229ddcae4aeb50 32-34,83,85-86,89,91-92,99-100,102,110-111,118,120,131,133,140,144,168-169,175,178,213,216
+tests/unit/renderer/components/SplitContainer.spec.tsx
+  s_7a27f124c1e8e3::t_5fc18390937a2e 33,43,45-46,68,70-71,76-82
+tests/unit/renderer/components/StartWork.spec.tsx
+  s_7a27f124c1e8e3::t_67733216dff803 201,239,264,301,306,621,721,749
+tests/unit/renderer/components/StateChip.spec.tsx
+  s_7a27f124c1e8e3::t_2ad2b54048681d 18,32-36
+tests/unit/renderer/components/StateGlyph.spec.tsx
+  s_7a27f124c1e8e3::t_c4caa148536ed5 16,21-22
+tests/unit/renderer/components/TabBar.spec.tsx
+  s_7a27f124c1e8e3::t_bb3f4ed3a353d7 2-3,104-105,109,267,353,406,418,430,441,454,475,490,503,518,549-550,568-574,580-585,590-591,600,633-634,641-642,647-648,897
+tests/unit/renderer/components/TerminalPane.spec.tsx
+  s_7a27f124c1e8e3::t_9198e27d957c9c 2,118-119,134-135,152-153,167,170,355,448-450,462-466
+tests/unit/renderer/components/ToastContainer.spec.tsx
+  s_7a27f124c1e8e3::t_275952454ee7a9 24
+tests/unit/renderer/components/TodayRail.spec.tsx
+  s_7a27f124c1e8e3::t_7b0a919b3e8b98 170,174,189,193-196
+tests/unit/renderer/components/UsageScreen.spec.tsx
+  s_7a27f124c1e8e3::t_57ca71ef6c9a84 145
+tests/unit/renderer/components/extension-surfaces.spec.tsx
+  s_7a27f124c1e8e3::t_7f6fab747480a2 131-133,148-149,156-158,167-168,174-175
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bfe3a3aeba77470baf0b269714f702a340f294f2",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
