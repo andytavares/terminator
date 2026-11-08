@@ -1,0 +1,19 @@
+scripts/test-select.mjs
+  s_7a27f124c1e8e3::t_335032a8eb93ea 189,192-198,272-278,292,298
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "40abfa7f8f5b12839cad34fcfd915d19bc911fee",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
