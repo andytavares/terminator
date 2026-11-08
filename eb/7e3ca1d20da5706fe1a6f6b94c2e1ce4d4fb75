@@ -1,0 +1,20 @@
+CLAUDE.md
+  s_56e599e17e5b82::t_4b3b7025e371cc 4-7
+  s_56e599e17e5b82::t_65529adf73900b 4-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "eb7e3ca1d20da5706fe1a6f6b94c2e1ce4d4fb75",
+  "prompts": {},
+  "sessions": {
+    "s_56e599e17e5b82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6c95cc7-f1de-49bf-a858-16efb95c5329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,149 @@
+docs/research/code-review-revamp.html
+  s_56e599e17e5b82::t_421ddc49f40fab 2381,2515,2914
+docs/research/forge-shaping-redesign/renderings.html
+  s_56e599e17e5b82::t_4747b934911de4 1407,1425,1455,2767
+docs/research/foundry-paved-paths.html
+  s_56e599e17e5b82::t_546b86493dca2e 433,1152
+docs/research/review-screen-declutter.md
+  s_56e599e17e5b82::t_e511aaf2aad8df 76
+docs/research/session-surface-repairs.md
+  s_56e599e17e5b82::t_3eaceb1001c154 34-35,38-42
+docs/user-guide/USER-GUIDE.md
+  s_56e599e17e5b82::t_ffe257d1253c5f 1062
+extensions/foundry/src/components/Floor.tsx
+  s_56e599e17e5b82::t_f6e1aff162ecd6 293,954-956
+extensions/foundry/src/components/foundry.css
+  s_56e599e17e5b82::t_2c6142fa914147 3456-3457
+extensions/foundry/src/forge/converge.ts
+  s_56e599e17e5b82::t_c855b38be10a4d 354
+extensions/foundry/src/ipc/forge-channels.ts
+  s_56e599e17e5b82::t_e97d7d9abce905 41
+extensions/foundry/src/ipc/ui-registration.ts
+  s_56e599e17e5b82::t_87f4257b198d7a 125
+extensions/foundry/src/trackers/write-back.ts
+  s_56e599e17e5b82::t_99ed5057a23dc4 42
+tests/unit/storage/extension-settings-store.spec.ts
+  s_56e599e17e5b82::t_f02b21fae7698c 34-35,40-41,49-50,59-60,89-90,104-107
+tests/unit/storage/settings-store.spec.ts
+  s_56e599e17e5b82::t_c27aef0bd37546 52-53,65-66,81-82,93-94,101-102,119-120,131-132,154-155,157-158
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_b2c599c3ca530f::t_7e5695a07357cc 718
+extensions/foundry/tests/factory/sim.spec.ts
+  s_b2c599c3ca530f::t_d2aaa2964a2917 529
+extensions/foundry/tests/helpers/foundry-host.ts
+  s_b2c599c3ca530f::t_6847b483a512f2 134-139
+extensions/foundry/tests/runtime/supervision-console.spec.ts
+  s_b2c599c3ca530f::t_ea7128359299fa 21-22
+extensions/git-integration/src/api/git.ts
+  s_b2c599c3ca530f::t_fa680e8a1b3893 10
+extensions/git-integration/src/schemas/git.schema.ts
+  s_56e599e17e5b82::t_565b02f0e4ae5f 4
+extensions/git-integration/tests/unit/diff-items.spec.ts
+  s_56e599e17e5b82::t_e76c047c3b4de1 93-97
+extensions/git-integration/tests/unit/lazy-store.spec.ts
+  s_56e599e17e5b82::t_25af9f4805818a 34-35
+extensions/notepad/src/components/noteListModel.ts
+  s_56e599e17e5b82::t_059779eb990e87 12
+extensions/remote-control/tests/unit/helpers/fake-pty-manager.ts
+  s_56e599e17e5b82::t_9dcbae7062bb1e 123-124
+extensions/remote-control/tests/unit/lazy-server.spec.ts
+  s_56e599e17e5b82::t_e7580c343ef810 46-49
+extensions/task-vault/src/components/TaskVaultView.tsx
+  s_56e599e17e5b82::t_5eb99c89680efa 458
+extensions/task-vault/src/vault/types.ts
+  s_56e599e17e5b82::t_980153f4629aa0 2
+packages/extension-sdk/types/api.d.ts
+  s_56e599e17e5b82::t_9878be25543216 333
+packages/extension-ui/src/Button.tsx
+  s_56e599e17e5b82::t_3316910650f518 8-11
+packages/extension-ui/src/IconButton.tsx
+  s_56e599e17e5b82::t_8ddf328eb7ea3d 7-10
+packages/extension-ui/src/controls.css
+  s_56e599e17e5b82::t_a02ca2b03d186f 16-25,35-43,69-79,89-95
+scripts/e2e-select.mjs
+  s_56e599e17e5b82::t_28390594c3e630 131
+scripts/perf/git-integration.mts
+  s_56e599e17e5b82::t_51541e35112a24 52-53
+src/extension-frame/frame-shim.ts
+  s_56e599e17e5b82::t_906b3e1816a7b1 65
+src/main/app-updater.ts
+  s_56e599e17e5b82::t_0ed17628dc7349 102
+src/main/mcp/app-tools.ts
+  s_56e599e17e5b82::t_e521eeb8acdff3 56-62
+src/renderer/components/home/ThreadDrawerAddLane.tsx
+  s_b2c599c3ca530f::t_385e8d6b275591 19-20
+src/renderer/components/home/desk-search.ts
+  s_56e599e17e5b82::t_7e7aa4c6fa1d1f 54-59
+src/renderer/components/home/useThreadSummary.ts
+  s_b2c599c3ca530f::t_ee5f2e9ef57666 7
+src/renderer/components/integrations/IssueDetails.tsx
+  s_b2c599c3ca530f::t_4d38bf6686f493 22
+src/renderer/components/sidebar/BranchSelect.tsx
+  s_b2c599c3ca530f::t_2f7b0e4e000783 133-136
+src/renderer/home/desk-order.ts
+  s_b2c599c3ca530f::t_ca59a1665ac2ae 5
+src/shared/electron-api/api-type.ts
+  s_b2c599c3ca530f::t_e0975d849203cd 25-27,30-32
+src/shared/electron-api/manifest.ts
+  s_b2c599c3ca530f::t_b8b2630bf718f1 116
+src/shared/usage/usage-state.ts
+  s_b2c599c3ca530f::t_1f6cab4a2eebab 4
+tests/e2e/leftover-processes.ts
+  s_b2c599c3ca530f::t_234757eb91200c 41,116
+tests/integration/ipc/terminal.ipc.spec.ts
+  s_b2c599c3ca530f::t_50be5af57d7eae 88-89,108-109
+tests/unit/agents/agent-session-watcher-arming.spec.ts
+  s_b2c599c3ca530f::t_48dbd4eb5b0b0c 34-35
+tests/unit/extensions/shell-scope-callers.spec.ts
+  s_b2c599c3ca530f::t_3176186856b373 163-164
+tests/unit/integrations/agent-context.spec.ts
+  s_b2c599c3ca530f::t_7028330c7c3005 14-15
+tests/unit/ipc/app.ipc.spec.ts
+  s_b2c599c3ca530f::t_ddaed44b99055d 29-30
+tests/unit/notifications/notification-manager.spec.ts
+  s_b2c599c3ca530f::t_c5d3c745f8794d 60-61,505-506
+tests/unit/renderer-remote/mobile/MobileControlToolbar.spec.tsx
+  s_b2c599c3ca530f::t_6709f5ec0fe1e3 7-8,16-17,25-26,36-37,45-46,54-55,65-66
+tests/unit/renderer-remote/mobile/MobileTerminalList.spec.tsx
+  s_b2c599c3ca530f::t_69757cec769782 24-25
+tests/unit/renderer-remote/mobile/MobileTerminalView.spec.tsx
+  s_b2c599c3ca530f::t_35ce40a7ef20ee 104-105,112-113,120-121,136-137,149-150,165-166,182-183,197-198,217-218,226-227,242-243,256-257,269-270,279-280
+tests/unit/renderer-remote/remote-client.spec.ts
+  s_b2c599c3ca530f::t_559ee8e8f4f827 150-151,163-164,174-175
+tests/unit/renderer/components/OverviewScreen.spec.tsx
+  s_b2c599c3ca530f::t_31c6d3b55a2f1d 301-302
+tests/unit/renderer/components/TerminalSession.spec.tsx
+  s_b2c599c3ca530f::t_f765b857d32a3e 141-142
+tests/unit/renderer/components/extension-surfaces.spec.tsx
+  s_b2c599c3ca530f::t_831381c7c0e25c 228-229
+tests/unit/renderer/quick-actions/shortcut-conflict-guard.spec.tsx
+  s_b2c599c3ca530f::t_944f8a28f23f3c 103-104
+tests/unit/renderer/stores/session-records.store.spec.ts
+  s_b2c599c3ca530f::t_e27f4640943447 5
+tests/unit/renderer/stores/workspace.store.spec.ts
+  s_b2c599c3ca530f::t_7578ba1ab284a1 747-748,758-759,780-781
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a8a15f19a28377140a336a0d7f0e164c2cfee2e4",
+  "prompts": {},
+  "sessions": {
+    "s_56e599e17e5b82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f6c95cc7-f1de-49bf-a858-16efb95c5329",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_b2c599c3ca530f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae19cc787e7a000c4",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
