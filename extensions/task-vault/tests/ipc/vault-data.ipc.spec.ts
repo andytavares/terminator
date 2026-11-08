@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { ExtensionDB } from '@terminator/extension-sdk'
-import { localDate } from '../../src/utils/local-date'
+import { setLocalClock } from '../support/clock'
 import {
   createIpcHarness,
   createVaultDb,
@@ -54,12 +54,13 @@ describe('task-vault settings and today_since', () => {
   })
 
   it('reset-today-since sets today_since to today', async () => {
+    setLocalClock('UTC', '2026-06-15T12:00:00.000Z')
     await seedTask(db, { id: 't1', todaySince: '2026-01-01' })
 
     expect(await harness.invoke('task-vault:vault:reset-today-since', { taskId: 't1' })).toEqual({
       success: true,
     })
-    expect(await selectTaskRow(db, 't1')).toMatchObject({ today_since: localDate() })
+    expect(await selectTaskRow(db, 't1')).toMatchObject({ today_since: '2026-06-15' })
   })
 })
 
@@ -174,7 +175,8 @@ function taskVaultVaultSetRecurrenceOccurrencesTests() {
 
 function taskVaultVaultSetRecurrenceOccurrencesSpawnsTheNextTests() {
   it('spawns the next occurrence as a linked open task', async () => {
-    await seedTask(db, { id: 'task-1', dueDate: localDate() })
+    setLocalClock('UTC', '2026-06-15T12:00:00.000Z')
+    await seedTask(db, { id: 'task-1', dueDate: '2026-06-15' })
 
     await setRecurrenceVia({ taskId: 'task-1', interval: 'daily' })
 
@@ -182,13 +184,14 @@ function taskVaultVaultSetRecurrenceOccurrencesSpawnsTheNextTests() {
       `SELECT * FROM tasks WHERE recurrence_template_id = 'task-1'`
     )
     expect(next).toMatchObject({ status: 'open', recurrence_rule: 'daily' })
-    expect((next?.due_date as string) > localDate()).toBe(true)
+    expect((next?.due_date as string) > '2026-06-15').toBe(true)
   })
 }
 
 function taskVaultVaultSetRecurrenceOccurrencesReplacesTheFutureTests() {
   it('replaces the future occurrences of an earlier rule', async () => {
-    await seedTask(db, { id: 'task-1', dueDate: localDate() })
+    setLocalClock('UTC', '2026-06-15T12:00:00.000Z')
+    await seedTask(db, { id: 'task-1', dueDate: '2026-06-15' })
     await setRecurrenceVia({ taskId: 'task-1', interval: 'daily' })
     await setRecurrenceVia({ taskId: 'task-1', interval: 'monthly' })
 

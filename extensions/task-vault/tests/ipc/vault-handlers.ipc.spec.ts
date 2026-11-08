@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { ExtensionDB } from '@terminator/extension-sdk'
-import { localDate } from '../../src/utils/local-date'
 import {
   createIpcHarness,
   createVaultDb,
@@ -174,6 +173,7 @@ function migrationSubtaskTests(channel: string) {
 
 describe('task-vault:vault:restore-task', () => {
   it('moves the task to today, unlike reopen-task which keeps its source', async () => {
+    setLocalClock('UTC', '2026-06-15T12:00:00.000Z')
     await seedTask(db, { id: 'restored', status: 'cancelled', source: 'someday' })
     await seedTask(db, { id: 'reopened', status: 'cancelled', source: 'someday' })
 
@@ -182,7 +182,7 @@ describe('task-vault:vault:restore-task', () => {
 
     expect(await selectTaskRow(db, 'restored')).toMatchObject({
       source: 'daily',
-      source_ref: localDate(),
+      source_ref: '2026-06-15',
     })
     expect(await selectTaskRow(db, 'reopened')).toMatchObject({
       source: 'someday',
@@ -333,6 +333,7 @@ function taskVaultVaultCompleteTaskTests() {
 
 function taskVaultVaultCompleteTaskCompletingTests() {
   it('marks the task done with today as its completion date', async () => {
+    setLocalClock('UTC', '2026-06-15T12:00:00.000Z')
     await seedTask(db, { id: 'task-1' })
 
     expect(await harness.invoke('task-vault:vault:complete-task', { taskId: 'task-1' })).toEqual({
@@ -340,7 +341,7 @@ function taskVaultVaultCompleteTaskCompletingTests() {
     })
     expect(await selectTaskRow(db, 'task-1')).toMatchObject({
       status: 'done',
-      completed_date: localDate(),
+      completed_date: '2026-06-15',
     })
   })
 
@@ -363,11 +364,12 @@ function taskVaultVaultCompleteTaskCompletingTests() {
 
 function taskVaultVaultCompleteTaskRecurrenceTests() {
   it('spawns the next occurrence of a recurring task in the same transaction', async () => {
+    setLocalClock('UTC', '2026-06-15T12:00:00.000Z')
     await seedTask(db, {
       id: 'daily',
       source: 'daily',
-      sourceRef: localDate(),
-      dueDate: localDate(),
+      sourceRef: '2026-06-15',
+      dueDate: '2026-06-15',
       recurrenceRule: 'daily',
     })
 
@@ -377,7 +379,7 @@ function taskVaultVaultCompleteTaskRecurrenceTests() {
       `SELECT * FROM tasks WHERE recurrence_template_id = 'daily'`
     )
     expect(next).toMatchObject({ status: 'open', recurrence_rule: 'daily' })
-    expect((next?.due_date as string) > localDate()).toBe(true)
+    expect((next?.due_date as string) > '2026-06-15').toBe(true)
   })
 
   it('does not create a notification (the renderer owns that event)', async () => {
@@ -452,10 +454,11 @@ function taskVaultVaultGetTodayTests() {
 
 function taskVaultVaultGetTodayEmptyListingTests() {
   it("returns today's date and no tasks for an empty database", async () => {
+    setLocalClock('UTC', '2026-06-15T12:00:00.000Z')
     const result = await getTodayVia()
 
     expect(result).toMatchObject({
-      date: localDate(),
+      date: '2026-06-15',
       tasks: [],
       exists: false,
       rolledOver: 0,
@@ -464,8 +467,9 @@ function taskVaultVaultGetTodayEmptyListingTests() {
   })
 
   it("returns today's top-level tasks with their subtasks", async () => {
-    await seedTask(db, { id: 'today-1', source: 'daily', sourceRef: localDate() })
-    await seedTask(db, { id: 'sub', parentId: 'today-1', source: 'daily', sourceRef: localDate() })
+    setLocalClock('UTC', '2026-06-15T12:00:00.000Z')
+    await seedTask(db, { id: 'today-1', source: 'daily', sourceRef: '2026-06-15' })
+    await seedTask(db, { id: 'sub', parentId: 'today-1', source: 'daily', sourceRef: '2026-06-15' })
     await seedTask(db, { id: 'tomorrow', source: 'daily', sourceRef: '2999-01-01' })
 
     const result = await getTodayVia()
@@ -499,20 +503,21 @@ function taskVaultVaultGetTodayRollingOverTests() {
   it.each(['open', 'blocked', 'in-progress'])(
     'rolls a %s task from a past day over to today and marks the original migrated',
     async (status) => {
+      setLocalClock('UTC', '2026-06-15T12:00:00.000Z')
       await seedPastTaskWithSubtask(status)
       const result = await getTodayVia()
 
       expect(result.rolledOver).toBe(1)
       expect(await selectTaskRow(db, 'old')).toMatchObject({
         status: 'migrated',
-        migrated_to: localDate(),
+        migrated_to: '2026-06-15',
       })
-      expect(await selectTaskRow(db, 'old-sub')).toMatchObject({ source_ref: localDate() })
+      expect(await selectTaskRow(db, 'old-sub')).toMatchObject({ source_ref: '2026-06-15' })
       const [newId] = result.rolledOverIds
       expect(await selectTaskRow(db, newId)).toMatchObject({
         status: 'open',
         source: 'daily',
-        source_ref: localDate(),
+        source_ref: '2026-06-15',
         today_since: '2026-04-28',
       })
       expect(result.tasks.map((task) => task.id)).toContain(newId)

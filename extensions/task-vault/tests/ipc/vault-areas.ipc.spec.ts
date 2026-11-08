@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { ExtensionDB } from '@terminator/extension-sdk'
-import { localDate } from '../../src/utils/local-date'
+import { setLocalClock } from '../support/clock'
 import {
   createIpcHarness,
   createVaultDb,
@@ -466,6 +466,7 @@ function taskVaultVaultListSomedayListingTests() {
 
 function taskVaultVaultListSomedayMovingTodayTests() {
   it('moves a someday task and its subtasks to today and opens it', async () => {
+    setLocalClock('UTC', '2026-06-15T12:00:00.000Z')
     await seedTask(db, { id: 'parked', source: 'someday', status: 'cancelled' })
     await seedTask(db, { id: 'parked-sub', source: 'someday', parentId: 'parked' })
 
@@ -476,12 +477,12 @@ function taskVaultVaultListSomedayMovingTodayTests() {
     )
     expect(await selectTaskRow(db, 'parked')).toMatchObject({
       source: 'daily',
-      source_ref: localDate(),
+      source_ref: '2026-06-15',
       status: 'open',
     })
     expect(await selectTaskRow(db, 'parked-sub')).toMatchObject({
       source: 'daily',
-      source_ref: localDate(),
+      source_ref: '2026-06-15',
     })
   })
 }

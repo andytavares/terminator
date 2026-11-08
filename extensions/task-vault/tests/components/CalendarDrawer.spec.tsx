@@ -2,6 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, cleanup, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { setLocalClock } from '../support/clock'
 
 const mockInvoke = vi.fn()
 const mockLoadDate = vi.fn()
@@ -55,11 +56,8 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-function todayString(): string {
-  const today = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
-}
+// Every test runs at noon on this day: setLocalClock in calendarDrawerTests.
+const TODAY = '2026-01-15'
 
 function dayTask(id: string, text: string) {
   return { id, text, status: 'open', metadata: {}, terminatorLinks: [] }
@@ -83,6 +81,7 @@ describe('CalendarDrawer', calendarDrawerTests)
 
 function calendarDrawerTests() {
   beforeEach(() => {
+    setLocalClock('UTC', `${TODAY}T12:00:00.000Z`)
     mockInvoke.mockResolvedValue({ days: [] })
   })
 
@@ -116,7 +115,7 @@ function calendarDrawerMountingTests() {
 function calendarDrawerTodayTests() {
   it('navigates to today and shows task list when today cell is clicked', async () => {
     const user = userEvent.setup()
-    const todayStr = todayString()
+    const todayStr = TODAY
 
     answerDays([{ date: todayStr, status: 'open', count: 1 }], {
       date: todayStr,
@@ -143,7 +142,7 @@ function calendarDrawerTodayTests() {
 function calendarDrawerOpeningTaskTests() {
   it('invokes task-vault:open-panel with taskId when a task in the day panel is clicked', async () => {
     const user = userEvent.setup()
-    const todayStr = todayString()
+    const todayStr = TODAY
 
     answerDays([{ date: todayStr, status: 'done', count: 1 }], {
       date: todayStr,
@@ -188,7 +187,7 @@ function calendarDrawerMonthsTests() {
 
 function calendarDrawerRefreshingTests() {
   it('refreshes task list when task-vault:push:index-updated fires', async () => {
-    const todayStr = todayString()
+    const todayStr = TODAY
 
     answerDays([], { tasks: [dayTask('t1', 'Updated task')] })
 

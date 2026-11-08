@@ -5,6 +5,7 @@ const mockInvoke = vi.fn()
 
 import { useVaultDataStore } from '../../src/stores/vault-data.store'
 import { useVaultNavStore } from '../../src/stores/vault-nav.store'
+import { setLocalClock } from '../support/clock'
 
 function resetStores() {
   vi.stubGlobal('window', {
@@ -60,14 +61,13 @@ function tickCalendarTests() {
 
 function loadTodayTests() {
   it('sets todayLog and updates viewingDate to today on success', async () => {
+    setLocalClock('UTC', '2026-06-10T12:00:00.000Z')
     const fakeLog = { date: '2026-06-09', tasks: [] }
     mockInvoke.mockResolvedValueOnce(fakeLog)
     await useVaultDataStore.getState().loadToday()
     expect(useVaultDataStore.getState().todayLog).toEqual(fakeLog)
     expect(useVaultDataStore.getState().isLoading).toBe(false)
-    const d = new Date()
-    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    expect(useVaultNavStore.getState().viewingDate).toBe(today)
+    expect(useVaultNavStore.getState().viewingDate).toBe('2026-06-10')
   })
 
   it('sets error when API returns error object', async () => {

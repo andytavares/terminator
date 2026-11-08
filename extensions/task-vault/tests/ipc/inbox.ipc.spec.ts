@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { ExtensionDB } from '@terminator/extension-sdk'
-import { localDate } from '../../src/utils/local-date'
+import { setLocalClock } from '../support/clock'
 import {
   createIpcHarness,
   createVaultDb,
@@ -57,17 +57,18 @@ function taskVaultVaultProcessInboxTrashDoNowTests() {
   })
 
   it('do-now moves the task and its subtasks to today and starts the task', async () => {
+    setLocalClock('UTC', '2026-06-15T12:00:00.000Z')
     expect(await processItem({ taskId: TASK_ID, action: 'do-now' })).toMatchObject({
       success: true,
     })
     expect(await selectTaskRow(db, TASK_ID)).toMatchObject({
       status: 'in-progress',
       source: 'daily',
-      source_ref: localDate(),
+      source_ref: '2026-06-15',
     })
     expect(await selectTaskRow(db, SUBTASK_ID)).toMatchObject({
       source: 'daily',
-      source_ref: localDate(),
+      source_ref: '2026-06-15',
     })
   })
 }
@@ -94,6 +95,7 @@ function taskVaultVaultProcessInboxSomedayTests() {
 
 function taskVaultVaultProcessInboxFilingExistingDestinationsTests() {
   it('file with an existing project destination links the task to that project', async () => {
+    setLocalClock('UTC', '2026-06-15T12:00:00.000Z')
     await seedProject(db, 'p-alpha', 'alpha')
 
     const result = await processItem({
@@ -106,7 +108,7 @@ function taskVaultVaultProcessInboxFilingExistingDestinationsTests() {
     expect(await selectTaskRow(db, TASK_ID)).toMatchObject({
       project_id: 'p-alpha',
       source: 'daily',
-      source_ref: localDate(),
+      source_ref: '2026-06-15',
     })
     expect(await selectTaskRow(db, SUBTASK_ID)).toMatchObject({ project_id: 'p-alpha' })
   })
