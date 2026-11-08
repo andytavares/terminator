@@ -1,0 +1,53 @@
+extensions/remote-control/tests/state/status.spec.ts
+  s_7a27f124c1e8e3::t_afcf3b0c815667 146,148-155
+extensions/notepad/tests/unit/ipc/search.ipc.spec.ts
+  s_7a27f124c1e8e3::t_3ee9ba48f4ea89 11,176-187
+extensions/notepad/tests/unit/ipc/folders.ipc.spec.ts
+  s_7a27f124c1e8e3::t_982da66a6c1022 69,73-78
+extensions/task-vault/tests/utils/local-date.spec.ts
+  s_7a27f124c1e8e3::t_db226343b9cd77 5
+extensions/notepad/tests/components/TableEditing.spec.tsx
+  s_7a27f124c1e8e3::t_ac2434dc834b03 5
+extensions/notepad/tests/unit/stores/notes.store.spec.ts
+  s_7a27f124c1e8e3::t_90273c8d513e65 53-59,70,131
+extensions/task-vault/tests/index.spec.ts
+  s_7a27f124c1e8e3::t_e96284e096b33d 101-110,116-117
+extensions/notepad/tests/components/ExportDialog.spec.tsx
+  s_7a27f124c1e8e3::t_c299a339830fcd 57,61-62,67-71,73
+extensions/notepad/tests/unit/editor/livePreviewBlocks.spec.ts
+  s_7a27f124c1e8e3::t_c0b875d48aad0d 57,61,63
+extensions/task-vault/tests/vault/mappers.spec.ts
+  s_7a27f124c1e8e3::t_db226343b9cd77 77-86
+extensions/notepad/tests/unit/renderer/App.spec.tsx
+  s_7a27f124c1e8e3::t_c9a2ba5617a5d8 123-127
+extensions/remote-control/tests/unit/bridge.route.spec.ts
+  s_7a27f124c1e8e3::t_fce174f3c5f068 310,313-315
+extensions/notepad/tests/unit/index.spec.ts
+  s_7a27f124c1e8e3::t_47dec6fd914ad8 129-136,142-150
+extensions/notepad/tests/unit/db/db.spec.ts
+  s_7a27f124c1e8e3::t_808ca2d73eba91 4
+extensions/notepad/tests/unit/ipc/notes.ipc.spec.ts
+  s_7a27f124c1e8e3::t_56f78837ff516a 289,295,302,305-308
+extensions/notepad/tests/unit/stores/filter.store.spec.ts
+  s_7a27f124c1e8e3::t_db137484f431f9 28,30-31
+extensions/remote-control/tests/unit/login.route.spec.ts
+  s_7a27f124c1e8e3::t_0cc827749e1e49 53
+extensions/task-vault/tests/stores/vault-nav.store.spec.ts
+  s_7a27f124c1e8e3::t_fa11c0d2bad7ec 39,92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4a0ae2385a409b0be63b972dd4ab76f20f1050c1",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
