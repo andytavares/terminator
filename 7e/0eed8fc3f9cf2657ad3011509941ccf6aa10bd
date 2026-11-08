@@ -1,0 +1,36 @@
+tests/unit/renderer/stores/workspace.store.spec.ts
+  s_7a27f124c1e8e3::t_eb0c150ee88a62 743-747
+tests/unit/renderer/stores/session.store.spec.ts
+  s_7a27f124c1e8e3::t_394a3c332d9f61 1233-1234,1252-1253
+tests/unit/renderer/extensions/registry.spec.ts
+  s_7a27f124c1e8e3::t_d6d201c5a7251b 10,15
+tests/unit/renderer/components/StartWork.spec.tsx
+  s_7a27f124c1e8e3::t_9f813cf4ecbb8d 1058-1065,1383-1384
+  s_7a27f124c1e8e3::t_364cc15fa713b8 1368
+tests/unit/renderer/components/TabBar.spec.tsx
+  s_7a27f124c1e8e3::t_260ba9979bad6d 2,115-124,959-961
+tests/unit/renderer/sidebar/branch-rows-performance.spec.ts
+  s_7a27f124c1e8e3::t_82f3092a80a39e 55,58-59,84
+  s_7a27f124c1e8e3::t_56d2f548e980d3 42-54,60-64,67-83,85
+tests/unit/renderer/stores/integrations.store.spec.ts
+  s_7a27f124c1e8e3::t_1ec256417bf48c 368-369,390-391
+  s_7a27f124c1e8e3::t_84e62cecee1323 1
+tests/unit/renderer/hooks/useSurfaceOpen.spec.tsx
+  s_7a27f124c1e8e3::t_8adaf3b87a5101 2,18-21,50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7e0eed8fc3f9cf2657ad3011509941ccf6aa10bd",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
