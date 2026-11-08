@@ -1055,6 +1055,14 @@ describe('StartWork — keys on a focused control', () => {
 })
 
 describe('whenProblem — a repeat that never runs', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 10, 4, 10, 0))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('says so, so it cannot be saved', () => {
     const notToday = (new Date().getDay() + 1) % 7
     const value = { ...startingWhen('2099-01-01'), when: 'repeat' as const }
@@ -1357,6 +1365,7 @@ const globalOnce: Schedule = {
 
 describe('StartWork — editing other scheduled runs', () => {
   beforeEach(seedTwoWorkspaces)
+  afterEach(() => void vi.useRealTimers())
 
   it('opens a one-time global run on Once, its date and Global', async () => {
     await openEditing(globalOnce)
@@ -1371,6 +1380,8 @@ describe('StartWork — editing other scheduled runs', () => {
   })
 
   it('counts the next runs from when the run was created, as the scheduler does', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 10, 5, 12, 0))
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
     const tomorrow = new Date()

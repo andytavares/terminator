@@ -1230,6 +1230,8 @@ describe('activity, attention and notes (feature 030) — lastAttendedAt', () =>
 })
 
 describe('setSessionScreen', () => {
+  setUpUseSessionStore()
+
   it("records a session's last visible line", async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'scr-1' })
     await useSessionStore.getState().createSession(shellRequest())
@@ -1247,6 +1249,8 @@ describe('setSessionScreen', () => {
 })
 
 describe('createSession — resuming', () => {
+  setUpUseSessionStore()
+
   it('asks for the command the terminal should run when it opens', async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'res-1' })
     await useSessionStore

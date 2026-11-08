@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
@@ -111,6 +111,16 @@ function renderTabBar(overrides: Partial<React.ComponentProps<typeof TabBar>> = 
     />
   )
 }
+
+afterEach(() => {
+  // A drag listens on the document until it ends, so end any drag a failed test left open.
+  act(() => {
+    document.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 1 }))
+  })
+  // jsdom has neither; startTabDrag adds them.
+  Reflect.deleteProperty(document, 'elementFromPoint')
+  Reflect.deleteProperty(HTMLElement.prototype, 'setPointerCapture')
+})
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -843,8 +853,6 @@ describe('TabBar — the drop target', () => {
     document.elementFromPoint = () => null
     pointerAt('pointermove', { x: 600, y: 300 })
     expect(tabs[1].classList.contains('tab-bar__tab--dnd-over')).toBe(false)
-    // An unreleased drag keeps listening on the document and would take a later test's release.
-    pointerAt('pointerup', { x: 600, y: 300 })
   })
 
   it('unmarks it, and moves nothing, when Escape cancels the drag', () => {
@@ -948,6 +956,9 @@ describe('TabBar — a tab let go somewhere it does not leave from', () => {
 
 describe('TabBar — a tab let go on an agent composer', () => {
   beforeEach(() => mockGetSessions.mockReturnValue(threeTabs))
+  afterEach(() => {
+    document.querySelectorAll('[data-context-drop]').forEach((composer) => composer.remove())
+  })
 
   it('attaches its session to that agent tab, and neither reorders nor breaks out', async () => {
     renderTabBar()
@@ -958,6 +969,5 @@ describe('TabBar — a tab let go on an agent composer', () => {
     await eventually(() => expect(attachSessions).toHaveBeenCalledWith('agent-1', ['ses-2']))
     expect(mockReorderSessions).not.toHaveBeenCalled()
     expect(breakOut).not.toHaveBeenCalled()
-    composer.remove()
   })
 })

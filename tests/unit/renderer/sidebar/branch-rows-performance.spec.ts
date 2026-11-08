@@ -39,34 +39,48 @@ const sessions: TerminalSession[] = Array.from({ length: 100 }, (_, i) => ({
   agentState: states[i % 4],
 }))
 
-describe('rebuilding the branch list stays well inside budget', () => {
-  it.each(BUILT_IN_VIEWS.map((v) => [v.name, v] as const))(
-    'builds the %s view quickly',
-    (_name, view) => {
-      const started = performance.now()
-      for (let i = 0; i < 20; i++) {
-        buildBranchRows({ sessions, projects, workspaces }, view, {
-          now: NOW,
-          staleAfterMs: STALE_AFTER,
-        })
-      }
-      expect(performance.now() - started).toBeLessThan(100)
-    }
-  )
-
-  // The sidebar must not get slower as terminals pile up on one branch: the
-  // cost is one pass over the sessions plus one over the branches, not a scan
-  // of every session for every branch.
-  it('scales with sessions plus branches, not their product', () => {
-    const many: TerminalSession[] = Array.from({ length: 2000 }, (_, i) => ({
+/** Builds `view` over `sessionCount` sessions spread across `projectCount` branches, and returns
+ * how many session fields it read: an operation count, which a loaded machine cannot change. */
+function sessionReadsToBuild(
+  view: (typeof BUILT_IN_VIEWS)[number],
+  projectCount: number,
+  sessionCount: number
+): number {
+  let reads = 0
+  const branches: Project[] = Array.from({ length: projectCount }, (_, i) => ({
+    ...projects[i % projects.length],
+    id: `p${i}`,
+  }))
+  const counted: TerminalSession[] = Array.from({ length: sessionCount }, (_, i) => {
+    const session = {
       ...sessions[i % sessions.length],
       id: `big-${i}`,
-    }))
-    const started = performance.now()
-    buildBranchRows({ sessions: many, projects, workspaces }, BUILT_IN_VIEWS[0], {
-      now: NOW,
-      staleAfterMs: STALE_AFTER,
+      projectId: `p${i % projectCount}`,
+    }
+    return new Proxy(session, {
+      get(target, key, receiver) {
+        reads++
+        return Reflect.get(target, key, receiver)
+      },
     })
-    expect(performance.now() - started).toBeLessThan(100)
   })
+  buildBranchRows({ sessions: counted, projects: branches, workspaces }, view, {
+    now: NOW,
+    staleAfterMs: STALE_AFTER,
+  })
+  return reads
+}
+
+// The sidebar must not get slower as terminals pile up on one branch: the cost is one pass over
+// the sessions plus one over the branches, not a scan of every session for every branch. With
+// four times the branches over the same sessions, a scan per branch reads four times as much.
+describe('rebuilding the branch list', () => {
+  it.each(BUILT_IN_VIEWS.map((v) => [v.name, v] as const))(
+    'builds the %s view with work that grows with sessions plus branches, not their product',
+    (_name, view) => {
+      const fewBranches = sessionReadsToBuild(view, 12, 2000)
+      const manyBranches = sessionReadsToBuild(view, 48, 2000)
+      expect(manyBranches).toBeLessThan(fewBranches * 2)
+    }
+  )
 })

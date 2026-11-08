@@ -7,28 +7,12 @@ import {
   useExtensionRegistry,
   matchesAccelerator,
 } from '../../../../src/renderer/extensions/registry'
-
-function resetStore() {
-  useExtensionRegistry.setState({
-    sidebarPanels: new Map(),
-    projectTabs: new Map(),
-    globalTabs: new Map(),
-    workspaceTabs: new Map(),
-    keyboardShortcuts: [],
-    commands: [],
-    overlays: [],
-    openPanels: new Set(),
-    activeProjectTabId: null,
-    activeGlobalTabId: null,
-    activeWorkspaceTabId: null,
-    pendingNavigations: new Map(),
-  })
-}
+import { resetStore } from '../../../support/renderer-stores'
 
 /** The hooks every "useExtensionRegistry" describe registers. */
 function setUpUseExtensionRegistry(): void {
   beforeEach(() => {
-    resetStore()
+    resetStore(useExtensionRegistry)
   })
 }
 

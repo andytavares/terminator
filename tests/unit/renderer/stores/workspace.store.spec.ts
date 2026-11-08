@@ -739,8 +739,12 @@ describe('useWorkspaceStore — expandedWorkspaceIds — survives a localStorage
   })
 })
 
-// Module-reset tests — must run after the main suite to avoid corrupting the static import
 describe('workspace.store — localStorage initialisation', () => {
+  afterEach(() => {
+    Object.keys(localStorageStore).forEach((key) => delete localStorageStore[key])
+    vi.resetModules()
+  })
+
   it('loads expandedWorkspaceIds from localStorage on module init', async () => {
     localStorageStore['terminator.workspace.expanded'] = JSON.stringify(['ws-1', 'ws-2'])
     vi.resetModules()
@@ -749,8 +753,6 @@ describe('workspace.store — localStorage initialisation', () => {
     )
     expect(freshStore.getState().expandedWorkspaceIds.has('ws-1')).toBe(true)
     expect(freshStore.getState().expandedWorkspaceIds.has('ws-2')).toBe(true)
-    delete localStorageStore['terminator.workspace.expanded']
-    vi.resetModules()
   })
 
   it('loads collapsedProjectIds from localStorage on module init', async () => {
@@ -760,8 +762,6 @@ describe('workspace.store — localStorage initialisation', () => {
       '../../../../src/renderer/stores/workspace.store'
     )
     expect(freshStore.getState().collapsedProjectIds.has('p-1')).toBe(true)
-    delete localStorageStore['terminator.project.collapsed']
-    vi.resetModules()
   })
 })
 

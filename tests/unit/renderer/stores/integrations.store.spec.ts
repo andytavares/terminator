@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { TrackerConnection } from '../../../../src/shared/types/index'
 
 const api = {
@@ -365,29 +365,30 @@ function restore(): void {
 }
 
 describe('integrations store — partial transports', () => {
+  afterEach(restore)
+
   it('reports failure rather than crashing when connect is not carried', async () => {
     withoutCredentialWrites()
     const ok = await useIntegrationsStore.getState().connect({ tracker: 'linear', apiKey: 'k' })
     expect(ok).toBe(false)
     expect(useIntegrationsStore.getState().connectError.linear).toBe('Could not connect')
-    restore()
   })
 
   it('does nothing when disconnect is not carried', async () => {
     withoutCredentialWrites()
     await expect(useIntegrationsStore.getState().disconnect('linear')).resolves.toBeUndefined()
-    restore()
   })
 
   it('subscribes to what the transport has and ignores what it does not', () => {
     withoutCredentialWrites()
     expect(() => useIntegrationsStore.getState().subscribe()()).not.toThrow()
     expect(api.onStatusChanged).toHaveBeenCalled()
-    restore()
   })
 })
 
 describe('integrations store — partial transports — survives an electronAPI with no integrations surface at all', () => {
+  afterEach(restore)
+
   const P = '11111111-1111-4111-8111-111111111111'
 
   it('survives an electronAPI with no integrations surface at all', async () => {
@@ -399,7 +400,6 @@ describe('integrations store — partial transports — survives an electronAPI 
       failures: [],
     })
     expect(() => useIntegrationsStore.getState().subscribe()()).not.toThrow()
-    restore()
   })
 })
 
