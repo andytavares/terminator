@@ -1,0 +1,181 @@
+extensions/notepad/tests/unit/editor/noteSync.spec.ts
+  s_7a27f124c1e8e3::t_9aeb033ee8dddf 1,46-52,89-92
+  s_7a27f124c1e8e3::t_caf60783cacf5e 87-88
+extensions/remote-control/tests/unit/helpers/fake-pty-manager.ts
+  s_7a27f124c1e8e3::t_f39cee1a366503 82-84
+extensions/task-vault/tests/components/TaskVaultView.spec.tsx
+  s_7a27f124c1e8e3::t_b92f34c91ba1ca 91,197,199
+  s_7a27f124c1e8e3::t_6c388db236a72c 3-4,74-77,119,123-134,184,190-193,196,198,200-204,206-210,212,271,274-275,277,279,283-284,286,288-294,300,302-308,312-313,315-316,318-322,324-325,327,331-333,335,337-338,340-342,344-345,347-351,353,357-358,367-368,371-372,379-380,383,388-390,392
+  s_7a27f124c1e8e3::t_892373397ac811 391
+extensions/task-vault/tests/utils/notify.spec.ts
+  s_7a27f124c1e8e3::t_74bfbfd0745ae9 65,67-68
+extensions/notepad/tests/components/NoteOutline.spec.tsx
+  s_7a27f124c1e8e3::t_ead8f1967f26c2 2-3,64-65,68,72-73,77,95-96,100
+extensions/remote-control/tests/unit/ngrok-manager.spec.ts
+  s_7a27f124c1e8e3::t_fb7a4140dee6e7 138,165
+extensions/notepad/tests/unit/ipc/search.ipc.spec.ts
+  s_7a27f124c1e8e3::t_461b02818268c2 61,154
+extensions/notepad/tests/unit/renderer/App.spec.tsx
+  s_7a27f124c1e8e3::t_c9546c63c1b508 51,58,66,73
+  s_7a27f124c1e8e3::t_1cdef761f20455 2,4-6,21-22,24,27,30,32-34,48,55,63,70,78,81-84,89,93-96,101-102,105
+extensions/notepad/tests/unit/ipc/comments.ipc.spec.ts
+  s_7a27f124c1e8e3::t_0bca19a7e6ba9b 53-67,85-90
+extensions/task-vault/tests/components/DateTimePickerHalves.spec.tsx
+  s_7a27f124c1e8e3::t_a0f1224e1cffdf 4,38-39,41,45-53,56,63-64,66,71-72,74,78-93,112-113,118,120-122,124,135-136,138,140-145,147,149-152,154-156
+  s_7a27f124c1e8e3::t_0a48bd0b4bdc57 3,26,116,123,153
+  s_7a27f124c1e8e3::t_fd7e23194f7727 33-34,119
+extensions/remote-control/tests/state/status.spec.ts
+  s_7a27f124c1e8e3::t_ee09f1fdff1124 26-29,116-119,158-161
+extensions/task-vault/tests/components/ArchiveViewActions.spec.tsx
+  s_7a27f124c1e8e3::t_caf60783cacf5e 3-4,32,34-35,68,71,78,81,90,93,104-105,107,113-117,127-129,133-137,143,147-155
+extensions/task-vault/tests/components/TaskDetailPanel.spec.tsx
+  s_7a27f124c1e8e3::t_6e7c143d137b1e 3-4,50,52,54-61,83,86-89,105-113,115-116,123,125,132-133,136-140,142,144-153,162,165-168
+  s_7a27f124c1e8e3::t_b92f34c91ba1ca 34,36-37,47,49,158,160
+extensions/remote-control/tests/unit/terminal.routes.spec.ts
+  s_7a27f124c1e8e3::t_f39cee1a366503 14,22,26,38,56-62,220,222,224-225,277,279,281,284,286,288-289,445,448,450,469-472,483,527-530,533,535-536,538-540,589-590,592,604,606
+extensions/task-vault/tests/ipc/remote-access.spec.ts
+  s_7a27f124c1e8e3::t_3846972fd494f1 35-42
+extensions/notepad/tests/components/NotepadView.spec.tsx
+  s_7a27f124c1e8e3::t_cd412c22d9244f 96-106
+  s_7a27f124c1e8e3::t_57a9cfaa25c713 63-70
+  s_7a27f124c1e8e3::t_6e009855367767 3-4,107,195,199,246,248-250,252,255,257-262,269,272,288-289,293,296-304
+  s_7a27f124c1e8e3::t_388ffee11f7efd 108-109
+extensions/notepad/tests/unit/editor/applyExternalDoc.spec.tsx
+  s_7a27f124c1e8e3::t_9aeb033ee8dddf 78-79,81-83
+  s_4312bdd443949d::t_9f5dddd46c5129 1-3,5-6,73-77
+extensions/task-vault/tests/components/InboxProcessor.spec.tsx
+  s_7a27f124c1e8e3::t_e5150973b522ba 4,30-31,33,35,60-70,72,77-81,87,90-92,94,97,99-103,105-120,139,141-144,157-158,160-161,166-170,172-173,175,181,185-187,199,201,203-204,214-215,217,219-220,223-228,230-231,233,241-250,252,269,272,276,280,283
+  s_7a27f124c1e8e3::t_85dc01bb79d763 3,202,218,229,253-254
+extensions/notepad/tests/unit/editor/headingEnter.spec.ts
+  s_7a27f124c1e8e3::t_9aeb033ee8dddf 48-56
+extensions/remote-control/tests/unit/renderer/RemoteControlView.spec.tsx
+  s_7a27f124c1e8e3::t_9aeb033ee8dddf 3-4,203,207,213,217,232,236,238-242,248,251,261,263,271,273,298,305
+  s_7a27f124c1e8e3::t_71ba39f0516a68 56-60,243-244
+extensions/task-vault/tests/index.spec.ts
+  s_7a27f124c1e8e3::t_b2a2c994d477f7 24-25,180-181,183,189-192,195-201
+extensions/remote-control/tests/unit/renderer/RemoteControlSettings.spec.tsx
+  s_7a27f124c1e8e3::t_9aeb033ee8dddf 3-4,65,69-70,82,86,88,104,108,111
+  s_7a27f124c1e8e3::t_71ba39f0516a68 33-37,87,89,109
+extensions/task-vault/tests/components/DailyLogSubtasks.spec.tsx
+  s_7a27f124c1e8e3::t_cf41e6fc61a40e 224-227,309,371-374
+  s_7a27f124c1e8e3::t_bf430762437163 85-86,88-93,99-103,105-112,119-130,133-134,136-137,140-170,175,177,179-181,186-187,189-191,197-210,217,219-223,235,241,244,246,256-269,272-273,276-277,284,286,294-295,297-298,352-355
+  s_7a27f124c1e8e3::t_3f852ee10585a6 4-5,57,62,64,70,72,81,228,304-308,310-312,314,320,349,357,359,368
+extensions/notepad/tests/unit/ipc/diagrams.ipc.spec.ts
+  s_7a27f124c1e8e3::t_cc9ffc2cb87114 156-157,159-163,165,167
+extensions/notepad/tests/components/LivePreviewView.spec.tsx
+  s_7a27f124c1e8e3::t_7c91e8eaf5c57a 221-225,230-235,239
+  s_7a27f124c1e8e3::t_0a2ad113f4fc28 116-117
+extensions/notepad/tests/components/CommentMargin.spec.tsx
+  s_7a27f124c1e8e3::t_fb21bc3f913303 2-3,51-52,57,117,120,130,133,160-161,164
+  s_7a27f124c1e8e3::t_48a202d6d18518 165
+extensions/task-vault/tests/components/ProjectsBrowser.spec.tsx
+  s_7a27f124c1e8e3::t_6845ccf945f394 3-4,61,64,67-69,77-85,87-106,108,115-119,128-131,133-135,137-141,143,148-156,158,166-167,169-170,175-178,181-188,198,200-201,206-225,227,229,231,233,235-237,242-248,251-252,254-255,257-259,263-264,269,271-272,278-286,288,292-296,302-307,309-311,316-323,326-329,331-339,346-353,355-357,362-364,369,371-372,374,383,385-386,388-393,402-403,405,408-409,417-423,427-431,438-443,449-458,467-468,472-478
+  s_7a27f124c1e8e3::t_b92f34c91ba1ca 86,232,234
+  s_7a27f124c1e8e3::t_a26b92b56e77ce 394-396
+  s_7a27f124c1e8e3::t_20a461bfc04773 159-161,168
+extensions/task-vault/tests/ipc/inbox.ipc.spec.ts
+  s_7a27f124c1e8e3::t_6e234e0e580e82 86-88
+extensions/task-vault/tests/ipc/vault-handlers.ipc.spec.ts
+  s_7a27f124c1e8e3::t_c1d182a8a5afdc 930-931
+extensions/task-vault/tests/components/AreasView.spec.tsx
+  s_7a27f124c1e8e3::t_7ffddac8cdf250 3-4,82,84,86-93,111-113,133-138,141-143,146,148-155,162-163,169-174,181,183,190-191,193-196,198-202,209-210,214-222,224-225,227-229,231-233,238-241,245-255,258,263-272,277-278,282-285,287-289,291-297,299-301,306-309,313-317,322,324-331,338-342,350,354-356,358-360,362-364,367-374,378-382,386-399,403-407,409-413
+extensions/notepad/tests/components/NotepadViewShortcuts.spec.tsx
+  s_7a27f124c1e8e3::t_6e009855367767 3-4,29-30,32-33
+extensions/task-vault/tests/components/ArchiveView.spec.tsx
+  s_7a27f124c1e8e3::t_070df674a79813 3-4,52,55-57,65,68
+extensions/notepad/tests/components/NoteList.spec.tsx
+  s_7a27f124c1e8e3::t_fb7a4140dee6e7 2-3,59,61-62,66-70,87-88,92,117-118,121,127-128,131,145,160,162,184,188-189,191-193,198-199,201-204,209-210,212-214,216,221-222,224-226,229-230,232-234,237-238,240-250,252,277-278,284-285,287-289,300-303,312-315
+extensions/task-vault/tests/ipc/vault-areas.ipc.spec.ts
+  s_7a27f124c1e8e3::t_6e234e0e580e82 214-216,302-306,311-312,404
+  s_7a27f124c1e8e3::t_c1d182a8a5afdc 401
+extensions/notepad/tests/unit/ipc/diagram-comments.ipc.spec.ts
+  s_7a27f124c1e8e3::t_802a02d8491eab 44-50
+extensions/notepad/tests/unit/ipc/export.ipc.spec.ts
+  s_7a27f124c1e8e3::t_6e7c143d137b1e 167-171,174,176,448,450,453,455,457
+extensions/notepad/tests/components/NoteListActions.spec.tsx
+  s_7a27f124c1e8e3::t_3c5ab0986fdefe 4,56-57,62,77,79-82,84,86-96,147,165-166,171,179,181-182,184-185,194,196-198,207,213-217,220-241,243,249-252,259-261,268,273-276,278-296
+extensions/task-vault/tests/components/InboxView.spec.tsx
+  s_7a27f124c1e8e3::t_0682b2e53987b5 3-4,63-64,67-68,75,82-86,100-101,103-107,115-116,118-119,121,126-127,130,132-134,136-142,144-146,148,150,152-156,165,168,170,172,177,179-180
+  s_7a27f124c1e8e3::t_b92f34c91ba1ca 96,149,151
+extensions/task-vault/tests/channel-schemas.spec.ts
+  s_7a27f124c1e8e3::t_3846972fd494f1 1,51-53,58,60-64,67,69
+extensions/task-vault/tests/components/SmartTaskInput.spec.tsx
+  s_7a27f124c1e8e3::t_8c61915caa6b40 172-174
+  s_7a27f124c1e8e3::t_0554daa69884d6 3-4,49,53,72-73,80-81,87-89,92-96,99-103,109-110,116-125,130,132-136,139-145,153-155,163-164,168-171,175,177-182,184-190,196-197,203,205-207,209-210,214-226,229-234,242-243,250-252,261-263
+extensions/task-vault/tests/renderer/App.spec.tsx
+  s_7a27f124c1e8e3::t_f112655a0e5335 71,74,77-78,97-99,102,106,108
+extensions/notepad/tests/components/SearchOverlay.spec.tsx
+  s_7a27f124c1e8e3::t_fcc8a8d396c021 37-38
+  s_7a27f124c1e8e3::t_4b1dc152290123 2-4,22-36,39-41,45,48-56,67-68,71-72,86-88,93-94,96-98,100-104,108-111,117,119-121
+extensions/notepad/tests/components/QuickCreateOverlay.spec.tsx
+  s_7a27f124c1e8e3::t_1d2afcf9fda647 3-4,6-7,25,39-40,43-44,48-49,52,89-90,93-96,102,105,114-118,130-132,142-145,147-152,157,159,163-164,172,174-176,178-180,185-192
+extensions/notepad/tests/components/DiagramView.spec.tsx
+  s_7a27f124c1e8e3::t_2bf01d5e3e04ba 189-193
+  s_7a27f124c1e8e3::t_054ada3baf4649 3-4,160,162,164-165,179,185,187,195-197,204-206,208,213-214,216,220-228,234,236-237
+extensions/task-vault/tests/home/publisher.spec.ts
+  s_7a27f124c1e8e3::t_23a90689be14f6 14,16,28,83,87
+extensions/task-vault/tests/components/DateTimePicker.spec.tsx
+  s_7a27f124c1e8e3::t_d29d2e45e427b3 55
+  s_7a27f124c1e8e3::t_63d4a13f8edba4 37-38,40,44-45,52-54,56,115-116,118,121-125,127,129-130,141-142,144,146,152,157,161,163,165,172,174,176,181-182,184-185,197-198,200,211,221-224,226,233,235-238,245,247,249,254,258,262,269,272,282,284,286,291,293,296
+  s_7a27f124c1e8e3::t_612bafe72800d5 3-4,20,29-31,36,39,43,46-47,51,114,117,128,140,143,145,151,156,160,164,171,175,180,183,196,199,210,213,220,232,244,248,253,256,261,264,268,271,281,285,290,294
+extensions/notepad/tests/unit/ipc/remote-access.spec.ts
+  s_7a27f124c1e8e3::t_e079a08ee77343 37-45
+extensions/notepad/tests/components/CommentComposer.spec.tsx
+  s_7a27f124c1e8e3::t_48a202d6d18518 94
+  s_7a27f124c1e8e3::t_fb21bc3f913303 2-3,52-54,72-74,80-81,84,89-90,93,95
+extensions/remote-control/tests/unit/login.route.spec.ts
+  s_7a27f124c1e8e3::t_0ba59bbaca8219 10,15,19,87-92,107-111
+extensions/task-vault/tests/components/CalendarDrawerMonths.spec.tsx
+  s_7a27f124c1e8e3::t_7ab1e375cb83b6 3-4,8-9,16-17,53-54,57,67-74,91,93-95,99-105,115,118-127
+  s_7a27f124c1e8e3::t_709d5538f2df26 48,50,75-77,112,114
+extensions/notepad/tests/unit/channel-schemas.spec.ts
+  s_7a27f124c1e8e3::t_e079a08ee77343 40-42,44-56
+extensions/remote-control/tests/unit/remote-server.spec.ts
+  s_7a27f124c1e8e3::t_9a95f044fee0d5 32-33,38-53,343,351-355,476-479,489-490
+extensions/remote-control/tests/unit/extension-index.spec.ts
+  s_7a27f124c1e8e3::t_fb7a4140dee6e7 117-120,124,139-149,151,157-161,163-167,280,282-285,287,290,299,302-305,307,310,329-339,341-342,344,346-352,354-355,357,359-362,456-460,464
+extensions/notepad/tests/unit/ipc/notes.ipc.spec.ts
+  s_7a27f124c1e8e3::t_985dd3c7a6211c 126,447-451,453,456-464,466,468
+extensions/notepad/tests/components/ExportDialog.spec.tsx
+  s_7a27f124c1e8e3::t_2a5c7de184a523 2-3,53,61,63,91-97,99-106,108,110-113,115-122,138-139,142,150,152,158,160,191,202,204-207,211-212,214-230
+extensions/notepad/tests/components/NoteWindowView.spec.tsx
+  s_7a27f124c1e8e3::t_59f20128d43d63 3-4,130,136,141-142,145-149
+extensions/task-vault/tests/components/DailyLogTaskRow.spec.tsx
+  s_7a27f124c1e8e3::t_e5cdbd89adf468 3,32-33,35-37,43,45,51-52,54,61-62,69-70,74-75,81-86,90-91,100-107,109-117,126-127,129-132,135-146,151,153,162,164,174,176,178,180-181,187-188,190-192,197-209,212,214,216-217,222-223,225-226,232,238-241,243,245-250,255-263,265-266,270,276,278,283,289-298,300
+  s_7a27f124c1e8e3::t_cf41e6fc61a40e 233-237
+  s_7a27f124c1e8e3::t_d1d036b6cf6521 2
+extensions/task-vault/tests/vault/ensure-next-occurrence.spec.ts
+  s_7a27f124c1e8e3::t_54c13a8f694863 278-281,284
+extensions/task-vault/tests/components/CalendarDrawer.spec.tsx
+  s_7a27f124c1e8e3::t_434ebf79b36da3 3,5-6,8-9,11,34,44,49,65-66,75,77-78,83-84,87-92
+extensions/task-vault/tests/components/DailyLog.spec.tsx
+  s_7a27f124c1e8e3::t_4d583341c41be1 4,6,44-47,57,61,63,67,72,75-76,84-85,89,91-106,132-143,145-146,150-155,161-162,176-199,202-205,212-219,221-235,283-290,292-293,297-302,308,310-317,322,329-334,345-363,365-366,379,388-390,392-394,400-406,408-430
+extensions/task-vault/tests/components/DailyLogDialogs.spec.tsx
+  s_7a27f124c1e8e3::t_f4543b49a7a080 2-3,5,24-60,63,68,75-76,79-84,86,96-99,103-108,112-114,116-117,119-126,137-139,141,151-152,155-161,163,173-177,179-183,185-186,194,196-199,201,206-209,211-218,234-252,262-269,273-274,278-284,286-287,289-294
+extensions/task-vault/tests/components/DatabaseAdmin.spec.tsx
+  s_7a27f124c1e8e3::t_2617c9e5ba0f2b 3-4,55-59,71,74,78,80-88,92-101,103,108,110-114,126,128-130,135-139,141-143,149,152,155,160-161,163-172,174-180,182,185,187-189,191,193-195,197-202,204-205,216,219-220,226,229-231
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bffdcd2a026e6227c10c1de5b776ecac35f0ffd6",
+  "prompts": {},
+  "sessions": {
+    "s_4312bdd443949d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "34ee8d8d-5ae0-4e48-8e14-e3d4c8e3f0af",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    },
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+extensions/foundry/src/ipc/record-registration.ts
+  s_7a27f124c1e8e3::t_fde79d6f0f4427 45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "11bffa9d1c8e9ab3c3f87eb411d15a94cb5f5f4c",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+extensions/foundry/src/trackers/write-back.ts
+  s_7a27f124c1e8e3::t_c6f6c4df0fc667 17,43-44
+extensions/git-integration/src/github/merged-search.ts
+  s_7a27f124c1e8e3::t_361dbbe7a4e28e 4-5
+extensions/foundry/src/ledger/curator.ts
+  s_7a27f124c1e8e3::t_c6f6c4df0fc667 26-27
+extensions/foundry/src/order/schema.ts
+  s_7a27f124c1e8e3::t_c6f6c4df0fc667 278-279
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "45ebe2fc56a154b94967672cb414be583f286716",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

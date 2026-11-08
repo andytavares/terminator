@@ -1,0 +1,77 @@
+tests/unit/packages/extension-ui/menu.spec.tsx
+  s_7a27f124c1e8e3::t_9f312e4e2506cb 98-100
+  s_7a27f124c1e8e3::t_18a4741d9bb49f 3,28,85-86,88,92-95
+  s_7a27f124c1e8e3::t_33131a7d1f24f1 96-97
+tests/unit/packages/extension-ui/modal-shell.spec.tsx
+  s_7a27f124c1e8e3::t_9f312e4e2506cb 71,73-75,77-80,84-85,87,93-94,96-98,116-117,121-123,153-154,158-160,173,175
+  s_7a27f124c1e8e3::t_030a66096e0ec6 4,34,39-41,52-53,55,59-60,62,176-177,186-188
+tests/unit/packages/extension-ui/desk.spec.tsx
+  s_7a27f124c1e8e3::t_9f312e4e2506cb 177,179
+  s_7a27f124c1e8e3::t_4380cfef4f9fc0 3-4,24,79-82,84,110,124,141,150,162,166-167,174,202-203,206,215
+tests/unit/extensions/api-issues.spec.ts
+  s_7a27f124c1e8e3::t_4db835068ef57b 78-80,82-92,94-95,98
+  s_7a27f124c1e8e3::t_99c56167ead69b 81,93,96-97,99-100
+  s_7a27f124c1e8e3::t_66dc364e858fed 101-102
+tests/unit/integrations/tracker-error.spec.ts
+  s_7a27f124c1e8e3::t_215e1d90be569f 5-9
+tests/unit/main/editor/known-editors.spec.ts
+  s_7a27f124c1e8e3::t_215e1d90be569f 5
+tests/unit/extensions/api-v1.2.0.spec.ts
+  s_7a27f124c1e8e3::t_f2d44f08be7847 300,309,367,369-392,397-401,403,508-521,529,531,544-545,547,549
+  s_7a27f124c1e8e3::t_c3d0804280e419 528,530,534,546,548,552-553
+  s_7a27f124c1e8e3::t_be36326cde3939 74-75,139,142-145,150,153-156
+  s_7a27f124c1e8e3::t_a27e96e18853ff 522
+tests/unit/packages/extension-ui/segmented-control.spec.tsx
+  s_7a27f124c1e8e3::t_44217826d93242 3-4,27,48-49,51,57-58,60-62,65,67,69,75-76,78-80,82,86-87,90-92,98-99,103,116
+  s_7a27f124c1e8e3::t_9f312e4e2506cb 72,74
+tests/unit/packages/extension-ui/empty-state.spec.tsx
+  s_7a27f124c1e8e3::t_b501ea157d3677 3-4,26,31,40-41,44,60-63,70,75,82-83,85-86,96,113-114,117,123-124,135,139-140,143,175,183-184,187,203-206
+tests/unit/extensions/PrDialog.spec.tsx
+  s_7a27f124c1e8e3::t_9f312e4e2506cb 125,127
+  s_7a27f124c1e8e3::t_75adaac0cdefee 190,192
+  s_7a27f124c1e8e3::t_f94853a6674298 3-4,52-56,58,61-62,65,70,73-74,77-78,83,95-96,99,101-102,107-108,111-112,115-116,119-123,128-129,132-138,143,152-153,156,159-160,174,198-210,215-216,223-224,227-228,231-234,237-238,244-245
+  s_7a27f124c1e8e3::t_4bcf7cbe52ddd2 164-171,173,175-189,193-196
+tests/unit/packages/extension-ui/tabs.spec.tsx
+  s_7a27f124c1e8e3::t_caf60783cacf5e 3-4,38,58-59,61,138-140,177-178,180,190-191,193-195,198,200,206-207,209-211,213,217-218,221-223,225,227,244-245,247
+  s_7a27f124c1e8e3::t_9f312e4e2506cb 156,158
+tests/unit/extensions/extension-host.spec.ts
+  s_7a27f124c1e8e3::t_8a4c6b5e0b0cb3 356-364,366-367,369,371
+tests/unit/packages/extension-ui/confirm-button.spec.tsx
+  s_7a27f124c1e8e3::t_5d58f5c9b7e615 32-34,47,64-66,75-77
+tests/unit/packages/extension-ui/button.spec.tsx
+  s_7a27f124c1e8e3::t_9aeb033ee8dddf 3-4,9-10,13,17-18,26,33-34,42,44
+tests/unit/packages/extension-ui/data-table.spec.tsx
+  s_7a27f124c1e8e3::t_6f6ca74cf44389 3-4,48-50,71-72,74,76,89-90,105-107,130-132
+tests/unit/packages/extension-ui/toast.spec.tsx
+  s_7a27f124c1e8e3::t_e5150973b522ba 9-13,52,66,94
+  s_7a27f124c1e8e3::t_9f312e4e2506cb 78,80
+  s_7a27f124c1e8e3::t_fb7a4140dee6e7 3-4,18,51,61,65,75,93,105
+tests/unit/integrations/issue-service.spec.ts
+  s_7a27f124c1e8e3::t_215e1d90be569f 239
+tests/unit/packages/extension-ui/behaviour-matrix.spec.tsx
+  s_7a27f124c1e8e3::t_a9ff75da9a235c 3-4,55-57,84-85,90
+tests/unit/packages/extension-ui/dialog.spec.tsx
+  s_7a27f124c1e8e3::t_d7debf5a63df8d 3-4,33,35,47-49,54-55,57,67-68,70-73,77-78,80,89-90,92,102-103,105,164-168,171-172,175,181,188,195,197,202-203,206,214,217-218,221,225-226,229,244,270-271,275-278,336-337,340,344-345,348,352-353,356,362-363
+tests/unit/packages/extension-ui/edges.spec.tsx
+  s_7a27f124c1e8e3::t_07e7ab6561c458 3-4,65-66,73-74,80-81,94
+tests/unit/packages/extension-ui/list-input.spec.tsx
+  s_7a27f124c1e8e3::t_881ffb95c6ef1c 3-4,47-48,51,55-56,58
+tests/unit/packages/extension-ui/popover.spec.tsx
+  s_7a27f124c1e8e3::t_a9be272c631a4b 4,25,37-38,40,44-45,47,51-52,54,88-89,91-93,158-159,165-168,174-176,181-182
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4e0217f40489c06b1068bd7b923aea149df779bf",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

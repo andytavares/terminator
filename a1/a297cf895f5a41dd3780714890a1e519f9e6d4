@@ -1,0 +1,25 @@
+packages/extension-ui/src/Markdown.tsx
+  s_7a27f124c1e8e3::t_ede7ea59b9337e 1,79-81,83-98,111,113,139,148-161
+  s_7a27f124c1e8e3::t_cd605de1e8aa50 82,137-138,140-141
+  s_7a27f124c1e8e3::t_21552eb8c98381 124-125,130-132,142
+  s_7a27f124c1e8e3::t_2ad8022934e55f 133-136
+tests/unit/packages/extension-ui/markdown.spec.tsx
+  s_7a27f124c1e8e3::t_f58b13ce43310d 4,460-472
+  s_7a27f124c1e8e3::t_c86f8e901ac1c2 473-482
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a1a297cf895f5a41dd3780714890a1e519f9e6d4",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
