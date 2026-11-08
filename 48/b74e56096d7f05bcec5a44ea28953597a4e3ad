@@ -1,0 +1,19 @@
+tests/e2e/extension-escape.spec.ts
+  s_7a27f124c1e8e3::t_460505c7bea342 91-117,120-123,174-180
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "48b74e56096d7f05bcec5a44ea28953597a4e3ad",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
