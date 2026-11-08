@@ -1,0 +1,37 @@
+tests/integration/scripts/create-extension.spec.js
+  s_7a27f124c1e8e3::t_c6b77801f117ca 32,94-99
+tests/e2e/extension-settings.spec.ts
+  s_7a27f124c1e8e3::t_bda5cc946cd391 19,317-339,358
+tests/e2e/sidebar-marks-the-shown-session.spec.ts
+  s_7a27f124c1e8e3::t_5ce34a3c5edee1 40,44,48-49,55-57,61-63,66,68,85-93
+tests/e2e/monitor-wall.spec.ts
+  s_7a27f124c1e8e3::t_b57e54cc063915 97-132,147-148
+tests/e2e/design-system-fields.spec.ts
+  s_7a27f124c1e8e3::t_b0c03c347aff66 113,115-133
+tests/integration/ipc/shell.ipc.spec.ts
+  s_7a27f124c1e8e3::t_11426b06585638 2
+tests/e2e/sidebar-sorting.spec.ts
+  s_7a27f124c1e8e3::t_a788951b22fc46 52-75,180-183
+tests/e2e/timings.json
+  s_7a27f124c1e8e3::t_27fe16aeb7bc8c 6,42
+tests/integration/foundry-portability.spec.ts
+  s_7a27f124c1e8e3::t_6030d84d277b15 138,145,149
+tests/integration/remote-bridge-allowlist.spec.ts
+  s_7a27f124c1e8e3::t_125909e5da1b6b 1,15-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9ec6314f79e7f2c53f8026122c646ec868625dfd",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
