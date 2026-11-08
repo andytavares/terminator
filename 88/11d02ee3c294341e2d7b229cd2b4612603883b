@@ -1,0 +1,32 @@
+extensions/foundry/tests/forge/forge-loop.spec.ts
+  s_7a27f124c1e8e3::t_a753aca49bb089 298-300,312,323
+extensions/foundry/tests/ipc/forge-defect-answer-ipc.spec.ts
+  s_7a27f124c1e8e3::t_59b06fcd06882b 153,156
+  s_7a27f124c1e8e3::t_523cd0f899ae71 139,147-152,154-155,157,174,253,271,297
+extensions/foundry/tests/runtime/supervision-console.spec.ts
+  s_7a27f124c1e8e3::t_abfa8768d87702 5,29-30,32,34-36,47-52
+extensions/git-integration/tests/unit/PrOverviewPanel.spec.tsx
+  s_7a27f124c1e8e3::t_87323027da9fd3 7,152-153
+extensions/foundry/tests/factory/fixtures/recorded-run/run-timeline.jsonl
+  s_7a27f124c1e8e3::t_96d6f533e13520 1-9
+extensions/foundry/tests/factory/replay.spec.ts
+  s_7a27f124c1e8e3::t_a9d17805db48c2 2,12-13,184,186,262,264
+extensions/foundry/tests/forge/forge-loop-release.spec.ts
+  s_7a27f124c1e8e3::t_d8eb03fd3e2927 33,116,198,209
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8811d02ee3c294341e2d7b229cd2b4612603883b",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
