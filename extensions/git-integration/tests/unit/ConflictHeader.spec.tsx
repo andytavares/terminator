@@ -57,7 +57,6 @@ const baseSession = {
 beforeEach(() => {
   vi.clearAllMocks()
   mockStoreState = {
-    session: baseSession,
     activeFileIndex: 0,
     activeBlockIndex: 0,
     _undoStack: [],
@@ -68,6 +67,7 @@ describe('ConflictHeader', () => {
   it('renders filename and progress', () => {
     const { container } = render(
       <ConflictHeader
+        session={baseSession}
         onBack={vi.fn()}
         onUndo={vi.fn()}
         canUndo={false}
@@ -87,6 +87,7 @@ describe('ConflictHeader — renders progress dots matching block count', () => 
   it('renders progress dots matching block count', () => {
     const { container } = render(
       <ConflictHeader
+        session={baseSession}
         onBack={vi.fn()}
         onUndo={vi.fn()}
         canUndo={false}
@@ -105,6 +106,7 @@ describe('ConflictHeader — marks resolved dot with resolved class', () => {
   it('marks resolved dot with resolved class', () => {
     const { container } = render(
       <ConflictHeader
+        session={baseSession}
         onBack={vi.fn()}
         onUndo={vi.fn()}
         canUndo={false}
@@ -124,6 +126,7 @@ describe('ConflictHeader — calls onBack when Files button clicked', () => {
     const onBack = vi.fn()
     render(
       <ConflictHeader
+        session={baseSession}
         onBack={onBack}
         onUndo={vi.fn()}
         canUndo={false}
@@ -143,6 +146,7 @@ describe('ConflictHeader — calls onUndo when Undo button clicked', () => {
     const onUndo = vi.fn()
     render(
       <ConflictHeader
+        session={baseSession}
         onBack={vi.fn()}
         onUndo={onUndo}
         canUndo={true}
@@ -161,6 +165,7 @@ describe('ConflictHeader — Undo button is disabled when canUndo is false', () 
   it('Undo button is disabled when canUndo is false', () => {
     render(
       <ConflictHeader
+        session={baseSession}
         onBack={vi.fn()}
         onUndo={vi.fn()}
         canUndo={false}
@@ -179,6 +184,7 @@ describe('ConflictHeader — Undo button is enabled when canUndo is true', () =>
   it('Undo button is enabled when canUndo is true', () => {
     render(
       <ConflictHeader
+        session={baseSession}
         onBack={vi.fn()}
         onUndo={vi.fn()}
         canUndo={true}
@@ -193,28 +199,11 @@ describe('ConflictHeader — Undo button is enabled when canUndo is true', () =>
   })
 })
 
-describe('ConflictHeader — renders null when session is null', () => {
-  it('renders null when session is null', () => {
-    mockStoreState = { ...mockStoreState, session: null }
-    const { container } = render(
-      <ConflictHeader
-        onBack={vi.fn()}
-        onUndo={vi.fn()}
-        canUndo={false}
-        onPrev={vi.fn()}
-        onNext={vi.fn()}
-        canPrev={false}
-        canNext={false}
-      />
-    )
-    expect(container.firstChild).toBeNull()
-  })
-})
-
 describe('ConflictHeader — shows exit button when onExit prop is provided', () => {
   it('shows exit button when onExit prop is provided', () => {
     render(
       <ConflictHeader
+        session={baseSession}
         onBack={vi.fn()}
         onUndo={vi.fn()}
         canUndo={false}
@@ -234,6 +223,7 @@ describe('ConflictHeader — calls onExit when exit button is clicked', () => {
     const onExit = vi.fn()
     render(
       <ConflictHeader
+        session={baseSession}
         onBack={vi.fn()}
         onUndo={vi.fn()}
         canUndo={false}
@@ -253,6 +243,7 @@ describe('ConflictHeader — does not show exit button when onExit is not provid
   it('does not show exit button when onExit is not provided', () => {
     render(
       <ConflictHeader
+        session={baseSession}
         onBack={vi.fn()}
         onUndo={vi.fn()}
         canUndo={false}

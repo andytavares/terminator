@@ -34,6 +34,15 @@ function row(over: Record<string, unknown> = {}) {
     risk: 'P2',
     failures: 0,
     source: { kind: 'typed', tracker: null, key: null },
+    standing: {
+      kind: 'shaping',
+      turn: 'foundry',
+      label: 'being shaped',
+      detail: 'Foundry is still shaping this.',
+      done: 0,
+      total: 0,
+      gateId: null,
+    },
     ...over,
   }
 }

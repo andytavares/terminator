@@ -898,7 +898,9 @@ describe('UnifiedSidebar — what the branch-first sidebar draws', () => {
 describe('UnifiedSidebar — agent state is derived, not read from a field nobody writes', () => {
   it('treats a session with an unread bell as awaiting input', () => {
     setSessions(new Map([['s6', sidebarSession('s6', 'p1', { tabTitle: 'claude', bellCount: 2 })]]))
-    const { container } = renderSidebar({ initialViewId: 'needs-me' })
+    const { container } = renderSidebar()
+    openFilter()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Needs me/ }))
     const names = Array.from(container.querySelectorAll('.branch-row__name')).map(
       (n) => n.textContent
     )
@@ -907,21 +909,27 @@ describe('UnifiedSidebar — agent state is derived, not read from a field nobod
 
   it('treats a session producing output as working', () => {
     setSessions(new Map([['s7', sidebarSession('s7', 'p1', { tabTitle: 'build', busy: true })]]))
-    const { container } = renderSidebar({ initialViewId: 'active' })
+    const { container } = renderSidebar()
+    openFilter()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Active/ }))
     const names = Array.from(container.querySelectorAll('.branch-row__name')).map(
       (n) => n.textContent
     )
     expect(names).toEqual(['main'])
   })
+})
 
+describe('UnifiedSidebar — agent state is derived, not read from a field nobody writes — leaves a quiet session idle', () => {
   it('leaves a quiet session idle, so it appears in neither', () => {
     sessions.clear()
     sessions.set('s8', sidebarSession('s8', 'p1', { tabTitle: 'quiet' }))
-    const needs = renderSidebar({ initialViewId: 'needs-me' })
-    expect(needs.container.textContent).not.toContain('quiet')
-    needs.unmount()
-    const active = renderSidebar({ initialViewId: 'active' })
-    expect(active.container.textContent).not.toContain('quiet')
+    const { container } = renderSidebar()
+    openFilter()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Needs me/ }))
+    expect(container.textContent).not.toContain('quiet')
+    openFilter()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Active/ }))
+    expect(container.textContent).not.toContain('quiet')
   })
 })
 
@@ -1683,11 +1691,6 @@ describe('UnifiedSidebar — odds and ends', () => {
     fireEvent.change(input, { target: { value: 'scratchpad' } })
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(renameSession).toHaveBeenCalledWith('sc1', 'scratchpad')
-  })
-
-  it('falls back to Everything for a starting view it does not have', () => {
-    const { container } = renderSidebar({ initialViewId: 'gone' })
-    expect(branchNames(container)).toHaveLength(3)
   })
 })
 

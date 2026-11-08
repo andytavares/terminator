@@ -6,6 +6,7 @@ import { FactorySite } from '../../../src/components/factory/FactorySite.js'
 import type { FactoryOrderRow } from '../../../src/components/factory/FactorySite.js'
 import type { Signal } from '../../../src/sensors/types.js'
 import { timesInvoked } from '../../helpers/bridge-calls.js'
+import { stubOffScreenObserver } from '../../helpers/off-screen-observer.js'
 
 function dockSignal(over: Partial<Signal> = {}): Signal {
   return {
@@ -75,7 +76,10 @@ function mount(
   return { onOpen, onShowList, invoke }
 }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  stubOffScreenObserver()
+})
 
 describe('FactorySite reading', () => {
   it('reads the orders again when Foundry says one changed, and not for time passing', async () => {

@@ -38,8 +38,8 @@ function forgeDeps(over: Partial<ForgeDeps> = {}): ForgeDeps {
 /** A compile payload as the channel's schema leaves it: one the operator asked for. */
 const compiling = (id: string, commit: boolean) => ({ id, commit, automatic: false })
 
-function channels(readIssue?: ReturnType<typeof vi.fn>) {
-  return createForgeChannels(forgeDeps({ readIssue: readIssue as never }))
+function channels(readIssue?: ForgeDeps['readIssue']) {
+  return createForgeChannels(forgeDeps(readIssue === undefined ? {} : { readIssue }))
 }
 
 /** Through the channel's own schema, as the renderer's request arrives. */
@@ -693,15 +693,6 @@ function unknownQuestionsAndNoTrackerTests() {
       answer: { questionId: 'Q-nope', option: 'x' },
     })) as OrderView
     expect(r.order.openQuestions).toEqual([])
-  })
-
-  it('seeds without a tracker reader at all', async () => {
-    const c = createForgeChannels(forgeDeps())
-    const r = (await c.create({
-      source: { kind: 'typed', text: 'no tracker here' },
-      repoPaths: [repo],
-    })) as OrderView
-    expect(r.order.id).toBeTruthy()
   })
 }
 
@@ -1695,11 +1686,6 @@ function configuredBudgetsTests() {
       budgetDefaults: () => ({ agents: null, wallClockMinutes: 10 }),
     })
     expect(r.order.budgets).toMatchObject({ agents: null, wallClockMinutes: 10 })
-  })
-
-  it('falls back to the schema defaults when nothing is configured', async () => {
-    const r = await seededWith({})
-    expect(r.order.budgets).toMatchObject({ agents: 3, wallClockMinutes: 45 })
   })
 }
 

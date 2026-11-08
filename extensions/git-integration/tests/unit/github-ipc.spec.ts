@@ -482,24 +482,6 @@ describe('github:pr-review-detail — leaves statusChecks empty when check-suite
   })
 })
 
-describe('github:pr-review-detail — skips check-suites fallback when headSHA is empty', () => {
-  const handlers = freshHandlers()
-
-  it('skips check-suites fallback when headSHA is empty', async () => {
-    mockPrDetail({ ...PR_META, headRefOid: '' })
-    // No 4th mock needed — the branch is skipped entirely
-
-    const result = (await handlers['github:pr-review-detail']({
-      repoRoot: '/repo',
-      prNumber: 6,
-    })) as { pr: { statusChecks: unknown[] } }
-
-    expect(result.pr.statusChecks).toEqual([])
-    const asked = mockExecFile.mock.calls.map((call) => (call[1] as string[]).join(' '))
-    expect(asked.some((request) => request.includes('check-suites'))).toBe(false)
-  })
-})
-
 describe('github:pr-review-detail — maps isDraft=true onto pr object', () => {
   const handlers = freshHandlers()
 

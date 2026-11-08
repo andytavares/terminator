@@ -46,14 +46,13 @@ import type { MonitorStatus } from './StationMonitor.js'
 import type { NodeState, RunGraph } from '../../line/run-graph.js'
 import type { ToolActivity } from '../../runtime/transcript-tailer.js'
 import type { TranscriptLine } from '../../runtime/transcript-excerpt.js'
-import { openInBrowser } from '@terminator/extension-sdk/renderer'
 import { attachTo } from '../../renderer/attach-to-step.js'
 import { GateCard } from '../GateCard.js'
 import { OrderLinks } from '../OrderLinks.js'
 import { DocumentChip, openDocument } from '../DocumentChip.js'
 import { OPEN_LABEL } from '../../line/document-kind.js'
 import type { DocumentLink } from '../../line/document-kind.js'
-import { Button, Markdown, usePolling, everyWhileVisible } from '@terminator/extension-ui'
+import { Button, usePolling, everyWhileVisible } from '@terminator/extension-ui'
 import { useFoundryQuery, ANY_RECORD } from '../../renderer/foundry-query.js'
 import './hall.css'
 import { foundryInvoke } from '../../renderer/foundry-invoke.js'
@@ -1434,17 +1433,7 @@ function AskInterruption(props: InterruptionCardProps & { readonly item: AskItem
 }
 
 function AskDetail({ item }: { readonly item: AskItem }) {
-  return (
-    <p className="fdry-card__detail">
-      {item.kind === 'ask' && item.prose ? (
-        <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
-          {item.detail}
-        </Markdown>
-      ) : (
-        item.detail
-      )}
-    </p>
-  )
+  return <p className="fdry-card__detail">{item.detail}</p>
 }
 
 function AskActions({ item, busy, onAllow, onDeny, onTerminal }: InterruptionCardProps) {

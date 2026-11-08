@@ -230,7 +230,7 @@ async function writeNoteRow(
 export async function autosaveNote(
   db: ExtensionDB,
   args: z.infer<typeof AutosaveNotePayload>,
-  broadcast?: NotesBroadcast
+  broadcast: NotesBroadcast
 ): Promise<Record<string, unknown>> {
   const { id, body, originId } = args
   const now = new Date().toISOString()
@@ -244,7 +244,7 @@ export async function autosaveNote(
   // separate in-memory body caches. Without this push each keeps serving (and
   // re-saving) its own stale copy, so the same note shows different content.
   const changed = { id, title, body, tags: mergedTags, updatedAt: now, originId: originId ?? null }
-  broadcast?.(NOTES_CHANGED_CHANNEL, changed)
+  broadcast(NOTES_CHANGED_CHANNEL, changed)
 
   return { data: { updatedAt: now, title } }
 }

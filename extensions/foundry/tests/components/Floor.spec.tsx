@@ -1579,27 +1579,8 @@ function noLimitAndCancelTests() {
 // An agent's own words are markdown and shown as markdown; a command it wants
 // to run is shown literally, because rendering it would eat its `*`s.
 describe('agent text on the Floor', () => {
-  describe('questions', floorQuestionsTests)
   describe('commands and activity', commandsAndActivityTests)
 })
-
-function floorQuestionsTests() {
-  it("renders an agent's question as markdown", async () => {
-    mount(reply(), {
-      pending: [
-        {
-          ...ASK,
-          toolName: 'AskUserQuestion',
-          summary: 'Asks: which?',
-          detail: 'Hide **done** tickets?\n\n- Hide\n- Grey',
-        },
-      ],
-    })
-    await screen.findByText('done')
-    expect(screen.getByText('done').tagName).toBe('STRONG')
-    expect(screen.getByText('Grey').tagName).toBe('LI')
-  })
-}
 
 function commandsAndActivityTests() {
   it('keeps a command literal', async () => {

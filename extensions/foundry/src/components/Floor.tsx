@@ -933,15 +933,10 @@ function AskActions({ ask, answer, handBack }: HeldCallProps) {
   )
 }
 
-/** An agent's question is prose; any other tool's input is literal, and rendering it would eat a command's `*`s. */
+/** A tool's input is literal: rendering it would eat a command's `*`s. */
 function AskDetail({ ask }: { readonly ask: PendingAsk }) {
   if (ask.detail === null) return null
-  if (ask.toolName !== 'AskUserQuestion') return <pre className="fdry-ask-detail">{ask.detail}</pre>
-  return (
-    <Markdown fetchesNothing className="fdry-md" onOpenLink={openInBrowser}>
-      {ask.detail}
-    </Markdown>
-  )
+  return <pre className="fdry-ask-detail">{ask.detail}</pre>
 }
 
 /** Only for more than one repository: "1 of 1, merges first" is ceremony (FR-068). */

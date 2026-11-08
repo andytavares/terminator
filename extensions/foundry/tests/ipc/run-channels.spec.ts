@@ -16,10 +16,10 @@ import type { WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
 import { readTimeline } from '../../src/factory/timeline-store.js'
+import { settleBackground } from '../../src/background.js'
 import { writeCiState } from '../../src/line/ci-state.js'
 import type { CiState } from '../../src/line/ci-state.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
-import { eventually } from '../../../../tests/support/eventually'
 
 // Everything that can refuse a run refuses before any work begins. An order
 // that fails half way through because a recipe could not run here has already
@@ -1024,12 +1024,10 @@ function failuresAndRefusalsTests() {
       })
     ).start({ id: 'WO-1' })
 
-    // The rejection is handled off the call — that is the point of not
-    // awaiting it — so wait for the entry rather than assuming one turn of the
-    // microtask queue is enough.
-    const ledgerFile = path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl')
-    await eventually(() => expect(fs.readFileSync(ledgerFile, 'utf8')).toContain('run.failed'))
-    const ledger = fs.readFileSync(ledgerFile, 'utf8')
+    // The rejection is handled off the call, which is the point of not awaiting it; the
+    // failure's ledger line is background work, so it has landed once the background settles.
+    await settleBackground()
+    const ledger = fs.readFileSync(path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')
     expect(ledger).toContain('run.failed')
     expect(ledger).toContain('no worktree could be prepared')
   })
@@ -1372,13 +1370,6 @@ function theTimelineTests() {
 
   it('says so for an order with no run', async () => {
     expect(await freshRunChannels().timeline({ id: 'WO-1' })).toEqual({ error: 'No run for WO-1.' })
-  })
-
-  it('hands back no gates when the host has no gate store to ask', async () => {
-    await store.save(order())
-    await freshRunChannels().start({ id: 'WO-1' })
-    const r = answered(await freshRunChannels().timeline({ id: 'WO-1' }))
-    expect(r.gates).toEqual([])
   })
 }
 

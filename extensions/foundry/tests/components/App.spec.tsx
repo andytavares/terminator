@@ -7,6 +7,7 @@ import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
 import { partialFake } from '../../../../tests/support/fakes'
 import { timesInvoked } from '../helpers/bridge-calls.js'
+import { stubOffScreenObserver } from '../helpers/off-screen-observer.js'
 
 // Two surfaces and a way into settings. The board, the card drawer, the phase
 // rail and the ticket importer are gone with the pipeline underneath them, so
@@ -123,6 +124,7 @@ beforeEach(() => {
   currentView = 'list'
   observeStanding = undefined
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(fakeCanvasContext())
+  stubOffScreenObserver()
   for (const key of Object.keys(bridgeHandlers)) delete bridgeHandlers[key]
   for (const key of Object.keys(everyHandler)) delete everyHandler[key]
   Object.assign(window, {

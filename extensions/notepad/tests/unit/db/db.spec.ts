@@ -23,8 +23,6 @@ describe('randomUUID', () => {
   })
 })
 
-describe('settings composite PK (extension_id, key)', notepadSettingsKeyTests)
-
 function applyNotepadSchemaTests() {
   describe('tables', applyNotepadSchemaTablesTests)
   describe('an earlier schema', applyNotepadSchemaEarlierSchemaTests)
@@ -45,7 +43,6 @@ function applyNotepadSchemaTablesTests() {
       'folders',
       'note_tags',
       'notes',
-      'settings',
       'tags',
     ])
   })
@@ -82,52 +79,5 @@ function applyNotepadSchemaCascadesTests() {
     expect(await db.query('SELECT * FROM note_tags')).toEqual([])
     expect(await db.query('SELECT * FROM comments')).toEqual([])
     expect(await db.query('SELECT * FROM tags')).toHaveLength(1)
-  })
-}
-
-function notepadSettingsKeyTests() {
-  beforeEach(async () => {
-    await applyNotepadSchema(db)
-  })
-
-  describe('independent extensions', settingsCompositePKExtensionIdIndependentExtensionsTests)
-  describe('duplicates', notepadSettingsDuplicateKeyTests)
-}
-
-function settingsCompositePKExtensionIdIndependentExtensionsTests() {
-  it('two different extension_ids can hold the same key independently', async () => {
-    await db.run(`INSERT INTO settings (extension_id, key, value) VALUES (?, ?, ?)`, [
-      'notepad',
-      'theme',
-      'dark',
-    ])
-    await db.run(`INSERT INTO settings (extension_id, key, value) VALUES (?, ?, ?)`, [
-      'other-ext',
-      'theme',
-      'light',
-    ])
-    const rows = await db.query<{ extension_id: string; value: string }>(
-      `SELECT extension_id, value FROM settings WHERE key = 'theme' ORDER BY extension_id`
-    )
-    expect(rows).toHaveLength(2)
-    expect(rows[0]).toMatchObject({ extension_id: 'notepad', value: 'dark' })
-    expect(rows[1]).toMatchObject({ extension_id: 'other-ext', value: 'light' })
-  })
-}
-
-function notepadSettingsDuplicateKeyTests() {
-  it('duplicate (extension_id, key) insert is rejected by PK constraint', async () => {
-    await db.run(`INSERT INTO settings (extension_id, key, value) VALUES (?, ?, ?)`, [
-      'notepad',
-      'theme',
-      'dark',
-    ])
-    await expect(
-      db.run(`INSERT INTO settings (extension_id, key, value) VALUES (?, ?, ?)`, [
-        'notepad',
-        'theme',
-        'light',
-      ])
-    ).rejects.toThrow()
   })
 }

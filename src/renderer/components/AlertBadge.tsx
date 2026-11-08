@@ -8,7 +8,7 @@ export function AlertBadge({
   count: number
   className?: string
 }): React.JSX.Element | null {
-  if (count <= 0) return null
+  if (count === 0) return null
   return (
     <span
       className={`alert-badge ${className}`.trim()}

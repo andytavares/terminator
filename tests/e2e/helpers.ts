@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 import { sealedAppEnvironment } from './e2e-environment'
 import { saveIpcTrace, startIpcTrace } from './ipc-trace'
 import { orOnHang } from '../support/hang-bound'
-import { E2E_LAUNCH_HANG_MS } from '../support/bounds'
+import { E2E_LAUNCH_HANG_MS, WAIT_BOUND_MS } from '../support/bounds'
 import { createLaunchSteps, type LaunchSteps } from '../support/launch-steps'
 import { appProcessTree, expectNoProcessesLeft, launchMarker } from './leftover-processes'
 
@@ -28,6 +28,8 @@ export interface AppHandle {
   userDataDir: string
   /** The marker in this launch's environment; closeApp finds what it left by it. */
   launchId: string
+  /** Set by closeApp once the app has exited: a later closeApp of the same handle does nothing. */
+  stopped: boolean
 }
 
 /**
@@ -266,7 +268,7 @@ export async function launchApp(
     const page = await within(LAUNCH_DEADLINE_MS, firstReadyWindow(app, steps))
     emulateFocusInExtensionFrames(page)
     drawBeforePointerActions(page)
-    return { app, page, userDataDir, launchId: marker.launchId }
+    return { app, page, userDataDir, launchId: marker.launchId, stopped: false }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     throw await launchFailure(
@@ -316,12 +318,10 @@ async function windowStates(app: ElectronApplication): Promise<string> {
   return orOnHang(read, WINDOW_STATE_READ_MS, () => '(the main process did not answer)')
 }
 
-// How long to wait for a graceful Electron shutdown before force-killing. A
-// healthy app closes in well under a second; this is only a guard against a
-// hang. Kept well below Playwright's 30s hook timeout so a stuck close can
-// never blow the afterAll hook (which cascades into a worker-teardown timeout
-// and fails the whole job as a non-test error).
-const GRACEFUL_CLOSE_MS = 5000
+// How long a graceful quit gets before a force-kill: only a hang bound. Quitting stops the
+// extensions, commands and PTYs (src/main/index.ts, before-quit), which took over 5 s on a loaded
+// CI runner; a SIGKILL then left Electron helpers running past the leftover check (run 42458181074).
+const GRACEFUL_CLOSE_MS = WAIT_BOUND_MS
 // SIGKILL cannot be caught, so the process is gone almost at once; a second is
 // only a guard against a kernel that never reaps it.
 const KILLED_EXIT_MS = 1000
@@ -363,12 +363,14 @@ async function stopApp(app: ElectronApplication, graceMs: number): Promise<void>
 }
 
 export async function closeApp(
-  handle: Pick<AppHandle, 'app' | 'userDataDir' | 'launchId'> | undefined
+  handle: Pick<AppHandle, 'app' | 'userDataDir' | 'launchId' | 'stopped'> | undefined
 ): Promise<void> {
-  if (!handle) return
+  // A spec's afterAll closes its handle again when a relaunch failed before replacing it.
+  if (!handle || handle.stopped) return
   await saveIpcTrace(handle.app)
   const started = appProcessTree(handle.app.process().pid ?? -1)
   await stopApp(handle.app, GRACEFUL_CLOSE_MS)
+  handle.stopped = true
   await expectNoProcessesLeft(handle.launchId, started)
   // The profile is not deleted here. It is still being written to as the app
   // dies — a terminal's scrollback, an extension's state, a transcript — and

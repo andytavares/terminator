@@ -9,11 +9,6 @@ describe('AlertBadge', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('renders nothing when count is negative', () => {
-    const { container } = render(<AlertBadge count={-1} />)
-    expect(container.firstChild).toBeNull()
-  })
-
   it('renders count when count is positive', () => {
     render(<AlertBadge count={3} />)
     expect(screen.getByText('3')).toBeTruthy()

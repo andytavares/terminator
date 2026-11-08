@@ -57,6 +57,16 @@ describe('the Forge is one box of steps', () => {
   })
 })
 
+const SHAPING = {
+  kind: 'shaping',
+  turn: 'foundry',
+  label: 'being shaped',
+  detail: 'Foundry is still shaping this.',
+  done: 0,
+  total: 0,
+  gateId: null,
+}
+
 describe('an open order is a frame', () => {
   it('marks the shell, and keeps the controls that end it last', async () => {
     bridge({
@@ -69,6 +79,7 @@ describe('an open order is a frame', () => {
             risk: 'P2',
             failures: 0,
             source: { kind: 'typed', tracker: null, key: null },
+            standing: SHAPING,
           },
         ],
       },

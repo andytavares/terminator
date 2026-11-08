@@ -61,7 +61,7 @@ afterEach(() => vi.useRealTimers())
 
 describe('the orders list', () => {
   describe('standings', standingsTests)
-  describe('older rows and refetching', olderRowsAndRefetchingTests)
+  describe('refetching', refetchingTests)
 })
 
 function standingsTests() {
@@ -102,14 +102,7 @@ function standingsTests() {
   })
 }
 
-function olderRowsAndRefetchingTests() {
-  // The row is polled, and a host mid-upgrade can answer without one.
-  it('survives a row from an older shape that carries no standing', async () => {
-    const { standing: _omitted, ...older } = row({ failures: 0 })
-    mount([older])
-    await screen.findByText('Refuse an expired refresh token')
-  })
-
+function refetchingTests() {
   it('refetches when Foundry says a gate changed, so an answer given elsewhere lands here', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const { invoke, bus } = mount([row({ openQuestions: 2 })])

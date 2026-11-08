@@ -77,20 +77,11 @@ const sidebarProps = {
   now: NOW,
 }
 
-/** One saved sidebar view per grouping, so each test can open the sidebar under any of them. */
-function saveGroupingViews(): void {
-  localStorage.clear()
+/** The grouping the user saved for the view the sidebar opens on, so each test can open it under any grouping. */
+function saveOpeningViewGrouping(groupBy: GroupKey): void {
   localStorage.setItem(
     'terminator.sidebar.views',
-    JSON.stringify(
-      GROUPINGS.map((groupBy) => ({
-        id: `g-${groupBy}`,
-        name: groupBy,
-        groupBy,
-        sortBy: 'name',
-        filters: {},
-      }))
-    )
+    JSON.stringify({ overrides: { everything: { groupBy, sortBy: 'name' } } })
   )
 }
 
@@ -129,7 +120,7 @@ function seedRegistry(): void {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  saveGroupingViews()
+  localStorage.clear()
   seedStores()
   seedRegistry()
 })
@@ -137,8 +128,10 @@ beforeEach(() => {
 const commandLabels = (): string[] =>
   useExtensionRegistry.getState().commands.map((command) => command.label)
 
-const renderSidebar = (groupBy: GroupKey) =>
-  render(<UnifiedSidebar {...sidebarProps} initialViewId={`g-${groupBy}`} />)
+const renderSidebar = (groupBy: GroupKey) => {
+  saveOpeningViewGrouping(groupBy)
+  return render(<UnifiedSidebar {...sidebarProps} />)
+}
 
 describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupBy) => {
   // Both surfaces now hang on the window's own left rail rather than the
@@ -152,12 +145,9 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
 
   it('surface 2: the workspace tab is reachable and fires with the owning workspace id', () => {
     const onSelectWorkspaceTab = vi.fn()
+    saveOpeningViewGrouping(groupBy)
     const { container } = render(
-      <UnifiedSidebar
-        {...sidebarProps}
-        initialViewId={`g-${groupBy}`}
-        onSelectWorkspaceTab={onSelectWorkspaceTab}
-      />
+      <UnifiedSidebar {...sidebarProps} onSelectWorkspaceTab={onSelectWorkspaceTab} />
     )
     const headerButton = container.querySelector('.repo-header__action')
     if (headerButton) {

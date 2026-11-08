@@ -28,15 +28,12 @@ export interface HallThumbnailProps {
 
 const PLACEHOLDER_TEXT = 'Not started yet — the floor appears when the work starts.'
 
-// Whether the element is within 200px of the screen, so an off-screen card never
-// fetches. With no `IntersectionObserver` (a test) it is visible at once.
+// Whether the element is within 200px of the screen, so an off-screen card never fetches.
 function useOnScreen(containerRef: React.MutableRefObject<HTMLDivElement | null>): boolean {
-  const canObserve = typeof IntersectionObserver !== 'undefined'
   const [intersected, setIntersected] = useState(false)
   useEffect(() => {
     const el = containerRef.current
     if (el === null) return
-    if (!canObserve) return
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) setIntersected(true)
@@ -45,8 +42,8 @@ function useOnScreen(containerRef: React.MutableRefObject<HTMLDivElement | null>
     )
     observer.observe(el)
     return () => observer.disconnect()
-  }, [canObserve, containerRef])
-  return !canObserve || intersected
+  }, [containerRef])
+  return intersected
 }
 
 /** The order's run graph; undefined for an order that has not started. */

@@ -90,8 +90,8 @@ function HideStaleItem({
   onChangeView,
   hideStaleUnavailable,
 }: FilterMenuProps): React.JSX.Element {
-  const active = views.find((v) => v.id === activeViewId) ?? views[0]
-  const on = active?.filters.hideStale === true
+  const active = views.find((v) => v.id === activeViewId)!
+  const on = active.filters.hideStale === true
   return (
     <button
       type="button"

@@ -217,12 +217,11 @@ function autosaveNoteSavingTests() {
   it('updates body, title, and updated_at', async () => {
     const created = await createNote(db, { title: 'Original', body: 'original body' })
     const id = (created as { data: { id: string } }).data.id
-    const result = await autosaveNote(db, {
-      id,
-      title: 'Updated Title',
-      body: 'updated body',
-      tags: [],
-    })
+    const result = await autosaveNote(
+      db,
+      { id, title: 'Updated Title', body: 'updated body', tags: [] },
+      vi.fn()
+    )
     expect(result).toHaveProperty('data')
     expect((result as { data: { updatedAt: string } }).data.updatedAt).toBeTruthy()
 
@@ -237,7 +236,7 @@ function autosaveNoteTagsTests() {
   it('reconciles tag additions', async () => {
     const created = await createNote(db, { title: 'T', body: '', tags: ['old'] })
     const id = (created as { data: { id: string } }).data.id
-    await autosaveNote(db, { id, title: 'T', body: '', tags: ['new'] })
+    await autosaveNote(db, { id, title: 'T', body: '', tags: ['new'] }, vi.fn())
 
     const noteTags = await db.query<{ name: string }>(
       `SELECT t.name FROM tags t JOIN note_tags nt ON nt.tag_id = t.id WHERE nt.note_id = ?`,
@@ -299,13 +298,6 @@ function autosaveNoteMissingNotesCallbacksTests() {
     )
     expect(result).toHaveProperty('error', 'NOTE_NOT_FOUND')
     expect(broadcast).not.toHaveBeenCalled()
-  })
-
-  it('saves without a broadcast callback', async () => {
-    const created = await createNote(db, { title: 'T', body: 'x' })
-    const id = (created as { data: { id: string } }).data.id
-    const result = await autosaveNote(db, { id, title: 'T', body: 'y', tags: [] })
-    expect(result).toHaveProperty('data')
   })
 }
 
@@ -538,7 +530,11 @@ function inlineTagParsingAutosaveExtractingTests() {
     const note = await createNote(db, { title: 'A', body: '', tags: [] })
     const id = (note as { data: { id: string } }).data.id
 
-    await autosaveNote(db, { id, title: 'A', body: 'thinking about #idea and #todo', tags: [] })
+    await autosaveNote(
+      db,
+      { id, title: 'A', body: 'thinking about #idea and #todo', tags: [] },
+      vi.fn()
+    )
 
     const noteTags = await db.query<{ name: string }>(
       'SELECT t.name FROM tags t JOIN note_tags nt ON nt.tag_id = t.id WHERE nt.note_id = ?',
@@ -555,7 +551,11 @@ function inlineTagParsingAutosaveMergingTests() {
     const note = await createNote(db, { title: 'A', body: '', tags: ['explicit'] })
     const id = (note as { data: { id: string } }).data.id
 
-    await autosaveNote(db, { id, title: 'A', body: 'some #inline tag', tags: ['explicit'] })
+    await autosaveNote(
+      db,
+      { id, title: 'A', body: 'some #inline tag', tags: ['explicit'] },
+      vi.fn()
+    )
 
     const noteTags = await db.query<{ name: string }>(
       'SELECT t.name FROM tags t JOIN note_tags nt ON nt.tag_id = t.id WHERE nt.note_id = ?',
@@ -571,13 +571,11 @@ function autosaveNoteTitleSetByHandTests() {
   it('keeps a title set by hand when later saves derive another', async () => {
     const created = await createNote(db, { title: 'Groceries', body: 'milk' })
     const id = (created as { data: { id: string } }).data.id
-    await autosaveNote(db, {
-      id,
-      title: 'Weekly shop',
-      body: 'milk',
-      tags: [],
-      titleSetByHand: true,
-    })
+    await autosaveNote(
+      db,
+      { id, title: 'Weekly shop', body: 'milk', tags: [], titleSetByHand: true },
+      vi.fn()
+    )
     const broadcast = vi.fn()
 
     const result = await autosaveNote(
@@ -598,12 +596,11 @@ function autosaveNoteDerivedTitleTests() {
     const created = await createNote(db, { title: 'Groceries', body: 'milk' })
     const id = (created as { data: { id: string } }).data.id
 
-    const result = await autosaveNote(db, {
-      id,
-      title: 'milk and eggs',
-      body: 'milk and eggs',
-      tags: [],
-    })
+    const result = await autosaveNote(
+      db,
+      { id, title: 'milk and eggs', body: 'milk and eggs', tags: [] },
+      vi.fn()
+    )
 
     expect(result).toMatchObject({ data: { title: 'milk and eggs' } })
   })

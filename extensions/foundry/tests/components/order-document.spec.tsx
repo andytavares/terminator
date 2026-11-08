@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { createChangeBus } from '../helpers/change-bus.js'
+import { stubOffScreenObserver } from '../helpers/off-screen-observer.js'
 import { Orders } from '../../src/components/Orders.js'
 import { Floor } from '../../src/components/Floor.js'
 import { FactorySite } from '../../src/components/factory/FactorySite.js'
@@ -34,11 +35,23 @@ function install(invoke: (channel: string) => unknown): void {
 }
 
 beforeEach(() => {
+  stubOffScreenObserver()
   openExternal = vi.fn(async () => ({ ok: true }))
   openPath = vi.fn(async () => ({ ok: true }))
   writeText = vi.fn(async () => undefined)
   Object.assign(navigator, { clipboard: { writeText } })
 })
+
+const DONE = {
+  kind: 'done',
+  turn: 'foundry',
+  label: 'done',
+  headline: 'Done',
+  detail: 'All finished.',
+  done: 1,
+  total: 1,
+  gateId: null,
+}
 
 const listRow = (over: Record<string, unknown>) => ({
   id: 'WO-1',
@@ -48,6 +61,7 @@ const listRow = (over: Record<string, unknown>) => ({
   failures: 0,
   source: { kind: 'typed', tracker: null, key: null },
   openQuestions: 0,
+  standing: DONE,
   ...over,
 })
 
@@ -77,16 +91,6 @@ describe('the order list', () => {
   })
 })
 
-const DONE = {
-  kind: 'done',
-  turn: 'foundry',
-  label: 'done',
-  headline: 'Done',
-  detail: 'All finished.',
-  done: 1,
-  total: 1,
-  gateId: null,
-}
 const RUNNING = { ...DONE, kind: 'running', headline: 'Running', done: 0 }
 
 function mountFloor(standing: unknown, document: DocumentLink | null): void {

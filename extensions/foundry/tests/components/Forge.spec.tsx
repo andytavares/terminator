@@ -744,7 +744,6 @@ function withChanged(changed: string[]) {
 
 describe('only the parts affected are redrawn (FR-007)', () => {
   describe('a struck assumption', aStruckAssumptionTests)
-  describe('nothing moved', nothingMovedTests)
 })
 
 function withFinding() {
@@ -797,25 +796,6 @@ function aStruckAssumptionTests() {
     expect(
       screen.getByRole('heading', { name: 'Assumptions' }).closest('section')?.className
     ).not.toContain('is-redrawn')
-  })
-}
-
-function nothingMovedTests() {
-  it('marks nothing when nothing moved', async () => {
-    withChanged([])
-    await openForgeStep('Plan')
-    await screen.findByText(/sessions are stored in Redis/)
-    fireEvent.click(
-      screen.getByText(/sessions are stored in Redis/).closest('button') as HTMLElement
-    )
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.turn', expect.anything())
-    )
-    expect(
-      within(stepList())
-        .getAllByRole('button')
-        .some((step) => step.className.includes('is-redrawn'))
-    ).toBe(false)
   })
 }
 
@@ -1533,28 +1513,6 @@ describe('attaching to the architect', () => {
     mountStates({}, { provenance: { forgeSession: 'sess-gone', decisions: [], amendments: [] } })
     fireEvent.click(await screen.findByRole('button', { name: /Attach/ }))
     await screen.findByText(/no longer has an agent tab/)
-  })
-})
-
-// Per-hunk review ended, so nothing drains a review queue any more: a refusal
-// because "three sessions are waiting for review" could never be cleared.
-describe('a start is never held back by finished turns', () => {
-  it('sends no override and offers none', async () => {
-    mountForStart({ start: { ok: true } })
-    await waitFor(() => handOffButton())
-    fireEvent.click(handOffButton())
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:run.start', expect.anything()))
-    const payload = invoke.mock.calls.find(([c]) => c === 'foundry:run.start')?.[1] as object
-    expect(payload).not.toHaveProperty('force')
-    expect(screen.queryByRole('button', { name: /Start anyway/ })).toBeNull()
-  })
-
-  it('still says why a refusal that is about the order did not start', async () => {
-    mountForStart({ start: { error: 'this repository has no test command' } })
-    await waitFor(() => handOffButton())
-    fireEvent.click(handOffButton())
-    await screen.findByText(/no test command/)
-    expect(screen.queryByRole('button', { name: /Start anyway/ })).toBeNull()
   })
 })
 

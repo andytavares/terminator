@@ -11,7 +11,7 @@ export const VIEWS_STORAGE_KEY = 'terminator.sidebar.views'
  */
 export const DEFAULT_VIEW_ID = 'everything'
 
-/** Built-in views ship as data, not code, so the pure layer stays declarative. */
+/** Built-in views ship as data, not code, so the pure layer stays declarative. @internal */
 export const BUILT_IN_VIEWS: SessionView[] = [
   {
     id: 'everything',

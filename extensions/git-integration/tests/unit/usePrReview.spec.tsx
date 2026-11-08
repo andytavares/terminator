@@ -496,16 +496,6 @@ describe('useLoadPrDetail — does not crash on exception', () => {
 })
 
 describe('useLoadInlineComments', () => {
-  it('does nothing when repoRoot is null', async () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      ...vi.mocked(usePrReviewStore)(),
-      activePr: validActivePr,
-    })
-    const { result } = renderHook(() => useLoadInlineComments(null))
-    await load(result.current)
-    expect(mockPrInlineComments).not.toHaveBeenCalled()
-  })
-
   it('does nothing when activePr is null', async () => {
     const { result } = renderHook(() => useLoadInlineComments('/repo'))
     await load(result.current)

@@ -100,26 +100,6 @@ describe('listWorkspaces', () => {
   })
 })
 
-describe('listProjects', () => {
-  it('GET /api/projects?workspaceId=... returns project array', async () => {
-    const projects = [{ id: 'p1', workspaceId: 'w1', name: 'Project' }]
-    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => projects })
-    const { listProjects } = await import('../../../src/renderer-remote/api/remote-client')
-    const result = await listProjects('w1')
-    expect(result).toEqual(projects)
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('workspaceId=w1'),
-      expect.anything()
-    )
-  })
-
-  it('throws when response is not ok', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 403 })
-    const { listProjects } = await import('../../../src/renderer-remote/api/remote-client')
-    await expect(listProjects('w1')).rejects.toThrow('listProjects failed')
-  })
-})
-
 describe('listTerminals', () => {
   it('GET /api/terminals returns terminal session array', async () => {
     const terminals = [{ sessionId: 's1', cwd: '/tmp', createdAt: '2026-06-19T10:00:00.000Z' }]

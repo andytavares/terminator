@@ -115,6 +115,9 @@ async function insightsScrollsInAShortWindow(page: Page): Promise<void> {
 }
 
 async function workRowOpensItsDrawer(page: Page): Promise<void> {
+  // The answered shell reads as working until its output has been still for a hold
+  // (session-controller.ts), then its task is Quiet, a group that folds to one line.
+  await tasks(page).getByRole('button', { name: 'Show Quiet' }).click()
   await tasks(page).getByRole('button', { name: BRANCH }).click()
   const drawer = page.getByRole('dialog', { name: BRANCH })
   await expect(drawer).toBeVisible()

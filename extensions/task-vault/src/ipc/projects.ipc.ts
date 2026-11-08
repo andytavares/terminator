@@ -5,7 +5,6 @@ import { randomUUID } from '../vault/db'
 import { toDisplayName } from '../vault/tags'
 import {
   ListProjectsRequestSchema,
-  UpdateProjectStatusRequestSchema,
   CreateProjectRequestSchema,
   DeleteProjectRequestSchema,
   UpdateProjectAreaRequestSchema,
@@ -13,7 +12,6 @@ import {
   RenameProjectRequestSchema,
 } from '../schemas/vault.schema'
 import type { ProjectStatus } from '../vault/types'
-import { setProjectStatus } from '../vault/project-status'
 import { rowToProject, PROJECT_COLS, PROJECT_JOINS } from '../vault/mappers'
 import { findOrCreateArea, indexUpdated, nowIso } from './vault-shared'
 
@@ -88,16 +86,6 @@ async function deleteProjectRow(
   return { success: true }
 }
 
-async function updateProjectFileStatus(
-  { db }: IpcContext,
-  args: z.infer<typeof UpdateProjectStatusRequestSchema>
-) {
-  const { projectFilePath: projectName, status } = args
-  if (!(await setProjectStatus(db, projectName, status))) return { error: 'NOT_FOUND' }
-  indexUpdated()
-  return { success: true }
-}
-
 async function updateArea(
   { db }: IpcContext,
   args: z.infer<typeof UpdateProjectAreaRequestSchema>
@@ -154,11 +142,6 @@ const PROJECT_ROUTES = [
   route('task-vault:projects:list', ListProjectsRequestSchema.default({}), queryProjects),
   route('task-vault:projects:create', CreateProjectRequestSchema, insertProject),
   route('task-vault:projects:delete', DeleteProjectRequestSchema, deleteProjectRow),
-  route(
-    'task-vault:projects:update-status',
-    UpdateProjectStatusRequestSchema,
-    updateProjectFileStatus
-  ),
   route('task-vault:projects:update-area', UpdateProjectAreaRequestSchema, updateArea),
   route('task-vault:projects:update-deadline', UpdateProjectDeadlineRequestSchema, updateDeadline),
   route('task-vault:projects:rename', RenameProjectRequestSchema, renameProjectRow),

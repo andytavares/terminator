@@ -6,7 +6,6 @@ import {
   seedArea,
   seedProject,
   seedTask,
-  selectTaskRow,
 } from '../support/vault-db'
 
 vi.mock('../../src/notifications/task-scheduler.js', () => ({
@@ -42,7 +41,6 @@ const projectNamesIn = (result: unknown) =>
 
 describe('task-vault:projects:list', taskVaultProjectsListTests)
 
-describe('task-vault:projects:update-status', taskVaultProjectsUpdateStatusTests)
 describe('task-vault:projects:create', taskVaultProjectsCreateTests)
 describe('task-vault:projects:delete', taskVaultProjectsDeleteTests)
 
@@ -182,66 +180,6 @@ function taskVaultProjectsListCountsAreasTests() {
     }
 
     expect(result.projects[0].area).toBe('Work')
-  })
-}
-
-function taskVaultProjectsUpdateStatusTests() {
-  describe('updating', taskVaultProjectsUpdateStatusUpdatingTests)
-  describe('archiving', taskVaultProjectsUpdateStatusArchivingTests)
-}
-
-function taskVaultProjectsUpdateStatusUpdatingTests() {
-  it('updates a project found by name', async () => {
-    await seedProject(db, 'p1', 'Alpha')
-
-    expect(
-      await harness.invoke('task-vault:projects:update-status', {
-        projectFilePath: 'Alpha',
-        status: 'someday',
-      })
-    ).toEqual({ success: true })
-    expect(await projectRowNamed('Alpha')).toMatchObject({ status: 'someday' })
-  })
-
-  it('finds the project by id when no project has that name', async () => {
-    await seedProject(db, 'p1', 'Alpha')
-
-    await harness.invoke('task-vault:projects:update-status', {
-      projectFilePath: 'p1',
-      status: 'done',
-    })
-
-    expect(await projectRowNamed('Alpha')).toMatchObject({ status: 'done' })
-  })
-}
-
-function taskVaultProjectsUpdateStatusArchivingTests() {
-  it('cancels open tasks, subtasks included, when archiving and leaves finished ones', async () => {
-    await seedProject(db, 'p1', 'Alpha')
-    await seedProject(db, 'p2', 'Other')
-    await seedTask(db, { id: 'open', projectId: 'p1' })
-    await seedTask(db, { id: 'blocked-child', parentId: 'open', status: 'blocked' })
-    await seedTask(db, { id: 'done', projectId: 'p1', status: 'done' })
-    await seedTask(db, { id: 'elsewhere', projectId: 'p2' })
-
-    await harness.invoke('task-vault:projects:update-status', {
-      projectFilePath: 'Alpha',
-      status: 'archived',
-    })
-
-    expect(await selectTaskRow(db, 'open')).toMatchObject({ status: 'cancelled' })
-    expect(await selectTaskRow(db, 'blocked-child')).toMatchObject({ status: 'cancelled' })
-    expect(await selectTaskRow(db, 'done')).toMatchObject({ status: 'done' })
-    expect(await selectTaskRow(db, 'elsewhere')).toMatchObject({ status: 'open' })
-  })
-
-  it('returns NOT_FOUND for an unknown project', async () => {
-    expect(
-      await harness.invoke('task-vault:projects:update-status', {
-        projectFilePath: 'nope',
-        status: 'done',
-      })
-    ).toEqual({ error: 'NOT_FOUND' })
   })
 }
 

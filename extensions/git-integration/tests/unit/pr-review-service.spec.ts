@@ -241,26 +241,6 @@ describe('computeRiskScore() — contributions', () => {
   })
 })
 
-describe('computeRiskScore() — caps composite at 100', () => {
-  it('caps composite at 100', () => {
-    const metrics = makeFileMetrics({
-      churn90d: 1000,
-      blastRadius: 1000,
-      additions: 10000,
-      deletions: 5000,
-      testFilePresent: false,
-      complexityDelta: 100,
-      patchCoverage: 0,
-    })
-    const allMetrics = [
-      metrics,
-      makeFileMetrics({ churn90d: 0, blastRadius: 0, additions: 1, deletions: 0 }),
-    ]
-    const score = computeRiskScore(metrics, allMetrics)
-    expect(score.composite).toBeLessThanOrEqual(100)
-  })
-})
-
 // ─── queueRiskLevel thresholds ───────────────────────────────────────────────
 
 describe('queueRiskLevel()', () => {

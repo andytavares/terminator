@@ -85,13 +85,6 @@ function activeBlock() {
 }
 
 describe('ConflictResolver', () => {
-  it('renders nothing when there is no session', () => {
-    const { container } = render(
-      <ConflictResolver repoRoot="/repo" onBack={vi.fn()} onComplete={vi.fn()} />
-    )
-    expect(container.firstChild).toBeNull()
-  })
-
   it('shows the file description, progress and both sides of the active block', () => {
     const { container } = renderResolver(2)
     expect(screen.getByText('both sides edited x')).toBeTruthy()

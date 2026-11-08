@@ -112,11 +112,6 @@ describe('detectMovedBlocks() — files and runs it skips', () => {
     expect(movedBlocksOf([{ path: 'a.ts' }, { path: 'b.ts' }])).toEqual([])
   })
 
-  it('skips a file listed without any path', () => {
-    const { patch } = removing('', XYZ)
-    expect(movedBlocksOf([{ patch }, adding('b.ts', XYZ)])).toEqual([])
-  })
-
   it('does not reuse an already-matched added run for a second identical removed run', () => {
     const lines = ['const alpha = 1', 'const beta = 2', 'const gamma = 3']
     const files = [

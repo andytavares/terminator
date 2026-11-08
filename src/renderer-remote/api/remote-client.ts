@@ -55,15 +55,6 @@ export interface Workspace {
   tags: string[]
 }
 
-/** @internal */
-export interface Project {
-  id: string
-  workspaceId: string
-  name: string
-  worktreePath?: string
-  gitBranch?: string
-}
-
 export interface TerminalSession {
   sessionId: string
   cwd: string
@@ -92,12 +83,5 @@ export async function assignTerminalWorkspace(
 export async function listWorkspaces(): Promise<Workspace[]> {
   const res = await apiFetch('/api/workspaces')
   if (!res.ok) throw new Error(`listWorkspaces failed: ${res.status}`)
-  return res.json()
-}
-
-/** @internal */
-export async function listProjects(workspaceId: string): Promise<Project[]> {
-  const res = await apiFetch(`/api/projects?workspaceId=${encodeURIComponent(workspaceId)}`)
-  if (!res.ok) throw new Error(`listProjects failed: ${res.status}`)
   return res.json()
 }

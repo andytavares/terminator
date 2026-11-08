@@ -28,6 +28,7 @@ import type { Gate } from '../gates/rules.js'
 import type { ToolActivity } from '../runtime/transcript-tailer.js'
 import { recordGraph, readTimeline } from '../factory/timeline-store.js'
 import { pullNumber } from '../line/pull-number.js'
+import { inBackground } from '../background.js'
 import type { FoundryIndex } from '../state/foundry-index.js'
 import type { ChannelSpec } from '@terminator/extension-sdk'
 import { foundryChannel } from './channel.js'
@@ -341,17 +342,19 @@ function fitRecipe(
 
 /** A run nobody awaits records its failure on the ledger, where a surface reads it. */
 function recordFailureOf(deps: RunDeps, order: WorkOrder, run: Promise<void>): void {
-  void run.catch(async (error: unknown) => {
-    await deps.store.record({
-      at: deps.now(),
-      orderId: order.id,
-      actor: 'rule:line',
-      action: 'run.failed',
-      subject: order.id,
-      reason: error instanceof Error ? error.message : String(error),
-      evidence: [],
+  inBackground(
+    run.catch(async (error: unknown) => {
+      await deps.store.record({
+        at: deps.now(),
+        orderId: order.id,
+        actor: 'rule:line',
+        action: 'run.failed',
+        subject: order.id,
+        reason: error instanceof Error ? error.message : String(error),
+        evidence: [],
+      })
     })
-  })
+  )
 }
 
 export function createRunChannels(deps: RunDeps): RunChannels {

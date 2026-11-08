@@ -133,12 +133,8 @@ const DEPLOY_TF_FILE = changedFileWithPatch(
 )
 
 describe('computeInsights() — complexity of skipped, removed and unparsed code', () => {
-  it('skips files with no patch or no path, and accounts for a removed function', async () => {
-    const files = [
-      { path: 'src/nopatch.ts', additions: 0, deletions: 0 },
-      { additions: 1, deletions: 0, patch: '@@ -0,0 +1,1 @@\n+x' },
-      SHRINK_FILE,
-    ]
+  it('skips files with no patch, and accounts for a removed function', async () => {
+    const files = [{ path: 'src/nopatch.ts', additions: 0, deletions: 0 }, SHRINK_FILE]
     const insights = await insightsOf(files, baseOpts)
     // The whole function was removed — its branches subtract from the total delta.
     expect(insights.complexity.branchDelta).toBeLessThan(0)

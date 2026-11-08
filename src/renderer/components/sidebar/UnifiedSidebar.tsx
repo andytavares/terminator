@@ -8,7 +8,6 @@ import { useChangeStatsStore } from '../../stores/change-stats.store'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import type { BranchRow as BranchRowData } from '../../sidebar/branch-rows'
-import { DEFAULT_VIEW_ID } from '../../sidebar/views'
 import { mergeReorder } from '../../sidebar/manual-order'
 import type { WorkItem } from '../../sidebar/work-item'
 import { useDismissSurfaceOnClick } from '../../hooks/useDismissSurfaceOnClick'
@@ -40,8 +39,6 @@ interface UnifiedSidebarProps {
   visible: boolean
   /** Injected by tests so relative times and staleness are deterministic. */
   now?: number
-  /** Initial saved view. Phase 5's view bar drives this through state. */
-  initialViewId?: string
 }
 
 export function UnifiedSidebar(props: UnifiedSidebarProps): React.JSX.Element {
@@ -155,7 +152,7 @@ function ResizeHandle({ onMouseDown, onDoubleClick }: ResizeHandleProps): React.
 
 /** The list's state: its views, the rows they show, the open dialog, and the row context. */
 function useUnifiedSidebar(props: UnifiedSidebarProps) {
-  const views = useSidebarViews(props.initialViewId ?? DEFAULT_VIEW_ID)
+  const views = useSidebarViews()
   const data = useSidebarData()
   useSidebarSources(data)
   const links = useSessionLinks()
