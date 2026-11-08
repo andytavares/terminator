@@ -1,0 +1,31 @@
+docs/adr/150-tests-run-in-enforced-tiers.md
+  s_7a27f124c1e8e3::t_f8969d9eddae9d 1-23
+docs/ARCHITECTURE.md
+  s_7a27f124c1e8e3::t_f8969d9eddae9d 425
+docs/adr/124-flaky-tests-are-caught-before-merge-and-quarantined-with-an-expiry.md
+  s_7a27f124c1e8e3::t_f8969d9eddae9d 3
+docs/adr/098-one-design-system-documented-in-storybook.md
+  s_7a27f124c1e8e3::t_f8969d9eddae9d 3
+docs/CONTRIBUTING.md
+  s_7a27f124c1e8e3::t_f8969d9eddae9d 109
+docs/CONSTITUTION.md
+  s_7a27f124c1e8e3::t_f8969d9eddae9d 2-19,384-386,388-389,399-405,417-420,426-428,439-440,485
+docs/adr/123-tests-run-once-sealed-and-selected.md
+  s_7a27f124c1e8e3::t_f8969d9eddae9d 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b9f75296bdef7b46cde3dcbfa365a9f8f28ce974",
+  "prompts": {},
+  "sessions": {
+    "s_7a27f124c1e8e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a59f4fb-4b55-4106-86e1-3343ce7a6038",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
